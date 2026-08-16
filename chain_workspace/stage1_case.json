@@ -1,0 +1,14 @@
+{
+  "radius_m": 2.0,
+  "charge_kg": 50.0,
+  "cell_size_m": 0.001,
+  "eos": "idealGas",
+  "cfl": 0.5,
+  "n_snapshots": 5,
+  "gauge_radii": [],
+  "gauge_file": "gauges.txt",
+  "profile_file": "C:\\Users\\rotem.ofek\\Projects\\BlastFoam\\chain_workspace\\stage1_profile.txt",
+  "schema": "blastlab-case",
+  "version": 1,
+  "dim": 1
+}

@@ -1,0 +1,136 @@
+  [auto] Cell size reduced to 0.01054 m (5 cells inside explosive, 190 total)
+
+=======================================================
+  1D Spherical Blast Solver
+=======================================================
+  Charge          : 1.0 kg TNT
+  Explosive radius: 0.0527 m
+  Domain radius   : 2.0 m
+  Cell size       : 0.010542361991237054 m  (190 cells)
+  EOS             : JWL
+  Initial p (exp) : 8.381e+09 Pa  (8.38 GPa)
+  Stop condition  : shock arrival at r = 2.0 m
+  Safety cap      : 58.8 ms
+=======================================================
+
+
+  Done. 578 steps, t_final = 1.836 ms
+  Stopped: shock arrived at outer boundary (p_last = 1.015e+05 Pa)
+
+  Gauge data saved: <OUT>\b1_gauges.txt  (580 rows x 3 gauges)
+  Field profile saved: <OUT>\b1_profile.txt  (190 cells, t = 1.836 ms)
+  [auto] Cell size reduced to 0.01054 m (5 cells across charge radius)
+
+============================================================
+  2D Blast Solver (axisymmetric)
+============================================================
+  Charge          : 1 kg TNT (sphere) on axis at height 0.7 m
+  Explosive radius: 0.0527 m
+  Domain          : 1.2 x 1.6 m,  cell 0.0105424 m  (114 x 152 = 17,328 cells)
+  EOS             : idealGas
+  Boundaries      : x_lo=wall, x_hi=open, y_lo=wall, y_hi=open  (x_lo = symmetry axis)
+  Obstacles       : 1
+  Gauges          : 2
+  Stop condition  : shock arrival at an open boundary
+  Safety cap      : 47.0 ms
+============================================================
+
+  Snapshot saved: t = 0.113 ms  (front at 0.48 m)
+  step     200  t =   0.154 ms  dt = 9.41e-07 s  p_max = 3.398e+06 Pa
+
+  Done. 384 steps, t_final = 0.368 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+
+  Gauge data saved: <OUT>\b2_gauges.txt  (386 rows x 2 gauges)
+  [auto] Cell size reduced to 0.01054 m (5 cells across charge radius)
+
+============================================================
+  2D Blast Solver (axisymmetric)
+============================================================
+  Charge          : 1 kg TNT (sphere) on axis at height 0.7 m
+  Explosive radius: 0.0527 m
+  Domain          : 0.5 x 1.6 m,  cell 0.0105424 m  (47 x 152 = 7,144 cells)
+  EOS             : idealGas
+  Boundaries      : x_lo=wall, x_hi=open, y_lo=wall, y_hi=open  (x_lo = symmetry axis)
+  Obstacles       : 0
+  Gauges          : 0
+  Stop condition  : shock arrival at an open boundary
+  Safety cap      : 47.0 ms
+============================================================
+
+
+  Done. 164 steps, t_final = 0.121 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+
+  2D field profile saved: <OUT>\b2_profile.npz  (47 x 152 cells, t = 0.121 ms)
+
+============================================================
+  2D Blast Solver (axisymmetric)
+============================================================
+  Init            : 1D profile remap (1 kg TNT, t0 = 1.836 ms)
+  Explosive radius: 0.0527 m
+  Domain          : 3 x 6 m,  cell 0.02 m  (150 x 300 = 45,000 cells)
+  EOS             : JWL
+  Boundaries      : x_lo=wall, x_hi=open, y_lo=open, y_hi=open  (x_lo = symmetry axis)
+  Obstacles       : 0
+  Gauges          : 1
+  Stop condition  : shock arrival at an open boundary
+  Safety cap      : 178.2 ms
+============================================================
+
+  step     200  t =   2.790 ms  dt = 5.36e-06 s  p_max = 1.902e+05 Pa
+
+  Done. 346 steps, t_final = 3.612 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.014e+05 Pa)
+
+  Gauge data saved: <OUT>\b2r_gauges.txt  (348 rows x 1 gauges)
+  [auto] Cell size reduced to 0.02108 m (5 cells across charge radius)
+
+==============================================================
+  3D Blast Solver
+==============================================================
+  Charge          : 8 kg TNT (sphere)
+  Burst point     : (0.5, 0.5, 0.5) m
+  Explosive radius: 0.1054 m
+  Domain          : 1 x 1 x 1 m,  cell 0.0210847 m
+  Grid            : 47 x 47 x 47 = 103,823 cells
+  EOS             : idealGas
+  Boundaries      : x_lo=open, x_hi=open, y_lo=open, y_hi=open, z_lo=wall, z_hi=open
+  Obstacles       : 1
+  Gauges          : 2
+  Stop condition  : shock arrival at an open boundary
+  Safety cap      : 29.4 ms
+  (3D steps are slow: expect roughly 1-1 s/step)
+==============================================================
+
+  step     50  t =   0.039 ms  dt = 7.15e-07 s  p_max = 1.751e+09 Pa
+
+  Done. 80 steps, t_final = 0.061 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+
+  Gauge data saved: <OUT>\b3_gauges.txt  (82 rows x 2 gauges)
+
+==============================================================
+  3D Blast Solver
+==============================================================
+  Init            : 2D axisym profile remap (1 kg TNT, t0 = 0.121 ms)
+  Burst point     : (0.8, 0.8, 0.7) m
+  Explosive radius: 0.0527 m
+  Domain          : 1.6 x 1.6 x 1.6 m,  cell 0.02 m
+  Grid            : 80 x 80 x 80 = 512,000 cells
+  EOS             : idealGas
+  Boundaries      : x_lo=open, x_hi=open, y_lo=open, y_hi=open, z_lo=wall, z_hi=open
+  Obstacles       : 0
+  Gauges          : 2
+  Stop condition  : shock arrival at an open boundary
+  Safety cap      : 47.1 ms
+  (3D steps are slow: expect roughly 1-1 s/step)
+==============================================================
+
+  step     50  t =   0.171 ms  dt = 1.05e-06 s  p_max = 2.749e+06 Pa
+  step    100  t =   0.227 ms  dt = 1.19e-06 s  p_max = 2.103e+06 Pa
+
+  Done. 119 steps, t_final = 0.250 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.014e+05 Pa)
+
+  Gauge data saved: <OUT>\b3r_gauges.txt  (121 rows x 2 gauges)

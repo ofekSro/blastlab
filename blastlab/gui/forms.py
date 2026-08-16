@@ -1,0 +1,588 @@
+"""Case setup forms: one CaseForm widget per dimension + a container
+that switches between them and produces/consumes Case objects.
+
+Layout language (see theme.py): related parameters live in titled
+Cards on a two-column grid; the SetupPanel pairs the scrollable form
+column with a live model-preview card and a validation status card.
+"""
+
+import tkinter as tk
+from tkinter import filedialog, ttk
+
+import customtkinter as ctk
+
+from ..core.case import Case1D, Case2D, Case3D
+from . import theme
+from .theme import GAP, PAD, Card, c, icon
+
+_ROW_PAD = dict(padx=(0, GAP), pady=4)
+
+
+def _row(frame, r, label, widget):
+    ctk.CTkLabel(frame, text=label, font=theme.F_BODY,
+                 text_color=c('muted'), anchor='w').grid(
+        row=r, column=0, sticky='w', **_ROW_PAD)
+    widget.grid(row=r, column=1, sticky='we', pady=4)
+    return r + 1
+
+
+def _entry(frame, var, width=150):
+    return ctk.CTkEntry(frame, textvariable=var, width=width,
+                        font=theme.F_BODY, corner_radius=8,
+                        fg_color=c('entry'), border_color=c('border'))
+
+
+def _combo(frame, var, values, width=176):
+    return ctk.CTkComboBox(frame, variable=var, values=list(values),
+                           state='readonly', width=width,
+                           font=theme.F_BODY, corner_radius=8,
+                           fg_color=c('entry'), border_color=c('border'),
+                           button_color=c('card2'),
+                           button_hover_color=c('border'),
+                           dropdown_font=theme.F_BODY)
+
+
+def _f(var, name):
+    """Parse a float StringVar with a helpful error."""
+    try:
+        return float(var.get())
+    except ValueError:
+        raise ValueError(f"'{name}' is not a number: {var.get()!r}")
+
+
+def _i(var, name):
+    try:
+        return int(float(var.get()))
+    except ValueError:
+        raise ValueError(f"'{name}' is not an integer: {var.get()!r}")
+
+
+class _PointList(ctk.CTkFrame):
+    """Treeview of fixed-arity numeric tuples (gauges, obstacles)."""
+
+    def __init__(self, parent, columns, on_change=None, height=4):
+        super().__init__(parent, fg_color='transparent')
+        self._arity = len(columns)
+        self._on_change = on_change
+        self.tree = ttk.Treeview(self, columns=columns, show='headings',
+                                 height=height)
+        for col in columns:
+            self.tree.heading(col, text=col)
+            self.tree.column(col, width=58, anchor='e')
+        self.tree.grid(row=0, column=0, columnspan=3, sticky='nsew',
+                       pady=(0, GAP))
+        self.columnconfigure(0, weight=1)
+
+        self.entry_var = tk.StringVar()
+        ent = ctk.CTkEntry(self, textvariable=self.entry_var,
+                           font=theme.F_BODY, corner_radius=8,
+                           fg_color=c('entry'), border_color=c('border'),
+                           placeholder_text=' '.join(columns))
+        ent.grid(row=1, column=0, sticky='we', padx=(0, GAP))
+        ent.bind('<Return>', lambda e: self._add())
+        for col, name, cmd in ((1, 'plus', self._add),
+                               (2, 'minus', self._remove)):
+            ctk.CTkButton(self, text='', image=icon(name, 14), width=34,
+                          height=30, corner_radius=theme.RADIUS,
+                          fg_color=c('card2'), hover_color=c('border'),
+                          command=cmd).grid(row=1, column=col,
+                                            padx=(0, GAP if col == 1 else 0))
+
+    def _add(self):
+        raw = self.entry_var.get().replace(',', ' ').split()
+        try:
+            vals = [float(v) for v in raw]
+        except ValueError:
+            return
+        if len(vals) != self._arity:
+            return
+        self.tree.insert('', 'end', values=[f'{v:g}' for v in vals])
+        self.entry_var.set('')
+        if self._on_change:
+            self._on_change()
+
+    def _remove(self):
+        for item in self.tree.selection():
+            self.tree.delete(item)
+        if self._on_change:
+            self._on_change()
+
+    def get(self):
+        return [tuple(float(v) for v in self.tree.item(i)['values'])
+                for i in self.tree.get_children()]
+
+    def set(self, tuples):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+        for tup in tuples or []:
+            self.tree.insert('', 'end', values=[f'{v:g}' for v in tup])
+
+
+class _FilePicker(ctk.CTkFrame):
+    def __init__(self, parent, var, save=False, filetypes=None):
+        super().__init__(parent, fg_color='transparent')
+        self.var = var
+        ctk.CTkEntry(self, textvariable=var, font=theme.F_BODY,
+                     corner_radius=8, fg_color=c('entry'),
+                     border_color=c('border')).grid(
+            row=0, column=0, sticky='we', padx=(0, GAP))
+        self.columnconfigure(0, weight=1)
+        kind = filedialog.asksaveasfilename if save \
+            else filedialog.askopenfilename
+        ctk.CTkButton(self, text='', image=icon('folder', 14), width=34,
+                      height=30, corner_radius=theme.RADIUS,
+                      fg_color=c('card2'), hover_color=c('border'),
+                      command=lambda: self._pick(kind, filetypes)).grid(
+            row=0, column=1)
+
+    def _pick(self, kind, filetypes):
+        fn = kind(filetypes=filetypes or [('All files', '*.*')])
+        if fn:
+            self.var.set(fn)
+
+
+class CaseForm(ctk.CTkFrame):
+    """Parameter form for one dimension (1, 2 or 3), as a two-column
+    grid of titled cards."""
+
+    def __init__(self, parent, dim, on_change=None):
+        super().__init__(parent, fg_color='transparent')
+        self.dim = dim
+        self._on_change = on_change or (lambda: None)
+        self.v = {}   # name -> tk variable
+        self._build()
+
+    def _var(self, name, value=''):
+        var = tk.StringVar(value=str(value))
+        var.trace_add('write', lambda *a: self._on_change())
+        self.v[name] = var
+        return var
+
+    def _bool(self, name, value=True):
+        var = tk.BooleanVar(value=value)
+        var.trace_add('write', lambda *a: self._on_change())
+        self.v[name] = var
+        return var
+
+    # ── layout ───────────────────────────────────────────────────────────
+    def _card(self, col, title):
+        """A titled card appended to the given column; returns its grid
+        body (label column 0, input column 1)."""
+        card = Card(self, title=title, pad=PAD)
+        card.grid(row=self._next_row[col], column=col, sticky='nwe',
+                  padx=(0 if col == 0 else GAP, GAP if col == 0 else 0),
+                  pady=(0, PAD - 4))
+        self._next_row[col] += 1
+        body = card.body
+        body.columnconfigure(0, weight=0)
+        body.columnconfigure(1, weight=1)
+        return body
+
+    def _build(self):
+        self.columnconfigure(0, weight=1, uniform='cols')
+        self.columnconfigure(1, weight=1, uniform='cols')
+        self._next_row = {0: 0, 1: 0}
+
+        # ── Domain ─────────────────────────────────────────────────────
+        dom = self._card(0, 'Domain')
+        r = 0
+        if self.dim == 1:
+            r = _row(dom, r, 'Domain radius [m]',
+                     _entry(dom, self._var('radius_m', 10.0)))
+            r = _row(dom, r, 'Cell size [m]',
+                     _entry(dom, self._var('cell', 0.001)))
+        else:
+            if self.dim == 2:
+                r = _row(dom, r, 'Geometry',
+                         _combo(dom, self._var('geometry', 'axisymmetric'),
+                                ['axisymmetric', 'planar']))
+                self.v['geometry'].trace_add(
+                    'write', lambda *a: self._sync_enabled())
+            r = _row(dom, r, 'Lx [m]', _entry(dom, self._var('Lx', 10.0)))
+            r = _row(dom, r, 'Ly [m]', _entry(dom, self._var('Ly', 10.0)))
+            if self.dim == 3:
+                r = _row(dom, r, 'Lz [m]',
+                         _entry(dom, self._var('Lz', 10.0)))
+            r = _row(dom, r, 'Cell size [m]',
+                     _entry(dom, self._var('cell',
+                                           0.025 if self.dim == 2 else 0.1)))
+
+        # ── Charge / initialization ────────────────────────────────────
+        chg = self._card(0, 'Charge' if self.dim == 1 else 'Initialization')
+        r = 0
+        if self.dim == 1:
+            r = _row(chg, r, 'Charge [kg TNT]',
+                     _entry(chg, self._var('charge', 1.0)))
+        else:
+            modes = (['charge', 'profile1d'] if self.dim == 2
+                     else ['charge', 'profile1d', 'profile2d'])
+            r = _row(chg, r, 'Initialize from',
+                     _combo(chg, self._var('init_mode', 'charge'), modes))
+            self.v['init_mode'].trace_add(
+                'write', lambda *a: self._sync_enabled())
+            r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
+                                                  self.dim == 2 else ''),
+                     _entry(chg, self._var('charge', 1.0)))
+            if self.dim == 3:
+                r = _row(chg, r, 'Charge resolution',
+                         _combo(chg, self._var('charge_res', 'resolve'),
+                                ['resolve', 'smear']))
+            r = _row(chg, r, 'Profile file',
+                     _FilePicker(chg, self._var('profile_in', ''),
+                                 filetypes=[('Profiles', '*.txt *.npz'),
+                                            ('All files', '*.*')]))
+            r = _row(chg, r, 'Burst x [m]',
+                     _entry(chg, self._var('cx', 0.0 if self.dim == 2
+                                           else 5.0)))
+            r = _row(chg, r, 'Burst y [m]',
+                     _entry(chg, self._var('cy', 5.0)))
+            if self.dim == 3:
+                r = _row(chg, r, 'Burst z [m]',
+                         _entry(chg, self._var('cz', 5.0)))
+
+        # ── Numerics ───────────────────────────────────────────────────
+        num = self._card(0, 'Numerics')
+        r = 0
+        r = _row(num, r, 'EOS',
+                 _combo(num, self._var('eos', 'idealGas'),
+                        ['idealGas', 'JWL']))
+        r = _row(num, r, 'Snapshots',
+                 _entry(num, self._var('n_snapshots',
+                                       5 if self.dim == 1 else 6)))
+        r = _row(num, r, 'CFL',
+                 _entry(num, self._var('cfl', {1: 0.5, 2: 0.4,
+                                               3: 0.30}[self.dim])))
+        if self.dim == 3:
+            r = _row(num, r, 'End time [s] (0 = auto)',
+                     _entry(num, self._var('t_end', 0.0)))
+            r = _row(num, r, 'Live slice normal',
+                     _combo(num, self._var('slice_axis', 'y'),
+                            ['x', 'y', 'z']))
+            r = _row(num, r, 'Slice position [m]\n(blank = burst)',
+                     _entry(num, self._var('slice_pos', '')))
+
+        # ── Boundaries ─────────────────────────────────────────────────
+        if self.dim > 1:
+            bcf = self._card(0, 'Boundaries')
+            for col in (1, 3):
+                bcf.columnconfigure(col, weight=1)
+            bcf.columnconfigure(2, minsize=GAP * 2)
+            sides = (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2 else
+                     ['x_lo', 'x_hi', 'y_lo', 'y_hi', 'z_lo', 'z_hi'])
+            defaults = (dict(x_lo='wall', x_hi='open', y_lo='wall',
+                             y_hi='open') if self.dim == 2 else
+                        dict(x_lo='open', x_hi='open', y_lo='open',
+                             y_hi='open', z_lo='wall', z_hi='open'))
+            self._bc_combos = {}
+            for i, side in enumerate(sides):
+                ctk.CTkLabel(bcf, text=side, font=theme.F_BODY,
+                             text_color=c('muted'), anchor='w').grid(
+                    row=i // 2, column=(i % 2) * 2, sticky='w',
+                    padx=(0, GAP), pady=4)
+                cb = _combo(bcf, self._var(f'bc_{side}', defaults[side]),
+                            ['open', 'wall'], width=96)
+                cb.grid(row=i // 2, column=(i % 2) * 2 + 1, sticky='we',
+                        padx=(0, GAP if i % 2 == 0 else 0), pady=4)
+                self._bc_combos[side] = cb
+
+        # ── right column: gauges / obstacles / outputs ─────────────────
+        if self.dim == 1:
+            gf = self._card(1, 'Gauge radii [m]')
+            self.gauges = _PointList(gf, ['r'], self._on_change)
+            self.gauges.grid(row=0, column=0, columnspan=2, sticky='nsew')
+        else:
+            cols = ['x', 'y'] if self.dim == 2 else ['x', 'y', 'z']
+            gf = self._card(1, 'Gauges [m]')
+            self.gauges = _PointList(gf, cols, self._on_change)
+            self.gauges.grid(row=0, column=0, columnspan=2, sticky='nsew')
+
+            ocols = (['x0', 'x1', 'y0', 'y1'] if self.dim == 2
+                     else ['x0', 'x1', 'y0', 'y1', 'z0', 'z1'])
+            of = self._card(1, 'Obstacles [m]')
+            self.obstacles = _PointList(of, ocols, self._on_change)
+            self.obstacles.grid(row=0, column=0, columnspan=2,
+                                sticky='nsew')
+
+        out = self._card(1, 'Outputs')
+        orow = 0
+        orow = _row(out, orow, 'Gauge TSV',
+                    _entry(out, self._var('gauge_file',
+                                          f'gauges_{self.dim}d.txt'
+                                          if self.dim > 1 else 'gauges.txt')))
+        if self.dim > 1:
+            orow = _row(out, orow, 'Animation (gif)',
+                        _entry(out, self._var(
+                            'anim_file', f'blast_{self.dim}d_animation.gif')))
+            ctk.CTkCheckBox(out, text='Record frames for animation/replay',
+                            variable=self._bool('record', True),
+                            font=theme.F_BODY, corner_radius=6,
+                            border_color=c('border'),
+                            fg_color=c('accent'),
+                            hover_color=c('accent_hover')).grid(
+                row=orow, column=0, columnspan=2, sticky='w', pady=(GAP, 4))
+            orow += 1
+        if self.dim == 1:
+            orow = _row(out, orow, 'Profile out (.txt)',
+                        _entry(out, self._var('profile_out',
+                                              'blast_profile.txt')))
+        elif self.dim == 2:
+            orow = _row(out, orow, 'Profile out (.npz)',
+                        _entry(out, self._var('profile_out', '')))
+
+        self._sync_enabled()
+
+    def _sync_enabled(self):
+        if self.dim == 2 and 'geometry' in self.v:
+            axisym = self.v['geometry'].get() == 'axisymmetric'
+            if hasattr(self, '_bc_combos'):
+                self._bc_combos['x_lo'].configure(
+                    state='disabled' if axisym else 'readonly')
+                if axisym:
+                    self.v['bc_x_lo'].set('wall')
+
+    # ── Case conversion ─────────────────────────────────────────────────
+    def get_case(self):
+        v = self.v
+        if self.dim == 1:
+            return Case1D(
+                radius_m=_f(v['radius_m'], 'radius'),
+                charge_kg=_f(v['charge'], 'charge'),
+                cell_size_m=_f(v['cell'], 'cell size'),
+                eos=v['eos'].get(), cfl=_f(v['cfl'], 'cfl'),
+                n_snapshots=_i(v['n_snapshots'], 'snapshots'),
+                gauge_radii=[g[0] for g in self.gauges.get()],
+                gauge_file=v['gauge_file'].get(),
+                profile_file=v['profile_out'].get() or None)
+
+        bcs = {side: v[f'bc_{side}'].get()
+               for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
+                            else ['x_lo', 'x_hi', 'y_lo', 'y_hi',
+                                  'z_lo', 'z_hi'])}
+        common = dict(
+            Lx=_f(v['Lx'], 'Lx'), Ly=_f(v['Ly'], 'Ly'),
+            cell_size_m=_f(v['cell'], 'cell size'),
+            init_mode=v['init_mode'].get(),
+            charge=_f(v['charge'], 'charge'),
+            profile_file_in=v['profile_in'].get() or None,
+            eos=v['eos'].get(), bcs=bcs,
+            obstacles=self.obstacles.get(), cfl=_f(v['cfl'], 'cfl'),
+            n_snapshots=_i(v['n_snapshots'], 'snapshots'),
+            gauges=self.gauges.get(),
+            gauge_file=v['gauge_file'].get(),
+            anim_file=v['anim_file'].get() or None,
+            record_frames=150 if v['record'].get() else 0,
+        )
+        if self.dim == 2:
+            return Case2D(geometry=v['geometry'].get(),
+                          center=(_f(v['cx'], 'burst x'),
+                                  _f(v['cy'], 'burst y')),
+                          profile_file=v['profile_out'].get() or None,
+                          **common)
+        slice_raw = v['slice_pos'].get().strip()
+        return Case3D(Lz=_f(v['Lz'], 'Lz'),
+                      center=(_f(v['cx'], 'burst x'),
+                              _f(v['cy'], 'burst y'),
+                              _f(v['cz'], 'burst z')),
+                      charge_resolution=v['charge_res'].get(),
+                      t_end=_f(v['t_end'], 'end time'),
+                      slice_axis=v['slice_axis'].get(),
+                      slice_pos=(_f(v['slice_pos'], 'slice position')
+                                 if slice_raw else None),
+                      **common)
+
+    def set_case(self, case):
+        v = self.v
+        if self.dim == 1:
+            v['radius_m'].set(f'{case.radius_m:g}')
+            v['charge'].set(f'{case.charge_kg:g}')
+            v['cell'].set(f'{case.cell_size_m:g}')
+            v['eos'].set(case.eos)
+            v['cfl'].set(f'{case.cfl:g}')
+            v['n_snapshots'].set(str(case.n_snapshots))
+            self.gauges.set([(g,) for g in case.gauge_radii])
+            v['gauge_file'].set(case.gauge_file)
+            v['profile_out'].set(case.profile_file or '')
+            return
+        if self.dim == 2:
+            v['geometry'].set(case.geometry)
+        v['Lx'].set(f'{case.Lx:g}')
+        v['Ly'].set(f'{case.Ly:g}')
+        if self.dim == 3:
+            v['Lz'].set(f'{case.Lz:g}')
+        v['cell'].set(f'{case.cell_size_m:g}')
+        v['init_mode'].set(case.init_mode)
+        v['charge'].set(f'{case.charge:g}' if case.charge is not None else '')
+        if self.dim == 3:
+            v['charge_res'].set(getattr(case, 'charge_resolution', 'resolve'))
+            v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
+            v['slice_axis'].set(getattr(case, 'slice_axis', 'y'))
+            sp = getattr(case, 'slice_pos', None)
+            v['slice_pos'].set('' if sp is None else f'{sp:g}')
+        v['profile_in'].set(case.profile_file_in or '')
+        v['cx'].set(f'{case.center[0]:g}')
+        v['cy'].set(f'{case.center[1]:g}')
+        if self.dim == 3 and len(case.center) > 2:
+            v['cz'].set(f'{case.center[2]:g}')
+        v['eos'].set(case.eos)
+        v['cfl'].set(f'{case.cfl:g}')
+        v['n_snapshots'].set(str(case.n_snapshots))
+        for side, val in case.bcs.items():
+            v[f'bc_{side}'].set(val)
+        self.gauges.set(case.gauges)
+        self.obstacles.set(case.obstacles)
+        v['gauge_file'].set(case.gauge_file)
+        v['anim_file'].set(case.anim_file or '')
+        v['record'].set(case.record_frames > 0)
+        if self.dim == 2:
+            v['profile_out'].set(case.profile_file or '')
+
+
+class SetupPanel(ctk.CTkFrame):
+    """Dimension selector + the three CaseForms + validation card,
+    with a live model preview on the right (2D matplotlib drawing or
+    3D pyvista render)."""
+
+    _PREV_HINT = 'Select 2D or 3D to preview the model here.'
+
+    def __init__(self, parent, on_change=None):
+        super().__init__(parent, fg_color='transparent')
+        self._on_change = on_change or (lambda: None)
+
+        self.columnconfigure(0, weight=11, uniform='main')
+        self.columnconfigure(1, weight=9, uniform='main')
+        self.rowconfigure(1, weight=1)
+
+        # header: title + dimension selector
+        head = ctk.CTkFrame(self, fg_color='transparent')
+        head.grid(row=0, column=0, columnspan=2, sticky='we',
+                  pady=(0, PAD - 4))
+        ctk.CTkLabel(head, text='Case Setup', font=theme.F_H1,
+                     text_color=c('text')).pack(side='left')
+        self.dim_var = tk.IntVar(value=2)
+        self._dim_seg = ctk.CTkSegmentedButton(
+            head, values=['1D', '2D', '3D'], font=theme.F_BODY,
+            corner_radius=theme.RADIUS, height=34,
+            fg_color=c('card'), unselected_color=c('card'),
+            unselected_hover_color=c('card2'),
+            selected_color=c('accent'),
+            selected_hover_color=c('accent_hover'),
+            command=self._dim_selected)
+        self._dim_seg.set('2D')
+        self._dim_seg.pack(side='right')
+
+        # left: scrollable form column
+        self._form_host = ctk.CTkScrollableFrame(
+            self, fg_color='transparent',
+            scrollbar_button_color=c('card2'),
+            scrollbar_button_hover_color=c('border'))
+        self._form_host.grid(row=1, column=0, sticky='nsew',
+                             padx=(0, GAP))
+
+        # left bottom: validation status card
+        self._status_card = Card(self, title=None)
+        self._status_card.grid(row=2, column=0, sticky='we',
+                               padx=(0, GAP), pady=(GAP, 0))
+        self._status_body = self._status_card.body
+
+        # right: preview card
+        prev_card = Card(self, title='Model Preview')
+        prev_card.grid(row=1, column=1, rowspan=2, sticky='nsew',
+                       padx=(GAP, 0))
+        host = prev_card.body
+        self._prev_msg = ctk.CTkLabel(host, text=self._PREV_HINT,
+                                      font=theme.F_BODY,
+                                      text_color=c('muted'))
+        from .preview_panel import Preview2DPanel
+        self.preview2d = Preview2DPanel(host)
+        self.preview = None                      # the 3D panel
+        from ..viz3d import MISSING_MSG, pyvista_available
+        if pyvista_available():
+            from .preview_panel import Preview3DPanel
+            self.preview = Preview3DPanel(host)
+        self._missing3d = MISSING_MSG
+        self._prev_current = None
+        self._show_preview_widget(self._prev_msg)
+
+        self._forms = {d: CaseForm(self._form_host, d, self._changed)
+                       for d in (1, 2, 3)}
+        self._current = None
+        self._swap()
+
+    def _dim_selected(self, value):
+        self.dim_var.set(int(value[0]))
+        self._swap()
+
+    def _swap(self):
+        if self._current is not None:
+            self._current.pack_forget()
+        self._current = self._forms[self.dim_var.get()]
+        self._current.pack(fill='both', expand=True)
+        self._changed()
+
+    def _changed(self):
+        self._on_change()
+
+    def _show_preview_widget(self, widget):
+        if self._prev_current is widget:
+            return
+        if self._prev_current is not None:
+            self._prev_current.pack_forget()
+        self._prev_current = widget
+        widget.pack(fill='both', expand=True)
+
+    def update_preview(self, case):
+        """Refresh the model preview (case is a parsed Case, or None
+        when the form doesn't parse - the last good preview is kept).
+        Called via the App's debounce."""
+        if case is None:
+            if self.dim_var.get() == 1:
+                self._prev_msg.configure(text=self._PREV_HINT)
+                self._show_preview_widget(self._prev_msg)
+            return
+        if case.dim == 2:
+            self.preview2d.show_case(case)
+            self._show_preview_widget(self.preview2d)
+        elif case.dim == 3:
+            if self.preview is None:
+                self._prev_msg.configure(text=self._missing3d)
+                self._show_preview_widget(self._prev_msg)
+                return
+            self.preview.show_case(case)
+            self._show_preview_widget(self.preview)
+        else:
+            self._prev_msg.configure(text=self._PREV_HINT)
+            self._show_preview_widget(self._prev_msg)
+
+    @property
+    def form(self):
+        return self._forms[self.dim_var.get()]
+
+    def get_case(self):
+        return self.form.get_case()
+
+    def set_case(self, case):
+        self.dim_var.set(case.dim)
+        self._dim_seg.set(f'{case.dim}D')
+        self._swap()
+        self.form.set_case(case)
+
+    def show_report(self, errors=(), warnings=(), notes=()):
+        for child in self._status_body.winfo_children():
+            child.destroy()
+        rows = ([('error', 'error', m) for m in errors]
+                + [('warning', 'warn', m) for m in warnings]
+                + [('info', 'muted', m) for m in notes])
+        if not rows:
+            rows = [('check', 'ok', 'Case OK')]
+        for name, colorkey, msg in rows:
+            row = ctk.CTkFrame(self._status_body, fg_color='transparent')
+            row.pack(fill='x', pady=1)
+            ctk.CTkLabel(row, text='', width=18,
+                         image=icon(name, 13,
+                                    color=theme.DARK[colorkey])).pack(
+                side='left', padx=(0, 6))
+            ctk.CTkLabel(row, text=msg, font=theme.F_BODY, justify='left',
+                         anchor='w', wraplength=520,
+                         text_color=(theme.LIGHT[colorkey],
+                                     theme.DARK[colorkey])).pack(
+                side='left', fill='x', expand=True)

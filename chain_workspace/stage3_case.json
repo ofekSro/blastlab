@@ -1,0 +1,38 @@
+{
+  "Lx": 10.0,
+  "Ly": 10.0,
+  "Lz": 10.0,
+  "cell_size_m": 0.1,
+  "init_mode": "profile2d",
+  "charge": 1.0,
+  "charge_resolution": "resolve",
+  "profile_file_in": "C:\\Users\\rotem.ofek\\Projects\\BlastFoam\\chain_workspace\\stage2_profile.npz",
+  "center": [
+    5.0,
+    5.0,
+    5.0
+  ],
+  "eos": "idealGas",
+  "bcs": {
+    "x_lo": "open",
+    "x_hi": "open",
+    "y_lo": "open",
+    "y_hi": "open",
+    "z_lo": "wall",
+    "z_hi": "open"
+  },
+  "obstacles": [],
+  "cfl": 0.3,
+  "t_end": 0.0,
+  "slice_axis": "y",
+  "slice_pos": null,
+  "n_snapshots": 6,
+  "gauges": [],
+  "gauge_file": "gauges_3d.txt",
+  "anim_file": "blast_3d_animation.gif",
+  "record_frames": 150,
+  "live": true,
+  "schema": "blastlab-case",
+  "version": 1,
+  "dim": 3
+}

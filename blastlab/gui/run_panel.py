@@ -1,0 +1,276 @@
+"""Run panel: start/stop controls, progress readouts, scrolled log and
+the embedded live overpressure view."""
+
+import tkinter as tk
+from tkinter import ttk
+
+import customtkinter as ctk
+import numpy as np
+from matplotlib.figure import Figure
+
+from ..core.constants import P_AIR
+from ..output.plots import overpressure_panel, set_frame
+from . import theme
+from .mpl import EmbeddedFigure
+from .theme import GAP, PAD, Card, c, icon
+from .view3d_panel import View3DPanel
+
+
+def _chip(parent, caption):
+    """Small stat chip: muted caption over a value label; returns the
+    value label."""
+    box = ctk.CTkFrame(parent, fg_color=c('card2'), corner_radius=8)
+    box.pack(side='left', padx=(0, GAP))
+    ctk.CTkLabel(box, text=caption, font=theme.F_SMALL,
+                 text_color=c('muted'), height=12).pack(
+        anchor='w', padx=10, pady=(5, 0))
+    val = ctk.CTkLabel(box, text='—', font=(theme.FONT, 12, 'bold'),
+                       text_color=c('text'), height=16)
+    val.pack(anchor='w', padx=10, pady=(0, 5))
+    return val
+
+
+class RunPanel(ctk.CTkFrame):
+    def __init__(self, parent, on_run, on_stop, on_view3d=None,
+                 on_init=None, on_exec=None, on_refresh=None):
+        super().__init__(parent, fg_color='transparent')
+
+        head = ctk.CTkFrame(self, fg_color='transparent')
+        head.pack(fill='x', pady=(0, PAD - 4))
+        ctk.CTkLabel(head, text='Run', font=theme.F_H1,
+                     text_color=c('text')).pack(side='left')
+
+        # ── control card ─────────────────────────────────────────────────
+        ctl = Card(self)
+        ctl.pack(fill='x', pady=(0, PAD - 4))
+        bar = ctk.CTkFrame(ctl.body, fg_color='transparent')
+        bar.pack(fill='x')
+        self.run_btn = theme.Button(
+            bar, text='Run', image=icon('play', 15, color='white'),
+            compound='left', width=110, height=38, font=theme.F_BODY,
+            corner_radius=theme.RADIUS, fg_color=c('accent'),
+            hover_color=c('accent_hover'), text_color='white',
+            command=on_run)
+        self.run_btn.pack(side='left', padx=(0, GAP))
+        self.stop_btn = theme.Button(
+            bar, text='Stop', image=icon('stop', 14, color='white'),
+            compound='left', width=100, height=38, font=theme.F_BODY,
+            corner_radius=theme.RADIUS, fg_color=c('danger'),
+            hover_color=c('danger_hover'), text_color='white',
+            state='disabled', command=on_stop)
+        self.stop_btn.pack(side='left', padx=(0, GAP))
+        self.view3d_btn = theme.Button(
+            bar, text='3D View', image=icon('cube', 15), compound='left',
+            width=110, height=38, font=theme.F_BODY,
+            corner_radius=theme.RADIUS, fg_color=c('card2'),
+            hover_color=c('border'), text_color=c('text'),
+            state='disabled', command=on_view3d or (lambda: None))
+        self.view3d_btn.pack(side='left', padx=(0, PAD))
+
+        self.progress = ctk.CTkProgressBar(
+            bar, width=220, height=8, corner_radius=4,
+            progress_color=c('accent'), fg_color=c('card2'))
+        self.progress.set(0.0)
+        self.progress.pack(side='left', padx=(0, PAD))
+
+        chips = ctk.CTkFrame(bar, fg_color='transparent')
+        chips.pack(side='right')
+        self._chip_step = _chip(chips, 'step')
+        self._chip_t = _chip(chips, 't [ms]')
+        self._chip_dt = _chip(chips, 'dt [s]')
+        self._chip_pmax = _chip(chips, 'p max [Pa]')
+
+        # ── stepped execution row (VIPER-style) ──────────────────────────
+        on_exec = on_exec or (lambda cmd: None)
+        ebar = ctk.CTkFrame(ctl.body, fg_color='transparent')
+        ebar.pack(fill='x', pady=(GAP + 2, 0))
+        self.init_btn = theme.Button(
+            ebar, text='Initialise Model', image=icon('flag', 14),
+            compound='left', width=150, height=32, font=theme.F_BODY,
+            corner_radius=theme.RADIUS, fg_color=c('card2'),
+            hover_color=c('border'), text_color=c('text'),
+            command=on_init or (lambda: None))
+        self.init_btn.pack(side='left', padx=(0, GAP))
+        self._exec_btns = []
+
+        def exec_btn(text, cmd, image=None, pad=(0, 4)):
+            b = theme.Button(
+                ebar, text=text, image=image, compound='left', width=78,
+                height=32, font=theme.F_BODY, corner_radius=theme.RADIUS,
+                fg_color=c('card2'), hover_color=c('border'),
+                text_color=c('text'), state='disabled', command=cmd)
+            b.pack(side='left', padx=pad)
+            self._exec_btns.append(b)
+            return b
+
+        for n in (1, 10, 100, 1000):
+            exec_btn(f'Exec {n}', lambda n=n: on_exec(n))
+        exec_btn('END', lambda: on_exec('run'), image=icon('end', 13))
+        exec_btn('Interrupt', lambda: on_exec('pause'),
+                 image=icon('pause', 13), pad=(GAP, 0))
+
+        # live-view refresh rate (2D slice + 3D view); blank = automatic
+        on_refresh = on_refresh or (lambda: None)
+        ctk.CTkLabel(ebar, text='(blank = auto)', font=theme.F_SMALL,
+                     text_color=c('muted')).pack(side='right')
+        self.refresh_mode = ctk.CTkComboBox(
+            ebar, state='readonly', width=104, height=32,
+            values=('seconds', 'steps'), font=theme.F_BODY,
+            corner_radius=8, fg_color=c('entry'),
+            border_color=c('border'), button_color=c('card2'),
+            button_hover_color=c('border'), dropdown_font=theme.F_BODY,
+            command=lambda v: on_refresh())
+        self.refresh_mode.set('seconds')
+        self.refresh_mode.pack(side='right', padx=GAP)
+        self.refresh_val = tk.StringVar(value='')
+        ent = ctk.CTkEntry(ebar, textvariable=self.refresh_val, width=64,
+                           height=32, font=theme.F_BODY, corner_radius=8,
+                           fg_color=c('entry'), border_color=c('border'))
+        ent.pack(side='right')
+        ent.bind('<Return>', lambda e: on_refresh())
+        ent.bind('<FocusOut>', lambda e: on_refresh())
+        ctk.CTkLabel(ebar, text='Refresh every', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='right',
+                                                 padx=(0, GAP))
+
+        # ── body: log | live view ────────────────────────────────────────
+        body = ttk.Panedwindow(self, orient='horizontal')
+        body.pack(fill='both', expand=True)
+
+        logcard = Card(body, title='Log', pad=12)
+        self.log = ctk.CTkTextbox(
+            logcard.body, state='disabled', wrap='none', width=380,
+            font=theme.F_MONO, corner_radius=8, fg_color=c('entry'),
+            text_color=c('text'), border_width=0,
+            scrollbar_button_color=c('card2'),
+            scrollbar_button_hover_color=c('border'))
+        self.log.pack(fill='both', expand=True)
+        body.add(logcard, weight=1)
+
+        right = Card(body, pad=12)
+        self._view_seg = ctk.CTkSegmentedButton(
+            right.body, values=['Live slice', '3D view'],
+            font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
+            fg_color=c('card2'), unselected_color=c('card2'),
+            unselected_hover_color=c('border'),
+            selected_color=c('accent'),
+            selected_hover_color=c('accent_hover'),
+            command=self._view_selected)
+        self._view_seg.pack(anchor='w', pady=(0, GAP))
+        stack = ctk.CTkFrame(right.body, fg_color='transparent')
+        stack.pack(fill='both', expand=True)
+        stack.grid_columnconfigure(0, weight=1)
+        stack.grid_rowconfigure(0, weight=1)
+        slice_tab = ctk.CTkFrame(stack, fg_color='transparent')
+        self.canvas = EmbeddedFigure(slice_tab, figsize=(5.5, 5.5),
+                                     toolbar=False)
+        self.canvas.pack(fill='both', expand=True)
+        self.view3d = View3DPanel(stack, log_fn=self.on_log)
+        for w in (self.view3d, slice_tab):
+            w.grid(row=0, column=0, sticky='nsew')
+        self._slice_tab = slice_tab
+        # Tk stacking follows creation order (view3d was created last),
+        # so raise the slice explicitly; seg.set() fires no callback.
+        self._view_seg.set('Live slice')
+        slice_tab.tkraise()
+        body.add(right, weight=2)
+
+        self._mesh = None
+        self._line = None
+        self._solid = None
+        self._title = None
+
+    # ── live-view sub-tab switching ──────────────────────────────────────
+    def _view_selected(self, value):
+        (self.view3d if value == '3D view' else self._slice_tab).tkraise()
+
+    def show_3d_tab(self):
+        self._view_seg.set('3D view')
+        self.view3d.tkraise()
+
+    def show_slice_tab(self):
+        self._view_seg.set('Live slice')
+        self._slice_tab.tkraise()
+
+    # ── event handlers (called from the app's queue drainer) ─────────────
+    def set_running(self, running):
+        self.run_btn.configure(state='disabled' if running else 'normal')
+        self.init_btn.configure(state='disabled' if running else 'normal')
+        self.stop_btn.configure(state='normal' if running else 'disabled')
+        for b in self._exec_btns:
+            b.configure(state='normal' if running else 'disabled')
+        if running:
+            self.progress.set(0.0)
+            self._clear_log()
+        else:
+            # live attach only during a run; Results tab covers afterwards
+            self.view3d_btn.configure(state='disabled')
+
+    def enable_view3d(self, enabled):
+        self.view3d_btn.configure(state='normal' if enabled else 'disabled')
+
+    def on_log(self, text):
+        self.log.configure(state='normal')
+        self.log.insert('end', text + '\n')
+        self.log.see('end')
+        self.log.configure(state='disabled')
+
+    def _clear_log(self):
+        self.log.configure(state='normal')
+        self.log.delete('1.0', 'end')
+        self.log.configure(state='disabled')
+
+    def on_progress(self, p):
+        self.progress.set(max(0.0, min(1.0, p.frac)))
+        self._chip_step.configure(text=str(p.step))
+        self._chip_t.configure(text=f'{p.t*1e3:.3f}')
+        self._chip_dt.configure(text=f'{p.dt:.2e}')
+        self._chip_pmax.configure(text=f'{p.p_max:.3e}')
+
+    def on_run_started(self, info):
+        fig = Figure(figsize=(5.5, 5.5))
+        ax = fig.add_subplot()
+        self._mesh = self._line = None
+        if info['dim'] == 1:
+            (self._line,) = ax.plot([], [], lw=1.4,
+                                    color=theme.cur('accent'))
+            ax.set_xlim(0, info['radius_m'])
+            ax.set_xlabel('r [m]')
+            ax.set_ylabel('Overpressure [kPa]')
+            ax.grid(True, alpha=0.3)
+            self._title = ax.set_title('t = 0.000 ms')
+        else:
+            self._solid = info['solid']
+            self._mesh = overpressure_panel(
+                ax, info['x_face'], info['y_face'], info['solid'].shape)
+            ax.set_xlabel(info['xlabel'])
+            ax.set_ylabel(info['ylabel'])
+            self._title = ax.set_title(info.get('title', ''))
+            fig.colorbar(self._mesh, ax=ax, label='Overpressure [kPa]',
+                         shrink=0.85)
+        fig.tight_layout()
+        self.canvas.set_figure(fig)
+
+    def on_frame(self, field, t):
+        # Frames are coalesced in a single slot shared across chain stages,
+        # so a frame may briefly belong to the NEXT stage while this panel
+        # is still configured for the previous one - guard by shape.
+        if self._mesh is not None:
+            if self._solid is None or field.shape != self._solid.shape:
+                return
+            set_frame(self._mesh, field, self._solid)
+        elif self._line is not None:
+            if field.ndim != 2 or field.shape[0] != 2:
+                return
+            r, p = field
+            ovp = (p.astype(np.float64) - P_AIR) / 1e3
+            self._line.set_data(r, ovp)
+            ax = self._line.axes
+            ax.relim()
+            ax.autoscale_view(scalex=False)
+        else:
+            return
+        if self._title is not None:
+            base = self._title.get_text().rsplit('t =', 1)[0].strip()
+            self._title.set_text(f'{base}  t = {t*1e3:.3f} ms'.strip())
+        self.canvas.draw()

@@ -1,0 +1,85 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+
+// =============================================================================
+// BlastFOAM Basic Case Template - controlDict
+// =============================================================================
+
+application     blastFoam;
+
+startFrom       startTime;
+startTime       0;
+
+stopAt          endTime;
+endTime         0.01;           // [s] - התאם לפי הצורך
+
+deltaT          1e-7;           // [s] - צעד זמן התחלתי
+writeControl    adjustableRunTime;
+writeInterval   1e-4;           // [s] - מרווח כתיבה
+
+purgeWrite      0;
+writeFormat     binary;
+writePrecision  12;
+writeCompression uncompressed;
+
+timeFormat      general;
+timePrecision   6;
+
+runTimeModifiable true;
+
+// התאמת צעד זמן אוטומטית - מומלץ מאוד!
+adjustTimeStep  yes;
+maxCo           0.5;            // מספר Courant מקסימלי
+
+// =============================================================================
+// Function Objects - עיבוד תוצאות בזמן ריצה
+// =============================================================================
+
+functions
+{
+    // חישוב לחץ-על שיא ואימפולס
+    overpressureAndImpulse
+    {
+        type            overpressureAndImpulse;
+        pRef            101325;     // [Pa] - לחץ אטמוספרי
+    }
+    
+    // מדידות בנקודות ספציפיות
+    probes
+    {
+        type            probes;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   1;
+        
+        // נקודות מדידה - התאם לגיאומטריה שלך
+        probeLocations
+        (
+            (0 0 0)         // מרכז
+            (1 0 0)         // 1 מטר
+            (2 0 0)         // 2 מטר
+            (5 0 0)         // 5 מטר
+            (10 0 0)        // 10 מטר
+        );
+        
+        fields (p rho T U);
+    }
+    
+    // שמירת ערכים מינימלי ומקסימלי
+    fieldMinMax
+    {
+        type            fieldMinMax;
+        libs            ("libfieldFunctionObjects.so");
+        writeControl    timeStep;
+        writeInterval   10;
+        fields          (p T rho);
+    }
+}
+
+// =============================================================================
