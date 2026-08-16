@@ -55,6 +55,7 @@ class CaseSpec:
     r_exp: float = 0.0
     center: tuple = (0.0, 0.0, 0.0)     # foam coordinates
     end_time: float = 0.0
+    cap_is_end: bool = False        # end_time is the user's t_end
     write_interval: float = 0.0
     grid: dict = None                    # core.grid product (per dim)
     probe_pts: list = field(default_factory=list)   # foam (x,y,z)
@@ -82,15 +83,23 @@ def _n_writes(n_snapshots):
     return min(N_WRITES_MAX, max(N_WRITES_MIN, 4 * n_snapshots))
 
 
-def _timing(case, dist, n_snapshots):
-    """(end_time, write_interval): endTime is the user's t_end or the
-    native-style safety cap; writeInterval is sized from the native
-    shock-transit estimate so an early (shock-arrival) stop still has
-    a full frame record."""
+def _timing(case, cap_dist, est_dist, n_snapshots):
+    """(end_time, write_interval, cap_is_end), mirroring the native
+    conventions: the safety cap is 10*cap_dist/c_amb (solver3d.py:298
+    uses max(L)); t_end overrides it only when smaller (cap_is_end);
+    writeInterval is sized from the native shock-transit estimate
+    (1.5*est_dist/c_amb, est_dist = nearest open boundary) so an early
+    shock-arrival stop still has a full frame record."""
     t_end = getattr(case, 't_end', 0.0) or 0.0
-    end_time = t_end if t_end > 0 else 10.0 * dist / C_AMB
-    t_est = min(end_time, 1.5 * dist / C_AMB)
-    return end_time, t_est / _n_writes(n_snapshots)
+    cap = 10.0 * cap_dist / C_AMB
+    cap_is_end = bool(t_end) and t_end < cap
+    end_time = t_end if cap_is_end else cap
+    # reference speed 2*c_amb: the shock front outruns ambient sound
+    # (strongly so in the near field), and frames/snapshots only exist
+    # at write times - this keeps the pre-arrival record dense enough
+    # without exploding the dir count on slow far-field runs
+    t_est = min(end_time, 1.5 * est_dist / (2.0 * C_AMB))
+    return end_time, t_est / _n_writes(n_snapshots), cap_is_end
 
 
 def plan_case(case):
@@ -111,8 +120,8 @@ def plan_case(case):
         gauges = [g for g in case.gauge_radii if 0.0 < g <= R_out]
         spec.gauge_ids = gauges
         spec.probe_pts = [(g, 0.0, 0.0) for g in gauges]
-        spec.end_time, spec.write_interval = _timing(
-            case, R_out, case.n_snapshots)
+        spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
+            case, R_out, R_out, case.n_snapshots)
         return spec
 
     if case.dim == 2:
@@ -139,11 +148,18 @@ def plan_case(case):
                   if 0 <= g[0] <= Lx_eff and 0 <= g[1] <= Ly_eff]
         spec.gauge_ids = gauges
         spec.probe_pts = [(g[0], g[1], 0.0) for g in gauges]
+        side_d = dict(x_lo=x0, x_hi=Lx_eff - x0,
+                      y_lo=y0, y_hi=Ly_eff - y0)
+        if not planar:
+            side_d.pop('x_lo')      # collapsed wedge axis, never open
+        opens = [d for s, d in side_d.items()
+                 if case.bcs.get(s) == 'open']
         corners = [(cx, cy) for cx in (0.0, Lx_eff)
                    for cy in (0.0, Ly_eff)]
-        dist = max(math.hypot(cx - x0, cy - y0) for cx, cy in corners)
-        spec.end_time, spec.write_interval = _timing(
-            case, dist, case.n_snapshots)
+        far = max(math.hypot(cx - x0, cy - y0) for cx, cy in corners)
+        est = min(opens) if opens else far
+        spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
+            case, max(Lx_eff, Ly_eff), est, case.n_snapshots)
         return spec
 
     # 3D
@@ -162,12 +178,16 @@ def plan_case(case):
               if all(0 <= v <= L for v, L in zip(g, Ls))]
     spec.gauge_ids = gauges
     spec.probe_pts = [tuple(g) for g in gauges]
+    side_d = dict(x_lo=x0, x_hi=Ls[0] - x0, y_lo=y0, y_hi=Ls[1] - y0,
+                  z_lo=z0, z_hi=Ls[2] - z0)
+    opens = [d for s, d in side_d.items() if case.bcs.get(s) == 'open']
     corners = [(cx, cy, cz) for cx in (0.0, Ls[0])
                for cy in (0.0, Ls[1]) for cz in (0.0, Ls[2])]
-    dist = max(math.sqrt((cx - x0) ** 2 + (cy - y0) ** 2
-                         + (cz - z0) ** 2) for cx, cy, cz in corners)
-    spec.end_time, spec.write_interval = _timing(
-        case, dist, case.n_snapshots)
+    far = max(math.sqrt((cx - x0) ** 2 + (cy - y0) ** 2
+                        + (cz - z0) ** 2) for cx, cy, cz in corners)
+    est = min(opens) if opens else far
+    spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
+        case, max(Ls), est, case.n_snapshots)
     return spec
 
 
