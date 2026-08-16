@@ -30,17 +30,17 @@ def _solve_stage(dim, case):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
     callable also writes the case's own output files (gauges, animation,
     profile) exactly like the CLI flow does."""
+    backend = getattr(case, 'solver', 'native')
+
     def solve(hooks):
+        from ..solvers import get_solver
+        res = get_solver(dim, backend)(case, hooks)
         if dim == 1:
-            from ..solvers.solver1d import solve_1d
-            res = solve_1d(case, hooks)
             if case.gauge_radii:
                 save_gauges_1d(res.gauges, case.gauge_file)
             if case.profile_file:
                 save_profile(res.meta['final_profile'], case.profile_file)
         elif dim == 2:
-            from ..solvers.solver2d import solve_2d
-            res = solve_2d(case, hooks)
             if case.gauges:
                 save_gauges_2d(res.gauges, case.gauge_file)
             if case.anim_file and res.meta.get('frames'):
@@ -48,14 +48,13 @@ def _solve_stage(dim, case):
             if case.profile_file:
                 save_profile_2d(res.meta, case.profile_file)
         else:
-            from ..solvers.solver3d import solve_3d
-            res = solve_3d(case, hooks)
             if case.gauges:
                 save_gauges_3d(res.gauges, case.gauge_file)
             if case.anim_file and res.meta.get('frames'):
                 write_animation(res.meta, case.anim_file)
         return res
-    return (f'{dim}D', solve)
+    label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
+    return (label, solve)
 
 
 class App:
@@ -237,6 +236,11 @@ class App:
             self.setup.show_report(errors=[str(exc)])
             self.setup.update_preview(None)
             return
+        if getattr(case, 'solver', 'native') == 'blastfoam':
+            # warm the cached WSL availability check off-thread so the
+            # validation report can show it without ever blocking
+            from ..solvers.foam import env as foam_env
+            foam_env.ensure_check_started()
         rep = validate_case(case)
         extra = []
         if rep.n_cells:

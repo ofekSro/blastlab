@@ -12,6 +12,7 @@ from tkinter import filedialog, ttk
 import customtkinter as ctk
 
 from ..core.case import Case1D, Case2D, Case3D
+from ..solvers.foam.materials import MATERIAL_NAMES
 from . import theme
 from .theme import GAP, PAD, Card, c, icon
 
@@ -213,6 +214,9 @@ class CaseForm(ctk.CTkFrame):
         if self.dim == 1:
             r = _row(chg, r, 'Charge [kg TNT]',
                      _entry(chg, self._var('charge', 1.0)))
+            self._mat_combo = _combo(chg, self._var('material', 'TNT'),
+                                     MATERIAL_NAMES)
+            r = _row(chg, r, 'Material (blastFoam)', self._mat_combo)
         else:
             modes = (['charge', 'profile1d'] if self.dim == 2
                      else ['charge', 'profile1d', 'profile2d'])
@@ -223,6 +227,9 @@ class CaseForm(ctk.CTkFrame):
             r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
                                                   self.dim == 2 else ''),
                      _entry(chg, self._var('charge', 1.0)))
+            self._mat_combo = _combo(chg, self._var('material', 'TNT'),
+                                     MATERIAL_NAMES)
+            r = _row(chg, r, 'Material (blastFoam)', self._mat_combo)
             if self.dim == 3:
                 r = _row(chg, r, 'Charge resolution',
                          _combo(chg, self._var('charge_res', 'resolve'),
@@ -243,9 +250,14 @@ class CaseForm(ctk.CTkFrame):
         # ── Numerics ───────────────────────────────────────────────────
         num = self._card(0, 'Numerics')
         r = 0
-        r = _row(num, r, 'EOS',
-                 _combo(num, self._var('eos', 'idealGas'),
-                        ['idealGas', 'JWL']))
+        r = _row(num, r, 'Solver',
+                 _combo(num, self._var('solver', 'native'),
+                        ['native', 'blastfoam']))
+        self.v['solver'].trace_add(
+            'write', lambda *a: self._sync_enabled())
+        self._eos_combo = _combo(num, self._var('eos', 'idealGas'),
+                                 ['idealGas', 'JWL'])
+        r = _row(num, r, 'EOS', self._eos_combo)
         r = _row(num, r, 'Snapshots',
                  _entry(num, self._var('n_snapshots',
                                        5 if self.dim == 1 else 6)))
@@ -339,6 +351,16 @@ class CaseForm(ctk.CTkFrame):
                     state='disabled' if axisym else 'readonly')
                 if axisym:
                     self.v['bc_x_lo'].set('wall')
+        # blastfoam: material choice applies, EOS is fixed (JWL products
+        # + ideal-gas air); native: TNT-only, EOS choice applies
+        if 'solver' in self.v and hasattr(self, '_mat_combo'):
+            foam = self.v['solver'].get() == 'blastfoam'
+            self._eos_combo.configure(
+                state='disabled' if foam else 'readonly')
+            self._mat_combo.configure(
+                state='readonly' if foam else 'disabled')
+            if not foam and self.v['material'].get() != 'TNT':
+                self.v['material'].set('TNT')
 
     # ── Case conversion ─────────────────────────────────────────────────
     def get_case(self):
@@ -352,7 +374,8 @@ class CaseForm(ctk.CTkFrame):
                 n_snapshots=_i(v['n_snapshots'], 'snapshots'),
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
-                profile_file=v['profile_out'].get() or None)
+                profile_file=v['profile_out'].get() or None,
+                solver=v['solver'].get(), material=v['material'].get())
 
         bcs = {side: v[f'bc_{side}'].get()
                for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
@@ -371,6 +394,7 @@ class CaseForm(ctk.CTkFrame):
             gauge_file=v['gauge_file'].get(),
             anim_file=v['anim_file'].get() or None,
             record_frames=150 if v['record'].get() else 0,
+            solver=v['solver'].get(), material=v['material'].get(),
         )
         if self.dim == 2:
             return Case2D(geometry=v['geometry'].get(),
@@ -395,6 +419,8 @@ class CaseForm(ctk.CTkFrame):
         if self.dim == 1:
             v['radius_m'].set(f'{case.radius_m:g}')
             v['charge'].set(f'{case.charge_kg:g}')
+            v['solver'].set(getattr(case, 'solver', 'native'))
+            v['material'].set(getattr(case, 'material', 'TNT'))
             v['cell'].set(f'{case.cell_size_m:g}')
             v['eos'].set(case.eos)
             v['cfl'].set(f'{case.cfl:g}')
@@ -423,6 +449,8 @@ class CaseForm(ctk.CTkFrame):
         v['cy'].set(f'{case.center[1]:g}')
         if self.dim == 3 and len(case.center) > 2:
             v['cz'].set(f'{case.center[2]:g}')
+        v['solver'].set(getattr(case, 'solver', 'native'))
+        v['material'].set(getattr(case, 'material', 'TNT'))
         v['eos'].set(case.eos)
         v['cfl'].set(f'{case.cfl:g}')
         v['n_snapshots'].set(str(case.n_snapshots))

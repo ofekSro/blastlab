@@ -32,6 +32,8 @@ class Case1D:
     gauge_radii: list = field(default_factory=list)
     gauge_file: str = 'gauges.txt'
     profile_file: str = None          # save final field for 2D/3D remap
+    solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
+    material: str = 'TNT'             # blastFoam charge material
 
 
 @dataclass
@@ -57,6 +59,8 @@ class Case2D:
     record_frames: int = 150
     live: bool = True
     profile_file: str = None          # save .npz for 3D remap (axisym only)
+    solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
+    material: str = 'TNT'             # blastFoam charge material
 
 
 @dataclass
@@ -88,6 +92,8 @@ class Case3D:
     anim_file: str = None
     record_frames: int = 150
     live: bool = True
+    solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
+    material: str = 'TNT'             # blastFoam charge material
 
 
 _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
@@ -156,10 +162,57 @@ class ValidationReport:
         return not self.errors
 
 
-def _charge_radius(case):
+def _charge_radius(case, rho0=None):
+    rho0 = JWL_TNT['rho0'] if rho0 is None else rho0
     if case.dim == 2 and case.geometry == 'planar':
-        return np.sqrt(case.charge / (np.pi * JWL_TNT['rho0']))
-    return (3.0 * case.charge / (4.0 * np.pi * JWL_TNT['rho0'])) ** (1.0 / 3.0)
+        return np.sqrt(case.charge / (np.pi * rho0))
+    return (3.0 * case.charge / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
+
+
+def _validate_solver(case, rep):
+    """Solver-backend gating. Returns the unreacted charge density used
+    to size r_exp (material-aware for blastfoam), or None on a fatal
+    backend error."""
+    err, note = rep.errors.append, rep.notes.append
+    solver = getattr(case, 'solver', 'native')
+    material = getattr(case, 'material', 'TNT')
+    if solver == 'native':
+        if material != 'TNT':
+            note("Charge material is ignored by the native solver "
+                 "(TNT only)")
+        return JWL_TNT['rho0']
+    if solver != 'blastfoam':
+        err(f"Unknown solver backend '{solver}'")
+        return None
+    from ..solvers.foam.materials import MATERIALS
+    if material not in MATERIALS:
+        err(f"Unknown charge material '{material}'")
+        return None
+    from ..solvers.foam import backend as foam_backend
+    if case.dim not in foam_backend.IMPLEMENTED:
+        err(f"The blastFoam backend for {case.dim}D cases is not "
+            f"implemented yet")
+    if getattr(case, 'obstacles', None):
+        err("Obstacles are not supported by the blastFoam backend yet")
+    if getattr(case, 'init_mode', 'charge') != 'charge':
+        err("Profile initialization is not supported by the blastFoam "
+            "backend yet")
+    if getattr(case, 'charge_resolution', 'resolve') == 'smear':
+        note("Charge resolution 'smear' is ignored by the blastFoam "
+             "backend (the grid is refined to resolve the charge)")
+    note("EOS setting is ignored by blastFoam (material JWL products "
+         "+ ideal-gas air)")
+    from ..solvers.foam import env as foam_env
+    st, detail = foam_env.status()
+    if st == 'fail':
+        err(f"blastFoam/WSL not available: {detail}")
+    elif st == 'checking':
+        note("Checking WSL blastFoam availability...")
+    elif st == 'ok':
+        note(detail)
+    else:
+        note("WSL blastFoam availability will be verified at run start")
+    return MATERIALS[material].rho0
 
 
 def validate_case(case):
@@ -171,6 +224,11 @@ def validate_case(case):
         err("Cell size must be > 0")
         return rep
 
+    rho0 = _validate_solver(case, rep)
+    if rho0 is None:
+        return rep
+    foam = getattr(case, 'solver', 'native') == 'blastfoam'
+
     if case.dim == 1:
         if case.charge_kg <= 0:
             err("Charge must be > 0")
@@ -179,7 +237,7 @@ def validate_case(case):
         if rep.errors:
             return rep
         r_exp = (3.0 * case.charge_kg
-                 / (4.0 * np.pi * JWL_TNT['rho0'])) ** (1.0 / 3.0)
+                 / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
         rep.r_exp = r_exp
         if r_exp >= case.radius_m:
             err(f"Explosive radius {r_exp:.3f} m exceeds domain radius")
@@ -220,11 +278,12 @@ def validate_case(case):
                 not in ('resolve', 'smear'):
             err("Charge resolution must be 'resolve' or 'smear'")
             return rep
-        r_exp = _charge_radius(case)
+        r_exp = _charge_radius(case, rho0)
         rep.r_exp = r_exp
         # 3D 'smear' keeps dx and enlarges the source ball instead of
         # refining; use the ball radius for the geometry checks below.
-        smeared = (case.dim == 3
+        # (blastfoam always resolves - smear is native-only.)
+        smeared = (case.dim == 3 and not foam
                    and getattr(case, 'charge_resolution',
                                'resolve') == 'smear'
                    and dx > r_exp / MIN_EXP_CELLS)

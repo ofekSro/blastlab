@@ -11,13 +11,17 @@ def main():
     ap.add_argument('--cli', metavar='DIM', choices=['1d', '2d', '3d'],
                     help='run the interactive prompt workflow instead of '
                          'the GUI (1d, 2d or 3d)')
+    ap.add_argument('--solver', choices=['native', 'blastfoam'],
+                    default='native',
+                    help='CLI solver backend: the built-in numpy solvers '
+                         'or blastFoam via WSL (default: native)')
     ap.add_argument('--case', metavar='FILE',
                     help='case JSON to open in the GUI at startup')
     args = ap.parse_args()
 
     if args.cli:
         from .cli import main as cli_main
-        cli_main(args.cli)
+        cli_main(args.cli, solver=args.solver)
     else:
         from .gui.app import main as gui_main
         gui_main(case_file=args.case)

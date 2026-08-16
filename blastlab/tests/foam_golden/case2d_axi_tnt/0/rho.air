@@ -1,0 +1,32 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      rho.air;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -3 0 0 0 0 0];
+internalField   uniform 1.225;
+boundaryField
+{
+    x_hi
+    {
+        type            zeroGradient;
+    }
+    y_lo
+    {
+        type            zeroGradient;
+    }
+    y_hi
+    {
+        type            zeroGradient;
+    }
+    wedge
+    {
+        type            wedge;
+    }
+}
+
+// ************************************************************************* //

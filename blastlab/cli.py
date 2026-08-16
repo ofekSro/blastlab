@@ -638,15 +638,20 @@ def ask_user_3d():
     )
 
 
-def main(dim):
-    """Run the historical prompt workflow for '1d', '2d' or '3d'."""
+def main(dim, solver='native'):
+    """Run the prompt workflow for '1d', '2d' or '3d'. The historical
+    (native) flow lives in legacy/; the blastFoam backend has its own
+    prompt flow so the byte-pinned legacy modules stay untouched."""
     dim = str(dim).lower().lstrip('-')
+    if dim not in ('1', '1d', '2', '2d', '3', '3d'):
+        raise SystemExit(f"Unknown dimension '{dim}' (use 1d, 2d or 3d)")
+    if solver == 'blastfoam':
+        from .solvers.foam.cli_run import run
+        return run(dim)
     if dim in ('1', '1d'):
         from .legacy import blast1d as mod
     elif dim in ('2', '2d'):
         from .legacy import blast2d as mod
-    elif dim in ('3', '3d'):
-        from .legacy import blast3d as mod
     else:
-        raise SystemExit(f"Unknown dimension '{dim}' (use 1d, 2d or 3d)")
+        from .legacy import blast3d as mod
     mod._main()

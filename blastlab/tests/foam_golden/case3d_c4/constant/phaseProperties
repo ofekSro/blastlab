@@ -1,0 +1,123 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      phaseProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+phases (expl air);
+radiationModel  none;
+expl
+{
+    type            detonating;
+    reactants
+    {
+        thermoType
+        {
+            transport       const;
+            thermo          eConst;
+            equationOfState Murnaghan;
+        }
+        equationOfState
+        {
+            rho0            1601;
+            Gamma           0.25;
+            pRef            101325;
+            K0              0;
+        }
+        specie
+        {
+            molWeight       55;
+        }
+        transport
+        {
+            mu              0;
+            Pr              1;
+        }
+        thermodynamics
+        {
+            Cv              815;
+            Hf              0;
+        }
+    }
+    products
+    {
+        thermoType
+        {
+            transport       const;
+            thermo          eConst;
+            equationOfState JWL;
+        }
+        equationOfState
+        {
+            rho0            1601;
+            A               6.0977e+11;
+            B               1.295e+10;
+            R1              4.5;
+            R2              1.4;
+            omega           0.25;
+        }
+        specie
+        {
+            molWeight       55;
+        }
+        transport
+        {
+            mu              0;
+            Pr              1;
+        }
+        thermodynamics
+        {
+            Cv              1400;
+            Hf              0;
+        }
+    }
+    activationModel linear;
+    initiation
+    {
+        E0              8901560000;
+        points
+        (
+            (0.5 0.5 0.5)
+        );
+        vDet            8193;
+    }
+    residualRho     1e-6;
+    residualAlpha   1e-10;
+}
+air
+{
+    type            basic;
+    thermoType
+    {
+        transport       const;
+        thermo          eConst;
+        equationOfState idealGas;
+    }
+    equationOfState
+    {
+        gamma           1.4;
+    }
+    specie
+    {
+        molWeight       28.97;
+    }
+    transport
+    {
+        mu              0;
+        Pr              1;
+    }
+    thermodynamics
+    {
+        type            eConst;
+        Cv              718;
+        Hf              0;
+    }
+    residualRho     1e-6;
+    residualAlpha   1e-10;
+}
+
+// ************************************************************************* //

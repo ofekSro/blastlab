@@ -1,0 +1,46 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     blastFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.1467489139;
+deltaT          1e-7;
+writeControl    adjustableRunTime;
+writeInterval   0.0005503084271;
+cycleWrite      0;
+writeFormat     ascii;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  yes;
+maxCo           0.4;
+maxDeltaT       1;
+functions
+{
+    gauges
+    {
+        type            blastProbes;
+        writeControl    timeStep;
+        writeInterval   1;
+        adjustLocations yes;
+        append          yes;
+        probeLocations
+        (
+            (1 1 0)
+        );
+        fields (p);
+    }
+}
+
+// ************************************************************************* //

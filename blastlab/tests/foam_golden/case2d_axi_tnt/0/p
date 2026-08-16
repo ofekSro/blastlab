@@ -1,0 +1,34 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      p;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [1 -1 -2 0 0 0 0];
+internalField   uniform 101325;
+boundaryField
+{
+    x_hi
+    {
+        type            pressureWaveTransmissive;
+        value           $internalField;
+    }
+    y_lo
+    {
+        type            zeroGradient;
+    }
+    y_hi
+    {
+        type            pressureWaveTransmissive;
+        value           $internalField;
+    }
+    wedge
+    {
+        type            wedge;
+    }
+}
+
+// ************************************************************************* //
