@@ -17,8 +17,15 @@ def main():
                          'or blastFoam via WSL (default: native)')
     ap.add_argument('--case', metavar='FILE',
                     help='case JSON to open in the GUI at startup')
+    ap.add_argument('--clean-foam-runs', action='store_true',
+                    help='list and delete the WSL-side blastFoam run '
+                         'directories, then exit')
     args = ap.parse_args()
 
+    if args.clean_foam_runs:
+        from .solvers.foam.cli_run import clean_runs
+        clean_runs()
+        return
     if args.cli:
         from .cli import main as cli_main
         cli_main(args.cli, solver=args.solver)

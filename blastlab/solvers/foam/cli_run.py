@@ -73,6 +73,36 @@ def _run_1d():
     return res
 
 
+def clean_runs(assume_yes=False):
+    """List and (after confirmation) delete the WSL-side blastFoam run
+    directories (`--clean-foam-runs`). Big 3D runs are kept on disk for
+    post-mortem inspection, so they accumulate."""
+    import subprocess
+    print(f"blastFoam run directories in WSL ({env.RUNS_ROOT}):")
+    res = subprocess.run(
+        env.wsl_argv(f'du -sh {env.RUNS_ROOT}/*/ 2>/dev/null'),
+        capture_output=True, text=True, timeout=120,
+        stdin=subprocess.DEVNULL, creationflags=env.CREATE_NO_WINDOW)
+    listing = (res.stdout or '').strip()
+    if res.returncode != 0 or not listing:
+        print("  (none)")
+        return
+    print('\n'.join(f'  {ln}' for ln in listing.splitlines()))
+    if not assume_yes:
+        try:
+            raw = input("Delete ALL of these? [y/N]: ").strip().lower()
+        except EOFError:
+            raw = ''
+        if raw not in ('y', 'yes'):
+            print("  Nothing deleted.")
+            return
+    subprocess.run(
+        env.wsl_argv(f'rm -rf {env.RUNS_ROOT}/*/'),
+        capture_output=True, timeout=300,
+        stdin=subprocess.DEVNULL, creationflags=env.CREATE_NO_WINDOW)
+    print("  Deleted.")
+
+
 def _validate_or_exit(case):
     from ...core.case import validate_case
     rep = validate_case(case)

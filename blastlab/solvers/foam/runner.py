@@ -129,18 +129,31 @@ class FoamRun:
         except OSError:
             pass    # caller's stop deadline will escalate to kill()
 
+    def _signal(self, sig):
+        subprocess.run(
+            env.wsl_argv(
+                f'kill -{sig} $(cat {self.case_posix}/.run.pid) '
+                f'2>/dev/null'),
+            capture_output=True, timeout=30,
+            stdin=subprocess.DEVNULL,
+            creationflags=env.CREATE_NO_WINDOW)
+
+    def suspend(self):
+        """SIGSTOP the solver (GUI Interrupt: freeze compute too)."""
+        if self.running:
+            self._signal('STOP')
+
+    def resume(self):
+        if self.running:
+            self._signal('CONT')
+
     def kill(self):
         """TERM then KILL the Linux-side solver, then the relay."""
+        self._signal('CONT')        # a stopped process ignores TERM
         for sig, wait_s in (('TERM', 5.0), ('KILL', 2.0)):
             if not self.running:
                 return
-            subprocess.run(
-                env.wsl_argv(
-                    f'kill -{sig} $(cat {self.case_posix}/.run.pid) '
-                    f'2>/dev/null'),
-                capture_output=True, timeout=30,
-                stdin=subprocess.DEVNULL,
-                creationflags=env.CREATE_NO_WINDOW)
+            self._signal(sig)
             deadline = time.time() + wait_s
             while self.running and time.time() < deadline:
                 time.sleep(0.2)

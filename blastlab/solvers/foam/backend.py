@@ -92,14 +92,27 @@ def _progress_line(line, st, hooks, end_time):
 
 
 def _note_pause(hooks, st, will_pause):
-    """One-time note: pausing a foam run gates the DISPLAY per written
-    frame; the WSL solver keeps computing (unlike the native per-step
-    Exec-N semantics)."""
+    """One-time note: foam Exec/Interrupt operates at written-frame
+    granularity (not per solver step like the native solvers)."""
     if will_pause and not st.get('pause_noted'):
         st['pause_noted'] = True
-        hooks.log('  [blastfoam] paused at a written frame - the WSL '
-                  'solver keeps computing; Exec advances by written '
-                  'frames, Stop ends the run')
+        hooks.log('  [blastfoam] pausing at a written frame - the WSL '
+                  'solver is suspended while paused; Exec advances by '
+                  'written frames, Stop ends the run')
+
+
+def _gated_step(run, hooks):
+    """step_gate() with the WSL solver truly suspended while the GUI
+    holds the gate (SIGSTOP/CONT around the blocking wait)."""
+    paused = getattr(hooks, 'exec_paused', None)
+    if paused is not None and paused() and not run.stop_requested:
+        run.suspend()
+        try:
+            hooks.step_gate()
+        finally:
+            run.resume()
+    else:
+        hooks.step_gate()
 
 
 def _pick_snapshots(store, names, n_snapshots):
@@ -204,7 +217,7 @@ def solve_1d_foam(case, hooks=None):
                 request_stop('shock arrived at outer boundary '
                              f"(p_last = {entry['p'][-1]:.3e} Pa)")
             _note_pause(hooks, st, will_pause)
-            hooks.step_gate()
+            _gated_step(run, hooks)
 
     try:
         while True:
@@ -439,7 +452,7 @@ def solve_2d_foam(case, hooks=None):
                 request_stop('shock arrived at an open boundary '
                              f'(p_edge = {p[open_edge].max():.3e} Pa)')
             _note_pause(hooks, st, will_pause)
-            hooks.step_gate()
+            _gated_step(run, hooks)
 
     try:
         while True:
@@ -752,7 +765,7 @@ def solve_3d_foam(case, hooks=None):
                 request_stop('shock arrived at an open boundary '
                              f'(p_edge = {p[open_edge].max():.3e} Pa)')
             _note_pause(hooks, st, will_pause)
-            hooks.step_gate()
+            _gated_step(run, hooks)
 
     try:
         while True:
