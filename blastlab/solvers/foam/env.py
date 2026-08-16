@@ -90,6 +90,7 @@ def _probe(timeout):
     try:
         res = subprocess.run(wsl_argv(script), capture_output=True,
                              text=True, timeout=timeout,
+                             stdin=subprocess.DEVNULL,
                              creationflags=CREATE_NO_WINDOW)
     except FileNotFoundError:
         return False, 'wsl.exe not found on PATH'

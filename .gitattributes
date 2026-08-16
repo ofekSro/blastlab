@@ -1,0 +1,4 @@
+# Byte-pinned test fixtures - never EOL-convert
+blastlab/tests/baseline/** -text
+blastlab/tests/foam_golden/** -text
+blastlab/tests/foam_fixtures/** -text

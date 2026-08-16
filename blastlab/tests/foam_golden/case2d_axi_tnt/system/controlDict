@@ -26,6 +26,11 @@ runTimeModifiable true;
 adjustTimeStep  yes;
 maxCo           0.4;
 maxDeltaT       1;
+OptimisationSwitches
+{
+    fileModificationChecking timeStampMaster;
+    fileModificationSkew 1;
+}
 functions
 {
     gauges

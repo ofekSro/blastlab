@@ -299,6 +299,16 @@ def _controldict(spec, case):
         'adjustTimeStep': 'yes',
         'maxCo': case.cfl,
         'maxDeltaT': 1,
+        # stop requests rewrite this file to `stopAt writeNow`; the
+        # default 10 s fileModificationSkew can swallow that edit
+        # forever (a fixed mtime never clears the skew window), so
+        # tighten it to 1 s for this case. (inotify would be cleaner
+        # but this OpenFOAM build lacks FOAM_USE_INOTIFY; the WSL-side
+        # sed rewrite guarantees a fresh native mtime.)
+        'OptimisationSwitches': {
+            'fileModificationChecking': 'timeStampMaster',
+            'fileModificationSkew': 1,
+        },
     }
     if spec.probe_pts:
         d['functions'] = {
