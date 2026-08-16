@@ -22,11 +22,7 @@ def run(dim):
     print(f"  {detail}")
     if not ok:
         _unavailable()
-    if dim == '1':
-        return _run_1d()
-    raise SystemExit(
-        f"  The blastFoam CLI workflow for {dim}D cases is not "
-        f"implemented yet.")
+    return {'1': _run_1d, '2': _run_2d, '3': _run_3d}[dim]()
 
 
 def _run_1d():
@@ -74,6 +70,118 @@ def _run_1d():
         save_profile(res.meta['final_profile'], profile_out)
 
     _show_plots_1d(res, case)
+    return res
+
+
+def _validate_or_exit(case):
+    from ...core.case import validate_case
+    rep = validate_case(case)
+    for msg in rep.notes:
+        print(f"  [note] {msg}")
+    for msg in rep.warnings:
+        print(f"  [warn] {msg}")
+    if not rep.ok:
+        raise SystemExit("  Invalid case:\n    "
+                         + "\n    ".join(rep.errors))
+
+
+def _run_2d():
+    from ...cli import (_ask, _ask_choice, _ask_gauges_2d, _positive)
+    from ...core.case import Case2D
+    from ...output.gauges import save_gauges_2d
+    from ...output.animation import write_animation
+    from ...core.profiles import save_profile_2d
+    from ..hooks import ConsoleHooks
+
+    print()
+    geometry = _ask_choice("Geometry", ['axisymmetric', 'planar'],
+                           'axisymmetric')
+    axisym = geometry == 'axisymmetric'
+    Lx = _ask("Domain Lx [m]", default=10.0, validator=_positive("Lx"))
+    Ly = _ask("Domain Ly [m]", default=10.0, validator=_positive("Ly"))
+    charge = _ask("Charge [kg]" if axisym else "Charge [kg per metre]",
+                  default=1.0, validator=_positive("Charge"))
+    material = _ask_choice("Charge material", list(MATERIAL_NAMES), 'TNT')
+    cell = _ask("Cell size [m]", default=0.025,
+                validator=_positive("Cell size"))
+    x0 = 0.0 if axisym else _ask("Burst x [m]", default=Lx / 2.0)
+    y0 = _ask("Burst height y [m]", default=Ly / 2.0)
+    n_snap = int(_ask("Snapshots", default=6, cast=int,
+                      validator=_positive("Snapshots")))
+    gauges = _ask_gauges_2d(Lx, Ly, x0, y0)
+    gauge_file = _ask("Gauge TSV file", default='gauges_2d.txt', cast=str)
+    anim = _ask("Animation gif ('-' = skip)",
+                default='blast_2d_animation.gif', cast=str)
+    anim = None if anim.strip() in ('-', '') else anim
+    profile_out = None
+    if axisym:
+        profile_out = _ask("Profile out (.npz, '-' = skip)", default='-',
+                           cast=str)
+        profile_out = (None if profile_out.strip() in ('-', '')
+                       else profile_out)
+
+    case = Case2D(geometry=geometry, Lx=Lx, Ly=Ly, cell_size_m=cell,
+                  charge=charge, center=(x0, y0), gauges=gauges,
+                  n_snapshots=n_snap, gauge_file=gauge_file,
+                  anim_file=anim, record_frames=150 if anim else 0,
+                  profile_file=profile_out,
+                  solver='blastfoam', material=material)
+    _validate_or_exit(case)
+
+    from .backend import solve_2d_foam
+    res = solve_2d_foam(case, ConsoleHooks(2))
+
+    if gauges:
+        save_gauges_2d(res.gauges, gauge_file)
+    if anim and res.meta.get('frames'):
+        write_animation(res.meta, anim)
+    if profile_out:
+        save_profile_2d(res.meta, profile_out)
+    return res
+
+
+def _run_3d():
+    from ...cli import (_ask, _ask_choice, _ask_gauges_3d, _positive)
+    from ...core.case import Case3D
+    from ...output.gauges import save_gauges_3d
+    from ...output.animation import write_animation
+    from ..hooks import ConsoleHooks
+
+    print()
+    Lx = _ask("Domain Lx [m]", default=10.0, validator=_positive("Lx"))
+    Ly = _ask("Domain Ly [m]", default=10.0, validator=_positive("Ly"))
+    Lz = _ask("Domain Lz [m]", default=10.0, validator=_positive("Lz"))
+    charge = _ask("Charge [kg]", default=1.0,
+                  validator=_positive("Charge"))
+    material = _ask_choice("Charge material", list(MATERIAL_NAMES), 'TNT')
+    cell = _ask("Cell size [m]", default=0.1,
+                validator=_positive("Cell size"))
+    x0 = _ask("Burst x [m]", default=Lx / 2.0)
+    y0 = _ask("Burst y [m]", default=Ly / 2.0)
+    z0 = _ask("Burst z [m]", default=Lz / 2.0)
+    t_end = _ask("End time [s] (0 = auto)", default=0.0)
+    n_snap = int(_ask("Snapshots", default=6, cast=int,
+                      validator=_positive("Snapshots")))
+    gauges = _ask_gauges_3d(Lx, Ly, Lz, x0, y0, z0)
+    gauge_file = _ask("Gauge TSV file", default='gauges_3d.txt', cast=str)
+    anim = _ask("Animation gif ('-' = skip)",
+                default='blast_3d_animation.gif', cast=str)
+    anim = None if anim.strip() in ('-', '') else anim
+
+    case = Case3D(Lx=Lx, Ly=Ly, Lz=Lz, cell_size_m=cell, charge=charge,
+                  center=(x0, y0, z0), t_end=t_end, gauges=gauges,
+                  n_snapshots=n_snap, gauge_file=gauge_file,
+                  anim_file=anim, record_frames=150 if anim else 0,
+                  solver='blastfoam', material=material)
+    _validate_or_exit(case)
+
+    from .backend import solve_3d_foam
+    res = solve_3d_foam(case, ConsoleHooks(3))
+
+    if gauges:
+        save_gauges_3d(res.gauges, gauge_file)
+    if anim and res.meta.get('frames'):
+        write_animation(res.meta, anim)
     return res
 
 

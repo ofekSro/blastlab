@@ -28,7 +28,7 @@ from . import env, reader, runner, writer
 from .materials import MATERIALS
 
 #: dims with a working blastFoam backend (grows per phase)
-IMPLEMENTED = frozenset({1, 3})
+IMPLEMENTED = frozenset({1, 2, 3})
 
 _RE_TIME = re.compile(r'^Time = ([0-9.eE+-]+)s?$')
 _RE_DT = re.compile(r'^deltaT = ([0-9.eE+-]+)$')
@@ -280,8 +280,262 @@ def solve_1d_foam(case, hooks=None):
                   stop_reason, stop_reason == 'stopped by user')
 
 
+# ── 2D ──────────────────────────────────────────────────────────────────────
+
+def _read_2d(dpath, spec, what=('p',)):
+    """Read fields of one time dir onto the native (Nx,Ny) layout."""
+    out = {}
+    n = spec.n_cells
+    if 'p' in what:
+        out['p'] = reader.to_grid(
+            reader.read_scalar(os.path.join(dpath, 'p'), n), spec)
+    if 'rho' in what:
+        out['rho'] = reader.to_grid(
+            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec)
+    if 'U' in what:
+        flat = reader.read_vector(os.path.join(dpath, 'U'), n)
+        out['u'] = reader.to_grid(flat[:, 0], spec)
+        out['v'] = reader.to_grid(flat[:, 1], spec)
+    return out
+
+
+def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
+    m = MATERIALS[spec.material]
+    bar = '=' * 60
+    bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
+    x0, y0, _ = spec.center
+    axisym = case.geometry == 'axisymmetric'
+    charge_lbl = (f'{case.charge:g} kg {spec.material} (sphere) on axis '
+                  f'at height {y0:g} m' if axisym else
+                  f'{case.charge:g} kg {spec.material} per metre '
+                  f'(infinite cylinder) at ({x0:g}, {y0:g}) m')
+    for line in (
+            '', bar, f'  2D Blast - blastFoam (WSL) ({case.geometry})',
+            bar,
+            f'  Charge          : {charge_lbl}',
+            f'  Explosive radius: {spec.r_exp:.4f} m',
+            f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  cell '
+            f'{spec.dx:g} m  ({spec.nx} x {spec.ny} = '
+            f'{spec.n_cells:,} cells)',
+            '  EOS             : JWL products + ideal-gas air '
+            f'(vDet {m.vDet:g} m/s)',
+            f'  Boundaries      : {bc_lbl}'
+            + ('  (x_lo = symmetry axis)' if axisym else ''),
+            f'  Gauges          : {n_gauges}',
+            '  Stop condition  : '
+            + ('shock arrival at an open boundary' if has_open
+               else 'safety cap (no open boundaries)'),
+            f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
+            f'  Write interval  : {spec.write_interval*1e3:.4f} ms',
+            bar, ''):
+        hooks.log(line)
+
+
 def solve_2d_foam(case, hooks=None):
-    _todo(2)
+    """Run a Case2D on blastFoam (axisymmetric wedge or planar slab).
+    Returns a Result shaped exactly like the native solve_2d."""
+    hooks = hooks or RunHooks()
+    spec = _preflight(case, hooks)
+    m = MATERIALS[spec.material]
+    g = spec.grid
+    x_c, y_c = g['x_c'], g['y_c']
+    Nx, Ny = spec.nx, spec.ny
+    x0, y0, _ = spec.center
+    bcs = dict(case.bcs)
+    axisym = case.geometry == 'axisymmetric'
+    solid = np.zeros((Nx, Ny), dtype=bool)      # no obstacles in v1
+
+    # open-boundary edge mask + distances (native logic, solver2d:236)
+    open_edge = np.zeros((Nx, Ny), dtype=bool)
+    sides = (('x_hi', np.s_[-1, :]), ('y_lo', np.s_[:, 0]),
+             ('y_hi', np.s_[:, -1]))
+    if not axisym:
+        sides += (('x_lo', np.s_[0, :]),)
+    for side, sl in sides:
+        if bcs[side] == 'open':
+            open_edge[sl] = True
+    has_open = open_edge.any()
+    d_charge = np.sqrt((x_c[:, None] - x0) ** 2
+                       + (y_c[None, :] - y0) ** 2)
+    dists = []
+    if bcs['x_hi'] == 'open':
+        dists.append(case.Lx - x0)
+    if bcs['x_lo'] == 'open' and not axisym:
+        dists.append(x0)
+    if bcs['y_lo'] == 'open':
+        dists.append(y0)
+    if bcs['y_hi'] == 'open':
+        dists.append(case.Ly - y0)
+    if not dists:
+        corners = [(0.0, 0.0), (case.Lx, 0.0), (0.0, case.Ly),
+                   (case.Lx, case.Ly)]
+        dists.append(max(float(np.hypot(cx - x0, cy - y0))
+                         for cx, cy in corners))
+    stop_dist = min(dists)
+    snap_radii = list(np.linspace(spec.r_exp, min(dists),
+                                  case.n_snapshots + 1)[1:-1])
+
+    _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_open)
+    hooks.run_started(dict(
+        dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
+        xlabel='r [m]' if axisym else 'x [m]',
+        ylabel='z [m]' if axisym else 'y [m]', title=''))
+
+    record_frames = case.record_frames
+    frame_t, frame_p = [], []
+    fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
+    ingested = {}               # dirname -> t (full arrays NOT retained)
+    snap_names = []
+    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0)
+    stop_reason = 'safety cap'
+    stop_deadline = None
+    last_draw = 0.0
+
+    run = runner.FoamRun(spec.case_posix, spec.case_unc)
+
+    def request_stop(reason):
+        nonlocal stop_reason, stop_deadline
+        stop_reason = reason
+        run.request_write_now()
+        stop_deadline = _time.time() + _STOP_GRACE_S
+
+    def ingest_ready():
+        nonlocal last_draw, frame_t, frame_p
+        for _t_disp, name in reader.list_times(spec.case_unc):
+            if name in ingested:
+                continue
+            dpath = os.path.join(spec.case_unc, name)
+            if not reader.time_ready(dpath, fields):
+                continue
+            try:
+                t, _dt = reader.read_time(dpath)
+                p = _read_2d(dpath, spec)['p']
+            except (ValueError, OSError):
+                continue            # mid-write; retry next poll
+            ingested[name] = t
+
+            shocked = p > _ARRIVAL_P
+            r_front = float(d_charge[shocked].max()) if shocked.any() \
+                else 0.0
+            st['frac'] = min(1.0, r_front / stop_dist)
+            while snap_radii and r_front >= snap_radii[0]:
+                snap_radii.pop(0)
+                if name not in snap_names:
+                    snap_names.append(name)
+                    hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
+                              f"(front at {r_front:.2f} m)")
+            if record_frames > 0:
+                frame_t.append(t)
+                frame_p.append(p.astype(np.float32))
+                if len(frame_p) >= 2 * record_frames:
+                    frame_t = frame_t[::2]
+                    frame_p = frame_p[::2]
+            will_pause = hooks.exec_will_pause()
+            if hooks.draw_due(st['step'], last_draw) or will_pause:
+                hooks.frame(p, t)
+                last_draw = _time.time()
+            if not run.stop_requested and has_open \
+                    and (p[open_edge] > _ARRIVAL_P).any():
+                request_stop('shock arrived at an open boundary '
+                             f'(p_edge = {p[open_edge].max():.3e} Pa)')
+            _note_pause(hooks, st, will_pause)
+            hooks.step_gate()
+
+    try:
+        while True:
+            for line in run.drain(_POLL_S):
+                _progress_line(line, st, hooks, spec.end_time)
+            ingest_ready()
+            if hooks.should_stop() and not run.stop_requested:
+                request_stop('stopped by user')
+            if stop_deadline and run.running \
+                    and _time.time() > stop_deadline:
+                hooks.log('  [blastfoam] solver did not stop cleanly '
+                          '- killing it')
+                run.kill()
+            if not run.running:
+                for line in run.drain(0.05):
+                    _progress_line(line, st, hooks, spec.end_time)
+                ingest_ready()
+                break
+    finally:
+        if run.running:
+            run.kill()
+
+    if run.returncode not in (0, None) and not run.stop_requested:
+        raise RuntimeError(
+            f"blastFoam failed (exit {run.returncode}) - case kept at "
+            f"{spec.case_unc}\n{run.tail()}")
+    if not ingested:
+        raise RuntimeError(
+            "blastFoam produced no readable time steps - case kept at "
+            f"{spec.case_unc}\n{run.tail()}")
+
+    # ── finalize: two-pass snapshot re-read ─────────────────────────────
+    names = sorted(ingested, key=ingested.get)
+    fin_name = names[-1]
+    snapshots = {}
+    for name in snap_names:
+        if name == fin_name:
+            continue
+        got = _read_2d(os.path.join(spec.case_unc, name), spec,
+                       ('p', 'rho', 'U'))
+        t = ingested[name]
+        label = f"t = {t*1e3:.3f} ms"
+        if label not in snapshots:
+            snapshots[label] = dict(
+                p=got['p'], rho=got['rho'],
+                speed=np.sqrt(got['u'] ** 2 + got['v'] ** 2))
+    dfin = os.path.join(spec.case_unc, fin_name)
+    fin = _read_2d(dfin, spec, ('p', 'rho', 'U'))
+    t_fin = ingested[fin_name]
+    snapshots[f"t = {t_fin*1e3:.3f} ms (final)"] = dict(
+        p=fin['p'], rho=fin['rho'],
+        speed=np.sqrt(fin['u'] ** 2 + fin['v'] ** 2))
+
+    if record_frames > 0 and (not frame_t or frame_t[-1] < t_fin):
+        frame_t.append(t_fin)
+        frame_p.append(fin['p'].astype(np.float32))
+    hooks.frame(fin['p'], t_fin)
+
+    # final_state for save_profile_2d -> 3D remap: e from T (per-phase
+    # Cv - blastFoam writes no e field), phase from the products alpha
+    alpha = reader.to_grid(reader.read_scalar(
+        os.path.join(dfin, f'alpha.{spec.phase}'), spec.n_cells), spec)
+    phase = (alpha > 0.5).astype(int)
+    T = reader.to_grid(reader.read_scalar(
+        os.path.join(dfin, 'T'), spec.n_cells), spec)
+    e_arr = np.where(phase == 1, m.Cv_products, writer.CV_AIR) * T
+
+    hooks.log(f"\n  Done. {st['step']} solver steps, t_final = "
+              f"{t_fin*1e3:.3f} ms")
+    hooks.log(f"  Stopped: {stop_reason}\n")
+
+    probes = reader.read_probes(spec.case_unc) if spec.probe_pts else None
+    if probes:
+        gauge_out = dict(times=probes['times'],
+                         points=[(pt[0], pt[1])
+                                 for pt in probes['points']],
+                         pressures=probes['pressures'])
+    else:
+        gauge_out = dict(times=np.array([]), points=[], pressures=[])
+
+    meta = dict(x_c=x_c, y_c=y_c,
+                x_face=g['x_face'], y_face=g['y_face'],
+                solid=solid, geometry=case.geometry,
+                Lx=case.Lx, Ly=case.Ly, dx=spec.dx,
+                eos='JWL', bcs=bcs, obstacles=[],
+                charge=case.charge, charge_center=(x0, y0),
+                r_exp=spec.r_exp, from_profile=False,
+                solver='blastfoam', material=spec.material,
+                case_dir=spec.case_unc)
+    meta['final_state'] = dict(t=t_fin, rho=fin['rho'], u=fin['u'],
+                               v=fin['v'], e=e_arr, p=fin['p'],
+                               phase=phase)
+    if record_frames > 0:
+        meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
+    return Result(snapshots, gauge_out, meta, stop_reason,
+                  stop_reason == 'stopped by user')
 
 
 # ── 3D ──────────────────────────────────────────────────────────────────────

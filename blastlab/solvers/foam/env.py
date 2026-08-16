@@ -86,6 +86,23 @@ def _background_probe():
 
 
 def _probe(timeout):
+    """A cold WSL start can transiently time out
+    (Wsl/Service/CreateInstance/0x800705b4), so failures are retried
+    before being cached as final."""
+    last = ''
+    for attempt in range(3):
+        if attempt:
+            time.sleep(3.0)
+        ok, detail = _probe_once(timeout)
+        if ok:
+            return True, detail
+        last = detail
+        if 'wsl.exe not found' in detail:
+            break               # no point retrying a missing binary
+    return False, last
+
+
+def _probe_once(timeout):
     script = ' && '.join(f'command -v {t}' for t in NEEDED_TOOLS)
     try:
         res = subprocess.run(wsl_argv(script), capture_output=True,
