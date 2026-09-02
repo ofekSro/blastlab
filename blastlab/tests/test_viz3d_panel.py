@@ -1,10 +1,11 @@
 """Embedded 3D panel test: real Tk + View3DPanel + off-screen pyvista.
 Feeds synthetic frames through the same Feed3D path the GUI uses,
 exercises every control callback and verifies rendered blits."""
-import sys
+import os, sys
 import numpy as np
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 import tkinter as tk
 from blastlab.core.constants import P_AIR

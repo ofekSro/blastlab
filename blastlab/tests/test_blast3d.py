@@ -3,7 +3,8 @@ import os, sys
 import numpy as np
 
 os.environ.setdefault('MPLBACKEND', 'Agg')
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 import blast1d
 import blast2d

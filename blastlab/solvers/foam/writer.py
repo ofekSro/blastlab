@@ -14,14 +14,18 @@ Templates copied from the shipped v6.2.0 tutorials:
   mappedBuilding3D/sector  1D spherical sector (collapsed hex + wedges)
   axisymmetricCharge       2D wedge orientation and face sets
   freeField                3D box, fvSchemes/fvSolution/phaseProperties
-The mesh is static and uniform in v1 (no AMR / refineInternal), run
-serially; obstacles and profile initialization are later phases.
+The mesh is static and uniform in v1 (no AMR / refineInternal); 3D
+obstacle boxes are carved out of the block by topoSet/subsetMesh
+(exposed faces -> 'obstacles' wall patch), keeping the retained cells
+in blockMesh order so read-back scatters onto the same native grid.
+Profile initialization is a later phase.
 """
 
 import math
 import os
 from dataclasses import dataclass, field
 
+from ...core.bc import solid_mask_2d, solid_mask_3d
 from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS)
 from ...core.grid import make_grid_1d, make_geometry, make_grid
 from . import env
@@ -35,6 +39,17 @@ MOLW_AIR = 28.97
 C_AMB = math.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)
 T_AMB = P_AIR / (RHO_AIR * (GAMMA_AIR - 1.0) * CV_AIR)
 N_WRITES_MIN, N_WRITES_MAX = 40, 60
+#: live sampling functionObjects: p(r) line (1D) / p plane cut (2D+3D)
+LIVE_SET = 'liveLine'
+LIVE_SLICE = 'liveSlice'
+
+
+def live_sample_steps(dim):
+    """Live-sample cadence in solver steps. 3D steps take seconds each,
+    so every step feeds the live view; 1D/2D run tens of steps per
+    second, where sparser sampling avoids pointless dir churn (the GUI
+    poll consumes at most ~4 frames/s anyway)."""
+    return {1: 10, 2: 5, 3: 1}[dim]
 
 #: OpenFOAM dimension vectors
 _DIMS = dict(p='[1 -1 -2 0 0 0 0]', T='[0 0 0 1 0 0 0]',
@@ -48,6 +63,7 @@ class CaseSpec:
     dim: int
     material: str
     phase: str = PHASE
+    n_procs: int = 1                # effective MPI ranks (1 = serial)
     nx: int = 0
     ny: int = 1
     nz: int = 1
@@ -58,16 +74,25 @@ class CaseSpec:
     cap_is_end: bool = False        # end_time is the user's t_end
     write_interval: float = 0.0
     grid: dict = None                    # core.grid product (per dim)
+    charges: list = field(default_factory=list)   # [((x,y,z), mass_kg)]
+    det_points: list = field(default_factory=list)  # [] = charge centres
     probe_pts: list = field(default_factory=list)   # foam (x,y,z)
     gauge_ids: list = field(default_factory=list)   # native radii/points
     patches: list = field(default_factory=list)     # (name, kind)
+    obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
+    solid: object = None            # (nx,ny,nz) bool mask, None = none
     files: dict = field(default_factory=dict)       # relpath -> text
     case_posix: str = ''
     case_unc: str = ''
 
     @property
     def n_cells(self):
-        return self.nx * self.ny * self.nz
+        """Cell count of the ACTUAL mesh: obstacle cells are carved out
+        by topoSet/subsetMesh, so field files hold only fluid values."""
+        n = self.nx * self.ny * self.nz
+        if self.solid is not None:
+            n -= int(self.solid.sum())
+        return n
 
 
 # ── planning ────────────────────────────────────────────────────────────────
@@ -97,9 +122,14 @@ def _timing(case, cap_dist, est_dist, n_snapshots):
     # reference speed 2*c_amb: the shock front outruns ambient sound
     # (strongly so in the near field), and frames/snapshots only exist
     # at write times - this keeps the pre-arrival record dense enough
-    # without exploding the dir count on slow far-field runs
+    # without exploding the dir count on slow far-field runs.
+    # The interval starts 4x DENSER than that sizing so the first live
+    # frame appears quickly (near-field dt is tiny - at the nominal
+    # interval a heavy charge shows nothing for thousands of steps);
+    # the backend's adaptive controller doubles it back within bounds
+    # [i0/4, i0*8] once frames accumulate.
     t_est = min(end_time, 1.5 * est_dist / (2.0 * C_AMB))
-    return end_time, t_est / _n_writes(n_snapshots), cap_is_end
+    return end_time, t_est / _n_writes(n_snapshots) / 4.0, cap_is_end
 
 
 def plan_case(case):
@@ -115,6 +145,7 @@ def plan_case(case):
         grid = dict(r_face=r_face, r=r, A_face=A_face, V_cell=V_cell)
         spec = CaseSpec(dim=1, material=mat, nx=len(r), dx=dx,
                         r_exp=r_exp, center=(0.0, 0.0, 0.0), grid=grid)
+        spec.charges = [((0.0, 0.0, 0.0), float(case.charge_kg))]
         R_out = r_face[-1]
         spec.patches = [('outlet', 'open'), ('wedge', 'wedge')]
         gauges = [g for g in case.gauge_radii if 0.0 < g <= R_out]
@@ -135,6 +166,10 @@ def plan_case(case):
         spec = CaseSpec(dim=2, material=mat,
                         nx=grid['Nx'], ny=grid['Ny'], dx=dx, r_exp=r_exp,
                         center=(x0, y0, 0.0), grid=grid)
+        spec.charges = [((x0, y0, 0.0), float(case.charge))]
+        spec.det_points = [
+            ((0.0 if not planar else float(px)), float(py), 0.0)
+            for px, py in (getattr(case, 'det_points', None) or [])]
         if planar:
             spec.patches = [(s, case.bcs[s])
                             for s in ('x_lo', 'x_hi', 'y_lo', 'y_hi')]
@@ -144,8 +179,24 @@ def plan_case(case):
             spec.patches = [(s, case.bcs[s])
                             for s in ('x_hi', 'y_lo', 'y_hi')]
             spec.patches.append(('wedge', 'wedge'))
+        # obstacle rectangles in the (x, y) / (r, z) plane, carved out
+        # by topoSet/subsetMesh exactly like the 3D boxes (the Python
+        # mask mirrors boxToCell's cell-centre criterion)
+        spec.obstacles = [tuple(float(v) for v in box)
+                          for box in (getattr(case, 'obstacles', None)
+                                      or [])]
+        if spec.obstacles:
+            spec.solid = solid_mask_2d(grid['x_c'], grid['y_c'],
+                                       spec.obstacles)
+            spec.patches.append(('obstacles', 'wall'))
+
+        def _in_obstacle2(g):
+            return any(x0 <= g[0] <= x1 and y0 <= g[1] <= y1
+                       for x0, x1, y0, y1 in spec.obstacles)
+
         gauges = [g for g in case.gauges
-                  if 0 <= g[0] <= Lx_eff and 0 <= g[1] <= Ly_eff]
+                  if 0 <= g[0] <= Lx_eff and 0 <= g[1] <= Ly_eff
+                  and not _in_obstacle2(g)]
         spec.gauge_ids = gauges
         spec.probe_pts = [(g[0], g[1], 0.0) for g in gauges]
         side_d = dict(x_lo=x0, x_hi=Lx_eff - x0,
@@ -162,20 +213,46 @@ def plan_case(case):
             case, max(Lx_eff, Ly_eff), est, case.n_snapshots)
         return spec
 
-    # 3D
-    r_exp = charge_radius(case.charge, m)
-    dx = _effective_dx(case.cell_size_m, r_exp)
+    # 3D - the primary charge plus any extras; the grid resolves the
+    # SMALLEST charge, snapshot radii start from the largest
+    x0, y0, z0 = case.center
+    charges = [((float(x0), float(y0), float(z0)), float(case.charge))]
+    for ex, ey, ez, mass in getattr(case, 'charges', None) or []:
+        charges.append(((float(ex), float(ey), float(ez)), float(mass)))
+    r_exps = [charge_radius(mass, m) for _c, mass in charges]
+    r_exp = max(r_exps)
+    dx = min(_effective_dx(case.cell_size_m, r) for r in r_exps)
     grid = make_grid(case.Lx, case.Ly, case.Lz, dx)
     Ls = (grid['x_face'][-1], grid['y_face'][-1], grid['z_face'][-1])
-    x0, y0, z0 = case.center
     spec = CaseSpec(dim=3, material=mat,
                     nx=grid['Nx'], ny=grid['Ny'], nz=grid['Nz'],
                     dx=dx, r_exp=r_exp, center=(x0, y0, z0), grid=grid)
+    spec.charges = charges
+    spec.det_points = [tuple(float(v) for v in p)
+                       for p in (getattr(case, 'det_points', None) or [])]
     spec.patches = [(s, case.bcs[s])
                     for s in ('x_lo', 'x_hi', 'y_lo', 'y_hi',
                               'z_lo', 'z_hi')]
+    # obstacles: axis-aligned boxes carved out of the mesh by
+    # topoSet(boxToCell)/subsetMesh; the Python-side mask mirrors
+    # boxToCell's criterion (cell CENTRE inside the box, inclusive)
+    # so read-back scatters fluid values onto the full native grid
+    spec.obstacles = [tuple(float(v) for v in box)
+                      for box in (getattr(case, 'obstacles', None)
+                                  or [])]
+    if spec.obstacles:
+        spec.solid = solid_mask_3d(grid['x_c'], grid['y_c'],
+                                   grid['z_c'], spec.obstacles)
+        spec.patches.append(('obstacles', 'wall'))
+
+    def _in_obstacle(g):
+        return any(x0 <= g[0] <= x1 and y0 <= g[1] <= y1
+                   and z0 <= g[2] <= z1
+                   for x0, x1, y0, y1, z0, z1 in spec.obstacles)
+
     gauges = [g for g in case.gauges
-              if all(0 <= v <= L for v, L in zip(g, Ls))]
+              if all(0 <= v <= L for v, L in zip(g, Ls))
+              and not _in_obstacle(g)]
     spec.gauge_ids = gauges
     spec.probe_pts = [tuple(g) for g in gauges]
     side_d = dict(x_lo=x0, x_hi=Ls[0] - x0, y_lo=y0, y_hi=Ls[1] - y0,
@@ -249,6 +326,8 @@ def _blockmesh_2d_axisym(spec, case):
         ('wedge0', {'type': 'wedge', 'faces': [(0, 1, 2, 3)]}),
         ('wedge1', {'type': 'wedge', 'faces': [(0, 4, 5, 3)]}),
     ]
+    if spec.obstacles:
+        boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
     line = (f'hex (0 1 2 3 0 4 5 3) ({spec.nx} {spec.ny} 1) '
             f'simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
@@ -273,6 +352,8 @@ def _blockmesh_2d_planar(spec, case):
         ('frontAndBack', {'type': 'empty',
                           'faces': [(0, 1, 2, 3), (4, 5, 6, 7)]}),
     ]
+    if spec.obstacles:
+        boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
     line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nx} {spec.ny} 1) '
             f'simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
@@ -292,9 +373,40 @@ def _blockmesh_3d(spec, case):
                         'faces': [faces[side]]})
                 for side in ('x_lo', 'x_hi', 'y_lo', 'y_hi',
                              'z_lo', 'z_hi')]
+    if spec.obstacles:
+        # zero-face wall patch: subsetMesh -patch adds the faces the
+        # obstacle carve exposes (the patch must pre-exist)
+        boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
     line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nx} {spec.ny} {spec.nz}) '
             f'simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
+
+
+def _toposetdict(spec):
+    """cellSet 'fluid' = everything OUTSIDE the obstacle boxes (one
+    boxToCell per box, then invert); subsetMesh keeps this set and
+    routes the exposed faces onto the 'obstacles' wall patch.
+
+    2D rectangles become z-unbounded boxes: wedge and slab cell
+    centres both sit at z = 0, so a symmetric z-span covering the
+    whole mesh selects exactly the (x, y) footprint."""
+    if spec.dim == 2:
+        zpad = float(spec.grid['x_face'][-1])
+        boxes = [(x0, x1, y0, y1, -zpad, zpad)
+                 for x0, x1, y0, y1 in spec.obstacles]
+    else:
+        boxes = spec.obstacles
+    acts = []
+    for i, (x0, x1, y0, y1, z0, z1) in enumerate(boxes):
+        acts.append(Raw(
+            '{ name fluid; type cellSet; action %s; '
+            'source boxToCell; '
+            'sourceInfo { box (%s %s %s) (%s %s %s); } }'
+            % ('new' if i == 0 else 'add',
+               fmt(x0), fmt(y0), fmt(z0), fmt(x1), fmt(y1), fmt(z1))))
+    acts.append(Raw('{ name fluid; type cellSet; action invert; }'))
+    return foam_file('topoSetDict', block({'actions': acts}),
+                     location='system')
 
 
 # ── system/ + constant/ dicts ───────────────────────────────────────────────
@@ -310,7 +422,10 @@ def _controldict(spec, case):
         'writeControl': 'adjustableRunTime',
         'writeInterval': spec.write_interval,
         'cycleWrite': 0,
-        'writeFormat': 'ascii',
+        # binary halves write size and Python parse time; 1D stays
+        # ascii (~10^3 cells, debuggability wins). The reader sniffs
+        # the format per file, so both coexist.
+        'writeFormat': 'ascii' if spec.dim == 1 else 'binary',
         'writePrecision': 6,
         'writeCompression': 'off',
         'timeFormat': 'general',
@@ -330,18 +445,99 @@ def _controldict(spec, case):
             'fileModificationSkew': 1,
         },
     }
-    if spec.probe_pts:
-        d['functions'] = {
-            'gauges': {
-                'type': 'blastProbes',
-                'writeControl': 'timeStep',
-                'writeInterval': 1,
-                'adjustLocations': 'yes',
-                'append': 'yes',
-                'probeLocations': [tuple(p) for p in spec.probe_pts],
-                'fields': ['p'],
-            },
+    functions = {}
+    if spec.dim >= 2:
+        # Per-step peak-pressure / impulse accumulation on the foam side
+        # (matches the native solvers' per-step tracking; the backend's
+        # Python per-write accumulators remain as a fallback). Field
+        # names written per time dir: 'pMax' and 'impulse'.
+        functions['impulse'] = {
+            'type': 'impulse',
+            'libs': Raw('("libblastFunctionObjects.so")'),
+            'writeControl': 'writeTime',
+            'pName': 'p',
+            'pRef': P_AIR,
         }
+        functions['pMax'] = {
+            'type': 'fieldMinMax',
+            'libs': Raw('("libblastFunctionObjects.so")'),
+            'writeControl': 'writeTime',
+            'fields': ['p'],
+            'minMax': 'max',
+        }
+        # live p slice every few steps (same role as the 1D liveLine):
+        # 2D cuts the z=0 mid-plane (the whole field, one face per
+        # cell); 3D cuts the user's live-slice plane through the
+        # nearest cell-centre layer. interpolate/triangulate off keep
+        # one uncut face per cell with the cell value, so the backend
+        # sorts the raw rows straight onto the grid.
+        if spec.dim == 2:
+            pt, nrm = (0.0, 0.0, 0.0), (0, 0, 1)
+        else:
+            axis = getattr(case, 'slice_axis', 'y') or 'y'
+            ax_i = 'xyz'.index(axis)
+            c = spec.grid[('x_c', 'y_c', 'z_c')[ax_i]]
+            pos = (spec.center[ax_i]
+                   if getattr(case, 'slice_pos', None) is None
+                   else float(case.slice_pos))
+            s0 = min(range(len(c)), key=lambda i: abs(float(c[i]) - pos))
+            pt = tuple(float(c[s0]) if a == ax_i else 0.0
+                       for a in range(3))
+            nrm = tuple(1 if a == ax_i else 0 for a in range(3))
+        functions[LIVE_SLICE] = {
+            'type': 'surfaces',
+            'libs': Raw('("libsampling.so")'),
+            'writeControl': 'timeStep',
+            'writeInterval': live_sample_steps(spec.dim),
+            'surfaceFormat': 'raw',
+            'interpolationScheme': 'cell',
+            'fields': ['p'],
+            'surfaces': [('slice', {
+                'type': 'plane',
+                'planeType': 'pointAndNormal',
+                'pointAndNormalDict': {'point': pt, 'normal': nrm},
+                'interpolate': False,
+                'triangulate': False,
+            })],
+        }
+    if spec.dim == 1:
+        # Live p(r) profile every few solver steps: full time dirs
+        # only appear once per writeInterval (hundreds of steps at
+        # near-field dt), far too sparse for the live view. The
+        # backend tails these tiny raw .xy dumps for hooks.frame and
+        # deletes each one once consumed.
+        functions[LIVE_SET] = {
+            'type': 'sets',
+            'libs': Raw('("libsampling.so")'),
+            'writeControl': 'timeStep',
+            'writeInterval': live_sample_steps(spec.dim),
+            'setFormat': 'raw',
+            'interpolationScheme': 'cell',
+            'fields': ['p'],
+            # endpoints a quarter-cell inside the apex/outlet: exact
+            # boundary points spawn 'Particle ... outside of the mesh'
+            # warnings from the set's tracking seeds; the line still
+            # crosses every cell
+            'sets': [('line', {
+                'type': 'lineCell',
+                'axis': 'x',
+                'start': (0.25 * spec.dx, 0.0, 0.0),
+                'end': (spec.grid['r_face'][-1] - 0.25 * spec.dx,
+                        0.0, 0.0),
+            })],
+        }
+    if spec.probe_pts:
+        functions['gauges'] = {
+            'type': 'blastProbes',
+            'writeControl': 'timeStep',
+            'writeInterval': 1,
+            'adjustLocations': 'yes',
+            'append': 'yes',
+            'probeLocations': [tuple(p) for p in spec.probe_pts],
+            'fields': ['p'],
+        }
+    if functions:
+        d['functions'] = functions
     return foam_file('controlDict', block(d), location='system')
 
 
@@ -379,36 +575,47 @@ def _fvsolution():
 
 def _setfieldsdict(spec, case):
     alpha = f'alpha.{PHASE}'
-    charge = case.charge_kg if spec.dim == 1 else case.charge
     if spec.dim == 2 and case.geometry == 'planar':
         x0, y0, _ = spec.center
-        region = ('cylinderToCell', {
+        regions = [('cylinderToCell', {
             'p1': (x0, y0, -spec.dx),
             'p2': (x0, y0, spec.dx),
             'radius': spec.r_exp,
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
-        })
+        })]
     else:
         m = MATERIALS[spec.material]
-        region = ('sphericalMassToCell', {
-            'centre': spec.center,
+        regions = [('sphericalMassToCell', {
+            'centre': centre,
             'rho': m.rho0,
-            'mass': charge,
-            'backup': {'centre': spec.center,
-                       'radius': 2.0 * spec.r_exp},
+            'mass': mass,
+            'backup': {'centre': centre,
+                       'radius': 2.0 * charge_radius(mass, m)},
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
-        })
+        }) for centre, mass in spec.charges]
     body = block({
         'fields': [alpha],
         'nBufferLayers': 1,
         'defaultFieldValues': [Raw(f'volScalarFieldValue {alpha} 0')],
-        'regions': [region],
+        'regions': regions,
     })
     return foam_file('setFieldsDict', body, location='system')
 
 
-def _phaseproperties(spec):
+def _phaseproperties(spec, activation='linear'):
     m = MATERIALS[spec.material]
+    # 'linear' burns at vDet from the detonation points (tutorial
+    # default); 'none' = fully reacted at t0 - the vendor's
+    # burstingWindow pattern: initiation carries only E0
+    if activation == 'none':
+        initiation = {'E0': E0(m)}
+    else:
+        initiation = {
+            'E0': E0(m),
+            'points': (spec.det_points
+                       or [c for c, _mass in spec.charges]),
+            'vDet': m.vDet,
+        }
     body = block({
         'phases': [PHASE, 'air'],
         'radiationModel': 'none',
@@ -434,12 +641,8 @@ def _phaseproperties(spec):
                 'transport': {'mu': 0, 'Pr': 1},
                 'thermodynamics': {'Cv': m.Cv_products, 'Hf': 0.0},
             },
-            'activationModel': 'linear',
-            'initiation': {
-                'E0': E0(m),
-                'points': [spec.center],
-                'vDet': m.vDet,
-            },
+            'activationModel': activation,
+            'initiation': initiation,
             'residualRho': Raw('1e-6'),
             'residualAlpha': Raw('1e-10'),
         },
@@ -462,6 +665,17 @@ def _dynamicmeshdict():
     return foam_file('dynamicMeshDict',
                      block({'dynamicFvMesh': 'staticFvMesh'}),
                      location='constant')
+
+
+def _decomposepardict(n_procs):
+    """scotch decomposition (modeled on the building3DWorkshop
+    tutorial); written only for parallel runs, so serial case trees
+    stay byte-identical."""
+    body = block({
+        'numberOfSubdomains': n_procs,
+        'method': 'scotch',
+    })
+    return foam_file('decomposeParDict', body, location='system')
 
 
 # ── 0/ field files ──────────────────────────────────────────────────────────
@@ -507,10 +721,12 @@ def _zero_fields(spec):
 
 # ── top level ───────────────────────────────────────────────────────────────
 
-def render_case(case):
+def render_case(case, n_procs=1):
     """Plan + render every case file. Returns a CaseSpec whose `files`
-    maps 'system/controlDict'-style relpaths to file text."""
+    maps 'system/controlDict'-style relpaths to file text. n_procs > 1
+    adds system/decomposeParDict (nothing else varies)."""
     spec = plan_case(case)
+    spec.n_procs = max(1, int(n_procs))
     if spec.dim == 1:
         bmd = _blockmesh_1d(spec)
     elif spec.dim == 2:
@@ -525,17 +741,23 @@ def render_case(case):
         'system/fvSchemes': _fvschemes(),
         'system/fvSolution': _fvsolution(),
         'system/setFieldsDict': _setfieldsdict(spec, case),
-        'constant/phaseProperties': _phaseproperties(spec),
+        'constant/phaseProperties': _phaseproperties(
+            spec, getattr(case, 'activation', 'linear')),
         'constant/dynamicMeshDict': _dynamicmeshdict(),
     }
+    if spec.obstacles:
+        spec.files['system/topoSetDict'] = _toposetdict(spec)
+    if spec.n_procs > 1:
+        spec.files['system/decomposeParDict'] = \
+            _decomposepardict(spec.n_procs)
     spec.files.update(_zero_fields(spec))
     return spec
 
 
-def write_case(case, case_posix=None):
+def write_case(case, case_posix=None, n_procs=1):
     """Render and write the case tree into the WSL filesystem (over
     UNC, LF endings). Returns the CaseSpec with paths filled in."""
-    spec = render_case(case)
+    spec = render_case(case, n_procs=n_procs)
     if case_posix is None:
         case_posix, case_unc = env.new_case_dir(case.dim)
     else:
@@ -546,4 +768,9 @@ def write_case(case, case_posix=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w', encoding='ascii', newline='\n') as f:
             f.write(text)
+    # the source Case rides along so a finished run can be reloaded
+    # later (postmortem.load_run); disk-side only - not part of the
+    # rendered case text pinned by the goldens
+    from ...core.case import save_case
+    save_case(case, os.path.join(case_unc, 'case.json'))
     return spec

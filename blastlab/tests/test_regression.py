@@ -1,10 +1,11 @@
 """Regression check: rerun the baseline cases and compare against the
 frozen pre-refactor outputs in tests/baseline/.
 
-TSV/transcript files must be byte-identical; npz compared array-by-array
-(zip metadata makes raw npz bytes unstable).
+TSV/transcript files must be byte-identical up to line endings (the
+committed baselines are LF; text-mode writers produce CRLF on Windows,
+so both sides are normalized before comparison); npz compared
+array-by-array (zip metadata makes raw npz bytes unstable).
 """
-import filecmp
 import os
 import shutil
 import sys
@@ -14,6 +15,15 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BASELINE = os.path.join(HERE, 'baseline')
+
+
+def _text_equal(path_a, path_b):
+    """Byte compare after newline normalization (CRLF -> LF)."""
+    with open(path_a, 'rb') as f:
+        a = f.read()
+    with open(path_b, 'rb') as f:
+        b = f.read()
+    return a.replace(b'\r\n', b'\n') == b.replace(b'\r\n', b'\n')
 
 
 def compare(outdir):
@@ -32,7 +42,7 @@ def compare(outdir):
             print(f"  [{'PASS' if same else 'FAIL'}] {name}: arrays "
                   f"{'equal' if same else 'DIFFER'}")
         else:
-            same = filecmp.cmp(ref, new, shallow=False)
+            same = _text_equal(ref, new)
             print(f"  [{'PASS' if same else 'FAIL'}] {name}: "
                   f"{'byte-identical' if same else 'BYTES DIFFER'}")
         ok &= same

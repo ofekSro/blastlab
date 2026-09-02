@@ -70,8 +70,51 @@ def main():
               and env.status() == ('ok', 'bg ok'))
         env.ensure_check_started()      # no-op once resolved
         check('ensure is idempotent', env.status() == ('ok', 'bg ok'))
+
+        # fail-retry: a cached failure heals after the cooldown
+        _reset()
+        env._probe = lambda timeout: (False, 'down')
+        ok, _ = env.check_available()
+        check('failure cached', not ok and env.status()[0] == 'fail')
+        env._probe = lambda timeout: (True, 'healed')
+        ok, _ = env.check_available()
+        check('failure held within cooldown', not ok)
+        with env._lock:
+            env._last_fail = (time.time()
+                              - env.FAIL_RETRY_COOLDOWN_S - 1)
+        ok, detail = env.check_available()
+        check('failure retried after cooldown', ok and detail == 'healed')
+
+        # status() self-heal: a stale failure re-kicks the bg probe
+        _reset()
+        env._probe = lambda timeout: (False, 'down')
+        env.check_available()
+        env._probe = lambda timeout: (True, 'healed')
+        with env._lock:
+            env._last_fail = (time.time()
+                              - env.FAIL_RETRY_COOLDOWN_S - 1)
+        st0 = env.status()[0]
+        for _ in range(50):
+            if env.status()[0] == 'ok':
+                break
+            time.sleep(0.05)
+        check('status self-heals after cooldown', st0 == 'checking'
+              and env.status() == ('ok', 'healed'))
     finally:
         env._probe = real_probe
+
+    # slots-aware auto parallel (mocked counts: 12 physical / 20 logical)
+    old_slots, old_cores = env._slots, env._cores
+    try:
+        env._slots, env._cores = 12, 20
+        check('auto ranks = physical cores - 2',
+              env.resolve_nprocs(0, 10 ** 6) == 10)
+        check('auto stays serial on small grids',
+              env.resolve_nprocs(0, 10 ** 5) == 1)
+        check('explicit ranks honored as-is',
+              env.resolve_nprocs(16, 10 ** 6) == 16)
+    finally:
+        env._slots, env._cores = old_slots, old_cores
 
     _reset()
     if shutil.which('wsl.exe'):

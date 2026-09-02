@@ -158,10 +158,79 @@ def build_scene_init(scene_info, max_dim=MAX_VIEW_DIM):
         Lz=float(scene_info['Lz']),
         charge_center=tuple(scene_info['charge_center']),
         r_exp=float(scene_info.get('r_exp') or 0.0),
+        cyl=scene_info.get('cyl'),
+        rings=[tuple(o) for o in scene_info.get('rings') or []],
         bcs=dict(scene_info['bcs']),
         face_specs=face_specs,
     )
     return init, stride, face_specs
+
+
+class Revolver:
+    """Revolve a live axisymmetric (r, z) field into a Cartesian 3D
+    block so the regular 3D viewer can show the cylinder it represents.
+
+    Built once per run from the solver's `revolve3d` info (uniform 2D
+    grid: r_c/z_c cell centres, solid mask, 2D bcs, burst height z0,
+    r_exp, radius R = Lx, height Lz = Ly). Precomputes nearest-
+    neighbour lookup tables onto a uniform cubic grid (equal spacing on
+    all axes, as the viewer's ImageData requires; max_dim-capped), so
+    `revolve` is a single fancy-indexing gather per frame. Cells beyond
+    the outer radius clamp to the outermost ring (ambient while the
+    outer boundary is quiet). `scene3d` is a standard scene_info dict,
+    so the whole Feed3D / BlastScene pipeline is reused unchanged: the
+    symmetry axis lands at the domain centre (R, R), the 2D y axis
+    becomes 3D z (y_lo = 'wall' gives the ground plane + its loads).
+    Read-only after construction - safe to use on the solver thread."""
+
+    def __init__(self, info, max_dim=MAX_VIEW_DIM):
+        r_c = np.asarray(info['r_c'], dtype=np.float64)
+        z_c = np.asarray(info['z_c'], dtype=np.float64)
+        R, Lz = float(info['R']), float(info['Lz'])
+        self._shape2d = (len(r_c), len(z_c))
+        dr = float(r_c[1] - r_c[0]) if len(r_c) > 1 else R
+        dz = float(z_c[1] - z_c[0]) if len(z_c) > 1 else Lz
+        dx = max(max(2.0 * R, Lz) / float(max_dim), min(dr, dz))
+        n_xy = max(2, int(np.ceil(2.0 * R / dx)))
+        n_z = max(2, int(np.ceil(Lz / dx)))
+        x_c = (np.arange(n_xy) + 0.5) * dx
+        z3_c = (np.arange(n_z) + 0.5) * dx
+        rr = np.hypot(x_c[:, None] - R, x_c[None, :] - R)
+        self._ri = np.clip(np.rint((rr - r_c[0]) / dr).astype(np.intp),
+                           0, len(r_c) - 1)
+        self._zi = np.clip(np.rint((z3_c - z_c[0]) / dz).astype(np.intp),
+                           0, len(z_c) - 1)
+        bcs2 = dict(info.get('bcs') or {})
+        side = bcs2.get('x_hi', 'open')
+        # box corners beyond the outer radius are not part of the
+        # domain: marked solid so face loads blank there, and the `cyl`
+        # entry lets the viewer draw/clip a true cylinder
+        solid3 = self.revolve(np.asarray(info['solid'], dtype=bool))
+        solid3 |= (rr > R)[:, :, None]
+        self.scene3d = dict(
+            x_c=x_c, y_c=x_c.copy(), z_c=z3_c, dx=float(dx),
+            solid=solid3,
+            obstacles=[],
+            # (r0, r1, z0, z1) source-plane rectangles: the viewer
+            # renders each as a revolved annular ring
+            rings=[tuple(float(v) for v in o)
+                   for o in info.get('obstacles') or []],
+            Lx=2.0 * R, Ly=2.0 * R, Lz=Lz,
+            charge_center=(R, R, float(info['z0'])),
+            r_exp=float(info.get('r_exp') or 0.0),
+            cyl=dict(cx=R, cy=R, R=R),
+            bcs=dict(x_lo=side, x_hi=side, y_lo=side, y_hi=side,
+                     z_lo=bcs2.get('y_lo', 'open'),
+                     z_hi=bcs2.get('y_hi', 'open')))
+
+    def revolve(self, field2d):
+        """One (Nr, Nz) frame -> (n_xy, n_xy, n_z) revolved block."""
+        f = np.asarray(field2d)
+        if f.shape != self._shape2d:
+            raise ValueError(
+                f"expected a {self._shape2d} axisymmetric frame, "
+                f"got {f.shape}")
+        return f[self._ri[:, :, None], self._zi[None, None, :]]
 
 
 class FrameStore:

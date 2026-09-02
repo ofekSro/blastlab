@@ -1,10 +1,11 @@
 """End-to-end IPC test: spawns the REAL viewer process (a window opens
 briefly on screen), streams synthetic frames, then closes it. Verifies
 the spawn/queue path works on Windows and that close() reaps the child."""
-import sys, time
+import os, sys, time
 import numpy as np
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core.constants import P_AIR
 from blastlab.core.grid import make_grid

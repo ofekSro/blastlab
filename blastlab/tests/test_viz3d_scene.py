@@ -8,7 +8,8 @@ playback path, and screenshots the result. No window is opened.
 import os, sys
 import numpy as np
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core.constants import P_AIR
 from blastlab.core.grid import make_grid

@@ -295,11 +295,18 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     print(f"{'='*60}\n")
 
     # ── Live view & animation frame recording ───────────────────────────────
-    hooks.run_started(dict(
+    run_info = dict(
         dim=2, x_face=geom['x_face'], y_face=geom['y_face'], solid=solid,
         xlabel='r [m]' if geometry == 'axisymmetric' else 'x [m]',
         ylabel='z [m]' if geometry == 'axisymmetric' else 'y [m]',
-        title=''))
+        title='')
+    if geometry == 'axisymmetric':
+        # live (r, z) frames can be revolved into a 3D cylinder view
+        run_info['revolve3d'] = dict(
+            r_c=geom['x_c'], z_c=geom['y_c'], solid=solid, bcs=bcs,
+            obstacles=[tuple(o) for o in obstacles],
+            z0=y0, r_exp=r_exp, R=Lx, Lz=Ly)
+    hooks.run_started(run_info)
     frame_t, frame_p = [], []
     frame_stride     = 1
     last_draw        = 0.0

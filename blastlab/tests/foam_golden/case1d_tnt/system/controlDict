@@ -15,7 +15,7 @@ stopAt          endTime;
 endTime         0.1468459545;
 deltaT          1e-7;
 writeControl    adjustableRunTime;
-writeInterval   0.0002753361646;
+writeInterval   6.883404115e-05;
 cycleWrite      0;
 writeFormat     ascii;
 writePrecision  6;
@@ -33,6 +33,26 @@ OptimisationSwitches
 }
 functions
 {
+    liveLine
+    {
+        type            sets;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   10;
+        setFormat       raw;
+        interpolationScheme cell;
+        fields (p);
+        sets
+        (
+            line
+            {
+                type            lineCell;
+                axis            x;
+                start (0.002635590498 0 0);
+                end (4.994443993 0 0);
+            }
+        );
+    }
     gauges
     {
         type            blastProbes;

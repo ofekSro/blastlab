@@ -14,10 +14,11 @@ import numpy as np
 
 from .constants import (JWL_TNT, MIN_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
-                        CELLS_WARN, CELLS_REFUSE)
+                        CELLS_WARN, CELLS_REFUSE,
+                        FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
 
 SCHEMA = 'blastlab-case'
-VERSION = 1
+VERSION = 2     # v2: n_procs, activation, charges, det_points (foam)
 
 
 @dataclass
@@ -34,6 +35,11 @@ class Case1D:
     profile_file: str = None          # save final field for 2D/3D remap
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
+    n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
+                                      # 1D always runs serial)
 
 
 @dataclass
@@ -61,6 +67,13 @@ class Case2D:
     profile_file: str = None          # save .npz for 3D remap (axisym only)
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
+    n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
+    det_points: list = None           # blastFoam: detonation points
+                                      # [(x, y), ...] (axisym: x = 0);
+                                      # None = charge centre
 
 
 @dataclass
@@ -94,6 +107,16 @@ class Case3D:
     live: bool = True
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
+    n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
+    charges: list = None              # blastFoam: ADDITIONAL charges
+                                      # [(x, y, z, mass_kg), ...] on top
+                                      # of the primary charge/center
+    det_points: list = None           # blastFoam: detonation points
+                                      # [(x, y, z), ...]; None = every
+                                      # charge centre
 
 
 _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
@@ -127,6 +150,9 @@ def case_from_dict(d):
     if hasattr(case, 'gauges'):
         case.gauges = [tuple(g) if isinstance(g, (list, tuple)) else g
                        for g in case.gauges]
+    for fld in ('charges', 'det_points'):
+        if getattr(case, fld, None):
+            setattr(case, fld, [tuple(v) for v in getattr(case, fld)])
     return case
 
 
@@ -176,10 +202,19 @@ def _validate_solver(case, rep):
     err, note = rep.errors.append, rep.notes.append
     solver = getattr(case, 'solver', 'native')
     material = getattr(case, 'material', 'TNT')
+    n_procs = getattr(case, 'n_procs', 0)
+    if n_procs < 0:
+        err("MPI ranks must be >= 0 (0 = auto)")
     if solver == 'native':
         if material != 'TNT':
             note("Charge material is ignored by the native solver "
                  "(TNT only)")
+        if n_procs > 1:
+            note("MPI ranks are ignored by the native solver")
+        if getattr(case, 'charges', None) or \
+                getattr(case, 'det_points', None):
+            err("Multiple charges / detonation points require the "
+                "blastFoam solver")
         return JWL_TNT['rho0']
     if solver != 'blastfoam':
         err(f"Unknown solver backend '{solver}'")
@@ -193,7 +228,8 @@ def _validate_solver(case, rep):
         err(f"The blastFoam backend for {case.dim}D cases is not "
             f"implemented yet")
     if getattr(case, 'obstacles', None):
-        err("Obstacles are not supported by the blastFoam backend yet")
+        note("Obstacles: cells inside each box are carved out of "
+             "the mesh (rigid walls)")
     if getattr(case, 'init_mode', 'charge') != 'charge':
         err("Profile initialization is not supported by the blastFoam "
             "backend yet")
@@ -202,6 +238,18 @@ def _validate_solver(case, rep):
              "backend (the grid is refined to resolve the charge)")
     note("EOS setting is ignored by blastFoam (material JWL products "
          "+ ideal-gas air)")
+    activation = getattr(case, 'activation', 'linear')
+    if activation not in ('linear', 'none'):
+        err(f"Unknown activation model '{activation}' "
+            f"(use 'linear' or 'none')")
+    elif activation == 'none':
+        note("Instant detonation ('none'): the whole charge reacts "
+             "at t = 0")
+    if n_procs > 1:
+        if case.dim == 1:
+            note("1D cases always run serial (MPI ranks ignored)")
+        else:
+            note(f"Parallel run: {n_procs} MPI ranks")
     from ..solvers.foam import env as foam_env
     st, detail = foam_env.status()
     if st == 'fail':
@@ -339,6 +387,76 @@ def validate_case(case):
             refined = True
             note(f"Cell size will be refined to {dx:.5f} m "
                  f"({MIN_EXP_CELLS} cells across the charge radius)")
+
+        # blastFoam extra charges (3D only) + detonation points
+        extras = getattr(case, 'charges', None) or []
+        if extras and case.dim != 3:
+            err("Additional charges are only supported for 3D "
+                "blastFoam cases")
+            extras = []
+        spheres = [(x0, y0, (z0 if case.dim == 3 else 0.0), r_exp)]
+        for ch in extras:
+            if len(ch) != 4:
+                err(f"Extra charge {tuple(ch)}: need (x, y, z, mass)")
+                continue
+            ex, ey, ez, mass = ch
+            if mass is None or mass <= 0:
+                err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}): "
+                    f"mass must be > 0")
+                continue
+            r_i = (3.0 * mass / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
+            if not (0 <= ex <= case.Lx and 0 <= ey <= case.Ly
+                    and 0 <= ez <= case.Lz):
+                err(f"Extra charge centre ({ex:g}, {ey:g}, {ez:g}) is "
+                    f"outside the domain")
+                continue
+            for over, side in ((r_i - ex, 'x_lo'),
+                               (r_i - (case.Lx - ex), 'x_hi'),
+                               (r_i - ey, 'y_lo'),
+                               (r_i - (case.Ly - ey), 'y_hi'),
+                               (r_i - ez, 'z_lo'),
+                               (r_i - (case.Lz - ez), 'z_hi')):
+                if over <= 0:
+                    continue
+                if case.bcs.get(side) == 'wall':
+                    note(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) is "
+                         f"truncated by the {side} wall")
+                else:
+                    err(f"Extra charge (r_exp = {r_i:.4f} m) at "
+                        f"({ex:g}, {ey:g}, {ez:g}) pokes through the "
+                        f"open '{side}' boundary")
+            for (px, py, pz, pr) in spheres:
+                d = np.sqrt((ex - px) ** 2 + (ey - py) ** 2
+                            + (ez - pz) ** 2)
+                if d < r_i + pr:
+                    err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) "
+                        f"overlaps another charge")
+            spheres.append((ex, ey, ez, r_i))
+            if dx > r_i / MIN_EXP_CELLS:
+                dx = r_i / MIN_EXP_CELLS
+                refined = True
+                note(f"Cell size will be refined to {dx:.5f} m "
+                     f"({MIN_EXP_CELLS} cells across the smallest "
+                     f"charge radius)")
+        for dp in getattr(case, 'det_points', None) or []:
+            pt = tuple(dp) + ((0.0,) if case.dim == 2 else ())
+            if len(pt) != 3:
+                err(f"Detonation point {tuple(dp)}: need "
+                    + ("(x, y)" if case.dim == 2 else "(x, y, z)"))
+                continue
+            px, py, pz = pt
+            if case.dim == 2:
+                px, py, pz = ((0.0 if case.geometry == 'axisymmetric'
+                               else px), py, 0.0)
+                inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2)
+                             <= sr for sx, sy, _sz, sr in spheres)
+            else:
+                inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2
+                                     + (pz - sz) ** 2) <= sr
+                             for sx, sy, sz, sr in spheres)
+            if not inside:
+                err(f"Detonation point {tuple(dp)} lies outside every "
+                    f"charge")
     else:
         if not case.profile_file_in:
             err("A profile file is required for remap initialization")
@@ -351,13 +469,29 @@ def validate_case(case):
     rep.effective_dx = dx
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
-        if n > CELLS_2D_MAX:
+        if foam:
+            # blastFoam solves in WSL; Python only ingests written
+            # frames, so the cap reflects wall time/disk, not RAM
+            if n > FOAM_CELLS_REFUSE:
+                err(f"~{n:,} cells exceeds the blastFoam cap of "
+                    f"{FOAM_CELLS_REFUSE:,}")
+            elif n > FOAM_CELLS_WARN:
+                warn(f"Large grid: ~{n:,} cells - expect a long run "
+                     f"and GBs of case files on the WSL disk")
+        elif n > CELLS_2D_MAX:
             err(f"~{n:,} cells exceeds the 2D cap of {CELLS_2D_MAX:,}")
         elif n > CELLS_2D_WARN:
             warn(f"Large grid: ~{n:,} cells - expect a long run")
     else:
         n = int(case.Lx / dx) * int(case.Ly / dx) * int(case.Lz / dx)
-        if n > CELLS_REFUSE:
+        if foam:
+            if n > FOAM_CELLS_REFUSE:
+                err(f"~{n:,} cells exceeds the blastFoam cap of "
+                    f"{FOAM_CELLS_REFUSE:,}")
+            elif n > FOAM_CELLS_WARN:
+                warn(f"Large grid: ~{n:,} cells - expect hours of wall "
+                     f"time and GBs of case files on the WSL disk")
+        elif n > CELLS_REFUSE:
             err(f"~{n:,} cells exceeds the 3D cap of {CELLS_REFUSE:,}"
                 + (" - set charge resolution to 'smear' to keep your "
                    "cell size" if refined else ""))

@@ -69,6 +69,12 @@ class ResultsPanel(ctk.CTkFrame):
                       fg_color=c('accent'), hover_color=c('accent_hover'),
                       text_color='white',
                       command=self._open_3d).pack(side='left', padx=PAD)
+        ctk.CTkButton(bar, text='Load foam run…', image=icon('folder', 14),
+                      compound='left', width=136, height=32,
+                      font=theme.F_BODY, corner_radius=theme.RADIUS,
+                      fg_color=c('card2'), hover_color=c('border'),
+                      text_color=c('text'),
+                      command=self._load_foam_run).pack(side='left')
 
         for label, name, kind in (('Profile', 'curve', 'profile'),
                                   ('GIF', 'film', 'gif'),
@@ -372,6 +378,34 @@ class ResultsPanel(ctk.CTkFrame):
                           f'({len(ent.result.snapshots)} snapshots)')
         except Exception as exc:
             self._log(f'3D view failed: {exc}')
+
+    # ── post-mortem load of a finished blastFoam case dir ────────────────
+    def _load_foam_run(self):
+        from ..solvers.foam import env as foam_env
+        initial = foam_env.unc(foam_env.RUNS_ROOT)
+        path = filedialog.askdirectory(
+            title='Load a finished blastFoam run directory',
+            initialdir=initial if os.path.isdir(initial) else None)
+        if not path:
+            return
+        self._log(f'Loading foam run {path} ...')
+
+        def work():
+            try:
+                from ..solvers.foam.postmortem import load_run
+                res = load_run(path)
+            except Exception as exc:
+                self._log(f'Load failed: {exc}')
+                return
+            dim = 1 if 'radius_m' in res.meta else \
+                (3 if 'z_c' in res.meta else 2)
+            label = f'Loaded - {os.path.basename(path)} ({dim}D)'
+            # Tk objects must be touched on the main thread
+            self.after(0, self.add_result, label, dim, res)
+            self._log(f'Loaded: {label} '
+                      f'({len(res.snapshots)} snapshots)')
+
+        threading.Thread(target=work, daemon=True).start()
 
     # ── exports ──────────────────────────────────────────────────────────
     def _export(self, kind):

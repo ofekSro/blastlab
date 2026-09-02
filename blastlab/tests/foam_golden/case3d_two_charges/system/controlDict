@@ -1,0 +1,79 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     blastFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.05893915755;
+deltaT          1e-7;
+writeControl    adjustableRunTime;
+writeInterval   9.642397724e-06;
+cycleWrite      0;
+writeFormat     binary;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  yes;
+maxCo           0.3;
+maxDeltaT       1;
+OptimisationSwitches
+{
+    fileModificationChecking timeStampMaster;
+    fileModificationSkew 1;
+}
+functions
+{
+    impulse
+    {
+        type            impulse;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+        pRef            101325;
+    }
+    pMax
+    {
+        type            fieldMinMax;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        fields (p);
+        minMax          max;
+    }
+    liveSlice
+    {
+        type            surfaces;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   1;
+        surfaceFormat   raw;
+        interpolationScheme cell;
+        fields (p);
+        surfaces
+        (
+            slice
+            {
+                type            plane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point (0 1.002832056 0);
+                    normal (0 1 0);
+                }
+                interpolate     no;
+                triangulate     no;
+            }
+        );
+    }
+}
+
+// ************************************************************************* //

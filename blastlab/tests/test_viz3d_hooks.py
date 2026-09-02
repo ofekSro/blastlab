@@ -1,10 +1,11 @@
 """Hook-level test: a tiny 3D run with a stub 3D-viewer client attached.
 Asserts the solver sends well-formed frame payloads and that attaching
 a viewer changes nothing about the physics (gauge output identical)."""
-import sys
+import os, sys
 import numpy as np
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.solvers.solver3d import _run_blast_3d
 from blastlab.solvers.hooks import RunHooks

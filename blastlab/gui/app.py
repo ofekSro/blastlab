@@ -3,6 +3,7 @@ Chain) + content stack, built with CustomTkinter."""
 
 import os
 import queue
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -376,6 +377,48 @@ class App:
             self.worker.hooks.feed3d = None
             self.run_panel.view3d.on_done(reason)
 
+    def _dispatch(self, w, msg):
+        """Handle one worker-queue message. Raises propagate to _drain,
+        which logs them and keeps draining - a bad frame or a broken
+        panel must never kill the polling loop mid-run."""
+        tag = msg[0]
+        if tag == 'log':
+            self.run_panel.on_log(msg[1])
+        elif tag == 'run_started':
+            self.run_panel.on_run_started(msg[1])
+            is3d = msg[1].get('scene3d') is not None
+            if is3d and not pyvista_available():
+                self.run_panel.on_log(f'  [{MISSING_MSG}]')
+                is3d = False
+            self.run_panel.enable_view3d(is3d)
+            if is3d:
+                self._attach_view3d_auto()
+        elif tag == 'progress':
+            self.run_panel.on_progress(msg[1])
+        elif tag == 'frame':
+            fr = w.hooks.latest_frame()
+            if fr is not None:
+                self.run_panel.on_frame(*fr)
+        elif tag == 'frame3d':
+            fr = w.hooks.latest_frame3d()
+            if fr is not None:
+                self.run_panel.view3d.on_frame(*fr)
+        elif tag == 'stage':
+            self.run_panel.on_log(f'=== Stage {msg[2]} ===')
+        elif tag == 'result':
+            k, res = msg[1], msg[2]
+            dim = self._stage_dims[k]
+            label = (f'Run {self._run_count} - {dim}D'
+                     + (' (stopped)' if res.stopped_early else ''))
+            self.results.add_result(label, dim, res)
+            # the live viewer belongs to this stage: hand it its
+            # playback mode (window stays open)
+            self._finish_view3d(res.stop_reason)
+        elif tag == 'error':
+            self.run_panel.on_log(msg[1])
+            messagebox.showerror('Run failed', msg[1].splitlines()[-1])
+            self._finish_view3d('run failed')
+
     def _drain(self):
         w = self.worker
         if w is None:
@@ -384,45 +427,21 @@ class App:
         try:
             while True:
                 msg = w.q.get_nowait()
-                tag = msg[0]
-                if tag == 'log':
-                    self.run_panel.on_log(msg[1])
-                elif tag == 'run_started':
-                    self.run_panel.on_run_started(msg[1])
-                    is3d = msg[1].get('scene3d') is not None
-                    if is3d and not pyvista_available():
-                        self.run_panel.on_log(f'  [{MISSING_MSG}]')
-                        is3d = False
-                    self.run_panel.enable_view3d(is3d)
-                    if is3d:
-                        self._attach_view3d_auto()
-                elif tag == 'progress':
-                    self.run_panel.on_progress(msg[1])
-                elif tag == 'frame':
-                    fr = w.hooks.latest_frame()
-                    if fr is not None:
-                        self.run_panel.on_frame(*fr)
-                elif tag == 'frame3d':
-                    fr = w.hooks.latest_frame3d()
-                    if fr is not None:
-                        self.run_panel.view3d.on_frame(*fr)
-                elif tag == 'stage':
-                    self.run_panel.on_log(f'=== Stage {msg[2]} ===')
-                elif tag == 'result':
-                    k, res = msg[1], msg[2]
-                    dim = self._stage_dims[k]
-                    label = (f'Run {self._run_count} - {dim}D'
-                             + (' (stopped)' if res.stopped_early else ''))
-                    self.results.add_result(label, dim, res)
-                    # the live viewer belongs to this stage: hand it its
-                    # playback mode (window stays open)
-                    self._finish_view3d(res.stop_reason)
-                elif tag == 'error':
-                    self.run_panel.on_log(msg[1])
-                    messagebox.showerror('Run failed', msg[1].splitlines()[-1])
-                    self._finish_view3d('run failed')
-                elif tag == 'done':
+                if msg[0] == 'done':
                     done = True
+                    continue
+                try:
+                    self._dispatch(w, msg)
+                except Exception:
+                    # keep draining: the worker is still solving and the
+                    # 'result'/'done' messages must still be received
+                    import traceback
+                    err = traceback.format_exc(limit=6)
+                    try:
+                        self.run_panel.on_log(
+                            f"  [ui error handling '{msg[0]}']\n{err}")
+                    except Exception:
+                        print(err, file=sys.stderr)
         except queue.Empty:
             pass
         if done:

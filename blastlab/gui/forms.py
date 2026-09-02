@@ -19,12 +19,18 @@ from .theme import GAP, PAD, Card, c, icon
 _ROW_PAD = dict(padx=(0, GAP), pady=4)
 
 
-def _row(frame, r, label, widget):
-    ctk.CTkLabel(frame, text=label, font=theme.F_BODY,
-                 text_color=c('muted'), anchor='w').grid(
-        row=r, column=0, sticky='w', **_ROW_PAD)
+def _row_lbl(frame, r, label, widget):
+    """Like _row, but also returns the label widget (for rows whose
+    caption changes with the geometry, e.g. axisymmetric r/z)."""
+    lbl = ctk.CTkLabel(frame, text=label, font=theme.F_BODY,
+                       text_color=c('muted'), anchor='w')
+    lbl.grid(row=r, column=0, sticky='w', **_ROW_PAD)
     widget.grid(row=r, column=1, sticky='we', pady=4)
-    return r + 1
+    return r + 1, lbl
+
+
+def _row(frame, r, label, widget):
+    return _row_lbl(frame, r, label, widget)[0]
 
 
 def _entry(frame, var, width=150):
@@ -199,8 +205,12 @@ class CaseForm(ctk.CTkFrame):
                                 ['axisymmetric', 'planar']))
                 self.v['geometry'].trace_add(
                     'write', lambda *a: self._sync_enabled())
-            r = _row(dom, r, 'Lx [m]', _entry(dom, self._var('Lx', 10.0)))
-            r = _row(dom, r, 'Ly [m]', _entry(dom, self._var('Ly', 10.0)))
+            r, lx_lbl = _row_lbl(dom, r, 'Lx [m]',
+                                 _entry(dom, self._var('Lx', 10.0)))
+            r, ly_lbl = _row_lbl(dom, r, 'Ly [m]',
+                                 _entry(dom, self._var('Ly', 10.0)))
+            if self.dim == 2:
+                self._dyn_labels = {'Lx': lx_lbl, 'Ly': ly_lbl}
             if self.dim == 3:
                 r = _row(dom, r, 'Lz [m]',
                          _entry(dom, self._var('Lz', 10.0)))
@@ -238,11 +248,14 @@ class CaseForm(ctk.CTkFrame):
                      _FilePicker(chg, self._var('profile_in', ''),
                                  filetypes=[('Profiles', '*.txt *.npz'),
                                             ('All files', '*.*')]))
-            r = _row(chg, r, 'Burst x [m]',
-                     _entry(chg, self._var('cx', 0.0 if self.dim == 2
-                                           else 5.0)))
-            r = _row(chg, r, 'Burst y [m]',
-                     _entry(chg, self._var('cy', 5.0)))
+            cx_ent = _entry(chg, self._var('cx', 0.0 if self.dim == 2
+                                           else 5.0))
+            r, cx_lbl = _row_lbl(chg, r, 'Burst x [m]', cx_ent)
+            r, cy_lbl = _row_lbl(chg, r, 'Burst y [m]',
+                                 _entry(chg, self._var('cy', 5.0)))
+            if self.dim == 2:
+                self._dyn_labels.update(cx=cx_lbl, cy=cy_lbl)
+                self._burst_x_entry = cx_ent
             if self.dim == 3:
                 r = _row(chg, r, 'Burst z [m]',
                          _entry(chg, self._var('cz', 5.0)))
@@ -258,12 +271,19 @@ class CaseForm(ctk.CTkFrame):
         self._eos_combo = _combo(num, self._var('eos', 'idealGas'),
                                  ['idealGas', 'JWL'])
         r = _row(num, r, 'EOS', self._eos_combo)
+        self._act_combo = _combo(num, self._var('activation', 'linear'),
+                                 ['linear', 'none'])
+        r = _row(num, r, 'Detonation (blastFoam)', self._act_combo)
         r = _row(num, r, 'Snapshots',
                  _entry(num, self._var('n_snapshots',
                                        5 if self.dim == 1 else 6)))
         r = _row(num, r, 'CFL',
                  _entry(num, self._var('cfl', {1: 0.5, 2: 0.4,
                                                3: 0.30}[self.dim])))
+        if self.dim > 1:
+            # blastFoam MPI ranks; 1D always runs serial so no field
+            self._nproc_entry = _entry(num, self._var('n_procs', 0))
+            r = _row(num, r, 'MPI ranks (0 = auto)', self._nproc_entry)
         if self.dim == 3:
             r = _row(num, r, 'End time [s] (0 = auto)',
                      _entry(num, self._var('t_end', 0.0)))
@@ -315,6 +335,20 @@ class CaseForm(ctk.CTkFrame):
             self.obstacles.grid(row=0, column=0, columnspan=2,
                                 sticky='nsew')
 
+            # blastFoam-only extras (validation blocks them on native)
+            if self.dim == 3:
+                xc = self._card(1, 'Extra charges (blastFoam) [m, kg]')
+                self.extra_charges = _PointList(
+                    xc, ['x', 'y', 'z', 'kg'], self._on_change, height=3)
+                self.extra_charges.grid(row=0, column=0, columnspan=2,
+                                        sticky='nsew')
+            dcols = ['x', 'y'] if self.dim == 2 else ['x', 'y', 'z']
+            dc = self._card(1, 'Detonation points (blastFoam) [m]')
+            self.det_pts = _PointList(dc, dcols, self._on_change,
+                                      height=3)
+            self.det_pts.grid(row=0, column=0, columnspan=2,
+                              sticky='nsew')
+
         out = self._card(1, 'Outputs')
         orow = 0
         orow = _row(out, orow, 'Gauge TSV',
@@ -351,6 +385,20 @@ class CaseForm(ctk.CTkFrame):
                     state='disabled' if axisym else 'readonly')
                 if axisym:
                     self.v['bc_x_lo'].set('wall')
+            # axisym: the domain is the (r, z) half-plane revolved about
+            # the axis - relabel, and pin the burst to the axis (r = 0)
+            texts = (dict(Lx='Radius R [m]', Ly='Height Z [m]',
+                          cx='Burst r [m]', cy='Burst z [m]') if axisym
+                     else dict(Lx='Lx [m]', Ly='Ly [m]',
+                               cx='Burst x [m]', cy='Burst y [m]'))
+            for key, lbl in getattr(self, '_dyn_labels', {}).items():
+                lbl.configure(text=texts[key])
+            if hasattr(self, '_burst_x_entry'):
+                if axisym:
+                    self.v['cx'].set('0')
+                    self._burst_x_entry.configure(state='disabled')
+                else:
+                    self._burst_x_entry.configure(state='normal')
         # blastfoam: material choice applies, EOS is fixed (JWL products
         # + ideal-gas air); native: TNT-only, EOS choice applies
         if 'solver' in self.v and hasattr(self, '_mat_combo'):
@@ -361,6 +409,13 @@ class CaseForm(ctk.CTkFrame):
                 state='readonly' if foam else 'disabled')
             if not foam and self.v['material'].get() != 'TNT':
                 self.v['material'].set('TNT')
+            if hasattr(self, '_nproc_entry'):
+                self._nproc_entry.configure(
+                    state='normal' if foam else 'disabled')
+            self._act_combo.configure(
+                state='readonly' if foam else 'disabled')
+            if not foam and self.v['activation'].get() != 'linear':
+                self.v['activation'].set('linear')
 
     # ── Case conversion ─────────────────────────────────────────────────
     def get_case(self):
@@ -375,7 +430,8 @@ class CaseForm(ctk.CTkFrame):
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
-                solver=v['solver'].get(), material=v['material'].get())
+                solver=v['solver'].get(), material=v['material'].get(),
+                activation=v['activation'].get())
 
         bcs = {side: v[f'bc_{side}'].get()
                for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
@@ -395,6 +451,9 @@ class CaseForm(ctk.CTkFrame):
             anim_file=v['anim_file'].get() or None,
             record_frames=150 if v['record'].get() else 0,
             solver=v['solver'].get(), material=v['material'].get(),
+            activation=v['activation'].get(),
+            n_procs=_i(v['n_procs'], 'MPI ranks'),
+            det_points=self.det_pts.get() or None,
         )
         if self.dim == 2:
             return Case2D(geometry=v['geometry'].get(),
@@ -412,6 +471,7 @@ class CaseForm(ctk.CTkFrame):
                       slice_axis=v['slice_axis'].get(),
                       slice_pos=(_f(v['slice_pos'], 'slice position')
                                  if slice_raw else None),
+                      charges=self.extra_charges.get() or None,
                       **common)
 
     def set_case(self, case):
@@ -421,6 +481,7 @@ class CaseForm(ctk.CTkFrame):
             v['charge'].set(f'{case.charge_kg:g}')
             v['solver'].set(getattr(case, 'solver', 'native'))
             v['material'].set(getattr(case, 'material', 'TNT'))
+            v['activation'].set(getattr(case, 'activation', 'linear'))
             v['cell'].set(f'{case.cell_size_m:g}')
             v['eos'].set(case.eos)
             v['cfl'].set(f'{case.cfl:g}')
@@ -451,6 +512,8 @@ class CaseForm(ctk.CTkFrame):
             v['cz'].set(f'{case.center[2]:g}')
         v['solver'].set(getattr(case, 'solver', 'native'))
         v['material'].set(getattr(case, 'material', 'TNT'))
+        v['activation'].set(getattr(case, 'activation', 'linear'))
+        v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
         v['eos'].set(case.eos)
         v['cfl'].set(f'{case.cfl:g}')
         v['n_snapshots'].set(str(case.n_snapshots))
@@ -458,6 +521,9 @@ class CaseForm(ctk.CTkFrame):
             v[f'bc_{side}'].set(val)
         self.gauges.set(case.gauges)
         self.obstacles.set(case.obstacles)
+        if self.dim == 3:
+            self.extra_charges.set(getattr(case, 'charges', None) or [])
+        self.det_pts.set(getattr(case, 'det_points', None) or [])
         v['gauge_file'].set(case.gauge_file)
         v['anim_file'].set(case.anim_file or '')
         v['record'].set(case.record_frames > 0)

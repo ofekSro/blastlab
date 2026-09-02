@@ -2,9 +2,10 @@
 thread, real tiny 3D solve. Opens the 3D view mid-run exactly like the
 '3D View' button, pumps the Tk event loop, and checks live frames,
 playback hand-off and the Results-tab 3D sub-tab. Window stays hidden."""
-import sys, time
+import os, sys, time
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 import tkinter as tk
 from blastlab.core.case import Case3D

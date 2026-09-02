@@ -1,5 +1,11 @@
-"""Parsers for blastFoam ascii output read over the WSL UNC share:
+"""Parsers for blastFoam output read over the WSL UNC share:
 internalField values -> numpy, time directories, blastProbes files.
+
+Both write formats are handled: `ascii` (line-parsed) and `binary`
+(FoamFile header + `nonuniform List<...>` + ascii count + `(` + raw
+little-endian float64 + `);` - uniform internalFields stay inline
+text in binary files too). The format is sniffed per file from the
+FoamFile header, so mixed-format case dirs read fine.
 
 All reads go through `_retry` (9p transients); a truncated in-progress
 write surfaces as ValueError so the caller re-polls instead of failing.
@@ -12,7 +18,6 @@ Grid mapping: a single-block blockMesh numbers cells x-fastest, so
 import os
 import re
 import time as _time
-import warnings
 
 import numpy as np
 
@@ -20,6 +25,9 @@ _RE_KIND = re.compile(r'internalField\s+(uniform|nonuniform)')
 _RE_UNIFORM = re.compile(r'internalField\s+uniform\s+'
                          r'(?:\(([^)]*)\)|([^;\s]+))\s*;')
 _RE_KEY_NUM = r'^\s*{key}\s+([0-9.eE+-]+);'
+_RE_FORMAT = re.compile(rb'format\s+(ascii|binary)\s*;')
+_RE_BIN_COUNT = re.compile(rb'internalField\s+nonuniform\s+'
+                           rb'List<\w+>\s*(\d+)\s*\(')
 
 
 def _retry(fn, tries=3, delay=0.5):
@@ -39,11 +47,16 @@ def _read_text(path):
     return _retry(go)
 
 
+def _read_bytes(path):
+    def go():
+        with open(path, 'rb') as f:
+            return f.read()
+    return _retry(go)
+
+
 def _floats(joined):
-    """C-fast whitespace-separated float parse."""
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', DeprecationWarning)
-        return np.fromstring(joined, dtype=np.float64, sep=' ')
+    """Whitespace-separated float parse (ascii fallback path)."""
+    return np.array(joined.split(), dtype=np.float64)
 
 
 def _nonuniform_body(text, path):
@@ -73,9 +86,41 @@ def _kind(text, path):
     return m.group(1)
 
 
+def _format_is_binary(buf):
+    m = _RE_FORMAT.search(buf[:4096])
+    return m is not None and m.group(1) == b'binary'
+
+
+def _binary_internal(buf, path, n_cells, ncomp):
+    """Binary nonuniform internalField -> flat float64 array (n*ncomp,),
+    or None when the internalField is uniform (inline text - the ascii
+    path handles it). Truncated/malformed data raises ValueError so a
+    mid-write poll retries."""
+    i = buf.find(b'internalField')
+    if i < 0:
+        raise ValueError(f'no internalField in {path}')
+    m = _RE_BIN_COUNT.match(buf, i)
+    if m is None:
+        return None                     # uniform - still inline text
+    n = int(m.group(1))
+    if n != n_cells:
+        raise ValueError(f'{path}: {n} values, expected {n_cells}')
+    start, need = m.end(), n * ncomp * 8
+    if len(buf) < start + need + 1 \
+            or buf[start + need:start + need + 1] != b')':
+        raise ValueError(f'{path}: truncated binary internalField')
+    return np.frombuffer(buf, '<f8', count=n * ncomp,
+                         offset=start).copy()
+
+
 def read_scalar(path, n_cells):
     """volScalarField internalField -> (n_cells,) float64."""
-    text = _read_text(path)
+    buf = _read_bytes(path)
+    if _format_is_binary(buf):
+        vals = _binary_internal(buf, path, n_cells, 1)
+        if vals is not None:
+            return vals
+    text = buf.decode('ascii', 'replace')
     if _kind(text, path) == 'uniform':
         m = _RE_UNIFORM.search(text)
         return np.full(n_cells, float(m.group(2)))
@@ -88,7 +133,12 @@ def read_scalar(path, n_cells):
 
 def read_vector(path, n_cells):
     """volVectorField internalField -> (n_cells, 3) float64."""
-    text = _read_text(path)
+    buf = _read_bytes(path)
+    if _format_is_binary(buf):
+        vals = _binary_internal(buf, path, n_cells, 3)
+        if vals is not None:
+            return vals.reshape(-1, 3)
+    text = buf.decode('ascii', 'replace')
     if _kind(text, path) == 'uniform':
         m = _RE_UNIFORM.search(text)
         v = [float(x) for x in m.group(1).split()]
@@ -134,27 +184,99 @@ def time_ready(dir_path, fields):
                for f in fields)
 
 
-def read_probes(case_unc, name='gauges', field='p'):
-    """blastProbes output -> dict(points, times, pressures) or None.
+def list_sample_times(case_unc, name):
+    """Sorted [(t_float, dirname)] of numeric time subdirectories of
+    postProcessing/<name> (the layout functionObjects write one output
+    time each). [] when the functionObject has not written yet."""
+    base = os.path.join(case_unc, 'postProcessing', name)
+    try:
+        names = os.listdir(base)
+    except OSError:
+        return []
+    out = []
+    for d in names:
+        try:
+            out.append((float(d), d))
+        except ValueError:
+            continue
+    out.sort()
+    return out
+
+
+def read_line_sample(case_unc, name, tdir):
+    """One raw-format `sets` output dir -> (coords, values) float64
+    arrays, or None when absent/unreadable. Malformed rows (partial
+    mid-write line) are skipped - the caller judges completeness from
+    the expected sample count."""
+    base = os.path.join(case_unc, 'postProcessing', name, tdir)
+    try:
+        files = sorted(f for f in os.listdir(base) if f.endswith('.xy'))
+    except OSError:
+        return None
+    if not files:
+        return None
+    try:
+        text = _read_text(os.path.join(base, files[0]))
+    except OSError:
+        return None
+    xs, vs = [], []
+    for ln in text.splitlines():
+        parts = ln.split()
+        if len(parts) < 2:
+            continue
+        try:
+            x, v = float(parts[0]), float(parts[1])
+        except ValueError:
+            continue
+        xs.append(x)
+        vs.append(v)
+    if not xs:
+        return None
+    return np.array(xs), np.array(vs)
+
+
+def read_surface_sample(case_unc, name, tdir):
+    """One raw-format `surfaces` output dir -> (points (n, 3), values
+    (n,)) float64 arrays, or None when absent/unreadable. Comment
+    lines are skipped and a partial mid-write tail row is dropped -
+    the caller judges completeness from the expected sample count."""
+    base = os.path.join(case_unc, 'postProcessing', name, tdir)
+    try:
+        files = sorted(f for f in os.listdir(base)
+                       if f.endswith('.raw') or f.endswith('.xy'))
+    except OSError:
+        return None
+    if not files:
+        return None
+    try:
+        text = _read_text(os.path.join(base, files[0]))
+    except OSError:
+        return None
+    rows = [ln for ln in text.splitlines()
+            if ln.strip() and not ln.lstrip().startswith('#')]
+    if not rows:
+        return None
+    try:
+        vals = np.array(' '.join(rows).split(), dtype=np.float64)
+    except ValueError:
+        rows.pop()                  # partial mid-write tail row
+        try:
+            vals = np.array(' '.join(rows).split(), dtype=np.float64)
+        except ValueError:
+            return None
+    n = (vals.size // 4) * 4        # x y z value rows
+    if n == 0:
+        return None
+    a = vals[:n].reshape(-1, 4)
+    return a[:, :3], a[:, 3]
+
+
+def _parse_probes_file(path):
+    """One blastProbes file -> (points, rows).
 
     File layout: '# Probe <i> (<x> <y> <z>)' header lines (adjusted
     locations), a '# Time' style column header, then rows of
     `time v0 v1 ...`."""
-    base = os.path.join(case_unc, 'postProcessing', name)
-    if not os.path.isdir(base):
-        return None
-    tdirs = []
-    for d in os.listdir(base):
-        try:
-            tdirs.append((float(d), d))
-        except ValueError:
-            continue
-    if not tdirs:
-        return None
-    tdirs.sort()
-    path = os.path.join(base, tdirs[0][1], field)
-    if not os.path.isfile(path):
-        return None
     text = _read_text(path)
     pts, rows = [], []
     for ln in text.splitlines():
@@ -167,6 +289,35 @@ def read_probes(case_unc, name='gauges', field='p'):
                 rows.append([float(v) for v in ln.split()])
             except ValueError:
                 continue        # partial last line mid-write
+    return pts, rows
+
+
+def read_probes(case_unc, name='gauges', field='p'):
+    """blastProbes output -> dict(points, times, pressures) or None.
+
+    Every time subdirectory of postProcessing/<name> is merged: a
+    restarted run appends a new subdir starting at the restart time
+    while the previous one may extend past it, so earlier chunks are
+    clipped to t < first_t of the next chunk (the later dir wins)."""
+    base = os.path.join(case_unc, 'postProcessing', name)
+    tdirs = list_sample_times(case_unc, name)
+    if not tdirs:
+        return None
+
+    pts, rows = [], []
+    for _t0, d in tdirs:
+        path = os.path.join(base, d, field)
+        if not os.path.isfile(path):
+            continue
+        chunk_pts, chunk_rows = _parse_probes_file(path)
+        if not pts:
+            pts = chunk_pts
+        if chunk_rows and rows:
+            first_t = chunk_rows[0][0]
+            rows = [r for r in rows if r[0] < first_t]
+        rows.extend(chunk_rows)
+    if not pts and not rows:
+        return None
     if not rows:
         return dict(points=pts, times=np.array([]),
                     pressures=[np.array([]) for _ in pts])
@@ -179,10 +330,20 @@ def read_probes(case_unc, name='gauges', field='p'):
                 pressures=[a[:, i + 1] for i in range(n_probes)])
 
 
-def to_grid(vals, spec):
-    """Flat internalField -> native blastlab array layout."""
+def to_grid(vals, spec, fill=0.0):
+    """Flat internalField -> native blastlab array layout.
+
+    On an obstacle-carved mesh (spec.solid mask set) the field holds
+    only the fluid cells - subsetMesh keeps them in ascending original
+    (x-fastest) order, so they scatter straight into the full grid;
+    carved cells take `fill` (ambient value chosen by the caller)."""
     if spec.dim == 1:
         return vals
-    if spec.dim == 2:
-        return vals.reshape((spec.nx, spec.ny), order='F')
-    return vals.reshape((spec.nx, spec.ny, spec.nz), order='F')
+    shape = ((spec.nx, spec.ny) if spec.dim == 2
+             else (spec.nx, spec.ny, spec.nz))
+    solid = getattr(spec, 'solid', None)
+    if solid is None:
+        return vals.reshape(shape, order='F')
+    full = np.full(solid.size, float(fill))
+    full[~solid.flatten(order='F')] = vals
+    return full.reshape(shape, order='F')

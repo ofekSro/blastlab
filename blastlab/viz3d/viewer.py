@@ -64,17 +64,55 @@ def _set_text(actor, s):
 def add_static_scenery(pl, geo):
     """Domain outline, obstacles, charge ball, ground tint and gauge
     markers. `geo`: Lx/Ly/Lz, obstacles, charge_center, r_draw, bcs and
-    optionally gauges. Shared by BlastScene and the setup preview."""
+    optionally gauges; a `cyl` entry (revolved axisymmetric domain)
+    swaps the box outline/ground for a cylinder rim and disc, and
+    `rings` ((r0, r1, z0, z1) rectangles of the source axisymmetric
+    plane) render as revolved annular solids. Shared by BlastScene and
+    the setup preview."""
     import pyvista as pv
-    bounds = (0.0, geo['Lx'], 0.0, geo['Ly'], 0.0, geo['Lz'])
-    pl.add_mesh(pv.Box(bounds=bounds).extract_all_edges(),
-                color='#6b7280', line_width=1, opacity=0.5,
-                name='domain')
-    if (geo.get('bcs') or {}).get('z_lo') == 'wall':
-        ground = pv.Plane(center=(geo['Lx'] / 2, geo['Ly'] / 2, 0.0),
-                          direction=(0, 0, 1),
-                          i_size=geo['Lx'], j_size=geo['Ly'])
-        pl.add_mesh(ground, color='#39424e', opacity=0.35, name='ground')
+    cyl = geo.get('cyl')
+    if cyl is not None:
+        cx, cy, R = float(cyl['cx']), float(cyl['cy']), float(cyl['R'])
+        th = np.linspace(0.0, 2.0 * np.pi, 97)
+        ring = np.column_stack([cx + R * np.cos(th),
+                                cy + R * np.sin(th),
+                                np.zeros_like(th)])
+        parts = []
+        for z in (0.0, float(geo['Lz'])):
+            pts = ring.copy()
+            pts[:, 2] = z
+            parts.append(pv.lines_from_points(pts))
+        for a in (0.0, 0.5 * np.pi, np.pi, 1.5 * np.pi):
+            px, py = cx + R * np.cos(a), cy + R * np.sin(a)
+            parts.append(pv.Line((px, py, 0.0),
+                                 (px, py, float(geo['Lz']))))
+        pl.add_mesh(parts[0].merge(parts[1:]), color='#6b7280',
+                    line_width=1, opacity=0.5, name='domain')
+        if (geo.get('bcs') or {}).get('z_lo') == 'wall':
+            pl.add_mesh(pv.Disc(center=(cx, cy, 0.0), inner=0.0,
+                                outer=R, normal=(0, 0, 1), c_res=96),
+                        color='#39424e', opacity=0.35, name='ground')
+        # obstacle rectangles of the (r, z) plane, revolved: an
+        # annular ring (r0 = 0 degenerates to a full cylinder)
+        for k, (r0, r1, zlo, zhi) in enumerate(geo.get('rings') or []):
+            disc = pv.Disc(center=(cx, cy, float(zlo)),
+                           inner=float(r0), outer=float(r1),
+                           normal=(0, 0, 1), c_res=96)
+            pl.add_mesh(disc.extrude((0, 0, float(zhi) - float(zlo)),
+                                     capping=True),
+                        color='#8d99ae', opacity=1.0,
+                        smooth_shading=False, name=f'ring{k}')
+    else:
+        bounds = (0.0, geo['Lx'], 0.0, geo['Ly'], 0.0, geo['Lz'])
+        pl.add_mesh(pv.Box(bounds=bounds).extract_all_edges(),
+                    color='#6b7280', line_width=1, opacity=0.5,
+                    name='domain')
+        if (geo.get('bcs') or {}).get('z_lo') == 'wall':
+            ground = pv.Plane(center=(geo['Lx'] / 2, geo['Ly'] / 2, 0.0),
+                              direction=(0, 0, 1),
+                              i_size=geo['Lx'], j_size=geo['Ly'])
+            pl.add_mesh(ground, color='#39424e', opacity=0.35,
+                        name='ground')
     for k, box in enumerate(geo.get('obstacles') or []):
         pl.add_mesh(pv.Box(bounds=box), color='#8d99ae',
                     opacity=1.0, smooth_shading=False,
@@ -491,6 +529,33 @@ class BlastScene(_CameraOps):
 
 
 # ── layers ────────────────────────────────────────────────────────────────
+def _clip_to_cylinder(scene, alg):
+    """Cylindrical-domain scenes (revolved axisymmetric runs): append a
+    clip to a polydata-producing pipeline so slices and surfaces end at
+    the true cylinder instead of the bounding box. Stays a live VTK
+    pipeline - no per-frame Python cost. Returns `alg` unchanged for
+    ordinary box domains."""
+    cyl = scene.init.get('cyl')
+    if not cyl:
+        return alg
+    import vtk
+    fn = vtk.vtkCylinder()
+    fn.SetCenter(float(cyl['cx']), float(cyl['cy']),
+                 0.5 * float(scene.init['Lz']))
+    fn.SetRadius(float(cyl['R']))
+    try:
+        fn.SetAxis(0.0, 0.0, 1.0)
+    except AttributeError:          # old VTK: default axis is y
+        tr = vtk.vtkTransform()
+        tr.RotateX(90.0)
+        fn.SetTransform(tr)
+    clip = vtk.vtkClipPolyData()
+    clip.SetInputConnection(alg.GetOutputPort())
+    clip.SetClipFunction(fn)
+    clip.InsideOutOn()              # keep the inside of the cylinder
+    return clip
+
+
 class _CutPlane(_Layer):
     """Cross-section plane, colour-mapped by the scene's active field
     (draggable VTK widget in the standalone window).
@@ -515,6 +580,7 @@ class _CutPlane(_Layer):
         self._cutter = vtk.vtkCutter()
         self._cutter.SetCutFunction(self._plane)
         self._cutter.SetInputData(scene.grid)
+        self._tail = _clip_to_cylinder(scene, self._cutter)
         self._actor = None
         self._scalars = None            # array the actor is coloured by
         self.widget = None
@@ -554,7 +620,7 @@ class _CutPlane(_Layer):
             s.pl.remove_actor(self.name)
             title = RHO_TITLE if use_rho else FIELDS[s.field]['title']
             self._actor = s.pl.add_mesh(
-                self._cutter, scalars=scal, cmap=CMAP, clim=clim,
+                self._tail, scalars=scal, cmap=CMAP, clim=clim,
                 log_scale=s.log_scale, opacity=self.opacity,
                 name=self.name, show_scalar_bar=True,
                 scalar_bar_args=dict(title=title, color='white',
@@ -584,6 +650,7 @@ class _Isosurface(_Layer):
         self._fe.SetInputArrayToProcess(
             0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, 'p')
         self._fe.SetNumberOfContours(1)
+        self._tail = _clip_to_cylinder(scene, self._fe)
         self._actor = None
         self.set_visible(on)
 
@@ -609,10 +676,17 @@ class _Isosurface(_Layer):
             return
         self._fe.SetValue(0, level)
         if self._actor is None:
-            self._actor = s.pl.add_mesh(
-                self._fe, color='#ffb74d', opacity=0.45,
-                smooth_shading=True, name=self.name,
-                show_scalar_bar=False, reset_camera=False, render=False)
+            kw = dict(color='#ffb74d', opacity=0.45, name=self.name,
+                      show_scalar_bar=False, reset_camera=False,
+                      render=False)
+            try:
+                self._actor = s.pl.add_mesh(self._tail, smooth_shading=True,
+                                            **kw)
+            except TypeError:
+                # pyvista >= 0.45 refuses to smooth-shade a piped
+                # vtkAlgorithm. Flat shading keeps the live pipeline (no
+                # per-frame Python re-slicing) instead of losing the layer.
+                self._actor = s.pl.add_mesh(self._tail, **kw)
         else:
             self._actor.visibility = True
 
@@ -677,10 +751,15 @@ class _SurfaceLoads(_Layer):
             mesh.cell_data['load'] = _ovp_kpa(arr).ravel(order='F')
             name = f'load_{fid}'
             if name not in s.pl.actors:
-                s.pl.add_mesh(mesh, scalars='load', cmap=CMAP,
-                              clim=self._load_clim(), name=name,
-                              nan_color='#4a4f57', show_scalar_bar=False,
-                              reset_camera=False, render=False)
+                kw = dict(scalars='load', cmap=CMAP,
+                          clim=self._load_clim(), name=name,
+                          nan_color='#4a4f57', show_scalar_bar=False,
+                          reset_camera=False, render=False)
+                if s.init.get('cyl'):
+                    # cylindrical domain: cells beyond the outer radius
+                    # are no-data - hide them so the ground is a disc
+                    kw['nan_opacity'] = 0.0
+                s.pl.add_mesh(mesh, **kw)
 
 
 class _Volume(_Layer):

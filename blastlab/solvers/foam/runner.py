@@ -56,16 +56,75 @@ def run_stage(case_posix, cmds, timeout=600):
     return out
 
 
-class FoamRun:
-    """A running blastFoam process with streamed stdout."""
+def rewrite_control_entry(case_posix, case_unc, key, value):
+    """Rewrite one top-level `key   value;` line of the case's
+    runTimeModifiable controlDict while the solver runs. The edit runs
+    INSIDE WSL (sed -i) so a fresh native mtime clears the
+    fileModificationSkew window; a UNC rewrite is the fallback.
+    Returns True when either path succeeded."""
+    if isinstance(value, float):
+        value = format(value, '.10g')
+    res = subprocess.run(
+        env.wsl_argv(
+            f"sed -i 's/^{key} .*$/{key}          {value};/' "
+            f'{case_posix}/system/controlDict'),
+        capture_output=True, timeout=60,
+        stdin=subprocess.DEVNULL,
+        creationflags=env.CREATE_NO_WINDOW)
+    if res.returncode == 0:
+        return True
+    path = os.path.join(case_unc, 'system', 'controlDict')
+    try:
+        with open(path, encoding='ascii') as f:
+            text = f.read()
+        text = re.sub(rf'^{re.escape(key)}(\s+)[^;]+;',
+                      rf'{key}\g<1>{value};', text, count=1, flags=re.M)
+        tmp = path + '.tmp'
+        with open(tmp, 'w', encoding='ascii', newline='\n') as f:
+            f.write(text)
+        os.replace(tmp, path)
+        return True
+    except OSError:
+        return False    # caller decides (stop path escalates to kill)
 
-    def __init__(self, case_posix, case_unc, app='blastFoam'):
+
+class FoamRun:
+    """A running blastFoam solver (serial or MPI) with streamed stdout.
+
+    Parallel runs launch through `setsid`, making the recorded pid a
+    session leader whose session contains mpirun and every rank (the
+    ranks live in their OWN process groups, so group signals would miss
+    them - verified empirically); all signalling is session-wide via
+    `pkill -s`. Serial keeps the historical single-pid path."""
+
+    def __init__(self, case_posix, case_unc, app='blastFoam',
+                 n_procs=1):
         self.case_posix = case_posix
         self.case_unc = case_unc
+        self.n_procs = max(1, int(n_procs))
         self.lines = queue.Queue()
         self.log_tail = collections.deque(maxlen=80)
         self.stop_requested = False
-        script = (f'cd {case_posix} && echo $$ > .run.pid && exec {app}')
+        if self.n_procs > 1:
+            # setsid -w: new session (so .run.pid = session id covering
+            # mpirun + all ranks) but the launcher WAITS - without -w a
+            # forked setsid parent exits, wsl.exe closes the stdout
+            # pipe and the detached solver dies on SIGPIPE
+            # Open MPI's default slot count is the physical-core
+            # count: ranks beyond it need explicit opt-in or mpirun
+            # refuses to launch ("not enough slots")
+            flags = ''
+            if self.n_procs > env.detect_slots():
+                flags = ' --use-hwthread-cpus'
+                if self.n_procs > env.detect_cores():
+                    flags += ' --oversubscribe'
+            inner = (f'echo $$ > .run.pid && exec mpirun '
+                     f'--allow-run-as-root{flags} -np {self.n_procs} '
+                     f'{app} -parallel')
+            script = f"cd {case_posix} && setsid -w bash -c '{inner}'"
+        else:
+            script = (f'cd {case_posix} && echo $$ > .run.pid '
+                      f'&& exec {app}')
         self.proc = subprocess.Popen(
             env.wsl_argv(script), stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -102,38 +161,24 @@ class FoamRun:
 
     def request_write_now(self):
         """Graceful stop: `stopAt writeNow` via the runTimeModifiable
-        controlDict. The edit runs INSIDE WSL (sed -i) so the inotify
-        watch fires natively; a UNC rewrite is the fallback."""
+        controlDict."""
         if self.stop_requested:
             return
         self.stop_requested = True
-        res = subprocess.run(
-            env.wsl_argv(
-                "sed -i 's/^stopAt.*$/stopAt          writeNow;/' "
-                f'{self.case_posix}/system/controlDict'),
-            capture_output=True, timeout=60,
-            stdin=subprocess.DEVNULL,
-            creationflags=env.CREATE_NO_WINDOW)
-        if res.returncode == 0:
-            return
-        path = os.path.join(self.case_unc, 'system', 'controlDict')
-        try:
-            with open(path, encoding='ascii') as f:
-                text = f.read()
-            text = re.sub(r'^stopAt(\s+)\w+;', r'stopAt\1writeNow;',
-                          text, count=1, flags=re.M)
-            tmp = path + '.tmp'
-            with open(tmp, 'w', encoding='ascii', newline='\n') as f:
-                f.write(text)
-            os.replace(tmp, path)
-        except OSError:
-            pass    # caller's stop deadline will escalate to kill()
+        rewrite_control_entry(self.case_posix, self.case_unc,
+                              'stopAt', 'writeNow')
 
     def _signal(self, sig):
+        if self.n_procs > 1:
+            # whole session: mpirun + every rank (ranks sit in their
+            # own process groups, so a group kill would miss them)
+            cmd = (f'pkill -{sig} -s '
+                   f'$(cat {self.case_posix}/.run.pid) 2>/dev/null')
+        else:
+            cmd = (f'kill -{sig} $(cat {self.case_posix}/.run.pid) '
+                   f'2>/dev/null')
         subprocess.run(
-            env.wsl_argv(
-                f'kill -{sig} $(cat {self.case_posix}/.run.pid) '
-                f'2>/dev/null'),
+            env.wsl_argv(cmd),
             capture_output=True, timeout=30,
             stdin=subprocess.DEVNULL,
             creationflags=env.CREATE_NO_WINDOW)

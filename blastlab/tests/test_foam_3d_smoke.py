@@ -101,8 +101,26 @@ def main():
     py = res.gauges['pressures'][1].max() - P_AIR
     check('gauges shocked', px > 2 * P_AIR and py > 2 * P_AIR,
           f'{px/1e3:.0f} / {py/1e3:.0f} kPa')
-    check('x/y symmetry', abs(px - py) <= 0.05 * max(px, py),
+    # --tiny gauges land on cell faces (0.45/0.025 = 18): the two probes
+    # snap to non-mirror cells, so the extreme near field reads ~8%
+    # apart; the full-size case stays within 5%.
+    sym_tol = 0.10 if '--tiny' in sys.argv else 0.05
+    check('x/y symmetry', abs(px - py) <= sym_tol * max(px, py),
           f'{px/1e3:.0f} vs {py/1e3:.0f} kPa')
+
+    # per-step peak/impulse maps from the function objects. Snapshot p
+    # is float32 (quantum ~8 Pa at 1e8 Pa), p_peak float64 - compare
+    # with a relative margin.
+    check('peak source is foam FO', m.get('peak_source') == 'foam-fo',
+          str(m.get('peak_source')))
+    fin_p = res.snapshots[labels[-1]]['p'].astype(np.float64)
+    check('p_peak dominates final p',
+          m['p_peak'].shape == N
+          and (m['p_peak'] >= fin_p * (1.0 - 1e-6)).all()
+          and m['p_peak'].max() > 2 * P_AIR)
+    check('impulse map sane',
+          m['impulse'].shape == N and np.isfinite(m['impulse']).all()
+          and m['impulse'].max() > 0)
 
     print()
     if FAIL:

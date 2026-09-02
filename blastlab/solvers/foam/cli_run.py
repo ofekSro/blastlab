@@ -103,6 +103,30 @@ def clean_runs(assume_yes=False):
     print("  Deleted.")
 
 
+def load_and_report(case_dir):
+    """`--load-foam-run`: post-mortem load + summary (no re-run)."""
+    from ..hooks import ConsoleHooks
+    from .postmortem import load_run, list_runs
+    if case_dir in ('list', '-'):
+        runs = list_runs()
+        print(f"blastFoam runs in {env.RUNS_ROOT}:")
+        for name, _unc in runs or []:
+            print(f"  {name}")
+        if not runs:
+            print("  (none)")
+        return None
+    res = load_run(case_dir, ConsoleHooks(1))
+    dim = 1 if 'radius_m' in res.meta else (3 if 'z_c' in res.meta else 2)
+    print(f"  Loaded {dim}D result from {res.meta['case_dir']}")
+    print(f"  Snapshots : {len(res.snapshots)}"
+          f"  ({', '.join(list(res.snapshots)[:3])}...)")
+    n_g = len(res.gauges.get('points', res.gauges.get('radii', [])))
+    print(f"  Gauges    : {n_g}")
+    if res.meta.get('peak_source'):
+        print(f"  Peak maps : {res.meta['peak_source']}")
+    return res
+
+
 def _validate_or_exit(case):
     from ...core.case import validate_case
     rep = validate_case(case)

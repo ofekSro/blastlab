@@ -39,6 +39,8 @@ class GuiHooks(RunHooks):
         self.feed3d = None            # Feed3D once the 3D view is open
         self._latest3d = None
         self._frame3d_pending = False
+        self._revolver = None         # 2D axisym -> 3D cylinder view
+        self._rev_last = 0.0
         # stepped execution: 'run' streams, 'step' consumes a budget
         self._exec_lock = threading.Lock()
         self._exec_mode = 'run'
@@ -47,6 +49,17 @@ class GuiHooks(RunHooks):
         self._exec_evt.set()
 
     def run_started(self, info):
+        # 2D axisymmetric runs: revolve the live (r, z) frames into a
+        # cylinder for the 3D view (pressure only, illustration)
+        self._revolver = None
+        rev = info.get('revolve3d')
+        if rev is not None and self.auto3d:
+            from ..viz3d.sampling import Revolver
+            try:
+                self._revolver = Revolver(rev)
+                info = dict(info, scene3d=self._revolver.scene3d)
+            except Exception:
+                self._revolver = None
         # cached so the app can open the 3D viewer mid-run (Tk thread)
         self.scene3d = info.get('scene3d')
         if self.auto3d and self.scene3d is not None and self.feed3d is None:
@@ -75,6 +88,19 @@ class GuiHooks(RunHooks):
             if not self._frame_pending:
                 self._frame_pending = True
                 self.q.put(('frame',))
+        # revolved 3D companion frame: rides the 2D cadence (already
+        # gated by the user's refresh policy); in seconds mode the 3D
+        # emission is additionally throttled by refresh3d
+        rev = self._revolver
+        if rev is not None and self.feed3d is not None:
+            mode, val = self.refresh3d
+            now = time.monotonic()
+            if mode == 'steps' or now - self._rev_last >= float(val):
+                self._rev_last = now
+                try:
+                    self.frame3d(t, dict(p=rev.revolve(field2d)))
+                except ValueError:
+                    pass          # not a full-grid (r, z) frame
 
     def latest_frame(self):
         with self._lock:

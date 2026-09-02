@@ -1,0 +1,85 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+convertToMeters 1;
+vertices
+(
+    (0 0 0)
+    (2.008194782 0 0)
+    (2.008194782 2.008194782 0)
+    (0 2.008194782 0)
+    (0 0 2.008194782)
+    (2.008194782 0 2.008194782)
+    (2.008194782 2.008194782 2.008194782)
+    (0 2.008194782 2.008194782)
+);
+blocks
+(
+    hex (0 1 2 3 4 5 6 7) (120 120 120) simpleGrading (1 1 1)
+);
+edges           ( );
+boundary
+(
+    x_lo
+    {
+        type            patch;
+        faces
+        (
+            (0 3 7 4)
+        );
+    }
+    x_hi
+    {
+        type            patch;
+        faces
+        (
+            (1 2 6 5)
+        );
+    }
+    y_lo
+    {
+        type            patch;
+        faces
+        (
+            (0 1 5 4)
+        );
+    }
+    y_hi
+    {
+        type            patch;
+        faces
+        (
+            (3 2 6 7)
+        );
+    }
+    z_lo
+    {
+        type            wall;
+        faces
+        (
+            (0 1 2 3)
+        );
+    }
+    z_hi
+    {
+        type            patch;
+        faces
+        (
+            (4 5 6 7)
+        );
+    }
+    obstacles
+    {
+        type            wall;
+        faces ();
+    }
+);
+mergePatchPairs ( );
+
+// ************************************************************************* //

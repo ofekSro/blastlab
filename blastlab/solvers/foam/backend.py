@@ -18,11 +18,12 @@ errors while editing the form instead of at launch.
 
 import os
 import re
+import shutil
 import time as _time
 
 import numpy as np
 
-from ...core.constants import P_AIR
+from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Progress, Result, RunHooks
 from . import env, reader, runner, writer
 from .materials import MATERIALS
@@ -37,6 +38,14 @@ _RE_MAXP = re.compile(r'^max\(p\):\s*([0-9.eE+-]+)')
 _ARRIVAL_P = 1.001 * P_AIR      # native shock-arrival threshold
 _STOP_GRACE_S = 60.0            # writeNow -> kill escalation window
 _POLL_S = 0.25
+
+#: FOAM warnings that are inherent to the collapsed-hex sector/wedge
+#: meshes (1D sector, 2D axisym): the apex face degenerates into the
+#: default patch, and the 1-degree wedge planarity residual is ~1e-16
+#: (pure float round-off - the vendor's own wedge tutorials print the
+#: same). Summarized once instead of spamming the log.
+_BENIGN_WARN = ('undefined faces in mesh; adding to default patch',
+                'is not planar')
 
 
 def _todo(dim):
@@ -54,21 +63,105 @@ def _preflight(case, hooks):
     if not rep.ok:
         raise ValueError("Invalid blastFoam case:\n  "
                          + "\n  ".join(rep.errors))
-    spec = writer.write_case(case)
+    # effective rank count: 1D always serial; auto stays serial for
+    # small grids (decompose overhead beats the speed-up there)
+    plan = writer.plan_case(case)
+    n_procs = 1 if case.dim == 1 else env.resolve_nprocs(
+        getattr(case, 'n_procs', 0), plan.n_cells)
+    spec = writer.write_case(case, n_procs=n_procs)
     hooks.log(f"  [blastfoam] case directory: {spec.case_unc}")
     hooks.log("  [blastfoam] meshing + charge init "
               "(blockMesh && setRefinedFields)...")
     # -noRefine: v1 keeps the mesh uniform (grid already sized to
-    # resolve the charge), so no refiner configuration is needed
-    runner.run_stage(spec.case_posix,
-                     ['blockMesh', 'setRefinedFields -noRefine'])
+    # resolve the charge), so no refiner configuration is needed.
+    # Parallel runs initialize serially, then decompose: the global
+    # mass normalization of sphericalMassToCell is trivially correct
+    # that way, and decomposePar distributes the initialized fields.
+    cmds = ['blockMesh']
+    if spec.obstacles:
+        # carve the obstacle boxes: cellSet 'fluid' (boxes inverted),
+        # keep it, exposed faces land on the 'obstacles' wall patch
+        hooks.log(f"  [blastfoam] carving {len(spec.obstacles)} "
+                  f"obstacle box(es) ({int(spec.solid.sum()):,} cells "
+                  f"-> topoSet && subsetMesh)...")
+        cmds += ['topoSet', 'subsetMesh fluid -patch obstacles '
+                            '-overwrite']
+    cmds.append('setRefinedFields -noRefine')
+    if spec.n_procs > 1:
+        hooks.log(f"  [blastfoam] parallel run: {spec.n_procs} "
+                  f"MPI ranks (decomposePar)...")
+        cmds.append('decomposePar -force')
+    out = runner.run_stage(spec.case_posix, cmds)
+    _scan_stage_warnings(out, hooks)
     return spec
+
+
+def _scan_stage_warnings(out, hooks):
+    """Surface FOAM warnings from the mesh/init stages (their output
+    is otherwise discarded on success): benign sector-wedge warnings
+    collapse into one note, anything else is logged with its message."""
+    msgs = re.findall(
+        r'--> FOAM Warning :[^\n]*\n'
+        r'(?:\s*From [^\n]*\n)?(?:\s*in file[^\n]*\n)?\s*([^\n]+)', out)
+    benign = [m for m in msgs if any(s in m for s in _BENIGN_WARN)]
+    other = [m for m in msgs if not any(s in m for s in _BENIGN_WARN)]
+    if benign:
+        hooks.log('  [blastfoam] note: benign wedge-geometry warnings '
+                  'from the sector mesh (collapsed apex / ~1e-16 '
+                  'planarity round-off) - expected, harmless')
+    for m in other:
+        hooks.log(f'  [foam] mesh-stage Warning: {m.strip()}')
+
+
+def _stop_grace(spec):
+    """writeNow -> kill escalation window: a big mesh needs longer to
+    finish the current step + final write."""
+    return max(_STOP_GRACE_S, spec.n_cells / 2e5)
+
+
+def _maybe_reconstruct(spec, fields, done=False):
+    """Parallel runs: reconstruct processor time dirs that are complete
+    on every rank and absent top-level, so the ingest loops read
+    reconstructed dirs indistinguishable from serial output. Quietly
+    retries next poll on failure. `done` lifts the per-poll batch cap
+    (final sweep after the solver exits)."""
+    if spec.n_procs <= 1:
+        return
+    proc_uncs = [os.path.join(spec.case_unc, f'processor{i}')
+                 for i in range(spec.n_procs)]
+    common = None
+    for pu in proc_uncs:
+        try:
+            times = {name for _t, name in reader.list_times(pu)
+                     if reader.time_ready(os.path.join(pu, name),
+                                          fields)}
+        except OSError:
+            return
+        common = times if common is None else (common & times)
+    if not common:
+        return
+    have = {name for _t, name in reader.list_times(spec.case_unc)}
+    todo = sorted(common - have, key=float)
+    if not done:
+        todo = todo[:4]             # bound per-poll reconstruct work
+    if not todo:
+        return
+    try:
+        runner.run_stage(
+            spec.case_posix,
+            [f'reconstructPar -newTimes -time {",".join(todo)}'],
+            timeout=1800)
+    except runner.FoamStageError:
+        pass                        # transient (mid-write): next poll
 
 
 def _progress_line(line, st, hooks, end_time):
     """Parse one solver stdout line into Progress state. st['frac'],
     when not None, overrides the t/end_time estimate (3D uses the
-    shock-front radius, updated per ingested write)."""
+    shock-front radius, updated per ingested write). FOAM warning
+    blocks are multi-line ('--> FOAM Warning :' then From/in file then
+    the message) - the actual message is captured and logged; the
+    benign sector-wedge warnings collapse into one note."""
     m = _RE_TIME.match(line)
     if m:
         st['t'] = float(m.group(1))
@@ -87,8 +180,27 @@ def _progress_line(line, st, hooks, end_time):
     if m:
         st['p_max'] = float(m.group(1))
         return
-    if 'FOAM Warning' in line or 'FOAM FATAL' in line:
+    if 'FOAM FATAL' in line:
         hooks.log('  [foam] ' + line.rstrip())
+        return
+    if 'FOAM Warning' in line:
+        st['warn_scan'] = 6         # look for the message just below
+        return
+    if st.get('warn_scan'):
+        st['warn_scan'] -= 1
+        ls = line.strip()
+        if not ls or ls.startswith('From ') or ls.startswith('in file'):
+            return
+        st['warn_scan'] = 0
+        if any(s in ls for s in _BENIGN_WARN):
+            if not st.get('warn_benign_noted'):
+                st['warn_benign_noted'] = True
+                hooks.log('  [blastfoam] note: benign wedge-geometry '
+                          'warnings from the sector mesh (collapsed '
+                          'apex / ~1e-16 planarity round-off) - '
+                          'expected, harmless')
+        else:
+            hooks.log('  [foam] Warning: ' + ls)
 
 
 def _note_pause(hooks, st, will_pause):
@@ -113,6 +225,86 @@ def _gated_step(run, hooks):
             run.resume()
     else:
         hooks.step_gate()
+
+
+def _tail_live(spec, hooks, st, live, set_name, decode):
+    """Shared live-sample tail (1D line / 2D+3D slice): poll the
+    postProcessing/<set_name> dirs, emit at most one hooks.frame per
+    call (the newest complete sample), delete consumed dirs so disk
+    use stays bounded. `decode(tdir)` -> frame payload or None while
+    the sample is still mid-write. The GUI refresh policy is honored:
+    seconds mode throttles wall time, steps mode gates on solver steps
+    since the last emitted live frame."""
+    entries = reader.list_sample_times(spec.case_unc, set_name)
+    fresh = [(t, n) for t, n in entries if n not in live['seen']]
+    if not fresh:
+        return
+    if not _due_sparse(hooks.refresh, st['step'], live):
+        return
+    for t, name in reversed(fresh):
+        payload = decode(name)
+        if payload is None:
+            continue
+        if t >= st['t_frame']:
+            hooks.frame(payload, t)
+            st['t_frame'] = t
+            live['step'] = st['step']
+            live['draw'] = _time.time()
+        for tt, nn in entries:
+            if tt <= t and nn not in live['seen']:
+                live['seen'].add(nn)
+                shutil.rmtree(
+                    os.path.join(spec.case_unc, 'postProcessing',
+                                 set_name, nn),
+                    ignore_errors=True)
+        break
+
+
+def _new_live():
+    return dict(seen=set(), step=-(10 ** 9), draw=0.0)
+
+
+def _due_sparse(policy, step, last):
+    """Refresh-policy check for the foam ingest paths. Unlike the
+    native solvers, these are evaluated only when output lands on disk
+    - at arbitrary step counts - so steps mode gates on solver steps
+    elapsed since the last emitted frame (RunHooks._due's `step % n`
+    form would almost never hit here). `last` carries the previous
+    emission: 'step' and 'draw' (wall time), as built by _new_live()."""
+    mode, val = policy
+    if mode == 'steps':
+        return step - last['step'] >= max(1, int(val))
+    return _time.time() - last['draw'] > float(val)
+
+
+def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None):
+    """One liveSlice raw sample -> grid-shaped p array or None while
+    mid-write. The plane cuts one face per cell (interpolate and
+    triangulate are off), so sorting the rows by their in-plane
+    coordinates (ax_v primary, ax_u secondary) lands them in the
+    native x-fastest cell order. `slice_mask` (obstacle-carved 3D
+    meshes) marks the solid cells of the sampled layer: the sample
+    then holds only that layer's fluid cells, which are scattered
+    around the mask; solid cells display ambient pressure."""
+    data = reader.read_surface_sample(spec.case_unc, writer.LIVE_SLICE,
+                                      tdir)
+    if data is None:
+        return None
+    pts, vals = data
+    if slice_mask is None:
+        if len(vals) != shape[0] * shape[1]:
+            return None
+        order = np.lexsort((pts[:, ax_u], pts[:, ax_v]))
+        return vals[order].reshape(shape, order='F')
+    fluid = ~slice_mask
+    if len(vals) != int(fluid.sum()):
+        return None
+    # boolean-mask assignment fills in C order (ax_v fastest), so sort
+    # ax_u primary / ax_v secondary to match
+    order = np.lexsort((pts[:, ax_v], pts[:, ax_u]))
+    full = np.full(shape, float(P_AIR))
+    full[fluid] = vals[order]
+    return full
 
 
 def _pick_snapshots(store, names, n_snapshots):
@@ -157,7 +349,10 @@ def _log_banner_1d(hooks, case, spec):
             '  EOS             : JWL products + ideal-gas air',
             f'  vDet            : {m.vDet:g} m/s',
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms',
+            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
+            f'(initial, adaptive)',
+            f'  Live profile    : p(r) sampled every '
+            f'{writer.live_sample_steps(1)} steps',
             bar, ''):
         hooks.log(line)
 
@@ -173,23 +368,27 @@ def solve_1d_foam(case, hooks=None):
 
     _log_banner_1d(hooks, case, spec)
     hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m))
+    _initial_frame(spec, hooks)
 
     store = {}                      # dirname -> dict(t, p, rho, u)
-    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR))
+    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0,
+              t_frame=-1.0)
+    live = _new_live()
+    adapt = dict(interval=spec.write_interval, since=0)
     stop_reason = 'safety cap'
     stop_deadline = None
-    last_draw = 0.0
 
-    run = runner.FoamRun(spec.case_posix, spec.case_unc)
+    run = runner.FoamRun(spec.case_posix, spec.case_unc,
+                         n_procs=spec.n_procs)
 
     def request_stop(reason):
         nonlocal stop_reason, stop_deadline
         stop_reason = reason
         run.request_write_now()
-        stop_deadline = _time.time() + _STOP_GRACE_S
+        stop_deadline = _time.time() + _stop_grace(spec)
 
     def ingest_ready():
-        nonlocal last_draw
+        _maybe_reconstruct(spec, fields)
         for _t_disp, name in reader.list_times(spec.case_unc):
             if name in store:
                 continue
@@ -209,20 +408,45 @@ def solve_1d_foam(case, hooks=None):
             except (ValueError, OSError):
                 continue            # mid-write over 9p; retry next poll
             store[name] = entry
+            # shock-front position: real progress for the bar and for
+            # the adaptive-interval controller
+            shocked = entry['p'] > _ARRIVAL_P
+            r_front = float(r[shocked].max()) if shocked.any() else 0.0
+            st['frac'] = min(1.0, r_front / float(r[-1]))
+            _maybe_adapt(spec, st, adapt, run, hooks, len(store))
             will_pause = hooks.exec_will_pause()
-            if hooks.draw_due(st['step'], last_draw) or will_pause:
+            due = (_due_sparse(hooks.refresh, st['step'], live)
+                   and entry['t'] >= st['t_frame'])
+            if due or will_pause:
                 hooks.frame(np.array([r, entry['p']]), entry['t'])
-                last_draw = _time.time()
+                st['t_frame'] = entry['t']
+                live['step'] = st['step']
+                live['draw'] = _time.time()
             if not run.stop_requested and entry['p'][-1] > _ARRIVAL_P:
                 request_stop('shock arrived at outer boundary '
                              f"(p_last = {entry['p'][-1]:.3e} Pa)")
             _note_pause(hooks, st, will_pause)
             _gated_step(run, hooks)
 
+    def decode_line(tdir):
+        data = reader.read_line_sample(spec.case_unc, writer.LIVE_SET,
+                                       tdir)
+        # the line's endpoints sit a quarter-cell inside the apex and
+        # outlet cells, so lineCell drops those two cells and a
+        # complete profile has exactly n_cells - 2 rows; anything
+        # shorter is a mid-write file (or a stale 9p view of one)
+        if data is None or len(data[0]) < spec.n_cells - 2:
+            return None
+        return np.array([data[0], data[1]])
+
+    def ingest_live():
+        _tail_live(spec, hooks, st, live, writer.LIVE_SET, decode_line)
+
     try:
         while True:
             for line in run.drain(_POLL_S):
                 _progress_line(line, st, hooks, spec.end_time)
+            ingest_live()
             ingest_ready()
             if hooks.should_stop() and not run.stop_requested:
                 request_stop('stopped by user')
@@ -234,11 +458,16 @@ def solve_1d_foam(case, hooks=None):
             if not run.running:
                 for line in run.drain(0.05):
                     _progress_line(line, st, hooks, spec.end_time)
+                _maybe_reconstruct(spec, fields, done=True)
                 ingest_ready()      # final sweep - files are complete
                 break
     finally:
         if run.running:
             run.kill()
+        # live samples are display-only; drop the leftovers so a kept
+        # case dir holds just the real record (time dirs + probes)
+        shutil.rmtree(os.path.join(spec.case_unc, 'postProcessing',
+                                   writer.LIVE_SET), ignore_errors=True)
 
     if run.returncode not in (0, None) and not run.stop_requested:
         raise RuntimeError(
@@ -249,7 +478,15 @@ def solve_1d_foam(case, hooks=None):
             "blastFoam produced no readable time steps - case kept at "
             f"{spec.case_unc}\n{run.tail()}")
 
-    # ── finalize: exact native Result shapes ────────────────────────────
+    return _finalize_1d(case, spec, store, hooks, stop_reason,
+                        st['step'])
+
+
+def _finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
+    """Build the exact native-shaped 1D Result from ingested time-dir
+    entries (also used by postmortem.load_run)."""
+    m = MATERIALS[spec.material]
+    r = spec.grid['r']
     names = sorted(store, key=lambda n: store[n]['t'])
     fin_name = names[-1]
     fin = store[fin_name]
@@ -280,7 +517,7 @@ def solve_1d_foam(case, hooks=None):
                          eos='JWL', r_exp=spec.r_exp,
                          radius_m=case.radius_m)
 
-    hooks.log(f"\n  Done. {st['step']} solver steps, t_final = "
+    hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{fin['t']*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
     hooks.frame(np.array([r, fin['p']]), fin['t'])
@@ -296,15 +533,18 @@ def solve_1d_foam(case, hooks=None):
 # ── 2D ──────────────────────────────────────────────────────────────────────
 
 def _read_2d(dpath, spec, what=('p',)):
-    """Read fields of one time dir onto the native (Nx,Ny) layout."""
+    """Read fields of one time dir onto the native (Nx,Ny) layout.
+    Obstacle-carved cells read back as still ambient."""
     out = {}
     n = spec.n_cells
     if 'p' in what:
         out['p'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'p'), n), spec)
+            reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
+            fill=P_AIR)
     if 'rho' in what:
         out['rho'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec)
+            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
+            fill=RHO_AIR)
     if 'U' in what:
         flat = reader.read_vector(os.path.join(dpath, 'U'), n)
         out['u'] = reader.to_grid(flat[:, 0], spec)
@@ -334,12 +574,18 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
             f'(vDet {m.vDet:g} m/s)',
             f'  Boundaries      : {bc_lbl}'
             + ('  (x_lo = symmetry axis)' if axisym else ''),
+            f'  Obstacles       : {len(spec.obstacles)}'
+            + (' (carved out of the mesh, rigid walls)'
+               if spec.obstacles else ''),
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
             + ('shock arrival at an open boundary' if has_open
                else 'safety cap (no open boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms',
+            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
+            f'(initial, adaptive)',
+            f'  Live slice      : p sampled every '
+            f'{writer.live_sample_steps(2)} steps',
             bar, ''):
         hooks.log(line)
 
@@ -356,7 +602,8 @@ def solve_2d_foam(case, hooks=None):
     x0, y0, _ = spec.center
     bcs = dict(case.bcs)
     axisym = case.geometry == 'axisymmetric'
-    solid = np.zeros((Nx, Ny), dtype=bool)      # no obstacles in v1
+    solid = (spec.solid if spec.solid is not None
+             else np.zeros((Nx, Ny), dtype=bool))
 
     # open-boundary edge mask + distances (native logic, solver2d:236)
     open_edge = np.zeros((Nx, Ny), dtype=bool)
@@ -367,6 +614,7 @@ def solve_2d_foam(case, hooks=None):
     for side, sl in sides:
         if bcs[side] == 'open':
             open_edge[sl] = True
+    open_edge &= ~solid         # carved cells read back as ambient
     has_open = open_edge.any()
     d_charge = np.sqrt((x_c[:, None] - x0) ** 2
                        + (y_c[None, :] - y0) ** 2)
@@ -389,31 +637,50 @@ def solve_2d_foam(case, hooks=None):
                                   case.n_snapshots + 1)[1:-1])
 
     _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_open)
-    hooks.run_started(dict(
+    run_info = dict(
         dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
         xlabel='r [m]' if axisym else 'x [m]',
-        ylabel='z [m]' if axisym else 'y [m]', title=''))
+        ylabel='z [m]' if axisym else 'y [m]', title='')
+    if axisym:
+        # live (r, z) frames can be revolved into a 3D cylinder view
+        run_info['revolve3d'] = dict(
+            r_c=x_c, z_c=y_c, solid=solid, bcs=bcs,
+            obstacles=[tuple(o) for o in spec.obstacles],
+            z0=y0, r_exp=spec.r_exp, R=case.Lx, Lz=case.Ly)
+    hooks.run_started(run_info)
+    _initial_frame(spec, hooks)
 
     record_frames = case.record_frames
     frame_t, frame_p = [], []
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
     ingested = {}               # dirname -> t (full arrays NOT retained)
     snap_names = []
-    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0)
+    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0,
+              t_frame=-1.0)
+    live = _new_live()
+    adapt = dict(interval=spec.write_interval, since=0)
     stop_reason = 'safety cap'
     stop_deadline = None
-    last_draw = 0.0
 
-    run = runner.FoamRun(spec.case_posix, spec.case_unc)
+    run = runner.FoamRun(spec.case_posix, spec.case_unc,
+                         n_procs=spec.n_procs)
 
     def request_stop(reason):
         nonlocal stop_reason, stop_deadline
         stop_reason = reason
         run.request_write_now()
-        stop_deadline = _time.time() + _STOP_GRACE_S
+        stop_deadline = _time.time() + _stop_grace(spec)
+
+    slice_solid = solid if solid.any() else None
+
+    def ingest_live():
+        _tail_live(spec, hooks, st, live, writer.LIVE_SLICE,
+                   lambda tdir: _decode_surface(spec, tdir, (Nx, Ny),
+                                                0, 1, slice_solid))
 
     def ingest_ready():
-        nonlocal last_draw, frame_t, frame_p
+        nonlocal frame_t, frame_p
+        _maybe_reconstruct(spec, fields)
         for _t_disp, name in reader.list_times(spec.case_unc):
             if name in ingested:
                 continue
@@ -431,6 +698,7 @@ def solve_2d_foam(case, hooks=None):
             r_front = float(d_charge[shocked].max()) if shocked.any() \
                 else 0.0
             st['frac'] = min(1.0, r_front / stop_dist)
+            _maybe_adapt(spec, st, adapt, run, hooks, len(ingested))
             while snap_radii and r_front >= snap_radii[0]:
                 snap_radii.pop(0)
                 if name not in snap_names:
@@ -444,9 +712,13 @@ def solve_2d_foam(case, hooks=None):
                     frame_t = frame_t[::2]
                     frame_p = frame_p[::2]
             will_pause = hooks.exec_will_pause()
-            if hooks.draw_due(st['step'], last_draw) or will_pause:
+            due = (_due_sparse(hooks.refresh, st['step'], live)
+                   and t >= st['t_frame'])
+            if due or will_pause:
                 hooks.frame(p, t)
-                last_draw = _time.time()
+                st['t_frame'] = t
+                live['step'] = st['step']
+                live['draw'] = _time.time()
             if not run.stop_requested and has_open \
                     and (p[open_edge] > _ARRIVAL_P).any():
                 request_stop('shock arrived at an open boundary '
@@ -458,6 +730,7 @@ def solve_2d_foam(case, hooks=None):
         while True:
             for line in run.drain(_POLL_S):
                 _progress_line(line, st, hooks, spec.end_time)
+            ingest_live()
             ingest_ready()
             if hooks.should_stop() and not run.stop_requested:
                 request_stop('stopped by user')
@@ -469,11 +742,15 @@ def solve_2d_foam(case, hooks=None):
             if not run.running:
                 for line in run.drain(0.05):
                     _progress_line(line, st, hooks, spec.end_time)
+                _maybe_reconstruct(spec, fields, done=True)
                 ingest_ready()
                 break
     finally:
         if run.running:
             run.kill()
+        shutil.rmtree(os.path.join(spec.case_unc, 'postProcessing',
+                                   writer.LIVE_SLICE),
+                      ignore_errors=True)
 
     if run.returncode not in (0, None) and not run.stop_requested:
         raise RuntimeError(
@@ -484,7 +761,23 @@ def solve_2d_foam(case, hooks=None):
             "blastFoam produced no readable time steps - case kept at "
             f"{spec.case_unc}\n{run.tail()}")
 
-    # ── finalize: two-pass snapshot re-read ─────────────────────────────
+    return _finalize_2d(case, spec, hooks, stop_reason, st['step'],
+                        ingested, snap_names, frame_t, frame_p,
+                        record_frames)
+
+
+def _finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
+                 snap_names, frame_t, frame_p, record_frames):
+    """Build the exact native-shaped 2D Result via a two-pass snapshot
+    re-read (also used by postmortem.load_run)."""
+    m = MATERIALS[spec.material]
+    g = spec.grid
+    x_c, y_c = g['x_c'], g['y_c']
+    x0, y0, _ = spec.center
+    bcs = dict(case.bcs)
+    solid = (spec.solid if spec.solid is not None
+             else np.zeros((spec.nx, spec.ny), dtype=bool))
+
     names = sorted(ingested, key=ingested.get)
     fin_name = names[-1]
     snapshots = {}
@@ -514,13 +807,15 @@ def solve_2d_foam(case, hooks=None):
     # final_state for save_profile_2d -> 3D remap: e from T (per-phase
     # Cv - blastFoam writes no e field), phase from the products alpha
     alpha = reader.to_grid(reader.read_scalar(
-        os.path.join(dfin, f'alpha.{spec.phase}'), spec.n_cells), spec)
+        os.path.join(dfin, f'alpha.{spec.phase}'), spec.n_cells), spec,
+        fill=0.0)
     phase = (alpha > 0.5).astype(int)
     T = reader.to_grid(reader.read_scalar(
-        os.path.join(dfin, 'T'), spec.n_cells), spec)
+        os.path.join(dfin, 'T'), spec.n_cells), spec,
+        fill=writer.T_AMB)
     e_arr = np.where(phase == 1, m.Cv_products, writer.CV_AIR) * T
 
-    hooks.log(f"\n  Done. {st['step']} solver steps, t_final = "
+    hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
 
@@ -537,11 +832,19 @@ def solve_2d_foam(case, hooks=None):
                 x_face=g['x_face'], y_face=g['y_face'],
                 solid=solid, geometry=case.geometry,
                 Lx=case.Lx, Ly=case.Ly, dx=spec.dx,
-                eos='JWL', bcs=bcs, obstacles=[],
+                eos='JWL', bcs=bcs,
+                obstacles=[tuple(o) for o in spec.obstacles],
                 charge=case.charge, charge_center=(x0, y0),
                 r_exp=spec.r_exp, from_profile=False,
                 solver='blastfoam', material=spec.material,
                 case_dir=spec.case_unc)
+    # per-step peak/impulse maps from the function objects (2D has no
+    # Python accumulator to fall back on - keys present only on success)
+    fo_peak2, fo_imp2 = _read_fo_fields(dfin, spec)
+    if fo_peak2 is not None:
+        meta['p_peak'] = fo_peak2
+        meta['impulse'] = fo_imp2
+        meta['peak_source'] = 'foam-fo'
     meta['final_state'] = dict(t=t_fin, rho=fin['rho'], u=fin['u'],
                                v=fin['v'], e=e_arr, p=fin['p'],
                                phase=phase)
@@ -552,6 +855,24 @@ def solve_2d_foam(case, hooks=None):
 
 
 # ── 3D ──────────────────────────────────────────────────────────────────────
+
+def _read_fo_fields(dpath, spec):
+    """Optional per-step accumulation fields written by the impulse /
+    fieldMinMax function objects (writer plants them for 2D/3D cases).
+    Returns (p_peak, impulse) grids or (None, None) when either is
+    missing/unreadable - the caller falls back to the Python per-write
+    accumulators, so an FO failure degrades instead of stalling."""
+    try:
+        peak = reader.to_grid(reader.read_scalar(
+            os.path.join(dpath, 'pMax'), spec.n_cells), spec,
+            fill=P_AIR)
+        imp = reader.to_grid(reader.read_scalar(
+            os.path.join(dpath, 'impulse'), spec.n_cells), spec,
+            fill=0.0)
+    except (ValueError, OSError):
+        return None, None
+    return peak, imp
+
 
 def _snapshot_payload(p, rho, U, j0, k0, t):
     """Native _snapshot (solver3d.py:49) rebuilt from foam arrays."""
@@ -567,20 +888,138 @@ def _snapshot_payload(p, rho, U, j0, k0, t):
 
 
 def _read_3d(dpath, spec, what=('p',)):
-    """Read fields of one time dir onto the native (Nx,Ny,Nz) layout."""
+    """Read fields of one time dir onto the native (Nx,Ny,Nz) layout.
+    Obstacle-carved cells (absent from the mesh) read back as still
+    ambient: p_atm / air density / zero velocity."""
     out = {}
     n = spec.n_cells
     if 'p' in what:
         out['p'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'p'), n), spec)
+            reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
+            fill=P_AIR)
     if 'rho' in what:
         out['rho'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec)
+            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
+            fill=RHO_AIR)
     if 'U' in what:
         flat = reader.read_vector(os.path.join(dpath, 'U'), n)
         out['U'] = np.stack([reader.to_grid(flat[:, i], spec)
                              for i in range(3)], axis=-1)
     return out
+
+
+#: adaptive writeInterval: act at most once per this many ingests
+_ADAPT_EVERY = 3
+
+
+def _maybe_adapt(spec, st, adapt, run, hooks, n_frames):
+    """Apply the adaptive-writeInterval controller (all dims; the
+    controlDict is runTimeModifiable). Called once per ingested frame."""
+    adapt['since'] += 1
+    if adapt['since'] < _ADAPT_EVERY or run.stop_requested:
+        return
+    new_iv = _next_interval(n_frames, st.get('frac') or 0.0,
+                            adapt['interval'], spec.write_interval)
+    if new_iv is not None and runner.rewrite_control_entry(
+            spec.case_posix, spec.case_unc, 'writeInterval', new_iv):
+        hooks.log(f"  [blastfoam] writeInterval "
+                  f"{adapt['interval']*1e3:.4f} -> "
+                  f"{new_iv*1e3:.4f} ms (adaptive)")
+        adapt['interval'] = new_iv
+        adapt['since'] = 0
+
+
+def _initial_frame(spec, hooks, live_sl=None):
+    """Emit the t=0 field as the first live frame: the run's 0/p is
+    written by the case writer (uniform ambient before activation), so
+    the plot shows a live view immediately instead of staying empty
+    until the first time directory lands."""
+    try:
+        p0 = reader.read_scalar(os.path.join(spec.case_unc, '0', 'p'),
+                                spec.n_cells)
+    except (OSError, ValueError):
+        return
+    if spec.dim == 1:
+        hooks.frame(np.array([spec.grid['r'], p0]), 0.0)
+    else:
+        p0 = reader.to_grid(p0, spec, fill=P_AIR)
+        hooks.frame(p0 if live_sl is None else p0[live_sl].copy(), 0.0)
+
+
+def _initial_frame3d(spec, hooks):
+    """Emit the t=0 state to an attached 3D viewer, mirroring
+    _initial_frame for the plane: the first full write can be many
+    solver steps in, and until then the 3D view would stay empty.
+    The case's 0/ dir has no plain rho, so ambient density is used."""
+    if not hooks.wants_frame3d():
+        return
+    try:
+        p0 = reader.to_grid(reader.read_scalar(
+            os.path.join(spec.case_unc, '0', 'p'), spec.n_cells), spec,
+            fill=P_AIR)
+    except (OSError, ValueError):
+        return
+    rho0 = np.full_like(p0, RHO_AIR)
+    e0 = p0 / (0.4 * rho0)
+    hooks.frame3d(0.0, dict(p=p0, rho=rho0, e=e0, p_peak=p0.copy(),
+                            imp=np.zeros_like(p0)))
+
+
+def _next_interval(n_frames, progress, interval, interval0):
+    """Pure controller for the adaptive writeInterval (3D runs): keep
+    the projected total frame count inside the writer's N_WRITES band.
+    Returns the new interval, or None for no change. Doubling backs
+    off a too-dense start (near-field shock much faster than the sizing
+    estimate); halving recovers frames when the front stalls."""
+    est_total = n_frames / max(progress, 0.05)
+    if est_total > 1.5 * writer.N_WRITES_MAX:
+        new = interval * 2.0
+    elif est_total < 0.7 * writer.N_WRITES_MIN and progress > 0.15:
+        new = interval / 2.0
+    else:
+        return None
+    new = min(max(new, interval0 / 4.0), interval0 * 8.0)
+    if abs(new - interval) < 1e-15 * max(interval, 1e-30):
+        return None
+    return new
+
+
+def _d_charge_3d(spec):
+    """Distance to the NEAREST charge centre per cell (shock-front
+    radius/progress metric; multi-charge aware)."""
+    g = spec.grid
+    d = None
+    for (cx, cy, cz), _mass in spec.charges:
+        di = np.sqrt((g['x_c'][:, None, None] - cx) ** 2
+                     + (g['y_c'][None, :, None] - cy) ** 2
+                     + (g['z_c'][None, None, :] - cz) ** 2)
+        d = di if d is None else np.minimum(d, di)
+    return d.astype(np.float32)
+
+
+def _slice_geom_3d(case, spec):
+    """Burst-plane + user live-slice indices (native conventions),
+    shared by the live run loop and the finalizer/postmortem."""
+    g = spec.grid
+    x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
+    x0, y0, z0 = spec.center
+    j0 = int(np.argmin(np.abs(y_c - y0)))
+    k0 = int(np.argmin(np.abs(z_c - z0)))
+    slice_axis = getattr(case, 'slice_axis', 'y') or 'y'
+    ax_i = 'xyz'.index(slice_axis)
+    coords = (x_c, y_c, z_c)
+    pos = ((x0, y0, z0)[ax_i] if getattr(case, 'slice_pos', None) is None
+           else float(case.slice_pos))
+    s0 = int(np.argmin(np.abs(coords[ax_i] - pos)))
+    live_sl = tuple(s0 if a == ax_i else slice(None) for a in range(3))
+    live_faces = {'x': (g['y_face'], g['z_face']),
+                  'y': (g['x_face'], g['z_face']),
+                  'z': (g['x_face'], g['y_face'])}[slice_axis]
+    live_labels = {'x': ('y [m]', 'z [m]'), 'y': ('x [m]', 'z [m]'),
+                   'z': ('x [m]', 'y [m]')}[slice_axis]
+    live_title = f'{slice_axis} = {coords[ax_i][s0]:.2f} m'
+    return (j0, k0, slice_axis, s0, live_sl, live_faces, live_labels,
+            live_title)
 
 
 def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
@@ -597,17 +1036,23 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
             f'  Domain          : {case.Lx:g} x {case.Ly:g} x '
             f'{case.Lz:g} m,  cell {spec.dx:g} m',
             f'  Grid            : {spec.nx} x {spec.ny} x {spec.nz} = '
-            f'{spec.n_cells:,} cells',
+            f'{spec.n_cells:,} cells'
+            + (' (obstacle cells carved out)' if spec.obstacles else ''),
             '  EOS             : JWL products + ideal-gas air '
             f'(vDet {m.vDet:g} m/s)',
             f'  Boundaries      : {bc_lbl}',
+            f'  Obstacles       : {len(spec.obstacles)} '
+            f'(carved out of the mesh, rigid walls)'
+            if spec.obstacles else '  Obstacles       : 0',
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
             + ('shock arrival at an open boundary' if has_open
                else 'safety cap (no open boundaries)'),
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms',
+            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
+            f'(initial, adaptive)',
+            '  Live slice      : p sampled every step',
             bar, ''):
         hooks.log(line)
 
@@ -623,7 +1068,8 @@ def solve_3d_foam(case, hooks=None):
     dx = spec.dx
     x0, y0, z0 = spec.center
     bcs = dict(case.bcs)
-    solid = np.zeros((Nx, Ny, Nz), dtype=bool)   # no obstacles in v1
+    solid = (spec.solid if spec.solid is not None
+             else np.zeros((Nx, Ny, Nz), dtype=bool))
 
     n_snapshots = case.n_snapshots
     max_snaps = max(1, int(1.5e9 / (4 * spec.n_cells)) - 1)
@@ -639,10 +1085,9 @@ def solve_3d_foam(case, hooks=None):
                      ('z_lo', np.s_[:, :, 0]), ('z_hi', np.s_[:, :, -1])):
         if bcs[side] == 'open':
             open_edge[sl] = True
+    open_edge &= ~solid         # carved cells read back as ambient
     has_open = open_edge.any()
-    d_charge = np.sqrt((x_c[:, None, None] - x0) ** 2
-                       + (y_c[None, :, None] - y0) ** 2
-                       + (z_c[None, None, :] - z0) ** 2).astype(np.float32)
+    d_charge = _d_charge_3d(spec)
     dists = [d for d, side in ((x0, 'x_lo'), (case.Lx - x0, 'x_hi'),
                                (y0, 'y_lo'), (case.Ly - y0, 'y_hi'),
                                (z0, 'z_lo'), (case.Lz - z0, 'z_hi'))
@@ -657,21 +1102,8 @@ def solve_3d_foam(case, hooks=None):
                                   n_snapshots + 1)[1:-1])
 
     # burst-plane slice indices + user live slice (native conventions)
-    j0 = int(np.argmin(np.abs(y_c - y0)))
-    k0 = int(np.argmin(np.abs(z_c - z0)))
-    slice_axis = getattr(case, 'slice_axis', 'y') or 'y'
-    ax_i = 'xyz'.index(slice_axis)
-    _coords = (x_c, y_c, z_c)
-    _pos = ((x0, y0, z0)[ax_i] if getattr(case, 'slice_pos', None) is None
-            else float(case.slice_pos))
-    s0 = int(np.argmin(np.abs(_coords[ax_i] - _pos)))
-    live_sl = tuple(s0 if a == ax_i else slice(None) for a in range(3))
-    live_faces = {'x': (g['y_face'], g['z_face']),
-                  'y': (g['x_face'], g['z_face']),
-                  'z': (g['x_face'], g['y_face'])}[slice_axis]
-    live_labels = {'x': ('y [m]', 'z [m]'), 'y': ('x [m]', 'z [m]'),
-                   'z': ('x [m]', 'y [m]')}[slice_axis]
-    live_title = f'{slice_axis} = {_coords[ax_i][s0]:.2f} m'
+    (j0, k0, slice_axis, s0, live_sl, live_faces, live_labels,
+     live_title) = _slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_open)
     hooks.run_started(dict(
@@ -679,42 +1111,64 @@ def solve_3d_foam(case, hooks=None):
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
-                     obstacles=[], Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
+                     obstacles=[tuple(o) for o in spec.obstacles],
+                     Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
                      charge_center=(x0, y0, z0), r_exp=spec.r_exp,
                      bcs=bcs)))
+    _initial_frame(spec, hooks, live_sl)
+    _initial_frame3d(spec, hooks)
 
     record_frames = case.record_frames
     frame_t, frame_p = [], []
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
     ingested = {}               # dirname -> t (full arrays NOT retained)
     snap_names = []             # dirs picked by front-radius crossings
-    p_peak = None
+    p_peak = None               # Python per-write accumulators (fallback)
     impulse = None
+    fo_peak = None              # per-step FO fields (preferred source)
+    fo_imp = None
+    fo_missing_noted = False
     t_prev = 0.0
-    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0)
+    adapt = dict(interval=spec.write_interval, since=0)
+    st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR), frac=0.0,
+              t_frame=-1.0)
+    live = _new_live()
+    live3d = _new_live()        # frame3d throttle (viewer refresh policy)
+    ax_i = 'xyz'.index(slice_axis)
+    uv = [a for a in range(3) if a != ax_i]
+    lshape = tuple((Nx, Ny, Nz)[a] for a in uv)
+    # the live-slice sample skips carved cells: pass that layer's
+    # solid mask so the decoder scatters around it
+    slice_solid = solid[live_sl] if solid.any() else None
     stop_reason = 'safety cap'
     stop_deadline = None
-    last_draw = 0.0
-    last_draw3d = 0.0
 
-    run = runner.FoamRun(spec.case_posix, spec.case_unc)
+    run = runner.FoamRun(spec.case_posix, spec.case_unc,
+                         n_procs=spec.n_procs)
 
     def request_stop(reason):
         nonlocal stop_reason, stop_deadline
         stop_reason = reason
         run.request_write_now()
-        stop_deadline = _time.time() + _STOP_GRACE_S
+        stop_deadline = _time.time() + _stop_grace(spec)
+
+    def ingest_live():
+        _tail_live(spec, hooks, st, live, writer.LIVE_SLICE,
+                   lambda tdir: _decode_surface(spec, tdir, lshape,
+                                                uv[0], uv[1],
+                                                slice_solid))
 
     def ingest_ready():
-        nonlocal p_peak, impulse, t_prev, last_draw, last_draw3d
-        nonlocal frame_t, frame_p
+        nonlocal p_peak, impulse, t_prev
+        nonlocal frame_t, frame_p, fo_peak, fo_imp, fo_missing_noted
+        _maybe_reconstruct(spec, fields)
         for _t_disp, name in reader.list_times(spec.case_unc):
             if name in ingested:
                 continue
             dpath = os.path.join(spec.case_unc, name)
             if not reader.time_ready(dpath, fields):
                 continue
-            will_3d = (hooks.draw3d_due(st['step'], last_draw3d)
+            will_3d = (_due_sparse(hooks.refresh3d, st['step'], live3d)
                        or hooks.exec_will_pause()) and hooks.wants_frame3d()
             try:
                 t, _dt = reader.read_time(dpath)
@@ -731,6 +1185,16 @@ def solve_3d_foam(case, hooks=None):
                 np.maximum(p_peak, p, out=p_peak)
             impulse += (p - P_AIR) * (t - t_prev)
             t_prev = t
+            # per-step FO fields (preferred over the per-write Python
+            # accumulators above); t=0 has no FO output yet
+            got_peak, got_imp = _read_fo_fields(dpath, spec)
+            if got_peak is not None:
+                fo_peak, fo_imp = got_peak, got_imp
+            elif t > 0.0 and fo_peak is None and not fo_missing_noted:
+                fo_missing_noted = True
+                hooks.log('  [blastfoam] pMax/impulse fields not found '
+                          '- peak/impulse tracked per write instead of '
+                          'per step')
 
             # shock-front progress + native snapshot scheduling
             shocked = p > _ARRIVAL_P
@@ -744,6 +1208,9 @@ def solve_3d_foam(case, hooks=None):
                     hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
                               f"(front at {r_front:.2f} m)")
 
+            # adaptive writeInterval (runTimeModifiable controlDict)
+            _maybe_adapt(spec, st, adapt, run, hooks, len(ingested))
+
             if record_frames > 0:
                 frame_t.append(t)
                 frame_p.append(p[live_sl].astype(np.float32))
@@ -751,15 +1218,22 @@ def solve_3d_foam(case, hooks=None):
                     frame_t = frame_t[::2]
                     frame_p = frame_p[::2]
             will_pause = hooks.exec_will_pause()
-            if hooks.draw_due(st['step'], last_draw) or will_pause:
+            due = (_due_sparse(hooks.refresh, st['step'], live)
+                   and t >= st['t_frame'])
+            if due or will_pause:
                 hooks.frame(p[live_sl].copy(), t)
-                last_draw = _time.time()
+                st['t_frame'] = t
+                live['step'] = st['step']
+                live['draw'] = _time.time()
             if will_3d:
                 rho = got['rho']
                 e_approx = p / (0.4 * np.maximum(rho, 1e-10))
-                hooks.frame3d(t, dict(p=p, rho=rho, e=e_approx,
-                                      p_peak=p_peak, imp=impulse))
-                last_draw3d = _time.time()
+                hooks.frame3d(t, dict(
+                    p=p, rho=rho, e=e_approx,
+                    p_peak=fo_peak if fo_peak is not None else p_peak,
+                    imp=fo_imp if fo_imp is not None else impulse))
+                live3d['step'] = st['step']
+                live3d['draw'] = _time.time()
             if not run.stop_requested and has_open \
                     and (p[open_edge] > _ARRIVAL_P).any():
                 request_stop('shock arrived at an open boundary '
@@ -771,6 +1245,7 @@ def solve_3d_foam(case, hooks=None):
         while True:
             for line in run.drain(_POLL_S):
                 _progress_line(line, st, hooks, spec.end_time)
+            ingest_live()
             ingest_ready()
             if hooks.should_stop() and not run.stop_requested:
                 request_stop('stopped by user')
@@ -782,11 +1257,15 @@ def solve_3d_foam(case, hooks=None):
             if not run.running:
                 for line in run.drain(0.05):
                     _progress_line(line, st, hooks, spec.end_time)
+                _maybe_reconstruct(spec, fields, done=True)
                 ingest_ready()
                 break
     finally:
         if run.running:
             run.kill()
+        shutil.rmtree(os.path.join(spec.case_unc, 'postProcessing',
+                                   writer.LIVE_SLICE),
+                      ignore_errors=True)
 
     if run.returncode not in (0, None) and not run.stop_requested:
         raise RuntimeError(
@@ -799,7 +1278,25 @@ def solve_3d_foam(case, hooks=None):
     if stop_reason == 'safety cap' and spec.cap_is_end:
         stop_reason = 'end time reached'
 
-    # ── finalize: two-pass snapshot re-read (bounds run-time memory) ────
+    return _finalize_3d(case, spec, hooks, stop_reason, st['step'],
+                        ingested, snap_names, frame_t, frame_p,
+                        record_frames, p_peak, impulse, fo_peak, fo_imp)
+
+
+def _finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
+                 snap_names, frame_t, frame_p, record_frames,
+                 p_peak, impulse, fo_peak, fo_imp):
+    """Build the exact native-shaped 3D Result via a two-pass snapshot
+    re-read - bounds run-time memory (also used by postmortem)."""
+    g = spec.grid
+    x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
+    dx = spec.dx
+    x0, y0, z0 = spec.center
+    bcs = dict(case.bcs)
+    solid = (spec.solid if spec.solid is not None
+             else np.zeros((spec.nx, spec.ny, spec.nz), dtype=bool))
+    j0, k0, slice_axis, s0, live_sl = _slice_geom_3d(case, spec)[:5]
+
     names = sorted(ingested, key=ingested.get)
     fin_name = names[-1]
     snapshots = {}
@@ -823,6 +1320,17 @@ def solve_3d_foam(case, hooks=None):
         p_peak = fin['p'].copy()
         impulse = np.zeros_like(p_peak)
     np.maximum(p_peak, fin['p'], out=p_peak)
+    # final-dir FO fields (per-step accumulation) supersede the
+    # per-write Python accumulators when present
+    got_peak, got_imp = _read_fo_fields(
+        os.path.join(spec.case_unc, fin_name), spec)
+    peak_source = 'python-writes'
+    if got_peak is not None:
+        p_peak, impulse = got_peak, got_imp
+        peak_source = 'foam-fo'
+    elif fo_peak is not None:
+        p_peak, impulse = fo_peak, fo_imp
+        peak_source = 'foam-fo'
     if record_frames > 0 and (not frame_t or frame_t[-1] < t_fin):
         frame_t.append(t_fin)
         frame_p.append(fin['p'][live_sl].astype(np.float32))
@@ -831,7 +1339,7 @@ def solve_3d_foam(case, hooks=None):
     hooks.frame3d(t_fin, dict(p=fin['p'], rho=fin['rho'], e=e_approx,
                               p_peak=p_peak, imp=impulse), force=True)
 
-    hooks.log(f"\n  Done. {st['step']} solver steps, t_final = "
+    hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
 
@@ -848,11 +1356,13 @@ def solve_3d_foam(case, hooks=None):
                 z_face=g['z_face'], j0=j0, k0=k0,
                 slice_axis=slice_axis, s0=s0,
                 solid=solid, Lx=case.Lx, Ly=case.Ly, Lz=case.Lz, dx=dx,
-                eos='JWL', bcs=bcs, obstacles=[],
+                eos='JWL', bcs=bcs,
+                obstacles=[tuple(o) for o in spec.obstacles],
                 charge=case.charge, charge_center=(x0, y0, z0),
                 r_exp=spec.r_exp, r_src=spec.r_exp, from_profile=None,
                 solver='blastfoam', material=spec.material,
-                case_dir=spec.case_unc)
+                case_dir=spec.case_unc,
+                p_peak=p_peak, impulse=impulse, peak_source=peak_source)
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     return Result(snapshots, gauge_out, meta, stop_reason,

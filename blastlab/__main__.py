@@ -20,11 +20,19 @@ def main():
     ap.add_argument('--clean-foam-runs', action='store_true',
                     help='list and delete the WSL-side blastFoam run '
                          'directories, then exit')
+    ap.add_argument('--load-foam-run', metavar='DIR',
+                    help='load a finished blastFoam run directory '
+                         '(name under /root/blastlab_runs, or a full '
+                         'path) and report its contents, then exit')
     args = ap.parse_args()
 
     if args.clean_foam_runs:
         from .solvers.foam.cli_run import clean_runs
         clean_runs()
+        return
+    if args.load_foam_run:
+        from .solvers.foam.cli_run import load_and_report
+        load_and_report(args.load_foam_run)
         return
     if args.cli:
         from .cli import main as cli_main

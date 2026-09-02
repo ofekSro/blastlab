@@ -1,8 +1,9 @@
 """One-shot check: real solver run streaming to a real viewer window,
 then playback and close (the GUI live path without the GUI)."""
-import sys, time
+import os, sys, time
 
-sys.path.insert(0, r'c:\Users\rotem.ofek\Projects\BlastFoam')
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 
 def main():
