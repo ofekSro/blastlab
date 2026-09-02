@@ -408,11 +408,20 @@ and falls through to `terminate()` (`client.py:64-76`). *How:* on `Full`, drop
 one queued frame and retry so 'done'/'close' always land. *Effort:* S.
 *Confidence:* code-read / partially hypothesis (needs a stalled child).
 
-**A9 — Commit hygiene.** `postmortem.py`, the binary reader fixtures
-(`p_binary`, `U_binary`, `p_binary_truncated`…), and `_e2e_foam_obstacle*` /
-`_e2e_gui_foam.py` are untracked — the post-mortem feature currently exists
-only in the working tree. Commit them (respecting `.gitattributes` for the
-binary fixtures). *Effort:* S. *Confidence:* verified via git status.
+**A9 — Commit hygiene. DONE (2026-09-02).** All working-tree state (source,
+tests, goldens/baselines, docs) committed in four coherent commits:
+`postmortem.py` + its test, the binary reader fixtures, the manual e2e
+drivers, and everything else (the accumulated backend/GUI/viz3d work plus
+ROADMAP.md/TASKS.md). `.gitattributes` already marked the fixture/baseline/
+golden dirs `-text`, so no edit was needed there. Left untracked on purpose
+(stray manual-run scratch output, not source): `case.json`, `gauges_2d.txt`,
+`test_profile.txt`, `blastlab/tests/gauges.txt` — worth a `git clean` or
+`.gitignore` entry when convenient. Re-verified before committing:
+test_regression.py, test_foam_writer.py, test_foam_reader.py,
+test_foam_env.py (all but the live-WSL-probe check), test_case_validate.py,
+test_gui_drain.py, test_adaptive_interval.py, test_foam_live_due.py,
+test_viz3d_sampling/hooks/scene/panel.py, and `import blastlab.gui.app` —
+all green.
 
 **A10 — Regression discipline (unchanged, restated).** Never touch
 native-solver stdout without a deliberate re-baseline (`test_regression.py` is

@@ -13,7 +13,7 @@
 
 | # | Task | Bundles (ROADMAP ids) | Effort | Status |
 |---|------|------------------------|--------|--------|
-| T0 | Commit untracked work | A9 | 10 min | [ ] |
+| T0 | Commit untracked work | A9 | 10 min | [x] |
 | T1 | Harden the foam stop/ingest path | B1, B2, B15 | S–M | [ ] |
 | T2 | Fix wrong-data display: 3D replay slice + viewer final frame + thinning | B3, B4, B20 | S | [ ] |
 | T3 | Units & labels: kPa everywhere, impulse naming | B8, B9(relabel) | S | [ ] |
