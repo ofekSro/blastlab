@@ -217,22 +217,35 @@ def due_sparse(policy, step, last):
     return _time.time() - last['draw'] > float(val)
 
 
-def read_fo_fields(dpath, spec):
+def read_fo_fields(dpath, spec, mesh=None):
     """Optional per-step accumulation fields written by the impulse /
     fieldMinMax function objects (writer plants them for 2D/3D cases).
     Returns (p_peak, impulse) grids or (None, None) when either is
     missing/unreadable - the caller falls back to the Python per-write
-    accumulators, so an FO failure degrades instead of stalling."""
+    accumulators, so an FO failure degrades instead of stalling.
+    `mesh` is the time dir's own structure on a dynamic-AMR run."""
+    n = spec.n_cells if mesh is None else mesh.n_cells
     try:
         peak = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'pMax'), spec.n_cells), spec,
-            fill=P_AIR)
+            os.path.join(dpath, 'pMax'), n), spec, fill=P_AIR, mesh=mesh)
         imp = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'impulse'), spec.n_cells), spec,
-            fill=0.0)
+            os.path.join(dpath, 'impulse'), n), spec, fill=0.0, mesh=mesh)
     except (ValueError, OSError):
         return None, None
     return peak, imp
+
+
+def level_counts(counts):
+    """'L0 4,753 / L1 5,776 / L2 161,600' from a MeshMap's counts."""
+    return ' / '.join(f'L{l} {int(c):,}' for l, c in enumerate(counts))
+
+
+def amr_note(mesh, n_prev, t):
+    """The per-write AMR log line: cells of this write, change against
+    the previous write and the per-level histogram."""
+    d = mesh.n_cells - (mesh.n_cells if n_prev is None else int(n_prev))
+    return (f'  [blastfoam] AMR t = {t*1e3:.3f} ms: {mesh.n_cells:,} cells '
+            f'({d:+,}), {level_counts(mesh.counts)}')
 
 
 def next_interval(n_frames, progress, interval, interval0):
@@ -349,10 +362,11 @@ class PeakImpulse:
         self.t_fo = None
         self._noted = False
 
-    def add(self, p, t, dpath, spec, hooks):
+    def add(self, p, t, dpath, spec, hooks, mesh=None):
         """Accumulate one ingested write. False (logged) when t is before
         the last accumulated time - unreachable with OrderedIngest, kept
-        as the guard B16 asks for; the caller then skips the dir."""
+        as the guard B16 asks for; the caller then skips the dir.
+        `mesh` is the write's own structure on a dynamic-AMR run."""
         if self.t_py is not None and t < self.t_py:
             hooks.log(f'  [blastfoam] write t = {t*1e3:.3f} ms arrived '
                       f'after {self.t_py*1e3:.3f} ms - not accumulated')
@@ -368,7 +382,7 @@ class PeakImpulse:
         self.t_py = t
         # per-step FO fields (preferred over the per-write accumulators
         # above); t=0 has no FO output yet
-        got_peak, got_imp = read_fo_fields(dpath, spec)
+        got_peak, got_imp = read_fo_fields(dpath, spec, mesh=mesh)
         if got_peak is not None:
             self.fo_peak, self.fo_imp, self.t_fo = got_peak, got_imp, t
         elif t > 0.0 and self.fo_peak is None and not self._noted:
@@ -384,7 +398,7 @@ class PeakImpulse:
             return self.fo_peak, self.fo_imp
         return self.p_peak, self.impulse
 
-    def final(self, p_fin, dfin, t_fin, spec):
+    def final(self, p_fin, dfin, t_fin, spec, mesh=None):
         """(p_peak, impulse, peak_source) for the Result.
         Order: the final dir's FO fields; an FO read that already covers
         t_fin; the Python accumulator - 'python-fallback' when FO data
@@ -394,7 +408,7 @@ class PeakImpulse:
             self.p_peak = p_fin.copy()
             self.impulse = np.zeros_like(p_fin)
         np.maximum(self.p_peak, p_fin, out=self.p_peak)
-        got_peak, got_imp = read_fo_fields(dfin, spec)
+        got_peak, got_imp = read_fo_fields(dfin, spec, mesh=mesh)
         if got_peak is not None:
             return got_peak, got_imp, 'foam-fo'
         if self.fo_peak is not None and self.t_fo >= t_fin:
@@ -411,7 +425,9 @@ class FoamRunLoop:
     1D `store`, the 2D/3D `ingested`); the loop only reads it for
     ordering and for the "no readable time steps" check. `live_set` is
     the postProcessing sample set (`writer.LIVE_SET` / `LIVE_SLICE`)
-    decoded by `decode(tdir)` for live frames between writes.
+    decoded by `decode(tdir)` for live frames between writes; None
+    (dynamic-AMR runs, whose live frames come from the written times)
+    disables the live tail.
 
     Attributes the callbacks use: `st` (progress state: step/t/dt/
     p_max/frac/t_frame), `live` (live-frame throttle, see new_live),
@@ -462,6 +478,8 @@ class FoamRunLoop:
         gated_step(self.foam, self.hooks)
 
     def _ingest_live(self):
+        if self.live_set is None:
+            return
         tail_live(self.spec, self.hooks, self.st, self.live, self.live_set,
                   self.decode)
 
@@ -506,8 +524,10 @@ class FoamRunLoop:
                 foam.kill()
             # live samples are display-only; drop the leftovers so a kept
             # case dir holds just the real record (time dirs + probes)
-            shutil.rmtree(os.path.join(spec.case_unc, 'postProcessing',
-                                       self.live_set), ignore_errors=True)
+            if self.live_set:
+                shutil.rmtree(os.path.join(spec.case_unc, 'postProcessing',
+                                           self.live_set),
+                              ignore_errors=True)
 
         if foam.returncode not in (0, None) and not foam.stop_requested:
             raise RuntimeError(

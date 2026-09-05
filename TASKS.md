@@ -34,7 +34,7 @@
 | T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [x] |
 | T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [x] |
 | T20 | Dynamic AMR: core model + schema + validation + writer + goldens | N16 | M | [x] |
-| T21 | Dynamic AMR: per-time ingest path + post-mortem + 2D e2e | N16 | M–L | [ ] |
+| T21 | Dynamic AMR: per-time ingest path + post-mortem + 2D e2e | N16 | M–L | [x] |
 | T22 | Dynamic AMR: GUI form + validation line + per-frame mesh in Results | N16 | M | [ ] |
 | T23 | Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs | N16 | S–M | [ ] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
@@ -749,7 +749,7 @@ Done when: green; ROADMAP N16 T20 part DONE.
 ## T21 — Dynamic AMR: per-time ingest path + post-mortem + 2D e2e (N16)
 
 ```
-SESSION PROMPT — T21
+SESSION PROMPT — T21   [DONE 2026-09-05; planar AMR charge -> cylindericalMassToCell + backup; defaults 0.4/0.2]
 Read: ROADMAP.md N16 (probe numbers), plan file "T21"; solvers/foam/backend.py
   (_mesh_stages, build_remap, _decode_surface, read_2d/read_3d, solve_2d/3d_foam
   read_dir/on_frame, finalize_2d/3d, _initial_frame*); reader.py (read_scalar,

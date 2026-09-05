@@ -30,6 +30,7 @@ from . import env, reader, runner, writer
 from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, FoamRunLoop, PeakImpulse,
                       due_sparse, new_live)
+from .runloop import amr_note, level_counts
 
 #: dims with a working blastFoam backend (grows per phase)
 IMPLEMENTED = frozenset({1, 2, 3})
@@ -88,7 +89,7 @@ def _mesh_stages(spec, hooks):
     # initialised afterwards on the final mesh, and the cell centres are
     # written (serial, before any decomposition) so the reader can match
     # the mesh against core.refine's prediction
-    for lv in range(1, spec.lmax + 1):
+    for lv in (range(1, spec.lmax + 1) if not spec.amr else ()):
         lbl = (f'refining level {lv} '
                f'({spec.dx_base / 2 ** lv:.4g} m cells)')
         stages += [(f'{lbl} - topoSet',
@@ -96,9 +97,18 @@ def _mesh_stages(spec, hooks):
                    (f'{lbl} - refineMesh',
                     f'refineMesh -dict system/refineMeshDict.{lv} '
                     f'-overwrite')]
-    stages.append(('charge init (setRefinedFields)',
-                   'setRefinedFields -noRefine'))
-    if spec.lmax:
+    if spec.amr:
+        # dynamic AMR (N16): setRefinedFields refines the charge region
+        # to `maxRefinement` at t = 0 and writes the hexRef cellLevel the
+        # run-time refiner continues from - the static path's -noRefine
+        # would leave the charge on the base grid
+        stages.append((f'charge init + t = 0 refinement to level '
+                       f'{spec.amr} (setRefinedFields)',
+                       'setRefinedFields'))
+    else:
+        stages.append(('charge init (setRefinedFields)',
+                       'setRefinedFields -noRefine'))
+    if spec.lmax or spec.amr:
         stages.append(('writing cell centres (writeCellCentres)',
                        'postProcess -func writeCellCentres -time 0'))
     if spec.n_procs > 1:
@@ -112,7 +122,10 @@ def build_remap(spec, hooks):
     mesh stages wrote (0/C), matches them against the predicted
     structure and stores `spec.remap` / `spec.n_cells_actual`. Any
     mismatch is fatal (the case dir is kept for inspection): silently
-    mis-mapping cells would put values in the wrong place."""
+    mis-mapping cells would put values in the wrong place. Dynamic-AMR
+    runs take the per-time path instead (`mesh_at` on the 0/ dir)."""
+    if spec.amr:
+        return _build_remap_amr(spec, hooks)
     try:
         C = reader.read_cell_centres(spec.case_unc)
     except (OSError, ValueError) as exc:
@@ -138,6 +151,60 @@ def build_remap(spec, hooks):
               f'{" x ".join(str(n) for n in spec.levels.shape)} grid)')
 
 
+def mesh_at(spec, dpath):
+    """Dynamic AMR (N16): the structure of ONE written time dir - a
+    core.refine.MeshMap built from that dir's cell centres `C` (the
+    writeCellCentres function object) and `cellLevel` (dumpLevel), or
+    None on a static mesh so callers fall back to `spec.remap` exactly
+    as before. At t = 0 (no cellLevel field yet) the hexRef labelList
+    `polyMesh/cellLevel` that setRefinedFields wrote is used, and a base
+    mesh without one is level 0 throughout. Torn files raise ValueError
+    (the ingest loop retries next poll); a mesh that does not tile the
+    display grid raises RuntimeError (fatal, case kept)."""
+    if not spec.amr:
+        return None
+    C = reader.read_vector(os.path.join(dpath, 'C'), None)
+    lv_path = os.path.join(dpath, 'cellLevel')
+    if os.path.isfile(lv_path):
+        lv = reader.read_scalar(lv_path, len(C))
+    else:
+        pm = os.path.join(dpath, 'polyMesh', 'cellLevel')
+        lv = (reader.read_label_list(pm) if os.path.isfile(pm)
+              else np.zeros(len(C), dtype=np.int64))
+        if len(lv) != len(C):
+            raise ValueError(f'{pm}: {len(lv)} levels for {len(C)} cells')
+    return refine.remap_from_centres(C[:, :spec.dim], lv, spec.grid,
+                                     spec.display_level, spec.solid)
+
+
+def _build_remap_amr(spec, hooks):
+    """AMR twin of build_remap: read the t = 0 mesh (charge refined by
+    setRefinedFields), keep its MeshMap on `spec.mesh0` for the initial
+    frames and record the starting cell count."""
+    d0 = os.path.join(spec.case_unc, '0')
+    try:
+        mm = mesh_at(spec, d0)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f'AMR mesh: cannot read the t = 0 cell centres / levels '
+            f'({exc}) - case kept at {spec.case_unc}') from exc
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f'AMR mesh at t = 0 does not tile the display grid: {exc} - '
+            f'case kept at {spec.case_unc}') from exc
+    spec.mesh0 = mm
+    spec.n_cells_actual = int(mm.n_cells)
+    for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
+        try:
+            os.remove(os.path.join(d0, f))
+        except OSError:
+            pass
+    hooks.log(f'  [blastfoam] AMR mesh at t = 0: {mm.n_cells:,} cells '
+              f'({level_counts(mm.counts)}), displayed on a '
+              f'{" x ".join(str(n) for n in mm.remap.shape)} grid at '
+              f'level {spec.display_level} ({spec.dx:.5g} m)')
+
+
 def _preflight(case, hooks):
     _check_available_stoppable(hooks)
     from ...core.case import validate_case
@@ -149,7 +216,9 @@ def _preflight(case, hooks):
     # effective rank count: 1D always serial; auto stays serial for
     # small grids (decompose overhead beats the speed-up there)
     plan = writer.plan_case(case)
-    n_procs = 1 if case.dim == 1 else env.resolve_nprocs(
+    # AMR runs are serial in this version (ROADMAP N16: reconstructPar
+    # cannot follow a changing mesh; the parallel path is a follow-up)
+    n_procs = 1 if (case.dim == 1 or plan.amr) else env.resolve_nprocs(
         getattr(case, 'n_procs', 0), plan.n_cells)
     spec = writer.write_case(case, n_procs=n_procs)
     hooks.log(f"  [blastfoam] case directory: {spec.case_unc}")
@@ -166,7 +235,7 @@ def _preflight(case, hooks):
     # `&&` chain: the benign wedge warnings collapse into one note
     # instead of one per stage that emits them
     _scan_stage_warnings('\n'.join(out), hooks)
-    if spec.lmax:
+    if spec.lmax or spec.amr:
         build_remap(spec, hooks)
     return spec
 
@@ -441,28 +510,36 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
 # ── 2D ──────────────────────────────────────────────────────────────────────
 
 
-def read_2d(dpath, spec, what=('p',)):
+def read_2d(dpath, spec, what=('p',), mesh=None):
     """Read fields of one time dir onto the native (Nx,Ny) layout.
-    Obstacle-carved cells read back as still ambient."""
+    Obstacle-carved cells read back as still ambient. `mesh` is the
+    dir's own MeshMap on a dynamic-AMR run (see `mesh_at`)."""
     out = {}
-    n = spec.n_cells
+    n = spec.n_cells if mesh is None else mesh.n_cells
     if 'p' in what:
         out['p'] = reader.to_grid(
             reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
-            fill=P_AIR)
+            fill=P_AIR, mesh=mesh)
     if 'rho' in what:
         out['rho'] = reader.to_grid(
             reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
-            fill=RHO_AIR)
+            fill=RHO_AIR, mesh=mesh)
     if 'U' in what:
         flat = reader.read_vector(os.path.join(dpath, 'U'), n)
-        out['u'] = reader.to_grid(flat[:, 0], spec)
-        out['v'] = reader.to_grid(flat[:, 1], spec)
+        out['u'] = reader.to_grid(flat[:, 0], spec, mesh=mesh)
+        out['v'] = reader.to_grid(flat[:, 1], spec, mesh=mesh)
     return out
 
 
 def _refine_lines(spec):
     """Banner lines for a locally refined mesh ([] when uniform)."""
+    if spec.amr:
+        disp = ' x '.join(str(n) for n in spec.levels.shape)
+        return [f'  Dynamic AMR     : up to level {spec.amr} '
+                f'({spec.dx_base / 2 ** spec.amr:g} m cells); displayed at '
+                f'level {spec.display_level} ({disp} grid at {spec.dx:g} m)',
+                f'  Mesh cells      : {spec.n_cells:,} at t = 0 '
+                f'(follows the shock)']
     if not spec.lmax:
         return []
     lv = np.asarray(spec.levels)
@@ -496,7 +573,8 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
             f'  Explosive radius: {spec.r_exp:.4f} m',
             (f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  cell '
              f'{spec.dx:g} m  ({spec.nx} x {spec.ny} = '
-             f'{spec.n_cells:,} cells)') if not spec.lmax else
+             f'{spec.n_cells:,} cells)') if not (spec.lmax or spec.amr)
+            else
             (f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  base '
              f'cell {spec.dx_base:g} m  ({spec.nb[0]} x {spec.nb[1]} '
              f'base cells)'),
@@ -515,8 +593,10 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
             f'(initial, adaptive)',
-            f'  Live slice      : p sampled every '
-            f'{writer.live_sample_steps(2)} steps',
+            ('  Live slice      : p of every written time (AMR)'
+             if spec.amr else
+             f'  Live slice      : p sampled every '
+             f'{writer.live_sample_steps(2)} steps'),
             bar, ''):
         hooks.log(line)
 
@@ -555,7 +635,7 @@ def solve_2d_foam(case, hooks=None):
         ylabel='z [m]' if axisym else 'y [m]', title='',
         mesh_src=(refine.slice_src(spec.levels, spec.lmax,
                                    solid_fine=spec.solid)
-                  if spec.lmax else None))
+                  if spec.lmax and not spec.amr else None))
     if axisym:
         # live (r, z) frames can be revolved into a 3D cylinder view
         run_info['revolve3d'] = dict(
@@ -566,9 +646,10 @@ def solve_2d_foam(case, hooks=None):
     _initial_frame(spec, hooks)
 
     record_frames = case.record_frames
-    frame_t, frame_p = [], []
-    # T is in the readiness tuple because finalize_2d re-reads it
-    fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
+    frame_t, frame_p, frame_lv = [], [], []
+    # T is in the readiness tuple because finalize_2d re-reads it;
+    # AMR runs add the per-time mesh files (C, cellLevel)
+    fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}') + spec.mesh_fields
     ingested = {}               # dirname -> t (full arrays NOT retained)
     snap_names = []
     acc = PeakImpulse()         # per-write Python + per-step FO accumulators
@@ -576,15 +657,19 @@ def solve_2d_foam(case, hooks=None):
 
     def read_dir(name, dpath):
         t, _dt = reader.read_time(dpath)
-        return t, read_2d(dpath, spec)['p']
+        mesh = mesh_at(spec, dpath)         # None on a static mesh
+        return t, read_2d(dpath, spec, mesh=mesh)['p'], mesh
 
     def on_frame(name, dpath, payload):
-        nonlocal frame_t, frame_p
-        t, p = payload
-        if not acc.add(p, t, dpath, spec, hooks):
+        nonlocal frame_t, frame_p, frame_lv
+        t, p, mesh = payload
+        if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             return False
         ingested[name] = t
         st, live = loop.st, loop.live
+        if mesh is not None:
+            hooks.log(amr_note(mesh, st.get('n_prev'), t))
+            st['n_prev'] = mesh.n_cells
 
         shocked = p > ARRIVAL_P
         r_front = float(d_charge[shocked].max()) if shocked.any() \
@@ -600,9 +685,12 @@ def solve_2d_foam(case, hooks=None):
         if record_frames > 0:
             frame_t.append(t)
             frame_p.append(p.astype(np.float32))
+            if mesh is not None:
+                frame_lv.append(mesh.levels)
             if len(frame_p) >= 2 * record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
+                frame_lv = frame_lv[::2]
         will_pause = hooks.exec_will_pause()
         due = (due_sparse(hooks.refresh, st['step'], live)
                and t >= st['t_frame'])
@@ -619,19 +707,23 @@ def solve_2d_foam(case, hooks=None):
         loop.gated_step()
         return True
 
-    loop = FoamRunLoop(
-        spec, hooks, fields, ingested, writer.LIVE_SLICE,
+    # AMR: no live-slice FO (its rows carry no cell size) - live frames
+    # come from the written times through the per-time remap
+    live_set, decode = (None, None) if spec.amr else (
+        writer.LIVE_SLICE,
         lambda tdir: _decode_surface(spec, tdir, (Nx, Ny), 0, 1,
-                                     slice_solid, remap_sl=spec.remap),
-        read_dir, on_frame)
+                                     slice_solid, remap_sl=spec.remap))
+    loop = FoamRunLoop(spec, hooks, fields, ingested, live_set, decode,
+                       read_dir, on_frame)
     stop_reason = loop.run()
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
-                       record_frames, acc)
+                       record_frames, acc, frame_lv=frame_lv)
 
 
 def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
-                 snap_names, frame_t, frame_p, record_frames, acc):
+                 snap_names, frame_t, frame_p, record_frames, acc,
+                 frame_lv=None):
     """Build the exact native-shaped 2D Result via a two-pass snapshot
     re-read (also used by postmortem.load_run)."""
     m = MATERIALS[spec.material]
@@ -648,18 +740,20 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     # Cv - blastFoam writes no e field), phase from the products alpha
     def read_final(name):
         dpath = os.path.join(spec.case_unc, name)
-        got = read_2d(dpath, spec, ('p', 'rho', 'U'))
+        mesh = mesh_at(spec, dpath)
+        n = spec.n_cells if mesh is None else mesh.n_cells
+        got = read_2d(dpath, spec, ('p', 'rho', 'U'), mesh=mesh)
         alpha = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, f'alpha.{spec.phase}'), spec.n_cells),
-            spec, fill=0.0)
+            os.path.join(dpath, f'alpha.{spec.phase}'), n),
+            spec, fill=0.0, mesh=mesh)
         phase = (alpha > 0.5).astype(int)
         T = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'T'), spec.n_cells), spec,
-            fill=writer.T_AMB)
+            os.path.join(dpath, 'T'), n), spec,
+            fill=writer.T_AMB, mesh=mesh)
         return got, phase, np.where(phase == 1, m.Cv_products,
-                                    writer.CV_AIR) * T
+                                    writer.CV_AIR) * T, mesh
 
-    names, (fin, phase, e_arr) = _final_read(
+    names, (fin, phase, e_arr, mesh_fin) = _final_read(
         hooks, names, ingested.get, read_final)
     fin_name = names[-1]
     dfin = os.path.join(spec.case_unc, fin_name)
@@ -669,8 +763,8 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     for name in snap_names:
         if name == fin_name:
             continue
-        got = read_2d(os.path.join(spec.case_unc, name), spec,
-                       ('p', 'rho', 'U'))
+        dp = os.path.join(spec.case_unc, name)
+        got = read_2d(dp, spec, ('p', 'rho', 'U'), mesh=mesh_at(spec, dp))
         t = ingested[name]
         label = f"t = {t*1e3:.3f} ms"
         if label not in snapshots:
@@ -685,6 +779,8 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     if record_frames > 0 and (not frame_t or frame_t[-1] < t_fin):
         frame_t.append(t_fin)
         frame_p.append(fin['p'].astype(np.float32))
+        if mesh_fin is not None and frame_lv is not None:
+            frame_lv.append(mesh_fin.levels)
     hooks.frame(fin['p'], t_fin)
 
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
@@ -713,17 +809,32 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     # per-step FO peak/impulse maps, falling back to the per-write Python
     # accumulator (B17: same policy as 3D)
     (meta['p_peak'], meta['impulse'],
-     meta['peak_source']) = acc.final(fin['p'], dfin, t_fin, spec)
+     meta['peak_source']) = acc.final(fin['p'], dfin, t_fin, spec,
+                                      mesh=mesh_fin)
     meta['final_state'] = dict(t=t_fin, rho=fin['rho'], u=fin['u'],
                                v=fin['v'], e=e_arr, p=fin['p'],
                                phase=phase)
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
+    _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames)
     return Result(snapshots, gauge_out, meta, stop_reason,
                   stop_reason == 'stopped by user')
 
 
 # ── 3D ──────────────────────────────────────────────────────────────────────
+
+
+def _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames):
+    """Dynamic AMR: meta['refine'] carries the LAST written mesh's
+    display-grid level map + cell count (the static payload holds the
+    predicted map), and the recorded frames carry their per-frame level
+    maps so "Show mesh" can follow the replay. No-op on static runs."""
+    if not spec.amr or mesh_fin is None:
+        return
+    meta['refine'] = dict(meta.get('refine') or {}, levels=mesh_fin.levels,
+                          n_cells=mesh_fin.n_cells, counts=mesh_fin.counts)
+    if record_frames > 0 and frame_lv:
+        meta.setdefault('frames', {})['levels'] = frame_lv
 
 
 def _snapshot_payload(p, rho, U, j0, k0, t):
@@ -739,23 +850,24 @@ def _snapshot_payload(p, rho, U, j0, k0, t):
                 rho3=decimate(rho, choose_stride(rho.shape)))
 
 
-def read_3d(dpath, spec, what=('p',)):
+def read_3d(dpath, spec, what=('p',), mesh=None):
     """Read fields of one time dir onto the native (Nx,Ny,Nz) layout.
     Obstacle-carved cells (absent from the mesh) read back as still
-    ambient: p_atm / air density / zero velocity."""
+    ambient: p_atm / air density / zero velocity. `mesh` is the dir's
+    own MeshMap on a dynamic-AMR run (see `mesh_at`)."""
     out = {}
-    n = spec.n_cells
+    n = spec.n_cells if mesh is None else mesh.n_cells
     if 'p' in what:
         out['p'] = reader.to_grid(
             reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
-            fill=P_AIR)
+            fill=P_AIR, mesh=mesh)
     if 'rho' in what:
         out['rho'] = reader.to_grid(
             reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
-            fill=RHO_AIR)
+            fill=RHO_AIR, mesh=mesh)
     if 'U' in what:
         flat = reader.read_vector(os.path.join(dpath, 'U'), n)
-        out['U'] = np.stack([reader.to_grid(flat[:, i], spec)
+        out['U'] = np.stack([reader.to_grid(flat[:, i], spec, mesh=mesh)
                              for i in range(3)], axis=-1)
     return out
 
@@ -773,7 +885,7 @@ def _initial_frame(spec, hooks, live_sl=None):
     if spec.dim == 1:
         hooks.frame(np.array([spec.grid['r'], p0]), 0.0)
     else:
-        p0 = reader.to_grid(p0, spec, fill=P_AIR)
+        p0 = reader.to_grid(p0, spec, fill=P_AIR, mesh=spec.mesh0)
         hooks.frame(p0 if live_sl is None else p0[live_sl].copy(), 0.0)
 
 
@@ -787,7 +899,7 @@ def _initial_frame3d(spec, hooks):
     try:
         p0 = reader.to_grid(reader.read_scalar(
             os.path.join(spec.case_unc, '0', 'p'), spec.n_cells), spec,
-            fill=P_AIR)
+            fill=P_AIR, mesh=spec.mesh0)
     except (OSError, ValueError):
         return
     rho0 = np.full_like(p0, RHO_AIR)
@@ -833,12 +945,13 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
             f'  Burst point     : ({x0:g}, {y0:g}, {z0:g}) m',
             f'  Explosive radius: {spec.r_exp:.4f} m',
             f'  Domain          : {case.Lx:g} x {case.Ly:g} x '
-            f'{case.Lz:g} m,  cell {spec.dx if not spec.lmax else spec.dx_base:g} m'
-            + (' (base)' if spec.lmax else ''),
+            f'{case.Lz:g} m,  cell '
+            f'{spec.dx if not (spec.lmax or spec.amr) else spec.dx_base:g} m'
+            + (' (base)' if (spec.lmax or spec.amr) else ''),
             (f'  Grid            : {spec.nx} x {spec.ny} x {spec.nz} = '
              f'{spec.n_cells:,} cells'
              + (' (obstacle cells carved out)' if spec.obstacles else ''))
-            if not spec.lmax else
+            if not (spec.lmax or spec.amr) else
             (f'  Grid            : {spec.nb[0]} x {spec.nb[1]} x '
              f'{spec.nb[2]} base cells'),
             *_refine_lines(spec),
@@ -856,7 +969,8 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
             f'{spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
             f'(initial, adaptive)',
-            '  Live slice      : p sampled every step',
+            ('  Live slice      : p of every written time (AMR)'
+             if spec.amr else '  Live slice      : p sampled every step'),
             bar, ''):
         hooks.log(line)
 
@@ -877,7 +991,8 @@ def solve_3d_foam(case, hooks=None):
     centers = [c for c, _m in spec.charges]
 
     n_snapshots = case.n_snapshots
-    n_disp = spec.nx * spec.ny * spec.nz if spec.lmax else spec.n_cells
+    n_disp = (spec.nx * spec.ny * spec.nz if (spec.lmax or spec.amr)
+              else spec.n_cells)
     max_snaps = max(1, int(1.5e9 / (4 * n_disp)) - 1)
     if n_snapshots > max_snaps:
         hooks.log(f"  [note] n_snapshots reduced {n_snapshots} -> "
@@ -905,7 +1020,7 @@ def solve_3d_foam(case, hooks=None):
         ylabel=live_labels[1], title=live_title,
         mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
                                    solid_fine=spec.solid)
-                  if spec.lmax else None),
+                  if spec.lmax and not spec.amr else None),
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=[tuple(o) for o in spec.obstacles],
                      Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
@@ -915,8 +1030,8 @@ def solve_3d_foam(case, hooks=None):
     _initial_frame3d(spec, hooks)
 
     record_frames = case.record_frames
-    frame_t, frame_p = [], []
-    fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
+    frame_t, frame_p, frame_lv = [], [], []
+    fields = ('p', 'rho', 'U', f'alpha.{spec.phase}') + spec.mesh_fields
     ingested = {}               # dirname -> t (full arrays NOT retained)
     snap_names = []             # dirs picked by front-radius crossings
     acc = PeakImpulse()         # per-write Python + per-step FO accumulators
@@ -931,17 +1046,22 @@ def solve_3d_foam(case, hooks=None):
         will_3d = (due_sparse(hooks.refresh3d, loop.st['step'], live3d)
                    or hooks.exec_will_pause()) and hooks.wants_frame3d()
         t, _dt = reader.read_time(dpath)
-        got = read_3d(dpath, spec, ('p', 'rho') if will_3d else ('p',))
-        return t, got, will_3d
+        mesh = mesh_at(spec, dpath)         # None on a static mesh
+        got = read_3d(dpath, spec, ('p', 'rho') if will_3d else ('p',),
+                      mesh=mesh)
+        return t, got, will_3d, mesh
 
     def on_frame(name, dpath, payload):
-        nonlocal frame_t, frame_p
-        t, got, will_3d = payload
+        nonlocal frame_t, frame_p, frame_lv
+        t, got, will_3d, mesh = payload
         p = got['p']
-        if not acc.add(p, t, dpath, spec, hooks):
+        if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             return False
         ingested[name] = t
         st, live = loop.st, loop.live
+        if mesh is not None:
+            hooks.log(amr_note(mesh, st.get('n_prev'), t))
+            st['n_prev'] = mesh.n_cells
 
         # shock-front progress + native snapshot scheduling
         shocked = p > ARRIVAL_P
@@ -961,9 +1081,12 @@ def solve_3d_foam(case, hooks=None):
         if record_frames > 0:
             frame_t.append(t)
             frame_p.append(p[live_sl].astype(np.float32))
+            if mesh is not None:
+                frame_lv.append(mesh.levels[live_sl])
             if len(frame_p) >= 2 * record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
+                frame_lv = frame_lv[::2]
         will_pause = hooks.exec_will_pause()
         due = (due_sparse(hooks.refresh, st['step'], live)
                and t >= st['t_frame'])
@@ -988,23 +1111,27 @@ def solve_3d_foam(case, hooks=None):
         loop.gated_step()
         return True
 
-    loop = FoamRunLoop(
-        spec, hooks, fields, ingested, writer.LIVE_SLICE,
+    # AMR: no live-slice FO (its rows carry no cell size) - live frames
+    # come from the written times through the per-time remap
+    live_set, decode = (None, None) if spec.amr else (
+        writer.LIVE_SLICE,
         lambda tdir: _decode_surface(
             spec, tdir, lshape, uv[0], uv[1], slice_solid,
-            remap_sl=None if spec.remap is None else spec.remap[live_sl]),
-        read_dir, on_frame)
+            remap_sl=None if spec.remap is None else spec.remap[live_sl]))
+    loop = FoamRunLoop(spec, hooks, fields, ingested, live_set, decode,
+                       read_dir, on_frame)
     stop_reason = loop.run()
     if stop_reason == 'safety cap' and spec.cap_is_end:
         stop_reason = 'end time reached'
 
     return finalize_3d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
-                       record_frames, acc)
+                       record_frames, acc, frame_lv=frame_lv)
 
 
 def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
-                 snap_names, frame_t, frame_p, record_frames, acc):
+                 snap_names, frame_t, frame_p, record_frames, acc,
+                 frame_lv=None):
     """Build the exact native-shaped 3D Result via a two-pass snapshot
     re-read - bounds run-time memory (also used by postmortem)."""
     g = spec.grid
@@ -1017,10 +1144,14 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     j0, k0, slice_axis, s0, live_sl = _slice_geom_3d(case, spec)[:5]
 
     names = sorted(ingested, key=ingested.get)
-    names, fin = _final_read(
-        hooks, names, ingested.get,
-        lambda name: read_3d(os.path.join(spec.case_unc, name), spec,
-                              ('p', 'rho', 'U')))
+
+    def read_final(name):
+        dpath = os.path.join(spec.case_unc, name)
+        mesh = mesh_at(spec, dpath)
+        return read_3d(dpath, spec, ('p', 'rho', 'U'), mesh=mesh), mesh
+
+    names, (fin, mesh_fin) = _final_read(
+        hooks, names, ingested.get, read_final)
     fin_name = names[-1]
     snap_names = [n for n in snap_names if n in names]
 
@@ -1029,7 +1160,8 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
         if name == fin_name:
             continue
         dpath = os.path.join(spec.case_unc, name)
-        got = read_3d(dpath, spec, ('p', 'rho', 'U'))
+        got = read_3d(dpath, spec, ('p', 'rho', 'U'),
+                      mesh=mesh_at(spec, dpath))
         t = ingested[name]
         label = f"t = {t*1e3:.3f} ms"
         if label not in snapshots:
@@ -1042,10 +1174,13 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     # final-dir FO fields (per-step accumulation) supersede the per-write
     # Python accumulator; a stale FO read does not (B17)
     p_peak, impulse, peak_source = acc.final(
-        fin['p'], os.path.join(spec.case_unc, fin_name), t_fin, spec)
+        fin['p'], os.path.join(spec.case_unc, fin_name), t_fin, spec,
+        mesh=mesh_fin)
     if record_frames > 0 and (not frame_t or frame_t[-1] < t_fin):
         frame_t.append(t_fin)
         frame_p.append(fin['p'][live_sl].astype(np.float32))
+        if mesh_fin is not None and frame_lv is not None:
+            frame_lv.append(mesh_fin.levels[live_sl])
     hooks.frame(fin['p'][live_sl].copy(), t_fin)
     e_approx = fin['p'] / (0.4 * np.maximum(fin['rho'], 1e-10))
     hooks.frame3d(t_fin, dict(p=fin['p'], rho=fin['rho'], e=e_approx,
@@ -1077,5 +1212,6 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                 p_peak=p_peak, impulse=impulse, peak_source=peak_source)
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
+    _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames)
     return Result(snapshots, gauge_out, meta, stop_reason,
                   stop_reason == 'stopped by user')

@@ -19,7 +19,7 @@ from ...core.case import load_case
 from ..hooks import RunHooks
 from . import env, reader, writer
 from .backend import (build_remap, finalize_1d, finalize_2d, finalize_3d,
-                      read_2d, read_3d)
+                      mesh_at, read_2d, read_3d)
 from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
@@ -72,9 +72,11 @@ def load_run(case_dir, hooks=None):
     spec = writer.render_case(case, n_procs=n_procs)
     spec.case_posix, spec.case_unc = posix, unc
     spec.files = None                   # nothing is written
-    if spec.lmax:
+    if spec.lmax or spec.amr:
         # refined mesh: rebuild the fine-grid gather map from the cell
-        # centres the run wrote (0/C is kept on disk for exactly this)
+        # centres the run wrote (0/C is kept on disk for exactly this);
+        # AMR runs rebuild the t = 0 map the same way and every later
+        # time dir carries its own C + cellLevel (mesh_at)
         if not os.path.isfile(os.path.join(unc, '0', 'C')):
             raise RuntimeError(
                 f'{unc} is a locally refined run without 0/C (cell '
@@ -84,6 +86,7 @@ def load_run(case_dir, hooks=None):
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
     if case.dim in (1, 2):              # finalize_1d/2d re-read T
         fields += ('T',)
+    fields += spec.mesh_fields
     if n_procs > 1:
         hooks.log(f'  [postmortem] reconstructing leftover parallel '
                   f'times ({n_procs} ranks)...')
@@ -102,8 +105,10 @@ def load_run(case_dir, hooks=None):
     # one dir reads - a real grid mismatch fails on every one of them.
     for _t, name in reversed(times):
         try:
+            mesh = mesh_at(spec, os.path.join(unc, name))
             reader.read_scalar(os.path.join(unc, name, 'p'),
-                               spec.n_cells)
+                               spec.n_cells if mesh is None
+                               else mesh.n_cells)
             break
         except (ValueError, OSError):
             continue
@@ -154,12 +159,13 @@ def load_run(case_dir, hooks=None):
         dpath = os.path.join(unc, name)
         try:
             t, _dt = reader.read_time(dpath)
-            p = (read_2d(dpath, spec)['p'] if case.dim == 2
-                 else read_3d(dpath, spec)['p'])
+            mesh = mesh_at(spec, dpath)         # None on a static mesh
+            p = (read_2d(dpath, spec, mesh=mesh)['p'] if case.dim == 2
+                 else read_3d(dpath, spec, mesh=mesh)['p'])
         except (ValueError, OSError) as exc:
             _skip(name, exc)
             continue
-        if not acc.add(p, t, dpath, spec, hooks):
+        if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             continue
         ingested[name] = t
         shocked = p > ARRIVAL_P

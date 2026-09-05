@@ -105,6 +105,7 @@ class CaseSpec:
     # structure of every written time is read back from C + cellLevel)
     amr: int = 0
     display_level: int = 0
+    mesh0: object = None            # AMR: the t = 0 MeshMap (build_remap)
 
     @property
     def n_cells(self):
@@ -697,22 +698,49 @@ def _fvsolution():
 
 def _setfieldsdict(spec, case):
     alpha = f'alpha.{PHASE}'
+    m = MATERIALS[spec.material]
+
+    def backup_radius(r):
+        # the backup region catches the coarse cells around the charge
+        # when none has its centre inside it. The static grid resolves
+        # the charge, so 2 r always hits; an AMR base cell may be far
+        # coarser than the charge - guarantee the cell holding the
+        # centre (half-diagonal 0.87 dx in 3D), then setRefinedFields
+        # refines from there and re-selects with the true radius
+        return max(2.0 * r, 0.9 * spec.dx_base) if spec.amr else 2.0 * r
+
     if spec.dim == 2 and case.geometry == 'planar':
         x0, y0, _ = spec.center
-        regions = [('cylinderToCell', {
-            'p1': (x0, y0, -spec.dx_base),
-            'p2': (x0, y0, spec.dx_base),
-            'radius': spec.r_exp,
-            'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
-        })]
+        if spec.amr:
+            # mass-based cylinder through the slab (per-metre charge x
+            # slab thickness) - the only planar source with a backup
+            # region, which the coarse AMR base grid needs
+            mass = float(case.charge) * spec.dx_base
+            regions = [('cylindericalMassToCell', {
+                'centre': (x0, y0, 0.0),
+                'rho': m.rho0,
+                'mass': mass,
+                'LbyD': spec.dx_base / (2.0 * spec.r_exp),
+                'direction': (0, 0, 1),
+                'backup': {'centre': (x0, y0, 0.0),
+                           'radius': backup_radius(spec.r_exp),
+                           'L': (0.0, 0.0, spec.dx_base)},
+                'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
+            })]
+        else:
+            regions = [('cylinderToCell', {
+                'p1': (x0, y0, -spec.dx_base),
+                'p2': (x0, y0, spec.dx_base),
+                'radius': spec.r_exp,
+                'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
+            })]
     else:
-        m = MATERIALS[spec.material]
         regions = [('sphericalMassToCell', {
             'centre': centre,
             'rho': m.rho0,
             'mass': mass,
             'backup': {'centre': centre,
-                       'radius': 2.0 * charge_radius(mass, m)},
+                       'radius': backup_radius(charge_radius(mass, m))},
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
         }) for centre, mass in spec.charges]
     d = {
@@ -821,8 +849,8 @@ def _dynamicmeshdict(spec=None, case=None):
         d['epsilon'] = LOHNER_EPS
     d.update({
         'refineInterval': int(getattr(case, 'amr_interval', 2)),
-        'lowerRefineLevel': float(getattr(case, 'amr_refine', 0.1)),
-        'unrefineLevel': float(getattr(case, 'amr_unrefine', 0.1)),
+        'lowerRefineLevel': float(getattr(case, 'amr_refine', 0.4)),
+        'unrefineLevel': float(getattr(case, 'amr_unrefine', 0.2)),
         'nBufferLayers': int(getattr(case, 'amr_buffer', 2)),
         'maxRefinement': int(spec.amr),
         'maxCells': (int(getattr(case, 'amr_max_cells', 0) or 0)

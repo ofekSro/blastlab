@@ -223,7 +223,7 @@ def amr_checks(specs):
     check('amr 2D: adaptiveFvMesh + densityGradient with the required keys',
           all(k in dm for k in (
               'dynamicFvMesh adaptiveFvMesh;', 'errorEstimator densityGradient;',
-              'refineInterval 2;', 'lowerRefineLevel 0.1;', 'unrefineLevel 0.1;',
+              'refineInterval 2;', 'lowerRefineLevel 0.4;', 'unrefineLevel 0.2;',
               'nBufferLayers 2;', 'maxRefinement 3;', 'maxCells 8000000;',
               'dumpLevel yes;'))
           and 'epsilon' not in dm and 'loadBalance' not in dm, dm)
@@ -243,6 +243,21 @@ def amr_checks(specs):
     check('amr 2D: setFieldsDict maxRefinement after nBufferLayers',
           'nBufferLayers 1; maxRefinement 3;' in norm(s2.files['system/setFieldsDict']),
           norm(s2.files['system/setFieldsDict'])[:200])
+    sfd = norm(s2.files['system/setFieldsDict'])
+    check('amr 2D planar: mass-based cylinder source with a backup region '
+          '(mass = charge x slab, LbyD = slab / 2r)',
+          'cylindericalMassToCell' in sfd and 'cylinderToCell' not in sfd
+          and f'mass {fmt(25.0 * 0.1)};' in sfd
+          and f'LbyD {fmt(0.1 / (2.0 * s2.r_exp))};' in sfd
+          and 'direction (0 0 1);' in sfd and 'backup' in sfd
+          and f'L (0 0 {fmt(0.1)});' in sfd
+          and f'radius {fmt(max(2.0 * s2.r_exp, 0.09))};' in sfd, sfd)
+    sfd3 = norm(specs['case3d_amr'].files['system/setFieldsDict'])
+    check('amr 3D: sphere backup radius >= 0.9 base cells',
+          f'radius {fmt(max(2.0 * specs["case3d_amr"].r_exp, 0.09))};' in sfd3, sfd3)
+    check('static planar: cylinderToCell unchanged',
+          'cylinderToCell' in specs['case2d_planar_refine'].files['system/setFieldsDict']
+          and 'MassToCell' not in specs['case2d_planar_refine'].files['system/setFieldsDict'])
     check('amr 2D: mesh_fields + refine_meta with amr keys',
           s2.mesh_fields == ('C', 'cellLevel')
           and set(s2.refine_meta()) == {'levels', 'lmax', 'dx_base', 'zones',

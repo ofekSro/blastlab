@@ -453,7 +453,7 @@ def test_amr():
     check('too few levels for the charge -> error naming the level needed',
           any('needs AMR level 3' in e for e in rep.errors), str(rep.errors))
     for kw, frag in ((dict(amr_estimator='gradient'), 'Unknown AMR error estimator'),
-                     (dict(amr_unrefine=0.2), 'unrefine threshold must not exceed'),
+                     (dict(amr_unrefine=0.5), 'unrefine threshold must not exceed'),
                      (dict(amr_refine=0.0), 'must be > 0'),
                      (dict(amr_interval=0), 'interval must be >= 1'),
                      (dict(amr_buffer=0), 'buffer layers must be >= 1'),

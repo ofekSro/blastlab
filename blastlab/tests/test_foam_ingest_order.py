@@ -136,7 +136,7 @@ def test_accumulator():
     print("\nB17: peak/impulse accumulator + finalize policy")
     fo = {}                                          # dpath -> (peak, imp) or None
     real = runloop.read_fo_fields
-    runloop.read_fo_fields = lambda dpath, spec: fo.get(dpath, (None, None))
+    runloop.read_fo_fields = lambda dpath, spec, mesh=None: fo.get(dpath, (None, None))
     try:
         hooks = Log()
         spec = object()

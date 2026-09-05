@@ -694,8 +694,8 @@ def validate_amr(case, plan, rho0=None):
                       + ' or '.join(repr(e) for e in AMR_ESTIMATORS) + ")")
     if not 1 <= amr <= MAX_AMR_LEVEL:
         errors.append(f"AMR levels must be 1..{MAX_AMR_LEVEL}")
-    lo = float(getattr(case, 'amr_refine', 0.1))
-    un = float(getattr(case, 'amr_unrefine', 0.1))
+    lo = float(getattr(case, 'amr_refine', 0.4))
+    un = float(getattr(case, 'amr_unrefine', 0.2))
     if lo <= 0 or un <= 0:
         errors.append("AMR refine / unrefine thresholds must be > 0")
     elif un > lo:

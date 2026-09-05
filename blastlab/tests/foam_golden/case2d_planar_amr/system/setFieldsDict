@@ -17,11 +17,19 @@ defaultFieldValues
 );
 regions
 (
-    cylinderToCell
+    cylindericalMassToCell
     {
-        p1 (1 1 -0.1);
-        p2 (1 1 0.1);
-        radius          0.0698716929;
+        centre (1 1 0);
+        rho             1630;
+        mass            2.5;
+        LbyD            0.7155973746;
+        direction (0 0 1);
+        backup
+        {
+            centre (1 1 0);
+            radius          0.1397433858;
+            L (0 0 0.1);
+        }
         fieldValues
         (
             volScalarFieldValue alpha.expl    1

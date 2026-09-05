@@ -52,6 +52,7 @@ python test_gui_gauge_summary.py  # Gauges-tab summary table + CSV (headless Tk)
 python test_gui_run_browser.py    # foam run browser with injected sources (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh overlays (headless Tk)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
+python test_foam_amr_ingest.py    # dynamic AMR per-time ingest path on fake time dirs (no WSL)
 python test_blast2d.py            # 2D native physics suite
 python test_blast3d.py            # 3D native physics suite
 python test_foam_1d_vs_native.py  # physics gates (~2 min, WSL)
@@ -986,7 +987,7 @@ uniform revolved grid, not the (r, z) refinement.
 ---
 
 **N16 — Dynamic mesh refinement (blastFoam `adaptiveFvMesh`). IN PROGRESS
-(T20 DONE 2026-09-05; T21-T23 open).** Owner request (2026-09-05): the mesh
+(T20-T21 DONE 2026-09-05; T22-T23 open).** Owner request (2026-09-05): the mesh
 follows the shock during the run instead of the static per-zone refinement
 of N15. Plan: `~/.claude/plans/amr-tranquil-blossom.md`; sessions T20-T23.
 Decisions: default estimator `densityGradient` (every blastFoam tutorial
@@ -1042,10 +1043,59 @@ every coefficient) + `amr_checks`; `test_refine.test_amr` (2D/3D remap
 coverage, averaging, weights, error paths, plan, validation, v5 round
 trip); `test_case_validate.amr_cap_checks`. All existing goldens and the
 native baseline byte-identical.
-*T21 (open)* — per-time ingest path (`reader.read_label_list`,
-`to_grid(mesh=)`, `backend.mesh_at`, `read_2d/3d(mesh=)`, FO fields,
-`FoamRunLoop(live_set=None)`, `amr_note`, `frames['levels']`, postmortem) +
-`_e2e_foam_amr2d.py` (planar, equal finest dx vs uniform).
+*T21 DONE (2026-09-05)* — the per-time ingest path. `refine.MeshMap` per
+written time: `backend.mesh_at(spec, dpath)` reads that dir's `C` +
+`cellLevel` (t = 0: the hexRef labelList `polyMesh/cellLevel` via
+`reader.read_label_list`, ascii or 32-bit binary) and builds the display
+remap with `remap_from_centres`; `reader.to_grid(mesh=)`,
+`read_2d/read_3d(mesh=)`, `runloop.read_fo_fields/PeakImpulse(mesh=)`
+decode through it (static runs pass `mesh=None` and run today's code);
+`read_dir` carries the MeshMap in the payload, `on_frame` logs
+`runloop.amr_note` (`AMR t = 0.386 ms: 14,212 cells (+324), L0 123 / L1 183
+/ L2 298 / L3 13,608`) and records `frames['levels']`; `finalize_2d/3d`
+re-read through `mesh_at`, put the final mesh's level map + cell count in
+`meta['refine']` and the per-frame maps in `meta['frames']['levels']`
+(`_amr_meta`); `FoamRunLoop(live_set=None)` drops the live-slice tail (AMR
+live frames = written times); `_mesh_stages` runs `setRefinedFields`
+WITHOUT `-noRefine` (the t = 0 charge refinement), no topoSet/refineMesh,
+serial only (`_preflight` forces `n_procs = 1`); `build_remap` AMR branch
+keeps the t = 0 MeshMap on `spec.mesh0`; postmortem replays through
+`mesh_at`. Writer: planar AMR cases use `cylindericalMassToCell` (mass =
+charge x slab, `LbyD` = slab / 2r) with a `backup` region of radius
+max(2 r, 0.9 base cells) - `cylinderToCell` has no backup and on a 0.2 m
+base no cell centre fell inside the 0.14 m charge, so `setRefinedFields`
+refined nothing and blastFoam aborted with "No mass was found"; the
+sphere source's backup got the same floor. Defaults moved to
+`amr_refine 0.4 / amr_unrefine 0.2` from the e2e sweep (below).
+`test_foam_amr_ingest.py` (fake AMR time dirs: stages, mesh_at, labelList
+fallback, decode path, FO fields, accumulator across changing counts,
+readiness gate, torn-file retry, tiling error, amr_note, finalize_2d AMR
+meta) + `read_label_list` ascii/binary/truncated.
+Verified live, `_e2e_foam_amr2d.py` (100 kg/m TNT in a 4 x 4 m planar
+box, base 0.2 m, 3 levels = finest 0.025 m, gauge at 1.2 m, vs a uniform
+0.025 m run of 25,600 cells): t = 0 mesh 676 cells (charge refined to
+level 3), 61-62 writes, per-frame level maps recorded, arrival stop
+honoured, post-mortem reload identical, FO pMax at the gauge cell within
+1.2 % of the gauge trace peak (9,255 vs 9,148 kPa - the FO survives every
+mesh change), no orphan. Threshold sweep (refine/unrefine, densityGradient)
+against the uniform reference (43 s):
+```
+case          wall s  max cells  peak %  arrival %
+AMR 0.1/0.1       49     21,553    -0.6       -5.6   (tutorial default: no saving)
+AMR 0.2/0.1       39     20,602    -2.0       -4.4
+AMR 0.4/0.2       35     16,816    -3.6       -3.6   <- new default
+AMR 0.8/0.4       30     11,926    -2.9       -3.6
+```
+Gauge peak within 1-4 %, arrival 4-6 % early and impulse ~10 % high against
+the uniform run: the AMR charge comes from the mass-based cylinder source
+and the uniform one from the geometric `cylinderToCell`, so the e2e bands
+are 10 % / 10 % / 15 % (peak / arrival / impulse). Wall time at this size
+is noisy (0.4/0.2: 35 s in the sweep, 44 s in the confirming run, uniform
+43-44 s) because the Python ingest of 62 writes over the UNC share is a
+fixed cost on both sides; the cell count is the robust metric (66 % of the
+uniform cells at arrival). The 2 m probe box at 0.1/0.1 (whole box refined)
+and this 4 m box at 0.4/0.2 bound what densityGradient thresholds buy in
+2D; 3D is measured in T23.
 *T22 (open)* — Numerics AMR card, validation line, preview, per-frame mesh
 in Results replay / animation / live plot.
 *T23 (open)* — 3D viewer per-frame mesh, `_e2e_foam_amr3d.py`, README,

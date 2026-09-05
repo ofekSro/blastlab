@@ -74,8 +74,12 @@ class Case2D:
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
     amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
-    amr_refine: float = 0.1           # lowerRefineLevel (refine above)
-    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
+    amr_refine: float = 0.4           # lowerRefineLevel (refine above);
+                                      # 0.4/0.2 measured on the 2D e2e:
+                                      # 1.2x faster than uniform at ~3.6 %
+                                      # gauge error (the tutorials' 0.1/0.1
+                                      # refines nearly everything)
+    amr_unrefine: float = 0.2         # unrefineLevel (unrefine below)
     amr_interval: int = 2             # refineInterval [steps]
     amr_buffer: int = 2               # nBufferLayers
     amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN
@@ -129,8 +133,12 @@ class Case3D:
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
     amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
-    amr_refine: float = 0.1           # lowerRefineLevel (refine above)
-    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
+    amr_refine: float = 0.4           # lowerRefineLevel (refine above);
+                                      # 0.4/0.2 measured on the 2D e2e:
+                                      # 1.2x faster than uniform at ~3.6 %
+                                      # gauge error (the tutorials' 0.1/0.1
+                                      # refines nearly everything)
+    amr_unrefine: float = 0.2         # unrefineLevel (unrefine below)
     amr_interval: int = 2             # refineInterval [steps]
     amr_buffer: int = 2               # nBufferLayers
     amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN

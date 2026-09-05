@@ -28,6 +28,7 @@ _RE_KEY_NUM = r'^\s*{key}\s+([0-9.eE+-]+);'
 _RE_FORMAT = re.compile(rb'format\s+(ascii|binary)\s*;')
 _RE_BIN_COUNT = re.compile(rb'internalField\s+nonuniform\s+'
                            rb'List<\w+>\s*(\d+)\s*\(')
+_RE_LIST_COUNT = re.compile(rb'\n(\d+)\s*\n\(')
 
 
 def _retry(fn, tries=3, delay=0.5):
@@ -160,6 +161,36 @@ def read_vector(path, n_cells):
         raise ValueError(f'{path}: {len(vals)} components, '
                          f'expected {3 * n_cells}')
     return vals.reshape(-1, 3)
+
+
+def read_label_list(path):
+    """A polyMesh labelList file (e.g. `polyMesh/cellLevel`, the hexRef
+    refinement level per cell that setRefinedFields / adaptiveFvMesh
+    write) -> int64 array. Ascii or binary (32-bit labels, this build's
+    Int32 flavour); a truncated file raises ValueError like the fields."""
+    buf = _read_bytes(path)
+    end_hdr = buf.find(b'}')                # end of the FoamFile header
+    if end_hdr < 0:
+        raise ValueError(f'no FoamFile header in {path}')
+    m = _RE_LIST_COUNT.search(buf, end_hdr)
+    if m is None:
+        raise ValueError(f'no label list in {path}')
+    n, start = int(m.group(1)), m.end()
+    if _format_is_binary(buf):
+        need = n * 4
+        if len(buf) < start + need + 1 \
+                or buf[start + need:start + need + 1] != b')':
+            raise ValueError(f'{path}: truncated binary labelList')
+        return np.frombuffer(buf, '<i4', count=n,
+                             offset=start).astype(np.int64)
+    text = buf[start:].decode('ascii', 'replace')
+    k = text.find(')')
+    if k < 0:
+        raise ValueError(f'{path}: unterminated labelList')
+    vals = np.array(text[:k].split(), dtype=np.int64)
+    if len(vals) != n:
+        raise ValueError(f'{path}: {len(vals)} labels, expected {n}')
+    return vals
 
 
 def read_cell_centres(case_unc):
@@ -348,15 +379,19 @@ def read_probes(case_unc, name='gauges', field='p'):
                 pressures=[a[:, i + 1] for i in range(n_probes)])
 
 
-def to_grid(vals, spec, fill=0.0):
+def to_grid(vals, spec, fill=0.0, mesh=None):
     """Flat internalField -> native blastlab array layout.
 
     On an obstacle-carved mesh (spec.solid mask set) the field holds
     only the fluid cells - subsetMesh keeps them in ascending original
     (x-fastest) order, so they scatter straight into the full grid;
-    carved cells take `fill` (ambient value chosen by the caller)."""
+    carved cells take `fill` (ambient value chosen by the caller).
+    `mesh` (a core.refine.MeshMap - the per-time structure of a
+    dynamic-AMR run) takes precedence over the per-run `spec.remap`."""
     if spec.dim == 1:
         return vals
+    if mesh is not None:
+        return mesh.gather(vals, fill)
     remap = getattr(spec, 'remap', None)
     if remap is not None:
         # refined mesh: every fine display cell gathers the value of the
