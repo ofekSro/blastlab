@@ -45,6 +45,7 @@ python test_case_validate.py      # cap gating per backend (no WSL)
 python test_adaptive_interval.py  # writeInterval controller (no WSL)
 python test_foam_live_due.py      # live-frame cadence gate (no WSL)   [was missing from this list]
 python test_gui_drain.py          # GUI queue-drain resilience (no WSL)
+python test_gui_results_fields.py # peak/impulse fields in Results (headless Tk, no WSL)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_blast2d.py            # 2D native physics suite
 python test_blast3d.py            # 3D native physics suite
@@ -699,8 +700,22 @@ out; the env probe retries 3× (`wsl --shutdown` if wedged).
 
 ## 4. New capabilities (ranked by impact/effort)
 
-**N1 — Peak-overpressure / impulse views in the Results panel** *(top gap — the
-data exists and is invisible)*. `meta['p_peak']`/`meta['impulse']` are computed
+**N1 — Peak-overpressure / impulse views in the Results panel. DONE
+(2026-09-05).** Native 3D now stores its viewer accumulators in
+`meta['p_peak']`/`meta['impulse']` (foam keys); native 2D gained the same two
+accumulators (running max of p; ∫(p−P_AIR)dt paired with the state update as in
+3D) - measured cost +0.8 % on the 190×380 test_blast2d case (35.84 -> 36.11 s,
+within noise), stdout unchanged, regression byte-identical. Results panel:
+"peak overpressure" / "net ovp impulse" for 2D, the same on the x-z / x-y
+slices for 3D, rendered through the per-field dict plumbing as one
+"whole run" panel (peak shown as overpressure in kPa, impulse in Pa·s) and
+hidden when a loaded result lacks the maps; PNG export adds
+`blast_2d_peak_overpressure/impulse.png` and the four 3D slice figures
+(`plots.figures_fields_*(..., include_peak=True)` - the CLI wrappers keep
+their default figure set and stdout). `test_gui_results_fields.py` (headless
+Tk) covers selector, rendering, hiding and export. *Original entry:* *(top
+gap — the data exists and is invisible)*. `meta['p_peak']`/`meta['impulse']`
+are computed
 for every foam 2D/3D run, and the 3D viewer already offers them
 (`view3d_panel.py:31`), but the Results field selector is still exactly
 overpressure/density/speed (`results_panel.py:203-207`). Add both (2D

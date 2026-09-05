@@ -309,9 +309,16 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     step        = 0
     snapshots   = {}
     stop_reason = 'safety cap'
+    p_peak      = None      # running peak pressure (as solver3d)
+    impulse     = None      # accumulated net overpressure impulse [Pa s]
 
     while t < safety_cap:
         rho_f, u_f, v_f, e_f, p_f, c_f = primitives(U, phase, eos)
+        if p_peak is None:
+            p_peak = p_f.copy()
+            impulse = np.zeros_like(p_f)
+        else:
+            np.maximum(p_peak, p_f, out=p_peak)
 
         # ── Record gauges ──────────────────────────────────────────────────
         if gauge_ij:
@@ -368,6 +375,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         dt = min(dt, safety_cap - t)
         if dt <= 0:
             break
+        # same (p at the step start) x (dt of this step) pairing as the
+        # state update and as solver3d
+        impulse += (p_f - P_AIR) * dt
 
         # ── Face fluxes (both sweeps) and divergence ───────────────────────
         Fx = face_fluxes(U, p_f, c_f, 1, bcs['x_lo'], bcs['x_hi'], solid)
@@ -403,6 +413,11 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
 
     # ── Final snapshot at stop time ────────────────────────────────────────
     rho_f, u_f, v_f, e_f, p_f, _ = primitives(U, phase, eos)
+    if p_peak is None:
+        p_peak = p_f.copy()
+        impulse = np.zeros_like(p_f)
+    else:
+        np.maximum(p_peak, p_f, out=p_peak)
     # skip when the loop top already recorded this t (exit via break):
     # a duplicated last timestamp makes dt-based post-processing inf/nan
     if gauge_ij and (not gauge_times_list or gauge_times_list[-1] != t):
@@ -431,7 +446,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
                 solid=solid, geometry=geometry, Lx=Lx, Ly=Ly, dx=dx,
                 eos=eos, bcs=bcs, obstacles=obstacles,
                 charge=charge, charge_center=(x0, y0), r_exp=r_exp,
-                from_profile=profile is not None)
+                from_profile=profile is not None,
+                # per-step running peak pressure and net overpressure
+                # impulse, same keys as the foam backend
+                p_peak=p_peak, impulse=impulse)
     # Full final field (for save_profile_2d -> 3D remap)
     meta['final_state'] = dict(t=t, rho=rho_f, u=u_f, v=v_f, e=e_f, p=p_f,
                                phase=phase)

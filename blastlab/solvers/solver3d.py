@@ -558,7 +558,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                 solid=solid, Lx=Lx, Ly=Ly, Lz=Lz, dx=dx,
                 eos=eos, bcs=bcs, obstacles=obstacles,
                 charge=charge, charge_center=(x0, y0, z0), r_exp=r_exp,
-                r_src=r_src, from_profile=from_profile)
+                r_src=r_src, from_profile=from_profile,
+                # per-step running peak pressure and net overpressure
+                # impulse (the viewer fields), same keys as the foam backend
+                p_peak=p_peak, impulse=impulse)
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     return Result(snapshots, gauge_out, meta, stop_reason,

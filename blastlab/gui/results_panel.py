@@ -159,6 +159,7 @@ class ResultsPanel(ctk.CTkFrame):
         self._anim_mesh = None
         self._anim_solid = None
         self._anim_title = None
+        self._anim_plane = ''
         self._playing = False
 
         # 3D view (embedded viewer, snapshot playback)
@@ -198,13 +199,24 @@ class ResultsPanel(ctk.CTkFrame):
         self.snap_sel.configure(values=snaps)
         if snaps:
             self.snap_sel.set(snaps[-1])
+        # whole-run peak overpressure / net impulse maps: native 2D/3D
+        # and foam 2D/3D carry them; runs loaded from older results may
+        # not, so the entries appear only when the maps exist
+        peak = plots.has_peak_maps(ent.result.meta)
         if ent.dim == 1:
             fields = ['profiles']
         elif ent.dim == 2:
             fields = ['overpressure', 'density', 'speed']
+            if peak:
+                fields += ['peak overpressure', 'net ovp impulse']
         else:
             fields = ['overpressure (x-z)', 'overpressure (x-y)',
-                      'density (x-z)', 'density (x-y)', 'isosurface']
+                      'density (x-z)', 'density (x-y)']
+            if peak:
+                fields += ['peak overpressure (x-z)',
+                           'peak overpressure (x-y)',
+                           'net ovp impulse (x-z)', 'net ovp impulse (x-y)']
+            fields.append('isosurface')
         self.field_sel.configure(values=fields)
         self.field_sel.set(fields[0])
         self._draw_field()
@@ -235,33 +247,61 @@ class ResultsPanel(ctk.CTkFrame):
             self.field_canvas.set_figure(fig)
             return
 
+        # whole-run maps are not per snapshot: one panel labelled so
+        is_peak = field.startswith('peak overpressure')
+        is_imp = field.startswith('net ovp impulse')
+        if is_peak or is_imp:
+            label = 'whole run'
+
         if dim == 2:
-            data = {'overpressure': (snap['p'] - P_AIR) / 1e3,
-                    'density': snap['rho'],
-                    'speed': snap['speed']}[field]
+            if is_peak or is_imp:
+                (pk_lbl, pk), (im_lbl, im) = plots.peak_items(meta)
+                data = pk if is_peak else im
+                unit = plots.PEAK_LABEL if is_peak else plots.IMPULSE_LABEL
+            else:
+                data = {'overpressure': (snap['p'] - P_AIR) / 1e3,
+                        'density': snap['rho'],
+                        'speed': snap['speed']}[field]
+                unit = {'overpressure': 'Overpressure [kPa]',
+                        'density': 'Density [kg/m³]',
+                        'speed': 'Speed [m/s]'}[field]
             solid_sl, xf, yf = meta['solid'], meta['x_face'], meta['y_face']
             xl = 'r [m]' if meta['geometry'] == 'axisymmetric' else 'x [m]'
             yl = 'z [m]' if meta['geometry'] == 'axisymmetric' else 'y [m]'
             aspect = meta['Lx'] / meta['Ly']
         else:
             j0, k0 = meta['j0'], meta['k0']
+            is_ovp = field.startswith('overpressure')
             if '(x-z)' in field:
-                solid_sl = meta['solid'][:, j0, :]
+                sl = np.s_[:, j0, :]
+                solid_sl = meta['solid'][sl]
                 xf, yf = meta['x_face'], meta['z_face']
                 xl, yl = 'x [m]', 'z [m]'
                 aspect = meta['Lx'] / meta['Lz']
-                data = (snap['p'][:, j0, :] - np.float32(P_AIR)
-                        if 'overpressure' in field else snap['rho_xz'])
+                plane, pos = 'x-z', f"y = {meta['y_c'][j0]:.2f} m"
+                raw = (snap['p'][sl] - np.float32(P_AIR)
+                      if is_ovp else snap['rho_xz'])
             else:
-                solid_sl = meta['solid'][:, :, k0]
+                sl = np.s_[:, :, k0]
+                solid_sl = meta['solid'][sl]
                 xf, yf = meta['x_face'], meta['y_face']
                 xl, yl = 'x [m]', 'y [m]'
                 aspect = meta['Lx'] / meta['Ly']
-                data = (snap['p'][:, :, k0] - np.float32(P_AIR)
-                        if 'overpressure' in field else snap['rho_xy'])
+                plane, pos = 'x-y', f"z = {meta['z_c'][k0]:.2f} m"
+                raw = (snap['p'][sl] - np.float32(P_AIR)
+                      if is_ovp else snap['rho_xy'])
+            if is_peak or is_imp:
+                (pk_lbl, pk), (im_lbl, im) = plots.peak_items(meta, sl)
+                data = pk if is_peak else im
+                unit = (f"{plots.PEAK_LABEL if is_peak else plots.IMPULSE_LABEL}"
+                        f" — {plane} slice at {pos}")
+            elif is_ovp:
+                data = raw / np.float32(1e3)
+                unit = f"Overpressure [kPa] — {plane} slice at {pos}"
+            else:
+                data = raw
+                unit = f"Density [kg/m³] — {plane} slice at {pos}"
 
-        unit = ('Overpressure [kPa]' if dim == 2 and field == 'overpressure'
-                else field)
         fig = plots._panel_grid_figure(
             [(label, data)], solid_sl, xf, yf, xl, yl,
             f"{field} - {plots.charge_label(meta)}", unit, aspect)
@@ -297,12 +337,29 @@ class ResultsPanel(ctk.CTkFrame):
 
         fig = Figure(figsize=(6, 5))
         ax = fig.add_subplot()
-        if 'z_face' in meta:      # 3D slice
-            xf, yf = meta['x_face'], meta['z_face']
-            self._anim_solid = meta['solid'][:, meta['j0'], :]
+        if 'z_face' in meta:      # 3D slice: mirror output/animation.py
+            s_ax = meta.get('slice_axis', 'y')
+            s0 = meta.get('s0', meta['j0'])
+            faces = {'x': (meta['y_face'], meta['z_face']),
+                     'y': (meta['x_face'], meta['z_face']),
+                     'z': (meta['x_face'], meta['y_face'])}[s_ax]
+            labels = {'x': ('y [m]', 'z [m]'), 'y': ('x [m]', 'z [m]'),
+                      'z': ('x [m]', 'y [m]')}[s_ax]
+            sl = tuple(s0 if a == 'xyz'.index(s_ax) else slice(None)
+                      for a in range(3))
+            xf, yf = faces
+            xlabel, ylabel = labels
+            self._anim_solid = meta['solid'][sl]
+            self._anim_plane = f"{s_ax} = {meta[f'{s_ax}_c'][s0]:.2f} m  "
         else:
             xf, yf = meta['x_face'], meta['y_face']
             self._anim_solid = meta['solid']
+            xlabel = 'x [m]'
+            ylabel = ('z [m]' if meta.get('geometry') == 'axisymmetric'
+                     else 'y [m]')
+            self._anim_plane = ''
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
         self._anim_mesh = plots.overpressure_panel(
             ax, xf, yf, self._anim_solid.shape)
         self._anim_title = ax.set_title('')
@@ -320,7 +377,8 @@ class ResultsPanel(ctk.CTkFrame):
         k = max(0, min(int(k), len(frames['pressures']) - 1))
         plots.set_frame(self._anim_mesh, frames['pressures'][k],
                         self._anim_solid)
-        self._anim_title.set_text(f"t = {frames['times'][k]*1e3:.3f} ms")
+        self._anim_title.set_text(
+            f"{self._anim_plane}t = {frames['times'][k]*1e3:.3f} ms")
         self.anim_canvas.draw()
 
     def _slider_moved(self, value):
@@ -456,12 +514,14 @@ class ResultsPanel(ctk.CTkFrame):
                                      res.gauges, res.meta['charge_kg'],
                                      res.meta['eos']))]
                     elif dim == 2:
-                        figs = plots.figures_fields_2d(res.snapshots, res.meta)
+                        figs = plots.figures_fields_2d(res.snapshots, res.meta,
+                                                       include_peak=True)
                         figs.append(('blast_2d_gauges.png',
                                      plots.figure_gauges_nd(res.gauges,
                                                             res.meta)))
                     else:
-                        figs = plots.figures_fields_3d(res.snapshots, res.meta)
+                        figs = plots.figures_fields_3d(res.snapshots, res.meta,
+                                                       include_peak=True)
                         figs.append(('blast_3d_gauges.png',
                                      plots.figure_gauges_nd(res.gauges,
                                                             res.meta)))

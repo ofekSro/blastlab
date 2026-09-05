@@ -205,8 +205,31 @@ def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
     return fig
 
 
-def figures_fields_2d(snapshots, meta):
-    """The two 2D field figures: [(filename, Figure), ...]."""
+PEAK_LABEL = 'Peak overpressure [kPa]'
+IMPULSE_LABEL = 'Net overpressure impulse [Pa·s]'
+
+
+def has_peak_maps(meta):
+    """True when the run carries whole-run p_peak / impulse maps (native
+    2D/3D and foam 2D/3D do; runs loaded from older results may not)."""
+    return (meta.get('p_peak') is not None
+            and meta.get('impulse') is not None)
+
+
+def peak_items(meta, sl=None):
+    """[(label, data)] for the two whole-run maps, optionally sliced.
+    p_peak is absolute pressure - shown as overpressure in kPa."""
+    pk, imp = meta['p_peak'], meta['impulse']
+    if sl is not None:
+        pk, imp = pk[sl], imp[sl]
+    return [('peak overpressure', (pk - P_AIR) / 1e3),
+            ('net ovp impulse', imp)]
+
+
+def figures_fields_2d(snapshots, meta, include_peak=False):
+    """The two 2D field figures: [(filename, Figure), ...]; with
+    `include_peak` (and maps present) also the whole-run peak
+    overpressure and net impulse figures."""
     base = (f"2D Blast ({meta['geometry']}) - {charge_label(meta)} - "
             f"EOS: {meta['eos']}")
     xlabel = 'r [m]' if meta['geometry'] == 'axisymmetric' else 'x [m]'
@@ -224,13 +247,23 @@ def figures_fields_2d(snapshots, meta):
         [(lbl, d['rho']) for lbl, d in snapshots.items()],
         title=f'Density - {base}', cbar_label='Density [kg/m³]',
         **common)))
+    if include_peak and has_peak_maps(meta):
+        (pk_lbl, pk), (im_lbl, im) = peak_items(meta)
+        out.append(('blast_2d_peak_overpressure.png', _panel_grid_figure(
+            [('whole run', pk)], title=f'Peak overpressure - {base}',
+            cbar_label=PEAK_LABEL, **common)))
+        out.append(('blast_2d_impulse.png', _panel_grid_figure(
+            [('whole run', im)], title=f'Net overpressure impulse - {base}',
+            cbar_label=IMPULSE_LABEL, **common)))
     return out
 
 
 # ── 3D slice figures ─────────────────────────────────────────────────────────
 
-def figures_fields_3d(snapshots, meta):
-    """The four 3D slice figures: [(filename, Figure), ...]."""
+def figures_fields_3d(snapshots, meta, include_peak=False):
+    """The four 3D slice figures: [(filename, Figure), ...]; with
+    `include_peak` (and maps present) also the whole-run peak
+    overpressure and net impulse maps on the same two planes."""
     j0, k0 = meta['j0'], meta['k0']
     y0 = meta['y_c'][j0]
     z0 = meta['z_c'][k0]
@@ -238,19 +271,19 @@ def figures_fields_3d(snapshots, meta):
 
     specs = [
         ('blast_3d_pressure_vertical.png',
-         [(lbl, s['p'][:, j0, :] - np.float32(P_AIR))
+         [(lbl, (s['p'][:, j0, :] - np.float32(P_AIR)) / np.float32(1e3))
           for lbl, s in snapshots.items()],
          meta['solid'][:, j0, :], meta['x_face'], meta['z_face'],
          'x [m]', 'z [m]',
          f'Overpressure, vertical plane y = {y0:.2f} m - {base}',
-         'Overpressure [Pa]', meta['Lx'] / meta['Lz']),
+         'Overpressure [kPa]', meta['Lx'] / meta['Lz']),
         ('blast_3d_pressure_horizontal.png',
-         [(lbl, s['p'][:, :, k0] - np.float32(P_AIR))
+         [(lbl, (s['p'][:, :, k0] - np.float32(P_AIR)) / np.float32(1e3))
           for lbl, s in snapshots.items()],
          meta['solid'][:, :, k0], meta['x_face'], meta['y_face'],
          'x [m]', 'y [m]',
          f'Overpressure, horizontal plane z = {z0:.2f} m - {base}',
-         'Overpressure [Pa]', meta['Lx'] / meta['Ly']),
+         'Overpressure [kPa]', meta['Lx'] / meta['Ly']),
         ('blast_3d_density_vertical.png',
          [(lbl, s['rho_xz']) for lbl, s in snapshots.items()],
          meta['solid'][:, j0, :], meta['x_face'], meta['z_face'],
@@ -264,6 +297,23 @@ def figures_fields_3d(snapshots, meta):
          f'Density, horizontal plane z = {z0:.2f} m - {base}',
          'Density [kg/m³]', meta['Lx'] / meta['Ly']),
     ]
+    if include_peak and has_peak_maps(meta):
+        for plane, sl, solid_sl, xf, yf, xl, yl, pos, ar in (
+                ('vertical', np.s_[:, j0, :], meta['solid'][:, j0, :],
+                 meta['x_face'], meta['z_face'], 'x [m]', 'z [m]',
+                 f'y = {y0:.2f} m', meta['Lx'] / meta['Lz']),
+                ('horizontal', np.s_[:, :, k0], meta['solid'][:, :, k0],
+                 meta['x_face'], meta['y_face'], 'x [m]', 'y [m]',
+                 f'z = {z0:.2f} m', meta['Lx'] / meta['Ly'])):
+            (pk_lbl, pk), (im_lbl, im) = peak_items(meta, sl)
+            specs.append((f'blast_3d_peak_overpressure_{plane}.png',
+                          [('whole run', pk)], solid_sl, xf, yf, xl, yl,
+                          f'Peak overpressure, {plane} plane {pos} - {base}',
+                          PEAK_LABEL, ar))
+            specs.append((f'blast_3d_impulse_{plane}.png',
+                          [('whole run', im)], solid_sl, xf, yf, xl, yl,
+                          f'Net overpressure impulse, {plane} plane {pos} '
+                          f'- {base}', IMPULSE_LABEL, ar))
     return [(fn, _panel_grid_figure(items, solid_sl, xf, yf, xl, yl,
                                     title, cl, ar))
             for fn, items, solid_sl, xf, yf, xl, yl, title, cl, ar in specs]
