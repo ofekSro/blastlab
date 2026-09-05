@@ -274,6 +274,15 @@ class CaseForm(ctk.CTkFrame):
         self._act_combo = _combo(num, self._var('activation', 'linear'),
                                  ['linear', 'none'])
         r = _row(num, r, 'Detonation (blastFoam)', self._act_combo)
+        if self.dim > 1:
+            # 'global' = today's rule (the whole grid is refined to resolve
+            # the charge); 'zone' keeps the base cell and adds automatic
+            # nested refinement zones around the charge (blastFoam only)
+            self._cref_combo = _combo(num, self._var('charge_refine',
+                                                     'global'),
+                                      ['global', 'zone'])
+            r = _row(num, r, 'Charge refinement (blastFoam)',
+                     self._cref_combo)
         r = _row(num, r, 'Snapshots',
                  _entry(num, self._var('n_snapshots',
                                        5 if self.dim == 1 else 6)))
@@ -334,6 +343,13 @@ class CaseForm(ctk.CTkFrame):
             self.obstacles = _PointList(of, ocols, self._on_change)
             self.obstacles.grid(row=0, column=0, columnspan=2,
                                 sticky='nsew')
+
+            # blastFoam local refinement zones: a box + a level (1 = base
+            # cell / 2, 2 = / 4, ...); validation blocks them on native
+            zf = self._card(1, 'Refinement zones (blastFoam) [m, level]')
+            self.zones = _PointList(zf, ocols + ['level'], self._on_change,
+                                    height=3)
+            self.zones.grid(row=0, column=0, columnspan=2, sticky='nsew')
 
             # blastFoam-only extras (validation blocks them on native)
             if self.dim == 3:
@@ -416,6 +432,11 @@ class CaseForm(ctk.CTkFrame):
                 state='readonly' if foam else 'disabled')
             if not foam and self.v['activation'].get() != 'linear':
                 self.v['activation'].set('linear')
+            if hasattr(self, '_cref_combo'):
+                self._cref_combo.configure(
+                    state='readonly' if foam else 'disabled')
+                if not foam and self.v['charge_refine'].get() != 'global':
+                    self.v['charge_refine'].set('global')
 
     # ── Case conversion ─────────────────────────────────────────────────
     def get_case(self):
@@ -454,6 +475,9 @@ class CaseForm(ctk.CTkFrame):
             activation=v['activation'].get(),
             n_procs=_i(v['n_procs'], 'MPI ranks'),
             det_points=self.det_pts.get() or None,
+            refine_zones=[(*z[:-1], int(round(z[-1])))
+                          for z in self.zones.get()],
+            charge_refine=v['charge_refine'].get(),
         )
         if self.dim == 2:
             return Case2D(geometry=v['geometry'].get(),
@@ -513,6 +537,7 @@ class CaseForm(ctk.CTkFrame):
         v['solver'].set(getattr(case, 'solver', 'native'))
         v['material'].set(getattr(case, 'material', 'TNT'))
         v['activation'].set(getattr(case, 'activation', 'linear'))
+        v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
         v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
         v['eos'].set(case.eos)
         v['cfl'].set(f'{case.cfl:g}')
@@ -521,6 +546,7 @@ class CaseForm(ctk.CTkFrame):
             v[f'bc_{side}'].set(val)
         self.gauges.set(case.gauges)
         self.obstacles.set(case.obstacles)
+        self.zones.set(getattr(case, 'refine_zones', None) or [])
         if self.dim == 3:
             self.extra_charges.set(getattr(case, 'charges', None) or [])
         self.det_pts.set(getattr(case, 'det_points', None) or [])
@@ -583,6 +609,15 @@ class SetupPanel(ctk.CTkFrame):
         prev_card.grid(row=1, column=1, rowspan=2, sticky='nsew',
                        padx=(GAP, 0))
         host = prev_card.body
+        self._last_case = None
+        self.show_mesh_var = tk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            prev_card, text='Show mesh', variable=self.show_mesh_var,
+            command=self._mesh_toggled, font=theme.F_BODY, corner_radius=6,
+            checkbox_width=19, checkbox_height=19, border_width=2,
+            border_color=c('border'), fg_color=c('accent'),
+            hover_color=c('accent_hover')).pack(
+            anchor='w', padx=PAD, pady=(0, 2), before=host)
         self._prev_msg = ctk.CTkLabel(host, text=self._PREV_HINT,
                                       font=theme.F_BODY,
                                       text_color=c('muted'))
@@ -633,19 +668,25 @@ class SetupPanel(ctk.CTkFrame):
                 self._prev_msg.configure(text=self._PREV_HINT)
                 self._show_preview_widget(self._prev_msg)
             return
+        self._last_case = case
+        show_mesh = bool(self.show_mesh_var.get())
         if case.dim == 2:
-            self.preview2d.show_case(case)
+            self.preview2d.show_case(case, show_mesh=show_mesh)
             self._show_preview_widget(self.preview2d)
         elif case.dim == 3:
             if self.preview is None:
                 self._prev_msg.configure(text=self._missing3d)
                 self._show_preview_widget(self._prev_msg)
                 return
-            self.preview.show_case(case)
+            self.preview.show_case(case, show_mesh=show_mesh)
             self._show_preview_widget(self.preview)
         else:
             self._prev_msg.configure(text=self._PREV_HINT)
             self._show_preview_widget(self._prev_msg)
+
+    def _mesh_toggled(self):
+        if self._last_case is not None:
+            self.update_preview(self._last_case)
 
     @property
     def form(self):

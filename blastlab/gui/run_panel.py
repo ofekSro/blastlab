@@ -8,8 +8,9 @@ import customtkinter as ctk
 import numpy as np
 from matplotlib.figure import Figure
 
+from ..core import refine
 from ..core.constants import P_AIR
-from ..output.plots import overpressure_panel, set_frame
+from ..output.plots import add_mesh_lines, overpressure_panel, set_frame
 from . import theme
 from .mpl import EmbeddedFigure
 from .theme import GAP, PAD, Card, c, icon
@@ -148,15 +149,26 @@ class RunPanel(ctk.CTkFrame):
         body.add(logcard, weight=1)
 
         right = Card(body, pad=12)
+        vbar = ctk.CTkFrame(right.body, fg_color='transparent')
+        vbar.pack(fill='x', pady=(0, GAP))
         self._view_seg = ctk.CTkSegmentedButton(
-            right.body, values=['Live slice', '3D view'],
+            vbar, values=['Live slice', '3D view'],
             font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
             fg_color=c('card2'), unselected_color=c('card2'),
             unselected_hover_color=c('border'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
             command=self._view_selected)
-        self._view_seg.pack(anchor='w', pady=(0, GAP))
+        self._view_seg.pack(side='left')
+        # cell edges over the live slice (true cells of a refined run)
+        self.show_mesh_var = tk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            vbar, text='Show mesh', variable=self.show_mesh_var,
+            command=self._rebuild_overlay, font=theme.F_BODY,
+            corner_radius=6, checkbox_width=19, checkbox_height=19,
+            border_width=2, border_color=c('border'),
+            fg_color=c('accent'), hover_color=c('accent_hover')).pack(
+            side='left', padx=(PAD, 0))
         stack = ctk.CTkFrame(right.body, fg_color='transparent')
         stack.pack(fill='both', expand=True)
         stack.grid_columnconfigure(0, weight=1)
@@ -178,6 +190,8 @@ class RunPanel(ctk.CTkFrame):
         self._mesh = None
         self._line = None
         self._solid = None
+        self._mesh_geom = None      # (x_face, y_face, mesh_src) of the run
+        self._mesh_lines = None     # the overlay LineCollection
         self._title = None
 
     # ── live-view sub-tab switching ──────────────────────────────────────
@@ -220,6 +234,12 @@ class RunPanel(ctk.CTkFrame):
         self.log.delete('1.0', 'end')
         self.log.configure(state='disabled')
 
+    def mark_complete(self):
+        """Run reached its own end: fill the bar. The worker throttles
+        progress messages to ~10 Hz, so the final one is usually dropped
+        and the last frac this panel ever saw is short of 1.0."""
+        self.progress.set(1.0)
+
     def on_progress(self, p):
         self.progress.set(max(0.0, min(1.0, p.frac)))
         self._chip_step.configure(text=str(p.step))
@@ -231,6 +251,7 @@ class RunPanel(ctk.CTkFrame):
         fig = Figure(figsize=(5.5, 5.5))
         ax = fig.add_subplot()
         self._mesh = self._line = None
+        self._mesh_geom = self._mesh_lines = None
         if info['dim'] == 1:
             (self._line,) = ax.plot([], [], lw=1.4,
                                     color=theme.cur('accent'))
@@ -243,6 +264,11 @@ class RunPanel(ctk.CTkFrame):
             self._solid = info['solid']
             self._mesh = overpressure_panel(
                 ax, info['x_face'], info['y_face'], info['solid'].shape)
+            # mesh_src: the plane's source-cell ids for a refined foam
+            # run (absent/None = uniform: every face)
+            self._mesh_geom = (info['x_face'], info['y_face'],
+                               info.get('mesh_src'))
+            self._rebuild_overlay(draw=False)
             ax.set_xlabel(info['xlabel'])
             ax.set_ylabel(info['ylabel'])
             self._title = ax.set_title(info.get('title', ''))
@@ -250,6 +276,21 @@ class RunPanel(ctk.CTkFrame):
                          shrink=0.85)
         fig.tight_layout()
         self.canvas.set_figure(fig)
+
+    def _rebuild_overlay(self, draw=True):
+        """Add/remove the cell-edge overlay per the checkbox."""
+        if self._mesh is None or self._mesh_geom is None:
+            return
+        if self._mesh_lines is not None:
+            self._mesh_lines.remove()
+            self._mesh_lines = None
+        if self.show_mesh_var.get():
+            xf, yf, src = self._mesh_geom
+            self._mesh_lines = add_mesh_lines(
+                self._mesh.axes, refine.mesh_segments_2d(src, xf, yf),
+                color=theme.cur('muted'))
+        if draw:
+            self.canvas.draw()
 
     def on_frame(self, field, t):
         # Frames are coalesced in a single slot shared across chain stages,

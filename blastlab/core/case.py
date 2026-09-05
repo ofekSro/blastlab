@@ -18,7 +18,8 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
 
 SCHEMA = 'blastlab-case'
-VERSION = 2     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 3     # v2: n_procs, activation, charges, det_points (foam)
+                # v3: refine_zones, charge_refine (foam local refinement)
 
 
 @dataclass
@@ -57,6 +58,13 @@ class Case2D:
     bcs: dict = field(default_factory=lambda: dict(
         x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'))
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1)
+    refine_zones: list = field(default_factory=list)  # blastFoam local
+                                      # refinement: (x0,x1,y0,y1,level),
+                                      # level l = base cell / 2**l
+    charge_refine: str = 'global'     # 'global': refine the whole grid to
+                                      # resolve the charge (native rule) |
+                                      # 'zone': keep the base cell, add
+                                      # automatic nested zones (blastFoam)
     cfl: float = 0.4
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y)
@@ -95,6 +103,9 @@ class Case3D:
         x_lo='open', x_hi='open', y_lo='open', y_hi='open',
         z_lo='wall', z_hi='open'))
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
+    refine_zones: list = field(default_factory=list)  # blastFoam local
+                                      # refinement: (x0,x1,y0,y1,z0,z1,level)
+    charge_refine: str = 'global'     # 'global' | 'zone' (see Case2D)
     cfl: float = 0.30
     t_end: float = 0.0                # stop at t0 + t_end [s]; 0 = auto
     slice_axis: str = 'y'             # live-slice normal: 'x' | 'y' | 'z'
@@ -147,6 +158,10 @@ def case_from_dict(d):
         case.center = tuple(case.center)
     if hasattr(case, 'obstacles'):
         case.obstacles = [tuple(o) for o in case.obstacles]
+    if getattr(case, 'refine_zones', None):
+        case.refine_zones = [(*[float(v) for v in z[:-1]],
+                              int(round(float(z[-1]))))
+                             for z in case.refine_zones]
     if hasattr(case, 'gauges'):
         case.gauges = [tuple(g) if isinstance(g, (list, tuple)) else g
                        for g in case.gauges]
@@ -182,6 +197,9 @@ class ValidationReport:
     effective_dx: float = None
     r_exp: float = None
     n_cells: int = None
+    lmax: int = 0                    # local refinement levels (foam)
+    dx_fine: float = None            # finest cell of a refined mesh
+    n_fine: int = None               # display-grid cells of a refined run
 
     @property
     def ok(self):
@@ -263,7 +281,13 @@ def _validate_solver(case, rep):
     return MATERIALS[material].rho0
 
 
-def validate_case(case):
+def validate_case(case, pending_inputs=False):
+    """Full pre-run report for one case.
+
+    `pending_inputs=True` means the case's profile input is produced by
+    an earlier stage of the same chain run, so its absence on disk right
+    now is expected rather than an error (everything else is still
+    checked). Only the chain panel passes it."""
     rep = ValidationReport()
     err, warn, note = rep.errors.append, rep.warnings.append, rep.notes.append
 
@@ -276,6 +300,8 @@ def validate_case(case):
     if rho0 is None:
         return rep
     foam = getattr(case, 'solver', 'native') == 'blastfoam'
+    cref = getattr(case, 'charge_refine', 'global')
+    zones = list(getattr(case, 'refine_zones', None) or [])
 
     if case.dim == 1:
         if case.charge_kg <= 0:
@@ -382,7 +408,7 @@ def validate_case(case):
         if smeared:
             note(f"Charge under-resolved at dx = {dx:g} m - its mass & "
                  f"energy will be smeared into a {r_exp:.3f} m source ball")
-        elif dx > r_exp / MIN_EXP_CELLS:
+        elif dx > r_exp / MIN_EXP_CELLS and not (foam and cref == 'zone'):
             dx = r_exp / MIN_EXP_CELLS
             refined = True
             note(f"Cell size will be refined to {dx:.5f} m "
@@ -460,15 +486,55 @@ def validate_case(case):
     else:
         if not case.profile_file_in:
             err("A profile file is required for remap initialization")
-        elif not os.path.exists(case.profile_file_in):
+        elif not (pending_inputs or os.path.exists(case.profile_file_in)):
             err(f"Profile file not found: {case.profile_file_in}")
         if case.dim == 2 and init == 'profile1d' \
                 and case.geometry != 'axisymmetric':
             err("1D profile remap is only valid in axisymmetric mode")
 
+    # blastFoam local refinement: zones and/or an automatic charge zone
+    plan = None
+    if case.dim >= 2 and (zones or cref == 'zone'):
+        if not foam:
+            err("Local mesh refinement (refinement zones / charge "
+                "refinement 'zone') requires the blastFoam solver")
+        elif cref not in ('global', 'zone'):
+            err(f"Unknown charge refinement mode '{cref}' (use 'global' "
+                f"or 'zone')")
+        elif init == 'charge' and not rep.errors:
+            from .refine import plan_levels, validate_zones
+            try:
+                plan = plan_levels(case, rho0)
+            except ValueError as exc:
+                err(str(exc))
+            else:
+                zerr, zwarn = validate_zones(case, plan)
+                rep.errors.extend(zerr)
+                rep.warnings.extend(zwarn)
+                if zerr:
+                    plan = None
+                else:
+                    if plan.refined:
+                        note(f"Local refinement: {plan.lmax} level(s), "
+                             f"finest cell {plan.dx_fine:.5g} m, "
+                             f"~{plan.n_pred:,} mesh cells; results are "
+                             f"resampled to a {plan.n_fine:,}-cell display "
+                             f"grid")
+                        rep.lmax = plan.lmax
+                        rep.dx_fine = plan.dx_fine
+                        rep.n_fine = plan.n_fine
+                    if cref == 'zone':
+                        note(f"Charge resolved by automatic level-"
+                             f"{plan.auto_level} zones (base cell kept at "
+                             f"{plan.dx_base:.5g} m)" if plan.auto_level
+                             else "The base cell already resolves the "
+                                  "charge - no automatic zone needed")
+
     rep.effective_dx = dx
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
+        if plan is not None and plan.refined:
+            n = plan.n_pred
         if foam:
             # blastFoam solves in WSL; Python only ingests written
             # frames, so the cap reflects wall time/disk, not RAM
@@ -484,6 +550,8 @@ def validate_case(case):
             warn(f"Large grid: ~{n:,} cells - expect a long run")
     else:
         n = int(case.Lx / dx) * int(case.Ly / dx) * int(case.Lz / dx)
+        if plan is not None and plan.refined:
+            n = plan.n_pred
         if foam:
             if n > FOAM_CELLS_REFUSE:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
@@ -498,6 +566,19 @@ def validate_case(case):
         elif n > CELLS_WARN:
             warn(f"Large grid: ~{n:,} cells - expect a long run and GBs of RAM")
     rep.n_cells = n
+    if plan is not None and plan.refined:
+        # Python holds the resampled fine grid per ingested write, so the
+        # display grid is capped like a native run's grid
+        cap = CELLS_2D_MAX if case.dim == 2 else CELLS_REFUSE
+        cap_warn = CELLS_2D_WARN if case.dim == 2 else CELLS_WARN
+        if plan.n_fine > cap:
+            err(f"Refined results are resampled to a {plan.n_fine:,}-cell "
+                f"display grid (finest cell {plan.dx_fine:.5g} m), above "
+                f"the {cap:,} cap - use fewer levels or a coarser base")
+        elif plan.n_fine > cap_warn:
+            warn(f"Refined results are resampled to a {plan.n_fine:,}-cell "
+                 f"display grid - expect GBs of RAM for frames and "
+                 f"snapshots")
 
     # gauges / obstacles sanity
     for g in getattr(case, 'gauges', []):

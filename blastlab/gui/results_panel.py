@@ -125,6 +125,16 @@ class ResultsPanel(ctk.CTkFrame):
         self.field_sel = _combo(fbar, width=180,
                                 command=lambda v: self._draw_field())
         self.field_sel.pack(side='left')
+        # cell edges over the field / replay plots (true cells of a
+        # refined blastFoam run, every face otherwise)
+        self.show_mesh_var = tk.BooleanVar(value=False)
+        ctk.CTkCheckBox(
+            fbar, text='Show mesh', variable=self.show_mesh_var,
+            command=self._mesh_toggled, font=theme.F_BODY,
+            corner_radius=6, checkbox_width=19, checkbox_height=19,
+            border_width=2, border_color=c('border'),
+            fg_color=c('accent'), hover_color=c('accent_hover')).pack(
+            side='left', padx=(PAD, 0))
         self.field_canvas = EmbeddedFigure(ftab, figsize=(6, 5))
         self.field_canvas.pack(fill='both', expand=True)
 
@@ -223,6 +233,10 @@ class ResultsPanel(ctk.CTkFrame):
         self._draw_gauges()
         self._setup_anim()
 
+    def _mesh_toggled(self):
+        self._draw_field()
+        self._setup_anim()
+
     def _draw_field(self):
         ent = self._current()
         if ent is None or not ent.result.snapshots:
@@ -302,9 +316,13 @@ class ResultsPanel(ctk.CTkFrame):
                 data = raw
                 unit = f"Density [kg/m³] — {plane} slice at {pos}"
 
+        mesh = None
+        if self.show_mesh_var.get():
+            mesh = plots.mesh_for(meta, xf, yf, sl if dim == 3 else None)
         fig = plots._panel_grid_figure(
             [(label, data)], solid_sl, xf, yf, xl, yl,
-            f"{field} - {plots.charge_label(meta)}", unit, aspect)
+            f"{field} - {plots.charge_label(meta)}", unit, aspect,
+            mesh=mesh)
         self.field_canvas.set_figure(fig)
 
     def _draw_gauges(self):
@@ -354,6 +372,7 @@ class ResultsPanel(ctk.CTkFrame):
         else:
             xf, yf = meta['x_face'], meta['y_face']
             self._anim_solid = meta['solid']
+            sl = None
             xlabel = 'x [m]'
             ylabel = ('z [m]' if meta.get('geometry') == 'axisymmetric'
                      else 'y [m]')
@@ -361,7 +380,9 @@ class ResultsPanel(ctk.CTkFrame):
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         self._anim_mesh = plots.overpressure_panel(
-            ax, xf, yf, self._anim_solid.shape)
+            ax, xf, yf, self._anim_solid.shape,
+            mesh=(plots.mesh_for(meta, xf, yf, sl)
+                  if self.show_mesh_var.get() else None))
         self._anim_title = ax.set_title('')
         fig.colorbar(self._anim_mesh, ax=ax, label='Overpressure [kPa]',
                      shrink=0.85)
@@ -471,6 +492,7 @@ class ResultsPanel(ctk.CTkFrame):
         if ent is None:
             return
         res, dim = ent.result, ent.dim
+        show_mesh = bool(self.show_mesh_var.get())
 
         # File dialogs must run on the Tk main thread; only the heavy
         # figure building / writing goes to the worker thread.
@@ -515,13 +537,15 @@ class ResultsPanel(ctk.CTkFrame):
                                      res.meta['eos']))]
                     elif dim == 2:
                         figs = plots.figures_fields_2d(res.snapshots, res.meta,
-                                                       include_peak=True)
+                                                       include_peak=True,
+                                                       show_mesh=show_mesh)
                         figs.append(('blast_2d_gauges.png',
                                      plots.figure_gauges_nd(res.gauges,
                                                             res.meta)))
                     else:
                         figs = plots.figures_fields_3d(res.snapshots, res.meta,
-                                                       include_peak=True)
+                                                       include_peak=True,
+                                                       show_mesh=show_mesh)
                         figs.append(('blast_3d_gauges.png',
                                      plots.figure_gauges_nd(res.gauges,
                                                             res.meta)))
@@ -539,7 +563,7 @@ class ResultsPanel(ctk.CTkFrame):
                      3: save_gauges_3d}[dim](res.gauges, target)
                     self._log(f'Saved {target}')
                 elif kind == 'gif':
-                    write_animation(res.meta, target)
+                    write_animation(res.meta, target, show_mesh=show_mesh)
                     self._log(f'Saved {target}')
                 elif kind == 'profile':
                     if dim == 1:

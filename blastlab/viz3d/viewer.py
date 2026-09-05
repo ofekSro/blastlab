@@ -2,9 +2,12 @@
 
 This is the only blastlab module that imports pyvista. `viewer_main`
 is the multiprocessing spawn target: it builds the scene from the
-'init' message, then drains ('frame', t, payload) messages on a render
-timer. While the run is live the view follows the newest frame; after
-('done', reason) the time slider scrubs the retained history.
+'init' message, then drains ('frame', t, payload, final) messages on a
+render timer - `final` marks the run's last frame so FrameStore.append
+is told to keep it even mid-thinning-stride, never inferred from the
+viewer's own 'done' state. While the run is live the view follows the
+newest frame; after ('done', reason) the time slider scrubs the
+retained history.
 
 Scene layers (each toggled by an on-screen control):
   plane1..planeN    : cross-section planes coloured by the active field
@@ -20,6 +23,7 @@ import queue as _queue
 
 import numpy as np
 
+from ..core.refine import LEVEL_COLORS
 from ..core.constants import P_AIR
 from .sampling import FrameStore
 
@@ -36,7 +40,8 @@ FIELDS = {
     'rho':    dict(title=RHO_TITLE,                  ovp=False),
     'e':      dict(title='Energy [J/kg]',            ovp=False),
     'p_peak': dict(title='Peak overpressure [kPa]',  ovp=True),
-    'imp':    dict(title='Impulse [Pa s]',           ovp=False),
+    #: net (not positive-phase) overpressure impulse - see README.md
+    'imp':    dict(title='Net overpressure impulse [Pa·s]', ovp=False),
 }
 
 #: Camera presets: view direction (towards the domain) and up vector.
@@ -59,6 +64,24 @@ def _set_text(actor, s):
         actor.input = s
     except AttributeError:
         actor.SetInput(s)
+
+
+def mesh_edges_polydata(segments, axis, pos):
+    """pyvista PolyData of cell-edge segments ((N, 2, 2) in-plane
+    coordinates) lying on the plane normal to `axis` at `pos`."""
+    import pyvista as pv
+    seg = np.asarray(segments, dtype=float).reshape(-1, 2, 2)
+    n = len(seg)
+    pts = np.zeros((2 * n, 3))
+    uv = [a for a in range(3) if a != axis]
+    pts[:, uv[0]] = seg[:, :, 0].ravel()
+    pts[:, uv[1]] = seg[:, :, 1].ravel()
+    pts[:, axis] = pos
+    lines = np.column_stack([np.full(n, 2), np.arange(0, 2 * n, 2),
+                             np.arange(1, 2 * n, 2)]).ravel()
+    poly = pv.PolyData(pts)
+    poly.lines = lines
+    return poly
 
 
 def add_static_scenery(pl, geo):
@@ -117,6 +140,20 @@ def add_static_scenery(pl, geo):
         pl.add_mesh(pv.Box(bounds=box), color='#8d99ae',
                     opacity=1.0, smooth_shading=False,
                     name=f'obstacle{k}')
+    # refinement zones: wireframe boxes coloured by level; the predicted
+    # mesh on the live-slice plane when the preview asks for it
+    for k, z in enumerate(geo.get('zones') or []):
+        lv = int(round(float(z[-1])))
+        col = LEVEL_COLORS[min(max(lv, 1), len(LEVEL_COLORS)) - 1]
+        pl.add_mesh(pv.Box(bounds=tuple(float(v) for v in z[:6]))
+                    .extract_all_edges(), color=col, line_width=1.5,
+                    opacity=0.9, name=f'zone{k}')
+    mp = geo.get('mesh_plane')
+    if mp and mp.get('segments') is not None and len(mp['segments']):
+        pl.add_mesh(mesh_edges_polydata(mp['segments'], mp['axis'],
+                                        mp['pos']),
+                    color='#d0d4da', line_width=1, opacity=0.7,
+                    name='mesh_preview')
     cx, cy, cz = geo['charge_center']
     pl.add_mesh(pv.Sphere(radius=geo['r_draw'], center=(cx, cy, cz)),
                 color='#ff8f00', opacity=0.85, name='charge')
@@ -432,8 +469,8 @@ class BlastScene(_CameraOps):
     def on_message(self, msg):
         tag = msg[0]
         if tag == 'frame':
-            _, t, payload = msg
-            stored = self.store.append(t, payload, force=self.done)
+            _, t, payload, final = msg
+            stored = self.store.append(t, payload, force=final)
             if self.follow_live or self.index < 0:
                 if stored:
                     self._show_index(len(self.store) - 1)

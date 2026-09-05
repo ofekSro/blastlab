@@ -10,11 +10,11 @@ from matplotlib import animation
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from .plots import overpressure_panel, set_frame, charge_label
+from .plots import mesh_for, overpressure_panel, set_frame, charge_label
 
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
-                    progress_callback=None):
+                    progress_callback=None, show_mesh=False):
     """
     Write the frames recorded by a run (meta['frames'] from
     record_frames > 0) to an animated .gif or .mp4.
@@ -62,6 +62,7 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     else:                            # 2D
         xf, yf = meta['x_face'], meta['y_face']
         solid_sl = meta['solid']
+        sl = None
         plane = ''
         xlabel = 'x [m]'
         ylabel = ('z [m]' if meta.get('geometry') == 'axisymmetric'
@@ -71,7 +72,9 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     fig = Figure(figsize=(7, 7 * h_over_w + 1))
     FigureCanvasAgg(fig)
     ax = fig.add_subplot()
-    mesh = overpressure_panel(ax, xf, yf, solid_sl.shape)
+    mesh = overpressure_panel(
+        ax, xf, yf, solid_sl.shape,
+        mesh=mesh_for(meta, xf, yf, sl) if show_mesh else None)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     title = ax.set_title('')

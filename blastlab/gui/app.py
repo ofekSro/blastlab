@@ -26,6 +26,30 @@ from .worker import SolverWorker
 _LOGO = os.path.join(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))), 'logo.gif')
 
+_TB_HEADER = 'Traceback (most recent call last):'
+_TB_CHAIN = (
+    'During handling of the above exception, another exception occurred:',
+    'The above exception was the direct cause of the following exception:')
+
+
+def _error_headline(text):
+    """The exception headline out of a traceback: the first non-empty
+    line that is not the traceback header, a chaining separator, or an
+    indented frame/source line.
+
+    Deliberately not `splitlines()[-1]`: a foam failure carries its own
+    multi-line message (FoamStageError appends the solver log tail), so
+    the last line is an arbitrary line of blastFoam output instead of
+    the "RuntimeError: blastFoam failed (exit 1) - case kept at ..."
+    the user actually needs."""
+    lines = [ln.rstrip() for ln in str(text).splitlines() if ln.strip()]
+    for line in lines:
+        if (line.startswith((' ', '\t')) or line.strip() == _TB_HEADER
+                or line.strip() in _TB_CHAIN):
+            continue
+        return line
+    return lines[-1] if lines else str(text).strip()
+
 
 def _solve_stage(dim, case):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
@@ -59,6 +83,16 @@ def _solve_stage(dim, case):
 
 
 class App:
+    #: Per-run outcome flags, reset by _start and set from the drained
+    #: 'result'/'error' messages: only a run that finished on its own
+    #: terms gets its progress bar filled to 100% on 'done'. Class-level
+    #: so a partially constructed App (tests drive _drain directly) has
+    #: them too.
+    _run_stopped_early = False
+    _run_errored = False
+    #: True from _start until the drain sees the worker's 'done'
+    _drain_pending = False
+
     def __init__(self, root, case_file=None):
         self.root = root
         root.title(f'blastlab {__version__}')
@@ -245,8 +279,11 @@ class App:
         rep = validate_case(case)
         extra = []
         if rep.n_cells:
-            extra.append(f'~{rep.n_cells:,} cells at dx = '
-                         f'{rep.effective_dx:g} m')
+            line = f'~{rep.n_cells:,} cells at dx = {rep.effective_dx:g} m'
+            if getattr(rep, 'lmax', 0):
+                line += (f' (finest {rep.dx_fine:g} m, {rep.n_fine:,} '
+                         f'display cells)')
+            extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
         self.setup.update_preview(case)
 
@@ -273,10 +310,16 @@ class App:
         self._show('run')
 
     def _start(self, dim_cases, paused=False):
-        if self.worker is not None and self.worker.is_alive():
+        # `is_alive()` alone leaves a ~50 ms window after the worker exits
+        # but before the drain sees its 'done': starting there would
+        # orphan the old queue and drop its finished result (G5)
+        if self._drain_pending or (self.worker is not None
+                                   and self.worker.is_alive()):
             messagebox.showinfo('Run', 'A run is already in progress.')
             return
+        self._drain_pending = True
         self._run_count += 1
+        self._run_stopped_early = self._run_errored = False
         self._stage_dims = [dim for dim, _ in dim_cases]
         stages = [_solve_stage(dim, case) for dim, case in dim_cases]
         self.worker = SolverWorker(stages)
@@ -285,9 +328,14 @@ class App:
         self._apply_refresh()
         if paused:
             self.worker.hooks.set_exec('pause')
+        self.run_panel.set_running(True)
+        self.chain.set_running(True)
+        # after set_running: it clears the log pane, which used to wipe
+        # this hint the instant it was written (the user saw a held run,
+        # an empty log and a 0% bar with no explanation)
+        if paused:
             self.run_panel.on_log('  [model initialised - use the Exec '
                                   'buttons to advance]')
-        self.run_panel.set_running(True)
         self._show('run')
         self.worker.start()
         self.root.after(50, self._drain)
@@ -410,13 +458,17 @@ class App:
             dim = self._stage_dims[k]
             label = (f'Run {self._run_count} - {dim}D'
                      + (' (stopped)' if res.stopped_early else ''))
+            self._run_stopped_early |= bool(res.stopped_early)
             self.results.add_result(label, dim, res)
             # the live viewer belongs to this stage: hand it its
             # playback mode (window stays open)
             self._finish_view3d(res.stop_reason)
         elif tag == 'error':
+            self._run_errored = True
             self.run_panel.on_log(msg[1])
-            messagebox.showerror('Run failed', msg[1].splitlines()[-1])
+            messagebox.showerror(
+                'Run failed',
+                _error_headline(msg[1]) + '\n\nSee the run log for details.')
             self._finish_view3d('run failed')
 
     def _drain(self):
@@ -445,7 +497,13 @@ class App:
         except queue.Empty:
             pass
         if done:
+            self._drain_pending = False
             self.run_panel.set_running(False)
+            self.chain.set_running(False)
+            if not (self._run_stopped_early or self._run_errored):
+                # the last progress message is often throttled away, so
+                # a completed run would otherwise rest below 100%
+                self.run_panel.mark_complete()
             self.run_panel.on_log('  [run finished]')
         else:
             self.root.after(50, self._drain)

@@ -30,6 +30,9 @@
 | T14 | Foam run browser + auto-cleanup | N8 | M | [ ] |
 | T15 | VTK/ParaView export button | N4 | S | [ ] |
 | T16 | Afterburn model (KB gap) | N3 | M | [ ] |
+| T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |
+| T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [ ] |
+| T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [ ] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
 
 ---
@@ -631,6 +634,91 @@ Done when: green; ROADMAP N3 DONE with the measured ratios written into it.
 ```
 
 ---
+
+## T17 — Local refinement: core + schema + validation + form + preview + show-mesh (N15)
+
+```
+SESSION PROMPT — T17   [DONE 2026-09-05]
+Read: ROADMAP.md item N15 and the plan ~/.claude/plans/3d-2d-recursive-lerdorf.md.
+Do: core/refine.py (plan_levels, validate_zones, fine_src, slice_src,
+  mesh_segments_2d, match_cells, auto_charge_zones); Case2D/3D refine_zones +
+  charge_refine (schema v3, case_from_dict coercion); validate_case (native ->
+  error; foam -> plan, notes, predicted count for FOAM caps, fine grid vs
+  native caps); forms (zones card, charge-refinement combo, preview "Show
+  mesh"); preview_panel (zone rectangles/wireframes, predicted edges);
+  plots.mesh_for/add_mesh_lines + mesh= on the panel builders + show_mesh on
+  figures/animation; RunPanel + ResultsPanel checkboxes.
+Verify: test_refine, test_gui_refine_preview, test_case_validate,
+  test_gui_results_fields/anim, test_foam_writer (byte-identical goldens),
+  test_regression (byte-identical), test_viz3d_scene/panel.
+Done when: green; ROADMAP N15 T17 part DONE.
+```
+
+## T18 — Local refinement: foam refine stages + remap reader + live slice + postmortem (N15)
+
+```
+SESSION PROMPT — T18
+Read: ROADMAP.md N15, the plan file section "T18", core/refine.py in full,
+  writer.py plan_case (2D/3D) + _blockmesh_* + _toposetdict, backend.py
+  _mesh_stages/_preflight/_decode_surface/solve_2d_foam/solve_3d_foam
+  banners, reader.py to_grid/read_vector, runloop.py FoamRunLoop,
+  postmortem.py load_run, env.py NEEDED_TOOLS.
+Do (WSL facts are in the plan: refineMesh -dict/-overwrite, e1/e2/e3
+  directions, no cellLevel -> postProcess -func writeCellCentres -> 0/C):
+1. writer.plan_case: plan = refine.plan_levels(case, rho0); spec gains
+   dx_base/nb/levels/lmax/zones/solid_base; spec.grid/nx/ny/nz/dx/solid = the
+   FINE grid (solid = expand(solid_base)); blockMesh on spec.nb/dx_base;
+   uniform cases render byte-identical. Per level l: system/topoSetDict.refine{l}
+   (cellSet refine{l} = boxToCell of snapped zones with level >= l) and
+   system/refineMeshDict.{l} (planar/axisym: directions (e1 e2), useHexTopology
+   no; 3D: (e1 e2 e3), useHexTopology yes; geometricCut no; writeMesh no).
+2. backend._mesh_stages: blockMesh -> [carve] -> per level topoSet -dict +
+   refineMesh -dict -overwrite -> setRefinedFields -noRefine -> (if lmax)
+   postProcess -func writeCellCentres -time 0 -> [decomposePar]. After the
+   stages: C = reader.read_cell_centres (read_vector n_cells=None), spec.remap
+   = refine.match_cells(C, spec.grid, refine.fine_src(spec.levels, spec.lmax,
+   spec.solid_fine)), spec.n_cells_actual = len(C); log "[blastfoam] refined
+   mesh: N cells matched the predicted structure"; mismatch -> RuntimeError,
+   case kept. env.NEEDED_TOOLS += topoSet, subsetMesh, refineMesh, postProcess.
+3. reader.to_grid remap branch (vals[remap], -1 -> fill); _decode_surface remap
+   branch (floor(pt/dx_fine) -> remap_sl -> cell id; count-check; NaN -> None);
+   run_info['mesh_src'] = refine.slice_src(...) when spec.lmax.
+4. Banners: base cell / per-level sizes + counts / actual foam cells / display
+   grid; keep every existing log string. finalize_2d/3d meta['refine'] =
+   plan.meta() when refined; scene3d['refine']. postmortem rebuilds remap from
+   the kept 0/C. max_snaps from the fine count; stop_grace from actual cells.
+Verify: test_foam_writer (new goldens case2d_planar_refine, case2d_axi_refine,
+  case3d_refine; existing byte-identical -> --update adds dirs only),
+  test_foam_reader (to_grid remap, _decode_surface remap, read_vector
+  n_cells=None), test_refine; WSL: _e2e_foam_refine2d.py, _e2e_foam_refine3d.py
+  (incl. n_procs=2), test_foam_postmortem (refined run), test_foam_3d_smoke
+  --tiny, test_foam_2d, test_foam_stop; orphan grep.
+Done when: green; ROADMAP N15 T18 part DONE.
+```
+
+## T19 — Local refinement: 3D viewer mesh layer + e2e + docs (N15)
+
+```
+SESSION PROMPT — T19
+Read: ROADMAP.md N15, plan file section "T19", viz3d/viewer.py (BlastScene
+  layers, _CutPlane, mesh_edges_polydata, add_static_scenery), viz3d/sampling.py
+  build_scene_init, viz3d/client.py scene_from_meta, gui/view3d_panel.py
+  (checkbox helper, _toggle_layer, _apply_all_controls).
+Do: viewer._MeshEdges(_Layer): per visible axis-aligned cut plane, k =
+  floor(origin[ax]/dx_fine) on the FULL-resolution init axes (not the
+  stride-decimated grid), src2d = refine.slice_src(levels, lmax, ax, k) or
+  None, mesh_edges_polydata -> add_mesh(color '#d0d4da', line_width 1,
+  opacity 0.7, name mesh_{plane}); refresh on plane move; guard > ~300k
+  segments (decimated grid instead); layers['mesh'] off by default;
+  _clip_to_cylinder for revolved scenes. build_scene_init/scene_from_meta pass
+  refine through. view3d_panel: Display-tab checkbox 'Show mesh' -> 'mesh';
+  _apply_all_controls lists it. README "Local mesh refinement (blastFoam)";
+  ROADMAP N15 DONE; TASKS rows.
+Verify: test_viz3d_scene/panel additions (synthetic refine, toggle, plane
+  move, line count == len(mesh_segments_2d(slice_src(...))), screenshot
+  differs); manual _e2e_gui_view3d.py on the refined 3D e2e case.
+Done when: green; ROADMAP N15 DONE.
+```
 
 ## Notes for whoever runs these
 

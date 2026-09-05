@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 from ...core.bc import solid_mask_2d, solid_mask_3d
 from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS)
 from ...core.grid import make_grid_1d, make_geometry, make_grid
+from ...core.refine import effective_dx as _effective_dx
 from . import env
 from .dicts import FLUX_SCHEME, P_OPEN_BC, Raw, block, fmt, foam_file
 from .materials import MATERIALS, E0, charge_radius
@@ -96,17 +97,6 @@ class CaseSpec:
 
 
 # ── planning ────────────────────────────────────────────────────────────────
-
-def _effective_dx(cell_size, r_exp, L):
-    """Native refinement rule: >= MIN_EXP_CELLS cells across r_exp, and the
-    refined spacing must divide L (the native solvers' reference length:
-    radius_m in 1D, Lx in 2D/3D) exactly - ceil so it is never coarser than
-    r_exp / MIN_EXP_CELLS. Mirrors solver1d/2d/3d so a foam case lays out
-    the same cell count as its native twin."""
-    if cell_size > r_exp / MIN_EXP_CELLS:
-        return L / math.ceil(L / (r_exp / MIN_EXP_CELLS))
-    return cell_size
-
 
 def _n_writes(n_snapshots):
     return min(N_WRITES_MAX, max(N_WRITES_MIN, 4 * n_snapshots))

@@ -46,6 +46,8 @@ python test_adaptive_interval.py  # writeInterval controller (no WSL)
 python test_foam_live_due.py      # live-frame cadence gate (no WSL)   [was missing from this list]
 python test_gui_drain.py          # GUI queue-drain resilience (no WSL)
 python test_gui_results_fields.py # peak/impulse fields in Results (headless Tk, no WSL)
+python test_refine.py             # predicted refined-mesh structure (no GUI, no WSL)
+python test_gui_refine_preview.py # zones form/preview + show-mesh overlays (headless Tk)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_blast2d.py            # 2D native physics suite
 python test_blast3d.py            # 3D native physics suite
@@ -798,11 +800,37 @@ figures. *Effort:* M. *Confidence:* carried forward.
 
 ---
 
+**N15 — Local mesh refinement (blastFoam) + "show mesh" overlays.** Owner
+request (2026-09-05): a base cell (e.g. 50 cm) plus axis-aligned refinement
+zones with a level (1 = dx/2, 2 = dx/4, ...; nested), blastFoam-only; results
+resampled onto the finest uniform grid so every plot/export/animation/3D path
+keeps working; a "show mesh" checkbox drawing the TRUE cell edges in the setup
+preview, the live run plot, the Results field/replay plots and the 3D viewer.
+Plan: `~/.claude/plans/3d-2d-recursive-lerdorf.md`; sessions T17-T19.
+*T17 DONE (2026-09-05)* — `core/refine.py` (predicted mesh structure: level
+map on the fine grid, level-(l-1)-face snapping, `fine_src` ids, predicted
+cell count, `mesh_segments_2d`, `match_cells`, automatic charge zones for
+`charge_refine='zone'`, 2:1 grading + axisymmetric axis rules); Case2D/3D
+`refine_zones` + `charge_refine` (schema v3); `validate_case` (native ->
+error, foam -> plan notes, predicted count for the FOAM caps, fine display
+grid against the native caps); form card + combo; setup-preview zones (colour
+per level) + "Show mesh" checkbox (2D edges, 3D zone wireframes + plane
+edges); `plots.mesh_for/add_mesh_lines`, `overpressure_panel(mesh=)`,
+`_panel_grid_figure(mesh=)`, `figures_fields_*(show_mesh=)`,
+`write_animation(show_mesh=)`; RunPanel + ResultsPanel checkboxes;
+`test_refine.py`, `test_gui_refine_preview.py`. Goldens and the native
+baseline untouched. *Open:* T18 (foam topoSet/refineMesh stages, `0/C`
+remap reader, live slice, postmortem), T19 (3D viewer `_MeshEdges` layer,
+e2e, README). Known limit: axisymmetric zones touching the axis are level
+<= 1 (wedge axis cells are prisms).
+
 ## 5. Nice-to-have
 
 - **AMR** (`adaptiveFvMesh`): breaks the entire x-fastest uniform-grid contract
   (`to_grid`, `_decode_surface`, obstacle scatter) — needs a cell-centre
   resampler + second mapping path. 1–2 weeks; correctly last. *(code-read)*
+  → **static** local refinement is N15 (T17 landed the predicted-mesh model;
+  T18 adds the resampler); dynamic AMR would reuse that resampler.
 - **Non-box obstacles** (STL → snappyHexMesh): needs the same resampler as AMR.
 - **`pressureBased` activation** — per-material rate constants; revisit if
   ignition physics matters.

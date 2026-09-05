@@ -39,13 +39,49 @@ def _inferno_bad_gray():
 
 # ── Shared quadmesh helpers (live view, animation, GUI) ──────────────────────
 
-def overpressure_panel(ax, x_face, y_face, shape2d):
-    """Create an empty overpressure pcolormesh panel; returns the QuadMesh."""
+def overpressure_panel(ax, x_face, y_face, shape2d, mesh=None):
+    """Create an empty overpressure pcolormesh panel; returns the QuadMesh.
+    `mesh`: cell-edge segments (see mesh_for) drawn on top."""
     Nx, Ny = shape2d
-    mesh = ax.pcolormesh(x_face, y_face, np.zeros((Ny, Nx)),
-                         cmap=_inferno_bad_gray(), shading='flat')
+    qm = ax.pcolormesh(x_face, y_face, np.zeros((Ny, Nx)),
+                       cmap=_inferno_bad_gray(), shading='flat')
     ax.set_aspect('equal')
-    return mesh
+    if mesh is not None:
+        add_mesh_lines(ax, mesh)
+    return qm
+
+
+def add_mesh_lines(ax, segments, color='0.6'):
+    """Overlay cell edges ((N, 2, 2) segments) on a field axis."""
+    from matplotlib.collections import LineCollection
+    lc = LineCollection(np.asarray(segments).reshape(-1, 2, 2),
+                        colors=color, linewidths=0.35, alpha=0.6,
+                        zorder=2.5)
+    ax.add_collection(lc)
+    return lc
+
+
+def mesh_for(meta, xf, yf, sl=None):
+    """Cell-edge segments for a field plot with faces xf/yf: the TRUE
+    cells of a refined blastFoam run (meta['refine'], coarse cells drawn
+    as merged blocks), every face for a uniform run. `sl` selects the
+    3D plane (a tuple with one integer index); very fine refined slices
+    fall back to the base grid."""
+    from ..core import refine
+    ref = meta.get('refine') if isinstance(meta, dict) else None
+    if ref is None:
+        return refine.mesh_segments_2d(None, xf, yf)
+    levels, lmax = ref['levels'], ref['lmax']
+    if sl is None:
+        src = refine.slice_src(levels, lmax)
+    else:
+        axis = next(a for a, s in enumerate(sl) if not isinstance(s, slice))
+        src = refine.slice_src(levels, lmax, axis, int(sl[axis]))
+    if src.size > 400_000:
+        step = 2 ** lmax
+        return refine.mesh_segments_2d(None, np.asarray(xf)[::step],
+                                       np.asarray(yf)[::step])
+    return refine.mesh_segments_2d(src, xf, yf)
 
 
 def set_frame(mesh, p, solid, clim=None):
@@ -172,10 +208,11 @@ def figure_gauges_nd(gauge_out, meta):
 # ── 2D field figures ─────────────────────────────────────────────────────────
 
 def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
-                       cbar_label, aspect_wh):
+                       cbar_label, aspect_wh, mesh=None):
     """
     Grid of pcolormesh panels with per-panel autoscale.
     items: list of (label, 2D array (Na,Nb)) plotted with faces xf/yf.
+    mesh: optional cell-edge segments (mesh_for) overlaid on each panel.
     """
     n     = len(items)
     ncols = min(n, 3)
@@ -192,6 +229,8 @@ def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
         ax = axes[k // ncols][k % ncols]
         zm = np.where(solid_sl, np.nan, z.astype(np.float64))
         im = ax.pcolormesh(xf, yf, zm.T, cmap=cmap, shading='flat')
+        if mesh is not None:
+            add_mesh_lines(ax, mesh)
         ax.set_title(label, fontsize=10)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
@@ -226,17 +265,21 @@ def peak_items(meta, sl=None):
             ('net ovp impulse', imp)]
 
 
-def figures_fields_2d(snapshots, meta, include_peak=False):
+def figures_fields_2d(snapshots, meta, include_peak=False,
+                      show_mesh=False):
     """The two 2D field figures: [(filename, Figure), ...]; with
     `include_peak` (and maps present) also the whole-run peak
-    overpressure and net impulse figures."""
+    overpressure and net impulse figures; `show_mesh` overlays the cell
+    edges (see mesh_for)."""
     base = (f"2D Blast ({meta['geometry']}) - {charge_label(meta)} - "
             f"EOS: {meta['eos']}")
     xlabel = 'r [m]' if meta['geometry'] == 'axisymmetric' else 'x [m]'
     ylabel = 'z [m]' if meta['geometry'] == 'axisymmetric' else 'y [m]'
     common = dict(solid_sl=meta['solid'], xf=meta['x_face'],
                   yf=meta['y_face'], xlabel=xlabel, ylabel=ylabel,
-                  aspect_wh=meta['Lx'] / meta['Ly'])
+                  aspect_wh=meta['Lx'] / meta['Ly'],
+                  mesh=(mesh_for(meta, meta['x_face'], meta['y_face'])
+                        if show_mesh else None))
 
     out = []
     out.append(('blast_2d_pressure.png', _panel_grid_figure(
@@ -260,11 +303,19 @@ def figures_fields_2d(snapshots, meta, include_peak=False):
 
 # ── 3D slice figures ─────────────────────────────────────────────────────────
 
-def figures_fields_3d(snapshots, meta, include_peak=False):
+def figures_fields_3d(snapshots, meta, include_peak=False,
+                      show_mesh=False):
     """The four 3D slice figures: [(filename, Figure), ...]; with
     `include_peak` (and maps present) also the whole-run peak
-    overpressure and net impulse maps on the same two planes."""
+    overpressure and net impulse maps on the same two planes;
+    `show_mesh` overlays the cell edges of each plane."""
     j0, k0 = meta['j0'], meta['k0']
+    mesh_v = mesh_h = None
+    if show_mesh:
+        mesh_v = mesh_for(meta, meta['x_face'], meta['z_face'],
+                          np.s_[:, j0, :])
+        mesh_h = mesh_for(meta, meta['x_face'], meta['y_face'],
+                          np.s_[:, :, k0])
     y0 = meta['y_c'][j0]
     z0 = meta['z_c'][k0]
     base = f"3D Blast - {charge_label(meta)} - EOS: {meta['eos']}"
@@ -315,7 +366,9 @@ def figures_fields_3d(snapshots, meta, include_peak=False):
                           f'Net overpressure impulse, {plane} plane {pos} '
                           f'- {base}', IMPULSE_LABEL, ar))
     return [(fn, _panel_grid_figure(items, solid_sl, xf, yf, xl, yl,
-                                    title, cl, ar))
+                                    title, cl, ar,
+                                    mesh=mesh_v if 'vertical' in fn
+                                    else mesh_h))
             for fn, items, solid_sl, xf, yf, xl, yl, title, cl, ar in specs]
 
 
