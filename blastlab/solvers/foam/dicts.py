@@ -22,6 +22,9 @@ FOOTER = ('// ' + '*' * 73 + ' //')
 #: vendor-validated tutorial defaults.
 FLUX_SCHEME = 'Kurganov'
 P_OPEN_BC = 'pressureWaveTransmissive'
+#: Lohner error-estimator noise floor (adaptiveFvMesh `epsilon`); the
+#: classic value for pressure-based blast refinement
+LOHNER_EPS = 0.05
 
 
 class Raw(str):

@@ -33,6 +33,10 @@
 | T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |
 | T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [x] |
 | T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [x] |
+| T20 | Dynamic AMR: core model + schema + validation + writer + goldens | N16 | M | [x] |
+| T21 | Dynamic AMR: per-time ingest path + post-mortem + 2D e2e | N16 | M–L | [ ] |
+| T22 | Dynamic AMR: GUI form + validation line + per-frame mesh in Results | N16 | M | [ ] |
+| T23 | Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs | N16 | S–M | [ ] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
 
 ---
@@ -718,6 +722,107 @@ Verify: test_viz3d_scene/panel additions (synthetic refine, toggle, plane
   move, line count == len(mesh_segments_2d(slice_src(...))), screenshot
   differs); manual _e2e_gui_view3d.py on the refined 3D e2e case.
 Done when: green; ROADMAP N15 DONE.
+```
+
+## T20 — Dynamic AMR: core + schema + validation + writer + goldens (N16)
+
+```
+SESSION PROMPT — T20   [DONE 2026-09-05]
+Read: ROADMAP.md item N16 and the plan ~/.claude/plans/amr-tranquil-blossom.md;
+  core/refine.py; core/case.py (schema, ValidationReport, _validate_solver,
+  validate_case refinement + cap blocks); solvers/foam/writer.py (CaseSpec,
+  plan_case, _controldict, _setfieldsdict, _dynamicmeshdict, render_case).
+Do: refine.remap_from_centres + MeshMap + display_level_for + Plan.amr /
+  display_level + _plan_amr + validate_amr; Case2D/3D amr_* fields (schema v5,
+  coercion); validate_case AMR rules (native error, zones exclusive, charge
+  resolvable, estimator/thresholds, axis warning, maxCells + display caps,
+  serial note); CaseSpec.amr/display_level/mesh_fields; _dynamicmeshdict(spec,
+  case) adaptiveFvMesh block; cellCentres FO (no live slice); setFieldsDict
+  maxRefinement; no static refine dicts for AMR; goldens case2d_planar_amr +
+  case3d_amr + amr_checks.
+Verify: test_refine (test_amr), test_case_validate (amr_cap_checks),
+  test_foam_writer (existing goldens byte-identical, new ones eyeballed),
+  test_regression byte-identical, GUI headless suites unchanged.
+Done when: green; ROADMAP N16 T20 part DONE.
+```
+
+## T21 — Dynamic AMR: per-time ingest path + post-mortem + 2D e2e (N16)
+
+```
+SESSION PROMPT — T21
+Read: ROADMAP.md N16 (probe numbers), plan file "T21"; solvers/foam/backend.py
+  (_mesh_stages, build_remap, _decode_surface, read_2d/read_3d, solve_2d/3d_foam
+  read_dir/on_frame, finalize_2d/3d, _initial_frame*); reader.py (read_scalar,
+  read_vector, to_grid, time_ready); runloop.py (FoamRunLoop, OrderedIngest,
+  PeakImpulse, read_fo_fields, tail_live); postmortem.py load_run;
+  tests/test_foam_ingest_order.py, test_foam_reader.py, _e2e_foam_refine2d.py.
+Do: reader.read_label_list (0/polyMesh/cellLevel), to_grid(mesh=);
+  backend.mesh_at(spec, dpath) -> refine.MeshMap | None (C then cellLevel,
+  ValueError = torn -> retry, RuntimeError = fatal); build_remap AMR branch
+  (t = 0); _mesh_stages AMR variant (setRefinedFields WITHOUT -noRefine, no
+  topoSet/refineMesh, writeCellCentres -time 0 kept, n_procs forced to 1);
+  read_2d/read_3d(mesh=), read_fo_fields/PeakImpulse(mesh=); read_dir carries
+  the MeshMap in the payload; on_frame logs runloop.amr_note and appends
+  frames['levels']; finalize_* re-reads through mesh_at and puts the final
+  levels in meta['refine']; FoamRunLoop(live_set=None) skips tail_live (live
+  frames = written p through the per-time remap); postmortem per-time path.
+  Tests: test_foam_amr_ingest.py (synthetic ascii C/cellLevel/p time dirs with
+  changing counts through OrderedIngest, torn-file retry, amr_note text);
+  _e2e_foam_amr2d.py (planar 25 kg/m in 2x2 m, base 0.1, 3 levels vs UNIFORM
+  0.0125 m: gauge peak within 10 %, arrival within 5 %, impulse within 10 %,
+  FO vs Python peak/impulse reported, cells per write, wall-time ratio,
+  graceful stop, post-mortem reload identical).
+Verify: test_foam_reader, test_foam_ingest_order, test_foam_amr_ingest,
+  test_foam_writer, test_regression; WSL: test_foam_2d, test_foam_postmortem,
+  test_foam_stop, _e2e_foam_amr2d.py; `wsl.exe -d Ubuntu -- pgrep -a blastFoam`
+  must print nothing. Delete /root/amr_probe once the e2e has its own runs.
+Done when: green; e2e numbers in ROADMAP N16.
+```
+
+## T22 — Dynamic AMR: GUI form + validation line + per-frame mesh in Results (N16)
+
+```
+SESSION PROMPT — T22
+Read: ROADMAP.md N16, plan file "T22"; gui/forms.py (row helpers, Numerics
+  card, _sync_enabled, get_case/set_case, SetupPanel.show_report); gui/app.py
+  _validate; gui/preview_panel.py; gui/results_panel.py (_setup_anim,
+  _show_frame); output/plots.py mesh_for; output/animation.py; gui/run_panel.py
+  (_rebuild_overlay); tests/test_gui_refine_preview.py, test_gui_results_anim.py.
+Do: "Dynamic refinement (blastFoam)" card (levels combo 0..5, estimator combo,
+  refine/unrefine/interval/buffer/max-cells entries, display-level combo
+  auto/0..L), greyed for native, AMR on <-> zones card + charge combo off;
+  get_case/set_case; App._validate line "AMR up to level L (finest X m),
+  displayed at level D (N cells)"; preview base grid + caption for AMR;
+  plots.mesh_for(levels=); per-frame LineCollection swap in
+  ResultsPanel._show_frame and animation.write_animation when
+  frames['levels'] exists; hooks.frame(levels=) + RunPanel overlay per write.
+  Tests: test_gui_amr_form.py (round trip, native disables, AMR disables
+  zones), test_gui_results_anim with a frames['levels'] fixture.
+Verify: test_gui_amr_form, test_gui_refine_preview, test_gui_results_fields,
+  test_gui_results_anim, test_case_validate, test_regression.
+Done when: green.
+```
+
+## T23 — Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs (N16)
+
+```
+SESSION PROMPT — T23
+Read: ROADMAP.md N16, plan file "T23"; viz3d/viewer.py _MeshEdges;
+  viz3d/sampling.py (build_scene_init, build_frame, FrameStore);
+  viz3d/client.py; gui/view3d_panel.py; tests/test_viz3d_scene.py,
+  test_viz3d_panel.py, _e2e_foam_refine3d.py.
+Do: frame3d payload `levels` (int8 display grid, AMR only, undecimated);
+  _MeshEdges rebuilds per frame when levels are present (cache key + frame
+  id), static runs keep the cached edges; _e2e_foam_amr3d.py (8 kg in a 3 m
+  box, base 0.1, 3 levels, display 1 vs uniform 0.05 m SMEAR reference at the
+  display level: gauge peak within 10 %, arrival within 5 %; cells per write,
+  wall time, extrapolated uniform-finest cost); README "Dynamic mesh
+  refinement (blastFoam)"; ROADMAP N16 DONE + parallel follow-up item; TASKS
+  rows; amr_prompt.md marked done; test matrix block.
+Verify: test_viz3d_scene/panel (per-frame levels change the line count,
+  static cache intact); WSL: _e2e_foam_amr3d.py, _e2e_foam_refine3d.py,
+  test_foam_3d_smoke --tiny; pgrep -a blastFoam empty.
+Done when: green; ROADMAP N16 DONE.
 ```
 
 ## Notes for whoever runs these

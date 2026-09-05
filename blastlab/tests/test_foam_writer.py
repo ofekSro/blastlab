@@ -106,6 +106,20 @@ def cases():
             obstacles=[(0.0, 0.2, 0.0, 0.2, 0.0, 0.2)],
             gauges=[(0.9, 0.5, 0.5)], n_snapshots=2,
             solver='blastfoam', material='TNT'),
+        # dynamic AMR (N16): adaptiveFvMesh cases - the base grid is the
+        # case cell, no static refine dicts, a cellCentres FO replaces
+        # the live slice; the 3D one exercises every coefficient
+        'case2d_planar_amr': Case2D(
+            geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1,
+            charge=25.0, center=(1.0, 1.0), gauges=[(1.6, 1.0)],
+            solver='blastfoam', material='TNT', amr_levels=3),
+        'case3d_amr': Case3D(
+            Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=8.0,
+            center=(1.0, 1.0, 1.0), gauges=[(1.8, 1.0, 1.0)],
+            n_snapshots=2, solver='blastfoam', material='TNT',
+            amr_levels=3, amr_display_level=1, amr_estimator='Lohner',
+            amr_refine=0.2, amr_unrefine=0.05, amr_interval=3,
+            amr_buffer=1, amr_max_cells=500000),
     }
 
 
@@ -200,9 +214,68 @@ def refine_checks(specs):
           and su.nb == (su.nx, su.ny, su.nz))
 
 
+def amr_checks(specs):
+    """N16: AMR cases render the adaptiveFvMesh block, keep the base
+    blockMesh, drop the static refine dicts and the live slice, and
+    expose the display grid + per-time mesh fields."""
+    s2 = specs['case2d_planar_amr']
+    dm = norm(s2.files['constant/dynamicMeshDict'])
+    check('amr 2D: adaptiveFvMesh + densityGradient with the required keys',
+          all(k in dm for k in (
+              'dynamicFvMesh adaptiveFvMesh;', 'errorEstimator densityGradient;',
+              'refineInterval 2;', 'lowerRefineLevel 0.1;', 'unrefineLevel 0.1;',
+              'nBufferLayers 2;', 'maxRefinement 3;', 'maxCells 8000000;',
+              'dumpLevel yes;'))
+          and 'epsilon' not in dm and 'loadBalance' not in dm, dm)
+    check('amr 2D: base blockMesh, display grid at the finest level',
+          s2.amr == 3 and s2.display_level == 3 and s2.nb == (20, 20)
+          and (s2.nx, s2.ny) == (160, 160) and abs(s2.dx - 0.0125) < 1e-12
+          and abs(s2.dx_base - 0.1) < 1e-12 and s2.n_cells == 400,
+          f'{s2.nb} {s2.nx} {s2.dx} {s2.n_cells}')
+    check('amr 2D: no static refine dicts, zones empty, lmax = display level',
+          not any('refine' in k for k in s2.files) and s2.zones == []
+          and s2.lmax == 3 and '(20 20 1)' in norm(s2.files['system/blockMeshDict']))
+    cd = s2.files['system/controlDict']
+    check('amr 2D: cellCentres FO at writeTime, no live slice, FOs kept',
+          'writeCellCentres' in cd and 'libfieldFunctionObjects' in cd
+          and 'liveSlice' not in cd and 'surfaces' not in cd
+          and 'impulse' in cd and 'pMax' in cd and 'gauges' in cd)
+    check('amr 2D: setFieldsDict maxRefinement after nBufferLayers',
+          'nBufferLayers 1; maxRefinement 3;' in norm(s2.files['system/setFieldsDict']),
+          norm(s2.files['system/setFieldsDict'])[:200])
+    check('amr 2D: mesh_fields + refine_meta with amr keys',
+          s2.mesh_fields == ('C', 'cellLevel')
+          and set(s2.refine_meta()) == {'levels', 'lmax', 'dx_base', 'zones',
+                                        'amr', 'display_level'}
+          and s2.refine_meta()['amr'] == 3 and s2.refine_meta()['display_level'] == 3)
+    s3 = specs['case3d_amr']
+    dm = norm(s3.files['constant/dynamicMeshDict'])
+    check('amr 3D: Lohner on p with epsilon + every coefficient',
+          all(k in dm for k in (
+              'errorEstimator Lohner;', 'field p;', 'epsilon 0.05;',
+              'refineInterval 3;', 'lowerRefineLevel 0.2;', 'unrefineLevel 0.05;',
+              'nBufferLayers 1;', 'maxRefinement 3;', 'maxCells 500000;')), dm)
+    check('amr 3D: display level 1 -> 40^3 display grid over a 20^3 base',
+          s3.display_level == 1 and s3.lmax == 1 and s3.nb == (20, 20, 20)
+          and (s3.nx, s3.ny, s3.nz) == (40, 40, 40) and abs(s3.dx - 0.05) < 1e-12
+          and s3.n_cells == 8000 and '(20 20 20)' in norm(s3.files['system/blockMeshDict']),
+          f'{s3.display_level} {s3.nb} {s3.nx} {s3.dx}')
+    check('amr 3D: setFieldsDict maxRefinement 3',
+          'maxRefinement 3;' in norm(s3.files['system/setFieldsDict']))
+    check('amr 3D: static-mesh readiness fields empty on non-AMR specs',
+          specs['case3d_c4'].mesh_fields == () and specs['case3d_refine'].mesh_fields == ())
+    su = specs['case3d_c4']
+    check('no AMR: staticFvMesh, live slice, no maxRefinement, amr 0',
+          'staticFvMesh' in su.files['constant/dynamicMeshDict']
+          and 'liveSlice' in su.files['system/controlDict']
+          and 'maxRefinement' not in su.files['system/setFieldsDict']
+          and su.amr == 0 and 'amr' not in specs['case3d_refine'].refine_meta())
+
+
 def semantic_checks(specs):
     refine_checks(specs)
     afterburn_checks(specs)
+    amr_checks(specs)
     s1 = specs['case1d_tnt']
     m_tnt = MATERIALS['TNT']
     r_exp = charge_radius(1.0, m_tnt)

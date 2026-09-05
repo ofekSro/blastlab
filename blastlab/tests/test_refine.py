@@ -232,7 +232,7 @@ def test_case_roundtrip_and_validation():
           back.refine_zones == c.refine_zones
           and all(isinstance(z[-1], int) for z in back.refine_zones)
           and back.charge_refine == 'zone', str(back.refine_zones))
-    check('schema version is current (4: afterburn)', d['version'] == 4,
+    check('schema version is current (5: amr)', d['version'] == 5,
           str(d['version']))
     n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.5, charge=100.0,
                center=(1.0, 1.0), solver='native')
@@ -284,6 +284,213 @@ def test_case_roundtrip_and_validation():
           any('display grid' in w for w in rep.warnings), str(rep.warnings))
 
 
+def _block_centres(x0, y0, size, n):
+    """n x n cell centres of spacing `size` tiling the unit square whose
+    lower corner is (x0, y0); x slow, y fast."""
+    cx = x0 + (np.arange(n) + 0.5) * size
+    cy = y0 + (np.arange(n) + 0.5) * size
+    X, Y = np.meshgrid(cx, cy, indexing='ij')
+    return np.column_stack([X.ravel(), Y.ravel()])
+
+
+def _expect_mean(C, vals, dxd, i, j):
+    """Mean of `vals` over the cells whose centre falls in display cell
+    (i, j) - valid when they all share one level."""
+    m = ((np.floor(C[:, 0] / dxd) == i) & (np.floor(C[:, 1] / dxd) == j))
+    return vals[m].mean()
+
+
+def test_amr():
+    print("\ndynamic AMR: remap_from_centres, plan, validation (N16)")
+    from blastlab.core.grid import make_geometry, make_grid
+    # a 2 x 2 m planar domain of four 1 m base cells: one unrefined, one
+    # at level 1 (4 cells), one at level 2 (16), one at level 3 (64)
+    C = np.vstack([_block_centres(0, 0, 1.0, 1), _block_centres(1, 0, 0.5, 2),
+                   _block_centres(0, 1, 0.25, 4), _block_centres(1, 1, 0.125, 8)])
+    lv = np.r_[[0], [1] * 4, [2] * 16, [3] * 64]
+    vals = np.arange(len(C), dtype=float)
+    disp = make_geometry('planar', 2.0, 2.0, 0.25)       # display level 2
+    mm = refine.remap_from_centres(C, lv, disp, 2)
+    check('counts per level + n_cells', mm.counts == (1, 4, 16, 64) and mm.n_cells == 85,
+          f'{mm.counts} {mm.n_cells}')
+    check('level-0 cell covers a 4x4 display block at level 0',
+          (mm.remap[0:4, 0:4] == 0).all() and (mm.levels[0:4, 0:4] == 0).all())
+    check('level-1 cells cover 2x2 blocks (x slow, y fast order)',
+          (mm.remap[4:6, 0:2] == 1).all() and (mm.remap[4:6, 2:4] == 2).all()
+          and (mm.remap[6:8, 0:2] == 3).all() and (mm.remap[6:8, 2:4] == 4).all()
+          and (mm.levels[4:8, 0:4] == 1).all(), str(mm.remap[4:8, 0:4]))
+    check('level-2 cells map one-to-one',
+          sorted(np.unique(mm.remap[0:4, 4:8]).tolist()) == list(range(5, 21))
+          and (mm.levels[0:4, 4:8] == 2).all())
+    check('cells finer than the display grid: remap -2, level capped at D',
+          (mm.remap[4:8, 4:8] == -2).all() and (mm.levels[4:8, 4:8] == 2).all())
+    g = mm.gather(vals)
+    check('gather: direct cells', g[0, 0] == 0 and g[5, 1] == 1 and g[7, 3] == 4
+          and g[0, 4] == vals[mm.remap[0, 4]])
+    exp = np.array([[_expect_mean(C[21:], vals[21:], 0.25, i, j)
+                     for j in range(4, 8)] for i in range(4, 8)])
+    check('gather: sub-display cells are box-averaged', np.allclose(g[4:8, 4:8], exp),
+          f'{g[4:8, 4:8][0]} vs {exp[0]}')
+    w = np.bincount(mm.sub_idx, weights=mm.sub_w, minlength=64)
+    check('sub-cell weights sum to 1 per display cell',
+          np.allclose(w[mm.remap.reshape(-1) == -2], 1.0) and len(mm.sub_cells) == 64)
+    try:
+        refine.remap_from_centres(C[1:], lv[1:], disp, 2)
+        bad = 'no error'
+    except RuntimeError as exc:
+        bad = str(exc)
+    check('a missing cell -> RuntimeError naming the gap', 'covered 0 times' in bad, bad)
+    try:
+        refine.remap_from_centres(np.vstack([C, C[1:2]]), np.r_[lv, 1], disp, 2)
+        bad = 'no error'
+    except RuntimeError as exc:
+        bad = str(exc)
+    check('a duplicate cell -> RuntimeError', 'covered 2 times' in bad, bad)
+    try:
+        refine.remap_from_centres(C, np.r_[lv[1:], 9], disp, 2)
+        bad = 'no error'
+    except RuntimeError as exc:
+        bad = str(exc)
+    check('a wrong level -> RuntimeError', 'RuntimeError' or bad != 'no error', bad)
+    solid = np.zeros((8, 8), dtype=bool)
+    solid[0:4, 0:4] = True
+    mm2 = refine.remap_from_centres(C[1:], lv[1:], disp, 2, solid_disp=solid)
+    check('carved block: remap -1 and the fill value',
+          (mm2.remap[0:4, 0:4] == -1).all()
+          and (mm2.gather(np.ones(84), fill=-9.0)[0:4, 0:4] == -9.0).all()
+          and mm2.gather(np.ones(84))[4:, :].min() == 1.0)
+    try:
+        refine.remap_from_centres(C, lv, disp, 2, solid_disp=solid)
+        bad = 'no error'
+    except RuntimeError as exc:
+        bad = str(exc)
+    check('a cell inside a carved region -> RuntimeError', 'carved' in bad, bad)
+    # display level 1 (0.5 m): level 0 -> 2x2 block, level 1 one-to-one,
+    # levels 2 and 3 averaged
+    disp1 = make_geometry('planar', 2.0, 2.0, 0.5)
+    m1 = refine.remap_from_centres(C, lv, disp1, 1)
+    g1 = m1.gather(vals)
+    exp1 = np.array([[_expect_mean(C[5:21], vals[5:21], 0.5, i, j) for j in (2, 3)]
+                     for i in (0, 1)])
+    exp3 = np.array([[_expect_mean(C[21:], vals[21:], 0.5, i, j) for j in (2, 3)]
+                     for i in (2, 3)])
+    check('display level 1: blocks, identity and two averaged levels',
+          (m1.remap[0:2, 0:2] == 0).all()
+          and m1.remap[2:4, 0:2].ravel().tolist() == [1, 2, 3, 4]
+          and (m1.remap[:, 2:4] == -2).all()
+          and np.allclose(g1[0:2, 2:4], exp1) and np.allclose(g1[2:4, 2:4], exp3)
+          and (m1.levels[:, 2:4] == 1).all(), str(m1.remap))
+    # static wrap: a match_cells-style remap becomes a MeshMap
+    st = refine.MeshMap.from_remap(mm.remap[0:4, 0:4] * 0, mm.levels[0:4, 0:4], 1)
+    check('MeshMap.from_remap gathers like to_grid', (st.gather(np.array([7.0])) == 7.0).all()
+          and st.sub_cells is None)
+    # 3D: one base cell refined to level 1 (8 cells) and to level 2 (64)
+    disp3 = make_grid(1.0, 1.0, 1.0, 0.5)
+    c8 = np.stack(np.meshgrid(*[(np.arange(2) + 0.5) * 0.5] * 3, indexing='ij'), -1).reshape(-1, 3)
+    m8 = refine.remap_from_centres(c8, np.ones(8), disp3, 1)
+    check('3D level-1 cells map one-to-one onto a 2^3 display grid',
+          sorted(m8.remap.ravel().tolist()) == list(range(8)) and m8.counts == (0, 8))
+    c64 = np.stack(np.meshgrid(*[(np.arange(4) + 0.5) * 0.25] * 3, indexing='ij'), -1).reshape(-1, 3)
+    m64 = refine.remap_from_centres(c64, np.full(64, 2), disp3, 1)
+    check('3D finer-than-display cells averaged with weight 1/8',
+          (m64.remap == -2).all() and np.allclose(m64.sub_w, 0.125)
+          and np.allclose(m64.gather(np.ones(64)), 1.0))
+    m0 = refine.remap_from_centres(np.array([[0.5, 0.5, 0.5]]), [0], disp3, 1)
+    check('3D base cell covers the whole 2^3 display block', (m0.remap == 0).all())
+
+    # ── plan_levels / display_level_for / validate_case ──
+    a = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
+               center=(1.0, 1.0), solver='blastfoam', amr_levels=3)
+    plan = refine.plan_levels(a)
+    check('AMR plan: base dx kept, display = finest (25.6k < cap), zero level map, no zones',
+          abs(plan.dx_base - 0.1) < 1e-12 and plan.amr == 3 and plan.display_level == 3
+          and plan.lmax == 3 and plan.levels.shape == (160, 160) and not plan.levels.any()
+          and plan.zones == [] and plan.n_pred == 400 and plan.n_fine == 160 ** 2,
+          f'{plan.dx_base} {plan.display_level} {plan.levels.shape} {plan.n_pred}')
+    check('plan.meta carries the amr keys', plan.meta()['amr'] == 3
+          and plan.meta()['display_level'] == 3)
+    a.amr_display_level = 1
+    plan = refine.plan_levels(a)
+    check('explicit display level 1 -> 40x40 display grid', plan.display_level == 1
+          and plan.lmax == 1 and plan.levels.shape == (40, 40) and abs(plan.dx_fine - 0.05) < 1e-12)
+    check('display_level_for picks the deepest level under the cap',
+          refine.display_level_for((2.0, 2.0), 0.1, 4, 50_000) == 3
+          and refine.display_level_for((2.0, 2.0), 0.1, 4, 10 ** 9) == 4
+          and refine.display_level_for((2.0, 2.0), 0.1, 4, 100) == 0)
+    rep = validate_case(a)
+    check('valid AMR case: no errors, AMR notes, report fields',
+          not rep.errors and any('AMR (densityGradient)' in n for n in rep.notes)
+          and any('displayed at level 1' in n for n in rep.notes)
+          and any('may grow to 8,000,000' in n for n in rep.notes)
+          and rep.amr_levels == 3 and rep.display_level == 1
+          and abs(rep.dx_fine - 0.0125) < 1e-12 and rep.n_fine == 1600
+          and rep.n_cells == 400 and abs(rep.effective_dx - 0.1) < 1e-12,
+          f'{rep.errors} {rep.notes}')
+    check('no global charge-cut note under AMR',
+          not any('will be refined' in n for n in rep.notes), str(rep.notes))
+    d = case_to_dict(a)
+    d['amr_levels'], d['amr_display_level'] = 3.0, 1.0
+    back = case_from_dict(d)
+    check('v5 round trip coerces the amr ints', back.amr_levels == 3
+          and isinstance(back.amr_levels, int) and back.amr_display_level == 1
+          and back.amr_estimator == 'densityGradient' and d['version'] == 5)
+    n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
+               center=(1.0, 1.0), solver='native', amr_levels=2)
+    check('native + AMR -> error naming blastFoam',
+          any('AMR' in e and 'blastFoam' in e for e in validate_case(n).errors),
+          str(validate_case(n).errors))
+    z = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
+               center=(1.0, 1.0), solver='blastfoam', amr_levels=3,
+               refine_zones=[(0.5, 1.5, 0.5, 1.5, 1)])
+    check('AMR + zones -> mutually exclusive error',
+          any('mutually exclusive' in e for e in validate_case(z).errors))
+    z.refine_zones, z.charge_refine = [], 'zone'
+    check("AMR + charge_refine='zone' -> same error",
+          any('mutually exclusive' in e for e in validate_case(z).errors))
+    u = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
+               center=(1.0, 1.0), solver='blastfoam', amr_levels=2)
+    rep = validate_case(u)
+    check('too few levels for the charge -> error naming the level needed',
+          any('needs AMR level 3' in e for e in rep.errors), str(rep.errors))
+    for kw, frag in ((dict(amr_estimator='gradient'), 'Unknown AMR error estimator'),
+                     (dict(amr_unrefine=0.2), 'unrefine threshold must not exceed'),
+                     (dict(amr_refine=0.0), 'must be > 0'),
+                     (dict(amr_interval=0), 'interval must be >= 1'),
+                     (dict(amr_buffer=0), 'buffer layers must be >= 1'),
+                     (dict(amr_display_level=5), 'display level must be 0..3'),
+                     (dict(amr_levels=6), 'levels must be 1..5')):
+        c = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
+                   center=(1.0, 1.0), solver='blastfoam', amr_levels=3)
+        for k, v in kw.items():
+            setattr(c, k, v)
+        rep = validate_case(c)
+        check(f'{kw} -> error', any(frag in e for e in rep.errors), str(rep.errors))
+    ax = Case2D(Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=1.0, center=(0.0, 1.0),
+                solver='blastfoam', amr_levels=4)
+    rep = validate_case(ax)
+    check('axisymmetric AMR -> axis warning, no error',
+          not rep.errors and any('Axisymmetric AMR' in w for w in rep.warnings),
+          f'{rep.errors} {rep.warnings}')
+    g = Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=8.0, center=(2.0, 2.0, 2.0),
+               solver='blastfoam', amr_levels=4)
+    rep = validate_case(g)
+    check('3D: auto display level stops under the cap (level 2 = 4.1M, warned)',
+          not rep.errors and rep.display_level == 2
+          and any('display grid' in w for w in rep.warnings), f'{rep.errors} {rep.warnings}')
+    g.amr_display_level = 3
+    rep = validate_case(g)
+    check('3D: forcing display level 3 (32.8M) -> cap error with the AMR hint',
+          any('lower the AMR display level' in e for e in rep.errors), str(rep.errors))
+    g.amr_display_level = None
+    g.amr_max_cells = 200_000_000
+    check('maxCells over the blastFoam cap -> error',
+          any('AMR max cells' in e for e in validate_case(g).errors))
+    g.amr_max_cells = 0
+    g.n_procs = 4
+    check('AMR + MPI ranks -> serial note',
+          any('serially' in n for n in validate_case(g).notes))
+
+
 if __name__ == '__main__':
     test_snap()
     test_plan_2d()
@@ -291,6 +498,7 @@ if __name__ == '__main__':
     test_auto_zones_3d()
     test_obstacles_and_segments()
     test_case_roundtrip_and_validation()
+    test_amr()
     print()
     print('REFINE: ' + ('PASS' if not FAILS else f'FAIL ({len(FAILS)}): ' + ', '.join(FAILS)))
     sys.exit(1 if FAILS else 0)

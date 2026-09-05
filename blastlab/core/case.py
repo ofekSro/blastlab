@@ -18,9 +18,10 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
 
 SCHEMA = 'blastlab-case'
-VERSION = 4     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 5     # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
+                # v5: amr_* (foam dynamic mesh refinement, N16)
 
 
 @dataclass
@@ -69,6 +70,17 @@ class Case2D:
                                       # resolve the charge (native rule) |
                                       # 'zone': keep the base cell, add
                                       # automatic nested zones (blastFoam)
+    amr_levels: int = 0               # blastFoam dynamic refinement
+                                      # (adaptiveFvMesh): levels below the
+                                      # base cell the mesh may reach, 0 = off
+    amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
+    amr_refine: float = 0.1           # lowerRefineLevel (refine above)
+    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
+    amr_interval: int = 2             # refineInterval [steps]
+    amr_buffer: int = 2               # nBufferLayers
+    amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN
+    amr_display_level: int = None     # display grid level (None = deepest
+                                      # level under the display cap)
     cfl: float = 0.4
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y)
@@ -113,6 +125,17 @@ class Case3D:
     refine_zones: list = field(default_factory=list)  # blastFoam local
                                       # refinement: (x0,x1,y0,y1,z0,z1,level)
     charge_refine: str = 'global'     # 'global' | 'zone' (see Case2D)
+    amr_levels: int = 0               # blastFoam dynamic refinement
+                                      # (adaptiveFvMesh): levels below the
+                                      # base cell the mesh may reach, 0 = off
+    amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
+    amr_refine: float = 0.1           # lowerRefineLevel (refine above)
+    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
+    amr_interval: int = 2             # refineInterval [steps]
+    amr_buffer: int = 2               # nBufferLayers
+    amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN
+    amr_display_level: int = None     # display grid level (None = deepest
+                                      # level under the display cap)
     cfl: float = 0.30
     t_end: float = 0.0                # stop at t0 + t_end [s]; 0 = auto
     slice_axis: str = 'y'             # live-slice normal: 'x' | 'y' | 'z'
@@ -172,6 +195,11 @@ def case_from_dict(d):
         case.refine_zones = [(*[float(v) for v in z[:-1]],
                               int(round(float(z[-1]))))
                              for z in case.refine_zones]
+    for fld in ('amr_levels', 'amr_interval', 'amr_buffer', 'amr_max_cells'):
+        if hasattr(case, fld):
+            setattr(case, fld, int(getattr(case, fld) or 0))
+    if getattr(case, 'amr_display_level', None) is not None:
+        case.amr_display_level = int(case.amr_display_level)
     if hasattr(case, 'gauges'):
         case.gauges = [tuple(g) if isinstance(g, (list, tuple)) else g
                        for g in case.gauges]
@@ -210,6 +238,8 @@ class ValidationReport:
     lmax: int = 0                    # local refinement levels (foam)
     dx_fine: float = None            # finest cell of a refined mesh
     n_fine: int = None               # display-grid cells of a refined run
+    amr_levels: int = 0              # dynamic AMR levels (foam, N16)
+    display_level: int = None        # AMR: level of the display grid
 
     @property
     def ok(self):
@@ -245,6 +275,9 @@ def _validate_solver(case, rep):
                 "blastFoam solver")
         if getattr(case, 'afterburn', 'none') not in ('none', None):
             err("The afterburn model requires the blastFoam solver")
+        if getattr(case, 'amr_levels', 0):
+            err("Dynamic mesh refinement (AMR) requires the blastFoam "
+                "solver")
         return JWL_TNT['rho0']
     if solver != 'blastfoam':
         err(f"Unknown solver backend '{solver}'")
@@ -327,6 +360,7 @@ def validate_case(case, pending_inputs=False):
     foam = getattr(case, 'solver', 'native') == 'blastfoam'
     cref = getattr(case, 'charge_refine', 'global')
     zones = list(getattr(case, 'refine_zones', None) or [])
+    amr = int(getattr(case, 'amr_levels', 0) or 0) if foam else 0
 
     if case.dim == 1:
         if case.charge_kg <= 0:
@@ -433,7 +467,8 @@ def validate_case(case, pending_inputs=False):
         if smeared:
             note(f"Charge under-resolved at dx = {dx:g} m - its mass & "
                  f"energy will be smeared into a {r_exp:.3f} m source ball")
-        elif dx > r_exp / MIN_EXP_CELLS and not (foam and cref == 'zone'):
+        elif dx > r_exp / MIN_EXP_CELLS and not (foam and cref == 'zone') \
+                and not amr:
             dx = r_exp / MIN_EXP_CELLS
             refined = True
             note(f"Cell size will be refined to {dx:.5f} m "
@@ -483,7 +518,7 @@ def validate_case(case, pending_inputs=False):
                     err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) "
                         f"overlaps another charge")
             spheres.append((ex, ey, ez, r_i))
-            if dx > r_i / MIN_EXP_CELLS:
+            if dx > r_i / MIN_EXP_CELLS and not amr:
                 dx = r_i / MIN_EXP_CELLS
                 refined = True
                 note(f"Cell size will be refined to {dx:.5f} m "
@@ -519,7 +554,30 @@ def validate_case(case, pending_inputs=False):
 
     # blastFoam local refinement: zones and/or an automatic charge zone
     plan = None
-    if case.dim >= 2 and (zones or cref == 'zone'):
+    if amr and (zones or cref == 'zone'):
+        err("Dynamic AMR and static refinement zones are mutually "
+            "exclusive - clear the zones and set charge refinement to "
+            "'global' (the charge is refined at t = 0 by the AMR itself)")
+    elif amr:
+        if init == 'charge' and not rep.errors:
+            from .refine import plan_levels, validate_amr
+            plan = plan_levels(case, rho0)
+            aerr, awarn, anote = validate_amr(case, plan, rho0)
+            rep.errors.extend(aerr)
+            rep.warnings.extend(awarn)
+            rep.notes.extend(anote)
+            if aerr:
+                plan = None
+            else:
+                rep.amr_levels = plan.amr
+                rep.display_level = plan.display_level
+                rep.lmax = plan.lmax
+                rep.dx_fine = plan.dx_base / 2 ** plan.amr
+                rep.n_fine = plan.n_fine
+                if getattr(case, 'n_procs', 0) > 1:
+                    note("AMR runs serially in this version (MPI ranks "
+                         "ignored)")
+    elif case.dim >= 2 and (zones or cref == 'zone'):
         if not foam:
             err("Local mesh refinement (refinement zones / charge "
                 "refinement 'zone') requires the blastFoam solver")
@@ -556,11 +614,24 @@ def validate_case(case, pending_inputs=False):
                                   "charge - no automatic zone needed")
 
     rep.effective_dx = dx
+    if plan is not None and plan.amr:
+        # AMR: the mesh grows during the run up to maxCells, so that is
+        # the number the blastFoam caps apply to (t = 0 is the base grid)
+        n_max = (int(getattr(case, 'amr_max_cells', 0) or 0)
+                 or FOAM_CELLS_WARN)
+        if n_max > FOAM_CELLS_REFUSE:
+            err(f"AMR max cells {n_max:,} exceeds the blastFoam cap of "
+                f"{FOAM_CELLS_REFUSE:,}")
+        elif n_max > FOAM_CELLS_WARN:
+            warn(f"AMR may grow the mesh to {n_max:,} cells - expect a "
+                 f"long run and GBs of case files on the WSL disk")
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
-        if plan is not None and plan.refined:
+        if plan is not None and (plan.refined or plan.amr):
             n = plan.n_pred
-        if foam:
+        if plan is not None and plan.amr:
+            pass
+        elif foam:
             # blastFoam solves in WSL; Python only ingests written
             # frames, so the cap reflects wall time/disk, not RAM
             if n > FOAM_CELLS_REFUSE:
@@ -575,9 +646,11 @@ def validate_case(case, pending_inputs=False):
             warn(f"Large grid: ~{n:,} cells - expect a long run")
     else:
         n = int(case.Lx / dx) * int(case.Ly / dx) * int(case.Lz / dx)
-        if plan is not None and plan.refined:
+        if plan is not None and (plan.refined or plan.amr):
             n = plan.n_pred
-        if foam:
+        if plan is not None and plan.amr:
+            pass
+        elif foam:
             if n > FOAM_CELLS_REFUSE:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
                     f"{FOAM_CELLS_REFUSE:,}")
@@ -599,7 +672,9 @@ def validate_case(case, pending_inputs=False):
         if plan.n_fine > cap:
             err(f"Refined results are resampled to a {plan.n_fine:,}-cell "
                 f"display grid (finest cell {plan.dx_fine:.5g} m), above "
-                f"the {cap:,} cap - use fewer levels or a coarser base")
+                f"the {cap:,} cap - "
+                + ("lower the AMR display level or use a coarser base"
+                   if plan.amr else "use fewer levels or a coarser base"))
         elif plan.n_fine > cap_warn:
             warn(f"Refined results are resampled to a {plan.n_fine:,}-cell "
                  f"display grid - expect GBs of RAM for frames and "

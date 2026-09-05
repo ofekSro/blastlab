@@ -32,7 +32,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .bc import solid_mask_2d, solid_mask_3d
-from .constants import JWL_TNT, MIN_EXP_CELLS
+from .constants import (JWL_TNT, MIN_EXP_CELLS, CELLS_2D_MAX, CELLS_REFUSE,
+                        FOAM_CELLS_WARN)
 from .grid import make_geometry, make_grid
 
 #: deepest refinement level (dx / 16): the fine display grid grows as
@@ -41,6 +42,13 @@ MAX_LEVEL = 4
 
 #: preview / overlay colours per level 1..MAX_LEVEL
 LEVEL_COLORS = ('#4fc3f7', '#ffb74d', '#e57373', '#ba68c8')
+
+#: dynamic AMR (blastFoam adaptiveFvMesh, N16): deepest maxRefinement
+#: accepted. Deeper than MAX_LEVEL because the DISPLAY grid may stop at
+#: a coarser `display_level` (cells below it are box-averaged onto it).
+MAX_AMR_LEVEL = 5
+#: error estimators the case writer knows how to render
+AMR_ESTIMATORS = ('densityGradient', 'Lohner')
 
 
 def effective_dx(cell_size, r_exp, L):
@@ -149,6 +157,8 @@ class Plan:
     n_pred: int = 0                  # predicted foam cell count
     n_fine: int = 0                  # fine display cells
     moved: list = field(default_factory=list)   # user zones that snapped
+    amr: int = 0                     # dynamic AMR max level (0 = static)
+    display_level: int = 0           # AMR: level of the display grid
 
     @property
     def dx_fine(self):
@@ -165,8 +175,11 @@ class Plan:
 
     def meta(self):
         """The picklable record carried in a Result's meta."""
-        return dict(levels=self.levels, lmax=self.lmax,
-                    dx_base=self.dx_base, zones=list(self.zones))
+        d = dict(levels=self.levels, lmax=self.lmax,
+                 dx_base=self.dx_base, zones=list(self.zones))
+        if self.amr:
+            d.update(amr=self.amr, display_level=self.display_level)
+        return d
 
 
 def _charges(case, rho0):
@@ -191,6 +204,9 @@ def plan_levels(case, rho0=None):
     validate_zones."""
     dim = case.dim
     dims = (case.Lx, case.Ly) if dim == 2 else (case.Lx, case.Ly, case.Lz)
+    amr = int(getattr(case, 'amr_levels', 0) or 0)
+    if amr > 0:
+        return _plan_amr(case, dims, amr)
     user = list(getattr(case, 'refine_zones', None) or [])
     for z in user:
         if len(z) != 2 * dim + 1:
@@ -235,17 +251,10 @@ def plan_levels(case, rho0=None):
     levels = level_map(centres, [z for z in zones
                                  if 1 <= zone_level(z) <= MAX_LEVEL])
 
-    obstacles = getattr(case, 'obstacles', None) or []
-    solid_base = None
-    if obstacles:
-        solid_base = (solid_mask_2d(base['x_c'], base['y_c'], obstacles)
-                      if dim == 2 else
-                      solid_mask_3d(base['x_c'], base['y_c'], base['z_c'],
-                                    obstacles))
     plan = Plan(dim=dim, dx_base=dx_base, base=base, fine=fine,
                 levels=levels, lmax=lmax, zones=zones, user_zones=user,
                 auto_zones=auto, auto_level=auto_level,
-                solid_base=solid_base, moved=moved)
+                solid_base=_solid_base(case, base), moved=moved)
     plan.n_fine = int(levels.size)
     plan.n_pred = n_cells_from_levels(levels, lmax, plan.solid_fine)
     return plan
@@ -255,6 +264,56 @@ def _grid(case, dx):
     if case.dim == 2:
         return make_geometry(case.geometry, case.Lx, case.Ly, dx)
     return make_grid(case.Lx, case.Ly, case.Lz, dx)
+
+
+def _solid_base(case, base):
+    obstacles = getattr(case, 'obstacles', None) or []
+    if not obstacles:
+        return None
+    if case.dim == 2:
+        return solid_mask_2d(base['x_c'], base['y_c'], obstacles)
+    return solid_mask_3d(base['x_c'], base['y_c'], base['z_c'], obstacles)
+
+
+def _plan_amr(case, dims, amr):
+    """Plan of a dynamic-AMR case. The base grid is the case cell size
+    untouched (the charge is resolved by the run-time refinement, not by
+    a global cut), the display grid sits at `display_level` <= amr (the
+    deepest level whose display grid fits the native cap, unless the
+    case names one) and the level map is all-zero: the real structure is
+    read back per written time (`remap_from_centres`). Zones are ignored
+    here - validation refuses them together with AMR."""
+    dim = case.dim
+    base = _grid(case, float(case.cell_size_m))
+    dx_base = float(base['dx'])
+    cap = CELLS_2D_MAX if dim == 2 else CELLS_REFUSE
+    D = getattr(case, 'amr_display_level', None)
+    if D is None:
+        D = display_level_for(dims, dx_base, amr, cap)
+    D = int(min(max(int(D), 0), amr))
+    fine = base if D == 0 else _grid(case, dx_base / (2 ** D))
+    shape = tuple(len(fine[k]) for k in ('x_c', 'y_c', 'z_c')[:dim])
+    levels = np.zeros(shape, dtype=np.int8)
+    plan = Plan(dim=dim, dx_base=dx_base, base=base, fine=fine,
+                levels=levels, lmax=D, zones=[],
+                solid_base=_solid_base(case, base), amr=amr,
+                display_level=D)
+    plan.n_fine = int(levels.size)
+    plan.n_pred = n_cells_from_levels(levels, D, plan.solid_fine)
+    return plan
+
+
+def display_level_for(dims, dx_base, amr_levels, cap):
+    """Deepest level d <= amr_levels whose display grid (dx_base / 2**d
+    over `dims`) holds at most `cap` cells; 0 when even the base grid
+    is over the cap (validation reports that separately)."""
+    for d in range(int(amr_levels), -1, -1):
+        n = 1
+        for L in dims:
+            n *= int(round(L / (dx_base / (2 ** d))))
+        if n <= cap:
+            return d
+    return 0
 
 
 def validate_zones(case, plan):
@@ -480,3 +539,212 @@ def match_cells(C, fine, fine_ids):
     cell_of_id[ids] = np.arange(len(ids), dtype=np.int32)
     return np.where(fine_ids >= 0, cell_of_id[np.maximum(fine_ids, 0)],
                     -1).astype(np.int32)
+
+
+# ── dynamic AMR: a written mesh mapped onto the display grid ────────────────
+
+@dataclass
+class MeshMap:
+    """How one written mesh maps onto the display grid.
+
+    `remap` (int32, display shape) holds the foam cell covering each
+    display cell: -1 in carved (obstacle) cells, -2 where the mesh is
+    FINER than the display grid (several foam cells per display cell;
+    those are listed in `sub_cells` with their flat C-order display index
+    `sub_idx` and weight `sub_w`, summing to 1 per display cell).
+    `levels` (int8) is the level drawn there (capped at the display
+    level). `counts` = foam cells per level (AMR only)."""
+    remap: np.ndarray
+    levels: np.ndarray
+    n_cells: int
+    counts: tuple = ()
+    sub_cells: np.ndarray = None
+    sub_idx: np.ndarray = None
+    sub_w: np.ndarray = None
+
+    @classmethod
+    def from_remap(cls, remap, levels, n_cells):
+        """Wrap a static `match_cells` remap (no sub-display cells)."""
+        return cls(np.asarray(remap, dtype=np.int32),
+                   np.asarray(levels, dtype=np.int8), int(n_cells))
+
+    def gather(self, vals, fill=0.0):
+        """Foam cell values -> display grid (box-averaging the cells
+        finer than the display grid; `fill` in carved cells)."""
+        vals = np.asarray(vals, dtype=float)
+        out = np.full(self.remap.shape, float(fill))
+        m = self.remap >= 0
+        out[m] = vals[self.remap[m]]
+        if self.sub_cells is not None and len(self.sub_cells):
+            acc = np.bincount(self.sub_idx,
+                              weights=vals[self.sub_cells] * self.sub_w,
+                              minlength=out.size)
+            flat = out.reshape(-1)
+            k = np.flatnonzero(self.remap.reshape(-1) == -2)
+            flat[k] = acc[k]
+        return out
+
+
+def remap_from_centres(C, cell_levels, disp, disp_level, solid_disp=None):
+    """Written mesh (cell centres `C` (n, >=dim) + hexRef `cell_levels`
+    (n,), 0 = base cell) -> MeshMap on the display grid `disp` (a
+    core.grid dict at dx_base / 2**disp_level).
+
+    A level-l cell with l <= D covers a block of s = 2**(D-l) display
+    cells per axis whose origin is round(C/dx_disp - s/2) (exact up to
+    float noise, so `rint` is robust); a cell with l > D falls inside one
+    display cell with weight 2**(-dim (l-D)). Every fluid display cell
+    must be covered exactly once (weights summing to 1); anything else -
+    a gap, an overlap, a centre inside a carved region - raises
+    RuntimeError naming the spot, because a silently wrong picture is
+    worse than a stopped run."""
+    C = np.asarray(C, dtype=float)
+    lv = np.asarray(cell_levels).astype(np.int64).ravel()
+    if len(lv) != len(C):
+        raise ValueError(f"{len(C)} cell centres but {len(lv)} cell levels")
+    dim = 3 if 'z_face' in disp else 2
+    faces = [np.asarray(disp[k], dtype=float)
+             for k in ('x_face', 'y_face', 'z_face')[:dim]]
+    shape = tuple(len(f) - 1 for f in faces)
+    x0 = np.array([f[0] for f in faces])
+    dxd = float(faces[0][1] - faces[0][0])
+    D = int(disp_level)
+    n = len(C)
+    remap = np.full(shape, -1, dtype=np.int32)
+    levels = np.full(shape, -1, dtype=np.int8)
+    cover = np.zeros(shape, dtype=float)
+    cover_flat, remap_flat, levels_flat = (cover.reshape(-1),
+                                           remap.reshape(-1),
+                                           levels.reshape(-1))
+    idx = np.arange(n, dtype=np.int32)
+    rel = (C[:, :dim] - x0) / dxd            # centres in display units
+    shape_a = np.array(shape)
+    subs = []
+    for l in np.unique(lv):
+        sel = np.flatnonzero(lv == l)
+        if l <= D:
+            s = 2 ** (D - l)
+            origin = np.rint(rel[sel] - s / 2.0).astype(np.int64)
+            bad = ((origin < 0).any(axis=1)
+                   | (origin + s > shape_a).any(axis=1))
+            if bad.any():
+                k = int(sel[np.flatnonzero(bad)[0]])
+                raise RuntimeError(
+                    f"mesh cell {k} at {tuple(np.round(C[k, :dim], 6))} "
+                    f"(level {l}) does not fit the display grid")
+            for o in np.indices((s,) * dim).reshape(dim, -1).T:
+                ij = tuple((origin + o).T)
+                remap[ij] = idx[sel]
+                levels[ij] = l
+                np.add.at(cover, ij, 1.0)
+        else:
+            i = np.floor(rel[sel]).astype(np.int64)
+            bad = ((i < 0).any(axis=1) | (i >= shape_a).any(axis=1))
+            if bad.any():
+                k = int(sel[np.flatnonzero(bad)[0]])
+                raise RuntimeError(
+                    f"mesh cell {k} at {tuple(np.round(C[k, :dim], 6))} "
+                    f"(level {l}) lies outside the display grid")
+            flat = np.ravel_multi_index(tuple(i.T), shape)
+            w = 2.0 ** (-dim * (l - D))
+            np.add.at(cover_flat, flat, w)
+            remap_flat[flat] = -2
+            levels_flat[flat] = D
+            subs.append((sel.astype(np.int32), flat, w))
+    fluid = (np.ones(shape, dtype=bool) if solid_disp is None
+             else ~np.asarray(solid_disp, dtype=bool))
+    axes = [0.5 * (f[1:] + f[:-1]) for f in faces]
+
+    def _where(k):
+        return ', '.join(f"{a[i]:.4g}" for a, i in zip(axes, k))
+
+    if solid_disp is not None:
+        hit = (cover > 0) & ~fluid
+        if hit.any():
+            k = tuple(int(i) for i in np.argwhere(hit)[0])
+            raise RuntimeError(
+                f"the mesh covers display cell ({_where(k)}) m inside a "
+                f"carved (obstacle) region")
+    bad = fluid & (np.abs(cover - 1.0) > 1e-6)
+    if bad.any():
+        k = tuple(int(i) for i in np.argwhere(bad)[0])
+        raise RuntimeError(
+            f"display cell ({_where(k)}) m is covered {cover[k]:.4g} times "
+            f"by the mesh (expected exactly once) - the written mesh does "
+            f"not tile the display grid")
+    sub_cells = sub_idx = sub_w = None
+    if subs:
+        sub_cells = np.concatenate([c for c, _f, _w in subs])
+        sub_idx = np.concatenate([f for _c, f, _w in subs])
+        sub_w = np.concatenate([np.full(len(f), w) for _c, f, w in subs])
+    counts = tuple(int(c) for c in
+                   np.bincount(lv, minlength=max(D, int(lv.max())) + 1))
+    return MeshMap(remap, levels, n, counts, sub_cells, sub_idx, sub_w)
+
+
+def validate_amr(case, plan, rho0=None):
+    """(errors, warnings, notes) for the AMR settings of a case whose
+    plan came from `plan_levels` with `amr_levels > 0`."""
+    errors, warnings, notes = [], [], []
+    amr = int(plan.amr)
+    est = (getattr(case, 'amr_estimator', 'densityGradient')
+           or 'densityGradient')
+    if est not in AMR_ESTIMATORS:
+        errors.append(f"Unknown AMR error estimator '{est}' (use "
+                      + ' or '.join(repr(e) for e in AMR_ESTIMATORS) + ")")
+    if not 1 <= amr <= MAX_AMR_LEVEL:
+        errors.append(f"AMR levels must be 1..{MAX_AMR_LEVEL}")
+    lo = float(getattr(case, 'amr_refine', 0.1))
+    un = float(getattr(case, 'amr_unrefine', 0.1))
+    if lo <= 0 or un <= 0:
+        errors.append("AMR refine / unrefine thresholds must be > 0")
+    elif un > lo:
+        errors.append("The AMR unrefine threshold must not exceed the "
+                      "refine threshold (cells would refine and unrefine "
+                      "in turn)")
+    interval = int(getattr(case, 'amr_interval', 2))
+    buffer = int(getattr(case, 'amr_buffer', 2))
+    if interval < 1:
+        errors.append("AMR refine interval must be >= 1 step")
+    if buffer < 1:
+        errors.append("AMR buffer layers must be >= 1")
+    max_cells = int(getattr(case, 'amr_max_cells', 0) or 0)
+    if max_cells < 0:
+        errors.append("AMR max cells must be >= 0 (0 = default)")
+    D = getattr(case, 'amr_display_level', None)
+    if D is not None and not 0 <= int(D) <= amr:
+        errors.append(f"AMR display level must be 0..{amr} (the AMR "
+                      f"levels)")
+    dx_base = plan.dx_base
+    if (getattr(case, 'init_mode', 'charge') == 'charge' and case.charge
+            and 1 <= amr <= MAX_AMR_LEVEL):
+        need = max(required_level(dx_base, r)
+                   for _c, r in _charges(case, rho0))
+        if need > amr:
+            errors.append(
+                f"Resolving the charge ({MIN_EXP_CELLS} cells across its "
+                f"radius) needs AMR level {need} (finest "
+                f"{dx_base / 2 ** need:.5g} m) - raise the AMR levels or "
+                f"lower the base cell to at most "
+                f"{dx_base * 2 ** (amr - need):.5g} m")
+    if plan.dim == 2 and case.geometry == 'axisymmetric':
+        warnings.append("Axisymmetric AMR: the wedge axis cells are prisms "
+                        "and never refine, so the charge stays coarse on "
+                        "the axis column (planar 2D refines everywhere)")
+    if errors:
+        return errors, warnings, notes
+    Dp = plan.display_level
+    notes.append(f"AMR ({est}): up to {amr} level(s) below the "
+                 f"{dx_base:.5g} m base cell (finest "
+                 f"{dx_base / 2 ** amr:.5g} m), refining every {interval} "
+                 f"step(s) with {buffer} buffer layer(s)")
+    if Dp < amr:
+        notes.append(f"Results are displayed at level {Dp} "
+                     f"({dx_base / 2 ** Dp:.5g} m, {plan.n_fine:,} cells); "
+                     f"cells finer than that are box-averaged")
+    else:
+        notes.append(f"Results are resampled to the finest level "
+                     f"({plan.n_fine:,} display cells)")
+    notes.append(f"The mesh starts at ~{plan.n_pred:,} cells and may grow "
+                 f"to {max_cells or FOAM_CELLS_WARN:,} (maxCells)")
+    return errors, warnings, notes

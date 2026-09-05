@@ -14,7 +14,9 @@ Templates copied from the shipped v6.2.0 tutorials:
   mappedBuilding3D/sector  1D spherical sector (collapsed hex + wedges)
   axisymmetricCharge       2D wedge orientation and face sets
   freeField                3D box, fvSchemes/fvSolution/phaseProperties
-The mesh is static and uniform in v1 (no AMR / refineInternal); 3D
+The mesh is uniform, statically refined per zone (N15: topoSet +
+refineMesh passes) or dynamically refined (N16: `adaptiveFvMesh`, whose
+per-time structure the backend reads back from `C` + `cellLevel`); 3D
 obstacle boxes are carved out of the block by topoSet/subsetMesh
 (exposed faces -> 'obstacles' wall patch), keeping the retained cells
 in blockMesh order so read-back scatters onto the same native grid.
@@ -25,12 +27,14 @@ import math
 import os
 from dataclasses import dataclass, field
 
-from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS)
+from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS,
+                               FOAM_CELLS_WARN)
 from ...core import refine
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from . import env
-from .dicts import FLUX_SCHEME, P_OPEN_BC, Raw, block, fmt, foam_file
+from .dicts import (FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC, Raw, block, fmt,
+                    foam_file)
 from .materials import AFTERBURN, MATERIALS, E0, charge_radius
 
 PHASE = 'expl'                  # fixed phase name for every material
@@ -96,6 +100,11 @@ class CaseSpec:
     solid_base: object = None       # obstacle mask on the base grid
     remap: object = None            # fine-grid int32 -> foam cell (T18)
     n_cells_actual: int = None      # foam cell count once the mesh exists
+    # dynamic AMR (N16): max level below the base cell (0 = static mesh)
+    # and the level of the display grid (`grid/nx/../dx` sit there; the
+    # structure of every written time is read back from C + cellLevel)
+    amr: int = 0
+    display_level: int = 0
 
     @property
     def n_cells(self):
@@ -113,8 +122,15 @@ class CaseSpec:
             n -= int(self.solid.sum())
         return n
 
+    @property
+    def mesh_fields(self):
+        """Per-time mesh files the readiness gate must see (AMR only)."""
+        return ('C', 'cellLevel') if self.amr else ()
+
     def apply_plan(self, plan):
         """Take the base/fine grids and zones from a core.refine.Plan."""
+        self.amr = int(getattr(plan, 'amr', 0) or 0)
+        self.display_level = int(getattr(plan, 'display_level', 0) or 0)
         self.dx_base = float(plan.dx_base)
         self.nb = tuple(int(plan.base[k]) for k in
                         (('Nx', 'Ny') if plan.dim == 2 else ('Nx', 'Ny', 'Nz')))
@@ -124,11 +140,16 @@ class CaseSpec:
         self.solid = plan.solid_fine
 
     def refine_meta(self):
-        """meta['refine'] payload (None for a uniform mesh)."""
-        if not self.lmax:
+        """meta['refine'] payload (None for a uniform mesh). For AMR the
+        levels are the display-grid level map of the LAST written time
+        (the backend fills it in at finalize)."""
+        if not self.lmax and not self.amr:
             return None
-        return dict(levels=self.levels, lmax=self.lmax,
-                    dx_base=self.dx_base, zones=list(self.zones))
+        d = dict(levels=self.levels, lmax=self.lmax,
+                 dx_base=self.dx_base, zones=list(self.zones))
+        if self.amr:
+            d.update(amr=self.amr, display_level=self.display_level)
+        return d
 
 
 # ── planning ────────────────────────────────────────────────────────────────
@@ -545,6 +566,18 @@ def _controldict(spec, case):
             'fields': ['p'],
             'minMax': 'max',
         }
+    if spec.dim >= 2 and spec.amr:
+        # AMR (N16): the cell count and order change every write, so
+        # each time dir carries its own cell centres (this FO) next to
+        # the refiner's `cellLevel` (dumpLevel); the backend rebuilds
+        # the display remap from the pair. No live slice: its raw rows
+        # carry no cell size, so live frames come from written times.
+        functions['cellCentres'] = {
+            'type': 'writeCellCentres',
+            'libs': Raw('("libfieldFunctionObjects.so")'),
+            'writeControl': 'writeTime',
+        }
+    elif spec.dim >= 2:
         # live p slice every few steps (same role as the 1D liveLine):
         # 2D cuts the z=0 mid-plane (the whole field, one face per
         # cell); 3D cuts the user's live-slice plane through the
@@ -682,13 +715,20 @@ def _setfieldsdict(spec, case):
                        'radius': 2.0 * charge_radius(mass, m)},
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
         }) for centre, mass in spec.charges]
-    body = block({
+    d = {
         'fields': [alpha],
         'nBufferLayers': 1,
+    }
+    if spec.amr:
+        # setRefinedFields (run WITHOUT -noRefine for AMR cases) refines
+        # the charge region to this level at t = 0 and writes the
+        # hexRef cellLevel the run-time refiner continues from
+        d['maxRefinement'] = spec.amr
+    d.update({
         'defaultFieldValues': [Raw(f'volScalarFieldValue {alpha} 0')],
         'regions': regions,
     })
-    return foam_file('setFieldsDict', body, location='system')
+    return foam_file('setFieldsDict', block(d), location='system')
 
 
 def _phaseproperties(spec, activation='linear', afterburn='none'):
@@ -763,10 +803,37 @@ def _afterburn_entries(spec, afterburn):
             'n': ab.n, 'm': ab.m, 'pMin': ab.pMin}
 
 
-def _dynamicmeshdict():
-    return foam_file('dynamicMeshDict',
-                     block({'dynamicFvMesh': 'staticFvMesh'}),
-                     location='constant')
+def _dynamicmeshdict(spec=None, case=None):
+    """staticFvMesh, or the adaptiveFvMesh block of an AMR case (N16).
+    Keys and defaults follow blastFoam 6.2.0's fvMeshRefiner /
+    errorEstimator readers (probed 2026-09-05): `lowerRefineLevel`,
+    `unrefineLevel` and `maxRefinement` are required, the rest optional;
+    `dumpLevel` makes every write carry a `cellLevel` field."""
+    if spec is None or not spec.amr:
+        return foam_file('dynamicMeshDict',
+                         block({'dynamicFvMesh': 'staticFvMesh'}),
+                         location='constant')
+    est = (getattr(case, 'amr_estimator', 'densityGradient')
+           or 'densityGradient')
+    d = {'dynamicFvMesh': 'adaptiveFvMesh', 'errorEstimator': est}
+    if est == 'Lohner':
+        d['field'] = 'p'
+        d['epsilon'] = LOHNER_EPS
+    d.update({
+        'refineInterval': int(getattr(case, 'amr_interval', 2)),
+        'lowerRefineLevel': float(getattr(case, 'amr_refine', 0.1)),
+        'unrefineLevel': float(getattr(case, 'amr_unrefine', 0.1)),
+        'nBufferLayers': int(getattr(case, 'amr_buffer', 2)),
+        'maxRefinement': int(spec.amr),
+        'maxCells': (int(getattr(case, 'amr_max_cells', 0) or 0)
+                     or FOAM_CELLS_WARN),
+        'dumpLevel': True,
+    })
+    if spec.n_procs > 1:
+        # fixed decomposition: balancing needs an `internal` patch
+        # (addEmptyPatch) - the parallel follow-up decides
+        d['loadBalance'] = {'balance': False}
+    return foam_file('dynamicMeshDict', block(d), location='constant')
 
 
 def _decomposepardict(n_procs):
@@ -846,11 +913,11 @@ def render_case(case, n_procs=1):
         'system/setFieldsDict': _setfieldsdict(spec, case),
         'constant/phaseProperties': _phaseproperties(
             spec, getattr(case, 'activation', 'linear'), afterburn),
-        'constant/dynamicMeshDict': _dynamicmeshdict(),
+        'constant/dynamicMeshDict': _dynamicmeshdict(spec, case),
     }
     if spec.obstacles:
         spec.files['system/topoSetDict'] = _toposetdict(spec)
-    if spec.lmax:
+    if spec.lmax and not spec.amr:
         spec.files.update(_refine_dicts(spec, case))
     if spec.n_procs > 1:
         spec.files['system/decomposeParDict'] = \

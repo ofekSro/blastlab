@@ -46,7 +46,7 @@ python test_adaptive_interval.py  # writeInterval controller (no WSL)
 python test_foam_live_due.py      # live-frame cadence gate (no WSL)   [was missing from this list]
 python test_gui_drain.py          # GUI queue-drain resilience (no WSL)
 python test_gui_results_fields.py # peak/impulse fields in Results (headless Tk, no WSL)
-python test_refine.py             # predicted refined-mesh structure (no GUI, no WSL)
+python test_refine.py             # predicted refined-mesh structure + AMR remap/plan/validation (no GUI, no WSL)
 python test_gauge_summary.py      # per-gauge peak/arrival/positive-phase impulse (no WSL)
 python test_gui_gauge_summary.py  # Gauges-tab summary table + CSV (headless Tk)
 python test_gui_run_browser.py    # foam run browser with injected sources (headless Tk)
@@ -983,13 +983,80 @@ Known limit: axisymmetric zones touching the axis are level <= 1 (wedge
 axis cells are prisms); the revolved (axisym-to-3D) viewer scene shows the
 uniform revolved grid, not the (r, z) refinement.
 
+---
+
+**N16 — Dynamic mesh refinement (blastFoam `adaptiveFvMesh`). IN PROGRESS
+(T20 DONE 2026-09-05; T21-T23 open).** Owner request (2026-09-05): the mesh
+follows the shock during the run instead of the static per-zone refinement
+of N15. Plan: `~/.claude/plans/amr-tranquil-blossom.md`; sessions T20-T23.
+Decisions: default estimator `densityGradient` (every blastFoam tutorial
+uses it, no extra keys; `Lohner` on p selectable); AMR and static zones are
+mutually exclusive (hexRef derives its level-0 edge from `cellLevel`, which
+`refineMesh` never writes, so a statically pre-refined mesh corrupts the
+levels; the charge is refined at t = 0 by `setRefinedFields` instead); a
+`display level` <= the AMR levels caps the display grid, cells finer than it
+are box-averaged; per-write log line + "Show mesh" follows the frame; serial
+in v1, parallel measured for a follow-up.
+*Probe (2026-09-05, blastFoam 6.2.0, 2 m box, 8k base cells, 1 kg TNT,
+densityGradient 0.1/0.1, maxRefinement 2):* every written time dir carries
+`C` (a `writeCellCentres` function object, 25 B/cell) and `cellLevel`
+(`dumpLevel true`, 8.3 B/cell) next to blastFoam's own per-time `polyMesh`
+(139 B/cell - 63 % of the write); the geometry-based remap built from the
+pair tiled the 80^3 display grid exactly once at all 14 written times in
+10-32 ms (+ 11-61 ms to read) up to 400k cells; `setRefinedFields` without
+`-noRefine` refined the charge at t = 0 (8,000 -> 8,784 cells, writes
+`0/polyMesh/cellLevel`) but at level 2 the 1 kg sphere held 32 cells and
+blastFoam reported an 18.5 % mass deficit -> the finest level must resolve
+the charge (validation rule). 436 steps to 0.7 ms in 572 s serial, 230
+refine + 21 unrefine events, cells 8.8k -> 402k: at 0.1/0.1 the whole 2 m
+box ended at level 2, so the e2e must use a domain where the front is a thin
+shell. Parallel (2 ranks, 0.2 ms, 78k cells): default load balancing aborts
+without the `internal` patch (`addEmptyPatch internalPatch internal
+-overwrite -parallel`); balance off 41 s / on 38 s / serial 52 s;
+`reconstructPar -newTimes` FAILS on a changed mesh (no
+`pointProcAddressing`), `reconstructParAll -time t` works (0.71 s per
+78k-cell time dir) - the follow-up's parallel path, or direct `processor*/`
+reads since the remap is geometric.
+*T20 DONE (2026-09-05)* — `core/refine.py`: `MAX_AMR_LEVEL = 5`,
+`AMR_ESTIMATORS`, `Plan.amr/display_level`, `plan_levels` AMR branch
+(`_plan_amr`: base dx untouched, zero level map at the display level),
+`display_level_for` (deepest level under the display cap),
+`remap_from_centres(C, cell_levels, disp, disp_level, solid_disp)` ->
+`MeshMap` (remap / levels / counts / sub-display cells with weights;
+`gather` box-averages the finer cells; gaps, overlaps and carved hits raise
+RuntimeError naming the spot), `validate_amr`. `core/case.py`: Case2D/3D
+`amr_levels`, `amr_estimator`, `amr_refine`, `amr_unrefine`,
+`amr_interval`, `amr_buffer`, `amr_max_cells`, `amr_display_level` (schema
+v5, int coercion), `ValidationReport.amr_levels/display_level`,
+`validate_case` (native -> error, zones + AMR -> error, charge must be
+resolvable within the levels, estimator/threshold/interval/buffer rules,
+axisymmetric axis warning, caps on `maxCells` and on the display grid,
+serial note for `n_procs > 1`; no global charge dx cut under AMR).
+writer: `CaseSpec.amr/display_level/mesh_fields`, `_dynamicmeshdict(spec,
+case)` (adaptiveFvMesh block, `dumpLevel`, `maxCells`, Lohner `field p` +
+`LOHNER_EPS`), `cellCentres` FO instead of the live slice, `setFieldsDict
+maxRefinement`, no static refine dicts for AMR. Goldens `case2d_planar_amr`
+(25 kg/m, base 0.1 m, 3 levels, display at the finest 160^2) and
+`case3d_amr` (8 kg, 20^3 base, 3 levels, display level 1 = 40^3, Lohner,
+every coefficient) + `amr_checks`; `test_refine.test_amr` (2D/3D remap
+coverage, averaging, weights, error paths, plan, validation, v5 round
+trip); `test_case_validate.amr_cap_checks`. All existing goldens and the
+native baseline byte-identical.
+*T21 (open)* — per-time ingest path (`reader.read_label_list`,
+`to_grid(mesh=)`, `backend.mesh_at`, `read_2d/3d(mesh=)`, FO fields,
+`FoamRunLoop(live_set=None)`, `amr_note`, `frames['levels']`, postmortem) +
+`_e2e_foam_amr2d.py` (planar, equal finest dx vs uniform).
+*T22 (open)* — Numerics AMR card, validation line, preview, per-frame mesh
+in Results replay / animation / live plot.
+*T23 (open)* — 3D viewer per-frame mesh, `_e2e_foam_amr3d.py`, README,
+ROADMAP numbers, parallel follow-up item.
+
 ## 5. Nice-to-have
 
-- **AMR** (`adaptiveFvMesh`): breaks the entire x-fastest uniform-grid contract
-  (`to_grid`, `_decode_surface`, obstacle scatter) — needs a cell-centre
-  resampler + second mapping path. 1–2 weeks; correctly last. *(code-read)*
-  → **static** local refinement is N15 (T17 landed the predicted-mesh model;
-  T18 adds the resampler); dynamic AMR would reuse that resampler.
+- **AMR** (`adaptiveFvMesh`): → promoted to **N16** (in progress, T20-T23);
+  the per-time structure comes from `C` + `cellLevel` per written time and
+  a geometry-based remap (`refine.remap_from_centres`), measured in the
+  2026-09-05 probe recorded under N16.
 - **Non-box obstacles** (STL → snappyHexMesh): needs the same resampler as AMR.
 - **`pressureBased` activation** — per-material rate constants; revisit if
   ignition physics matters.
