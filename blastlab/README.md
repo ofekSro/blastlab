@@ -96,10 +96,10 @@ so existing cases and baselines are unchanged.
 
 ## Local mesh refinement (blastFoam)
 
-Refinement here is **static**: the mesh is built before the run (topoSet +
-refineMesh per level) and does not change while the solver runs. blastFoam's
-dynamic AMR (`adaptiveFvMesh`, the mesh following the shock) is not wired up -
-the case writer always emits `dynamicFvMesh staticFvMesh`.
+Two kinds of refinement exist. **Static** refinement (this section) builds
+the mesh before the run (topoSet + refineMesh per level) and never changes
+it. **Dynamic** refinement (next section) lets blastFoam's `adaptiveFvMesh`
+follow the shock during the run; the two are mutually exclusive on a case.
 
 The blastFoam backend can refine the mesh locally instead of shrinking the
 whole grid. A case has a **base cell size** plus **refinement zones**: axis-
@@ -128,6 +128,35 @@ wedge axis cells are prisms); refinement needs `topoSet`, `refineMesh` and
 `postProcess` in the WSL install. The run keeps `0/C` (cell centres) so a
 refined run can be reloaded post-mortem. E2E drivers:
 `tests/_e2e_foam_refine2d.py`, `tests/_e2e_foam_refine3d.py`.
+
+## Dynamic mesh refinement (blastFoam AMR)
+
+With **AMR levels** > 0 (Numerics card "Dynamic refinement (blastFoam)")
+the case writer emits an `adaptiveFvMesh` dictionary and blastFoam refines
+the mesh around the shock as it moves and unrefines behind it. The base cell
+is the case cell size untouched; the charge is refined at t = 0 by
+`setRefinedFields` (the finest level must resolve it - validation says which
+level a charge needs). Coefficients: the **error estimator**
+(`densityGradient`, the blastFoam tutorial default, or `Lohner` on p),
+**refine above / unrefine below** thresholds (defaults 0.4 / 0.2, measured
+on the 2D e2e: ~1.2x faster than the uniform grid at ~3.6 % gauge error,
+where the tutorials' 0.1 / 0.1 refines nearly everything), **refine every**
+N steps, **buffer layers**, **max cells** and the **display level**.
+
+Because the cell count and order change at every write, each written time
+carries its own cell centres (`C`, a `writeCellCentres` function object)
+and refinement levels (`cellLevel`, `dumpLevel`); the reader rebuilds the
+mapping onto the **display grid** per time (`core/refine.remap_from_centres`).
+The display grid sits at the **display level** (auto = the deepest level
+whose grid fits the memory cap): cells finer than it are box-averaged, so a
+3D case may run 3-4 levels while displaying at level 1-2. Live frames come
+from the written times (no live-slice sampling), the log reports the cell
+count and per-level histogram at every write, and **Show mesh** follows the
+frame in the live plot, the Results replay, the animation export and the 3D
+viewer. AMR runs are serial in this version (blastFoam's `reconstructPar`
+cannot follow a changing mesh; the measured parallel options are in ROADMAP
+N16). E2E drivers: `tests/_e2e_foam_amr2d.py` (`--sweep=0.2:0.1,...` adds
+a threshold table), `tests/_e2e_foam_amr3d.py`.
 
 ## Layout
 

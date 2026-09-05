@@ -750,7 +750,9 @@ class _MeshEdges(_Layer):
     a solid sheet. Built from the FULL-resolution axes in `init` - not
     the stride-decimated display grid - and rebuilt only when a plane
     moves or toggles (frames refresh every layer, so the geometry is
-    cached). Off by default."""
+    cached). Dynamic-AMR frames carry their own level map (`levels` in
+    the payload): the overlay is then rebuilt per displayed frame so the
+    mesh follows the shock in the replay. Off by default."""
 
     NAME = 'mesh_edges'
 
@@ -778,18 +780,25 @@ class _MeshEdges(_Layer):
                 geom = self._plane_geom(layer)
                 if geom is not None:
                     planes.append(geom)
-        if self._built == planes:
+        init = s.init
+        rec = init.get('refine')
+        lv = s.frame.get('levels') if isinstance(s.frame, dict) else None
+        key = (planes, None if lv is None else id(lv))
+        if self._built == key:
             return
         self._remove()
-        init = s.init
+        if lv is not None and rec is not None:
+            # dynamic AMR: this frame's own level map on the display grid
+            # (the record's lmax IS the display level; -1 = carved)
+            rec = dict(rec, levels=np.maximum(np.asarray(lv), 0))
         poly = mesh_polydata((init['x_c'], init['y_c'], init['z_c']),
-                             float(init['dx']), init.get('refine'), planes)
+                             float(init['dx']), rec, planes)
         if poly is None:
             return
         s.pl.add_mesh(poly, color=MESH_COLOR, line_width=1,
                       opacity=MESH_OPACITY, name=self.NAME,
                       reset_camera=False, render=False)
-        self._built = planes
+        self._built = key
 
     def _plane_geom(self, layer):
         """(axis, fine layer index, position) of an axis-aligned plane,

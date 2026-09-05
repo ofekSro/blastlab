@@ -36,7 +36,7 @@
 | T20 | Dynamic AMR: core model + schema + validation + writer + goldens | N16 | M | [x] |
 | T21 | Dynamic AMR: per-time ingest path + post-mortem + 2D e2e | N16 | M–L | [x] |
 | T22 | Dynamic AMR: GUI form + validation line + per-frame mesh in Results | N16 | M | [x] |
-| T23 | Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs | N16 | S–M | [ ] |
+| T23 | Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs | N16 | S–M | [x] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
 
 ---
@@ -806,7 +806,7 @@ Done when: green.
 ## T23 — Dynamic AMR: 3D viewer per-frame mesh + 3D e2e + docs (N16)
 
 ```
-SESSION PROMPT — T23
+SESSION PROMPT — T23   [DONE 2026-09-06; 3D arrival +18 % vs static reference recorded as an open N16 finding]
 Read: ROADMAP.md N16, plan file "T23"; viz3d/viewer.py _MeshEdges;
   viz3d/sampling.py (build_scene_init, build_frame, FrameStore);
   viz3d/client.py; gui/view3d_panel.py; tests/test_viz3d_scene.py,

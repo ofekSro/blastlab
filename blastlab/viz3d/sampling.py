@@ -134,6 +134,11 @@ def build_payload(fields, stride, face_specs):
         arr = fields.get(key)
         if arr is not None:
             payload[key] = decimate(np.asarray(arr), stride)
+    lv = fields.get('levels')
+    if lv is not None:
+        # dynamic AMR: the frame's level map on the FULL display grid
+        # (not decimated - the mesh-edge layer slices it at cell level)
+        payload['levels'] = np.asarray(lv, dtype=np.int8).copy()
     return payload
 
 

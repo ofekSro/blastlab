@@ -825,6 +825,12 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
 # ── 3D ──────────────────────────────────────────────────────────────────────
 
 
+def _levels_of(mesh):
+    """{'levels': ...} for a 3D viewer frame of a dynamic-AMR run, {}
+    otherwise (static payloads stay exactly as before)."""
+    return {} if mesh is None else {'levels': mesh.levels}
+
+
 def _emit_frame(hooks, p, t, mesh, sl=None):
     """hooks.frame with the frame's AMR level map when there is one;
     static runs keep the two-argument call so custom hooks that only
@@ -918,7 +924,8 @@ def _initial_frame3d(spec, hooks):
     rho0 = np.full_like(p0, RHO_AIR)
     e0 = p0 / (0.4 * rho0)
     hooks.frame3d(0.0, dict(p=p0, rho=rho0, e=e0, p_peak=p0.copy(),
-                            imp=np.zeros_like(p0)))
+                            imp=np.zeros_like(p0),
+                            **_levels_of(spec.mesh0)))
 
 
 def _slice_geom_3d(case, spec):
@@ -1114,7 +1121,8 @@ def solve_3d_foam(case, hooks=None):
             e_approx = p / (0.4 * np.maximum(rho, 1e-10))
             pk_live, imp_live = acc.live()
             hooks.frame3d(t, dict(p=p, rho=rho, e=e_approx,
-                                  p_peak=pk_live, imp=imp_live))
+                                  p_peak=pk_live, imp=imp_live,
+                                  **_levels_of(mesh)))
             live3d['step'] = st['step']
             live3d['draw'] = _time.time()
         if not loop.stop_requested and has_open \
@@ -1198,7 +1206,8 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     _emit_frame(hooks, fin['p'], t_fin, mesh_fin, live_sl)
     e_approx = fin['p'] / (0.4 * np.maximum(fin['rho'], 1e-10))
     hooks.frame3d(t_fin, dict(p=fin['p'], rho=fin['rho'], e=e_approx,
-                              p_peak=p_peak, imp=impulse), force=True)
+                              p_peak=p_peak, imp=impulse,
+                              **_levels_of(mesh_fin)), force=True)
 
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")

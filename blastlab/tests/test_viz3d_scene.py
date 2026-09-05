@@ -212,6 +212,40 @@ check("refined scene draws its mesh", 'mesh_edges' in pl_r.actors
       and pl_r.actors['mesh_edges'].mapper.dataset.n_lines > 0)
 pl_r.close()
 
+print("\nS3a2: dynamic AMR - the overlay follows each frame's level map (N16)")
+init_a = dict(init, refine=dict(levels=np.zeros((40, 40, 40), dtype=np.int8),
+                                lmax=1, dx_base=0.2, zones=[], amr=1,
+                                display_level=1))
+pl_a = pv.Plotter(off_screen=True, window_size=(400, 300))
+scene_a = BlastScene(pl_a, init_a)
+scene_a.set_plane('plane1', 'z', 0.1)
+scene_a.layers['plane2'].set_visible(False)
+scene_a.layers['mesh'].set_visible(True)
+n_rec = pl_a.actors['mesh_edges'].mapper.dataset.n_lines
+lvA = np.zeros((40, 40, 40), dtype=np.int8)
+lvA[:10, :10, :10] = 1
+scene_a.on_message(('frame', 1e-3, dict(synth_frame(1e-3, 0.5), levels=lvA), False))
+n_a = pl_a.actors['mesh_edges'].mapper.dataset.n_lines
+lvB = np.zeros((40, 40, 40), dtype=np.int8)
+lvB[:24, :24, :4] = 1
+scene_a.on_message(('frame', 2e-3, dict(synth_frame(2e-3, 0.7), levels=lvB), False))
+n_b = pl_a.actors['mesh_edges'].mapper.dataset.n_lines
+check("AMR frames rebuild the overlay from their own level maps",
+      n_a != n_rec and n_b != n_a, f"{n_rec} {n_a} {n_b}")
+built = scene_a.layers['mesh']._built
+scene_a.layers['plane1'].refresh()
+check("same frame, same planes: cached (no rebuild)",
+      scene_a.layers['mesh']._built == built)
+scene_a.on_message(('frame', 3e-3, synth_frame(3e-3, 0.9), False))
+check("a frame without levels falls back to the record's map",
+      pl_a.actors['mesh_edges'].mapper.dataset.n_lines == n_rec)
+scene_a.show_frame(1)
+check("scrubbing back to an AMR frame restores its overlay",
+      pl_a.actors['mesh_edges'].mapper.dataset.n_lines == n_b)
+pl_a.close()
+check("static scene: frames never change the built key",
+      scene.layers['mesh']._built is None or scene.layers['mesh']._built[1] is None)
+
 print("\nS3b: field switching / colour scale / presets")
 scene.set_field('rho')
 check("plane mapper bound to density", scene.field == 'rho'

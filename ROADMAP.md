@@ -66,6 +66,7 @@ python test_foam_kb_anchor.py     # KB free-air + C4/TNT (~2 min, WSL)
 python test_foam_stop.py          # SIGSTOP/writeNow regression (WSL)
 python _e2e_foam_obstacle2d.py / _e2e_foam_obstacle3d.py   # obstacle e2e (WSL)
 python _e2e_foam_refine2d.py / _e2e_foam_refine3d.py       # local refinement e2e (WSL, ~3 min each)
+python _e2e_foam_amr2d.py / _e2e_foam_amr3d.py             # dynamic AMR e2e vs uniform / static reference (WSL, ~3 and ~6 min)
 python _e2e_gui_foam.py           # real-GUI session (WSL)
 ```
 
@@ -987,8 +988,9 @@ uniform revolved grid, not the (r, z) refinement.
 
 ---
 
-**N16 — Dynamic mesh refinement (blastFoam `adaptiveFvMesh`). IN PROGRESS
-(T20-T22 DONE 2026-09-05; T23 open).** Owner request (2026-09-05): the mesh
+**N16 — Dynamic mesh refinement (blastFoam `adaptiveFvMesh`). DONE
+(2026-09-06, T20-T23; parallel AMR and the 3D arrival offset are the
+follow-ups below).** Owner request (2026-09-05): the mesh
 follows the shock during the run instead of the static per-zone refinement
 of N15. Plan: `~/.claude/plans/amr-tranquil-blossom.md`; sessions T20-T23.
 Decisions: default estimator `densityGradient` (every blastFoam tutorial
@@ -1119,12 +1121,56 @@ custom two-argument hooks stay compatible. `test_gui_amr_form.py` (form
 round trip and enable rules, mesh_for(levels=), RunPanel per-frame
 overlay, ResultsPanel replay overlay changes between frames,
 write_animation(show_mesh=True) on an AMR record).
-*T23 (open)* — 3D viewer per-frame mesh, `_e2e_foam_amr3d.py`, README,
-ROADMAP numbers, parallel follow-up item.
+*T23 DONE (2026-09-06)* — 3D viewer: `sampling.build_payload` carries the
+frame's `levels` (full display grid, int8) and `viewer._MeshEdges` rebuilds
+the overlay per displayed frame from it (cache key = planes + frame map;
+static scenes keep the cached edges; scrubbing back restores that frame's
+mesh); `backend._levels_of` adds it to the frame3d payloads (initial,
+live, final). README section "Dynamic mesh refinement (blastFoam AMR)".
+`test_viz3d_scene` S3a2 covers rebuild / cache / fallback / scrub.
+Verified live, `_e2e_foam_amr3d.py` (20 kg TNT in a 3 m box, base 0.1 m,
+2 levels = finest 0.025 m, displayed at level 1 = 60^3, `maxCells`
+300k, gauge at 1 m; reference = the same case on a 0.05 m base with N15
+charge zones, 228,096 static cells, serial): t = 0 mesh 29,856 cells (L2
+2,560 in the charge), 70 writes, cells 39k -> 337,849 (capped, then
+~301k as the interior unrefines: L0 15k / L1 66k / L2 221k at arrival),
+mean 220k = 13 % of the 1.7M cells a uniform 2.5 cm run would carry
+(~7.8x the AMR cell-steps, infeasible in the 4 GB WSL VM); FO pMax at the
+gauge display cell 3,692 vs 3,130 kPa gauge trace (box-averaged over up
+to 8 fine cells); gauge peak AMR 3,130 vs static 3,048 kPa (+2.7 %);
+post-mortem reload identical; no orphan. Wall time: AMR 1,392 s (579
+steps) vs the static-zones reference 880 s (561 steps) - at the DISPLAY
+level AMR is slower than static zones (same cell count + refinement
+overhead); its win is against the finest level. Disk: the AMR run dir is
+5.3 GB (blastFoam rewrites the polyMesh at every write, ~75 MB per write
+at 300k cells; the run browser's cleanup policy applies).
+**Open finding (3D arrival):** the AMR gauge arrival is 0.298 ms vs
+0.252 ms static (+18 %) while the peak agrees to 2.7 % and 2D arrivals
+were 4-6 % EARLY. Candidate cause: blastProbes `adjustLocations` snaps
+the gauge to the t = 0 cell centre - a 0.1 m base cell here (8.7 %
+farther from the charge) vs 0.05 m in the reference - and the probe cell
+changes level as the mesh refines; the e2e reports the offset and gates at
+a 25 % sanity band. Follow-up: a probe-cell study (gauge at a base-cell
+centre, or `adjustLocations no`) - one ~20 min run each.
+**Lessons from the WSL side:** an uncapped 3D AMR case (no `maxCells`
+beyond the 8M default) grew the mesh until the 4 GB WSL VM died (6.4 GB
+written in 68 steps) and the root filesystem came back read-only until a
+`wsl --shutdown`; the 3D e2e caps at 300k and validation's maxCells note
+is the user's lever. `_e2e_foam_amr3d.py --amr-dir=<run name>` reloads a
+finished AMR run post-mortem and only re-runs the reference.
+**Parallel follow-up (measured 2026-09-05 in the probe):** two ranks work
+with `loadBalance { balance no; }` (41 s vs 52 s serial to 0.2 ms) or
+with balancing on after `addEmptyPatch internalPatch internal -overwrite
+-parallel` (38 s); per-rank time dirs carry `C`/`cellLevel`/`polyMesh`;
+`reconstructPar -newTimes` fails on a changed mesh (no
+`pointProcAddressing`), `reconstructParAll -time t` works (0.71 s per
+78k-cell time dir). Options in order: direct `processor*/<t>/` reads
+(concatenate `C`, `cellLevel` and every field across ranks - the remap is
+geometric, no reconstruction), or `reconstructParAll` per write.
 
 ## 5. Nice-to-have
 
-- **AMR** (`adaptiveFvMesh`): → promoted to **N16** (in progress, T20-T23);
+- **AMR** (`adaptiveFvMesh`): → promoted to **N16** (DONE 2026-09-06, T20-T23; parallel AMR is its follow-up);
   the per-time structure comes from `C` + `cellLevel` per written time and
   a geometry-based remap (`refine.remap_from_centres`), measured in the
   2026-09-05 probe recorded under N16.

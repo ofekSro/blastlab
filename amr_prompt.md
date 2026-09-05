@@ -1,3 +1,5 @@
+> **DONE (2026-09-05).** This brief was executed as ROADMAP N16, sessions T20-T23 (plan `~/.claude/plans/amr-tranquil-blossom.md`). Kept for the record; the measured numbers live in ROADMAP N16.
+
 # פרומפט להוספת AMR (עידון רשת דינמי) — לשיחה חדשה
 
 **איך להשתמש:** פותחים שיחה חדשה של Claude Code בתיקיית הפרויקט עם מודל **Fable**,
