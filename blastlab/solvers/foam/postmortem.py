@@ -15,12 +15,12 @@ import os
 import numpy as np
 
 from ...core.case import load_case
-from ...core.constants import P_AIR
 from ..hooks import RunHooks
 from . import env, reader, writer
-from .backend import (_ARRIVAL_P, _d_charge_3d, _finalize_1d,
-                      _finalize_2d, _finalize_3d, _maybe_reconstruct,
-                      _read_2d, _read_3d, _read_fo_fields)
+from .backend import (_ARRIVAL_P, _PeakImpulse, _d_charge_3d,
+                      _finalize_1d, _finalize_2d, _finalize_3d,
+                      _maybe_reconstruct, _stop_dists_3d,
+                      _read_2d, _read_3d)
 
 
 def _paths(case_dir):
@@ -67,17 +67,10 @@ def _snap_radii(case, spec):
                              for cx, cy in corners))
         n_snapshots = case.n_snapshots
     else:
-        dists = [d for d, side in ((x0, 'x_lo'), (case.Lx - x0, 'x_hi'),
-                                   (y0, 'y_lo'), (case.Ly - y0, 'y_hi'),
-                                   (z0, 'z_lo'), (case.Lz - z0, 'z_hi'))
-                 if case.bcs[side] == 'open']
-        if not dists:
-            dists = [max(float(np.hypot(np.hypot(cx - x0, cy - y0),
-                                        cz - z0))
-                         for cx in (0, case.Lx) for cy in (0, case.Ly)
-                         for cz in (0, case.Lz))]
+        dists = _stop_dists_3d(case, spec)
         n_snapshots = min(case.n_snapshots,
                           max(1, int(1.5e9 / (4 * spec.n_cells)) - 1))
+
     return list(np.linspace(spec.r_exp, min(dists),
                             n_snapshots + 1)[1:-1])
 
@@ -104,6 +97,8 @@ def load_run(case_dir, hooks=None):
     spec.files = None                   # nothing is written
 
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
+    if case.dim in (1, 2):              # _finalize_1d/2d re-read T
+        fields += ('T',)
     if n_procs > 1:
         hooks.log(f'  [postmortem] reconstructing leftover parallel '
                   f'times ({n_procs} ranks)...')
@@ -117,23 +112,45 @@ def load_run(case_dir, hooks=None):
     hooks.log(f'  [postmortem] {unc}: {n_frames} written frames')
     stop_reason = f'loaded post-mortem ({n_frames} frames)'
 
-    # sanity: the re-planned grid must match what is on disk
-    probe = os.path.join(unc, times[-1][1], 'p')
-    reader.read_scalar(probe, spec.n_cells)     # raises on mismatch
+    # sanity: the re-planned grid must match what is on disk. A run
+    # killed mid-write can leave a torn newest dir, so walk back until
+    # one dir reads - a real grid mismatch fails on every one of them.
+    for _t, name in reversed(times):
+        try:
+            reader.read_scalar(os.path.join(unc, name, 'p'),
+                               spec.n_cells)
+            break
+        except (ValueError, OSError):
+            continue
+    else:
+        raise RuntimeError(
+            f'no readable time directory in {unc} - the grid does not '
+            f'match case.json, or every write is truncated')
+
+    def _skip(name, exc):
+        hooks.log(f'  [postmortem] time dir {name} unreadable '
+                  f'({exc}) - skipped')
 
     if case.dim == 1:
         store = {}
         for _t, name in times:
             dpath = os.path.join(unc, name)
-            t, _dt = reader.read_time(dpath)
-            store[name] = dict(
-                t=t,
-                p=reader.read_scalar(os.path.join(dpath, 'p'),
-                                     spec.n_cells),
-                rho=reader.read_scalar(os.path.join(dpath, 'rho'),
-                                       spec.n_cells),
-                u=reader.read_vector(os.path.join(dpath, 'U'),
-                                     spec.n_cells)[:, 0])
+            try:
+                t, _dt = reader.read_time(dpath)
+                entry = dict(
+                    t=t,
+                    p=reader.read_scalar(os.path.join(dpath, 'p'),
+                                         spec.n_cells),
+                    rho=reader.read_scalar(os.path.join(dpath, 'rho'),
+                                           spec.n_cells),
+                    u=reader.read_vector(os.path.join(dpath, 'U'),
+                                         spec.n_cells)[:, 0])
+            except (ValueError, OSError) as exc:
+                _skip(name, exc)
+                continue
+            store[name] = entry
+        if not store:
+            raise RuntimeError(f'no readable time directory in {unc}')
         return _finalize_1d(case, spec, store, hooks, stop_reason, 0)
 
     # 2D / 3D: replay the ingest - per-frame shock front drives the
@@ -147,26 +164,19 @@ def load_run(case_dir, hooks=None):
         d_charge = _d_charge_3d(spec)
     snap_radii = _snap_radii(case, spec)
     ingested, snap_names = {}, []
-    p_peak = impulse = None
-    fo_peak = fo_imp = None
-    t_prev = 0.0
+    acc = _PeakImpulse()
     for _t, name in times:
         dpath = os.path.join(unc, name)
-        t, _dt = reader.read_time(dpath)
-        p = (_read_2d(dpath, spec)['p'] if case.dim == 2
-             else _read_3d(dpath, spec)['p'])
+        try:
+            t, _dt = reader.read_time(dpath)
+            p = (_read_2d(dpath, spec)['p'] if case.dim == 2
+                 else _read_3d(dpath, spec)['p'])
+        except (ValueError, OSError) as exc:
+            _skip(name, exc)
+            continue
+        if not acc.add(p, t, dpath, spec, hooks):
+            continue
         ingested[name] = t
-        if case.dim == 3:
-            if p_peak is None:
-                p_peak = p.copy()
-                impulse = np.zeros_like(p)
-            else:
-                np.maximum(p_peak, p, out=p_peak)
-            impulse += (p - P_AIR) * (t - t_prev)
-            t_prev = t
-            got_peak, got_imp = _read_fo_fields(dpath, spec)
-            if got_peak is not None:
-                fo_peak, fo_imp = got_peak, got_imp
         shocked = p > _ARRIVAL_P
         r_front = float(d_charge[shocked].max()) if shocked.any() else 0.0
         while snap_radii and r_front >= snap_radii[0]:
@@ -174,21 +184,31 @@ def load_run(case_dir, hooks=None):
             if name not in snap_names:
                 snap_names.append(name)
 
+    if not ingested:
+        raise RuntimeError(f'no readable time directory in {unc}')
     if case.dim == 2:
         return _finalize_2d(case, spec, hooks, stop_reason, 0,
-                            ingested, snap_names, [], [], 0)
+                            ingested, snap_names, [], [], 0, acc)
     return _finalize_3d(case, spec, hooks, stop_reason, 0,
-                        ingested, snap_names, [], [], 0,
-                        p_peak, impulse, fo_peak, fo_imp)
+                        ingested, snap_names, [], [], 0, acc)
 
 
-def list_runs():
-    """[(name, unc)] of run directories under env.RUNS_ROOT, newest
-    first (missing root -> empty)."""
+def list_runs(check_alive=False):
+    """[(name, unc, alive)] of run directories under env.RUNS_ROOT,
+    newest first (missing root -> empty).
+
+    `alive` is True/False when `check_alive` asks WSL whether each run's
+    recorded solver pid is still running (one round trip for the whole
+    list, via env.runs_alive), and None when the question was not asked
+    or WSL did not answer - so a caller can never mistake "not checked"
+    for "not running"."""
     root = env.unc(env.RUNS_ROOT)
     try:
         names = sorted(os.listdir(root), reverse=True)
     except OSError:
         return []
-    return [(n, os.path.join(root, n)) for n in names
-            if os.path.isdir(os.path.join(root, n))]
+    names = [n for n in names if os.path.isdir(os.path.join(root, n))]
+    alive = (env.runs_alive([f'{env.RUNS_ROOT}/{n}' for n in names])
+             if check_alive and names else {})
+    return [(n, os.path.join(root, n),
+             alive.get(f'{env.RUNS_ROOT}/{n}')) for n in names]

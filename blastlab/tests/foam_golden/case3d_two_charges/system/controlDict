@@ -15,7 +15,7 @@ stopAt          endTime;
 endTime         0.05877270994;
 deltaT          1e-7;
 writeControl    adjustableRunTime;
-writeInterval   9.642397724e-06;
+writeInterval   8.264912335e-06;
 cycleWrite      0;
 writeFormat     binary;
 writePrecision  6;

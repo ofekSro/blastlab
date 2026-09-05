@@ -23,7 +23,7 @@
 | T7 | Native solver warnings through hooks (transcript byte-identical) | B11 | M | [x] |
 | T8 | Native fixes that need ONE re-baseline | B10, B12, B18 | S + re-baseline | [x] |
 | T9 | Extract the shared foam run loop | A1, A2, A3, A4(foam part) | M | [ ] |
-| T10 | Foam accumulator correctness | B16, B17, B21 | S–M | [ ] |
+| T10 | Foam accumulator correctness | B16, B17, B21 | S–M | [x] |
 | T11 | Peak-overpressure / impulse views in Results | N1 (+ native 2D accumulators, native 3D meta) | M | [ ] |
 | T12 | Per-gauge engineering summary + CSV | N2, positive-phase impulse (B9 full) | S–M | [ ] |
 | T13 | 3D viewer colour-range plumbing + viz3d dead code | B19, A4(viz part), A8 | S | [ ] |

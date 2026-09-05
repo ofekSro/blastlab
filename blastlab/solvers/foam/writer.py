@@ -259,8 +259,13 @@ def plan_case(case):
               and not _in_obstacle(g)]
     spec.gauge_ids = gauges
     spec.probe_pts = [tuple(g) for g in gauges]
-    side_d = dict(x_lo=x0, x_hi=Ls[0] - x0, y_lo=y0, y_hi=Ls[1] - y0,
-                  z_lo=z0, z_hi=Ls[2] - z0)
+    # per open side: distance from the NEAREST charge (B21), mirroring
+    # backend._stop_dists_3d so timing is sized for the front that
+    # reaches the boundary first
+    side_d = {s: min(d(c) for c, _m in charges) for s, d in (
+        ('x_lo', lambda c: c[0]), ('x_hi', lambda c: Ls[0] - c[0]),
+        ('y_lo', lambda c: c[1]), ('y_hi', lambda c: Ls[1] - c[1]),
+        ('z_lo', lambda c: c[2]), ('z_hi', lambda c: Ls[2] - c[2]))}
     opens = [d for s, d in side_d.items() if case.bcs.get(s) == 'open']
     corners = [(cx, cy, cz) for cx in (0.0, Ls[0])
                for cy in (0.0, Ls[1]) for cz in (0.0, Ls[2])]

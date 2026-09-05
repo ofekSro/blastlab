@@ -45,6 +45,7 @@ python test_case_validate.py      # cap gating per backend (no WSL)
 python test_adaptive_interval.py  # writeInterval controller (no WSL)
 python test_foam_live_due.py      # live-frame cadence gate (no WSL)   [was missing from this list]
 python test_gui_drain.py          # GUI queue-drain resilience (no WSL)
+python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_blast2d.py            # 2D native physics suite
 python test_blast3d.py            # 3D native physics suite
 python test_foam_1d_vs_native.py  # physics gates (~2 min, WSL)
@@ -352,7 +353,15 @@ breaks when it's most needed. *How:* catch + degrade (log, fall through to next
 escalation step). *Effort:* S. *Confidence:* code-read.
 
 **B16 — Out-of-order ingestion can corrupt the Python impulse fallback and the
-recorded-frame timeline.** *What:* ingest loops `continue` past an unreadable
+recorded-frame timeline. DONE (2026-09-05).** `backend._OrderedIngest` drives
+all three ingest loops: a pass ends at the first time dir that is not ready
+(or tears mid-read) so a later write never lands before an earlier one; a dir
+that stays unreadable for 20 polls *after a later dir is complete* is skipped
+for good with one `[blastfoam] time dir <n> stayed unreadable ... - skipped`
+line (the newest write still in progress never counts); the final sweep skips
+gaps at once so nothing readable is lost. `_PeakImpulse.add` refuses t < t_prev
+with a log line (belt and braces). `test_foam_ingest_order.py` drives both
+with fake time dirs (no WSL). *Original entry:* *What:* ingest loops `continue` past an unreadable
 earlier time dir and ingest a later one first (`backend.py:396-409,685-695,
 1166-1179`); the late-arriving earlier dir then adds a *negative* dt to
 `impulse += (p-P_AIR)*(t-t_prev)` (`backend.py:1186`) and makes `meta['frames']`
@@ -363,7 +372,13 @@ earlier dir permanently once a later one is ingested, logging it). *Effort:* S.
 *Confidence:* code-read; trigger is **hypothesis** (needs a 9p anomaly).
 
 **B17 — Stale 'foam-fo' peak/impulse when the final dir's FO read fails; 2D has
-no fallback at all.** *What:* `backend.py:1325-1333` — on final-dir FO failure
+no fallback at all. DONE (2026-09-05).** One `backend._PeakImpulse` (per-write
+Python maps + the per-step FO fields, each with the time it last covered) is
+shared by the 2D/3D live loops and `postmortem.load_run`; `final()` prefers the
+final dir's FO, then an FO read that already covers t_fin, else the Python maps
+labelled `peak_source='python-fallback'` (FO existed but is older than the final
+frame) or `'python-writes'` (no FO at all). 2D Results now always carry
+p_peak/impulse/peak_source. *Original entry:* *What:* `backend.py:1325-1333` — on final-dir FO failure
 the result keeps an earlier-time FO accumulation labeled `peak_source='foam-fo'`
 and discards the fresher Python accumulator; 2D drops p_peak/impulse entirely
 (acknowledged comment, `backend.py:842-847`). *Why:* under-reported impulse
@@ -431,7 +446,13 @@ jumps in LIVE mode; compounds B4. *How:* thin anchored on the last element
 (`frames[-1]` always kept) and return actual status. *Effort:* S. *Confidence:*
 **confirmed by execution**.
 
-**B21 — Multi-charge stop/progress distances use only the primary charge.**
+**B21 — Multi-charge stop/progress distances use only the primary charge. DONE
+(2026-09-05).** `backend._stop_dists_3d` (per open side: distance from the
+NEAREST charge; closed box: far corner from the primary) feeds `solve_3d_foam`
+and `postmortem._snap_radii`; `writer.plan_case` 3D sizing uses the same
+min-over-charges. Golden `case3d_two_charges`: only `writeInterval` moved
+(9.64e-6 -> 8.26e-6 s, ratio 0.6/0.7 = the secondary's distance to x_hi
+replacing the primary's to x_lo); endTime unchanged. *Original entry:*
 *What:* `writer.plan_case` 3D sizing (`writer.py:258-266`) and `solve_3d_foam`
 `dists`/`stop_dist` (`backend.py:1091-1100`) measure to `spec.center` only,
 though `d_charge` is multi-charge aware. *Why:* with a secondary charge near an
