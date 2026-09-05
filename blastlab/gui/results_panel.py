@@ -186,6 +186,9 @@ class ResultsPanel(ctk.CTkFrame):
         self._anim_mesh = None
         self._anim_solid = None
         self._anim_title = None
+        self._anim_levels = None    # AMR: per-frame level maps
+        self._anim_lines = None     # the per-frame overlay
+        self._anim_geom = None
         self._anim_plane = ''
         self._playing = False
 
@@ -413,10 +416,17 @@ class ResultsPanel(ctk.CTkFrame):
             self._anim_plane = ''
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
+        # dynamic AMR: the recorded per-frame level maps drive a
+        # per-frame overlay (see _show_frame); static runs keep the one
+        # predicted-mesh overlay
+        self._anim_levels = frames.get('levels')
+        self._anim_geom = (meta, xf, yf, sl)
+        self._anim_lines = None
         self._anim_mesh = plots.overpressure_panel(
             ax, xf, yf, self._anim_solid.shape,
             mesh=(plots.mesh_for(meta, xf, yf, sl)
-                  if self.show_mesh_var.get() else None))
+                  if self.show_mesh_var.get() and self._anim_levels is None
+                  else None))
         self._anim_title = ax.set_title('')
         fig.colorbar(self._anim_mesh, ax=ax, label='Overpressure [kPa]',
                      shrink=0.85)
@@ -432,6 +442,14 @@ class ResultsPanel(ctk.CTkFrame):
         k = max(0, min(int(k), len(frames['pressures']) - 1))
         plots.set_frame(self._anim_mesh, frames['pressures'][k],
                         self._anim_solid)
+        if self._anim_levels is not None and self.show_mesh_var.get():
+            meta, xf, yf, sl = self._anim_geom
+            if self._anim_lines is not None:
+                self._anim_lines.remove()
+            lv = self._anim_levels[min(k, len(self._anim_levels) - 1)]
+            self._anim_lines = plots.add_mesh_lines(
+                self._anim_mesh.axes,
+                plots.mesh_for(meta, xf, yf, sl, levels=lv))
         self._anim_title.set_text(
             f"{self._anim_plane}t = {frames['times'][k]*1e3:.3f} ms")
         self.anim_canvas.draw()

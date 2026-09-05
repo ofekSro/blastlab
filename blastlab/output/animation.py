@@ -10,7 +10,8 @@ from matplotlib import animation
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from .plots import mesh_for, overpressure_panel, set_frame, charge_label
+from .plots import (add_mesh_lines, mesh_for, overpressure_panel,
+                    set_frame, charge_label)
 
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
@@ -72,9 +73,15 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     fig = Figure(figsize=(7, 7 * h_over_w + 1))
     FigureCanvasAgg(fig)
     ax = fig.add_subplot()
+    # dynamic AMR runs record a level map per frame: the overlay is then
+    # rebuilt per frame instead of drawn once from the predicted mesh
+    levels = frames.get('levels')
+    per_frame = bool(show_mesh and levels is not None)
     mesh = overpressure_panel(
         ax, xf, yf, solid_sl.shape,
-        mesh=mesh_for(meta, xf, yf, sl) if show_mesh else None)
+        mesh=mesh_for(meta, xf, yf, sl) if show_mesh and not per_frame
+        else None)
+    lines = [None]
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     title = ax.set_title('')
@@ -83,9 +90,15 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
 
     def draw(k):
         set_frame(mesh, pressures[k], solid_sl)
+        if per_frame:
+            if lines[0] is not None:
+                lines[0].remove()
+            lv = levels[min(k, len(levels) - 1)]
+            lines[0] = add_mesh_lines(ax, mesh_for(meta, xf, yf, sl,
+                                                   levels=lv))
         title.set_text(f"{charge_label(meta)}  {plane}"
                        f"t = {times[k]*1e3:.3f} ms")
-        return mesh,
+        return (mesh, lines[0]) if per_frame else (mesh,)
 
     print(f"  Writing animation ({len(pressures)} frames) ... ",
           end='', flush=True)

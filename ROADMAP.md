@@ -51,6 +51,7 @@ python test_gauge_summary.py      # per-gauge peak/arrival/positive-phase impuls
 python test_gui_gauge_summary.py  # Gauges-tab summary table + CSV (headless Tk)
 python test_gui_run_browser.py    # foam run browser with injected sources (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh overlays (headless Tk)
+python test_gui_amr_form.py       # dynamic AMR card + per-frame mesh overlays (headless Tk)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_foam_amr_ingest.py    # dynamic AMR per-time ingest path on fake time dirs (no WSL)
 python test_blast2d.py            # 2D native physics suite
@@ -987,7 +988,7 @@ uniform revolved grid, not the (r, z) refinement.
 ---
 
 **N16 — Dynamic mesh refinement (blastFoam `adaptiveFvMesh`). IN PROGRESS
-(T20-T21 DONE 2026-09-05; T22-T23 open).** Owner request (2026-09-05): the mesh
+(T20-T22 DONE 2026-09-05; T23 open).** Owner request (2026-09-05): the mesh
 follows the shock during the run instead of the static per-zone refinement
 of N15. Plan: `~/.claude/plans/amr-tranquil-blossom.md`; sessions T20-T23.
 Decisions: default estimator `densityGradient` (every blastFoam tutorial
@@ -1096,8 +1097,28 @@ fixed cost on both sides; the cell count is the robust metric (66 % of the
 uniform cells at arrival). The 2 m probe box at 0.1/0.1 (whole box refined)
 and this 4 m box at 0.4/0.2 bound what densityGradient thresholds buy in
 2D; 3D is measured in T23.
-*T22 (open)* — Numerics AMR card, validation line, preview, per-frame mesh
-in Results replay / animation / live plot.
+*T22 DONE (2026-09-05)* — GUI + display. `forms.CaseForm`: a "Dynamic
+refinement (blastFoam)" card (levels combo 0..5, estimator combo, refine /
+unrefine / interval / buffer / max-cells entries, display-level combo
+auto/0..5) that greys out for the native solver, enables its coefficients
+only while AMR is on and disables the charge-refinement combo (a 'zone'
+pick snaps back to 'global'); `get_case`/`set_case` round-trip every
+`amr_*` field (`amr_display_level` None <-> 'auto'). `App._validate` cell
+line: "N cells at dx at t = 0; AMR up to level L (finest X m), displayed
+at level D (M cells)". Setup preview: AMR cases draw the base grid with a
+"follows the shock" caption (2D and the 3D `_mesh_3d` scenery).
+`plots.mesh_for(..., levels=)` draws one frame's level map (carved -1
+cells left out); `ResultsPanel._show_frame` and
+`animation.write_animation` swap the overlay per frame when
+`frames['levels']` exists (static runs keep the single predicted-mesh
+overlay); `RunHooks.frame(field, t, levels=None)` + `GuiHooks`/`App`
+carry the level map of each live frame to `RunPanel.on_frame`, which
+rebuilds the live overlay from it (`display_level` rides in
+`run_started`); `backend._emit_frame` passes `levels` only on AMR runs so
+custom two-argument hooks stay compatible. `test_gui_amr_form.py` (form
+round trip and enable rules, mesh_for(levels=), RunPanel per-frame
+overlay, ResultsPanel replay overlay changes between frames,
+write_animation(show_mesh=True) on an AMR record).
 *T23 (open)* — 3D viewer per-frame mesh, `_e2e_foam_amr3d.py`, README,
 ROADMAP numbers, parallel follow-up item.
 

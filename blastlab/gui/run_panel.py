@@ -268,6 +268,10 @@ class RunPanel(ctk.CTkFrame):
             # run (absent/None = uniform: every face)
             self._mesh_geom = (info['x_face'], info['y_face'],
                                info.get('mesh_src'))
+            # dynamic AMR: frames carry their level map; display_level
+            # sizes the blocks (the display grid sits at that level)
+            self._disp_level = info.get('display_level')
+            self._mesh_levels = None
             self._rebuild_overlay(draw=False)
             ax.set_xlabel(info['xlabel'])
             ax.set_ylabel(info['ylabel'])
@@ -286,6 +290,13 @@ class RunPanel(ctk.CTkFrame):
             self._mesh_lines = None
         if self.show_mesh_var.get():
             xf, yf, src = self._mesh_geom
+            lv = getattr(self, '_mesh_levels', None)
+            if lv is not None:
+                lv = np.asarray(lv)
+                src = refine.fine_src(
+                    np.maximum(lv, 0),
+                    int(getattr(self, '_disp_level', None) or lv.max()),
+                    solid_fine=(lv < 0) if (lv < 0).any() else None)
             from ..output.plots import MESH_MAX_LINES
             self._mesh_lines = add_mesh_lines(
                 self._mesh.axes,
@@ -295,7 +306,7 @@ class RunPanel(ctk.CTkFrame):
         if draw:
             self.canvas.draw()
 
-    def on_frame(self, field, t):
+    def on_frame(self, field, t, levels=None):
         # Frames are coalesced in a single slot shared across chain stages,
         # so a frame may briefly belong to the NEXT stage while this panel
         # is still configured for the previous one - guard by shape.
@@ -303,6 +314,10 @@ class RunPanel(ctk.CTkFrame):
             if self._solid is None or field.shape != self._solid.shape:
                 return
             set_frame(self._mesh, field, self._solid)
+            if levels is not None and np.shape(levels) == field.shape:
+                self._mesh_levels = levels
+                if self.show_mesh_var.get():
+                    self._rebuild_overlay(draw=False)
         elif self._line is not None:
             if field.ndim != 2 or field.shape[0] != 2:
                 return

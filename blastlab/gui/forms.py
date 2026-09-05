@@ -305,6 +305,40 @@ class CaseForm(ctk.CTkFrame):
             r = _row(num, r, 'Slice position [m]\n(blank = burst)',
                      _entry(num, self._var('slice_pos', '')))
 
+        # ── Dynamic refinement (blastFoam adaptiveFvMesh, N16) ─────────
+        if self.dim > 1:
+            from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
+            amr = self._card(0, 'Dynamic refinement (blastFoam)')
+            r = 0
+            self._amr_levels_combo = _combo(
+                amr, self._var('amr_levels', '0'),
+                [str(i) for i in range(MAX_AMR_LEVEL + 1)])
+            r = _row(amr, r, 'AMR levels (0 = off)', self._amr_levels_combo)
+            self.v['amr_levels'].trace_add(
+                'write', lambda *a: self._sync_enabled())
+            self._amr_est_combo = _combo(
+                amr, self._var('amr_estimator', 'densityGradient'),
+                list(AMR_ESTIMATORS))
+            r = _row(amr, r, 'Error estimator', self._amr_est_combo)
+            self._amr_entries = []
+            for key, label, default in (
+                    ('amr_refine', 'Refine above', 0.4),
+                    ('amr_unrefine', 'Unrefine below', 0.2),
+                    ('amr_interval', 'Refine every [steps]', 2),
+                    ('amr_buffer', 'Buffer layers', 2),
+                    ('amr_max_cells', 'Max cells (0 = default)', 0)):
+                w = _entry(amr, self._var(key, default))
+                r = _row(amr, r, label, w)
+                self._amr_entries.append(w)
+            self._amr_disp_combo = _combo(
+                amr, self._var('amr_display_level', 'auto'),
+                ['auto'] + [str(i) for i in range(MAX_AMR_LEVEL + 1)])
+            r = _row(amr, r, 'Display level', self._amr_disp_combo)
+            if 'charge_refine' in self.v:
+                # picking 'zone' while AMR is on snaps back to 'global'
+                self.v['charge_refine'].trace_add(
+                    'write', lambda *a: self._sync_enabled())
+
         # ── Boundaries ─────────────────────────────────────────────────
         if self.dim > 1:
             bcf = self._card(0, 'Boundaries')
@@ -445,6 +479,26 @@ class CaseForm(ctk.CTkFrame):
                     state='readonly' if foam else 'disabled')
                 if not foam and self.v['charge_refine'].get() != 'global':
                     self.v['charge_refine'].set('global')
+            if hasattr(self, '_amr_disp_combo'):
+                # dynamic AMR: blastFoam only; its coefficients apply only
+                # while it is on, and it excludes the static zones / the
+                # 'zone' charge mode (validation refuses the combination)
+                self._amr_levels_combo.configure(
+                    state='readonly' if foam else 'disabled')
+                if not foam and self.v['amr_levels'].get() != '0':
+                    self.v['amr_levels'].set('0')
+                amr_on = foam and self.v['amr_levels'].get().strip() \
+                    not in ('', '0')
+                for w in self._amr_entries:
+                    w.configure(state='normal' if amr_on else 'disabled')
+                for w in (self._amr_est_combo, self._amr_disp_combo):
+                    w.configure(state='readonly' if amr_on else 'disabled')
+                if hasattr(self, '_cref_combo'):
+                    self._cref_combo.configure(
+                        state='readonly' if foam and not amr_on
+                        else 'disabled')
+                    if amr_on and self.v['charge_refine'].get() != 'global':
+                        self.v['charge_refine'].set('global')
 
     # ── Case conversion ─────────────────────────────────────────────────
     def get_case(self):
@@ -488,6 +542,16 @@ class CaseForm(ctk.CTkFrame):
             refine_zones=[(*z[:-1], int(round(z[-1])))
                           for z in self.zones.get()],
             charge_refine=v['charge_refine'].get(),
+            amr_levels=_i(v['amr_levels'], 'AMR levels'),
+            amr_estimator=v['amr_estimator'].get(),
+            amr_refine=_f(v['amr_refine'], 'AMR refine threshold'),
+            amr_unrefine=_f(v['amr_unrefine'], 'AMR unrefine threshold'),
+            amr_interval=_i(v['amr_interval'], 'AMR refine interval'),
+            amr_buffer=_i(v['amr_buffer'], 'AMR buffer layers'),
+            amr_max_cells=_i(v['amr_max_cells'], 'AMR max cells'),
+            amr_display_level=(
+                None if v['amr_display_level'].get().strip() in ('', 'auto')
+                else _i(v['amr_display_level'], 'AMR display level')),
         )
         if self.dim == 2:
             return Case2D(geometry=v['geometry'].get(),
@@ -550,6 +614,15 @@ class CaseForm(ctk.CTkFrame):
         v['activation'].set(getattr(case, 'activation', 'linear'))
         v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
         v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
+        v['amr_levels'].set(str(int(getattr(case, 'amr_levels', 0) or 0)))
+        v['amr_estimator'].set(getattr(case, 'amr_estimator',
+                                       'densityGradient') or 'densityGradient')
+        for key, default in (('amr_refine', 0.4), ('amr_unrefine', 0.2),
+                             ('amr_interval', 2), ('amr_buffer', 2),
+                             ('amr_max_cells', 0)):
+            v[key].set(f'{getattr(case, key, default):g}')
+        dl = getattr(case, 'amr_display_level', None)
+        v['amr_display_level'].set('auto' if dl is None else str(int(dl)))
         v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
         v['eos'].set(case.eos)
         v['cfl'].set(f'{case.cfl:g}')

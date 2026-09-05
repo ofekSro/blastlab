@@ -41,13 +41,15 @@ def _mesh_3d(case, plan):
     grid (the viewer adds the six boundary faces) plus the live-slice
     plane of a Case3D."""
     axis = 'xyz'.index(getattr(case, 'slice_axis', 'y') or 'y')
-    c = plan.fine[('x_c', 'y_c', 'z_c')[axis]]
+    # dynamic AMR: the mesh follows the shock, so the preview can only
+    # show the base grid it starts from
+    g = plan.base if plan.amr else plan.fine
+    c = g[('x_c', 'y_c', 'z_c')[axis]]
     pos = getattr(case, 'slice_pos', None)
     pos = float(case.center[axis]) if pos is None else float(pos)
     k = int(min(range(len(c)), key=lambda i: abs(float(c[i]) - pos)))
-    return dict(axes=(plan.fine['x_c'], plan.fine['y_c'], plan.fine['z_c']),
-                dx=float(plan.fine['dx']),
-                refine=plan.meta() if plan.refined else None,
+    return dict(axes=(g['x_c'], g['y_c'], g['z_c']), dx=float(g['dx']),
+                refine=plan.meta() if plan.refined and not plan.amr else None,
                 planes=[(axis, k, float(c[k]))])
 
 
@@ -202,7 +204,13 @@ class Preview2DPanel(ctk.CTkFrame):
     def _draw_mesh(self, ax, plan):
         """Cell edges of the predicted mesh (uniform: every base face).
         Returns a title suffix."""
-        if plan.n_fine > MESH_PREVIEW_MAX:
+        if plan.amr:
+            segs = refine.mesh_segments_2d(None, plan.base['x_face'],
+                                           plan.base['y_face'],
+                                           max_lines=MESH_MAX_LINES)
+            note = (f' | base grid ({plan.n_pred:,} cells) - AMR up to '
+                    f'level {plan.amr} follows the shock')
+        elif plan.n_fine > MESH_PREVIEW_MAX:
             segs = refine.mesh_segments_2d(None, plan.base['x_face'],
                                            plan.base['y_face'],
                                            max_lines=MESH_MAX_LINES)

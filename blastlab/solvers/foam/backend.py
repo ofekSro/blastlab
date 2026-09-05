@@ -635,7 +635,8 @@ def solve_2d_foam(case, hooks=None):
         ylabel='z [m]' if axisym else 'y [m]', title='',
         mesh_src=(refine.slice_src(spec.levels, spec.lmax,
                                    solid_fine=spec.solid)
-                  if spec.lmax and not spec.amr else None))
+                  if spec.lmax and not spec.amr else None),
+        display_level=spec.display_level if spec.amr else None)
     if axisym:
         # live (r, z) frames can be revolved into a 3D cylinder view
         run_info['revolve3d'] = dict(
@@ -695,7 +696,7 @@ def solve_2d_foam(case, hooks=None):
         due = (due_sparse(hooks.refresh, st['step'], live)
                and t >= st['t_frame'])
         if due or will_pause:
-            hooks.frame(p, t)
+            _emit_frame(hooks, p, t, mesh)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -781,7 +782,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
         frame_p.append(fin['p'].astype(np.float32))
         if mesh_fin is not None and frame_lv is not None:
             frame_lv.append(mesh_fin.levels)
-    hooks.frame(fin['p'], t_fin)
+    _emit_frame(hooks, fin['p'], t_fin, mesh_fin)
 
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")
@@ -822,6 +823,18 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
 
 
 # ── 3D ──────────────────────────────────────────────────────────────────────
+
+
+def _emit_frame(hooks, p, t, mesh, sl=None):
+    """hooks.frame with the frame's AMR level map when there is one;
+    static runs keep the two-argument call so custom hooks that only
+    accept (field, t) stay compatible."""
+    field = p if sl is None else p[sl].copy()
+    if mesh is None:
+        hooks.frame(field, t)
+    else:
+        hooks.frame(field, t,
+                    levels=mesh.levels if sl is None else mesh.levels[sl])
 
 
 def _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames):
@@ -1021,6 +1034,7 @@ def solve_3d_foam(case, hooks=None):
         mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
                                    solid_fine=spec.solid)
                   if spec.lmax and not spec.amr else None),
+        display_level=spec.display_level if spec.amr else None,
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=[tuple(o) for o in spec.obstacles],
                      Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
@@ -1091,7 +1105,7 @@ def solve_3d_foam(case, hooks=None):
         due = (due_sparse(hooks.refresh, st['step'], live)
                and t >= st['t_frame'])
         if due or will_pause:
-            hooks.frame(p[live_sl].copy(), t)
+            _emit_frame(hooks, p, t, mesh, live_sl)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -1181,7 +1195,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
         frame_p.append(fin['p'][live_sl].astype(np.float32))
         if mesh_fin is not None and frame_lv is not None:
             frame_lv.append(mesh_fin.levels[live_sl])
-    hooks.frame(fin['p'][live_sl].copy(), t_fin)
+    _emit_frame(hooks, fin['p'], t_fin, mesh_fin, live_sl)
     e_approx = fin['p'] / (0.4 * np.maximum(fin['rho'], 1e-10))
     hooks.frame3d(t_fin, dict(p=fin['p'], rho=fin['rho'], e=e_approx,
                               p_peak=p_peak, imp=impulse), force=True)

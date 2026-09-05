@@ -41,8 +41,8 @@ class Log:
     def log(self, s):
         self.lines.append(s)
 
-    def frame(self, payload, t):
-        self.frames.append((payload, t))
+    def frame(self, payload, t, levels=None):
+        self.frames.append((payload, t, levels))
 
     def wants_frame3d(self):
         return False
@@ -267,7 +267,7 @@ def test_mesh_at_and_decode():
         ingested = {'1e-05': 1e-5, '2e-05': 2e-5}
         acc = runloop.PeakImpulse()
         frame_lv = [m1.levels, m2.levels]
-        res = backend.finalize_2d(case, spec, Log(), 'test', 2, ingested, ['1e-05'],
+        res = backend.finalize_2d(case, spec, hooks, 'test', 2, ingested, ['1e-05'],
                                   [1e-5, 2e-5], [got['p'], got2['p']], 10, acc,
                                   frame_lv=frame_lv)
         m = res.meta
@@ -281,6 +281,9 @@ def test_mesh_at_and_decode():
         check('finalize_2d: final snapshot on the display grid',
               list(res.snapshots.values())[-1]['p'].shape == (8, 8)
               and m['peak_source'] == 'foam-fo')
+        check('finalize_2d: the final live frame carries its level map',
+              hooks.frames and hooks.frames[-1][2] is not None
+              and np.array_equal(hooks.frames[-1][2], m2.levels))
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

@@ -23,7 +23,7 @@ import traceback
 
 import numpy as np
 
-from ..solvers.hooks import RunHooks
+from ..solvers.hooks import RunHooks, StoppedBeforeStart
 
 
 class GuiHooks(RunHooks):
@@ -82,9 +82,11 @@ class GuiHooks(RunHooks):
             self._last_progress = now
             self.q.put(('progress', p))
 
-    def frame(self, field2d, t):
+    def frame(self, field2d, t, levels=None):
         with self._lock:
-            self._latest = (np.asarray(field2d, dtype=np.float32).copy(), t)
+            self._latest = (np.asarray(field2d, dtype=np.float32).copy(), t,
+                            None if levels is None
+                            else np.asarray(levels, dtype=np.int8).copy())
             if not self._frame_pending:
                 self._frame_pending = True
                 self.q.put(('frame',))
@@ -118,7 +120,13 @@ class GuiHooks(RunHooks):
             return
         payload = feed.make_payload(fields)
         with self._lock:
-            self._latest3d = (t, payload)
+            # coalesced latest-wins slot: keep `final` sticky so a forced
+            # (run-ending) frame's flag survives being overwritten before
+            # the Tk thread drains it (should not happen in practice - the
+            # forced frame is always the last one emitted - but drop it
+            # silently rather than lose finality if it ever does).
+            prev_final = self._latest3d[2] if self._latest3d is not None else False
+            self._latest3d = (t, payload, force or prev_final)
             if not self._frame3d_pending:
                 self._frame3d_pending = True
                 self.q.put(('frame3d',))
@@ -190,6 +198,12 @@ class SolverWorker(threading.Thread):
                 self.q.put(('stage', k, label))
                 try:
                     res = solve(self.hooks)
+                except StoppedBeforeStart as exc:
+                    # the user stopped during setup (WSL probe, meshing):
+                    # nothing was computed, so there is no partial Result
+                    # to post - and it is not a failure either
+                    self.q.put(('log', f'  [{exc}]'))
+                    break
                 except Exception:
                     self.q.put(('error', traceback.format_exc()))
                     break

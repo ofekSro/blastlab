@@ -37,6 +37,17 @@ class Result:
         return self.snapshots, self.gauges, self.meta
 
 
+class StoppedBeforeStart(RuntimeError):
+    """The user stopped a run before it produced anything at all.
+
+    Raised only from the setup phase a solver goes through before its
+    first step - for blastFoam the WSL availability probe and the
+    mesh/charge-init stages, which can take minutes on a cold start. No
+    partial Result exists at that point (there is no field to finalize),
+    so this is *not* a failure and hosts must not report it as one: end
+    the run quietly and post no result."""
+
+
 class RunHooks:
     """No-op base. Override any subset."""
 
@@ -78,9 +89,11 @@ class RunHooks:
     def progress(self, p: Progress):
         """Called every step (cheap; receivers throttle themselves)."""
 
-    def frame(self, field2d, t):
+    def frame(self, field2d, t, levels=None):
         """Live pressure field: 2D array (3D runs pass the x-z slice
-        through the burst; 1D runs pass the (r, p) profile pair)."""
+        through the burst; 1D runs pass the (r, p) profile pair).
+        `levels` (dynamic-AMR runs only) is that frame's level map on
+        the same plane, for a mesh overlay that follows the run."""
 
     def wants_frame3d(self):
         """True while an interactive 3D viewer is attached and open."""
@@ -149,7 +162,7 @@ class ConsoleHooks(RunHooks):
             print(_STEP_FMT[self.dim].format(step=p.step, t=p.t * 1e3,
                                              dt=p.dt, p=p.p_max))
 
-    def frame(self, field2d, t):
+    def frame(self, field2d, t, levels=None):
         if not self._want_live or self.dim == 1:
             return
         if self._viewer is None:

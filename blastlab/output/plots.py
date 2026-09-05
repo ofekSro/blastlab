@@ -66,21 +66,29 @@ def add_mesh_lines(ax, segments, color='0.6'):
 MESH_MAX_LINES = 60
 
 
-def mesh_for(meta, xf, yf, sl=None):
+def mesh_for(meta, xf, yf, sl=None, levels=None):
     """Cell-edge segments for a field plot with faces xf/yf: the TRUE
     cells of a refined blastFoam run (meta['refine'], coarse cells drawn
     as merged blocks), every face for a uniform run. `sl` selects the
     3D plane (a tuple with one integer index); very fine refined slices
-    fall back to the base grid."""
+    fall back to the base grid. `levels` (dynamic AMR: one frame's level
+    map, already on the plotted plane, -1 = carved) replaces the
+    meta['refine'] map so the overlay follows the replay."""
     from ..core import refine
     ref = meta.get('refine') if isinstance(meta, dict) else None
     if ref is None:
         return refine.mesh_segments_2d(None, xf, yf,
                                        max_lines=MESH_MAX_LINES)
-    levels, lmax = ref['levels'], ref['lmax']
-    if sl is None:
+    lmax = ref['lmax']
+    if levels is not None:
+        lv = np.asarray(levels)
+        src = refine.fine_src(np.maximum(lv, 0), lmax,
+                              solid_fine=(lv < 0) if (lv < 0).any() else None)
+    elif sl is None:
+        levels = ref['levels']
         src = refine.slice_src(levels, lmax)
     else:
+        levels = ref['levels']
         axis = next(a for a, s in enumerate(sl) if not isinstance(s, slice))
         src = refine.slice_src(levels, lmax, axis, int(sl[axis]))
     if src.size > 400_000:

@@ -286,7 +286,11 @@ class App:
         extra = []
         if rep.n_cells:
             line = f'~{rep.n_cells:,} cells at dx = {rep.effective_dx:g} m'
-            if getattr(rep, 'lmax', 0):
+            if getattr(rep, 'amr_levels', 0):
+                line += (f' at t = 0; AMR up to level {rep.amr_levels} '
+                         f'(finest {rep.dx_fine:g} m), displayed at level '
+                         f'{rep.display_level} ({rep.n_fine:,} cells)')
+            elif getattr(rep, 'lmax', 0):
                 line += (f' (finest {rep.dx_fine:g} m, {rep.n_fine:,} '
                          f'display cells)')
             extra.append(line)
