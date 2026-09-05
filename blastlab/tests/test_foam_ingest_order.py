@@ -1,7 +1,7 @@
 """Ordered ingest + peak/impulse accumulator (B16, B17) - no WSL.
 
-Builds fake time directories on disk to drive backend._OrderedIngest and
-backend._PeakImpulse through the paths the live WSL suites never hit: an
+Builds fake time directories on disk to drive runloop.OrderedIngest and
+runloop.PeakImpulse through the paths the live WSL suites never hit: an
 earlier dir that is torn while later ones are complete, the final sweep,
 an out-of-order write reaching the accumulator, and the stale-FO finalize
 policy.
@@ -18,8 +18,9 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+from blastlab.core import geometry                              # noqa: E402
 from blastlab.core.constants import P_AIR                       # noqa: E402
-from blastlab.solvers.foam import backend                       # noqa: E402
+from blastlab.solvers.foam import runloop                       # noqa: E402
 
 FAILS = []
 
@@ -66,7 +67,7 @@ def test_ordered_ingest():
     try:
         spec = types.SimpleNamespace(case_unc=root)
         hooks = Log()
-        order = backend._OrderedIngest(spec, FIELDS, hooks)
+        order = runloop.OrderedIngest(spec, FIELDS, hooks)
         make_dir(root, '0')
         make_dir(root, '0.001', complete=False)     # still being written
         make_dir(root, '0.002')
@@ -77,7 +78,7 @@ def test_ordered_ingest():
         # 0.001 is the head of the queue while 0.002 is complete -> one stall
         # per poll (the first pass above already counted one)
         check('first pass already counted the stall', order.stalls.get('0.001') == 1, str(order.stalls))
-        for _ in range(backend._STALL_POLLS - 2):
+        for _ in range(runloop.STALL_POLLS - 2):
             got = names(order, done)
             check_ok = got == []
             if not check_ok:
@@ -92,7 +93,7 @@ def test_ordered_ingest():
 
         # a torn read (exception in the body) follows the same policy
         hooks2 = Log()
-        order2 = backend._OrderedIngest(spec, FIELDS, hooks2)
+        order2 = runloop.OrderedIngest(spec, FIELDS, hooks2)
         make_dir(root, '0.001')                     # now complete on disk
         done2 = {'0': 0.0}
         seq = []
@@ -107,18 +108,18 @@ def test_ordered_ingest():
 
         # the head of the queue being incomplete with NOTHING complete behind it is normal
         hooks3 = Log()
-        order3 = backend._OrderedIngest(spec, FIELDS, hooks3)
+        order3 = runloop.OrderedIngest(spec, FIELDS, hooks3)
         shutil.rmtree(os.path.join(root, '0.002'))
         shutil.rmtree(os.path.join(root, '0.001'))
         make_dir(root, '0.001', complete=False)
-        for _ in range(3 * backend._STALL_POLLS):
+        for _ in range(3 * runloop.STALL_POLLS):
             names(order3, {'0': 0.0})
         check('in-progress newest write never counts as a stall', not order3.stalls and not hooks3.lines, str(order3.stalls))
 
         # final sweep: gaps are skipped at once so later complete dirs are kept
         make_dir(root, '0.002')
         hooks4 = Log()
-        order4 = backend._OrderedIngest(spec, FIELDS, hooks4)
+        order4 = runloop.OrderedIngest(spec, FIELDS, hooks4)
         got = names(order4, {'0': 0.0}, final=True)
         check('final sweep skips a gap immediately', got == ['0.002'], str(got))
         check('final-sweep skip logged', len(hooks4.lines) == 1, str(hooks4.lines))
@@ -134,15 +135,15 @@ def test_ordered_ingest():
 def test_accumulator():
     print("\nB17: peak/impulse accumulator + finalize policy")
     fo = {}                                          # dpath -> (peak, imp) or None
-    real = backend._read_fo_fields
-    backend._read_fo_fields = lambda dpath, spec: fo.get(dpath, (None, None))
+    real = runloop.read_fo_fields
+    runloop.read_fo_fields = lambda dpath, spec: fo.get(dpath, (None, None))
     try:
         hooks = Log()
         spec = object()
         p0 = np.full(4, P_AIR)
         p1 = p0 + 1000.0
         p2 = p0 + 500.0
-        acc = backend._PeakImpulse()
+        acc = runloop.PeakImpulse()
         check('first write accepted', acc.add(p0, 0.0, 'd0', spec, hooks))
         check('second write accepted', acc.add(p1, 1e-3, 'd1', spec, hooks))
         check('impulse = sum ovp*dt', np.allclose(acc.impulse, 1000.0 * 1e-3), str(acc.impulse))
@@ -167,7 +168,7 @@ def test_accumulator():
         check("final-dir FO -> 'foam-fo'", src == 'foam-fo' and pk is fo_pk, src)
 
         # stale FO (last read at t=1 ms) but the final dir's FO read fails -> python-fallback
-        acc2 = backend._PeakImpulse()
+        acc2 = runloop.PeakImpulse()
         fo.clear()
         fo['e1'] = (fo_pk, fo_im)
         acc2.add(p0, 0.0, 'e0', spec, hooks)
@@ -182,12 +183,17 @@ def test_accumulator():
         pk, imp, src = acc2.final(p1, 'e1', 1e-3, spec)
         check("FO covering t_fin -> 'foam-fo'", src == 'foam-fo' and pk is fo_pk, src)
         # final() folds the final frame into the Python peak even after a _final_read fallback
-        acc3 = backend._PeakImpulse()
+        acc3 = runloop.PeakImpulse()
         acc3.add(p0, 0.0, 'f0', spec, hooks)
         pk, imp, src = acc3.final(p1, 'f1', 1e-3, spec)
         check('final frame folded into the Python peak', np.allclose(pk, p1) and src == 'python-writes')
     finally:
-        backend._read_fo_fields = real
+        runloop.read_fo_fields = real
+
+
+def dists(case, spec):
+    return geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz,
+                                  [c for c, _m in spec.charges], case.bcs)
 
 
 def test_stop_dists():
@@ -197,10 +203,10 @@ def test_stop_dists():
                                           y_hi='wall', z_lo='wall', z_hi='open'))
     spec = types.SimpleNamespace(center=(0.7, 1.0, 1.0),
                                  charges=[((0.7, 1.0, 1.0), 4.0), ((1.4, 1.0, 0.5), 2.0)])
-    d = backend._stop_dists_3d(case, spec)
+    d = dists(case, spec)
     check('x_hi from the secondary charge (0.6), z_hi from the primary (1.0 < 1.5)', np.allclose(sorted(d), [0.6, 1.0]), str(d))
     case.bcs = {k: 'wall' for k in case.bcs}
-    d = backend._stop_dists_3d(case, spec)
+    d = dists(case, spec)
     check('closed box -> far corner from the primary', np.allclose(d, [np.sqrt(1.3**2 + 1 + 1)]), str(d))
 
 

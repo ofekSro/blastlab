@@ -5,7 +5,7 @@ for this).
 `load_run` replays the backend's ingest headlessly: the saved case.json
 rebuilds the CaseSpec through the same planner the run used, snapshot
 picks re-apply the native radius-crossing rule from each written
-frame's shock front, and the shared `_finalize_*` helpers assemble the
+frame's shock front, and the shared `finalize_*` helpers assemble the
 exact live-run Result shapes. Parallel leftovers (`processor*/`) get a
 final reconstruct sweep first.
 """
@@ -14,13 +14,12 @@ import os
 
 import numpy as np
 
+from ...core import geometry
 from ...core.case import load_case
 from ..hooks import RunHooks
 from . import env, reader, writer
-from .backend import (_ARRIVAL_P, _PeakImpulse, _d_charge_3d,
-                      _finalize_1d, _finalize_2d, _finalize_3d,
-                      _maybe_reconstruct, _stop_dists_3d,
-                      _read_2d, _read_3d)
+from .backend import finalize_1d, finalize_2d, finalize_3d, read_2d, read_3d
+from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
 def _paths(case_dir):
@@ -51,28 +50,16 @@ def _snap_radii(case, spec):
     x0, y0, z0 = spec.center
     if case.dim == 2:
         axisym = case.geometry == 'axisymmetric'
-        dists = []
-        if case.bcs['x_hi'] == 'open':
-            dists.append(case.Lx - x0)
-        if case.bcs['x_lo'] == 'open' and not axisym:
-            dists.append(x0)
-        if case.bcs['y_lo'] == 'open':
-            dists.append(y0)
-        if case.bcs['y_hi'] == 'open':
-            dists.append(case.Ly - y0)
-        if not dists:
-            corners = [(0.0, 0.0), (case.Lx, 0.0), (0.0, case.Ly),
-                       (case.Lx, case.Ly)]
-            dists.append(max(float(np.hypot(cx - x0, cy - y0))
-                             for cx, cy in corners))
+        dists = geometry.stop_dists_2d(case.Lx, case.Ly, x0, y0, case.bcs,
+                                       x_lo_counts=not axisym)
         n_snapshots = case.n_snapshots
     else:
-        dists = _stop_dists_3d(case, spec)
+        dists = geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz,
+                                       [c for c, _m in spec.charges],
+                                       case.bcs)
         n_snapshots = min(case.n_snapshots,
                           max(1, int(1.5e9 / (4 * spec.n_cells)) - 1))
-
-    return list(np.linspace(spec.r_exp, min(dists),
-                            n_snapshots + 1)[1:-1])
+    return geometry.snap_radii(spec.r_exp, dists, n_snapshots)
 
 
 def load_run(case_dir, hooks=None):
@@ -97,12 +84,12 @@ def load_run(case_dir, hooks=None):
     spec.files = None                   # nothing is written
 
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
-    if case.dim in (1, 2):              # _finalize_1d/2d re-read T
+    if case.dim in (1, 2):              # finalize_1d/2d re-read T
         fields += ('T',)
     if n_procs > 1:
         hooks.log(f'  [postmortem] reconstructing leftover parallel '
                   f'times ({n_procs} ranks)...')
-        _maybe_reconstruct(spec, fields, done=True)
+        maybe_reconstruct(spec, fields, done=True)
 
     times = [(t, name) for t, name in reader.list_times(unc)
              if reader.time_ready(os.path.join(unc, name), fields)]
@@ -151,33 +138,33 @@ def load_run(case_dir, hooks=None):
             store[name] = entry
         if not store:
             raise RuntimeError(f'no readable time directory in {unc}')
-        return _finalize_1d(case, spec, store, hooks, stop_reason, 0)
+        return finalize_1d(case, spec, store, hooks, stop_reason, 0)
 
     # 2D / 3D: replay the ingest - per-frame shock front drives the
     # native radius-crossing snapshot picks
     g = spec.grid
     x0, y0, z0 = spec.center
     if case.dim == 2:
-        d_charge = np.sqrt((g['x_c'][:, None] - x0) ** 2
-                           + (g['y_c'][None, :] - y0) ** 2)
+        d_charge = geometry.d_charge_2d(g['x_c'], g['y_c'], x0, y0)
     else:
-        d_charge = _d_charge_3d(spec)
+        d_charge = geometry.d_charge_3d(g['x_c'], g['y_c'], g['z_c'],
+                                        [c for c, _m in spec.charges])
     snap_radii = _snap_radii(case, spec)
     ingested, snap_names = {}, []
-    acc = _PeakImpulse()
+    acc = PeakImpulse()
     for _t, name in times:
         dpath = os.path.join(unc, name)
         try:
             t, _dt = reader.read_time(dpath)
-            p = (_read_2d(dpath, spec)['p'] if case.dim == 2
-                 else _read_3d(dpath, spec)['p'])
+            p = (read_2d(dpath, spec)['p'] if case.dim == 2
+                 else read_3d(dpath, spec)['p'])
         except (ValueError, OSError) as exc:
             _skip(name, exc)
             continue
         if not acc.add(p, t, dpath, spec, hooks):
             continue
         ingested[name] = t
-        shocked = p > _ARRIVAL_P
+        shocked = p > ARRIVAL_P
         r_front = float(d_charge[shocked].max()) if shocked.any() else 0.0
         while snap_radii and r_front >= snap_radii[0]:
             snap_radii.pop(0)
@@ -187,9 +174,9 @@ def load_run(case_dir, hooks=None):
     if not ingested:
         raise RuntimeError(f'no readable time directory in {unc}')
     if case.dim == 2:
-        return _finalize_2d(case, spec, hooks, stop_reason, 0,
+        return finalize_2d(case, spec, hooks, stop_reason, 0,
                             ingested, snap_names, [], [], 0, acc)
-    return _finalize_3d(case, spec, hooks, stop_reason, 0,
+    return finalize_3d(case, spec, hooks, stop_reason, 0,
                         ingested, snap_names, [], [], 0, acc)
 
 

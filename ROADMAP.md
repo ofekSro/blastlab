@@ -601,7 +601,15 @@ S. *Confidence:* code-read (verified still open).
 
 ## 3. Architecture & code health
 
-**A1 — The foam run loop is triplicated (~250 lines ×3).** `solve_1d/2d/3d_foam`
+**A1 — The foam run loop is triplicated (~250 lines ×3). DONE (2026-09-05).**
+`solvers/foam/runloop.py`: `FoamRunLoop` owns FoamRun start, stdout pumping ->
+`progress_line`, time-dir polling + readiness + strictly ordered ingest
+(`OrderedIngest`), stop-request -> writeNow -> grace -> kill, drain, adaptive
+writeInterval and the `finally` cleanup; each dim supplies `read_dir(name,
+dpath)` (torn reads raise -> retry) and `on_frame(name, dpath, payload)`.
+`solve_1d/2d/3d_foam` are preflight -> callbacks -> `FoamRunLoop.run()` ->
+`finalize_*`; backend.py went 1593 -> ~980 lines, every log string kept
+verbatim. *Original entry:* `solve_1d/2d/3d_foam`
 share poll/ingest/stop-grace/kill/drain/`finally` machinery with small deltas
 (`backend.py:360-482,593-766,1060-1283`) — B1/B2/B16-class fixes must land three
 times. *How:* extract a `_FoamRunLoop` helper owning polling, readiness,
@@ -609,13 +617,22 @@ stop-escalation and ingest ordering; keep per-dim ingest/finalize as callbacks.
 Do it *together with* the B1/B2 fixes so they land once. *Effort:* M.
 *Confidence:* code-read.
 
-**A2 — Geometry logic quadruplicated.** Open-edge mask + stop distances +
+**A2 — Geometry logic quadruplicated. DONE (2026-09-05).** `core/geometry.py`
+(`open_edge_mask`, `stop_dists_2d/3d`, `snap_radii`, `d_charge_2d/3d`) is used
+by backend 2D/3D, `postmortem._snap_radii`/`load_run` AND the native
+solver2d/solver3d - a pure drop-in there, `test_regression` byte-identical.
+*Original entry:* Open-edge mask + stop distances +
 snapshot radii exist in backend 2D, backend 3D, `postmortem._snap_radii`
 (`postmortem.py:49-82`) and the native solvers (`solver2d.py:219-250`); the
 postmortem copy must stay bug-for-bug identical by hand. *How:* one shared
 helper in `core/`. *Effort:* S–M. *Confidence:* code-read.
 
-**A3 — `postmortem.py` imports seven underscore-private names from `backend`**
+**A3 — `postmortem.py` imports seven underscore-private names from `backend`.
+DONE (2026-09-05).** postmortem now imports public names only:
+`finalize_1d/2d/3d`, `read_2d/3d` (backend), `ARRIVAL_P`, `PeakImpulse`,
+`maybe_reconstruct` (runloop) and `core.geometry`; the tests follow suit
+(`test_adaptive_interval`, `test_foam_live_due`, `test_foam_ingest_order`).
+*Original entry:*
 (`postmortem.py:21-23`). Promote them to a shared module (natural home for the
 A1 extraction) or drop the underscores. *Effort:* S. *Confidence:* code-read.
 
@@ -623,8 +640,8 @@ A1 extraction) or drop the underscores. *Effort:* S. *Confidence:* code-read.
 yet is exactly the block copy-pasted into all three solvers' `primitives()`
 (call it instead — bit-identical, regression-safe); `core/riemann.py:108
 mirror_state` dead; solver1d rebuilds its grid inline twice duplicating
-`make_grid_1d`; `_todo` unreachable in `backend.py:51`; unused `m = MATERIALS…`
-locals (`backend.py:365,598`); viz3d: `client.open_playback` has no callers and
+`make_grid_1d`; ~~`_todo` unreachable in `backend.py:51`; unused `m = MATERIALS…`
+locals (`backend.py:365,598`)~~ (foam part DONE with T9, 2026-09-05); viz3d: `client.open_playback` has no callers and
 duplicates `feed_result` line-for-line, `density_planes`/`have_rho`/`iso_locked`
 are dead CLI-era toggles (`viewer.py:216-231,668-672`), `FIELD_LABELS`
 duplicates viewer `FIELDS`. `legacy/blast2d/3d.py` carry ~100 lines of fossil

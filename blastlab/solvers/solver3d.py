@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 
+from ..core import geometry as core_geometry
 from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               E_AIR, CELLS_WARN, CELLS_REFUSE)
 from ..core.eos import (air_pressure, air_soundspeed,
@@ -312,26 +313,12 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
     if cap_is_end:
         safety_cap = t0 + t_end
 
-    open_edge = np.zeros((Nx, Ny, Nz), dtype=bool)
-    for side, sl in (('x_lo', np.s_[0, :, :]),  ('x_hi', np.s_[-1, :, :]),
-                     ('y_lo', np.s_[:, 0, :]),  ('y_hi', np.s_[:, -1, :]),
-                     ('z_lo', np.s_[:, :, 0]),  ('z_hi', np.s_[:, :, -1])):
-        if bcs[side] == 'open':
-            open_edge[sl] = True
-    open_edge &= fluid
+    open_edge = core_geometry.open_edge_mask((Nx, Ny, Nz), bcs, fluid=fluid)
     has_open = open_edge.any()
 
-    d_charge = np.sqrt((x_c[:, None, None] - x0)**2
-                       + (y_c[None, :, None] - y0)**2
-                       + (z_c[None, None, :] - z0)**2).astype(np.float32)
-    dists = [d for d, side in ((x0, 'x_lo'), (Lx - x0, 'x_hi'),
-                               (y0, 'y_lo'), (Ly - y0, 'y_hi'),
-                               (z0, 'z_lo'), (Lz - z0, 'z_hi'))
-             if bcs[side] == 'open']
-    if not dists:   # closed box: cover the whole domain
-        dists = [max(np.hypot(np.hypot(cx - x0, cy - y0), cz - z0)
-                     for cx in (0, Lx) for cy in (0, Ly) for cz in (0, Lz))]
-    snap_radii = list(np.linspace(r_shock, min(dists), n_snapshots + 1)[1:-1])
+    d_charge = core_geometry.d_charge_3d(x_c, y_c, z_c, [(x0, y0, z0)])
+    dists = core_geometry.stop_dists_3d(Lx, Ly, Lz, [(x0, y0, z0)], bcs)
+    snap_radii = core_geometry.snap_radii(r_shock, dists, n_snapshots)
 
     # ── Gauge setup ────────────────────────────────────────────────────────
     gauges = gauges or []

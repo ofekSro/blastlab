@@ -5,7 +5,7 @@ import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
-from blastlab.solvers.foam.backend import _next_interval       # noqa: E402
+from blastlab.solvers.foam.runloop import next_interval as _next_interval       # noqa: E402
 from blastlab.solvers.foam.writer import (N_WRITES_MIN,        # noqa: E402
                                           N_WRITES_MAX)
 

@@ -260,7 +260,7 @@ def plan_case(case):
     spec.gauge_ids = gauges
     spec.probe_pts = [tuple(g) for g in gauges]
     # per open side: distance from the NEAREST charge (B21), mirroring
-    # backend._stop_dists_3d so timing is sized for the front that
+    # core.geometry.stop_dists_3d so timing is sized for the front that
     # reaches the boundary first
     side_d = {s: min(d(c) for c, _m in charges) for s, d in (
         ('x_lo', lambda c: c[0]), ('x_hi', lambda c: Ls[0] - c[0]),

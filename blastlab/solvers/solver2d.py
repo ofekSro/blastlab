@@ -5,6 +5,7 @@ import time
 
 import numpy as np
 
+from ..core import geometry as core_geometry
 from ..core.constants import GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT, E_AIR
 from ..core.eos import (air_pressure, air_soundspeed,
                         jwl_pressure, jwl_soundspeed)
@@ -227,16 +228,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
 
     # Fluid cells adjacent to OPEN boundaries only (a wall reflection must
     # not end the run).
-    open_edge = np.zeros((Nx, Ny), dtype=bool)
-    if bcs['x_lo'] == 'open':
-        open_edge[0, :] = True
-    if bcs['x_hi'] == 'open':
-        open_edge[-1, :] = True
-    if bcs['y_lo'] == 'open':
-        open_edge[:, 0] = True
-    if bcs['y_hi'] == 'open':
-        open_edge[:, -1] = True
-    open_edge &= fluid
+    open_edge = core_geometry.open_edge_mask((Nx, Ny), bcs, fluid=fluid)
     has_open = open_edge.any()
 
     # Snapshots are triggered by shock-front POSITION, not time: a strong
@@ -244,21 +236,11 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     # would leave time-scheduled snapshots untaken. Intermediate snapshots
     # fire when the front crosses evenly spaced radii between the charge and
     # the stop distance; the final state is always recorded as well.
-    d_charge = np.sqrt((x_c[:, None] - x0)**2 + (y_c[None, :] - y0)**2)
-    dists = []
-    if bcs['x_hi'] == 'open':
-        dists.append(Lx - x0)
-    if bcs['x_lo'] == 'open' and geometry == 'planar':
-        dists.append(x0)
-    if bcs['y_lo'] == 'open':
-        dists.append(y0)
-    if bcs['y_hi'] == 'open':
-        dists.append(Ly - y0)
-    if not dists:   # closed box: cover the whole domain
-        corners = [(0.0, 0.0), (Lx, 0.0), (0.0, Ly), (Lx, Ly)]
-        dists.append(max(np.hypot(cx - x0, cy - y0) for cx, cy in corners))
+    d_charge = core_geometry.d_charge_2d(x_c, y_c, x0, y0)
+    dists = core_geometry.stop_dists_2d(Lx, Ly, x0, y0, bcs,
+                               x_lo_counts=(geometry == 'planar'))
     r_start = r_exp if profile is None else r_shock
-    snap_radii = list(np.linspace(r_start, min(dists), n_snapshots + 1)[1:-1])
+    snap_radii = core_geometry.snap_radii(r_start, dists, n_snapshots)
 
     # ── Gauge setup ────────────────────────────────────────────────────────
     gauges = gauges or []
