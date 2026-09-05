@@ -23,8 +23,8 @@ from .vtk_host import VtkTkHost
 #: above this many fine display cells the 2D preview draws only the
 #: base grid (the fine lines would be sub-pixel anyway)
 MESH_PREVIEW_MAX = 250_000
-#: cap on cell-edge segments drawn on a 3D preview plane
-MESH_SEGMENTS_MAX = 300_000
+#: full-span grid lines per direction (refinement boundaries always show)
+MESH_MAX_LINES = 60
 
 
 def _plan(case):
@@ -36,21 +36,19 @@ def _plan(case):
         return None
 
 
-def _mesh_plane_3d(case, plan):
-    """Predicted cell edges on the live-slice plane of a Case3D:
-    dict(axis, pos, segments) for viewer.mesh_edges_polydata."""
+def _mesh_3d(case, plan):
+    """Whole-domain mesh data for viewer.mesh_polydata: the predicted
+    grid (the viewer adds the six boundary faces) plus the live-slice
+    plane of a Case3D."""
     axis = 'xyz'.index(getattr(case, 'slice_axis', 'y') or 'y')
     c = plan.fine[('x_c', 'y_c', 'z_c')[axis]]
     pos = getattr(case, 'slice_pos', None)
     pos = float(case.center[axis]) if pos is None else float(pos)
     k = int(min(range(len(c)), key=lambda i: abs(float(c[i]) - pos)))
-    src = refine.slice_src(plan.levels, plan.lmax, axis, k, plan.solid_fine)
-    uv = [a for a in range(3) if a != axis]
-    faces = [plan.fine[('x_face', 'y_face', 'z_face')[a]] for a in uv]
-    segs = refine.mesh_segments_2d(src, faces[0], faces[1])
-    if len(segs) > MESH_SEGMENTS_MAX:
-        segs = None
-    return dict(axis=axis, pos=float(c[k]), segments=segs)
+    return dict(axes=(plan.fine['x_c'], plan.fine['y_c'], plan.fine['z_c']),
+                dx=float(plan.fine['dx']),
+                refine=plan.meta() if plan.refined else None,
+                planes=[(axis, k, float(c[k]))])
 
 
 def case_geometry(case, show_mesh=False):
@@ -58,7 +56,7 @@ def case_geometry(case, show_mesh=False):
     The charge ball radius matches what the solver will actually use
     (including the 'smear' source-ball enlargement). Refinement zones
     ride along as `zones` (snapped boxes + level) and, with `show_mesh`,
-    the predicted cell edges on the live-slice plane as `mesh_plane`."""
+    the predicted mesh as `mesh` (whole domain + live-slice plane)."""
     r_draw = 0.0
     if case.init_mode == 'charge' and case.charge and case.charge > 0:
         r_draw = _charge_radius(case)
@@ -76,7 +74,7 @@ def case_geometry(case, show_mesh=False):
     if plan is not None:
         geo['zones'] = [tuple(z) for z in plan.zones]
         if show_mesh:
-            geo['mesh_plane'] = _mesh_plane_3d(case, plan)
+            geo['mesh'] = _mesh_3d(case, plan)
     return geo
 
 
@@ -206,13 +204,15 @@ class Preview2DPanel(ctk.CTkFrame):
         Returns a title suffix."""
         if plan.n_fine > MESH_PREVIEW_MAX:
             segs = refine.mesh_segments_2d(None, plan.base['x_face'],
-                                           plan.base['y_face'])
+                                           plan.base['y_face'],
+                                           max_lines=MESH_MAX_LINES)
             note = ' | base grid only (mesh too fine to draw)'
         else:
             src = refine.slice_src(plan.levels, plan.lmax,
                                    solid_fine=plan.solid_fine)
             segs = refine.mesh_segments_2d(src, plan.fine['x_face'],
-                                           plan.fine['y_face'])
+                                           plan.fine['y_face'],
+                                           max_lines=MESH_MAX_LINES)
             note = (f' | mesh: {plan.n_pred:,} cells'
                     if plan.refined else f' | mesh: {plan.n_fine:,} cells')
         ax.add_collection(LineCollection(segs, colors=theme.cur('muted'),

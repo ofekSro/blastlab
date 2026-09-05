@@ -959,8 +959,17 @@ carved cells ambient, coarse corner one 8^3 block, gauge within 10 %).
 The e2e runs exposed and fixed B25 (controlDict edits within
 `fileModificationSkew` ignored) and a T10 side effect (the writer's `0/`
 dir reported as a skipped stall).
-*T19 DONE (2026-09-05)* — `viz3d/viewer._MeshEdges` layer: per visible
-axis-aligned cut plane the cell edges from the FULL-resolution `init` axes
+*T19 DONE (2026-09-05; overlay reworked the same day after the owner
+reported "a white surface")* — `viz3d/viewer._MeshEdges` layer: one merged
+actor covering the WHOLE domain (the grid on the six boundary faces plus one
+grid per visible cut plane), muted colour at 0.45 opacity, and
+`core.refine.mesh_segments_2d(max_lines=...)` thinning full-span grid lines
+per direction while always keeping refinement-block boundaries - a 200-cell
+axis drew 201 white lines per direction that merged into a solid sheet on one
+plane, with nothing elsewhere. `mesh_polydata()` builds it and the setup
+preview uses the same helper (geo key `mesh`). The 2D overlays (field plots,
+live run, preview) thin the same way. Per visible cut plane the cell edges
+come from the FULL-resolution `init` axes
 (true cells of a refined run via `init['refine']`, every face otherwise),
 drawn at the plane's own position, rebuilt only when a plane moves/toggles
 (cached across frames), cylinder-filtered for revolved scenes, capped at

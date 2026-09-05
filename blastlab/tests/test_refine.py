@@ -232,7 +232,8 @@ def test_case_roundtrip_and_validation():
           back.refine_zones == c.refine_zones
           and all(isinstance(z[-1], int) for z in back.refine_zones)
           and back.charge_refine == 'zone', str(back.refine_zones))
-    check('schema version is 3', d['version'] == 3)
+    check('schema version is current (4: afterburn)', d['version'] == 4,
+          str(d['version']))
     n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.5, charge=100.0,
                center=(1.0, 1.0), solver='native')
     n.refine_zones = [(0.5, 1.5, 0.5, 1.5, 1)]

@@ -117,7 +117,10 @@ Results are resampled onto the **finest uniform grid** (dx / 2^lmax), so
 every plot, export, animation and 3D view works unchanged; coarse cells
 appear as constant blocks. The **Show mesh** checkbox (setup preview, live
 run plot, Results field/replay plots, 3D viewer Display tab) draws the true
-cell edges. Validation reports the predicted mesh cell count and the size
+cell edges. In 3D the overlay covers the WHOLE domain - the grid on the six
+boundary faces plus one grid per visible cut plane - and full-span grid lines
+are thinned (refinement boundaries are always kept) so a fine mesh reads as a
+grid instead of a solid white sheet. Validation reports the predicted mesh cell count and the size
 of the display grid (which is what costs memory - keep lmax at 3-4).
 
 Limits: axisymmetric zones touching the symmetry axis are level 1 only (the

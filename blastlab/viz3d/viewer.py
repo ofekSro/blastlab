@@ -90,6 +90,50 @@ def mesh_edges_polydata(segments, axis, pos):
     return poly
 
 
+#: cell-edge overlay style: muted and translucent, so a fine grid reads
+#: as a mesh instead of a white sheet
+MESH_COLOR = '#8b95a3'
+MESH_OPACITY = 0.45
+#: full-span grid lines drawn per direction on one face (see
+#: core.refine.mesh_segments_2d) - refinement boundaries are always kept
+MESH_MAX_LINES = 40
+
+
+def mesh_polydata(axes_c, dx, refine_rec=None, planes=(), boundary=True,
+                  max_lines=MESH_MAX_LINES):
+    """Cell edges over the WHOLE domain: the grid on each of the six
+    boundary faces plus one grid per requested cut plane, merged into a
+    single PolyData.
+
+    `axes_c`: full-resolution (x_c, y_c, z_c); `dx`: their spacing;
+    `refine_rec`: a Result/scene `refine` record (levels/lmax) for the
+    true cells of a locally refined run, or None for a uniform mesh;
+    `planes`: [(axis, fine index, position)]."""
+    import pyvista as pv
+    from ..core import refine
+    axes = [np.asarray(a, dtype=float) for a in axes_c]
+    faces = [np.concatenate(([a[0] - dx / 2], a + dx / 2)) for a in axes]
+    want = list(planes)
+    if boundary:
+        for ax in range(3):
+            for k in (0, len(axes[ax]) - 1):
+                want.append((ax, k, float(faces[ax][k + (k > 0)])))
+    parts = []
+    for ax, k, pos in want:
+        src = None
+        if refine_rec is not None:
+            src = refine.slice_src(refine_rec['levels'], refine_rec['lmax'],
+                                   ax, int(k))
+        uv = [a for a in range(3) if a != ax]
+        segs = refine.mesh_segments_2d(src, faces[uv[0]], faces[uv[1]],
+                                       max_lines=max_lines)
+        if len(segs):
+            parts.append(mesh_edges_polydata(segs, ax, float(pos)))
+    if not parts:
+        return None
+    return parts[0].merge(parts[1:]) if len(parts) > 1 else parts[0]
+
+
 def add_static_scenery(pl, geo):
     """Domain outline, obstacles, charge ball, ground tint and gauge
     markers. `geo`: Lx/Ly/Lz, obstacles, charge_center, r_draw, bcs and
@@ -154,12 +198,13 @@ def add_static_scenery(pl, geo):
         pl.add_mesh(pv.Box(bounds=tuple(float(v) for v in z[:6]))
                     .extract_all_edges(), color=col, line_width=1.5,
                     opacity=0.9, name=f'zone{k}')
-    mp = geo.get('mesh_plane')
-    if mp and mp.get('segments') is not None and len(mp['segments']):
-        pl.add_mesh(mesh_edges_polydata(mp['segments'], mp['axis'],
-                                        mp['pos']),
-                    color='#d0d4da', line_width=1, opacity=0.7,
-                    name='mesh_preview')
+    mesh = geo.get('mesh')
+    if mesh:
+        poly = mesh_polydata(mesh['axes'], mesh['dx'],
+                             mesh.get('refine'), mesh.get('planes', ()))
+        if poly is not None:
+            pl.add_mesh(poly, color=MESH_COLOR, line_width=1,
+                        opacity=MESH_OPACITY, name='mesh_preview')
     cx, cy, cz = geo['charge_center']
     pl.add_mesh(pv.Sphere(radius=geo['r_draw'], center=(cx, cy, cz)),
                 color='#ff8f00', opacity=0.85, name='charge')
@@ -697,55 +742,59 @@ class _CutPlane(_Layer):
 
 
 class _MeshEdges(_Layer):
-    """Cell edges of the computational mesh on every visible axis-aligned
-    cut plane: the TRUE cells of a locally refined run (coarse cells as
-    merged blocks, from `init['refine']`) or every face of a uniform run.
-    Built from the FULL-resolution axes in `init` - not the
-    stride-decimated display grid - through core.refine, and rebuilt only
-    when a plane moves or toggles (frames refresh every layer, so the
-    per-plane geometry is cached). Off by default."""
+    """Cell edges of the computational mesh over the WHOLE domain: the
+    grid on the six boundary faces plus one grid per visible axis-
+    aligned cut plane. The true cells of a locally refined run (coarse
+    cells as merged blocks, from `init['refine']`), every face
+    otherwise, thinned by core.refine so a fine grid does not merge into
+    a solid sheet. Built from the FULL-resolution axes in `init` - not
+    the stride-decimated display grid - and rebuilt only when a plane
+    moves or toggles (frames refresh every layer, so the geometry is
+    cached). Off by default."""
 
-    MAX_SEGMENTS = 300_000
+    NAME = 'mesh_edges'
 
     def __init__(self, scene, on):
         self.s = scene
-        self._built = {}            # actor name -> (axis, k) it was built for
+        self._built = None          # the plane set the actor was built for
         self.set_visible(on)
 
-    def _remove(self, name):
+    def _remove(self):
         try:
-            self.s.pl.remove_actor(name)
+            self.s.pl.remove_actor(self.NAME)
         except Exception:
             pass
-        self._built.pop(name, None)
+        self._built = None
 
     def refresh(self):
         s = self.s
-        want = {}
-        if self.visible:
-            for key, layer in s.layers.items():
-                if key.startswith('plane') and layer.visible:
-                    geom = self._plane_geom(layer)
-                    if geom is not None:
-                        want[f'mesh_{key}'] = geom
-        for name in list(self._built):
-            if name not in want or self._built[name] != want[name]:
-                self._remove(name)
-        for name, geom in want.items():
-            if name in self._built:
-                continue
-            poly = self._edges(*geom)
-            if poly is None:
-                continue
-            s.pl.add_mesh(poly, color='#d0d4da', line_width=1,
-                          opacity=0.7, name=name, reset_camera=False,
-                          render=False)
-            self._built[name] = geom
+        if not self.visible:
+            self._remove()
+            return
+        planes = []
+        for key in sorted(s.layers):
+            layer = s.layers[key]
+            if key.startswith('plane') and layer.visible:
+                geom = self._plane_geom(layer)
+                if geom is not None:
+                    planes.append(geom)
+        if self._built == planes:
+            return
+        self._remove()
+        init = s.init
+        poly = mesh_polydata((init['x_c'], init['y_c'], init['z_c']),
+                             float(init['dx']), init.get('refine'), planes)
+        if poly is None:
+            return
+        s.pl.add_mesh(poly, color=MESH_COLOR, line_width=1,
+                      opacity=MESH_OPACITY, name=self.NAME,
+                      reset_camera=False, render=False)
+        self._built = planes
 
     def _plane_geom(self, layer):
         """(axis, fine layer index, position) of an axis-aligned plane,
-        else None. The layer index selects the refinement structure; the
-        edges are drawn at the plane's own position."""
+        else None. The index selects the refinement structure; the edges
+        are drawn at the plane's own position."""
         n = np.asarray(layer.normal, dtype=float)
         ax = int(np.argmax(np.abs(n)))
         if abs(n[ax]) < 0.99 * np.linalg.norm(n):
@@ -756,50 +805,8 @@ class _MeshEdges(_Layer):
         pos = float(layer.origin[ax])
         k = int(np.clip(np.floor((pos - (c[0] - dxf / 2)) / dxf), 0,
                         len(c) - 1))
-        return ax, k, round(pos, 9)
-
-    def _edges(self, ax, k, pos):
-        init = self.s.init
-        dxf = float(init['dx'])
-        axes_c = (init['x_c'], init['y_c'], init['z_c'])
-        uv = [a for a in range(3) if a != ax]
-        faces = [np.concatenate(([axes_c[a][0] - dxf / 2],
-                                 np.asarray(axes_c[a]) + dxf / 2))
-                 for a in uv]
-        ref = init.get('refine')
-        src = None
-        if ref is not None:
-            src = refine.slice_src(ref['levels'], ref['lmax'], ax, k)
-        if src is None and len(faces[0]) + len(faces[1]) > self.MAX_SEGMENTS:
-            return None
-        segs = refine.mesh_segments_2d(src, faces[0], faces[1])
-        if len(segs) > self.MAX_SEGMENTS:      # too fine to draw: base grid
-            step = 2 ** int(ref['lmax']) if ref is not None else 1
-            segs = refine.mesh_segments_2d(None, faces[0][::step],
-                                           faces[1][::step])
-        segs = self._cyl_filter(segs, ax)
-        if not len(segs):
-            return None
         # a hair off the cut surface so the lines are not z-fought away
-        return mesh_edges_polydata(segs, ax, pos + 1e-3 * dxf)
-
-    def _cyl_filter(self, segs, ax):
-        """Revolved axisymmetric scenes: drop segments lying entirely
-        outside the cylinder (the plane spans the bounding box)."""
-        cyl = self.s.init.get('cyl')
-        if not cyl or not len(segs):
-            return segs
-        cx, cy, R = float(cyl['cx']), float(cyl['cy']), float(cyl['R'])
-        uv = [a for a in range(3) if a != ax]
-        pts = segs.reshape(-1, 2)              # (2N, 2) in-plane coords
-        if ax == 2:                            # horizontal plane: radial test
-            d = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
-        else:                                  # vertical plane: horizontal axis
-            h = pts[:, 0] if uv[0] in (0, 1) else pts[:, 1]
-            c0 = cx if uv[0] == 0 else cy
-            d = np.abs(h - c0)
-        inside = (d <= R * (1 + 1e-9)).reshape(-1, 2).any(axis=1)
-        return segs[inside]
+        return ax, k, round(pos + 1e-3 * dxf, 9)
 
 
 class _Isosurface(_Layer):

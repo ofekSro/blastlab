@@ -164,12 +164,18 @@ def main():
     geo = case_geometry(c3, show_mesh=True)
     check('zones exported for the 3D scene', len(geo.get('zones', [])) == 2
           and all(len(z) == 7 for z in geo['zones']), str(geo.get('zones')))
-    mp = geo.get('mesh_plane')
-    check('mesh_plane on the live-slice axis with segments',
-          mp is not None and mp['axis'] == 1 and mp['segments'] is not None
-          and len(mp['segments']) > 0, str(mp and (mp['axis'], mp['pos'])))
-    check('no mesh_plane without show_mesh',
-          'mesh_plane' not in case_geometry(c3, show_mesh=False))
+    mp = geo.get('mesh')
+    check('mesh data carries the domain axes + the live-slice plane',
+          mp is not None and len(mp['axes']) == 3 and mp['dx'] > 0
+          and mp['planes'] and mp['planes'][0][0] == 1,
+          str(mp and (mp['dx'], mp['planes'])))
+    from blastlab.viz3d.viewer import mesh_polydata
+    poly = mesh_polydata(mp['axes'], mp['dx'], mp.get('refine'), mp['planes'])
+    check('mesh polydata spans the whole domain',
+          poly is not None and poly.points[:, 0].max() > 1.9,
+          str(None if poly is None else poly.points[:, 0].max()))
+    check('no mesh without show_mesh',
+          'mesh' not in case_geometry(c3, show_mesh=False))
 
     print("\nSetupPanel checkbox")
     sp = SetupPanel(root)

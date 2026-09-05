@@ -388,29 +388,52 @@ def _runs(mask):
     return list(zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1)))
 
 
-def mesh_segments_2d(src2d, u_face, v_face):
+def _thin(mask, max_lines):
+    """Drop FULL-span interior grid lines until at most `max_lines`
+    remain. A line that does not span the whole plane marks a
+    refinement-block boundary - the structure - and is always kept, as
+    are the two domain edges. Without this a 200-cell axis draws 201
+    lines that merge into a solid sheet on screen."""
+    if not max_lines:
+        return mask
+    full = mask.all(axis=1)
+    idx = np.flatnonzero(full)
+    if len(idx) <= max_lines:
+        return mask
+    step = int(math.ceil(len(idx) / max_lines))
+    keep = set(idx[::step].tolist()) | {0, len(mask) - 1}
+    out = mask.copy()
+    for i in idx:
+        if int(i) not in keep:
+            out[i] = False
+    return out
+
+
+def mesh_segments_2d(src2d, u_face, v_face, max_lines=None):
     """Cell-edge segments (N, 2, 2) of a plane: every face between two
     fine cells with different source ids, plus the domain boundary;
     `src2d=None` means a uniform mesh (every fine face). Consecutive
-    faces on one line are merged into one segment."""
+    faces on one line are merged into one segment. `max_lines` thins
+    full-span lines per direction so a fine grid stays readable (see
+    _thin) - refinement boundaries survive it."""
     u_face = np.asarray(u_face, dtype=float)
     v_face = np.asarray(v_face, dtype=float)
     nu, nv = len(u_face) - 1, len(v_face) - 1
-    segs = []
     if src2d is None:
-        for u in u_face:
-            segs.append(((u, v_face[0]), (u, v_face[-1])))
-        for v in v_face:
-            segs.append(((u_face[0], v), (u_face[-1], v)))
-        return np.array(segs, dtype=float).reshape(-1, 2, 2)
-    src = np.asarray(src2d)
-    vert = np.ones((nu + 1, nv), dtype=bool)        # faces at u_face[i]
-    vert[1:-1] = src[1:] != src[:-1]
+        vert = np.ones((nu + 1, nv), dtype=bool)
+        horiz = np.ones((nu, nv + 1), dtype=bool)
+    else:
+        src = np.asarray(src2d)
+        vert = np.ones((nu + 1, nv), dtype=bool)    # faces at u_face[i]
+        vert[1:-1] = src[1:] != src[:-1]
+        horiz = np.ones((nu, nv + 1), dtype=bool)   # faces at v_face[j]
+        horiz[:, 1:-1] = src[:, 1:] != src[:, :-1]
+    vert = _thin(vert, max_lines)
+    horiz = _thin(horiz.T, max_lines).T
+    segs = []
     for i in range(nu + 1):
         for j0, j1 in _runs(vert[i]):
             segs.append(((u_face[i], v_face[j0]), (u_face[i], v_face[j1])))
-    horiz = np.ones((nu, nv + 1), dtype=bool)       # faces at v_face[j]
-    horiz[:, 1:-1] = src[:, 1:] != src[:, :-1]
     for j in range(nv + 1):
         for i0, i1 in _runs(horiz[:, j]):
             segs.append(((u_face[i0], v_face[j]), (u_face[i1], v_face[j])))

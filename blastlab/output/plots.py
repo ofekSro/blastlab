@@ -61,6 +61,11 @@ def add_mesh_lines(ax, segments, color='0.6'):
     return lc
 
 
+#: full-span grid lines per direction on a field plot (refinement
+#: boundaries are always kept - see core.refine.mesh_segments_2d)
+MESH_MAX_LINES = 60
+
+
 def mesh_for(meta, xf, yf, sl=None):
     """Cell-edge segments for a field plot with faces xf/yf: the TRUE
     cells of a refined blastFoam run (meta['refine'], coarse cells drawn
@@ -70,7 +75,8 @@ def mesh_for(meta, xf, yf, sl=None):
     from ..core import refine
     ref = meta.get('refine') if isinstance(meta, dict) else None
     if ref is None:
-        return refine.mesh_segments_2d(None, xf, yf)
+        return refine.mesh_segments_2d(None, xf, yf,
+                                       max_lines=MESH_MAX_LINES)
     levels, lmax = ref['levels'], ref['lmax']
     if sl is None:
         src = refine.slice_src(levels, lmax)
@@ -80,8 +86,9 @@ def mesh_for(meta, xf, yf, sl=None):
     if src.size > 400_000:
         step = 2 ** lmax
         return refine.mesh_segments_2d(None, np.asarray(xf)[::step],
-                                       np.asarray(yf)[::step])
-    return refine.mesh_segments_2d(src, xf, yf)
+                                       np.asarray(yf)[::step],
+                                       max_lines=MESH_MAX_LINES)
+    return refine.mesh_segments_2d(src, xf, yf, max_lines=MESH_MAX_LINES)
 
 
 def set_frame(mesh, p, solid, clim=None):

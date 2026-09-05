@@ -286,8 +286,11 @@ class RunPanel(ctk.CTkFrame):
             self._mesh_lines = None
         if self.show_mesh_var.get():
             xf, yf, src = self._mesh_geom
+            from ..output.plots import MESH_MAX_LINES
             self._mesh_lines = add_mesh_lines(
-                self._mesh.axes, refine.mesh_segments_2d(src, xf, yf),
+                self._mesh.axes,
+                refine.mesh_segments_2d(src, xf, yf,
+                                        max_lines=MESH_MAX_LINES),
                 color=theme.cur('muted'))
         if draw:
             self.canvas.draw()

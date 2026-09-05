@@ -106,9 +106,9 @@ check("plane1 repositioned", abs(o[0] - 1.0) < 1e-9 and n == (1.0, 0.0, 0.0),
       f"origin={o} normal={n}")
 
 panel._vars['mesh'].set(True); panel._toggle_layer('mesh')
-check("show mesh on (plane1 edges)", 'mesh_plane1' in pl.actors)
+check("show mesh on (whole-domain edges)", 'mesh_edges' in pl.actors)
 panel._vars['mesh'].set(False); panel._toggle_layer('mesh')
-check("show mesh off", 'mesh_plane1' not in pl.actors)
+check("show mesh off", 'mesh_edges' not in pl.actors)
 
 print("\nP4b: VIPER-style controls (fields / scale / planes / views)")
 check("6 cross-section planes",

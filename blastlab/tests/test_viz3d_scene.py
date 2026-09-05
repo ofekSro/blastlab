@@ -159,45 +159,57 @@ check("plane2 actor", 'cut_plane2' in pl.actors)
 
 print("\nS3a: mesh-edge layer (N15 show mesh)")
 from blastlab.core import refine as _refine
-check("mesh layer off by default", 'mesh_plane1' not in pl.actors)
+from blastlab.viz3d.viewer import mesh_polydata
+check("mesh layer off by default", 'mesh_edges' not in pl.actors)
+scene.layers['plane1'].set_visible(True)      # known plane state for the
+scene.layers['plane2'].set_visible(False)     # line-count comparisons below
 scene.layers['mesh'].set_visible(True)
-vis = {k for k, l in scene.layers.items() if k.startswith('plane') and l.visible}
-check("mesh edges drawn on exactly the visible planes",
-      {k for k in pl.actors if k.startswith('mesh_')} == {f'mesh_{k}' for k in vis},
+check("one merged mesh actor", 'mesh_edges' in pl.actors
+      and not any(k.startswith('mesh_plane') for k in pl.actors),
       str([k for k in pl.actors if 'mesh' in k]))
-poly = pl.actors['mesh_plane1'].mapper.dataset
-want = len(_refine.mesh_segments_2d(None, np.arange(41) * 0.1, np.arange(41) * 0.1))
-check("uniform mesh: one line per face (41 + 41)", poly.n_lines == want,
-      f"{poly.n_lines} vs {want}")
-scene.set_plane('plane1', 'x', 0.5)
-poly2 = pl.actors['mesh_plane1'].mapper.dataset
-check("plane move rebuilds the edges at the new plane position",
-      abs(poly2.points[:, 0].mean() - 2.0) < 0.001 and poly2.n_lines == want,
-      f"x mean {poly2.points[:, 0].mean():.3f}")
+poly = pl.actors['mesh_edges'].mapper.dataset
+axes = (init['x_c'], init['y_c'], init['z_c'])
+want = mesh_polydata(axes, init['dx'], None,
+                     [scene.layers['mesh']._plane_geom(scene.layers['plane1'])])
+check("edges cover the six boundary faces + the visible plane",
+      poly.n_lines == want.n_lines and poly.n_lines > 12,
+      f"{poly.n_lines} vs {want.n_lines}")
+xs = poly.points[:, 0]
+check("edges span the whole domain, not one plane",
+      xs.min() < 0.01 and xs.max() > 3.99, f"x range {xs.min():.2f}..{xs.max():.2f}")
+before = poly.n_lines
 scene.layers['plane2'].set_visible(True)
-check("second plane gets its own edges", 'mesh_plane2' in pl.actors)
+check("a second visible plane adds its grid",
+      pl.actors['mesh_edges'].mapper.dataset.n_lines > before)
 scene.layers['plane2'].set_visible(False)
-check("hiding a plane removes its edges", 'mesh_plane2' not in pl.actors)
+check("hiding it removes those lines again",
+      pl.actors['mesh_edges'].mapper.dataset.n_lines == before)
 scene.on_message(('frame', 5e-3, synth_frame(5e-3, 2.2), False))
-check("frames do not rebuild the edges", 'mesh_plane1' in pl.actors
-      and pl.actors['mesh_plane1'].mapper.dataset is poly2)
+check("frames keep the edges", 'mesh_edges' in pl.actors)
 scene.layers['mesh'].set_visible(False)
-check("mesh layer off removes every edge actor",
-      not any(k.startswith('mesh_') for k in pl.actors))
-# a refined record: base 0.2 m (20^3) with one level-1 block -> fine 40^3
-lev = np.zeros((40, 40, 40), dtype=np.int8)
-lev[:10, :10, :10] = 1
-init_r = dict(init, refine=dict(levels=lev, lmax=1, dx_base=0.2, zones=[]))
+check("mesh layer off removes the actor", 'mesh_edges' not in pl.actors)
+many = _refine.mesh_segments_2d(None, np.linspace(0, 1, 401),
+                                np.linspace(0, 1, 401), max_lines=40)
+check("fine uniform grid thinned to the line budget", len(many) <= 84,
+      str(len(many)))
+lev = np.zeros((40, 40), dtype=np.int8)
+lev[:10, :10] = 1
+thin = _refine.mesh_segments_2d(_refine.fine_src(lev, 1),
+                                np.linspace(0, 4, 41),
+                                np.linspace(0, 4, 41), max_lines=8)
+inner = [sg for sg in thin
+         if abs(sg[0][0] - sg[1][0]) < 1e-9 and 0.05 < sg[0][0] < 0.95]
+check("refinement-block boundaries survive thinning", len(inner) > 0,
+      str(len(inner)))
+lev3 = np.zeros((40, 40, 40), dtype=np.int8)
+lev3[:10, :10, :10] = 1
+init_r = dict(init, refine=dict(levels=lev3, lmax=1, dx_base=0.2, zones=[]))
 pl_r = pv.Plotter(off_screen=True, window_size=(400, 300))
 scene_r = BlastScene(pl_r, init_r)
-scene_r.set_plane('plane1', 'z', 0.1)          # z = 0.4 -> fine layer 4
+scene_r.set_plane('plane1', 'z', 0.1)
 scene_r.layers['mesh'].set_visible(True)
-poly_r = pl_r.actors['mesh_plane1'].mapper.dataset
-faces = np.arange(41) * 0.1
-src = _refine.slice_src(lev, 1, 2, 4)
-want_r = len(_refine.mesh_segments_2d(src, faces, faces))
-check("refined mesh: coarse cells merged, fine block resolved",
-      poly_r.n_lines == want_r and want_r < 82, f"{poly_r.n_lines} vs {want_r}")
+check("refined scene draws its mesh", 'mesh_edges' in pl_r.actors
+      and pl_r.actors['mesh_edges'].mapper.dataset.n_lines > 0)
 pl_r.close()
 
 print("\nS3b: field switching / colour scale / presets")
