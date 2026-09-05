@@ -47,6 +47,8 @@ python test_foam_live_due.py      # live-frame cadence gate (no WSL)   [was miss
 python test_gui_drain.py          # GUI queue-drain resilience (no WSL)
 python test_gui_results_fields.py # peak/impulse fields in Results (headless Tk, no WSL)
 python test_refine.py             # predicted refined-mesh structure (no GUI, no WSL)
+python test_gauge_summary.py      # per-gauge peak/arrival/positive-phase impulse (no WSL)
+python test_gui_gauge_summary.py  # Gauges-tab summary table + CSV (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh overlays (headless Tk)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_blast2d.py            # 2D native physics suite
@@ -221,8 +223,9 @@ speed/density GUI colorbars carry no units. *Why:* the same quantity differs by
 every colorbar label. *Effort:* S. *Confidence:* code-read.
 
 **B9 — Displayed "Impulse [Pa s]" is *net* overpressure impulse (negative phase
-included), not positive-phase impulse. RELABELED (2026-09-02) — positive-phase
-accumulator still open, tracked for T12.** Renamed to `"Net overpressure
+included), not positive-phase impulse. RELABELED (2026-09-02); positive-phase
+impulse DONE (2026-09-05) as the per-gauge summary (N2) - the field maps stay
+net impulse (labelled so), the engineering number per gauge is positive-phase.** Renamed to `"Net overpressure
 impulse [Pa·s]"` in `viz3d/viewer.py`'s `FIELDS` (colorbar title) and to
 `"Net ovp impulse"` in `view3d_panel.FIELD_LABELS` (compact control-column
 label, matching the terseness of its neighbours); `blastlab/README.md` now
@@ -745,7 +748,18 @@ tracks them for the viewer but not meta; **native 2D has no accumulators at
 all** — that half is "add the tracking", not "expose it". *Effort:* M.
 *Confidence:* verified still open.
 
-**N2 — Per-gauge engineering summary.** Table per gauge: peak overpressure,
+**N2 — Per-gauge engineering summary. DONE (2026-09-05).**
+`output/gauge_summary.py`: per trace peak overpressure [kPa], arrival (first
+sample above 1.1 p_amb - the `test_foam_1d_vs_native` rule), time of peak,
+positive-phase duration (to the interpolated zero crossing after the peak),
+positive-phase impulse (trapezoid of max(p - p_amb, 0) over that window) and
+net impulse; `complete=False` flags a record cut inside the positive phase.
+Results panel Gauges tab shows the table under the traces (1D/2D/3D, native
+and foam) and "Summary CSV" exports `gauges_<dim>d_summary.csv` - the
+byte-pinned gauge TSVs are untouched. `test_gauge_summary.py` (Friedlander
+pulse: impulse within 0.1 % of the analytic value) and
+`test_gui_gauge_summary.py` (headless table + CSV). *Original entry:*
+Table per gauge: peak overpressure,
 arrival time, positive-phase impulse (+ export `gauges_summary.csv` — keep it
 out of the byte-pinned TSVs). This is the number users transcribe into reports;
 today they read it off the curve. Depends on B9's positive-phase definition.

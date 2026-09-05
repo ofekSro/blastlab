@@ -4,14 +4,14 @@ recorded animation frames, and export artifacts."""
 import os
 import threading
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 
 import customtkinter as ctk
 import numpy as np
 from matplotlib.figure import Figure
 
 from ..core.constants import P_AIR
-from ..output import plots
+from ..output import gauge_summary, plots
 from ..output.animation import write_animation
 from ..output.gauges import save_gauges_1d, save_gauges_2d, save_gauges_3d
 from ..core.profiles import save_profile, save_profile_2d
@@ -78,6 +78,7 @@ class ResultsPanel(ctk.CTkFrame):
 
         for label, name, kind in (('Profile', 'curve', 'profile'),
                                   ('GIF', 'film', 'gif'),
+                                  ('Summary CSV', 'table', 'summary'),
                                   ('Gauges TSV', 'table', 'tsv'),
                                   ('PNGs', 'image', 'pngs')):
             ctk.CTkButton(bar, text=label, image=icon(name, 14),
@@ -138,10 +139,23 @@ class ResultsPanel(ctk.CTkFrame):
         self.field_canvas = EmbeddedFigure(ftab, figsize=(6, 5))
         self.field_canvas.pack(fill='both', expand=True)
 
-        # Gauges view
+        # Gauges view: the traces + the per-gauge engineering summary
+        # (peak, arrival, positive-phase duration/impulse, net impulse)
         gtab = ctk.CTkFrame(stack, fg_color='transparent')
         self.gauge_canvas = EmbeddedFigure(gtab, figsize=(7, 5))
         self.gauge_canvas.pack(fill='both', expand=True)
+        cols = ('gauge', 'peak', 'arrival', 't_peak', 'pos_dur', 'pos_imp',
+                'net_imp', 'complete')
+        heads = ('Gauge', 'Peak ovp [kPa]', 'Arrival [ms]', 't peak [ms]',
+                 'Pos. phase [ms]', 'Pos. impulse [Pa·s]',
+                 'Net impulse [Pa·s]', 'Complete')
+        self.summary_table = ttk.Treeview(gtab, columns=cols, show='headings',
+                                          height=4)
+        for col, head in zip(cols, heads):
+            self.summary_table.heading(col, text=head)
+            self.summary_table.column(col, width=110 if col != 'gauge' else 150,
+                                      anchor='e' if col != 'gauge' else 'w')
+        self.summary_table.pack(fill='x', pady=(GAP, 0))
 
         # Animation view
         atab = ctk.CTkFrame(stack, fg_color='transparent')
@@ -337,6 +351,18 @@ class ResultsPanel(ctk.CTkFrame):
             fig = plots.figure_gauges_nd(res.gauges, res.meta)
         if fig is not None:
             self.gauge_canvas.set_figure(fig)
+        self._fill_summary(res)
+
+    def summary_rows(self, res):
+        """Per-gauge engineering rows for a Result (output.gauge_summary)."""
+        return gauge_summary.summarize_gauges(res.gauges)
+
+    def _fill_summary(self, res):
+        tbl = self.summary_table
+        for iid in tbl.get_children():
+            tbl.delete(iid)
+        for row in gauge_summary.table_rows(self.summary_rows(res)):
+            tbl.insert('', 'end', values=row)
 
     # ── animation replay ─────────────────────────────────────────────────
     def _setup_anim(self):
@@ -502,6 +528,13 @@ class ResultsPanel(ctk.CTkFrame):
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
                 defaultextension='.txt', initialfile=f'gauges_{dim}d.txt')
+        elif kind == 'summary':
+            if not res.gauges.get('pressures'):
+                self._log('No gauges in this result.')
+                return
+            target = filedialog.asksaveasfilename(
+                defaultextension='.csv',
+                initialfile=f'gauges_{dim}d_summary.csv')
         elif kind == 'gif':
             if not res.meta.get('frames'):
                 self._log('No recorded frames in this result.')
@@ -561,6 +594,10 @@ class ResultsPanel(ctk.CTkFrame):
                 elif kind == 'tsv':
                     {1: save_gauges_1d, 2: save_gauges_2d,
                      3: save_gauges_3d}[dim](res.gauges, target)
+                    self._log(f'Saved {target}')
+                elif kind == 'summary':
+                    gauge_summary.save_gauge_summary(
+                        self.summary_rows(res), target)
                     self._log(f'Saved {target}')
                 elif kind == 'gif':
                     write_animation(res.meta, target, show_mesh=show_mesh)
