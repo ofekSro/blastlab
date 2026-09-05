@@ -14,14 +14,14 @@
 | # | Task | Bundles (ROADMAP ids) | Effort | Status |
 |---|------|------------------------|--------|--------|
 | T0 | Commit untracked work | A9 | 10 min | [x] |
-| T1 | Harden the foam stop/ingest path | B1, B2, B15 | S–M | [ ] |
-| T2 | Fix wrong-data display: 3D replay slice + viewer final frame + thinning | B3, B4, B20 | S | [ ] |
-| T3 | Units & labels: kPa everywhere, impulse naming | B8, B9(relabel) | S | [ ] |
-| T4 | Runs-dir safety: unique dirs, live-run guard, orphan reaping | B13, B14 | S | [ ] |
-| T5 | Papercuts bundle (one-liners) | B7, G1, B22, G6a | S | [ ] |
-| T6 | Chain validation + visible/stoppable foam preflight | B5, B6 | M | [ ] |
-| T7 | Native solver warnings through hooks (transcript byte-identical) | B11 | M | [ ] |
-| T8 | Native fixes that need ONE re-baseline | B10, B12, B18 | S + re-baseline | [ ] |
+| T1 | Harden the foam stop/ingest path | B1, B2, B15 | S–M | [x] |
+| T2 | Fix wrong-data display: 3D replay slice + viewer final frame + thinning | B3, B4, B20 | S | [x] |
+| T3 | Units & labels: kPa everywhere, impulse naming | B8, B9(relabel) | S | [x] |
+| T4 | Runs-dir safety: unique dirs, live-run guard, orphan reaping | B13, B14 | S | [x] |
+| T5 | Papercuts bundle (one-liners) | B7, G1, B22, G6a | S | [x] |
+| T6 | Chain validation + visible/stoppable foam preflight | B5, B6 | M | [x] |
+| T7 | Native solver warnings through hooks (transcript byte-identical) | B11 | M | [x] |
+| T8 | Native fixes that need ONE re-baseline | B10, B12, B18 | S + re-baseline | [x] |
 | T9 | Extract the shared foam run loop | A1, A2, A3, A4(foam part) | M | [ ] |
 | T10 | Foam accumulator correctness | B16, B17, B21 | S–M | [ ] |
 | T11 | Peak-overpressure / impulse views in Results | N1 (+ native 2D accumulators, native 3D meta) | M | [ ] |

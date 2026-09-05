@@ -1,5 +1,6 @@
 """3D Cartesian blast solver (unsplit Godunov + HLL)."""
 
+import math
 import time
 
 import numpy as np
@@ -138,7 +139,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         z0 = profile2d['y0']            # burst height from the 2D profile
         r_exp = r_src = profile2d['r_exp']
         if profile2d['eos'] != eos:
-            print(f"  [warn] Profile EOS '{profile2d['eos']}' differs from "
+            hooks.log(f"  [warn] Profile EOS '{profile2d['eos']}' differs from "
                   f"run EOS '{eos}' - products will be evaluated with '{eos}'.")
         if z0 > Lz:
             raise ValueError(f"Profile burst height {z0:g} m exceeds "
@@ -147,7 +148,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         x0, y0, z0 = charge_center
         r_exp = r_src = profile['r_exp']
         if profile['eos'] != eos:
-            print(f"  [warn] Profile EOS '{profile['eos']}' differs from "
+            hooks.log(f"  [warn] Profile EOS '{profile['eos']}' differs from "
                   f"run EOS '{eos}' - products will be evaluated with '{eos}'.")
     else:
         if charge <= 0:
@@ -173,7 +174,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
             if over <= 0:
                 continue
             if bcs[side] == 'wall':
-                print(f"  [note] Charge is truncated by the {side} wall "
+                hooks.log(f"  [note] Charge is truncated by the {side} wall "
                       f"(surface burst)")
             else:
                 raise ValueError(f"Charge (source radius = {r_src:.4f} m) "
@@ -186,12 +187,14 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                 raise ValueError("Charge overlaps an obstacle")
 
         if smeared:
-            print(f"  [note] Charge under-resolved at dx = {dx:g} m "
+            hooks.log(f"  [note] Charge under-resolved at dx = {dx:g} m "
                   f"(r_exp = {r_exp:.4f} m): mass & energy smeared into a "
                   f"{r_src:.4f} m source ball")
         elif dx > r_exp / MIN_EXP_CELLS:
             # Resolve the charge; refinement is CUBIC in cell count in 3D.
-            dx = r_exp / MIN_EXP_CELLS
+            # the largest spacing that keeps MIN_EXP_CELLS across the
+            # charge AND divides Lx exactly (ceil: never coarser)
+            dx = Lx / math.ceil(Lx / (r_exp / MIN_EXP_CELLS))
             n_est = int(Lx / dx) * int(Ly / dx) * int(Lz / dx)
             if n_est > CELLS_REFUSE:
                 raise ValueError(
@@ -199,11 +202,20 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                     f"~{n_est:,} cells (refinement is cubic in 3D). Shrink "
                     f"the domain, enlarge the charge, remap from 1D/2D, or "
                     f"use charge_resolution='smear' to keep your cell size.")
-            print(f"  [auto] Cell size reduced to {dx:.5f} m "
+            hooks.log(f"  [auto] Cell size reduced to {dx:.5f} m "
                   f"({MIN_EXP_CELLS} cells across charge radius)")
 
     # ── Grid & solids ───────────────────────────────────────────────────────
     grid = make_grid(Lx, Ly, Lz, dx)
+    if grid['dx'] != dx:
+        # dx did not divide Lx: core.grid fitted the exact domain with a
+        # slightly different (cubic) spacing - use it everywhere below
+        hooks.log(f"  [note] Cell size adjusted {dx:g} -> {grid['dx']:.4g} m "
+                  f"to fit {Lx:g} m exactly (domain {grid['x_face'][-1]:g} "
+                  f"x {grid['y_face'][-1]:.4g} x {grid['z_face'][-1]:.4g} m)")
+        dx = grid['dx']
+        Lx, Ly, Lz = (float(grid['x_face'][-1]), float(grid['y_face'][-1]),
+                      float(grid['z_face'][-1]))
     x_c, y_c, z_c = grid['x_c'], grid['y_c'], grid['z_c']
     Nx, Ny, Nz = grid['Nx'], grid['Ny'], grid['Nz']
     n_cells = Nx * Ny * Nz
@@ -211,7 +223,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         raise ValueError(f"Grid {Nx} x {Ny} x {Nz} = {n_cells:,} cells "
                          f"exceeds the {CELLS_REFUSE:,} cap")
     if n_cells > CELLS_WARN:
-        print(f"  [warn] Large grid: {Nx} x {Ny} x {Nz} = {n_cells:,} "
+        hooks.log(f"  [warn] Large grid: {Nx} x {Ny} x {Nz} = {n_cells:,} "
               f"cells - expect a long run and GBs of RAM")
 
     solid = solid_mask(x_c, y_c, z_c, obstacles)
@@ -220,7 +232,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
     # Bound snapshot memory: full 3D float32 overpressure per snapshot.
     max_snaps = max(1, int(1.5e9 / (4 * n_cells)) - 1)
     if n_snapshots > max_snaps:
-        print(f"  [note] n_snapshots reduced {n_snapshots} -> {max_snaps} "
+        hooks.log(f"  [note] n_snapshots reduced {n_snapshots} -> {max_snaps} "
               f"to bound snapshot memory")
         n_snapshots = max_snaps
 
@@ -238,7 +250,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         if (x0 - r_shock < 0 or x0 + r_shock > Lx
                 or y0 - r_shock < 0 or y0 + r_shock > Ly
                 or z0 + r_shock > Lz):
-            print(f"  [warn] 2D profile shock radius ({r_shock:.2f} m) "
+            hooks.log(f"  [warn] 2D profile shock radius ({r_shock:.2f} m) "
                   f"already reaches a 3D boundary - remap may clip the field")
     elif profile is not None:
         U, phase, t0 = remap_profile_1d(profile, x_c, y_c, z_c, (x0, y0, z0))
@@ -246,7 +258,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         r_shock = (float(profile['r'][shocked1].max()) if shocked1.any()
                    else r_exp)
         if (min(x0, Lx - x0, y0, Ly - y0, z0, Lz - z0) < r_shock):
-            print(f"  [warn] 1D profile shock radius ({r_shock:.2f} m) "
+            hooks.log(f"  [warn] 1D profile shock radius ({r_shock:.2f} m) "
                   f"already reaches a 3D boundary - remap may clip the field")
     else:
         X = x_c[:, None, None]
@@ -283,7 +295,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                          + (y_c[None, :, None] - y0)**2
                          + (z_c[None, None, :] - z0)**2)
             if (solid & (d3 <= r_shock)).any():
-                print("  [warn] An obstacle lies inside the remapped shocked "
+                hooks.log("  [warn] An obstacle lies inside the remapped shocked "
                       "region - the profile is not valid there")
             del d3
 
@@ -326,14 +338,14 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
     gauge_ijk, gauge_actual = [], []
     for (gx, gy, gz) in gauges:
         if not (0 <= gx <= Lx and 0 <= gy <= Ly and 0 <= gz <= Lz):
-            print(f"  [warn] Gauge ({gx:g}, {gy:g}, {gz:g}) outside domain "
+            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}, {gz:g}) outside domain "
                   f"- dropped")
             continue
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
         k = int(np.argmin(np.abs(z_c - gz)))
         if solid[i, j, k]:
-            print(f"  [warn] Gauge ({gx:g}, {gy:g}, {gz:g}) inside an "
+            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}, {gz:g}) inside an "
                   f"obstacle - dropped")
             continue
         gauge_ijk.append((i, j, k))
@@ -362,34 +374,34 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
 
     # ── Print summary ───────────────────────────────────────────────────────
     bc_lbl = ", ".join(f"{k}={v}" for k, v in bcs.items())
-    print(f"\n{'='*62}")
-    print(f"  3D Blast Solver")
-    print(f"{'='*62}")
+    hooks.log(f"\n{'='*62}")
+    hooks.log(f"  3D Blast Solver")
+    hooks.log(f"{'='*62}")
     if profile2d is not None:
-        print(f"  Init            : 2D axisym profile remap "
+        hooks.log(f"  Init            : 2D axisym profile remap "
               f"({profile2d['charge_kg']:g} kg TNT, t0 = {t0*1e3:.3f} ms)")
     elif profile is not None:
-        print(f"  Init            : 1D profile remap "
+        hooks.log(f"  Init            : 1D profile remap "
               f"({profile['charge_kg']:g} kg TNT, t0 = {t0*1e3:.3f} ms)")
     else:
-        print(f"  Charge          : {charge:g} kg TNT (sphere)")
-    print(f"  Burst point     : ({x0:g}, {y0:g}, {z0:g}) m")
-    print(f"  Explosive radius: {r_exp:.4f} m"
+        hooks.log(f"  Charge          : {charge:g} kg TNT (sphere)")
+    hooks.log(f"  Burst point     : ({x0:g}, {y0:g}, {z0:g}) m")
+    hooks.log(f"  Explosive radius: {r_exp:.4f} m"
           + (f" (smeared to {r_src:.4f} m)" if smeared else ""))
-    print(f"  Domain          : {Lx:g} x {Ly:g} x {Lz:g} m,  cell {dx:g} m")
-    print(f"  Grid            : {Nx} x {Ny} x {Nz} = {n_cells:,} cells")
-    print(f"  EOS             : {eos}")
-    print(f"  Boundaries      : {bc_lbl}")
-    print(f"  Obstacles       : {len(obstacles)}")
-    print(f"  Gauges          : {len(gauge_ijk)}")
-    print(f"  Stop condition  : "
+    hooks.log(f"  Domain          : {Lx:g} x {Ly:g} x {Lz:g} m,  cell {dx:g} m")
+    hooks.log(f"  Grid            : {Nx} x {Ny} x {Nz} = {n_cells:,} cells")
+    hooks.log(f"  EOS             : {eos}")
+    hooks.log(f"  Boundaries      : {bc_lbl}")
+    hooks.log(f"  Obstacles       : {len(obstacles)}")
+    hooks.log(f"  Gauges          : {len(gauge_ijk)}")
+    hooks.log(f"  Stop condition  : "
           + ("shock arrival at an open boundary" if has_open
              else "safety cap (no open boundaries)"))
-    print(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
+    hooks.log(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
           f"{safety_cap*1e3:.1f} ms")
-    print(f"  (3D steps are slow: expect roughly "
+    hooks.log(f"  (3D steps are slow: expect roughly "
           f"{max(1, n_cells // 2_000_000)}-{max(1, n_cells // 500_000)} s/step)")
-    print(f"{'='*62}\n")
+    hooks.log(f"{'='*62}\n")
 
     # ── Live view & animation frame recording (vertical x-z slice) ─────────
     hooks.run_started(dict(
@@ -448,7 +460,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                 label = f"t = {t*1e3:.3f} ms"
                 snapshots[label] = _snapshot(p_f, rho_f, u_f, v_f, w_f,
                                              j0, k0, t)
-                print(f"  Snapshot saved: {label}  (front at {r_front:.2f} m)")
+                hooks.log(f"  Snapshot saved: {label}  (front at {r_front:.2f} m)")
 
         # ── Animation frames (adaptive stride) & live view ─────────────────
         if record_frames > 0 and step % frame_stride == 0:
@@ -526,7 +538,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         impulse = np.zeros_like(p_f)
     else:
         np.maximum(p_peak, p_f, out=p_peak)
-    if gauge_ijk:
+    # skip when the loop top already recorded this t (exit via break):
+    # a duplicated last timestamp makes dt-based post-processing inf/nan
+    if gauge_ijk and (not gauge_times_list or gauge_times_list[-1] != t):
         gauge_times_list.append(t)
         for g, (i, j, k) in enumerate(gauge_ijk):
             gauge_press_lists[g].append(p_f[i, j, k])
@@ -540,8 +554,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
     hooks.frame3d(t, dict(p=p_f, rho=rho_f, e=e_f,
                           p_peak=p_peak, imp=impulse), force=True)
 
-    print(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
-    print(f"  Stopped: {stop_reason}\n")
+    hooks.log(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
+    hooks.log(f"  Stopped: {stop_reason}\n")
 
     gauge_out = dict(
         times    = np.array(gauge_times_list),

@@ -1,5 +1,6 @@
 """2D planar / axisymmetric blast solver (unsplit Godunov + HLL)."""
 
+import math
 import time
 
 import numpy as np
@@ -108,7 +109,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         y0 = charge_center[1]
         r_exp = profile['r_exp']
         if profile['eos'] != eos:
-            print(f"  [warn] Profile EOS '{profile['eos']}' differs from run "
+            hooks.log(f"  [warn] Profile EOS '{profile['eos']}' differs from run "
                   f"EOS '{eos}' - products will be evaluated with '{eos}'.")
     else:
         if charge is None or charge <= 0:
@@ -133,7 +134,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
             if over <= 0:
                 continue
             if bcs[side] == 'wall':
-                print(f"  [note] Charge is truncated by the {side} wall "
+                hooks.log(f"  [note] Charge is truncated by the {side} wall "
                       f"(surface burst)")
             else:
                 raise ValueError(f"Charge (r_exp = {r_exp:.4f} m at "
@@ -151,24 +152,34 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         # but cap total cell count - refinement is quadratic in 2D.
         MIN_EXP_CELLS = 5
         if dx > r_exp / MIN_EXP_CELLS:
-            dx = r_exp / MIN_EXP_CELLS
+            # the largest spacing that keeps MIN_EXP_CELLS across the
+            # charge AND divides Lx exactly (ceil: never coarser)
+            dx = Lx / math.ceil(Lx / (r_exp / MIN_EXP_CELLS))
             n_est = int(Lx / dx) * int(Ly / dx)
             if n_est > 8_000_000:
                 raise ValueError(
                     f"Resolving the charge needs dx = {dx:.5f} m -> ~{n_est:,} "
                     f"cells. Reduce the domain or enlarge the charge.")
-            print(f"  [auto] Cell size reduced to {dx:.5f} m "
+            hooks.log(f"  [auto] Cell size reduced to {dx:.5f} m "
                   f"({MIN_EXP_CELLS} cells across charge radius)")
 
     # ── Grid, metrics, solids ───────────────────────────────────────────────
     geom = make_geometry(geometry, Lx, Ly, dx)
+    if geom['dx'] != dx:
+        # dx did not divide Lx: core.grid fitted the exact domain with a
+        # slightly different (square) spacing - use it everywhere below
+        hooks.log(f"  [note] Cell size adjusted {dx:g} -> {geom['dx']:.4g} m "
+                  f"to fit {Lx:g} m exactly (domain {geom['x_face'][-1]:g} "
+                  f"x {geom['y_face'][-1]:.4g} m)")
+        dx = geom['dx']
+        Lx, Ly = float(geom['x_face'][-1]), float(geom['y_face'][-1])
     x_c, y_c = geom['x_c'], geom['y_c']
     A_xf, A_yf, V = geom['A_xf'], geom['A_yf'], geom['V']
     Nx, Ny, dy = geom['Nx'], geom['Ny'], geom['dy']
     if Nx * Ny > 8_000_000:
         raise ValueError(f"Grid {Nx} x {Ny} = {Nx*Ny:,} cells is too large")
     if Nx * Ny > 2_000_000:
-        print(f"  [warn] Large grid: {Nx} x {Ny} = {Nx*Ny:,} cells - "
+        hooks.log(f"  [warn] Large grid: {Nx} x {Ny} = {Nx*Ny:,} cells - "
               f"expect a long run")
 
     solid = solid_mask(x_c, y_c, obstacles)
@@ -187,7 +198,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
             cy = min(max(y0, oy0), oy1)
             touches |= cx**2 + (cy - y0)**2 < r_shock**2
         if touches:
-            print(f"  [warn] 1D profile shock radius ({r_shock:.2f} m) already "
+            hooks.log(f"  [warn] 1D profile shock radius ({r_shock:.2f} m) already "
                   f"reaches a boundary/obstacle - remap is not spherical there.")
     else:
         is_exp = (x_c[:, None] - x0)**2 + (y_c[None, :] - y0)**2 <= r_exp**2
@@ -254,12 +265,12 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     gauge_ij, gauge_actual = [], []
     for (gx, gy) in gauges:
         if not (0 <= gx <= Lx and 0 <= gy <= Ly):
-            print(f"  [warn] Gauge ({gx:g}, {gy:g}) outside domain - dropped")
+            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}) outside domain - dropped")
             continue
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
         if solid[i, j]:
-            print(f"  [warn] Gauge ({gx:g}, {gy:g}) inside an obstacle - dropped")
+            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}) inside an obstacle - dropped")
             continue
         gauge_ij.append((i, j))
         gauge_actual.append((float(x_c[i]), float(y_c[j])))
@@ -268,31 +279,31 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
 
     # ── Print summary ───────────────────────────────────────────────────────
     bc_lbl = ", ".join(f"{k}={v}" for k, v in bcs.items())
-    print(f"\n{'='*60}")
-    print(f"  2D Blast Solver ({geometry})")
-    print(f"{'='*60}")
+    hooks.log(f"\n{'='*60}")
+    hooks.log(f"  2D Blast Solver ({geometry})")
+    hooks.log(f"{'='*60}")
     if profile is not None:
-        print(f"  Init            : 1D profile remap "
+        hooks.log(f"  Init            : 1D profile remap "
               f"({profile['charge_kg']:g} kg TNT, t0 = {t0*1e3:.3f} ms)")
     elif geometry == 'planar':
-        print(f"  Charge          : {charge:g} kg TNT per metre "
+        hooks.log(f"  Charge          : {charge:g} kg TNT per metre "
               f"(infinite cylinder) at ({x0:g}, {y0:g}) m")
     else:
-        print(f"  Charge          : {charge:g} kg TNT (sphere) "
+        hooks.log(f"  Charge          : {charge:g} kg TNT (sphere) "
               f"on axis at height {y0:g} m")
-    print(f"  Explosive radius: {r_exp:.4f} m")
-    print(f"  Domain          : {Lx:g} x {Ly:g} m,  cell {dx:g} m  "
+    hooks.log(f"  Explosive radius: {r_exp:.4f} m")
+    hooks.log(f"  Domain          : {Lx:g} x {Ly:g} m,  cell {dx:g} m  "
           f"({Nx} x {Ny} = {Nx*Ny:,} cells)")
-    print(f"  EOS             : {eos}")
-    print(f"  Boundaries      : {bc_lbl}"
+    hooks.log(f"  EOS             : {eos}")
+    hooks.log(f"  Boundaries      : {bc_lbl}"
           + ("  (x_lo = symmetry axis)" if geometry == 'axisymmetric' else ""))
-    print(f"  Obstacles       : {len(obstacles)}")
-    print(f"  Gauges          : {len(gauge_ij)}")
-    print(f"  Stop condition  : "
+    hooks.log(f"  Obstacles       : {len(obstacles)}")
+    hooks.log(f"  Gauges          : {len(gauge_ij)}")
+    hooks.log(f"  Stop condition  : "
           + ("shock arrival at an open boundary" if has_open
              else "safety cap (no open boundaries)"))
-    print(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
-    print(f"{'='*60}\n")
+    hooks.log(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
+    hooks.log(f"{'='*60}\n")
 
     # ── Live view & animation frame recording ───────────────────────────────
     run_info = dict(
@@ -348,7 +359,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
                 label = f"t = {t*1e3:.3f} ms"
                 snapshots[label] = dict(p=p_f.copy(), rho=rho_f.copy(),
                                         speed=np.sqrt(u_f**2 + v_f**2))
-                print(f"  Snapshot saved: {label}  "
+                hooks.log(f"  Snapshot saved: {label}  "
                       f"(front at {r_front:.2f} m)")
 
         # ── Animation frames (adaptive stride) & live view ─────────────────
@@ -410,7 +421,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
 
     # ── Final snapshot at stop time ────────────────────────────────────────
     rho_f, u_f, v_f, e_f, p_f, _ = primitives(U, phase, eos)
-    if gauge_ij:
+    # skip when the loop top already recorded this t (exit via break):
+    # a duplicated last timestamp makes dt-based post-processing inf/nan
+    if gauge_ij and (not gauge_times_list or gauge_times_list[-1] != t):
         gauge_times_list.append(t)
         for k, (i, j) in enumerate(gauge_ij):
             gauge_press_lists[k].append(p_f[i, j])
@@ -423,8 +436,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         frame_p.append(p_f.astype(np.float32))
     hooks.frame(p_f, t)
 
-    print(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
-    print(f"  Stopped: {stop_reason}\n")
+    hooks.log(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
+    hooks.log(f"  Stopped: {stop_reason}\n")
 
     gauge_out = dict(
         times    = np.array(gauge_times_list),

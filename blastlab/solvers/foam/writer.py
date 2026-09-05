@@ -97,10 +97,14 @@ class CaseSpec:
 
 # ── planning ────────────────────────────────────────────────────────────────
 
-def _effective_dx(cell_size, r_exp):
-    """Native refinement rule: >= MIN_EXP_CELLS cells across r_exp."""
+def _effective_dx(cell_size, r_exp, L):
+    """Native refinement rule: >= MIN_EXP_CELLS cells across r_exp, and the
+    refined spacing must divide L (the native solvers' reference length:
+    radius_m in 1D, Lx in 2D/3D) exactly - ceil so it is never coarser than
+    r_exp / MIN_EXP_CELLS. Mirrors solver1d/2d/3d so a foam case lays out
+    the same cell count as its native twin."""
     if cell_size > r_exp / MIN_EXP_CELLS:
-        return r_exp / MIN_EXP_CELLS
+        return L / math.ceil(L / (r_exp / MIN_EXP_CELLS))
     return cell_size
 
 
@@ -140,7 +144,7 @@ def plan_case(case):
 
     if case.dim == 1:
         r_exp = charge_radius(case.charge_kg, m)
-        dx = _effective_dx(case.cell_size_m, r_exp)
+        dx = _effective_dx(case.cell_size_m, r_exp, case.radius_m)
         r_face, r, A_face, V_cell = make_grid_1d(case.radius_m, dx)
         grid = dict(r_face=r_face, r=r, A_face=A_face, V_cell=V_cell)
         spec = CaseSpec(dim=1, material=mat, nx=len(r), dx=dx,
@@ -158,7 +162,7 @@ def plan_case(case):
     if case.dim == 2:
         planar = case.geometry == 'planar'
         r_exp = charge_radius(case.charge, m, planar=planar)
-        dx = _effective_dx(case.cell_size_m, r_exp)
+        dx = _effective_dx(case.cell_size_m, r_exp, case.Lx)
         grid = make_geometry(case.geometry, case.Lx, case.Ly, dx)
         Lx_eff, Ly_eff = grid['x_face'][-1], grid['y_face'][-1]
         x0 = 0.0 if not planar else case.center[0]
@@ -221,7 +225,7 @@ def plan_case(case):
         charges.append(((float(ex), float(ey), float(ez)), float(mass)))
     r_exps = [charge_radius(mass, m) for _c, mass in charges]
     r_exp = max(r_exps)
-    dx = min(_effective_dx(case.cell_size_m, r) for r in r_exps)
+    dx = min(_effective_dx(case.cell_size_m, r, case.Lx) for r in r_exps)
     grid = make_grid(case.Lx, case.Ly, case.Lz, dx)
     Ls = (grid['x_face'][-1], grid['y_face'][-1], grid['z_face'][-1])
     spec = CaseSpec(dim=3, material=mat,
@@ -756,13 +760,21 @@ def render_case(case, n_procs=1):
 
 def write_case(case, case_posix=None, n_procs=1):
     """Render and write the case tree into the WSL filesystem (over
-    UNC, LF endings). Returns the CaseSpec with paths filled in."""
+    UNC, LF endings). Returns the CaseSpec with paths filled in.
+
+    A fresh run (no `case_posix`) claims its own directory: the create
+    is exist_ok=False, so a name collision fails loudly here instead of
+    silently rewriting a concurrent run's controlDict and 0/ fields.
+    Passing an explicit `case_posix` is the deliberate reuse path (a
+    resume or post-mortem rewrite) and keeps the permissive create."""
     spec = render_case(case, n_procs=n_procs)
-    if case_posix is None:
+    fresh = case_posix is None
+    if fresh:
         case_posix, case_unc = env.new_case_dir(case.dim)
     else:
         case_unc = env.unc(case_posix)
     spec.case_posix, spec.case_unc = case_posix, case_unc
+    os.makedirs(case_unc, exist_ok=not fresh)
     for rel, text in spec.files.items():
         path = os.path.join(case_unc, *rel.split('/'))
         os.makedirs(os.path.dirname(path), exist_ok=True)

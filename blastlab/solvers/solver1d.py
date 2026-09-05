@@ -1,11 +1,14 @@
 """1D spherical blast solver (Godunov + HLL)."""
 
+import math
+
 import numpy as np
 
 from ..core.constants import GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT
 from ..core.eos import (air_pressure, air_soundspeed,
                         jwl_pressure, jwl_soundspeed)
 from ..core.riemann import hll_fluxes_1d as hll_fluxes
+from ..core.grid import make_grid_1d
 from .hooks import ConsoleHooks, Progress, Result
 
 def primitives(U, phase, eos):
@@ -52,7 +55,11 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     cell_size_m : float       Uniform cell size [m]
     eos         : str         'JWL' or 'idealGas'
     cfl         : float       Courant-Friedrichs-Lewy number (< 1)
-    n_snapshots : int         Number of solution snapshots to record
+    n_snapshots : int         Number of solution snapshots to record,
+                              including the final state; the others fire
+                              as the shock front crosses evenly spaced
+                              radii between the charge and the boundary
+                              (same semantics as the 2D/3D solvers)
     gauge_radii : list[float] Radii [m] at which to record pressure history
 
     Returns
@@ -65,10 +72,15 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
         hooks = ConsoleHooks(1)
     # ── Grid ──────────────────────────────────────────────────────────────────
     # r=0 is at the left domain boundary; first cell centre at dr/2
-    r_face = np.arange(0.0, radius_m + 0.5 * cell_size_m, cell_size_m)
+    r_face = make_grid_1d(radius_m, cell_size_m)[0]
     r      = 0.5 * (r_face[:-1] + r_face[1:])   # cell centres
     N      = len(r)
-    dr     = cell_size_m
+    # effective spacing: == cell_size_m unless it does not divide radius_m,
+    # in which case the grid was fitted to the exact domain (core.grid)
+    dr     = float(r_face[1])
+    if dr != cell_size_m:
+        hooks.log(f"  [note] Cell size adjusted {cell_size_m:g} -> {dr:.4g} m "
+                  f"to fit {radius_m:g} m exactly")
 
     # Spherical face areas and cell volumes
     A_face = 4.0 * np.pi * r_face**2                              # (N+1,)
@@ -86,13 +98,15 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     # collapsing rho to the floor and making e (and c) blow up to near-infinity.
     MIN_EXP_CELLS = 5
     if dr > r_exp / MIN_EXP_CELLS:
-        dr = r_exp / MIN_EXP_CELLS
-        r_face = np.arange(0.0, radius_m + 0.5 * dr, dr)
+        # the largest spacing that keeps MIN_EXP_CELLS across the charge
+        # AND divides the domain exactly (ceil: never coarser than r_exp/N)
+        dr = radius_m / math.ceil(radius_m / (r_exp / MIN_EXP_CELLS))
+        r_face = make_grid_1d(radius_m, dr)[0]
         r      = 0.5 * (r_face[:-1] + r_face[1:])
         N      = len(r)
         A_face = 4.0 * np.pi * r_face**2
         V_cell = (4.0 / 3.0) * np.pi * (r_face[1:]**3 - r_face[:-1]**3)
-        print(f"  [auto] Cell size reduced to {dr:.5f} m "
+        hooks.log(f"  [auto] Cell size reduced to {dr:.5f} m "
               f"({MIN_EXP_CELLS} cells inside explosive, {N} total)")
 
     # ── Initial conditions ──────────────────────────────────────────────────
@@ -121,11 +135,14 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     c_amb        = np.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)        # ~340 m/s
     arrival_p    = P_AIR * 1.001                                # 0.1 % overpressure
     safety_cap   = 10.0 * radius_m / c_amb                      # absolute upper bound
-    t_estimate   = 1.5 * radius_m / c_amb                       # for snapshot placement
 
-    # Snapshots scheduled at fractions of an estimate; if the run ends sooner,
-    # we just record a final snapshot at the actual stop time.
-    snap_times = list(np.linspace(0.0, t_estimate, n_snapshots + 1)[1:])
+    # Snapshots are triggered by shock-front POSITION, not time, exactly as
+    # in 2D/3D: the blast crosses the domain far faster than the acoustic
+    # estimate that used to schedule them, which left the intermediate
+    # snapshots untaken. They fire when the front crosses evenly spaced
+    # radii between the charge and the outer boundary; the final state is
+    # always recorded as well (n_snapshots total, including the final).
+    snap_radii = list(np.linspace(r_exp, radius_m, n_snapshots + 1)[1:-1])
 
     # ── Gauge setup ────────────────────────────────────────────────────────
     if gauge_radii is None:
@@ -144,18 +161,18 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
 
     # ── Print summary ───────────────────────────────────────────────────────
     p0_exp = p[is_exp].mean() if is_exp.any() else 0.0
-    print(f"\n{'='*55}")
-    print(f"  1D Spherical Blast Solver")
-    print(f"{'='*55}")
-    print(f"  Charge          : {charge_kg} kg TNT")
-    print(f"  Explosive radius: {r_exp:.4f} m")
-    print(f"  Domain radius   : {radius_m} m")
-    print(f"  Cell size       : {dr} m  ({N} cells)")
-    print(f"  EOS             : {eos}")
-    print(f"  Initial p (exp) : {p0_exp:.3e} Pa  ({p0_exp/1e9:.2f} GPa)")
-    print(f"  Stop condition  : shock arrival at r = {radius_m} m")
-    print(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
-    print(f"{'='*55}\n")
+    hooks.log(f"\n{'='*55}")
+    hooks.log(f"  1D Spherical Blast Solver")
+    hooks.log(f"{'='*55}")
+    hooks.log(f"  Charge          : {charge_kg} kg TNT")
+    hooks.log(f"  Explosive radius: {r_exp:.4f} m")
+    hooks.log(f"  Domain radius   : {radius_m} m")
+    hooks.log(f"  Cell size       : {dr} m  ({N} cells)")
+    hooks.log(f"  EOS             : {eos}")
+    hooks.log(f"  Initial p (exp) : {p0_exp:.3e} Pa  ({p0_exp/1e9:.2f} GPa)")
+    hooks.log(f"  Stop condition  : shock arrival at r = {radius_m} m")
+    hooks.log(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
+    hooks.log(f"{'='*55}\n")
 
     # ── Time integration (Godunov, 1st order) ──────────────────────────────
     t          = 0.0
@@ -191,13 +208,16 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
             stop_reason = f'shock arrived at outer boundary (p_last = {p_f[-1]:.3e} Pa)'
             break
 
-        # Take any due snapshots before the update
-        while snap_times and t >= snap_times[0]:
-            snap_times.pop(0)
+        # Take any due snapshots before the update (front = outermost
+        # cell above the arrival threshold, as in 2D/3D)
+        shocked = p_f > arrival_p
+        r_front = r[shocked].max() if shocked.any() else 0.0
+        while snap_radii and r_front >= snap_radii[0]:
+            snap_radii.pop(0)
             label = f"t = {t*1e3:.3f} ms"
             snapshots[label] = dict(r=r.copy(), p=p_f.copy(),
                                     rho=rho_f.copy(), u=u_f.copy())
-            print(f"  Snapshot saved: {label}")
+            hooks.log(f"  Snapshot saved: {label}")
 
         # ── CFL time step ─────────────────────────────────────────────────
         dt = cfl * dr / np.max(np.abs(u_f) + c_f)
@@ -243,7 +263,9 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
 
     # ── Final snapshot at stop time ────────────────────────────────────────
     rho_f, u_f, e_f, p_f, _ = primitives(U, phase, eos)
-    if gauge_indices:
+    # skip when the loop top already recorded this t (exit via break):
+    # a duplicated last timestamp makes dt-based post-processing inf/nan
+    if gauge_indices and (not gauge_times_list or gauge_times_list[-1] != t):
         gauge_times_list.append(t)
         for k, idx in enumerate(gauge_indices):
             gauge_press_lists[k].append(p_f[idx])
@@ -257,8 +279,8 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
                          charge_kg=charge_kg, eos=eos, r_exp=r_exp,
                          radius_m=radius_m)
 
-    print(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
-    print(f"  Stopped: {stop_reason}\n")
+    hooks.log(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
+    hooks.log(f"  Stopped: {stop_reason}\n")
 
     gauge_out = dict(
         times    = np.array(gauge_times_list),

@@ -12,10 +12,10 @@ application     blastFoam;
 startFrom       startTime;
 startTime       0;
 stopAt          endTime;
-endTime         0.1468459545;
+endTime         0.1469317748;
 deltaT          1e-7;
 writeControl    adjustableRunTime;
-writeInterval   6.883404115e-05;
+writeInterval   6.887426946e-05;
 cycleWrite      0;
 writeFormat     ascii;
 writePrecision  6;
@@ -48,8 +48,8 @@ functions
             {
                 type            lineCell;
                 axis            x;
-                start (0.002635590498 0 0);
-                end (4.994443993 0 0);
+                start (0.002631578947 0 0);
+                end (4.997368421 0 0);
             }
         );
     }

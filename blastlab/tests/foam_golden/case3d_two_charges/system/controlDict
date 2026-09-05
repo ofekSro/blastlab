@@ -12,7 +12,7 @@ application     blastFoam;
 startFrom       startTime;
 startTime       0;
 stopAt          endTime;
-endTime         0.05893915755;
+endTime         0.05877270994;
 deltaT          1e-7;
 writeControl    adjustableRunTime;
 writeInterval   9.642397724e-06;
@@ -66,7 +66,7 @@ functions
                 planeType       pointAndNormal;
                 pointAndNormalDict
                 {
-                    point (0 1.002832056 0);
+                    point (0 1 0);
                     normal (0 1 0);
                 }
                 interpolate     no;

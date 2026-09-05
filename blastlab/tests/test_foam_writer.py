@@ -5,6 +5,7 @@ Run:  python test_foam_writer.py             compare against foam_golden/
       python test_foam_writer.py --update    regenerate the golden files
 """
 
+import math
 import os
 import sys
 
@@ -88,9 +89,13 @@ def semantic_checks(specs):
     s1 = specs['case1d_tnt']
     m_tnt = MATERIALS['TNT']
     r_exp = charge_radius(1.0, m_tnt)
-    dx = r_exp / MIN_EXP_CELLS          # 0.02 is coarser -> refined
-    check('1d: dx refined to r_exp/MIN_EXP_CELLS',
-          abs(s1.dx - dx) < 1e-12, f'{s1.dx} vs {dx}')
+    # 0.02 is coarser than r_exp/5 -> refined to the largest spacing that
+    # keeps MIN_EXP_CELLS across the charge AND divides radius_m exactly
+    # (the native solvers' divisor rule, so foam and native cell counts agree)
+    dx = 5.0 / math.ceil(5.0 / (r_exp / MIN_EXP_CELLS))
+    check('1d: dx refined to divisor-aware r_exp/MIN_EXP_CELLS',
+          abs(s1.dx - dx) < 1e-12 and s1.dx <= r_exp / MIN_EXP_CELLS,
+          f'{s1.dx} vs {dx}')
     check('1d: nx matches core.grid', s1.nx == len(make_grid_1d(5.0, dx)[1]))
     check('1d: file set complete', set(s1.files) == EXPECTED_FILES,
           str(set(s1.files) ^ EXPECTED_FILES))
@@ -186,8 +191,10 @@ def semantic_checks(specs):
           and 'mass            4;' in sf2 and 'mass            2;' in sf2)
     check('two charges: both det points',
           '(0.7 1 1)' in pp2 and '(1.4 1 1)' in pp2)
+    dx_small = charge_radius(2.0, m_tnt) / MIN_EXP_CELLS
     check('two charges: dx resolves the smaller charge',
-          abs(s3t.dx - charge_radius(2.0, m_tnt) / MIN_EXP_CELLS) < 1e-12)
+          abs(s3t.dx - 2.0 / math.ceil(2.0 / dx_small)) < 1e-12
+          and s3t.dx <= dx_small)
     check('two charges: r_exp is the larger',
           abs(s3t.r_exp - charge_radius(4.0, m_tnt)) < 1e-12)
 
@@ -290,12 +297,55 @@ def golden(specs, update):
         check(f'golden: {name}', not bad, ', '.join(bad))
 
 
+def fresh_dir_checks():
+    """B13: a fresh run must claim its own directory. new_case_dir is
+    redirected to a local temp dir, so this needs no WSL."""
+    import shutil
+    import tempfile
+    from blastlab.solvers.foam import writer as fw
+
+    case = cases()['case3d_c4']
+    tmp = tempfile.mkdtemp(prefix='blastlab_writer_')
+    taken = os.path.join(tmp, 'taken_3d')
+    real_new = fw.env.new_case_dir
+    try:
+        fw.env.new_case_dir = lambda dim, stamp=None: ('/root/taken_3d',
+                                                       taken)
+        spec = fw.write_case(case)
+        check('write_case creates the fresh case dir',
+              os.path.isfile(os.path.join(spec.case_unc, 'system',
+                                          'controlDict')))
+        try:
+            fw.write_case(case)
+            same_dir_ok = True
+        except FileExistsError:
+            same_dir_ok = False
+        check('a second fresh run refuses to reuse the dir (B13)',
+              not same_dir_ok)
+        # the explicit-path branch stays permissive (resume/postmortem)
+        real_unc = fw.env.unc
+        try:
+            fw.env.unc = lambda posix: taken
+            fw.write_case(case, case_posix='/root/taken_3d')
+            reuse_ok = True
+        except FileExistsError:
+            reuse_ok = False
+        finally:
+            fw.env.unc = real_unc
+        check('an explicit case_posix may reuse an existing dir',
+              reuse_ok)
+    finally:
+        fw.env.new_case_dir = real_new
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     update = '--update' in sys.argv
     specs = {name: render_case(case) for name, case in cases().items()}
     # parallel golden variant: same 3D case rendered for 4 MPI ranks
     specs['case3d_c4_np4'] = render_case(cases()['case3d_c4'], n_procs=4)
     semantic_checks(specs)
+    fresh_dir_checks()
     golden(specs, update)
     print()
     if FAIL:
