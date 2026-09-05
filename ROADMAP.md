@@ -791,7 +791,16 @@ parameters + a Case field; `test_foam_kb_anchor.py` is a ready harness — expec
 the ratio to move meaningfully toward 1. *Effort:* M (~1 day + re-baseline KB
 numbers). *Confidence:* verified still absent (no `afterburnModel` anywhere).
 
-**N4 — VTK / ParaView export** *(cheap, high value)*. `foamToVTK` is installed
+**N4 — VTK / ParaView export. DONE (2026-09-05).** `solvers/foam/export_vtk.py`:
+`foamToVTK -useTimeName -poly` (polyhedral cells of locally refined meshes
+kept) through `runner.run_stage` on the kept case dir, one file per written
+time in `<case>/VTK/`; Results-panel 'VTK' export button, enabled only for a
+blastFoam result whose case dir still exists (`can_export`), runs off-thread
+with `[vtk]` log lines and opens the folder (`os.startfile`); failures ->
+log + a short dialog. `env.case_paths` (UNC / posix / run name -> both) is
+the public resolver postmortem now delegates to. Verified on a 22-time-dir
+3D run: 22 volume .vtk files (+ patch folders). Native .vti export stays
+out of scope. *Original entry:* *(cheap, high value)*. `foamToVTK` is installed
 WSL-side; a Results button running `run_stage(case_posix, ['foamToVTK
 -useTimeName'])` + open-folder gives the full ParaView pipeline for reports.
 Native runs: optional `.vti` via pyvista later. *Effort:* S. *Confidence:*

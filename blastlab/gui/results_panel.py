@@ -4,7 +4,7 @@ recorded animation frames, and export artifacts."""
 import os
 import threading
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
 import numpy as np
@@ -76,18 +76,21 @@ class ResultsPanel(ctk.CTkFrame):
                       text_color=c('text'),
                       command=self._open_run_browser).pack(side='left')
 
+        self._export_btns = {}
         for label, name, kind in (('Profile', 'curve', 'profile'),
                                   ('GIF', 'film', 'gif'),
+                                  ('VTK', 'cube', 'vtk'),
                                   ('Summary CSV', 'table', 'summary'),
                                   ('Gauges TSV', 'table', 'tsv'),
                                   ('PNGs', 'image', 'pngs')):
-            ctk.CTkButton(bar, text=label, image=icon(name, 14),
-                          compound='left', width=104, height=32,
-                          font=theme.F_BODY, corner_radius=theme.RADIUS,
-                          fg_color=c('card2'), hover_color=c('border'),
-                          text_color=c('text'),
-                          command=lambda k=kind: self._export(k)).pack(
-                side='right', padx=(GAP, 0))
+            b = ctk.CTkButton(bar, text=label, image=icon(name, 14),
+                              compound='left', width=104, height=32,
+                              font=theme.F_BODY, corner_radius=theme.RADIUS,
+                              fg_color=c('card2'), hover_color=c('border'),
+                              text_color=c('text'),
+                              command=lambda k=kind: self._export(k))
+            b.pack(side='right', padx=(GAP, 0))
+            self._export_btns[kind] = b
         ctk.CTkLabel(bar, text='Export', font=theme.F_BODY,
                      text_color=c('muted')).pack(side='right',
                                                  padx=(0, GAP))
@@ -219,6 +222,11 @@ class ResultsPanel(ctk.CTkFrame):
         if ent is None:
             return
         self._stop_play()
+        # ParaView export only makes sense for a foam run whose case dir
+        # still exists on the WSL disk
+        from ..solvers.foam.export_vtk import can_export
+        self._export_btns['vtk'].configure(
+            state='normal' if can_export(ent.result.meta) else 'disabled')
         snaps = list(ent.result.snapshots.keys())
         self.snap_sel.configure(values=snaps)
         if snaps:
@@ -537,6 +545,13 @@ class ResultsPanel(ctk.CTkFrame):
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
                 defaultextension='.txt', initialfile=f'gauges_{dim}d.txt')
+        elif kind == 'vtk':
+            from ..solvers.foam.export_vtk import can_export
+            if not can_export(res.meta):
+                self._log('VTK export needs a blastFoam run whose case '
+                          'directory still exists.')
+                return
+            target = res.meta['case_dir']
         elif kind == 'summary':
             if not res.gauges.get('pressures'):
                 self._log('No gauges in this result.')
@@ -608,6 +623,20 @@ class ResultsPanel(ctk.CTkFrame):
                     gauge_summary.save_gauge_summary(
                         self.summary_rows(res), target)
                     self._log(f'Saved {target}')
+                elif kind == 'vtk':
+                    from ..solvers.foam.export_vtk import export_vtk
+                    try:
+                        out = export_vtk(target, log=self._log)
+                    except RuntimeError as exc:
+                        self._log(f'VTK export failed: {exc}')
+                        self.after(0, messagebox.showerror, 'VTK export',
+                                   str(exc)[:600])
+                        return
+                    self._log(f'VTK export done: {out}')
+                    try:
+                        os.startfile(out)
+                    except OSError as exc:
+                        self._log(f'(could not open the folder: {exc})')
                 elif kind == 'gif':
                     write_animation(res.meta, target, show_mesh=show_mesh)
                     self._log(f'Saved {target}')

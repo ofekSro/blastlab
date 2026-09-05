@@ -62,6 +62,22 @@ def unc(posix_path):
         + posix_path.replace('/', '\\')
 
 
+def case_paths(case_dir):
+    """(posix, unc) for a run/case dir given as a WSL UNC path, a posix
+    path, or a bare run name under RUNS_ROOT."""
+    d = str(case_dir).rstrip('/\\')
+    if d.startswith('\\\\'):
+        tail = d.split('\\' + WSL_DISTRO + '\\', 1)
+        if len(tail) != 2:
+            raise ValueError(f'not a WSL UNC path: {case_dir}')
+        posix = '/' + tail[1].replace('\\', '/')
+    elif d.startswith('/'):
+        posix = d
+    else:
+        posix = f'{RUNS_ROOT}/{d}'
+    return posix, unc(posix)
+
+
 def wsl_argv(script):
     """argv running `script` in WSL with the OpenFOAM env sourced."""
     return ['wsl.exe', '-d', WSL_DISTRO, '-e', 'bash', '-lc',

@@ -24,19 +24,8 @@ from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
 def _paths(case_dir):
-    """(posix, unc) for a case dir given either form, or a bare run
-    name under env.RUNS_ROOT."""
-    d = str(case_dir).rstrip('/\\')
-    if d.startswith('\\\\'):
-        tail = d.split('\\' + env.WSL_DISTRO + '\\', 1)
-        if len(tail) != 2:
-            raise ValueError(f'not a WSL UNC path: {case_dir}')
-        posix = '/' + tail[1].replace('\\', '/')
-    elif d.startswith('/'):
-        posix = d
-    else:
-        posix = f'{env.RUNS_ROOT}/{d}'
-    return posix, env.unc(posix)
+    """(posix, unc) - see env.case_paths."""
+    return env.case_paths(case_dir)
 
 
 def _n_procs_on_disk(case_unc):

@@ -123,6 +123,18 @@ def main():
             ok, detail = False, f'{type(exc).__name__}: {exc}'
         check(f"{label}: '{values[0]}' still renders", ok, detail)
 
+    print("\nVTK export button state")
+    check('VTK button disabled for a native result',
+          panel._export_btns['vtk'].cget('state') == 'disabled',
+          str(panel._export_btns['vtk'].cget('state')))
+    foam = fake_2d()
+    foam.meta['solver'] = 'blastfoam'
+    foam.meta['case_dir'] = os.getcwd()
+    panel.add_result('foam', 2, foam)
+    check('VTK button enabled for a foam result with an existing case dir',
+          panel._export_btns['vtk'].cget('state') == 'normal',
+          str(panel._export_btns['vtk'].cget('state')))
+
     print("\nhidden without the maps (older loaded runs)")
     for label, dim, res, new in (('2D old', 2, fake_2d(False), NEW_2D),
                                  ('3D old', 3, fake_3d(False), NEW_3D)):

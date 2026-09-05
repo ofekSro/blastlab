@@ -37,6 +37,28 @@ def main():
           argv[:5] == ['wsl.exe', '-d', 'Ubuntu', '-e', 'bash']
           and argv[5] == '-lc' and env.FOAM_BASHRC in argv[6]
           and argv[6].endswith('echo hi'))
+    # ── N4: case_paths accepts UNC / posix / bare name ──────────────────
+    for given in (r'\\wsl.localhost\Ubuntu\root\blastlab_runs\r1',
+                  '/root/blastlab_runs/r1', 'r1', 'r1/'):
+        px, un = env.case_paths(given)
+        check(f'case_paths({given!r})',
+              px == '/root/blastlab_runs/r1'
+              and un == r'\\wsl.localhost\Ubuntu\root\blastlab_runs\r1',
+              f'{px} {un}')
+    try:
+        env.case_paths(r'\\other\share\x')
+        check('case_paths rejects a foreign UNC', False)
+    except ValueError:
+        check('case_paths rejects a foreign UNC', True)
+    from blastlab.solvers.foam.export_vtk import can_export
+    check('can_export: native result -> False',
+          not can_export(dict(solver='native', case_dir='C:/')))
+    check('can_export: foam result with a missing dir -> False',
+          not can_export(dict(solver='blastfoam',
+                              case_dir=r'\\wsl.localhost\Ubuntu\nope')))
+    check('can_export: foam result with an existing dir -> True',
+          can_export(dict(solver='blastfoam', case_dir=os.getcwd())))
+
     # ── N8: run-dir info parsing, cleanup policy, settings ─────────────
     dirs = ['/root/blastlab_runs/a', '/root/blastlab_runs/b']
     info = env._parse_info('INFO|/root/blastlab_runs/a|1024|1700000000\n'
