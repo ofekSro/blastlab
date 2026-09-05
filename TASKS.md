@@ -32,7 +32,7 @@
 | T16 | Afterburn model (KB gap) | N3 | M | [ ] |
 | T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |
 | T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [x] |
-| T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [ ] |
+| T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [x] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
 
 ---
@@ -699,7 +699,7 @@ Done when: green; ROADMAP N15 T18 part DONE.
 ## T19 — Local refinement: 3D viewer mesh layer + e2e + docs (N15)
 
 ```
-SESSION PROMPT — T19
+SESSION PROMPT — T19   [DONE 2026-09-05]
 Read: ROADMAP.md N15, plan file section "T19", viz3d/viewer.py (BlastScene
   layers, _CutPlane, mesh_edges_polydata, add_static_scenery), viz3d/sampling.py
   build_scene_init, viz3d/client.py scene_from_meta, gui/view3d_panel.py

@@ -28,7 +28,8 @@ from .vtk_host import VtkTkHost
 
 N_PLANES = 6
 FIELD_LABELS = [('p', 'Pressure'), ('rho', 'Density'), ('e', 'Energy'),
-                ('p_peak', 'Peak overpressure'), ('imp', 'Impulse')]
+                ('p_peak', 'Peak overpressure'),
+                ('imp', 'Net ovp impulse')]
 
 
 class Feed3D:
@@ -157,6 +158,8 @@ class View3DPanel(VtkTkHost):
                  lambda: self._toggle_layer('loads'))
         checkbox(disp, 'Volume render', 'volume', False,
                  lambda: self._toggle_layer('volume'))
+        checkbox(disp, 'Show mesh', 'mesh', False,
+                 lambda: self._toggle_layer('mesh'))
 
         # ── Planes tab (VIPER-style cross-sections) ────────────────────
         small_label(planes, 'CROSS-SECTION PLANES')
@@ -292,20 +295,23 @@ class View3DPanel(VtkTkHost):
         feed = Feed3D(scene_from_meta(result.meta))
         if not self._ensure_scene(feed.init):
             return False
-        for snap in result.snapshots.values():
+        names = list(result.snapshots.keys())
+        for i, name in enumerate(names):
+            snap = result.snapshots[name]
             payload = feed.make_payload(dict(p=snap['p']))
             rho3 = snap.get('rho3')   # stored pre-decimated, same stride rule
             if rho3 is not None and rho3.shape == payload['p'].shape:
                 payload['rho'] = rho3
-            self.on_frame(float(snap.get('t', 0.0)), payload)
+            self.on_frame(float(snap.get('t', 0.0)), payload,
+                         final=(i == len(names) - 1))
         self.on_done(result.stop_reason)
         return True
 
     # ── frame flow (Tk thread) ───────────────────────────────────────────
-    def on_frame(self, t, payload):
+    def on_frame(self, t, payload, final=False):
         if self._scene is None:
             return
-        self._scene.on_message(('frame', t, payload))
+        self._scene.on_message(('frame', t, payload, final))
         self._set_time_range(len(self._scene.store))
         if self._scene.follow_live:
             self._sync_slider(self._scene.index)
@@ -479,7 +485,7 @@ class View3DPanel(VtkTkHost):
     def _apply_all_controls(self):
         """Push current Tk control state into a freshly built scene."""
         s = self._scene
-        for key in (['iso', 'loads', 'volume']
+        for key in (['iso', 'loads', 'volume', 'mesh']
                     + [f'plane{k}' for k in range(1, N_PLANES + 1)]):
             s.layers[key].set_visible(self._vars[key].get())
         s.set_field(self._vars['field'].get())

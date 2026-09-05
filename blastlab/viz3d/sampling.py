@@ -162,6 +162,7 @@ def build_scene_init(scene_info, max_dim=MAX_VIEW_DIM):
         rings=[tuple(o) for o in scene_info.get('rings') or []],
         bcs=dict(scene_info['bcs']),
         face_specs=face_specs,
+        refine=scene_info.get('refine'),   # local refinement record or None
     )
     return init, stride, face_specs
 
@@ -260,7 +261,10 @@ class FrameStore:
 
     def append(self, t, frame, force=False):
         """Offer a frame; it is kept every `stride`-th offer (always when
-        force=True, e.g. the final frame). Returns True if stored."""
+        force=True, e.g. the final frame). Returns True if the frame is
+        still present in the store after any thinning triggered by this
+        append (thinning is anchored on the newest frame, so it is never
+        the one dropped)."""
         keep = force or (self._seen % self._stride == 0)
         self._seen += 1
         if not keep:
@@ -269,12 +273,13 @@ class FrameStore:
         self.frames.append(frame)
         self._bytes += self._frame_bytes(frame)
         while self._bytes > self._mem_cap and len(self.frames) > 2:
-            # keep first/last spacing even; recount, strides double
-            self.times = self.times[::2]
-            self.frames = self.frames[::2]
+            # anchor thinning on the newest frame (drop from the older
+            # end) so the frame we just accepted is never discarded
+            self.times = self.times[::-2][::-1]
+            self.frames = self.frames[::-2][::-1]
             self._bytes = sum(self._frame_bytes(f) for f in self.frames)
             self._stride *= 2
-        return True
+        return bool(self.frames) and self.frames[-1] is frame
 
     def __len__(self):
         return len(self.frames)

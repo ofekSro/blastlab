@@ -819,8 +819,8 @@ figures. *Effort:* M. *Confidence:* carried forward.
 
 ---
 
-**N15 — Local mesh refinement (blastFoam) + "show mesh" overlays.** Owner
-request (2026-09-05): a base cell (e.g. 50 cm) plus axis-aligned refinement
+**N15 — Local mesh refinement (blastFoam) + "show mesh" overlays. DONE
+(2026-09-05, T17-T19).** Owner request (2026-09-05): a base cell (e.g. 50 cm) plus axis-aligned refinement
 zones with a level (1 = dx/2, 2 = dx/4, ...; nested), blastFoam-only; results
 resampled onto the finest uniform grid so every plot/export/animation/3D path
 keeps working; a "show mesh" checkbox drawing the TRUE cell edges in the setup
@@ -861,9 +861,21 @@ graceful stop honoured, post-mortem reload identical) and
 carved cells ambient, coarse corner one 8^3 block, gauge within 10 %).
 The e2e runs exposed and fixed B25 (controlDict edits within
 `fileModificationSkew` ignored) and a T10 side effect (the writer's `0/`
-dir reported as a skipped stall). *Open:* T19 (3D viewer `_MeshEdges`
-layer, e2e polish, README). Known limit: axisymmetric zones touching the
-axis are level <= 1 (wedge axis cells are prisms).
+dir reported as a skipped stall).
+*T19 DONE (2026-09-05)* — `viz3d/viewer._MeshEdges` layer: per visible
+axis-aligned cut plane the cell edges from the FULL-resolution `init` axes
+(true cells of a refined run via `init['refine']`, every face otherwise),
+drawn at the plane's own position, rebuilt only when a plane moves/toggles
+(cached across frames), cylinder-filtered for revolved scenes, capped at
+300k segments (base grid beyond); `refine` flows through
+`sampling.build_scene_init` and `client.scene_from_meta`; Display-tab
+"Show mesh" checkbox + `_apply_all_controls`. README section "Local mesh
+refinement (blastFoam)". `test_viz3d_scene` (uniform 41+41 lines, plane
+move, second plane, hide, frames do not rebuild, refined 40^3 record ->
+merged coarse cells) and `test_viz3d_panel` (toggle) cover it.
+Known limit: axisymmetric zones touching the axis are level <= 1 (wedge
+axis cells are prisms); the revolved (axisym-to-3D) viewer scene shows the
+uniform revolved grid, not the (r, z) refinement.
 
 ## 5. Nice-to-have
 

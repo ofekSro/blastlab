@@ -45,7 +45,10 @@ class Viewer3DClient:
     def send_frame(self, t, fields, force=False):
         """Decimate and enqueue one frame; silently dropped when the
         viewer is behind (bounded queue) or the throttle interval has
-        not elapsed. `fields` values are only read, never kept."""
+        not elapsed. `fields` values are only read, never kept.
+        `force` both bypasses the throttle/drop (e.g. the final frame of
+        a run) and is carried in the message as `final`, so the viewer's
+        FrameStore keeps it regardless of thinning stride."""
         now = time.time()
         if not force and now - self._last_send < self._min_interval:
             return
@@ -54,9 +57,9 @@ class Viewer3DClient:
         payload = build_payload(fields, self._stride, self._face_specs)
         try:
             if force:   # e.g. the final frame of a run - don't drop it
-                self._q.put(('frame', float(t), payload), timeout=2.0)
+                self._q.put(('frame', float(t), payload, True), timeout=2.0)
             else:
-                self._q.put_nowait(('frame', float(t), payload))
+                self._q.put_nowait(('frame', float(t), payload, False))
             self._last_send = now
         except _queue.Full:
             pass
@@ -82,7 +85,8 @@ def scene_from_meta(meta):
                 dx=meta['dx'], solid=meta['solid'],
                 obstacles=meta['obstacles'], Lx=meta['Lx'], Ly=meta['Ly'],
                 Lz=meta['Lz'], charge_center=meta['charge_center'],
-                r_exp=meta.get('r_src', meta.get('r_exp')), bcs=meta['bcs'])
+                r_exp=meta.get('r_src', meta.get('r_exp')), bcs=meta['bcs'],
+                refine=meta.get('refine'))
 
 
 def _send_blocking(client, msg, timeout=30.0):
@@ -102,7 +106,9 @@ def open_playback(result):
     """Open a viewer on a finished 3D Result: replay its snapshots
     (which carry `t` and decimated density) and enter playback mode."""
     client = Viewer3DClient(scene_from_meta(result.meta))
-    for snap in result.snapshots.values():
+    names = list(result.snapshots.keys())
+    for i, name in enumerate(names):
+        snap = result.snapshots[name]
         p = np.asarray(snap['p'])
         payload = dict(p=decimate(p, client._stride),
                        loads=extract_loads(p, client._face_specs))
@@ -111,8 +117,9 @@ def open_playback(result):
         # shapes match unless the snapshot predates the viewer
         if rho3 is not None and rho3.shape == payload['p'].shape:
             payload['rho'] = rho3
+        final = (i == len(names) - 1)
         if not _send_blocking(client, ('frame', float(snap.get('t', 0.0)),
-                                       payload)):
+                                       payload, final)):
             break
     client.finish(result.stop_reason)
     return client

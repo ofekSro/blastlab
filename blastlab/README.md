@@ -64,7 +64,12 @@ double-click resets. The control column has three tabs:
 | View | Top/Bottom/Front/Back/Left/Right presets, parallel projection, reset |
 
 Peak overpressure and impulse are accumulated by the solver per cell,
-so the planes can paint running maxima like VIPER does. Below the tabs:
+so the planes can paint running maxima like VIPER does. The displayed
+impulse is *net* overpressure impulse - ∫(p−p₀)dt over the whole
+record, negative phase included - not the positive-phase impulse used
+in blast engineering (KB) tables, so it reads systematically low
+against published data; it decreases once the negative phase passes.
+Below the tabs:
 follow-live toggle, a time slider over the retained history and
 Play/Pause. The auto colour scale tracks each frame's own range (so a
 decaying shock stays visible); switch it off and type Min/Max (with
@@ -76,6 +81,33 @@ run. In the GUI the scene renders off-screen in-process and is blitted
 into the panel; the CLI window runs in a separate process fed over a
 bounded, drop-on-full queue. Without pyvista everything else works
 unchanged.
+
+## Local mesh refinement (blastFoam)
+
+The blastFoam backend can refine the mesh locally instead of shrinking the
+whole grid. A case has a **base cell size** plus **refinement zones**: axis-
+aligned boxes `(x0, x1, y0, y1[, z0, z1], level)` where level *l* halves the
+cell *l* times (level 1 = dx/2, level 2 = dx/4, up to level 4). Zones may
+nest; each level-*l* zone must sit at least one level-(*l*-1) cell inside a
+level-(*l*-1) zone (2:1 grading - validation refuses jumps of two levels),
+and zone edges snap outward onto the faces of level *l*-1. **Charge
+refinement** `'global'` keeps today's rule (the whole grid is refined to
+resolve the charge); `'zone'` keeps the base cell and adds automatic nested
+zones around each charge. The native solvers stay uniform - zones on a
+native case are a validation error.
+
+Results are resampled onto the **finest uniform grid** (dx / 2^lmax), so
+every plot, export, animation and 3D view works unchanged; coarse cells
+appear as constant blocks. The **Show mesh** checkbox (setup preview, live
+run plot, Results field/replay plots, 3D viewer Display tab) draws the true
+cell edges. Validation reports the predicted mesh cell count and the size
+of the display grid (which is what costs memory - keep lmax at 3-4).
+
+Limits: axisymmetric zones touching the symmetry axis are level 1 only (the
+wedge axis cells are prisms); refinement needs `topoSet`, `refineMesh` and
+`postProcess` in the WSL install. The run keeps `0/C` (cell centres) so a
+refined run can be reloaded post-mortem. E2E drivers:
+`tests/_e2e_foam_refine2d.py`, `tests/_e2e_foam_refine3d.py`.
 
 ## Layout
 

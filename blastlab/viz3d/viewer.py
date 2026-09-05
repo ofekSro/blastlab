@@ -23,6 +23,7 @@ import queue as _queue
 
 import numpy as np
 
+from ..core import refine
 from ..core.refine import LEVEL_COLORS
 from ..core.constants import P_AIR
 from .sampling import FrameStore
@@ -280,6 +281,7 @@ class BlastScene(_CameraOps):
         self.layers['iso'] = _Isosurface(self, on=True)
         self.layers['loads'] = _SurfaceLoads(self, on=True)
         self.layers['volume'] = _Volume(self, on=False)
+        self.layers['mesh'] = _MeshEdges(self, on=False)
         if not embedded:
             self._widgets()
 
@@ -634,6 +636,17 @@ class _CutPlane(_Layer):
         self._plane.SetNormal(*self.normal)
         self._plane.SetOrigin(*self.origin)
         self.refresh()
+        self._sync_mesh()
+
+    def set_visible(self, on):
+        super().set_visible(on)
+        self._sync_mesh()
+
+    def _sync_mesh(self):
+        """The mesh-edge layer follows this plane's position/visibility."""
+        m = self.s.layers.get('mesh')
+        if m is not None and m.visible:
+            m.refresh()
 
     def on_clim_changed(self):
         self.refresh()
@@ -671,6 +684,112 @@ class _CutPlane(_Layer):
             self._actor.mapper.scalar_range = clim
             self._actor.mapper.lookup_table.log_scale = s.log_scale
             self._actor.prop.opacity = self.opacity
+
+
+class _MeshEdges(_Layer):
+    """Cell edges of the computational mesh on every visible axis-aligned
+    cut plane: the TRUE cells of a locally refined run (coarse cells as
+    merged blocks, from `init['refine']`) or every face of a uniform run.
+    Built from the FULL-resolution axes in `init` - not the
+    stride-decimated display grid - through core.refine, and rebuilt only
+    when a plane moves or toggles (frames refresh every layer, so the
+    per-plane geometry is cached). Off by default."""
+
+    MAX_SEGMENTS = 300_000
+
+    def __init__(self, scene, on):
+        self.s = scene
+        self._built = {}            # actor name -> (axis, k) it was built for
+        self.set_visible(on)
+
+    def _remove(self, name):
+        try:
+            self.s.pl.remove_actor(name)
+        except Exception:
+            pass
+        self._built.pop(name, None)
+
+    def refresh(self):
+        s = self.s
+        want = {}
+        if self.visible:
+            for key, layer in s.layers.items():
+                if key.startswith('plane') and layer.visible:
+                    geom = self._plane_geom(layer)
+                    if geom is not None:
+                        want[f'mesh_{key}'] = geom
+        for name in list(self._built):
+            if name not in want or self._built[name] != want[name]:
+                self._remove(name)
+        for name, geom in want.items():
+            if name in self._built:
+                continue
+            poly = self._edges(*geom)
+            if poly is None:
+                continue
+            s.pl.add_mesh(poly, color='#d0d4da', line_width=1,
+                          opacity=0.7, name=name, reset_camera=False,
+                          render=False)
+            self._built[name] = geom
+
+    def _plane_geom(self, layer):
+        """(axis, fine layer index, position) of an axis-aligned plane,
+        else None. The layer index selects the refinement structure; the
+        edges are drawn at the plane's own position."""
+        n = np.asarray(layer.normal, dtype=float)
+        ax = int(np.argmax(np.abs(n)))
+        if abs(n[ax]) < 0.99 * np.linalg.norm(n):
+            return None
+        init = self.s.init
+        c = (init['x_c'], init['y_c'], init['z_c'])[ax]
+        dxf = float(init['dx'])
+        pos = float(layer.origin[ax])
+        k = int(np.clip(np.floor((pos - (c[0] - dxf / 2)) / dxf), 0,
+                        len(c) - 1))
+        return ax, k, round(pos, 9)
+
+    def _edges(self, ax, k, pos):
+        init = self.s.init
+        dxf = float(init['dx'])
+        axes_c = (init['x_c'], init['y_c'], init['z_c'])
+        uv = [a for a in range(3) if a != ax]
+        faces = [np.concatenate(([axes_c[a][0] - dxf / 2],
+                                 np.asarray(axes_c[a]) + dxf / 2))
+                 for a in uv]
+        ref = init.get('refine')
+        src = None
+        if ref is not None:
+            src = refine.slice_src(ref['levels'], ref['lmax'], ax, k)
+        if src is None and len(faces[0]) + len(faces[1]) > self.MAX_SEGMENTS:
+            return None
+        segs = refine.mesh_segments_2d(src, faces[0], faces[1])
+        if len(segs) > self.MAX_SEGMENTS:      # too fine to draw: base grid
+            step = 2 ** int(ref['lmax']) if ref is not None else 1
+            segs = refine.mesh_segments_2d(None, faces[0][::step],
+                                           faces[1][::step])
+        segs = self._cyl_filter(segs, ax)
+        if not len(segs):
+            return None
+        # a hair off the cut surface so the lines are not z-fought away
+        return mesh_edges_polydata(segs, ax, pos + 1e-3 * dxf)
+
+    def _cyl_filter(self, segs, ax):
+        """Revolved axisymmetric scenes: drop segments lying entirely
+        outside the cylinder (the plane spans the bounding box)."""
+        cyl = self.s.init.get('cyl')
+        if not cyl or not len(segs):
+            return segs
+        cx, cy, R = float(cyl['cx']), float(cyl['cy']), float(cyl['R'])
+        uv = [a for a in range(3) if a != ax]
+        pts = segs.reshape(-1, 2)              # (2N, 2) in-plane coords
+        if ax == 2:                            # horizontal plane: radial test
+            d = np.hypot(pts[:, 0] - cx, pts[:, 1] - cy)
+        else:                                  # vertical plane: horizontal axis
+            h = pts[:, 0] if uv[0] in (0, 1) else pts[:, 1]
+            c0 = cx if uv[0] == 0 else cy
+            d = np.abs(h - c0)
+        inside = (d <= R * (1 + 1e-9)).reshape(-1, 2).any(axis=1)
+        return segs[inside]
 
 
 class _Isosurface(_Layer):

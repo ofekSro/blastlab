@@ -61,13 +61,13 @@ pl = pv.Plotter(off_screen=True, window_size=(800, 600))
 scene = BlastScene(pl, init)
 check("grid dims match decimated solid",
       tuple(scene.grid.dimensions) == init['solid_dec'].shape)
-check("5 layers", set(scene.layers) == {'plane1', 'plane2', 'iso',
-                                        'loads', 'volume'})
+check("6 layers", set(scene.layers) == {'plane1', 'plane2', 'iso',
+                                        'loads', 'volume', 'mesh'})
 check("hud placeholder", scene.frame is None)
 
 print("\nS2: live frames")
 for k, r in enumerate((0.3, 0.8, 1.4, 2.0)):
-    scene.on_message(('frame', 1e-3 * (k + 1), synth_frame(1e-3, r)))
+    scene.on_message(('frame', 1e-3 * (k + 1), synth_frame(1e-3, r), False))
 check("4 frames stored", len(scene.store) == 4)
 check("follow-live tracks latest", scene.index == 3)
 check("time is latest", abs(scene.t - 4e-3) < 1e-12)
@@ -84,14 +84,15 @@ print("\nS2b: per-frame auto scale follows a decaying field")
 big = scene.cmax
 scene.on_message(('frame', 5e-3, {
     **synth_frame(5e-3, 2.0),
-    'p': decimate(np.full(solid.shape, P_AIR + 5e4, np.float64), stride)}))
+    'p': decimate(np.full(solid.shape, P_AIR + 5e4, np.float64), stride)},
+    False))
 check("cmax came down with the field", scene.cmax < 0.3 * big,
       f"({big:.0f} -> {scene.cmax:.0f} kPa)")
 
 print("\nS2c: slice data varies on every plane orientation")
 X, Y, Z = np.meshgrid(x_c, y_c, z_c, indexing='ij')
 scene.on_message(('frame', 6e-3,
-                  dict(p=decimate(P_AIR + 1e5 * Z, stride))))
+                  dict(p=decimate(P_AIR + 1e5 * Z, stride)), False))
 for axis, expect_flat in (('x', False), ('y', False), ('z', True)):
     scene.set_plane('plane1', axis, 0.5)
     pl.render()
@@ -107,7 +108,7 @@ for axis, expect_flat in (('x', False), ('y', False), ('z', True)):
           f"(range {rng:.1f} kPa)")
 
 print("\nS3: toggles")
-scene.on_message(('frame', 7e-3, synth_frame(7e-3, 1.4)))
+scene.on_message(('frame', 7e-3, synth_frame(7e-3, 1.4), True))
 scene.layers['volume'].set_visible(True)
 check("volume actor added", 'volume_f' in pl.actors)
 scene.layers['volume'].set_visible(False)
@@ -124,6 +125,49 @@ check("density plane drawn", 'cut_plane1' in pl.actors)
 scene._set_density_planes(False)
 scene.layers['plane2'].set_visible(True)
 check("plane2 actor", 'cut_plane2' in pl.actors)
+
+print("\nS3a: mesh-edge layer (N15 show mesh)")
+from blastlab.core import refine as _refine
+check("mesh layer off by default", 'mesh_plane1' not in pl.actors)
+scene.layers['mesh'].set_visible(True)
+vis = {k for k, l in scene.layers.items() if k.startswith('plane') and l.visible}
+check("mesh edges drawn on exactly the visible planes",
+      {k for k in pl.actors if k.startswith('mesh_')} == {f'mesh_{k}' for k in vis},
+      str([k for k in pl.actors if 'mesh' in k]))
+poly = pl.actors['mesh_plane1'].mapper.dataset
+want = len(_refine.mesh_segments_2d(None, np.arange(41) * 0.1, np.arange(41) * 0.1))
+check("uniform mesh: one line per face (41 + 41)", poly.n_lines == want,
+      f"{poly.n_lines} vs {want}")
+scene.set_plane('plane1', 'x', 0.5)
+poly2 = pl.actors['mesh_plane1'].mapper.dataset
+check("plane move rebuilds the edges at the new plane position",
+      abs(poly2.points[:, 0].mean() - 2.0) < 0.001 and poly2.n_lines == want,
+      f"x mean {poly2.points[:, 0].mean():.3f}")
+scene.layers['plane2'].set_visible(True)
+check("second plane gets its own edges", 'mesh_plane2' in pl.actors)
+scene.layers['plane2'].set_visible(False)
+check("hiding a plane removes its edges", 'mesh_plane2' not in pl.actors)
+scene.on_message(('frame', 5e-3, synth_frame(5e-3, 2.2), False))
+check("frames do not rebuild the edges", 'mesh_plane1' in pl.actors
+      and pl.actors['mesh_plane1'].mapper.dataset is poly2)
+scene.layers['mesh'].set_visible(False)
+check("mesh layer off removes every edge actor",
+      not any(k.startswith('mesh_') for k in pl.actors))
+# a refined record: base 0.2 m (20^3) with one level-1 block -> fine 40^3
+lev = np.zeros((40, 40, 40), dtype=np.int8)
+lev[:10, :10, :10] = 1
+init_r = dict(init, refine=dict(levels=lev, lmax=1, dx_base=0.2, zones=[]))
+pl_r = pv.Plotter(off_screen=True, window_size=(400, 300))
+scene_r = BlastScene(pl_r, init_r)
+scene_r.set_plane('plane1', 'z', 0.1)          # z = 0.4 -> fine layer 4
+scene_r.layers['mesh'].set_visible(True)
+poly_r = pl_r.actors['mesh_plane1'].mapper.dataset
+faces = np.arange(41) * 0.1
+src = _refine.slice_src(lev, 1, 2, 4)
+want_r = len(_refine.mesh_segments_2d(src, faces, faces))
+check("refined mesh: coarse cells merged, fine block resolved",
+      poly_r.n_lines == want_r and want_r < 82, f"{poly_r.n_lines} vs {want_r}")
+pl_r.close()
 
 print("\nS3b: field switching / colour scale / presets")
 scene.set_field('rho')
@@ -155,13 +199,23 @@ scene.reset_view()
 print("\nS3c: live display continues when history thinning rejects")
 scene2_pl = pv.Plotter(off_screen=True, window_size=(300, 200))
 scene2 = BlastScene(scene2_pl, init, embedded=True)
-scene2.store._mem_cap = 1     # every append triggers thinning/rejects
+scene2.store._mem_cap = 1     # every append triggers thinning
 for k in range(8):
-    scene2.on_message(('frame', 1e-3 * (k + 1), synth_frame(0, 0.5)))
+    scene2.on_message(('frame', 1e-3 * (k + 1), synth_frame(0, 0.5), False))
 check("store thinned", len(scene2.store) < 8,
       f"(stored {len(scene2.store)})")
 check("displayed time is the newest frame", abs(scene2.t - 8e-3) < 1e-12,
       f"(t={scene2.t*1e3:.0f} ms)")
+
+# B4/B20: the run's actual final frame is tagged `final=True` in the
+# message (never inferred from `scene2.done`, which is still False here)
+# and must survive being the newest frame under active thinning.
+scene2.on_message(('frame', 9e-3, synth_frame(0, 0.5), True))
+check("final-tagged frame stored despite aggressive thinning",
+      abs(scene2.store.times[-1] - 9e-3) < 1e-12,
+      f"(stored last t={scene2.store.times[-1]*1e3:.0f} ms)")
+check("final frame did not itself flip scene2.done",
+      not scene2.done)
 scene2_pl.close()
 
 print("\nS4: done -> playback")
