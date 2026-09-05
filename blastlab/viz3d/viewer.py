@@ -37,12 +37,17 @@ RHO_TITLE = 'Density [kg/m3]'
 #: Selectable display fields: payload key -> scalar-bar title and
 #: whether the stored display values are overpressure in kPa.
 FIELDS = {
-    'p':      dict(title=OVP_TITLE,                  ovp=True),
-    'rho':    dict(title=RHO_TITLE,                  ovp=False),
-    'e':      dict(title='Energy [J/kg]',            ovp=False),
-    'p_peak': dict(title='Peak overpressure [kPa]',  ovp=True),
+    'p':      dict(title=OVP_TITLE,                  ovp=True,
+                   label='Pressure'),
+    'rho':    dict(title=RHO_TITLE,                  ovp=False,
+                   label='Density'),
+    'e':      dict(title='Energy [J/kg]',            ovp=False,
+                   label='Energy'),
+    'p_peak': dict(title='Peak overpressure [kPa]',  ovp=True,
+                   label='Peak overpressure'),
     #: net (not positive-phase) overpressure impulse - see README.md
-    'imp':    dict(title='Net overpressure impulse [Pa·s]', ovp=False),
+    'imp':    dict(title='Net overpressure impulse [Pa·s]', ovp=False,
+                   label='Net ovp impulse'),
 }
 
 #: Camera presets: view direction (towards the domain) and up vector.
@@ -251,10 +256,7 @@ class BlastScene(_CameraOps):
         self.log_scale = False
         self.vmin = 0.0              # manual colour range (active field)
         self.cmax = 10.0
-        self.density_planes = False  # CLI back-compat plane toggle
         self.iso_frac = 0.10
-        self.iso_locked = False
-        self._iso_locked_val = None
 
         dx = init['dx'] * init['stride']
         shape = init['solid_dec'].shape
@@ -266,7 +268,6 @@ class BlastScene(_CameraOps):
         n = int(np.prod(shape))
         for key in FIELDS:
             self.grid.point_data[key] = np.zeros(n, np.float32)
-        self.have_rho = False
         self._stale = set()          # frame fields not yet uploaded
 
         self._static_scene()
@@ -316,7 +317,6 @@ class BlastScene(_CameraOps):
             ('Shock isosurface', True, lambda v: self.layers['iso'].set_visible(v)),
             ('Surface loads', True, lambda v: self.layers['loads'].set_visible(v)),
             ('Volume render', False, lambda v: self.layers['volume'].set_visible(v)),
-            ('Density planes', False, self._set_density_planes),
             ('Auto colour scale', True, self._set_auto_scale),
             ('Follow live', True, self._set_follow),
         ]
@@ -379,23 +379,27 @@ class BlastScene(_CameraOps):
         self.auto_scale = False
         self.vmin = float(vmin)
         self.cmax = max(float(vmax), self.vmin + 1e-9)
-        self._refresh_field_layers()
+        self._broadcast_clim()
 
     def set_log_scale(self, on):
         self.log_scale = bool(on)
-        self._refresh_field_layers()
+        self._broadcast_clim()
 
-    def _set_density_planes(self, on):
-        self.density_planes = bool(on)
+    def _broadcast_clim(self):
+        """One colour-range change reaches EVERY layer (B19): the planes
+        rebuild, the volume rescales/rebuilds, the loads re-range."""
+        self._refresh_field_layers()
         for key, layer in self.layers.items():
             if key.startswith('plane'):
-                layer.refresh()
+                continue                    # refreshed above
+            if hasattr(layer, 'on_clim_changed'):
+                layer.on_clim_changed()
 
     def _set_auto_scale(self, on):
         self.auto_scale = bool(on)
         if on:
             self._auto_clim()
-            self._refresh_field_layers()
+            self._broadcast_clim()
         elif not self.embedded:
             self._apply_cmax(self.slider_cmax.GetRepresentation().GetValue())
 
@@ -406,7 +410,6 @@ class BlastScene(_CameraOps):
 
     def _set_iso_frac(self, v):
         self.iso_frac = float(v)
-        self.iso_locked = False
         self.layers['iso'].refresh()
 
     def _set_cmax(self, v):
@@ -418,8 +421,7 @@ class BlastScene(_CameraOps):
         if abs(v - self.cmax) / self.cmax < 0.02:
             return
         self.cmax = v
-        self._refresh_field_layers()
-        self.layers['loads'].on_clim_changed()
+        self._broadcast_clim()
 
     def _refresh_field_layers(self):
         for key, layer in self.layers.items():
@@ -439,7 +441,10 @@ class BlastScene(_CameraOps):
                    or abs(lo - self.vmin) > 0.02 * max(abs(self.vmin), 1e-9))
         if changed:
             self.vmin, self.cmax = lo, hi
-            self.layers['loads'].on_clim_changed()
+            for key, layer in self.layers.items():
+                if not key.startswith('plane') and \
+                        hasattr(layer, 'on_clim_changed'):
+                    layer.on_clim_changed()    # planes refresh per frame
 
     def active_clim(self, field=None):
         """(vmin, vmax) for colouring `field` (default: active field);
@@ -511,11 +516,8 @@ class BlastScene(_CameraOps):
         self._stale = {k for k in FIELDS if frame.get(k) is not None}
         for key in self._stale:
             self.have[key] = True
-        self.have_rho = self.have['rho']
         self.ensure_field('p')        # iso + HUD peak always track pressure
         self.ensure_field(self.field)
-        if self.density_planes:
-            self.ensure_field('rho')
         if self.auto_scale:
             self._auto_clim()
         for layer in self.layers.values():
@@ -662,19 +664,27 @@ class _CutPlane(_Layer):
             if self._actor is not None:
                 self._actor.visibility = False
             return
-        use_rho = s.density_planes and s.have_rho
-        scal = 'rho' if use_rho else s.field
+        scal = s.field
         s.ensure_field(scal)
-        clim = s.active_clim('rho') if use_rho else s.active_clim()
+        clim = s.active_clim()
         if self._actor is None or scal != self._scalars:
             s.pl.remove_actor(self.name)
-            title = RHO_TITLE if use_rho else FIELDS[s.field]['title']
+            title = FIELDS[s.field]['title']
+            if self._scalars is not None and self._scalars != scal:
+                # pyvista keeps a removed actor's scalar bar: drop the old
+                # field's bar so it does not overprint the new one (B19)
+                try:
+                    s.pl.remove_scalar_bar(FIELDS[self._scalars]['title'],
+                                           render=False)
+                except Exception:
+                    pass
             self._actor = s.pl.add_mesh(
                 self._tail, scalars=scal, cmap=CMAP, clim=clim,
                 log_scale=s.log_scale, opacity=self.opacity,
                 name=self.name, show_scalar_bar=True,
                 scalar_bar_args=dict(title=title, color='white',
-                                     fmt='%.0f', vertical=True,
+                                     fmt='%.0f' if FIELDS[s.field]['ovp']
+                                     else '%.3g', vertical=True,
                                      position_x=0.90, position_y=0.25,
                                      width=0.05, height=0.55),
                 reset_camera=False, render=False)
@@ -821,11 +831,7 @@ class _Isosurface(_Layer):
             return
         s.ensure_field('p')
         peak = float(s.grid.point_data['p'].max())
-        if s.iso_locked and s._iso_locked_val is not None:
-            level = s._iso_locked_val
-        else:
-            level = s.iso_frac * peak
-            s._iso_locked_val = level
+        level = s.iso_frac * peak
         if peak <= 0 or level <= 0 or level >= peak:
             if self._actor is not None:
                 self._actor.visibility = False
@@ -847,12 +853,23 @@ class _Isosurface(_Layer):
             self._actor.visibility = True
 
 
+LOADS_TITLE = 'Surface loads [kPa]'
+
+
 class _SurfaceLoads(_Layer):
-    """Obstacle faces + ground plane painted by adjacent-fluid pressure."""
+    """Obstacle faces + ground plane painted by adjacent-fluid pressure.
+
+    Always painted in overpressure kPa with its OWN colour range (tracked
+    per frame from the faces themselves, or the manual Min/Max when the
+    active field is an overpressure field), so switching the planes to
+    Density/Energy never saturates the loads; a second small scalar bar
+    titles them separately from the active field's bar (B19)."""
 
     def __init__(self, scene, on):
         self.s = scene
         self.meshes = {}
+        self._own = (0.0, 1.0)      # per-frame overpressure range [kPa]
+        self._bar_actor = None      # the face carrying the loads bar
         init = scene.init
         coords = (init['x_c'], init['y_c'], init['z_c'])
         dx = init['dx']
@@ -881,10 +898,25 @@ class _SurfaceLoads(_Layer):
         return sg
 
     def _load_clim(self):
+        """Manual Min/Max applies only when it is an overpressure range;
+        otherwise the faces keep their own per-frame overpressure range."""
         s = self.s
-        if FIELDS[s.field]['ovp']:
+        if not s.auto_scale and FIELDS[s.field]['ovp']:
             return s.active_clim()
-        return (0.0, max(s.cmax, 1.0)) if s.auto_scale else (0.0, 500.0)
+        lo, hi = self._own
+        return (lo, max(hi, lo + 1e-6))
+
+    def _track(self, loads):
+        """Per-frame overpressure range of the faces (2 % dead-band)."""
+        hi = 0.0
+        for fid in self.meshes:
+            arr = loads.get(fid)
+            if arr is not None:
+                v = _ovp_kpa(arr)
+                if v.size:
+                    hi = max(hi, float(np.nanmax(v)))
+        if abs(hi - self._own[1]) > 0.02 * max(self._own[1], 1e-9):
+            self._own = (0.0, max(hi, 1e-6))
 
     def on_clim_changed(self):
         clim = self._load_clim()
@@ -893,13 +925,24 @@ class _SurfaceLoads(_Layer):
             if actor is not None:
                 actor.mapper.scalar_range = clim
 
+    def _remove_all(self):
+        s = self.s
+        for fid in self.meshes:
+            s.pl.remove_actor(f'load_{fid}')
+        try:
+            s.pl.remove_scalar_bar(LOADS_TITLE, render=False)
+        except Exception:
+            pass
+        self._bar_actor = None
+
     def refresh(self):
         s = self.s
         if not self.visible or s.frame is None:
-            for fid in self.meshes:
-                s.pl.remove_actor(f'load_{fid}')
+            self._remove_all()
             return
         loads = s.frame.get('loads') or {}
+        self._track(loads)
+        clim = self._load_clim()
         for fid, mesh in self.meshes.items():
             arr = loads.get(fid)
             if arr is None:
@@ -907,15 +950,24 @@ class _SurfaceLoads(_Layer):
             mesh.cell_data['load'] = _ovp_kpa(arr).ravel(order='F')
             name = f'load_{fid}'
             if name not in s.pl.actors:
-                kw = dict(scalars='load', cmap=CMAP,
-                          clim=self._load_clim(), name=name,
-                          nan_color='#4a4f57', show_scalar_bar=False,
+                first_bar = self._bar_actor is None
+                kw = dict(scalars='load', cmap=CMAP, clim=clim, name=name,
+                          nan_color='#4a4f57', show_scalar_bar=first_bar,
                           reset_camera=False, render=False)
+                if first_bar:
+                    kw['scalar_bar_args'] = dict(
+                        title=LOADS_TITLE, color='white', fmt='%.0f',
+                        vertical=True, position_x=0.90, position_y=0.02,
+                        width=0.05, height=0.18)
                 if s.init.get('cyl'):
                     # cylindrical domain: cells beyond the outer radius
                     # are no-data - hide them so the ground is a disc
                     kw['nan_opacity'] = 0.0
-                s.pl.add_mesh(mesh, **kw)
+                actor = s.pl.add_mesh(mesh, **kw)
+                if first_bar:
+                    self._bar_actor = actor
+            else:
+                s.pl.actors[name].mapper.scalar_range = clim
 
 
 class _Volume(_Layer):

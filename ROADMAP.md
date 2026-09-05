@@ -424,8 +424,19 @@ the domain isn't what they asked for; derived distances are subtly off.
 *How:* either round N and adjust dx (exact L), or print/validate a note with
 the effective domain. *Effort:* S. *Confidence:* **confirmed by execution**.
 
-**B19 — 3D viewer colour-range plumbing misses two layers and mixes units.**
-*What:* (a) the Volume layer's clim is frozen at add-time — `_Volume.
+**B19 — 3D viewer colour-range plumbing misses two layers and mixes units.
+DONE (2026-09-05).** `BlastScene._broadcast_clim()` (from `set_clim`,
+`set_log_scale`, `_apply_cmax`, auto-scale on; `_auto_clim` notifies the
+non-plane layers too) reaches planes, volume and loads alike - the volume
+now rescales/rebuilds on manual Min/Max. `_SurfaceLoads` keeps its OWN
+per-frame overpressure range (2 % dead-band) whatever field the planes show,
+takes the manual Min/Max only when that range is an overpressure one, and
+carries a second small scalar bar "Surface loads [kPa]" (removed with the
+layer). Switching fields also drops the previous field's scalar bar, which
+pyvista kept after `remove_actor` and overprinted the new one; non-ovp bars
+format ticks with `%.3g`. Verified off-screen with Density active + loads on
+(separate Density and loads bars, loads 0-600 kPa) and in
+`test_viz3d_scene` S3-B19. *Original entry:* *What:* (a) the Volume layer's clim is frozen at add-time — `_Volume.
 on_clim_changed` (`viewer.py:774`) has no callers, so auto-scale/manual Min-Max
 never reach it (`viewer.py:791-806`); (b) GUI manual Min/Max never reaches
 Surface Loads (`viewer.py:338-343` skips `loads.on_clim_changed`, unlike the CLI
@@ -666,10 +677,10 @@ yet is exactly the block copy-pasted into all three solvers' `primitives()`
 (call it instead — bit-identical, regression-safe); `core/riemann.py:108
 mirror_state` dead; solver1d rebuilds its grid inline twice duplicating
 `make_grid_1d`; ~~`_todo` unreachable in `backend.py:51`; unused `m = MATERIALS…`
-locals (`backend.py:365,598`)~~ (foam part DONE with T9, 2026-09-05); viz3d: `client.open_playback` has no callers and
+locals (`backend.py:365,598`)~~ (foam part DONE with T9, 2026-09-05); ~~viz3d: `client.open_playback` has no callers and
 duplicates `feed_result` line-for-line, `density_planes`/`have_rho`/`iso_locked`
 are dead CLI-era toggles (`viewer.py:216-231,668-672`), `FIELD_LABELS`
-duplicates viewer `FIELDS`. `legacy/blast2d/3d.py` carry ~100 lines of fossil
+duplicates viewer `FIELDS`.~~ (viz part DONE with T13, 2026-09-05: all removed; `FIELD_LABELS` is derived from `viewer.FIELDS[...]['label']`). `legacy/blast2d/3d.py` carry ~100 lines of fossil
 scaffolding (stale imports, empty headers) — the exported names must stay.
 *Effort:* S. *Confidence:* code-read, grep-verified.
 
@@ -691,7 +702,12 @@ exact-count gate returns None forever on a persistent face-count mismatch
 (`backend.py:295-301`) — live slice never updates, no message. Same spirit as
 A6. *Effort:* S. *Confidence:* code-read.
 
-**A8 — viz3d control-message delivery is best-effort.** `client.finish()` gives
+**A8 — viz3d control-message delivery is best-effort. DONE (2026-09-05).**
+`client._send_blocking` drops one queued FRAME (never a non-frame message,
+which is put back) when the bounded queue is full and retries, so 'done' and
+'close' always land on a stalled viewer; `close()` goes through it too.
+Unit-checked in `test_viz3d_scene` (A8 section). *Original entry:*
+`client.finish()` gives
 up after 5 s on a full queue (zombie-LIVE viewer); `close()` uses `put_nowait`
 and falls through to `terminate()` (`client.py:64-76`). *How:* on `Full`, drop
 one queued frame and retry so 'done'/'close' always land. *Effort:* S.

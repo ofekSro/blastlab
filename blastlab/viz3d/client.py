@@ -11,9 +11,7 @@ import multiprocessing
 import queue as _queue
 import time
 
-import numpy as np
-
-from .sampling import build_payload, build_scene_init, decimate, extract_loads
+from .sampling import build_payload, build_scene_init
 
 
 class Viewer3DClient:
@@ -69,11 +67,10 @@ class Viewer3DClient:
         _send_blocking(self, ('done', str(stop_reason)), timeout=5.0)
 
     def close(self):
-        """Ask the viewer window to close; terminate if unresponsive."""
-        try:
-            self._q.put_nowait(('close',))
-        except _queue.Full:
-            pass
+        """Ask the viewer window to close; terminate if unresponsive.
+        A full queue (stalled viewer) has one frame dropped so the
+        'close' always lands (A8)."""
+        _send_blocking(self, ('close',), timeout=2.0)
         self._proc.join(timeout=2.0)
         if self._proc.is_alive():
             self._proc.terminate()
@@ -90,8 +87,11 @@ def scene_from_meta(meta):
 
 
 def _send_blocking(client, msg, timeout=30.0):
-    """Deliver a message even through the bounded queue (playback replay
-    must not drop frames). Gives up if the viewer dies or stalls."""
+    """Deliver a control message through the bounded queue. When the
+    queue is full (the viewer is behind or stalled) one queued FRAME is
+    dropped to make room - frames are expendable, 'done'/'close' are
+    not; a non-frame message pulled out by mistake is put back. Gives up
+    only when the viewer dies or the deadline passes (A8)."""
     deadline = time.time() + timeout
     while time.time() < deadline and client.alive:
         try:
@@ -99,30 +99,16 @@ def _send_blocking(client, msg, timeout=30.0):
             return True
         except _queue.Full:
             pass
+        try:
+            item = client._q.get_nowait()
+        except _queue.Empty:
+            continue
+        if item and item[0] != 'frame':
+            try:
+                client._q.put(item, timeout=0.25)
+            except _queue.Full:
+                pass
     return False
-
-
-def open_playback(result):
-    """Open a viewer on a finished 3D Result: replay its snapshots
-    (which carry `t` and decimated density) and enter playback mode."""
-    client = Viewer3DClient(scene_from_meta(result.meta))
-    names = list(result.snapshots.keys())
-    for i, name in enumerate(names):
-        snap = result.snapshots[name]
-        p = np.asarray(snap['p'])
-        payload = dict(p=decimate(p, client._stride),
-                       loads=extract_loads(p, client._face_specs))
-        rho3 = snap.get('rho3')
-        # snapshots decimate density with the same stride rule, so the
-        # shapes match unless the snapshot predates the viewer
-        if rho3 is not None and rho3.shape == payload['p'].shape:
-            payload['rho'] = rho3
-        final = (i == len(names) - 1)
-        if not _send_blocking(client, ('frame', float(snap.get('t', 0.0)),
-                                       payload, final)):
-            break
-    client.finish(result.stop_reason)
-    return client
 
 
 class _StartupAttach:

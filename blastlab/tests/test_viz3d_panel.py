@@ -83,6 +83,10 @@ cam_b = panel._plotter.screenshot(return_img=True).copy()
 check("camera moves show up in the blit",
       not np.array_equal(cam_a, cam_b))
 
+from blastlab.viz3d.viewer import FIELDS as _FIELDS
+check("field radios come from viewer.FIELDS",
+      set(panel._field_btns) == set(_FIELDS), str(set(panel._field_btns)))
+
 print("\nP4: controls drive the scene")
 pl = panel._scene.pl
 panel._vars['volume'].set(True); panel._toggle_layer('volume')

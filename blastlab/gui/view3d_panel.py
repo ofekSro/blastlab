@@ -25,11 +25,11 @@ from ..viz3d.sampling import build_payload, build_scene_init
 from . import theme
 from .theme import GAP, c
 from .vtk_host import VtkTkHost
+from ..viz3d.viewer import FIELDS
 
 N_PLANES = 6
-FIELD_LABELS = [('p', 'Pressure'), ('rho', 'Density'), ('e', 'Energy'),
-                ('p_peak', 'Peak overpressure'),
-                ('imp', 'Net ovp impulse')]
+#: radio-button fields, straight from the viewer's FIELDS table
+FIELD_LABELS = [(key, spec['label']) for key, spec in FIELDS.items()]
 
 
 class Feed3D:

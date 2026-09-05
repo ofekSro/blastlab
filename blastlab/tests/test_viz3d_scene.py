@@ -120,9 +120,40 @@ check("iso back", pl.actors['iso_surface'].visibility)
 scene.layers['loads'].set_visible(False)
 check("loads removed", not any(a.startswith('load_') for a in pl.actors))
 scene.layers['loads'].set_visible(True)
-scene._set_density_planes(True)
-check("density plane drawn", 'cut_plane1' in pl.actors)
-scene._set_density_planes(False)
+check("plane1 drawn", 'cut_plane1' in pl.actors)
+
+print("\nS3-B19: colour range reaches every layer")
+from blastlab.viz3d.viewer import LOADS_TITLE
+check("loads carry their own scalar bar", LOADS_TITLE in pl.scalar_bars,
+      str(list(pl.scalar_bars.keys())))
+load_actor = next(a for n, a in pl.actors.items() if n.startswith('load_'))
+own = tuple(load_actor.mapper.scalar_range)
+scene.set_field('rho')
+check("switching the field drops the previous field's scalar bar",
+      'Overpressure [kPa]' not in pl.scalar_bars and 'Density [kg/m3]' in pl.scalar_bars,
+      str(list(pl.scalar_bars.keys())))
+check("Density active: loads keep an overpressure range, not the density clim",
+      tuple(load_actor.mapper.scalar_range) == own
+      and own[1] < 1e4 and own[1] > 0.0, f"{load_actor.mapper.scalar_range} vs {own}")
+scene.layers['volume'].set_visible(True)
+scene.set_clim(1.0, 2.0)
+vol = pl.actors['volume_f']
+check("manual Min/Max reaches the volume", tuple(vol.mapper.scalar_range) == (1.0, 2.0),
+      str(vol.mapper.scalar_range))
+check("manual Min/Max on a density field leaves the loads alone",
+      tuple(load_actor.mapper.scalar_range) == own, str(load_actor.mapper.scalar_range))
+scene.set_field('p')
+scene.set_clim(0.0, 250.0)
+check("manual overpressure Min/Max reaches the loads",
+      tuple(load_actor.mapper.scalar_range) == (0.0, 250.0), str(load_actor.mapper.scalar_range))
+scene._set_auto_scale(True)
+check("auto scale restores the loads' own range",
+      abs(load_actor.mapper.scalar_range[1] - own[1]) < 1e-6 * max(own[1], 1),
+      str(load_actor.mapper.scalar_range))
+scene.layers['volume'].set_visible(False)
+scene.layers['loads'].set_visible(False)
+check("hiding loads removes their scalar bar", LOADS_TITLE not in pl.scalar_bars)
+scene.layers['loads'].set_visible(True)
 scene.layers['plane2'].set_visible(True)
 check("plane2 actor", 'cut_plane2' in pl.actors)
 
@@ -237,6 +268,26 @@ img = pl.screenshot(out)
 check("screenshot written", os.path.exists(out) and img is not None)
 check("image not blank", float(np.asarray(img).std()) > 1.0)
 pl.close()
+
+print("\nA8: control messages get through a full queue")
+import queue as _queue
+from types import SimpleNamespace
+from blastlab.viz3d.client import _send_blocking
+q = _queue.Queue(maxsize=2)
+q.put(('frame', 0.0, {}, False)); q.put(('frame', 1e-3, {}, False))
+fake = SimpleNamespace(_q=q, alive=True)
+ok = _send_blocking(fake, ('done', 'x'), timeout=2.0)
+items = []
+while not q.empty():
+    items.append(q.get_nowait()[0])
+check("'done' delivered by dropping one frame", ok and 'done' in items and items.count('frame') == 1, str(items))
+q2 = _queue.Queue(maxsize=1); q2.put(('init', {}))
+fake2 = SimpleNamespace(_q=q2, alive=True)
+ok2 = _send_blocking(fake2, ('close',), timeout=0.6)
+left = []
+while not q2.empty():
+    left.append(q2.get_nowait()[0])
+check("a non-frame message is never dropped to make room", 'init' in left, f"{ok2} {left}")
 
 print("\nS6: geometry-only preview scene")
 pl3 = pv.Plotter(off_screen=True, window_size=(400, 300))
