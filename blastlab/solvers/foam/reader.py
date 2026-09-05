@@ -103,7 +103,7 @@ def _binary_internal(buf, path, n_cells, ncomp):
     if m is None:
         return None                     # uniform - still inline text
     n = int(m.group(1))
-    if n != n_cells:
+    if n_cells is not None and n != n_cells:
         raise ValueError(f'{path}: {n} values, expected {n_cells}')
     start, need = m.end(), n * ncomp * 8
     if len(buf) < start + need + 1 \
@@ -123,6 +123,8 @@ def read_scalar(path, n_cells):
     text = buf.decode('ascii', 'replace')
     if _kind(text, path) == 'uniform':
         m = _RE_UNIFORM.search(text)
+        if m is None or m.group(2) is None:
+            raise ValueError(f'truncated uniform field: {path}')
         return np.full(n_cells, float(m.group(2)))
     vals = _floats('\n'.join(_nonuniform_body(text, path)))
     if len(vals) != n_cells:
@@ -132,7 +134,9 @@ def read_scalar(path, n_cells):
 
 
 def read_vector(path, n_cells):
-    """volVectorField internalField -> (n_cells, 3) float64."""
+    """volVectorField internalField -> (n_cells, 3) float64.
+    `n_cells=None` accepts any nonuniform count (used for the cell
+    centres of a refined mesh, whose count the reader learns here)."""
     buf = _read_bytes(path)
     if _format_is_binary(buf):
         vals = _binary_internal(buf, path, n_cells, 3)
@@ -140,15 +144,29 @@ def read_vector(path, n_cells):
             return vals.reshape(-1, 3)
     text = buf.decode('ascii', 'replace')
     if _kind(text, path) == 'uniform':
+        if n_cells is None:
+            raise ValueError(f'{path}: uniform field needs a cell count')
         m = _RE_UNIFORM.search(text)
+        if m is None or m.group(1) is None:
+            raise ValueError(f'truncated uniform field: {path}')
         v = [float(x) for x in m.group(1).split()]
         return np.tile(np.array(v), (n_cells, 1))
     body = '\n'.join(_nonuniform_body(text, path))
     vals = _floats(body.replace('(', ' ').replace(')', ' '))
-    if len(vals) != 3 * n_cells:
+    if len(vals) % 3:
+        raise ValueError(f'{path}: {len(vals)} components is not a '
+                         f'whole number of vectors')
+    if n_cells is not None and len(vals) != 3 * n_cells:
         raise ValueError(f'{path}: {len(vals)} components, '
                          f'expected {3 * n_cells}')
     return vals.reshape(-1, 3)
+
+
+def read_cell_centres(case_unc):
+    """(n, 3) cell centres written by `postProcess -func
+    writeCellCentres -time 0` (0/C) - the refined mesh's own account of
+    its cells, matched against core.refine's prediction."""
+    return read_vector(os.path.join(case_unc, '0', 'C'), None)
 
 
 def read_time(dir_path):
@@ -339,6 +357,14 @@ def to_grid(vals, spec, fill=0.0):
     carved cells take `fill` (ambient value chosen by the caller)."""
     if spec.dim == 1:
         return vals
+    remap = getattr(spec, 'remap', None)
+    if remap is not None:
+        # refined mesh: every fine display cell gathers the value of the
+        # foam cell covering it (-1 = carved)
+        out = np.full(remap.shape, float(fill))
+        m = remap >= 0
+        out[m] = vals[remap[m]]
+        return out
     shape = ((spec.nx, spec.ny) if spec.dim == 2
              else (spec.nx, spec.ny, spec.nz))
     solid = getattr(spec, 'solid', None)

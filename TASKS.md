@@ -31,7 +31,7 @@
 | T15 | VTK/ParaView export button | N4 | S | [ ] |
 | T16 | Afterburn model (KB gap) | N3 | M | [ ] |
 | T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |
-| T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [ ] |
+| T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [x] |
 | T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [ ] |
 | later | N5 mass deficit, N6 resume, N7 profile→foam, N9 run names, N10 MUSCL, N11 materials, G2–G4, G7–G9, A5–A7 | — | — | see ROADMAP.md |
 
@@ -657,7 +657,7 @@ Done when: green; ROADMAP N15 T17 part DONE.
 ## T18 — Local refinement: foam refine stages + remap reader + live slice + postmortem (N15)
 
 ```
-SESSION PROMPT — T18
+SESSION PROMPT — T18   [DONE 2026-09-05; also fixed B25 + the T10 '0' dir stall]
 Read: ROADMAP.md N15, the plan file section "T18", core/refine.py in full,
   writer.py plan_case (2D/3D) + _blockmesh_* + _toposetdict, backend.py
   _mesh_stages/_preflight/_decode_surface/solve_2d_foam/solve_3d_foam

@@ -298,6 +298,8 @@ class OrderedIngest:
             self._i = i
             dpath = os.path.join(self.spec.case_unc, name)
             if not reader.time_ready(dpath, self.fields):
+                if _t_disp == 0.0:
+                    continue        # the writer's 0/ dir: not a solver write
                 if self.unreadable(name):
                     continue
                 return

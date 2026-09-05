@@ -1,0 +1,17 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      topoSetDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+actions
+(
+    { name refine3; type cellSet; action new; source boxToCell; sourceInfo { box (0.375 0.375 0.375) (0.625 0.625 0.625); } }
+    { name refine3; type cellSet; action add; source boxToCell; sourceInfo { box (0.3875 0.3875 0.3875) (0.6125 0.6125 0.6125); } }
+);
+
+// ************************************************************************* //

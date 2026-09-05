@@ -60,6 +60,7 @@ python test_foam_features.py      # multi-charge + activation none (WSL)
 python test_foam_kb_anchor.py     # KB free-air + C4/TNT (~2 min, WSL)
 python test_foam_stop.py          # SIGSTOP/writeNow regression (WSL)
 python _e2e_foam_obstacle2d.py / _e2e_foam_obstacle3d.py   # obstacle e2e (WSL)
+python _e2e_foam_refine2d.py / _e2e_foam_refine3d.py       # local refinement e2e (WSL, ~3 min each)
 python _e2e_gui_foam.py           # real-GUI session (WSL)
 ```
 
@@ -499,6 +500,24 @@ touches no ingest/stop-timing code).
 ---
 
 
+**B25 — controlDict rewrites within OpenFOAM's `fileModificationSkew` were
+ignored: an early Stop or arrival stop ran on until the 60 s kill. DONE
+(2026-09-05).** OpenFOAM re-reads a `runTimeModifiable` controlDict only
+when its mtime exceeds the last one it saw by more than
+`fileModificationSkew` (10 s in OpenFOAM-9), so `stopAt writeNow` written
+within ~10 s of the solver start (a user Stop right after launch; the
+arrival stop of a small/coarse mesh - exactly what a locally refined run
+does) or right after an adaptive `writeInterval` rewrite was never seen:
+the solver ran to the kill deadline and the Result came from a killed run.
+`runner.rewrite_control_entry` now advances the file's mtime to
+`max(now, current) + SKEW_S` (40 s) after every rewrite (WSL `touch -m -d`,
+`os.utime` on the UNC fallback), monotonically, so each edit is detected.
+Found by `_e2e_foam_refine2d.py` (a 1,488-cell run wrote 1,700 time dirs
+past the stop before being killed); `test_foam_stop` stays green.
+*Also fixed:* T10's `OrderedIngest` counted the writer's `0/` dir (no
+`uniform/time`) as a stalled write and logged a spurious skip on every
+run - the t = 0 dir is now passed over silently.
+
 **B24 — Resolved-charge initialisation in 2D/3D does not conserve the charge's
 mass/energy; the stair-stepped sphere carries ±3% depending on where the centre
 falls.** *What:* with `dx = r_exp/MIN_EXP_CELLS` the explosive is a 5-cell-radius
@@ -819,10 +838,32 @@ edges); `plots.mesh_for/add_mesh_lines`, `overpressure_panel(mesh=)`,
 `_panel_grid_figure(mesh=)`, `figures_fields_*(show_mesh=)`,
 `write_animation(show_mesh=)`; RunPanel + ResultsPanel checkboxes;
 `test_refine.py`, `test_gui_refine_preview.py`. Goldens and the native
-baseline untouched. *Open:* T18 (foam topoSet/refineMesh stages, `0/C`
-remap reader, live slice, postmortem), T19 (3D viewer `_MeshEdges` layer,
-e2e, README). Known limit: axisymmetric zones touching the axis are level
-<= 1 (wedge axis cells are prisms).
+baseline untouched.
+*T18 DONE (2026-09-05)* — writer: `plan_case` takes the base/fine split from
+`refine.plan_levels` (`CaseSpec.apply_plan`: `dx_base`, `nb`, `levels`,
+`lmax`, `zones`, `solid_base`; `grid/nx/ny/nz/dx/solid` are the FINE display
+grid, blockMesh/slab thickness/setFields use the base), one
+`system/topoSetDict.refine{l}` + `system/refineMeshDict.{l}` pair per level
+(OpenFOAM-9 e1/e2[/e3] directions, hexRef8 in 3D, in-plane cutter in 2D).
+backend: mesh stages blockMesh -> carve -> per-level topoSet/refineMesh ->
+setRefinedFields -> `postProcess -func writeCellCentres -time 0` ->
+decomposePar; `build_remap` reads `0/C`, matches it against `refine.fine_src`
+(any structural mismatch is fatal, case kept) and sets `spec.remap` /
+`n_cells_actual`; `reader.to_grid` gathers per fine cell through the remap;
+`_decode_surface` maps liveSlice rows (cut centroids) to cells through the
+fine grid; banners report base cell / per-level counts / actual cells /
+display grid; `meta['refine']` + `scene3d['refine']`; postmortem rebuilds
+the remap from the kept `0/C`. Verified live: `_e2e_foam_refine2d.py`
+(3,030 cells matched, refined run 14 s vs uniform 102 s, gauge within
+15 %/10 % of the uniform reference once the path to the gauge is resolved,
+graceful stop honoured, post-mortem reload identical) and
+`_e2e_foam_refine3d.py` (50,328 cells matched serial and with 2 MPI ranks,
+carved cells ambient, coarse corner one 8^3 block, gauge within 10 %).
+The e2e runs exposed and fixed B25 (controlDict edits within
+`fileModificationSkew` ignored) and a T10 side effect (the writer's `0/`
+dir reported as a skipped stall). *Open:* T19 (3D viewer `_MeshEdges`
+layer, e2e polish, README). Known limit: axisymmetric zones touching the
+axis are level <= 1 (wedge axis cells are prisms).
 
 ## 5. Nice-to-have
 

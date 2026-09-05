@@ -11,6 +11,12 @@ Two invocations per run:
      directory and exits 0; the kill path escalates TERM -> KILL on the
      Linux pid recorded in .run.pid (never `wsl --terminate`, which
      would nuke the whole distro).
+
+`.run.pid` holds two lines: the WSL-side solver pid (line 1, all the
+signalling reads just that one) and the Windows-side pid of the Python
+process that owns the run (line 2). The owner line is what lets
+`env.reap_orphans` tell "someone else is still running this" from "the
+process that started this is gone and nothing will ever stop it".
 """
 
 import collections
@@ -56,23 +62,108 @@ def run_stage(case_posix, cmds, timeout=600):
     return out
 
 
-def rewrite_control_entry(case_posix, case_unc, key, value):
+def run_stage_stoppable(case_posix, cmd, timeout=600, should_stop=None,
+                        poll=0.25):
+    """`run_stage` for a single command, interruptible by the user.
+
+    Same contract (returns combined output, raises FoamStageError on a
+    nonzero exit), except that `should_stop()` is polled every `poll`
+    seconds while the command runs. On a stop the wsl.exe relay is
+    killed, which takes the WSL-side command with it - WSL ends the
+    processes of a session once its relay exits - and
+    StoppedBeforeStart is raised.
+
+    `run_stage` keeps its own batch API for the callers that are not
+    user-facing (the reconstruct sweeps)."""
+    from ..hooks import StoppedBeforeStart
+    script = f'cd {case_posix} && {cmd}'
+    proc = subprocess.Popen(
+        env.wsl_argv(script), stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+        creationflags=env.CREATE_NO_WINDOW)
+    # drained on a thread: a mesh stage can outrun the ~64 KB pipe
+    # buffer, and a blocked writer would never reach `poll() is not None`
+    chunks = []
+
+    def _pump():
+        with proc.stdout as stream:
+            for raw in stream:
+                chunks.append(raw.decode('utf-8', 'replace'))
+
+    threading.Thread(target=_pump, daemon=True).start()
+    deadline = time.time() + timeout
+    while proc.poll() is None:
+        if should_stop is not None and should_stop():
+            proc.kill()
+            proc.wait(timeout=10)
+            raise StoppedBeforeStart(f"stopped during '{cmd}'")
+        if time.time() > deadline:
+            proc.kill()
+            proc.wait(timeout=10)
+            raise FoamStageError(cmd, f'timed out after {timeout} s')
+        time.sleep(poll)
+    out = ''.join(chunks)
+    if proc.returncode != 0:
+        raise FoamStageError(cmd, _tail(out))
+    return out
+
+
+def _noop_log(_msg):
+    pass
+
+
+#: seconds to wait for a wsl.exe control/signal round trip
+_WSL_EDIT_S = 60
+#: mtime advance per controlDict rewrite - must exceed OpenFOAM's
+#: fileModificationSkew (10 s in OpenFOAM-9's etc/controlDict)
+SKEW_S = 40
+_WSL_SIGNAL_S = 30
+
+
+def _pid_file_cmd():
+    """Shell writing `.run.pid`: solver pid on line 1, this Python
+    process (the run's Windows-side owner) on line 2. Two plain `echo`s
+    rather than one quoted printf - the parallel launch nests this
+    inside `bash -c '...'`, where a quote of our own would break it."""
+    return f'echo $$ > .run.pid && echo {os.getpid()} >> .run.pid'
+
+
+def rewrite_control_entry(case_posix, case_unc, key, value, log=None):
     """Rewrite one top-level `key   value;` line of the case's
     runTimeModifiable controlDict while the solver runs. The edit runs
-    INSIDE WSL (sed -i) so a fresh native mtime clears the
-    fileModificationSkew window; a UNC rewrite is the fallback.
-    Returns True when either path succeeded."""
+    INSIDE WSL (sed -i); a UNC rewrite is the fallback. Returns True
+    when either path succeeded.
+
+    OpenFOAM only notices a re-read when the file's mtime exceeds the
+    one it last saw by more than `fileModificationSkew` (10 s default),
+    so an edit within that window - a Stop or an arrival stop seconds
+    after the solver started, an adaptive writeInterval right before a
+    stop - was silently ignored and the run had to be killed. Every
+    rewrite therefore pushes the mtime to max(now, current) + SKEW_S,
+    monotonically, so each one is seen.
+
+    A wedged WSL is exactly the moment a stop is being attempted, so a
+    timeout degrades to False (the caller escalates) instead of raising
+    out of the stop path."""
+    log = log or _noop_log
     if isinstance(value, float):
         value = format(value, '.10g')
-    res = subprocess.run(
-        env.wsl_argv(
-            f"sed -i 's/^{key} .*$/{key}          {value};/' "
-            f'{case_posix}/system/controlDict'),
-        capture_output=True, timeout=60,
-        stdin=subprocess.DEVNULL,
-        creationflags=env.CREATE_NO_WINDOW)
-    if res.returncode == 0:
-        return True
+    cd = f'{case_posix}/system/controlDict'
+    bump = (f'o=$(stat -c %Y {cd}); n=$(date +%s); '
+            f'b=$(( o > n ? o : n )); touch -m -d @$(( b + {SKEW_S} )) {cd}')
+    try:
+        res = subprocess.run(
+            env.wsl_argv(
+                f"sed -i 's/^{key} .*$/{key}          {value};/' {cd} "
+                f'&& {bump}'),
+            capture_output=True, timeout=_WSL_EDIT_S,
+            stdin=subprocess.DEVNULL,
+            creationflags=env.CREATE_NO_WINDOW)
+        if res.returncode == 0:
+            return True
+    except (subprocess.TimeoutExpired, OSError):
+        log(f'  [blastfoam] WSL did not answer to the {key} rewrite '
+            f'within {_WSL_EDIT_S} s - trying the UNC path')
     path = os.path.join(case_unc, 'system', 'controlDict')
     try:
         with open(path, encoding='ascii') as f:
@@ -82,9 +173,13 @@ def rewrite_control_entry(case_posix, case_unc, key, value):
         tmp = path + '.tmp'
         with open(tmp, 'w', encoding='ascii', newline='\n') as f:
             f.write(text)
+        old = os.stat(path).st_mtime
         os.replace(tmp, path)
+        t = max(time.time(), old) + SKEW_S
+        os.utime(path, (t, t))
         return True
     except OSError:
+        log(f'  [blastfoam] could not rewrite {key} in the controlDict')
         return False    # caller decides (stop path escalates to kill)
 
 
@@ -98,10 +193,11 @@ class FoamRun:
     `pkill -s`. Serial keeps the historical single-pid path."""
 
     def __init__(self, case_posix, case_unc, app='blastFoam',
-                 n_procs=1):
+                 n_procs=1, log=None):
         self.case_posix = case_posix
         self.case_unc = case_unc
         self.n_procs = max(1, int(n_procs))
+        self.log = log or _noop_log
         self.lines = queue.Queue()
         self.log_tail = collections.deque(maxlen=80)
         self.stop_requested = False
@@ -118,12 +214,12 @@ class FoamRun:
                 flags = ' --use-hwthread-cpus'
                 if self.n_procs > env.detect_cores():
                     flags += ' --oversubscribe'
-            inner = (f'echo $$ > .run.pid && exec mpirun '
+            inner = (f'{_pid_file_cmd()} && exec mpirun '
                      f'--allow-run-as-root{flags} -np {self.n_procs} '
                      f'{app} -parallel')
             script = f"cd {case_posix} && setsid -w bash -c '{inner}'"
         else:
-            script = (f'cd {case_posix} && echo $$ > .run.pid '
+            script = (f'cd {case_posix} && {_pid_file_cmd()} '
                       f'&& exec {app}')
         self.proc = subprocess.Popen(
             env.wsl_argv(script), stdout=subprocess.PIPE,
@@ -163,25 +259,35 @@ class FoamRun:
         """Graceful stop: `stopAt writeNow` via the runTimeModifiable
         controlDict."""
         if self.stop_requested:
-            return
+            return True
         self.stop_requested = True
-        rewrite_control_entry(self.case_posix, self.case_unc,
-                              'stopAt', 'writeNow')
+        return rewrite_control_entry(self.case_posix, self.case_unc,
+                                     'stopAt', 'writeNow', self.log)
 
     def _signal(self, sig):
+        """Send one signal into WSL. Returns False (and logs) when WSL
+        does not answer in time - kill() then escalates instead of
+        raising out of a caller's `finally`."""
+        # line 1 only: line 2 is the Windows owner pid, and a bare
+        # `cat` would splice it into the signal's argument list
+        pid = f'$(head -n1 {self.case_posix}/.run.pid)'
         if self.n_procs > 1:
             # whole session: mpirun + every rank (ranks sit in their
             # own process groups, so a group kill would miss them)
-            cmd = (f'pkill -{sig} -s '
-                   f'$(cat {self.case_posix}/.run.pid) 2>/dev/null')
+            cmd = f'pkill -{sig} -s {pid} 2>/dev/null'
         else:
-            cmd = (f'kill -{sig} $(cat {self.case_posix}/.run.pid) '
-                   f'2>/dev/null')
-        subprocess.run(
-            env.wsl_argv(cmd),
-            capture_output=True, timeout=30,
-            stdin=subprocess.DEVNULL,
-            creationflags=env.CREATE_NO_WINDOW)
+            cmd = f'kill -{sig} {pid} 2>/dev/null'
+        try:
+            subprocess.run(
+                env.wsl_argv(cmd),
+                capture_output=True, timeout=_WSL_SIGNAL_S,
+                stdin=subprocess.DEVNULL,
+                creationflags=env.CREATE_NO_WINDOW)
+        except (subprocess.TimeoutExpired, OSError):
+            self.log(f'  [blastfoam] WSL did not answer to SIG{sig} '
+                     f'within {_WSL_SIGNAL_S} s')
+            return False
+        return True
 
     def suspend(self):
         """SIGSTOP the solver (GUI Interrupt: freeze compute too)."""
@@ -203,7 +309,11 @@ class FoamRun:
             while self.running and time.time() < deadline:
                 time.sleep(0.2)
         if self.running:
-            self.proc.kill()
+            try:
+                self.proc.kill()    # last resort: the wsl.exe relay
+            except OSError:
+                self.log('  [blastfoam] could not kill the wsl.exe '
+                         'relay process')
 
     def tail(self, n=40):
         return '\n'.join(list(self.log_tail)[-n:])

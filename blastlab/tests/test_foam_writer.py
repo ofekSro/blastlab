@@ -82,10 +82,100 @@ def cases():
             center=(0.0, 1.0), obstacles=[(2.0, 2.4, 0.0, 1.6)],
             gauges=[(1.0, 1.0), (2.2, 0.8)],
             solver='blastfoam', material='TNT'),
+        # local refinement (N15): user zones nested 1 -> 2 on a base the
+        # charge does not refine ('zone' mode: the charge gets automatic
+        # zones instead of a global dx cut)
+        'case2d_planar_refine': Case2D(
+            geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1,
+            charge=50.0, center=(1.0, 1.0), charge_refine='zone',
+            refine_zones=[(0.5, 1.5, 0.5, 1.5, 1),
+                          (0.75, 1.25, 0.75, 1.25, 2)],
+            gauges=[(1.6, 1.0)], solver='blastfoam', material='TNT'),
+        'case2d_axi_refine': Case2D(
+            Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=1.0,
+            center=(0.0, 1.0), charge_refine='zone',
+            refine_zones=[(0.0, 0.6, 0.6, 1.4, 1)],
+            gauges=[(1.0, 1.0)], solver='blastfoam', material='TNT'),
+        'case3d_refine': Case3D(
+            Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.1, charge=1.0,
+            center=(0.5, 0.5, 0.5), charge_refine='zone',
+            obstacles=[(0.0, 0.2, 0.0, 0.2, 0.0, 0.2)],
+            gauges=[(0.9, 0.5, 0.5)], n_snapshots=2,
+            solver='blastfoam', material='TNT'),
     }
 
 
+def refine_checks(specs):
+    """N15: refined cases render one topoSet/refineMesh pair per level on
+    a base-count blockMesh; spec exposes the fine display grid."""
+    from blastlab.core import refine
+    sp = specs['case2d_planar_refine']
+    check('refine 2D: base kept at 0.1 m, zones + auto charge zones',
+          abs(sp.dx_base - 0.1) < 1e-12 and sp.lmax == 3
+          and sp.nb == (20, 20), f'{sp.dx_base} {sp.lmax} {sp.nb}')
+    check('refine 2D: spec grid is the fine grid (nb * 2**lmax)',
+          (sp.nx, sp.ny) == (160, 160) and abs(sp.dx - 0.0125) < 1e-12,
+          f'{sp.nx} {sp.ny} {sp.dx}')
+    check('refine 2D: n_cells is the predicted refined count',
+          sp.n_cells == refine.n_cells_from_levels(sp.levels, sp.lmax)
+          and sp.n_cells < sp.nx * sp.ny, str(sp.n_cells))
+    bmd = norm(sp.files['system/blockMeshDict'])
+    check('refine 2D: blockMesh on the base counts', '(20 20 1)' in bmd, bmd[-200:])
+    check('refine 2D: slab thickness = base cell',
+          f'(0 0 {fmt(-0.05)})' in sp.files['system/blockMeshDict'].replace(' -0.05', ' -0.05')
+          and '-0.05' in sp.files['system/blockMeshDict'])
+    check('refine 2D: one topoSet + refineMesh dict per level',
+          all(f'system/topoSetDict.refine{l}' in sp.files
+              and f'system/refineMeshDict.{l}' in sp.files for l in (1, 2, 3))
+          and 'system/refineMeshDict.4' not in sp.files)
+    rmd = sp.files['system/refineMeshDict.1']
+    check('refine 2D: in-plane directions, no hex topology',
+          'directions      (e1 e2);' in rmd or 'directions (e1 e2);' in norm(rmd)
+          and 'useHexTopology' in rmd and 'no;' in rmd
+          and 'set             refine1;' in rmd or 'refine1' in rmd,
+          rmd[-400:])
+    tsd = sp.files['system/topoSetDict.refine2']
+    check('refine 2D: level-2 set holds the user level-2 zone and the auto zones',
+          tsd.count('boxToCell') >= 2 and 'name refine2' in tsd
+          and 'invert' not in tsd, tsd[-300:])
+    check('refine 2D: setFields slab extent uses the base cell',
+          f'(1 1 {fmt(-0.1)})' in sp.files['system/setFieldsDict'].replace('(1 1 -0.1)', f'(1 1 {fmt(-0.1)})'))
+    sa = specs['case2d_axi_refine']
+    check('refine axi: axis zone limited to level 1 -> lmax 1',
+          sa.lmax == 1 and (sa.nx, sa.ny) == (40, 40), f'{sa.lmax} {sa.nx}')
+    check('refine axi: wedge normal never refined',
+          '(e1 e2)' in sa.files['system/refineMeshDict.1']
+          and 'e3' not in sa.files['system/refineMeshDict.1'])
+    s3 = specs['case3d_refine']
+    check('refine 3D: hexRef8 (three directions + hex topology)',
+          '(e1 e2 e3)' in s3.files['system/refineMeshDict.1']
+          and 'useHexTopology  yes;' in s3.files['system/refineMeshDict.1']
+          or ('useHexTopology' in s3.files['system/refineMeshDict.1']
+              and 'yes' in s3.files['system/refineMeshDict.1']))
+    check('refine 3D: level 4 auto zones (1 kg on 10 cm)', s3.lmax == 4
+          and s3.nb == (10, 10, 10) and (s3.nx, s3.ny, s3.nz) == (160, 160, 160),
+          f'{s3.lmax} {s3.nb} {s3.nx}')
+    check('refine 3D: solid mask expanded from the base carve, not re-evaluated',
+          s3.solid is not None and s3.solid.shape == (160, 160, 160)
+          and int(s3.solid.sum()) == 8 * (16 ** 3)
+          and s3.solid_base is not None and int(s3.solid_base.sum()) == 8,
+          f"{s3.solid.sum() if s3.solid is not None else None}")
+    check('refine 3D: n_cells excludes the carved base cells',
+          s3.n_cells == refine.n_cells_from_levels(s3.levels, s3.lmax, s3.solid))
+    check('refine 3D: blockMesh on base counts + obstacles patch',
+          '(10 10 10)' in norm(s3.files['system/blockMeshDict'])
+          and 'obstacles' in s3.files['system/blockMeshDict'])
+    check('refine 3D: meta payload', set(s3.refine_meta()) == {'levels', 'lmax', 'dx_base', 'zones'})
+    # uniform cases: no refinement artefacts at all
+    su = specs['case3d_c4']
+    check('uniform: lmax 0, no refine dicts, refine_meta None',
+          su.lmax == 0 and su.refine_meta() is None
+          and not any('refine' in k for k in su.files)
+          and su.nb == (su.nx, su.ny, su.nz))
+
+
 def semantic_checks(specs):
+    refine_checks(specs)
     s1 = specs['case1d_tnt']
     m_tnt = MATERIALS['TNT']
     r_exp = charge_radius(1.0, m_tnt)

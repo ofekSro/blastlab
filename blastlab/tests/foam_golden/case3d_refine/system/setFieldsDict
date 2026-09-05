@@ -1,0 +1,36 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fields (alpha.expl);
+nBufferLayers   1;
+defaultFieldValues
+(
+    volScalarFieldValue alpha.expl 0
+);
+regions
+(
+    sphericalMassToCell
+    {
+        centre (0.5 0.5 0.5);
+        rho             1630;
+        mass            1;
+        backup
+        {
+            centre (0.5 0.5 0.5);
+            radius          0.1054236199;
+        }
+        fieldValues
+        (
+            volScalarFieldValue alpha.expl    1
+        );
+    }
+);
+
+// ************************************************************************* //

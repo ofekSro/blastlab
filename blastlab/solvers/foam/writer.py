@@ -25,9 +25,9 @@ import math
 import os
 from dataclasses import dataclass, field
 
-from ...core.bc import solid_mask_2d, solid_mask_3d
 from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS)
-from ...core.grid import make_grid_1d, make_geometry, make_grid
+from ...core import refine
+from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from . import env
 from .dicts import FLUX_SCHEME, P_OPEN_BC, Raw, block, fmt, foam_file
@@ -85,15 +85,50 @@ class CaseSpec:
     files: dict = field(default_factory=dict)       # relpath -> text
     case_posix: str = ''
     case_unc: str = ''
+    # local refinement (core.refine): nx/ny/nz/dx/grid/solid above are
+    # the FINE display grid (dx = dx_base / 2**lmax); blockMesh is built
+    # on the base counts `nb`, refineMesh passes realise `zones`
+    dx_base: float = 0.0
+    nb: tuple = ()                  # base (nx, ny[, nz]) for blockMesh
+    levels: object = None           # int8 level map on the fine grid
+    lmax: int = 0
+    zones: list = field(default_factory=list)       # snapped (box.., level)
+    solid_base: object = None       # obstacle mask on the base grid
+    remap: object = None            # fine-grid int32 -> foam cell (T18)
+    n_cells_actual: int = None      # foam cell count once the mesh exists
 
     @property
     def n_cells(self):
         """Cell count of the ACTUAL mesh: obstacle cells are carved out
-        by topoSet/subsetMesh, so field files hold only fluid values."""
+        by topoSet/subsetMesh, so field files hold only fluid values; a
+        refined mesh counts its real cells (predicted until the mesh
+        stages have run, then measured)."""
+        if self.n_cells_actual is not None:
+            return self.n_cells_actual
+        if self.lmax:
+            return refine.n_cells_from_levels(self.levels, self.lmax,
+                                              self.solid)
         n = self.nx * self.ny * self.nz
         if self.solid is not None:
             n -= int(self.solid.sum())
         return n
+
+    def apply_plan(self, plan):
+        """Take the base/fine grids and zones from a core.refine.Plan."""
+        self.dx_base = float(plan.dx_base)
+        self.nb = tuple(int(plan.base[k]) for k in
+                        (('Nx', 'Ny') if plan.dim == 2 else ('Nx', 'Ny', 'Nz')))
+        self.levels, self.lmax = plan.levels, plan.lmax
+        self.zones = list(plan.zones)
+        self.solid_base = plan.solid_base
+        self.solid = plan.solid_fine
+
+    def refine_meta(self):
+        """meta['refine'] payload (None for a uniform mesh)."""
+        if not self.lmax:
+            return None
+        return dict(levels=self.levels, lmax=self.lmax,
+                    dx_base=self.dx_base, zones=list(self.zones))
 
 
 # ── planning ────────────────────────────────────────────────────────────────
@@ -152,14 +187,17 @@ def plan_case(case):
     if case.dim == 2:
         planar = case.geometry == 'planar'
         r_exp = charge_radius(case.charge, m, planar=planar)
-        dx = _effective_dx(case.cell_size_m, r_exp, case.Lx)
-        grid = make_geometry(case.geometry, case.Lx, case.Ly, dx)
+        # base spacing (charge auto-refine unless charge_refine='zone')
+        # + zones -> the fine display grid the reader scatters onto
+        plan = refine.plan_levels(case, rho0=m.rho0)
+        grid, dx = plan.fine, plan.dx_fine
         Lx_eff, Ly_eff = grid['x_face'][-1], grid['y_face'][-1]
         x0 = 0.0 if not planar else case.center[0]
         y0 = case.center[1]
         spec = CaseSpec(dim=2, material=mat,
                         nx=grid['Nx'], ny=grid['Ny'], dx=dx, r_exp=r_exp,
                         center=(x0, y0, 0.0), grid=grid)
+        spec.apply_plan(plan)
         spec.charges = [((x0, y0, 0.0), float(case.charge))]
         spec.det_points = [
             ((0.0 if not planar else float(px)), float(py), 0.0)
@@ -180,8 +218,8 @@ def plan_case(case):
                           for box in (getattr(case, 'obstacles', None)
                                       or [])]
         if spec.obstacles:
-            spec.solid = solid_mask_2d(grid['x_c'], grid['y_c'],
-                                       spec.obstacles)
+            # mask evaluated on the BASE grid by the plan (boxToCell
+            # carves before refinement) and expanded to the fine grid
             spec.patches.append(('obstacles', 'wall'))
 
         def _in_obstacle2(g):
@@ -215,12 +253,13 @@ def plan_case(case):
         charges.append(((float(ex), float(ey), float(ez)), float(mass)))
     r_exps = [charge_radius(mass, m) for _c, mass in charges]
     r_exp = max(r_exps)
-    dx = min(_effective_dx(case.cell_size_m, r, case.Lx) for r in r_exps)
-    grid = make_grid(case.Lx, case.Ly, case.Lz, dx)
+    plan = refine.plan_levels(case, rho0=m.rho0)
+    grid, dx = plan.fine, plan.dx_fine
     Ls = (grid['x_face'][-1], grid['y_face'][-1], grid['z_face'][-1])
     spec = CaseSpec(dim=3, material=mat,
                     nx=grid['Nx'], ny=grid['Ny'], nz=grid['Nz'],
                     dx=dx, r_exp=r_exp, center=(x0, y0, z0), grid=grid)
+    spec.apply_plan(plan)
     spec.charges = charges
     spec.det_points = [tuple(float(v) for v in p)
                        for p in (getattr(case, 'det_points', None) or [])]
@@ -235,9 +274,7 @@ def plan_case(case):
                       for box in (getattr(case, 'obstacles', None)
                                   or [])]
     if spec.obstacles:
-        spec.solid = solid_mask_3d(grid['x_c'], grid['y_c'],
-                                   grid['z_c'], spec.obstacles)
-        spec.patches.append(('obstacles', 'wall'))
+        spec.patches.append(('obstacles', 'wall'))   # mask: see apply_plan
 
     def _in_obstacle(g):
         return any(x0 <= g[0] <= x1 and y0 <= g[1] <= y1
@@ -327,7 +364,7 @@ def _blockmesh_2d_axisym(spec, case):
     ]
     if spec.obstacles:
         boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
-    line = (f'hex (0 1 2 3 0 4 5 3) ({spec.nx} {spec.ny} 1) '
+    line = (f'hex (0 1 2 3 0 4 5 3) ({spec.nb[0]} {spec.nb[1]} 1) '
             f'simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
 
@@ -336,7 +373,7 @@ def _blockmesh_2d_planar(spec, case):
     """One-cell-thick slab with empty front/back."""
     Lx = spec.grid['x_face'][-1]
     Ly = spec.grid['y_face'][-1]
-    zh = spec.dx / 2.0
+    zh = spec.dx_base / 2.0
     vertices = [(0, 0, -zh), (Lx, 0, -zh), (Lx, Ly, -zh), (0, Ly, -zh),
                 (0, 0, zh), (Lx, 0, zh), (Lx, Ly, zh), (0, Ly, zh)]
     boundary = [
@@ -353,7 +390,7 @@ def _blockmesh_2d_planar(spec, case):
     ]
     if spec.obstacles:
         boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
-    line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nx} {spec.ny} 1) '
+    line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nb[0]} {spec.nb[1]} 1) '
             f'simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
 
@@ -376,8 +413,8 @@ def _blockmesh_3d(spec, case):
         # zero-face wall patch: subsetMesh -patch adds the faces the
         # obstacle carve exposes (the patch must pre-exist)
         boundary.append(('obstacles', {'type': 'wall', 'faces': []}))
-    line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nx} {spec.ny} {spec.nz}) '
-            f'simpleGrading (1 1 1)')
+    line = (f'hex (0 1 2 3 4 5 6 7) ({spec.nb[0]} {spec.nb[1]} '
+            f'{spec.nb[2]}) simpleGrading (1 1 1)')
     return _bmd(vertices, line, boundary)
 
 
@@ -406,6 +443,50 @@ def _toposetdict(spec):
     acts.append(Raw('{ name fluid; type cellSet; action invert; }'))
     return foam_file('topoSetDict', block({'actions': acts}),
                      location='system')
+
+
+def _refine_dicts(spec, case):
+    """One topoSet + refineMesh dict pair per level: pass l selects every
+    cell whose centre lies in a zone of level >= l (zones are snapped to
+    level-(l-1) faces so the selection is whole cells) and halves it in
+    the in-plane (2D) or all three (3D) directions. Directions are the
+    global e1/e2/e3 of OpenFOAM-9's refineMesh; the wedge normal (e3)
+    is never refined in 2D. hexRef8 (useHexTopology + 3 directions)
+    gives exact 1:8 splits in 3D; the 2-direction cutter halves hexes at
+    their midpoints."""
+    files = {}
+    if spec.dim == 2:
+        zpad = float(spec.grid['x_face'][-1])
+    for lv in range(1, spec.lmax + 1):
+        acts = []
+        for z in spec.zones:
+            if refine.zone_level(z) < lv:
+                continue
+            if spec.dim == 2:
+                x0, x1, y0, y1 = z[:4]
+                z0, z1 = -zpad, zpad
+            else:
+                x0, x1, y0, y1, z0, z1 = z[:6]
+            acts.append(Raw(
+                '{ name refine%d; type cellSet; action %s; '
+                'source boxToCell; '
+                'sourceInfo { box (%s %s %s) (%s %s %s); } }'
+                % (lv, 'new' if not acts else 'add',
+                   fmt(x0), fmt(y0), fmt(z0), fmt(x1), fmt(y1), fmt(z1))))
+        files[f'system/topoSetDict.refine{lv}'] = foam_file(
+            'topoSetDict', block({'actions': acts}), location='system')
+        three = spec.dim == 3
+        files[f'system/refineMeshDict.{lv}'] = foam_file(
+            'refineMeshDict', block({
+                'set': Raw(f'refine{lv}'),
+                'coordinateSystem': Raw('global'),
+                'globalCoeffs': {'e1': (1, 0, 0), 'e2': (0, 1, 0)},
+                'directions': Raw('(e1 e2 e3)' if three else '(e1 e2)'),
+                'useHexTopology': three,
+                'geometricCut': False,
+                'writeMesh': False,
+            }), location='system')
+    return files
 
 
 # ── system/ + constant/ dicts ───────────────────────────────────────────────
@@ -577,8 +658,8 @@ def _setfieldsdict(spec, case):
     if spec.dim == 2 and case.geometry == 'planar':
         x0, y0, _ = spec.center
         regions = [('cylinderToCell', {
-            'p1': (x0, y0, -spec.dx),
-            'p2': (x0, y0, spec.dx),
+            'p1': (x0, y0, -spec.dx_base),
+            'p2': (x0, y0, spec.dx_base),
             'radius': spec.r_exp,
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
         })]
@@ -746,6 +827,8 @@ def render_case(case, n_procs=1):
     }
     if spec.obstacles:
         spec.files['system/topoSetDict'] = _toposetdict(spec)
+    if spec.lmax:
+        spec.files.update(_refine_dicts(spec, case))
     if spec.n_procs > 1:
         spec.files['system/decomposeParDict'] = \
             _decomposepardict(spec.n_procs)

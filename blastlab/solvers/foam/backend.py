@@ -23,7 +23,7 @@ import time as _time
 
 import numpy as np
 
-from ...core import geometry
+from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Result, RunHooks, StoppedBeforeStart
 from . import env, reader, runner, writer
@@ -83,12 +83,59 @@ def _mesh_stages(spec, hooks):
         stages += [(f'{carve} - topoSet', 'topoSet'),
                    (f'{carve} - subsetMesh',
                     'subsetMesh fluid -patch obstacles -overwrite')]
+    # local refinement: one topoSet + refineMesh pass per level, coarse
+    # to fine (each pass re-selects on the current mesh); the charge is
+    # initialised afterwards on the final mesh, and the cell centres are
+    # written (serial, before any decomposition) so the reader can match
+    # the mesh against core.refine's prediction
+    for lv in range(1, spec.lmax + 1):
+        lbl = (f'refining level {lv} '
+               f'({spec.dx_base / 2 ** lv:.4g} m cells)')
+        stages += [(f'{lbl} - topoSet',
+                    f'topoSet -dict system/topoSetDict.refine{lv}'),
+                   (f'{lbl} - refineMesh',
+                    f'refineMesh -dict system/refineMeshDict.{lv} '
+                    f'-overwrite')]
     stages.append(('charge init (setRefinedFields)',
                    'setRefinedFields -noRefine'))
+    if spec.lmax:
+        stages.append(('writing cell centres (writeCellCentres)',
+                       'postProcess -func writeCellCentres -time 0'))
     if spec.n_procs > 1:
         stages.append((f'decomposing for {spec.n_procs} MPI ranks',
                        'decomposePar -force'))
     return stages
+
+
+def build_remap(spec, hooks):
+    """Refined mesh -> fine-grid gather map. Reads the cell centres the
+    mesh stages wrote (0/C), matches them against the predicted
+    structure and stores `spec.remap` / `spec.n_cells_actual`. Any
+    mismatch is fatal (the case dir is kept for inspection): silently
+    mis-mapping cells would put values in the wrong place."""
+    try:
+        C = reader.read_cell_centres(spec.case_unc)
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(
+            f'refined mesh: cannot read cell centres 0/C ({exc}) - case '
+            f'kept at {spec.case_unc}') from exc
+    ids = refine.fine_src(spec.levels, spec.lmax, spec.solid)
+    try:
+        spec.remap = refine.match_cells(C[:, :spec.dim], spec.grid, ids)
+    except RuntimeError as exc:
+        raise RuntimeError(
+            f'blastFoam refined mesh does not match the refinement plan: '
+            f'{exc} - case kept at {spec.case_unc}') from exc
+    spec.n_cells_actual = int(len(C))
+    for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
+        try:
+            os.remove(os.path.join(spec.case_unc, '0', f))
+        except OSError:
+            pass
+    hooks.log(f'  [blastfoam] refined mesh: {len(C):,} cells matched the '
+              f'predicted structure ({spec.lmax} level(s), finest '
+              f'{spec.dx:.5g} m, displayed on a '
+              f'{" x ".join(str(n) for n in spec.levels.shape)} grid)')
 
 
 def _preflight(case, hooks):
@@ -119,6 +166,8 @@ def _preflight(case, hooks):
     # `&&` chain: the benign wedge warnings collapse into one note
     # instead of one per stage that emits them
     _scan_stage_warnings('\n'.join(out), hooks)
+    if spec.lmax:
+        build_remap(spec, hooks)
     return spec
 
 
@@ -139,7 +188,8 @@ def _scan_stage_warnings(out, hooks):
         hooks.log(f'  [foam] mesh-stage Warning: {m.strip()}')
 
 
-def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None):
+def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
+                    remap_sl=None):
     """One liveSlice raw sample -> grid-shaped p array or None while
     mid-write. The plane cuts one face per cell (interpolate and
     triangulate are off), so sorting the rows by their in-plane
@@ -147,12 +197,32 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None):
     native x-fastest cell order. `slice_mask` (obstacle-carved 3D
     meshes) marks the solid cells of the sampled layer: the sample
     then holds only that layer's fluid cells, which are scattered
-    around the mask; solid cells display ambient pressure."""
+    around the mask; solid cells display ambient pressure. `remap_sl`
+    (refined meshes: the plane's slice of spec.remap) maps each sampled
+    row - a cut-polygon centroid, i.e. the cell centre in-plane - to its
+    foam cell via the fine cell it falls in, then gathers per fine cell
+    so coarse cells show as blocks."""
     data = reader.read_surface_sample(spec.case_unc, writer.LIVE_SLICE,
                                       tdir)
     if data is None:
         return None
     pts, vals = data
+    if remap_sl is not None:
+        dxf = float(spec.dx)
+        iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
+                     shape[0] - 1)
+        iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,
+                     shape[1] - 1)
+        cells = remap_sl[iu, iv]
+        fluid = remap_sl >= 0
+        if (cells < 0).any() or len(vals) != len(np.unique(remap_sl[fluid])):
+            return None                 # mid-write / stale sample
+        val = np.full(int(spec.n_cells), np.nan)
+        val[cells] = vals
+        out = np.where(fluid, val[np.maximum(remap_sl, 0)], float(P_AIR))
+        if np.isnan(out).any():
+            return None
+        return out
     if slice_mask is None:
         if len(vals) != shape[0] * shape[1]:
             return None
@@ -391,6 +461,24 @@ def read_2d(dpath, spec, what=('p',)):
     return out
 
 
+def _refine_lines(spec):
+    """Banner lines for a locally refined mesh ([] when uniform)."""
+    if not spec.lmax:
+        return []
+    lv = np.asarray(spec.levels)
+    dim = lv.ndim
+    counts = np.bincount(lv.ravel().astype(np.int64), minlength=spec.lmax + 1)
+    per = []
+    for l in range(1, spec.lmax + 1):
+        n_l = int(counts[l]) // (2 ** (dim * (spec.lmax - l)))
+        per.append(f'L{l} {spec.dx_base / 2 ** l:g} m: {n_l:,}')
+    disp = ' x '.join(str(n) for n in lv.shape)
+    return [f'  Refinement      : {spec.lmax} level(s) - ' + ', '.join(per)
+            + ' cells',
+            f'  Mesh cells      : {spec.n_cells:,}  (displayed on the '
+            f'{disp} grid at {spec.dx:g} m)']
+
+
 def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
     m = MATERIALS[spec.material]
     bar = '=' * 60
@@ -406,9 +494,13 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
             bar,
             f'  Charge          : {charge_lbl}',
             f'  Explosive radius: {spec.r_exp:.4f} m',
-            f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  cell '
-            f'{spec.dx:g} m  ({spec.nx} x {spec.ny} = '
-            f'{spec.n_cells:,} cells)',
+            (f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  cell '
+             f'{spec.dx:g} m  ({spec.nx} x {spec.ny} = '
+             f'{spec.n_cells:,} cells)') if not spec.lmax else
+            (f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  base '
+             f'cell {spec.dx_base:g} m  ({spec.nb[0]} x {spec.nb[1]} '
+             f'base cells)'),
+            *_refine_lines(spec),
             '  EOS             : JWL products + ideal-gas air '
             f'(vDet {m.vDet:g} m/s)',
             f'  Boundaries      : {bc_lbl}'
@@ -460,7 +552,10 @@ def solve_2d_foam(case, hooks=None):
     run_info = dict(
         dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
         xlabel='r [m]' if axisym else 'x [m]',
-        ylabel='z [m]' if axisym else 'y [m]', title='')
+        ylabel='z [m]' if axisym else 'y [m]', title='',
+        mesh_src=(refine.slice_src(spec.levels, spec.lmax,
+                                   solid_fine=spec.solid)
+                  if spec.lmax else None))
     if axisym:
         # live (r, z) frames can be revolved into a 3D cylinder view
         run_info['revolve3d'] = dict(
@@ -527,7 +622,7 @@ def solve_2d_foam(case, hooks=None):
     loop = FoamRunLoop(
         spec, hooks, fields, ingested, writer.LIVE_SLICE,
         lambda tdir: _decode_surface(spec, tdir, (Nx, Ny), 0, 1,
-                                     slice_solid),
+                                     slice_solid, remap_sl=spec.remap),
         read_dir, on_frame)
     stop_reason = loop.run()
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
@@ -614,7 +709,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0),
                 r_exp=spec.r_exp, from_profile=False,
                 solver='blastfoam', material=spec.material,
-                case_dir=spec.case_unc)
+                case_dir=spec.case_unc, refine=spec.refine_meta())
     # per-step FO peak/impulse maps, falling back to the per-write Python
     # accumulator (B17: same policy as 3D)
     (meta['p_peak'], meta['impulse'],
@@ -738,10 +833,15 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
             f'  Burst point     : ({x0:g}, {y0:g}, {z0:g}) m',
             f'  Explosive radius: {spec.r_exp:.4f} m',
             f'  Domain          : {case.Lx:g} x {case.Ly:g} x '
-            f'{case.Lz:g} m,  cell {spec.dx:g} m',
-            f'  Grid            : {spec.nx} x {spec.ny} x {spec.nz} = '
-            f'{spec.n_cells:,} cells'
-            + (' (obstacle cells carved out)' if spec.obstacles else ''),
+            f'{case.Lz:g} m,  cell {spec.dx if not spec.lmax else spec.dx_base:g} m'
+            + (' (base)' if spec.lmax else ''),
+            (f'  Grid            : {spec.nx} x {spec.ny} x {spec.nz} = '
+             f'{spec.n_cells:,} cells'
+             + (' (obstacle cells carved out)' if spec.obstacles else ''))
+            if not spec.lmax else
+            (f'  Grid            : {spec.nb[0]} x {spec.nb[1]} x '
+             f'{spec.nb[2]} base cells'),
+            *_refine_lines(spec),
             '  EOS             : JWL products + ideal-gas air '
             f'(vDet {m.vDet:g} m/s)',
             f'  Boundaries      : {bc_lbl}',
@@ -777,7 +877,8 @@ def solve_3d_foam(case, hooks=None):
     centers = [c for c, _m in spec.charges]
 
     n_snapshots = case.n_snapshots
-    max_snaps = max(1, int(1.5e9 / (4 * spec.n_cells)) - 1)
+    n_disp = spec.nx * spec.ny * spec.nz if spec.lmax else spec.n_cells
+    max_snaps = max(1, int(1.5e9 / (4 * n_disp)) - 1)
     if n_snapshots > max_snaps:
         hooks.log(f"  [note] n_snapshots reduced {n_snapshots} -> "
                   f"{max_snaps} to bound snapshot memory")
@@ -797,15 +898,19 @@ def solve_3d_foam(case, hooks=None):
      live_title) = _slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_open)
+    ax_i = 'xyz'.index(slice_axis)
     hooks.run_started(dict(
         dim=3, x_face=live_faces[0], y_face=live_faces[1],
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
+        mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
+                                   solid_fine=spec.solid)
+                  if spec.lmax else None),
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=[tuple(o) for o in spec.obstacles],
                      Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
                      charge_center=(x0, y0, z0), r_exp=spec.r_exp,
-                     bcs=bcs)))
+                     bcs=bcs, refine=spec.refine_meta())))
     _initial_frame(spec, hooks, live_sl)
     _initial_frame3d(spec, hooks)
 
@@ -816,7 +921,6 @@ def solve_3d_foam(case, hooks=None):
     snap_names = []             # dirs picked by front-radius crossings
     acc = PeakImpulse()         # per-write Python + per-step FO accumulators
     live3d = new_live()         # frame3d throttle (viewer refresh policy)
-    ax_i = 'xyz'.index(slice_axis)
     uv = [a for a in range(3) if a != ax_i]
     lshape = tuple((Nx, Ny, Nz)[a] for a in uv)
     # the live-slice sample skips carved cells: pass that layer's
@@ -886,8 +990,9 @@ def solve_3d_foam(case, hooks=None):
 
     loop = FoamRunLoop(
         spec, hooks, fields, ingested, writer.LIVE_SLICE,
-        lambda tdir: _decode_surface(spec, tdir, lshape, uv[0], uv[1],
-                                     slice_solid),
+        lambda tdir: _decode_surface(
+            spec, tdir, lshape, uv[0], uv[1], slice_solid,
+            remap_sl=None if spec.remap is None else spec.remap[live_sl]),
         read_dir, on_frame)
     stop_reason = loop.run()
     if stop_reason == 'safety cap' and spec.cap_is_end:
@@ -968,7 +1073,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0, z0),
                 r_exp=spec.r_exp, r_src=spec.r_exp, from_profile=None,
                 solver='blastfoam', material=spec.material,
-                case_dir=spec.case_unc,
+                case_dir=spec.case_unc, refine=spec.refine_meta(),
                 p_peak=p_peak, impulse=impulse, peak_source=peak_source)
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)

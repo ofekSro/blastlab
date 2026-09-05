@@ -18,7 +18,8 @@ from ...core import geometry
 from ...core.case import load_case
 from ..hooks import RunHooks
 from . import env, reader, writer
-from .backend import finalize_1d, finalize_2d, finalize_3d, read_2d, read_3d
+from .backend import (build_remap, finalize_1d, finalize_2d, finalize_3d,
+                      read_2d, read_3d)
 from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
@@ -82,6 +83,14 @@ def load_run(case_dir, hooks=None):
     spec = writer.render_case(case, n_procs=n_procs)
     spec.case_posix, spec.case_unc = posix, unc
     spec.files = None                   # nothing is written
+    if spec.lmax:
+        # refined mesh: rebuild the fine-grid gather map from the cell
+        # centres the run wrote (0/C is kept on disk for exactly this)
+        if not os.path.isfile(os.path.join(unc, '0', 'C')):
+            raise RuntimeError(
+                f'{unc} is a locally refined run without 0/C (cell '
+                f'centres) - re-run it with the current blastlab')
+        build_remap(spec, hooks)
 
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
     if case.dim in (1, 2):              # finalize_1d/2d re-read T

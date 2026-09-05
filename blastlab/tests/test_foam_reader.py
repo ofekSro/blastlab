@@ -42,6 +42,24 @@ def main():
     p0 = reader.read_scalar(os.path.join(FIX, 'p_uniform'), N)
     check('scalar uniform', len(p0) == N and (p0 == 101325.0).all())
 
+    # torn mid-write uniform field (cut before the ';'): ValueError, not
+    # the AttributeError that used to escape the ingest retry guards
+    try:
+        reader.read_scalar(os.path.join(FIX, 'p_uniform_truncated'), N)
+        check('uniform truncated raises', False)
+    except ValueError:
+        check('uniform truncated raises', True)
+    except Exception as exc:                # noqa: BLE001 - diagnostic
+        check('uniform truncated raises', False, type(exc).__name__)
+    try:
+        reader.read_vector(os.path.join(FIX, 'p_uniform_truncated'), N)
+        check('uniform truncated vector raises', False)
+    except ValueError:
+        check('uniform truncated vector raises', True)
+    except Exception as exc:                # noqa: BLE001 - diagnostic
+        check('uniform truncated vector raises', False,
+              type(exc).__name__)
+
     # nonuniform vector
     U = reader.read_vector(os.path.join(FIX, 'U_nonuniform'), N)
     check('vector nonuniform', U.shape == (N, 3)
@@ -200,6 +218,37 @@ def main():
              for i in range(nx) for j in range(ny) for k in range(nz))
     check('3d obstacle scatter + fill', ok)
 
+    # refined-mesh remap (N15): to_grid gathers per fine cell, -1 = carved
+    remap = np.array([[0, 0, 1, 2],
+                      [0, 0, 3, 4],
+                      [5, 6, -1, -1],
+                      [7, 8, -1, -1]], dtype=np.int32)
+    rspec = SimpleNamespace(dim=2, nx=4, ny=4, remap=remap)
+    vals = np.arange(9, dtype=float) * 10.0
+    g = reader.to_grid(vals, rspec, fill=-1.0)
+    check('remap to_grid: coarse cell fills its 2x2 block',
+          (g[:2, :2] == 0.0).all() and g[0, 2] == 10.0 and g[1, 3] == 40.0)
+    check('remap to_grid: carved fine cells take fill',
+          (g[2:, 2:] == -1.0).all() and g[3, 1] == 80.0)
+    # count-free vector read (cell centres of a refined mesh)
+    ctxt = ('FoamFile { format ascii; class volVectorField; object C; }\n'
+            'dimensions [0 1 0 0 0 0 0];\n'
+            'internalField   nonuniform List<vector> \n3\n(\n'
+            '(0.1 0.2 0)\n(0.3 0.4 0)\n(0.5 0.6 0)\n)\n;\n'
+            'boundaryField { }\n')
+    import tempfile as _tf
+    cpath = os.path.join(_tf.mkdtemp(prefix='blastlab_c_'), 'C')
+    with open(cpath, 'w') as f:
+        f.write(ctxt)
+    C = reader.read_vector(cpath, None)
+    check('read_vector(n_cells=None) accepts any count', C.shape == (3, 3)
+          and abs(C[2, 1] - 0.6) < 1e-12, str(C.shape))
+    try:
+        reader.read_vector(cpath, 4)
+        check('read_vector strict count still enforced', False)
+    except ValueError:
+        check('read_vector strict count still enforced', True)
+
     # obstacle-aware live-slice decode (backend._decode_surface with a
     # slice mask): fluid rows land on their cells, carved cells read
     # ambient, and a short mid-write sample returns None
@@ -239,6 +288,27 @@ def main():
     check('short carved sample -> None',
           backend._decode_surface(sspec, '0.001', (sx, sy), 0, 1,
                                   smask) is None)
+
+    # remap branch: rows are cut-polygon centroids (= in-plane centres);
+    # a 2x2 fine plane where the left column is one coarse cell
+    rmap = np.array([[0, 0], [1, 2]], dtype=np.int32)
+    rdir = os.path.join(tmp, 'postProcessing', 'liveSlice', '0.002')
+    os.makedirs(rdir, exist_ok=True)
+    with open(os.path.join(rdir, 'p_plane.raw'), 'w') as f:
+        f.write('# x y z p\n0.5 1.0 0 100\n1.5 0.5 0 200\n1.5 1.5 0 300\n')
+    rspec2 = SimpleNamespace(dim=2, nx=2, ny=2, case_unc=tmp, dx=1.0,
+                             n_cells=3, remap=rmap)
+    got = backend._decode_surface(rspec2, '0.002', (2, 2), 0, 1,
+                                  remap_sl=rmap)
+    check('remap decode: coarse cell value fills both fine cells',
+          got is not None and got[0, 0] == 100 and got[0, 1] == 100
+          and got[1, 0] == 200 and got[1, 1] == 300,
+          str(None if got is None else got.tolist()))
+    with open(os.path.join(rdir, 'p_plane.raw'), 'w') as f:
+        f.write('# x y z p\n0.5 1.0 0 100\n1.5 0.5 0 200\n')
+    check('remap decode: incomplete sample -> None (retry)',
+          backend._decode_surface(rspec2, '0.002', (2, 2), 0, 1,
+                                  remap_sl=rmap) is None)
 
     print()
     if FAIL:

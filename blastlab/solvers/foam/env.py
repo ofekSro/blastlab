@@ -13,8 +13,17 @@ The availability check is a subprocess probe with three access styles:
 A failed check is cached only for FAIL_RETRY_COOLDOWN_S rather than
 pinned for the process lifetime, so a transient WSL outage (service
 wedge, cold-start timeout) heals without restarting the app.
+
+It also owns the run-directory lifecycle: unique names for fresh runs
+(`new_case_dir`), the liveness of the solver recorded in a run's
+`.run.pid` (`run_is_alive`/`runs_alive`, one wsl.exe round trip for a
+whole list) and the reaping of solvers whose Windows-side owner died
+(`reap_orphans`).
 """
 
+import collections
+import itertools
+import os
 import subprocess
 import threading
 import time
@@ -24,7 +33,8 @@ FOAM_BASHRC = '/root/OpenFOAM/OpenFOAM-9/etc/bashrc'
 RUNS_ROOT   = '/root/blastlab_runs'
 
 #: tools the backend pipeline needs (checked after sourcing the bashrc)
-NEEDED_TOOLS = ('blastFoam', 'blockMesh', 'setRefinedFields')
+NEEDED_TOOLS = ('blastFoam', 'blockMesh', 'setRefinedFields', 'topoSet',
+                'subsetMesh', 'refineMesh', 'postProcess')
 
 CREATE_NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 
@@ -58,11 +68,35 @@ def wsl_argv(script):
             f'source {FOAM_BASHRC} && {script}']
 
 
+def wsl_plain_argv(script):
+    """argv running `script` in WSL WITHOUT sourcing the OpenFOAM env.
+
+    For the run-directory utilities (pid liveness, signals, rm): they
+    must keep working when the blastFoam install itself is broken -
+    sourcing a missing bashrc would fail the `&&` chain before the
+    script ever ran."""
+    return ['wsl.exe', '-d', WSL_DISTRO, '-e', 'bash', '-lc', script]
+
+
+#: per-process run counter: makes two runs launched by the SAME process
+#: within one wall-second distinct (next() on a count is atomic)
+_dir_seq = itertools.count()
+
+
 def new_case_dir(dim, stamp=None):
     """Fresh run-directory pair (posix, unc). Not created on disk yet -
-    the writer creates it when it writes the case files."""
+    the writer creates it (exist_ok=False) when it writes the case.
+
+    The name carries the launching process's pid and a per-process
+    counter on top of the 1-second timestamp, so two runs started in the
+    same second - parallel test processes, GUI + CLI, or back-to-back
+    chain stages - can never share a directory. They used to: the second
+    run rewrote the first one's controlDict and 0/ fields underneath it
+    and both fought over the same `.run.pid`, so a stop signal could hit
+    the wrong solver."""
     stamp = stamp or time.strftime('%Y%m%d-%H%M%S')
-    posix = f'{RUNS_ROOT}/{stamp}_{dim}d'
+    posix = (f'{RUNS_ROOT}/{stamp}_{dim}d'
+             f'_p{os.getpid()}-{next(_dir_seq):02d}')
     return posix, unc(posix)
 
 
@@ -213,3 +247,195 @@ def _probe_once(timeout):
             detail += f' ({tail[-1].strip()})'
         return False, detail
     return True, f'blastFoam ready in WSL ({WSL_DISTRO})'
+
+
+# ── run directories: liveness and orphan reaping ────────────────────────────
+
+#: One run's `.run.pid`: the WSL-side solver pid (a session leader for
+#: parallel runs, the solver itself for serial), the Windows-side owner
+#: pid - the Python process that launched it - and whether the solver is
+#: still running. `owner` is None for dirs written before the owner line
+#: existed; `alive` is None when WSL could not be asked.
+RunPid = collections.namedtuple('RunPid', 'dir pid owner alive')
+
+#: Windows process-liveness constants (see _win_pid_alive)
+_SYNCHRONIZE = 0x00100000
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+_ERROR_ACCESS_DENIED = 5
+_WAIT_OBJECT_0 = 0
+
+_WSL_UTIL_S = 30
+
+
+def run_dirs():
+    """Posix paths of the run directories currently under RUNS_ROOT."""
+    root = unc(RUNS_ROOT)
+    try:
+        names = sorted(os.listdir(root))
+    except OSError:
+        return []
+    return [f'{RUNS_ROOT}/{n}' for n in names
+            if os.path.isdir(os.path.join(root, n))]
+
+
+def _int_or_none(text):
+    try:
+        return int(str(text).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _scan_script(dirs):
+    quoted = ' '.join(f"'{d}'" for d in dirs)
+    return (f'for d in {quoted}; do '
+            'f="$d/.run.pid"; '
+            'p=$(sed -n 1p "$f" 2>/dev/null); '
+            'w=$(sed -n 2p "$f" 2>/dev/null); '
+            'a=0; if [ -n "$p" ] && kill -0 "$p" 2>/dev/null; then a=1; fi; '
+            'echo "RUN|$d|$p|$w|$a"; '
+            'done')
+
+
+def _parse_scan(stdout, dirs, alive_default=None):
+    """Scan output -> {dir: RunPid}. Dirs the script said nothing about
+    keep `alive_default` (None = 'could not tell'). Pure: the no-WSL
+    tests drive this directly."""
+    out = {d: RunPid(d, None, None, alive_default) for d in dirs}
+    for line in (stdout or '').splitlines():
+        parts = line.strip().split('|')
+        if len(parts) != 5 or parts[0] != 'RUN' or parts[1] not in out:
+            continue
+        _, d, pid, owner, alive = parts
+        out[d] = RunPid(d, _int_or_none(pid), _int_or_none(owner),
+                        alive == '1')
+    return out
+
+
+def scan_runs(case_dirs=None, timeout=_WSL_UTIL_S):
+    """{posix_dir: RunPid} for `case_dirs` (default: every run dir).
+
+    ONE wsl.exe round trip for the whole list - a per-dir probe would
+    pay a process spawn each. When WSL cannot be reached every record
+    comes back with `alive=None` ('unknown'), never a bare False: the
+    callers guard destructive work with this and must not read a failed
+    probe as 'nothing is running'."""
+    dirs = list(run_dirs() if case_dirs is None
+                else [str(d).rstrip('/') for d in case_dirs])
+    if not dirs:
+        return {}
+    try:
+        res = subprocess.run(wsl_plain_argv(_scan_script(dirs)),
+                             capture_output=True, text=True,
+                             timeout=timeout, stdin=subprocess.DEVNULL,
+                             creationflags=CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return _parse_scan('', dirs)
+    return _parse_scan(res.stdout, dirs)
+
+
+def runs_alive(case_dirs=None, timeout=_WSL_UTIL_S):
+    """{posix_dir: True | False | None} - is each run's solver still
+    running? None means WSL could not be asked."""
+    return {d: r.alive
+            for d, r in scan_runs(case_dirs, timeout=timeout).items()}
+
+
+def run_is_alive(case_dir, timeout=_WSL_UTIL_S):
+    """True/False for one run dir, or None when WSL did not answer."""
+    d = str(case_dir).rstrip('/')
+    return runs_alive([d], timeout=timeout).get(d)
+
+
+def _win_pid_alive(pid):
+    """True when a Windows process with `pid` exists.
+
+    Deliberately NOT os.kill(pid, 0): on Windows os.kill TERMINATES the
+    target whatever the signal. Uses OpenProcess + a zero-timeout wait
+    and errs towards 'alive' (access denied, no ctypes, odd errors), so
+    a live owner is never mistaken for a dead one and reaping stays
+    conservative."""
+    if not pid or int(pid) <= 0:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL,
+                                    wintypes.DWORD)
+        k32.WaitForSingleObject.restype = wintypes.DWORD
+        k32.WaitForSingleObject.argtypes = (wintypes.HANDLE,
+                                            wintypes.DWORD)
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        h = k32.OpenProcess(
+            _SYNCHRONIZE | _PROCESS_QUERY_LIMITED_INFORMATION,
+            False, int(pid))
+        if not h:
+            # "access denied" means it exists and simply isn't ours
+            return ctypes.get_last_error() == _ERROR_ACCESS_DENIED
+        try:
+            # the process object signals once the process has exited
+            return k32.WaitForSingleObject(h, 0) != _WAIT_OBJECT_0
+        finally:
+            k32.CloseHandle(h)
+    except (AttributeError, OSError, ValueError):
+        return True             # cannot tell -> never reap
+
+
+def _is_orphan(rec):
+    """A solver still running in WSL whose Windows-side owner is gone."""
+    return bool(rec.alive and rec.owner and not _win_pid_alive(rec.owner))
+
+
+def _signal_script(pids, sig):
+    """Each pid gets both a direct `kill` (serial runs record the solver
+    itself) and a session-wide `pkill -s` (parallel runs record the
+    setsid session leader covering mpirun and every rank); whichever
+    form does not apply simply matches nothing."""
+    return '; '.join(
+        f'kill -{sig} {p} 2>/dev/null; pkill -{sig} -s {p} 2>/dev/null'
+        for p in pids) + '; true'
+
+
+def _signal_pids(pids, sig, timeout=_WSL_UTIL_S):
+    """Send one signal to a set of recorded run pids (one wsl call)."""
+    if not pids:
+        return True
+    script = _signal_script(pids, sig)
+    try:
+        subprocess.run(wsl_plain_argv(script), capture_output=True,
+                       timeout=timeout, stdin=subprocess.DEVNULL,
+                       creationflags=CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return True
+
+
+def reap_orphans(case_dirs=None, log=None, grace_s=5.0,
+                 timeout=_WSL_UTIL_S):
+    """TERM (then KILL) every run whose solver is alive in WSL but whose
+    Windows-side owner process is gone.
+
+    Without this, a Python process that dies hard leaves blastFoam
+    running to `endTime` - hours of CPU for a big 3D - with nothing left
+    to stop it. Conservative by construction: a run is reaped only when
+    its `.run.pid` records BOTH pids and the owner is provably gone, so
+    runs owned by another live window (or written before the owner line
+    existed) are never touched. Returns the reaped RunPid records."""
+    log = log or (lambda _msg: None)
+    recs = scan_runs(case_dirs, timeout=timeout)
+    orphans = [r for r in recs.values() if _is_orphan(r)]
+    if not orphans:
+        return []
+    for r in orphans:
+        log(f"  [blastfoam] reaping orphaned solver in "
+            f"{r.dir.rsplit('/', 1)[-1]} (pid {r.pid}; owner process "
+            f"{r.owner} is gone)")
+    _signal_pids([r.pid for r in orphans], 'TERM', timeout=timeout)
+    time.sleep(grace_s)
+    left = scan_runs([r.dir for r in orphans], timeout=timeout)
+    hard = [r.pid for r in orphans
+            if left.get(r.dir) is not None and left[r.dir].alive]
+    if hard:
+        _signal_pids(hard, 'KILL', timeout=timeout)
+    return orphans
