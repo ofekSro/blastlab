@@ -96,6 +96,11 @@ so existing cases and baselines are unchanged.
 
 ## Local mesh refinement (blastFoam)
 
+Refinement here is **static**: the mesh is built before the run (topoSet +
+refineMesh per level) and does not change while the solver runs. blastFoam's
+dynamic AMR (`adaptiveFvMesh`, the mesh following the shock) is not wired up -
+the case writer always emits `dynamicFvMesh staticFvMesh`.
+
 The blastFoam backend can refine the mesh locally instead of shrinking the
 whole grid. A case has a **base cell size** plus **refinement zones**: axis-
 aligned boxes `(x0, x1, y0, y1[, z0, z1], level)` where level *l* halves the

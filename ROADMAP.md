@@ -512,6 +512,21 @@ should be a conscious call, not a drive-by edit. *Effort:* S. *Confidence:*
 **confirmed by execution** (found while verifying T4; unrelated to it — T4
 touches no ingest/stop-timing code).
 
+*Update (2026-09-05, re-measured after T18):* the premise above no longer
+holds — the common prefix is NOT bit-identical any more (max |dp| = 470 Pa
+over 643 shared rows; lengths 525 vs 616, t_end 0.585 vs 0.760 ms). Cause:
+`writeControl adjustableRunTime` makes the solver CLIP its time step to land
+on write times, and the adaptive `writeInterval` controller moves those times
+at wall-clock-dependent moments, so the two runs take different time steps
+from the first adaptation on (the first five sample times are still exactly
+equal). B25's mtime fix is what made those rewrites actually take effect, so
+it exposed this. The physics still agrees: gauge peaks within 0.13 % and
+2e-4, arrival times within 0.7 % and exactly. *Options for the owner:*
+(a) assert physical agreement (peaks/arrivals within a tolerance) instead of
+row equality; (b) disable the adaptive controller for the determinism pair so
+the runs really are bit-identical - then the check tests what it claims;
+(c) leave it as a known-failing suite. Recommendation: (b), else (a).
+
 ---
 
 
