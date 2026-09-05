@@ -31,7 +31,7 @@ from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from . import env
 from .dicts import FLUX_SCHEME, P_OPEN_BC, Raw, block, fmt, foam_file
-from .materials import MATERIALS, E0, charge_radius
+from .materials import AFTERBURN, MATERIALS, E0, charge_radius
 
 PHASE = 'expl'                  # fixed phase name for every material
 HALF_ANGLE_DEG = 1.0            # wedge half-angle (1D sector, 2D axisym)
@@ -621,15 +621,22 @@ def _controldict(spec, case):
     return foam_file('controlDict', block(d), location='system')
 
 
-def _fvschemes():
+def _fvschemes(afterburn='none'):
+    """Schemes for the case. An afterburn model transports its own burn
+    fraction c.<phase>, which needs its div/reconstruct entries - added
+    only when the model is on, so unrefined/unafterburnt cases render
+    exactly as before."""
+    div = {
+        'default': 'none',
+        f'div(alphaRhoPhi.{PHASE},lambda.{PHASE})': 'Riemann',
+    }
+    if afterburn != 'none':
+        div[f'div(alphaRhoPhi.{PHASE},c.{PHASE})'] = 'Riemann'
     body = block({
         'fluxScheme': FLUX_SCHEME,
         'ddtSchemes': {'default': 'Euler', 'timeIntegrator': 'RK2SSP'},
         'gradSchemes': {'default': Raw('cellMDLimited leastSquares 1.0')},
-        'divSchemes': {
-            'default': 'none',
-            f'div(alphaRhoPhi.{PHASE},lambda.{PHASE})': 'Riemann',
-        },
+        'divSchemes': div,
         'laplacianSchemes': {'default': Raw('Gauss linear corrected')},
         'interpolationSchemes': {
             'default': 'cubic',
@@ -640,6 +647,8 @@ def _fvschemes():
             'reconstruct(p)': 'vanAlbada',
             'reconstruct(speedOfSound)': 'vanAlbada',
             f'reconstruct(lambda.{PHASE})': 'vanAlbada',
+            **({f'reconstruct(c.{PHASE})': 'vanAlbada'}
+               if afterburn != 'none' else {}),
         },
         'snGradSchemes': {'default': 'corrected'},
     })
@@ -682,7 +691,7 @@ def _setfieldsdict(spec, case):
     return foam_file('setFieldsDict', body, location='system')
 
 
-def _phaseproperties(spec, activation='linear'):
+def _phaseproperties(spec, activation='linear', afterburn='none'):
     m = MATERIALS[spec.material]
     # 'linear' burns at vDet from the detonation points (tutorial
     # default); 'none' = fully reacted at t0 - the vendor's
@@ -723,6 +732,9 @@ def _phaseproperties(spec, activation='linear'):
             },
             'activationModel': activation,
             'initiation': initiation,
+            # afterburn: products burning with atmospheric oxygen
+            # (Miller model; keys read straight from this phase dict)
+            **_afterburn_entries(spec, afterburn),
             'residualRho': Raw('1e-6'),
             'residualAlpha': Raw('1e-10'),
         },
@@ -739,6 +751,16 @@ def _phaseproperties(spec, activation='linear'):
         },
     })
     return foam_file('phaseProperties', body, location='constant')
+
+
+def _afterburn_entries(spec, afterburn):
+    """`afterburnModel` + its coefficients for the detonating phase
+    ({} when off - the dict then renders exactly as before)."""
+    if afterburn == 'none':
+        return {}
+    ab = AFTERBURN[spec.material]
+    return {'afterburnModel': 'Miller', 'Q0': ab.Q0, 'a': ab.a,
+            'n': ab.n, 'm': ab.m, 'pMin': ab.pMin}
 
 
 def _dynamicmeshdict():
@@ -807,6 +829,7 @@ def render_case(case, n_procs=1):
     adds system/decomposeParDict (nothing else varies)."""
     spec = plan_case(case)
     spec.n_procs = max(1, int(n_procs))
+    afterburn = getattr(case, 'afterburn', 'none') or 'none' 
     if spec.dim == 1:
         bmd = _blockmesh_1d(spec)
     elif spec.dim == 2:
@@ -818,11 +841,11 @@ def render_case(case, n_procs=1):
     spec.files = {
         'system/blockMeshDict': bmd,
         'system/controlDict': _controldict(spec, case),
-        'system/fvSchemes': _fvschemes(),
+        'system/fvSchemes': _fvschemes(afterburn),
         'system/fvSolution': _fvsolution(),
         'system/setFieldsDict': _setfieldsdict(spec, case),
         'constant/phaseProperties': _phaseproperties(
-            spec, getattr(case, 'activation', 'linear')),
+            spec, getattr(case, 'activation', 'linear'), afterburn),
         'constant/dynamicMeshDict': _dynamicmeshdict(),
     }
     if spec.obstacles:

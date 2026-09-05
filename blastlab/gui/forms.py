@@ -274,6 +274,9 @@ class CaseForm(ctk.CTkFrame):
         self._act_combo = _combo(num, self._var('activation', 'linear'),
                                  ['linear', 'none'])
         r = _row(num, r, 'Detonation (blastFoam)', self._act_combo)
+        self._ab_combo = _combo(num, self._var('afterburn', 'none'),
+                                ['none', 'miller'])
+        r = _row(num, r, 'Afterburn (blastFoam)', self._ab_combo)
         if self.dim > 1:
             # 'global' = today's rule (the whole grid is refined to resolve
             # the charge); 'zone' keeps the base cell and adds automatic
@@ -432,6 +435,11 @@ class CaseForm(ctk.CTkFrame):
                 state='readonly' if foam else 'disabled')
             if not foam and self.v['activation'].get() != 'linear':
                 self.v['activation'].set('linear')
+            if hasattr(self, '_ab_combo'):
+                self._ab_combo.configure(
+                    state='readonly' if foam else 'disabled')
+                if not foam and self.v['afterburn'].get() != 'none':
+                    self.v['afterburn'].set('none')
             if hasattr(self, '_cref_combo'):
                 self._cref_combo.configure(
                     state='readonly' if foam else 'disabled')
@@ -452,7 +460,8 @@ class CaseForm(ctk.CTkFrame):
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
                 solver=v['solver'].get(), material=v['material'].get(),
-                activation=v['activation'].get())
+                activation=v['activation'].get(),
+                afterburn=v['afterburn'].get())
 
         bcs = {side: v[f'bc_{side}'].get()
                for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
@@ -473,6 +482,7 @@ class CaseForm(ctk.CTkFrame):
             record_frames=150 if v['record'].get() else 0,
             solver=v['solver'].get(), material=v['material'].get(),
             activation=v['activation'].get(),
+            afterburn=v['afterburn'].get(),
             n_procs=_i(v['n_procs'], 'MPI ranks'),
             det_points=self.det_pts.get() or None,
             refine_zones=[(*z[:-1], int(round(z[-1])))
@@ -506,6 +516,7 @@ class CaseForm(ctk.CTkFrame):
             v['solver'].set(getattr(case, 'solver', 'native'))
             v['material'].set(getattr(case, 'material', 'TNT'))
             v['activation'].set(getattr(case, 'activation', 'linear'))
+            v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
             v['cell'].set(f'{case.cell_size_m:g}')
             v['eos'].set(case.eos)
             v['cfl'].set(f'{case.cfl:g}')
@@ -537,6 +548,7 @@ class CaseForm(ctk.CTkFrame):
         v['solver'].set(getattr(case, 'solver', 'native'))
         v['material'].set(getattr(case, 'material', 'TNT'))
         v['activation'].set(getattr(case, 'activation', 'linear'))
+        v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
         v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
         v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
         v['eos'].set(case.eos)

@@ -67,6 +67,10 @@ def cases():
             center=(0.7, 1.0, 1.0), charges=[(1.4, 1.0, 1.0, 2.0)],
             det_points=[(0.7, 1.0, 1.0), (1.4, 1.0, 1.0)],
             n_snapshots=3, solver='blastfoam', material='TNT'),
+        'case1d_tnt_afterburn': Case1D(
+            radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
+            gauge_radii=[1.0, 2.0], solver='blastfoam', material='TNT',
+            afterburn='miller'),
         'case2d_axi_none': Case2D(
             Lx=4.0, Ly=4.0, cell_size_m=0.02, charge=1.0,
             center=(0.0, 1.0), activation='none',
@@ -103,6 +107,28 @@ def cases():
             gauges=[(0.9, 0.5, 0.5)], n_snapshots=2,
             solver='blastfoam', material='TNT'),
     }
+
+
+def afterburn_checks(specs):
+    """N3: the Miller afterburn model reaches the phase dict and brings
+    its transported burn fraction's schemes with it."""
+    from blastlab.solvers.foam.materials import AFTERBURN
+    sa = specs['case1d_tnt_afterburn']
+    pp = sa.files['constant/phaseProperties']
+    ab = AFTERBURN['TNT']
+    check('afterburn: model + coefficients in the detonating phase',
+          'afterburnModel Miller;' in norm(pp)
+          and f'Q0 {fmt(ab.Q0)};' in norm(pp)
+          and f'a {fmt(ab.a)};' in norm(pp)
+          and f'pMin {fmt(ab.pMin)};' in norm(pp), norm(pp)[-400:])
+    fs = norm(sa.files['system/fvSchemes'])
+    check('afterburn: c.expl div + reconstruct schemes',
+          'div(alphaRhoPhi.expl,c.expl) Riemann;' in fs
+          and 'reconstruct(c.expl) vanAlbada;' in fs, fs)
+    plain = specs['case1d_tnt']
+    check('no afterburn: dicts untouched',
+          'afterburn' not in plain.files['constant/phaseProperties']
+          and 'c.expl' not in plain.files['system/fvSchemes'])
 
 
 def refine_checks(specs):
@@ -176,6 +202,7 @@ def refine_checks(specs):
 
 def semantic_checks(specs):
     refine_checks(specs)
+    afterburn_checks(specs)
     s1 = specs['case1d_tnt']
     m_tnt = MATERIALS['TNT']
     r_exp = charge_radius(1.0, m_tnt)

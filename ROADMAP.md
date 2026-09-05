@@ -784,12 +784,34 @@ out of the byte-pinned TSVs). This is the number users transcribe into reports;
 today they read it off the curve. Depends on B9's positive-phase definition.
 *Effort:* S–M. *Confidence:* verified still open.
 
-**N3 — Afterburn** *(the KB gap closer)*. The anchor sits at 0.73–0.77 of
-Kingery-Bulmash — the classic detonation-only-energy signature. blastFoam
-v6.2.0 ships `afterburnModel` (`Miller|constant|linear`). Per-material
-parameters + a Case field; `test_foam_kb_anchor.py` is a ready harness — expect
-the ratio to move meaningfully toward 1. *Effort:* M (~1 day + re-baseline KB
-numbers). *Confidence:* verified still absent (no `afterburnModel` anywhere).
+**N3 — Afterburn. DONE (2026-09-05).** `afterburn: 'none' | 'miller'` on
+Case1D/2D/3D (schema v4, default `'none'` - every golden, baseline and KB gate
+unchanged), blastFoam-only. The writer puts `afterburnModel Miller` plus
+`Q0/a/n/m/pMin` into the detonating phase and adds the schemes for the burn
+fraction the model transports (`div(alphaRhoPhi.expl,c.expl)` and
+`reconstruct(c.expl)`) - only when the model is on. The key set was
+established empirically against the installed blastFoam (the library carries
+`Miller|constant|linear|none`; the solver names each missing keyword in turn):
+`dc/dt = a (1 - c)^m p^n` above `pMin`, releasing `Q0 * c` J/kg.
+
+**Measured (tests/test_foam_kb_anchor.py --afterburn, 1 kg TNT free air):**
+
+| Z [m/kg^1/3] | KB [kPa] | detonation only | ratio | + afterburn | ratio |
+|---|---|---|---|---|---|
+| 1 | 904 | 652 | 0.72 | 929 | **1.03** |
+| 2 | 186 | 133 | 0.72 | 178 | **0.96** |
+| 3 | 80 | 60 | 0.75 | 76 | **0.95** |
+| 4 | 47 | 36 | 0.77 | 45 | **0.96** |
+
+TNT's `Q0 = 2.0 MJ/kg, a = 3e-4` are CALIBRATED on that anchor (not
+vendor/paper constants - `materials.Afterburn` says so); the other materials
+scale TNT's Q0 by oxygen balance (RDX/HMX/C4 -21.6 %, PETN -10.1 %, ANFO ~0
+against TNT's -74 %) and are physically ordered estimates, not anchored.
+The harness gained `--afterburn`: a third run, its own upward band
+(0.80-1.35), and the comparison table above; the detonation-only gate is
+untouched. New golden `case1d_tnt_afterburn`. *Next:* per-material
+calibration when data is available, and N5 (rasterization deficit) which
+biases all of these low.
 
 **N4 — VTK / ParaView export. DONE (2026-09-05).** `solvers/foam/export_vtk.py`:
 `foamToVTK -useTimeName -poly` (polyhedral cells of locally refined meshes

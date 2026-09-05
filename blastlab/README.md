@@ -82,6 +82,18 @@ into the panel; the CLI window runs in a separate process fed over a
 bounded, drop-on-full queue. Without pyvista everything else works
 unchanged.
 
+## Afterburn (blastFoam)
+
+A pure detonation run carries only the explosive's own (anaerobic) energy,
+which lands a free-air 1 kg TNT anchor ~25 % below Kingery-Bulmash. Setting
+**Afterburn** to `miller` on a blastFoam case adds the energy released as the
+detonation products burn with atmospheric oxygen (blastFoam's Miller model:
+`dc/dt = a (1-c)^m p^n` above `pMin`, releasing `Q0 * c` J/kg), which brings
+that anchor to 0.95-1.03 of Kingery-Bulmash at Z = 1-4 m/kg^(1/3). TNT's
+parameters are calibrated on that anchor; the other materials scale by oxygen
+balance and are estimates - calibrate before quoting them. Default is `none`,
+so existing cases and baselines are unchanged.
+
 ## Local mesh refinement (blastFoam)
 
 The blastFoam backend can refine the mesh locally instead of shrinking the

@@ -18,8 +18,9 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
 
 SCHEMA = 'blastlab-case'
-VERSION = 3     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 4     # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
+                # v4: afterburn (foam Miller afterburn model)
 
 
 @dataclass
@@ -39,6 +40,9 @@ class Case1D:
     activation: str = 'linear'        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
+    afterburn: str = 'none'           # blastFoam afterburn model:
+                                      # 'none' | 'miller' (products
+                                      # burning with atmospheric oxygen)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
                                       # 1D always runs serial)
 
@@ -78,6 +82,9 @@ class Case2D:
     activation: str = 'linear'        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
+    afterburn: str = 'none'           # blastFoam afterburn model:
+                                      # 'none' | 'miller' (products
+                                      # burning with atmospheric oxygen)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y), ...] (axisym: x = 0);
@@ -121,6 +128,9 @@ class Case3D:
     activation: str = 'linear'        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
+    afterburn: str = 'none'           # blastFoam afterburn model:
+                                      # 'none' | 'miller' (products
+                                      # burning with atmospheric oxygen)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     charges: list = None              # blastFoam: ADDITIONAL charges
                                       # [(x, y, z, mass_kg), ...] on top
@@ -233,6 +243,8 @@ def _validate_solver(case, rep):
                 getattr(case, 'det_points', None):
             err("Multiple charges / detonation points require the "
                 "blastFoam solver")
+        if getattr(case, 'afterburn', 'none') not in ('none', None):
+            err("The afterburn model requires the blastFoam solver")
         return JWL_TNT['rho0']
     if solver != 'blastfoam':
         err(f"Unknown solver backend '{solver}'")
@@ -263,6 +275,19 @@ def _validate_solver(case, rep):
     elif activation == 'none':
         note("Instant detonation ('none'): the whole charge reacts "
              "at t = 0")
+    afterburn = getattr(case, 'afterburn', 'none') or 'none'
+    if afterburn not in ('none', 'miller'):
+        err(f"Unknown afterburn model '{afterburn}' "
+            f"(use 'none' or 'miller')")
+    elif afterburn == 'miller':
+        from ..solvers.foam.materials import AFTERBURN
+        ab = AFTERBURN.get(material)
+        if ab is None:
+            err(f"No afterburn parameters for '{material}'")
+        else:
+            note(f"Afterburn (Miller): up to {ab.Q0/1e6:g} MJ/kg released "
+                 f"as the products burn with atmospheric oxygen - "
+                 f"calibrated against Kingery-Bulmash, see ROADMAP N3")
     if n_procs > 1:
         if case.dim == 1:
             note("1D cases always run serial (MPI ranks ignored)")

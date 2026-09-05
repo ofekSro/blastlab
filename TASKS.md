@@ -29,7 +29,7 @@
 | T13 | 3D viewer colour-range plumbing + viz3d dead code | B19, A4(viz part), A8 | S | [x] |
 | T14 | Foam run browser + auto-cleanup | N8 | M | [x] |
 | T15 | VTK/ParaView export button | N4 | S | [x] |
-| T16 | Afterburn model (KB gap) | N3 | M | [ ] |
+| T16 | Afterburn model (KB gap) | N3 | M | [x] |
 | T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |
 | T18 | Local refinement: foam refine stages + remap reader + live slice + postmortem | N15 | M–L | [x] |
 | T19 | Local refinement: 3D viewer mesh layer + e2e + docs | N15 | S–M | [x] |

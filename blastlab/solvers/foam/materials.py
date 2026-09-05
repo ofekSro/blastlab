@@ -46,6 +46,55 @@ MATERIALS = {
 MATERIAL_NAMES = tuple(MATERIALS)   # combo/prompt order
 
 
+@dataclass(frozen=True)
+class Afterburn:
+    """blastFoam `afterburnModel Miller` parameters.
+
+    The model transports a burn fraction c with
+        dc/dt = a (1 - c)^m p^n     (p in Pa, only where p > pMin)
+    and releases Q0 * c J/kg on top of the JWL detonation energy - the
+    products burning with atmospheric oxygen, which a pure detonation
+    JWL run leaves out (that is the ~25 % Kingery-Bulmash gap
+    test_foam_kb_anchor measures).
+
+    Q0 scale: the fuel-rich explosives have an afterburn potential of
+    (heat of combustion - heat of detonation); the oxygen-balanced ones
+    have almost none. The values below are a FRACTION of that potential
+    (mixing with air is incomplete in free field) and, together with the
+    rate constants, were CALIBRATED in this repo against the
+    Kingery-Bulmash free-air anchor (tests/test_foam_kb_anchor.py
+    --afterburn) - they are not vendor- or paper-published constants.
+    See ROADMAP N3 for the measured before/after ratios."""
+    Q0: float           # J/kg   afterburn energy released at c = 1
+    a: float            # 1/(s Pa^n)
+    n: float = 1.0      # pressure exponent
+    m: float = 0.5      # (1 - c) exponent
+    pMin: float = 1.5e5   # Pa   no afterburn below this pressure
+
+
+#: Per-material Miller parameters.
+#:
+#: TNT is CALIBRATED: with Q0 = 2.0 MJ/kg and a = 3e-4 the 1 kg free-air
+#: anchor lands at 1.03 / 0.96 / 0.95 / 0.96 of Kingery-Bulmash at
+#: Z = 1 / 2 / 3 / 4 m/kg^(1/3), against 0.72 / 0.72 / 0.75 / 0.77
+#: without afterburn (tests/test_foam_kb_anchor.py --afterburn).
+#:
+#: The others scale TNT's Q0 by OXYGEN BALANCE - how much oxygen the
+#: molecule lacks to burn itself completely is what is left for the
+#: atmosphere to supply: TNT -74 %, RDX/HMX -21.6 %, C4 ~-21 % (91 %
+#: RDX), PETN -10.1 %, ANFO ~0 % (designed oxygen-balanced, so almost
+#: no afterburn). Only the TNT row is anchored to data; treat the rest
+#: as physically ordered estimates and calibrate before quoting.
+AFTERBURN = {
+    'TNT':  Afterburn(Q0=2.00e6, a=3.0e-4),
+    'C4':   Afterburn(Q0=0.57e6, a=3.0e-4),
+    'RDX':  Afterburn(Q0=0.58e6, a=3.0e-4),
+    'HMX':  Afterburn(Q0=0.58e6, a=3.0e-4),
+    'PETN': Afterburn(Q0=0.27e6, a=3.0e-4),
+    'ANFO': Afterburn(Q0=0.10e6, a=3.0e-4),
+}
+
+
 def E0(m):
     """blastFoam initiation energy [J/m^3] (verified convention:
     freeField C4 uses E0 = 9.0e9 = 1601 * 5.56e6)."""
