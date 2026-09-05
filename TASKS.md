@@ -27,7 +27,7 @@
 | T11 | Peak-overpressure / impulse views in Results | N1 (+ native 2D accumulators, native 3D meta) | M | [x] |
 | T12 | Per-gauge engineering summary + CSV | N2, positive-phase impulse (B9 full) | S–M | [x] |
 | T13 | 3D viewer colour-range plumbing + viz3d dead code | B19, A4(viz part), A8 | S | [x] |
-| T14 | Foam run browser + auto-cleanup | N8 | M | [ ] |
+| T14 | Foam run browser + auto-cleanup | N8 | M | [x] |
 | T15 | VTK/ParaView export button | N4 | S | [ ] |
 | T16 | Afterburn model (KB gap) | N3 | M | [ ] |
 | T17 | Local refinement: core model + schema + validation + form + preview + show-mesh (uniform path) | N15 | M | [x] |

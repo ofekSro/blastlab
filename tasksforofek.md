@@ -42,8 +42,11 @@
   `Projects` כולו (117 GB) נראה כעותק מקומי של הגיבוי. לבדוק ולהחליט מה נשאר.
 - **הרווח הגדול בלי למחוק:** ב-OneDrive, קליק ימני על `250` (153 GB), `גיבוי לכרמל` (64 GB),
   `תואר ראשון` (54 GB) → **Free up space** (Files On-Demand) — נשאר בענן, מתפנה מקומית.
-- **WSL `C:\WSL\Ubuntu\ext4.vhdx` — 15 GB**: ריצות הבדיקה שלי יושבות ב-`/root/blastlab_runs`.
-  ניקוי: `python -m blastlab --clean-foam-runs`. ה-vhdx לא מתכווץ לבד — אם צריך את המקום:
+- **WSL `C:\WSL\Ubuntu\ext4.vhdx` — 15 GB**: ריצות הבדיקה שלי יושבות ב-`/root/blastlab_runs`
+  (נמדד: 64 ריצות, 12.1 GB, כולן מהיום וכולן הסתיימו). ניקוי: `python -m blastlab --clean-foam-runs`
+  (או `--older-than 1` / `--keep-gb 5`); מהגרסה הזו יש גם ניקוי אוטומטי בהפעלת ה-GUI
+  (ברירת מחדל: מעל 20 GB או ריצות ישנות מ-14 יום, 3 האחרונות נשמרות; כיבוי דרך
+  `auto_cleanup: false` ב-`%APPDATA%\blastlab\settings.json`) וכפתור "Foam runs…" ב-Results. ה-vhdx לא מתכווץ לבד — אם צריך את המקום:
   `wsl --shutdown` ואז `diskpart` → `select vdisk file=C:\WSL\Ubuntu\ext4.vhdx` → `compact vdisk`.
 - `hiberfil.sys` 3.1 GB: אם לא משתמשים ב-Hibernate — `powercfg /h off` (כמנהל).
 

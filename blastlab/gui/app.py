@@ -131,6 +131,12 @@ class App:
                                   on_exec=self._exec,
                                   on_refresh=self._apply_refresh)
         self.results = ResultsPanel(content, log_fn=self._log_threadsafe)
+        # N8: sweep old/large WSL run dirs per the persisted settings,
+        # off-thread (WSL round trips must never block the window)
+        from ..solvers.foam import env as foam_env
+        from . import settings as gui_settings
+        self._cleanup_thread = foam_env.start_auto_cleanup(
+            gui_settings.load(), self._log_threadsafe)
         self.chain = ChainPanel(content, on_run_chain=self._run_chain)
 
         self._panels = {'setup': self.setup, 'run': self.run_panel,

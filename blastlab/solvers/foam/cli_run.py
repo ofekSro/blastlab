@@ -73,34 +73,94 @@ def _run_1d():
     return res
 
 
-def clean_runs(assume_yes=False):
+def reap_foam_runs():
+    """`--reap-foam-runs`: kill WSL solvers whose owning Python process
+    is gone (see env.reap_orphans), without deleting anything."""
+    reaped = env.reap_orphans(log=print)
+    print(f"  Reaped {len(reaped)} orphaned solver(s)."
+          if reaped else "  No orphaned solvers found.")
+    return reaped
+
+
+def _human(n):
+    if n is None:
+        return '?'
+    n = float(n)
+    for unit in ('B', 'K', 'M', 'G', 'T'):
+        if n < 1024 or unit == 'T':
+            return f'{n:.0f}{unit}' if unit == 'B' else f'{n:.1f}{unit}'
+        n /= 1024.0
+
+
+def clean_runs(assume_yes=False, force=False, older_than_days=None,
+               keep_gb=None):
     """List and (after confirmation) delete the WSL-side blastFoam run
     directories (`--clean-foam-runs`). Big 3D runs are kept on disk for
-    post-mortem inspection, so they accumulate."""
-    import subprocess
+    post-mortem inspection, so they accumulate.
+
+    Runs whose solver is still alive are listed but skipped - deleting a
+    case dir out from under a running solve loses that whole result -
+    unless `force`. Orphans (alive in WSL, owning process gone) are
+    reaped first so their directories become collectable. With
+    `older_than_days` / `keep_gb` only the runs the age/size policy picks
+    (env.cleanup_policy, nothing kept for recency) are deleted."""
+    import time
     print(f"blastFoam run directories in WSL ({env.RUNS_ROOT}):")
-    res = subprocess.run(
-        env.wsl_argv(f'du -sh {env.RUNS_ROOT}/*/ 2>/dev/null'),
-        capture_output=True, text=True, timeout=120,
-        stdin=subprocess.DEVNULL, creationflags=env.CREATE_NO_WINDOW)
-    listing = (res.stdout or '').strip()
-    if res.returncode != 0 or not listing:
+    env.reap_orphans(log=print)
+    dirs = env.run_dirs()
+    if not dirs:
         print("  (none)")
         return
-    print('\n'.join(f'  {ln}' for ln in listing.splitlines()))
+    info = env.run_info(dirs)
+    sizes = {d: _human(info.get(d, {}).get('bytes')) for d in dirs}
+    alive = env.runs_alive(dirs)
+    policy = older_than_days is not None or keep_gb is not None
+    chosen = None
+    if policy:
+        records = [dict(dir=d, bytes=info.get(d, {}).get('bytes'),
+                        mtime=info.get(d, {}).get('mtime'),
+                        alive=alive.get(d)) for d in dirs]
+        chosen = set(env.cleanup_policy(
+            records, time.time(),
+            max_bytes=None if keep_gb is None else keep_gb * 1024 ** 3,
+            max_age_s=None if older_than_days is None
+            else older_than_days * 86400.0,
+            keep_recent=0))
+    victims, skipped = [], []
+    now = time.time()
+    for d in dirs:
+        live, note = alive.get(d), ''
+        mt = info.get(d, {}).get('mtime')
+        age = f'{(now - mt) / 86400:.1f} d' if mt else '?'
+        if live and force:
+            note = '  <- RUNNING, deleted anyway (--force)'
+        elif live:
+            note = '  <- RUNNING, skipped'
+        elif live is None and not force:
+            note = '  <- state unknown (WSL did not answer), skipped'
+        elif policy and d not in chosen:
+            note = '  <- kept by the age/size policy'
+        take = force or (live is False and (not policy or d in chosen))
+        (victims if take else skipped).append(d)
+        print(f"  {sizes.get(d, '?'):>7}  {age:>7}  "
+              f"{d.rsplit('/', 1)[-1]}{note}")
+    if not victims:
+        print(f"  Nothing to delete ({len(skipped)} run(s) skipped; "
+              f"--force overrides).")
+        return
     if not assume_yes:
         try:
-            raw = input("Delete ALL of these? [y/N]: ").strip().lower()
+            raw = input(f"Delete {len(victims)} of these? "
+                        f"[y/N]: ").strip().lower()
         except EOFError:
             raw = ''
         if raw not in ('y', 'yes'):
             print("  Nothing deleted.")
             return
-    subprocess.run(
-        env.wsl_argv(f'rm -rf {env.RUNS_ROOT}/*/'),
-        capture_output=True, timeout=300,
-        stdin=subprocess.DEVNULL, creationflags=env.CREATE_NO_WINDOW)
-    print("  Deleted.")
+    env.delete_runs(victims)
+    print(f"  Deleted {len(victims)} of {len(dirs)} run director"
+          f"{'y' if len(victims) == 1 else 'ies'}."
+          + (f"  {len(skipped)} skipped." if skipped else ''))
 
 
 def load_and_report(case_dir):
@@ -108,10 +168,10 @@ def load_and_report(case_dir):
     from ..hooks import ConsoleHooks
     from .postmortem import load_run, list_runs
     if case_dir in ('list', '-'):
-        runs = list_runs()
+        runs = list_runs(check_alive=True)
         print(f"blastFoam runs in {env.RUNS_ROOT}:")
-        for name, _unc in runs or []:
-            print(f"  {name}")
+        for name, _unc, alive in runs or []:
+            print(f"  {name}" + ('  [running]' if alive else ''))
         if not runs:
             print("  (none)")
         return None

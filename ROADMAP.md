@@ -49,6 +49,7 @@ python test_gui_results_fields.py # peak/impulse fields in Results (headless Tk,
 python test_refine.py             # predicted refined-mesh structure (no GUI, no WSL)
 python test_gauge_summary.py      # per-gauge peak/arrival/positive-phase impulse (no WSL)
 python test_gui_gauge_summary.py  # Gauges-tab summary table + CSV (headless Tk)
+python test_gui_run_browser.py    # foam run browser with injected sources (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh overlays (headless Tk)
 python test_foam_ingest_order.py  # ordered ingest + peak/impulse accumulator (no WSL)
 python test_blast2d.py            # 2D native physics suite
@@ -631,7 +632,9 @@ det points, both previews. *Effort:* S. *Confidence:* code-read (verified).
 menu shortcuts), no UI-state persistence (geometry hard-coded `'1280x840'`,
 mode always dark on start, refresh field blank — `app.py:65,465`). *How:*
 Ctrl+O/S for case files, F5 run; a tiny json in the user config dir. *Effort:*
-S. *Confidence:* code-read (verified still open).
+S. *Confidence:* code-read (verified still open). *Half started (2026-09-05,
+T14):* the json settings file exists (`gui/settings.py`, load/save/update)
+- geometry/mode/refresh persistence just needs keys + two call sites.
 
 ---
 
@@ -814,7 +817,25 @@ the inverse of `_finalize_2d`), skip `setRefinedFields`, drop the
 real. *Effort:* M–L (2–4 days incl. physics sanity test). *Confidence:*
 code-read (writer has no nonuniform emitter today).
 
-**N8 — Foam run browser + run-dir hygiene.** Replace the bare directory dialog
+**N8 — Foam run browser + run-dir hygiene. DONE (2026-09-05).**
+`gui/run_browser.FoamRunBrowser` ("Foam runs…" on the Results tab): table of
+name / dims (case.json) / size / started / state from `postmortem.list_runs`
++ the new `env.run_info` (one `du -sb` + `stat` round trip), sizes and alive
+state filled from a worker thread through a polled queue; Load -> the
+Results loader (`load_foam_run_path`), Delete refuses running/unknown runs
+and confirms, Refresh, Browse… (the old directory dialog as fallback).
+Auto-cleanup: `env.cleanup_policy` (pure; never alive/unknown runs, never
+the N most recent, age rule then oldest-first until under the size cap) +
+`env.auto_cleanup`/`start_auto_cleanup` at GUI start off-thread with a
+"run-dir cleanup: removed X run(s), Y GB" log line; settings in the new
+`gui/settings.py` (json in %APPDATA%\blastlab; `auto_cleanup`,
+`cleanup_max_gb` 20, `cleanup_max_age_days` 14, `cleanup_keep_recent` 3) -
+the G9 persistence file now exists. `--clean-foam-runs` gains `--older-than
+DAYS` / `--keep-gb N` (policy with keep_recent=0) and prints age + size per
+run; `env.delete_runs` is the one rm path. Tests: `test_foam_env` (info
+parse, policy rules, settings round trip, opt-out), `test_gui_run_browser`
+(headless with injected sources). Real listing today: 64 runs, 12.1 GB.
+*Original entry:* Replace the bare directory dialog
 (`results_panel.py:385-396`) with a list fed by `postmortem.list_runs()`
 (exists, unused): name/dims/size/date + per-run Delete reusing
 `--clean-foam-runs` logic (after B14's live-run guard). Add age/size-based

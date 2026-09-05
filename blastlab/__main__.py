@@ -19,7 +19,21 @@ def main():
                     help='case JSON to open in the GUI at startup')
     ap.add_argument('--clean-foam-runs', action='store_true',
                     help='list and delete the WSL-side blastFoam run '
-                         'directories, then exit')
+                         'directories, then exit (runs still solving '
+                         'are skipped unless --force)')
+    ap.add_argument('--force', action='store_true',
+                    help='with --clean-foam-runs: delete run '
+                         'directories even while their solver is alive')
+    ap.add_argument('--older-than', metavar='DAYS', type=float,
+                    help='with --clean-foam-runs: only runs untouched '
+                         'for more than DAYS')
+    ap.add_argument('--keep-gb', metavar='N', type=float,
+                    help='with --clean-foam-runs: delete oldest runs '
+                         'until the runs root fits under N GB')
+    ap.add_argument('--reap-foam-runs', action='store_true',
+                    help='kill WSL-side blastFoam solvers whose owning '
+                         'blastlab process is gone (keeps the run '
+                         'directories), then exit')
     ap.add_argument('--load-foam-run', metavar='DIR',
                     help='load a finished blastFoam run directory '
                          '(name under /root/blastlab_runs, or a full '
@@ -28,7 +42,12 @@ def main():
 
     if args.clean_foam_runs:
         from .solvers.foam.cli_run import clean_runs
-        clean_runs()
+        clean_runs(force=args.force, older_than_days=args.older_than,
+                   keep_gb=args.keep_gb)
+        return
+    if args.reap_foam_runs:
+        from .solvers.foam.cli_run import reap_foam_runs
+        reap_foam_runs()
         return
     if args.load_foam_run:
         from .solvers.foam.cli_run import load_and_report

@@ -285,6 +285,149 @@ def _int_or_none(text):
         return None
 
 
+# ── run-dir hygiene (N8) ─────────────────────────────────────────────────────
+
+_INFO_S = 120
+
+
+def _info_script(dirs):
+    quoted = ' '.join(f"'{d}'" for d in dirs)
+    return (f'for d in {quoted}; do '
+            'b=$(du -sb "$d" 2>/dev/null | cut -f1); '
+            'm=$(stat -c %Y "$d" 2>/dev/null); '
+            'echo "INFO|$d|$b|$m"; done')
+
+
+def _parse_info(stdout, dirs):
+    """Info-script output -> {dir: dict(bytes, mtime)} (None where the
+    script said nothing / could not stat). Pure."""
+    out = {d: dict(bytes=None, mtime=None) for d in dirs}
+    for line in (stdout or '').splitlines():
+        parts = line.strip().split('|')
+        if len(parts) != 4 or parts[0] != 'INFO' or parts[1] not in out:
+            continue
+        out[parts[1]] = dict(bytes=_int_or_none(parts[2]),
+                             mtime=_int_or_none(parts[3]))
+    return out
+
+
+def run_info(case_dirs=None, timeout=_INFO_S):
+    """{posix_dir: dict(bytes, mtime)} for the run dirs in ONE wsl round
+    trip (`du -sb` + `stat`); {} when WSL cannot be reached."""
+    dirs = list(run_dirs() if case_dirs is None
+                else [str(d).rstrip('/') for d in case_dirs])
+    if not dirs:
+        return {}
+    try:
+        res = subprocess.run(wsl_plain_argv(_info_script(dirs)),
+                             capture_output=True, text=True,
+                             timeout=timeout, stdin=subprocess.DEVNULL,
+                             creationflags=CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    return _parse_info(res.stdout, dirs)
+
+
+def delete_runs(case_dirs, timeout=300):
+    """rm -rf the given run dirs inside WSL. True when the command ran."""
+    dirs = [str(d).rstrip('/') for d in case_dirs]
+    if not dirs:
+        return True
+    try:
+        res = subprocess.run(
+            wsl_plain_argv('rm -rf ' + ' '.join(f"'{d}'" for d in dirs)),
+            capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL,
+            creationflags=CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return res.returncode == 0
+
+
+def cleanup_policy(records, now, max_bytes=None, max_age_s=None,
+                   keep_recent=3):
+    """Which run dirs an automatic sweep may delete. Pure.
+
+    `records`: [dict(dir, bytes, mtime, alive)]. Never a run whose solver
+    is alive or whose state is unknown (alive None), never one whose
+    size/mtime could not be read, never the `keep_recent` most recently
+    touched runs. Of the rest: everything older than `max_age_s`, then -
+    oldest first - until the total of ALL runs fits under `max_bytes`.
+    Returns the victims' dirs (oldest first)."""
+    recs = [r for r in records if r.get('bytes') is not None
+            and r.get('mtime') is not None]
+    recs.sort(key=lambda r: r['mtime'])           # oldest first
+    protected = {r['dir'] for r in recs[len(recs) - keep_recent:]}         if keep_recent > 0 else set()
+    total = sum(int(r['bytes'] or 0) for r in records
+                if r.get('bytes') is not None)
+    victims = []
+    for r in recs:
+        if r['dir'] in protected or r.get('alive') is not False:
+            continue
+        too_old = max_age_s is not None and now - r['mtime'] > max_age_s
+        too_big = max_bytes is not None and total > max_bytes
+        if too_old or too_big:
+            victims.append(r['dir'])
+            total -= int(r['bytes'])
+    return victims
+
+
+def auto_cleanup(settings=None, log=None, now=None):
+    """Sweep the runs root per the GUI settings (opt-out
+    `auto_cleanup=False`). Returns (n_deleted, bytes_deleted). One log
+    line when something was removed; silent otherwise."""
+    from ...gui import settings as gui_settings
+    cfg = dict(gui_settings.DEFAULTS)
+    cfg.update(settings or {})
+    if not cfg.get('auto_cleanup', True):
+        return 0, 0
+    dirs = run_dirs()
+    if not dirs:
+        return 0, 0
+    info = run_info(dirs)
+    if not info:
+        return 0, 0
+    alive = runs_alive(dirs)
+    records = [dict(dir=d, bytes=info.get(d, {}).get('bytes'),
+                    mtime=info.get(d, {}).get('mtime'), alive=alive.get(d))
+               for d in dirs]
+    victims = cleanup_policy(
+        records, now if now is not None else time.time(),
+        max_bytes=float(cfg.get('cleanup_max_gb', 20)) * 1024 ** 3,
+        max_age_s=float(cfg.get('cleanup_max_age_days', 14)) * 86400.0,
+        keep_recent=int(cfg.get('cleanup_keep_recent', 3)))
+    if not victims:
+        return 0, 0
+    freed = sum(int(info[d]['bytes'] or 0) for d in victims)
+    if not delete_runs(victims):
+        if log:
+            log('  [blastfoam] run-dir cleanup: WSL did not delete '
+                f'{len(victims)} old run(s)')
+        return 0, 0
+    if log:
+        log(f'  [blastfoam] run-dir cleanup: removed {len(victims)} old '
+            f'run(s), {freed / 1024 ** 3:.1f} GB '
+            f'({len(dirs) - len(victims)} kept)')
+    return len(victims), freed
+
+
+def start_auto_cleanup(settings=None, log=None):
+    """Run auto_cleanup on a daemon thread (GUI startup: WSL round trips
+    must never block the window)."""
+    import threading
+
+    def work():
+        try:
+            auto_cleanup(settings, log)
+        except Exception as exc:              # never kill the GUI for this
+            if log:
+                log(f'  [blastfoam] run-dir cleanup skipped: {exc}')
+
+    th = threading.Thread(target=work, daemon=True,
+                          name='blastlab-run-cleanup')
+    th.start()
+    return th
+
+
 def _scan_script(dirs):
     quoted = ' '.join(f"'{d}'" for d in dirs)
     return (f'for d in {quoted}; do '

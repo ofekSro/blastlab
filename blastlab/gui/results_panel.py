@@ -69,12 +69,12 @@ class ResultsPanel(ctk.CTkFrame):
                       fg_color=c('accent'), hover_color=c('accent_hover'),
                       text_color='white',
                       command=self._open_3d).pack(side='left', padx=PAD)
-        ctk.CTkButton(bar, text='Load foam run…', image=icon('folder', 14),
+        ctk.CTkButton(bar, text='Foam runs…', image=icon('folder', 14),
                       compound='left', width=136, height=32,
                       font=theme.F_BODY, corner_radius=theme.RADIUS,
                       fg_color=c('card2'), hover_color=c('border'),
                       text_color=c('text'),
-                      command=self._load_foam_run).pack(side='left')
+                      command=self._open_run_browser).pack(side='left')
 
         for label, name, kind in (('Profile', 'curve', 'profile'),
                                   ('GIF', 'film', 'gif'),
@@ -485,12 +485,21 @@ class ResultsPanel(ctk.CTkFrame):
             self._log(f'3D view failed: {exc}')
 
     # ── post-mortem load of a finished blastFoam case dir ────────────────
-    def _load_foam_run(self):
-        from ..solvers.foam import env as foam_env
-        initial = foam_env.unc(foam_env.RUNS_ROOT)
-        path = filedialog.askdirectory(
-            title='Load a finished blastFoam run directory',
-            initialdir=initial if os.path.isdir(initial) else None)
+    def _open_run_browser(self):
+        """The WSL run browser (N8): list / load / delete run dirs."""
+        from .run_browser import FoamRunBrowser
+        win = getattr(self, '_run_browser', None)
+        if win is not None and win.winfo_exists():
+            win.lift()
+            win.focus()
+            win.refresh()
+            return
+        self._run_browser = FoamRunBrowser(
+            self, on_load=self.load_foam_run_path, log=self._log)
+
+    def load_foam_run_path(self, path):
+        """Post-mortem load of one run dir (UNC/posix/name) off-thread,
+        then add it to the results list."""
         if not path:
             return
         self._log(f'Loading foam run {path} ...')
