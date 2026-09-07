@@ -491,6 +491,113 @@ def test_amr():
           any('serially' in n for n in validate_case(g).notes))
 
 
+def test_amr_centres():
+    print("\ndynamic AMR: wedge centroids tile the display grid, levels "
+          "from centres")
+    from blastlab.core.grid import make_geometry
+
+    def r_cent(i, s):
+        """Volume centroid (in r) of an axisymmetric wedge cell spanning
+        [i s, (i+1) s]: (2/3)((i+1)^3 - i^3)/((i+1)^2 - i^2) s - 2/3 s
+        for the axis cell, not the Cartesian midpoint."""
+        return (2.0 / 3.0) * (((i + 1) ** 3 - i ** 3)
+                              / ((i + 1) ** 2 - i ** 2)) * s
+
+    # four 1 m base cells of a 2 x 2 m axisymmetric domain displayed at
+    # level 3 (0.125 m): the axis cell's centroid sits 2/3 of the way
+    # out, which used to land its block one display cell too far
+    # (rint(rel - s/2)) and fail the exact-cover check at t = 0
+    C = np.array([[r_cent(i, 1.0), j + 0.5] for i in range(2)
+                  for j in range(2)])
+    disp = make_geometry('planar', 2.0, 2.0, 0.125)
+    try:
+        mm = refine.remap_from_centres(C, np.zeros(4, dtype=int), disp, 3)
+        ok = (mm.remap.shape == (16, 16) and (mm.remap[0:8, 0:8] == 0).all()
+              and (mm.remap[8:16, 0:8] == 2).all()
+              and (mm.remap[8:16, 8:16] == 3).all())
+        detail = str(mm.remap[::8, ::8].tolist())
+    except RuntimeError as exc:
+        ok, detail = False, str(exc)
+    check('wedge base-cell centroids tile a level-3 display grid', ok,
+          detail)
+
+    Cc = np.vstack([_block_centres(0, 0, 1.0, 1), _block_centres(1, 0, 0.5, 2),
+                    _block_centres(0, 1, 0.25, 4),
+                    _block_centres(1, 1, 0.125, 8)])
+    lvc = np.r_[[0], [1] * 4, [2] * 16, [3] * 64]
+    got = refine.levels_from_centres(Cc, (0.0, 0.0), 1.0, 3)
+    check('levels_from_centres recovers every level', (got == lvc).all(),
+          str(got))
+    noisy = Cc + np.random.default_rng(0).uniform(-5e-6, 5e-6, Cc.shape)
+    check('... under the 6-significant-digit write noise',
+          (refine.levels_from_centres(noisy, (0.0, 0.0), 1.0, 3)
+           == lvc).all())
+    check('a row no level fits (torn line) -> -1',
+          refine.levels_from_centres(np.array([[0.2, 0.03]]), (0.0, 0.0),
+                                     1.0, 3)[0] == -1)
+    check('finest-first: a level-5 centre near a coarse half-odd is level 5',
+          refine.levels_from_centres(np.array([[7.5 / 32, 7.5 / 32]]),
+                                     (0.0, 0.0), 1.0, 5)[0] == 5)
+    check('a grid origin away from 0 is honoured',
+          (refine.levels_from_centres(Cc + 3.0, (3.0, 3.0), 1.0, 3)
+           == lvc).all())
+
+
+def test_plan_guards():
+    """QA S1 fixes: plan_levels must refuse a degenerate or memory-blowing
+    grid with a ValueError (never OOM / ZeroDivision / a nan int cast), and
+    a fine grid whose axis does not divide evenly must still line its solid
+    mask up with the level map (was an IndexError 641 vs 642)."""
+    # a fine axis that does not divide evenly (Ly = 2 m -> 641, not 642)
+    c = Case2D(geometry='planar', Lx=3.0, Ly=2.0, cell_size_m=0.05,
+               charge=5.0, center=(1.0, 0.5),
+               obstacles=[(1.5, 1.8, 0.0, 0.6)], solver='blastfoam',
+               refine_zones=[(0.5, 1.5, 0.0, 1.0, 1)])
+    plan = refine.plan_levels(c, rho0=1630.0)
+    check('non-dividing fine axis: solid_fine matches the level map',
+          plan.solid_fine.shape == plan.levels.shape)
+    check('... and the full validate_case does not raise',
+          validate_case(c).errors == [])
+
+    def raises(case):
+        try:
+            refine.plan_levels(case)
+            return False
+        except ValueError:
+            return True
+
+    check('cell size 0 -> ValueError (not ZeroDivision)',
+          raises(Case2D(cell_size_m=0.0)))
+    check('cell size 1e-9 -> ValueError (not a billion-cell arange)',
+          raises(Case2D(cell_size_m=1e-9)))
+    check('non-finite charge -> ValueError (not a nan int cast)',
+          raises(Case2D(charge=float('inf')))
+          and raises(Case2D(charge=float('nan'))))
+    check('default 3D case is too fine to plan -> ValueError (was 6 GB OOM)',
+          raises(Case3D()))
+    check('AMR display grid computed without an int64 blow-up',
+          refine.plan_levels(
+              Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=8.0,
+                     center=(2.0, 2.0, 2.0), solver='blastfoam',
+                     amr_levels=4, amr_display_level=4)).n_pred == 64_000)
+
+
+def test_profile_centre_in_domain():
+    """QA-06: a profile-initialised stage whose burst point is outside the
+    domain must be rejected (it used to reach the backend and crash)."""
+    bad = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.02,
+                 init_mode='profile1d', center=(0.0, 99.0),
+                 profile_file_in='x.txt')
+    ok_ = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.02,
+                 init_mode='profile1d', center=(0.0, 1.0),
+                 profile_file_in='x.txt')
+    check('profile burst outside domain -> error (even pending inputs)',
+          any('outside the domain' in e
+              for e in validate_case(bad, pending_inputs=True).errors))
+    check('profile burst inside domain -> no error',
+          validate_case(ok_, pending_inputs=True).errors == [])
+
+
 if __name__ == '__main__':
     test_snap()
     test_plan_2d()
@@ -499,6 +606,9 @@ if __name__ == '__main__':
     test_obstacles_and_segments()
     test_case_roundtrip_and_validation()
     test_amr()
+    test_amr_centres()
+    test_plan_guards()
+    test_profile_centre_in_domain()
     print()
     print('REFINE: ' + ('PASS' if not FAILS else f'FAIL ({len(FAILS)}): ' + ', '.join(FAILS)))
     sys.exit(1 if FAILS else 0)

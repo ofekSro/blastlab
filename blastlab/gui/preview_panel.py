@@ -28,11 +28,15 @@ MESH_MAX_LINES = 60
 
 
 def _plan(case):
-    """The refinement plan for a parsed case, or None when the zones
-    cannot be laid out (validation reports why)."""
+    """The refinement plan for a parsed case, or None when it cannot be
+    laid out (validation reports why in the status strip). A grid too
+    large/fine to plan, a torn cell size or a nan extent all come back as
+    ValueError now; catch the residual numeric blow-ups too so a preview
+    can never take the app down."""
     try:
         return refine.plan_levels(case)
-    except ValueError:
+    except (ValueError, ZeroDivisionError, MemoryError, OverflowError,
+            FloatingPointError):
         return None
 
 

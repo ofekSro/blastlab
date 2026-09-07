@@ -470,9 +470,16 @@ class App:
                      + (' (stopped)' if res.stopped_early else ''))
             self._run_stopped_early |= bool(res.stopped_early)
             self.results.add_result(label, dim, res)
-            # the live viewer belongs to this stage: hand it its
-            # playback mode (window stays open)
-            self._finish_view3d(res.stop_reason)
+            # the live viewer belongs to this stage: hand it its playback
+            # mode (window stays open). In a chain, only the LAST stage
+            # finalizes it - finalizing an earlier stage would tear the
+            # view down just as the next stage rebuilds it (the drain can
+            # see this 'result' after the worker already started the next
+            # stage and reset feed3d), so the 3D stage of a 1->2->3 chain
+            # never got a live view. The final 'done' finalizes whatever
+            # is left (idempotent).
+            if k == len(self._stage_dims) - 1:
+                self._finish_view3d(res.stop_reason)
         elif tag == 'error':
             self._run_errored = True
             self.run_panel.on_log(msg[1])
@@ -508,6 +515,9 @@ class App:
             pass
         if done:
             self._drain_pending = False
+            # finalize the embedded 3D view if the last stage's 'result'
+            # did not (idempotent: no-op when there is no live feed)
+            self._finish_view3d('run complete')
             self.run_panel.set_running(False)
             self.chain.set_running(False)
             if not (self._run_stopped_early or self._run_errored):

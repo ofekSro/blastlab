@@ -559,6 +559,14 @@ def validate_case(case, pending_inputs=False):
         if case.dim == 2 and init == 'profile1d' \
                 and case.geometry != 'axisymmetric':
             err("1D profile remap is only valid in axisymmetric mode")
+        # the remapped charge is still placed at `center`, so an out-of-
+        # domain centre is just as invalid as for a fresh charge (a chain
+        # stage fed a bad burst point used to reach the backend and die)
+        cc = ((0.0, case.center[1])
+              if case.dim == 2 and case.geometry == 'axisymmetric'
+              else tuple(case.center)[:case.dim])
+        if any(not (0 <= float(v) <= float(L)) for v, L in zip(cc, dims)):
+            err("Charge centre is outside the domain")
 
     # blastFoam local refinement: zones and/or an automatic charge zone
     plan = None
@@ -569,7 +577,11 @@ def validate_case(case, pending_inputs=False):
     elif amr:
         if init == 'charge' and not rep.errors:
             from .refine import plan_levels, validate_amr
-            plan = plan_levels(case, rho0)
+            try:
+                plan = plan_levels(case, rho0)
+            except ValueError as exc:
+                err(str(exc))
+                return rep
             aerr, awarn, anote = validate_amr(case, plan, rho0)
             rep.errors.extend(aerr)
             rep.warnings.extend(awarn)

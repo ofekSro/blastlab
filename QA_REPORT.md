@@ -13,6 +13,33 @@
 > T11–T15 (עידון סטטי + Show mesh בכל המקומות, AMR per-frame, טבלת גייג'ים + CSV, דפדפן ריצות,
 > VTK, טעינה זהה לריצה חיה), Stop בכל שלב, ואין סולברים יתומים.
 
+## S1 status — FIXED 2026-09-07
+
+All six S1 findings are fixed and covered by `blastlab/tests/test_refine.py`
+(`test_plan_guards`, `test_profile_centre_in_domain`) plus the GUI harness
+re-runs (B03, C02, C08, C10, H01, I03, I05, D04, G01, G02 — no tk-exception,
+no MemoryError, no "Run failed" IndexError, no `[ui error`). The full 21-suite
+no-WSL matrix stays green (`test_regression` byte-identical).
+
+- **QA-01/02/03 (B27)** — `core/refine.plan_levels`/`_plan_amr` now reject a
+  degenerate or memory-blowing grid with a `ValueError` (finiteness + a base
+  and a fine cell-count guard) *before* allocating any full-grid array; the
+  setup preview (`gui/preview_panel._plan`) catches it and draws geometry
+  only.
+- **QA-04** — `Plan.solid_fine` crops `expand(solid_base)` to the fine level-
+  map shape (`_fit_shape`), so a fine axis that does not divide evenly
+  (641 vs 642) no longer throws an `IndexError`.
+- **QA-05 (B26)** — `gui/worker.GuiHooks.run_started` drops the previous
+  stage's 3D feed/scene; `gui/app` finalizes the embedded view only at the
+  last chain stage; `gui/view3d_panel.on_frame` guards a coalesced stale
+  frame. A 1->2->3 chain runs to completion with the 3D stage's live view
+  attached and no crash.
+- **QA-06** — `core/case.validate_case` checks the burst centre against the
+  domain for every init mode, so a profile stage with an out-of-domain burst
+  is refused before it reaches the backend.
+
+---
+
 ## 0. How to read this / environment
 
 - **Output dir (screenshots, logs, evidence):** `C:\Users\Ofek Rotem\blastlab_qa\20260907-0108\`

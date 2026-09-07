@@ -49,6 +49,17 @@ class GuiHooks(RunHooks):
         self._exec_evt.set()
 
     def run_started(self, info):
+        # Each stage starts fresh: drop any 3D feed/revolver/scene left by
+        # the PREVIOUS stage of a chain before deciding what this stage
+        # needs. Without this a 2D axisym stage's revolved feed survived
+        # into a following 3D stage (feed3d was not None, so the real 3D
+        # feed was never built) and the first 3D frame crashed the run in
+        # extract_loads with a shape mismatch (128 vs 40).
+        with self._lock:
+            self._latest3d = None
+            self._frame3d_pending = False
+        self.feed3d = None
+        self.scene3d = None
         # 2D axisymmetric runs: revolve the live (r, z) frames into a
         # cylinder for the 3D view (pressure only, illustration)
         self._revolver = None

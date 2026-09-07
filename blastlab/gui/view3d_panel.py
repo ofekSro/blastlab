@@ -311,7 +311,18 @@ class View3DPanel(VtkTkHost):
     def on_frame(self, t, payload, final=False):
         if self._scene is None:
             return
-        self._scene.on_message(('frame', t, payload, final))
+        # Frames are coalesced in a latest-wins slot, so at a chain
+        # stage boundary this payload may already belong to the NEXT
+        # stage while _scene is still the previous stage's (e.g. a 3D
+        # stage's 40**3 frame arriving before the 2D-axisym revolved
+        # scene has been rebuilt). The viewer raises on the size
+        # mismatch; drop the frame - the next one, after adopt_feed
+        # rebuilds the scene, is consistent. (Mirror of RunPanel.on_frame's
+        # shape guard.)
+        try:
+            self._scene.on_message(('frame', t, payload, final))
+        except (ValueError, IndexError):
+            return
         self._set_time_range(len(self._scene.store))
         if self._scene.follow_live:
             self._sync_slider(self._scene.index)

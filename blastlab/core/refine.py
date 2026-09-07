@@ -50,6 +50,52 @@ MAX_AMR_LEVEL = 5
 #: error estimators the case writer knows how to render
 AMR_ESTIMATORS = ('densityGradient', 'Lohner')
 
+#: A plan whose base or fine grid would exceed this many cells is refused
+#: (ValueError) BEFORE any full-grid array is allocated: such a case is
+#: already over every display/solver cap, so the caller reports it - but
+#: the earlier code allocated the fine level map first and could OOM the
+#: process on a stray cell size (e.g. the 10 m 3D default, or dx = 1e-9).
+#: Comfortably above the 3D display cap (15M) so every runnable case still
+#: builds its real plan and gets the precise cap message.
+_PLAN_MAX_CELLS = 40_000_000
+
+#: The AMR display grid is a single int8 array (n bytes), and validate_case
+#: reports its own precise "display grid over the cap" message for a
+#: user-forced display level, so the raw refusal only has to stop a grid
+#: that would not fit in memory at all - a much higher bar than the static
+#: fine grid (which also builds an int64 id array).
+_AMR_MAX_DISPLAY = 400_000_000
+
+
+def _grid_cells(dims, dx):
+    """Predicted whole-cell count of a `dims` box at spacing `dx`, from
+    arithmetic only (no arrays) - the guard uses it before building a
+    grid so a tiny/huge dx cannot allocate a giant axis first."""
+    n = 1
+    for L in dims:
+        n *= max(1, int(round(float(L) / dx)))
+    return n
+
+
+def _fit_shape(arr, shape):
+    """Crop (or edge-pad) `arr` to `shape` per axis; a no-op when equal.
+
+    `expand` doubles the BASE cells, but `make_grid` rounds each axis
+    length independently, so along an axis that does not divide evenly by
+    the base spacing the fine count differs from base x 2**lmax by one
+    (Ly = 2 m at 0.006237 m -> 321 base, 641 fine, not 642). The fine grid
+    shape is authoritative; keep it. Identical output when the shapes
+    already match, so no obstacle golden moves."""
+    arr = np.asarray(arr)
+    shape = tuple(int(s) for s in shape)
+    if arr.shape == shape:
+        return arr
+    arr = arr[tuple(slice(0, n) for n in shape)]
+    pad = [(0, max(0, n - s)) for n, s in zip(shape, arr.shape)]
+    if any(hi for _lo, hi in pad):
+        arr = np.pad(arr, pad, mode='edge')
+    return arr
+
 
 def effective_dx(cell_size, r_exp, L):
     """The charge auto-refinement rule shared by the native solvers and
@@ -170,8 +216,10 @@ class Plan:
 
     @property
     def solid_fine(self):
-        return None if self.solid_base is None else expand(self.solid_base,
-                                                            self.lmax)
+        if self.solid_base is None:
+            return None
+        return _fit_shape(expand(self.solid_base, self.lmax),
+                          self.levels.shape)
 
     def meta(self):
         """The picklable record carried in a Result's meta."""
@@ -204,6 +252,20 @@ def plan_levels(case, rho0=None):
     validate_zones."""
     dim = case.dim
     dims = (case.Lx, case.Ly) if dim == 2 else (case.Lx, case.Ly, case.Lz)
+    # cheap sanity before ANY array is built: a non-positive/non-finite
+    # cell size or extent, or a non-finite charge, otherwise reaches
+    # `_grid`/`charge_radius` as a ZeroDivisionError, an arange of billions
+    # of cells or a nan -> int cast. Raised as ValueError so the setup
+    # preview and validate_case both degrade gracefully (geometry only).
+    dx0 = float(case.cell_size_m)
+    if not (math.isfinite(dx0) and dx0 > 0):
+        raise ValueError("cell size must be a positive number")
+    for L in dims:
+        if not (math.isfinite(float(L)) and float(L) > 0):
+            raise ValueError("domain extents must be positive numbers")
+    ch = getattr(case, 'charge', None)
+    if ch is not None and not math.isfinite(float(ch)):
+        raise ValueError("charge must be a finite number")
     amr = int(getattr(case, 'amr_levels', 0) or 0)
     if amr > 0:
         return _plan_amr(case, dims, amr)
@@ -225,6 +287,13 @@ def plan_levels(case, rho0=None):
     dx = float(case.cell_size_m)
     if charges and mode != 'zone':
         dx = min(effective_dx(dx, r, case.Lx) for _c, r in charges)
+    # guard the BASE grid before building it (a tiny dx would arange
+    # billions of faces; the global-charge rule already applied above)
+    if _grid_cells(dims, dx) > _PLAN_MAX_CELLS:
+        raise ValueError(
+            f"grid of ~{_grid_cells(dims, dx):,} cells at dx = {dx:.4g} m "
+            f"is too large to plan - use a coarser cell size or a smaller "
+            f"domain")
     base = _grid(case, dx)
     dx_base = float(base['dx'])
 
@@ -247,6 +316,17 @@ def plan_levels(case, rho0=None):
             moved.append(z)
     lmax = max([min(zone_level(z), MAX_LEVEL) for z in zones], default=0)
     fine = base if lmax == 0 else _grid(case, dx_base / (2 ** lmax))
+    # guard the FINE display grid before allocating its level map / masks
+    # (this is the array that OOM'd the setup preview on the 10 m 3D
+    # default and the deep-zone checklist case)
+    n_fine = 1
+    for k in ('x_c', 'y_c', 'z_c')[:dim]:
+        n_fine *= len(fine[k])
+    if n_fine > _PLAN_MAX_CELLS:
+        raise ValueError(
+            f"refined display grid of ~{n_fine:,} cells (finest "
+            f"{dx_base / (2 ** lmax):.4g} m) is too large to plan - use "
+            f"fewer levels or a coarser base cell")
     centres = tuple(fine[k] for k in ('x_c', 'y_c', 'z_c')[:dim])
     levels = level_map(centres, [z for z in zones
                                  if 1 <= zone_level(z) <= MAX_LEVEL])
@@ -293,13 +373,27 @@ def _plan_amr(case, dims, amr):
     D = int(min(max(int(D), 0), amr))
     fine = base if D == 0 else _grid(case, dx_base / (2 ** D))
     shape = tuple(len(fine[k]) for k in ('x_c', 'y_c', 'z_c')[:dim])
+    n_fine = 1
+    for s in shape:
+        n_fine *= s
+    if n_fine > _AMR_MAX_DISPLAY:
+        raise ValueError(
+            f"AMR display grid of ~{n_fine:,} cells is too large to plan "
+            f"- lower the display level or the base cell size")
     levels = np.zeros(shape, dtype=np.int8)
     plan = Plan(dim=dim, dx_base=dx_base, base=base, fine=fine,
                 levels=levels, lmax=D, zones=[],
                 solid_base=_solid_base(case, base), amr=amr,
                 display_level=D)
     plan.n_fine = int(levels.size)
-    plan.n_pred = n_cells_from_levels(levels, D, plan.solid_fine)
+    # t = 0 mesh is the base grid (all display cells are level 0); compute
+    # it arithmetically rather than through n_cells_from_levels, whose
+    # int64 promotion of a forced-huge display grid could itself OOM.
+    n_base = 1
+    for k in ('x_c', 'y_c', 'z_c')[:dim]:
+        n_base *= len(base[k])
+    solid_n = 0 if plan.solid_base is None else int(plan.solid_base.sum())
+    plan.n_pred = n_base - solid_n
     return plan
 
 
@@ -585,14 +679,36 @@ class MeshMap:
         return out
 
 
+def levels_from_centres(C, x0, dx_base, lmax, tol=0.1):
+    """Hex-refinement level of each cell from its centre alone (the
+    live-slice rows of an AMR run carry no cell size). A level-l cell
+    (size dx_base / 2**l) is centred at a half-odd multiple of its own
+    size on every axis; at any finer size that centre is an integer
+    multiple (half a cell off), so testing the levels finest-first and
+    taking the first hit is unambiguous, and `tol` (in cells) only has
+    to absorb the file's write precision. `C` (n, dim) are in-plane /
+    in-domain centres, `x0` the grid origin. Returns int64 levels, -1
+    where no level fits (a torn row of a mid-write sample)."""
+    rel = np.asarray(C, dtype=float) - np.asarray(x0, dtype=float)
+    out = np.full(len(rel), -1, dtype=np.int64)
+    for l in range(int(lmax), -1, -1):
+        q = rel / (float(dx_base) / 2 ** l) - 0.5
+        hit = (np.abs(q - np.rint(q)) < tol).all(axis=1) & (out < 0)
+        out[hit] = l
+    return out
+
+
 def remap_from_centres(C, cell_levels, disp, disp_level, solid_disp=None):
     """Written mesh (cell centres `C` (n, >=dim) + hexRef `cell_levels`
     (n,), 0 = base cell) -> MeshMap on the display grid `disp` (a
     core.grid dict at dx_base / 2**disp_level).
 
     A level-l cell with l <= D covers a block of s = 2**(D-l) display
-    cells per axis whose origin is round(C/dx_disp - s/2) (exact up to
-    float noise, so `rint` is robust); a cell with l > D falls inside one
+    cells per axis whose origin is the block containing the centre,
+    floor(C/dx_disp / s) * s - the centre only has to lie INSIDE its
+    cell, which also holds for the volume centroids of axisymmetric
+    wedge cells (shifted outward in r, up to 2/3 of the cell for the
+    axis cell); a cell with l > D falls inside one
     display cell with weight 2**(-dim (l-D)). Every fluid display cell
     must be covered exactly once (weights summing to 1); anything else -
     a gap, an overlap, a centre inside a carved region - raises
@@ -624,7 +740,7 @@ def remap_from_centres(C, cell_levels, disp, disp_level, solid_disp=None):
         sel = np.flatnonzero(lv == l)
         if l <= D:
             s = 2 ** (D - l)
-            origin = np.rint(rel[sel] - s / 2.0).astype(np.int64)
+            origin = np.floor(rel[sel] / s).astype(np.int64) * s
             bad = ((origin < 0).any(axis=1)
                    | (origin + s > shape_a).any(axis=1))
             if bad.any():
