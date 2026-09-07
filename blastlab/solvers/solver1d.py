@@ -6,13 +6,13 @@ import numpy as np
 
 from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               MIN_EXP_CELLS)
-from ..core.eos import (air_pressure, jwl_pressure,
+from ..core.eos import (air_pressure, jwl_pressure, material_jwl,
                         pressure_soundspeed)
 from ..core.riemann import hll_fluxes_1d as hll_fluxes
 from ..core.grid import make_grid_1d
 from .hooks import ConsoleHooks, Progress, Result
 
-def primitives(U, phase, eos):
+def primitives(U, phase, eos, jwl=JWL_TNT):
     """
     Recover rho, u, e, p, c from conserved variables U = [rho, rho*u, E_vol].
     phase: integer array (0=air, 1=explosive products)
@@ -23,12 +23,12 @@ def primitives(U, phase, eos):
 
     # the identical air/products dispatch lived in all three solvers
     # (A4); eos.pressure_soundspeed is that same block, verbatim
-    p, c = pressure_soundspeed(rho, e, phase, eos)
+    p, c = pressure_soundspeed(rho, e, phase, eos, jwl)
 
     return rho, u, e, p, c
 
 
-def _run_blast_1d(radius_m, charge_kg, cell_size_m,
+def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
                   eos='idealGas', cfl=0.5, n_snapshots=5,
                   gauge_radii=None, hooks=None):
     """
@@ -72,7 +72,10 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
                   f"to fit {radius_m:g} m exactly")
 
     # ── Explosive sphere radius from charge weight ──────────────────────────
-    rho_exp = JWL_TNT['rho0']
+    # N11/T46: JWL parameters by charge material; 'TNT' IS the pinned
+    # constants object, so default runs stay byte-identical
+    jwl = material_jwl(material)
+    rho_exp = jwl['rho0']
     r_exp   = (3.0 * charge_kg / (4.0 * np.pi * rho_exp)) ** (1.0 / 3.0)
 
     if r_exp >= radius_m:
@@ -97,12 +100,12 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     rho    = np.where(is_exp, rho_exp, RHO_AIR)
     u      = np.zeros(N)
     e_air  = P_AIR / ((GAMMA_AIR - 1.0) * RHO_AIR)
-    e      = np.where(is_exp, JWL_TNT['e0'], e_air)
+    e      = np.where(is_exp, jwl['e0'], e_air)
 
     # Pressure from chosen EOS
     p = np.empty(N)
     if eos == 'JWL':
-        p[is_exp]  = jwl_pressure(rho[is_exp], e[is_exp])
+        p[is_exp]  = jwl_pressure(rho[is_exp], e[is_exp], jwl)
     else:
         p[is_exp]  = air_pressure(rho[is_exp], e[is_exp])
     p[~is_exp] = air_pressure(rho[~is_exp], e[~is_exp])
@@ -162,7 +165,7 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     stop_reason = 'safety cap'
 
     while t < safety_cap:
-        rho_f, u_f, e_f, p_f, c_f = primitives(U, phase, eos)
+        rho_f, u_f, e_f, p_f, c_f = primitives(U, phase, eos, jwl)
 
         # ── Record gauges (pressure at the current time t) ────────────────
         if gauge_indices:
@@ -243,7 +246,7 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
                                 frac=min(1.0, t / safety_cap)))
 
     # ── Final snapshot at stop time ────────────────────────────────────────
-    rho_f, u_f, e_f, p_f, _ = primitives(U, phase, eos)
+    rho_f, u_f, e_f, p_f, _ = primitives(U, phase, eos, jwl)
     # skip when the loop top already recorded this t (exit via break):
     # a duplicated last timestamp makes dt-based post-processing inf/nan
     if gauge_indices and (not gauge_times_list or gauge_times_list[-1] != t):
@@ -278,6 +281,7 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
 def solve_1d(case, hooks=None):
     """Run a Case1D. Returns a Result."""
     return _run_blast_1d(case.radius_m, case.charge_kg, case.cell_size_m,
+                         material=getattr(case, 'material', 'TNT'),
                          eos=case.eos, cfl=case.cfl,
                          n_snapshots=case.n_snapshots,
                          gauge_radii=list(case.gauge_radii), hooks=hooks)

@@ -9,13 +9,13 @@ from ..core import geometry as core_geometry
 from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               E_AIR, MIN_EXP_CELLS,
                               CELLS_2D_WARN, CELLS_2D_MAX)
-from ..core.eos import pressure_soundspeed
+from ..core.eos import material_jwl, pressure_soundspeed
 from ..core.bc import face_fluxes, solid_mask_2d as solid_mask
 from ..core.grid import make_geometry
 from ..core.profiles import remap_profile_1d_to_2d as remap_profile
 from .hooks import ConsoleHooks, Progress, Result
 
-def primitives(U, phase, eos):
+def primitives(U, phase, eos, jwl=JWL_TNT):
     """
     Recover rho, u, v, e, p, c from conserved U = [rho, rho*u, rho*v, E_vol].
     phase: integer array (0=air, 1=explosive products)
@@ -27,12 +27,12 @@ def primitives(U, phase, eos):
 
     # the identical air/products dispatch lived in all three solvers
     # (A4); eos.pressure_soundspeed is that same block, verbatim
-    p, c = pressure_soundspeed(rho, e, phase, eos)
+    p, c = pressure_soundspeed(rho, e, phase, eos, jwl)
 
     return rho, u, v, e, p, c
 
 
-def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
+def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                   charge=None, charge_center=None, profile=None,
                   eos='idealGas', bcs=None, obstacles=None,
                   cfl=0.4, n_snapshots=6, gauges=None,
@@ -86,7 +86,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     dx = cell_size_m
 
     # ── Charge geometry (direct init) ───────────────────────────────────────
-    rho_exp = JWL_TNT['rho0']
+    # N11/T46: JWL parameters by charge material ('TNT' IS the pinned
+    # constants object - default runs stay byte-identical)
+    jwl = material_jwl(material)
+    rho_exp = jwl['rho0']
     if profile is not None:
         if geometry != 'axisymmetric':
             raise ValueError("1D profile remap is only valid in axisymmetric mode")
@@ -210,7 +213,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         hooks.log(f"  [note] resolved charge: {n_exp} cells, energy "
                   f"scaled x{e_scale:.3f}")
         rho = np.where(is_exp, rho_exp, RHO_AIR)
-        e   = np.where(is_exp, JWL_TNT['e0'] * e_scale, E_AIR)
+        e   = np.where(is_exp, jwl['e0'] * e_scale, E_AIR)
         U = np.array([rho,
                       np.zeros((Nx, Ny)),
                       np.zeros((Nx, Ny)),
@@ -316,7 +319,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     impulse     = None      # accumulated net overpressure impulse [Pa s]
 
     while t < safety_cap:
-        rho_f, u_f, v_f, e_f, p_f, c_f = primitives(U, phase, eos)
+        rho_f, u_f, v_f, e_f, p_f, c_f = primitives(U, phase, eos,
+                                                    jwl)
         if p_peak is None:
             p_peak = p_f.copy()
             impulse = np.zeros_like(p_f)
@@ -415,7 +419,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
                                 frac=min(1.0, r_front / _stop_dist)))
 
     # ── Final snapshot at stop time ────────────────────────────────────────
-    rho_f, u_f, v_f, e_f, p_f, _ = primitives(U, phase, eos)
+    rho_f, u_f, v_f, e_f, p_f, _ = primitives(U, phase, eos, jwl)
     if p_peak is None:
         p_peak = p_f.copy()
         impulse = np.zeros_like(p_f)
@@ -472,6 +476,7 @@ def solve_2d(case, hooks=None, profile=None):
         from ..core.profiles import load_profile
         profile = load_profile(case.profile_file_in)
     return _run_blast_2d(case.geometry, case.Lx, case.Ly, case.cell_size_m,
+                         material=getattr(case, 'material', 'TNT'),
                          charge=case.charge if case.init_mode == 'charge' else None,
                          charge_center=tuple(case.center),
                          profile=profile, eos=case.eos, bcs=dict(case.bcs),

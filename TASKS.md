@@ -111,7 +111,7 @@ Hard rules:
 | T43 | Resume a stopped foam run | N6 | M | [x] 2026-09-07 |
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [x] 2026-09-07 |
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [x] 2026-09-07 |
-| T46 | Materials beyond TNT for the native solvers | N11 | M | [ ] |
+| T46 | Materials beyond TNT for the native solvers | N11 | M | [x] 2026-09-08 |
 | T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [ ] |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
@@ -1638,6 +1638,29 @@ Done when: green; N11 DONE.
 Commit: "T46: JWL materials for the native solvers (N11)"
 ```
 
+**DONE (2026-09-08):** `eos.material_jwl(name)` returns the JWL parameter set for a charge
+material - **'TNT' returns the byte-pinned `constants.JWL_TNT` OBJECT itself**, everything
+else comes from the shared `solvers/foam/materials` table (pure data, lazily imported) as a
+dict with the same keys. `pressure_soundspeed` and `jwl_pressure`/`jwl_soundspeed` take the
+set as a parameter defaulting to `JWL_TNT`, the three `primitives` pass it through, and the
+three engines take `material='TNT'` (threaded from `case.material` by the solve wrappers) -
+rho0, e0, the init pressure and the products EOS all follow the material. **test_regression
+is byte-identical**, which is the whole point of the TNT-object fast path.
+
+`validate_case`'s native branch validates the material against the table and returns ITS
+rho0 (so r_exp and the resolve rule match the material; unknown names are an error, and the
+"Charge material is ignored by the native solver" note is gone). The GUI Material combo is
+now a shared row in both solver modes (both form branches; `test_gui_solver_mode`'s
+inventory and stage-override checks updated - the override marker is now the still-foam-only
+afterburn row).
+
+Direction check (new, in test_blast2d): the same 1 kg at r = 1 m, native 1D JWL -
+**TNT 733 kPa vs C4 910 kPa (x1.24)**, matching C4's ~30 % higher specific detonation
+energy. Afterburn stays foam-only exactly as N3 documents.
+
+Tests: test_regression byte-identical, test_blast2d (incl. the C4 check), test_case_validate,
+test_gui_solver_mode PASS.
+
 ### T47 — MUSCL second-order native reconstruction, opt-in (N10)
 
 ```
@@ -1772,7 +1795,9 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - N8 foam run browser + auto-cleanup (settings in %APPDATA%\blastlab) — DONE (T14)
 - N9 user-named runs — DONE (2026-09-07, T30)
 - **N10** MUSCL second order — OPEN → **T47**
-- **N11** native materials beyond TNT — OPEN → **T46**
+- N11 native materials beyond TNT — DONE (2026-09-08, T46; `eos.material_jwl` +
+  parameterised JWL EOS, materials from the shared table, validation + shared Material
+  combo; TNT default proven byte-identical, C4 1D peak x1.24 over TNT)
 - N12 gauge fields beyond p — DONE (2026-09-07, T44; `fields (p U rho)` in the gauges FO,
   vector-probe parser + aligned-or-dropped merge, `speeds`/`rhos` in Result.gauges, a
   p / |U| / rho selector on the Gauges tab and TSV columns; native stays p-only and

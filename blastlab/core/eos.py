@@ -33,11 +33,26 @@ def jwl_soundspeed(rho, e, p, j=JWL_TNT):
     return np.sqrt(np.maximum(c2, 1.0))  # floor at 1 m/s
 
 
-def pressure_soundspeed(rho, e, phase, eos):
+def material_jwl(name):
+    """JWL parameter dict for a charge material (N11/T46). 'TNT' returns
+    the byte-pinned constants.JWL_TNT OBJECT itself, so every default
+    run stays bit-identical; other names come from the shared
+    solvers/foam/materials table (pure data, no foam dependency)."""
+    if not name or name == 'TNT':
+        return JWL_TNT
+    from ..solvers.foam.materials import MATERIALS
+    m = MATERIALS[name]
+    return dict(A=m.A, B=m.B, R1=m.R1, R2=m.R2, omega=m.omega,
+                rho0=m.rho0, e0=m.e0)
+
+
+def pressure_soundspeed(rho, e, phase, eos, jwl=JWL_TNT):
     """
     Per-cell pressure and sound speed dispatched by phase mask
     (0 = air, 1 = detonation products). The JWL numerical soundspeed is
     evaluated on the product mask only - never on the full grid.
+    `jwl` is the material's parameter set (material_jwl); the default
+    keeps every existing caller byte-identical.
     """
     air  = phase == 0
     prod = ~air
@@ -50,8 +65,9 @@ def pressure_soundspeed(rho, e, phase, eos):
 
     if prod.any():
         if eos == 'JWL':
-            p[prod] = np.maximum(jwl_pressure(rho[prod], e[prod]), 1.0)
-            c[prod] = jwl_soundspeed(rho[prod], e[prod], p[prod])
+            p[prod] = np.maximum(jwl_pressure(rho[prod], e[prod], jwl),
+                                 1.0)
+            c[prod] = jwl_soundspeed(rho[prod], e[prod], p[prod], jwl)
         else:
             p[prod] = air_pressure(rho[prod], e[prod])
             c[prod] = air_soundspeed(rho[prod], p[prod])

@@ -9,14 +9,14 @@ from ..core import geometry as core_geometry
 from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               E_AIR, CELLS_WARN, CELLS_REFUSE,
                               MIN_EXP_CELLS)
-from ..core.eos import pressure_soundspeed
+from ..core.eos import material_jwl, pressure_soundspeed
 from ..core.bc import face_fluxes, solid_mask_3d as solid_mask
 from ..core.grid import make_grid
 from ..core.profiles import (remap_profile_1d_to_3d as remap_profile_1d,
                              remap_profile_2d_to_3d as remap_profile_2d)
 from .hooks import ConsoleHooks, Progress, Result
 
-def primitives(U, phase, eos):
+def primitives(U, phase, eos, jwl=JWL_TNT):
     """
     Recover rho, u, v, w, e, p, c from U = [rho, rho*u, rho*v, rho*w, E].
     phase: integer array (0=air, 1=explosive products)
@@ -29,7 +29,7 @@ def primitives(U, phase, eos):
 
     # the identical air/products dispatch lived in all three solvers
     # (A4); eos.pressure_soundspeed is that same block, verbatim
-    p, c = pressure_soundspeed(rho, e, phase, eos)
+    p, c = pressure_soundspeed(rho, e, phase, eos, jwl)
 
     return rho, u, v, w, e, p, c
 
@@ -50,7 +50,7 @@ def _snapshot(p, rho, u, v, w, j0, k0, t=0.0):
                 rho3=decimate(rho, rho_stride))
 
 
-def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
+def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT',
                   charge=None, charge_center=None,
                   profile=None, profile2d=None,
                   eos='idealGas', bcs=None, obstacles=None,
@@ -119,7 +119,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         raise ValueError("charge_resolution must be 'resolve' or 'smear'")
 
     # ── Burst point & charge geometry ───────────────────────────────────────
-    rho_exp = JWL_TNT['rho0']
+    # N11/T46: JWL parameters by charge material ('TNT' IS the pinned
+    # constants object - default runs stay byte-identical)
+    jwl = material_jwl(material)
+    rho_exp = jwl['rho0']
     smeared = False
     if profile2d is not None:
         x0, y0 = charge_center[0], charge_center[1]
@@ -262,7 +265,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                                  "move the burst point or refine the grid")
             V_src   = n_src * dx**3
             rho_src = RHO_AIR + charge / V_src
-            e_src   = (RHO_AIR * E_AIR + charge * JWL_TNT['e0'] / V_src) \
+            e_src   = (RHO_AIR * E_AIR + charge * jwl['e0'] / V_src) \
                 / rho_src
             rho = np.where(is_exp, rho_src, RHO_AIR)
             e   = np.where(is_exp, e_src, E_AIR)
@@ -282,7 +285,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
             hooks.log(f"  [note] resolved charge: {n_exp} cells, energy "
                       f"scaled x{e_scale:.3f}")
             rho = np.where(is_exp, rho_exp, RHO_AIR)
-            e   = np.where(is_exp, JWL_TNT['e0'] * e_scale, E_AIR)
+            e   = np.where(is_exp, jwl['e0'] * e_scale, E_AIR)
         zeros = np.zeros((Nx, Ny, Nz))
         U = np.array([rho, zeros, zeros.copy(), zeros.copy(), rho * e])
         t0 = 0.0
@@ -411,7 +414,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
     impulse     = None      # accumulated overpressure impulse [Pa s]
 
     while t < safety_cap:
-        rho_f, u_f, v_f, w_f, e_f, p_f, c_f = primitives(U, phase, eos)
+        rho_f, u_f, v_f, w_f, e_f, p_f, c_f = primitives(U, phase,
+                                                         eos, jwl)
         if p_peak is None:
             p_peak = p_f.copy()
             impulse = np.zeros_like(p_f)
@@ -518,7 +522,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         stop_reason = 'end time reached'
 
     # ── Final snapshot at stop time ────────────────────────────────────────
-    rho_f, u_f, v_f, w_f, e_f, p_f, _ = primitives(U, phase, eos)
+    rho_f, u_f, v_f, w_f, e_f, p_f, _ = primitives(U, phase, eos, jwl)
     if p_peak is None:
         p_peak = p_f.copy()
         impulse = np.zeros_like(p_f)
@@ -579,6 +583,7 @@ def solve_3d(case, hooks=None, profile=None, profile2d=None):
         from ..core.profiles import load_profile_2d
         profile2d = load_profile_2d(case.profile_file_in)
     return _run_blast_3d(case.Lx, case.Ly, case.Lz, case.cell_size_m,
+                         material=getattr(case, 'material', 'TNT'),
                          charge=case.charge if case.init_mode == 'charge' else None,
                          charge_center=tuple(case.center),
                          profile=profile, profile2d=profile2d,

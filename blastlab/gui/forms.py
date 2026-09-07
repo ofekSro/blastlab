@@ -340,11 +340,11 @@ class CaseForm(ctk.CTkFrame):
         if self.dim == 1:
             r = _row(chg, r, 'Charge [kg TNT]',
                      _entry(chg, self._var('charge', 1.0)))
-            # native is TNT-only: the material choice is a blastFoam row
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
-            r = self._srow(chg, r, 'Material', self._mat_combo,
-                           scope='blastfoam')[0]
+            # N11/T46: the native solvers share the JWL material table,
+            # so the row shows in both solver modes
+            r = _row(chg, r, 'Material', self._mat_combo)
         else:
             modes = (['charge', 'profile1d'] if self.dim == 2
                      else ['charge', 'profile1d', 'profile2d'])
@@ -356,8 +356,9 @@ class CaseForm(ctk.CTkFrame):
                                            1.0 if self.dim == 2 else 25.0)))
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
-            r = self._srow(chg, r, 'Material', self._mat_combo,
-                           scope='blastfoam')[0]
+            # N11/T46: the native solvers share the JWL material table,
+            # so the row shows in both solver modes
+            r = _row(chg, r, 'Material', self._mat_combo)
             if self.dim == 3:
                 # blastFoam always resolves the charge (smear is ignored
                 # with a note), so the choice is a native row

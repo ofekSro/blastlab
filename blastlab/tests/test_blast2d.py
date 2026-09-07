@@ -191,6 +191,25 @@ for k, r in enumerate(g1d):
 check("arrival times within 5%", ok_arr)
 check("peak overpressure within 15%", ok_pk)
 
+# ── T46/N11: JWL materials on the native solvers ─────────────────────────────
+print()
+print("T46: native material='C4' vs TNT (1D)")
+from blastlab.core.case import Case1D
+from blastlab.solvers.solver1d import solve_1d
+_res_t = solve_1d(Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                         eos='JWL', n_snapshots=1, gauge_radii=[1.0]))
+_res_c = solve_1d(Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                         eos='JWL', n_snapshots=1, gauge_radii=[1.0],
+                         material='C4'))
+_pk_t = _res_t.gauges['pressures'][0].max() - P_AIR
+_pk_c = _res_c.gauges['pressures'][0].max() - P_AIR
+# C4 carries ~30 % more specific detonation energy (5.56 vs 4.29 MJ/kg),
+# so the same mass must hit harder at the same radius
+check("material='C4' raises the 1D peak over TNT",
+      _pk_c > 1.05 * _pk_t,
+      f"TNT {_pk_t/1e3:.0f} kPa, C4 {_pk_c/1e3:.0f} kPa "
+      f"(x{_pk_c/_pk_t:.2f})")
+
 # ── T9: 1D -> 2D remap round trip ────────────────────────────────────────────
 print("\nT9: 1D -> 2D remap")
 _, _, prof = blast1d.run_blast(2.5, charge, cell, eos='idealGas',

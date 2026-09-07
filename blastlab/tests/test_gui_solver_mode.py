@@ -66,10 +66,12 @@ def teardown(root, app):
     theme._ICON_CACHE.clear()
 
 
-FOAM_ONLY = {1: ['_mat_combo', '_act_combo', '_ab_combo'],
-             2: ['_mat_combo', '_act_combo', '_ab_combo', '_cref_combo',
+# _mat_combo left this list with T46/N11: the native solvers share the
+# JWL material table, so Material shows in BOTH modes now
+FOAM_ONLY = {1: ['_act_combo', '_ab_combo'],
+             2: ['_act_combo', '_ab_combo', '_cref_combo',
                  '_nproc_entry', '_amr_card', '_zones_card', '_det_card'],
-             3: ['_mat_combo', '_act_combo', '_ab_combo', '_cref_combo',
+             3: ['_act_combo', '_ab_combo', '_cref_combo',
                  '_nproc_entry', '_amr_card', '_zones_card', '_det_card',
                  '_xc_card']}
 NATIVE_ONLY = {1: ['_eos_combo'], 2: ['_eos_combo'],
@@ -225,8 +227,10 @@ def main():
           app.chain.forms[2].get_case().solver == 'blastfoam'
           and app.chain.forms[1].get_case().solver == 'native'
           and app.chain._stage_solver_seg[2].get() == 'blastFoam'
-          and app.chain.forms[2]._mat_combo.winfo_manager() == 'grid'
-          and app.chain.forms[1]._mat_combo.winfo_manager() == '')
+          # Material shows in BOTH modes since T46; the per-stage
+          # override is still visible through a foam-only row
+          and app.chain.forms[2]._ab_combo.winfo_manager() == 'grid'
+          and app.chain.forms[1]._ab_combo.winfo_manager() == '')
     app.set_solver('blastfoam')
     root.update()
     check('a global change presets every stage again',
@@ -253,7 +257,8 @@ def main():
             pass
     check('export button order restored after re-show',
           order == ['Export', 'Profile', 'GIF', 'VTK', 'Summary CSV',
-                    'Gauges TSV', 'PNGs'], str(order))
+                    'Gauges TSV', 'Field CSV', 'Report', 'PNGs'],
+          str(order))
 
     print('\nPersistence')
     app.set_solver('native')

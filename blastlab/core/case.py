@@ -290,9 +290,12 @@ def _validate_solver(case, rep):
     if n_procs < 0:
         err("MPI ranks must be >= 0 (0 = auto)")
     if solver == 'native':
-        if material != 'TNT':
-            note("Charge material is ignored by the native solver "
-                 "(TNT only)")
+        # N11/T46: the native solvers take their JWL set from the same
+        # material table as blastFoam
+        from ..solvers.foam.materials import MATERIALS as _MATS
+        if material not in _MATS:
+            err(f"Unknown charge material '{material}'")
+            return None
         if n_procs > 1:
             note("MPI ranks are ignored by the native solver")
         if getattr(case, 'charges', None) or \
@@ -304,7 +307,7 @@ def _validate_solver(case, rep):
         if getattr(case, 'amr_levels', 0):
             err("Dynamic mesh refinement (AMR) requires the blastFoam "
                 "solver")
-        return JWL_TNT['rho0']
+        return _MATS[material].rho0
     if solver != 'blastfoam':
         err(f"Unknown solver backend '{solver}'")
         return None
