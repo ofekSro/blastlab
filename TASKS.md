@@ -92,7 +92,7 @@ Hard rules:
 | T25 | QA S1: validation/preview memory safety, defaults, finite input | QA-01..04, 14, 15; B27, G10 | M | [x] 2026-09-07 (`ba37a65`, `73ca834`) |
 | T26 | QA S1: chain feed3d lifecycle + profile-stage validation | QA-05, 06; B26 | S | [x] 2026-09-07 (`ba37a65`) |
 | T27 | QA: remaining layout — Run-tab 3D viewport, status card height, truncations | QA-17, 25, 27; G11 | S–M | [x] 2026-09-07 |
-| T28 | QA: chain feedback (stage select, workspace after validation, stage prefix) | QA-23; G12 | S | [ ] |
+| T28 | QA: chain feedback (stage select, workspace after validation, stage prefix) | QA-23; G12 | S | [x] 2026-09-07 |
 | T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [ ] |
 | T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [ ] |
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [ ] |
@@ -221,6 +221,21 @@ Verify: test_case_validate (stage-prefixed parse error), test_gui_drain; harness
 Done when: green; QA-23 FIXED; G12 DONE.
 Commit: "T28: chain validation feedback - stage select, workspace after validation (QA-23)"
 ```
+
+**DONE (2026-09-07):** items 1-4 had already landed in `a6c7463` (`ChainPanel._run`
+parses every stage first, `focus_stage` raises the offending form, the parse-error
+dialog reads "Stage n (nD): ...", `os.makedirs(ws)` runs only once the chain will
+start, and the workspace defaults to `~/Documents/blastlab/chain_workspace`) — not
+redone. This task closed the gap around them: the "must be axisymmetric to feed 3D"
+refusal now also carries the stage prefix and raises stage 2 (it was the one chain
+dialog that still left the switcher where it was); `test_gui_drain` gained
+`chain_feedback_checks` (stage-prefixed dialog, switcher on the offending stage, no
+workspace created, chain not started, default path under the user profile); and the
+G01 harness assertion, which asserted the *defect* (`isdir(ws)` after five refusals)
+and would have passed on a leftover directory, now checks the fix against a fresh
+workspace path under the QA output dir.
+Tests: test_case_validate, test_gui_drain; harness G01 (all five refusal dialogs
+stage-prefixed, switcher ends on Stage 2D, workspace absent) and G03.
 
 ### T29 — QA: validation & feedback bundle (G3, QA-16, QA-22)
 
@@ -868,7 +883,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - **G9** accelerators / persistence / focus — OPEN → **T32**
 - G10 default 3D case invalid, nan/inf accepted — DONE (2026-09-07, QA-14/15)
 - G11 layout at 1280×840 / 1100×720 — combos + export row DONE (QA-07/08); Run-tab sash, collapsible 3D control column, HUD/scalar-bar scaling, wrapped card titles + tooltips — DONE (2026-09-07, T27)
-- **G12** stale state — chips/preflight/Animation/tab raise/paused DONE (QA-09..12); chain feedback → **T28**
+- G12 stale state — chips/preflight/Animation/tab raise/paused DONE (QA-09..12); chain feedback DONE (2026-09-07, T28)
 - **G13** light-mode affordance — OPEN → **T32**
 
 **Architecture (A)**

@@ -1921,6 +1921,9 @@ def g01_chain_validation(qa):
     _chain_forms(qa)
     ch = qa.app.chain
     qa.shot('chain_default')
+    # a path of its own, so the check below cannot be satisfied by a
+    # leftover workspace from an earlier session
+    ch.ws_var.set(os.path.join(qa.out, 'chain_ws_refused'))
     for d in (1, 2, 3):
         ch.use[d].set(False)
     ch._run()
@@ -1963,9 +1966,12 @@ def g01_chain_validation(qa):
     qa.shot('after_dialogs')
     qa.note(f'stage switcher after the dialogs: {ch._stage_seg.get()} '
             f'(the dialog named stage 2)')
-    qa.check(os.path.isdir(ch.ws_var.get()),
-             'workspace dir created although every run was refused '
-             '(side effect before validation)', 'S4')
+    # QA-23/T28: the workspace is created only once a chain will really
+    # run - this assertion used to encode the defect (dir present after
+    # five refusals) and now checks the fix
+    qa.check(not os.path.isdir(ch.ws_var.get()),
+             'workspace dir NOT created while every run was refused',
+             'S4')
     qa.check(str(ch.run_btn.cget('state')) == 'normal',
              'Run chain still enabled after refused starts', 'S2')
 

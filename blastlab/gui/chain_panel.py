@@ -192,8 +192,10 @@ class ChainPanel(ctk.CTkFrame):
                 cases[2].init_mode = 'profile1d'
                 cases[2].profile_file_in = p1
             if cases[2].geometry != 'axisymmetric' and 3 in cases:
+                self.focus_stage(2)          # the dialog names stage 2
                 messagebox.showerror(
-                    'Chain', 'Stage 2 must be axisymmetric to feed 3D.')
+                    'Chain', 'Stage 2 (2D): must be axisymmetric to '
+                             'feed the 3D stage.')
                 return
             if 3 in cases:
                 cases[2].profile_file = p2

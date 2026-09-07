@@ -123,7 +123,12 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
   instead of raw parser text.
 - **QA-23** — the Chain validates before creating the workspace, prefixes
   parse errors with their stage, and switches the stage switcher to the
-  offending form.
+  offending form. **T28:** verified end to end — the "must be axisymmetric
+  to feed 3D" refusal now also names and raises stage 2, `test_gui_drain`
+  carries a headless check (stage-prefixed dialog, switcher moved, no
+  workspace directory, chain not started, default path under the user
+  profile), and the G01 harness assertion that used to *encode* the defect
+  now checks the fix against a workspace path of its own.
 - **QA-24** — a result with no replay frames explains itself on the
   Animation tab (shared with QA-12).
 - **QA-25** — the validation status card is height-capped and scrolls, so a
