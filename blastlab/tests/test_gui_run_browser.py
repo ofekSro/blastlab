@@ -61,7 +61,7 @@ def main():
     sizes = {f'/root/blastlab_runs/{n}': dict(bytes=(i + 1) * 1024 ** 2,
                                               mtime=1000)
              for i, (n, _d, _a) in enumerate(runs)}
-    deleted, loaded, asked = [], [], []
+    deleted, loaded, asked, resumed = [], [], [], []
 
     def lister():
         return [r for r in runs if r[0] not in deleted]
@@ -75,7 +75,8 @@ def main():
     win = FoamRunBrowser(root, on_load=loaded.append, log=lambda s: None,
                          lister=lister, sizer=lambda d: sizes,
                          deleter=deleter,
-                         confirm=lambda t, m: asked.append(m) or True)
+                         confirm=lambda t, m: asked.append(m) or True,
+                         on_resume=resumed.append)
     win.withdraw()
     ok = pump(root, 3.0, until=lambda: not win._busy)
     check('listing + sizing finished off-thread', ok)
@@ -114,6 +115,35 @@ def main():
     win.load_selected()
     check('Load without a selection is a no-op with a hint',
           'select a run' in win.status.cget('text'))
+
+    print("\nresume (N6/T43)")
+    check('Resume button present when a resume callback is wired',
+          getattr(win, 'btn_resume', None) is not None)
+    win.table.selection_set('20260905-130000_3d_p2-00')
+    win.resume_selected()
+    check('Resume refuses a running run', resumed == []
+          and 'not resuming' in win.status.cget('text'),
+          win.status.cget('text'))
+    win.table.selection_set('20260905-140000_1d_p3-00')
+    win.resume_selected()
+    check('Resume refuses an unknown-state run', resumed == [])
+    # the finished 2D run was deleted above; recreate a stopped one
+    deleted.remove('20260905-120000_2d_p1-00')
+    win.refresh()
+    pump(root, 3.0, until=lambda: not win._busy)
+    win.table.selection_set('20260905-120000_2d_p1-00')
+    win.resume_selected()
+    check('Resume hands a STOPPED run to the callback and closes',
+          resumed and resumed[-1].endswith('20260905-120000_2d_p1-00')
+          and not win.winfo_exists(), str(resumed))
+    # reopen a browser WITHOUT a resume callback: no button
+    win2 = FoamRunBrowser(root, on_load=loaded.append, log=lambda s: None,
+                          lister=lister, sizer=lambda d: sizes,
+                          deleter=deleter, autorefresh=False)
+    win2.withdraw()
+    check('no Resume button without a callback',
+          getattr(win2, 'btn_resume', None) is None)
+    win2.destroy()
 
     print("\nResults panel wiring")
     from blastlab.gui.results_panel import ResultsPanel

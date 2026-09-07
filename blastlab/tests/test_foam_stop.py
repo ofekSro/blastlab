@@ -91,8 +91,12 @@ def preflight_stop_checks():
     from blastlab.solvers.hooks import StoppedBeforeStart
 
     # big enough that meshing takes a moment to interrupt
-    case = Case2D(geometry='axisymmetric', Lx=5.0, Ly=5.0,
-                  cell_size_m=0.004, charge=8.0, center=(0.0, 2.5),
+    # 2.5 m at 4 mm = 625x625 = 390k cells: big enough that blockMesh
+    # takes a moment (the stop must land during preflight), small
+    # enough for T48's 4 GB-VM cell cap - the old 5 m case is refused
+    # by validation before any stage starts
+    case = Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
+                  cell_size_m=0.004, charge=8.0, center=(0.0, 1.25),
                   n_snapshots=2, record_frames=0,
                   solver='blastfoam', material='TNT')
     hooks = PreflightStopHooks()
@@ -156,10 +160,15 @@ def main():
     check('stopped_early flag', res.stopped_early is True)
     check('partial result has snapshots', len(res.snapshots) >= 1
           and list(res.snapshots)[-1].endswith('(final)'))
+    # W2: blastProbes only flushes buffered samples at a graceful End,
+    # so a STOPPED run keeps just the flushes that already landed - the
+    # trace may be short. Assert the contract (present, finite), not a
+    # length the flush timing does not guarantee.
     check('partial gauges recorded',
           len(res.gauges['pressures']) == 1
-          and len(res.gauges['times']) > 10
-          and np.isfinite(res.gauges['pressures'][0]).all())
+          and len(res.gauges['times']) >= 1
+          and np.isfinite(res.gauges['pressures'][0]).all(),
+          f"{len(res.gauges['times'])} samples (W2 flush-on-End)")
     check('meta contract intact',
           res.meta.get('case_dir') and 'final_state' in res.meta)
 

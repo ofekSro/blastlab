@@ -583,6 +583,16 @@ class FoamRunLoop:
                     self._ingest_ready(final=True)  # final sweep - files complete
                     break
         finally:
+            # give a solver that is already tearing down a moment to
+            # reach its graceful End: the ingest breaks out the instant
+            # the final write LANDS, while blastProbes only flushes its
+            # buffered gauge samples in the FO destructors - killing
+            # here threw those samples away on every stopped run (and
+            # on every resumed one, T43/N6: 5 of ~600 samples survived)
+            for _ in range(100):
+                if not foam.running:
+                    break
+                _time.sleep(0.1)
             if foam.running:
                 foam.kill()
             # live samples are display-only; drop the leftovers so a kept

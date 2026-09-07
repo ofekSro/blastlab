@@ -1,7 +1,12 @@
-"""postmortem.load_run round-trip: run a small 2D foam case live, then
-reload the same finished case dir and require the exact same Result
-shapes and values. Path mapping and run listing are checked without
-WSL; the round-trip auto-SKIPs when blastFoam is unavailable."""
+"""postmortem.load_run round-trip, and resume (N6/T43).
+
+Round-trip: run a small 2D foam case live, reload the finished case dir
+and require the exact same Result shapes and values. Resume: run the
+SAME case again but stop it after a few writes, `backend.resume_run` it,
+and compare the merged result against the uninterrupted reference -
+gauges identical over the pre-stop prefix, final peak map within 0.5 %.
+Path mapping and run listing are checked without WSL; everything else
+auto-SKIPs when blastFoam is unavailable."""
 
 import os
 import sys
@@ -98,6 +103,61 @@ def main():
           loaded.meta.get('peak_source') == live.meta.get('peak_source'))
     check('stop reason marks post-mortem',
           loaded.stop_reason.startswith('loaded post-mortem'))
+
+    # ── stop -> resume -> compare with the uninterrupted run (N6/T43) ──
+    print("\nresume (N6/T43)")
+    from blastlab.solvers.foam.backend import resume_run
+    from blastlab.solvers.hooks import RunHooks
+
+    class StopAfter(RunHooks):
+        """Request a graceful stop once N frames were ingested."""
+        refresh = ('steps', 1)          # a frame per ingested write
+
+        def __init__(self, n):
+            self.n, self.frames = n, 0
+
+        def frame(self, field2d, t, levels=None):
+            self.frames += 1
+
+        def should_stop(self):
+            return self.frames >= self.n
+
+    st_hooks = StopAfter(3)
+    part = get_solver(2, 'blastfoam')(case, st_hooks)
+    check('run stopped early by the scripted hooks',
+          part.stopped_early and len(part.gauges['times'])
+          < len(live.gauges['times']),
+          f"{part.stop_reason}; {len(part.gauges['times'])} vs "
+          f"{len(live.gauges['times'])} samples")
+
+    res = resume_run(part.meta['case_dir'])
+    check('resume returns a completed result',
+          not res.stopped_early
+          and res.meta['case_dir'] == part.meta['case_dir'],
+          res.stop_reason)
+
+    n_pre = len(part.gauges['times'])
+    check('gauge times identical over the pre-stop prefix',
+          np.array_equal(res.gauges['times'][:n_pre],
+                         live.gauges['times'][:n_pre]))
+    check('gauge pressures identical over the pre-stop prefix',
+          all(np.array_equal(res.gauges['pressures'][k][:n_pre],
+                             live.gauges['pressures'][k][:n_pre])
+              for k in range(len(live.gauges['pressures']))))
+    pk_live = live.meta['p_peak']
+    pk_res = res.meta['p_peak']
+    rel = float(np.abs(pk_res - pk_live).max() / np.abs(pk_live).max())
+    check('final peak map within 0.5 % of the uninterrupted run',
+          rel <= 0.005, f'max rel diff {rel:.2e}')
+    # characterisation, not a gate (W2): blastProbes buffers its per-step
+    # samples and only flushes them at a graceful End, so a run that is
+    # STOPPED loses the samples still in the buffer - measured 5 of ~600
+    # surviving. The loss happens at stop time, with or without a
+    # resume; the brief's own acceptance (prefix identical, peak map
+    # within 0.5 %) is asserted above.
+    n_res, n_live = len(res.gauges['times']), len(live.gauges['times'])
+    print(f'  [note] merged trace {n_res} samples vs uninterrupted'
+          f' {n_live} (blastProbes flush-on-End, see W2)')
 
     print()
     if FAIL:

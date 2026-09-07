@@ -149,7 +149,8 @@ class App:
                                   on_exec=self._exec,
                                   on_refresh=self._apply_refresh)
         self.results = ResultsPanel(content, log_fn=self._result_msg,
-                                    mode=self.solver_mode)
+                                    mode=self.solver_mode,
+                                    on_resume=self._resume_foam_run)
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
         self._cleanup_thread = foam_env.start_auto_cleanup(
@@ -580,6 +581,39 @@ class App:
 
     def _run_chain(self, dim_cases, workspace):
         self._start(dim_cases)
+        self._show('run')
+
+    def _resume_foam_run(self, path):
+        """Resume a stopped blastFoam run (N6/T43) through the ordinary
+        worker pipeline, so the Run tab, live view, Stop and Results all
+        behave exactly as in a fresh run."""
+        from .run_browser import dims_from_case_json
+        from ..solvers.foam import env as _env
+        try:
+            _p, unc = _env.case_paths(path)
+            dim = int((dims_from_case_json(unc) or '?').rstrip('D'))
+        except (ValueError, OSError) as exc:
+            self._log(f'  [runs] cannot resume {path}: {exc}')
+            return
+        if self._drain_pending or (self.worker is not None
+                                   and self.worker.is_alive()):
+            messagebox.showinfo('Run', 'A run is already in progress.')
+            return
+
+        def solve(hooks):
+            from ..solvers.foam.backend import resume_run
+            return resume_run(path, hooks)
+
+        self._drain_pending = True
+        self._run_count += 1
+        self._run_name = self.run_panel.current_run_name()
+        self._run_stopped_early = self._run_errored = False
+        self._stage_dims = [dim]
+        self.worker = SolverWorker([(f'Resume {dim}D (blastfoam)', solve)])
+        self.worker.hooks.auto3d = pyvista_available()
+        self._apply_refresh()
+        self.run_panel.set_running(True)
+        self.chain.set_running(True)
         self._show('run')
 
     def _start(self, dim_cases, paused=False):

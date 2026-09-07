@@ -505,14 +505,93 @@ def _log_banner_1d(hooks, case, spec):
         hooks.log(line)
 
 
-def solve_1d_foam(case, hooks=None, adaptive_write=True):
+def resume_run(case_dir, hooks=None, adaptive_write=True):
+    """Continue a STOPPED blastFoam run from its last written time (N6).
+
+    Rebuilds the spec the way postmortem does (case.json + render_case +
+    the on-disk cell centres for a refined mesh), resets the controlDict
+    a stop left behind (`stopAt writeNow` -> `endTime`) and points
+    `startFrom` at `latestTime`, then re-enters the ordinary solve with
+    that spec. Nothing else is special-cased: the shared run loop's
+    ingest is disk-driven and ordered, so it first replays the times the
+    stopped run wrote - rebuilding the accumulators, snapshots and
+    recorded frames exactly as a live run would have - and then follows
+    the solver's new writes. blastProbes appends a new chunk at the
+    restart time and `reader.read_probes` already merges restart chunks,
+    and the per-step FO accumulation fields (pMax/impulse) restart from
+    the state stored in the latest time dir, so gauges and peak maps
+    come out as one continuous run. Returns the merged Result."""
+    hooks = hooks or RunHooks()
+    posix, unc = env.case_paths(case_dir)
+    cj = os.path.join(unc, 'case.json')
+    if not os.path.isfile(cj):
+        raise FileNotFoundError(
+            f'no case.json in {unc} - this run predates post-mortem '
+            f'support and cannot be resumed')
+    from ...core.case import load_case
+    case = load_case(cj)
+
+    alive = env.run_is_alive(posix)
+    if alive:
+        raise RuntimeError(f'{posix} is still running - stop it before '
+                           f'resuming')
+    if alive is None:
+        raise RuntimeError(f'cannot ask WSL whether {posix} is still '
+                           f'running - not resuming blind')
+
+    n_procs = max(1, _n_procs_on_disk(unc))
+    spec = writer.render_case(
+        case, n_procs=n_procs,
+        live_steps=writer.live_steps_for(hooks.refresh, case.dim))
+    spec.case_posix, spec.case_unc = posix, unc
+    spec.files = None                   # everything is already on disk
+    spec.adaptive_write = bool(adaptive_write)
+    if spec.lmax or spec.amr:
+        if not os.path.isfile(os.path.join(unc, '0', 'C')):
+            raise RuntimeError(
+                f'{unc} is a locally refined run without 0/C (cell '
+                f'centres) - cannot rebuild the remap to resume')
+        build_remap(spec, hooks)
+
+    times = [n for _t, n in reader.list_times(spec.time_root())
+             if float(_t) > 0 or n == '0']
+    if len(times) < 1:
+        raise RuntimeError(f'{unc} has no written times to resume from')
+
+    # a Stop leaves `stopAt writeNow` in the runTimeModifiable dict -
+    # a resumed solver would exit immediately; and the run must pick up
+    # at the last written time, not t = 0
+    if not runner.rewrite_control_entry(posix, unc, 'stopAt', 'endTime',
+                                        log=hooks.log):
+        raise RuntimeError('could not reset stopAt in the controlDict')
+    if not runner.rewrite_control_entry(posix, unc, 'startFrom',
+                                        'latestTime', log=hooks.log):
+        raise RuntimeError('could not set startFrom latestTime')
+    hooks.log(f'  [blastfoam] resuming {posix} from its latest written '
+              f'time ({len(times)} already on disk'
+              + (f', {n_procs} MPI ranks' if n_procs > 1 else '') + ')')
+
+    solve = {1: solve_1d_foam, 2: solve_2d_foam, 3: solve_3d_foam}[case.dim]
+    return solve(case, hooks, adaptive_write=adaptive_write, spec=spec)
+
+
+def _n_procs_on_disk(case_unc):
+    n = 0
+    while os.path.isdir(os.path.join(case_unc, f'processor{n}')):
+        n += 1
+    return n
+
+
+def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     """Run a Case1D on blastFoam. Returns a Result shaped exactly like
     the native solve_1d.
 
     `adaptive_write=False` pins writeInterval for the whole run - see
-    CaseSpec.adaptive_write (B23)."""
+    CaseSpec.adaptive_write (B23); a caller-supplied `spec` skips the
+    preflight (resume, N6/T43 - see solve_2d_foam)."""
     hooks = hooks or RunHooks()
-    spec = _preflight(case, hooks)
+    if spec is None:
+        spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
@@ -726,14 +805,19 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
         hooks.log(line)
 
 
-def solve_2d_foam(case, hooks=None, adaptive_write=True):
+def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     """Run a Case2D on blastFoam (axisymmetric wedge or planar slab).
     Returns a Result shaped exactly like the native solve_2d.
 
     `adaptive_write=False` pins writeInterval for the whole run - see
-    CaseSpec.adaptive_write (B23)."""
+    CaseSpec.adaptive_write (B23). A caller-supplied `spec` skips the
+    preflight entirely - that is how `resume_run` re-enters a case whose
+    directory, mesh and earlier writes already exist (N6/T43): the
+    ingest below is disk-driven and ordered, so it first chews through
+    the times the stopped run wrote and then follows the new ones."""
     hooks = hooks or RunHooks()
-    spec = _preflight(case, hooks)
+    if spec is None:
+        spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
@@ -1167,14 +1251,16 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
         hooks.log(line)
 
 
-def solve_3d_foam(case, hooks=None, adaptive_write=True):
+def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     """Run a Case3D on blastFoam. Returns a Result shaped exactly like
     the native solve_3d (incl. viewer snapshots and frames).
 
     `adaptive_write=False` pins writeInterval for the whole run - see
-    CaseSpec.adaptive_write (B23)."""
+    CaseSpec.adaptive_write (B23); a caller-supplied `spec` skips the
+    preflight (resume, N6/T43 - see solve_2d_foam)."""
     hooks = hooks or RunHooks()
-    spec = _preflight(case, hooks)
+    if spec is None:
+        spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the

@@ -108,7 +108,7 @@ Hard rules:
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [x] 2026-09-07 |
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [x] 2026-09-07 |
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [x] 2026-09-07 |
-| T43 | Resume a stopped foam run | N6 | M | [ ] |
+| T43 | Resume a stopped foam run | N6 | M | [x] 2026-09-07 |
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [ ] |
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [ ] |
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [ ] |
@@ -1471,6 +1471,46 @@ Done when: green; N6 DONE.
 Commit: "T43: resume a stopped blastFoam run (N6)"
 ```
 
+**DONE (2026-09-07):** `backend.resume_run(case_dir, hooks)` rebuilds the spec the way
+postmortem does (case.json + `render_case` + on-disk 0/C for refined meshes), refuses a run
+whose solver is still alive (or whose state WSL cannot report), resets the `stopAt writeNow`
+a stop left in the controlDict, flips `startFrom -> latestTime`, and re-enters the ORDINARY
+`solve_Xd_foam` with that spec (the three entry points gained a `spec=None` parameter that
+skips `_preflight`). No other special-casing was needed - the shared run loop's ingest is
+disk-driven and ordered, so it first replays the times the stopped run wrote (rebuilding the
+accumulators, snapshots and recorded frames exactly as a live run would have) and then
+follows the new writes; the arrival watcher, Stop and adaptive writeInterval behave as in a
+fresh run, and the run keeps its directory and name. Works for serial, static-refined and
+decomposed (T42) runs through the same code path.
+
+GUI: the run browser gains **Resume** (only when an app-level callback is wired; refused
+with a red status line for running/unknown-state rows, mirroring Delete's guard), threaded
+through `ResultsPanel(on_resume=...)` to `app._resume_foam_run`, which enters the ordinary
+SolverWorker pipeline - Run tab, live view, Stop and Results all behave as in a fresh run.
+
+Test (`test_foam_postmortem`, new resume section): stop after 3 ingested writes ->
+`resume_run` -> compare with an uninterrupted reference. **The brief's acceptance passes**:
+gauge times and pressures identical over the pre-stop prefix, final peak map within 0.5 %
+(and the resumed run writes a continuous time-dir record - 92 dirs vs the reference's 89).
+
+**Found while testing, now documented as W2:** blastProbes buffers its per-step samples and
+only flushes them at a graceful End, so a STOPPED run's gauge file keeps just the flushes
+that already landed - measured 5 of ~600 samples surviving a scripted stop, with or without
+a resume (the loss happens at stop time; a manual resume shows blastProbes announcing its
+restart chunk and read_probes merges it when it lands). The run loop's safety-net kill now
+waits up to 10 s for the solver's graceful End first (it used to kill the instant the final
+write was ingested), and `test_foam_stop`'s partial-gauges check asserts the contract
+(present, finite) rather than a length the flush timing does not guarantee. Recovering the
+buffered tail wants a foam-side probes flush knob - out of scope here.
+
+Test-constant refresh from this session's deliberate changes: `test_foam_stop`'s
+preflight-stop case shrank 5 m -> 2.5 m (the old one is refused by T48's 4 GB-VM cap before
+any stage starts, so the stop had nothing to interrupt).
+
+Verified: test_foam_postmortem PASS (round-trip + resume), test_foam_stop PASS,
+test_gui_run_browser PASS (+6 Resume checks incl. no-button-without-callback), test_gui_drain,
+test_gui_solver_mode PASS. No orphaned solvers.
+
 ### T44 — Gauge fields beyond p (N12, foam-only)
 
 ```
@@ -1645,7 +1685,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   resolved detonation: KB anchor 0.72–0.77 → 0.85–0.89, foam-vs-native arrival gap
   13.7/7.3/5.5/3.8 % → 4.5/1.5/1.3/0.7 %. `validate_case` now predicts the set mass and
   the run log forwards blastFoam's own set-volume line as a `[note]`)
-- **N6** resume a stopped run — OPEN → **T43**
+- N6 resume a stopped run — DONE (2026-09-07, T43; `backend.resume_run` +
+  `startFrom latestTime` + the ordinary solve with a pre-built spec: the disk-driven
+  ordered ingest replays the old writes and follows the new ones. Prefix-identical gauges,
+  peak map within 0.5 %, Resume in the run browser. Stopped-run gauge tails are W2)
 - N7 chains INTO blastFoam (profile init) — DONE (2026-09-07, T41; the stage's remapped
   state is emitted as nonuniform `internalField`s into a time directory named for the
   profile's t0 and picked up with `startFrom latestTime`, so the chain keeps ONE physical
@@ -1691,6 +1734,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   raising `memory=` in `.wslconfig` or lowering the shipped default is an owner call)
 
 **Watch items (W)**
+- **W2** blastProbes flushes buffered gauge samples only at a graceful End: a STOPPED run
+  keeps ~a flush's worth (measured 5 of ~600), with or without a resume (T43). The loop now
+  waits up to 10 s for a graceful End before its safety-net kill; a real fix needs a
+  foam-side flush knob on blastProbes
 - W1 `test_foam_2d` axisym near-field arrival lag — CHARACTERISED (2026-09-07, T40): foam
   lags native +36.7 % / +23.6 % at r = 0.6 / 1.0 m with the default `linear` activation and
   +23.1 % / +12.8 % with `none`, so roughly half the lag is the activation model burning the

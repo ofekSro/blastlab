@@ -76,12 +76,14 @@ class FoamRunBrowser(ctk.CTkToplevel):
     panel's loader); `log(str)` receives progress lines."""
 
     def __init__(self, parent, on_load, log=print, lister=None, sizer=None,
-                 deleter=None, confirm=None, autorefresh=True):
+                 deleter=None, confirm=None, autorefresh=True,
+                 on_resume=None):
         super().__init__(parent)
         self.title('blastFoam runs')
         self.geometry('760x420')
         self.configure(fg_color=c('bg'))
         self._on_load = on_load
+        self._on_resume = on_resume
         self._log = log
         self._lister = lister or _default_lister
         self._sizer = sizer or _default_sizer
@@ -131,6 +133,10 @@ class FoamRunBrowser(ctk.CTkToplevel):
         self.btn_delete.pack(side='right', padx=(GAP, 0))
         self.btn_load = button('Load', self.load_selected)
         self.btn_load.pack(side='right', padx=(GAP, 0))
+        if on_resume is not None:
+            # N6/T43: continue a STOPPED run from its last written time
+            self.btn_resume = button('Resume', self.resume_selected)
+            self.btn_resume.pack(side='right', padx=(GAP, 0))
         self.btn_refresh = button('Refresh', self.refresh)
         self.btn_refresh.pack(side='right', padx=(GAP, 0))
         button('Browse…', self.browse).pack(side='right', padx=(GAP, 0))
@@ -254,6 +260,25 @@ class FoamRunBrowser(ctk.CTkToplevel):
             return
         self._log(f'  [runs] loading {name} ...')
         self._on_load(r['unc'])
+
+    def resume_selected(self):
+        """Continue the selected run from its last written time (N6).
+        Refused while its solver is alive - Resume is for STOPPED runs -
+        or when WSL cannot say (resuming blind would race the solver)."""
+        name, r = self.selected()
+        if r is None:
+            self.status.configure(text='select a run first')
+            return
+        if r['alive'] is not False:
+            why = ('its solver is still running' if r['alive']
+                   else 'WSL did not report its state')
+            self.status.configure(text=f'not resuming {name}: {why}',
+                                  text_color=c('danger'))
+            self._log(f'  [runs] refused to resume {name}: {why}')
+            return
+        self._log(f'  [runs] resuming {name} ...')
+        self.destroy()                  # the Run tab takes over
+        self._on_resume(r['unc'])
 
     def delete_selected(self):
         name, r = self.selected()

@@ -68,10 +68,11 @@ def _set_solver_mode(panel, m):
 
 
 class ResultsPanel(ctk.CTkFrame):
-    def __init__(self, parent, log_fn=print, mode=None):
+    def __init__(self, parent, log_fn=print, mode=None, on_resume=None):
         super().__init__(parent, fg_color='transparent')
         self._entries = []
         self._log = log_fn
+        self._on_resume = on_resume     # N6/T43: app-level resume runner
         self._anim_job = None
         # T34: blastFoam-only launchers ("Foam runs…", VTK) are hidden in
         # native mode; a standalone panel (tests) shows everything
@@ -754,7 +755,8 @@ class ResultsPanel(ctk.CTkFrame):
             win.refresh()
             return
         self._run_browser = FoamRunBrowser(
-            self, on_load=self.load_foam_run_path, log=self._log)
+            self, on_load=self.load_foam_run_path, log=self._log,
+            on_resume=self._on_resume)
 
     def load_foam_run_path(self, path):
         """Post-mortem load of one run dir (UNC/posix/name) off-thread,
