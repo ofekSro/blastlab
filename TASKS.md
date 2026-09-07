@@ -110,7 +110,7 @@ Hard rules:
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [x] 2026-09-07 |
 | T43 | Resume a stopped foam run | N6 | M | [x] 2026-09-07 |
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [x] 2026-09-07 |
-| T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [ ] |
+| T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [x] 2026-09-07 |
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [ ] |
 | T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [ ] |
 
@@ -1590,6 +1590,37 @@ Done when: green; N13 + N14 DONE.
 Commit: "T45: field-map CSV export and HTML report (N13, N14)"
 ```
 
+**DONE (2026-09-07):** new `blastlab/output/report.py`, pure writers shared by the two new
+Results-tab export buttons.
+
+*Field CSV (N14):* `save_field_csvs` writes p_peak, impulse and every snapshot field (p /
+rho / speed) as long-format CSV - one file per field, `x[m],y[m][,z[m]],<name>[unit]`
+header, one row per cell on the result's own grid; 1D exports `r[m],value`. Works for
+native and foam alike (same meta layout); fields that do not match the grid are skipped
+rather than mis-shaped.
+
+*HTML report (N13):* `save_html_report` writes ONE self-contained file - banner (name,
+solver, dims, date, stop reason), the N2 per-gauge engineering table, base64-inlined PNGs
+built by the existing figure builders, the case JSON (read from the run dir's case.json or
+passed in), and a **Kingery-Bulmash free-air comparison** that appears only for a free-air
+case (single charge, no obstacles, axisym/3D): per gauge R, Z, measured peak, the KB value
+(log-log interpolation in the standard table, the same values `test_foam_kb_anchor` pins)
+and the ratio. The GUI opens the file in the browser after writing.
+
+Buttons: "Field CSV" (directory picker) and "Report" (.html) join the export bar between
+Gauges TSV and PNGs; `_sync_export_buttons` needed no change (unknown kinds default to
+enabled, and both work for any result with snapshots/gauges).
+
+Tests: new `test_report.py` (14 headless checks: row counts = cells, headers with units per
+dim, cell-centre coordinates, KB block present for free-air / absent with obstacles, log-log
+interpolation pinned at the table points, base64-inlined self-contained HTML, sections
+list); test_gui_results_fields, test_gui_solver_mode (export-order check now includes the
+two new buttons) PASS; harness E03 extended to click both new exports and PASSES - after
+fixing a pre-existing E03 race (it waited for a bare 'Saved', which matches the PREVIOUS
+export's stale log line; it now waits for each export's own filename). Note E03 needs the
+D-series cache seeds in a fresh QA stamp ("no cache for native2d" otherwise - that is the
+harness contract, not a defect).
+
 ### T46 — Materials beyond TNT for the native solvers (N11)
 
 ```
@@ -1746,8 +1777,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   vector-probe parser + aligned-or-dropped merge, `speeds`/`rhos` in Result.gauges, a
   p / |U| / rho selector on the Gauges tab and TSV columns; native stays p-only and
   byte-pinned)
-- **N13** HTML report — OPEN → **T45**
-- **N14** CSV field maps — OPEN → **T45**
+- N13 HTML report — DONE (2026-09-07, T45; one self-contained file: banner, N2 gauge
+  table, inlined PNGs, case JSON, KB free-air comparison when applicable)
+- N14 CSV field maps — DONE (2026-09-07, T45; long-format per-field CSVs of p_peak /
+  impulse / snapshot fields on the result's own grid, 1D as r,value)
 - N15 local (static) refinement + show-mesh — DONE (T17–T19)
 - N16 dynamic AMR (`adaptiveFvMesh`; default estimator densityGradient; AMR and static zones mutually exclusive; display level caps the display grid; serial in v1; an uncapped 3D AMR case once killed the 4 GB WSL VM — the 3D e2e caps at 300k cells) — DONE (T20–T24). Open follow-ups:
   - N16-a 3D AMR gauge arrival +18 % vs static (peak within 2.7 %) — DONE (2026-09-07, T40).
