@@ -108,14 +108,24 @@ unchanged.
 ## Afterburn (blastFoam)
 
 A pure detonation run carries only the explosive's own (anaerobic) energy,
-which lands a free-air 1 kg TNT anchor ~25 % below Kingery-Bulmash. Setting
+which lands a free-air 1 kg TNT anchor ~13 % below Kingery-Bulmash. Setting
 **Afterburn** to `miller` on a blastFoam case adds the energy released as the
 detonation products burn with atmospheric oxygen (blastFoam's Miller model:
 `dc/dt = a (1-c)^m p^n` above `pMin`, releasing `Q0 * c` J/kg), which brings
-that anchor to 0.95-1.03 of Kingery-Bulmash at Z = 1-4 m/kg^(1/3). TNT's
+that anchor to 1.02-1.20 of Kingery-Bulmash at Z = 1-4 m/kg^(1/3). TNT's
 parameters are calibrated on that anchor; the other materials scale by oxygen
 balance and are estimates - calibrate before quoting them. Default is `none`,
 so existing cases and baselines are unchanged.
+
+Near-field blastFoam arrival times depend on the **activation model**: the
+native solvers detonate the whole charge at t = 0 while blastFoam's default
+`linear` model burns it at the detonation velocity, so a gauge one or two
+charge radii out sees the shock later. Measured on a 8 kg axisymmetric case,
+foam arrival runs +37 % / +24 % over native at r = 0.6 / 1.0 m with `linear`
+and +23 % / +13 % with `none` - about half the near-field lag is the
+activation model, the rest is the resolved-charge expansion itself. The gap
+closes with distance (a few per cent by r = 3-4 m), and `linear` stays the
+default because `none` overshoots the peaks (1.36-1.43x native here).
 
 ## Local mesh refinement (blastFoam)
 

@@ -104,7 +104,7 @@ Hard rules:
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [x] 2026-09-07 |
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [x] 2026-09-07 |
-| T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [ ] |
+| T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [x] 2026-09-07 |
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [ ] |
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [ ] |
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [ ] |
@@ -1001,6 +1001,61 @@ Done when: both tables recorded in this file (DONE line + §6 N16/W1); N16-a clo
 Commit: "T40: AMR probe-cell and activation arrival studies (N16-a, W1)"
 ```
 
+**DONE (2026-09-07):** both studies run; **the `adjustLocations` hypothesis is refuted.**
+
+*1. AMR probe cell (N16-a).* New driver `blastlab/tests/_e2e_foam_probe_study.py` runs the
+same case as {AMR, static reference} x {adjustLocations yes, no} with two gauges - one on a
+cell CORNER of both meshes, one already at a base-cell CENTRE - and saves the traces so each
+solve is its own ~2 min invocation. 0.8 m box, 8 kg TNT, AMR base 0.05 m + 2 levels
+(finest 0.0125 m, display level 1) vs a static `zone` case at the same finest cell:
+
+```
+adjustLocations   gauge                 AMR arr   static arr    d%     AMR pk  static pk     d%
+yes               (0.65,0.40,0.40)      0.0328 ms  0.0315 ms  +4.23   10023 kPa  3704 kPa  +170.6
+yes               (0.625,0.425,0.425)   0.0242 ms  0.0273 ms  -11.48  13195 kPa  8417 kPa   +56.8
+no                (0.65,0.40,0.40)      0.0328 ms  0.0315 ms  +4.38   10060 kPa  3704 kPa  +171.6
+no                (0.625,0.425,0.425)   0.0242 ms  0.0273 ms  -11.48  13197 kPa  8417 kPa   +56.8
+```
+
+Turning `adjustLocations` off moves the arrival difference by **0.15 percentage points** and
+the peaks by 0.4 %: blastProbes reports the containing cell's value either way, so snapping
+the point to that cell's centre changes nothing. The default therefore stays `yes` and the
+e2e's 25 % band stays a sanity band (the brief's condition for tightening to 10 % - "(ii)
+removes the offset" - is not met). What *does* move the numbers is which cell the gauge lands
+in: at a cell corner AMR arrives 4 % late, at a base-cell centre 11 % early, and the peaks
+differ by 57-171 % because the AMR mesh follows the shock and is at its finest level around
+the gauge while the static `zone` reference only refines around the CHARGE. That is a real
+resolution difference at the gauge, not a probe artefact - N16-a closed on that basis.
+A `probe_adjust` knob (Case1D/2D/3D -> writer -> `blastProbes adjustLocations`) was added to
+run the experiment and is kept; default True, so goldens are unchanged.
+
+*2. Near-field lag (W1).* Same axisymmetric case as `test_foam_2d` (8 kg TNT, 2.5 x 2.5 m,
+gauges at 1.1x and 1.9x the source radius), native vs blastFoam with `linear` and `none`:
+
+```
+gauge          native arr   foam linear    d%     foam none     d%
+(0.6, 1.25)     0.1002 ms    0.1370 ms   +36.7    0.1234 ms   +23.1
+(1.0, 1.25)     0.2537 ms    0.3135 ms   +23.6    0.2863 ms   +12.8
+peak ratio vs native:        linear 1.254 / 0.968 ;  none 1.430 / 1.364
+```
+
+`activation none` closes **about half** the near-field lag (36.7 -> 23.1 and 23.6 -> 12.8
+percentage points) but not all of it, and it overshoots the peaks by 36-43 %, so the
+remaining lag is the resolved-charge expansion itself rather than the activation model
+alone. Defaults unchanged, as the brief requires; one paragraph added to
+`blastlab/README.md` under Afterburn. Its stale "~25 % below KB" / "0.95-1.03" figures were
+corrected to the post-T39 measurements (13 % below KB; 1.02-1.20 with `miller`).
+
+**Blocked / not done:** `_e2e_foam_amr3d.py` itself was not run to completion. It had to be
+re-sized anyway (T39's 8-cell charge target makes its 20 kg charge need a third AMR level, so
+the charge is now 60 kg and it records the second, base-cell-centre gauge), but its static
+reference builds a 3 m / 0.025 m display grid of 1,728,000 cells = 13.8 MB per float64 field,
+and this PC has 7.7 GB of RAM with 4 GB inside the WSL VM and ~0.3 GB free - an earlier
+attempt died in `reader.to_grid` with a MemoryError on a 6.75 MiB allocation. The purpose-built
+small-case study above is what produced the T40 numbers; the e2e's two cases were verified to
+validate cleanly (AMR display 216,000 cells, static mesh 256,824). One orphaned blastFoam from
+the interrupted attempt was found and killed; WSL verified idle afterwards.
+
 ### T41 — Chains INTO blastFoam: profile-initialised foam stages (N7)
 
 **Why:** today a chain stage with `solver='blastfoam'` cannot start from a 1D/2D profile
@@ -1355,12 +1410,23 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - **N14** CSV field maps — OPEN → **T45**
 - N15 local (static) refinement + show-mesh — DONE (T17–T19)
 - N16 dynamic AMR (`adaptiveFvMesh`; default estimator densityGradient; AMR and static zones mutually exclusive; display level caps the display grid; serial in v1; an uncapped 3D AMR case once killed the 4 GB WSL VM — the 3D e2e caps at 300k cells) — DONE (T20–T24). Open follow-ups:
-  - **N16-a** 3D AMR gauge arrival +18 % vs static (peak within 2.7 %); suspect `adjustLocations` probe snapping — → **T40**
+  - N16-a 3D AMR gauge arrival +18 % vs static (peak within 2.7 %) — DONE (2026-09-07, T40).
+    `adjustLocations` REFUTED: switching it off moves the AMR-vs-static arrival by 0.15
+    percentage points (blastProbes reports the containing cell's value either way), so the
+    default stays `yes`. The difference is a real resolution difference at the gauge - the
+    AMR mesh follows the shock and is at its finest level there, the static `zone` reference
+    refines only around the charge - measured with `_e2e_foam_probe_study.py`
+    (+4.2 % at a cell corner, -11.5 % at a base-cell centre, peaks 57-171 % apart)
   - **N16-b** parallel AMR (`loadBalance { balance no; }` 41 s vs 52 s serial; `reconstructPar -newTimes` fails on a changed mesh; `reconstructParAll -time t` works; direct `processor*/` reads preferred) — → **T42**
 - **N17** hardware-aware run plan: WSL physical cores + VM RAM → auto MPI ranks (cells-per-rank floor, RAM-per-rank cap, configurable headroom) and memory-derived cell caps instead of the fixed `FOAM_CELLS_*`, visible in the sidebar and the validation strip; modelled on BlastStudio's pure `plan_run` + pinned decision table — OPEN → **T48**
 
 **Watch items (W)**
-- **W1** `test_foam_2d` axisym: foam near-field arrival lags native 27–39 % (peaks agree 0.88–0.99); tolerances accept it; never characterised — → **T40**
+- W1 `test_foam_2d` axisym near-field arrival lag — CHARACTERISED (2026-09-07, T40): foam
+  lags native +36.7 % / +23.6 % at r = 0.6 / 1.0 m with the default `linear` activation and
+  +23.1 % / +12.8 % with `none`, so roughly half the lag is the activation model burning the
+  charge at vDet while the native solvers detonate it instantly; the rest is the resolved
+  charge's expansion. `none` overshoots the peaks (1.43x / 1.36x native), so `linear` stays
+  the default and the tolerances stay as they are. Documented in `blastlab/README.md`
 
 ---
 

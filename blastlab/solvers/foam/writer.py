@@ -99,6 +99,11 @@ class CaseSpec:
     det_points: list = field(default_factory=list)  # [] = charge centres
     probe_pts: list = field(default_factory=list)   # foam (x,y,z)
     gauge_ids: list = field(default_factory=list)   # native radii/points
+    #: blastProbes `adjustLocations`. 'yes' moves each probe onto the
+    #: centre of the cell that holds it at t = 0, which on a coarse base
+    #: mesh can be a long way from the requested point and, under AMR,
+    #: pins the sample to a cell that later refines under it (N16-a/T40).
+    probe_adjust: str = 'yes'
     patches: list = field(default_factory=list)     # (name, kind)
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
     solid: object = None            # (nx,ny,nz) bool mask, None = none
@@ -675,7 +680,7 @@ def _controldict(spec, case):
             'type': 'blastProbes',
             'writeControl': 'timeStep',
             'writeInterval': 1,
-            'adjustLocations': 'yes',
+            'adjustLocations': spec.probe_adjust,
             'append': 'yes',
             'probeLocations': [tuple(p) for p in spec.probe_pts],
             'fields': ['p'],
@@ -957,6 +962,8 @@ def render_case(case, n_procs=1, live_steps=0):
     spec = plan_case(case)
     spec.n_procs = max(1, int(n_procs))
     spec.live_steps = max(0, int(live_steps or 0))
+    spec.probe_adjust = ('no' if getattr(case, 'probe_adjust', True) is False
+                         else 'yes')
     afterburn = getattr(case, 'afterburn', 'none') or 'none' 
     if spec.dim == 1:
         bmd = _blockmesh_1d(spec)

@@ -1,2 +1,3 @@
 __pycache__/
 *.pyc
+blastlab/tests/_probe_study/

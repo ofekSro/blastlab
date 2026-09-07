@@ -44,6 +44,9 @@ class Case1D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: blastProbes adjustLocations: True snaps each gauge onto the
+    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    probe_adjust: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
                                       # 1D always runs serial)
 
@@ -101,6 +104,9 @@ class Case2D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: blastProbes adjustLocations: True snaps each gauge onto the
+    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    probe_adjust: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y), ...] (axisym: x = 0);
@@ -162,6 +168,9 @@ class Case3D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: blastProbes adjustLocations: True snaps each gauge onto the
+    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    probe_adjust: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     charges: list = None              # blastFoam: ADDITIONAL charges
                                       # [(x, y, z, mass_kg), ...] on top

@@ -2,7 +2,7 @@
 (adaptiveFvMesh, ROADMAP N16) against a statically refined reference at
 the display level.
 
-20 kg TNT in a 3 x 3 x 3 m box on a 10 cm base with 2 AMR levels
+60 kg TNT in a 3 x 3 x 3 m box on a 10 cm base with 2 AMR levels
 (finest 2.5 cm) displayed at level 1 (5 cm, 60^3 = 216,000 display cells;
 cells finer than that are box-averaged) versus the same case on a 5 cm
 grid with the N15 static charge zones ('zone' mode: base 5 cm + level-1
@@ -14,9 +14,15 @@ line, the display grid, the recorded per-frame level maps (slices), gauge
 agreement (peak / arrival), the FO peak at the gauge cell, the arrival
 stop, the post-mortem reload, the wall times and the cell count over time.
 
+Two gauges are recorded: the requested (2.5, 1.5, 1.5), which is a cell
+CORNER on both meshes, and (2.45, 1.45, 1.45), which is the centre of a
+base (10 cm) cell - the pair separates a real arrival difference from the
+probe being snapped somewhere else (N16-a).
+
 Run:  cd blastlab/tests && python _e2e_foam_amr3d.py   (~30 min, WSL: the
       AMR run itself is ~23 min at 300k cells; --amr-dir=<case dir> reloads
-      a finished AMR run post-mortem instead of re-running it)
+      a finished AMR run post-mortem instead of re-running it;
+      --no-adjust-locations writes blastProbes with adjustLocations no)
 """
 import os
 import re
@@ -81,9 +87,17 @@ def run(case, label):
 
 
 def main():
-    base = dict(Lx=3.0, Ly=3.0, Lz=3.0, charge=20.0, center=(1.5, 1.5, 1.5),
-                gauges=[(2.5, 1.5, 1.5)], n_snapshots=2, solver='blastfoam',
-                material='TNT')
+    # 60 kg, not 20: blastFoam resolves the charge with 8 cells across
+    # its radius (T39), and at 20 kg that needs a third AMR level and a
+    # 13.8M-cell display grid. 60 kg keeps 2 levels and the same mesh and
+    # display budget this study was built around.
+    # Gauge 2 sits at a BASE-cell centre; gauge 1 at a cell corner.
+    base = dict(Lx=3.0, Ly=3.0, Lz=3.0, charge=60.0, center=(1.5, 1.5, 1.5),
+                gauges=[(2.5, 1.5, 1.5), (2.45, 1.45, 1.45)],
+                n_snapshots=2, solver='blastfoam', material='TNT')
+    adjust = '--no-adjust-locations' not in sys.argv
+    base['probe_adjust'] = adjust
+    print(f'  probe adjustLocations: {"yes" if adjust else "no"}')
     # maxCells bounds the solver's memory: the WSL VM has 4 GB and an
     # uncapped run took it down (2026-09-05)
     amr = Case3D(cell_size_m=0.1, amr_levels=2, amr_display_level=1,
@@ -167,9 +181,22 @@ def main():
         print(f'  extrapolated: a uniform 2.5 cm run would cost ~{est:.1f}x the '
               f'AMR cell-steps ({120 ** 3:,} cells x {h.steps} steps)')
     g_a, g_u = res.gauges, ref_res.gauges
-    check('both runs recorded the gauge',
-          len(g_a['pressures']) == 1 and len(g_u['pressures']) == 1)
+    check('both runs recorded the gauges',
+          len(g_a['pressures']) == 2 and len(g_u['pressures']) == 2)
     if g_a['pressures'] and g_u['pressures']:
+        # the study table (N16-a/T40): both gauges, both runs
+        print('   gauge                 AMR arr    static arr   d%     '
+              'AMR pk      static pk   d%')
+        for k, gp in enumerate(base['gauges']):
+            if k >= min(len(g_a['pressures']), len(g_u['pressures'])):
+                continue
+            aa = arrival(g_a['times'], g_a['pressures'][k])
+            au = arrival(g_u['times'], g_u['pressures'][k])
+            pa = g_a['pressures'][k].max() - P_AIR
+            pu = g_u['pressures'][k].max() - P_AIR
+            print(f'   {str(gp):20s} {aa*1e3:8.3f}  {au*1e3:11.3f}  '
+                  f'{(aa-au)/au*100:+6.1f}  {pa/1e3:9.0f}  {pu/1e3:10.0f}  '
+                  f'{(pa-pu)/pu*100:+6.1f}')
         pk_a = g_a['pressures'][0].max() - P_AIR
         pk_u = g_u['pressures'][0].max() - P_AIR
         ta_a = arrival(g_a['times'], g_a['pressures'][0])
@@ -178,10 +205,17 @@ def main():
               abs(pk_a - pk_u) / pk_u < 0.10,
               f'AMR {pk_a/1e3:.0f} kPa, static {pk_u/1e3:.0f} kPa')
         # measured 2026-09-06: AMR 0.298 ms vs static 0.252 ms (+18 %) at a
-        # 2.7 % peak agreement - open finding (ROADMAP N16): the blastProbes
-        # location snaps to the t = 0 cell centre, 0.1 m cells here vs
-        # 0.05 m in the reference (8.7 % farther from the charge), and the
-        # front crosses the 5 kPa threshold on whatever level the cell has
+        # 2.7 % peak agreement. T40 tested the blastProbes `adjustLocations`
+        # hypothesis with _e2e_foam_probe_study.py and REFUTED it: turning
+        # adjustLocations off moves the AMR-vs-static arrival by 0.15
+        # percentage points (+4.23 % -> +4.38 % at a cell corner, -11.48 %
+        # unchanged at a base-cell centre) - blastProbes reports the
+        # containing cell's value either way. What does move it is which
+        # cell the gauge lands in: the AMR mesh follows the shock and is at
+        # its finest level around the gauge while the static reference only
+        # refines around the CHARGE, so the two sample different-sized
+        # cells. That is a real resolution difference, not a probe artefact,
+        # which is why this band stays a sanity band.
         print(f'  gauge arrival: AMR {ta_a*1e3:.3f} ms, static {ta_u*1e3:.3f} ms '
               f'({(ta_a - ta_u) / ta_u * 100:+.1f} %)')
         check('gauge arrival within 25 % of the static reference (sanity band; '
