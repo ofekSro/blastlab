@@ -1398,6 +1398,21 @@ needs `addEmptyPatch internalPatch internal -overwrite -parallel` first, per the
 a coarser acceptance point away from the charge. I did not choose for you, and I did not
 weaken the gate to make the row green.
 
+*Follow-up measurement (same day, on the `balance yes` question):* the per-rank cell counts
+of the np2 run itself - `part_counts` already reads them - show the fixed scotch decomposition
+was **almost perfectly balanced the whole run**: over 71 written times, max-rank/ideal was
+mean 1.024 and worst 1.037 (1.0 = balanced, 2.0 = one rank holds everything). Rank0/rank1 at
+the end: 16,935 / 17,777 of 34,712 cells. The charge sits mid-domain and the blast expands
+symmetrically, so refinement grows evenly into both subdomains and there is at most ~4 % of
+wall time for balancing to recover on this case - consistent with N16's own measurement
+(41 s -> 38 s). The 1.43x-instead-of-2x is therefore MPI/halo/AMR-sync overhead, NOT
+imbalance, and `balance yes` would also not fix the 2.64 % gate miss (redistribution is one
+more source of divergence from the serial mesh, not less). Balancing becomes worth its
+addEmptyPatch preflight and redistribution cost when the refinement is NOT symmetric across
+the decomposition - an off-centre charge, a surface burst near a corner, obstacles - or when
+more than 2 ranks are available (this VM's RAM caps AMR at 2). Recommendation recorded:
+keep `balance no` as the default, revisit as an opt-in once T48's caps allow 4+ ranks.
+
 `_e2e_foam_amr2d.py` gains `--np=N`. Tests: test_regression byte-identical, test_foam_writer,
 test_foam_env, test_case_validate, test_refine (its "AMR runs serially" assertion updated to
 the new behaviour), test_foam_amr_ingest (+9 new checks), test_foam_ingest_order (its fake
