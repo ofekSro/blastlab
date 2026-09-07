@@ -66,7 +66,7 @@ functions
                 planeType       pointAndNormal;
                 pointAndNormalDict
                 {
-                    point (0 0.9916666667 0);
+                    point (0 1.005208333 0);
                     normal (0 1 0);
                 }
                 interpolate     no;

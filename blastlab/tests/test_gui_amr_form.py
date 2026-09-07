@@ -80,8 +80,11 @@ def main():
 
     print("\nCaseForm: AMR card round trip + enable rules")
     form = CaseForm(root, 2)
+    # 320 kg/m: r_exp = 0.25 m, so 3 AMR levels still reach the 8 cells
+    # across the radius blastFoam asks for (T39) - this case exercises
+    # the form round trip, not the level rule
     c = Case2D(geometry='planar', Lx=4.0, Ly=4.0, cell_size_m=0.2,
-               charge=100.0, center=(2.0, 2.0), solver='blastfoam',
+               charge=320.0, center=(2.0, 2.0), solver='blastfoam',
                amr_levels=3, amr_estimator='Lohner', amr_refine=0.2,
                amr_unrefine=0.05, amr_interval=3, amr_buffer=1,
                amr_max_cells=500000, amr_display_level=2)

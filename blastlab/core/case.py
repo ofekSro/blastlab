@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, asdict
 
 import numpy as np
 
-from .constants import (JWL_TNT, MIN_EXP_CELLS,
+from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
@@ -248,6 +248,8 @@ class ValidationReport:
     n_fine: int = None               # display-grid cells of a refined run
     amr_levels: int = 0              # dynamic AMR levels (foam, N16)
     display_level: int = None        # AMR: level of the display grid
+    charge_cells: int = None         # foam: cells setFields will mark
+    charge_mass_frac: float = None   # foam: set mass / requested (N5)
 
     @property
     def ok(self):
@@ -369,6 +371,10 @@ def validate_case(case, pending_inputs=False):
     if rho0 is None:
         return rep
     foam = getattr(case, 'solver', 'native') == 'blastfoam'
+    # blastFoam wants more cells across the charge than the native
+    # solvers: sphericalMassToCell deposits only the staircase mass
+    # (N5/T39). Native stays byte-pinned at MIN_EXP_CELLS.
+    n_exp = FOAM_EXP_CELLS if foam else MIN_EXP_CELLS
     cref = getattr(case, 'charge_refine', 'global')
     zones = list(getattr(case, 'refine_zones', None) or [])
     amr = int(getattr(case, 'amr_levels', 0) or 0) if foam else 0
@@ -385,10 +391,10 @@ def validate_case(case, pending_inputs=False):
         rep.r_exp = r_exp
         if r_exp >= case.radius_m:
             err(f"Explosive radius {r_exp:.3f} m exceeds domain radius")
-        if dx > r_exp / MIN_EXP_CELLS:
-            dx = r_exp / MIN_EXP_CELLS
+        if dx > r_exp / n_exp:
+            dx = r_exp / n_exp
             note(f"Cell size will be refined to {dx:.5f} m "
-                 f"({MIN_EXP_CELLS} cells inside the charge)")
+                 f"({n_exp} cells inside the charge)")
         rep.effective_dx = dx
         rep.n_cells = int(case.radius_m / dx)
         return rep
@@ -478,12 +484,12 @@ def validate_case(case, pending_inputs=False):
         if smeared:
             note(f"Charge under-resolved at dx = {dx:g} m - its mass & "
                  f"energy will be smeared into a {r_exp:.3f} m source ball")
-        elif dx > r_exp / MIN_EXP_CELLS and not (foam and cref == 'zone') \
+        elif dx > r_exp / n_exp and not (foam and cref == 'zone') \
                 and not amr:
-            dx = r_exp / MIN_EXP_CELLS
+            dx = r_exp / n_exp
             refined = True
             note(f"Cell size will be refined to {dx:.5f} m "
-                 f"({MIN_EXP_CELLS} cells across the charge radius)")
+                 f"({n_exp} cells across the charge radius)")
 
         # blastFoam extra charges (3D only) + detonation points
         extras = getattr(case, 'charges', None) or []
@@ -529,11 +535,11 @@ def validate_case(case, pending_inputs=False):
                     err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) "
                         f"overlaps another charge")
             spheres.append((ex, ey, ez, r_i))
-            if dx > r_i / MIN_EXP_CELLS and not amr:
-                dx = r_i / MIN_EXP_CELLS
+            if dx > r_i / n_exp and not amr:
+                dx = r_i / n_exp
                 refined = True
                 note(f"Cell size will be refined to {dx:.5f} m "
-                     f"({MIN_EXP_CELLS} cells across the smallest "
+                     f"({n_exp} cells across the smallest "
                      f"charge radius)")
         for dp in getattr(case, 'det_points', None) or []:
             pt = tuple(dp) + ((0.0,) if case.dim == 2 else ())
@@ -650,6 +656,33 @@ def validate_case(case, pending_inputs=False):
                 + (", or charge resolution 'smear'"
                    if case.dim == 3 and not foam else "")
                 + (", or blastFoam charge refinement 'zone'" if foam else ""))
+
+    # What blastFoam will actually deposit (N5/T39): setFields marks
+    # whole cells, so the charge is a staircase whose mass is only
+    # approximately the requested one. Reported for foam cases with a
+    # direct charge, at the finest spacing the charge will see.
+    if foam and init == 'charge' and rep.r_exp and not rep.errors:
+        dx_charge = dx
+        if plan is not None:
+            dx_charge = (plan.dx_base / 2 ** plan.amr if plan.amr
+                         else plan.dx_fine)
+        try:
+            from .refine import set_mass_fraction
+            cen = ((0.0 if case.geometry == 'axisymmetric' else case.center[0],
+                    case.center[1]) if case.dim == 2
+                   else tuple(float(v) for v in case.center[:3]))
+            n_set, frac = set_mass_fraction(
+                case.dim, getattr(case, 'geometry', ''), dx_charge,
+                rep.r_exp, cen, dims)
+        except (ValueError, ZeroDivisionError, IndexError):
+            n_set = 0
+        if case.dim >= 2 and n_set:
+            rep.charge_cells = n_set
+            rep.charge_mass_frac = frac
+            note(f"Charge cells: {n_set:,} at {dx_charge:.5g} m -> "
+                 f"~{frac:.2f} of the {case.charge:g} kg set by "
+                 f"blastFoam (whole cells are marked; "
+                 f"{n_exp} cells across the radius)")
 
     rep.effective_dx = dx
     if plan is not None and plan.amr:

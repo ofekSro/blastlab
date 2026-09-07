@@ -19,7 +19,7 @@ vertices
 );
 blocks
 (
-    hex (0 1 2 3 0 4 5 3) (380 380 1) simpleGrading (1 1 1)
+    hex (0 1 2 3 0 4 5 3) (608 608 1) simpleGrading (1 1 1)
 );
 edges           ( );
 boundary

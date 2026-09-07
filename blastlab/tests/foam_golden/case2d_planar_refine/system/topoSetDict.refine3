@@ -10,7 +10,8 @@ FoamFile
 
 actions
 (
-    { name refine3; type cellSet; action new; source boxToCell; sourceInfo { box (0.8 0.8 -2) (1.2 1.2 2); } }
+    { name refine3; type cellSet; action new; source boxToCell; sourceInfo { box (0.775 0.775 -2) (1.225 1.225 2); } }
+    { name refine3; type cellSet; action add; source boxToCell; sourceInfo { box (0.8 0.8 -2) (1.2 1.2 2); } }
 );
 
 // ************************************************************************* //

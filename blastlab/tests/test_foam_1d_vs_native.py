@@ -95,11 +95,17 @@ def main():
 
     # Result-contract spot checks (shapes the GUI/exports rely on)
     fp = foam.meta['final_profile']
+    # The foam and native grids no longer have the same cell count: the
+    # native rule keeps 5 cells across the charge radius (byte-pinned)
+    # while blastFoam asks for 8 (T39), so only the profile's own arrays
+    # have to agree in length.
     check('final_profile contract',
           sorted(fp) == sorted(('t', 'r', 'rho', 'u', 'e', 'p', 'phase',
                                 'charge_kg', 'eos', 'r_exp', 'radius_m'))
           and fp['phase'].dtype.kind == 'i'
-          and len(fp['r']) == len(fp['p']) == len(nat.meta['r']))
+          and len({len(fp[k]) for k in ('r', 'p', 'rho', 'u', 'e',
+                                        'phase')}) == 1,
+          f"foam {len(fp['r'])} cells, native {len(nat.meta['r'])}")
     check('snapshot labels contract',
           list(foam.snapshots)[-1].endswith('(final)')
           and all(k.startswith('t = ') for k in foam.snapshots))

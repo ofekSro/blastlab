@@ -13,7 +13,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core.case import Case1D, Case2D, Case3D          # noqa: E402
-from blastlab.core.constants import MIN_EXP_CELLS              # noqa: E402
+from blastlab.core.constants import FOAM_EXP_CELLS             # noqa: E402
 from blastlab.core.grid import make_grid_1d, make_grid         # noqa: E402
 from blastlab.solvers.foam.dicts import fmt                    # noqa: E402
 from blastlab.solvers.foam.materials import (MATERIALS, E0,    # noqa: E402
@@ -150,11 +150,14 @@ def refine_checks(specs):
     a base-count blockMesh; spec exposes the fine display grid."""
     from blastlab.core import refine
     sp = specs['case2d_planar_refine']
+    # lmax 4, not 3: the automatic charge zones target FOAM_EXP_CELLS = 8
+    # cells across r_exp for blastFoam (T39), one level deeper than the
+    # native 5-cell rule this case used to plan for.
     check('refine 2D: base kept at 0.1 m, zones + auto charge zones',
-          abs(sp.dx_base - 0.1) < 1e-12 and sp.lmax == 3
+          abs(sp.dx_base - 0.1) < 1e-12 and sp.lmax == 4
           and sp.nb == (20, 20), f'{sp.dx_base} {sp.lmax} {sp.nb}')
     check('refine 2D: spec grid is the fine grid (nb * 2**lmax)',
-          (sp.nx, sp.ny) == (160, 160) and abs(sp.dx - 0.0125) < 1e-12,
+          (sp.nx, sp.ny) == (320, 320) and abs(sp.dx - 0.00625) < 1e-12,
           f'{sp.nx} {sp.ny} {sp.dx}')
     check('refine 2D: n_cells is the predicted refined count',
           sp.n_cells == refine.n_cells_from_levels(sp.levels, sp.lmax)
@@ -166,8 +169,8 @@ def refine_checks(specs):
           and '-0.05' in sp.files['system/blockMeshDict'])
     check('refine 2D: one topoSet + refineMesh dict per level',
           all(f'system/topoSetDict.refine{l}' in sp.files
-              and f'system/refineMeshDict.{l}' in sp.files for l in (1, 2, 3))
-          and 'system/refineMeshDict.4' not in sp.files)
+              and f'system/refineMeshDict.{l}' in sp.files for l in (1, 2, 3, 4))
+          and 'system/refineMeshDict.5' not in sp.files)
     rmd = sp.files['system/refineMeshDict.1']
     check('refine 2D: in-plane directions, no hex topology',
           'directions      (e1 e2);' in rmd or 'directions (e1 e2);' in norm(rmd)
@@ -294,12 +297,13 @@ def semantic_checks(specs):
     s1 = specs['case1d_tnt']
     m_tnt = MATERIALS['TNT']
     r_exp = charge_radius(1.0, m_tnt)
-    # 0.02 is coarser than r_exp/5 -> refined to the largest spacing that
-    # keeps MIN_EXP_CELLS across the charge AND divides radius_m exactly
-    # (the native solvers' divisor rule, so foam and native cell counts agree)
-    dx = 5.0 / math.ceil(5.0 / (r_exp / MIN_EXP_CELLS))
-    check('1d: dx refined to divisor-aware r_exp/MIN_EXP_CELLS',
-          abs(s1.dx - dx) < 1e-12 and s1.dx <= r_exp / MIN_EXP_CELLS,
+    # 0.02 is coarser than r_exp/8 -> refined to the largest spacing that
+    # keeps FOAM_EXP_CELLS across the charge AND divides radius_m exactly
+    # (the native divisor rule; blastFoam asks for 8 cells, not the
+    # native 5, because setFields deposits only the staircase mass - T39)
+    dx = 5.0 / math.ceil(5.0 / (r_exp / FOAM_EXP_CELLS))
+    check('1d: dx refined to divisor-aware r_exp/FOAM_EXP_CELLS',
+          abs(s1.dx - dx) < 1e-12 and s1.dx <= r_exp / FOAM_EXP_CELLS,
           f'{s1.dx} vs {dx}')
     check('1d: nx matches core.grid', s1.nx == len(make_grid_1d(5.0, dx)[1]))
     check('1d: file set complete', set(s1.files) == EXPECTED_FILES,
@@ -396,7 +400,7 @@ def semantic_checks(specs):
           and 'mass            4;' in sf2 and 'mass            2;' in sf2)
     check('two charges: both det points',
           '(0.7 1 1)' in pp2 and '(1.4 1 1)' in pp2)
-    dx_small = charge_radius(2.0, m_tnt) / MIN_EXP_CELLS
+    dx_small = charge_radius(2.0, m_tnt) / FOAM_EXP_CELLS
     check('two charges: dx resolves the smaller charge',
           abs(s3t.dx - 2.0 / math.ceil(2.0 / dx_small)) < 1e-12
           and s3t.dx <= dx_small)

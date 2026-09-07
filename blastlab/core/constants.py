@@ -19,6 +19,14 @@ E_AIR = P_AIR / ((GAMMA_AIR - 1.0) * RHO_AIR)   # ambient specific internal ener
 
 # Grid-size guard rails (native solvers: live numpy state ~200 B/cell)
 MIN_EXP_CELLS  = 5             # min cells across the charge radius
+# blastFoam charge target (N5/T39). blastFoam's sphericalMassToCell sets
+# alpha = 1 in the cells whose CENTRES fall inside r_exp, so the mass it
+# actually deposits is the staircase volume: ~0.85 of the request at 5
+# cells across the radius, and the deficit falls roughly as 1/n. 8 cells
+# brings it to ~0.94 for a 2.6x (2D) / 4.1x (3D) cell-count cost. Native
+# stays at MIN_EXP_CELLS = 5 - its outputs are byte-pinned, and T36
+# rescales the products' energy instead.
+FOAM_EXP_CELLS = 8
 CELLS_2D_WARN  = 2_000_000
 CELLS_2D_MAX   = 8_000_000
 CELLS_WARN     = 4_000_000     # 3D

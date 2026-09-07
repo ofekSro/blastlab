@@ -48,8 +48,8 @@ functions
             {
                 type            lineCell;
                 axis            x;
-                start (0.002631578947 0 0);
-                end (4.997368421 0 0);
+                start (0.001646903821 0 0);
+                end (4.998353096 0 0);
             }
         );
     }

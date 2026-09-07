@@ -3,11 +3,16 @@
 1. Kingery-Bulmash free-air incident peak overpressure at scaled
    distances Z = R / W^(1/3): a 1 kg TNT sphere in a 5 m domain,
    gauges at 1/2/3/4 m. Gate is a WIDE band (ratio 0.65-1.35): a pure
-   hydro code (JWL products, no afterburn) at this resolution is known
-   to land ~20-30% below KB in the near/mid field - what we pin is
-   "the right decade and the right decay", not the last percent.
+   hydro code (JWL products, no afterburn) at this resolution lands
+   below KB in the near/mid field - what we pin is "the right decade
+   and the right decay", not the last percent. Measured 0.85-0.89 since
+   the charge is resolved with 8 cells across its radius (T39); it was
+   0.72-0.77 at the old 5-cell target.
 2. Multi-material spot check: the same case with C4 must give peaks
-   ~1.1-1.5x the TNT ones (higher detonation energy and pressure).
+   above the TNT ones (higher detonation energy and pressure). Measured
+   1.11-1.17 at 8 cells across the radius (1.22-1.37 at 5 cells): the
+   better-resolved TNT charge closed most of the gap, so the band is
+   1.05-1.5 rather than the old 1.1-1.5.
 
 `--afterburn` adds a third run with the Miller afterburn model on and
 prints a KB comparison table (its own, upward band - the detonation-only
@@ -34,9 +39,11 @@ FAIL = []
 KB_FREE_AIR = {1.0: 904.0, 2.0: 186.0, 3.0: 80.0, 4.0: 47.0}
 KB_BAND = (0.65, 1.35)
 #: band for the afterburn run (`--afterburn`): the model must not
-#: overshoot KB and must not leave the detonation-only deficit untouched
+#: overshoot KB badly and must not leave the detonation-only deficit
+#: untouched. Measured with the 8-cell charge (T39): 1.20 at Z = 1,
+#: 1.02-1.04 at Z = 2..4 (it was 0.95-1.03 across the board at 5 cells)
 KB_AB_BAND = (0.80, 1.35)
-C4_OVER_TNT = (1.1, 1.5)
+C4_OVER_TNT = (1.05, 1.5)
 
 
 def check(name, ok, detail=''):

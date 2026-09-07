@@ -5,7 +5,7 @@ Pure-text rendering (`render_case`) is separated from disk I/O
 (`write_case`) so golden tests can pin the generated dicts without WSL.
 
 Geometry mirrors the native solvers: the same effective cell size
-(MIN_EXP_CELLS across the charge radius, material-aware density) on the
+(FOAM_EXP_CELLS across the charge radius, material-aware density) on the
 same uniform grid built by core.grid, so field read-back lands
 cell-for-cell on the native x_c/y_c/z_c arrays (a single-block
 blockMesh numbers cells x-fastest -> reshape(..., order='F')).
@@ -32,6 +32,7 @@ from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS,
 from ...core import refine
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
+from ...core.refine import exp_cells as _exp_cells
 from . import env
 from .dicts import (FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC, Raw, block, fmt,
                     foam_file)
@@ -210,7 +211,8 @@ def plan_case(case):
 
     if case.dim == 1:
         r_exp = charge_radius(case.charge_kg, m)
-        dx = _effective_dx(case.cell_size_m, r_exp, case.radius_m)
+        dx = _effective_dx(case.cell_size_m, r_exp, case.radius_m,
+                           _exp_cells(case))
         r_face, r, A_face, V_cell = make_grid_1d(case.radius_m, dx)
         grid = dict(r_face=r_face, r=r, A_face=A_face, V_cell=V_cell)
         spec = CaseSpec(dim=1, material=mat, nx=len(r), dx=dx,

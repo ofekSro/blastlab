@@ -239,9 +239,39 @@ def _preflight(case, hooks):
     # `&&` chain: the benign wedge warnings collapse into one note
     # instead of one per stage that emits them
     _scan_stage_warnings('\n'.join(out), hooks)
+    _scan_set_mass('\n'.join(out), hooks, spec)
     if spec.lmax or spec.amr:
         build_remap(spec, hooks)
     return spec
+
+
+#: setFields/setRefinedFields report what the charge region actually
+#: got. 3D and planar meshes print "Set volume of cell: <V> m^3"; the
+#: collapsed wedge/sector meshes (1D, 2D axisym) print the sector volume
+#: and then the domain-equivalent one, "<sector> m^3 (<full> actual)".
+#: The domain-equivalent number is the one to compare with the charge:
+#: mass = V x rho0 is the staircase deposit the run starts from (N5/T39).
+_RE_SET_VOLUME = re.compile(
+    r'Set volume of cell:\s*([0-9.eE+-]+)\s*m\^3'
+    r'(?:\s*\(\s*([0-9.eE+-]+)\s*actual\))?')
+
+
+def _scan_set_mass(out, hooks, spec):
+    """Forward blastFoam's own set-volume line as a [note] with the mass
+    it implies and how that compares with the requested charge."""
+    rho0 = MATERIALS[spec.material].rho0
+    requested = [m for _c, m in (spec.charges or [])]
+    for i, (plain, actual) in enumerate(_RE_SET_VOLUME.findall(out)):
+        try:
+            v = float(actual or plain)
+        except ValueError:
+            continue
+        mass = v * rho0
+        want = requested[i] if i < len(requested) else None
+        tail = (f' ({mass / want:.2f} of the {want:g} kg requested)'
+                if want else '')
+        hooks.log(f'  [note] blastFoam set {mass:.4g} kg of explosive'
+                  f'{tail}')
 
 
 def _scan_stage_warnings(out, hooks):

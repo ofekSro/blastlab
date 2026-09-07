@@ -32,7 +32,8 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .bc import solid_mask_2d, solid_mask_3d
-from .constants import (JWL_TNT, MIN_EXP_CELLS, CELLS_2D_MAX, CELLS_REFUSE,
+from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
+                        CELLS_2D_MAX, CELLS_REFUSE,
                         FOAM_CELLS_WARN)
 from .grid import make_geometry, make_grid
 
@@ -97,13 +98,22 @@ def _fit_shape(arr, shape):
     return arr
 
 
-def effective_dx(cell_size, r_exp, L):
+def exp_cells(case):
+    """Cells demanded across the charge radius: MIN_EXP_CELLS for the
+    native solvers (byte-pinned), FOAM_EXP_CELLS for blastFoam, whose
+    `sphericalMassToCell` deposits only the staircase mass (N5/T39)."""
+    return (FOAM_EXP_CELLS
+            if getattr(case, 'solver', 'native') == 'blastfoam'
+            else MIN_EXP_CELLS)
+
+
+def effective_dx(cell_size, r_exp, L, n_cells=MIN_EXP_CELLS):
     """The charge auto-refinement rule shared by the native solvers and
-    the foam writer: >= MIN_EXP_CELLS cells across r_exp, and the refined
+    the foam writer: >= `n_cells` cells across r_exp, and the refined
     spacing must divide L exactly (ceil: never coarser than
-    r_exp / MIN_EXP_CELLS)."""
-    if cell_size > r_exp / MIN_EXP_CELLS:
-        return L / math.ceil(L / (r_exp / MIN_EXP_CELLS))
+    r_exp / n_cells)."""
+    if cell_size > r_exp / n_cells:
+        return L / math.ceil(L / (r_exp / n_cells))
     return cell_size
 
 
@@ -114,6 +124,50 @@ def charge_radius(mass, rho0=None, planar=False):
     if planar:
         return math.sqrt(mass / (math.pi * rho0))
     return (3.0 * mass / (4.0 * math.pi * rho0)) ** (1.0 / 3.0)
+
+
+def set_mass_fraction(dim, geometry, dx, r_exp, centre, dims):
+    """What blastFoam's `sphericalMassToCell` actually deposits (N5).
+
+    It sets `alpha = 1` in the cells whose CENTRES fall inside r_exp and
+    the mass that lands is therefore the staircase volume x rho0, not
+    the sphere's: ~0.85 of the request at 5 cells across the radius.
+    Returns `(n_cells, fraction)` against the charge volume clipped to
+    the domain (a wall-truncated charge is a deliberate surface burst,
+    so its outside part is not counted as missing). `centre` is
+    (x0, y0[, z0]) with x0 = 0 on the axis in axisymmetric 2D."""
+    from . import geometry as geom
+    if not (dx > 0 and r_exp > 0):
+        return 0, 0.0
+
+    def axis(c, L):
+        """Global cell centres (i + 0.5) dx within r_exp of c."""
+        i0 = max(int(math.floor((c - r_exp) / dx)), 0)
+        i1 = min(int(math.ceil((c + r_exp) / dx)), int(math.ceil(L / dx)))
+        return (np.arange(i0, max(i1, i0) + 1) + 0.5) * dx
+
+    r2 = r_exp * r_exp
+    if dim == 3:
+        x0, y0, z0 = centre
+        X = axis(x0, dims[0])[:, None, None]
+        Y = axis(y0, dims[1])[None, :, None]
+        Z = axis(z0, dims[2])[None, None, :]
+        inside = (X - x0) ** 2 + (Y - y0) ** 2 + (Z - z0) ** 2 <= r2
+        n = int(inside.sum())
+        V_disc = n * dx ** 3
+        V_true = geom.charge_volume_3d(r_exp, x0, y0, z0, *dims)
+    else:
+        x0, y0 = centre[0], centre[1]
+        xs, ys = axis(x0, dims[0]), axis(y0, dims[1])
+        inside = (xs[:, None] - x0) ** 2 + (ys[None, :] - y0) ** 2 <= r2
+        n = int(inside.sum())
+        if geometry == 'axisymmetric':
+            # per radian, exactly as core.grid's axisym cell volumes
+            V_disc = float((inside * (xs[:, None] * dx * dx)).sum())
+        else:
+            V_disc = n * dx * dx        # per unit depth
+        V_true = geom.charge_volume_2d(geometry, r_exp, x0, y0, *dims)
+    return n, (V_disc / V_true if V_true > 0 else 0.0)
 
 
 # ── zones ────────────────────────────────────────────────────────────────────
@@ -154,26 +208,27 @@ def level_map(centres, zones):
     return lv
 
 
-def required_level(dx_base, r_exp):
-    """Levels needed below dx_base so that r_exp spans MIN_EXP_CELLS
-    cells at the finest level (0 when the base already resolves it)."""
-    need = dx_base / (r_exp / MIN_EXP_CELLS)
+def required_level(dx_base, r_exp, n_cells=MIN_EXP_CELLS):
+    """Levels needed below dx_base so that r_exp spans `n_cells` cells
+    at the finest level (0 when the base already resolves it)."""
+    need = dx_base / (r_exp / n_cells)
     return 0 if need <= 1.0 + 1e-12 else int(math.ceil(math.log2(need)))
 
 
-def auto_charge_zones(dim, dx_base, dims, centres, r_exps, level_cap=None):
+def auto_charge_zones(dim, dx_base, dims, centres, r_exps, level_cap=None,
+                      n_cells=MIN_EXP_CELLS):
     """Nested boxes around each charge for `charge_refine='zone'`. The
     finest zone (level L) spans centre +- 2 r_exp; each coarser zone l
     adds one cell of level l (dx_base / 2**l) so, after snapping, every
     zone sits at least one cell of the next coarser level inside it (the
     2:1 grading rule). Returns (zones, L) with L the level the smallest
     charge needs (clamped by `level_cap`)."""
-    L = max(required_level(dx_base, r) for r in r_exps)
+    L = max(required_level(dx_base, r, n_cells) for r in r_exps)
     if level_cap is not None:
         L = min(L, level_cap)
     zones = []
     for c, r in zip(centres, r_exps):
-        Lc = required_level(dx_base, r)
+        Lc = required_level(dx_base, r, n_cells)
         if level_cap is not None:
             Lc = min(Lc, level_cap)
         for l in range(1, Lc + 1):
@@ -285,8 +340,9 @@ def plan_levels(case, rho0=None):
     # base spacing: today's global rule unless the charge is left to an
     # automatic zone
     dx = float(case.cell_size_m)
+    n_exp = exp_cells(case)
     if charges and mode != 'zone':
-        dx = min(effective_dx(dx, r, case.Lx) for _c, r in charges)
+        dx = min(effective_dx(dx, r, case.Lx, n_exp) for _c, r in charges)
     # guard the BASE grid before building it (a tiny dx would arange
     # billions of faces; the global-charge rule already applied above)
     if _grid_cells(dims, dx) > _PLAN_MAX_CELLS:
@@ -302,7 +358,8 @@ def plan_levels(case, rho0=None):
         axisym = dim == 2 and case.geometry == 'axisymmetric'
         auto, auto_level = auto_charge_zones(
             dim, dx_base, dims, [c for c, _r in charges],
-            [r for _c, r in charges], level_cap=1 if axisym else None)
+            [r for _c, r in charges], level_cap=1 if axisym else None,
+            n_cells=n_exp)
 
     zones, moved = [], []
     for z in user + auto:
@@ -834,11 +891,12 @@ def validate_amr(case, plan, rho0=None):
     dx_base = plan.dx_base
     if (getattr(case, 'init_mode', 'charge') == 'charge' and case.charge
             and 1 <= amr <= MAX_AMR_LEVEL):
-        need = max(required_level(dx_base, r)
+        n_exp = exp_cells(case)
+        need = max(required_level(dx_base, r, n_exp)
                    for _c, r in _charges(case, rho0))
         if need > amr:
             errors.append(
-                f"Resolving the charge ({MIN_EXP_CELLS} cells across its "
+                f"Resolving the charge ({n_exp} cells across its "
                 f"radius) needs AMR level {need} (finest "
                 f"{dx_base / 2 ** need:.5g} m) - raise the AMR levels or "
                 f"lower the base cell to at most "

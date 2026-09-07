@@ -246,7 +246,8 @@ def test_case_roundtrip_and_validation():
     check("native + charge_refine='zone' -> same error",
           any('requires the blastFoam solver' in e for e in rep.errors), str(rep.errors))
     # foam, 50 kg/m planar charge on a 10 cm base in 'zone' mode: the
-    # charge needs level 3, user zones (levels 1, 2) nest around it
+    # charge needs level 4 (FOAM_EXP_CELLS = 8 across r_exp; it was
+    # level 3 at the native 5-cell target), user zones (1, 2) nest
     f = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=50.0,
                center=(1.0, 1.0), solver='blastfoam')
     f.charge_refine = 'zone'
@@ -256,12 +257,15 @@ def test_case_roundtrip_and_validation():
     zone_errs = [e for e in rep.errors if 'efine' in e or 'jumps' in e]
     check('foam + nested user zones + auto zones: no refinement errors',
           zone_errs == [], str(rep.errors))
-    check('report matches the plan (lmax 3, fine 0.0125 m, 160x160)',
-          rep.lmax == plan.lmax == 3 and abs(rep.dx_fine - 0.0125) < 1e-12
-          and rep.n_fine == plan.n_fine == 160 ** 2,
+    check('report matches the plan (lmax 4, fine 0.00625 m, 320x320)',
+          rep.lmax == plan.lmax == 4 and abs(rep.dx_fine - 0.00625) < 1e-12
+          and rep.n_fine == plan.n_fine == 320 ** 2,
           f'{rep.lmax} {rep.dx_fine} {rep.n_fine}')
     check('note describes the refinement',
-          any('Local refinement: 3 level' in x for x in rep.notes), str(rep.notes))
+          any('Local refinement: 4 level' in x for x in rep.notes), str(rep.notes))
+    check('note predicts the set mass',
+          any('Charge cells:' in x and 'set by blastFoam' in x
+              for x in rep.notes), str(rep.notes))
     check('n_cells is the predicted mesh count', rep.n_cells == plan.n_pred,
           f'{rep.n_cells} vs {plan.n_pred}')
     check("effective dx stays the base in 'zone' mode", abs(rep.effective_dx - 0.1) < 1e-12,
@@ -417,13 +421,16 @@ def test_amr():
           refine.display_level_for((2.0, 2.0), 0.1, 4, 50_000) == 3
           and refine.display_level_for((2.0, 2.0), 0.1, 4, 10 ** 9) == 4
           and refine.display_level_for((2.0, 2.0), 0.1, 4, 100) == 0)
+    # 4 AMR levels: the 8-cell foam charge target (T39) needs one more
+    # level than the native 5-cell one for this 25 kg/m charge
+    a.amr_levels = 4
     rep = validate_case(a)
     check('valid AMR case: no errors, AMR notes, report fields',
           not rep.errors and any('AMR (densityGradient)' in n for n in rep.notes)
           and any('displayed at level 1' in n for n in rep.notes)
           and any('may grow to 8,000,000' in n for n in rep.notes)
-          and rep.amr_levels == 3 and rep.display_level == 1
-          and abs(rep.dx_fine - 0.0125) < 1e-12 and rep.n_fine == 1600
+          and rep.amr_levels == 4 and rep.display_level == 1
+          and abs(rep.dx_fine - 0.00625) < 1e-12 and rep.n_fine == 1600
           and rep.n_cells == 400 and abs(rep.effective_dx - 0.1) < 1e-12,
           f'{rep.errors} {rep.notes}')
     check('no global charge-cut note under AMR',
@@ -451,7 +458,7 @@ def test_amr():
                center=(1.0, 1.0), solver='blastfoam', amr_levels=2)
     rep = validate_case(u)
     check('too few levels for the charge -> error naming the level needed',
-          any('needs AMR level 3' in e for e in rep.errors), str(rep.errors))
+          any('needs AMR level 4' in e for e in rep.errors), str(rep.errors))
     for kw, frag in ((dict(amr_estimator='gradient'), 'Unknown AMR error estimator'),
                      (dict(amr_unrefine=0.5), 'unrefine threshold must not exceed'),
                      (dict(amr_refine=0.0), 'must be > 0'),

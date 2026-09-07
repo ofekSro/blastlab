@@ -12,6 +12,7 @@ actions
 (
     { name refine2; type cellSet; action new; source boxToCell; sourceInfo { box (0.75 0.75 -2) (1.25 1.25 2); } }
     { name refine2; type cellSet; action add; source boxToCell; sourceInfo { box (0.75 0.75 -2) (1.25 1.25 2); } }
+    { name refine2; type cellSet; action add; source boxToCell; sourceInfo { box (0.775 0.775 -2) (1.225 1.225 2); } }
     { name refine2; type cellSet; action add; source boxToCell; sourceInfo { box (0.8 0.8 -2) (1.2 1.2 2); } }
 );
 

@@ -144,9 +144,12 @@ def shared_constant_checks():
 
 
 def main():
-    # ~64M cells: 40 m cube at 0.1 m with a large charge (no refine)
+    # ~64M cells: 40 m cube at 0.1 m with a large charge. The charge is
+    # big enough (r_exp = 0.85 m) that the 0.1 m cell already gives the
+    # 8 cells across the radius blastFoam wants (T39), so these cases
+    # test the CAPS and not the charge auto-refinement.
     big3 = dict(Lx=40.0, Ly=40.0, Lz=40.0, cell_size_m=0.1,
-                charge=1000.0, center=(20.0, 20.0, 20.0))
+                charge=4000.0, center=(20.0, 20.0, 20.0))
 
     # T1: native 3D refuses above CELLS_REFUSE
     rep = validate_case(Case3D(solver='native', **big3))

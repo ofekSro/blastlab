@@ -103,7 +103,7 @@ Hard rules:
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [x] 2026-09-07 |
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [x] 2026-09-07 |
-| T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [ ] |
+| T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [x] 2026-09-07 |
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [ ] |
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [ ] |
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [ ] |
@@ -918,6 +918,59 @@ Done when: green with recorded ratios; N5 DONE.
 Commit: "T39: 8 cells across the charge for blastFoam, report the set mass (N5)"
 ```
 
+**DONE (2026-09-07):** `constants.FOAM_EXP_CELLS = 8` now drives every blastFoam charge
+target (1D/2D/3D global refine, the automatic zone level, the AMR level check and the
+validation notes) through the new `refine.exp_cells(case)`; the native solvers keep
+`MIN_EXP_CELLS = 5` and `test_regression` stays byte-identical. `refine.set_mass_fraction`
+predicts what `sphericalMassToCell` will deposit (whole cells inside r_exp, against the
+T36 clipped charge volume) and `validate_case` reports it as
+"Charge cells: N at dx -> ~F of the M kg set by blastFoam"; `backend._scan_set_mass`
+forwards blastFoam's own line as `[note] blastFoam set X kg of explosive (F of the M kg
+requested)`, handling both printed forms (3D/planar `Set volume of cell: V m^3`, and the
+wedge/sector `V m^3 (V_full actual)`).
+
+**Measured against blastFoam itself** (1 kg TNT; predictor vs the solver's reported set
+volume): 3D 5 cells 0.9791 predicted / 0.9791 reported, 8 cells 1.0273 / 1.0273; 2D axisym
+5 cells 1.0273 / 1.0271, 8 cells 1.0227 / 1.0225; 1D 0.9952 at both (the sector grid
+resolves the charge radially either way). **The N5 premise of "~0.85 of the requested mass
+at 5 cells" is not what this build does** - the staircase error depends on where the burst
+point falls between the faces, not systematically on n. Over 400 random burst offsets the
+set-mass fraction is: 3D RMS error 1.00 % (range 0.955-1.022) at 5 cells vs 0.41 %
+(0.989-1.024) at 8; 2D axisym RMS 3.67 % (0.990-1.056) vs 2.95 % (0.981-1.055). So 8 cells
+mainly removes the *spread*, at 1.6x (1D) / 2.6x (2D) / 4.1x (3D) cells.
+
+**What actually improved is the resolved detonation**, and by a lot. KB free-air anchor
+(1 kg TNT, gauges 1-4 m), foam/KB ratio before -> after: Z=1 0.72 -> 0.89, Z=2 0.72 -> 0.85,
+Z=3 0.75 -> 0.86, Z=4 0.77 -> 0.87 (band 0.65-1.35 unchanged). With `--afterburn miller`:
+1.20 / 1.04 / 1.02 / 1.02 (was 0.95-1.03 across the board - N3 note updated; the Z = 1
+overshoot is new and stays inside the 0.80-1.35 afterburn band). C4/TNT peak ratio
+1.37/1.28/1.22 -> 1.17/1.13/1.11, so the pinned band moved 1.1-1.5 -> 1.05-1.5 (the
+better-resolved TNT reference closed the gap; C4 is still clearly above TNT).
+`test_foam_1d_vs_native`: foam/native peak ratio 0.89/0.97/0.99/1.02 -> 1.10/1.14/1.14/1.16
+and arrival gap 13.7/7.3/5.5/3.8 % -> 4.5/1.5/1.3/0.7 % at r = 1/2/3/4 m.
+
+Test updates (all expectation changes, no widened physics gates): `test_refine` charge zone
+level 3 -> 4 and the AMR case 3 -> 4 levels; `test_case_validate` cap case charge 1000 ->
+4000 kg so it still tests the caps rather than auto-refinement; `test_gui_amr_form` charge
+100 -> 320 kg/m so 3 levels still suffice; `test_foam_writer` 1D/two-charge/zone
+expectations; `test_foam_1d_vs_native` final_profile contract no longer requires the foam
+and native 1D grids to have the same cell count (759 vs 475 by design).
+
+Goldens regenerated with `test_foam_writer.py --update`. Eyeballed diff: only cell counts
+and the derived half-cell offsets move, e.g. `case1d_tnt` blockMesh `(475 1 1)` ->
+`(759 1 1)` and its probe `start (0.002631578947 0 0)` -> `(0.001646903821 0 0)`,
+`case2d_planar_anfo` setFields slab `p1 (2 2 -0.003868471954)` -> `(2 2 -0.002418379686)`;
+the zone case gains `topoSetDict.refine4` + `refineMeshDict.4`. No dictionary keys,
+regions or solver settings changed.
+
+Tests: test_regression PASS (byte-identical), test_refine, test_case_validate,
+test_foam_writer, test_foam_reader, test_foam_env, test_adaptive_interval,
+test_foam_live_due, test_gui_drain, test_gui_results_fields, test_gui_results_anim,
+test_gauge_summary, test_gui_gauge_summary, test_gui_run_browser, test_gui_refine_preview,
+test_gui_amr_form, test_gui_solver_mode, test_foam_ingest_order, test_foam_amr_ingest,
+test_viz3d_sampling/hooks/panel all PASS; WSL: test_foam_kb_anchor (plain and
+`--afterburn`) and test_foam_1d_vs_native PASS. No orphaned solvers.
+
 ### T40 — Arrival-time characterisation: AMR probe cell (N16-a) + foam near-field lag (W1)
 
 **Why:** (a) the 3D AMR e2e gives gauge arrival 0.298 ms vs 0.252 ms static (+18 %) while
@@ -1277,9 +1330,20 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 **New capabilities (N)**
 - N1 peak/impulse views — DONE (T11)
 - N2 per-gauge summary + CSV — DONE (T12)
-- N3 afterburn (`none | miller`; TNT calibrated to KB 0.95–1.03; other materials from oxygen balance only, uncalibrated) — DONE (T16)
+- N3 afterburn (`none | miller`; other materials from oxygen balance only, uncalibrated)
+  — DONE (T16). KB anchor with `miller` re-measured after T39's 8-cell charge: 1.20 at
+  Z = 1 and 1.02–1.04 at Z = 2–4 (it was 0.95–1.03 across the board when the charge was
+  resolved with 5 cells); band in `test_foam_kb_anchor` is 0.80–1.35
 - N4 VTK export — DONE (T15)
-- **N5** charge-mass rasterisation deficit (~0.85 of requested mass at 5 cells/radius) — OPEN → **T39**
+- N5 charge-mass rasterisation deficit — DONE (2026-09-07, T39; `FOAM_EXP_CELLS = 8`
+  drives every blastFoam charge target, native keeps 5. The "~0.85 of requested mass"
+  premise did not reproduce: measured against blastFoam's own set-volume line the deposit
+  is 0.979 (3D, 5 cells) / 1.027 (3D, 8 cells) / 0.995 (1D, both), and over 400 random
+  burst offsets 8 cells mainly cuts the SPREAD - 3D RMS 1.00 % → 0.41 %, axisym
+  3.67 % → 2.95 % - for 1.6x/2.6x/4.1x the cells in 1D/2D/3D. The real gain is the
+  resolved detonation: KB anchor 0.72–0.77 → 0.85–0.89, foam-vs-native arrival gap
+  13.7/7.3/5.5/3.8 % → 4.5/1.5/1.3/0.7 %. `validate_case` now predicts the set mass and
+  the run log forwards blastFoam's own set-volume line as a `[note]`)
 - **N6** resume a stopped run — OPEN → **T43**
 - **N7** chains INTO blastFoam (profile init) — OPEN → **T41**
 - N8 foam run browser + auto-cleanup (settings in %APPDATA%\blastlab) — DONE (T14)
@@ -1309,8 +1373,9 @@ viewer `ravel(order='F')` ↔ VTK point order is consistent end-to-end (a transp
 `test_viz3d_scene` S2c); obstacle scatter/carve ordering matches boxToCell; the GUI
 worker/queue architecture (latest-wins frame slots, exception-hardened drain,
 Tk-thread-only widget access) is clean — treat it as the pattern for new panels.
-Native↔foam physics: peaks within 2–7 % at r = 1–4 m, both monotonic
-(`test_foam_1d_vs_native`); KB anchor ratio 0.95–1.03 with afterburn `miller` (N3).
+Native↔foam physics: foam peaks 1.10–1.16x native at r = 1–4 m with arrivals within
+0.7–4.5 %, both monotonic (`test_foam_1d_vs_native`, re-measured after T39); KB anchor
+1.02–1.20 with afterburn `miller` (N3).
 The QA pass verified by eye: static refinement + Show mesh everywhere, AMR per-frame
 mesh, gauge table + CSV, run browser, VTK export, post-mortem load identical to live,
 Stop at every stage, no orphaned solvers.
