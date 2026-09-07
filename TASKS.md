@@ -1056,6 +1056,17 @@ small-case study above is what produced the T40 numbers; the e2e's two cases wer
 validate cleanly (AMR display 216,000 cells, static mesh 256,824). One orphaned blastFoam from
 the interrupted attempt was found and killed; WSL verified idle afterwards.
 
+*Retry (owner-requested, same day, after `wsl --shutdown` reclaimed the VM):* got further -
+**the whole AMR half ran and PASSED every one of its checks** (arrival stop, graceful stop,
+foam-fo peak source, FO pMax at the gauge cell within 20 %, per-frame level maps, 519 live
+frames; case dirs `20260907-211638_3d_p17264-00` and the static ref `-01` on the WSL disk),
+and the static reference SOLVED - but its ingest died again in `reader.to_grid`, this time on
+a 13.2 MiB allocation of the 1,728,000-cell display grid. The host held 0.3-0.6 GB free even
+after the WSL restart: the ~7 GB consumer is other host processes, not the VM. The driver
+needs roughly 1 GB free on the Windows side; rerun `_e2e_foam_amr3d.py
+--amr-dir=/root/blastlab_runs/20260907-211638_3d_p17264-00` on a quieter machine to reuse the
+finished AMR run and only redo the reference + comparison.
+
 ### T41 — Chains INTO blastFoam: profile-initialised foam stages (N7)
 
 **Why:** today a chain stage with `solver='blastfoam'` cannot start from a 1D/2D profile
