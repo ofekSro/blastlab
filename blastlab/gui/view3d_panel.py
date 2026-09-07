@@ -30,6 +30,15 @@ from ..viz3d.viewer import FIELDS
 N_PLANES = 6
 #: radio-button fields, straight from the viewer's FIELDS table
 FIELD_LABELS = [(key, spec['label']) for key, spec in FIELDS.items()]
+#: wrap width for the hint texts inside the (narrow) control column
+CTL_TEXT_WRAP = 188
+
+
+def _raise(w):
+    """tkraise a control tab. A CTkScrollableFrame is a canvas child of
+    an outer frame: raising the widget itself moves nothing, so raise
+    the frame that actually carries the grid slot."""
+    getattr(w, '_parent_frame', w).tkraise()
 
 
 class Feed3D:
@@ -48,20 +57,42 @@ class View3DPanel(VtkTkHost):
                    'automatically. Finished 3D results replay\n'
                    'here from the Results tab.')
 
+    #: width of the control column, and the panel width below which it
+    #: folds away on its own
+    CTL_W = 200
+    COLLAPSE_W = 700
+
     def __init__(self, parent, log_fn=print):
         self._playing = False
         self._syncing_slider = False
         self._built = False
+        self._ctl_collapsed = False
+        self._ctl_user = False
         super().__init__(parent, log_fn=log_fn)
         self._build_controls()
         self._built = True
 
     # ── UI construction ──────────────────────────────────────────────────
     def _build_controls(self):
-        ctl = ctk.CTkFrame(self, width=206, fg_color='transparent')
+        ctl = ctk.CTkFrame(self, width=self.CTL_W, fg_color='transparent')
         ctl.pack(side='left', fill='y', padx=(0, GAP), pady=0,
                  before=self.view)
         ctl.pack_propagate(False)
+        self._ctl = ctl
+        # a 200 px column out of a 330 px viewport left nothing to look at
+        # (QA-17): a rail button folds it away, automatically below
+        # COLLAPSE_W until the user decides for themselves
+        rail = ctk.CTkFrame(self, width=22, fg_color='transparent')
+        rail.pack(side='left', fill='y', pady=0, before=self.view)
+        rail.pack_propagate(False)
+        self._ctl_rail = rail
+        self._collapse_btn = ctk.CTkButton(
+            rail, text='‹', width=20, height=48, font=theme.F_BODY,
+            corner_radius=6, fg_color=c('card2'), hover_color=c('border'),
+            text_color=c('text'), command=self._collapse_clicked)
+        self._collapse_btn.pack(side='top', pady=(2, 0))
+        theme.tooltip(self._collapse_btn, 'Show / hide the 3D controls')
+        self.bind('<Configure>', self._auto_collapse, add='+')
         self._vars = {}
 
         def small_label(parent, text):
@@ -101,9 +132,17 @@ class View3DPanel(VtkTkHost):
         stack.pack(fill='both', expand=True, pady=(GAP, 0))
         stack.grid_columnconfigure(0, weight=1)
         stack.grid_rowconfigure(0, weight=1)
-        disp = ctk.CTkFrame(stack, fg_color='transparent')
-        planes = ctk.CTkFrame(stack, fg_color='transparent')
-        viewtab = ctk.CTkFrame(stack, fg_color='transparent')
+        # scrollable tabs: the Display tab is taller than the column at
+        # 840 px and much taller at 720 px, and whatever did not fit used
+        # to be simply unreachable (the timeline/Play strip, or the layer
+        # checkboxes) - QA-17/27
+        def tab():
+            return ctk.CTkScrollableFrame(
+                stack, fg_color='transparent', corner_radius=0,
+                scrollbar_button_color=c('card2'),
+                scrollbar_button_hover_color=c('border'))
+
+        disp, planes, viewtab = tab(), tab(), tab()
         self._tabs = {'Display': disp, 'Planes': planes, 'View': viewtab}
         for w in (viewtab, planes, disp):
             w.grid(row=0, column=0, sticky='nsew')
@@ -113,7 +152,7 @@ class View3DPanel(VtkTkHost):
         # the View tab's camera presets under a highlighted "Display" and
         # the field/colour/layer controls were unreachable until the user
         # clicked another tab. seg.set() fires no callback, so raise it here.
-        disp.tkraise()
+        _raise(disp)
 
         # ── Display tab ────────────────────────────────────────────────
         small_label(disp, 'FIELD')
@@ -133,19 +172,22 @@ class View3DPanel(VtkTkHost):
         small_label(disp, 'COLOUR SCALE')
         checkbox(disp, 'Auto colour scale', 'auto_scale', True,
                  self._auto_changed)
-        row = ctk.CTkFrame(disp, fg_color='transparent')
-        row.pack(fill='x', pady=2)
         self._vars['vmin'] = tk.StringVar(value='0')
         self._vars['vmax'] = tk.StringVar(value='500')
+        # one row each: side by side in a 200 px column an auto-filled
+        # value read "1.74829e+" (QA-27)
         for lbl, key in (('Min', 'vmin'), ('Max', 'vmax')):
-            ctk.CTkLabel(row, text=lbl, font=theme.F_SMALL,
+            row = ctk.CTkFrame(disp, fg_color='transparent')
+            row.pack(fill='x', pady=2)
+            ctk.CTkLabel(row, text=lbl, font=theme.F_SMALL, width=28,
+                         anchor='w',
                          text_color=c('muted')).pack(side='left',
                                                      padx=(0, 4))
             ent = ctk.CTkEntry(row, textvariable=self._vars[key],
-                               width=70, height=26, font=theme.F_SMALL,
+                               height=26, font=theme.F_SMALL,
                                corner_radius=6, fg_color=c('entry'),
                                border_color=c('border'))
-            ent.pack(side='left', padx=(0, GAP))
+            ent.pack(side='left', fill='x', expand=True)
             ent.bind('<Return>', lambda e: self._clim_changed())
             ent.bind('<FocusOut>', lambda e: self._clim_changed())
         checkbox(disp, 'Log contours', 'log', False, self._log_changed)
@@ -211,7 +253,7 @@ class View3DPanel(VtkTkHost):
             self._vars[f'{key}_op'] = op
         ctk.CTkLabel(planes, text='Each row: on, axis, position, opacity %',
                      font=theme.F_SMALL, text_color=c('muted'),
-                     wraplength=220, justify='left', anchor='w').pack(
+                     wraplength=CTL_TEXT_WRAP, justify='left', anchor='w').pack(
             fill='x', pady=(GAP, 0))
 
         # ── View tab ───────────────────────────────────────────────────
@@ -260,9 +302,37 @@ class View3DPanel(VtkTkHost):
                      font=theme.F_SMALL, text_color=c('muted'),
                      justify='left', anchor='w').pack(
             fill='x', pady=(6, 0))
+        # pack order decides who is squeezed first: the expanding tab
+        # stack must come AFTER `bottom`, or a tall Display tab pushes
+        # the timeline and Play button off the column (QA-27)
+        stack.pack_forget()
+        stack.pack(fill='both', expand=True, pady=(GAP, 0))
 
     def _tab_selected(self, value):
-        self._tabs[value].tkraise()
+        _raise(self._tabs[value])
+
+    # ── control-column collapse ──────────────────────────────────────────
+    def _collapse_clicked(self):
+        self._ctl_user = True       # a manual choice outranks the width
+        self.set_controls_collapsed(not self._ctl_collapsed)
+
+    def set_controls_collapsed(self, collapsed):
+        collapsed = bool(collapsed)
+        if collapsed == self._ctl_collapsed:
+            return
+        self._ctl_collapsed = collapsed
+        if collapsed:
+            self._ctl.pack_forget()
+        else:
+            self._ctl.pack(side='left', fill='y', padx=(0, GAP), pady=0,
+                           before=self._ctl_rail)
+        self._collapse_btn.configure(text='›' if collapsed else '‹')
+
+    def _auto_collapse(self, e):
+        if self._ctl_user or not self._built or e.widget is not self:
+            return
+        if e.width > 1:
+            self.set_controls_collapsed(e.width < self.COLLAPSE_W)
 
     # ── scene lifecycle ──────────────────────────────────────────────────
     def _ensure_scene(self, init):

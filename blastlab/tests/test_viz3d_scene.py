@@ -123,9 +123,15 @@ scene.layers['loads'].set_visible(True)
 check("plane1 drawn", 'cut_plane1' in pl.actors)
 
 print("\nS3-B19: colour range reaches every layer")
-from blastlab.viz3d.viewer import LOADS_TITLE
-check("loads carry their own scalar bar", LOADS_TITLE in pl.scalar_bars,
+from blastlab.viz3d.viewer import (LOADS_TITLE, LOADS_BAR_KEY,
+                                   LOADS_CAPTION)
+# the bar lies flat along the bottom and is untitled: VTK printed a
+# horizontal bar's title over its own tick labels, so the caption is a
+# separate viewport text actor (QA-17)
+check("loads carry their own scalar bar", LOADS_BAR_KEY in pl.scalar_bars,
       str(list(pl.scalar_bars.keys())))
+check("loads bar is captioned", LOADS_CAPTION in pl.actors
+      and LOADS_TITLE.startswith('Surface loads'))
 load_actor = next(a for n, a in pl.actors.items() if n.startswith('load_'))
 own = tuple(load_actor.mapper.scalar_range)
 scene.set_field('rho')

@@ -223,6 +223,60 @@ p2.show_case(c2p)
 check("planar remap: x label + origin marker",
       ax.get_xlabel() == 'x [m]' and len(ax.patches) == 0)
 
+print("")
+print("P10: layout - collapsible control column + Run-tab sash (QA-17)")
+root.geometry("1280x840")
+root.deiconify()
+for _ in range(3):
+    root.update()
+check("control column is ~200 px", View3DPanel.CTL_W <= 206)
+panel.set_controls_collapsed(True)
+root.update()
+check("controls fold away", panel._ctl.winfo_manager() == "")
+panel.set_controls_collapsed(False)
+root.update()
+check("controls come back", panel._ctl.winfo_manager() == "pack")
+panel._auto_collapse(type("E", (), dict(widget=panel, width=520))())
+check("auto-collapse below 700 px", panel._ctl_collapsed)
+panel._auto_collapse(type("E", (), dict(widget=panel, width=900))())
+check("auto-expand above 700 px", not panel._ctl_collapsed)
+panel._collapse_clicked()
+panel._auto_collapse(type("E", (), dict(widget=panel, width=900))())
+check("a manual toggle outranks the width", panel._ctl_collapsed)
+
+from blastlab.gui.run_panel import RunPanel
+top = tk.Toplevel(root)          # a window of its own: the shared root is
+top.geometry("1280x840")         # already full of the panels above
+rp = RunPanel(top, on_run=lambda: None, on_stop=lambda: None,
+              on_init=lambda: None, on_refresh=lambda: None)
+rp.pack(fill="both", expand=True)
+for _ in range(4):
+    root.update()
+rp._place_sash()
+root.update()
+_w = rp._body.winfo_width()
+_pos = rp._body.sashpos(0)
+check("live/3D pane keeps >= 60 % of the Run tab",
+      _w > 1 and (_w - _pos) >= 0.6 * _w, f"body={_w} sash={_pos}")
+rp._sash_dragged()
+rp._body.sashpos(0, int(_w * 0.7))
+rp._place_sash()
+check("a dragged sash is left alone",
+      abs(rp._body.sashpos(0) - int(_w * 0.7)) <= 4)
+
+from blastlab.gui import theme
+_card = theme.Card(top, title="Refinement zones (blastFoam) [m, level]")
+_card.pack(fill="x")
+for _ in range(3):
+    root.update()
+check("card title wraps instead of clipping",
+      _card.title_label is not None
+      and getattr(_card.title_label, "_wrap_at", 0) > 0,
+      f"wrap_at={getattr(_card.title_label, '_wrap_at', None)}")
+check("card title keeps the full text on hover",
+      _card.title_label._blastlab_tip.text
+      == "Refinement zones (blastFoam) [m, level]")
+
 root.destroy()
 
 print("\n" + "=" * 50)

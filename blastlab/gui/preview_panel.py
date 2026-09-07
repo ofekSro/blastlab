@@ -256,7 +256,7 @@ class Preview2DPanel(ctk.CTkFrame):
         ax.set_aspect('equal')
         ax.set_xlabel('r [m]' if axisym else 'x [m]')
         ax.set_ylabel('y [m]')
-        ax.set_title(f'2D {case.geometry} - solid: wall, dashed: open'
+        ax.set_title(f'2D {case.geometry} · wall: solid, open: dashed'
                      + mesh_note, fontsize=9)
         # grid(False, alpha=...) warns; set the properties only when on
         if show_mesh:
@@ -274,8 +274,9 @@ class Preview2DPanel(ctk.CTkFrame):
             segs = refine.mesh_segments_2d(None, plan.base['x_face'],
                                            plan.base['y_face'],
                                            max_lines=MESH_MAX_LINES)
-            note = (f' | base grid ({plan.n_pred:,} cells) - AMR up to '
-                    f'level {plan.amr} follows the shock')
+            # short enough to fit the preview pane at 1100 px (QA-27):
+            # the cell count is already on the validation strip
+            note = f' | base grid · AMR L{plan.amr} follows the shock'
         elif plan.n_fine > MESH_PREVIEW_MAX:
             segs = refine.mesh_segments_2d(None, plan.base['x_face'],
                                            plan.base['y_face'],

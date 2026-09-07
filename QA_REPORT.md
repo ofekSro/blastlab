@@ -98,7 +98,13 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
   nudged just inside so it cannot silently vanish; the Results 3D viewer now
   carries the whole-run `p_peak` / `impulse` maps, so Peak overpressure and
   Net ovp impulse are selectable instead of greyed while the Fields list
-  offers them.
+  offers them. **T27 (layout):** the sash is parked after layout so the
+  live/3D pane keeps >= 60 % of the Run tab (measured 845 of 1280 px, and
+  62 % at 1100 px); the control column is 200 px, scrolls, and folds away
+  behind a rail button (automatically below 700 px); the HUD font follows
+  the render-window width; the field bar sits at x = 0.855 with short
+  titles and the surface-loads bar lies flat along the bottom with its own
+  caption actor.
 - **QA-18** — `feed_result` measured **2364 ms -> 259 ms**; the Setup 3D
   preview caches its scene and rebuilds only when something visible changed
   (typing a cfl or a file name no longer costs a VTK rebuild); worst observed
@@ -121,7 +127,8 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
 - **QA-24** — a result with no replay frames explains itself on the
   Animation tab (shared with QA-12).
 - **QA-25** — the validation status card is height-capped and scrolls, so a
-  long report no longer squeezes the form above it.
+  long report no longer squeezes the form above it (re-verified in T27,
+  shot `114_C05_setup_amr_card_on_dark`).
 
 ---
 
@@ -143,7 +150,14 @@ The 22-suite no-WSL matrix stays green.
 - **QA-27** — card titles, the replay checkbox and the gauge-table headers
   are short enough to fit; panel figures use constrained layout, so the
   run title no longer overlaps the panel label and tall 3D slice panels
-  keep their x axis.
+  keep their x axis. **T27:** a card title that still does not fit now
+  wraps and keeps its full text as a tooltip; the 2D preview title is
+  short ("2D axisymmetric · wall: solid, open: dashed | base grid · AMR L3
+  follows the shock"); the 3D viewer's Min/Max boxes take a row each (an
+  auto-filled `1.88e+06` read `1.88265e+`); the Run-tab stat chips are
+  packed first so the last one survives at 1100 px, the progress bar takes
+  the slack, and the "(blank = auto)" caption became a hover hint on the
+  Refresh box (which now shows `auto` as its placeholder).
 - **QA-28** — matplotlib's Back/Forward buttons (whose disabled image
   rendered as a dark-mode checkerboard) are dropped from the toolbar.
 - **QA-29 (G9)** — Ctrl+O / Ctrl+S / F5 / Esc are bound; window geometry,

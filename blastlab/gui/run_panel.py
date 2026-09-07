@@ -73,7 +73,9 @@ class RunPanel(ctk.CTkFrame):
             bar, width=220, height=8, corner_radius=4,
             progress_color=c('accent'), fg_color=c('card2'))
         self.progress.set(0.0)
-        self.progress.pack(side='left', padx=(0, GAP))
+        # takes the slack so the readouts on the right keep their width
+        self.progress.pack(side='left', padx=(0, GAP), fill='x',
+                           expand=True)
         # stepped execution used to be visible only as a "[interrupted]"
         # line in the log; say it where the run state is read
         self._paused_lbl = ctk.CTkLabel(bar, text='', font=theme.F_SMALL,
@@ -86,7 +88,10 @@ class RunPanel(ctk.CTkFrame):
         self._valid_lbl.pack(side='left', padx=(0, PAD))
 
         chips = ctk.CTkFrame(bar, fg_color='transparent')
-        chips.pack(side='right')
+        # packed BEFORE the buttons: pack hands out requested widths in
+        # packing order, so the chips used to be the row that lost its
+        # last box at 1100 px (QA-27)
+        chips.pack(side='right', before=self.run_btn)
         self._chip_step = _chip(chips, 'step')
         self._chip_t = _chip(chips, 't [ms]')
         self._chip_dt = _chip(chips, 'dt [s]')
@@ -109,7 +114,7 @@ class RunPanel(ctk.CTkFrame):
 
         def exec_btn(text, cmd, image=None, pad=(0, 4)):
             b = theme.Button(
-                ebar, text=text, image=image, compound='left', width=78,
+                ebar, text=text, image=image, compound='left', width=72,
                 height=32, font=theme.F_BODY, corner_radius=theme.RADIUS,
                 fg_color=c('card2'), hover_color=c('border'),
                 text_color=c('text'), state='disabled', command=cmd)
@@ -125,8 +130,6 @@ class RunPanel(ctk.CTkFrame):
 
         # live-view refresh rate (2D slice + 3D view); blank = automatic
         on_refresh = on_refresh or (lambda: None)
-        ctk.CTkLabel(ebar, text='(blank = auto)', font=theme.F_SMALL,
-                     text_color=c('muted')).pack(side='right')
         self.refresh_mode = ctk.CTkComboBox(
             ebar, state='readonly', width=104, height=32,
             values=('seconds', 'steps'), font=theme.F_BODY,
@@ -139,11 +142,16 @@ class RunPanel(ctk.CTkFrame):
         self.refresh_val = tk.StringVar(value='')
         ent = ctk.CTkEntry(ebar, textvariable=self.refresh_val, width=64,
                            height=32, font=theme.F_BODY, corner_radius=8,
+                           placeholder_text='auto',
                            fg_color=c('entry'), border_color=c('border'))
         ent.pack(side='right')
         ent.bind('<Return>', lambda e: on_refresh())
         ent.bind('<FocusOut>', lambda e: on_refresh())
         self._refresh_entry = ent
+        # the "(blank = auto)" caption cost 73 px of a row that does not
+        # fit at 1100 px - it is a hover hint now (QA-27)
+        theme.tooltip(ent, 'How often the live view redraws; '
+                           'leave blank for automatic.')
         ctk.CTkLabel(ebar, text='Refresh every', font=theme.F_BODY,
                      text_color=c('muted')).pack(side='right',
                                                  padx=(0, GAP))
@@ -154,7 +162,9 @@ class RunPanel(ctk.CTkFrame):
 
         logcard = Card(body, title='Log', pad=12)
         self.log = ctk.CTkTextbox(
-            logcard.body, state='disabled', wrap='word', width=380,
+            # requested width kept small: ttk clamps the sash to the panes'
+            # requested sizes, so a wide box pinned the log pane open
+            logcard.body, state='disabled', wrap='word', width=280,
             font=theme.F_MONO, corner_radius=8, fg_color=c('entry'),
             text_color=c('text'), border_width=0,
             scrollbar_button_color=c('card2'),
@@ -201,6 +211,15 @@ class RunPanel(ctk.CTkFrame):
         slice_tab.tkraise()
         body.add(right, weight=3)
 
+        # ttk pane weights only share out EXTRA space, so the sash opened
+        # where the log's requested width put it and the embedded 3D view
+        # was ~330 px wide with a clipped HUD (QA-17). Park the sash after
+        # the first real layout, and stop once the user drags it.
+        self._body = body
+        self._sash_user = False
+        body.bind('<Configure>', self._place_sash, add='+')
+        body.bind('<ButtonRelease-1>', self._sash_dragged, add='+')
+
         self._mesh = None
         self._line = None
         self._solid = None
@@ -211,6 +230,30 @@ class RunPanel(ctk.CTkFrame):
         self._amr_run = 0           # consecutive AMR log lines collapsed
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
+
+    # ── body sash ────────────────────────────────────────────────────────
+    #: share of the Run-tab width given to the log; the live/3D pane keeps
+    #: the rest (>= 60 %, the QA-17 target)
+    LOG_FRAC = 0.34
+    LOG_MIN = 240
+    VIEW_MIN = 420
+
+    def _sash_dragged(self, _e=None):
+        self._sash_user = True
+
+    def _place_sash(self, _e=None):
+        if self._sash_user:
+            return
+        w = self._body.winfo_width()
+        if w <= 1:
+            return
+        want = max(self.LOG_MIN, min(int(w * self.LOG_FRAC),
+                                     w - self.VIEW_MIN))
+        try:
+            if abs(self._body.sashpos(0) - want) > 4:
+                self._body.sashpos(0, want)
+        except tk.TclError:
+            pass
 
     # ── live-view sub-tab switching ──────────────────────────────────────
     def _view_selected(self, value):

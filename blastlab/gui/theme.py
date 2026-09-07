@@ -85,6 +85,110 @@ class Slider(_Compat, ctk.CTkSlider):
     pass
 
 
+# ── tooltips ─────────────────────────────────────────────────────────────
+class Tooltip:
+    """Hover help for any Tk/CTk widget.
+
+    Text that no longer fits (a wrapped card title, an abbreviated table
+    header, a disabled control that has to explain itself) stays
+    reachable here instead of being silently clipped. The popup is
+    created lazily and every step is exception-guarded, so a tooltip can
+    never take the app down (QA-27).
+    """
+
+    DELAY = 450     # ms of hover before the tip shows
+
+    def __init__(self, widget, text, delay=None):
+        self.widget = widget
+        self.text = text
+        self.delay = self.DELAY if delay is None else delay
+        self._after = None
+        self._tip = None
+        widget.bind('<Enter>', self._schedule, add='+')
+        widget.bind('<Leave>', self._hide, add='+')
+        widget.bind('<ButtonPress>', self._hide, add='+')
+
+    def set_text(self, text):
+        self.text = text
+        if self._tip is not None:
+            self._hide()
+
+    def _schedule(self, _e=None):
+        self._unschedule()
+        if self.text:
+            self._after = self.widget.after(self.delay, self._show)
+
+    def _unschedule(self):
+        if self._after is not None:
+            try:
+                self.widget.after_cancel(self._after)
+            except Exception:
+                pass
+            self._after = None
+
+    def _show(self):
+        self._after = None
+        if self._tip is not None or not self.text:
+            return
+        try:
+            x = self.widget.winfo_rootx() + 12
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+            tip = ctk.CTkToplevel(self.widget)
+            tip.wm_overrideredirect(True)
+            tip.wm_geometry(f'+{x}+{y}')
+            tip.attributes('-topmost', True)
+            ctk.CTkLabel(tip, text=self.text, font=F_SMALL, justify='left',
+                         anchor='w', wraplength=320, corner_radius=6,
+                         fg_color=c('card2'),
+                         text_color=c('text')).pack(padx=8, pady=5)
+            self._tip = tip
+        except Exception:
+            self._tip = None
+
+    def _hide(self, _e=None):
+        self._unschedule()
+        if self._tip is not None:
+            try:
+                self._tip.destroy()
+            except Exception:
+                pass
+            self._tip = None
+
+
+def tooltip(widget, text, delay=None):
+    """Attach (or update) a Tooltip on `widget`; returns it."""
+    tip = getattr(widget, '_blastlab_tip', None)
+    if tip is None:
+        tip = Tooltip(widget, text, delay)
+        try:
+            widget._blastlab_tip = tip
+        except Exception:
+            pass
+    else:
+        tip.set_text(text)
+    return tip
+
+
+def wrap_to_width(label, minimum=60):
+    """Let a CTkLabel wrap at its own width instead of clipping.
+
+    CTk labels do not re-wrap on resize, so a long card title used to be
+    cut off mid-word; re-set `wraplength` whenever the width really
+    changed (guarded, or configure() would re-fire <Configure> forever).
+    """
+    def _on_configure(e, w=label):
+        want = max(minimum, e.width - 4)
+        if abs(getattr(w, '_wrap_at', -1) - want) < 4:
+            return
+        w._wrap_at = want
+        try:
+            w.configure(wraplength=want)
+        except Exception:
+            pass
+    label.bind('<Configure>', _on_configure, add='+')
+    return label
+
+
 # ── Card container ───────────────────────────────────────────────────────
 class Card(ctk.CTkFrame):
     """Rounded panel with a subtle border and optional title. Children
@@ -96,10 +200,17 @@ class Card(ctk.CTkFrame):
         kw.setdefault('border_width', 1)
         kw.setdefault('border_color', c('border'))
         super().__init__(parent, **kw)
+        self.title_label = None
         if title:
-            ctk.CTkLabel(self, text=title, font=F_H2, anchor='w',
-                         text_color=c('text')).pack(
-                fill='x', padx=pad, pady=(12, 2))
+            # a narrow card used to clip its title mid-word ("Refinement
+            # zones (blastFoam) [m, l"): wrap instead, and keep the full
+            # text one hover away (QA-27)
+            lbl = ctk.CTkLabel(self, text=title, font=F_H2, anchor='w',
+                               justify='left', text_color=c('text'))
+            lbl.pack(fill='x', padx=pad, pady=(12, 2))
+            wrap_to_width(lbl)
+            tooltip(lbl, title)
+            self.title_label = lbl
         self.body = ctk.CTkFrame(self, fg_color='transparent')
         self.body.pack(fill='both', expand=True, padx=pad,
                        pady=((4 if title else 12), 12))

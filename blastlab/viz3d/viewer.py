@@ -593,6 +593,25 @@ class BlastScene(_CameraOps):
         if self.done and self.stop_reason:
             s += f'\nrun ended: {self.stop_reason}   (space = play/pause)'
         _set_text(self.hud, s)
+        self._scale_hud()
+
+    def _scale_hud(self):
+        """Size the HUD to the render window: an 11 pt overlay on a
+        330 px embedded viewport ran off the right edge ("run ended: ..."
+        clipped, QA-17/27). Re-applied per frame - the Tk host resizes
+        the off-screen window whenever the pane moves."""
+        try:
+            w = int(self.pl.window_size[0])
+        except Exception:
+            return
+        size = int(max(7, min(14, round(w / 64.0))))
+        if size == getattr(self, '_hud_size', None):
+            return
+        self._hud_size = size
+        try:
+            self.hud.GetTextProperty().SetFontSize(size)
+        except Exception:
+            pass
 
     def tick(self, *_):
         """Render-timer callback: playback stepping."""
@@ -743,8 +762,12 @@ class _CutPlane(_Layer):
                 scalar_bar_args=dict(title=title, color='white',
                                      fmt='%.0f' if FIELDS[s.field]['ovp']
                                      else '%.3g', vertical=True,
-                                     position_x=0.90, position_y=0.25,
-                                     width=0.05, height=0.55),
+                                     # far enough from the right edge that
+                                     # the (centred) title still fits on a
+                                     # narrow embedded viewport (QA-17)
+                                     position_x=0.82, position_y=0.30,
+                                     width=0.06, height=0.52,
+                                     title_font_size=11, label_font_size=10),
                 reset_camera=False, render=False)
             self._scalars = scal
         else:
@@ -883,6 +906,11 @@ class _Isosurface(_Layer):
 
 
 LOADS_TITLE = 'Surface loads [kPa]'
+#: the loads bar lies flat along the bottom edge; VTK prints a horizontal
+#: bar's title straight over its tick labels, so the bar itself is
+#: untitled and the caption is drawn as its own viewport text (QA-17)
+LOADS_BAR_KEY = ' '
+LOADS_CAPTION = 'loads_caption'
 
 
 class _SurfaceLoads(_Layer):
@@ -959,7 +987,11 @@ class _SurfaceLoads(_Layer):
         for fid in self.meshes:
             s.pl.remove_actor(f'load_{fid}')
         try:
-            s.pl.remove_scalar_bar(LOADS_TITLE, render=False)
+            s.pl.remove_scalar_bar(LOADS_BAR_KEY, render=False)
+        except Exception:
+            pass
+        try:
+            s.pl.remove_actor(LOADS_CAPTION, render=False)
         except Exception:
             pass
         self._bar_actor = None
@@ -984,10 +1016,14 @@ class _SurfaceLoads(_Layer):
                           nan_color='#4a4f57', show_scalar_bar=first_bar,
                           reset_camera=False, render=False)
                 if first_bar:
+                    # horizontal, along the bottom: two vertical bars at
+                    # the right edge crowded a narrow embedded viewport
+                    # and the lower one lost its labels (QA-17)
                     kw['scalar_bar_args'] = dict(
-                        title=LOADS_TITLE, color='white', fmt='%.0f',
-                        vertical=True, position_x=0.90, position_y=0.02,
-                        width=0.05, height=0.18)
+                        title=LOADS_BAR_KEY, color='white', fmt='%.0f',
+                        vertical=False, position_x=0.28, position_y=0.02,
+                        width=0.44, height=0.10, n_labels=4,
+                        title_font_size=1, label_font_size=9)
                 if s.init.get('cyl'):
                     # cylindrical domain: cells beyond the outer radius
                     # are no-data - hide them so the ground is a disc
@@ -995,6 +1031,9 @@ class _SurfaceLoads(_Layer):
                 actor = s.pl.add_mesh(mesh, **kw)
                 if first_bar:
                     self._bar_actor = actor
+                    s.pl.add_text(LOADS_TITLE, position=(0.395, 0.10),
+                                  viewport=True, font_size=6,
+                                  color='white', name=LOADS_CAPTION)
             else:
                 s.pl.actors[name].mapper.scalar_range = clim
 
