@@ -98,7 +98,7 @@ Hard rules:
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [x] 2026-09-07 |
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [x] 2026-09-07 |
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [x] 2026-09-07 |
-| T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
+| T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [x] 2026-09-07 |
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [x] 2026-09-07 |
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
@@ -611,6 +611,33 @@ Verify: the full no-WSL matrix (§8) + harness --smoke; then harness --scenario
 Done when: green; README updated; a short "Solver mode" paragraph in blastlab/README.md.
 Commit: "T34: global solver mode - sidebar selector, solver-specific layout"
 ```
+
+**DONE (2026-09-07):** targeted refactor, not a rewrite. New `gui/mode.py` (`SolverMode`
+observable, no Tk) seeded from `settings.json` (`solver`, fresh default `blastfoam`) before
+the panels are built; sidebar block (segment + explainer + live WSL status) above Dark mode;
+`CaseForm` registers rows/cards per scope and `_apply_mode()` grid_removes the other
+solver's (EOS / 3D Charge resolution are native-only; Material, Detonation, Afterburn,
+Charge refinement, MPI ranks, the AMR / Refinement zones / Extra charges / Detonation
+points cards are blastFoam-only; AMR coefficient rows only while levels > 0, the
+charge-refinement row hidden while AMR is on); the Solver combo and every value coercion
+are gone - `get_case()` strips hidden fields to that solver's defaults and never parses
+them, Tk vars keep the typed values. `SetupPanel.set_case` adopts the case's solver as
+the app mode (Open case). Chain: per-stage native|blastFoam switch above each stage
+form, preset from the global mode (`set_stage_solver` / `set_stage_case`). Results hides
+"Foam runs…" and VTK in native mode. `theme.segmented()` replaces the five inline
+segmented-button copies. `validate_case` notes the ignored EOS only when it is not the
+default. Tests: new `test_gui_solver_mode.py` (31 checks); `test_gui_amr_form`,
+`test_gui_refine_preview`, `test_gui_drain` moved to `winfo_manager()` asserts; harness
+gained `qa.solver()` + `--solver` and C05/C06/C07/G01/`_chain_forms` drive the new API.
+Verified: full no-WSL matrix green incl. test_regression byte-identical and
+test_blast2d/3d; `_e2e_gui_foam` (WSL) green, no orphans; harness `--smoke`, then
+B01,B02,B03,C05,C06,C07,C09,C10,E03,G01 starting in blastFoam mode and
+B01,B03,B05,B07,C05,C07,G01 with `--solver native` (dark + light, 1280x840 + 1100x720):
+no tk-exception, no ui error; the only findings (C10 "Local refinement" strip text for the
+level-capped 10 m zone case, E03 export-file checks) are present unchanged in the
+2026-09-07 01:08 and 09:54 runs, i.e. pre-existing and unrelated. Out of scope, left as
+found: untracked `test_gui_results_anim.py` / `_e2e_gui_native_warn.py` from earlier
+sessions.
 
 ### T35 — `test_foam_parallel` determinism check (B23) — owner decided
 

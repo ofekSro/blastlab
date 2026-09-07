@@ -197,14 +197,8 @@ class RunPanel(ctk.CTkFrame):
         right = Card(body, pad=12)
         vbar = ctk.CTkFrame(right.body, fg_color='transparent')
         vbar.pack(fill='x', pady=(0, GAP))
-        self._view_seg = ctk.CTkSegmentedButton(
-            vbar, values=['Live slice', '3D view'],
-            font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('seg'),
-            unselected_hover_color=c('border'),
-            selected_color=c('accent'),
-            selected_hover_color=c('accent_hover'),
-            command=self._view_selected)
+        self._view_seg = theme.segmented(
+            vbar, ['Live slice', '3D view'], command=self._view_selected)
         self._view_seg.pack(side='left')
         # cell edges over the live slice (true cells of a refined run)
         self.show_mesh_var = tk.BooleanVar(value=False)

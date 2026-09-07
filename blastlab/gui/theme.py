@@ -216,6 +216,23 @@ class Card(ctk.CTkFrame):
                        pady=((4 if title else 12), 12))
 
 
+def segmented(parent, values, command=None, height=32, font=None, **kw):
+    """A CTkSegmentedButton in the app's palette.
+
+    Five panels used to build theirs inline with the same eight options
+    (and had drifted apart); keyword overrides still win."""
+    kw.setdefault('font', font or F_BODY)
+    kw.setdefault('corner_radius', RADIUS)
+    kw.setdefault('height', height)
+    kw.setdefault('fg_color', c('card2'))
+    kw.setdefault('unselected_color', c('seg'))
+    kw.setdefault('unselected_hover_color', c('border'))
+    kw.setdefault('selected_color', c('accent'))
+    kw.setdefault('selected_hover_color', c('accent_hover'))
+    return ctk.CTkSegmentedButton(parent, values=list(values),
+                                  command=command, **kw)
+
+
 # ── icons (drawn with PIL, no asset files) ───────────────────────────────
 _ICON_CACHE = {}
 

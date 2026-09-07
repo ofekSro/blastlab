@@ -121,14 +121,9 @@ class View3DPanel(VtkTkHost):
                 button_color=c('accent'),
                 button_hover_color=c('accent_hover'), command=command)
 
-        self._tab_seg = ctk.CTkSegmentedButton(
-            ctl, values=['Display', 'Planes', 'View'],
-            font=theme.F_SMALL, corner_radius=theme.RADIUS, height=28,
-            fg_color=c('card2'), unselected_color=c('seg'),
-            unselected_hover_color=c('border'),
-            selected_color=c('accent'),
-            selected_hover_color=c('accent_hover'),
-            command=self._tab_selected)
+        self._tab_seg = theme.segmented(
+            ctl, ['Display', 'Planes', 'View'], command=self._tab_selected,
+            height=28, font=theme.F_SMALL)
         self._tab_seg.pack(fill='x')
         stack = ctk.CTkFrame(ctl, fg_color='transparent')
         stack.pack(fill='both', expand=True, pady=(GAP, 0))

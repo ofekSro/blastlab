@@ -102,15 +102,26 @@ def main():
           and all(isinstance(z[-1], int) for z in got.refine_zones),
           str(got.refine_zones))
     check("charge_refine round-trip ('zone')", got.charge_refine == 'zone')
-    check('combo enabled for blastfoam',
-          form._cref_combo.cget('state') == 'readonly',
-          str(form._cref_combo.cget('state')))
-    form.v['solver'].set('native')
+    check('charge-refinement row shown for blastfoam',
+          form._cref_combo.winfo_manager() == 'grid',
+          repr(form._cref_combo.winfo_manager()))
+    form.set_mode('native')
     root.update()
-    check("native resets charge_refine to 'global' and disables the combo",
-          form.v['charge_refine'].get() == 'global'
-          and form._cref_combo.cget('state') == 'disabled',
-          f"{form.v['charge_refine'].get()} {form._cref_combo.cget('state')}")
+    got_n = form.get_case()
+    check("native mode keeps 'zone' in the form, hides the row and the "
+          "zones card, and strips both from the case",
+          form.v['charge_refine'].get() == 'zone'
+          and form._cref_combo.winfo_manager() == ''
+          and form._zones_card.winfo_manager() == ''
+          and got_n.charge_refine == 'global' and got_n.refine_zones == []
+          and got_n.solver == 'native',
+          f"{form.v['charge_refine'].get()} {form._cref_combo.winfo_manager()!r} "
+          f"{got_n.charge_refine} {got_n.refine_zones}")
+    form.set_mode('blastfoam')
+    root.update()
+    check('back to blastfoam: the zones return',
+          form.get_case().refine_zones == c3.refine_zones
+          and form._zones_card.winfo_manager() == 'grid')
     form2 = CaseForm(root, 2)
     c2 = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.5,
                 charge=1.0, center=(1.0, 1.0), solver='blastfoam')

@@ -511,6 +511,13 @@ class QA:
         self.pump(settle)
         self.action = ''
 
+    def solver(self, mode, settle=1.2):
+        """The sidebar solver mode (T34) - the same path a click takes."""
+        self.action = f'solver {mode}'
+        self.app.set_solver(mode)
+        self.pump(settle)
+        self.action = ''
+
     def add_row(self, plist, text):
         plist.entry_var.set(text)
         plist._add()
@@ -1118,22 +1125,38 @@ def c04_point_lists(qa):
 
 @scenario('C05', 'C', est=40)
 def c05_native_vs_foam(qa):
-    """Numerics / AMR cards greyed for native, enabled for blastFoam."""
-    _fresh2d(qa)
+    """blastFoam-only cards hidden for native, shown for blastFoam."""
+    _fresh2d(qa)                      # a native case -> native mode
+    form = qa.app.setup.form
+    qa.check(form._amr_card.winfo_manager() == ''
+             and form._zones_card.winfo_manager() == ''
+             and form._eos_combo.winfo_manager() == 'grid',
+             'native mode: AMR / zones cards hidden, EOS row shown', 'S2')
     qa.shot('numerics_native')
-    qa.field('solver', 'blastfoam', settle=1.2)
+    qa.solver('blastfoam')
+    qa.check(form._amr_card.winfo_manager() == 'grid'
+             and form._zones_card.winfo_manager() == 'grid'
+             and form._eos_combo.winfo_manager() == '',
+             'blastFoam mode: AMR / zones cards shown, EOS row hidden', 'S2')
     qa.shot('numerics_foam')
     qa.note('foam strip: ' + ' | '.join(qa.strip_text()))
     qa.field('material', 'C4')
     qa.field('amr_levels', '2', settle=1.0)
     qa.scroll_form(0.35)
     qa.shot('amr_card_on')
-    qa.field('solver', 'native', settle=1.2)
+    qa.solver('native')
     qa.shot('back_to_native')
-    form = qa.app.setup.form
+    # T34: values are kept, not coerced; the case is stripped instead
+    got = qa.app.setup.get_case()
+    qa.check(form.v['material'].get() == 'C4'
+             and form.v['amr_levels'].get() == '2'
+             and got.material == 'TNT' and got.amr_levels == 0,
+             'native keeps the typed foam values in the form and strips '
+             'them from the case', 'S2')
     qa.note(f'after native: material={form.v["material"].get()} '
             f'amr_levels={form.v["amr_levels"].get()} '
-            f'charge_refine={form.v["charge_refine"].get()}')
+            f'charge_refine={form.v["charge_refine"].get()} '
+            f'(case: {got.material}, {got.amr_levels})')
     qa.scroll_form(0.0)
     _fresh2d(qa)
 
@@ -1146,10 +1169,13 @@ def c06_zones(qa):
                        charge=20.0, center=(1.0, 1.0)))
     form = qa.app.setup.form
     qa.scroll_form(0.5)
+    # the zones card is hidden in native mode (the row still lands in
+    # its list) and the case is stripped, so the strip shows no zone error
     qa.add_row(form.zones, '0.5 1.5 0.5 1.5 1')
     qa.shot('zone_on_native')
-    qa.note('zone on native: ' + ' | '.join(qa.strip_text()))
-    qa.field('solver', 'blastfoam', settle=1.2)
+    qa.note('zone on native (card hidden, case stripped): '
+            + ' | '.join(qa.strip_text()))
+    qa.solver('blastfoam')
     qa.shot('zone_on_foam')
     qa.note('zone on foam: ' + ' | '.join(qa.strip_text()))
     _set_rows(qa, form.zones, [(0.5, 1.5, 0.5, 1.5, 7)])
@@ -1186,15 +1212,16 @@ def c07_amr_rules(qa):
     qa.scroll_form(0.35)
     qa.field('amr_levels', '2', settle=1.0)
     qa.note(f'AMR on native: amr_levels field now '
-            f'{form.v["amr_levels"].get()!r} (form forces 0?) strip: '
+            f'{form.v["amr_levels"].get()!r} (kept in the hidden card, '
+            f'stripped from the case) strip: '
             + ' | '.join(qa.strip_text()))
     qa.shot('amr_native')
-    qa.field('solver', 'blastfoam', settle=1.2)
+    qa.solver('blastfoam')
     qa.field('amr_levels', '3', settle=1.0)
     qa.shot('amr_valid')
     qa.note('valid AMR case: ' + ' | '.join(qa.strip_text()))
-    qa.check(form._cref_combo.cget('state') == 'disabled',
-             'charge-refinement combo disabled while AMR is on', 'S3')
+    qa.check(form._cref_combo.winfo_manager() == '',
+             'charge-refinement row hidden while AMR is on', 'S3')
     _set_rows(qa, form.zones, [(1.5, 2.5, 1.5, 2.5, 1)])
     qa.shot('amr_plus_zones')
     qa.note('AMR + zones: ' + ' | '.join(qa.strip_text()))
@@ -1896,15 +1923,16 @@ def _chain_forms(qa, planar2d=False, foam2d=False):
     ch = qa.app.chain
     # 1D radius < 2D half-size and 2D size < 3D half-size so each
     # profile fits inside the next stage's domain
-    ch.forms[1].set_case(Case1D(radius_m=0.6, charge_kg=1.0,
+    # set_stage_case adopts each case's solver as the stage's override
+    ch.set_stage_case(1, Case1D(radius_m=0.6, charge_kg=1.0,
                                 cell_size_m=0.002, gauge_radii=[0.4],
                                 n_snapshots=2))
-    ch.forms[2].set_case(Case2D(
+    ch.set_stage_case(2, Case2D(
         geometry='planar' if planar2d else 'axisymmetric', Lx=2.0, Ly=2.0,
         cell_size_m=0.02, charge=1.0, center=(0.0, 1.0), gauges=[(0.8, 1.0)],
         n_snapshots=2, record_frames=30,
         solver='blastfoam' if foam2d else 'native'))
-    ch.forms[3].set_case(Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1,
+    ch.set_stage_case(3, Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1,
                                 charge=1.0, center=(2.0, 2.0, 1.0),
                                 gauges=[(3.2, 2.0, 1.0)], n_snapshots=2,
                                 record_frames=30))
@@ -1938,7 +1966,7 @@ def g01_chain_validation(qa):
     ch._run()
     qa.pump(0.3)
     ch.forms[2].v['geometry'].set('axisymmetric')
-    ch.forms[2].v['solver'].set('blastfoam')
+    ch.set_stage_solver(2, 'blastfoam')        # per-stage override (T34)
     qa.pump(0.3)
     ch._run()
     qa.pump(0.3)
@@ -1951,7 +1979,7 @@ def g01_chain_validation(qa):
                  for t in texts),
              'foam 2D stage fed by 1D -> N7 refusal dialog (uncommitted '
              'stage_errors)', 'S1', evidence=str(texts[-1:]))
-    ch.forms[2].v['solver'].set('native')
+    ch.set_stage_solver(2, 'native')
     ch.forms[2].v['Lx'].set('abc')
     qa.pump(0.3)
     ch._run()
@@ -2828,6 +2856,10 @@ def main():
     ap.add_argument('--budget', type=float, default=540)
     ap.add_argument('--smoke', action='store_true')
     ap.add_argument('--list', action='store_true')
+    ap.add_argument('--solver', default='',
+                    help="seed the sidebar solver mode the app starts in "
+                         "('native' | 'blastfoam'; T34) in the scratch "
+                         "settings file")
     args = ap.parse_args()
 
     if args.out:
@@ -2844,6 +2876,12 @@ def main():
     if not os.path.exists(settings):
         with open(settings, 'w', encoding='utf-8') as f:
             json.dump(dict(auto_cleanup=False), f)
+    if args.solver:
+        with open(settings, encoding='utf-8') as f:
+            st = json.load(f)
+        st['solver'] = args.solver
+        with open(settings, 'w', encoding='utf-8') as f:
+            json.dump(st, f)
     os.environ['BLASTLAB_SETTINGS'] = settings
     os.environ['MPLBACKEND'] = 'TkAgg'
     cwd = os.path.join(out, 'cwd')

@@ -44,6 +44,27 @@ the picture really moves every N solver steps), **Results** (snapshot
 browser, gauge histories, animation replay, exports), **Chain**
 (auto-wired 1D → 2D → 3D remap workflow into a workspace folder).
 
+## Solver mode
+
+The solver is chosen once, for the whole app, with the **native |
+blastFoam** switch in the sidebar (directly above Dark mode); a short
+explainer and, in blastFoam mode, the WSL availability sit under it.
+Every tab lays itself out for the chosen solver: controls that do not
+apply are hidden, not greyed. In native mode that is the Material,
+Detonation, Afterburn, Charge refinement and MPI rows and the Dynamic
+refinement (AMR), Refinement zones, Extra charges and Detonation points
+cards; in blastFoam mode the EOS and (3D) Charge resolution rows.
+Switching never loses input - hidden values stay in the form and come
+back when you switch back - but the case you run or save carries only
+what is visible (hidden fields get that solver's defaults). Open case
+adopts the case file's solver; the mode is remembered in
+`settings.json`. The Chain tab presets every stage from the sidebar
+mode and lets you override it per stage with the switch above the
+stage form (a blastFoam 1D stage feeding native 2D/3D stages works
+today; blastFoam stages fed by a profile wait for N7). In native mode
+the Results tab hides the blastFoam-only **Foam runs…** browser and
+**VTK** export.
+
 ## Interactive 3D viewer
 
 3D runs get a live 3D view (VTK/OpenGL via **pyvista**, an optional
@@ -133,7 +154,8 @@ refined run can be reloaded post-mortem. E2E drivers:
 
 ## Dynamic mesh refinement (blastFoam AMR)
 
-With **AMR levels** > 0 (Numerics card "Dynamic refinement (blastFoam)")
+With **AMR levels** > 0 (the "Dynamic refinement (AMR)" card, shown in
+blastFoam mode)
 the case writer emits an `adaptiveFvMesh` dictionary and blastFoam refines
 the mesh around the shock as it moves and unrefines behind it. The base cell
 is the case cell size untouched; the charge is refined at t = 0 by

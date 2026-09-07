@@ -1,8 +1,9 @@
 """Dynamic AMR in the GUI (ROADMAP N16, T22) - headless Tk, no WSL.
 
-The "Dynamic refinement (blastFoam)" card round-trips every amr_* case
-field, greys out for the native solver, and excludes the static charge
-'zone' mode while AMR is on; the validation cell line reports the AMR
+The "Dynamic refinement (AMR)" card round-trips every amr_* case
+field, is hidden for the native solver mode (T34: hidden, not greyed;
+the values stay in the form), and hides the static charge 'zone' row
+while AMR is on; the validation cell line reports the AMR
 levels; the run-panel live overlay and the Results replay / animation
 export follow the per-frame level maps an AMR run records;
 plots.mesh_for(levels=) draws one frame's mesh.
@@ -98,11 +99,12 @@ def main():
                got.amr_display_level)))
     check('the AMR case validates through the form',
           not validate_case(got).errors, str(validate_case(got).errors))
-    check('AMR on: coefficients enabled, charge-refinement combo disabled',
-          all(w.cget('state') == 'normal' for w in form._amr_entries)
-          and form._amr_est_combo.cget('state') == 'readonly'
-          and form._cref_combo.cget('state') == 'disabled',
-          f"{[w.cget('state') for w in form._amr_entries]} {form._cref_combo.cget('state')}")
+    check('AMR on: coefficient rows shown, charge-refinement row hidden',
+          all(w.winfo_manager() == 'grid' for w in form._amr_entries)
+          and form._amr_est_combo.winfo_manager() == 'grid'
+          and form._cref_combo.winfo_manager() == '',
+          f"{[w.winfo_manager() for w in form._amr_entries]} "
+          f"{form._cref_combo.winfo_manager()!r}")
     c.amr_display_level = None
     form.set_case(c)
     root.update()
@@ -111,21 +113,35 @@ def main():
           and form.get_case().amr_display_level is None)
     form.v['charge_refine'].set('zone')
     root.update()
-    check("AMR on resets a 'zone' charge mode to 'global'",
-          form.v['charge_refine'].get() == 'global', form.v['charge_refine'].get())
+    check("AMR on: a 'zone' charge mode stays in the form but the case "
+          "says 'global'",
+          form.v['charge_refine'].get() == 'zone'
+          and form.get_case().charge_refine == 'global',
+          f"{form.v['charge_refine'].get()} {form.get_case().charge_refine}")
     form.v['amr_levels'].set('0')
     root.update()
-    check('AMR off: coefficients disabled, charge combo back to readonly',
-          all(w.cget('state') == 'disabled' for w in form._amr_entries)
-          and form._amr_disp_combo.cget('state') == 'disabled'
-          and form._cref_combo.cget('state') == 'readonly'
-          and form.get_case().amr_levels == 0)
+    check('AMR off: coefficient rows hidden, charge-refinement row back '
+          "with its 'zone' value",
+          all(w.winfo_manager() == '' for w in form._amr_entries)
+          and form._amr_disp_combo.winfo_manager() == ''
+          and form._cref_combo.winfo_manager() == 'grid'
+          and form.get_case().amr_levels == 0
+          and form.get_case().charge_refine == 'zone')
     form.v['amr_levels'].set('2')
-    form.v['solver'].set('native')
+    form.set_mode('native')
     root.update()
-    check('native solver: AMR forced off and its combo disabled',
-          form.v['amr_levels'].get() == '0'
-          and form._amr_levels_combo.cget('state') == 'disabled')
+    check('native mode: AMR card hidden, level kept in the form, case '
+          'says 0',
+          form.v['amr_levels'].get() == '2'
+          and form._amr_card.winfo_manager() == ''
+          and form.get_case().amr_levels == 0
+          and form.get_case().solver == 'native',
+          f"{form.v['amr_levels'].get()} {form._amr_card.winfo_manager()!r}")
+    form.set_mode('blastfoam')
+    root.update()
+    check('back to blastFoam: the AMR card and its level return',
+          form._amr_card.winfo_manager() == 'grid'
+          and form.get_case().amr_levels == 2)
     form3 = CaseForm(root, 3)
     c3 = Case3D(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=8.0,
                 center=(1.0, 1.0, 1.0), solver='blastfoam', amr_levels=3,

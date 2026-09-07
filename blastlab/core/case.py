@@ -307,8 +307,11 @@ def _validate_solver(case, rep):
     if getattr(case, 'charge_resolution', 'resolve') == 'smear':
         note("Charge resolution 'smear' is ignored by the blastFoam "
              "backend (the grid is refined to resolve the charge)")
-    note("EOS setting is ignored by blastFoam (material JWL products "
-         "+ ideal-gas air)")
+    if getattr(case, 'eos', 'idealGas') != 'idealGas':
+        # only worth saying when someone actually picked a non-default
+        # EOS (the GUI hides the row in blastFoam mode, T34)
+        note("EOS setting is ignored by blastFoam (material JWL products "
+             "+ ideal-gas air)")
     activation = getattr(case, 'activation', 'linear')
     if activation not in ('linear', 'none'):
         err(f"Unknown activation model '{activation}' "

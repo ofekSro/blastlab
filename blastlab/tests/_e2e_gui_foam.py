@@ -79,6 +79,10 @@ def main():
                       'charges', 'det_points') if hasattr(case, f))
         check(f'{dim}D form round-trips new fields', same,
               f'{vars(back)}')
+    # T34: the case's solver became the app-level mode
+    check('a blastFoam case switches the sidebar solver mode',
+          app.solver == 'blastfoam' and app._solver_seg.get() == 'blastFoam',
+          f'{app.solver} {app._solver_seg.get()}')
 
     # validation strip for the 3D foam case: no errors
     from blastlab.core.case import validate_case

@@ -46,12 +46,36 @@ class ResultEntry:
         self.result = result
 
 
+def _set_solver_mode(panel, m):
+    """ResultsPanel.set_solver_mode body (kept module-level so the
+    class below stays readable): show the blastFoam-only launchers in
+    blastFoam mode, hide them in native mode. Per-result gating of the
+    VTK button (`_sync_export_buttons`) is unchanged - configuring a
+    hidden button is harmless. Post-mortem loads still work in native
+    mode; only the launcher button is out of the way."""
+    foam = (m == 'blastfoam')
+    panel._solver_mode = m
+    vtk = panel._export_btns['vtk']
+    if foam:
+        if panel._foam_runs_btn.winfo_manager() != 'pack':
+            panel._foam_runs_btn.pack(side='left')
+        if vtk.winfo_manager() != 'pack':
+            vtk.pack(side='left', padx=(0, GAP),
+                     after=panel._export_btns['gif'])
+    else:
+        panel._foam_runs_btn.pack_forget()
+        vtk.pack_forget()
+
+
 class ResultsPanel(ctk.CTkFrame):
-    def __init__(self, parent, log_fn=print):
+    def __init__(self, parent, log_fn=print, mode=None):
         super().__init__(parent, fg_color='transparent')
         self._entries = []
         self._log = log_fn
         self._anim_job = None
+        # T34: blastFoam-only launchers ("Foam runs…", VTK) are hidden in
+        # native mode; a standalone panel (tests) shows everything
+        self._solver_mode = 'blastfoam'
 
         head = ctk.CTkFrame(self, fg_color='transparent')
         head.pack(fill='x', pady=(0, PAD - 4))
@@ -77,18 +101,20 @@ class ResultsPanel(ctk.CTkFrame):
             hover_color=c('border'), text_color=c('text'),
             command=self._remove_current)
         self._remove_btn.pack(side='left', padx=(GAP, 0))
-        ctk.CTkButton(bar, text='3D Viewer', image=icon('cube', 15),
-                      compound='left', width=120, height=32,
-                      font=theme.F_BODY, corner_radius=theme.RADIUS,
-                      fg_color=c('accent'), hover_color=c('accent_hover'),
-                      text_color='white',
-                      command=self._open_3d).pack(side='left', padx=PAD)
-        ctk.CTkButton(bar, text='Foam runs…', image=icon('folder', 14),
-                      compound='left', width=136, height=32,
-                      font=theme.F_BODY, corner_radius=theme.RADIUS,
-                      fg_color=c('card2'), hover_color=c('border'),
-                      text_color=c('text'),
-                      command=self._open_run_browser).pack(side='left')
+        self._view3d_btn = ctk.CTkButton(
+            bar, text='3D Viewer', image=icon('cube', 15),
+            compound='left', width=120, height=32,
+            font=theme.F_BODY, corner_radius=theme.RADIUS,
+            fg_color=c('accent'), hover_color=c('accent_hover'),
+            text_color='white', command=self._open_3d)
+        self._view3d_btn.pack(side='left', padx=PAD)
+        self._foam_runs_btn = ctk.CTkButton(
+            bar, text='Foam runs…', image=icon('folder', 14),
+            compound='left', width=136, height=32,
+            font=theme.F_BODY, corner_radius=theme.RADIUS,
+            fg_color=c('card2'), hover_color=c('border'),
+            text_color=c('text'), command=self._open_run_browser)
+        self._foam_runs_btn.pack(side='left')
 
         # Second row: the six export buttons never fitted beside the picker
         # (at 1280 px "Gauges TSV" and "PNGs" were packed clean off the
@@ -113,17 +139,15 @@ class ResultsPanel(ctk.CTkFrame):
             b.pack(side='left', padx=(0, GAP))
             self._export_btns[kind] = b
         self._sync_export_buttons(None)   # nothing selected yet
+        if mode is not None:
+            mode.subscribe(self.set_solver_mode)
+            self.set_solver_mode(mode.get())
 
         # ── sub-views: Fields / Gauges / Animation / 3D ──────────────────
         views = Card(self, pad=12)
         views.pack(fill='both', expand=True)
-        self._view_seg = ctk.CTkSegmentedButton(
-            views.body, values=['Fields', 'Gauges', 'Animation', '3D'],
-            font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('seg'),
-            unselected_hover_color=c('border'),
-            selected_color=c('accent'),
-            selected_hover_color=c('accent_hover'),
+        self._view_seg = theme.segmented(
+            views.body, ['Fields', 'Gauges', 'Animation', '3D'],
             command=self._view_selected)
         self._view_seg.pack(anchor='w', pady=(0, GAP))
 
@@ -376,6 +400,10 @@ class ResultsPanel(ctk.CTkFrame):
         self._draw_field()
         self._draw_gauges()
         self._setup_anim()
+
+    def set_solver_mode(self, m):
+        """T34: hide the blastFoam-only launchers in native mode."""
+        _set_solver_mode(self, m)
 
     def _sync_export_buttons(self, ent):
         """Only offer an export that can actually run for this result.

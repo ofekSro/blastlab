@@ -14,6 +14,7 @@ import customtkinter as ctk
 
 from ..core.case import Case1D, Case2D, Case3D
 from ..solvers.foam.materials import MATERIAL_NAMES
+from . import mode as mode_mod
 from . import theme
 from .theme import GAP, PAD, Card, c, icon
 
@@ -220,16 +221,41 @@ class _FilePicker(ctk.CTkFrame):
 
 class CaseForm(ctk.CTkFrame):
     """Parameter form for one dimension (1, 2 or 3), as a two-column
-    grid of titled cards."""
+    grid of titled cards.
 
-    def __init__(self, parent, dim, on_change=None):
+    The form lays itself out for a solver `mode` (T34): rows and cards
+    that only apply to the other solver are hidden (grid_remove), never
+    greyed, and their Tk variables keep whatever the user typed so
+    switching back restores them. The mode is pushed in by the container
+    (`set_mode`); the form itself never subscribes to anything, so it is
+    usable standalone."""
+
+    def __init__(self, parent, dim, on_change=None, mode=mode_mod.DEFAULT):
         super().__init__(parent, fg_color='transparent')
         self.dim = dim
         self._on_change = on_change or (lambda: None)
         self.v = {}   # name -> tk variable
         self._wmap = None            # textvariable name -> widget (lazy)
         self._bad = set()            # currently red-bordered fields
+        self._mode = mode_mod.normalize(mode)
+        # grid-managed widgets (row labels, inputs, whole Cards) that only
+        # exist for one solver
+        self._scoped = {'native': [], 'blastfoam': []}
+        self._amr_rows = []          # (label, widget): shown while AMR > 0
+        self._cref_row = None        # (label, widget): hidden while AMR on
         self._build()
+
+    @property
+    def mode(self):
+        return self._mode
+
+    def set_mode(self, mode):
+        m = mode_mod.normalize(mode)
+        if m == self._mode:
+            return
+        self._mode = m
+        self._apply_mode()
+        self._on_change()
 
     def _var(self, name, value=''):
         var = tk.StringVar(value=str(value))
@@ -244,18 +270,29 @@ class CaseForm(ctk.CTkFrame):
         return var
 
     # ── layout ───────────────────────────────────────────────────────────
-    def _card(self, col, title):
+    def _card(self, col, title, scope=None):
         """A titled card appended to the given column; returns its grid
-        body (label column 0, input column 1)."""
+        body (label column 0, input column 1). `scope` ('native' |
+        'blastfoam') makes the whole card solver-specific."""
         card = Card(self, title=title, pad=PAD)
         card.grid(row=self._next_row[col], column=col, sticky='nwe',
                   padx=(0 if col == 0 else GAP, GAP if col == 0 else 0),
                   pady=(0, PAD - 4))
         self._next_row[col] += 1
+        if scope:
+            self._scoped[scope].append(card)
         body = card.body
         body.columnconfigure(0, weight=0)
         body.columnconfigure(1, weight=1, minsize=INPUT_MIN)
         return body
+
+    def _srow(self, frame, r, label, widget, scope=None):
+        """_row_lbl plus solver scoping; returns (next row, label,
+        widget) so callers can keep the pair for later show/hide."""
+        r, lbl = _row_lbl(frame, r, label, widget)
+        if scope:
+            self._scoped[scope] += [lbl, widget]
+        return r, lbl, widget
 
     def _build(self):
         self.columnconfigure(0, weight=1, uniform='cols')
@@ -276,7 +313,7 @@ class CaseForm(ctk.CTkFrame):
                          _combo(dom, self._var('geometry', 'axisymmetric'),
                                 ['axisymmetric', 'planar']))
                 self.v['geometry'].trace_add(
-                    'write', lambda *a: self._sync_enabled())
+                    'write', lambda *a: self._sync_geometry())
             # 3D starts from a case that actually validates: the old
             # 10 m / 0.1 m / 1 kg default auto-refined to 0.0105 m and
             # showed ~852 M cells (over the 15 M cap) on a fresh tab.
@@ -301,27 +338,32 @@ class CaseForm(ctk.CTkFrame):
         if self.dim == 1:
             r = _row(chg, r, 'Charge [kg TNT]',
                      _entry(chg, self._var('charge', 1.0)))
+            # native is TNT-only: the material choice is a blastFoam row
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
-            r = _row(chg, r, 'Material (blastFoam)', self._mat_combo)
+            r = self._srow(chg, r, 'Material', self._mat_combo,
+                           scope='blastfoam')[0]
         else:
             modes = (['charge', 'profile1d'] if self.dim == 2
                      else ['charge', 'profile1d', 'profile2d'])
             r = _row(chg, r, 'Initialize from',
                      _combo(chg, self._var('init_mode', 'charge'), modes))
-            self.v['init_mode'].trace_add(
-                'write', lambda *a: self._sync_enabled())
             r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
                                                   self.dim == 2 else ''),
                      _entry(chg, self._var('charge',
                                            1.0 if self.dim == 2 else 8.0)))
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
-            r = _row(chg, r, 'Material (blastFoam)', self._mat_combo)
+            r = self._srow(chg, r, 'Material', self._mat_combo,
+                           scope='blastfoam')[0]
             if self.dim == 3:
-                r = _row(chg, r, 'Charge resolution',
-                         _combo(chg, self._var('charge_res', 'resolve'),
-                                ['resolve', 'smear']))
+                # blastFoam always resolves the charge (smear is ignored
+                # with a note), so the choice is a native row
+                self._cres_combo = _combo(
+                    chg, self._var('charge_res', 'resolve'),
+                    ['resolve', 'smear'])
+                r = self._srow(chg, r, 'Charge resolution',
+                               self._cres_combo, scope='native')[0]
             r = _row(chg, r, 'Profile file',
                      _FilePicker(chg, self._var('profile_in', ''),
                                  title='Open profile file',
@@ -341,31 +383,33 @@ class CaseForm(ctk.CTkFrame):
                          _entry(chg, self._var('cz', c0)))
 
         # ── Numerics ───────────────────────────────────────────────────
+        # the solver itself is the app-level mode (sidebar, T34): there
+        # is no Solver row any more
         num = self._card(0, 'Numerics')
         r = 0
-        r = _row(num, r, 'Solver',
-                 _combo(num, self._var('solver', 'native'),
-                        ['native', 'blastfoam']))
-        self.v['solver'].trace_add(
-            'write', lambda *a: self._sync_enabled())
+        # blastFoam fixes the EOS (JWL products + ideal-gas air)
         self._eos_combo = _combo(num, self._var('eos', 'idealGas'),
                                  ['idealGas', 'JWL'])
-        r = _row(num, r, 'EOS', self._eos_combo)
+        r = self._srow(num, r, 'EOS', self._eos_combo, scope='native')[0]
         self._act_combo = _combo(num, self._var('activation', 'linear'),
                                  ['linear', 'none'])
-        r = _row(num, r, 'Detonation (blastFoam)', self._act_combo)
+        r = self._srow(num, r, 'Detonation', self._act_combo,
+                       scope='blastfoam')[0]
         self._ab_combo = _combo(num, self._var('afterburn', 'none'),
                                 ['none', 'miller'])
-        r = _row(num, r, 'Afterburn (blastFoam)', self._ab_combo)
+        r = self._srow(num, r, 'Afterburn', self._ab_combo,
+                       scope='blastfoam')[0]
         if self.dim > 1:
             # 'global' = today's rule (the whole grid is refined to resolve
             # the charge); 'zone' keeps the base cell and adds automatic
-            # nested refinement zones around the charge (blastFoam only)
+            # nested refinement zones around the charge (blastFoam only;
+            # the row also goes away while dynamic AMR is on)
             self._cref_combo = _combo(num, self._var('charge_refine',
                                                      'global'),
                                       ['global', 'zone'])
-            r = _row(num, r, 'Charge refinement (blastFoam)',
-                     self._cref_combo)
+            r, lbl, w = self._srow(num, r, 'Charge refinement',
+                                   self._cref_combo, scope='blastfoam')
+            self._cref_row = (lbl, w)
         r = _row(num, r, 'Snapshots',
                  _entry(num, self._var('n_snapshots',
                                        5 if self.dim == 1 else 6)))
@@ -375,7 +419,8 @@ class CaseForm(ctk.CTkFrame):
         if self.dim > 1:
             # blastFoam MPI ranks; 1D always runs serial so no field
             self._nproc_entry = _entry(num, self._var('n_procs', 0))
-            r = _row(num, r, 'MPI ranks (0 = auto)', self._nproc_entry)
+            r = self._srow(num, r, 'MPI ranks (0 = auto)',
+                           self._nproc_entry, scope='blastfoam')[0]
         if self.dim == 3:
             r = _row(num, r, 'End time [s] (0 = auto)',
                      _entry(num, self._var('t_end', 0.0)))
@@ -388,18 +433,23 @@ class CaseForm(ctk.CTkFrame):
         # ── Dynamic refinement (blastFoam adaptiveFvMesh, N16) ─────────
         if self.dim > 1:
             from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
-            amr = self._card(0, 'Dynamic refinement (blastFoam)')
+            amr = self._card(0, 'Dynamic refinement (AMR)',
+                             scope='blastfoam')
+            self._amr_card = amr.master
             r = 0
             self._amr_levels_combo = _combo(
                 amr, self._var('amr_levels', '0'),
                 [str(i) for i in range(MAX_AMR_LEVEL + 1)])
             r = _row(amr, r, 'AMR levels (0 = off)', self._amr_levels_combo)
+            # the coefficient rows only exist while AMR is on
             self.v['amr_levels'].trace_add(
-                'write', lambda *a: self._sync_enabled())
+                'write', lambda *a: self._apply_mode())
             self._amr_est_combo = _combo(
                 amr, self._var('amr_estimator', 'densityGradient'),
                 list(AMR_ESTIMATORS))
-            r = _row(amr, r, 'Error estimator', self._amr_est_combo)
+            r, lbl, w = self._srow(amr, r, 'Error estimator',
+                                   self._amr_est_combo)
+            self._amr_rows.append((lbl, w))
             self._amr_entries = []
             for key, label, default in (
                     ('amr_refine', 'Refine above', 0.4),
@@ -408,16 +458,15 @@ class CaseForm(ctk.CTkFrame):
                     ('amr_buffer', 'Buffer layers', 2),
                     ('amr_max_cells', 'Max cells (0 = default)', 0)):
                 w = _entry(amr, self._var(key, default))
-                r = _row(amr, r, label, w)
+                r, lbl, w = self._srow(amr, r, label, w)
+                self._amr_rows.append((lbl, w))
                 self._amr_entries.append(w)
             self._amr_disp_combo = _combo(
                 amr, self._var('amr_display_level', 'auto'),
                 ['auto'] + [str(i) for i in range(MAX_AMR_LEVEL + 1)])
-            r = _row(amr, r, 'Display level', self._amr_disp_combo)
-            if 'charge_refine' in self.v:
-                # picking 'zone' while AMR is on snaps back to 'global'
-                self.v['charge_refine'].trace_add(
-                    'write', lambda *a: self._sync_enabled())
+            r, lbl, w = self._srow(amr, r, 'Display level',
+                                   self._amr_disp_combo)
+            self._amr_rows.append((lbl, w))
 
         # ── Boundaries ─────────────────────────────────────────────────
         if self.dim > 1:
@@ -462,21 +511,26 @@ class CaseForm(ctk.CTkFrame):
                                 sticky='nsew')
 
             # blastFoam local refinement zones: a box + a level (1 = base
-            # cell / 2, 2 = / 4, ...); validation blocks them on native
-            zf = self._card(1, 'Refinement zones [m, level]')
+            # cell / 2, 2 = / 4, ...); the card is hidden on native
+            zf = self._card(1, 'Refinement zones [m, level]',
+                            scope='blastfoam')
+            self._zones_card = zf.master
             self.zones = _PointList(zf, ocols + ['level'], self._on_change,
                                     height=3)
             self.zones.grid(row=0, column=0, columnspan=2, sticky='nsew')
 
-            # blastFoam-only extras (validation blocks them on native)
+            # blastFoam-only extras (hidden on native)
             if self.dim == 3:
-                xc = self._card(1, 'Extra charges [m, kg]')
+                xc = self._card(1, 'Extra charges [m, kg]',
+                                scope='blastfoam')
+                self._xc_card = xc.master
                 self.extra_charges = _PointList(
                     xc, ['x', 'y', 'z', 'kg'], self._on_change, height=3)
                 self.extra_charges.grid(row=0, column=0, columnspan=2,
                                         sticky='nsew')
             dcols = ['x', 'y'] if self.dim == 2 else ['x', 'y', 'z']
-            dc = self._card(1, 'Detonation points [m]')
+            dc = self._card(1, 'Detonation points [m]', scope='blastfoam')
+            self._det_card = dc.master
             self.det_pts = _PointList(dc, dcols, self._on_change,
                                       height=3)
             self.det_pts.grid(row=0, column=0, columnspan=2,
@@ -508,9 +562,39 @@ class CaseForm(ctk.CTkFrame):
             orow = _row(out, orow, 'Profile out (.npz)',
                         _entry(out, self._var('profile_out', '')))
 
-        self._sync_enabled()
+        self._sync_geometry()
+        self._apply_mode()
 
-    def _sync_enabled(self):
+    def _amr_on(self):
+        return (self._mode == 'blastfoam' and 'amr_levels' in self.v
+                and self.v['amr_levels'].get().strip() not in ('', '0'))
+
+    def _apply_mode(self):
+        """Show the rows/cards of the active solver and hide the other
+        solver's; within blastFoam, the AMR coefficient rows exist only
+        while AMR is on and the charge-refinement row only while it is
+        off (the two are mutually exclusive by validation). Nothing is
+        disabled and no value is touched."""
+        foam = self._mode == 'blastfoam'
+        for w in self._scoped['blastfoam']:
+            (w.grid if foam else w.grid_remove)()
+        for w in self._scoped['native']:
+            (w.grid_remove if foam else w.grid)()
+        if self._amr_rows:
+            amr_on = self._amr_on()
+            for lbl, w in self._amr_rows:
+                for x in (lbl, w):
+                    (x.grid if amr_on else x.grid_remove)()
+            if self._cref_row is not None:
+                show = foam and not amr_on
+                for x in self._cref_row:
+                    (x.grid if show else x.grid_remove)()
+
+    def _sync_geometry(self):
+        """2D axisymmetric relabels r/z and pins the burst to the axis;
+        the x_lo boundary is the axis itself (a wall) - this is the one
+        place a control stays disabled, because it is geometry, not a
+        solver choice."""
         if self.dim == 2 and 'geometry' in self.v:
             axisym = self.v['geometry'].get() == 'axisymmetric'
             if hasattr(self, '_bc_combos'):
@@ -532,53 +616,6 @@ class CaseForm(ctk.CTkFrame):
                     self._burst_x_entry.configure(state='disabled')
                 else:
                     self._burst_x_entry.configure(state='normal')
-        # blastfoam: material choice applies, EOS is fixed (JWL products
-        # + ideal-gas air); native: TNT-only, EOS choice applies
-        if 'solver' in self.v and hasattr(self, '_mat_combo'):
-            foam = self.v['solver'].get() == 'blastfoam'
-            self._eos_combo.configure(
-                state='disabled' if foam else 'readonly')
-            self._mat_combo.configure(
-                state='readonly' if foam else 'disabled')
-            if not foam and self.v['material'].get() != 'TNT':
-                self.v['material'].set('TNT')
-            if hasattr(self, '_nproc_entry'):
-                self._nproc_entry.configure(
-                    state='normal' if foam else 'disabled')
-            self._act_combo.configure(
-                state='readonly' if foam else 'disabled')
-            if not foam and self.v['activation'].get() != 'linear':
-                self.v['activation'].set('linear')
-            if hasattr(self, '_ab_combo'):
-                self._ab_combo.configure(
-                    state='readonly' if foam else 'disabled')
-                if not foam and self.v['afterburn'].get() != 'none':
-                    self.v['afterburn'].set('none')
-            if hasattr(self, '_cref_combo'):
-                self._cref_combo.configure(
-                    state='readonly' if foam else 'disabled')
-                if not foam and self.v['charge_refine'].get() != 'global':
-                    self.v['charge_refine'].set('global')
-            if hasattr(self, '_amr_disp_combo'):
-                # dynamic AMR: blastFoam only; its coefficients apply only
-                # while it is on, and it excludes the static zones / the
-                # 'zone' charge mode (validation refuses the combination)
-                self._amr_levels_combo.configure(
-                    state='readonly' if foam else 'disabled')
-                if not foam and self.v['amr_levels'].get() != '0':
-                    self.v['amr_levels'].set('0')
-                amr_on = foam and self.v['amr_levels'].get().strip() \
-                    not in ('', '0')
-                for w in self._amr_entries:
-                    w.configure(state='normal' if amr_on else 'disabled')
-                for w in (self._amr_est_combo, self._amr_disp_combo):
-                    w.configure(state='readonly' if amr_on else 'disabled')
-                if hasattr(self, '_cref_combo'):
-                    self._cref_combo.configure(
-                        state='readonly' if foam and not amr_on
-                        else 'disabled')
-                    if amr_on and self.v['charge_refine'].get() != 'global':
-                        self.v['charge_refine'].set('global')
 
     # ── Case conversion ─────────────────────────────────────────────────
     def _widget_for(self, name):
@@ -621,9 +658,15 @@ class CaseForm(ctk.CTkFrame):
     def get_case(self):
         """Build the Case. EVERY bad numeric field is reported, not just
         the first one: the strip used to show a single message and the
-        user fixed them one reload at a time."""
+        user fixed them one reload at a time.
+
+        Fields hidden by the solver mode are STRIPPED, not read: the case
+        carries that solver's defaults for them (what you see is what
+        runs and saves), and a stale bad value in a hidden box can never
+        block a run. The form keeps the values for a later switch back."""
         v = self.v
         errs, bad = [], []
+        foam = self._mode == 'blastfoam'
 
         def _F(name, label):
             try:
@@ -657,14 +700,17 @@ class CaseForm(ctk.CTkFrame):
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
-                solver=v['solver'].get(), material=v['material'].get(),
-                activation=v['activation'].get(),
-                afterburn=v['afterburn'].get()))
+                solver=self._mode,
+                material=v['material'].get() if foam else 'TNT',
+                activation=v['activation'].get() if foam else 'linear',
+                afterburn=v['afterburn'].get() if foam else 'none'))
 
         bcs = {side: v[f'bc_{side}'].get()
                for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
                             else ['x_lo', 'x_hi', 'y_lo', 'y_hi',
                                   'z_lo', 'z_hi'])}
+        amr_levels = _I('amr_levels', 'AMR levels') if foam else 0
+        amr_on = foam and amr_levels > 0
         common = dict(
             Lx=_F('Lx', 'Lx'), Ly=_F('Ly', 'Ly'),
             cell_size_m=_F('cell', 'cell size'),
@@ -678,23 +724,32 @@ class CaseForm(ctk.CTkFrame):
             gauge_file=v['gauge_file'].get(),
             anim_file=v['anim_file'].get() or None,
             record_frames=150 if v['record'].get() else 0,
-            solver=v['solver'].get(), material=v['material'].get(),
-            activation=v['activation'].get(),
-            afterburn=v['afterburn'].get(),
-            n_procs=_I('n_procs', 'MPI ranks'),
-            det_points=self.det_pts.get() or None,
-            refine_zones=[(*z[:-1], int(round(z[-1])))
-                          for z in self.zones.get()],
-            charge_refine=v['charge_refine'].get(),
-            amr_levels=_I('amr_levels', 'AMR levels'),
-            amr_estimator=v['amr_estimator'].get(),
-            amr_refine=_F('amr_refine', 'AMR refine threshold'),
-            amr_unrefine=_F('amr_unrefine', 'AMR unrefine threshold'),
-            amr_interval=_I('amr_interval', 'AMR refine interval'),
-            amr_buffer=_I('amr_buffer', 'AMR buffer layers'),
-            amr_max_cells=_I('amr_max_cells', 'AMR max cells'),
+            solver=self._mode,
+            material=v['material'].get() if foam else 'TNT',
+            activation=v['activation'].get() if foam else 'linear',
+            afterburn=v['afterburn'].get() if foam else 'none',
+            n_procs=_I('n_procs', 'MPI ranks') if foam else 0,
+            det_points=(self.det_pts.get() or None) if foam else None,
+            refine_zones=([(*z[:-1], int(round(z[-1])))
+                           for z in self.zones.get()] if foam else []),
+            charge_refine=(v['charge_refine'].get()
+                           if foam and not amr_on else 'global'),
+            amr_levels=amr_levels,
+            amr_estimator=(v['amr_estimator'].get() if amr_on
+                           else 'densityGradient'),
+            amr_refine=(_F('amr_refine', 'AMR refine threshold')
+                        if amr_on else 0.4),
+            amr_unrefine=(_F('amr_unrefine', 'AMR unrefine threshold')
+                          if amr_on else 0.2),
+            amr_interval=(_I('amr_interval', 'AMR refine interval')
+                          if amr_on else 2),
+            amr_buffer=(_I('amr_buffer', 'AMR buffer layers')
+                        if amr_on else 2),
+            amr_max_cells=(_I('amr_max_cells', 'AMR max cells')
+                           if amr_on else 0),
             amr_display_level=(
-                None if v['amr_display_level'].get().strip() in ('', 'auto')
+                None if not amr_on
+                or v['amr_display_level'].get().strip() in ('', 'auto')
                 else _I('amr_display_level', 'AMR display level')),
         )
         if self.dim == 2:
@@ -708,12 +763,14 @@ class CaseForm(ctk.CTkFrame):
                             center=(_F('cx', 'burst x'),
                                     _F('cy', 'burst y'),
                                     _F('cz', 'burst z')),
-                            charge_resolution=v['charge_res'].get(),
+                            charge_resolution=(v['charge_res'].get()
+                                               if not foam else 'resolve'),
                             t_end=_F('t_end', 'end time'),
                             slice_axis=v['slice_axis'].get(),
                             slice_pos=(_F('slice_pos', 'slice position')
                                        if slice_raw else None),
-                            charges=self.extra_charges.get() or None,
+                            charges=((self.extra_charges.get() or None)
+                                     if foam else None),
                             **common))
 
     def set_case(self, case):
@@ -721,7 +778,6 @@ class CaseForm(ctk.CTkFrame):
         if self.dim == 1:
             v['radius_m'].set(f'{case.radius_m:g}')
             v['charge'].set(f'{case.charge_kg:g}')
-            v['solver'].set(getattr(case, 'solver', 'native'))
             v['material'].set(getattr(case, 'material', 'TNT'))
             v['activation'].set(getattr(case, 'activation', 'linear'))
             v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
@@ -753,7 +809,6 @@ class CaseForm(ctk.CTkFrame):
         v['cy'].set(f'{case.center[1]:g}')
         if self.dim == 3 and len(case.center) > 2:
             v['cz'].set(f'{case.center[2]:g}')
-        v['solver'].set(getattr(case, 'solver', 'native'))
         v['material'].set(getattr(case, 'material', 'TNT'))
         v['activation'].set(getattr(case, 'activation', 'linear'))
         v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
@@ -793,9 +848,12 @@ class SetupPanel(ctk.CTkFrame):
 
     _PREV_HINT = 'Select 2D or 3D to preview the model here.'
 
-    def __init__(self, parent, on_change=None):
+    def __init__(self, parent, on_change=None, mode=None):
         super().__init__(parent, fg_color='transparent')
         self._on_change = on_change or (lambda: None)
+        # the app-level solver mode (T34); a private one when the panel
+        # is built standalone (tests)
+        self._mode = mode if mode is not None else mode_mod.SolverMode()
 
         # the form column carries two cards of label+input side by side and
         # is the one that runs out of room first; the preview only loses
@@ -811,14 +869,9 @@ class SetupPanel(ctk.CTkFrame):
         ctk.CTkLabel(head, text='Case Setup', font=theme.F_H1,
                      text_color=c('text')).pack(side='left')
         self.dim_var = tk.IntVar(value=2)
-        self._dim_seg = ctk.CTkSegmentedButton(
-            head, values=['1D', '2D', '3D'], font=theme.F_BODY,
-            corner_radius=theme.RADIUS, height=34,
-            fg_color=c('card'), unselected_color=c('seg'),
-            unselected_hover_color=c('card2'),
-            selected_color=c('accent'),
-            selected_hover_color=c('accent_hover'),
-            command=self._dim_selected)
+        self._dim_seg = theme.segmented(
+            head, ['1D', '2D', '3D'], command=self._dim_selected, height=34,
+            fg_color=c('card'), unselected_hover_color=c('card2'))
         self._dim_seg.set('2D')
         self._dim_seg.pack(side='right')
 
@@ -872,10 +925,28 @@ class SetupPanel(ctk.CTkFrame):
         self._prev_current = None
         self._show_preview_widget(self._prev_msg)
 
-        self._forms = {d: CaseForm(self._form_host, d, self._changed)
+        self._forms = {d: CaseForm(self._form_host, d, self._changed,
+                                   mode=self._mode.get())
                        for d in (1, 2, 3)}
         self._current = None
         self._swap()
+        self._mode.subscribe(self._mode_changed)
+
+    @property
+    def solver(self):
+        return self._mode.get()
+
+    def _mode_changed(self, m):
+        for f in self._forms.values():
+            f.set_mode(m)
+        # cards vanished: the scroll region shrinks on its own, but a
+        # viewport left past the new end would show nothing
+        try:
+            self.update_idletasks()
+            self._form_host._parent_canvas.yview_moveto(0)
+        except Exception:
+            pass
+        self._changed()
 
     def _dim_selected(self, value):
         self.dim_var.set(int(value[0]))
@@ -936,6 +1007,10 @@ class SetupPanel(ctk.CTkFrame):
         return self.form.get_case()
 
     def set_case(self, case):
+        # the case's solver becomes the app mode (sidebar, Chain presets,
+        # Results) BEFORE the form is filled, so the amr_levels trace and
+        # the hide/show logic see the right mode
+        self._mode.set(getattr(case, 'solver', 'native'))
         self.dim_var.set(case.dim)
         self._dim_seg.set(f'{case.dim}D')
         self._swap()

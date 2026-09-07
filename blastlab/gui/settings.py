@@ -19,6 +19,9 @@ DEFAULTS = dict(
     appearance='dark',          # 'dark' | 'light'
     refresh_value='',           # Run tab "Refresh every" box
     refresh_mode='seconds',     # 'seconds' | 'steps'
+    # T34: the sidebar solver mode ('native' | 'blastfoam'); a fresh
+    # install starts in blastFoam mode
+    solver='blastfoam',
 )
 
 

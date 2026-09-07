@@ -81,8 +81,10 @@ def chain_feedback_checks(root):
         check("chain parse error names the stage",
               bool(seen) and seen[-1].startswith('Stage 2 (2D):'),
               seen[-1] if seen else '<no dialog>')
+        # T34: the stage stack holds a wrapper (solver switch + form)
         check("chain switches to the offending stage",
-              panel._current is panel.forms[2])
+              panel._current is panel._stage_wrap[2]
+              and panel.forms[2].winfo_manager() == 'pack')
         check("chain does not create the workspace when it refuses",
               not os.path.exists(ws))
         check("chain did not start", 'RAN' not in seen)

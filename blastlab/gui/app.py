@@ -15,10 +15,14 @@ from ..core.case import load_case, save_case, validate_case
 from ..core.profiles import save_profile, save_profile_2d
 from ..output.animation import write_animation
 from ..output.gauges import save_gauges_1d, save_gauges_2d, save_gauges_3d
+from ..solvers.foam import env as foam_env
 from ..viz3d import MISSING_MSG, pyvista_available
+from . import mode as mode_mod
+from . import settings as gui_settings
 from . import theme
 from .chain_panel import ChainPanel
 from .forms import SetupPanel
+from .mode import SolverMode
 from .results_panel import ResultsPanel
 from .run_panel import RunPanel
 from .theme import GAP, PAD, Card, c, icon
@@ -113,6 +117,13 @@ class App:
         self._run_count = 0
         self._stage_dims = []
         self._validate_job = None
+        self._wsl_job = None
+
+        # T34: the solver is an app-level mode. It is seeded from the
+        # persisted settings BEFORE the sidebar and the panels exist, so
+        # everything is built laid out for it (no flash, no double layout)
+        st = gui_settings.load()
+        self.solver_mode = SolverMode(st.get('solver', mode_mod.DEFAULT))
 
         root.grid_columnconfigure(1, weight=1)
         root.grid_rowconfigure(0, weight=1)
@@ -124,21 +135,22 @@ class App:
         content.grid_columnconfigure(0, weight=1)
         content.grid_rowconfigure(0, weight=1)
 
-        self.setup = SetupPanel(content, on_change=self._schedule_validate)
+        self.setup = SetupPanel(content, on_change=self._schedule_validate,
+                                mode=self.solver_mode)
         self.run_panel = RunPanel(content, on_run=self._run_single,
                                   on_stop=self._stop,
                                   on_view3d=self._open_view3d,
                                   on_init=self._init_model,
                                   on_exec=self._exec,
                                   on_refresh=self._apply_refresh)
-        self.results = ResultsPanel(content, log_fn=self._result_msg)
+        self.results = ResultsPanel(content, log_fn=self._result_msg,
+                                    mode=self.solver_mode)
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
-        from ..solvers.foam import env as foam_env
-        from . import settings as gui_settings
         self._cleanup_thread = foam_env.start_auto_cleanup(
-            gui_settings.load(), self._log_threadsafe)
-        self.chain = ChainPanel(content, on_run_chain=self._run_chain)
+            st, self._log_threadsafe)
+        self.chain = ChainPanel(content, on_run_chain=self._run_chain,
+                                mode=self.solver_mode)
 
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
@@ -156,10 +168,75 @@ class App:
         self._restore_ui_state()
         self._bind_accelerators(root)
 
-        self._schedule_validate()
+        # the panels are all built; from here on a mode change re-lays
+        # them out. The first call fills the sidebar hints and schedules
+        # the first validation.
+        self.solver_mode.subscribe(self._on_solver_mode)
+        self._on_solver_mode(self.solver_mode.get())
 
         if case_file:
             self._open_case(case_file)
+
+    # ── T34: app-level solver mode ───────────────────────────────────────
+    @property
+    def solver(self):
+        return self.solver_mode.get()
+
+    def set_solver(self, mode):
+        """Public entry point (tests, the QA harness): the same as
+        clicking the sidebar segment."""
+        self.solver_mode.set(mode)
+
+    def _solver_picked(self, label):
+        self.solver_mode.set(mode_mod.from_label(label))
+
+    def _on_solver_mode(self, m):
+        # .set() on a CTkSegmentedButton does not fire its command, so
+        # mirroring the mode into the segment cannot re-enter
+        self._solver_seg.set(mode_mod.label(m))
+        self._solver_hint.configure(text=mode_mod.EXPLAIN[m])
+        self._cancel_wsl_poll()
+        if m == 'blastfoam':
+            # warm the cached WSL availability check off-thread and show
+            # its outcome under the selector
+            foam_env.ensure_check_started()
+            self._poll_wsl()
+        else:
+            self._wsl_hint.configure(text='')
+            theme.tooltip(self._wsl_hint, '')
+        self._schedule_validate()
+
+    def _poll_wsl(self):
+        self._wsl_job = None
+        try:
+            st = foam_env.status()
+            state, detail = (st if isinstance(st, tuple) else (st, ''))[:2]
+        except Exception as exc:
+            state, detail = 'fail', str(exc)
+        detail = str(detail or '')
+        if state == 'checking':
+            text, colour = 'WSL: checking blastFoam…', c('muted')
+        elif state == 'ok':
+            text, colour = 'WSL: blastFoam ready', c('ok')
+        elif state == 'fail':
+            text, colour = 'WSL: unavailable - ' + detail[:60], c('warn')
+        else:
+            text, colour = 'WSL: verified at run start', c('muted')
+        try:
+            self._wsl_hint.configure(text=text, text_color=colour)
+            theme.tooltip(self._wsl_hint, detail if state == 'fail' else '')
+        except Exception:
+            return
+        if state == 'checking':
+            self._wsl_job = self.root.after(1000, self._poll_wsl)
+
+    def _cancel_wsl_poll(self):
+        if self._wsl_job is not None:
+            try:
+                self.root.after_cancel(self._wsl_job)
+            except Exception:
+                pass
+            self._wsl_job = None
 
     # ── G9: keyboard + persisted window state ────────────────────────────
     def _bind_accelerators(self, root):
@@ -179,7 +256,6 @@ class App:
         """Window size, appearance mode and the refresh box, from the same
         json the foam cleanup policy lives in (they reset every launch)."""
         try:
-            from . import settings as gui_settings
             st = gui_settings.load()
             geo = str(st.get('geometry') or '')
             if 'x' in geo:
@@ -197,11 +273,11 @@ class App:
 
     def _save_ui_state(self):
         try:
-            from . import settings as gui_settings
             state = dict(
                 appearance=('dark' if self._mode_switch.get() else 'light'),
                 refresh_value=self.run_panel.refresh_val.get(),
-                refresh_mode=self.run_panel.refresh_mode.get())
+                refresh_mode=self.run_panel.refresh_mode.get(),
+                solver=self.solver_mode.get())
             # only a real, mapped window has a meaningful geometry: a
             # minimised or never-shown one reports the placeholder size
             geo = self.root.geometry()
@@ -278,6 +354,28 @@ class App:
                           text_color=c('muted'),
                           command=lambda f=cmd: f()).pack(
                 fill='x', padx=12, pady=2)
+
+        # T34: the solver is chosen here, once, for the whole app; every
+        # tab hides what does not apply to it. Directly above Dark mode.
+        blk = ctk.CTkFrame(bottom, fg_color='transparent')
+        blk.pack(fill='x', padx=12, pady=(10, 2))
+        ctk.CTkLabel(blk, text='Solver', font=theme.F_SMALL,
+                     text_color=c('muted'), anchor='w').pack(fill='x',
+                                                             padx=12)
+        self._solver_seg = theme.segmented(
+            blk, [mode_mod.label(m) for m in mode_mod.MODES],
+            command=self._solver_picked, height=30, font=theme.F_SMALL)
+        self._solver_seg.set(mode_mod.label(self.solver_mode.get()))
+        self._solver_seg.pack(fill='x', padx=12, pady=(2, 4))
+        # 216 px sidebar - 2 x (12 + 12) px padding = 168 px of text
+        self._solver_hint = ctk.CTkLabel(
+            blk, text='', font=theme.F_SMALL, text_color=c('muted'),
+            anchor='w', justify='left', wraplength=160)
+        self._solver_hint.pack(fill='x', padx=12)
+        self._wsl_hint = ctk.CTkLabel(
+            blk, text='', font=theme.F_SMALL, text_color=c('muted'),
+            anchor='w', justify='left', wraplength=160)
+        self._wsl_hint.pack(fill='x', padx=12, pady=(0, 2))
 
         self._mode_switch = ctk.CTkSwitch(
             bottom, text='Dark mode', font=theme.F_BODY,
@@ -377,7 +475,6 @@ class App:
         if getattr(case, 'solver', 'native') == 'blastfoam':
             # warm the cached WSL availability check off-thread so the
             # validation report can show it without ever blocking
-            from ..solvers.foam import env as foam_env
             foam_env.ensure_check_started()
         rep = validate_case(case)
         extra = []
@@ -671,11 +768,24 @@ class App:
         self.root.after(0, self.notify, text, level)
 
     def _log_threadsafe(self, text):
-        self.root.after(0, self.run_panel.on_log, str(text))
+        try:
+            self.root.after(0, self.run_panel.on_log, str(text))
+        except (tk.TclError, RuntimeError):
+            # window already closed (worker tail), or a thread reaching
+            # Tk while no mainloop runs (headless drivers pump update())
+            pass
 
     # ── shutdown ─────────────────────────────────────────────────────────
     def _on_close(self):
         self._save_ui_state()
+        self._cancel_wsl_poll()
+        for job in (self._validate_job, self._status_job):
+            if job is not None:
+                try:
+                    self.root.after_cancel(job)
+                except Exception:
+                    pass
+        self._validate_job = self._status_job = None
         if self.worker is not None and self.worker.is_alive():
             self.worker.stop()
             self.worker.join(timeout=10)

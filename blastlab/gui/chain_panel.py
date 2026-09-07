@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from ..core.case import save_case, validate_case
+from . import mode as mode_mod
 from . import theme
 from .forms import CaseForm
 from .theme import GAP, PAD, Card, c, icon
@@ -43,9 +44,13 @@ def stage_errors(stages, cases):
 
 
 class ChainPanel(ctk.CTkFrame):
-    def __init__(self, parent, on_run_chain):
+    def __init__(self, parent, on_run_chain, mode=None):
         super().__init__(parent, fg_color='transparent')
         self._on_run_chain = on_run_chain
+        # T34: every stage starts on the app-level solver mode and can be
+        # overridden per stage (a native 2D stage can follow a blastFoam
+        # 1D one); a global change presets all three again
+        self._mode = mode if mode is not None else mode_mod.SolverMode()
 
         head = ctk.CTkFrame(self, fg_color='transparent')
         head.pack(fill='x', pady=(0, PAD - 4))
@@ -114,13 +119,8 @@ class ChainPanel(ctk.CTkFrame):
         # ── stage forms behind a segmented switcher ──────────────────────
         stages = Card(self, pad=12)
         stages.pack(fill='both', expand=True)
-        self._stage_seg = ctk.CTkSegmentedButton(
-            stages.body, values=['Stage 1D', 'Stage 2D', 'Stage 3D'],
-            font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('seg'),
-            unselected_hover_color=c('border'),
-            selected_color=c('accent'),
-            selected_hover_color=c('accent_hover'),
+        self._stage_seg = theme.segmented(
+            stages.body, ['Stage 1D', 'Stage 2D', 'Stage 3D'],
             command=self._stage_selected)
         self._stage_seg.pack(anchor='w', pady=(0, GAP))
 
@@ -129,11 +129,51 @@ class ChainPanel(ctk.CTkFrame):
             scrollbar_button_color=c('card2'),
             scrollbar_button_hover_color=c('border'))
         stack.pack(fill='both', expand=True)
-        self.forms = {d: CaseForm(stack, d) for d in (1, 2, 3)}
+        self.forms, self._stage_wrap = {}, {}
+        self._stage_solver_seg, self.stage_solver = {}, {}
+        for d in (1, 2, 3):
+            wrap = ctk.CTkFrame(stack, fg_color='transparent')
+            row = ctk.CTkFrame(wrap, fg_color='transparent')
+            row.pack(fill='x', pady=(0, GAP))
+            ctk.CTkLabel(row, text='Solver for this stage',
+                         font=theme.F_BODY, text_color=c('muted')).pack(
+                side='left', padx=(0, GAP))
+            seg = theme.segmented(
+                row, [mode_mod.label(m) for m in mode_mod.MODES],
+                height=28, font=theme.F_SMALL,
+                command=lambda lbl, d=d: self.set_stage_solver(
+                    d, mode_mod.from_label(lbl)))
+            seg.pack(side='left')
+            ctk.CTkLabel(row, text='preset from the sidebar - override '
+                                   'per stage',
+                         font=theme.F_SMALL, text_color=c('muted')).pack(
+                side='left', padx=(GAP, 0))
+            self.forms[d] = CaseForm(wrap, d, mode=self._mode.get())
+            self.forms[d].pack(fill='both', expand=True)
+            self._stage_wrap[d], self._stage_solver_seg[d] = wrap, seg
+            self.stage_solver[d] = self._mode.get()
+            seg.set(mode_mod.label(self.stage_solver[d]))
         self._stack = stack
         self._current = None
         self._stage_seg.set('Stage 1D')
         self._stage_selected('Stage 1D')
+        self._mode.subscribe(self._on_global_mode)
+
+    # ── T34: per-stage solver ────────────────────────────────────────────
+    def set_stage_solver(self, d, m):
+        m = mode_mod.normalize(m)
+        self.stage_solver[d] = m
+        self._stage_solver_seg[d].set(mode_mod.label(m))   # no command
+        self.forms[d].set_mode(m)
+
+    def set_stage_case(self, d, case):
+        """Fill stage `d` from a Case, adopting its solver."""
+        self.set_stage_solver(d, getattr(case, 'solver', 'native'))
+        self.forms[d].set_case(case)
+
+    def _on_global_mode(self, m):
+        for d in (1, 2, 3):
+            self.set_stage_solver(d, m)
 
     def focus_stage(self, d):
         """Bring stage `d`'s form to the front (a dialog naming 'Stage 2'
@@ -148,7 +188,7 @@ class ChainPanel(ctk.CTkFrame):
         d = int(value.split()[1][0])
         if self._current is not None:
             self._current.pack_forget()
-        self._current = self.forms[d]
+        self._current = self._stage_wrap[d]
         self._current.pack(fill='both', expand=True)
 
     def _pick_ws(self):
