@@ -63,6 +63,13 @@ class ResultsPanel(ctk.CTkFrame):
                           command=lambda v: self._refresh())
         self.sel.pack(side='left')
 
+        self._remove_btn = ctk.CTkButton(
+            bar, text='Remove', image=icon('minus', 14), compound='left',
+            width=104, height=32, font=theme.F_BODY,
+            corner_radius=theme.RADIUS, fg_color=c('card2'),
+            hover_color=c('border'), text_color=c('text'),
+            command=self._remove_current)
+        self._remove_btn.pack(side='left', padx=(GAP, 0))
         ctk.CTkButton(bar, text='3D Viewer', image=icon('cube', 15),
                       compound='left', width=120, height=32,
                       font=theme.F_BODY, corner_radius=theme.RADIUS,
@@ -76,6 +83,13 @@ class ResultsPanel(ctk.CTkFrame):
                       text_color=c('text'),
                       command=self._open_run_browser).pack(side='left')
 
+        # Second row: the six export buttons never fitted beside the picker
+        # (at 1280 px "Gauges TSV" and "PNGs" were packed clean off the
+        # window and could not be reached at all), so they get their own.
+        bar2 = ctk.CTkFrame(top.body, fg_color='transparent')
+        bar2.pack(fill='x', pady=(GAP, 0))
+        ctk.CTkLabel(bar2, text='Export', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='left', padx=(0, GAP))
         self._export_btns = {}
         for label, name, kind in (('Profile', 'curve', 'profile'),
                                   ('GIF', 'film', 'gif'),
@@ -83,17 +97,14 @@ class ResultsPanel(ctk.CTkFrame):
                                   ('Summary CSV', 'table', 'summary'),
                                   ('Gauges TSV', 'table', 'tsv'),
                                   ('PNGs', 'image', 'pngs')):
-            b = ctk.CTkButton(bar, text=label, image=icon(name, 14),
+            b = ctk.CTkButton(bar2, text=label, image=icon(name, 14),
                               compound='left', width=104, height=32,
                               font=theme.F_BODY, corner_radius=theme.RADIUS,
                               fg_color=c('card2'), hover_color=c('border'),
                               text_color=c('text'),
                               command=lambda k=kind: self._export(k))
-            b.pack(side='right', padx=(GAP, 0))
+            b.pack(side='left', padx=(0, GAP))
             self._export_btns[kind] = b
-        ctk.CTkLabel(bar, text='Export', font=theme.F_BODY,
-                     text_color=c('muted')).pack(side='right',
-                                                 padx=(0, GAP))
 
         # ── sub-views: Fields / Gauges / Animation / 3D ──────────────────
         views = Card(self, pad=12)
@@ -206,11 +217,58 @@ class ResultsPanel(ctk.CTkFrame):
         self._views[value].tkraise()
 
     # ── entries ──────────────────────────────────────────────────────────
+    def _unique_label(self, label):
+        """Number a duplicate label. The picker matches entries by their
+        text, so two identical labels made the second one unreachable -
+        selecting it always returned the first (loading the same foam run
+        twice did exactly that)."""
+        taken = {e.label for e in self._entries}
+        if label not in taken:
+            return label
+        n = 2
+        while f'{label} #{n}' in taken:
+            n += 1
+        return f'{label} #{n}'
+
     def add_result(self, label, dim, result):
+        label = self._unique_label(label)
         self._entries.append(ResultEntry(label, dim, result))
         self.sel.configure(values=[e.label for e in self._entries])
         self.sel.set(label)
         self._refresh()
+
+    def _remove_current(self):
+        """Drop the selected result (results used to accumulate for the
+        whole session with no way to free their frames)."""
+        ent = self._current()
+        if ent is None:
+            self._log('Remove: select a result first.')
+            return
+        self._stop_play()
+        self._entries.remove(ent)
+        labels = [e.label for e in self._entries]
+        self.sel.configure(values=labels)
+        if labels:
+            self.sel.set(labels[-1])
+            self._refresh()
+        else:
+            self.sel.set('')
+            self._clear_views()
+        self._log(f'Removed result: {ent.label}')
+
+    def _clear_views(self):
+        """Blank every sub-view (no results left to show)."""
+        for canvas, size in ((self.field_canvas, (6, 5)),
+                             (self.gauge_canvas, (7, 5))):
+            fig = Figure(figsize=size)
+            fig.add_subplot().axis('off')
+            canvas.set_figure(fig)
+        self._anim_placeholder('')
+        for iid in self.summary_table.get_children():
+            self.summary_table.delete(iid)
+        for combo in (self.snap_sel, self.field_sel):
+            combo.configure(values=[])
+            combo.set('')
 
     def _current(self):
         label = self.sel.get()
@@ -376,17 +434,46 @@ class ResultsPanel(ctk.CTkFrame):
             tbl.insert('', 'end', values=row)
 
     # ── animation replay ─────────────────────────────────────────────────
+    def _anim_placeholder(self, text):
+        """Blank the replay canvas. Without this the previously selected
+        result's frame stayed on screen under a result that has no
+        animation at all (a 1D run, or a post-mortem loaded run), which
+        reads as this result's data."""
+        fig = Figure(figsize=(6, 5))
+        ax = fig.add_subplot()
+        ax.axis('off')
+        if text:
+            ax.text(0.5, 0.5, text, transform=ax.transAxes, ha='center',
+                    va='center', fontsize=10, color=theme.cur('muted'))
+        self._anim_mesh = None
+        self._anim_title = None
+        self._anim_lines = None
+        self._anim_levels = None
+        self._anim_geom = None
+        self.anim_canvas.set_figure(fig)
+        self.play_btn.configure(state='disabled')
+        self.frame_slider.configure(to=1, number_of_steps=1)
+        self.frame_slider.set(0)
+
     def _setup_anim(self):
         ent = self._current()
         self._stop_play()
         self._anim_mesh = None
         if ent is None or ent.dim == 1:
+            self._anim_placeholder(
+                '1D results have no animation frames.' if ent is not None
+                else '')
             return
         frames = ent.result.meta.get('frames')
         if not frames or not len(frames['pressures']):
+            self._anim_placeholder(
+                'No recorded frames for this result.\n'
+                'Tick "Record frames" before the run; runs loaded from the\n'
+                'foam run browser carry snapshots but no replay frames.')
             return
         meta = ent.result.meta
         n = len(frames['pressures'])
+        self.play_btn.configure(state='normal')
         self.frame_slider.configure(to=max(1, n - 1),
                                     number_of_steps=max(1, n - 1))
 

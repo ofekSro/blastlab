@@ -453,6 +453,8 @@ class App:
                 self._attach_view3d_auto()
         elif tag == 'progress':
             self.run_panel.on_progress(msg[1])
+        elif tag == 'paused':
+            self.run_panel.set_paused(bool(msg[1]))
         elif tag == 'frame':
             fr = w.hooks.latest_frame()
             if fr is not None:

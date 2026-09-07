@@ -1862,10 +1862,21 @@ def e09_duplicate_labels(qa):
     qa.pump(0.5)
     vals = list(qa.app.results.sel.cget('values'))
     qa.note(f'combo now: {vals}')
-    ents = [e for e in qa.app.results._entries if e.label == 'QA native1d']
-    qa.check(len(ents) == 2 and qa.app.results._current() is ents[0],
-             'with two identical labels the combo can only ever reach the '
-             'FIRST entry (G2 confirmed)', 'S2')
+    # G2 fix: a repeated label is numbered, so every entry stays reachable
+    dupes = [v for v in vals if v == 'QA native1d']
+    qa.check(len(dupes) == 1 and 'QA native1d #2' in vals,
+             'a repeated result label is de-duplicated (#2), so both entries '
+             'stay reachable in the picker', 'S2')
+    qa.app.results.sel.set('QA native1d #2')
+    cur = qa.app.results._current()
+    qa.check(cur is not None and cur.label == 'QA native1d #2',
+             'selecting the de-duplicated entry returns that entry', 'S2')
+    n_before = len(qa.app.results._entries)
+    qa.app.results._remove_current()
+    qa.pump(0.4)
+    qa.check(len(qa.app.results._entries) == n_before - 1
+             and 'QA native1d #2' not in list(qa.app.results.sel.cget('values')),
+             'Remove drops the selected result from the picker', 'S2')
     qa.shot('duplicate_labels')
     qa.note(f'{len(qa.app.results._entries)} entries retained; no Remove '
             f'button exists')

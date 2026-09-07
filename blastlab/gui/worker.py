@@ -5,7 +5,8 @@ with the Tk main thread ONLY through a queue of tagged tuples:
 
     ('log', text)               a line of run output
     ('run_started', info)       grid info for the live view
-    ('progress', Progress)      throttled to ~10 Hz
+    ('progress', Progress)      throttled to ~10 Hz (flushed on pause/end)
+    ('paused', bool)            the stepped-execution gate holds / releases
     ('frame',)                  token: a fresh live frame is available
     ('stage', index, label)     a chain stage begins
     ('result', index, Result)   a stage finished (also on Stop)
@@ -39,6 +40,7 @@ class GuiHooks(RunHooks):
         self.feed3d = None            # Feed3D once the 3D view is open
         self._latest3d = None
         self._frame3d_pending = False
+        self._last_p = None           # newest Progress, for flush_progress
         self._revolver = None         # 2D axisym -> 3D cylinder view
         self._rev_last = 0.0
         # stepped execution: 'run' streams, 'step' consumes a budget
@@ -88,9 +90,21 @@ class GuiHooks(RunHooks):
         self.q.put(('log', msg))
 
     def progress(self, p):
+        self._last_p = p
         now = time.monotonic()
         if now - self._last_progress >= 0.1:
             self._last_progress = now
+            self.q.put(('progress', p))
+
+    def flush_progress(self):
+        """Post the newest Progress even if the ~10 Hz throttle just
+        dropped it. The stat chips otherwise keep the step/time of the
+        last message that got through, which is visibly wrong exactly
+        when the model stops moving: at a step gate (Interrupt / Exec n)
+        and at the end of a stage."""
+        p = self._last_p
+        if p is not None:
+            self._last_progress = time.monotonic()
             self.q.put(('progress', p))
 
     def frame(self, field2d, t, levels=None):
@@ -175,16 +189,25 @@ class GuiHooks(RunHooks):
             return self._exec_mode == 'step' and self._exec_budget <= 1
 
     def step_gate(self):
+        held = False
         while not self._stop.is_set():
             with self._exec_lock:
                 if self._exec_mode == 'run':
-                    return
+                    break
                 if self._exec_budget > 0:
                     self._exec_budget -= 1
-                    return
+                    break
                 self._exec_evt.clear()
+            if not held:
+                # entering the hold: publish the true step/time and tell
+                # the UI it is paused (it used to show only a log line)
+                held = True
+                self.flush_progress()
+                self.q.put(('paused', True))
             # paused: wake on set_exec()/Stop; timeout re-checks stop
             self._exec_evt.wait(0.2)
+        if held:
+            self.q.put(('paused', False))
 
 
 class SolverWorker(threading.Thread):
@@ -219,6 +242,7 @@ class SolverWorker(threading.Thread):
                     self.q.put(('error', traceback.format_exc()))
                     break
                 self.results[k] = res
+                self.hooks.flush_progress()   # chips show the true final step
                 self.q.put(('result', k, res))
                 if self.stop_event.is_set():
                     break

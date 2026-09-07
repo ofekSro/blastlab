@@ -6,6 +6,7 @@ Cards on a two-column grid; the SetupPanel pairs the scrollable form
 column with a live model-preview card and a validation status card.
 """
 
+import math
 import tkinter as tk
 from tkinter import filedialog, ttk
 
@@ -18,12 +19,23 @@ from .theme import GAP, PAD, Card, c, icon
 
 _ROW_PAD = dict(padx=(0, GAP), pady=4)
 
+#: caption wrap width and the minimum width reserved for the input column
+#: of a parameter card, so a value is always readable at the 1100x720
+#: minimum window size (see _row_lbl / _card)
+LABEL_WRAP = 132
+INPUT_MIN = 146
+
 
 def _row_lbl(frame, r, label, widget):
     """Like _row, but also returns the label widget (for rows whose
-    caption changes with the geometry, e.g. axisymmetric r/z)."""
+    caption changes with the geometry, e.g. axisymmetric r/z).
+
+    Long captions wrap instead of squeezing the input: a label like
+    "Charge refinement (blastFoam)" used to take the whole card and left
+    its combo ~40 px wide, showing one character of the value."""
     lbl = ctk.CTkLabel(frame, text=label, font=theme.F_BODY,
-                       text_color=c('muted'), anchor='w')
+                       text_color=c('muted'), anchor='w',
+                       wraplength=LABEL_WRAP, justify='left')
     lbl.grid(row=r, column=0, sticky='w', **_ROW_PAD)
     widget.grid(row=r, column=1, sticky='we', pady=4)
     return r + 1, lbl
@@ -50,18 +62,31 @@ def _combo(frame, var, values, width=176):
 
 
 def _f(var, name):
-    """Parse a float StringVar with a helpful error."""
+    """Parse a float StringVar with a helpful error.
+
+    'nan'/'inf'/'1e400' parse as floats but are not usable geometry: they
+    used to reach validation and produce messages like "r_exp = inf m
+    pokes through the boundary" instead of being refused."""
     try:
-        return float(var.get())
+        val = float(var.get())
     except ValueError:
         raise ValueError(f"'{name}' is not a number: {var.get()!r}")
+    if not math.isfinite(val):
+        raise ValueError(f"'{name}' must be a finite number: {var.get()!r}")
+    return val
 
 
 def _i(var, name):
+    """Parse an integer StringVar. A fractional entry is refused rather
+    than silently truncated (n_snapshots = 2.7 used to become 2)."""
+    raw = var.get()
     try:
-        return int(float(var.get()))
+        val = float(raw)
     except ValueError:
-        raise ValueError(f"'{name}' is not an integer: {var.get()!r}")
+        raise ValueError(f"'{name}' is not an integer: {raw!r}")
+    if not math.isfinite(val) or val != int(val):
+        raise ValueError(f"'{name}' must be a whole number: {raw!r}")
+    return int(val)
 
 
 class _PointList(ctk.CTkFrame):
@@ -182,7 +207,7 @@ class CaseForm(ctk.CTkFrame):
         self._next_row[col] += 1
         body = card.body
         body.columnconfigure(0, weight=0)
-        body.columnconfigure(1, weight=1)
+        body.columnconfigure(1, weight=1, minsize=INPUT_MIN)
         return body
 
     def _build(self):
@@ -205,18 +230,23 @@ class CaseForm(ctk.CTkFrame):
                                 ['axisymmetric', 'planar']))
                 self.v['geometry'].trace_add(
                     'write', lambda *a: self._sync_enabled())
+            # 3D starts from a case that actually validates: the old
+            # 10 m / 0.1 m / 1 kg default auto-refined to 0.0105 m and
+            # showed ~852 M cells (over the 15 M cap) on a fresh tab.
+            # 8 kg in a 3 m box keeps the 2 cm cell as typed (3.4 M cells).
+            L0 = 10.0 if self.dim == 2 else 3.0
             r, lx_lbl = _row_lbl(dom, r, 'Lx [m]',
-                                 _entry(dom, self._var('Lx', 10.0)))
+                                 _entry(dom, self._var('Lx', L0)))
             r, ly_lbl = _row_lbl(dom, r, 'Ly [m]',
-                                 _entry(dom, self._var('Ly', 10.0)))
+                                 _entry(dom, self._var('Ly', L0)))
             if self.dim == 2:
                 self._dyn_labels = {'Lx': lx_lbl, 'Ly': ly_lbl}
             if self.dim == 3:
                 r = _row(dom, r, 'Lz [m]',
-                         _entry(dom, self._var('Lz', 10.0)))
+                         _entry(dom, self._var('Lz', L0)))
             r = _row(dom, r, 'Cell size [m]',
                      _entry(dom, self._var('cell',
-                                           0.025 if self.dim == 2 else 0.1)))
+                                           0.025 if self.dim == 2 else 0.02)))
 
         # ── Charge / initialization ────────────────────────────────────
         chg = self._card(0, 'Charge' if self.dim == 1 else 'Initialization')
@@ -236,7 +266,8 @@ class CaseForm(ctk.CTkFrame):
                 'write', lambda *a: self._sync_enabled())
             r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
                                                   self.dim == 2 else ''),
-                     _entry(chg, self._var('charge', 1.0)))
+                     _entry(chg, self._var('charge',
+                                           1.0 if self.dim == 2 else 8.0)))
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
             r = _row(chg, r, 'Material (blastFoam)', self._mat_combo)
@@ -248,17 +279,18 @@ class CaseForm(ctk.CTkFrame):
                      _FilePicker(chg, self._var('profile_in', ''),
                                  filetypes=[('Profiles', '*.txt *.npz'),
                                             ('All files', '*.*')]))
+            c0 = 5.0 if self.dim == 2 else 1.5      # centre of L0
             cx_ent = _entry(chg, self._var('cx', 0.0 if self.dim == 2
-                                           else 5.0))
+                                           else c0))
             r, cx_lbl = _row_lbl(chg, r, 'Burst x [m]', cx_ent)
             r, cy_lbl = _row_lbl(chg, r, 'Burst y [m]',
-                                 _entry(chg, self._var('cy', 5.0)))
+                                 _entry(chg, self._var('cy', c0)))
             if self.dim == 2:
                 self._dyn_labels.update(cx=cx_lbl, cy=cy_lbl)
                 self._burst_x_entry = cx_ent
             if self.dim == 3:
                 r = _row(chg, r, 'Burst z [m]',
-                         _entry(chg, self._var('cz', 5.0)))
+                         _entry(chg, self._var('cz', c0)))
 
         # ── Numerics ───────────────────────────────────────────────────
         num = self._card(0, 'Numerics')
@@ -653,8 +685,11 @@ class SetupPanel(ctk.CTkFrame):
         super().__init__(parent, fg_color='transparent')
         self._on_change = on_change or (lambda: None)
 
-        self.columnconfigure(0, weight=11, uniform='main')
-        self.columnconfigure(1, weight=9, uniform='main')
+        # the form column carries two cards of label+input side by side and
+        # is the one that runs out of room first; the preview only loses
+        # some empty margin (weights were 11:9)
+        self.columnconfigure(0, weight=13, uniform='main')
+        self.columnconfigure(1, weight=7, uniform='main')
         self.rowconfigure(1, weight=1)
 
         # header: title + dimension selector

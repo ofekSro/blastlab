@@ -72,7 +72,12 @@ class RunPanel(ctk.CTkFrame):
             bar, width=220, height=8, corner_radius=4,
             progress_color=c('accent'), fg_color=c('card2'))
         self.progress.set(0.0)
-        self.progress.pack(side='left', padx=(0, PAD))
+        self.progress.pack(side='left', padx=(0, GAP))
+        # stepped execution used to be visible only as a "[interrupted]"
+        # line in the log; say it where the run state is read
+        self._paused_lbl = ctk.CTkLabel(bar, text='', font=theme.F_SMALL,
+                                        text_color=c('warn'))
+        self._paused_lbl.pack(side='left', padx=(0, PAD))
 
         chips = ctk.CTkFrame(bar, fg_color='transparent')
         chips.pack(side='right')
@@ -193,6 +198,7 @@ class RunPanel(ctk.CTkFrame):
         self._mesh_geom = None      # (x_face, y_face, mesh_src) of the run
         self._mesh_lines = None     # the overlay LineCollection
         self._title = None
+        self._last_step = None      # newest step, for the PAUSED readout
 
     # ── live-view sub-tab switching ──────────────────────────────────────
     def _view_selected(self, value):
@@ -213,12 +219,47 @@ class RunPanel(ctk.CTkFrame):
         self.stop_btn.configure(state='normal' if running else 'disabled')
         for b in self._exec_btns:
             b.configure(state='normal' if running else 'disabled')
+        self.set_paused(False)
         if running:
             self.progress.set(0.0)
             self._clear_log()
+            # Everything below belongs to the PREVIOUS run: the chips and
+            # the live plot used to keep its step/time/field until the new
+            # run's first frame, which on a blastFoam cold start is minutes
+            # of a stale picture (and, after Initialise Model, a t = 0 plot
+            # beside the last run's step count).
+            self._reset_readouts()
         else:
             # live attach only during a run; Results tab covers afterwards
             self.view3d_btn.configure(state='disabled')
+
+    def _reset_readouts(self):
+        """Chips back to '-', live plot to a waiting placeholder, 3D view
+        dropped: nothing on the Run tab may still describe the last run."""
+        self._last_step = None
+        for chip in (self._chip_step, self._chip_t, self._chip_dt,
+                     self._chip_pmax):
+            chip.configure(text='—')
+        self._mesh = self._line = self._solid = None
+        self._mesh_geom = self._mesh_lines = None
+        self._title = None
+        fig = Figure(figsize=(5.5, 5.5))
+        ax = fig.add_subplot()
+        ax.axis('off')
+        ax.text(0.5, 0.5, 'waiting for the solver…', transform=ax.transAxes,
+                ha='center', va='center', fontsize=11,
+                color=theme.cur('muted'))
+        self.canvas.set_figure(fig)
+        try:
+            self.view3d.reset()
+        except Exception:
+            pass
+
+    def set_paused(self, paused):
+        self._paused_lbl.configure(
+            text=('PAUSED at step '
+                  f'{self._last_step}' if self._last_step is not None
+                  else 'PAUSED') if paused else '')
 
     def enable_view3d(self, enabled):
         self.view3d_btn.configure(state='normal' if enabled else 'disabled')
@@ -242,6 +283,7 @@ class RunPanel(ctk.CTkFrame):
 
     def on_progress(self, p):
         self.progress.set(max(0.0, min(1.0, p.frac)))
+        self._last_step = p.step
         self._chip_step.configure(text=str(p.step))
         self._chip_t.configure(text=f'{p.t*1e3:.3f}')
         self._chip_dt.configure(text=f'{p.dt:.2e}')

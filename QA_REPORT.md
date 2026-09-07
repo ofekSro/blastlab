@@ -40,6 +40,44 @@ no-WSL matrix stays green (`test_regression` byte-identical).
 
 ---
 
+## S2 status — FIXED 2026-09-07
+
+All nine S2 findings are fixed, covered by `test_gui_results_fields.py`
+(`qa_s2_checks`) and re-rendered in the harness (B01/B02/B03/B05, D03, E01,
+E06, E09). The 21-suite no-WSL matrix stays green (`test_regression`
+byte-identical).
+
+- **QA-07** — parameter cards give the input column a minimum width
+  (`forms.INPUT_MIN`) and let long captions wrap (`LABEL_WRAP`); the form
+  column also takes a larger share of the Setup row (13:7, was 11:9). Every
+  combo/entry value is readable at 1280x840 *and* at the 1100x720 minimum.
+- **QA-08** — the Results header is two rows: picker + Remove / 3D Viewer /
+  Foam runs on row 1, "Export" + all six export buttons on row 2. Nothing is
+  packed off-window any more (verified at 1100 px).
+- **QA-09** — `View3DPanel` raises the Display tab after construction (Tk
+  stacks by creation order, so the View tab covered it).
+- **QA-10** — `set_running` resets the stat chips; `GuiHooks.flush_progress`
+  publishes the newest Progress when the step gate holds and at stage end,
+  and a `('paused', bool)` message drives a "PAUSED at step N" readout.
+- **QA-11** — `set_running` also swaps the live pane to a "waiting for the
+  solver…" placeholder and drops the 3D scene, so a blastFoam preflight no
+  longer shows the previous run's picture and chips.
+- **QA-12** — `_setup_anim` blanks the replay canvas with an explanation and
+  disables Play when a result has no frames (1D, post-mortem loaded).
+- **QA-13** — `add_result` numbers a repeated label (`... #2`) so every entry
+  stays reachable, and a Remove button frees the selected result.
+- **QA-14** — the 3D form opens on a case that validates (8 kg in a 3 m box
+  at 2 cm = 3.4M cells, cell size honoured as typed) instead of the 10 m /
+  1 kg default that auto-refined to ~852M cells.
+- **QA-15** — `forms._f` refuses non-finite input and `_i` refuses a
+  fractional count instead of truncating it.
+
+Cap errors now also explain the cause ("resolving the 0.105 m charge forces a
+0.01054 m cell across the whole 10 m domain; use a smaller domain, a larger
+charge, or charge resolution 'smear' / blastFoam charge refinement 'zone'").
+
+---
+
 ## 0. How to read this / environment
 
 - **Output dir (screenshots, logs, evidence):** `C:\Users\Ofek Rotem\blastlab_qa\20260907-0108\`

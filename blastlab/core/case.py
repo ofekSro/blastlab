@@ -633,6 +633,21 @@ def validate_case(case, pending_inputs=False):
                              else "The base cell already resolves the "
                                   "charge - no automatic zone needed")
 
+    def scale_hint():
+        """Why a modest cell size turned into a huge grid: the charge, not
+        the cell-size field, sets the spacing, and it applies to the WHOLE
+        uniform domain. Without this the user only saw 'cell size will be
+        refined' and a cell count two orders of magnitude off what they
+        asked for."""
+        if not refined or not rep.r_exp:
+            return ""
+        return (f" - resolving the {2 * rep.r_exp:.3g} m charge forces a "
+                f"{dx:.4g} m cell across the whole {max(dims):g} m domain; "
+                f"use a smaller domain, a larger charge"
+                + (", or charge resolution 'smear'"
+                   if case.dim == 3 and not foam else "")
+                + (", or blastFoam charge refinement 'zone'" if foam else ""))
+
     rep.effective_dx = dx
     if plan is not None and plan.amr:
         # AMR: the mesh grows during the run up to maxCells, so that is
@@ -656,12 +671,13 @@ def validate_case(case, pending_inputs=False):
             # frames, so the cap reflects wall time/disk, not RAM
             if n > FOAM_CELLS_REFUSE:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
-                    f"{FOAM_CELLS_REFUSE:,}")
+                    f"{FOAM_CELLS_REFUSE:,}" + scale_hint())
             elif n > FOAM_CELLS_WARN:
                 warn(f"Large grid: ~{n:,} cells - expect a long run "
                      f"and GBs of case files on the WSL disk")
         elif n > CELLS_2D_MAX:
-            err(f"~{n:,} cells exceeds the 2D cap of {CELLS_2D_MAX:,}")
+            err(f"~{n:,} cells exceeds the 2D cap of {CELLS_2D_MAX:,}"
+                + scale_hint())
         elif n > CELLS_2D_WARN:
             warn(f"Large grid: ~{n:,} cells - expect a long run")
     else:
@@ -673,14 +689,13 @@ def validate_case(case, pending_inputs=False):
         elif foam:
             if n > FOAM_CELLS_REFUSE:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
-                    f"{FOAM_CELLS_REFUSE:,}")
+                    f"{FOAM_CELLS_REFUSE:,}" + scale_hint())
             elif n > FOAM_CELLS_WARN:
                 warn(f"Large grid: ~{n:,} cells - expect hours of wall "
                      f"time and GBs of case files on the WSL disk")
         elif n > CELLS_REFUSE:
             err(f"~{n:,} cells exceeds the 3D cap of {CELLS_REFUSE:,}"
-                + (" - set charge resolution to 'smear' to keep your "
-                   "cell size" if refined else ""))
+                + scale_hint())
         elif n > CELLS_WARN:
             warn(f"Large grid: ~{n:,} cells - expect a long run and GBs of RAM")
     rep.n_cells = n

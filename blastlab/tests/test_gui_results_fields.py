@@ -168,7 +168,67 @@ def main():
     check('peak shown as overpressure in kPa',
           np.allclose(pk['peak overpressure'], 6.0), str(pk['peak overpressure'].ravel()[:2]))
 
+    qa_s2_checks(panel)
     root.destroy()
+
+
+def qa_s2_checks(panel):
+    """QA S2 fixes: duplicate result labels are numbered so every entry
+    stays reachable, Remove frees one, and a result with no replay frames
+    blanks the animation canvas instead of leaving the previous result's
+    frame on screen. Plus the stricter numeric field parsing."""
+    import tkinter as tk
+    from blastlab.gui import forms
+
+    print("\nQA S2: results management")
+    r2 = fake_2d()
+    panel.add_result('dup', 2, r2)
+    panel.add_result('dup', 2, r2)
+    vals = list(panel.sel.cget('values'))
+    check('a repeated label is numbered, not shadowed',
+          vals.count('dup') == 1 and 'dup #2' in vals, str(vals))
+    panel.sel.set('dup #2')
+    ent = panel._current()
+    check('the numbered entry is selectable',
+          ent is not None and ent.label == 'dup #2')
+    n = len(panel._entries)
+    panel._remove_current()
+    check('Remove drops it from the picker and the entry list',
+          len(panel._entries) == n - 1
+          and 'dup #2' not in list(panel.sel.cget('values')))
+
+    print("\nQA S2: animation placeholder")
+    # a result whose meta carries no frames must not keep the previous
+    # result's replay picture (the 1D / post-mortem case)
+    panel.add_result('noframes', 2, fake_2d())
+    panel.sel.set('noframes')
+    panel._refresh()
+    check('no frames -> Play disabled',
+          str(panel.play_btn.cget('state')) == 'disabled')
+    check('no frames -> replay canvas carries an explanation',
+          any('No recorded frames' in t.get_text()
+              for ax in panel.anim_canvas.figure.axes for t in ax.texts))
+
+    print("\nQA S2: numeric field parsing")
+    var = tk.StringVar()
+    for bad in ('nan', 'inf', '1e400'):
+        var.set(bad)
+        try:
+            forms._f(var, 'charge')
+            check(f'_f refuses {bad!r}', False)
+        except ValueError as exc:
+            check(f'_f refuses {bad!r}', 'finite' in str(exc))
+    var.set('1.5')
+    check('_f still accepts a normal float', forms._f(var, 'x') == 1.5)
+    var.set('2.7')
+    try:
+        forms._i(var, 'snapshots')
+        check('_i refuses a fractional count', False)
+    except ValueError as exc:
+        check('_i refuses a fractional count', 'whole number' in str(exc))
+    for good, want in (('6', 6), ('6.0', 6), ('0', 0)):
+        var.set(good)
+        check(f'_i accepts {good!r}', forms._i(var, 'n') == want)
 
 
 if __name__ == '__main__':

@@ -108,6 +108,12 @@ class View3DPanel(VtkTkHost):
         for w in (viewtab, planes, disp):
             w.grid(row=0, column=0, sticky='nsew')
         self._tab_seg.set('Display')
+        # Tk stacks siblings by CREATION order, not grid order, so `viewtab`
+        # (created last) covered the Display tab: the panel opened showing
+        # the View tab's camera presets under a highlighted "Display" and
+        # the field/colour/layer controls were unreachable until the user
+        # clicked another tab. seg.set() fires no callback, so raise it here.
+        disp.tkraise()
 
         # ── Display tab ────────────────────────────────────────────────
         small_label(disp, 'FIELD')
@@ -275,6 +281,22 @@ class View3DPanel(VtkTkHost):
         self._apply_all_controls()
         self._dirty = True
         return True
+
+    def reset(self):
+        """Drop the current scene and go back to the placeholder, so a new
+        run does not start against the previous run's picture (the panel
+        keeps its last blit until a new frame arrives otherwise)."""
+        self._scene = None
+        self._dirty = False
+        self._photo = None
+        self._playing = False
+        try:
+            self.play_btn.configure(
+                text='Play', image=theme.icon('play', 12, color='white'))
+            self.view.configure(image='', text=self.PLACEHOLDER)
+            self._set_time_range(0)
+        except Exception:
+            pass
 
     def prepare_live(self, scene_info):
         """New live 3D run: build the scene; returns the Feed3D whose
