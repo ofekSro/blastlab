@@ -311,6 +311,71 @@ def qa_s2_checks(panel):
     check('without robust the full range is kept',
           plain.axes[0].collections[0].get_clim()[1] >= 5e4)
 
+    t29_checks(panel)
+
+
+def t29_checks(panel):
+    """T29: the Run tab gates its start buttons on validation, a greyed
+    export says why it is greyed, and Open case explains a bad file."""
+    print("")
+    print("T29: run gating, export reasons, open-case messages")
+    from blastlab.gui.run_panel import RunPanel
+    root = panel.winfo_toplevel()
+    rp = RunPanel(root, on_run=lambda: None, on_stop=lambda: None,
+                  on_init=lambda: None, on_refresh=lambda: None)
+    rp.set_validation(False, 3)
+    check('errors gate Run and Initialise',
+          str(rp.run_btn.cget('state')) == 'disabled'
+          and str(rp.init_btn.cget('state')) == 'disabled')
+    check('the Run tab says how many errors',
+          '3 errors' in rp._valid_lbl.cget('text'),
+          rp._valid_lbl.cget('text'))
+    rp.set_validation(True)
+    check('a clean case re-enables the start buttons',
+          str(rp.run_btn.cget('state')) == 'normal'
+          and rp._valid_lbl.cget('text') == 'Case OK')
+    rp.destroy()
+
+    panel.sel.set('gating')          # the planar 2D result from QA S3
+    panel._refresh()
+    prof = panel._export_btns['profile']
+    check('a disabled export explains itself on hover',
+          'axisymmetric' in getattr(prof, '_blastlab_tip').text,
+          getattr(prof, '_blastlab_tip').text)
+
+    import json, tempfile, os as _os
+    from blastlab.gui import app as _app
+    seen = []
+    real = _app.messagebox.showerror
+    _app.messagebox.showerror = lambda title, msg: seen.append((title, msg))
+    stub = _app.App.__new__(_app.App)
+    stub.setup = type('S', (), dict(set_case=lambda self, c: None))()
+    stub._show = lambda *a: None
+    tmp = tempfile.mkdtemp(prefix='blastlab_open_')
+    try:
+        bad = _os.path.join(tmp, 'bad.json')
+        with open(bad, 'w', encoding='utf-8') as f:
+            f.write('{not json')
+        stub._open_case(bad)
+        check('garbage JSON reads as a JSON error',
+              'not valid JSON' in seen[-1][1], seen[-1][1])
+        wrong = _os.path.join(tmp, 'wrong.json')
+        with open(wrong, 'w', encoding='utf-8') as f:
+            json.dump(dict(dim=5), f)
+        stub._open_case(wrong)
+        check('a wrong schema reads as a blastlab-case error',
+              'case file' in seen[-1][1].lower(), seen[-1][1])
+        missing = _os.path.join(tmp, 'nope.json')
+        stub._open_case(missing)
+        check('a missing file is named as a path, not a repr',
+              seen[-1][1] == f'File not found: {missing}', seen[-1][1])
+        check('every Open-case dialog is titled',
+              all(t == 'Open case' for t, _ in seen[-3:]))
+    finally:
+        _app.messagebox.showerror = real
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == '__main__':
     main()

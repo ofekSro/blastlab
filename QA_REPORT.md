@@ -92,7 +92,14 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
   a window-wide status bar surfaces export/load/viewer messages and solver
   `[warn]` lines wherever the user is standing; export buttons are enabled
   only when that export can actually run (nothing selected = all off,
-  Profile off for planar 2D and 3D).
+  Profile off for planar 2D and 3D). **T29:** a greyed export now says
+  why on hover ("Only axisymmetric 2D fields can be remapped into 3D",
+  "This result has no recorded frames …"); `_refresh` re-gates the row
+  when the picker matches nothing (it used to leave the previous
+  result's buttons enabled, so they were live no-ops again) and
+  `_export` answers "Select a result before exporting."; and every file
+  dialog is titled — Open case / Save case / Save gauges TSV / Save gauge
+  summary CSV / Save animation GIF / Save profile / Open profile file.
 - **QA-17** — the Run tab gives the live view a larger share and the 3D
   control column is 206 px (was 248); a plane parked on a domain face is
   nudged just inside so it cannot silently vanish; the Results 3D viewer now

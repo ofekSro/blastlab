@@ -287,6 +287,11 @@ class ResultsPanel(ctk.CTkFrame):
     def _refresh(self):
         ent = self._current()
         if ent is None:
+            # a picker text that matches nothing (a cleared combo, a
+            # label typed by a test) used to leave the export row exactly
+            # as the previous result had left it, so every button stayed
+            # enabled and did nothing when pressed (QA-16)
+            self._sync_export_buttons(None)
             return
         self._stop_play()
         self._sync_export_buttons(ent)
@@ -324,8 +329,9 @@ class ResultsPanel(ctk.CTkFrame):
         silent no-ops, and Profile on a planar 2D result opened a file
         dialog and then failed in the log."""
         if ent is None:
-            for b in self._export_btns.values():
+            for kind, b in self._export_btns.items():
                 b.configure(state='disabled')
+                theme.tooltip(b, 'Select a result first.')
             return
         res, dim = ent.result, ent.dim
         meta = res.meta
@@ -340,8 +346,23 @@ class ResultsPanel(ctk.CTkFrame):
             profile=(dim == 1 or (dim == 2 and meta.get('geometry')
                                   == 'axisymmetric')),
         )
+        # a greyed button has to say why it is greyed - "Profile" in
+        # particular is off for every 3D and planar-2D result (QA-16)
+        why = dict(
+            vtk='Only a blastFoam run whose case directory still exists '
+                'can be written as VTK.',
+            gif='This result has no recorded frames - tick "Record replay '
+                'frames" before the run.',
+            summary='This result has no gauges.',
+            tsv='This result has no gauges.',
+            pngs='This result has no field snapshots.',
+            profile=('3D results have no profile export.' if dim == 3 else
+                     'Only axisymmetric 2D fields can be remapped into 3D.'),
+        )
         for kind, b in self._export_btns.items():
-            b.configure(state='normal' if ok.get(kind, True) else 'disabled')
+            good = ok.get(kind, True)
+            b.configure(state='normal' if good else 'disabled')
+            theme.tooltip(b, '' if good else why.get(kind, ''))
 
     def _mesh_toggled(self):
         self._draw_field()
@@ -665,6 +686,7 @@ class ResultsPanel(ctk.CTkFrame):
     def _export(self, kind):
         ent = self._current()
         if ent is None:
+            self._log('Select a result before exporting.')
             return
         res, dim = ent.result, ent.dim
         show_mesh = bool(self.show_mesh_var.get())
@@ -676,7 +698,8 @@ class ResultsPanel(ctk.CTkFrame):
             target = filedialog.askdirectory(title='Save PNGs into')
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
-                defaultextension='.txt', initialfile=f'gauges_{dim}d.txt')
+                title='Save gauges TSV', defaultextension='.txt',
+                initialfile=f'gauges_{dim}d.txt')
         elif kind == 'vtk':
             from ..solvers.foam.export_vtk import can_export
             if not can_export(res.meta):
@@ -689,20 +712,21 @@ class ResultsPanel(ctk.CTkFrame):
                 self._log('No gauges in this result.')
                 return
             target = filedialog.asksaveasfilename(
-                defaultextension='.csv',
+                title='Save gauge summary CSV', defaultextension='.csv',
                 initialfile=f'gauges_{dim}d_summary.csv')
         elif kind == 'gif':
             if not res.meta.get('frames'):
                 self._log('No recorded frames in this result.')
                 return
             target = filedialog.asksaveasfilename(
-                defaultextension='.gif',
+                title='Save animation GIF', defaultextension='.gif',
                 initialfile=f'blast_{dim}d_animation.gif')
         elif kind == 'profile':
             if dim == 3:
                 self._log('3D results have no profile export.')
                 return
             target = filedialog.asksaveasfilename(
+                title='Save profile',
                 defaultextension='.txt' if dim == 1 else '.npz',
                 initialfile=('blast_profile.txt' if dim == 1
                              else 'blast_profile_2d.npz'))

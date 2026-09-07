@@ -93,7 +93,7 @@ Hard rules:
 | T26 | QA S1: chain feed3d lifecycle + profile-stage validation | QA-05, 06; B26 | S | [x] 2026-09-07 (`ba37a65`) |
 | T27 | QA: remaining layout — Run-tab 3D viewport, status card height, truncations | QA-17, 25, 27; G11 | S–M | [x] 2026-09-07 |
 | T28 | QA: chain feedback (stage select, workspace after validation, stage prefix) | QA-23; G12 | S | [x] 2026-09-07 |
-| T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [ ] |
+| T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [x] 2026-09-07 |
 | T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [ ] |
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [ ] |
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [ ] |
@@ -281,6 +281,32 @@ Verify: test_case_validate, test_gui_drain, test_gui_results_fields (+ new headl
 Done when: green; G3 DONE; QA-16/22 FIXED.
 Commit: "T29: collect every validation error, inline field feedback, Results status line (G3, QA-16/22)"
 ```
+
+**DONE (2026-09-07):** items 1-3 and most of 4-5 had landed in `a6c7463` — verified,
+not redone: `CaseForm.get_case` raises ONE newline-joined ValueError and
+`mark_fields` red-borders every offending entry; `_PointList._reject/_accept` keep
+the text, red-border the box and print a one-line hint; `RunPanel.set_validation`
+drives the "Case OK / N errors - see Setup" chip and disables Run + Initialise;
+`RunPanel.mark_refresh` marks an unusable "Refresh every"; `App.notify` +
+`_status` is one window-wide status bar (chosen over a per-panel line - it reaches
+the user wherever they stand) and `_open_case` reports JSONDecodeError / schema /
+FileNotFoundError in plain words.
+This task closed the rest: every file dialog is titled (Open case, Save case, Save
+gauges TSV, Save gauge summary CSV, Save animation GIF, Save profile, Open profile
+file - `_FilePicker` takes a `title=`); a disabled export button carries a tooltip
+saying why it is off (the brief's "only axisymmetric 2D fields can be remapped"
+among them); `ResultsPanel._refresh` re-gates the export row when the picker matches
+nothing (it returned early, leaving the previous result's buttons enabled and live
+as no-ops - the E08 harness finding); and `_export` answers "Select a result before
+exporting." instead of returning in silence.
+Tests: test_gui_results_fields gained a `t29_checks` block (Run/Initialise gated by
+set_validation, a disabled export explains itself, Open case on garbage JSON / a
+`dim: 5` schema / a missing path, every dialog titled) - plus test_case_validate,
+test_gui_drain, test_gui_gauge_summary, test_gui_refine_preview, test_gui_amr_form,
+test_gui_run_browser, test_gui_results_anim, test_regression byte-identical.
+Harness C01, C04, C08, E03, E07, E08, I03 - no findings. (E03/E08 first reported
+findings when run in isolation: E03 needs D01/D02 to have cached the 1D/2D results,
+and E08's was the live-no-op bug fixed above; re-run after D01,D02 both pass.)
 
 ### T30 — QA: user-named runs + loaded-run replay (N9, QA-24) — G2 close-out
 
@@ -874,7 +900,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 **GUI (G)**
 - G1 "Initialise Model" hint erased — DONE (T5)
 - **G2** results accumulate / duplicate labels — de-dup + Remove DONE (QA-13); names → **T30**
-- **G3** validation split-brain / silent swallowing — OPEN → **T29**
+- G3 validation split-brain / silent swallowing — DONE (2026-09-07, T29)
 - **G4** replay / preview stalls (idle-CPU half refuted) — OPEN → **T31**
 - G5 chain start race — DONE (T6)
 - G6 progress < 100 % (DONE, T5); theme half refuted by QA (mesh overlay colour cosmetic) — closed

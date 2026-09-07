@@ -191,9 +191,13 @@ class _PointList(ctk.CTkFrame):
 
 
 class _FilePicker(ctk.CTkFrame):
-    def __init__(self, parent, var, save=False, filetypes=None):
+    def __init__(self, parent, var, save=False, filetypes=None,
+                 title=None):
         super().__init__(parent, fg_color='transparent')
         self.var = var
+        # every dialog says what it is for - a bare "Open" gave no clue
+        # which of the file fields had opened it (QA-16)
+        self._dlg_title = title or ('Save file' if save else 'Open file')
         ctk.CTkEntry(self, textvariable=var, font=theme.F_BODY,
                      corner_radius=8, fg_color=c('entry'),
                      border_color=c('border')).grid(
@@ -208,7 +212,8 @@ class _FilePicker(ctk.CTkFrame):
             row=0, column=1)
 
     def _pick(self, kind, filetypes):
-        fn = kind(filetypes=filetypes or [('All files', '*.*')])
+        fn = kind(title=self._dlg_title,
+                  filetypes=filetypes or [('All files', '*.*')])
         if fn:
             self.var.set(fn)
 
@@ -319,6 +324,7 @@ class CaseForm(ctk.CTkFrame):
                                 ['resolve', 'smear']))
             r = _row(chg, r, 'Profile file',
                      _FilePicker(chg, self._var('profile_in', ''),
+                                 title='Open profile file',
                                  filetypes=[('Profiles', '*.txt *.npz'),
                                             ('All files', '*.*')]))
             c0 = 5.0 if self.dim == 2 else 1.5      # centre of L0

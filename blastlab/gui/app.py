@@ -310,6 +310,7 @@ class App:
     # ── case files ───────────────────────────────────────────────────────
     def _open_case(self, path=None):
         path = path or filedialog.askopenfilename(
+            title='Open case',
             filetypes=[('blastlab case', '*.json'), ('All files', '*.*')])
         if not path:
             return
@@ -349,7 +350,7 @@ class App:
             messagebox.showerror('Save case', str(exc))
             return
         path = filedialog.asksaveasfilename(
-            defaultextension='.json',
+            title='Save case', defaultextension='.json',
             filetypes=[('blastlab case', '*.json')])
         if path:
             save_case(case, path)
