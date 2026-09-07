@@ -101,7 +101,7 @@ Hard rules:
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [x] 2026-09-07 |
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
-| T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [ ] |
+| T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [ ] |
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [ ] |
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [ ] |
@@ -746,6 +746,44 @@ Done when: green; A4 (native part) / A5 / A6 / A7 DONE.
 Commit: "T37: shared EOS/grid/constants in the native solvers, stdout + surface canaries (A4-A7)"
 ```
 
+**DONE (2026-09-07):** all four, with `test_regression` byte-identical after every
+step (no re-baseline, as the brief demands).
+- **A4:** the identical air/products dispatch in solver1d/2d/3d `primitives()` is
+  now one call to `eos.pressure_soundspeed` (the function that already held that
+  exact block and had no caller); solver1d takes `r`, `A_face` and `V_cell` from
+  `make_grid_1d` instead of rebuilding them inline, in both the initial and the
+  auto-refined grid. `riemann.mirror_state` is deleted - grep found no CALLER, only
+  two unused imports in `legacy/blast2d.py` and `legacy/blast3d.py`, which went with
+  it (an unused import cannot change those byte-pinned modules' output, and
+  test_regression drives all three legacy solvers).
+- **A5:** solver1d/2d/3d import `MIN_EXP_CELLS`, `CELLS_2D_WARN` and `CELLS_2D_MAX`
+  from `core.constants`; the `MIN_EXP_CELLS = 5` and `8_000_000` / `2_000_000`
+  literals are gone. (The remaining `2_000_000` in solver3d is the s/step wall-time
+  estimate, not a guard rail.) `test_case_validate.shared_constant_checks` asserts
+  that constants.py, validate_case and each solver see the same numbers AND that no
+  solver re-types the literals.
+- **A6:** `runloop.progress_line` counts solver stdout lines while `st['step']` is
+  still 0 and logs ONE warning through hooks after `TIME_CANARY_LINES` (500) of them
+  - "blastFoam output format changed? no 'Time =' lines yet - live cadence and
+  progress may stall". A solver that is stepping never trips it.
+- **A7:** `backend._surface_refused` / `_surface_ok` wrap every face-count and
+  exact-cover refusal in `_decode_surface` and `_decode_surface_amr`. A mid-write
+  sample is refused legitimately, so the canary waits for
+  `SURFACE_CANARY_TRIES` (20) CONSECUTIVE refusals - about 5 s of polling - and then
+  logs one line naming both counts; a sample that decodes clears the streak. The
+  three `solve_*_foam` entry points hand the spec its hooks (`spec.hooks`) so the
+  decoders can log without changing their call sites.
+Tests: test_regression byte-identical, test_blast2d, test_blast3d, test_foam_reader,
+test_foam_live_due (new `canary_checks`: quiet below both thresholds, exactly one
+line above them, never twice, a stepping solver and a decoding sample clear it),
+test_case_validate (new `shared_constant_checks`), test_foam_writer, test_refine,
+test_gauge_summary.
+**Note on the preceding commit:** `_decode_surface_amr`, which this brief names,
+existed only as UNCOMMITTED work in the working tree (the live AMR slice + the
+solver-side "Refresh every N steps" cadence, with its README text and its AMR
+controlDict goldens). A7 could not be delivered against HEAD without it, so that
+work was landed first, unchanged, in its own commit; T37 sits on top.
+
 ### T38 — Live-view niceties (G7): foam cadence hint + 2D live Min/Max
 
 ```
@@ -1066,10 +1104,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - A1 foam run loop triplicated — DONE (T9)
 - A2 geometry logic quadruplicated — DONE (T9, `core/geometry.py`)
 - A3 postmortem private imports — DONE (T9)
-- **A4** dead code — foam + viz3d parts DONE (T9/T13); native part (eos.pressure_soundspeed, riemann.mirror_state, solver1d grid) → **T37**
-- **A5** guard-rail constants duplicated as literals — OPEN → **T37**
-- **A6** `Time =` regex needs a canary — OPEN → **T37**
-- **A7** `_decode_surface` silent degrade — OPEN → **T37**
+- A4 dead code — foam + viz3d parts DONE (T9/T13); native part DONE (2026-09-07, T37)
+- A5 guard-rail constants duplicated as literals — DONE (2026-09-07, T37)
+- A6 `Time =` regex needs a canary — DONE (2026-09-07, T37)
+- A7 `_decode_surface` silent degrade — DONE (2026-09-07, T37)
 - A8 viz3d control-message delivery — DONE (T13)
 - A9 commit hygiene — DONE (2026-09-02)
 - A10 regression discipline — standing rule (§2)

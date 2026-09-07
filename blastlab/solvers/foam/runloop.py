@@ -43,6 +43,13 @@ POLL_S = 0.25
 STALL_POLLS = 20
 #: adaptive writeInterval: act at most once per this many ingests
 ADAPT_EVERY = 3
+#: solver stdout lines tolerated before the first `Time = ` match. The
+#: regex below is load-bearing - step counting, the progress bar and the
+#: live-frame cadence all hang off it - so a blastFoam release that
+#: reworded its time banner would silently freeze all three. One warning
+#: after this many lines is the canary (A6). blastFoam's own header is
+#: well under 100 lines.
+TIME_CANARY_LINES = 500
 
 #: FOAM warnings that are inherent to the collapsed-hex sector/wedge
 #: meshes (1D sector, 2D axisym): the apex face degenerates into the
@@ -103,6 +110,14 @@ def progress_line(line, st, hooks, end_time):
     the message) - the actual message is captured and logged; the
     benign sector-wedge warnings collapse into one note."""
     m = _RE_TIME.match(line)
+    if not m and not st['step'] and not st.get('time_canary'):
+        # never yet seen a `Time = ` line: count how long that lasts
+        st['no_time'] = st.get('no_time', 0) + 1
+        if st['no_time'] >= TIME_CANARY_LINES:
+            st['time_canary'] = True
+            hooks.log("  [warn] blastFoam output format changed? no "
+                      "'Time =' lines yet - live cadence and progress "
+                      "may stall")
     if m:
         st['t'] = float(m.group(1))
         st['step'] += 1

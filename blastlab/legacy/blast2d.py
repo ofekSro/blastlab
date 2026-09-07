@@ -56,7 +56,7 @@ from matplotlib import animation
 from ..core.constants import GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT, E_AIR
 from ..core.eos import (air_pressure, air_soundspeed,
                         jwl_pressure, jwl_soundspeed)
-from ..core.riemann import hll_fluxes, mirror_state
+from ..core.riemann import hll_fluxes
 from ..core.bc import face_fluxes, solid_mask_2d as solid_mask
 from ..core.grid import make_geometry
 from ..core.profiles import (load_profile, save_profile_2d,

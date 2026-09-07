@@ -4,9 +4,10 @@ import math
 
 import numpy as np
 
-from ..core.constants import GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT
-from ..core.eos import (air_pressure, air_soundspeed,
-                        jwl_pressure, jwl_soundspeed)
+from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
+                              MIN_EXP_CELLS)
+from ..core.eos import (air_pressure, jwl_pressure,
+                        pressure_soundspeed)
 from ..core.riemann import hll_fluxes_1d as hll_fluxes
 from ..core.grid import make_grid_1d
 from .hooks import ConsoleHooks, Progress, Result
@@ -20,22 +21,9 @@ def primitives(U, phase, eos):
     u   = U[1] / rho
     e   = np.maximum((U[2] - 0.5 * rho * u**2) / rho, 1.0)  # floor e at 1 J/kg
 
-    air  = phase == 0
-    prod = ~air
-    p    = np.empty_like(rho)
-    c    = np.empty_like(rho)
-
-    if air.any():
-        p[air] = air_pressure(rho[air], e[air])
-        c[air] = air_soundspeed(rho[air], p[air])
-
-    if prod.any():
-        if eos == 'JWL':
-            p[prod] = np.maximum(jwl_pressure(rho[prod], e[prod]), 1.0)
-            c[prod] = jwl_soundspeed(rho[prod], e[prod], p[prod])
-        else:
-            p[prod] = air_pressure(rho[prod], e[prod])
-            c[prod] = air_soundspeed(rho[prod], p[prod])
+    # the identical air/products dispatch lived in all three solvers
+    # (A4); eos.pressure_soundspeed is that same block, verbatim
+    p, c = pressure_soundspeed(rho, e, phase, eos)
 
     return rho, u, e, p, c
 
@@ -72,8 +60,9 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
         hooks = ConsoleHooks(1)
     # ── Grid ──────────────────────────────────────────────────────────────────
     # r=0 is at the left domain boundary; first cell centre at dr/2
-    r_face = make_grid_1d(radius_m, cell_size_m)[0]
-    r      = 0.5 * (r_face[:-1] + r_face[1:])   # cell centres
+    # core.grid.make_grid_1d owns the spherical metrics; this used to
+    # take its faces and then rebuild r / A_face / V_cell inline (A4)
+    r_face, r, A_face, V_cell = make_grid_1d(radius_m, cell_size_m)
     N      = len(r)
     # effective spacing: == cell_size_m unless it does not divide radius_m,
     # in which case the grid was fitted to the exact domain (core.grid)
@@ -81,10 +70,6 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     if dr != cell_size_m:
         hooks.log(f"  [note] Cell size adjusted {cell_size_m:g} -> {dr:.4g} m "
                   f"to fit {radius_m:g} m exactly")
-
-    # Spherical face areas and cell volumes
-    A_face = 4.0 * np.pi * r_face**2                              # (N+1,)
-    V_cell = (4.0 / 3.0) * np.pi * (r_face[1:]**3 - r_face[:-1]**3)  # (N,)
 
     # ── Explosive sphere radius from charge weight ──────────────────────────
     rho_exp = JWL_TNT['rho0']
@@ -96,16 +81,12 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m,
     # Ensure at least 5 cells inside the explosive sphere — otherwise the
     # density contact surface is unresolved and HLL drains the cell in one step,
     # collapsing rho to the floor and making e (and c) blow up to near-infinity.
-    MIN_EXP_CELLS = 5
     if dr > r_exp / MIN_EXP_CELLS:
         # the largest spacing that keeps MIN_EXP_CELLS across the charge
         # AND divides the domain exactly (ceil: never coarser than r_exp/N)
         dr = radius_m / math.ceil(radius_m / (r_exp / MIN_EXP_CELLS))
-        r_face = make_grid_1d(radius_m, dr)[0]
-        r      = 0.5 * (r_face[:-1] + r_face[1:])
+        r_face, r, A_face, V_cell = make_grid_1d(radius_m, dr)
         N      = len(r)
-        A_face = 4.0 * np.pi * r_face**2
-        V_cell = (4.0 / 3.0) * np.pi * (r_face[1:]**3 - r_face[:-1]**3)
         hooks.log(f"  [auto] Cell size reduced to {dr:.5f} m "
               f"({MIN_EXP_CELLS} cells inside explosive, {N} total)")
 

@@ -261,6 +261,35 @@ def _scan_stage_warnings(out, hooks):
         hooks.log(f'  [foam] mesh-stage Warning: {m.strip()}')
 
 
+#: consecutive live-slice samples refused before we say so. A sample
+#: caught mid-write is refused legitimately and the next poll succeeds;
+#: a face count that never matches means the live view is dead for the
+#: rest of the run, which used to happen in complete silence (A7).
+SURFACE_CANARY_TRIES = 20
+
+
+def _surface_refused(spec, got, want):
+    """Count a refused live-slice sample; log ONE line once the refusals
+    stop looking like a mid-write race. Always returns None, so callers
+    can `return _surface_refused(...)`."""
+    n = getattr(spec, 'surface_bad', 0) + 1
+    spec.surface_bad = n
+    hooks = getattr(spec, 'hooks', None)
+    if (hooks is not None and n >= SURFACE_CANARY_TRIES
+            and not getattr(spec, 'surface_canary', False)):
+        spec.surface_canary = True
+        hooks.log(f'  [warn] live slice disabled: surface has {got} '
+                  f'faces, expected {want} - the live view will stop '
+                  f'updating (written times are unaffected)')
+    return None
+
+
+def _surface_ok(spec, value):
+    """A sample decoded: clear the refusal streak."""
+    spec.surface_bad = 0
+    return value
+
+
 def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
                     remap_sl=None):
     """One liveSlice raw sample -> grid-shaped p array or None while
@@ -288,28 +317,29 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
                      shape[1] - 1)
         cells = remap_sl[iu, iv]
         fluid = remap_sl >= 0
-        if (cells < 0).any() or len(vals) != len(np.unique(remap_sl[fluid])):
-            return None                 # mid-write / stale sample
+        want = len(np.unique(remap_sl[fluid]))
+        if (cells < 0).any() or len(vals) != want:
+            return _surface_refused(spec, len(vals), want)
         val = np.full(int(spec.n_cells), np.nan)
         val[cells] = vals
         out = np.where(fluid, val[np.maximum(remap_sl, 0)], float(P_AIR))
         if np.isnan(out).any():
             return None
-        return out
+        return _surface_ok(spec, out)
     if slice_mask is None:
         if len(vals) != shape[0] * shape[1]:
-            return None
+            return _surface_refused(spec, len(vals), shape[0] * shape[1])
         order = np.lexsort((pts[:, ax_u], pts[:, ax_v]))
-        return vals[order].reshape(shape, order='F')
+        return _surface_ok(spec, vals[order].reshape(shape, order='F'))
     fluid = ~slice_mask
     if len(vals) != int(fluid.sum()):
-        return None
+        return _surface_refused(spec, len(vals), int(fluid.sum()))
     # boolean-mask assignment fills in C order (ax_v fastest), so sort
     # ax_u primary / ax_v secondary to match
     order = np.lexsort((pts[:, ax_v], pts[:, ax_u]))
     full = np.full(shape, float(P_AIR))
     full[fluid] = vals[order]
-    return full
+    return _surface_ok(spec, full)
 
 
 def _pick_snapshots(store, names, n_snapshots):
@@ -399,6 +429,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True):
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
+    spec.hooks = hooks              # the live-slice canary logs through it
     r = spec.grid['r']
     # T is in the readiness tuple because finalize_1d re-reads it
     fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
@@ -617,6 +648,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True):
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
+    spec.hooks = hooks              # the live-slice canary logs through it
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
     Nx, Ny = spec.nx, spec.ny
@@ -929,13 +961,17 @@ def _decode_surface_amr(spec, tdir, ax_u, ax_v, faces_uv, slice_solid=None):
     lv = refine.levels_from_centres(C, (fu[0], fv[0]), spec.dx_base,
                                     spec.amr)
     if len(lv) == 0 or (lv < 0).any():
-        return None
+        return _surface_refused(spec, len(lv),
+                                'a level for every cut face')
     try:
         mm = refine.remap_from_centres(C, lv, dict(x_face=fu, y_face=fv),
                                        spec.display_level, slice_solid)
     except (RuntimeError, ValueError):
-        return None                     # rows missing: mid-write sample
-    return mm.gather(vals, P_AIR), mm.levels
+        # rows missing: mid-write sample, or a mesh the plane no longer
+        # covers exactly
+        return _surface_refused(spec, len(vals), 'an exact cover of the '
+                                                 'display plane')
+    return _surface_ok(spec, (mm.gather(vals, P_AIR), mm.levels))
 
 
 def _initial_frame(spec, hooks, live_sl=None):
@@ -1051,6 +1087,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True):
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
+    spec.hooks = hooks              # the live-slice canary logs through it
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
     Nx, Ny, Nz = spec.nx, spec.ny, spec.nz

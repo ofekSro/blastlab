@@ -7,9 +7,9 @@ import numpy as np
 
 from ..core import geometry as core_geometry
 from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
-                              E_AIR, CELLS_WARN, CELLS_REFUSE)
-from ..core.eos import (air_pressure, air_soundspeed,
-                        jwl_pressure, jwl_soundspeed)
+                              E_AIR, CELLS_WARN, CELLS_REFUSE,
+                              MIN_EXP_CELLS)
+from ..core.eos import pressure_soundspeed
 from ..core.bc import face_fluxes, solid_mask_3d as solid_mask
 from ..core.grid import make_grid
 from ..core.profiles import (remap_profile_1d_to_3d as remap_profile_1d,
@@ -27,23 +27,9 @@ def primitives(U, phase, eos):
     w   = U[3] / rho
     e   = np.maximum((U[4] - 0.5 * rho * (u**2 + v**2 + w**2)) / rho, 1.0)
 
-    air  = phase == 0
-    prod = ~air
-    p    = np.empty_like(rho)
-    c    = np.empty_like(rho)
-
-    if air.any():
-        p[air] = air_pressure(rho[air], e[air])
-        c[air] = air_soundspeed(rho[air], p[air])
-
-    if prod.any():
-        # JWL numerical soundspeed only on the (small, static) product mask
-        if eos == 'JWL':
-            p[prod] = np.maximum(jwl_pressure(rho[prod], e[prod]), 1.0)
-            c[prod] = jwl_soundspeed(rho[prod], e[prod], p[prod])
-        else:
-            p[prod] = air_pressure(rho[prod], e[prod])
-            c[prod] = air_soundspeed(rho[prod], p[prod])
+    # the identical air/products dispatch lived in all three solvers
+    # (A4); eos.pressure_soundspeed is that same block, verbatim
+    p, c = pressure_soundspeed(rho, e, phase, eos)
 
     return rho, u, v, w, e, p, c
 
@@ -160,7 +146,6 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
         # Under-resolved charge: 'smear' keeps dx and enlarges the source
         # ball to a few cells (mass & energy conserving, see init below);
         # 'resolve' refines dx so the true radius spans MIN_EXP_CELLS.
-        MIN_EXP_CELLS = 5
         smeared = (charge_resolution == 'smear'
                    and dx > r_exp / MIN_EXP_CELLS)
         r_src = max(r_exp, 2.0 * dx) if smeared else r_exp

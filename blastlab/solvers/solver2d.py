@@ -6,9 +6,10 @@ import time
 import numpy as np
 
 from ..core import geometry as core_geometry
-from ..core.constants import GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT, E_AIR
-from ..core.eos import (air_pressure, air_soundspeed,
-                        jwl_pressure, jwl_soundspeed)
+from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
+                              E_AIR, MIN_EXP_CELLS,
+                              CELLS_2D_WARN, CELLS_2D_MAX)
+from ..core.eos import pressure_soundspeed
 from ..core.bc import face_fluxes, solid_mask_2d as solid_mask
 from ..core.grid import make_geometry
 from ..core.profiles import remap_profile_1d_to_2d as remap_profile
@@ -24,24 +25,9 @@ def primitives(U, phase, eos):
     v   = U[2] / rho
     e   = np.maximum((U[3] - 0.5 * rho * (u**2 + v**2)) / rho, 1.0)  # floor at 1 J/kg
 
-    air  = phase == 0
-    prod = ~air
-    p    = np.empty_like(rho)
-    c    = np.empty_like(rho)
-
-    if air.any():
-        p[air] = air_pressure(rho[air], e[air])
-        c[air] = air_soundspeed(rho[air], p[air])
-
-    if prod.any():
-        # JWL numerical soundspeed is evaluated on the (small, static)
-        # product mask only - never on the full grid.
-        if eos == 'JWL':
-            p[prod] = np.maximum(jwl_pressure(rho[prod], e[prod]), 1.0)
-            c[prod] = jwl_soundspeed(rho[prod], e[prod], p[prod])
-        else:
-            p[prod] = air_pressure(rho[prod], e[prod])
-            c[prod] = air_soundspeed(rho[prod], p[prod])
+    # the identical air/products dispatch lived in all three solvers
+    # (A4); eos.pressure_soundspeed is that same block, verbatim
+    p, c = pressure_soundspeed(rho, e, phase, eos)
 
     return rho, u, v, e, p, c
 
@@ -151,13 +137,12 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
 
         # Resolve the charge with at least MIN_EXP_CELLS cells (as in blast1d),
         # but cap total cell count - refinement is quadratic in 2D.
-        MIN_EXP_CELLS = 5
         if dx > r_exp / MIN_EXP_CELLS:
             # the largest spacing that keeps MIN_EXP_CELLS across the
             # charge AND divides Lx exactly (ceil: never coarser)
             dx = Lx / math.ceil(Lx / (r_exp / MIN_EXP_CELLS))
             n_est = int(Lx / dx) * int(Ly / dx)
-            if n_est > 8_000_000:
+            if n_est > CELLS_2D_MAX:
                 raise ValueError(
                     f"Resolving the charge needs dx = {dx:.5f} m -> ~{n_est:,} "
                     f"cells. Reduce the domain or enlarge the charge.")
@@ -177,9 +162,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
     x_c, y_c = geom['x_c'], geom['y_c']
     A_xf, A_yf, V = geom['A_xf'], geom['A_yf'], geom['V']
     Nx, Ny, dy = geom['Nx'], geom['Ny'], geom['dy']
-    if Nx * Ny > 8_000_000:
+    if Nx * Ny > CELLS_2D_MAX:
         raise ValueError(f"Grid {Nx} x {Ny} = {Nx*Ny:,} cells is too large")
-    if Nx * Ny > 2_000_000:
+    if Nx * Ny > CELLS_2D_WARN:
         hooks.log(f"  [warn] Large grid: {Nx} x {Ny} = {Nx*Ny:,} cells - "
               f"expect a long run")
 

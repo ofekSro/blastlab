@@ -104,9 +104,3 @@ def hll_fluxes_1d(U_L, U_R, p_L, p_R, c_L, c_R):
         np.where(s_R[np.newaxis, :] <= 0.0, F_R, F_hll))
     return F
 
-
-def mirror_state(U, n):
-    """Copy of U with momentum row n negated (reflective ghost state)."""
-    M = U.copy()
-    M[n] = -M[n]
-    return M

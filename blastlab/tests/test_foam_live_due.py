@@ -35,6 +35,74 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
+def canary_checks(_st):
+    """A6/A7: the two silent-degradation paths must say something once.
+
+    `_RE_TIME` drives step counting, the progress bar and the live-frame
+    cadence, and the live-slice face-count gate can refuse every sample
+    forever - both used to fail in complete silence.
+    """
+    from blastlab.solvers.foam import runloop, backend, writer
+
+    print("")
+    print("A6: a solver that never prints 'Time =' is reported once")
+
+    class _Log(RunHooks):
+        def __init__(self):
+            self.lines = []
+
+        def log(self, msg):
+            self.lines.append(str(msg))
+
+        def progress(self, p):
+            pass
+
+    rec, st = _Log(), _st()
+    for k in range(runloop.TIME_CANARY_LINES - 1):
+        runloop.progress_line(f'Courant Number mean: {k}', st, rec, 1e-4)
+    check('quiet until the threshold', not rec.lines, str(rec.lines))
+    for k in range(3):
+        runloop.progress_line('smoothSolver: solving for p', st, rec, 1e-4)
+    warn = [ln for ln in rec.lines if 'Time =' in ln]
+    check('one warning after the threshold', len(warn) == 1, str(rec.lines))
+    check('the warning says what breaks',
+          'live cadence and progress' in warn[0], warn[0] if warn else '')
+
+    rec2, st2 = _Log(), _st()
+    for k in range(runloop.TIME_CANARY_LINES + 50):
+        runloop.progress_line('Time = 1e-05' if k == 3 else f'line {k}',
+                              st2, rec2, 1e-4)
+    check('a solver that IS stepping never triggers it',
+          not any('Time =' in ln for ln in rec2.lines), str(rec2.lines))
+
+    print("")
+    print("A7: a live slice that can never decode is reported once")
+    spec = writer.CaseSpec(dim=2, material='TNT', nx=4, ny=4, dx=0.1)
+    spec.hooks = _Log()
+    for _ in range(backend.SURFACE_CANARY_TRIES - 1):
+        backend._surface_refused(spec, 15, 16)
+    check('quiet while it still looks like a mid-write race',
+          not spec.hooks.lines, str(spec.hooks.lines))
+    backend._surface_refused(spec, 15, 16)
+    check('one line once the refusals are persistent',
+          len(spec.hooks.lines) == 1, str(spec.hooks.lines))
+    check('the line gives both counts',
+          '15 faces' in spec.hooks.lines[0]
+          and 'expected 16' in spec.hooks.lines[0], spec.hooks.lines[0])
+    for _ in range(3 * backend.SURFACE_CANARY_TRIES):
+        backend._surface_refused(spec, 15, 16)
+    check('and only one line, however long it lasts',
+          len(spec.hooks.lines) == 1, str(len(spec.hooks.lines)))
+
+    spec2 = writer.CaseSpec(dim=2, material='TNT', nx=4, ny=4, dx=0.1)
+    spec2.hooks = _Log()
+    for _ in range(3 * backend.SURFACE_CANARY_TRIES):
+        backend._surface_refused(spec2, 15, 16)
+        backend._surface_ok(spec2, 'decoded')   # a good sample every other poll
+    check('a sample that decodes clears the streak',
+          not spec2.hooks.lines, str(spec2.hooks.lines))
+
+
 def main():
     # fresh state: the very first frame is due immediately in both modes
     check('first frame due (steps)',
@@ -232,6 +300,8 @@ def main():
         check('no live set: nothing to sync', len(calls) == 3)
     finally:
         runner.rewrite_control_entry = orig
+
+    canary_checks(_st)
 
     print()
     if FAIL:

@@ -107,6 +107,42 @@ def chain_stage_checks():
           str(errs))
 
 
+def shared_constant_checks():
+    """A5: validate_case and the solvers must gate on the SAME numbers.
+
+    MIN_EXP_CELLS and the 2D caps used to be re-typed as literals in
+    solver1d/2d/3d, so the strip could accept a case the solver then
+    refused (or the other way round) after any edit to constants.py.
+    """
+    import inspect
+    from blastlab.core import constants
+    from blastlab.core import case as case_mod
+    from blastlab.solvers import solver1d, solver2d, solver3d
+
+    print("")
+    print("A5: guard-rail constants are shared, not re-typed")
+    for name in ('MIN_EXP_CELLS', 'CELLS_2D_WARN', 'CELLS_2D_MAX',
+                 'CELLS_WARN', 'CELLS_REFUSE'):
+        want = getattr(constants, name)
+        check(f'{name} reaches validate_case unchanged',
+              getattr(case_mod, name, None) == want)
+    for mod, names in ((solver1d, ('MIN_EXP_CELLS',)),
+                       (solver2d, ('MIN_EXP_CELLS', 'CELLS_2D_WARN',
+                                   'CELLS_2D_MAX')),
+                       (solver3d, ('MIN_EXP_CELLS', 'CELLS_WARN',
+                                   'CELLS_REFUSE'))):
+        for name in names:
+            check(f'{mod.__name__.split(".")[-1]} uses '
+                  f'constants.{name}',
+                  getattr(mod, name, None) == getattr(constants, name))
+        src = inspect.getsource(mod)
+        check(f'{mod.__name__.split(".")[-1]} has no re-typed '
+              f'MIN_EXP_CELLS literal', 'MIN_EXP_CELLS = ' not in src)
+    src2 = inspect.getsource(solver2d)
+    check('solver2d has no re-typed 2D cap literals',
+          '8_000_000' not in src2 and '2_000_000' not in src2)
+
+
 def main():
     # ~64M cells: 40 m cube at 0.1 m with a large charge (no refine)
     big3 = dict(Lx=40.0, Ly=40.0, Lz=40.0, cell_size_m=0.1,
@@ -177,6 +213,7 @@ def main():
               and not any('Large grid' in w for w in rep.warnings))
 
     chain_stage_checks()
+    shared_constant_checks()
     amr_cap_checks()
 
     print()
