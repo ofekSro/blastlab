@@ -3,3 +3,4 @@ __pycache__/
 blastlab/tests/_probe_study/
 blastlab/tests/_chain_study/
 blastlab/tests/_t42/
+blastlab/tests/_amr_ab/

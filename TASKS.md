@@ -107,7 +107,7 @@ Hard rules:
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [x] 2026-09-07 |
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [x] 2026-09-07 |
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [x] 2026-09-07 |
-| T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [ ] |
+| T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [x] 2026-09-07 |
 | T43 | Resume a stopped foam run | N6 | M | [ ] |
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [ ] |
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [ ] |
@@ -1336,8 +1336,8 @@ Done when: green; N16-b DONE with the timings.
 Commit: "T42: parallel AMR via direct processor*/ reads (N16-b)"
 ```
 
-**STATUS (2026-09-07) — implemented and working, but ONE acceptance number misses, so the
-row stays `[ ]` for an owner call.**
+**DONE (2026-09-07)** — closed the same day after the owner chose the acceptance below;
+the implementation section, the measurements and the decision trail follow unchanged.
 
 *What was built.* `CaseSpec.decomposed` (AMR + n_procs > 1), `time_root()` and
 `time_dirs(name)` say where a written time lives; a decomposed run answers with one directory
@@ -1391,12 +1391,35 @@ and wreck the arrival times; instead arrivals agree to 0.4 % and the map correla
 The 21.5 % difference in the map's MEAN is those 358 near-charge cells dominating a mean over
 20,000.
 
-*The owner call.* Either (a) accept that serial and parallel AMR are different discretisations
-and set the e2e gate on gauge peaks to ~3 % with this table as the justification, or (b) keep
-1 % and treat it as a real requirement, which then needs `loadBalance` balancing on (which
-needs `addEmptyPatch internalPatch internal -overwrite -parallel` first, per the N16 notes) or
-a coarser acceptance point away from the charge. I did not choose for you, and I did not
-weaken the gate to make the row green.
+*The owner call and how it resolved.* The owner first chose (b) - keep 1 % as a real
+requirement, try `balance yes`, and fall back to far-field acceptance gauges. Both of those
+were then run and MEASURED OUT the same evening:
+
+* `balance yes` (with `addEmptyPatch internalPatch internal -overwrite -parallel`, which
+  exists and ran in 0.01 s): gauge results **identical to `balance no`** - +2.66 % vs
+  +2.64 % on the missing peak, +0.38/+0.30 % arrivals, ~203 s solver time. As predicted by
+  the imbalance measurement below, there was nothing for it to fix. The writer therefore
+  KEEPS `balance no` and `addEmptyPatch` is not wired into the product path.
+* Far-field gauges at a 1 % point gate: the peak-map row scan shows the point difference
+  fluctuating 0.15-4 % along the domain (0.66 % at x = 0.285, 1.71 % at 0.495, 3.8 % at
+  0.705) - no gauge position holds 1 % robustly; picking one that happens to pass would be
+  luck, and the test would be flaky.
+* Two further facts pinned the mechanism: serial AMR is **bit-deterministic** (a second
+  serial run with a different, non-binding maxCells produced byte-identical traces - and the
+  cap never bound, killing the cap hypothesis), while two parallel runs with DIFFERENT
+  balance settings agree to **0.015-0.017 %**. So serial and decomposed AMR are two
+  self-consistent, slightly different discretisations - the rank boundaries alter the
+  refinement pattern and the difference feeds back and grows: positive-phase impulse over a
+  common window drifts **+4.15 % / +9.10 %**, accumulated late (the 0.2-0.25 ms windows).
+
+**Final acceptance (owner decision): 1 % on the observables where serial-vs-parallel 1 %
+exists** - per-gauge arrival within 1 % (measured 0.51 / 0.36 %) and the peak-overpressure
+MAP's median over the 0.15-0.8 m loading region within 1 % (measured 0.605 % over 9,696
+cells); point peaks and impulse are printed as characterisation, ungated. Implemented as
+`blastlab/tests/_e2e_foam_amr_ab.py` (run/report pattern: `--only serial`, `--only np2`,
+`--report`), which PASSES on the measured pair. The full decision trail - including the
+rejected routes and their numbers - is deliberately kept above so the 1 %-point question is
+never relitigated without this data.
 
 *Follow-up measurement (same day, on the `balance yes` question):* the per-rank cell counts
 of the np2 run itself - `part_counts` already reads them - show the fixed scotch decomposition
@@ -1643,16 +1666,16 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
     AMR mesh follows the shock and is at its finest level there, the static `zone` reference
     refines only around the charge - measured with `_e2e_foam_probe_study.py`
     (+4.2 % at a cell corner, -11.5 % at a base-cell centre, peaks 57-171 % apart)
-  - **N16-b** parallel AMR — IMPLEMENTED (2026-09-07, T42), row still `[ ]`: the ingest
-    reads `processor*/` directly and concatenates per rank (cell-for-cell identical to the
-    serial read, unit-pinned), `maybe_reconstruct` skips decomposed runs and the serial
-    guards are lifted. Measured np=2 vs serial: **340 s → 237 s (1.43x)**, arrivals +0.51 %
-    / +0.36 %, peaks +0.80 % / **+2.64 %**. That last number is over the brief's 1 % gate,
-    which was NOT widened: serial and parallel AMR are different discretisations
-    (`balance no` refines per subdomain; final meshes differ 1.2 %), and the peak-map
-    disagreement is confined to the 358 charge-region cells (median 12.8 %) while the
-    blast-loading region agrees to ~0.5 %. Owner call: accept ~3 % on near-field AMR peaks,
-    or require balancing — → **T42**
+  - N16-b parallel AMR — DONE (2026-09-07, T42): the ingest reads `processor*/` directly
+    and concatenates per rank (cell-for-cell identical to the serial read, unit-pinned);
+    `maybe_reconstruct` skips decomposed runs; serial guards lifted. **340 s → 237 s
+    (1.43x)** at np=2. Serial-vs-parallel AMR are two self-consistent discretisations:
+    arrivals agree 0.3-0.5 %, point peaks fluctuate 0.15-4 %, impulse drifts 4-9 % late;
+    `balance yes` changes nothing (load already balanced 1.02-1.04, verified with
+    addEmptyPatch + a live run) and maxCells never bound. Acceptance (owner decision):
+    per-gauge arrival ≤ 1 % and loading-region peak-map median ≤ 1 % (0.605 % measured),
+    point values characterised ungated — `_e2e_foam_amr_ab.py`, PASS. `balance no` stays
+    the default; revisit balancing only for asymmetric refinement or 4+ ranks
 - N17 hardware-aware run plan — DONE (2026-09-07, T48; pure `env.plan_run` + `RunPlan`,
   `detect_ram_gb`/`hardware()`/`prime_hardware`, an 11-row pinned decision table and a
   432-case invariant sweep. **Measured** `BYTES_PER_CELL = 2650` (blastFoam serial 3D peak
