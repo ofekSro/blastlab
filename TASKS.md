@@ -112,7 +112,7 @@ Hard rules:
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [x] 2026-09-07 |
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [x] 2026-09-07 |
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [x] 2026-09-08 |
-| T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [ ] |
+| T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1679,6 +1679,46 @@ Done when: green; N10 DONE with the measured improvement.
 Commit: "T47: opt-in MUSCL second-order reconstruction for the native solvers (N10)"
 ```
 
+**DONE (2026-09-08):** limited MUSCL face reconstruction, opt-in via `case.order == 2`
+(default 1 on all three case classes; **test_regression stays byte-identical** - the order-1
+statements are untouched).
+
+*Where it lives.* 2D/3D: inside `bc._face_fluxes_axis0` behind `order=2` - `minmod` +
+`muscl_states` build limited L/R face states from the ghost-extended conserved state, and
+each side's p and c are recomputed from ITS reconstructed state through a `pc_of` callback
+the solver supplies (the EOS dispatch - air/JWL/material - lives there, so bc.py stays
+EOS-free). Slopes are zeroed on solid cells and their fluid neighbours (the wall mirror
+handles those faces), ghost replication makes domain edges first order naturally, and any
+face whose reconstructed density or internal energy would go non-positive falls back to the
+first-order pair - robust exactly at the blast front. The sweep dispatcher moves `phase`
+alongside U for the y/z directions. 1D: its own compact block in the pinned solver1d
+(same scheme, donor-cell phase per side). Time stepping stays forward Euler (the brief's
+"MUSCL + limiter" option): 2nd order in space, with the CFL guidance in validate_case
+("keep CFL at or below 0.4"). GUI: an Order combo ("1 (Godunov)" / "2 (MUSCL)") in the
+Numerics card, native-only per the T34 inventory, round-tripped by the forms.
+
+**Measured (the brief's number): 1 kg TNT free-air 1D at r = 1.5 m - order 1 262 kPa
+(0.75 of KB) -> order 2 315 kPa (0.90 of KB)**, pinned as a standing check in test_blast2d
+together with a 2D order-2 finite-fields smoke. The full 1D anchor sweep: o/KB
+0.81/0.74/0.76/0.75 -> **0.88/0.85/0.89/0.89** at Z = 1/2/3/4 (1814 steps vs 1531 - the
+sharper front costs ~18 % more steps).
+
+*Cross-validation that fell out of it:* `test_foam_1d_vs_native --order2` (new flag, native
+side only) - the foam/native peak ratios collapse from 1.10-1.16 (order 1, post-T39) to
+**1.01/0.99/0.97/0.98** at r = 1-4 m with arrivals 4.8/1.6/1.6/1.2 %: the two independent
+codes now land on the same peaks to ~3 %, which is strong evidence the order-2 path is the
+more accurate native scheme rather than a different bias.
+
+Not done from the brief's reading list: a separate Sod tube harness - the Verify list does
+not ask for one and the KB + cross-code checks above pin the same property; noted rather
+than silently skipped.
+
+Tests: test_regression byte-identical, test_blast2d (incl. both new T47 checks),
+test_blast3d (order-1 re-verified after the primitives/face_fluxes signature threading),
+test_case_validate (order 1|2 gate, foam "ignored" note), test_gui_solver_mode (inventory
+gains `_order_combo` as native-only), test_gui_refine_preview, test_gui_amr_form PASS;
+WSL: test_foam_1d_vs_native PASS both plain and `--order2`.
+
 ---
 
 ## 5. Unscheduled / nice-to-have (not in the queue; pick up on request)
@@ -1794,7 +1834,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   uniform base mesh)
 - N8 foam run browser + auto-cleanup (settings in %APPDATA%\blastlab) — DONE (T14)
 - N9 user-named runs — DONE (2026-09-07, T30)
-- **N10** MUSCL second order — OPEN → **T47**
+- N10 MUSCL second order — DONE (2026-09-08, T47; opt-in `order=2`, limited MUSCL in
+  `bc._face_fluxes_axis0` + a 1D block, EOS via solver callback, unphysical-face fallback
+  to order 1. r = 1.5 m: 0.75 -> 0.90 of KB; anchor sweep 0.74-0.81 -> 0.85-0.89; with
+  order 2 the foam/native peak ratios collapse to 0.97-1.01)
 - N11 native materials beyond TNT — DONE (2026-09-08, T46; `eos.material_jwl` +
   parameterised JWL EOS, materials from the shared table, validation + shared Material
   combo; TNT default proven byte-identical, C4 1D peak x1.24 over TNT)

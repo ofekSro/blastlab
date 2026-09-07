@@ -74,8 +74,10 @@ FOAM_ONLY = {1: ['_act_combo', '_ab_combo'],
              3: ['_act_combo', '_ab_combo', '_cref_combo',
                  '_nproc_entry', '_amr_card', '_zones_card', '_det_card',
                  '_xc_card']}
-NATIVE_ONLY = {1: ['_eos_combo'], 2: ['_eos_combo'],
-               3: ['_eos_combo', '_cres_combo']}
+# _order_combo: T47/N10 - the MUSCL order knob is native-only
+NATIVE_ONLY = {1: ['_eos_combo', '_order_combo'],
+               2: ['_eos_combo', '_order_combo'],
+               3: ['_eos_combo', '_order_combo', '_cres_combo']}
 
 
 def main():

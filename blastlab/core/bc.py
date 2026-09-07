@@ -11,11 +11,59 @@ import numpy as np
 from .riemann import hll_fluxes
 
 
-def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid):
+def minmod(a, b):
+    """The minmod slope limiter: the smaller-magnitude of two one-sided
+    differences when they agree in sign, zero at an extremum (T47/N10)."""
+    return np.where(a * b > 0.0,
+                    np.where(np.abs(a) < np.abs(b), a, b), 0.0)
+
+
+def muscl_states(U_ext, solid_ext=None):
+    """Limited MUSCL face states from a ghost-extended conserved state:
+    for face i+1/2, L = U_i + s_i/2 and R = U_{i+1} - s_{i+1}/2 with
+    minmod slopes along axis 1. Slopes are zeroed on solid cells and
+    their fluid neighbours (the wall mirror handles those faces), and a
+    face whose reconstructed density or internal energy is not positive
+    falls back to the first-order pair - robust exactly where a strong
+    blast front would make an unlimited slope unphysical."""
+    dq = np.diff(U_ext, axis=1)
+    slope = np.zeros_like(U_ext)
+    slope[:, 1:-1] = minmod(dq[:, :-1], dq[:, 1:])
+    if solid_ext is not None and solid_ext.any():
+        near = solid_ext.copy()
+        near[:-1] |= solid_ext[1:]
+        near[1:] |= solid_ext[:-1]
+        slope[:, near] = 0.0
+    U_L = U_ext[:, :-1] + 0.5 * slope[:, :-1]
+    U_R = U_ext[:, 1:] - 0.5 * slope[:, 1:]
+
+    def bad(Us):
+        rho = Us[0]
+        ke = 0.5 * sum(Us[k] ** 2 for k in range(1, Us.shape[0] - 1)) \
+            / np.maximum(rho, 1e-30)
+        return (rho <= 1e-10) | (Us[-1] - ke <= 0.0)
+
+    fall = bad(U_L) | bad(U_R)
+    if fall.any():
+        U_L = U_L.copy()
+        U_R = U_R.copy()
+        U_L[:, fall] = U_ext[:, :-1][:, fall]
+        U_R[:, fall] = U_ext[:, 1:][:, fall]
+    return U_L, U_R
+
+
+def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid,
+                       order=1, phase=None, pc_of=None):
     """
     HLL fluxes at all faces along spatial axis 0 (normal momentum = row 1),
     with one ghost layer per side ('open' copy / 'wall' mirror) and mirror
     treatment at fluid|solid faces. Returns F (N, Na+1, ...).
+
+    `order=2` (T47/N10, opt-in) reconstructs the face states with
+    limited MUSCL slopes and recomputes each side's p and c from its
+    reconstructed state via `pc_of(rho, e, phase_side)` - the solver
+    supplies it because the EOS dispatch (air/JWL + material) lives
+    there. The default order-1 path is untouched and byte-identical.
     """
     g_lo = U[:, :1].copy()
     if bc_lo == 'wall':
@@ -28,9 +76,28 @@ def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid):
     p_ext = np.concatenate([p[:1], p, p[-1:]], axis=0)
     c_ext = np.concatenate([c[:1], c, c[-1:]], axis=0)
 
-    U_L, U_R = U_ext[:, :-1], U_ext[:, 1:]
-    p_L, p_R = p_ext[:-1], p_ext[1:]
-    c_L, c_R = c_ext[:-1], c_ext[1:]
+    if order == 2:
+        s_ext0 = None
+        if solid is not None and solid.any():
+            ghost = np.zeros((1,) + solid.shape[1:], dtype=bool)
+            s_ext0 = np.concatenate([ghost, solid, ghost], axis=0)
+        U_L, U_R = muscl_states(U_ext, s_ext0)
+        ph_ext = np.concatenate([phase[:1], phase, phase[-1:]], axis=0)
+
+        def side_pc(Us):
+            rho = np.maximum(Us[0], 1e-10)
+            ke = 0.5 * sum(Us[k] ** 2 for k in range(1, Us.shape[0] - 1)) \
+                / rho
+            e = np.maximum((Us[-1] - ke) / rho, 1.0)
+            return e
+
+        e_L, e_R = side_pc(U_L), side_pc(U_R)
+        p_L, c_L = pc_of(np.maximum(U_L[0], 1e-10), e_L, ph_ext[:-1])
+        p_R, c_R = pc_of(np.maximum(U_R[0], 1e-10), e_R, ph_ext[1:])
+    else:
+        U_L, U_R = U_ext[:, :-1], U_ext[:, 1:]
+        p_L, p_R = p_ext[:-1], p_ext[1:]
+        c_L, c_R = c_ext[:-1], c_ext[1:]
 
     have_solid = solid.any()
     if have_solid:
@@ -62,14 +129,16 @@ def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid):
     return F
 
 
-def face_fluxes(U, p, c, n, bc_lo, bc_hi, solid):
+def face_fluxes(U, p, c, n, bc_lo, bc_hi, solid,
+                order=1, phase=None, pc_of=None):
     """
     Face fluxes for sweep direction n (1 = x, 2 = y, 3 = z). Directions
     beyond the first reuse the axis-0 core with momentum rows swapped and
     the sweep spatial axis moved to the front.
     """
     if n == 1:
-        return _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid)
+        return _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid,
+                                  order=order, phase=phase, pc_of=pc_of)
     rows = list(range(U.shape[0]))
     rows[1], rows[n] = rows[n], rows[1]
     U_sw = np.moveaxis(U[rows], n, 1)              # U[rows] copies
@@ -77,7 +146,11 @@ def face_fluxes(U, p, c, n, bc_lo, bc_hi, solid):
                               np.moveaxis(p, n - 1, 0),
                               np.moveaxis(c, n - 1, 0),
                               bc_lo, bc_hi,
-                              np.moveaxis(solid, n - 1, 0))
+                              np.moveaxis(solid, n - 1, 0),
+                              order=order,
+                              phase=(None if phase is None else
+                                     np.moveaxis(phase, n - 1, 0)),
+                              pc_of=pc_of)
     return np.moveaxis(F_sw[rows], 1, n)
 
 

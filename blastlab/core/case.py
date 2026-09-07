@@ -45,6 +45,9 @@ class Case1D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: native reconstruction order (T47/N10): 1 = the pinned Godunov
+    #: path, 2 = opt-in limited MUSCL (native solvers only)
+    order: int = 1
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
@@ -110,6 +113,9 @@ class Case2D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: native reconstruction order (T47/N10): 1 = the pinned Godunov
+    #: path, 2 = opt-in limited MUSCL (native solvers only)
+    order: int = 1
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
@@ -174,6 +180,9 @@ class Case3D:
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
+    #: native reconstruction order (T47/N10): 1 = the pinned Godunov
+    #: path, 2 = opt-in limited MUSCL (native solvers only)
+    order: int = 1
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
@@ -289,6 +298,18 @@ def _validate_solver(case, rep):
     n_procs = getattr(case, 'n_procs', 0)
     if n_procs < 0:
         err("MPI ranks must be >= 0 (0 = auto)")
+    # T47/N10: reconstruction order is a native-solver knob
+    _order = int(getattr(case, 'order', 1) or 1)
+    if _order not in (1, 2):
+        err("Reconstruction order must be 1 or 2")
+    elif _order == 2:
+        if solver == 'blastfoam':
+            note("Reconstruction order is a native-solver setting - "
+                 "blastFoam uses its own schemes (ignored)")
+        else:
+            note("Order 2 (MUSCL): sharper fronts at the same grid; "
+                 "keep CFL at or below 0.4 (limiter falls back to "
+                 "order 1 where a slope would go unphysical)")
     if solver == 'native':
         # N11/T46: the native solvers take their JWL set from the same
         # material table as blastFoam

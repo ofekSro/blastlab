@@ -50,7 +50,7 @@ def _snapshot(p, rho, u, v, w, j0, k0, t=0.0):
                 rho3=decimate(rho, rho_stride))
 
 
-def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT',
+def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                   charge=None, charge_center=None,
                   profile=None, profile2d=None,
                   eos='idealGas', bcs=None, obstacles=None,
@@ -393,6 +393,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT',
     hooks.log(f"{'='*62}\n")
 
     # ── Live view & animation frame recording (vertical x-z slice) ─────────
+    # T47/N10: order-2 face reconstruction (see solver2d)
+    def _pc(rho_s, e_s, phase_s):
+        return pressure_soundspeed(rho_s, e_s, phase_s, eos, jwl)
+
     hooks.run_started(dict(
         dim=3, x_face=live_faces[0], y_face=live_faces[1],
         solid=solid[live_sl], xlabel=live_labels[0],
@@ -490,7 +494,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT',
         for n, lo, hi in ((1, 'x_lo', 'x_hi'),
                           (2, 'y_lo', 'y_hi'),
                           (3, 'z_lo', 'z_hi')):
-            F = face_fluxes(U, p_f, c_f, n, bcs[lo], bcs[hi], solid)
+            F = face_fluxes(U, p_f, c_f, n, bcs[lo], bcs[hi], solid,
+                            order=order, phase=phase, pc_of=_pc)
             sl_hi = (slice(None),) + (slice(None),) * (n - 1) + (slice(1, None),)
             sl_lo = (slice(None),) + (slice(None),) * (n - 1) + (slice(None, -1),)
             U_new -= (dt / dx) * (F[sl_hi] - F[sl_lo])
@@ -584,6 +589,7 @@ def solve_3d(case, hooks=None, profile=None, profile2d=None):
         profile2d = load_profile_2d(case.profile_file_in)
     return _run_blast_3d(case.Lx, case.Ly, case.Lz, case.cell_size_m,
                          material=getattr(case, 'material', 'TNT'),
+                         order=int(getattr(case, 'order', 1) or 1),
                          charge=case.charge if case.init_mode == 'charge' else None,
                          charge_center=tuple(case.center),
                          profile=profile, profile2d=profile2d,

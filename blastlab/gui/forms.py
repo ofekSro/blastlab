@@ -394,6 +394,11 @@ class CaseForm(ctk.CTkFrame):
         self._eos_combo = _combo(num, self._var('eos', 'idealGas'),
                                  ['idealGas', 'JWL'])
         r = self._srow(num, r, 'EOS', self._eos_combo, scope='native')[0]
+        # T47/N10: opt-in MUSCL reconstruction, native solvers only
+        self._order_combo = _combo(num, self._var('order', '1 (Godunov)'),
+                                   ['1 (Godunov)', '2 (MUSCL)'])
+        r = self._srow(num, r, 'Order', self._order_combo,
+                       scope='native')[0]
         self._act_combo = _combo(num, self._var('activation', 'linear'),
                                  ['linear', 'none'])
         r = self._srow(num, r, 'Detonation', self._act_combo,
@@ -699,6 +704,7 @@ class CaseForm(ctk.CTkFrame):
                 charge_kg=_F('charge', 'charge'),
                 cell_size_m=_F('cell', 'cell size'),
                 eos=v['eos'].get(), cfl=_F('cfl', 'cfl'),
+                order=int(str(v['order'].get()).split()[0] or 1),
                 n_snapshots=_I('n_snapshots', 'snapshots'),
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
@@ -721,6 +727,7 @@ class CaseForm(ctk.CTkFrame):
             charge=_F('charge', 'charge'),
             profile_file_in=v['profile_in'].get() or None,
             eos=v['eos'].get(), bcs=bcs,
+            order=int(str(v['order'].get()).split()[0] or 1),
             obstacles=self.obstacles.get(), cfl=_F('cfl', 'cfl'),
             n_snapshots=_I('n_snapshots', 'snapshots'),
             gauges=self.gauges.get(),
@@ -786,6 +793,8 @@ class CaseForm(ctk.CTkFrame):
             v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
             v['cell'].set(f'{case.cell_size_m:g}')
             v['eos'].set(case.eos)
+            v['order'].set('2 (MUSCL)' if int(getattr(
+                case, 'order', 1) or 1) == 2 else '1 (Godunov)')
             v['cfl'].set(f'{case.cfl:g}')
             v['n_snapshots'].set(str(case.n_snapshots))
             self.gauges.set([(g,) for g in case.gauge_radii])
@@ -827,6 +836,8 @@ class CaseForm(ctk.CTkFrame):
         v['amr_display_level'].set('auto' if dl is None else str(int(dl)))
         v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
         v['eos'].set(case.eos)
+        v['order'].set('2 (MUSCL)' if int(getattr(
+            case, 'order', 1) or 1) == 2 else '1 (Godunov)')
         v['cfl'].set(f'{case.cfl:g}')
         v['n_snapshots'].set(str(case.n_snapshots))
         for side, val in case.bcs.items():

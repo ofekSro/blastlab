@@ -38,9 +38,13 @@ def check(name, ok, detail=''):
 
 
 def _case(solver):
+    # --order2 (T47/N10) runs the NATIVE side with MUSCL; foam is
+    # unaffected, so the gates measure how much closer the two get
+    order = 2 if '--order2' in sys.argv and solver == 'native' else 1
     return Case1D(radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
                   gauge_radii=list(GAUGES), n_snapshots=3,
-                  solver=solver, material='TNT', eos='JWL')
+                  solver=solver, material='TNT', eos='JWL',
+                  order=order)
 
 
 def _arrival(times, p):

@@ -29,6 +29,7 @@ def primitives(U, phase, eos, jwl=JWL_TNT):
 
 
 def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
+                  order=1,
                   eos='idealGas', cfl=0.5, n_snapshots=5,
                   gauge_radii=None, hooks=None):
     """
@@ -210,9 +211,39 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
             break
 
         # ── Face fluxes ────────────────────────────────────────────────────
-        F_int = hll_fluxes(U[:, :-1], U[:, 1:],
-                           p_f[:-1], p_f[1:],
-                           c_f[:-1], c_f[1:])
+        if order == 2:
+            # T47/N10: limited MUSCL face states; each side's p and c
+            # are re-evaluated from ITS reconstructed state. Slopes are
+            # zero at the two edge cells (np.diff pads nothing there),
+            # so the axis and outer faces stay first order.
+            from ..core.bc import minmod
+            dq = np.diff(U, axis=1)
+            sl = np.zeros_like(U)
+            sl[:, 1:-1] = minmod(dq[:, :-1], dq[:, 1:])
+            U_L = U[:, :-1] + 0.5 * sl[:, :-1]
+            U_R = U[:, 1:] - 0.5 * sl[:, 1:]
+            eL = (U_L[2] - 0.5 * U_L[1] ** 2 / np.maximum(U_L[0], 1e-10)) \
+                / np.maximum(U_L[0], 1e-10)
+            eR = (U_R[2] - 0.5 * U_R[1] ** 2 / np.maximum(U_R[0], 1e-10)) \
+                / np.maximum(U_R[0], 1e-10)
+            bad = (U_L[0] <= 1e-10) | (U_R[0] <= 1e-10) \
+                | (eL <= 0.0) | (eR <= 0.0)
+            if bad.any():
+                U_L[:, bad] = U[:, :-1][:, bad]
+                U_R[:, bad] = U[:, 1:][:, bad]
+                eL = (U_L[2] - 0.5 * U_L[1] ** 2 / U_L[0]) / U_L[0]
+                eR = (U_R[2] - 0.5 * U_R[1] ** 2 / U_R[0]) / U_R[0]
+            pL, cL = pressure_soundspeed(np.maximum(U_L[0], 1e-10),
+                                         np.maximum(eL, 1.0),
+                                         phase[:-1], eos, jwl)
+            pR, cR = pressure_soundspeed(np.maximum(U_R[0], 1e-10),
+                                         np.maximum(eR, 1.0),
+                                         phase[1:], eos, jwl)
+            F_int = hll_fluxes(U_L, U_R, pL, pR, cL, cR)
+        else:
+            F_int = hll_fluxes(U[:, :-1], U[:, 1:],
+                               p_f[:-1], p_f[1:],
+                               c_f[:-1], c_f[1:])
 
         F = np.zeros((3, N + 1))
         F[:, 1:N] = F_int
@@ -282,6 +313,7 @@ def solve_1d(case, hooks=None):
     """Run a Case1D. Returns a Result."""
     return _run_blast_1d(case.radius_m, case.charge_kg, case.cell_size_m,
                          material=getattr(case, 'material', 'TNT'),
+                         order=int(getattr(case, 'order', 1) or 1),
                          eos=case.eos, cfl=case.cfl,
                          n_snapshots=case.n_snapshots,
                          gauge_radii=list(case.gauge_radii), hooks=hooks)

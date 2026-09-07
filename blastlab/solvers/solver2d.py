@@ -33,6 +33,7 @@ def primitives(U, phase, eos, jwl=JWL_TNT):
 
 
 def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
+                  order=1,
                   charge=None, charge_center=None, profile=None,
                   eos='idealGas', bcs=None, obstacles=None,
                   cfl=0.4, n_snapshots=6, gauges=None,
@@ -305,6 +306,11 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
             r_c=geom['x_c'], z_c=geom['y_c'], solid=solid, bcs=bcs,
             obstacles=[tuple(o) for o in obstacles],
             z0=y0, r_exp=r_exp, R=Lx, Lz=Ly)
+    # T47/N10: order 2 reconstructs face states; each side's p and c
+    # come from ITS state through the run's own EOS dispatch
+    def _pc(rho_s, e_s, phase_s):
+        return pressure_soundspeed(rho_s, e_s, phase_s, eos, jwl)
+
     hooks.run_started(run_info)
     frame_t, frame_p = [], []
     frame_stride     = 1
@@ -387,8 +393,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         impulse += (p_f - P_AIR) * dt
 
         # ── Face fluxes (both sweeps) and divergence ───────────────────────
-        Fx = face_fluxes(U, p_f, c_f, 1, bcs['x_lo'], bcs['x_hi'], solid)
-        Fy = face_fluxes(U, p_f, c_f, 2, bcs['y_lo'], bcs['y_hi'], solid)
+        Fx = face_fluxes(U, p_f, c_f, 1, bcs['x_lo'], bcs['x_hi'],
+                         solid, order=order, phase=phase, pc_of=_pc)
+        Fy = face_fluxes(U, p_f, c_f, 2, bcs['y_lo'], bcs['y_hi'],
+                         solid, order=order, phase=phase, pc_of=_pc)
 
         div_F = ((A_xf[1:] * Fx[:, 1:, :] - A_xf[:-1] * Fx[:, :-1, :])
                  + A_yf * (Fy[:, :, 1:] - Fy[:, :, :-1])) / V
@@ -477,6 +485,7 @@ def solve_2d(case, hooks=None, profile=None):
         profile = load_profile(case.profile_file_in)
     return _run_blast_2d(case.geometry, case.Lx, case.Ly, case.cell_size_m,
                          material=getattr(case, 'material', 'TNT'),
+                         order=int(getattr(case, 'order', 1) or 1),
                          charge=case.charge if case.init_mode == 'charge' else None,
                          charge_center=tuple(case.center),
                          profile=profile, eos=case.eos, bcs=dict(case.bcs),

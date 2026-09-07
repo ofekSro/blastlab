@@ -210,6 +210,34 @@ check("material='C4' raises the 1D peak over TNT",
       f"TNT {_pk_t/1e3:.0f} kPa, C4 {_pk_c/1e3:.0f} kPa "
       f"(x{_pk_c/_pk_t:.2f})")
 
+# ── T47/N10: opt-in MUSCL order 2 ────────────────────────────────────────────
+print()
+print("T47: order 2 (MUSCL) vs order 1, 1D free-air vs Kingery-Bulmash")
+_kb15 = 350.0e3    # KB free-air incident peak at Z = 1.5 m/kg^(1/3) [Pa]
+_r1 = solve_1d(Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                      eos='JWL', n_snapshots=1, gauge_radii=[1.5]))
+_r2 = solve_1d(Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                      eos='JWL', n_snapshots=1, gauge_radii=[1.5],
+                      order=2))
+_p1 = _r1.gauges['pressures'][0].max() - P_AIR
+_p2 = _r2.gauges['pressures'][0].max() - P_AIR
+check('order 2 brings the r = 1.5 m peak closer to KB than order 1',
+      abs(_p2 - _kb15) < abs(_p1 - _kb15) and _p2 > _p1,
+      f'o1 {_p1/1e3:.0f} kPa, o2 {_p2/1e3:.0f} kPa, KB {_kb15/1e3:.0f} kPa '
+      f'(o1/KB {_p1/_kb15:.2f} -> o2/KB {_p2/_kb15:.2f})')
+
+# the 2D sweep path at order 2 must run and stay finite (tiny case;
+# through the Case API - the legacy run_blast_2d signature is pinned)
+from blastlab.core.case import Case2D as _C2
+from blastlab.solvers.solver2d import solve_2d as _solve2
+_res2 = _solve2(_C2(geometry='axisymmetric', Lx=0.8, Ly=1.6,
+                    cell_size_m=0.02, charge=1.0, center=(0.0, 0.8),
+                    eos='JWL', n_snapshots=1, gauges=[(0.5, 0.8)],
+                    order=2))
+check('2D order-2 run completes with finite fields',
+      np.isfinite(_res2.gauges['pressures'][0]).all()
+      and _res2.gauges['pressures'][0].max() > 2 * P_AIR)
+
 # ── T9: 1D -> 2D remap round trip ────────────────────────────────────────────
 print("\nT9: 1D -> 2D remap")
 _, _, prof = blast1d.run_blast(2.5, charge, cell, eos='idealGas',
