@@ -175,6 +175,25 @@ class ResultsPanel(ctk.CTkFrame):
                  'Net imp [Pa·s]', 'Phase ended')
         self.summary_table = ttk.Treeview(gtab, columns=cols, show='headings',
                                           height=4)
+        # abbreviated headers ("Pos. imp [Pa*s]") say what they mean on
+        # hover; ttk headings take no tooltip, so the table carries one
+        # tip whose text follows the pointer's column (QA-33)
+        self._head_help = {
+            'gauge': 'Gauge number, where you asked for it and, when the '
+                     'solver had to snap it, the cell centre it reads.',
+            'peak': 'Highest overpressure seen at this gauge.',
+            'arrival': 'First time the overpressure crossed the arrival '
+                       'threshold.',
+            't_peak': 'Time of the peak overpressure.',
+            'pos_dur': 'Length of the positive phase, from arrival to the '
+                       'first return to ambient.',
+            'pos_imp': 'Overpressure impulse of the positive phase only.',
+            'net_imp': 'Overpressure impulse over the whole record, '
+                       'negative phase included.',
+            'complete': 'Whether the positive phase ended inside the run '
+                        '- "no" means the run stopped first, so the '
+                        'impulses are lower bounds.',
+        }
         for col, head in zip(cols, heads):
             self.summary_table.heading(col, text=head)
             self.summary_table.column(
@@ -182,6 +201,8 @@ class ResultsPanel(ctk.CTkFrame):
                 minwidth=90 if col != 'gauge' else 120,
                 anchor='e' if col != 'gauge' else 'w')
         self.summary_table.pack(fill='x', pady=(GAP, 0))
+        self._head_tip = theme.tooltip(self.summary_table, '')
+        self.summary_table.bind('<Motion>', self._table_hover, add='+')
 
         # Animation view
         atab = ctk.CTkFrame(stack, fg_color='transparent')
@@ -503,9 +524,25 @@ class ResultsPanel(ctk.CTkFrame):
             self.gauge_canvas.set_figure(fig)
         self._fill_summary(res)
 
+    def _table_hover(self, event):
+        """Point the shared tooltip at the column under the pointer."""
+        tbl = self.summary_table
+        try:
+            if tbl.identify_region(event.x, event.y) != 'heading':
+                self._head_tip.set_text('')
+                return
+            col = tbl.identify_column(event.x)
+            name = tbl['columns'][int(col[1:]) - 1]
+        except (ValueError, IndexError, tk.TclError):
+            return
+        self._head_tip.set_text(self._head_help.get(name, ''))
+
     def summary_rows(self, res):
         """Per-gauge engineering rows for a Result (output.gauge_summary)."""
-        return gauge_summary.summarize_gauges(res.gauges)
+        # meta['gauges'] is what the USER asked for; gauges['points']
+        # is where the solver put them (QA-33)
+        return gauge_summary.summarize_gauges(
+            res.gauges, requested=res.meta.get('gauges'))
 
     def _fill_summary(self, res):
         tbl = self.summary_table

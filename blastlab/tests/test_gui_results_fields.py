@@ -314,6 +314,7 @@ def qa_s2_checks(panel):
     t29_checks(panel)
     t30_checks(panel)
     t32_checks(panel)
+    t33_checks(panel)
 
 
 def t30_checks(panel):
@@ -452,6 +453,42 @@ def t32_checks(panel):
               == ('1400x900+10+10', 'light', '7', 'steps'), str(back))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def t33_checks(panel):
+    """T33 / QA-32-33: the AMR cell count is a chip, not just a log line,
+    and the abbreviated gauge headers explain themselves on hover."""
+    print("")
+    print("T33: AMR cells chip + gauge header help")
+    from blastlab.gui.run_panel import RunPanel
+    root = panel.winfo_toplevel()
+    rp = RunPanel(root, on_run=lambda: None, on_stop=lambda: None,
+                  on_init=lambda: None, on_refresh=lambda: None)
+    check('a static run shows no cells chip',
+          rp._chip_cells.master.winfo_manager() == '')
+    # display grid at level 2; a quarter of it is still level 0, which
+    # stands for one real cell per 4**2 display cells
+    lv = np.full((8, 8), 2, np.int8)
+    lv[:4, :4] = 0
+    rp._show_cells(lv)
+    want = 48 + 1                       # 48 fine cells + one coarse cell
+    check('the cells chip counts real cells, not display cells',
+          rp._chip_cells.cget('text') == f'{want:,}',
+          rp._chip_cells.cget('text'))
+    check('the cells chip appears with the first AMR frame',
+          rp._chip_cells.master.winfo_manager() == 'pack')
+    rp.set_running(True)
+    check('a new run hides it again until that run reports levels',
+          rp._chip_cells.master.winfo_manager() == '')
+    rp.set_running(False)
+    rp.destroy()
+
+    tbl = panel.summary_table
+    check('every gauge column has hover help',
+          set(panel._head_help) == set(tbl['columns']),
+          str(set(tbl['columns']) - set(panel._head_help)))
+    check('the "Phase ended" column explains what "no" means',
+          'lower bounds' in panel._head_help['complete'])
 
 
 def t29_checks(panel):

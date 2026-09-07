@@ -806,6 +806,10 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0),
                 r_exp=spec.r_exp, from_profile=False,
                 solver='blastfoam', material=spec.material,
+                # what the USER asked for; gauge_out['points'] is where
+                # the probes landed in the mesh (QA-33)
+                gauges=[tuple(float(v) for v in g)
+                        for g in (case.gauges or [])],
                 case_dir=spec.case_unc, refine=spec.refine_meta())
     # per-step FO peak/impulse maps, falling back to the per-write Python
     # accumulator (B17: same policy as 3D)
@@ -1231,6 +1235,10 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0, z0),
                 r_exp=spec.r_exp, r_src=spec.r_exp, from_profile=None,
                 solver='blastfoam', material=spec.material,
+                # what the USER asked for; gauge_out['points'] is where
+                # the probes landed in the mesh (QA-33)
+                gauges=[tuple(float(v) for v in g)
+                        for g in (case.gauges or [])],
                 case_dir=spec.case_unc, refine=spec.refine_meta(),
                 p_peak=p_peak, impulse=impulse, peak_source=peak_source)
     if record_frames > 0:

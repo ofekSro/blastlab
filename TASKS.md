@@ -97,7 +97,7 @@ Hard rules:
 | T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [x] 2026-09-07 |
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [x] 2026-09-07 |
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [x] 2026-09-07 |
-| T33 | QA: papercuts | QA-20, 26, 30..35 | S | [ ] |
+| T33 | QA: papercuts | QA-20, 26, 30..35 | S | [x] 2026-09-07 |
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [ ] |
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
@@ -522,6 +522,41 @@ Verify: test_regression byte-identical (no solver prints touched); test_gui_run_
 Done when: green; QA-20/26/30-35 FIXED.
 Commit: "T33: GUI papercuts (QA-20/26/30-35)"
 ```
+
+**DONE (2026-09-07):** already landed in `3cb800c` and verified, not redone - the Run
+log's `wrap='word'` with F_MONO (QA-20); the `p max [kPa]` chip fed with `p.p_max/1e3`
+(QA-26); the run browser's `ttk.Scrollbar` on `table.yview` and its
+`messagebox.showwarning` refusal (QA-30); `_panel_grid_figure(robust=True)` clipping
+the charge spike out of the peak/impulse colour range and saying so in the panel label
+(QA-31); the AMR log collapsed to one live line with a running count and the 1D live
+axes opening on 0-10 kPa (QA-32); the closed logo file and the `grid(False)` warning
+(QA-34).
+Closed here:
+- **QA-32 (cells chip):** `RunPanel._chip_cells` + `_show_cells`, fed from
+  `on_frame(levels=)`. It reports REAL cells, not display cells - a display cell at
+  level l stands for `2**((disp - l) * ndim)` of them - appears with the first frame
+  that carries a level map and hides again on the next run until that run reports one.
+  Verified live on F05 (`cells 5,149` beside the other chips).
+- **QA-33:** `gauge_summary.gauge_labels(gauge_out, requested=None)` prefixes every
+  label with its gauge number and, when the solver snapped a gauge, prints
+  "G1 (1.000, 2.000, 0.450) -> cell (1.000, 2.000, 0.500) m"; `meta['gauges']` now
+  carries the requested list from solver2d, solver3d and both foam finalizers, and
+  `ResultsPanel.summary_rows` passes it. Each abbreviated column header explains
+  itself through one tooltip that follows the pointer's column (ttk headings take no
+  tooltip of their own), including what "Phase ended = no" means for the impulses.
+  The header text stays "Phase ended" rather than the brief's "Pos. phase complete":
+  the short form is what keeps the column unclipped (QA-27) and the tooltip carries
+  the meaning.
+- **QA-35:** the AMR disk note gives the run total as well as the per-write figure.
+Tests: test_gauge_summary updated for the numbered labels plus two new checks (a
+snapped gauge shows both, an exact one is not cluttered); test_gui_results_fields
+gained `t33_checks` (chip hidden for a static run, real-cell arithmetic, chip appearing
+with the first AMR frame and hidden again by set_running, hover help for every gauge
+column). test_regression byte-identical - the meta key is new, and neither the
+transcript nor the pinned TSV/npz files carry meta. Plus test_gui_gauge_summary,
+test_gui_run_browser, test_gui_amr_form, test_case_validate, test_foam_writer,
+test_refine. Harness D02, F05 (2D AMR in WSL) and F09; idle WSL before, no orphans
+after.
 
 ### T34 — GUI: global solver mode (sidebar selector; hide what does not apply)
 

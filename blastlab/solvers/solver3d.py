@@ -559,6 +559,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
                 eos=eos, bcs=bcs, obstacles=obstacles,
                 charge=charge, charge_center=(x0, y0, z0), r_exp=r_exp,
                 r_src=r_src, from_profile=from_profile,
+                # what the USER asked for; gauge_out['points'] is where
+                # they landed after snapping to cell centres (QA-33)
+                gauges=[tuple(float(v) for v in g) for g in (gauges or [])],
                 # per-step running peak pressure and net overpressure
                 # impulse (the viewer fields), same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)

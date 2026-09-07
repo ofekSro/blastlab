@@ -205,13 +205,25 @@ The 22-suite no-WSL matrix stays green.
 - **QA-32** — the per-write AMR log keeps the first 5 writes, then every
   10th plus any write whose cell count moves more than 10 % (40 writes ->
   8 lines); the 1D live plot starts on a sensible 0-10 kPa range instead
-  of an empty -0.04..0.04.
+  of an empty -0.04..0.04. **T33:** the Run tab also carries a `cells`
+  chip fed from `hooks.frame(levels=)` - it counts REAL cells (a display
+  cell at level l stands for 2**((disp-l)*ndim) of them), appears with
+  the first frame that reports a level map and hides again for a static
+  run.
 - **QA-33** — the gauge table says "Gauge (cell)" and "Phase ended"
-  instead of an unexplained "Complete".
+  instead of an unexplained "Complete". **T33:** every abbreviated header
+  now explains itself on hover (one tooltip that follows the pointer's
+  column, since ttk headings take none), and a row reads
+  "G1 (1.000, 2.000, 0.450) -> cell (1.000, 2.000, 0.500) m" when the
+  solver had to snap the gauge - the snapped numbers alone read as a typo
+  in the user's own input. `meta['gauges']` (native 2D/3D and foam 2D/3D)
+  carries what was asked for.
 - **QA-34** — the logo file is closed (no ResourceWarning) and the
   `grid(False, alpha=...)` UserWarning is gone.
 - **QA-35** — an AMR case whose per-write mesh is heavy gets a note with
-  the estimated MB per write and where to clean up.
+  the estimated MB per write and where to clean up. **T33:** the note now
+  also gives the total for the run ("~57 MB per write, about 0.3 GB for
+  this run").
 
 ---
 

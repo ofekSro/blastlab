@@ -447,6 +447,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
                 eos=eos, bcs=bcs, obstacles=obstacles,
                 charge=charge, charge_center=(x0, y0), r_exp=r_exp,
                 from_profile=profile is not None,
+                # what the USER asked for; gauge_out['points'] is where
+                # they landed after snapping to cell centres (QA-33)
+                gauges=[tuple(float(v) for v in g) for g in gauges],
                 # per-step running peak pressure and net overpressure
                 # impulse, same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)

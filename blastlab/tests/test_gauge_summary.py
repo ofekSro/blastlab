@@ -77,12 +77,26 @@ def main():
     print("\ngauge dicts + CSV")
     g1 = dict(times=t, radii=[1.0, 2.5], pressures=[p, friedlander(t, 2 * ta, ps / 3, td, b)])
     rows = gs.summarize_gauges(g1)
-    check('1D labels', [r['gauge'] for r in rows] == ['r = 1.000 m', 'r = 2.500 m'],
+    # QA-33: every label starts with the gauge number the plots use
+    check('1D labels',
+          [r['gauge'] for r in rows] == ['G1  r = 1.000 m',
+                                         'G2  r = 2.500 m'],
           str([r['gauge'] for r in rows]))
     check('second gauge later and weaker',
           rows[1]['arrival_ms'] > rows[0]['arrival_ms'] and rows[1]['peak_kpa'] < rows[0]['peak_kpa'])
     g3 = dict(times=t, points=[(1.0, 2.0, 0.5)], pressures=[p])
-    check('3D label', gs.summarize_gauges(g3)[0]['gauge'] == '(1.000, 2.000, 0.500) m')
+    check('3D label',
+          gs.summarize_gauges(g3)[0]['gauge'] == 'G1 (1.000, 2.000, 0.500) m',
+          gs.summarize_gauges(g3)[0]['gauge'])
+    # a gauge the solver had to snap says both numbers, so the snapped
+    # coordinates do not read as a typo in the user's input (QA-33)
+    snapped = gs.summarize_gauges(g3, requested=[(1.0, 2.0, 0.45)])[0]['gauge']
+    check('a snapped gauge shows requested -> cell',
+          snapped == 'G1 (1.000, 2.000, 0.450) -> cell '
+                     '(1.000, 2.000, 0.500) m', snapped)
+    check('an exact gauge is not cluttered with an arrow',
+          '->' not in gs.summarize_gauges(
+              g3, requested=[(1.0, 2.0, 0.5)])[0]['gauge'])
     check('empty gauges -> no rows', gs.summarize_gauges(dict(times=np.array([]), points=[], pressures=[])) == [])
     out = os.path.join(tempfile.mkdtemp(prefix='blastlab_gs_'), 'gauges_summary.csv')
     gs.save_gauge_summary(rows, out)

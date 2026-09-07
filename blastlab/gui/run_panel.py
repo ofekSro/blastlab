@@ -116,6 +116,11 @@ class RunPanel(ctk.CTkFrame):
         # kPa like every plot and colorbar (the chip used to be the one
         # readout in Pa, a 1000x mismatch against the live view beside it)
         self._chip_pmax = _chip(chips, 'p max [kPa]')
+        # dynamic AMR moves the cell count every write; it was only ever
+        # visible as a log line (QA-32). Packed on the first frame that
+        # carries a level map, so a static run keeps its four chips.
+        self._chip_cells = _chip(chips, 'cells')
+        self._chip_cells.master.pack_forget()
 
         # ── stepped execution row (VIPER-style) ──────────────────────────
         on_exec = on_exec or (lambda cmd: None)
@@ -324,8 +329,9 @@ class RunPanel(ctk.CTkFrame):
         """Chips back to '-', live plot to a waiting placeholder, 3D view
         dropped: nothing on the Run tab may still describe the last run."""
         self._last_step = None
+        self._chip_cells.master.pack_forget()
         for chip in (self._chip_step, self._chip_t, self._chip_dt,
-                     self._chip_pmax):
+                     self._chip_pmax, self._chip_cells):
             chip.configure(text='—')
         self._mesh = self._line = self._solid = None
         self._mesh_geom = self._mesh_lines = None
@@ -482,6 +488,29 @@ class RunPanel(ctk.CTkFrame):
         if draw:
             self.canvas.draw()
 
+    def _show_cells(self, levels):
+        """Live cell count of a dynamic-AMR mesh (QA-32).
+
+        `levels` is a level map on the DISPLAY grid (the finest displayed
+        level), so a cell at level l stands for 2**((disp - l) * ndim)
+        display cells - count each of them once. A 3D run hands over the
+        live plane, not the whole mesh; the tooltip says so.
+        """
+        try:
+            lv = np.asarray(levels)
+            disp = float(lv.max())
+            n = int(round(float(np.power(
+                2.0, -(disp - lv.astype(np.float64)) * lv.ndim).sum())))
+        except (ValueError, TypeError, AttributeError):
+            return
+        box = self._chip_cells.master
+        if box.winfo_manager() == '':
+            box.pack(side='left', padx=(0, GAP))
+            theme.tooltip(box, 'Cells of the dynamic (AMR) mesh on the '
+                               'live plane - a 3D run counts the slice, '
+                               'not the whole mesh.')
+        self._chip_cells.configure(text=f'{n:,}')
+
     def on_frame(self, field, t, levels=None):
         # Frames are coalesced in a single slot shared across chain stages,
         # so a frame may briefly belong to the NEXT stage while this panel
@@ -492,6 +521,7 @@ class RunPanel(ctk.CTkFrame):
             set_frame(self._mesh, field, self._solid)
             if levels is not None and np.shape(levels) == field.shape:
                 self._mesh_levels = levels
+                self._show_cells(levels)
                 if self.show_mesh_var.get():
                     self._rebuild_overlay(draw=False)
         elif self._line is not None:

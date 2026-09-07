@@ -75,20 +75,42 @@ def summarize_trace(times, p, p_ambient=P_AIR, arrival_frac=ARRIVAL_FRAC):
     return out
 
 
-def gauge_labels(gauge_out):
-    """One label per gauge: 'r = 1.000 m' (1D) or '(x, y[, z]) m'."""
+def gauge_labels(gauge_out, requested=None):
+    """One label per gauge.
+
+    1D: 'G1  r = 1.000 m'. 2D/3D: 'G1 (0.300, 0.800)' when the gauge sits
+    where it was asked for, and 'G1 (0.300, 0.800) -> cell (0.305, 0.802)'
+    when the solver snapped it to a cell centre - the table used to show
+    the snapped numbers alone, which read as a typo in the user's input
+    (QA-33). `requested` is the case's gauge list (meta['gauges']).
+    """
+    def fmt(pt):
+        return '(' + ', '.join(f'{float(v):.3f}' for v in pt) + ')'
+
     if 'radii' in gauge_out:
-        return [f'r = {r:.3f} m' for r in gauge_out['radii']]
-    return ['(' + ', '.join(f'{v:.3f}' for v in pt) + ') m'
-            for pt in gauge_out.get('points', [])]
+        return [f'G{k + 1}  r = {r:.3f} m'
+                for k, r in enumerate(gauge_out['radii'])]
+    pts = list(gauge_out.get('points', []))
+    want = list(requested or [])
+    out = []
+    for k, pt in enumerate(pts):
+        label = f'G{k + 1} {fmt(pt)} m'
+        if k < len(want) and len(want[k]) == len(pt):
+            snapped = any(abs(float(a) - float(b)) > 1e-9
+                          for a, b in zip(want[k], pt))
+            if snapped:
+                label = f'G{k + 1} {fmt(want[k])} -> cell {fmt(pt)} m'
+        out.append(label)
+    return out
 
 
-def summarize_gauges(gauge_out, p_ambient=P_AIR):
+def summarize_gauges(gauge_out, p_ambient=P_AIR, requested=None):
     """[row dict per gauge] for a native or foam Result's `gauges`
     (1D: times/radii/pressures; 2D/3D: times/points/pressures)."""
     rows = []
     times = gauge_out.get('times', [])
-    for label, p in zip(gauge_labels(gauge_out), gauge_out.get('pressures', [])):
+    for label, p in zip(gauge_labels(gauge_out, requested),
+                        gauge_out.get('pressures', [])):
         row = dict(gauge=label)
         row.update(summarize_trace(times, p, p_ambient))
         rows.append(row)

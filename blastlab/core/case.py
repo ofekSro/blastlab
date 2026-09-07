@@ -666,8 +666,9 @@ def validate_case(case, pending_inputs=False):
         mb = plan.n_pred * 60 / 1e6            # ~60 B per cell per write
         if mb * n_w > 200:
             note(f"AMR keeps a mesh per written time: roughly "
-                 f"{mb:.0f} MB per write on the WSL disk - clean old runs "
-                 f"with 'Foam runs...' or --clean-foam-runs")
+                 f"{mb:.0f} MB per write, about {mb * n_w / 1000:.1f} GB "
+                 f"for this run on the WSL disk - clean old runs with "
+                 f"'Foam runs...' or --clean-foam-runs")
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
         if plan is not None and (plan.refined or plan.amr):
