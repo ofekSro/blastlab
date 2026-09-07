@@ -270,6 +270,8 @@ def next_interval(n_frames, progress, interval, interval0):
 def maybe_adapt(spec, st, adapt, run, hooks, n_frames):
     """Apply the adaptive-writeInterval controller (all dims; the
     controlDict is runTimeModifiable). Called once per ingested frame."""
+    if not getattr(spec, 'adaptive_write', True):
+        return                      # writeInterval pinned for this run
     adapt['since'] += 1
     if adapt['since'] < ADAPT_EVERY or run.stop_requested:
         return

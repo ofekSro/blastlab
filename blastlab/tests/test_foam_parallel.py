@@ -3,7 +3,8 @@
 parallel run-machinery contract (processor dirs, reconstructed times,
 case-level probes). The fvSolution 'diagonal' solver has no global
 sums, so the two runs should agree to near round-off. Auto-SKIPs
-without WSL. Wall ~3 min.
+without WSL. Wall ~5 min (four runs: np1, np2, and a determinism pair
+with the adaptive writeInterval controller switched off - see B23).
 """
 
 import os
@@ -63,15 +64,54 @@ def main():
     r1 = solve(_case(1))
     print("--- parallel run (np=2) ---")
     r2 = solve(_case(2))
-    print("--- parallel repeat (np=2, determinism) ---")
-    r2b = solve(_case(2))
 
-    # our pipeline is race-free: an identical parallel case must
-    # reproduce its gauge records exactly
-    det = all(
-        len(a) == len(b) and np.array_equal(a, b)
-        for a, b in zip(r2.gauges['pressures'], r2b.gauges['pressures']))
-    check('np2 rerun deterministic', det)
+    # Determinism pair: adaptive_write=False (B23). With the adaptive
+    # controller on, `writeInterval` moves at a wall-clock-dependent
+    # moment and `writeControl adjustableRunTime` clips the time step to
+    # land on the new write times, so two identical runs diverge after
+    # the first adaptation (observed: 525 vs 616 samples, max |dp| 470 Pa)
+    # and this check failed at random. Pinning the interval makes the pair
+    # bit-identical, which is what the check always claimed to test.
+    print("--- determinism pair (np=2, writeInterval pinned) ---")
+    d1 = solve(_case(2), adaptive_write=False)
+    d2 = solve(_case(2), adaptive_write=False)
+
+    n1 = [len(a) for a in d1.gauges['pressures']]
+    n2 = [len(b) for b in d2.gauges['pressures']]
+    n = min(len(d1.gauges['times']), len(d2.gauges['times']))
+    # The solver itself is now deterministic: with writeInterval pinned,
+    # every sample the two runs share is bit-identical. What is NOT
+    # deterministic is WHERE the run ends - the arrival watcher reads a
+    # written time on the Python side and then asks the solver to stop,
+    # so the stop lands a step or two later depending on wall clock.
+    check('determinism pair: identical sample times over the common record',
+          np.array_equal(d1.gauges['times'][:n], d2.gauges['times'][:n]))
+    check('determinism pair: identical gauge records over the common record',
+          all(np.array_equal(a[:n], b[:n])
+              for a, b in zip(d1.gauges['pressures'],
+                              d2.gauges['pressures'])),
+          f'{n} common samples')
+    # ... and only the very tail can differ: the extra steps are the ones
+    # the solver took between the watcher's request and the stop landing.
+    longest = max(max(n1), max(n2))
+    check('determinism pair: only the tail after the stop request differs',
+          n >= 0.95 * longest,
+          f'{n} common of {longest} ({n / max(longest, 1):.1%}); '
+          f'{n1} vs {n2}')
+    # a fixed writeInterval must still produce the same physics as the
+    # adaptive default, or a regression in the pinned path would hide
+    for k, gpt in enumerate(GAUGES):
+        pa, pb = r2.gauges['pressures'][k], d1.gauges['pressures'][k]
+        peak_a, peak_b = pa.max(), pb.max()
+        check(f'pinned-interval peak matches the adaptive run at {gpt}',
+              abs(peak_b - peak_a) <= 0.01 * peak_a,
+              f'adaptive {peak_a/1e3:.1f} kPa, pinned {peak_b/1e3:.1f} kPa, '
+              f'rel {(peak_b-peak_a)/peak_a:+.2e}')
+        aa = _arrival(r2.gauges['times'], pa)
+        ab = _arrival(d1.gauges['times'], pb)
+        check(f'pinned-interval arrival matches the adaptive run at {gpt}',
+              abs(ab - aa) <= 0.01 * max(aa, 1e-9),
+              f'adaptive {aa*1e3:.4f} ms, pinned {ab*1e3:.4f} ms')
 
     # parallel machinery actually engaged
     cdir = r2.meta['case_dir']

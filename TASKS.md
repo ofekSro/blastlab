@@ -99,7 +99,7 @@ Hard rules:
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [x] 2026-09-07 |
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [x] 2026-09-07 |
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
-| T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [ ] |
+| T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [x] 2026-09-07 |
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [ ] |
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [ ] |
@@ -646,6 +646,37 @@ Done when: two consecutive green runs; B23 DONE.
 Commit: "T35: deterministic writeInterval for the parallel determinism pair (B23)"
 ```
 
+**DONE (2026-09-07):** option (b) as the owner decided. `CaseSpec.adaptive_write`
+(default True) and an `adaptive_write=` kwarg on `solve_1d/2d/3d_foam`; when it is
+False `runloop.maybe_adapt` returns immediately, so the run never rewrites
+`writeInterval` and `writeControl adjustableRunTime` clips the time step onto the
+same write times every time. Nothing changes by default: the writer emits exactly
+what it always did (the goldens are untouched - `test_foam_writer` PASS) and only
+the new dataclass field exists.
+`test_foam_parallel` now runs the determinism pair with `adaptive_write=False` and
+adds the physics guard the brief asked for (pinned vs adaptive peaks and arrivals
+within 1 %: measured +6.6e-4 / -1.1e-3 on the peaks, 0.15 vs 0.15 ms and 0.339 vs
+0.339 ms on the arrivals). `test_adaptive_interval` gained a no-WSL unit check that
+`adaptive_write=False` produces zero `rewrite_control_entry` calls and a pinned
+interval, that True still adapts, and that the default is True.
+**Deviation from the brief's wording, and why:** the pair is now bit-identical in
+every sample it records - identical times, identical pressures - which is what the
+old comment claimed. It is NOT identical in RECORD LENGTH: 372 vs 368 samples on the
+second run. That last difference is not a numerical race. The arrival watcher reads a
+written time on the Python side and then asks the solver to stop, so the solver takes
+a wall-clock-dependent number of extra steps before the stop lands, and the probe
+function object samples every one of them. Making that identical would need a
+solver-side stop condition, which is out of this task's scope. The test therefore
+asserts (i) identical sample times over the common record, (ii) identical gauge
+records over the common record, and (iii) that the common record covers >= 95 % of
+the longer one (measured 98.9 %), with the reason in a comment - instead of a bare
+`len(a) == len(b)` that would fail on the tail alone. Before this change the pair
+differed by 91 samples with 470 Pa peak error; now it differs by 4 samples and 0 Pa.
+Tests: `test_foam_parallel` twice in a row, both PASS (idle WSL checked before each,
+no orphans after); test_adaptive_interval, test_foam_writer (goldens byte-identical),
+test_foam_live_due, test_foam_reader, test_case_validate, test_regression
+byte-identical.
+
 ### T36 — Mass/energy-conserving resolved-charge init in 2D/3D (B24) + re-baseline
 
 **Why:** with `dx = r_exp/MIN_EXP_CELLS` the explosive is a 5-cell-radius stair-step; the
@@ -1010,7 +1041,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - B20 FrameStore thinning — DONE (T2)
 - B21 multi-charge stop distances — DONE (T10)
 - B22 'Run failed' dialog text — DONE (T5)
-- **B23** `test_foam_parallel` determinism fails randomly — OPEN → **T35** (owner: option b)
+- B23 `test_foam_parallel` determinism fails randomly — DONE (2026-09-07, T35; `adaptive_write=False` pins writeInterval, the pair is bit-identical over the common record, only the asynchronous stop moves the tail)
 - **B24** resolved-charge init not mass/energy conserving (±3 %) — OPEN → **T36**
 - B25 controlDict rewrites inside fileModificationSkew ignored — DONE (2026-09-05, T18)
 - B26 chain 3D stage reused the 2D revolved feed — DONE (2026-09-07, QA-05)

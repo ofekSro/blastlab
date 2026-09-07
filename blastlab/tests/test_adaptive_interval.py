@@ -63,6 +63,45 @@ def main():
     # band sanity against writer constants
     check('band constants sane', N_WRITES_MIN < N_WRITES_MAX)
 
+    # B23/T35: a run with adaptive_write=False never rewrites the
+    # controlDict, so two identical runs write at exactly the same times
+    from blastlab.solvers.foam import runloop, writer
+
+    class _Run:
+        stop_requested = False
+
+    class _Hooks:
+        def log(self, *_a, **_k):
+            pass
+
+    rewrites = []
+    real = runloop.runner.rewrite_control_entry
+    runloop.runner.rewrite_control_entry = (
+        lambda *a, **k: rewrites.append(a) or True)
+    try:
+        for adaptive in (True, False):
+            spec = writer.CaseSpec(dim=2, material='TNT',
+                                   write_interval=I0,
+                                   adaptive_write=adaptive)
+            adapt = dict(interval=I0, since=0)
+            st = dict(frac=0.10)
+            before = len(rewrites)
+            # far too dense: the controller would double the interval
+            for _ in range(4 * runloop.ADAPT_EVERY):
+                runloop.maybe_adapt(spec, st, adapt, _Run(), _Hooks(), 40)
+            n = len(rewrites) - before
+            check(f'adaptive_write={adaptive} -> '
+                  f'{"some" if adaptive else "no"} controlDict rewrites',
+                  (n > 0) if adaptive else (n == 0), f'{n} rewrites')
+            check(f'adaptive_write={adaptive} interval '
+                  f'{"moves" if adaptive else "pinned"}',
+                  (adapt['interval'] != I0) if adaptive
+                  else (adapt['interval'] == I0), f"{adapt['interval']:g}")
+    finally:
+        runloop.runner.rewrite_control_entry = real
+    check('CaseSpec defaults to the adaptive controller',
+          writer.CaseSpec(dim=2, material='TNT').adaptive_write is True)
+
     print()
     if FAIL:
         print(f"ADAPTIVE INTERVAL: FAIL ({len(FAIL)}): {', '.join(FAIL)}")

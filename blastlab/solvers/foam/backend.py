@@ -386,11 +386,15 @@ def _log_banner_1d(hooks, case, spec):
         hooks.log(line)
 
 
-def solve_1d_foam(case, hooks=None):
+def solve_1d_foam(case, hooks=None, adaptive_write=True):
     """Run a Case1D on blastFoam. Returns a Result shaped exactly like
-    the native solve_1d."""
+    the native solve_1d.
+
+    `adaptive_write=False` pins writeInterval for the whole run - see
+    CaseSpec.adaptive_write (B23)."""
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
+    spec.adaptive_write = bool(adaptive_write)
     r = spec.grid['r']
     # T is in the readiness tuple because finalize_1d re-reads it
     fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
@@ -601,11 +605,15 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
         hooks.log(line)
 
 
-def solve_2d_foam(case, hooks=None):
+def solve_2d_foam(case, hooks=None, adaptive_write=True):
     """Run a Case2D on blastFoam (axisymmetric wedge or planar slab).
-    Returns a Result shaped exactly like the native solve_2d."""
+    Returns a Result shaped exactly like the native solve_2d.
+
+    `adaptive_write=False` pins writeInterval for the whole run - see
+    CaseSpec.adaptive_write (B23)."""
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
+    spec.adaptive_write = bool(adaptive_write)
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
     Nx, Ny = spec.nx, spec.ny
@@ -999,11 +1007,15 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
         hooks.log(line)
 
 
-def solve_3d_foam(case, hooks=None):
+def solve_3d_foam(case, hooks=None, adaptive_write=True):
     """Run a Case3D on blastFoam. Returns a Result shaped exactly like
-    the native solve_3d (incl. viewer snapshots and frames)."""
+    the native solve_3d (incl. viewer snapshots and frames).
+
+    `adaptive_write=False` pins writeInterval for the whole run - see
+    CaseSpec.adaptive_write (B23)."""
     hooks = hooks or RunHooks()
     spec = _preflight(case, hooks)
+    spec.adaptive_write = bool(adaptive_write)
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
     Nx, Ny, Nz = spec.nx, spec.ny, spec.nz

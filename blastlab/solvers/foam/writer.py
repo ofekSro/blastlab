@@ -78,6 +78,10 @@ class CaseSpec:
     end_time: float = 0.0
     cap_is_end: bool = False        # end_time is the user's t_end
     write_interval: float = 0.0
+    #: False pins writeInterval for the whole run: the adaptive
+    #: controller never rewrites the controlDict, so two identical runs
+    #: write at exactly the same times and stay bit-identical (B23)
+    adaptive_write: bool = True
     grid: dict = None                    # core.grid product (per dim)
     charges: list = field(default_factory=list)   # [((x,y,z), mass_kg)]
     det_points: list = field(default_factory=list)  # [] = charge centres
