@@ -209,3 +209,71 @@ The fast no-WSL suites were **not** re-run by this pass: another session was run
 - `/root/blastlab_runs`: 86 runs, 27.8 GB (8 new runs from this pass, names `*_p<pid>-NN`; F09 deleted one of them via the browser). Cleanup is the owner's call (`python -m blastlab --clean-foam-runs`).
 - Power plan: DC display/sleep timeouts were set to 0 for the night and restored to 3 min / 10 min; AC values were already "never" and untouched.
 - Repo: no source file touched; new files `QA_REPORT.md`, `blastlab/tests/_qa_gui_harness.py`; `TASKS.md`/`ROADMAP.md` gained the QA rows/briefs (next to the other session's uncommitted T24 hunks). Scratch outputs (gauges, GIFs, case JSONs) went to the QA output dir, not the repo.
+
+## 9. Proposed fix per finding
+
+Concrete, minimal changes; each maps to a T25–T33 brief. File:function names are the current ones.
+
+**QA-01 / QA-02 / QA-03 (B27).** Reorder `core/case.validate_case`: (1) finiteness + positivity of every float (`math.isfinite`, `> 0`) → on failure `return rep` immediately (that also removes the ZeroDivisionError); (2) predicted cell count by arithmetic only (`round(L/dx)` per axis, refinement volume estimate from zone boxes × 4^level / 8^level); (3) compare against the cap; (4) call `refine.plan_levels` only when under the cap. Inside `refine.plan_levels` compute `n_fine = prod(round(L/dx_fine))` first and raise `ValueError('display grid of N cells exceeds …')` before any `np.zeros`; `preview_panel._plan` already swallows ValueError. Cap the auto charge levels with `auto_charge_zones(level_cap=…)` derived from the display-cell cap. `Preview3DPanel.show_case` / `Preview2DPanel.show_case`: take the ValidationReport, draw geometry only (no `mesh`) when `rep.errors` or `plan.n_fine > MESH_PREVIEW_MAX` (add the same guard to `_mesh_3d`), and on any exception call `self.clear(f'preview unavailable: {exc}')` instead of printing to stdout. (T25)
+
+**QA-04.** Make `Plan.fine['x_face']/['y_face']` derive from the `levels` array shape (`np.linspace(0, L, levels.shape[i] + 1)`) instead of an independent `round(L/dx_fine)`; assert `src2d.shape == (len(u_face)-1, len(v_face)-1)` in `refine.mesh_segments_2d`. Regression check: planar 3.0×2.0, cell 0.05, obstacle (1.5,1.8,0,0.6), zone (0.5,1.5,0,1.0,1). (T25)
+
+**QA-05 (B26).** `GuiHooks.run_started`: unconditionally reset `self.feed3d = None; self._revolver = None; self.scene3d = None` at the top, then build a fresh `Feed3D` when `auto3d` (the "keep an existing feed" branch only served a viewer the user opened mid-run — keep that via a `user_opened` flag instead). `App._dispatch('stage')`: call `self._finish_view3d('stage ended')` before the next `run_started` is handled. Tag frames with the stage index (`frame3d(t, fields, stage=k)`) and drop frames whose stage differs from the panel's current stage. (T26)
+
+**QA-06.** In `validate_case`, move the "Charge centre is outside the domain" check (and the obstacle-overlap check) outside the `init_mode == 'charge'` branch — the profile is placed at `center` too. (T26)
+
+**QA-07.** `forms.py`: drop the fixed `width` on `_combo`/`_entry` and use `sticky='we'` with `body.columnconfigure(1, weight=1, minsize=170)`; wrap long labels (`wraplength=150`) or move "(blastFoam)" into a tooltip; if still tight, change `SetupPanel.columnconfigure` weights from 11:9 to 12:8 and let the form fall back to one column below 1200 px. (T27)
+
+**QA-08.** `results_panel.py` header: a second row (`bar2`) holding "Export" + the six buttons packed `side='left'`, or one `CTkOptionMenu('Export')`. Rule: nothing packed `side='right'` that can silently be dropped. (T27)
+
+**QA-09.** `View3DPanel._build_controls`: after `self._tab_seg.set('Display')` add `disp.tkraise()` (mirror of `results_panel`'s `ftab.tkraise()`). (T28)
+
+**QA-10.** `RunPanel.set_running(True)`: reset the four chips to "—". `GuiHooks`: keep the last `Progress`; in `step_gate` when the gate will hold, and at stage end, put it on the queue unthrottled. Add `RunPanel.set_paused(bool)` showing a "PAUSED at step n" label next to the bar and a pressed Interrupt. (T28)
+
+**QA-11.** `RunPanel.set_running(True)`: swap in a placeholder figure ("waiting for the solver…" / "checking WSL…") and clear the 3D panel; `on_run_started` rebuilds. (T28)
+
+**QA-12.** `ResultsPanel._setup_anim`: on the early return set a figure with a centred caption "No recorded frames for this result", disable Play, set the slider to 0..1. (T28)
+
+**QA-13.** `add_result`: de-duplicate labels (`label #2`); a "Remove" button next to the picker that pops the entry, rebuilds the combo values and selects the last one; free `ent.result` (the frames are the memory). (T30)
+
+**QA-14.** Change `Case3D` defaults so the fresh 3D tab validates: `charge_resolution='smear'` by default (keeps 10 m / 0.1 m at 1 M cells), or a 5 m box with an 8 kg charge. Add a note line explaining when `resolve` overrides the cell size. (T25)
+
+**QA-15.** `forms._f`: reject non-finite values (`math.isfinite`) with "'charge' must be a finite number"; `forms._i`: reject non-integers (`float(v).is_integer()`); same checks in `validate_case` for JSON-loaded cases. (T29)
+
+**QA-16 (G3).** `CaseForm.get_case`: collect every parse error into a list and raise one ValueError joined by newlines; `App._validate` shows each line; keep `self.widgets[name]` in CaseForm and set `border_color=theme.c('error')` on the offending entries (`c('border')` when fixed). `_PointList._add`: on a bad row keep the text, red border, and a hint label under the list ("expected 2 numbers: x y"). Refresh-every: same red border. Run tab: `RunPanel.set_validation(ok, n_errors)` chip next to Run, fed by `_validate`; disable Run/Initialise while errors exist. Feedback: a bottom status label per panel plus `App.notify(text)`; route `ResultsPanel._log` to it (keep the log copy). Disable export buttons when nothing is selected; disable Profile for planar 2D and 3D results with a tooltip. (T29)
+
+**QA-17.** `run_panel.py`: set the paned sash after layout (`body.sashpos(0, 400)`) so the right pane gets at least 60 %; `View3DPanel` control column `width=200` and collapsible below 700 px; `viewer.py`: HUD font from window width, scalar bars `width=0.06` with short titles ("Overpressure [kPa]"), loads bar horizontal at the bottom. Field radios: include `p_peak`/`imp` (from `meta`) in the playback payload in `feed_result`; if a field is absent hide its radio (tooltip) instead of greying it. (T27/T31)
+
+**QA-18 (G4).** `feed_result`: feed one snapshot per `after(1, …)` tick with a "loading n/N" HUD. 3D preview: keep one `GeometryScene` and update actors in place (charge/gauges/obstacles) instead of rebuilding; debounce 500 ms and skip while a build is pending. AMR mesh edges: build the polydata inside `Feed3D.make_payload` on the worker thread and hand it to `_MeshEdges`. (T31)
+
+**QA-19 / QA-28.** `theme.py`: segmented `unselected_color=('#d5dbe3', '#333333')` with a matching hover colour; buttons get `text_color_disabled=c('muted')` and `set_running` swaps Stop to `fg_color=c('card2')` while disabled (red only during a run). Toolbar: matplotlib's back/forward "disabled" images are what render as checkerboards — hide those two buttons or build a 4-button toolbar (Home, Pan, Zoom, Save) with `theme.icon`. (T32)
+
+**QA-20.** `CTkTextbox(wrap='word')` for the Run log (keep `F_MONO`). (T33)
+
+**QA-21 (G8).** `preview_panel.case_geometry`: add `charges=[(x, y, z, r_i)]` and `det_points`; `viewer.add_static_scenery` draws extra spheres + small diamonds; `Preview2DPanel` draws det points as "x" markers. (T31)
+
+**QA-22.** `App._open_case`: map `json.JSONDecodeError` → "This file is not valid JSON (line L, column C)", schema/dim errors → "Not a blastlab case file (dim 5 is not supported)", `FileNotFoundError` → "File not found: <path>" (`str(path)`, not repr). (T29)
+
+**QA-23.** `ChainPanel._run`: validate first, `os.makedirs` after; on errors select the first offending stage in the segmented switcher; wrap `get_case` per stage to prefix parse errors with "Stage d (dD):". Paused label per QA-10. (T28)
+
+**QA-24.** `postmortem.load_run` already reads every written time — populate `meta['frames']` from those slices (sampled to at most 150) so loaded runs replay; otherwise the QA-12 caption. Ellipsise long labels in the picker with the full text as a tooltip. (T30)
+
+**QA-25.** `SetupPanel`: status body inside a `CTkScrollableFrame` with a fixed height (~6 lines, `pack_propagate(False)`). (T27)
+
+**QA-26.** `RunPanel.on_progress`: show `p.p_max/1e3` with caption "p max [kPa]". (T33)
+
+**QA-27.** `Card` titles: `wraplength` + tooltip; "Record frames" → "Record replay frames"; `summary_table.column(..., stretch=True, minwidth=…)`; 3D field figures with `constrained_layout=True`; `plots._panel_grid_figure` puts the snapshot label in the axes title and the run label in `fig.suptitle(y=0.99)` so they cannot overlap; AMR preview title shortened to "base grid · AMR L3 follows the shock". (T27)
+
+**QA-29 (G9).** `App.__init__`: `root.bind_all` for Ctrl+O (open), Ctrl+S (save), F5 (run), Escape (stop); persist `geometry`, `mode`, `refresh` via `gui_settings.update(...)` in `_on_close` and apply them in `__init__`; entry focus ring by binding FocusIn/FocusOut in `forms._entry` to swap `border_color` to accent. Chain workspace default: `~/Documents/blastlab/chain_workspace`. (T32/T33)
+
+**QA-30.** `FoamRunBrowser`: a `ttk.Scrollbar` bound to `table.yview` packed next to the table; the running-run refusal as `messagebox.showwarning` (or the status label in `c('danger')`). (T33)
+
+**QA-31.** Peak-map colour scale: `vmax = np.nanpercentile(pk[~charge_mask], 99.5)` where `charge_mask` = cells within `r_exp` of any charge, or a `LogNorm`. (T33)
+
+**QA-32.** Runloop AMR note: log the first 5 writes, then every 10th or when the cell count changes by more than 10 %; add a "cells" chip on the Run tab fed from `hooks.frame(levels=)`. 1D live axes: initial `set_ylim(0, 10)` kPa until the first frame. (T33)
+
+**QA-33.** Tooltips on the table headers; rename "Complete" → "Pos. phase complete"; gauge row label "G1 (0.3, 0.8) → cell (0.305, 0.802)". (T33)
+
+**QA-34.** `app.py:164`: `with Image.open(_LOGO) as im: img = im.convert('RGBA')`. `preview_panel.py:199`: call `ax.grid(True, alpha=0.25)` only when the mesh is off, `ax.grid(False)` otherwise. (T33)
+
+**QA-35.** Add "~X MB per write, ~Y GB for this run" to the AMR/3D validation line from the predicted cell count × written times; the auto-cleanup policy (N8) already bounds the total. (T33)
