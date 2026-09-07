@@ -267,8 +267,22 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m,
             rho = np.where(is_exp, rho_src, RHO_AIR)
             e   = np.where(is_exp, e_src, E_AIR)
         else:
+            # Energy-conserving stair-step (B24), as in solver2d: keep
+            # rho_exp, scale e by V_true / V_discretised so the initial
+            # energy equals the requested charge's (mass keeps the
+            # rasterisation error; V_true is clipped to the domain).
+            n_exp = int(is_exp.sum())
+            if n_exp == 0:
+                raise ValueError("Resolved charge covers no fluid cell - "
+                                 "move the burst point or refine the grid")
+            V_disc  = n_exp * dx ** 3
+            V_true  = core_geometry.charge_volume_3d(r_exp, x0, y0, z0,
+                                                     Lx, Ly, Lz)
+            e_scale = V_true / V_disc
+            hooks.log(f"  [note] resolved charge: {n_exp} cells, energy "
+                      f"scaled x{e_scale:.3f}")
             rho = np.where(is_exp, rho_exp, RHO_AIR)
-            e   = np.where(is_exp, JWL_TNT['e0'], E_AIR)
+            e   = np.where(is_exp, JWL_TNT['e0'] * e_scale, E_AIR)
         zeros = np.zeros((Nx, Ny, Nz))
         U = np.array([rho, zeros, zeros.copy(), zeros.copy(), rho * e])
         t0 = 0.0

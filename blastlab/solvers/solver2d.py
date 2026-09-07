@@ -191,8 +191,26 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m,
         is_exp &= fluid
         phase = is_exp.astype(int)
 
+        # Energy-conserving stair-step (B24): the cell set holds +-3 % of
+        # the true sphere depending on where the centre sits between the
+        # faces. Keep rho_exp (JWL is exponential in rho0/rho: rescaling
+        # the density would move the initial products pressure ~10 % for
+        # a 3 % volume error, rescaling e moves it < 1 %) and scale e so
+        # the total energy equals the requested charge's exactly; the
+        # products' MASS keeps the rasterisation error. V_true is the
+        # sphere clipped to the domain (surface bursts stay truncated).
+        n_exp = int(is_exp.sum())
+        if n_exp == 0:
+            raise ValueError("Resolved charge covers no fluid cell - "
+                             "move the burst point or refine the grid")
+        V_disc  = float((V * is_exp).sum())
+        V_true  = core_geometry.charge_volume_2d(geometry, r_exp, x0, y0,
+                                                 Lx, Ly)
+        e_scale = V_true / V_disc
+        hooks.log(f"  [note] resolved charge: {n_exp} cells, energy "
+                  f"scaled x{e_scale:.3f}")
         rho = np.where(is_exp, rho_exp, RHO_AIR)
-        e   = np.where(is_exp, JWL_TNT['e0'], E_AIR)
+        e   = np.where(is_exp, JWL_TNT['e0'] * e_scale, E_AIR)
         U = np.array([rho,
                       np.zeros((Nx, Ny)),
                       np.zeros((Nx, Ny)),

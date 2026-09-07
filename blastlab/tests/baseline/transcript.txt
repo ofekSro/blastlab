@@ -21,6 +21,7 @@
   Gauge data saved: <OUT>\b1_gauges.txt  (579 rows x 3 gauges)
   Field profile saved: <OUT>\b1_profile.txt  (190 cells, t = 1.833 ms)
   [auto] Cell size reduced to 0.01053 m (5 cells across charge radius)
+  [note] resolved charge: 39 cells, energy scaled x0.957
 
 ============================================================
   2D Blast Solver (axisymmetric)
@@ -36,14 +37,15 @@
   Safety cap      : 47.0 ms
 ============================================================
 
-  Snapshot saved: t = 0.114 ms  (front at 0.48 m)
-  step     200  t =   0.154 ms  dt = 9.45e-07 s  p_max = 3.372e+06 Pa
+  Snapshot saved: t = 0.116 ms  (front at 0.48 m)
+  step     200  t =   0.158 ms  dt = 9.66e-07 s  p_max = 3.233e+06 Pa
 
-  Done. 382 steps, t_final = 0.367 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.014e+05 Pa)
+  Done. 382 steps, t_final = 0.375 ms
+  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
 
   Gauge data saved: <OUT>\b2_gauges.txt  (383 rows x 2 gauges)
   [auto] Cell size reduced to 0.01042 m (5 cells across charge radius)
+  [note] resolved charge: 41 cells, energy scaled x0.965
 
 ============================================================
   2D Blast Solver (axisymmetric)
@@ -60,10 +62,10 @@
 ============================================================
 
 
-  Done. 171 steps, t_final = 0.124 ms
+  Done. 171 steps, t_final = 0.127 ms
   Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
 
-  2D field profile saved: <OUT>\b2_profile.npz  (48 x 154 cells, t = 0.124 ms)
+  2D field profile saved: <OUT>\b2_profile.npz  (48 x 154 cells, t = 0.127 ms)
 
 ============================================================
   2D Blast Solver (axisymmetric)
@@ -86,6 +88,7 @@
 
   Gauge data saved: <OUT>\b2r_gauges.txt  (348 rows x 1 gauges)
   [auto] Cell size reduced to 0.02083 m (5 cells across charge radius)
+  [note] resolved charge: 552 cells, energy scaled x0.983
 
 ==============================================================
   3D Blast Solver
@@ -104,7 +107,7 @@
   (3D steps are slow: expect roughly 1-1 s/step)
 ==============================================================
 
-  step     50  t =   0.039 ms  dt = 7.07e-07 s  p_max = 1.706e+09 Pa
+  step     50  t =   0.040 ms  dt = 7.13e-07 s  p_max = 1.678e+09 Pa
 
   Done. 83 steps, t_final = 0.063 ms
   Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
@@ -114,7 +117,7 @@
 ==============================================================
   3D Blast Solver
 ==============================================================
-  Init            : 2D axisym profile remap (1 kg TNT, t0 = 0.124 ms)
+  Init            : 2D axisym profile remap (1 kg TNT, t0 = 0.127 ms)
   Burst point     : (0.8, 0.8, 0.7) m
   Explosive radius: 0.0527 m
   Domain          : 1.6 x 1.6 x 1.6 m,  cell 0.02 m
@@ -128,10 +131,10 @@
   (3D steps are slow: expect roughly 1-1 s/step)
 ==============================================================
 
-  step     50  t =   0.174 ms  dt = 1.06e-06 s  p_max = 2.711e+06 Pa
-  step    100  t =   0.231 ms  dt = 1.19e-06 s  p_max = 2.064e+06 Pa
+  step     50  t =   0.177 ms  dt = 1.08e-06 s  p_max = 2.622e+06 Pa
+  step    100  t =   0.235 ms  dt = 1.21e-06 s  p_max = 1.998e+06 Pa
 
-  Done. 117 steps, t_final = 0.251 ms
+  Done. 117 steps, t_final = 0.256 ms
   Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
 
   Gauge data saved: <OUT>\b3r_gauges.txt  (118 rows x 2 gauges)

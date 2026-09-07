@@ -100,7 +100,7 @@ Hard rules:
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [x] 2026-09-07 |
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [x] 2026-09-07 |
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [x] 2026-09-07 |
-| T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
+| T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [x] 2026-09-07 |
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [x] 2026-09-07 |
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [ ] |
@@ -737,8 +737,37 @@ Do:
 Verify: test_regression (re-baselined), test_blast2d, test_blast3d, test_foam_1d_vs_native
   (native side changed - WSL, ~2 min), test_case_validate.
 Done when: green; B24 DONE with the measured before/after gaps.
-Commit: "T36: energy-conserving resolved charge init in 2D/3D + re-baseline (B24)"
 ```
+
+**DONE (2026-09-07):** `core/geometry.py` gained exact clipped charge volumes
+(`disc_box_area`, `charge_volume_2d` planar/axisym-per-radian, `charge_volume_3d`
+Gauss-Legendre over the analytic disc-in-box area; verified against closed forms to 2e-16
+and against a 1200^3 brute-force count for a corner-clipped ball to 1.7e-6). Both resolve
+paths (2D axisym + planar, 3D) now keep `rho_exp` and scale the products' specific energy
+by `V_true / V_discretised`, so the initial energy equals the requested charge's to 4e-16
+over 12 randomised charges/offsets (mass keeps the staircase error - JWL is exponential in
+rho0/rho, so scaling rho would move the initial products pressure ~10 % for a 3 % volume
+error while scaling e moves it < 1 %). One `[note] resolved charge: N cells, energy scaled
+xF` line per run through hooks. Measured scale factors in the baseline cases: b2 x0.957
+(39 cells), b2 profile-source x0.965 (41), b3 x0.983 (552), test_blast3d T7 x1.005 (174).
+
+Gaps before -> after (arrival % / peak %):
+- 2D axisym vs 1D (test_blast2d T8): r=1.5 m 5.21 -> 3.92 arr, 1.36 -> 1.21 pk;
+  r=2.5 m 4.23 -> 2.98, 2.40 -> 4.60; r=3.5 m 2.49 -> 1.50, 0.98 -> 2.94. Arrival gate
+  tightened 6 % -> 5 % (passes at 3.92 % worst).
+- 3D vs 1D (test_blast3d T6): r=0.40 17.94 -> 17.24 arr, 0.01 -> 1.65 pk; r=0.55
+  15.40 -> 14.69, 2.80 -> 4.41; r=0.70 12.24 -> 11.50, 1.63 -> 3.25. The residual near-field
+  arrival bias is front smearing, not the charge (gate stays 20 %).
+- 2D -> 3D remap (test_blast3d T7): arr 3.52/0.15/0.69 -> 0.99/2.30/3.12,
+  peak 12.59/13.62/11.92 -> 8.26/9.39/7.58.
+- 1D-init remap sections unchanged byte-for-byte (no charge init there).
+
+Re-baselined b2_gauges, b2_profile.npz, b3_gauges, b3r_gauges, transcript. 1D
+(b1_gauges, b1_profile) and b2r_gauges verified byte-identical - b2r is profile-initialised,
+so it never touches the charge path. Tests: test_regression PASS (re-baselined),
+test_blast2d PASS (5 % gate), test_blast3d PASS, test_case_validate PASS,
+test_foam_1d_vs_native PASS (WSL, peaks 0.89/0.97/0.99/1.02, arrivals 13.7/7.3/5.5/3.8 % -
+unchanged, the 1D solver is untouched). No orphaned solvers.
 
 ### T37 — Hardening bundle (A4 native dead code, A5 shared constants, A6/A7 canaries)
 
@@ -1213,7 +1242,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - B21 multi-charge stop distances — DONE (T10)
 - B22 'Run failed' dialog text — DONE (T5)
 - B23 `test_foam_parallel` determinism fails randomly — DONE (2026-09-07, T35; `adaptive_write=False` pins writeInterval, the pair is bit-identical over the common record, only the asynchronous stop moves the tail)
-- **B24** resolved-charge init not mass/energy conserving (±3 %) — OPEN → **T36**
+- B24 resolved-charge init not mass/energy conserving (±3 %) — DONE (2026-09-07, T36; products' energy rescaled by the exact clipped charge volume, energy exact to 4e-16; measured scale factors 0.957–1.005 on the baseline cases; 2D-vs-1D arrival at r = 1.5 m 5.21 % → 3.92 %, gate 6 % → 5 %; 2D→3D remap peaks 11.9–13.6 % → 7.6–9.4 %; mass keeps the staircase deficit on purpose — see N5/T39)
 - B25 controlDict rewrites inside fileModificationSkew ignored — DONE (2026-09-05, T18)
 - B26 chain 3D stage reused the 2D revolved feed — DONE (2026-09-07, QA-05)
 - B27 validation/preview allocated the full fine grid — DONE (2026-09-07, QA-01..04)
