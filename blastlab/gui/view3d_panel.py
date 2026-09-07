@@ -58,7 +58,7 @@ class View3DPanel(VtkTkHost):
 
     # ── UI construction ──────────────────────────────────────────────────
     def _build_controls(self):
-        ctl = ctk.CTkFrame(self, width=248, fg_color='transparent')
+        ctl = ctk.CTkFrame(self, width=206, fg_color='transparent')
         ctl.pack(side='left', fill='y', padx=(0, GAP), pady=0,
                  before=self.view)
         ctl.pack_propagate(False)
@@ -91,7 +91,7 @@ class View3DPanel(VtkTkHost):
         self._tab_seg = ctk.CTkSegmentedButton(
             ctl, values=['Display', 'Planes', 'View'],
             font=theme.F_SMALL, corner_radius=theme.RADIUS, height=28,
-            fg_color=c('card2'), unselected_color=c('card2'),
+            fg_color=c('card2'), unselected_color=c('seg'),
             unselected_hover_color=c('border'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
@@ -317,10 +317,20 @@ class View3DPanel(VtkTkHost):
         feed = Feed3D(scene_from_meta(result.meta))
         if not self._ensure_scene(feed.init):
             return False
+        # whole-run maps live in meta, not per snapshot: without them the
+        # viewer greyed out Peak overpressure / Net ovp impulse even
+        # though the Results "Fields" list offers exactly those maps for
+        # the same run (they are constant over the playback, as in Fields
+        # where they are labelled "whole run")
+        whole = {}
+        for key, mkey in (('p_peak', 'p_peak'), ('imp', 'impulse')):
+            arr = result.meta.get(mkey)
+            if arr is not None:
+                whole[key] = arr
         names = list(result.snapshots.keys())
         for i, name in enumerate(names):
             snap = result.snapshots[name]
-            payload = feed.make_payload(dict(p=snap['p']))
+            payload = feed.make_payload(dict(p=snap['p'], **whole))
             rho3 = snap.get('rho3')   # stored pre-decimated, same stride rule
             if rho3 is not None and rho3.shape == payload['p'].shape:
                 payload['rho'] = rho3
@@ -377,7 +387,9 @@ class View3DPanel(VtkTkHost):
         if self._scene is None:
             return
         axis = self._vars[f'{key}_axis'].get()
-        frac = float(self._vars[f'{key}_pos'].get())
+        # 0.0 / 1.0 sit exactly on a domain face: the cut is empty and the
+        # plane silently disappears, so keep it just inside
+        frac = min(max(float(self._vars[f'{key}_pos'].get()), 0.001), 0.999)
         self._scene.set_plane(key, axis, frac)
         self._dirty = True
 

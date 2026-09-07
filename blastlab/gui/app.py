@@ -1,6 +1,7 @@
 """blastlab GUI main window: left sidebar (Setup | Run | Results |
 Chain) + content stack, built with CustomTkinter."""
 
+import json
 import os
 import queue
 import sys
@@ -130,7 +131,7 @@ class App:
                                   on_init=self._init_model,
                                   on_exec=self._exec,
                                   on_refresh=self._apply_refresh)
-        self.results = ResultsPanel(content, log_fn=self._log_threadsafe)
+        self.results = ResultsPanel(content, log_fn=self._result_msg)
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
         from ..solvers.foam import env as foam_env
@@ -143,6 +144,14 @@ class App:
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
             panel.grid(row=0, column=0, sticky='nsew')
+        # one status line for the whole window: exports, loads and solver
+        # warnings used to land only in the Run tab's log, invisible to a
+        # user standing on Results or Setup
+        self._status = ctk.CTkLabel(root, text='', font=theme.F_SMALL,
+                                    text_color=c('muted'), anchor='w')
+        self._status.grid(row=1, column=1, sticky='we',
+                          padx=(0, PAD), pady=(0, 6))
+        self._status_job = None
         self._show('setup')
 
         self._schedule_validate()
@@ -245,8 +254,29 @@ class App:
             return
         try:
             case = load_case(path)
+        except FileNotFoundError:
+            messagebox.showerror('Open case', f'File not found: {path}')
+            return
+        except json.JSONDecodeError as exc:
+            messagebox.showerror(
+                'Open case', f'This file is not valid JSON '
+                             f'(line {exc.lineno}, column {exc.colno}).')
+            return
+        except (KeyError, TypeError) as exc:
+            messagebox.showerror(
+                'Open case', f'Not a blastlab case file: unsupported or '
+                             f'missing field {exc}.')
+            return
+        except OSError as exc:
+            messagebox.showerror(
+                'Open case',
+                f'Could not read the file: {exc.strerror or exc}')
+            return
         except Exception as exc:
-            messagebox.showerror('Open case', str(exc))
+            msg = str(exc)
+            messagebox.showerror(
+                'Open case', msg if 'case file' in msg.lower()
+                else f'Not a blastlab case file: {msg}')
             return
         self.setup.set_case(case)
         self._show('setup')
@@ -274,7 +304,9 @@ class App:
         try:
             case = self.setup.get_case()
         except ValueError as exc:
-            self.setup.show_report(errors=[str(exc)])
+            lines = [ln for ln in str(exc).splitlines() if ln.strip()]
+            self.setup.show_report(errors=lines)
+            self.run_panel.set_validation(False, len(lines))
             self.setup.update_preview(None)
             return
         if getattr(case, 'solver', 'native') == 'blastfoam':
@@ -295,6 +327,7 @@ class App:
                          f'display cells)')
             extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
+        self.run_panel.set_validation(not rep.errors, len(rep.errors))
         self.setup.update_preview(case)
 
     # ── running ──────────────────────────────────────────────────────────
@@ -385,10 +418,13 @@ class App:
     def _apply_refresh(self):
         """Push the refresh policy into the live worker (also called at
         run start). Blank restores the automatic defaults."""
+        pol = self._refresh_policy()
+        raw = self.run_panel.refresh_val.get().strip()
+        # an unusable value silently meant 'automatic'; say so
+        self.run_panel.mark_refresh(not raw or pol is not None)
         w = self.worker
         if w is None:
             return
-        pol = self._refresh_policy()
         if pol is None:
             w.hooks.refresh = type(w.hooks).refresh
             w.hooks.refresh3d = type(w.hooks).refresh3d
@@ -442,6 +478,9 @@ class App:
         tag = msg[0]
         if tag == 'log':
             self.run_panel.on_log(msg[1])
+            line = ' '.join(str(msg[1]).split())
+            if '[warn]' in line or '[error]' in line:
+                self.notify(line, 'warn')
         elif tag == 'run_started':
             self.run_panel.on_run_started(msg[1])
             is3d = msg[1].get('scene3d') is not None
@@ -529,6 +568,33 @@ class App:
             self.run_panel.on_log('  [run finished]')
         else:
             self.root.after(50, self._drain)
+
+    def notify(self, text, level='info'):
+        """Show a short-lived line in the window's status bar."""
+        text = ' '.join(str(text).split())
+        if not text:
+            return
+        colour = {'error': c('error'), 'warn': c('warn')}.get(level,
+                                                              c('muted'))
+        try:
+            self._status.configure(text=text[:200], text_color=colour)
+        except Exception:
+            return
+        if self._status_job is not None:
+            try:
+                self.root.after_cancel(self._status_job)
+            except Exception:
+                pass
+        self._status_job = self.root.after(
+            12000, lambda: self._status.configure(text=''))
+
+    def _result_msg(self, text):
+        """Results-panel messages (exports, post-mortem loads, viewer
+        hints) go to the run log AND the status bar."""
+        self._log_threadsafe(text)
+        low = str(text).lower()
+        level = ('error' if 'fail' in low or 'error' in low else 'info')
+        self.root.after(0, self.notify, text, level)
 
     def _log_threadsafe(self, text):
         self.root.after(0, self.run_panel.on_log, str(text))

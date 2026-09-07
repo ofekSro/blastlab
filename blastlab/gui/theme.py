@@ -21,6 +21,7 @@ DARK = dict(
     text='#e8e8e8', muted='#9aa4b2', view='#141414',
     danger='#e5484d', danger_hover='#c93a3f',
     error='#ff6b6b', warn='#ffb86b', ok='#69db7c',
+    seg='#3a3f46',
 )
 LIGHT = dict(
     bg='#f2f4f7', card='#ffffff', card2='#e9edf2', border='#dde2e9',
@@ -28,6 +29,7 @@ LIGHT = dict(
     text='#1f2430', muted='#5f6b7a', view='#141414',
     danger='#d13438', danger_hover='#b02a2f',
     error='#d6336c', warn='#c77700', ok='#2f9e44',
+    seg='#ced6e0',
 )
 
 
@@ -66,7 +68,13 @@ class _Compat:
 
 
 class Button(_Compat, ctk.CTkButton):
-    pass
+    """CTkButton whose DISABLED text stays legible. The default disabled
+    tint was nearly invisible in light mode, so Exec / Interrupt / 3D View
+    read as blank slabs."""
+
+    def __init__(self, *a, **kw):
+        kw.setdefault('text_color_disabled', c('muted'))
+        super().__init__(*a, **kw)
 
 
 class RadioButton(_Compat, ctk.CTkRadioButton):

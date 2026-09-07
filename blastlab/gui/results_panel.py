@@ -105,6 +105,7 @@ class ResultsPanel(ctk.CTkFrame):
                               command=lambda k=kind: self._export(k))
             b.pack(side='left', padx=(0, GAP))
             self._export_btns[kind] = b
+        self._sync_export_buttons(None)   # nothing selected yet
 
         # ── sub-views: Fields / Gauges / Animation / 3D ──────────────────
         views = Card(self, pad=12)
@@ -112,7 +113,7 @@ class ResultsPanel(ctk.CTkFrame):
         self._view_seg = ctk.CTkSegmentedButton(
             views.body, values=['Fields', 'Gauges', 'Animation', '3D'],
             font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('card2'),
+            fg_color=c('card2'), unselected_color=c('seg'),
             unselected_hover_color=c('border'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
@@ -269,6 +270,7 @@ class ResultsPanel(ctk.CTkFrame):
         for combo in (self.snap_sel, self.field_sel):
             combo.configure(values=[])
             combo.set('')
+        self._sync_export_buttons(None)
 
     def _current(self):
         label = self.sel.get()
@@ -283,11 +285,7 @@ class ResultsPanel(ctk.CTkFrame):
         if ent is None:
             return
         self._stop_play()
-        # ParaView export only makes sense for a foam run whose case dir
-        # still exists on the WSL disk
-        from ..solvers.foam.export_vtk import can_export
-        self._export_btns['vtk'].configure(
-            state='normal' if can_export(ent.result.meta) else 'disabled')
+        self._sync_export_buttons(ent)
         snaps = list(ent.result.snapshots.keys())
         self.snap_sel.configure(values=snaps)
         if snaps:
@@ -315,6 +313,31 @@ class ResultsPanel(ctk.CTkFrame):
         self._draw_field()
         self._draw_gauges()
         self._setup_anim()
+
+    def _sync_export_buttons(self, ent):
+        """Only offer an export that can actually run for this result.
+        Every button used to stay enabled: with nothing selected they were
+        silent no-ops, and Profile on a planar 2D result opened a file
+        dialog and then failed in the log."""
+        if ent is None:
+            for b in self._export_btns.values():
+                b.configure(state='disabled')
+            return
+        res, dim = ent.result, ent.dim
+        meta = res.meta
+        from ..solvers.foam.export_vtk import can_export
+        has_gauges = bool(res.gauges.get('pressures'))
+        ok = dict(
+            vtk=can_export(meta),
+            gif=bool(meta.get('frames')),
+            summary=has_gauges,
+            tsv=has_gauges,
+            pngs=bool(res.snapshots),
+            profile=(dim == 1 or (dim == 2 and meta.get('geometry')
+                                  == 'axisymmetric')),
+        )
+        for kind, b in self._export_btns.items():
+            b.configure(state='normal' if ok.get(kind, True) else 'disabled')
 
     def _mesh_toggled(self):
         self._draw_field()

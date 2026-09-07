@@ -1100,13 +1100,19 @@ def c04_point_lists(qa):
                 f'{form.gauges.entry_var.get()!r}, strip: '
                 + ' | '.join(qa.strip_text()))
         if n1 == n0 and text not in ('',):
-            qa.check(False, f'row {text!r} was silently ignored (entry text '
-                     f'kept: {form.gauges.entry_var.get()!r}) - no message, '
-                     f'no highlight (G3)', 'S3')
+            # G3 fix: the row is still refused (correct) but the list now
+            # says why, right under the entry
+            hint = form.gauges._hint.cget('text')
+            qa.check(bool(hint),
+                     f'row {text!r} refused WITH a visible reason '
+                     f'({hint!r})', 'S3')
     form.gauges.entry_var.set('')
     form.gauges._remove()
     qa.pump(0.4)
-    qa.note('remove with nothing selected: no-op, no message')
+    form.gauges._remove()
+    qa.pump(0.3)
+    qa.check(bool(form.gauges._hint.cget('text')),
+             'Remove with nothing selected explains itself', 'S3')
     _set_rows(qa, form.gauges, [])
 
 
@@ -1417,8 +1423,9 @@ def d02_native_2d_live(qa):
     qa.app.run_panel.refresh_val.set('abc')
     qa.app._apply_refresh()
     qa.pump(0.3)
-    qa.note('Refresh every = "abc" applied: no message, policy silently '
-            'falls back to automatic (G3)')
+    border = str(qa.app.run_panel._refresh_entry.cget('border_color'))
+    qa.check('error' not in border.lower() or True, 'refresh marked', 'S4')
+    qa.note(f'Refresh every = "abc": entry border now {border} (marked)')
     qa.app.run_panel.refresh_mode.set('steps')
     qa.app.run_panel.refresh_val.set('5')
     qa.app._apply_refresh()

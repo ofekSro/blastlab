@@ -208,6 +208,19 @@ def add_static_scenery(pl, geo):
     cx, cy, cz = geo['charge_center']
     pl.add_mesh(pv.Sphere(radius=geo['r_draw'], center=(cx, cy, cz)),
                 color='#ff8f00', opacity=0.85, name='charge')
+    # blastFoam multi-charge cases: the preview drew only the primary
+    # charge, so a two-charge case looked single-charge (ROADMAP G8)
+    for k, ch in enumerate(geo.get('charges') or []):
+        ex, ey, ez, er = (list(ch) + [geo['r_draw']])[:4]
+        pl.add_mesh(pv.Sphere(radius=max(float(er), geo['r_gauge']),
+                              center=(float(ex), float(ey), float(ez))),
+                    color='#ffb74d', opacity=0.85, name=f'xcharge{k}')
+    for k, dp in enumerate(geo.get('det_points') or []):
+        px, py, pz = (list(dp) + [0.0, 0.0, 0.0])[:3]
+        pl.add_mesh(pv.Sphere(radius=0.7 * geo['r_gauge'],
+                              center=(float(px), float(py), float(pz)),
+                              theta_resolution=8, phi_resolution=8),
+                    color='#e5484d', name=f'det{k}')
     for k, g in enumerate(geo.get('gauges') or []):
         pl.add_mesh(pv.Sphere(radius=geo['r_gauge'], center=tuple(g)),
                     color='#4fc3f7', name=f'gauge{k}')

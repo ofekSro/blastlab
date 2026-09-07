@@ -95,6 +95,7 @@ class _PointList(ctk.CTkFrame):
     def __init__(self, parent, columns, on_change=None, height=4):
         super().__init__(parent, fg_color='transparent')
         self._arity = len(columns)
+        self._columns = list(columns)
         self._on_change = on_change
         self.tree = ttk.Treeview(self, columns=columns, show='headings',
                                  height=height)
@@ -112,6 +113,7 @@ class _PointList(ctk.CTkFrame):
                            placeholder_text=' '.join(columns))
         ent.grid(row=1, column=0, sticky='we', padx=(0, GAP))
         ent.bind('<Return>', lambda e: self._add())
+        self._entry = ent
         for col, name, cmd in ((1, 'plus', self._add),
                                (2, 'minus', self._remove)):
             ctk.CTkButton(self, text='', image=icon(name, 14), width=34,
@@ -119,23 +121,55 @@ class _PointList(ctk.CTkFrame):
                           fg_color=c('card2'), hover_color=c('border'),
                           command=cmd).grid(row=1, column=col,
                                             padx=(0, GAP if col == 1 else 0))
+        # a rejected row used to vanish in silence: the text stayed in the
+        # box, nothing was added and nothing said why
+        self._hint = ctk.CTkLabel(self, text='', font=theme.F_SMALL,
+                                  text_color=theme.c('error'), anchor='w',
+                                  justify='left', wraplength=240)
+        self._hint.grid(row=2, column=0, columnspan=3, sticky='we',
+                        pady=(2, 0))
+
+    def _reject(self, msg):
+        self._hint.configure(text=msg)
+        try:
+            self._entry.configure(border_color=theme.c('error'))
+        except Exception:
+            pass
+
+    def _accept(self):
+        self._hint.configure(text='')
+        try:
+            self._entry.configure(border_color=c('border'))
+        except Exception:
+            pass
 
     def _add(self):
-        raw = self.entry_var.get().replace(',', ' ').split()
+        text = self.entry_var.get().strip()
+        raw = text.replace(',', ' ').split()
+        if not raw:
+            return self._reject('enter ' + ' '.join(self._columns))
         try:
             vals = [float(v) for v in raw]
         except ValueError:
-            return
+            return self._reject(f'not numbers: {text!r} - expected '
+                                + ' '.join(self._columns))
         if len(vals) != self._arity:
-            return
+            return self._reject(
+                f'expected {self._arity} numbers ('
+                + ' '.join(self._columns) + f'), got {len(vals)}')
         self.tree.insert('', 'end', values=[f'{v:g}' for v in vals])
         self.entry_var.set('')
+        self._accept()
         if self._on_change:
             self._on_change()
 
     def _remove(self):
-        for item in self.tree.selection():
+        sel = self.tree.selection()
+        if not sel:
+            return self._reject('select a row in the list first')
+        for item in sel:
             self.tree.delete(item)
+        self._accept()
         if self._on_change:
             self._on_change()
 
@@ -182,6 +216,8 @@ class CaseForm(ctk.CTkFrame):
         self.dim = dim
         self._on_change = on_change or (lambda: None)
         self.v = {}   # name -> tk variable
+        self._wmap = None            # textvariable name -> widget (lazy)
+        self._bad = set()            # currently red-bordered fields
         self._build()
 
     def _var(self, name, value=''):
@@ -533,35 +569,99 @@ class CaseForm(ctk.CTkFrame):
                         self.v['charge_refine'].set('global')
 
     # ── Case conversion ─────────────────────────────────────────────────
+    def _widget_for(self, name):
+        """The entry/combo bound to a variable name, for the red-border
+        marking. Built lazily by walking the form once and matching each
+        widget's `textvariable` against the vars in self.v."""
+        var = self.v.get(name)
+        if var is None:
+            return None
+        if self._wmap is None:
+            self._wmap = {}
+            stack = [self]
+            while stack:
+                w = stack.pop()
+                stack.extend(w.winfo_children())
+                try:
+                    tv = w.cget('textvariable')
+                except Exception:
+                    tv = None
+                if tv:
+                    self._wmap[str(tv)] = w
+        return self._wmap.get(str(var))
+
+    def mark_fields(self, names):
+        """Red-border exactly `names` (and clear any previous marks), so a
+        parse error points at the field it came from instead of only
+        naming it in the status strip."""
+        names = set(names or ())
+        for name in self._bad | names:
+            w = self._widget_for(name)
+            if w is None:
+                continue
+            try:
+                w.configure(border_color=(theme.c('error') if name in names
+                                          else c('border')))
+            except Exception:
+                pass
+        self._bad = names
+
     def get_case(self):
+        """Build the Case. EVERY bad numeric field is reported, not just
+        the first one: the strip used to show a single message and the
+        user fixed them one reload at a time."""
         v = self.v
+        errs, bad = [], []
+
+        def _F(name, label):
+            try:
+                return _f(v[name], label)
+            except ValueError as exc:
+                errs.append(str(exc))
+                bad.append(name)
+                return 0.0
+
+        def _I(name, label):
+            try:
+                return _i(v[name], label)
+            except ValueError as exc:
+                errs.append(str(exc))
+                bad.append(name)
+                return 0
+
+        def _done(case):
+            self.mark_fields(bad)
+            if errs:
+                raise ValueError('\n'.join(errs))
+            return case
+
         if self.dim == 1:
-            return Case1D(
-                radius_m=_f(v['radius_m'], 'radius'),
-                charge_kg=_f(v['charge'], 'charge'),
-                cell_size_m=_f(v['cell'], 'cell size'),
-                eos=v['eos'].get(), cfl=_f(v['cfl'], 'cfl'),
-                n_snapshots=_i(v['n_snapshots'], 'snapshots'),
+            return _done(Case1D(
+                radius_m=_F('radius_m', 'radius'),
+                charge_kg=_F('charge', 'charge'),
+                cell_size_m=_F('cell', 'cell size'),
+                eos=v['eos'].get(), cfl=_F('cfl', 'cfl'),
+                n_snapshots=_I('n_snapshots', 'snapshots'),
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
                 solver=v['solver'].get(), material=v['material'].get(),
                 activation=v['activation'].get(),
-                afterburn=v['afterburn'].get())
+                afterburn=v['afterburn'].get()))
 
         bcs = {side: v[f'bc_{side}'].get()
                for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
                             else ['x_lo', 'x_hi', 'y_lo', 'y_hi',
                                   'z_lo', 'z_hi'])}
         common = dict(
-            Lx=_f(v['Lx'], 'Lx'), Ly=_f(v['Ly'], 'Ly'),
-            cell_size_m=_f(v['cell'], 'cell size'),
+            Lx=_F('Lx', 'Lx'), Ly=_F('Ly', 'Ly'),
+            cell_size_m=_F('cell', 'cell size'),
             init_mode=v['init_mode'].get(),
-            charge=_f(v['charge'], 'charge'),
+            charge=_F('charge', 'charge'),
             profile_file_in=v['profile_in'].get() or None,
             eos=v['eos'].get(), bcs=bcs,
-            obstacles=self.obstacles.get(), cfl=_f(v['cfl'], 'cfl'),
-            n_snapshots=_i(v['n_snapshots'], 'snapshots'),
+            obstacles=self.obstacles.get(), cfl=_F('cfl', 'cfl'),
+            n_snapshots=_I('n_snapshots', 'snapshots'),
             gauges=self.gauges.get(),
             gauge_file=v['gauge_file'].get(),
             anim_file=v['anim_file'].get() or None,
@@ -569,40 +669,40 @@ class CaseForm(ctk.CTkFrame):
             solver=v['solver'].get(), material=v['material'].get(),
             activation=v['activation'].get(),
             afterburn=v['afterburn'].get(),
-            n_procs=_i(v['n_procs'], 'MPI ranks'),
+            n_procs=_I('n_procs', 'MPI ranks'),
             det_points=self.det_pts.get() or None,
             refine_zones=[(*z[:-1], int(round(z[-1])))
                           for z in self.zones.get()],
             charge_refine=v['charge_refine'].get(),
-            amr_levels=_i(v['amr_levels'], 'AMR levels'),
+            amr_levels=_I('amr_levels', 'AMR levels'),
             amr_estimator=v['amr_estimator'].get(),
-            amr_refine=_f(v['amr_refine'], 'AMR refine threshold'),
-            amr_unrefine=_f(v['amr_unrefine'], 'AMR unrefine threshold'),
-            amr_interval=_i(v['amr_interval'], 'AMR refine interval'),
-            amr_buffer=_i(v['amr_buffer'], 'AMR buffer layers'),
-            amr_max_cells=_i(v['amr_max_cells'], 'AMR max cells'),
+            amr_refine=_F('amr_refine', 'AMR refine threshold'),
+            amr_unrefine=_F('amr_unrefine', 'AMR unrefine threshold'),
+            amr_interval=_I('amr_interval', 'AMR refine interval'),
+            amr_buffer=_I('amr_buffer', 'AMR buffer layers'),
+            amr_max_cells=_I('amr_max_cells', 'AMR max cells'),
             amr_display_level=(
                 None if v['amr_display_level'].get().strip() in ('', 'auto')
-                else _i(v['amr_display_level'], 'AMR display level')),
+                else _I('amr_display_level', 'AMR display level')),
         )
         if self.dim == 2:
-            return Case2D(geometry=v['geometry'].get(),
-                          center=(_f(v['cx'], 'burst x'),
-                                  _f(v['cy'], 'burst y')),
-                          profile_file=v['profile_out'].get() or None,
-                          **common)
+            return _done(Case2D(geometry=v['geometry'].get(),
+                                center=(_F('cx', 'burst x'),
+                                        _F('cy', 'burst y')),
+                                profile_file=v['profile_out'].get() or None,
+                                **common))
         slice_raw = v['slice_pos'].get().strip()
-        return Case3D(Lz=_f(v['Lz'], 'Lz'),
-                      center=(_f(v['cx'], 'burst x'),
-                              _f(v['cy'], 'burst y'),
-                              _f(v['cz'], 'burst z')),
-                      charge_resolution=v['charge_res'].get(),
-                      t_end=_f(v['t_end'], 'end time'),
-                      slice_axis=v['slice_axis'].get(),
-                      slice_pos=(_f(v['slice_pos'], 'slice position')
-                                 if slice_raw else None),
-                      charges=self.extra_charges.get() or None,
-                      **common)
+        return _done(Case3D(Lz=_F('Lz', 'Lz'),
+                            center=(_F('cx', 'burst x'),
+                                    _F('cy', 'burst y'),
+                                    _F('cz', 'burst z')),
+                            charge_resolution=v['charge_res'].get(),
+                            t_end=_F('t_end', 'end time'),
+                            slice_axis=v['slice_axis'].get(),
+                            slice_pos=(_F('slice_pos', 'slice position')
+                                       if slice_raw else None),
+                            charges=self.extra_charges.get() or None,
+                            **common))
 
     def set_case(self, case):
         v = self.v
@@ -702,7 +802,7 @@ class SetupPanel(ctk.CTkFrame):
         self._dim_seg = ctk.CTkSegmentedButton(
             head, values=['1D', '2D', '3D'], font=theme.F_BODY,
             corner_radius=theme.RADIUS, height=34,
-            fg_color=c('card'), unselected_color=c('card'),
+            fg_color=c('card'), unselected_color=c('seg'),
             unselected_hover_color=c('card2'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
@@ -722,7 +822,15 @@ class SetupPanel(ctk.CTkFrame):
         self._status_card = Card(self, title=None)
         self._status_card.grid(row=2, column=0, sticky='we',
                                padx=(0, GAP), pady=(GAP, 0))
-        self._status_body = self._status_card.body
+        # a long report (AMR + zones + foam notes can be 8 lines) used to
+        # grow the card until the form above it had a third of its height;
+        # cap it and scroll instead
+        self._status_body = ctk.CTkScrollableFrame(
+            self._status_card.body, fg_color='transparent', height=104,
+            scrollbar_button_color=c('card2'),
+            scrollbar_button_hover_color=c('border'))
+        self._status_body.pack(fill='both', expand=True)
+        self._status_rows = []
 
         # right: preview card
         prev_card = Card(self, title='Model Preview')
@@ -822,8 +930,11 @@ class SetupPanel(ctk.CTkFrame):
         self.form.set_case(case)
 
     def show_report(self, errors=(), warnings=(), notes=()):
-        for child in self._status_body.winfo_children():
-            child.destroy()
+        # destroy only the rows we created: the body is a scrollable frame
+        # whose own canvas/scrollbar must survive
+        for row in self._status_rows:
+            row.destroy()
+        self._status_rows = []
         rows = ([('error', 'error', m) for m in errors]
                 + [('warning', 'warn', m) for m in warnings]
                 + [('info', 'muted', m) for m in notes])
@@ -831,6 +942,7 @@ class SetupPanel(ctk.CTkFrame):
             rows = [('check', 'ok', 'Case OK')]
         for name, colorkey, msg in rows:
             row = ctk.CTkFrame(self._status_body, fg_color='transparent')
+            self._status_rows.append(row)
             row.pack(fill='x', pady=1)
             ctk.CTkLabel(row, text='', width=18,
                          image=icon(name, 13,

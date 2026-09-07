@@ -8,10 +8,38 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
-from ..core.case import save_case
+from ..core.case import save_case, validate_case
 from . import theme
 from .forms import CaseForm
 from .theme import GAP, PAD, Card, c, icon
+
+
+def stage_errors(stages, cases):
+    """Per-stage validation errors for an auto-wired chain, as
+    "Stage <n> (<n>D): <message>" lines (empty = ready to run).
+
+    Must run AFTER the profile hand-offs are wired: the wiring is what
+    makes a later stage profile-initialized, so validating the raw forms
+    would miss exactly the combination that used to reach the backend
+    and die there with a traceback."""
+    errors = []
+    for d in stages:
+        case = cases[d]
+        # every stage but the first is fed by the one before it, so its
+        # profile input cannot exist on disk yet
+        msgs = list(validate_case(
+            case, pending_inputs=(d != stages[0])).errors)
+        if (getattr(case, 'solver', 'native') == 'blastfoam'
+                and getattr(case, 'init_mode', 'charge') != 'charge'):
+            # the chain wired this profile init, not the user, so say so
+            # instead of repeating validate_case's generic phrasing
+            msgs = [m for m in msgs if 'Profile initialization' not in m]
+            msgs.insert(0, 'blastFoam stages cannot start from a profile '
+                           'yet (ROADMAP N7) - run this stage with the '
+                           'native solver, or drop the stage that feeds '
+                           'it')
+        errors += [f'Stage {d} ({d}D): {m}' for m in msgs]
+    return errors
 
 
 class ChainPanel(ctk.CTkFrame):
@@ -53,13 +81,13 @@ class ChainPanel(ctk.CTkFrame):
                             border_color=c('border'), fg_color=c('accent'),
                             hover_color=c('accent_hover')).pack(
                 side='left', padx=(0, GAP))
-        ctk.CTkButton(bar, text='Run chain',
-                      image=icon('play', 14, color='white'),
-                      compound='left', width=130, height=36,
-                      font=theme.F_BODY, corner_radius=theme.RADIUS,
-                      fg_color=c('accent'), hover_color=c('accent_hover'),
-                      text_color='white',
-                      command=self._run).pack(side='right')
+        self.run_btn = ctk.CTkButton(
+            bar, text='Run chain', image=icon('play', 14, color='white'),
+            compound='left', width=130, height=36,
+            font=theme.F_BODY, corner_radius=theme.RADIUS,
+            fg_color=c('accent'), hover_color=c('accent_hover'),
+            text_color='white', command=self._run)
+        self.run_btn.pack(side='right')
 
         hint = ("The chain runs the checked stages in order. Profile files "
                 "are wired automatically: 1D saves stage1_profile.txt, the "
@@ -84,7 +112,7 @@ class ChainPanel(ctk.CTkFrame):
         self._stage_seg = ctk.CTkSegmentedButton(
             stages.body, values=['Stage 1D', 'Stage 2D', 'Stage 3D'],
             font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('card2'),
+            fg_color=c('card2'), unselected_color=c('seg'),
             unselected_hover_color=c('border'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
@@ -101,6 +129,15 @@ class ChainPanel(ctk.CTkFrame):
         self._current = None
         self._stage_seg.set('Stage 1D')
         self._stage_selected('Stage 1D')
+
+    def focus_stage(self, d):
+        """Bring stage `d`'s form to the front (a dialog naming 'Stage 2'
+        used to leave the switcher wherever it was)."""
+        try:
+            self._stage_seg.set(f'Stage {d}D')
+            self._stage_selected(f'Stage {d}D')
+        except Exception:
+            pass
 
     def _stage_selected(self, value):
         d = int(value.split()[1][0])
@@ -124,15 +161,23 @@ class ChainPanel(ctk.CTkFrame):
             return
 
         ws = self.ws_var.get()
-        os.makedirs(ws, exist_ok=True)
+        # the workspace used to be created even when the run was refused
         p1 = os.path.join(ws, 'stage1_profile.txt')
         p2 = os.path.join(ws, 'stage2_profile.npz')
 
-        try:
-            cases = {d: self.forms[d].get_case() for d in stages}
-        except ValueError as exc:
-            messagebox.showerror('Chain', str(exc))
-            return
+        cases = {}
+        for d in stages:
+            try:
+                cases[d] = self.forms[d].get_case()
+            except ValueError as exc:
+                # name the stage (a bare "'Lx' is not a number" gave no
+                # clue which of the three forms it came from) and switch
+                # to it so the offending field is on screen
+                self.focus_stage(d)
+                messagebox.showerror('Chain', '\n'.join(
+                    f'Stage {d} ({d}D): {ln}'
+                    for ln in str(exc).splitlines() if ln.strip()))
+                return
 
         # auto-wire profile hand-offs
         if 1 in cases:
@@ -151,7 +196,22 @@ class ChainPanel(ctk.CTkFrame):
             cases[3].init_mode = 'profile2d'
             cases[3].profile_file_in = p2
 
+        errors = stage_errors(stages, cases)
+        if errors:
+            for d in stages:                     # jump to the first bad one
+                if any(e.startswith(f'Stage {d} ') for e in errors):
+                    self.focus_stage(d)
+                    break
+            messagebox.showerror('Chain', '\n'.join(errors))
+            return
+
+        os.makedirs(ws, exist_ok=True)           # only once it will run
         for d, case in cases.items():
             save_case(case, os.path.join(ws, f'stage{d}_case.json'))
 
         self._on_run_chain([(d, cases[d]) for d in stages], ws)
+
+    def set_running(self, running):
+        """Mirror the Run button's state: a second start while a run is
+        live would orphan the drain loop and drop the finished result."""
+        self.run_btn.configure(state='disabled' if running else 'normal')

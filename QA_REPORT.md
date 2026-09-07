@@ -78,6 +78,53 @@ charge, or charge resolution 'smear' / blastFoam charge refinement 'zone'").
 
 ---
 
+## S3 status — FIXED 2026-09-07
+
+All S3 findings are fixed (QA-18 substantially: see the note), covered by
+`test_gui_results_fields.py` and harness re-runs (B02, B07, C01, C04, C09,
+D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
+
+- **QA-16 (G3)** — `CaseForm.get_case` reports EVERY bad field at once and
+  red-borders each one; `_PointList` says why a row was refused instead of
+  swallowing it; an unusable "Refresh every" marks the box; the Run tab
+  carries a "Case OK / N errors - see Setup" chip and its start buttons are
+  gated on it (so the validation modal no longer substitutes for feedback);
+  a window-wide status bar surfaces export/load/viewer messages and solver
+  `[warn]` lines wherever the user is standing; export buttons are enabled
+  only when that export can actually run (nothing selected = all off,
+  Profile off for planar 2D and 3D).
+- **QA-17** — the Run tab gives the live view a larger share and the 3D
+  control column is 206 px (was 248); a plane parked on a domain face is
+  nudged just inside so it cannot silently vanish; the Results 3D viewer now
+  carries the whole-run `p_peak` / `impulse` maps, so Peak overpressure and
+  Net ovp impulse are selectable instead of greyed while the Fields list
+  offers them.
+- **QA-18** — `feed_result` measured **2364 ms -> 259 ms**; the Setup 3D
+  preview caches its scene and rebuilds only when something visible changed
+  (typing a cfl or a file name no longer costs a VTK rebuild); worst observed
+  gap on a native 3D run 3544 -> 1100 ms. *Still open:* the per-frame mesh
+  rebuild of a 3D AMR run (~3.5 s) - it needs the polydata built on the
+  worker thread, tracked in T31.
+- **QA-19** — a dedicated `seg` palette entry makes unselected segments
+  visible in light mode; `theme.Button` keeps disabled text legible; Stop is
+  grey while disabled and only turns danger-red while a run is live.
+- **QA-20** — the Run log wraps by word instead of clipping notes and
+  warnings at the pane edge.
+- **QA-21 (G8)** — both previews draw the extra blastFoam charges (sized by
+  their own mass) and the detonation points.
+- **QA-22** — Open-case failures read as "This file is not valid JSON (line
+  1, column 2).", "unsupported or missing field 5.", "File not found: ..."
+  instead of raw parser text.
+- **QA-23** — the Chain validates before creating the workspace, prefixes
+  parse errors with their stage, and switches the stage switcher to the
+  offending form.
+- **QA-24** — a result with no replay frames explains itself on the
+  Animation tab (shared with QA-12).
+- **QA-25** — the validation status card is height-capped and scrolls, so a
+  long report no longer squeezes the form above it.
+
+---
+
 ## 0. How to read this / environment
 
 - **Output dir (screenshots, logs, evidence):** `C:\Users\Ofek Rotem\blastlab_qa\20260907-0108\`

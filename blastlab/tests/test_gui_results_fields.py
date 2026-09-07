@@ -230,6 +230,52 @@ def qa_s2_checks(panel):
         var.set(good)
         check(f'_i accepts {good!r}', forms._i(var, 'n') == want)
 
+    print("\nQA S3: export gating + multi-error parsing + list feedback")
+    r2 = fake_2d()
+    panel.add_result('gating', 2, r2)
+    panel.sel.set('gating')
+    panel._refresh()
+    st = {k: str(b.cget('state')) for k, b in panel._export_btns.items()}
+    check('planar 2D -> Profile export disabled (it always failed)',
+          st['profile'] == 'disabled', str(st))
+    check('native run -> VTK disabled, PNGs enabled',
+          st['vtk'] == 'disabled' and st['pngs'] == 'normal', str(st))
+    panel.sel.set('')
+    panel._clear_views()
+    st = {k: str(b.cget('state')) for k, b in panel._export_btns.items()}
+    check('nothing selected -> every export disabled (was a silent no-op)',
+          set(st.values()) == {'disabled'}, str(st))
+
+    form = forms.CaseForm(panel.winfo_toplevel(), 2)
+    form.v['Lx'].set('abc')
+    form.v['cell'].set('')
+    form.v['cfl'].set('zzz')
+    try:
+        form.get_case()
+        check('every bad field is reported at once', False)
+    except ValueError as exc:
+        lines = [ln for ln in str(exc).splitlines() if ln.strip()]
+        check('every bad field is reported at once', len(lines) == 3,
+              str(lines))
+    check('the offending fields are marked',
+          form._bad == {'Lx', 'cell', 'cfl'}, str(form._bad))
+    form.v['Lx'].set('10')
+    form.v['cell'].set('0.025')
+    form.v['cfl'].set('0.4')
+    form.get_case()
+    check('marks clear once the fields parse', form._bad == set())
+
+    form.gauges.entry_var.set('a b')
+    form.gauges._add()
+    check('a rejected list row explains itself',
+          'not numbers' in form.gauges._hint.cget('text'))
+    form.gauges.entry_var.set('1 2')
+    form.gauges._add()
+    check('a good row is accepted and clears the hint',
+          len(form.gauges.get()) == 1
+          and form.gauges._hint.cget('text') == '')
+    form.destroy()
+
 
 if __name__ == '__main__':
     main()

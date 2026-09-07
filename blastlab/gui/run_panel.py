@@ -53,11 +53,12 @@ class RunPanel(ctk.CTkFrame):
             hover_color=c('accent_hover'), text_color='white',
             command=on_run)
         self.run_btn.pack(side='left', padx=(0, GAP))
+        # starts inert: a disabled danger-red button reads as armed
         self.stop_btn = theme.Button(
             bar, text='Stop', image=icon('stop', 14, color='white'),
             compound='left', width=100, height=38, font=theme.F_BODY,
-            corner_radius=theme.RADIUS, fg_color=c('danger'),
-            hover_color=c('danger_hover'), text_color='white',
+            corner_radius=theme.RADIUS, fg_color=c('card2'),
+            hover_color=c('border'), text_color=c('muted'),
             state='disabled', command=on_stop)
         self.stop_btn.pack(side='left', padx=(0, GAP))
         self.view3d_btn = theme.Button(
@@ -77,7 +78,12 @@ class RunPanel(ctk.CTkFrame):
         # line in the log; say it where the run state is read
         self._paused_lbl = ctk.CTkLabel(bar, text='', font=theme.F_SMALL,
                                         text_color=c('warn'))
-        self._paused_lbl.pack(side='left', padx=(0, PAD))
+        self._paused_lbl.pack(side='left', padx=(0, GAP))
+        # the Setup strip is on another tab, so the Run tab used to give
+        # no hint that the case was invalid until a modal appeared
+        self._valid_lbl = ctk.CTkLabel(bar, text='', font=theme.F_SMALL,
+                                       text_color=c('muted'))
+        self._valid_lbl.pack(side='left', padx=(0, PAD))
 
         chips = ctk.CTkFrame(bar, fg_color='transparent')
         chips.pack(side='right')
@@ -135,6 +141,7 @@ class RunPanel(ctk.CTkFrame):
         ent.pack(side='right')
         ent.bind('<Return>', lambda e: on_refresh())
         ent.bind('<FocusOut>', lambda e: on_refresh())
+        self._refresh_entry = ent
         ctk.CTkLabel(ebar, text='Refresh every', font=theme.F_BODY,
                      text_color=c('muted')).pack(side='right',
                                                  padx=(0, GAP))
@@ -145,13 +152,13 @@ class RunPanel(ctk.CTkFrame):
 
         logcard = Card(body, title='Log', pad=12)
         self.log = ctk.CTkTextbox(
-            logcard.body, state='disabled', wrap='none', width=380,
+            logcard.body, state='disabled', wrap='word', width=380,
             font=theme.F_MONO, corner_radius=8, fg_color=c('entry'),
             text_color=c('text'), border_width=0,
             scrollbar_button_color=c('card2'),
             scrollbar_button_hover_color=c('border'))
         self.log.pack(fill='both', expand=True)
-        body.add(logcard, weight=1)
+        body.add(logcard, weight=2)
 
         right = Card(body, pad=12)
         vbar = ctk.CTkFrame(right.body, fg_color='transparent')
@@ -159,7 +166,7 @@ class RunPanel(ctk.CTkFrame):
         self._view_seg = ctk.CTkSegmentedButton(
             vbar, values=['Live slice', '3D view'],
             font=theme.F_BODY, corner_radius=theme.RADIUS, height=32,
-            fg_color=c('card2'), unselected_color=c('card2'),
+            fg_color=c('card2'), unselected_color=c('seg'),
             unselected_hover_color=c('border'),
             selected_color=c('accent'),
             selected_hover_color=c('accent_hover'),
@@ -190,7 +197,7 @@ class RunPanel(ctk.CTkFrame):
         # so raise the slice explicitly; seg.set() fires no callback.
         self._view_seg.set('Live slice')
         slice_tab.tkraise()
-        body.add(right, weight=2)
+        body.add(right, weight=3)
 
         self._mesh = None
         self._line = None
@@ -199,6 +206,8 @@ class RunPanel(ctk.CTkFrame):
         self._mesh_lines = None     # the overlay LineCollection
         self._title = None
         self._last_step = None      # newest step, for the PAUSED readout
+        self._running = False
+        self._case_ok = True        # latest validation verdict (Setup tab)
 
     # ── live-view sub-tab switching ──────────────────────────────────────
     def _view_selected(self, value):
@@ -214,9 +223,16 @@ class RunPanel(ctk.CTkFrame):
 
     # ── event handlers (called from the app's queue drainer) ─────────────
     def set_running(self, running):
-        self.run_btn.configure(state='disabled' if running else 'normal')
-        self.init_btn.configure(state='disabled' if running else 'normal')
-        self.stop_btn.configure(state='normal' if running else 'disabled')
+        self._running = bool(running)
+        start_ok = (not running) and self._case_ok
+        self.run_btn.configure(state='normal' if start_ok else 'disabled')
+        self.init_btn.configure(state='normal' if start_ok else 'disabled')
+        # a disabled Stop used to stay danger-red, reading as armed
+        self.stop_btn.configure(
+            state='normal' if running else 'disabled',
+            fg_color=c('danger') if running else c('card2'),
+            hover_color=c('danger_hover') if running else c('border'),
+            text_color='white' if running else c('muted'))
         for b in self._exec_btns:
             b.configure(state='normal' if running else 'disabled')
         self.set_paused(False)
@@ -252,6 +268,32 @@ class RunPanel(ctk.CTkFrame):
         self.canvas.set_figure(fig)
         try:
             self.view3d.reset()
+        except Exception:
+            pass
+
+    def set_validation(self, ok, n_errors=0):
+        """Mirror the Setup validation strip on the Run tab and gate the
+        start buttons, so an invalid case is visible here instead of only
+        as a modal after pressing Run."""
+        self._case_ok = bool(ok)
+        if ok:
+            self._valid_lbl.configure(text='Case OK', text_color=c('ok'))
+        else:
+            n = max(int(n_errors), 1)
+            self._valid_lbl.configure(
+                text=f'{n} error{"s" if n != 1 else ""} - see Setup',
+                text_color=c('error'))
+        if not self._running:
+            state = 'normal' if ok else 'disabled'
+            self.run_btn.configure(state=state)
+            self.init_btn.configure(state=state)
+
+    def mark_refresh(self, ok):
+        """Red-border the 'Refresh every' box when its value is unusable
+        (it used to fall back to automatic in silence)."""
+        try:
+            self._refresh_entry.configure(
+                border_color=c('border') if ok else theme.c('error'))
         except Exception:
             pass
 

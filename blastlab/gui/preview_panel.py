@@ -70,11 +70,24 @@ def case_geometry(case, show_mesh=False):
                 and case.cell_size_m > r_draw / MIN_EXP_CELLS:
             r_draw = max(r_draw, 2.0 * case.cell_size_m)
     marker = 0.008 * max(case.Lx, case.Ly, case.Lz)
+    # extra blastFoam charges get their own radius from their own mass
+    extras = []
+    for ch in (getattr(case, 'charges', None) or []):
+        try:
+            ex, ey, ez, mass = (list(ch) + [0.0])[:4]
+            r_i = refine.charge_radius(float(mass))
+        except (TypeError, ValueError):
+            continue
+        extras.append((float(ex), float(ey), float(ez),
+                       max(r_i, marker)))
     geo = dict(Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
                obstacles=[tuple(o) for o in case.obstacles],
                charge_center=tuple(case.center),
                r_draw=max(r_draw, marker), r_gauge=marker,
                bcs=dict(case.bcs),
+               charges=extras,
+               det_points=[tuple(float(v) for v in p)
+                           for p in (getattr(case, 'det_points', None) or [])],
                gauges=[tuple(g) for g in case.gauges])
     plan = _plan(case)
     if plan is not None:
@@ -89,20 +102,53 @@ class Preview3DPanel(VtkTkHost):
 
     def __init__(self, parent, log_fn=print):
         super().__init__(parent, log_fn=log_fn, view_size=(520, 480))
+        self._geo_key = None
+
+    @staticmethod
+    def _key(case, show_mesh):
+        """Everything the rendered scene depends on. Rebuilding the VTK
+        actors costs ~1.5 s, and the 300 ms validation debounce fired it
+        on every keystroke - including edits (cfl, file names, gauges
+        file) that cannot change the picture."""
+        def rows(v):
+            return tuple(tuple(float(x) for x in r) for r in (v or []))
+        return (case.Lx, case.Ly, getattr(case, 'Lz', 0.0),
+                case.cell_size_m, tuple(float(v) for v in case.center),
+                case.charge, getattr(case, 'charge_resolution', ''),
+                getattr(case, 'init_mode', ''), getattr(case, 'solver', ''),
+                getattr(case, 'material', ''),
+                getattr(case, 'charge_refine', ''),
+                int(getattr(case, 'amr_levels', 0) or 0),
+                getattr(case, 'slice_axis', ''), getattr(case, 'slice_pos', None),
+                tuple(sorted((case.bcs or {}).items())),
+                rows(case.obstacles), rows(case.gauges),
+                rows(getattr(case, 'refine_zones', None)),
+                rows(getattr(case, 'charges', None)),
+                rows(getattr(case, 'det_points', None)),
+                bool(show_mesh))
 
     def show_case(self, case, show_mesh=False):
         """Render (or update) the preview for a parsed Case3D."""
         if not pyvista_available():
             self.clear(MISSING_MSG)
             return
+        try:
+            key = self._key(case, show_mesh)
+        except Exception:
+            key = None
+        if key is not None and key == self._geo_key and self._scene is not None:
+            return                      # nothing visible changed
         if self._scene is None:
             from ..viz3d.viewer import GeometryScene
             self._scene = GeometryScene(self._make_plotter())
         try:
             self._scene.show(case_geometry(case, show_mesh=show_mesh))
         except Exception as exc:
+            self._geo_key = None
+            self.clear(f'preview unavailable: {exc}')
             self._log(f'3D preview error: {exc}')
             return
+        self._geo_key = key
         self._dirty = True
 
     def clear(self, message=None):
@@ -110,6 +156,7 @@ class Preview3DPanel(VtkTkHost):
         The scene is dropped so the render tick stops blitting over the
         placeholder; the next show_case rebuilds it."""
         self._scene = None
+        self._geo_key = None
         self._dirty = False
         self._photo = None
         self.view.configure(image='', text=message or self.PLACEHOLDER)
@@ -185,6 +232,17 @@ class Preview2DPanel(ctk.CTkFrame):
         else:
             ax.plot([cx], [cy], marker='x', ms=9, mew=2,
                     color='#ff8f00', zorder=4)
+
+        # blastFoam detonation points (G8: the preview showed nothing of
+        # them, so a multi-point case looked like a single centred burst)
+        for k, dp in enumerate(getattr(case, 'det_points', None) or []):
+            px, py = (list(dp) + [0.0, 0.0])[:2]
+            if axisym:
+                px = 0.0
+            ax.plot([px], [py], marker='x', ms=7, mew=1.8,
+                    color='#e5484d', zorder=4.5)
+            ax.annotate(f'D{k + 1}', (px, py), textcoords='offset points',
+                        xytext=(4, -10), fontsize=7, color='#e5484d')
 
         gauge_c = theme.cur('accent')
         for k, (gx, gy) in enumerate(case.gauges):
