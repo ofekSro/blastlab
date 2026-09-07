@@ -1826,6 +1826,7 @@ python test_gui_results_fields.py # Results panel (fields, S2 QA checks)
 python test_gui_results_anim.py   # Animation tab
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
 python test_gauge_summary.py      # per-gauge peak/arrival/impulse
+python test_report.py             # field CSVs + HTML report (T45)
 python test_gui_gauge_summary.py  # Gauges-tab table + CSV (headless Tk)
 python test_gui_run_browser.py    # foam run browser (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh
