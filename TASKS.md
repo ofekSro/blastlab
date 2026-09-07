@@ -96,7 +96,7 @@ Hard rules:
 | T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [x] 2026-09-07 |
 | T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [x] 2026-09-07 |
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [x] 2026-09-07 |
-| T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [ ] |
+| T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [x] 2026-09-07 |
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [ ] |
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [ ] |
@@ -467,6 +467,33 @@ Verify: headless checks for the persisted keys + the accelerator bindings; harne
 Done when: green; G9 + G13 DONE; QA-19/28/29 FIXED.
 Commit: "T32: light-mode affordance, disabled styles, toolbar icons, accelerators, persistence (G9/G13)"
 ```
+
+**DONE (2026-09-07):** items 1-6 had landed in `a6c7463` / `3cb800c` and are verified,
+not redone: a dedicated `seg` palette entry (`('#ced6e0', '#3a3f46')`, the tuple the
+brief asked for in spirit) on every `CTkSegmentedButton`; `theme.Button` with
+`text_color_disabled=c('muted')`; `RunPanel.set_running` swapping Stop between
+`card2`/muted and `danger`/white; matplotlib's Back/Forward (whose disabled images
+rendered as dark-mode checkerboards) dropped from the toolbar; `forms._entry` binding
+FocusIn/FocusOut to an accent border; `App._bind_accelerators` for Ctrl+O / Ctrl+S /
+F5 / Esc; and geometry + appearance + refresh box persisted through
+`gui/settings.py` (geometry only from a really mapped window at least the minimum
+size).
+This task closed the gap the per-widget approach left: 16 call sites build a plain
+`ctk.CTkButton` (Results exports, Remove, Foam runs, Play, the chain Run button, the
+camera presets, the file-picker buttons) and kept CTk's near-invisible disabled tint.
+`theme._apply_ctk_defaults()` now writes the muted disabled text and the `seg`
+unselected fill straight into `ctk.ThemeManager` at import, so every button, segmented
+button, checkbox, radio, entry, option menu and combo inherits them without touching
+the call sites.
+Tests: test_gui_results_fields gained `t32_checks` - a plain CTkButton's disabled text
+colour, a segmented button's unselected colour, Stop red only while running, an entry's
+focus ring (driven through a really mapped window, since a synthesised <FocusIn> never
+reaches the inner tk Entry CTkEntry binds on), all four accelerators bound on the root,
+the four persisted keys present in DEFAULTS and round-tripping through settings.json.
+Plus test_regression byte-identical and the GUI matrix. Harness B04, B06, B07, H03 in
+both modes: B06 confirms the accelerators fire (F5 really started a run, which is why
+the harness then reports "worker still alive between scenarios" and stops it - a
+harness housekeeping note, not a defect).
 
 ### T33 — QA: papercuts (QA-20, QA-26, QA-30..QA-35)
 
@@ -963,11 +990,11 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - G6 progress < 100 % (DONE, T5); theme half refuted by QA (mesh overlay colour cosmetic) — closed
 - **G7** live-view niceties (cadence hint, 2D Min/Max) — OPEN → **T38**
 - G8 preview lacks extra charges / det points — DONE (2026-09-07, QA-21 + T31)
-- **G9** accelerators / persistence / focus — OPEN → **T32**
+- G9 accelerators / persistence / focus — DONE (2026-09-07, T32)
 - G10 default 3D case invalid, nan/inf accepted — DONE (2026-09-07, QA-14/15)
 - G11 layout at 1280×840 / 1100×720 — combos + export row DONE (QA-07/08); Run-tab sash, collapsible 3D control column, HUD/scalar-bar scaling, wrapped card titles + tooltips — DONE (2026-09-07, T27)
 - G12 stale state — chips/preflight/Animation/tab raise/paused DONE (QA-09..12); chain feedback DONE (2026-09-07, T28)
-- **G13** light-mode affordance — OPEN → **T32**
+- G13 light-mode affordance — DONE (2026-09-07, T32)
 
 **Architecture (A)**
 - A1 foam run loop triplicated — DONE (T9)

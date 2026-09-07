@@ -313,6 +313,7 @@ def qa_s2_checks(panel):
 
     t29_checks(panel)
     t30_checks(panel)
+    t32_checks(panel)
 
 
 def t30_checks(panel):
@@ -357,6 +358,100 @@ def t30_checks(panel):
     check('the full label is one hover away',
           panel.sel._blastlab_tip.text == long_label)
     panel._remove_current()
+
+
+def t32_checks(panel):
+    """T32 / G9 / G13: affordance in both modes, accelerators, and UI
+    state that survives a restart."""
+    print("")
+    print("T32: affordance, accelerators, persistence")
+    import tkinter as tk
+    import customtkinter as ctk
+    from blastlab.gui import theme
+    from blastlab.gui import settings as gui_settings
+    from blastlab.gui.app import App
+    from blastlab.gui.run_panel import RunPanel
+    from blastlab.gui import forms as gforms
+    root = panel.winfo_toplevel()
+
+    plain = ctk.CTkButton(root, text='x', state='disabled')
+    check('a plain CTkButton keeps legible disabled text',
+          list(plain.cget('text_color_disabled'))
+          == [theme.LIGHT['muted'], theme.DARK['muted']],
+          str(plain.cget('text_color_disabled')))
+    seg = ctk.CTkSegmentedButton(root, values=['a', 'b'])
+    check('unselected segments are visible in both modes',
+          list(seg.cget('unselected_color'))
+          == [theme.LIGHT['seg'], theme.DARK['seg']],
+          str(seg.cget('unselected_color')))
+
+    rp = RunPanel(root, on_run=lambda: None, on_stop=lambda: None,
+                  on_init=lambda: None, on_refresh=lambda: None)
+    idle = rp.stop_btn.cget('fg_color')
+    rp.set_running(True)
+    live = rp.stop_btn.cget('fg_color')
+    rp.set_running(False)
+    check('Stop is danger-red only while a run is live',
+          list(live) == list(theme.c('danger'))
+          and list(idle) == list(theme.c('card2'))
+          and list(rp.stop_btn.cget('fg_color')) == list(idle),
+          f'{idle} -> {live}')
+    rp.destroy()
+
+    # a real focus change needs a mapped window: synthesised <FocusIn>
+    # events never reach the inner tk Entry CTkEntry binds on
+    was_hidden = not root.winfo_ismapped()
+    root.deiconify()
+    ent = gforms._entry(root, tk.StringVar())
+    ent.pack()
+    sink = ctk.CTkFrame(root)
+    sink.pack()
+    for _ in range(3):
+        root.update()
+    getattr(ent, '_entry', ent).focus_force()
+    for _ in range(3):
+        root.update()
+    focused = ent.cget('border_color')
+    sink.focus_force()
+    for _ in range(3):
+        root.update()
+    check('an entry shows a focus ring',
+          list(focused) == list(theme.c('accent'))
+          and list(ent.cget('border_color')) == list(theme.c('border')),
+          f'{focused} -> {ent.cget("border_color")}')
+    ent.destroy()
+    sink.destroy()
+    if was_hidden:
+        root.withdraw()
+
+    stub = App.__new__(App)
+    stub._open_case = lambda *a: None
+    stub._save_case = lambda *a: None
+    stub._run_single = lambda *a: None
+    stub._stop = lambda *a: None
+    stub._bind_accelerators(root)
+    for seq in ('<Control-o>', '<Control-s>', '<F5>', '<Escape>'):
+        check(f'{seq} is bound', bool(root.bind_all(seq)))
+
+    import tempfile, shutil
+    tmp = tempfile.mkdtemp(prefix='blastlab_settings_')
+    cfg = os.path.join(tmp, 'settings.json')
+    try:
+        for key in ('geometry', 'appearance', 'refresh_value',
+                    'refresh_mode'):
+            check(f'{key} has a persisted default',
+                  key in gui_settings.DEFAULTS)
+        gui_settings.save(dict(gui_settings.DEFAULTS,
+                               geometry='1400x900+10+10',
+                               appearance='light', refresh_value='7',
+                               refresh_mode='steps'), cfg)
+        back = gui_settings.load(cfg)
+        check('UI state round-trips through settings.json',
+              (back['geometry'], back['appearance'], back['refresh_value'],
+               back['refresh_mode'])
+              == ('1400x900+10+10', 'light', '7', 'steps'), str(back))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def t29_checks(panel):

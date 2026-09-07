@@ -385,6 +385,38 @@ def icon(name, size=16, color=None):
     return _ICON_CACHE[key]
 
 
+# ── CustomTkinter defaults ───────────────────────────────────────
+def _apply_ctk_defaults():
+    """CTk's stock disabled text is a near-invisible tint of the button
+    colour - in light mode a greyed Exec / Profile / Remove read as a
+    blank slab. `Button` sets it per widget; do it once for every plain
+    CTkButton in the app too (QA-19/G13). Also give the segmented
+    buttons a visible unselected fill in both modes."""
+    try:
+        theme = ctk.ThemeManager.theme
+    except Exception:
+        return
+    muted = [LIGHT['muted'], DARK['muted']]
+    seg = [LIGHT['seg'], DARK['seg']]
+    border = [LIGHT['border'], DARK['border']]
+    for widget, key, value in (('CTkButton', 'text_color_disabled', muted),
+                               ('CTkSegmentedButton', 'unselected_color', seg),
+                               ('CTkSegmentedButton', 'unselected_hover_color',
+                                border),
+                               ('CTkCheckBox', 'text_color_disabled', muted),
+                               ('CTkRadioButton', 'text_color_disabled', muted),
+                               ('CTkEntry', 'text_color_disabled', muted),
+                               ('CTkOptionMenu', 'text_color_disabled', muted),
+                               ('CTkComboBox', 'text_color_disabled', muted)):
+        try:
+            theme[widget][key] = value
+        except (KeyError, TypeError):
+            pass
+
+
+_apply_ctk_defaults()
+
+
 # ── ttk styling (Treeview / Panedwindow have no CTk equivalent) ──────────
 def apply_ttk_style(root=None):
     pal = DARK if ctk.get_appearance_mode() == 'Dark' else LIGHT

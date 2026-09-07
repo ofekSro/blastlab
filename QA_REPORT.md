@@ -128,6 +128,10 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
 - **QA-19** — a dedicated `seg` palette entry makes unselected segments
   visible in light mode; `theme.Button` keeps disabled text legible; Stop is
   grey while disabled and only turns danger-red while a run is live.
+  **T32:** `theme._apply_ctk_defaults()` pushes the muted disabled text and
+  the `seg` unselected fill into `ctk.ThemeManager`, so the 16 plain
+  `CTkButton` / segmented / checkbox / combo call sites that never used
+  `theme.Button` are covered too, in both modes.
 - **QA-20** — the Run log wraps by word instead of clipping notes and
   warnings at the pane edge.
 - **QA-21 (G8)** — both previews draw the extra blastFoam charges (sized by
