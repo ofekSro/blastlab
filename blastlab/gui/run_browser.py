@@ -97,13 +97,19 @@ class FoamRunBrowser(ctk.CTkToplevel):
 
         card = Card(self, title='Runs in WSL (/root/blastlab_runs)', pad=12)
         card.pack(fill='both', expand=True, padx=PAD, pady=PAD)
-        self.table = ttk.Treeview(card.body, columns=COLS, show='headings',
+        # 80+ run dirs with no scrollbar meant mouse-wheel only
+        tbl = ctk.CTkFrame(card.body, fg_color='transparent')
+        tbl.pack(fill='both', expand=True)
+        self.table = ttk.Treeview(tbl, columns=COLS, show='headings',
                                   height=10, selectmode='browse')
         for col, head, w in zip(COLS, HEADS, WIDTHS):
             self.table.heading(col, text=head)
             self.table.column(col, width=w, anchor='w' if col == 'name'
                               else 'center')
-        self.table.pack(fill='both', expand=True)
+        vsb = ttk.Scrollbar(tbl, orient='vertical', command=self.table.yview)
+        self.table.configure(yscrollcommand=vsb.set)
+        self.table.pack(side='left', fill='both', expand=True)
+        vsb.pack(side='right', fill='y')
         self.table.bind('<Double-1>', lambda e: self.load_selected())
 
         bar = ctk.CTkFrame(card.body, fg_color='transparent')
@@ -202,6 +208,7 @@ class FoamRunBrowser(ctk.CTkToplevel):
     def _fill(self, rows, sized):
         if not self.winfo_exists():
             return
+        self.status.configure(text_color=c('muted'))
         self.rows = rows
         selected = self.table.selection()
         sel_name = self.table.item(selected[0])['values'][0] if selected \
@@ -256,8 +263,12 @@ class FoamRunBrowser(ctk.CTkToplevel):
         if r['alive'] is not False:
             why = ('its solver is still running' if r['alive']
                    else 'WSL did not report its state')
-            self.status.configure(text=f'not deleting {name}: {why}')
+            # a muted status line was easy to miss for a refused delete
+            self.status.configure(text=f'not deleting {name}: {why}',
+                                  text_color=c('danger'))
             self._log(f'  [runs] refused to delete {name}: {why}')
+            messagebox.showwarning(
+                'Delete run', f'{name} was not deleted: {why}.', parent=self)
             return
         size = human_size(r['bytes'])
         if not self._confirm('Delete run', f'Delete {name} ({size}) from the '

@@ -90,7 +90,9 @@ class RunPanel(ctk.CTkFrame):
         self._chip_step = _chip(chips, 'step')
         self._chip_t = _chip(chips, 't [ms]')
         self._chip_dt = _chip(chips, 'dt [s]')
-        self._chip_pmax = _chip(chips, 'p max [Pa]')
+        # kPa like every plot and colorbar (the chip used to be the one
+        # readout in Pa, a 1000x mismatch against the live view beside it)
+        self._chip_pmax = _chip(chips, 'p max [kPa]')
 
         # ── stepped execution row (VIPER-style) ──────────────────────────
         on_exec = on_exec or (lambda cmd: None)
@@ -206,6 +208,7 @@ class RunPanel(ctk.CTkFrame):
         self._mesh_lines = None     # the overlay LineCollection
         self._title = None
         self._last_step = None      # newest step, for the PAUSED readout
+        self._amr_run = 0           # consecutive AMR log lines collapsed
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
 
@@ -306,13 +309,31 @@ class RunPanel(ctk.CTkFrame):
     def enable_view3d(self, enabled):
         self.view3d_btn.configure(state='normal' if enabled else 'disabled')
 
+    #: a dynamic-AMR run logs one of these per written time - 60+ lines for
+    #: half a millisecond of simulation, which buried every other message.
+    #: They are collapsed HERE rather than in the solver: the text itself
+    #: is the e2e drivers' instrumentation (cells per write) and must keep
+    #: reaching stdout and the transcript unchanged.
+    _AMR_MARK = '[blastfoam] AMR t = '
+
     def on_log(self, text):
+        line = str(text)
         self.log.configure(state='normal')
-        self.log.insert('end', text + '\n')
+        if self._AMR_MARK in line and self._amr_run:
+            # replace the previous (also collapsed) AMR line in place
+            self.log.delete('end-2l linestart', 'end-1l linestart')
+            self._amr_run += 1
+            line = f'{line}   [{self._amr_run} AMR writes so far]'
+        elif self._AMR_MARK in line:
+            self._amr_run = 1
+        else:
+            self._amr_run = 0
+        self.log.insert('end', line + '\n')
         self.log.see('end')
         self.log.configure(state='disabled')
 
     def _clear_log(self):
+        self._amr_run = 0
         self.log.configure(state='normal')
         self.log.delete('1.0', 'end')
         self.log.configure(state='disabled')
@@ -329,7 +350,7 @@ class RunPanel(ctk.CTkFrame):
         self._chip_step.configure(text=str(p.step))
         self._chip_t.configure(text=f'{p.t*1e3:.3f}')
         self._chip_dt.configure(text=f'{p.dt:.2e}')
-        self._chip_pmax.configure(text=f'{p.p_max:.3e}')
+        self._chip_pmax.configure(text=f'{p.p_max / 1e3:,.4g}')
 
     def on_run_started(self, info):
         fig = Figure(figsize=(5.5, 5.5))
@@ -340,6 +361,9 @@ class RunPanel(ctk.CTkFrame):
             (self._line,) = ax.plot([], [], lw=1.4,
                                     color=theme.cur('accent'))
             ax.set_xlim(0, info['radius_m'])
+            # before the first frame an empty autoscaled axis showed a
+            # meaningless -0.04..0.04 kPa range
+            ax.set_ylim(0, 10)
             ax.set_xlabel('r [m]')
             ax.set_ylabel('Overpressure [kPa]')
             ax.grid(True, alpha=0.3)

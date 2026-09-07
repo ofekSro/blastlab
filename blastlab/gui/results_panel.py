@@ -161,15 +161,19 @@ class ResultsPanel(ctk.CTkFrame):
         self.gauge_canvas.pack(fill='both', expand=True)
         cols = ('gauge', 'peak', 'arrival', 't_peak', 'pos_dur', 'pos_imp',
                 'net_imp', 'complete')
-        heads = ('Gauge', 'Peak ovp [kPa]', 'Arrival [ms]', 't peak [ms]',
-                 'Pos. phase [ms]', 'Pos. impulse [Pa·s]',
-                 'Net impulse [Pa·s]', 'Complete')
+        # headers used to be clipped ("Pos. impulse [Pa" ...) and
+        # "Complete" never said complete WHAT
+        heads = ('Gauge (cell)', 'Peak ovp [kPa]', 'Arrival [ms]',
+                 't peak [ms]', 'Pos. phase [ms]', 'Pos. imp [Pa·s]',
+                 'Net imp [Pa·s]', 'Phase ended')
         self.summary_table = ttk.Treeview(gtab, columns=cols, show='headings',
                                           height=4)
         for col, head in zip(cols, heads):
             self.summary_table.heading(col, text=head)
-            self.summary_table.column(col, width=110 if col != 'gauge' else 150,
-                                      anchor='e' if col != 'gauge' else 'w')
+            self.summary_table.column(
+                col, width=150 if col == 'gauge' else 104, stretch=True,
+                minwidth=90 if col != 'gauge' else 120,
+                anchor='e' if col != 'gauge' else 'w')
         self.summary_table.pack(fill='x', pady=(GAP, 0))
 
         # Animation view
@@ -428,7 +432,7 @@ class ResultsPanel(ctk.CTkFrame):
         fig = plots._panel_grid_figure(
             [(label, data)], solid_sl, xf, yf, xl, yl,
             f"{field} - {plots.charge_label(meta)}", unit, aspect,
-            mesh=mesh)
+            mesh=mesh, robust=(is_peak or is_imp))
         self.field_canvas.set_figure(fig)
 
     def _draw_gauges(self):

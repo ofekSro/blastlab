@@ -52,6 +52,16 @@ class EmbeddedFigure(ctk.CTkFrame):
             self._mpl_toolbar = NavigationToolbar2Tk(self._mpl_canvas, self,
                                                      pack_toolbar=False)
             self._mpl_toolbar.update()
+            # Back / Forward have no history in a single-figure panel and
+            # matplotlib renders their DISABLED image as a checkerboard on
+            # a dark background - drop them rather than ship broken icons
+            for name in ('Back', 'Forward'):
+                btn = getattr(self._mpl_toolbar, '_buttons', {}).get(name)
+                if btn is not None:
+                    try:
+                        btn.pack_forget()
+                    except Exception:
+                        pass
             self._mpl_toolbar.pack(side=tk.BOTTOM, fill=tk.X)
         self._style_chrome()
         self._mpl_canvas.draw_idle()

@@ -60,7 +60,12 @@ class ChainPanel(ctk.CTkFrame):
         ctk.CTkLabel(bar, text='Workspace', font=theme.F_BODY,
                      text_color=c('muted')).pack(side='left',
                                                  padx=(0, GAP))
-        self.ws_var = tk.StringVar(value=os.path.abspath('chain_workspace'))
+        # under Documents rather than whatever the process CWD happens to
+        # be (which for blastlab.bat is the install directory)
+        _docs = os.path.join(os.path.expanduser('~'), 'Documents')
+        _base = _docs if os.path.isdir(_docs) else os.path.expanduser('~')
+        self.ws_var = tk.StringVar(
+            value=os.path.join(_base, 'blastlab', 'chain_workspace'))
         ctk.CTkEntry(bar, textvariable=self.ws_var, width=380, height=32,
                      font=theme.F_BODY, corner_radius=8,
                      fg_color=c('entry'), border_color=c('border')).pack(

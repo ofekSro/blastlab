@@ -258,7 +258,11 @@ class Preview2DPanel(ctk.CTkFrame):
         ax.set_ylabel('y [m]')
         ax.set_title(f'2D {case.geometry} - solid: wall, dashed: open'
                      + mesh_note, fontsize=9)
-        ax.grid(not show_mesh, alpha=0.25)
+        # grid(False, alpha=...) warns; set the properties only when on
+        if show_mesh:
+            ax.grid(False)
+        else:
+            ax.grid(True, alpha=0.25)
         theme.style_figure(self._fig)
         self._fig.tight_layout()
         self.canvas.draw()

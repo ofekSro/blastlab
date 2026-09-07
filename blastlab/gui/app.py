@@ -153,11 +153,71 @@ class App:
                           padx=(0, PAD), pady=(0, 6))
         self._status_job = None
         self._show('setup')
+        self._restore_ui_state()
+        self._bind_accelerators(root)
 
         self._schedule_validate()
 
         if case_file:
             self._open_case(case_file)
+
+    # ── G9: keyboard + persisted window state ────────────────────────────
+    def _bind_accelerators(self, root):
+        """Ctrl+O / Ctrl+S / F5 / Esc did nothing at all before."""
+        for seq, fn in (('<Control-o>', lambda e: self._open_case()),
+                        ('<Control-O>', lambda e: self._open_case()),
+                        ('<Control-s>', lambda e: self._save_case()),
+                        ('<Control-S>', lambda e: self._save_case()),
+                        ('<F5>', lambda e: self._run_single()),
+                        ('<Escape>', lambda e: self._stop())):
+            try:
+                root.bind_all(seq, fn)
+            except Exception:
+                pass
+
+    def _restore_ui_state(self):
+        """Window size, appearance mode and the refresh box, from the same
+        json the foam cleanup policy lives in (they reset every launch)."""
+        try:
+            from . import settings as gui_settings
+            st = gui_settings.load()
+            geo = str(st.get('geometry') or '')
+            if 'x' in geo:
+                self.root.geometry(geo)
+            if str(st.get('appearance', 'dark')).lower() == 'light':
+                if self._mode_switch.get():
+                    self._mode_switch.deselect()
+                self._toggle_mode()
+            self.run_panel.refresh_val.set(str(st.get('refresh_value', '')))
+            mode = str(st.get('refresh_mode', 'seconds'))
+            if mode in ('seconds', 'steps'):
+                self.run_panel.refresh_mode.set(mode)
+        except Exception:
+            pass
+
+    def _save_ui_state(self):
+        try:
+            from . import settings as gui_settings
+            state = dict(
+                appearance=('dark' if self._mode_switch.get() else 'light'),
+                refresh_value=self.run_panel.refresh_val.get(),
+                refresh_mode=self.run_panel.refresh_mode.get())
+            # only a real, mapped window has a meaningful geometry: a
+            # minimised or never-shown one reports the placeholder size
+            geo = self.root.geometry()
+            try:
+                size = geo.split('+')[0]
+                w, h = (int(v) for v in size.split('x'))
+                mapped = (self.root.winfo_ismapped()
+                          and self.root.state() == 'normal')
+            except Exception:
+                w = h = 0
+                mapped = False
+            if mapped and w >= 1100 and h >= 720:
+                state['geometry'] = geo
+            gui_settings.update(**state)
+        except Exception:
+            pass
 
     # ── sidebar / navigation ─────────────────────────────────────────────
     def _build_sidebar(self, root):
@@ -170,7 +230,8 @@ class App:
         # logo (falls back to a text title if the file is missing)
         if os.path.exists(_LOGO):
             from PIL import Image, ImageTk
-            img = Image.open(_LOGO).convert('RGBA')
+            with Image.open(_LOGO) as _logo_file:   # else a ResourceWarning
+                img = _logo_file.convert('RGBA')
             w = 184
             h = max(1, round(img.height * w / img.width))
             logo = ctk.CTkImage(light_image=img, dark_image=img, size=(w, h))
@@ -601,6 +662,7 @@ class App:
 
     # ── shutdown ─────────────────────────────────────────────────────────
     def _on_close(self):
+        self._save_ui_state()
         if self.worker is not None and self.worker.is_alive():
             self.worker.stop()
             self.worker.join(timeout=10)

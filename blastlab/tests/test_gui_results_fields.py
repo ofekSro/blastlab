@@ -276,6 +276,41 @@ def qa_s2_checks(panel):
           and form.gauges._hint.cget('text') == '')
     form.destroy()
 
+    print("\nQA S4: polish")
+    from blastlab.gui.run_panel import RunPanel
+    rp = RunPanel(panel.winfo_toplevel(), on_run=lambda: None,
+                  on_stop=lambda: None)
+    rp.on_log('  2D Blast Solver')
+    for i in range(40):
+        rp.on_log(f'  [blastfoam] AMR t = {i * 0.01:.3f} ms: '
+                  f'{1000 + i:,} cells (+1), L0 {1000 + i:,}')
+    rp.on_log('  Done. 400 steps')
+    lines = rp.log.get('1.0', 'end').rstrip('\n').splitlines()
+    check('40 AMR write lines collapse into one live line',
+          len(lines) == 3, f'{len(lines)} lines')
+    check('the collapsed line keeps the newest write and a count',
+          '0.390 ms' in lines[1] and '40 AMR writes' in lines[1],
+          lines[1] if len(lines) > 1 else '')
+    check('a non-AMR line after them is not swallowed',
+          lines[-1].strip() == 'Done. 400 steps')
+    rp.destroy()
+
+    # peak maps: the charge cells used to swallow the whole colour range
+    # a charge is a tiny fraction of the domain (here 4 of 6400 cells)
+    n = 80
+    peak = np.linspace(1.0, 40.0, n * n).reshape(n, n)
+    peak[39:41, 39:41] = 5e4                   # the charge, 3 decades up
+    faces = np.linspace(0, 1, n + 1)
+    solid = np.zeros((n, n), bool)
+    args = (solid, faces, faces, 'x', 'y', 'peak', plots.PEAK_LABEL, 1.0)
+    fig = plots._panel_grid_figure([('whole run', peak)], *args, robust=True)
+    vmax = fig.axes[0].collections[0].get_clim()[1]
+    check('robust peak scale clips the charge spike',
+          vmax < 1e3, f'vmax={vmax}')
+    plain = plots._panel_grid_figure([('whole run', peak)], *args)
+    check('without robust the full range is kept',
+          plain.axes[0].collections[0].get_clim()[1] >= 5e4)
+
 
 if __name__ == '__main__':
     main()

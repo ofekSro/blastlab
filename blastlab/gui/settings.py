@@ -14,6 +14,11 @@ DEFAULTS = dict(
     cleanup_max_gb=20.0,        # keep the runs root under this total size
     cleanup_max_age_days=14,    # delete runs untouched for longer than this
     cleanup_keep_recent=3,      # never delete the N most recent runs
+    # G9 UI state: restored at startup, saved on close
+    geometry='1280x840',        # main window size/position
+    appearance='dark',          # 'dark' | 'light'
+    refresh_value='',           # Run tab "Refresh every" box
+    refresh_mode='seconds',     # 'seconds' | 'steps'
 )
 
 

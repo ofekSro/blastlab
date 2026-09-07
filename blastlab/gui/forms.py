@@ -46,9 +46,15 @@ def _row(frame, r, label, widget):
 
 
 def _entry(frame, var, width=150):
-    return ctk.CTkEntry(frame, textvariable=var, width=width,
-                        font=theme.F_BODY, corner_radius=8,
-                        fg_color=c('entry'), border_color=c('border'))
+    ent = ctk.CTkEntry(frame, textvariable=var, width=width,
+                       font=theme.F_BODY, corner_radius=8,
+                       fg_color=c('entry'), border_color=c('border'))
+    # keyboard focus was invisible: nothing showed which box Tab landed in
+    ent.bind('<FocusIn>',
+             lambda e, w=ent: w.configure(border_color=c('accent')))
+    ent.bind('<FocusOut>',
+             lambda e, w=ent: w.configure(border_color=c('border')))
+    return ent
 
 
 def _combo(frame, var, values, width=176):
@@ -451,20 +457,20 @@ class CaseForm(ctk.CTkFrame):
 
             # blastFoam local refinement zones: a box + a level (1 = base
             # cell / 2, 2 = / 4, ...); validation blocks them on native
-            zf = self._card(1, 'Refinement zones (blastFoam) [m, level]')
+            zf = self._card(1, 'Refinement zones [m, level]')
             self.zones = _PointList(zf, ocols + ['level'], self._on_change,
                                     height=3)
             self.zones.grid(row=0, column=0, columnspan=2, sticky='nsew')
 
             # blastFoam-only extras (validation blocks them on native)
             if self.dim == 3:
-                xc = self._card(1, 'Extra charges (blastFoam) [m, kg]')
+                xc = self._card(1, 'Extra charges [m, kg]')
                 self.extra_charges = _PointList(
                     xc, ['x', 'y', 'z', 'kg'], self._on_change, height=3)
                 self.extra_charges.grid(row=0, column=0, columnspan=2,
                                         sticky='nsew')
             dcols = ['x', 'y'] if self.dim == 2 else ['x', 'y', 'z']
-            dc = self._card(1, 'Detonation points (blastFoam) [m]')
+            dc = self._card(1, 'Detonation points [m]')
             self.det_pts = _PointList(dc, dcols, self._on_change,
                                       height=3)
             self.det_pts.grid(row=0, column=0, columnspan=2,
@@ -480,7 +486,7 @@ class CaseForm(ctk.CTkFrame):
             orow = _row(out, orow, 'Animation (gif)',
                         _entry(out, self._var(
                             'anim_file', f'blast_{self.dim}d_animation.gif')))
-            ctk.CTkCheckBox(out, text='Record frames for animation/replay',
+            ctk.CTkCheckBox(out, text='Record replay frames',
                             variable=self._bool('record', True),
                             font=theme.F_BODY, corner_radius=6,
                             border_color=c('border'),

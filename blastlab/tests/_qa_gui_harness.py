@@ -1402,8 +1402,7 @@ def d01_native_1d(qa):
     rp = qa.app.run_panel
     qa.note(f'chips after 1D run: step={rp._chip_step.cget("text")} '
             f't={rp._chip_t.cget("text")} dt={rp._chip_dt.cget("text")} '
-            f'pmax={rp._chip_pmax.cget("text")} (caption "p max [Pa]" while '
-            f'the plots use kPa)')
+            f'pmax={rp._chip_pmax.cget("text")} (now kPa, like the plots)')
     qa.check(abs(rp.progress.get() - 1.0) < 1e-6, 'progress 100% after run')
     _cache_result(qa, 'native1d')
 
@@ -2487,9 +2486,10 @@ def f09_run_browser(qa):
         qa.pump(240, until=lambda: 'Loaded:' in qa.run_log()[n0:])
         qa.pump(1.5)
         vals = list(qa.app.results.sel.cget('values'))
-        dup = [v for v in vals if v == f'Loaded - {name} (2D)']
-        qa.check(len(dup) == 2, 'loading twice yields two identical combo '
-                 'entries (G2)', 'S2', evidence=str(vals))
+        base = f'Loaded - {name} (2D)'
+        qa.check(vals.count(base) == 1 and f'{base} #2' in vals,
+                 'loading the same run twice yields two DISTINCT entries '
+                 '(G2 fixed)', 'S2', evidence=str(vals))
         qa.shot('duplicate_loaded')
     win.refresh()
     qa.pump(120, until=lambda: not win._busy)

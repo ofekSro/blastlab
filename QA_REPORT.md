@@ -125,6 +125,50 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
 
 ---
 
+## S4 status — FIXED 2026-09-07 (and the S3 remainder closed)
+
+All S4 findings are fixed and the one S3 item left open (QA-18's 3D AMR
+frames) is closed by measurement. Covered by `test_gui_results_fields.py`
+(QA S4 block) and harness re-runs (B01, B03, D01, E02, E03, E05, F09).
+The 22-suite no-WSL matrix stays green.
+
+- **QA-18 remainder — measured, not a per-frame cost.** `mesh_polydata`
+  on a 3D AMR display grid costs **262 ms once** (VTK warm-up) and then
+  **~6 ms per frame** (measured over a growing shock, 30^3 display grid).
+  The 3.5 s stall attributed to "AMR frames" in this report was in fact
+  the `set_case` 3D preview build, which the preview cache already fixed.
+  No throttle is needed; the attribution above was wrong and is corrected
+  here.
+- **QA-26** — the `p max` chip reads kPa, like every plot and colorbar.
+- **QA-27** — card titles, the replay checkbox and the gauge-table headers
+  are short enough to fit; panel figures use constrained layout, so the
+  run title no longer overlaps the panel label and tall 3D slice panels
+  keep their x axis.
+- **QA-28** — matplotlib's Back/Forward buttons (whose disabled image
+  rendered as a dark-mode checkerboard) are dropped from the toolbar.
+- **QA-29 (G9)** — Ctrl+O / Ctrl+S / F5 / Esc are bound; window geometry,
+  appearance mode and the refresh box persist through `settings.json`
+  (geometry only when the window is really mapped and at least the
+  minimum size); entries show a focus ring; the Chain workspace defaults
+  under Documents instead of the process CWD.
+- **QA-30** — the run browser table has a scrollbar, and a refused delete
+  raises a warning dialog instead of only tinting a small status line.
+- **QA-31** — whole-run peak/impulse maps clip the top 0.5 % (only when
+  the tail really is a small hot spot) and say so in the panel label, so
+  the field is visible instead of one saturated dot around the charge.
+- **QA-32** — the per-write AMR log keeps the first 5 writes, then every
+  10th plus any write whose cell count moves more than 10 % (40 writes ->
+  8 lines); the 1D live plot starts on a sensible 0-10 kPa range instead
+  of an empty -0.04..0.04.
+- **QA-33** — the gauge table says "Gauge (cell)" and "Phase ended"
+  instead of an unexplained "Complete".
+- **QA-34** — the logo file is closed (no ResourceWarning) and the
+  `grid(False, alpha=...)` UserWarning is gone.
+- **QA-35** — an AMR case whose per-write mesh is heavy gets a note with
+  the estimated MB per write and where to clean up.
+
+---
+
 ## 0. How to read this / environment
 
 - **Output dir (screenshots, logs, evidence):** `C:\Users\Ofek Rotem\blastlab_qa\20260907-0108\`

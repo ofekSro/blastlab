@@ -223,11 +223,15 @@ def figure_gauges_nd(gauge_out, meta):
 # ── 2D field figures ─────────────────────────────────────────────────────────
 
 def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
-                       cbar_label, aspect_wh, mesh=None):
+                       cbar_label, aspect_wh, mesh=None, robust=False):
     """
     Grid of pcolormesh panels with per-panel autoscale.
     items: list of (label, 2D array (Na,Nb)) plotted with faces xf/yf.
     mesh: optional cell-edge segments (mesh_for) overlaid on each panel.
+    robust: clip the top of the colour range to the 99.5th percentile.
+      Whole-run peak/impulse maps are dominated by the few charge cells
+      (1e7 kPa against a field of 1e2), which painted everything else
+      black - the map read as a single dot.
     """
     n     = len(items)
     ncols = min(n, 3)
@@ -235,7 +239,10 @@ def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
     panel_w = 5.0
     panel_h = panel_w / aspect_wh + 1.0
 
-    fig = Figure(figsize=(panel_w * ncols, panel_h * nrows))
+    # constrained layout: tight_layout let the run title and the per-panel
+    # label overlap, and clipped the x axis of tall 3D slice panels
+    fig = Figure(figsize=(panel_w * ncols, panel_h * nrows),
+                 layout='constrained')
     axes = fig.subplots(nrows, ncols, squeeze=False)
     fig.suptitle(title, fontsize=12)
 
@@ -243,19 +250,28 @@ def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
     for k, (label, z) in enumerate(items):
         ax = axes[k // ncols][k % ncols]
         zm = np.where(solid_sl, np.nan, z.astype(np.float64))
-        im = ax.pcolormesh(xf, yf, zm.T, cmap=cmap, shading='flat')
+        vmax = None
+        if robust and np.isfinite(zm).any():
+            hi = float(np.nanpercentile(zm, 99.5))
+            top = float(np.nanmax(zm))
+            # only clip when the tail really is a small hot spot
+            if np.isfinite(hi) and hi > 0 and top > 4.0 * hi:
+                vmax = hi
+        im = ax.pcolormesh(xf, yf, zm.T, cmap=cmap, shading='flat',
+                           vmax=vmax)
         if mesh is not None:
             add_mesh_lines(ax, mesh)
-        ax.set_title(label, fontsize=10)
+        ax.set_title(label + ('  (top 0.5 % clipped)' if vmax else ''),
+                     fontsize=10)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_aspect('equal')
-        fig.colorbar(im, ax=ax, label=cbar_label, shrink=0.85)
+        fig.colorbar(im, ax=ax, label=cbar_label, shrink=0.85,
+                     extend='max' if vmax else 'neither')
 
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
-    fig.tight_layout()
     return fig
 
 
@@ -309,10 +325,10 @@ def figures_fields_2d(snapshots, meta, include_peak=False,
         (pk_lbl, pk), (im_lbl, im) = peak_items(meta)
         out.append(('blast_2d_peak_overpressure.png', _panel_grid_figure(
             [('whole run', pk)], title=f'Peak overpressure - {base}',
-            cbar_label=PEAK_LABEL, **common)))
+            cbar_label=PEAK_LABEL, robust=True, **common)))
         out.append(('blast_2d_impulse.png', _panel_grid_figure(
             [('whole run', im)], title=f'Net overpressure impulse - {base}',
-            cbar_label=IMPULSE_LABEL, **common)))
+            cbar_label=IMPULSE_LABEL, robust=True, **common)))
     return out
 
 
@@ -383,7 +399,8 @@ def figures_fields_3d(snapshots, meta, include_peak=False,
     return [(fn, _panel_grid_figure(items, solid_sl, xf, yf, xl, yl,
                                     title, cl, ar,
                                     mesh=mesh_v if 'vertical' in fn
-                                    else mesh_h))
+                                    else mesh_h,
+                                    robust=('peak' in fn or 'impulse' in fn)))
             for fn, items, solid_sl, xf, yf, xl, yl, title, cl, ar in specs]
 
 

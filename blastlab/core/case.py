@@ -660,6 +660,14 @@ def validate_case(case, pending_inputs=False):
         elif n_max > FOAM_CELLS_WARN:
             warn(f"AMR may grow the mesh to {n_max:,} cells - expect a "
                  f"long run and GBs of case files on the WSL disk")
+        # every written time keeps its own mesh (cell centres + levels), so
+        # an AMR run's disk cost is much larger than a static one's
+        n_w = max(int(getattr(case, 'n_snapshots', 6) or 6), 1)
+        mb = plan.n_pred * 60 / 1e6            # ~60 B per cell per write
+        if mb * n_w > 200:
+            note(f"AMR keeps a mesh per written time: roughly "
+                 f"{mb:.0f} MB per write on the WSL disk - clean old runs "
+                 f"with 'Foam runs...' or --clean-foam-runs")
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
         if plan is not None and (plan.refined or plan.amr):
