@@ -34,6 +34,14 @@ def main():
     p, _ = pm._paths('/root/spike/s1')
     check('posix passes through', p == '/root/spike/s1', p)
 
+    # listing contract (B14a): triples, and "not checked" is None -
+    # never False, so a caller cannot read it as "nothing is running"
+    runs = pm.list_runs()
+    check('list_runs yields (name, unc, alive) triples',
+          all(len(r) == 3 for r in runs), f'{len(runs)} run(s)')
+    check('list_runs leaves alive unknown unless asked',
+          all(r[2] is None for r in runs))
+
     # ── live-vs-loaded round trip (WSL) ─────────────────────────────────
     from blastlab.solvers.foam import env
     ok, detail = env.check_available()
@@ -67,8 +75,20 @@ def main():
           all(np.array_equal(a, b) for a, b in
               zip(live.gauges['pressures'], loaded.gauges['pressures'])))
     check('meta keys superset',
-          set(loaded.meta) >= set(live.meta) - {'frames'},
-          str((set(live.meta) - {'frames'}) - set(loaded.meta)))
+          set(loaded.meta) >= set(live.meta),
+          str(set(live.meta) - set(loaded.meta)))
+    # QA-24/T30: a loaded run replays. Its frames come from every written
+    # time, so it has at least as many as the live run's live-frame gate
+    # let through - and they are the same slice shape.
+    lf = (live.meta.get('frames') or {}).get('pressures') or []
+    pf = (loaded.meta.get('frames') or {}).get('pressures') or []
+    check('a loaded run carries replay frames', len(pf) > 0, f'{len(pf)}')
+    check('loaded frames have the live frame shape',
+          not lf or lf[0].shape == pf[0].shape,
+          f'{lf[0].shape if lf else None} vs {pf[0].shape if pf else None}')
+    check('loaded frame times are sorted and finite',
+          bool(len(pf)) and list(loaded.meta['frames']['times'])
+          == sorted(loaded.meta['frames']['times']))
     fs_l, fs_p = live.meta['final_state'], loaded.meta['final_state']
     check('final_state identical',
           all(np.array_equal(np.asarray(fs_l[k]), np.asarray(fs_p[k]))

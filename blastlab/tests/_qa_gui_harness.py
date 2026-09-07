@@ -2491,11 +2491,16 @@ def f09_run_browser(qa):
         win.load_selected()
         qa.pump(240, until=lambda: 'Loaded:' in qa.run_log()[n0:])
         qa.pump(1.5)
+        # T30 renamed loaded results to "<run dir> (loaded, 2D)" and the
+        # picker elides the middle of a long label, so compare the
+        # entries themselves rather than the combo's display strings
+        labels = [e.label for e in qa.app.results._entries]
+        base = f'{name} (loaded, 2D)'
         vals = list(qa.app.results.sel.cget('values'))
-        base = f'Loaded - {name} (2D)'
-        qa.check(vals.count(base) == 1 and f'{base} #2' in vals,
+        qa.check(labels.count(base) == 1 and f'{base} #2' in labels
+                 and len(set(vals)) == len(vals),
                  'loading the same run twice yields two DISTINCT entries '
-                 '(G2 fixed)', 'S2', evidence=str(vals))
+                 '(G2 fixed)', 'S2', evidence=str(labels) + str(vals))
         qa.shot('duplicate_loaded')
     win.refresh()
     qa.pump(120, until=lambda: not win._busy)

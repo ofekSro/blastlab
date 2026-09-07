@@ -137,7 +137,13 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
   profile), and the G01 harness assertion that used to *encode* the defect
   now checks the fix against a workspace path of its own.
 - **QA-24** — a result with no replay frames explains itself on the
-  Animation tab (shared with QA-12).
+  Animation tab (shared with QA-12). **T30:** a loaded run now *has*
+  frames — `postmortem.load_run` records every written time (thinned by
+  halving to `case.record_frames`, 150 by default; 3D keeps the run's own
+  live slice), so the Animation tab replays it; its label reads
+  "<run dir> (loaded, 2D)"; and a label longer than the 250 px picker is
+  elided in the MIDDLE (the tail carries the dimension, "(stopped)" and
+  the " #2" marker) with the whole text on hover.
 - **QA-25** — the validation status card is height-capped and scrolls, so a
   long report no longer squeezes the form above it (re-verified in T27,
   shot `114_C05_setup_amr_card_on_dark`).

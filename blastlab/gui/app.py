@@ -341,6 +341,9 @@ class App:
                 else f'Not a blastlab case file: {msg}')
             return
         self.setup.set_case(case)
+        # a run started from this case is named after the file (N9)
+        self.run_panel.set_run_name(
+            os.path.splitext(os.path.basename(path))[0])
         self._show('setup')
 
     def _save_case(self):
@@ -424,6 +427,9 @@ class App:
             return
         self._drain_pending = True
         self._run_count += 1
+        # the name the user typed on the Run tab labels every result of
+        # this run (and its exports) - blank keeps the old "Run N - 2D"
+        self._run_name = self.run_panel.current_run_name()
         self._run_stopped_early = self._run_errored = False
         self._stage_dims = [dim for dim, _ in dim_cases]
         stages = [_solve_stage(dim, case) for dim, case in dim_cases]
@@ -569,8 +575,12 @@ class App:
         elif tag == 'result':
             k, res = msg[1], msg[2]
             dim = self._stage_dims[k]
-            label = (f'Run {self._run_count} - {dim}D'
+            name = getattr(self, '_run_name', '')
+            label = ((f'{name} - {dim}D' if name
+                      else f'Run {self._run_count} - {dim}D')
                      + (' (stopped)' if res.stopped_early else ''))
+            if name:
+                res.meta['name'] = name
             self._run_stopped_early |= bool(res.stopped_early)
             self.results.add_result(label, dim, res)
             # the live viewer belongs to this stage: hand it its playback

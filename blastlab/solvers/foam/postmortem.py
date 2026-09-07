@@ -19,7 +19,7 @@ from ...core.case import load_case
 from ..hooks import RunHooks
 from . import env, reader, writer
 from .backend import (build_remap, finalize_1d, finalize_2d, finalize_3d,
-                      mesh_at, read_2d, read_3d)
+                      mesh_at, read_2d, read_3d, slice_geom_3d)
 from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
@@ -155,6 +155,13 @@ def load_run(case_dir, hooks=None):
     snap_radii = _snap_radii(case, spec)
     ingested, snap_names = {}, []
     acc = PeakImpulse()
+    # replay frames: a loaded run used to reach the Animation tab with
+    # nothing to play (QA-24). Every written time is a frame, thinned by
+    # halving exactly like the live loop, and 3D keeps the same live
+    # slice the run would have shown.
+    record_frames = int(getattr(case, 'record_frames', 0) or 0) or 150
+    live_sl = slice_geom_3d(case, spec)[4] if case.dim == 3 else None
+    frame_t, frame_p, frame_lv = [], [], []
     for _t, name in times:
         dpath = os.path.join(unc, name)
         try:
@@ -168,6 +175,15 @@ def load_run(case_dir, hooks=None):
         if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             continue
         ingested[name] = t
+        frame_t.append(t)
+        frame_p.append((p if live_sl is None
+                        else p[live_sl]).astype(np.float32))
+        if mesh is not None:
+            frame_lv.append(mesh.levels if live_sl is None
+                            else mesh.levels[live_sl])
+        if len(frame_p) >= 2 * record_frames:
+            frame_t, frame_p = frame_t[::2], frame_p[::2]
+            frame_lv = frame_lv[::2]
         shocked = p > ARRIVAL_P
         r_front = float(d_charge[shocked].max()) if shocked.any() else 0.0
         while snap_radii and r_front >= snap_radii[0]:
@@ -179,9 +195,11 @@ def load_run(case_dir, hooks=None):
         raise RuntimeError(f'no readable time directory in {unc}')
     if case.dim == 2:
         return finalize_2d(case, spec, hooks, stop_reason, 0,
-                            ingested, snap_names, [], [], 0, acc)
+                            ingested, snap_names, frame_t, frame_p,
+                            record_frames, acc, frame_lv=frame_lv)
     return finalize_3d(case, spec, hooks, stop_reason, 0,
-                        ingested, snap_names, [], [], 0, acc)
+                        ingested, snap_names, frame_t, frame_p,
+                        record_frames, acc, frame_lv=frame_lv)
 
 
 def list_runs(check_alive=False):

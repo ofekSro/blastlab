@@ -2,6 +2,7 @@
 recorded animation frames, and export artifacts."""
 
 import os
+import re
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -32,9 +33,15 @@ def _combo(parent, values=(), width=200, command=None):
                            dropdown_font=theme.F_BODY, command=command)
 
 
+#: longest label the 250 px picker shows in full; anything longer is
+#: ellipsised there and kept whole in the combo's tooltip (QA-24)
+PICKER_MAX = 34
+
+
 class ResultEntry:
     def __init__(self, label, dim, result):
         self.label = label
+        self.display = label
         self.dim = dim
         self.result = result
 
@@ -235,11 +242,32 @@ class ResultsPanel(ctk.CTkFrame):
             n += 1
         return f'{label} #{n}'
 
+    def _displays(self):
+        """Picker texts: ellipsised labels, still unique."""
+        taken, out = set(), []
+        for ent in self._entries:
+            d = ent.label
+            if len(d) > PICKER_MAX:
+                # elide the MIDDLE: the tail carries the dimension, the
+                # "(stopped)" note and the " #2" de-duplication marker,
+                # which a trailing ellipsis would eat
+                keep = PICKER_MAX - 1
+                head, tail = (keep + 1) // 2, keep // 2
+                d = d[:head] + '…' + d[len(d) - tail:]
+            base, n = d, 2
+            while d in taken:
+                d = f'{base} ({n})'
+                n += 1
+            taken.add(d)
+            ent.display = d
+            out.append(d)
+        return out
+
     def add_result(self, label, dim, result):
         label = self._unique_label(label)
         self._entries.append(ResultEntry(label, dim, result))
-        self.sel.configure(values=[e.label for e in self._entries])
-        self.sel.set(label)
+        self.sel.configure(values=self._displays())
+        self.sel.set(self._entries[-1].display)
         self._refresh()
 
     def _remove_current(self):
@@ -251,7 +279,7 @@ class ResultsPanel(ctk.CTkFrame):
             return
         self._stop_play()
         self._entries.remove(ent)
-        labels = [e.label for e in self._entries]
+        labels = self._displays()
         self.sel.configure(values=labels)
         if labels:
             self.sel.set(labels[-1])
@@ -279,7 +307,7 @@ class ResultsPanel(ctk.CTkFrame):
     def _current(self):
         label = self.sel.get()
         for ent in self._entries:
-            if ent.label == label:
+            if label in (ent.label, ent.display):
                 return ent
         return None
 
@@ -292,7 +320,12 @@ class ResultsPanel(ctk.CTkFrame):
             # as the previous result had left it, so every button stayed
             # enabled and did nothing when pressed (QA-16)
             self._sync_export_buttons(None)
+            theme.tooltip(self.sel, '')
             return
+        # the picker is 250 px: a long name is ellipsised there and whole
+        # on hover (QA-24)
+        theme.tooltip(self.sel, ent.label if ent.label != ent.display
+                      else '')
         self._stop_play()
         self._sync_export_buttons(ent)
         snaps = list(ent.result.snapshots.keys())
@@ -674,7 +707,10 @@ class ResultsPanel(ctk.CTkFrame):
                 return
             dim = 1 if 'radius_m' in res.meta else \
                 (3 if 'z_c' in res.meta else 2)
-            label = f'Loaded - {os.path.basename(path)} ({dim}D)'
+            name = (str(res.meta.get('name') or '').strip()
+                    or os.path.basename(str(path).rstrip('/' + os.sep)))
+            res.meta.setdefault('name', name)
+            label = f'{name} (loaded, {dim}D)'
             # Tk objects must be touched on the main thread
             self.after(0, self.add_result, label, dim, res)
             self._log(f'Loaded: {label} '
@@ -683,12 +719,21 @@ class ResultsPanel(ctk.CTkFrame):
         threading.Thread(target=work, daemon=True).start()
 
     # ── exports ──────────────────────────────────────────────────────────
+    @staticmethod
+    def _name_prefix(res):
+        """"<run name>_" for the suggested export file names, so three
+        runs do not all propose gauges_2d.txt (N9)."""
+        name = str(res.meta.get('name') or '').strip()
+        slug = re.sub(r'[^0-9A-Za-z._-]+', '_', name).strip('_')
+        return f'{slug[:40]}_' if slug else ''
+
     def _export(self, kind):
         ent = self._current()
         if ent is None:
             self._log('Select a result before exporting.')
             return
         res, dim = ent.result, ent.dim
+        pre = self._name_prefix(res)
         show_mesh = bool(self.show_mesh_var.get())
 
         # File dialogs must run on the Tk main thread; only the heavy
@@ -699,7 +744,7 @@ class ResultsPanel(ctk.CTkFrame):
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
                 title='Save gauges TSV', defaultextension='.txt',
-                initialfile=f'gauges_{dim}d.txt')
+                initialfile=f'{pre}gauges_{dim}d.txt')
         elif kind == 'vtk':
             from ..solvers.foam.export_vtk import can_export
             if not can_export(res.meta):
@@ -713,14 +758,14 @@ class ResultsPanel(ctk.CTkFrame):
                 return
             target = filedialog.asksaveasfilename(
                 title='Save gauge summary CSV', defaultextension='.csv',
-                initialfile=f'gauges_{dim}d_summary.csv')
+                initialfile=f'{pre}gauges_{dim}d_summary.csv')
         elif kind == 'gif':
             if not res.meta.get('frames'):
                 self._log('No recorded frames in this result.')
                 return
             target = filedialog.asksaveasfilename(
                 title='Save animation GIF', defaultextension='.gif',
-                initialfile=f'blast_{dim}d_animation.gif')
+                initialfile=f'{pre}blast_{dim}d_animation.gif')
         elif kind == 'profile':
             if dim == 3:
                 self._log('3D results have no profile export.')
@@ -728,8 +773,8 @@ class ResultsPanel(ctk.CTkFrame):
             target = filedialog.asksaveasfilename(
                 title='Save profile',
                 defaultextension='.txt' if dim == 1 else '.npz',
-                initialfile=('blast_profile.txt' if dim == 1
-                             else 'blast_profile_2d.npz'))
+                initialfile=(f'{pre}blast_profile.txt' if dim == 1
+                             else f'{pre}blast_profile_2d.npz'))
         if not target:
             return
 
@@ -768,6 +813,7 @@ class ResultsPanel(ctk.CTkFrame):
                     for name, fig in figs:
                         if fig is None:
                             continue
+                        name = pre + name       # <run name>_... (N9)
                         fig.savefig(os.path.join(outdir, name), dpi=150,
                                     bbox_inches='tight')
                         self._log(f'Saved {name}')

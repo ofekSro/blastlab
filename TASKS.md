@@ -94,7 +94,7 @@ Hard rules:
 | T27 | QA: remaining layout — Run-tab 3D viewport, status card height, truncations | QA-17, 25, 27; G11 | S–M | [x] 2026-09-07 |
 | T28 | QA: chain feedback (stage select, workspace after validation, stage prefix) | QA-23; G12 | S | [x] 2026-09-07 |
 | T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [x] 2026-09-07 |
-| T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [ ] |
+| T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [x] 2026-09-07 |
 | T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [ ] |
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [ ] |
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [ ] |
@@ -337,6 +337,31 @@ Verify: test_gui_results_fields (name in label, loaded frames replay), test_foam
 Done when: green; N9 DONE; G2 DONE; QA-24 FIXED.
 Commit: "T30: user-named runs, replay frames for loaded runs (N9, QA-24)"
 ```
+
+**DONE (2026-09-07):** (1) a "Name" box next to Run/Stop/3D View on the Run tab
+(`RunPanel.run_name` / `current_run_name` / `set_run_name`); `App._start` captures it,
+`_dispatch('result')` labels the result "<name> - 2D" (blank keeps "Run N - 2D") and
+writes `Result.meta['name']`; Open case pre-fills the name from the file stem without
+ever overwriting what the user typed; every suggested export file name gains a
+slugged "<name>_" prefix (`ResultsPanel._name_prefix`), the PNG batch included.
+NOTE: CTkEntry silently drops `placeholder_text` once a textvariable is attached, so
+the box carries a real label (and the same applies to "Refresh every"). (2)
+`postmortem.load_run` collects a frame per written time - thinned by halving exactly
+like the live loop, capped at `case.record_frames` (150 by default), 3D reduced to the
+run's own live slice via the now-public `backend.slice_geom_3d` - and hands them to
+finalize_2d/3d, so a loaded run replays; its label is "<run dir> (loaded, 2D)".
+(3) The picker elides a label longer than 34 chars in the MIDDLE and keeps the full
+text as a tooltip; `_current()` resolves either form, so the de-dup marker and the
+dimension stay visible.
+Tests: test_gui_results_fields gained `t30_checks` (name trimming, set_run_name never
+overwriting, export prefix, middle elision, tooltip, picker resolution);
+test_foam_postmortem gained three frame checks and now demands the FULL meta-key
+superset (it used to except 'frames'); the F09 harness assertion compares entry labels
+instead of the combo's display strings. WSL suite run on an idle WSL, no orphans after.
+Harness E09 and F09 (post-mortem load == live, "frame times equal: True", two distinct
+entries), B05 for the Run-tab layout at 1280x840 / 1100x720 / 900x600, plus
+test_regression byte-identical, test_gui_drain, test_gui_results_anim,
+test_gui_run_browser, test_foam_writer, test_foam_reader, test_case_validate.
 
 ### T31 — QA: UI stalls + preview extras + viewer field availability (G4, G8, QA-18, QA-21, QA-17 fields)
 
@@ -899,7 +924,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 
 **GUI (G)**
 - G1 "Initialise Model" hint erased — DONE (T5)
-- **G2** results accumulate / duplicate labels — de-dup + Remove DONE (QA-13); names → **T30**
+- G2 results accumulate / duplicate labels — de-dup + Remove DONE (QA-13); user-named runs DONE (2026-09-07, T30)
 - G3 validation split-brain / silent swallowing — DONE (2026-09-07, T29)
 - **G4** replay / preview stalls (idle-CPU half refuted) — OPEN → **T31**
 - G5 chain start race — DONE (T6)
@@ -933,7 +958,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - **N6** resume a stopped run — OPEN → **T43**
 - **N7** chains INTO blastFoam (profile init) — OPEN → **T41**
 - N8 foam run browser + auto-cleanup (settings in %APPDATA%\blastlab) — DONE (T14)
-- **N9** user-named runs — OPEN → **T30**
+- N9 user-named runs — DONE (2026-09-07, T30)
 - **N10** MUSCL second order — OPEN → **T47**
 - **N11** native materials beyond TNT — OPEN → **T46**
 - **N12** gauge fields beyond p — OPEN → **T44**

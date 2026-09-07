@@ -69,8 +69,26 @@ class RunPanel(ctk.CTkFrame):
             state='disabled', command=on_view3d or (lambda: None))
         self.view3d_btn.pack(side='left', padx=(0, PAD))
 
+        # results used to be labelled by dim + a counter only, so three
+        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
+        # (CTkEntry drops its placeholder as soon as a textvariable is
+        # attached, so the box gets a real label instead)
+        self.run_name = tk.StringVar(value='')
+        ctk.CTkLabel(bar, text='Name', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='left',
+                                                 padx=(0, 6))
+        self._name_entry = ctk.CTkEntry(
+            bar, textvariable=self.run_name, width=130, height=32,
+            font=theme.F_BODY, corner_radius=8, fg_color=c('entry'),
+            border_color=c('border'))
+        self._name_entry.pack(side='left', padx=(0, GAP))
+        theme.tooltip(self._name_entry,
+                      'Names this run in the Results picker and in the '
+                      'exported file names; blank falls back to '
+                      '"Run N - 2D".')
+
         self.progress = ctk.CTkProgressBar(
-            bar, width=220, height=8, corner_radius=4,
+            bar, width=120, height=8, corner_radius=4,
             progress_color=c('accent'), fg_color=c('card2'))
         self.progress.set(0.0)
         # takes the slack so the readouts on the right keep their width
@@ -142,7 +160,6 @@ class RunPanel(ctk.CTkFrame):
         self.refresh_val = tk.StringVar(value='')
         ent = ctk.CTkEntry(ebar, textvariable=self.refresh_val, width=64,
                            height=32, font=theme.F_BODY, corner_radius=8,
-                           placeholder_text='auto',
                            fg_color=c('entry'), border_color=c('border'))
         ent.pack(side='right')
         ent.bind('<Return>', lambda e: on_refresh())
@@ -151,7 +168,7 @@ class RunPanel(ctk.CTkFrame):
         # the "(blank = auto)" caption cost 73 px of a row that does not
         # fit at 1100 px - it is a hover hint now (QA-27)
         theme.tooltip(ent, 'How often the live view redraws; '
-                           'leave blank for automatic.')
+                           'leave blank (or 0) for automatic.')
         ctk.CTkLabel(ebar, text='Refresh every', font=theme.F_BODY,
                      text_color=c('muted')).pack(side='right',
                                                  padx=(0, GAP))
@@ -230,6 +247,14 @@ class RunPanel(ctk.CTkFrame):
         self._amr_run = 0           # consecutive AMR log lines collapsed
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
+
+    def set_run_name(self, name):
+        """Pre-fill the run name (Open case uses the file stem)."""
+        if not self.run_name.get().strip():
+            self.run_name.set(str(name or ''))
+
+    def current_run_name(self):
+        return self.run_name.get().strip()
 
     # ── body sash ────────────────────────────────────────────────────────
     #: share of the Run-tab width given to the log; the live/3D pane keeps

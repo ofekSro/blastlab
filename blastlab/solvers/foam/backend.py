@@ -507,7 +507,7 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
                   stop_reason, stop_reason == 'stopped by user')
 
 
-# ── 2D ──────────────────────────────────────────────────────────────────────
+# â”€â”€ 2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 def read_2d(dpath, spec, what=('p',), mesh=None):
@@ -822,7 +822,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                   stop_reason == 'stopped by user')
 
 
-# ── 3D ──────────────────────────────────────────────────────────────────────
+# â”€â”€ 3D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
 def _levels_of(mesh):
@@ -928,7 +928,7 @@ def _initial_frame3d(spec, hooks):
                             **_levels_of(spec.mesh0)))
 
 
-def _slice_geom_3d(case, spec):
+def slice_geom_3d(case, spec):
     """Burst-plane + user live-slice indices (native conventions),
     shared by the live run loop and the finalizer/postmortem."""
     g = spec.grid
@@ -1030,7 +1030,7 @@ def solve_3d_foam(case, hooks=None):
 
     # burst-plane slice indices + user live slice (native conventions)
     (j0, k0, slice_axis, s0, live_sl, live_faces, live_labels,
-     live_title) = _slice_geom_3d(case, spec)
+     live_title) = slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_open)
     ax_i = 'xyz'.index(slice_axis)
@@ -1163,7 +1163,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     bcs = dict(case.bcs)
     solid = (spec.solid if spec.solid is not None
              else np.zeros((spec.nx, spec.ny, spec.nz), dtype=bool))
-    j0, k0, slice_axis, s0, live_sl = _slice_geom_3d(case, spec)[:5]
+    j0, k0, slice_axis, s0, live_sl = slice_geom_3d(case, spec)[:5]
 
     names = sorted(ingested, key=ingested.get)
 

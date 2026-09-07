@@ -312,6 +312,51 @@ def qa_s2_checks(panel):
           plain.axes[0].collections[0].get_clim()[1] >= 5e4)
 
     t29_checks(panel)
+    t30_checks(panel)
+
+
+def t30_checks(panel):
+    """T30 / N9 / QA-24: a run can be named, the name reaches the label
+    and the suggested export file names, and a long label stays
+    reachable in the 250 px picker."""
+    print("")
+    print("T30: named runs + picker ellipsis")
+    from blastlab.gui.run_panel import RunPanel
+    from blastlab.gui.results_panel import ResultsPanel, PICKER_MAX
+    root = panel.winfo_toplevel()
+    rp = RunPanel(root, on_run=lambda: None, on_stop=lambda: None,
+                  on_init=lambda: None, on_refresh=lambda: None)
+    rp.run_name.set('  urban street  ')
+    check('the Run tab hands back a trimmed run name',
+          rp.current_run_name() == 'urban street')
+    rp.set_run_name('from_file')
+    check('Open case never overwrites a name the user typed',
+          rp.current_run_name() == 'urban street')
+    rp.run_name.set('')
+    rp.set_run_name('kitchen_case')
+    check('Open case pre-fills the name from the file stem',
+          rp.current_run_name() == 'kitchen_case')
+    rp.destroy()
+
+    named = fake_2d()
+    named.meta['name'] = 'urban street'
+    check('export file names carry the run name',
+          ResultsPanel._name_prefix(named) == 'urban_street_',
+          ResultsPanel._name_prefix(named))
+    check('an unnamed run keeps the old export names',
+          ResultsPanel._name_prefix(fake_2d()) == '')
+
+    long_label = 'a really long run name that will not fit the picker - 2D'
+    panel.add_result(long_label, 2, named)
+    ent = panel._entries[-1]
+    check('a long label is elided in the picker, tail kept',
+          '…' in ent.display and len(ent.display) <= PICKER_MAX
+          and ent.display.endswith('- 2D'), ent.display)
+    check('the picker still resolves the ellipsised entry',
+          panel._current() is ent)
+    check('the full label is one hover away',
+          panel.sel._blastlab_tip.text == long_label)
+    panel._remove_current()
 
 
 def t29_checks(panel):
