@@ -105,7 +105,10 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
   nudged just inside so it cannot silently vanish; the Results 3D viewer now
   carries the whole-run `p_peak` / `impulse` maps, so Peak overpressure and
   Net ovp impulse are selectable instead of greyed while the Fields list
-  offers them. **T27 (layout):** the sash is parked after layout so the
+  offers them. **T31 (fields):** a field the run never recorded is HIDDEN
+  rather than greyed - a greyed radio read as a control the user had
+  failed to unlock - and the radios re-appear in their fixed order for
+  the next result. **T27 (layout):** the sash is parked after layout so the
   live/3D pane keeps >= 60 % of the Run tab (measured 845 of 1280 px, and
   62 % at 1100 px); the control column is 200 px, scrolls, and folds away
   behind a rail button (automatically below 700 px); the HUD font follows
@@ -115,16 +118,23 @@ D02, D04, E06, I03). The 21-suite no-WSL matrix stays green.
 - **QA-18** — `feed_result` measured **2364 ms -> 259 ms**; the Setup 3D
   preview caches its scene and rebuilds only when something visible changed
   (typing a cfl or a file name no longer costs a VTK rebuild); worst observed
-  gap on a native 3D run 3544 -> 1100 ms. *Still open:* the per-frame mesh
-  rebuild of a 3D AMR run (~3.5 s) - it needs the polydata built on the
-  worker thread, tracked in T31.
+  gap on a native 3D run 3544 -> 1100 ms. **T31:** `feed_result` now
+  streams one snapshot per Tk tick with a "loading n/N" HUD line (a
+  snapshot tick measures ~1 ms), and the Setup 3D preview adds a
+  500 ms leading-edge throttle on top of the key cache, so a burst of
+  typing costs one rebuild. The per-frame AMR mesh is *not* moved
+  off-thread: re-measured here at 320 ms once (VTK warm-up) then 5-8 ms
+  per frame on a 30^3 display grid, confirming the S4 correction below.
 - **QA-19** — a dedicated `seg` palette entry makes unselected segments
   visible in light mode; `theme.Button` keeps disabled text legible; Stop is
   grey while disabled and only turns danger-red while a run is live.
 - **QA-20** — the Run log wraps by word instead of clipping notes and
   warnings at the pane edge.
 - **QA-21 (G8)** — both previews draw the extra blastFoam charges (sized by
-  their own mass) and the detonation points.
+  their own mass) and the detonation points. **T31:** a detonation point
+  is now an octahedron, so it cannot be mistaken for one more (spherical)
+  charge or gauge; `test_viz3d_scene` checks the actors appear, differ in
+  shape, and go away with the case that had them.
 - **QA-22** — Open-case failures read as "This file is not valid JSON (line
   1, column 2).", "unsupported or missing field 5.", "File not found: ..."
   instead of raw parser text.

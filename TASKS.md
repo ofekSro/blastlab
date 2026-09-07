@@ -95,7 +95,7 @@ Hard rules:
 | T28 | QA: chain feedback (stage select, workspace after validation, stage prefix) | QA-23; G12 | S | [x] 2026-09-07 |
 | T29 | QA: validation & feedback bundle (G3, Results feedback, bad-file messages) | G3, QA-16, 22 | M | [x] 2026-09-07 |
 | T30 | QA: user-named runs + loaded-run replay | N9, QA-24; G2 | S–M | [x] 2026-09-07 |
-| T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [ ] |
+| T31 | QA: UI stalls + preview extras + viewer field availability | G4, G8, QA-18, 21, 17 | M | [x] 2026-09-07 |
 | T32 | QA: theme/affordance + accelerators + persistence | G9, G13, QA-19, 28, 29 | S–M | [ ] |
 | T33 | QA: papercuts | QA-20, 26, 30..35 | S | [ ] |
 | T34 | GUI: global solver mode (sidebar selector; hide, don't grey) | — | L | [ ] |
@@ -402,6 +402,38 @@ Verify: test_viz3d_panel (chunked feed_result + timing), test_gui_refine_preview
 Done when: green; G4/G8 DONE; QA-17 (fields)/18/21 FIXED.
 Commit: "T31: chunked replay feed, in-place 3D preview, off-thread AMR edges, preview extras (G4/G8)"
 ```
+
+**DONE (2026-09-07):** (1) `View3DPanel.feed_result` streams ONE snapshot per
+`after(1, ...)` tick (`_feed_step` / `_cancel_feed`), with `BlastScene.loading`
+adding a "loading n/N snapshots" HUD line that clears on the last frame; a new
+result or `reset()` cancels a feed still in flight. Measured: a snapshot tick ~1 ms;
+the harness E06 gate reads 360 ms for `_open_3d`, which is now the one-off VTK scene
+build, not the snapshot loop. (2) Setup 3D preview: the existing `_key` cache is kept
+and a 500 ms LEADING-edge throttle added (`THROTTLE_MS`, `_flush_pending`) - the first
+edit of a burst renders at once, the rest collapse into one trailing rebuild; `clear()`
+cancels a pending build. The scene object itself was already reused in place.
+(4) G8 was already drawn by `a6c7463`; a detonation point is now an octahedron so it
+cannot read as one more spherical charge/gauge. (5) The whole-run `p_peak` / `impulse`
+maps already rode along in the payload; `_sync_field_availability` now HIDES a radio
+whose field is absent (re-packing in the fixed order, and falling back to Pressure if
+the selected field disappears) instead of greying it, and the plane slider was already
+clamped to 0.001/0.999 so a cut is always shown.
+**NOT DONE - item 3 (off-thread AMR mesh edges), and why:** the premise was refuted
+before this task. QA_REPORT S4 measured `mesh_polydata` at 262 ms once then ~6 ms per
+frame; re-measured here on a 30^3 display grid with a growing shock: **320 ms on the
+first call (VTK warm-up, paid at scene build in the app) then 5-8 ms per frame**. Moving
+that to `Feed3D.make_payload` would hand VTK objects built on the solver worker thread
+to the Tk thread - real risk, no measured gain - so it was left alone and the
+measurement recorded in QA_REPORT instead.
+Tests: test_viz3d_panel gained a P9b block (chunked feed, HUD counter, per-tick timing,
+every snapshot arriving, loading line cleared, whole-run radios shown, reset cancelling
+a feed) and its "impulse radio disabled" check became "hidden"; test_viz3d_scene gained
+the extra-charge / det-point actor checks. Plus test_regression byte-identical,
+test_viz3d_sampling, test_viz3d_hooks, test_gui_refine_preview, test_gui_amr_form,
+test_gui_results_fields, test_gui_drain. Harness C09, D04, E06 and F06 (3D AMR in WSL,
+141 s, idle WSL before and no orphans after). F06 crashed once on a Windows
+`ImageGrab` "screen grab failed" - a desktop-capture hiccup, not the app; the re-run
+was clean.
 
 ### T32 — QA: theme & affordance + accelerators + persistence (G9, G13, QA-19, QA-28, QA-29)
 
@@ -926,11 +958,11 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - G1 "Initialise Model" hint erased — DONE (T5)
 - G2 results accumulate / duplicate labels — de-dup + Remove DONE (QA-13); user-named runs DONE (2026-09-07, T30)
 - G3 validation split-brain / silent swallowing — DONE (2026-09-07, T29)
-- **G4** replay / preview stalls (idle-CPU half refuted) — OPEN → **T31**
+- G4 replay / preview stalls (idle-CPU half refuted) — DONE (2026-09-07, T31)
 - G5 chain start race — DONE (T6)
 - G6 progress < 100 % (DONE, T5); theme half refuted by QA (mesh overlay colour cosmetic) — closed
 - **G7** live-view niceties (cadence hint, 2D Min/Max) — OPEN → **T38**
-- **G8** preview lacks extra charges / det points — OPEN → **T31**
+- G8 preview lacks extra charges / det points — DONE (2026-09-07, QA-21 + T31)
 - **G9** accelerators / persistence / focus — OPEN → **T32**
 - G10 default 3D case invalid, nan/inf accepted — DONE (2026-09-07, QA-14/15)
 - G11 layout at 1280×840 / 1100×720 — combos + export row DONE (QA-07/08); Run-tab sash, collapsible 3D control column, HUD/scalar-bar scaling, wrapped card titles + tooltips — DONE (2026-09-07, T27)

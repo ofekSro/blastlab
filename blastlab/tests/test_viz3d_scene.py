@@ -358,6 +358,24 @@ check("camera preserved on update",
 gs.show(dict(geo, Lx=8.0))              # new extents: camera reset
 img3 = pl3.screenshot(None, return_img=True)
 check("preview renders", float(np.asarray(img3).std()) > 1.0)
+
+# G8/QA-21: a multi-charge blastFoam case must not look single-charge,
+# and a detonation point must not look like one more charge
+gs.show(dict(geo, charges=[(1.0, 1.0, 0.5, 0.2), (3.0, 1.0, 0.5, 0.1)],
+             det_points=[(1.0, 1.0, 0.5), (3.0, 1.0, 0.5)]))
+check("extra charges get their own actors",
+      all(k in pl3.actors for k in ('xcharge0', 'xcharge1')),
+      str([k for k in pl3.actors if k.startswith('xcharge')]))
+check("detonation points get their own actors",
+      all(k in pl3.actors for k in ('det0', 'det1')))
+check("a detonation point is a diamond, not another ball",
+      pl3.actors['det0'].mapper.dataset.n_points
+      < pl3.actors['xcharge0'].mapper.dataset.n_points,
+      f"{pl3.actors['det0'].mapper.dataset.n_points} vs "
+      f"{pl3.actors['xcharge0'].mapper.dataset.n_points}")
+gs.show(geo)                            # back to a plain case
+check("they go away with the case that had them",
+      not any(k.startswith(('xcharge', 'det')) for k in pl3.actors))
 pl3.close()
 
 print("\n" + "=" * 50)

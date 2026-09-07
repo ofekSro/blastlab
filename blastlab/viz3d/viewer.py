@@ -217,10 +217,16 @@ def add_static_scenery(pl, geo):
                     color='#ffb74d', opacity=0.85, name=f'xcharge{k}')
     for k, dp in enumerate(geo.get('det_points') or []):
         px, py, pz = (list(dp) + [0.0, 0.0, 0.0])[:3]
-        pl.add_mesh(pv.Sphere(radius=0.7 * geo['r_gauge'],
-                              center=(float(px), float(py), float(pz)),
-                              theta_resolution=8, phi_resolution=8),
-                    color='#e5484d', name=f'det{k}')
+        r = 0.8 * geo['r_gauge']
+        ctr = (float(px), float(py), float(pz))
+        # a diamond, so a detonation point never reads as one more
+        # (spherical) charge or gauge
+        try:
+            marker = pv.Octahedron(radius=r, center=ctr)
+        except Exception:
+            marker = pv.Sphere(radius=r, center=ctr,
+                               theta_resolution=8, phi_resolution=8)
+        pl.add_mesh(marker, color='#e5484d', name=f'det{k}')
     for k, g in enumerate(geo.get('gauges') or []):
         pl.add_mesh(pv.Sphere(radius=geo['r_gauge'], center=tuple(g)),
                     color='#4fc3f7', name=f'gauge{k}')
@@ -305,6 +311,10 @@ class BlastScene(_CameraOps):
         self.index = -1
         self.done = False
         self.stop_reason = ''
+        #: extra HUD line while a caller streams frames in (playback of a
+        #: finished result is fed one snapshot per Tk tick, so the window
+        #: stays responsive and says how far it has got)
+        self.loading = ''
         self.follow_live = True
         self.playing = False
         self._play_skip = 0
@@ -590,6 +600,8 @@ class BlastScene(_CameraOps):
         n = len(self.store)
         s = (f't = {self.t*1e3:8.3f} ms    peak = {peak:9.1f} kPa    '
              f'{mode}   [{self.index+1}/{n} frames]')
+        if self.loading:
+            s += f'\n{self.loading}'
         if self.done and self.stop_reason:
             s += f'\nrun ended: {self.stop_reason}   (space = play/pause)'
         _set_text(self.hud, s)

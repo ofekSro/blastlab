@@ -68,6 +68,8 @@ class View3DPanel(VtkTkHost):
         self._built = False
         self._ctl_collapsed = False
         self._ctl_user = False
+        self._feed_job = None       # chunked feed_result in flight
+        self._feed_state = None
         super().__init__(parent, log_fn=log_fn)
         self._build_controls()
         self._built = True
@@ -168,6 +170,11 @@ class View3DPanel(VtkTkHost):
                 command=self._field_changed)
             rb.pack(anchor='w', pady=2)
             self._field_btns[key] = rb
+        # zero-height anchor: a radio hidden for one result must come
+        # back in its original place for the next one
+        self._field_after = ctk.CTkFrame(disp, height=0, width=1,
+                                         fg_color='transparent')
+        self._field_after.pack(fill='x')
 
         small_label(disp, 'COLOUR SCALE')
         checkbox(disp, 'Auto colour scale', 'auto_scale', True,
@@ -356,6 +363,7 @@ class View3DPanel(VtkTkHost):
         """Drop the current scene and go back to the placeholder, so a new
         run does not start against the previous run's picture (the panel
         keeps its last blit until a new frame arrives otherwise)."""
+        self._cancel_feed()     # a replay still streaming in has no scene
         self._scene = None
         self._dirty = False
         self._photo = None
@@ -382,8 +390,15 @@ class View3DPanel(VtkTkHost):
         return self._ensure_scene(feed.init)
 
     def feed_result(self, result):
-        """Playback of a finished 3D Result's snapshots."""
+        """Playback of a finished 3D Result's snapshots.
+
+        Fed one snapshot per Tk tick: a 20-snapshot 3D result rebuilt
+        every layer inside a single callback and froze the window for
+        seconds (QA-18). The HUD counts the snapshots in while they
+        stream, and a new result cancels a feed still in flight.
+        """
         from ..viz3d.client import scene_from_meta
+        self._cancel_feed()
         feed = Feed3D(scene_from_meta(result.meta))
         if not self._ensure_scene(feed.init):
             return False
@@ -398,16 +413,43 @@ class View3DPanel(VtkTkHost):
             if arr is not None:
                 whole[key] = arr
         names = list(result.snapshots.keys())
-        for i, name in enumerate(names):
-            snap = result.snapshots[name]
-            payload = feed.make_payload(dict(p=snap['p'], **whole))
-            rho3 = snap.get('rho3')   # stored pre-decimated, same stride rule
-            if rho3 is not None and rho3.shape == payload['p'].shape:
-                payload['rho'] = rho3
-            self.on_frame(float(snap.get('t', 0.0)), payload,
-                         final=(i == len(names) - 1))
-        self.on_done(result.stop_reason)
+        self._feed_state = dict(i=0, names=names, feed=feed, whole=whole,
+                                result=result)
+        self._feed_step()
         return True
+
+    def _cancel_feed(self):
+        if self._feed_job is not None:
+            try:
+                self.after_cancel(self._feed_job)
+            except Exception:
+                pass
+            self._feed_job = None
+        self._feed_state = None
+
+    def _feed_step(self):
+        """One snapshot per tick, so Tk never blocks for a whole result."""
+        self._feed_job = None
+        st = self._feed_state
+        if st is None or self._scene is None:
+            return
+        i, names = st['i'], st['names']
+        name = names[i]
+        snap = st['result'].snapshots[name]
+        payload = st['feed'].make_payload(dict(p=snap['p'], **st['whole']))
+        rho3 = snap.get('rho3')   # stored pre-decimated, same stride rule
+        if rho3 is not None and rho3.shape == payload['p'].shape:
+            payload['rho'] = rho3
+        last = i == len(names) - 1
+        self._scene.loading = ('' if last else
+                               f'loading {i + 1}/{len(names)} snapshots')
+        self.on_frame(float(snap.get('t', 0.0)), payload, final=last)
+        st['i'] = i + 1
+        if last:
+            self._feed_state = None
+            self.on_done(st['result'].stop_reason)
+        else:
+            self._feed_job = self.after(1, self._feed_step)
 
     # ── frame flow (Tk thread) ───────────────────────────────────────────
     def on_frame(self, t, payload, final=False):
@@ -530,11 +572,25 @@ class View3DPanel(VtkTkHost):
 
     # ── control <-> scene sync ───────────────────────────────────────────
     def _sync_field_availability(self):
-        for key, rb in self._field_btns.items():
-            avail = self._scene is not None \
-                and self._scene.field_available(key)
-            rb.configure(state='normal' if avail or key == 'p'
-                         else 'disabled')
+        """Offer exactly the fields this result carries.
+
+        A greyed radio read as a control the user had failed to unlock,
+        even where the Results "Fields" list happily offered the same
+        map. A field the run never recorded is hidden instead, so every
+        radio on screen is live (QA-17)."""
+        def ok(key):
+            return key == 'p' or (self._scene is not None
+                                  and self._scene.field_available(key))
+
+        for key, _lbl in FIELD_LABELS:
+            self._field_btns[key].pack_forget()
+        for key, _lbl in FIELD_LABELS:      # re-pack in the fixed order
+            if ok(key):
+                self._field_btns[key].pack(anchor='w', pady=2,
+                                           before=self._field_after)
+        if not ok(self._vars['field'].get()):
+            self._vars['field'].set('p')
+            self._field_changed()
 
     def _sync_clim_entries(self, force=False):
         """While auto scale is on, show the live range in the entries

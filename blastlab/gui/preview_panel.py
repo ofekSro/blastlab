@@ -6,6 +6,8 @@ debounce as the validation strip so they follow the form as you type:
 - Preview2DPanel: matplotlib drawing of the Case2D domain (boundary
   types, obstacles, charge, gauges) - no pyvista needed."""
 
+import time
+
 import customtkinter as ctk
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
@@ -100,9 +102,16 @@ def case_geometry(case, show_mesh=False):
 class Preview3DPanel(VtkTkHost):
     PLACEHOLDER = 'Select 3D to preview the model here.'
 
+    #: leading-edge throttle: the first edit of a burst renders at once,
+    #: the rest of the burst collapses into one trailing rebuild
+    THROTTLE_MS = 500
+
     def __init__(self, parent, log_fn=print):
         super().__init__(parent, log_fn=log_fn, view_size=(520, 480))
         self._geo_key = None
+        self._build_job = None
+        self._pending = None
+        self._last_build = -1e9
 
     @staticmethod
     def _key(case, show_mesh):
@@ -128,7 +137,31 @@ class Preview3DPanel(VtkTkHost):
                 bool(show_mesh))
 
     def show_case(self, case, show_mesh=False):
-        """Render (or update) the preview for a parsed Case3D."""
+        """Render (or update) the preview for a parsed Case3D.
+
+        The 300 ms validation debounce calls this on every keystroke.
+        The key cache below skips edits that cannot change the picture;
+        for the ones that can, a burst of typing is collapsed into one
+        rebuild at most every THROTTLE_MS (G4).
+        """
+        now = time.monotonic() * 1000.0
+        if (self._build_job is not None
+                or now - self._last_build < self.THROTTLE_MS):
+            self._pending = (case, show_mesh)
+            if self._build_job is None:
+                wait = int(max(1, self.THROTTLE_MS - (now - self._last_build)))
+                self._build_job = self.after(wait, self._flush_pending)
+            return
+        self._build(case, show_mesh)
+
+    def _flush_pending(self):
+        self._build_job = None
+        pending, self._pending = self._pending, None
+        if pending is not None:
+            self._build(*pending)
+
+    def _build(self, case, show_mesh=False):
+        self._last_build = time.monotonic() * 1000.0
         if not pyvista_available():
             self.clear(MISSING_MSG)
             return
@@ -155,6 +188,13 @@ class Preview3DPanel(VtkTkHost):
         """Drop back to the text placeholder (non-3D case / parse error).
         The scene is dropped so the render tick stops blitting over the
         placeholder; the next show_case rebuilds it."""
+        if self._build_job is not None:
+            try:
+                self.after_cancel(self._build_job)
+            except Exception:
+                pass
+            self._build_job = None
+        self._pending = None
         self._scene = None
         self._geo_key = None
         self._dirty = False

@@ -122,8 +122,14 @@ panel._vars['field'].set('rho'); panel._field_changed()
 check("field switched to density", panel._scene.field == 'rho')
 check("density radio enabled",
       str(panel._field_btns['rho']['state']) != 'disabled')
-check("impulse radio disabled (not in payload)",
-      str(panel._field_btns['imp']['state']) == 'disabled')
+# T31/QA-17: a field the run never recorded is HIDDEN, not greyed - a
+# greyed radio read as a control the user had failed to unlock
+check("impulse radio hidden (not in payload)",
+      panel._field_btns['imp'].winfo_manager() == '',
+      panel._field_btns['imp'].winfo_manager())
+check("pressure and density radios stay on screen",
+      all(panel._field_btns[k].winfo_manager() == 'pack'
+          for k in ('p', 'rho')))
 panel._vars['field'].set('p'); panel._field_changed()
 panel._vars['vmin'].set('5'); panel._vars['vmax'].set('250')
 panel._clim_changed()
@@ -224,6 +230,48 @@ check("planar remap: x label + origin marker",
       ax.get_xlabel() == 'x [m]' and len(ax.patches) == 0)
 
 print("")
+print("P9b: chunked feed_result (QA-18) + field radios follow the payload")
+import time as _time
+
+
+class _FakeResult:
+    meta = dict(scene_info, Lz=4.0,
+                p_peak=fields(1.4)['p'], impulse=np.zeros_like(D))
+    stop_reason = 'shock arrived at an open boundary'
+    snapshots = {f't = {k}': dict(t=1e-3 * (k + 1), p=fields(0.4 * k + 0.4)['p'])
+                 for k in range(8)}
+
+
+_ok = panel.feed_result(_FakeResult())
+check("feed_result returns without draining the result", _ok
+      and len(panel._scene.store) == 1, f'{len(panel._scene.store)} frames')
+check("the HUD counts the snapshots in",
+      panel._scene.loading.startswith('loading 1/8'), panel._scene.loading)
+# the first call also builds the scene (VTK warm-up); the per-snapshot
+# tick is what must stay off the 300 ms budget
+_t0 = _time.perf_counter()
+panel._feed_step()
+_blocked = (_time.perf_counter() - _t0) * 1e3
+check("a snapshot tick stays well under 300 ms", _blocked < 300,
+      f'{_blocked:.0f} ms')
+for _ in range(200):
+    root.update()
+    if panel._feed_state is None:
+        break
+    _time.sleep(0.002)
+check("every snapshot arrives", len(panel._scene.store) == 8,
+      f'{len(panel._scene.store)} frames')
+check("the loading line clears at the end", panel._scene.loading == '')
+check("playback is marked done", panel._scene.done)
+check("whole-run maps make their radios available",
+      all(panel._field_btns[k].winfo_manager() == 'pack'
+          for k in ('p_peak', 'imp')))
+panel.reset()
+check("reset cancels a feed in flight", panel._feed_state is None
+      and panel._feed_job is None)
+panel.prepare_live(scene_info)
+panel.on_frame(1e-3, feed.make_payload(fields(0.8)))
+
 print("P10: layout - collapsible control column + Run-tab sash (QA-17)")
 root.geometry("1280x840")
 root.deiconify()
