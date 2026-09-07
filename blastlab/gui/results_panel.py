@@ -130,6 +130,8 @@ class ResultsPanel(ctk.CTkFrame):
                                   ('VTK', 'cube', 'vtk'),
                                   ('Summary CSV', 'table', 'summary'),
                                   ('Gauges TSV', 'table', 'tsv'),
+                                  ('Field CSV', 'table', 'fieldcsv'),
+                                  ('Report', 'image', 'report'),
                                   ('PNGs', 'image', 'pngs')):
             b = ctk.CTkButton(bar2, text=label, image=icon(name, 14),
                               compound='left', width=104, height=32,
@@ -837,6 +839,15 @@ class ResultsPanel(ctk.CTkFrame):
         target = None
         if kind == 'pngs':
             target = filedialog.askdirectory(title='Save PNGs into')
+        elif kind == 'fieldcsv':
+            # N14: p_peak / impulse / snapshot fields, one long-format
+            # CSV per field
+            target = filedialog.askdirectory(title='Save field CSVs into')
+        elif kind == 'report':
+            # N13: one self-contained HTML file
+            target = filedialog.asksaveasfilename(
+                title='Save HTML report', defaultextension='.html',
+                initialfile=f'{pre}blast_{dim}d_report.html')
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
                 title='Save gauges TSV', defaultextension='.txt',
@@ -917,6 +928,45 @@ class ResultsPanel(ctk.CTkFrame):
                     {1: save_gauges_1d, 2: save_gauges_2d,
                      3: save_gauges_3d}[dim](res.gauges, target)
                     self._log(f'Saved {target}')
+                elif kind == 'fieldcsv':
+                    from ..output import report as report_mod
+                    written = report_mod.save_field_csvs(
+                        res, dim, target, prefix=pre)
+                    if written:
+                        self._log(f'Saved {len(written)} field CSV(s) '
+                                  f'into {target}')
+                    else:
+                        self._log('No exportable field maps in this '
+                                  'result.')
+                elif kind == 'report':
+                    from ..output import report as report_mod
+                    figs = []
+                    if dim == 1:
+                        figs = [('Results', plots.figure_results_1d(
+                                    res.snapshots, res.meta['eos'],
+                                    res.meta['charge_kg'],
+                                    res.meta['radius_m'])),
+                                ('Gauges', plots.figure_gauges_1d(
+                                    res.gauges, res.meta['charge_kg'],
+                                    res.meta['eos']))]
+                    else:
+                        builder = (plots.figures_fields_2d if dim == 2
+                                   else plots.figures_fields_3d)
+                        figs = [(n.rsplit('.', 1)[0].replace('_', ' '), f)
+                                for n, f in builder(
+                                    res.snapshots, res.meta,
+                                    include_peak=True,
+                                    show_mesh=show_mesh)]
+                        figs.append(('Gauges', plots.figure_gauges_nd(
+                            res.gauges, res.meta)))
+                    report_mod.save_html_report(
+                        res, dim, target, figures=figs,
+                        title=ent.label)
+                    self._log(f'Saved {target}')
+                    try:
+                        os.startfile(target)
+                    except OSError:
+                        pass
                 elif kind == 'summary':
                     gauge_summary.save_gauge_summary(
                         self.summary_rows(res), target)

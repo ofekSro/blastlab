@@ -1648,10 +1648,17 @@ def e03_gauges_table(qa):
             f'{[tbl.column(c, "width") for c in tbl["columns"]]} '
             f'(sum {sum(tbl.column(c, "width") for c in tbl["columns"])} px) '
             f'vs table width {tbl.winfo_width()} px')
+    # T45/N13+N14: the field-CSV directory export and the one-file
+    # HTML report ride the same dialog interception
     for kind, fname in (('summary', 'gauges_2d_summary.csv'),
-                        ('tsv', 'gauges_2d.txt')):
+                        ('tsv', 'gauges_2d.txt'),
+                        ('fieldcsv', 'p_peak.csv'),
+                        ('report', 'blast_2d_report.html')):
         qa.click(qa.app.results._export_btns[kind], kind)
-        ok = qa.wait_log('Saved', 30)
+        # wait for THIS export's own line - a bare 'Saved' matches a
+        # previous export's stale log line and races the writer
+        ok = qa.wait_log(fname if kind != 'fieldcsv'
+                         else 'field CSV', 30)
         p = os.path.join(qa.dirs['exports'], 'E03', fname)
         qa.check(ok and os.path.exists(p), f'{kind} export wrote {fname}',
                  'S2')
