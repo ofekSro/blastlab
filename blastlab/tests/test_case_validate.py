@@ -150,7 +150,64 @@ def shared_constant_checks():
           '8_000_000' not in src2 and '2_000_000' not in src2)
 
 
+
+
+def run_plan_checks():
+    """N17/T48: the cell caps follow the WSL VM's RAM once a probe has
+    run, and fall back to the fixed constants when it has not."""
+    from blastlab.solvers.foam import env
+    print("\nT48: memory-derived cell caps")
+
+    def case(dx):
+        return Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=dx,
+                      charge=4000.0, center=(2.0, 2.0, 2.0),
+                      gauges=[(3.0, 2.0, 2.0)], solver='blastfoam')
+
+    old = (env._cores, env._slots, env._ram_gb)
+    try:
+        # (a) no probe yet -> the fixed FOAM_CELLS_* caps, as before
+        env.forget_hardware()
+        rep = validate_case(case(0.02))          # 8M cells
+        check('no hardware probe -> fixed caps still allow 8M cells',
+              not cells_err(rep), str(rep.errors))
+        check('no hardware probe -> the rank note still explains itself',
+              any(n.startswith('Parallel run: ') for n in rep.notes),
+              str(rep.notes))
+
+        # (b) a 4 GB VM cannot hold 8M cells at ~2.6 KB each
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=4)
+        rep = validate_case(case(0.02))
+        errs = cells_err(rep)
+        check('4 GB VM -> 8M cells refused', bool(errs), str(rep.errors))
+        check('the refusal names the VM, the per-cell cost and the fix',
+              any('GB WSL VM' in e and 'KB/cell' in e
+                  and '.wslconfig' in e for e in errs), str(errs))
+        check('the memory cap is ~1.1M cells, not the fixed 120M',
+              any('1,134,519' in e for e in errs), str(errs))
+
+        # (c) the same VM is fine with a grid that fits
+        rep = validate_case(case(0.05))          # 512k cells
+        check('4 GB VM -> 512k cells allowed', not cells_err(rep),
+              str(rep.errors))
+        check('rank count is RAM-limited on a 4 GB VM',
+              any('2 MPI ranks' in n and 'GB at' in n
+                  for n in rep.notes), str(rep.notes))
+
+        # (d) a big VM lifts both the cap and the rank count
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=64)
+        rep = validate_case(case(0.02))
+        check('64 GB VM -> 8M cells allowed again', not cells_err(rep),
+              str(rep.errors))
+        check('rank count is core-limited on a big VM',
+              any('physical cores' in n for n in rep.notes),
+              str(rep.notes))
+    finally:
+        env._cores, env._slots, env._ram_gb = old
+
 def main():
+    run_plan_checks()
     # ~64M cells: 40 m cube at 0.1 m with a large charge. The charge is
     # big enough (r_exp = 0.85 m) that the 0.1 m cell already gives the
     # 8 cells across the radius blastFoam wants (T39), so these cases

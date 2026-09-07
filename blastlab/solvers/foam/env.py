@@ -27,6 +27,12 @@ import os
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
+
+from ...core.constants import (BYTES_PER_CELL, CELLS_PER_RANK,
+                               FOAM_CELLS_REFUSE, FOAM_CELLS_WARN,
+                               RAM_GB_PER_RANK, RAM_REFUSE_FRACTION,
+                               RAM_WARN_FRACTION)
 
 WSL_DISTRO  = 'Ubuntu'
 FOAM_BASHRC = '/root/OpenFOAM/OpenFOAM-9/etc/bashrc'
@@ -54,6 +60,7 @@ _detail = ''
 _last_fail = 0.0            # wall time of the last failed probe
 _cores = None               # cached WSL `nproc` result (logical CPUs)
 _slots = None               # cached physical-core count (MPI slots)
+_ram_gb = None              # cached WSL VM MemTotal in GiB (N17/T48)
 
 
 def unc(posix_path):
@@ -172,18 +179,172 @@ def detect_slots(timeout=30):
     return _slots
 
 
-def resolve_nprocs(n_req, n_cells):
-    """Effective MPI rank count for a run. Explicit n_req >= 1 is
-    honored as-is (the runner adds mpirun opt-in flags when it exceeds
-    the slot count); auto (0) uses physical cores - 2 capped, and stays
-    serial for small grids where decompose overhead dominates. Physical
-    cores, not logical: CFD is memory-bandwidth-bound (SMT adds ~nothing)
-    and Open MPI refuses ranks beyond the physical count by default."""
-    if n_req >= 1:
-        return int(n_req)
+def detect_ram_gb(timeout=30):
+    """Total RAM of the WSL VM in GiB (cached; None when unavailable).
+
+    The VM - not the Windows host - is what the solver runs in, and WSL
+    hands it about half the host's RAM unless the user's .wslconfig says
+    otherwise. None means "unknown": callers fall back to the fixed cell
+    caps rather than guessing (N17/T48)."""
+    global _ram_gb
+    if _ram_gb is not None:
+        return _ram_gb or None
+    try:
+        res = subprocess.run(wsl_argv('free -g'), capture_output=True,
+                             text=True, timeout=timeout,
+                             stdin=subprocess.DEVNULL,
+                             creationflags=CREATE_NO_WINDOW)
+        _ram_gb = parse_free_gb(res.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        _ram_gb = 0
+    return _ram_gb or None
+
+
+def parse_free_gb(text):
+    """`free -g` stdout -> total GiB (0 when the line is not there).
+
+    Split out so the parse can be tested without WSL: the header row
+    differs between distros, so the Mem: row is matched by name."""
+    for line in (text or '').splitlines():
+        parts = line.split()
+        if parts and parts[0].rstrip(':').lower() == 'mem':
+            try:
+                return int(parts[1])
+            except (IndexError, ValueError):
+                return 0
+    return 0
+
+
+def hardware(probe=False):
+    """dict(cores, logical, ram_gb) or None - CACHED VALUES ONLY.
+
+    validate_case calls this on every keystroke, so it must never touch
+    WSL: without `probe` it returns what earlier probes cached (or the
+    numbers a previous session persisted, see `prime_hardware`), and
+    None when nothing is known yet."""
+    if probe:
+        detect_cores()
+        detect_slots()
+        detect_ram_gb()
+    if _slots is None and _cores is None and not _ram_gb:
+        return None
+    return dict(cores=_slots or _cores, logical=_cores,
+                ram_gb=_ram_gb or None)
+
+
+def prime_hardware(cores=None, ram_gb=None):
+    """Seed the caches from persisted settings so the GUI can show real
+    numbers before the first WSL round trip finishes. A live probe
+    overwrites them."""
+    global _slots, _ram_gb
+    if _slots is None and cores:
+        _slots = int(cores)
+    if _ram_gb is None and ram_gb:
+        _ram_gb = int(ram_gb)
+
+
+def forget_hardware():
+    """Drop the cached probe (the GUI Re-detect button, and tests)."""
+    global _cores, _slots, _ram_gb
+    _cores = _slots = _ram_gb = None
+
+
+@dataclass(frozen=True)
+class RunPlan:
+    """What the hardware allows for one run: how many MPI ranks to ask
+    for, and how many cells the machine can actually hold."""
+    ranks: int
+    cell_cap_warn: int
+    cell_cap_refuse: int
+    reason: str
+    ram_gb: int = None
+    cores: int = None
+
+    @property
+    def from_memory(self):
+        """True when the caps came from measured VM RAM rather than the
+        fixed FOAM_CELLS_* fallbacks."""
+        return self.ram_gb is not None
+
+
+def plan_run(n_req, n_cells, cores=None, ram_gb=None, dim=3, amr=0,
+             headroom=1):
+    """Pure planner: (requested ranks, cells, hardware) -> RunPlan.
+
+    No I/O and no globals, so the decision table can be pinned in tests
+    and the same rules serve the GUI, validate_case and the CLI. Rules,
+    in order:
+
+      * an explicit n_req >= 1 is honoured as the user asked;
+      * 1D and dynamic-AMR runs are serial (AMR until T42);
+      * a grid under AUTO_PARALLEL_MIN_CELLS stays serial - decompose
+        and reconstruct cost more than the ranks save;
+      * otherwise as many ranks as the cores (minus headroom), the
+        cells-per-rank floor and the RAM-per-rank budget all allow.
+
+    The cell caps come from measured VM RAM (BYTES_PER_CELL) when it is
+    known and from the fixed FOAM_CELLS_* constants when it is not -
+    those stay the no-WSL default and are never removed."""
+    cores = int(cores or 0)
+    ram = int(ram_gb) if ram_gb else None
+    if ram:
+        refuse = int(RAM_REFUSE_FRACTION * ram * 2 ** 30 / BYTES_PER_CELL)
+        warn = int(RAM_WARN_FRACTION * ram * 2 ** 30 / BYTES_PER_CELL)
+    else:
+        refuse, warn = FOAM_CELLS_REFUSE, FOAM_CELLS_WARN
+
+    def plan(ranks, reason):
+        return RunPlan(max(1, int(ranks)), warn, refuse, reason,
+                       ram_gb=ram, cores=cores or None)
+
+    if n_req and int(n_req) >= 1:
+        return plan(int(n_req), 'requested: %d MPI ranks' % int(n_req))
+    if dim == 1:
+        return plan(1, 'serial: 1D runs are a single wedge')
+    if amr:
+        return plan(1, 'serial: dynamic AMR (parallel AMR is T42)')
     if n_cells < AUTO_PARALLEL_MIN_CELLS:
-        return 1
-    return max(1, min(MAX_AUTO_PROCS, detect_slots() - 2))
+        return plan(1, '1 rank: %s cells is below the %s-cell parallel '
+                       'floor' % (format(int(n_cells), ','),
+                                  format(AUTO_PARALLEL_MIN_CELLS, ',')))
+    limits = [(MAX_AUTO_PROCS, 'the %d-rank cap' % MAX_AUTO_PROCS)]
+    if cores:
+        limits.append((cores - int(headroom),
+                       '%d physical cores - %d headroom'
+                       % (cores, int(headroom))))
+    limits.append((int(n_cells) // CELLS_PER_RANK,
+                   '%s cells at %s/rank'
+                   % (format(int(n_cells), ','),
+                      format(CELLS_PER_RANK, ','))))
+    if ram:
+        limits.append((ram // RAM_GB_PER_RANK,
+                       '%d GB at %d GB/rank' % (ram, RAM_GB_PER_RANK)))
+    ranks, why = min(limits, key=lambda kv: kv[0])
+    if ranks < 1:
+        return plan(1, '1 rank: %s leaves no room for more' % why)
+    return plan(ranks, 'auto: %d MPI ranks (%s)' % (ranks, why))
+
+
+def mpi_headroom(default=1):
+    """Cores kept free for the rest of the machine (settings.json
+    `mpi_headroom`). The old hard-coded -2 was never justified."""
+    try:
+        from ...gui import settings
+        return max(0, int(settings.load().get('mpi_headroom', default)))
+    except Exception:
+        return default
+
+
+def resolve_nprocs(n_req, n_cells, dim=3, amr=0, headroom=None):
+    """Effective MPI rank count - a thin wrapper over the pure
+    `plan_run` that supplies the probed hardware. Explicit n_req >= 1 is
+    honored as-is (the runner adds mpirun opt-in flags when it exceeds
+    the slot count)."""
+    if headroom is None:
+        headroom = mpi_headroom()
+    return plan_run(n_req, n_cells, cores=detect_slots(),
+                    ram_gb=detect_ram_gb(), dim=dim, amr=amr,
+                    headroom=headroom).ranks
 
 
 def check_available(force=False, timeout=90):

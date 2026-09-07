@@ -22,6 +22,14 @@ DEFAULTS = dict(
     # T34: the sidebar solver mode ('native' | 'blastfoam'); a fresh
     # install starts in blastFoam mode
     solver='blastfoam',
+    # N17/T48: last WSL hardware probe, so the sidebar and the cell
+    # caps show real numbers before the first probe of a session
+    # returns. mpi_headroom is the cores left free for the rest of
+    # the machine when the rank count is automatic.
+    hw_cores=0,
+    hw_ram_gb=0,
+    hw_stamp='',
+    mpi_headroom=1,
 )
 
 

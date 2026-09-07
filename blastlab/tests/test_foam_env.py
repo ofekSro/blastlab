@@ -12,6 +12,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.solvers.foam import env                          # noqa: E402
+from blastlab.core.constants import (BYTES_PER_CELL,           # noqa: E402
+                                     CELLS_PER_RANK,
+                                     FOAM_CELLS_REFUSE,
+                                     FOAM_CELLS_WARN)
+from blastlab.solvers.foam.env import MAX_AUTO_PROCS           # noqa: E402
 
 FAIL = []
 
@@ -28,7 +33,113 @@ def _reset():
         env._state, env._detail = 'unchecked', ''
 
 
+
+def run_plan_checks():
+    """N17/T48: the pure planner, the `free -g` parse and the persisted
+    hardware numbers."""
+    print("\nT48: hardware-aware run plan")
+    # (a) free -g parsing, with the header shapes distros actually print
+    check('free -g: plain Mem: row',
+          env.parse_free_gb('              total  used  free\n'
+                            'Mem:              15     3    11\n'
+                            'Swap:              4     0     4') == 15)
+    check('free -g: lower-case and no Swap row',
+          env.parse_free_gb('total used\nmem: 7 1') == 7)
+    check('free -g: nothing usable -> 0',
+          env.parse_free_gb('') == 0
+          and env.parse_free_gb('Mem: notanumber') == 0
+          and env.parse_free_gb('Total: 8') == 0)
+
+    # (b) pinned decision table: (n_req, cells, cores, ram, dim, amr) ->
+    #     ranks, and whether the caps came from RAM
+    P = env.plan_run
+    table = [
+        ('explicit request wins',      P(4, 10 ** 6, 8, 16, 3, 0), 4, True),
+        ('explicit beats every floor', P(6, 1000, 8, 16, 3, 0), 6, True),
+        ('1D is serial',               P(0, 10 ** 7, 8, 16, 1, 0), 1, True),
+        ('AMR is serial (T42)',        P(0, 10 ** 7, 8, 16, 3, 2), 1, True),
+        ('tiny grid is serial',        P(0, 120_000, 8, 16, 3, 0), 1, True),
+        ('cores-limited',              P(0, 10 ** 7, 8, 64, 3, 0), 7, True),
+        ('cells-limited',              P(0, 300_000, 32, 64, 3, 0), 6, True),
+        ('RAM-limited',                P(0, 10 ** 7, 32, 8, 3, 0), 4, True),
+        ('rank cap',                   P(0, 10 ** 8, 64, 256, 3, 0), 16, True),
+        ('unknown RAM -> fixed caps',  P(0, 10 ** 7, 8, None, 3, 0), 7, False),
+        ('single core still runs',     P(0, 10 ** 7, 1, 16, 3, 0), 1, True),
+    ]
+    for name, plan, want, from_mem in table:
+        check(f'plan: {name} -> {want} rank(s)',
+              plan.ranks == want and plan.from_memory is from_mem,
+              f'{plan.ranks} ranks, from_memory={plan.from_memory}, '
+              f'{plan.reason}')
+    check('plan: every row explains itself',
+          all(p.reason for _n, p, _w, _f in table))
+    check('plan: unknown RAM falls back to the fixed constants',
+          P(0, 10 ** 7, 8, None, 3, 0).cell_cap_refuse == FOAM_CELLS_REFUSE
+          and P(0, 10 ** 7, 8, None, 3, 0).cell_cap_warn == FOAM_CELLS_WARN)
+    p4 = P(0, 10 ** 6, 8, 4, 3, 0)
+    check('plan: 4 GB VM -> ~1.1M cell refuse cap, warn at half',
+          abs(p4.cell_cap_refuse - 0.70 * 4 * 2 ** 30 / BYTES_PER_CELL) < 1
+          and p4.cell_cap_warn * 2 == p4.cell_cap_refuse
+          or abs(p4.cell_cap_warn * 2 - p4.cell_cap_refuse) <= 1,
+          f'{p4.cell_cap_warn:,} / {p4.cell_cap_refuse:,}')
+
+    # (c) invariants over a sweep, not just the pinned rows
+    bad = []
+    for cores in (1, 2, 4, 8, 16, 64):
+        for ram in (None, 2, 4, 8, 16, 128):
+            for cells in (0, 1000, 199_999, 200_000, 10 ** 6, 10 ** 8):
+                for dim in (2, 3):
+                    pl = P(0, cells, cores, ram, dim, 0)
+                    if pl.ranks < 1:
+                        bad.append((cores, ram, cells, 'ranks < 1'))
+                    if cores and pl.ranks > max(1, cores - 1):
+                        bad.append((cores, ram, cells, 'above cores'))
+                    if pl.ranks > 1 and \
+                            pl.ranks * CELLS_PER_RANK > cells:
+                        bad.append((cores, ram, cells, 'below the floor'))
+                    if pl.ranks > MAX_AUTO_PROCS:
+                        bad.append((cores, ram, cells, 'above the cap'))
+    check('plan: sweep keeps every invariant '
+          '(1 <= ranks <= cores - headroom, cells/rank floor, rank cap)',
+          not bad, str(bad[:3]))
+
+    # (d) the caches: primed from settings, dropped on demand
+    old = (env._cores, env._slots, env._ram_gb)
+    try:
+        env.forget_hardware()
+        check('hardware(): None until something is known',
+              env.hardware() is None)
+        env.prime_hardware(cores=6, ram_gb=12)
+        hw = env.hardware()
+        check('hardware(): primed values are returned without a probe',
+              hw == dict(cores=6, logical=None, ram_gb=12), str(hw))
+        env.prime_hardware(cores=99, ram_gb=99)
+        check('hardware(): priming never overwrites a known value',
+              env.hardware()['cores'] == 6
+              and env.hardware()['ram_gb'] == 12)
+        env.forget_hardware()
+        check('forget_hardware(): back to unknown',
+              env.hardware() is None)
+    finally:
+        env._cores, env._slots, env._ram_gb = old
+
+    # (e) the hw_* keys survive a settings round trip
+    import tempfile
+    from blastlab.gui import settings as st
+    fd = os.path.join(tempfile.mkdtemp(), 'settings.json')
+    st.save(dict(st.load(fd), hw_cores=8, hw_ram_gb=15,
+                 hw_stamp='2026-09-07T12:00:00', mpi_headroom=2), fd)
+    back = st.load(fd)
+    check('settings: hw_cores / hw_ram_gb / hw_stamp / mpi_headroom '
+          'round trip',
+          (back['hw_cores'], back['hw_ram_gb'], back['mpi_headroom'])
+          == (8, 15, 2) and back['hw_stamp'].startswith('2026-09-07'),
+          str({k: back.get(k) for k in
+               ('hw_cores', 'hw_ram_gb', 'hw_stamp', 'mpi_headroom')}))
+
+
 def main():
+    run_plan_checks()
     check('unc translation',
           env.unc('/root/a/b') == r'\\wsl.localhost\Ubuntu\root\a\b',
           env.unc('/root/a/b'))
@@ -226,18 +337,22 @@ def main():
           and 'kill -TERM 22 ' in sig and 'pkill -TERM -s 22 ' in sig,
           sig)
 
-    # slots-aware auto parallel (mocked counts: 12 physical / 20 logical)
+    # slots-aware auto parallel (mocked counts: 12 physical / 20 logical,
+    # RAM unknown so the rank count is not RAM-limited)
     old_slots, old_cores = env._slots, env._cores
+    old_ram = env._ram_gb
     try:
-        env._slots, env._cores = 12, 20
-        check('auto ranks = physical cores - 2',
-              env.resolve_nprocs(0, 10 ** 6) == 10)
+        env._slots, env._cores, env._ram_gb = 12, 20, 0
+        check('auto ranks = physical cores - headroom (T48: 1, was 2)',
+              env.resolve_nprocs(0, 10 ** 6, headroom=1) == 11,
+              str(env.resolve_nprocs(0, 10 ** 6, headroom=1)))
         check('auto stays serial on small grids',
               env.resolve_nprocs(0, 10 ** 5) == 1)
         check('explicit ranks honored as-is',
               env.resolve_nprocs(16, 10 ** 6) == 16)
     finally:
         env._slots, env._cores = old_slots, old_cores
+        env._ram_gb = old_ram
 
     _reset()
     if shutil.which('wsl.exe'):

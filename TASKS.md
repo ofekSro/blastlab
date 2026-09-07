@@ -106,7 +106,7 @@ Hard rules:
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [x] 2026-09-07 |
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [x] 2026-09-07 |
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [x] 2026-09-07 |
-| T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [ ] |
+| T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [x] 2026-09-07 |
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [ ] |
 | T43 | Resume a stopped foam run | N6 | M | [ ] |
 | T44 | Gauge fields beyond p (foam) | N12 | S–M | [ ] |
@@ -1238,6 +1238,72 @@ Done when: green; the planner's constants carry measured numbers; N17 added to �
 Commit: "T48: hardware-aware run plan - WSL cores + RAM -> MPI ranks and cell caps (N17)"
 ```
 
+**DONE (2026-09-07):** `env.plan_run(n_req, n_cells, cores, ram_gb, dim, amr, headroom)`
+is a pure function returning `RunPlan(ranks, cell_cap_warn, cell_cap_refuse, reason,
+ram_gb, cores)`; `resolve_nprocs` is now a thin wrapper that supplies the probed hardware.
+`detect_ram_gb()` reads the WSL VM's `free -g` (parse split out as `parse_free_gb` so it is
+testable without WSL), `hardware()` returns **cached values only** - it is called on every
+keystroke by `validate_case` and must never touch WSL - and `prime_hardware()` seeds the
+cache from `settings.json` (`hw_cores`, `hw_ram_gb`, `hw_stamp`, plus `mpi_headroom`,
+default 1) so the sidebar shows real numbers before the first probe of a session returns.
+
+**BYTES_PER_CELL measured, not guessed** (the brief's requirement): blastFoam serial, 3D
+uniform hex mesh, `/usr/bin/time -v` peak RSS - **59,319 cells -> 305.1 MB** and
+**262,144 cells -> 843.3 MB**, i.e. **2653 B/cell at the margin** on top of a **~148 MB
+fixed cost** (the two points give 5143 and 3217 B/cell including that fixed cost, which is
+why the marginal slope is the number the caps use; the fixed cost sits inside the 30 %
+headroom). `BYTES_PER_CELL = 2650`, `CELLS_PER_RANK = 50_000`, `RAM_GB_PER_RANK = 2`,
+`RAM_REFUSE_FRACTION = 0.70`, `RAM_WARN_FRACTION = 0.35`, all in `core/constants.py` with
+the measurement in the comment.
+
+Headroom is now **1, not 2** - the old `detect_slots() - 2` was never justified, and it is
+configurable via `settings.json`.
+
+**This PC, probed live:** 4 physical cores / 8 logical, **4 GB WSL VM** -> cell caps
+**567,259 warn / 1,134,519 refuse** and, for a 500k-cell 2D case,
+`Parallel run: auto: 2 MPI ranks (4 GB at 2 GB/rank)` (RAM-limited, not core-limited). A
+45k-cell case reports `1 rank: 45,753 cells is below the 200,000-cell parallel floor`. With
+`ram_gb` unknown the fixed `FOAM_CELLS_*` constants are used unchanged, so every existing
+no-WSL test keeps its old expectations.
+
+**Consequence worth knowing: the app's DEFAULT 2D case no longer validates on this
+machine.** It is 2,301,289 cells, which at 2.65 KB/cell is ~6.1 GB - more than the whole
+4 GB VM. The strip now says so, with the cause and the fix:
+
+```
+~2,301,289 cells exceeds the blastFoam cap of 1,134,519 (~2.8 GB of the 4 GB WSL VM at
+~2.6 KB/cell) - shrink the case, raise `memory=` in %USERPROFILE%\.wslconfig, or use AMR
+```
+
+That case was always going to thrash or die inside WSL; before T48 it was silently accepted.
+It is not a regression in the planner, but it IS a change in the out-of-the-box experience on
+a small machine, so it is flagged here for the owner rather than buried: either raise
+`memory=` in `.wslconfig` (this host has 7.7 GB total, so the VM could take ~6 GB), or lower
+the shipped default cell size. Left as the owner's call - changing a shipped default is not
+in this brief.
+
+GUI: the sidebar line reads `WSL: blastFoam ready · 4 cores · 4 GB` (built by `_hw_suffix`,
+which prints nothing when nothing is known - the line never invents numbers), with a small
+**Re-detect** button under it that drops the cache, re-probes off-thread, persists the result
+and re-validates. The Run-tab log keeps its "decomposing for N MPI ranks" line, and the foam
+CLI already routes through `validate_case`, so it picks up the same caps and the same
+`Parallel run:` note without its own copy of the rules.
+
+Tests: `test_foam_env` gains the `free -g` parse (three shapes incl. a lower-case `mem:` and
+junk), an **11-row pinned decision table** (requested / requested-beats-floors / 1D / AMR /
+tiny grid / cores-limited / cells-limited / RAM-limited / rank cap / unknown-RAM / single
+core), a **432-case sweep** asserting `1 <= ranks <= cores - headroom`, the cells-per-rank
+floor and the rank cap, the cache behaviour (`hardware()` None until known, priming never
+overwrites, `forget_hardware`), and the `hw_*` settings round trip. `test_case_validate`
+gains the memory-derived cap with an injected hardware dict, the fixed-cap fallback, and both
+rank-limit reasons.
+
+Verified: test_regression byte-identical, test_foam_writer goldens **unchanged** (ranks are
+not baked into them - confirmed), test_foam_env, test_case_validate, test_gui_solver_mode,
+test_refine, test_gui_drain all PASS; WSL: `test_foam_3d_smoke --tiny` PASS and a live
+`n_procs=0` 2D pair showing the planned ranks and the reason; harness `B01,C08,F01` PASS
+(B01's strip is the quote above). No orphaned solvers.
+
 ### T42 — Parallel AMR (N16-b): direct `processor*/` reads
 
 **Why:** AMR runs are serial (`backend.py:~219` comment): `reconstructPar -newTimes` fails
@@ -1493,7 +1559,15 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
     refines only around the charge - measured with `_e2e_foam_probe_study.py`
     (+4.2 % at a cell corner, -11.5 % at a base-cell centre, peaks 57-171 % apart)
   - **N16-b** parallel AMR (`loadBalance { balance no; }` 41 s vs 52 s serial; `reconstructPar -newTimes` fails on a changed mesh; `reconstructParAll -time t` works; direct `processor*/` reads preferred) — → **T42**
-- **N17** hardware-aware run plan: WSL physical cores + VM RAM → auto MPI ranks (cells-per-rank floor, RAM-per-rank cap, configurable headroom) and memory-derived cell caps instead of the fixed `FOAM_CELLS_*`, visible in the sidebar and the validation strip; modelled on BlastStudio's pure `plan_run` + pinned decision table — OPEN → **T48**
+- N17 hardware-aware run plan — DONE (2026-09-07, T48; pure `env.plan_run` + `RunPlan`,
+  `detect_ram_gb`/`hardware()`/`prime_hardware`, an 11-row pinned decision table and a
+  432-case invariant sweep. **Measured** `BYTES_PER_CELL = 2650` (blastFoam serial 3D peak
+  RSS: 59,319 cells -> 305.1 MB, 262,144 -> 843.3 MB, ~148 MB fixed); headroom 1 (was an
+  unjustified 2), `CELLS_PER_RANK = 50_000`, `RAM_GB_PER_RANK = 2`, caps at 0.70/0.35 of VM
+  RAM with the fixed `FOAM_CELLS_*` as the no-WSL fallback. On this PC (4 cores, 4 GB VM)
+  that is 1,134,519 cells and 2 RAM-limited ranks — **and it refuses the shipped default 2D
+  case (2.3M cells ≈ 6.1 GB), which used to be accepted and would have died inside WSL**;
+  raising `memory=` in `.wslconfig` or lowering the shipped default is an owner call)
 
 **Watch items (W)**
 - W1 `test_foam_2d` axisym near-field arrival lag — CHARACTERISED (2026-09-07, T40): foam

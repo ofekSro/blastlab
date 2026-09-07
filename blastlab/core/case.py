@@ -15,7 +15,8 @@ import numpy as np
 from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
-                        FOAM_CELLS_WARN, FOAM_CELLS_REFUSE)
+                        FOAM_CELLS_WARN, FOAM_CELLS_REFUSE,
+                        BYTES_PER_CELL)
 
 SCHEMA = 'blastlab-case'
 VERSION = 5     # v2: n_procs, activation, charges, det_points (foam)
@@ -259,6 +260,7 @@ class ValidationReport:
     display_level: int = None        # AMR: level of the display grid
     charge_cells: int = None         # foam: cells setFields will mark
     charge_mass_frac: float = None   # foam: set mass / requested (N5)
+    run_plan: object = None          # foam: env.RunPlan (N17/T48)
 
     @property
     def ok(self):
@@ -358,11 +360,8 @@ def _validate_solver(case, rep):
             note(f"Afterburn (Miller): up to {ab.Q0/1e6:g} MJ/kg released "
                  f"as the products burn with atmospheric oxygen - "
                  f"calibrated against Kingery-Bulmash, see ROADMAP N3")
-    if n_procs > 1:
-        if case.dim == 1:
-            note("1D cases always run serial (MPI ranks ignored)")
-        else:
-            note(f"Parallel run: {n_procs} MPI ranks")
+    if n_procs > 1 and case.dim == 1:
+        note("1D cases always run serial (MPI ranks ignored)")
     from ..solvers.foam import env as foam_env
     st, detail = foam_env.status()
     if st == 'fail':
@@ -708,16 +707,35 @@ def validate_case(case, pending_inputs=False):
                  f"blastFoam (whole cells are marked; "
                  f"{n_exp} cells across the radius)")
 
+    # N17/T48: the caps come from the WSL VM's measured RAM when a probe
+    # has run (BYTES_PER_CELL), and from the fixed FOAM_CELLS_* constants
+    # when it has not - `hardware()` never touches WSL, so validation
+    # stays instant.
+    from ..solvers.foam import env as _env
+    _hw = _env.hardware() or {}
+    _caps = _env.plan_run(0, 0, cores=_hw.get('cores'),
+                          ram_gb=_hw.get('ram_gb'), dim=case.dim)
+    cap_warn, cap_refuse = _caps.cell_cap_warn, _caps.cell_cap_refuse
+
+    def ram_hint():
+        """Why the cap is what it is, in the units the user can act on."""
+        if not _caps.from_memory:
+            return ""
+        return (f" (~{cap_refuse * BYTES_PER_CELL / 2 ** 30:.1f} GB of the "
+                f"{_hw['ram_gb']} GB WSL VM at ~{BYTES_PER_CELL / 1000:.1f} "
+                f"KB/cell) - shrink the case, raise `memory=` in "
+                f"%USERPROFILE%\\.wslconfig, or use AMR")
+
     rep.effective_dx = dx
     if plan is not None and plan.amr:
         # AMR: the mesh grows during the run up to maxCells, so that is
         # the number the blastFoam caps apply to (t = 0 is the base grid)
         n_max = (int(getattr(case, 'amr_max_cells', 0) or 0)
-                 or FOAM_CELLS_WARN)
-        if n_max > FOAM_CELLS_REFUSE:
+                 or cap_warn)
+        if n_max > cap_refuse:
             err(f"AMR max cells {n_max:,} exceeds the blastFoam cap of "
-                f"{FOAM_CELLS_REFUSE:,}")
-        elif n_max > FOAM_CELLS_WARN:
+                f"{cap_refuse:,}" + ram_hint())
+        elif n_max > cap_warn:
             warn(f"AMR may grow the mesh to {n_max:,} cells - expect a "
                  f"long run and GBs of case files on the WSL disk")
         # every written time keeps its own mesh (cell centres + levels), so
@@ -738,10 +756,10 @@ def validate_case(case, pending_inputs=False):
         elif foam:
             # blastFoam solves in WSL; Python only ingests written
             # frames, so the cap reflects wall time/disk, not RAM
-            if n > FOAM_CELLS_REFUSE:
+            if n > cap_refuse:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
-                    f"{FOAM_CELLS_REFUSE:,}" + scale_hint())
-            elif n > FOAM_CELLS_WARN:
+                    f"{cap_refuse:,}" + ram_hint() + scale_hint())
+            elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect a long run "
                      f"and GBs of case files on the WSL disk")
         elif n > CELLS_2D_MAX:
@@ -756,10 +774,10 @@ def validate_case(case, pending_inputs=False):
         if plan is not None and plan.amr:
             pass
         elif foam:
-            if n > FOAM_CELLS_REFUSE:
+            if n > cap_refuse:
                 err(f"~{n:,} cells exceeds the blastFoam cap of "
-                    f"{FOAM_CELLS_REFUSE:,}" + scale_hint())
-            elif n > FOAM_CELLS_WARN:
+                    f"{cap_refuse:,}" + ram_hint() + scale_hint())
+            elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect hours of wall "
                      f"time and GBs of case files on the WSL disk")
         elif n > CELLS_REFUSE:
@@ -768,6 +786,15 @@ def validate_case(case, pending_inputs=False):
         elif n > CELLS_WARN:
             warn(f"Large grid: ~{n:,} cells - expect a long run and GBs of RAM")
     rep.n_cells = n
+    if foam:
+        # N17/T48: resolve the rank count with the real cell count and
+        # say what was decided, for auto (0) as well as an explicit ask
+        rep.run_plan = _env.plan_run(
+            int(getattr(case, 'n_procs', 0) or 0), n,
+            cores=_hw.get('cores'), ram_gb=_hw.get('ram_gb'),
+            dim=case.dim, amr=amr, headroom=_env.mpi_headroom())
+        if case.dim > 1:
+            note("Parallel run: " + rep.run_plan.reason)
     if plan is not None and plan.refined:
         # Python holds the resampled fine grid per ingested write, so the
         # display grid is capped like a native run's grid

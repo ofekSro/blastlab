@@ -5,6 +5,7 @@ import json
 import os
 import queue
 import sys
+import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
@@ -124,6 +125,10 @@ class App:
         # everything is built laid out for it (no flash, no double layout)
         st = gui_settings.load()
         self.solver_mode = SolverMode(st.get('solver', mode_mod.DEFAULT))
+        # N17/T48: show last session's WSL hardware immediately; the
+        # live probe (started with blastFoam mode) overwrites it
+        foam_env.prime_hardware(cores=st.get('hw_cores'),
+                                ram_gb=st.get('hw_ram_gb'))
 
         root.grid_columnconfigure(1, weight=1)
         root.grid_rowconfigure(0, weight=1)
@@ -200,11 +205,65 @@ class App:
             # warm the cached WSL availability check off-thread and show
             # its outcome under the selector
             foam_env.ensure_check_started()
+            self._probe_hw_async()
             self._poll_wsl()
         else:
             self._wsl_hint.configure(text='')
             theme.tooltip(self._wsl_hint, '')
+        try:
+            self._wsl_redetect.pack_configure()
+            if m != 'blastfoam':
+                self._wsl_redetect.pack_forget()
+        except Exception:
+            pass
         self._schedule_validate()
+
+    def _hw_suffix(self):
+        """" · 8 cores · 16 GB" from the cached probe (N17/T48). Empty
+        while nothing is known - the line must never invent numbers."""
+        hw = foam_env.hardware() or {}
+        bits = []
+        if hw.get('cores'):
+            bits.append(f"{hw['cores']} cores")
+        if hw.get('ram_gb'):
+            bits.append(f"{hw['ram_gb']} GB")
+        return (' \u00b7 ' + ' \u00b7 '.join(bits)) if bits else ''
+
+    def _probe_hw_async(self):
+        """Probe the WSL VM's cores + RAM off-thread and persist them, so
+        the next session can show the numbers before WSL is warm."""
+        def work():
+            try:
+                hw = foam_env.hardware(probe=True) or {}
+            except Exception:
+                return
+            try:
+                import datetime
+                gui_settings.save(dict(
+                    gui_settings.load(),
+                    hw_cores=int(hw.get('cores') or 0),
+                    hw_ram_gb=int(hw.get('ram_gb') or 0),
+                    hw_stamp=datetime.datetime.now().isoformat(
+                        timespec='seconds')))
+            except Exception:
+                pass
+            try:
+                self.root.after(0, self._poll_wsl)
+                self.root.after(0, self._schedule_validate)
+            except Exception:
+                pass
+        threading.Thread(target=work, daemon=True).start()
+
+    def _redetect_hw(self):
+        """Re-detect button: drop the cached probe, ask again, revalidate
+        (the cell caps and the rank count both follow the hardware)."""
+        foam_env.forget_hardware()
+        try:
+            self._wsl_hint.configure(text='WSL: detecting hardware\u2026',
+                                     text_color=c('muted'))
+        except Exception:
+            pass
+        self._probe_hw_async()
 
     def _poll_wsl(self):
         self._wsl_job = None
@@ -217,7 +276,7 @@ class App:
         if state == 'checking':
             text, colour = 'WSL: checking blastFoam…', c('muted')
         elif state == 'ok':
-            text, colour = 'WSL: blastFoam ready', c('ok')
+            text, colour = 'WSL: blastFoam ready' + self._hw_suffix(), c('ok')
         elif state == 'fail':
             text, colour = 'WSL: unavailable - ' + detail[:60], c('warn')
         else:
@@ -376,6 +435,15 @@ class App:
             blk, text='', font=theme.F_SMALL, text_color=c('muted'),
             anchor='w', justify='left', wraplength=160)
         self._wsl_hint.pack(fill='x', padx=12, pady=(0, 2))
+        # N17/T48: the hardware behind the rank/cap decisions, and a way
+        # to re-probe it without restarting (a .wslconfig edit or a
+        # `wsl --shutdown` changes both numbers under a running GUI)
+        self._wsl_redetect = ctk.CTkButton(
+            blk, text='Re-detect', width=70, height=18,
+            font=theme.F_SMALL, fg_color='transparent',
+            text_color=c('accent'), hover_color=c('card'),
+            command=self._redetect_hw)
+        self._wsl_redetect.pack(anchor='w', padx=12, pady=(0, 2))
 
         self._mode_switch = ctk.CTkSwitch(
             bottom, text='Dark mode', font=theme.F_BODY,
