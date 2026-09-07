@@ -128,11 +128,33 @@ def _pid_file_cmd():
     return f'echo $$ > .run.pid && echo {os.getpid()} >> .run.pid'
 
 
-def rewrite_control_entry(case_posix, case_unc, key, value, log=None):
+def rewrite_entry_text(text, key, value, within=None):
+    """`key   value;` rewrite of a controlDict text: the first top-level
+    `key ...;` line, or - `within` a function-object block as the writer
+    lays it out (`    name` / `    {` / 8-space entries / `    }`) -
+    that block's own `key` line. Unchanged text when the key is absent.
+    Mirrors the WSL-side sed of rewrite_control_entry."""
+    if isinstance(value, float):
+        value = format(value, '.10g')
+    if within is None:
+        return re.sub(rf'^{re.escape(key)}(\s+)[^;]+;',
+                      rf'{key}\g<1>{value};', text, count=1, flags=re.M)
+    m = re.search(rf'^    {re.escape(within)}\n    \{{\n(.*?)^    \}}',
+                  text, flags=re.M | re.S)
+    if m is None:
+        return text
+    body = re.sub(rf'^(        {re.escape(key)}\s+)[^;]+;',
+                  rf'\g<1>{value};', m.group(1), count=1, flags=re.M)
+    return text[:m.start(1)] + body + text[m.end(1):]
+
+
+def rewrite_control_entry(case_posix, case_unc, key, value, log=None,
+                          within=None):
     """Rewrite one top-level `key   value;` line of the case's
-    runTimeModifiable controlDict while the solver runs. The edit runs
-    INSIDE WSL (sed -i); a UNC rewrite is the fallback. Returns True
-    when either path succeeded.
+    runTimeModifiable controlDict while the solver runs - or, with
+    `within`, the `key` line inside that function-object block (the
+    live-sample cadence). The edit runs INSIDE WSL (sed -i); a UNC
+    rewrite is the fallback. Returns True when either path succeeded.
 
     OpenFOAM only notices a re-read when the file's mtime exceeds the
     one it last saw by more than `fileModificationSkew` (10 s default),
@@ -151,11 +173,14 @@ def rewrite_control_entry(case_posix, case_unc, key, value, log=None):
     cd = f'{case_posix}/system/controlDict'
     bump = (f'o=$(stat -c %Y {cd}); n=$(date +%s); '
             f'b=$(( o > n ? o : n )); touch -m -d @$(( b + {SKEW_S} )) {cd}')
+    if within is None:
+        expr = f"'s/^{key} .*$/{key}          {value};/'"
+    else:
+        expr = (f"'/^    {within}$/,/^    }}$/ "
+                f"s/^\\(        {key} *\\).*$/\\1{value};/'")
     try:
         res = subprocess.run(
-            env.wsl_argv(
-                f"sed -i 's/^{key} .*$/{key}          {value};/' {cd} "
-                f'&& {bump}'),
+            env.wsl_argv(f'sed -i {expr} {cd} && {bump}'),
             capture_output=True, timeout=_WSL_EDIT_S,
             stdin=subprocess.DEVNULL,
             creationflags=env.CREATE_NO_WINDOW)
@@ -168,8 +193,7 @@ def rewrite_control_entry(case_posix, case_unc, key, value, log=None):
     try:
         with open(path, encoding='ascii') as f:
             text = f.read()
-        text = re.sub(rf'^{re.escape(key)}(\s+)[^;]+;',
-                      rf'{key}\g<1>{value};', text, count=1, flags=re.M)
+        text = rewrite_entry_text(text, key, value, within)
         tmp = path + '.tmp'
         with open(tmp, 'w', encoding='ascii', newline='\n') as f:
             f.write(text)

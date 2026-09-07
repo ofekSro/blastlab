@@ -236,9 +236,9 @@ def amr_checks(specs):
           not any('refine' in k for k in s2.files) and s2.zones == []
           and s2.lmax == 3 and '(20 20 1)' in norm(s2.files['system/blockMeshDict']))
     cd = s2.files['system/controlDict']
-    check('amr 2D: cellCentres FO at writeTime, no live slice, FOs kept',
+    check('amr 2D: cellCentres FO at writeTime, live slice kept, FOs kept',
           'writeCellCentres' in cd and 'libfieldFunctionObjects' in cd
-          and 'liveSlice' not in cd and 'surfaces' not in cd
+          and 'liveSlice' in cd and 'surfaces' in cd
           and 'impulse' in cd and 'pMax' in cd and 'gauges' in cd)
     check('amr 2D: setFieldsDict maxRefinement after nBufferLayers',
           'nBufferLayers 1; maxRefinement 3;' in norm(s2.files['system/setFieldsDict']),

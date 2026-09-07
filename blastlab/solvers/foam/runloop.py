@@ -172,21 +172,28 @@ def tail_live(spec, hooks, st, live, set_name, decode):
     postProcessing/<set_name> dirs, emit at most one hooks.frame per
     call (the newest complete sample), delete consumed dirs so disk
     use stays bounded. `decode(tdir)` -> frame payload or None while
-    the sample is still mid-write. The GUI refresh policy is honored:
+    the sample is still mid-write; a `(field, levels)` tuple carries a
+    dynamic-AMR frame's level map. The GUI refresh policy is honored:
     seconds mode throttles wall time, steps mode gates on solver steps
     since the last emitted live frame."""
     entries = reader.list_sample_times(spec.case_unc, set_name)
     fresh = [(t, n) for t, n in entries if n not in live['seen']]
     if not fresh:
         return
-    if not due_sparse(hooks.refresh, st['step'], live):
+    mode, val = hooks.refresh
+    if mode == 'steps' and live.get('fo_steps') == max(1, int(val)):
+        pass    # the sample cadence IS the policy: every sample shows
+    elif not due_sparse(hooks.refresh, st['step'], live):
         return
     for t, name in reversed(fresh):
         payload = decode(name)
         if payload is None:
             continue
         if t >= st['t_frame']:
-            hooks.frame(payload, t)
+            if isinstance(payload, tuple):
+                hooks.frame(payload[0], t, levels=payload[1])
+            else:
+                hooks.frame(payload, t)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -451,6 +458,11 @@ class FoamRunLoop:
         self.st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR),
                        frac=None, t_frame=-1.0)
         self.live = new_live()
+        # live-sample cadence [solver steps] the case was written with;
+        # _sync_live_steps follows the GUI's "Refresh every N steps"
+        self.live_steps = int(getattr(spec, 'live_steps', 0)
+                              or writer.live_sample_steps(spec.dim))
+        self.live['fo_steps'] = self.live_steps
         self.adapt = dict(interval=spec.write_interval, since=0)
         self.stop_reason = 'safety cap'
         self.stop_deadline = None
@@ -479,9 +491,31 @@ class FoamRunLoop:
     def gated_step(self):
         gated_step(self.foam, self.hooks)
 
+    def _sync_live_steps(self):
+        """'Refresh every N steps' -> the live-sample function object
+        writes every N solver steps (the controlDict is
+        runTimeModifiable), so the live view follows the setting
+        instead of the fixed per-dim cadence; blank / seconds restore
+        the default. One rewrite per change, never retried per poll."""
+        if self.live_set is None:
+            return
+        want = writer.live_steps_for(self.hooks.refresh, self.spec.dim)
+        if want == self.live_steps:
+            return
+        self.live_steps = want
+        if runner.rewrite_control_entry(
+                self.spec.case_posix, self.spec.case_unc, 'writeInterval',
+                want, self.hooks.log, within=self.live_set):
+            self.live['fo_steps'] = want
+            self.hooks.log(f'  [blastfoam] live sample every {want} '
+                           f'solver step(s)')
+        else:
+            self.live['fo_steps'] = None    # tail falls back to due_sparse
+
     def _ingest_live(self):
         if self.live_set is None:
             return
+        self._sync_live_steps()
         tail_live(self.spec, self.hooks, self.st, self.live, self.live_set,
                   self.decode)
 

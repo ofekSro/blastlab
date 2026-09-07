@@ -310,6 +310,49 @@ def main():
           backend._decode_surface(rspec2, '0.002', (2, 2), 0, 1,
                                   remap_sl=rmap) is None)
 
+    # dynamic-AMR live-slice decode (backend._decode_surface_amr): the
+    # rows carry no cell size - each centre pins its level and the
+    # sample tiles the display plane like a written mesh. 2 x 2 m, base
+    # 1 m, display level 1 (4 x 4 at 0.5 m): a level-0 cell, ten
+    # level-1 cells and one display cell holding four level-2 cells
+    # (finer than the display -> box-averaged, level capped at 1)
+    adir = os.path.join(tmp, 'postProcessing', 'liveSlice', '0.003')
+    os.makedirs(adir, exist_ok=True)
+    arows = ['0.5 0.5 0 100',
+             '1.25 0.25 0 200', '1.75 0.25 0 300', '1.25 0.75 0 400',
+             '1.75 0.75 0 500',
+             '0.25 1.25 0 600', '0.75 1.25 0 700', '0.25 1.75 0 800',
+             '0.75 1.75 0 900',
+             '1.75 1.25 0 1100', '1.25 1.75 0 1200', '1.75 1.75 0 1300',
+             '1.125 1.125 0 10', '1.375 1.125 0 20', '1.125 1.375 0 30',
+             '1.375 1.375 0 40']
+    arows = [arows[k] for k in (9, 3, 14, 0, 12, 7, 1, 15, 5, 11, 2, 13,
+                                8, 6, 10, 4)]
+    with open(os.path.join(adir, 'p_slice.raw'), 'w') as f:
+        f.write('# x y z p\n' + '\n'.join(arows) + '\n')
+    aspec = SimpleNamespace(case_unc=tmp, dx_base=1.0, amr=2,
+                            display_level=1)
+    fuv = (np.arange(5) * 0.5, np.arange(5) * 0.5)
+    got = backend._decode_surface_amr(aspec, '0.003', 0, 1, fuv)
+    want = np.array([[100, 100, 600, 800], [100, 100, 700, 900],
+                     [200, 400, 25, 1200], [300, 500, 1100, 1300]], float)
+    want_lv = np.ones((4, 4), dtype=int)
+    want_lv[0:2, 0:2] = 0
+    check('AMR slice decode: levels off the centres, exact tiling, '
+          'sub-display cells averaged',
+          got is not None and np.allclose(got[0], want)
+          and (got[1] == want_lv).all(),
+          'None' if got is None else str(got[0].tolist()))
+    with open(os.path.join(adir, 'p_slice.raw'), 'w') as f:
+        f.write('# x y z p\n' + '\n'.join(arows[:-3]) + '\n')
+    check('AMR slice decode: incomplete sample -> None (retry)',
+          backend._decode_surface_amr(aspec, '0.003', 0, 1, fuv) is None)
+    with open(os.path.join(adir, 'p_slice.raw'), 'w') as f:
+        f.write('# x y z p\n' + '\n'.join(arows) + '\n1.7')
+    check('AMR slice decode: partial trailing row is dropped, not fatal',
+          backend._decode_surface_amr(aspec, '0.003', 0, 1, fuv)
+          is not None)
+
     print()
     if FAIL:
         print(f"FOAM READER: FAIL ({len(FAIL)}): {', '.join(FAIL)}")

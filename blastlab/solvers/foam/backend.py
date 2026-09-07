@@ -220,7 +220,11 @@ def _preflight(case, hooks):
     # cannot follow a changing mesh; the parallel path is a follow-up)
     n_procs = 1 if (case.dim == 1 or plan.amr) else env.resolve_nprocs(
         getattr(case, 'n_procs', 0), plan.n_cells)
-    spec = writer.write_case(case, n_procs=n_procs)
+    # the live-sample cadence follows the GUI's "Refresh every N steps"
+    # from the first step (the run loop re-syncs it on later changes)
+    spec = writer.write_case(
+        case, n_procs=n_procs,
+        live_steps=writer.live_steps_for(hooks.refresh, case.dim))
     hooks.log(f"  [blastfoam] case directory: {spec.case_unc}")
     # one wsl call per stage (not one `&&` chain): that is what lets a
     # Stop land between stages and kill the running one, and it lets the
@@ -381,7 +385,7 @@ def _log_banner_1d(hooks, case, spec):
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
             f'(initial, adaptive)',
             f'  Live profile    : p(r) sampled every '
-            f'{writer.live_sample_steps(1)} steps',
+            f'{spec.live_steps or writer.live_sample_steps(1)} steps',
             bar, ''):
         hooks.log(line)
 
@@ -511,7 +515,7 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
                   stop_reason, stop_reason == 'stopped by user')
 
 
-# â”€â”€ 2D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── 2D ──────────────────────────────────────────────────────────────────────
 
 
 def read_2d(dpath, spec, what=('p',), mesh=None):
@@ -597,10 +601,9 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
             f'(initial, adaptive)',
-            ('  Live slice      : p of every written time (AMR)'
-             if spec.amr else
-             f'  Live slice      : p sampled every '
-             f'{writer.live_sample_steps(2)} steps'),
+            f'  Live slice      : p sampled every '
+            f'{spec.live_steps or writer.live_sample_steps(2)} steps'
+            + (' + every written time (AMR)' if spec.amr else ''),
             bar, ''):
         hooks.log(line)
 
@@ -716,14 +719,16 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True):
         loop.gated_step()
         return True
 
-    # AMR: no live-slice FO (its rows carry no cell size) - live frames
-    # come from the written times through the per-time remap
-    live_set, decode = (None, None) if spec.amr else (
-        writer.LIVE_SLICE,
-        lambda tdir: _decode_surface(spec, tdir, (Nx, Ny), 0, 1,
-                                     slice_solid, remap_sl=spec.remap))
-    loop = FoamRunLoop(spec, hooks, fields, ingested, live_set, decode,
-                       read_dir, on_frame)
+    if spec.amr:
+        # AMR: the rows carry no cell size; their centres pin the level
+        # and the sample tiles the display grid like a written mesh
+        decode = lambda tdir: _decode_surface_amr(          # noqa: E731
+            spec, tdir, 0, 1, (g['x_face'], g['y_face']), slice_solid)
+    else:
+        decode = lambda tdir: _decode_surface(              # noqa: E731
+            spec, tdir, (Nx, Ny), 0, 1, slice_solid, remap_sl=spec.remap)
+    loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
+                       decode, read_dir, on_frame)
     stop_reason = loop.run()
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
@@ -834,7 +839,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                   stop_reason == 'stopped by user')
 
 
-# â”€â”€ 3D â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── 3D ──────────────────────────────────────────────────────────────────────
 
 
 def _levels_of(mesh):
@@ -901,6 +906,36 @@ def read_3d(dpath, spec, what=('p',), mesh=None):
         out['U'] = np.stack([reader.to_grid(flat[:, i], spec, mesh=mesh)
                              for i in range(3)], axis=-1)
     return out
+
+
+def _decode_surface_amr(spec, tdir, ax_u, ax_v, faces_uv, slice_solid=None):
+    """AMR twin of _decode_surface (N16): one liveSlice raw sample of a
+    dynamic-AMR run -> (p on the display plane, level map) or None while
+    the sample is mid-write. The rows are cut-face centroids (= in-plane
+    cell centres); refine.levels_from_centres reads each cell's level
+    off its centre and refine.remap_from_centres tiles the rows onto
+    the display plane exactly as a written time's C + cellLevel are -
+    a torn or incomplete sample fails its exact-cover check (or has a
+    row no level fits) and is retried next poll. `faces_uv` are the
+    plane's display-grid face coordinates, `slice_solid` the carved
+    cells of the plane (or None)."""
+    data = reader.read_surface_sample(spec.case_unc, writer.LIVE_SLICE,
+                                      tdir)
+    if data is None:
+        return None
+    pts, vals = data
+    C = pts[:, (ax_u, ax_v)]
+    fu, fv = (np.asarray(f, dtype=float) for f in faces_uv)
+    lv = refine.levels_from_centres(C, (fu[0], fv[0]), spec.dx_base,
+                                    spec.amr)
+    if len(lv) == 0 or (lv < 0).any():
+        return None
+    try:
+        mm = refine.remap_from_centres(C, lv, dict(x_face=fu, y_face=fv),
+                                       spec.display_level, slice_solid)
+    except (RuntimeError, ValueError):
+        return None                     # rows missing: mid-write sample
+    return mm.gather(vals, P_AIR), mm.levels
 
 
 def _initial_frame(spec, hooks, live_sl=None):
@@ -1149,15 +1184,19 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True):
         loop.gated_step()
         return True
 
-    # AMR: no live-slice FO (its rows carry no cell size) - live frames
-    # come from the written times through the per-time remap
-    live_set, decode = (None, None) if spec.amr else (
-        writer.LIVE_SLICE,
-        lambda tdir: _decode_surface(
+    if spec.amr:
+        # AMR: the rows carry no cell size; their in-plane centres pin
+        # the level and the sample tiles the display plane like a
+        # written mesh (the writer cuts through a finest-level
+        # sub-layer so no cell face lies on the plane)
+        decode = lambda tdir: _decode_surface_amr(          # noqa: E731
+            spec, tdir, uv[0], uv[1], live_faces, slice_solid)
+    else:
+        decode = lambda tdir: _decode_surface(              # noqa: E731
             spec, tdir, lshape, uv[0], uv[1], slice_solid,
-            remap_sl=None if spec.remap is None else spec.remap[live_sl]))
-    loop = FoamRunLoop(spec, hooks, fields, ingested, live_set, decode,
-                       read_dir, on_frame)
+            remap_sl=None if spec.remap is None else spec.remap[live_sl])
+    loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
+                       decode, read_dir, on_frame)
     stop_reason = loop.run()
     if stop_reason == 'safety cap' and spec.cap_is_end:
         stop_reason = 'end time reached'

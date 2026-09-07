@@ -38,7 +38,9 @@ VIPER-style stepped execution: **Initialise Model** starts a run held
 at t = 0 and **Exec 1/10/100/1000/END** + **Interrupt** advance or
 pause it; a 3D case can set an end time. A **Refresh every** input
 sets how often the live views redraw - in seconds or steps, blank =
-automatic - and can be changed mid-run), **Results** (snapshot
+automatic - and can be changed mid-run; on blastFoam "every N steps"
+also sets how often the solver samples the live slice / profile, so
+the picture really moves every N solver steps), **Results** (snapshot
 browser, gauge histories, animation replay, exports), **Chain**
 (auto-wired 1D → 2D → 3D remap workflow into a workspace folder).
 
@@ -149,12 +151,14 @@ and refinement levels (`cellLevel`, `dumpLevel`); the reader rebuilds the
 mapping onto the **display grid** per time (`core/refine.remap_from_centres`).
 The display grid sits at the **display level** (auto = the deepest level
 whose grid fits the memory cap): cells finer than it are box-averaged, so a
-3D case may run 3-4 levels while displaying at level 1-2. Live frames come
-from the written times (no live-slice sampling), the log reports the cell
+3D case may run 3-4 levels while displaying at level 1-2. The live slice
+samples every few solver steps as on a static mesh (each sampled cell's
+centre pins its refinement level, so the rows tile the display grid the
+same way a written time does), the log reports the cell
 count and per-level histogram at every write, and **Show mesh** follows the
 frame in the live plot, the Results replay, the animation export and the 3D
 viewer. AMR runs are serial in this version (blastFoam's `reconstructPar`
-cannot follow a changing mesh; the measured parallel options are in ROADMAP
+cannot follow a changing mesh; the measured parallel options are in TASKS.md (reference entry
 N16). E2E drivers: `tests/_e2e_foam_amr2d.py` (`--sweep=0.2:0.1,...` adds
 a threshold table), `tests/_e2e_foam_amr3d.py`.
 

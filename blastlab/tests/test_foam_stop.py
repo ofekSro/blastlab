@@ -65,6 +65,71 @@ class ScriptedHooks(RunHooks):
         return self._stop
 
 
+class PreflightStopHooks(RunHooks):
+    """Stop as soon as the backend logs that it is meshing - i.e. while
+    the run is still in preflight, long before the first solver step."""
+
+    def __init__(self):
+        self.log_lines = []
+        self._stop = False
+
+    def log(self, msg):
+        self.log_lines.append(str(msg))
+        if 'meshing' in str(msg):
+            self._stop = True
+
+    def should_stop(self):
+        return self._stop
+
+
+def preflight_stop_checks():
+    """B6: Stop must be able to interrupt the preflight (WSL probe and
+    mesh/charge-init stages), promptly and without leaving a solver
+    behind."""
+    from blastlab.solvers import get_solver
+    from blastlab.solvers.foam import env
+    from blastlab.solvers.hooks import StoppedBeforeStart
+
+    # big enough that meshing takes a moment to interrupt
+    case = Case2D(geometry='axisymmetric', Lx=5.0, Ly=5.0,
+                  cell_size_m=0.004, charge=8.0, center=(0.0, 2.5),
+                  n_snapshots=2, record_frames=0,
+                  solver='blastfoam', material='TNT')
+    hooks = PreflightStopHooks()
+    t0 = time.time()
+    try:
+        get_solver(2, 'blastfoam')(case, hooks)
+        outcome = 'returned a Result'
+    except StoppedBeforeStart as exc:
+        outcome = f'StoppedBeforeStart: {exc}'
+    except Exception as exc:                         # noqa: BLE001
+        outcome = f'{type(exc).__name__}: {exc}'
+    dt = time.time() - t0
+
+    check('stop during preflight ends the run promptly', dt < 15.0,
+          f'{dt:.1f}s, outcome: {outcome}')
+    check('stop during preflight is not reported as a failure',
+          outcome.startswith('StoppedBeforeStart'), outcome)
+    check('the WSL probe is announced before it blocks',
+          any('checking WSL' in ln for ln in hooks.log_lines),
+          str(hooks.log_lines[:2]))
+    check('the stage the user waits on is named in the log',
+          any('meshing (blockMesh)' in ln for ln in hooks.log_lines),
+          str(hooks.log_lines[-2:]))
+
+    # nothing left running in WSL. The bracket classes keep pgrep -f
+    # from matching the shell that carries this very pattern.
+    import subprocess
+    left = subprocess.run(
+        env.wsl_plain_argv('pgrep -a -f "[b]lockMesh|[s]etRefinedFields|'
+                           '[b]lastFoam" 2>/dev/null; true'),
+        capture_output=True, text=True, timeout=60,
+        stdin=subprocess.DEVNULL,
+        creationflags=env.CREATE_NO_WINDOW).stdout.strip()
+    check('no mesh/solver process left behind in WSL', not left,
+          f'still running: {left!r}')
+
+
 def main():
     from blastlab.solvers.foam import env
     ok, detail = env.check_available()
@@ -97,6 +162,8 @@ def main():
           and np.isfinite(res.gauges['pressures'][0]).all())
     check('meta contract intact',
           res.meta.get('case_dir') and 'final_state' in res.meta)
+
+    preflight_stop_checks()
 
     print()
     if FAIL:

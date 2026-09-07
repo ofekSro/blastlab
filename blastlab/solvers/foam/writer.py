@@ -56,6 +56,17 @@ def live_sample_steps(dim):
     poll consumes at most ~4 frames/s anyway)."""
     return {1: 10, 2: 5, 3: 1}[dim]
 
+
+def live_steps_for(policy, dim):
+    """Live-sample cadence [solver steps] for a live-view refresh policy
+    (RunHooks.refresh): 'Refresh every N steps' samples every N steps
+    so the live view follows the setting; seconds / automatic keep the
+    per-dim default (the ingest tail applies the wall-clock gate)."""
+    mode, val = policy
+    if mode == 'steps':
+        return max(1, int(val))
+    return live_sample_steps(dim)
+
 #: OpenFOAM dimension vectors
 _DIMS = dict(p='[1 -1 -2 0 0 0 0]', T='[0 0 0 1 0 0 0]',
              U='[0 1 -1 0 0 0 0]', alpha='[0 0 0 0 0 0 0]',
@@ -110,6 +121,10 @@ class CaseSpec:
     amr: int = 0
     display_level: int = 0
     mesh0: object = None            # AMR: the t = 0 MeshMap (build_remap)
+    # live-sample cadence [solver steps] the case is written with
+    # (0 = the per-dim default of live_sample_steps); the run loop
+    # rewrites it when the GUI's refresh policy changes mid-run
+    live_steps: int = 0
 
     @property
     def n_cells(self):
@@ -575,20 +590,22 @@ def _controldict(spec, case):
         # AMR (N16): the cell count and order change every write, so
         # each time dir carries its own cell centres (this FO) next to
         # the refiner's `cellLevel` (dumpLevel); the backend rebuilds
-        # the display remap from the pair. No live slice: its raw rows
-        # carry no cell size, so live frames come from written times.
+        # the display remap from the pair.
         functions['cellCentres'] = {
             'type': 'writeCellCentres',
             'libs': Raw('("libfieldFunctionObjects.so")'),
             'writeControl': 'writeTime',
         }
-    elif spec.dim >= 2:
+    if spec.dim >= 2:
         # live p slice every few steps (same role as the 1D liveLine):
         # 2D cuts the z=0 mid-plane (the whole field, one face per
         # cell); 3D cuts the user's live-slice plane through the
         # nearest cell-centre layer. interpolate/triangulate off keep
         # one uncut face per cell with the cell value, so the backend
-        # sorts the raw rows straight onto the grid.
+        # sorts the raw rows straight onto the grid. On an AMR mesh the
+        # rows carry no cell size, but a hex-refined cell's centre pins
+        # its level (refine.levels_from_centres), so the backend tiles
+        # them onto the display grid like a written mesh.
         if spec.dim == 2:
             pt, nrm = (0.0, 0.0, 0.0), (0, 0, 1)
         else:
@@ -599,14 +616,21 @@ def _controldict(spec, case):
                    if getattr(case, 'slice_pos', None) is None
                    else float(case.slice_pos))
             s0 = min(range(len(c)), key=lambda i: abs(float(c[i]) - pos))
-            pt = tuple(float(c[s0]) if a == ax_i else 0.0
-                       for a in range(3))
+            pos = float(c[s0])
+            if spec.amr and spec.display_level < spec.amr:
+                # cells finer than the display grid have faces at the
+                # display-layer centre: cut through the centre of the
+                # first finest-level sub-layer instead (a half-odd
+                # multiple of the finest cell never lies on a face of
+                # any level); in-plane centres are unaffected
+                pos += (spec.dx_base / 2 ** spec.amr - spec.dx) / 2.0
+            pt = tuple(pos if a == ax_i else 0.0 for a in range(3))
             nrm = tuple(1 if a == ax_i else 0 for a in range(3))
         functions[LIVE_SLICE] = {
             'type': 'surfaces',
             'libs': Raw('("libsampling.so")'),
             'writeControl': 'timeStep',
-            'writeInterval': live_sample_steps(spec.dim),
+            'writeInterval': spec.live_steps or live_sample_steps(spec.dim),
             'surfaceFormat': 'raw',
             'interpolationScheme': 'cell',
             'fields': ['p'],
@@ -628,7 +652,7 @@ def _controldict(spec, case):
             'type': 'sets',
             'libs': Raw('("libsampling.so")'),
             'writeControl': 'timeStep',
-            'writeInterval': live_sample_steps(spec.dim),
+            'writeInterval': spec.live_steps or live_sample_steps(spec.dim),
             'setFormat': 'raw',
             'interpolationScheme': 'cell',
             'fields': ['p'],
@@ -922,12 +946,15 @@ def _zero_fields(spec):
 
 # ── top level ───────────────────────────────────────────────────────────────
 
-def render_case(case, n_procs=1):
+def render_case(case, n_procs=1, live_steps=0):
     """Plan + render every case file. Returns a CaseSpec whose `files`
     maps 'system/controlDict'-style relpaths to file text. n_procs > 1
-    adds system/decomposeParDict (nothing else varies)."""
+    adds system/decomposeParDict; `live_steps` > 0 sets the live-sample
+    function object's cadence (see live_steps_for) - nothing else
+    varies."""
     spec = plan_case(case)
     spec.n_procs = max(1, int(n_procs))
+    spec.live_steps = max(0, int(live_steps or 0))
     afterburn = getattr(case, 'afterburn', 'none') or 'none' 
     if spec.dim == 1:
         bmd = _blockmesh_1d(spec)
@@ -958,16 +985,17 @@ def render_case(case, n_procs=1):
     return spec
 
 
-def write_case(case, case_posix=None, n_procs=1):
+def write_case(case, case_posix=None, n_procs=1, live_steps=0):
     """Render and write the case tree into the WSL filesystem (over
     UNC, LF endings). Returns the CaseSpec with paths filled in.
+    `live_steps` is passed to render_case.
 
     A fresh run (no `case_posix`) claims its own directory: the create
     is exist_ok=False, so a name collision fails loudly here instead of
     silently rewriting a concurrent run's controlDict and 0/ fields.
     Passing an explicit `case_posix` is the deliberate reuse path (a
     resume or post-mortem rewrite) and keeps the permissive create."""
-    spec = render_case(case, n_procs=n_procs)
+    spec = render_case(case, n_procs=n_procs, live_steps=live_steps)
     fresh = case_posix is None
     if fresh:
         case_posix, case_unc = env.new_case_dir(case.dim)

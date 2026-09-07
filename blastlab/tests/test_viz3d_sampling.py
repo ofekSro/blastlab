@@ -136,6 +136,34 @@ nested.append(0.0, dict(p=np.zeros(10, np.float32),
                         loads=dict(a=np.zeros(5, np.float32))))
 check("nested load bytes counted", nested._bytes == 10 * 4 + 5 * 4)
 
+# ── T5b: B20 - thinning must never discard the frame it just accepted ───────
+# (stride-rejected offers - kept=False, unrelated to B20 - are skipped;
+# this isolates the accept-then-immediately-thinned case, including the
+# "crossed the cap with an even stored length" case the bug hit.)
+print("\nT5b: FrameStore thinning keeps the newest frame")
+tiny = FrameStore(mem_cap=1)      # every accepted append re-triggers thinning
+accepted_but_lost = 0
+mismatched_last_t = 0
+for k in range(50):
+    t = k * 1e-4
+    kept = tiny.append(t, dict(p=np.zeros(100, np.float32)))
+    if kept and tiny.times[-1] != t:
+        mismatched_last_t += 1
+check("append() never reports 'kept' while the frame is actually gone "
+      "after thinning", mismatched_last_t == 0, f"{mismatched_last_t}/50")
+check("store still bounded by thinning", len(tiny) < 50, f"n={len(tiny)}")
+
+# B20's exact trigger: the cap is sized so the FIRST thinning pass fires
+# right as the 4th frame lands (len jumps 3 -> 4, an even length). The
+# old `frames[::2]` thinning dropped index len-1 (the frame just
+# accepted) whenever the pre-thin length was even.
+one_frame_bytes = np.zeros(4, np.float32).nbytes
+even = FrameStore(mem_cap=3 * one_frame_bytes + 1)   # room for exactly 3
+for k in range(4):     # force every offer so all 4 are accepted
+    kept = even.append(float(k), dict(p=np.zeros(4, np.float32)), force=True)
+    check(f"forced append #{k} (len={len(even)}) reports itself present",
+          kept and even.times[-1] == float(k), f"times={even.times}")
+
 
 # ── T6: build_payload optional fields ────────────────────────────────────────
 print("\nT6: build_payload extra fields")
