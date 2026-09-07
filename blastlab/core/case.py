@@ -56,13 +56,18 @@ class Case1D:
 class Case2D:
     dim = 2
     geometry: str = 'axisymmetric'    # 'planar' | 'axisymmetric'
-    Lx: float = 10.0
-    Ly: float = 10.0
+    # 4 m, not 10: resolving the default 1 kg charge with blastFoam's 8
+    # cells across the radius (T39) makes a 10 m domain 2.3M cells,
+    # which is ~6 GB inside the solver - more than a default 4 GB WSL VM
+    # holds (T48 measured ~2.65 KB/cell). 4 m is 368k cells: valid and
+    # warning-free out of the box on the smallest supported machine.
+    Lx: float = 4.0
+    Ly: float = 4.0
     cell_size_m: float = 0.025
     init_mode: str = 'charge'         # 'charge' | 'profile1d'
     charge: float = 1.0               # kg (axisym) / kg per m (planar)
     profile_file_in: str = None       # 1D profile to remap
-    center: tuple = (0.0, 5.0)        # (x0, y0); axisym forces x0 = 0
+    center: tuple = (0.0, 2.0)        # (x0, y0); axisym forces x0 = 0
     eos: str = 'idealGas'
     bcs: dict = field(default_factory=lambda: dict(
         x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'))

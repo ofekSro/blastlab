@@ -1276,11 +1276,15 @@ machine.** It is 2,301,289 cells, which at 2.65 KB/cell is ~6.1 GB - more than t
 ```
 
 That case was always going to thrash or die inside WSL; before T48 it was silently accepted.
-It is not a regression in the planner, but it IS a change in the out-of-the-box experience on
-a small machine, so it is flagged here for the owner rather than buried: either raise
-`memory=` in `.wslconfig` (this host has 7.7 GB total, so the VM could take ~6 GB), or lower
-the shipped default cell size. Left as the owner's call - changing a shipped default is not
-in this brief.
+**Resolved same day (owner decision): the shipped defaults were re-sized to validate on a
+4 GB VM.** Case2D defaults went 10 m -> 4 m (368k cells, clean in both solver modes), and
+the 3D form seed - whose QA-14 invariant is exactly "starts from a case that validates" -
+went from 8 kg / 3 m / 0.02 m (11.7M cells under the T39 8-cell rule, ~30 GB) to
+25 kg / 1.5 m / 0.025 m (457k cells, clean in both modes, no warnings, on every hardware
+profile probed). Harness B01 now shows the default strip clean with the run plan visible
+("auto: 2 MPI ranks (4 GB at 2 GB/rank)"). Raising `memory=` in `.wslconfig` on THIS host
+was rejected: 7.7 GB total with ~0.3 GB free means feeding the VM more would starve the
+Python ingest side that already MemoryErrored twice this session.
 
 GUI: the sidebar line reads `WSL: blastFoam ready · 4 cores · 4 GB` (built by `_hw_suffix`,
 which prints nothing when nothing is known - the line never invents numbers), with a small

@@ -314,11 +314,14 @@ class CaseForm(ctk.CTkFrame):
                                 ['axisymmetric', 'planar']))
                 self.v['geometry'].trace_add(
                     'write', lambda *a: self._sync_geometry())
-            # 3D starts from a case that actually validates: the old
-            # 10 m / 0.1 m / 1 kg default auto-refined to 0.0105 m and
-            # showed ~852 M cells (over the 15 M cap) on a fresh tab.
-            # 8 kg in a 3 m box keeps the 2 cm cell as typed (3.4 M cells).
-            L0 = 10.0 if self.dim == 2 else 3.0
+            # Both forms start from a case that actually validates ON A
+            # 4 GB WSL VM (QA-14 set the invariant; T48's memory-derived
+            # caps re-sized it): 2D is 1 kg in a 4 m box (368k cells with
+            # blastFoam's 8-cell charge rule), 3D is 25 kg in a 1.5 m box
+            # (457k cells) - clean, no warnings, in both solver modes.
+            # The old 3 m / 8 kg 3D seed became 11.7M cells under the
+            # 8-cell rule, ~30 GB inside the solver.
+            L0 = 4.0 if self.dim == 2 else 1.5
             r, lx_lbl = _row_lbl(dom, r, 'Lx [m]',
                                  _entry(dom, self._var('Lx', L0)))
             r, ly_lbl = _row_lbl(dom, r, 'Ly [m]',
@@ -329,8 +332,7 @@ class CaseForm(ctk.CTkFrame):
                 r = _row(dom, r, 'Lz [m]',
                          _entry(dom, self._var('Lz', L0)))
             r = _row(dom, r, 'Cell size [m]',
-                     _entry(dom, self._var('cell',
-                                           0.025 if self.dim == 2 else 0.02)))
+                     _entry(dom, self._var('cell', 0.025)))
 
         # ── Charge / initialization ────────────────────────────────────
         chg = self._card(0, 'Charge' if self.dim == 1 else 'Initialization')
@@ -351,7 +353,7 @@ class CaseForm(ctk.CTkFrame):
             r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
                                                   self.dim == 2 else ''),
                      _entry(chg, self._var('charge',
-                                           1.0 if self.dim == 2 else 8.0)))
+                                           1.0 if self.dim == 2 else 25.0)))
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
             r = self._srow(chg, r, 'Material', self._mat_combo,
@@ -369,7 +371,7 @@ class CaseForm(ctk.CTkFrame):
                                  title='Open profile file',
                                  filetypes=[('Profiles', '*.txt *.npz'),
                                             ('All files', '*.*')]))
-            c0 = 5.0 if self.dim == 2 else 1.5      # centre of L0
+            c0 = 2.0 if self.dim == 2 else 0.75     # centre of L0
             cx_ent = _entry(chg, self._var('cx', 0.0 if self.dim == 2
                                            else c0))
             r, cx_lbl = _row_lbl(chg, r, 'Burst x [m]', cx_ent)
