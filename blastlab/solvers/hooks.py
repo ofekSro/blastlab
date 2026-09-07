@@ -83,6 +83,16 @@ class RunHooks:
         solid mask/slice, slice label. 3D runs add a 'scene3d' sub-dict
         (grid coords, solid mask, obstacles) for the 3D viewer."""
 
+    def cadence(self, dt=None, steps=None):
+        """How often live frames are expected.
+
+        A blastFoam run cannot emit a frame per step: the live view moves
+        at the live-sample cadence (`steps` solver steps) or, without one,
+        at `writeInterval` (`dt` simulation seconds) - and both can move
+        mid-run. Either argument may be None for "unchanged". Native runs
+        never call this; they emit whenever the refresh policy allows.
+        """
+
     def log(self, msg):
         """A line of run output (summaries, notes, warnings)."""
 

@@ -97,6 +97,98 @@ def chain_feedback_checks(root):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def live_view_checks(root):
+    """G7 / T38: the live view says how fast it can move, and its colour
+    range can be pinned for the run."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    from blastlab.solvers.hooks import Progress
+    from blastlab.gui.run_panel import RunPanel
+
+    rp = RunPanel(root, on_run=lambda: None, on_stop=lambda: None,
+                  on_init=lambda: None, on_refresh=lambda: None)
+    x_face = np.linspace(0.0, 1.0, 5)
+    y_face = np.linspace(0.0, 1.0, 5)
+    solid = np.zeros((4, 4), bool)
+    info = dict(dim=2, x_face=x_face, y_face=y_face, solid=solid,
+                xlabel='x [m]', ylabel='y [m]', title='y = 1.25 m')
+    field = P_AIR + 1e3 * np.arange(16, dtype=float).reshape(4, 4)
+
+    # a native run: no cadence is claimed
+    rp.set_running(True)
+    rp.on_run_started(info)
+    rp.on_frame(field, 1.23e-4)
+    check("native live title has no cadence hint",
+          'frames every' not in rp._title.get_text(),
+          rp._title.get_text())
+
+    # a foam run without a live sample: writeInterval drives the view
+    rp.set_running(True)
+    rp.on_run_started(info)
+    rp.set_cadence(dt=5e-5)
+    rp.on_frame(field, 1.23e-4)
+    txt = rp._title.get_text()
+    check("foam live title carries t and the cadence",
+          't = 0.123 ms' in txt and 'frames every ~0.05 ms' in txt, txt)
+    rp.on_frame(field, 2.0e-4)
+    check("the cadence suffix is not duplicated frame after frame",
+          rp._title.get_text().count('frames every') == 1,
+          rp._title.get_text())
+    rp.set_cadence(dt=1e-4)           # the adaptive controller moved it
+    rp.on_frame(field, 3.0e-4)
+    check("a changed writeInterval updates the hint",
+          'frames every ~0.1 ms' in rp._title.get_text(),
+          rp._title.get_text())
+    rp.set_cadence(dt=1e-6)
+    rp.on_frame(field, 3.0e-4)
+    check("a sub-microsecond-scale cadence reads in microseconds",
+          'frames every ~1 µs' in rp._title.get_text(),
+          rp._title.get_text())
+
+    # with a live sample the cadence is N solver steps; the newest dt
+    # turns that into the time the user actually asked for
+    rp.set_cadence(steps=5)
+    check("no solver dt yet: the hint falls back to steps",
+          rp.cadence_text() == 'frames every ~5 solver steps',
+          rp.cadence_text())
+    rp.on_progress(Progress(step=10, t=1e-4, dt=2e-8, p_max=P_AIR, frac=0.1))
+    check("a step cadence is reported as a time once dt is known",
+          rp.cadence_text() == 'frames every ~0.1 µs', rp.cadence_text())
+    rp.set_cadence(steps=50)          # "Refresh every 50 steps"
+    check("changing the refresh policy moves the hint",
+          rp.cadence_text() == 'frames every ~1 µs', rp.cadence_text())
+    rp.set_running(True)
+    check("a new run drops the previous run's cadence",
+          rp._cadence == 0.0)
+
+    # colour range: auto by default, pinned on demand, and it holds
+    rp.set_running(True)
+    rp.on_run_started(info)
+    check("the live pane autoscales by default", rp.live_clim() is None)
+    check("the Min/Max boxes are inert while Auto is on",
+          all(str(e.cget('state')) == 'disabled' for e in rp._clim_entries))
+    rp.auto_clim_var.set(False)
+    rp.clim_min.set('0')
+    rp.clim_max.set('250')
+    rp._clim_changed()
+    check("the Min/Max boxes wake up with Auto off",
+          all(str(e.cget('state')) == 'normal' for e in rp._clim_entries))
+    check("a manual range is used", rp.live_clim() == (0.0, 250.0))
+    rp.on_frame(field, 1e-4)
+    check("the frame is drawn in the manual range",
+          tuple(rp._mesh.get_clim()) == (0.0, 250.0),
+          str(rp._mesh.get_clim()))
+    rp.clim_max.set('abc')
+    check("an unusable range falls back to autoscale, not a frozen one",
+          rp.live_clim() is None)
+    rp.clim_max.set('40')
+    rp._clim_changed()
+    check("editing the range redraws the frame already on screen",
+          tuple(rp._mesh.get_clim()) == (0.0, 40.0),
+          str(rp._mesh.get_clim()))
+    rp.destroy()
+
+
 def main():
     from blastlab.gui.app import App
 
@@ -198,6 +290,7 @@ def main():
           app.run_panel.completed == 0)
 
     chain_feedback_checks(root)
+    live_view_checks(root)
 
     root.destroy()
     print("\n" + "=" * 50)

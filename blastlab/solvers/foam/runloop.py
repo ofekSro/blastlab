@@ -307,6 +307,7 @@ def maybe_adapt(spec, st, adapt, run, hooks, n_frames):
                   f"{new_iv*1e3:.4f} ms (adaptive)")
         adapt['interval'] = new_iv
         adapt['since'] = 0
+        hooks.cadence(dt=new_iv)    # the live view says how fast it moves
 
 
 class OrderedIngest:
@@ -522,6 +523,7 @@ class FoamRunLoop:
                 self.spec.case_posix, self.spec.case_unc, 'writeInterval',
                 want, self.hooks.log, within=self.live_set):
             self.live['fo_steps'] = want
+            self.hooks.cadence(steps=want)
             self.hooks.log(f'  [blastfoam] live sample every {want} '
                            f'solver step(s)')
         else:

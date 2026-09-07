@@ -74,6 +74,9 @@ def main():
         def log(self, *_a, **_k):
             pass
 
+        def cadence(self, *_a, **_k):
+            pass
+
     rewrites = []
     real = runloop.runner.rewrite_control_entry
     runloop.runner.rewrite_control_entry = (

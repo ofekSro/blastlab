@@ -268,7 +268,10 @@ def main():
     runner.rewrite_control_entry = fake_rewrite
     try:
         logs = []
-        hh = SimpleNamespace(refresh=('seconds', 0.05), log=logs.append)
+        cad = []
+        hh = SimpleNamespace(refresh=('seconds', 0.05), log=logs.append,
+                             cadence=lambda dt=None, steps=None:
+                             cad.append((dt, steps)))
         obj = SimpleNamespace(live_set='liveSlice', hooks=hh,
                               spec=SimpleNamespace(dim=2, case_posix='/c',
                                                    case_unc='C:\\c'),
@@ -283,6 +286,9 @@ def main():
               and obj.live_steps == 20 and obj.live['fo_steps'] == 20
               and any('every 20 solver step' in s for s in logs),
               f'{calls} {logs}')
+        # G7: the live-view title follows the cadence it was given
+        check('the new cadence is reported to the live view',
+              cad == [(None, 20)], str(cad))
         hh.refresh = ('seconds', 2.0)
         runloop.FoamRunLoop._sync_live_steps(obj)
         check('back to seconds: the per-dim default is restored',

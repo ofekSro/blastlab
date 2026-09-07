@@ -215,6 +215,34 @@ class RunPanel(ctk.CTkFrame):
             border_width=2, border_color=c('border'),
             fg_color=c('accent'), hover_color=c('accent_hover')).pack(
             side='left', padx=(PAD, 0))
+        # manual colour range for the 2D live pane, mirroring the 3D
+        # viewer's Min/Max: a late weak frame used to rescale the whole
+        # picture, so nothing could be compared across a run (G7)
+        self.auto_clim_var = tk.BooleanVar(value=True)
+        ctk.CTkCheckBox(
+            vbar, text='Auto', variable=self.auto_clim_var,
+            command=self._clim_changed, font=theme.F_BODY,
+            corner_radius=6, checkbox_width=19, checkbox_height=19,
+            border_width=2, border_color=c('border'),
+            fg_color=c('accent'), hover_color=c('accent_hover')).pack(
+            side='left', padx=(PAD, GAP))
+        self.clim_min = tk.StringVar(value='0')
+        self.clim_max = tk.StringVar(value='')
+        self._clim_entries = []
+        for lbl, var in (('Min', self.clim_min), ('Max', self.clim_max)):
+            ctk.CTkLabel(vbar, text=lbl, font=theme.F_SMALL,
+                         text_color=c('muted')).pack(side='left',
+                                                     padx=(0, 4))
+            ent = ctk.CTkEntry(vbar, textvariable=var, width=64, height=28,
+                               font=theme.F_SMALL, corner_radius=8,
+                               fg_color=c('entry'), border_color=c('border'))
+            ent.pack(side='left', padx=(0, GAP))
+            ent.bind('<Return>', lambda e: self._clim_changed())
+            ent.bind('<FocusOut>', lambda e: self._clim_changed())
+            self._clim_entries.append(ent)
+        ctk.CTkLabel(vbar, text='kPa', font=theme.F_SMALL,
+                     text_color=c('muted')).pack(side='left')
+        self._sync_clim_state()
         stack = ctk.CTkFrame(right.body, fg_color='transparent')
         stack.pack(fill='both', expand=True)
         stack.grid_columnconfigure(0, weight=1)
@@ -250,6 +278,10 @@ class RunPanel(ctk.CTkFrame):
         self._title = None
         self._last_step = None      # newest step, for the PAUSED readout
         self._amr_run = 0           # consecutive AMR log lines collapsed
+        self._cadence = 0.0         # foam: seconds between live frames
+        self._cadence_steps = 0     # foam: solver steps between live frames
+        self._last_dt = 0.0         # newest solver time step [s]
+        self._last_field = None     # newest 2D frame, for a clim redraw
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
 
@@ -300,6 +332,13 @@ class RunPanel(ctk.CTkFrame):
     # ── event handlers (called from the app's queue drainer) ─────────────
     def set_running(self, running):
         self._running = bool(running)
+        if running:
+            # the cadence belongs to the run: a native run after a foam
+            # one must not inherit "frames every ~0.05 ms" (G7)
+            self._cadence = 0.0
+            self._cadence_steps = 0
+            self._last_dt = 0.0
+            self._last_field = None
         start_ok = (not running) and self._case_ok
         self.run_btn.configure(state='normal' if start_ok else 'disabled')
         self.init_btn.configure(state='normal' if start_ok else 'disabled')
@@ -424,9 +463,11 @@ class RunPanel(ctk.CTkFrame):
         self._chip_step.configure(text=str(p.step))
         self._chip_t.configure(text=f'{p.t*1e3:.3f}')
         self._chip_dt.configure(text=f'{p.dt:.2e}')
+        self._last_dt = float(p.dt)     # turns a step cadence into a time
         self._chip_pmax.configure(text=f'{p.p_max / 1e3:,.4g}')
 
     def on_run_started(self, info):
+        self._last_field = None
         fig = Figure(figsize=(5.5, 5.5))
         ax = fig.add_subplot()
         self._mesh = self._line = None
@@ -462,6 +503,67 @@ class RunPanel(ctk.CTkFrame):
                          shrink=0.85)
         fig.tight_layout()
         self.canvas.set_figure(fig)
+
+    # ── live colour range (2D pane) ──────────────────────────────────────
+    def _sync_clim_state(self):
+        state = 'disabled' if self.auto_clim_var.get() else 'normal'
+        for ent in self._clim_entries:
+            ent.configure(state=state)
+
+    def live_clim(self):
+        """(vmin, vmax) in kPa for the live pane, or None for autoscale.
+        A blank or unparsable box falls back to autoscale rather than
+        pinning the picture to a nonsense range."""
+        if self.auto_clim_var.get():
+            return None
+        try:
+            lo = float(self.clim_min.get().strip() or 0.0)
+            hi = float(self.clim_max.get().strip())
+        except ValueError:
+            return None
+        if not (np.isfinite(lo) and np.isfinite(hi)) or hi <= lo:
+            return None
+        return (lo, hi)
+
+    def _clim_changed(self):
+        self._sync_clim_state()
+        if self._mesh is not None and self._last_field is not None:
+            set_frame(self._mesh, self._last_field, self._solid,
+                      clim=self.live_clim())
+            self.canvas.draw()
+
+    def set_cadence(self, dt=None, steps=None):
+        """How often live frames arrive: `steps` solver steps (the live
+        sample) or `dt` seconds (writeInterval, when there is no live
+        sample). Either may be None for "unchanged" - the adaptive
+        controller reports one, the refresh policy the other."""
+        if dt is not None:
+            try:
+                self._cadence = max(0.0, float(dt))
+            except (TypeError, ValueError):
+                self._cadence = 0.0
+        if steps is not None:
+            try:
+                self._cadence_steps = max(0, int(steps))
+            except (TypeError, ValueError):
+                self._cadence_steps = 0
+
+    @staticmethod
+    def _fmt_dt(seconds):
+        ms = seconds * 1e3
+        return f'{ms * 1e3:.3g} µs' if ms < 0.01 else f'{ms:.3g} ms'
+
+    def cadence_text(self):
+        """"frames every ~X" for the live-view title, or '' when the run
+        emits whenever it likes (native)."""
+        if self._cadence_steps > 0:
+            if self._last_dt > 0.0:
+                return ('frames every ~'
+                        + self._fmt_dt(self._cadence_steps * self._last_dt))
+            return f'frames every ~{self._cadence_steps} solver steps'
+        if self._cadence > 0.0:
+            return 'frames every ~' + self._fmt_dt(self._cadence)
+        return ''
 
     def _rebuild_overlay(self, draw=True):
         """Add/remove the cell-edge overlay per the checkbox."""
@@ -518,7 +620,9 @@ class RunPanel(ctk.CTkFrame):
         if self._mesh is not None:
             if self._solid is None or field.shape != self._solid.shape:
                 return
-            set_frame(self._mesh, field, self._solid)
+            self._last_field = field
+            set_frame(self._mesh, field, self._solid,
+                      clim=self.live_clim())
             if levels is not None and np.shape(levels) == field.shape:
                 self._mesh_levels = levels
                 self._show_cells(levels)
@@ -536,6 +640,12 @@ class RunPanel(ctk.CTkFrame):
         else:
             return
         if self._title is not None:
+            # everything before the LAST 't =' is the pane's own label;
+            # the cadence suffix is re-appended each frame (G7)
             base = self._title.get_text().rsplit('t =', 1)[0].strip()
-            self._title.set_text(f'{base}  t = {t*1e3:.3f} ms'.strip())
+            txt = f'{base}  t = {t*1e3:.3f} ms'.strip()
+            hint = self.cadence_text()
+            if hint:
+                txt += f'  ·  {hint}'
+            self._title.set_text(txt)
         self.canvas.draw()

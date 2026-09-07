@@ -86,6 +86,9 @@ class GuiHooks(RunHooks):
                 self.feed3d = None
         self.q.put(('run_started', info))
 
+    def cadence(self, dt=None, steps=None):
+        self.q.put(('cadence', dt, steps))
+
     def log(self, msg):
         self.q.put(('log', msg))
 

@@ -430,6 +430,10 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True):
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
+    # blastFoam cannot emit a frame per step: the live view moves at the
+    # live-sample cadence, or at writeInterval without one (G7)
+    hooks.cadence(dt=spec.write_interval,
+                  steps=spec.live_steps or writer.live_sample_steps(case.dim))
     r = spec.grid['r']
     # T is in the readiness tuple because finalize_1d re-reads it
     fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
@@ -649,6 +653,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True):
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
+    # blastFoam cannot emit a frame per step: the live view moves at the
+    # live-sample cadence, or at writeInterval without one (G7)
+    hooks.cadence(dt=spec.write_interval,
+                  steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
     Nx, Ny = spec.nx, spec.ny
@@ -1088,6 +1096,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True):
     spec = _preflight(case, hooks)
     spec.adaptive_write = bool(adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
+    # blastFoam cannot emit a frame per step: the live view moves at the
+    # live-sample cadence, or at writeInterval without one (G7)
+    hooks.cadence(dt=spec.write_interval,
+                  steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
     Nx, Ny, Nz = spec.nx, spec.ny, spec.nz

@@ -558,6 +558,8 @@ class App:
             self.run_panel.enable_view3d(is3d)
             if is3d:
                 self._attach_view3d_auto()
+        elif tag == 'cadence':
+            self.run_panel.set_cadence(msg[1], msg[2])
         elif tag == 'progress':
             self.run_panel.on_progress(msg[1])
         elif tag == 'paused':

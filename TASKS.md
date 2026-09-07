@@ -102,7 +102,7 @@ Hard rules:
 | T35 | `test_foam_parallel` determinism check (owner decided: option b) | B23 | S | [x] 2026-09-07 |
 | T36 | Mass/energy-conserving resolved-charge init in 2D/3D (+ re-baseline) | B24 | S | [ ] |
 | T37 | Hardening bundle: native dead code, shared constants, stdout canaries | A4, A5, A6, A7 | S | [x] 2026-09-07 |
-| T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [ ] |
+| T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [x] 2026-09-07 |
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [ ] |
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [ ] |
 | T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [ ] |
@@ -803,6 +803,34 @@ Done when: green; G7 DONE.
 Commit: "T38: foam cadence hint in the live title, 2D live Min/Max (G7)"
 ```
 
+**DONE (2026-09-07):** (1) a new `RunHooks.cadence(dt=None, steps=None)` - no-op for
+native runs, which emit whenever the refresh policy allows. The foam solvers report
+`writeInterval` AND the live-sample cadence at run start; `runloop.maybe_adapt`
+reports a new `writeInterval` and `_sync_live_steps` a new step cadence, so the hint
+follows both mid-run. `GuiHooks` queues it, `App._dispatch` hands it to
+`RunPanel.set_cadence`, and the live-view title reads
+"t = 0.107 ms · frames every ~3.44 µs" (verified live on F02). A step cadence is
+turned into a TIME using the newest solver `dt` from Progress - which is the number
+the brief asked for and the one a user can act on - falling back to
+"frames every ~5 solver steps" before the first Progress; anything under 0.01 ms
+reads in µs. The hint is re-derived every frame from the pane's own label, so it
+never doubles up, and `set_running` clears it so a native run after a foam one does
+not inherit it.
+(2) The 2D live pane gained "Auto | Min | Max | kPa" beside Show mesh, mirroring the
+3D viewer's manual clim: the boxes are inert while Auto is on, a manual range is
+passed to `plots.set_frame(clim=...)` (which already took one), editing it redraws
+the frame already on screen, an unusable or inverted range falls back to autoscale
+rather than freezing the picture on nonsense, and the setting persists across the
+run (cleared at the next `set_running`).
+Tests: `test_gui_drain.live_view_checks` - no hint for a native run, t + cadence for
+a foam one, no duplication frame after frame, an adaptive writeInterval change moving
+it, µs formatting, the steps fallback and the steps-to-time conversion, autoscale by
+default, entries gated on Auto, a manual range reaching the QuadMesh, a bad range
+falling back, and a redraw on edit. `test_foam_live_due` asserts `_sync_live_steps`
+reports the new cadence; `test_adaptive_interval`'s fake hooks gained the method.
+Full no-WSL matrix green (22 suites incl. test_regression byte-identical) plus the
+harness smoke; harness D02 (native 2D) and F02 (blastFoam 2D, idle WSL, no orphans).
+
 ### T39 — Charge-mass rasterisation deficit (N5, foam)
 
 **Why:** `sphericalMassToCell` at 5 cells/radius sets ~0.85 of the requested mass (visible
@@ -1092,7 +1120,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - G4 replay / preview stalls (idle-CPU half refuted) — DONE (2026-09-07, T31)
 - G5 chain start race — DONE (T6)
 - G6 progress < 100 % (DONE, T5); theme half refuted by QA (mesh overlay colour cosmetic) — closed
-- **G7** live-view niceties (cadence hint, 2D Min/Max) — OPEN → **T38**
+- G7 live-view niceties (cadence hint, 2D Min/Max) — DONE (2026-09-07, T38)
 - G8 preview lacks extra charges / det points — DONE (2026-09-07, QA-21 + T31)
 - G9 accelerators / persistence / focus — DONE (2026-09-07, T32)
 - G10 default 3D case invalid, nan/inf accepted — DONE (2026-09-07, QA-14/15)
