@@ -100,6 +100,53 @@ def main():
     check('probes physics sane',
           pr['pressures'][0].max() > pr['pressures'][1].max()
           > pr['pressures'][2].max() > 1.5 * 101325.0)
+    check('p-only run: no speeds/rhos keys (T44 degrades cleanly)',
+          'speeds' not in pr and 'rhos' not in pr)
+
+    # T44/N12: U (vector file format!) and rho ride along when their
+    # rows align with p's; a torn/missing extra degrades to p-only
+    with tempfile.TemporaryDirectory() as td:
+        pdir = os.path.join(td, 'postProcessing', 'gauges', '0')
+        os.makedirs(pdir)
+        for fx, name in (('probes_p2', 'p'), ('probes_U', 'U'),
+                         ('probes_rho', 'rho')):
+            src = os.path.join(FIX, fx if fx != 'probes_p2'
+                               else 'probes_U')
+            pass
+        # build a 3-row p file matching the U/rho fixtures
+        with open(os.path.join(pdir, 'p'), 'w') as f:
+            f.write('# Probe 0 (0.5 0 0)\n'
+                    '# Probe 1 (1 0 0)\n'
+                    '#         Time             0             1\n'
+                    '            0        101325        101325\n'
+                    '  1.19964e-07        201325        101325\n'
+                    '  2.63446e-07        301325        111325\n')
+        import shutil as _sh
+        _sh.copy(os.path.join(FIX, 'probes_U'),
+                 os.path.join(pdir, 'U'))
+        _sh.copy(os.path.join(FIX, 'probes_rho'),
+                 os.path.join(pdir, 'rho'))
+        pr2 = reader.read_probes(td)
+        check('U probes parsed as |U| per gauge (3-4-0 -> 5)',
+              'speeds' in pr2 and len(pr2['speeds']) == 2
+              and np.allclose(pr2['speeds'][0], [0.0, 5.0, 10.0])
+              and np.allclose(pr2['speeds'][1], [0.0, 0.0, 3.0]),
+              str(pr2.get('speeds')))
+        check('rho probes ride along',
+              'rhos' in pr2
+              and np.allclose(pr2['rhos'][0], [1.225, 2.45, 4.9]),
+              str(pr2.get('rhos')))
+        check('pressures unchanged by the extras',
+              np.allclose(pr2['pressures'][0],
+                          [101325, 201325, 301325]))
+        # a torn U file (fewer rows) must NOT misalign - drop it
+        with open(os.path.join(pdir, 'U'), 'w') as f:
+            f.write('# Probe 0 (0.5 0 0)\n'
+                    '#         Time             0\n'
+                    '            0    (0 0 0)\n')
+        pr3 = reader.read_probes(td)
+        check('torn U file degrades to p-only, never misaligns',
+              'speeds' not in pr3 and 'rhos' in pr3)
 
     # ── binary format (fixtures from a writeFormat-binary sector run) ──
     NB = 190                    # cells in the binary fixture run

@@ -45,7 +45,15 @@ def save_gauges_2d(gauge_out, filename='gauges_2d.txt'):
 
     header = 'time[s]\t' + '\t'.join(f'p_({x:.3f},{y:.3f})m[Pa]'
                                      for (x, y) in points)
-    matrix = np.column_stack([times] + pdata)
+    cols = list(pdata)
+    # T44/N12: |U| and rho columns when the run recorded them (foam)
+    for key, unit in (('speeds', 'U_mag'), ('rhos', 'rho')):
+        extra = gauge_out.get(key)
+        if extra and len(extra) == len(points):
+            header += '\t' + '\t'.join(
+                f'{unit}_({x:.3f},{y:.3f})m' for (x, y) in points)
+            cols += list(extra)
+    matrix = np.column_stack([times] + cols)
     np.savetxt(filename, matrix, delimiter='\t', header=header,
                comments='', fmt='%.6e')
     print(f"  Gauge data saved: {filename}  "
@@ -67,7 +75,16 @@ def save_gauges_3d(gauge_out, filename='gauges_3d.txt'):
 
     header = 'time[s]\t' + '\t'.join(f'p_({x:.3f},{y:.3f},{z:.3f})m[Pa]'
                                      for (x, y, z) in points)
-    matrix = np.column_stack([times] + pdata)
+    cols = list(pdata)
+    # T44/N12: |U| and rho columns when the run recorded them (foam)
+    for key, unit in (('speeds', 'U_mag'), ('rhos', 'rho')):
+        extra = gauge_out.get(key)
+        if extra and len(extra) == len(points):
+            header += '\t' + '\t'.join(
+                f'{unit}_({x:.3f},{y:.3f},{z:.3f})m'
+                for (x, y, z) in points)
+            cols += list(extra)
+    matrix = np.column_stack([times] + cols)
     np.savetxt(filename, matrix, delimiter='\t', header=header,
                comments='', fmt='%.6e')
     print(f"  Gauge data saved: {filename}  "

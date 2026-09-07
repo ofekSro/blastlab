@@ -341,30 +341,60 @@ def _parse_probes_file(path):
     return pts, rows
 
 
-def read_probes(case_unc, name='gauges', field='p'):
-    """blastProbes output -> dict(points, times, pressures) or None.
+def _parse_probes_vec(path):
+    """One VECTOR blastProbes file -> (points, rows): vector rows look
+    like `time (ux uy uz) (ux uy uz) ...`, so each row flattens to
+    [t, u0x, u0y, u0z, u1x, ...]."""
+    text = _read_text(path)
+    pts, rows = [], []
+    for ln in text.splitlines():
+        if ln.lstrip().startswith('#'):
+            m = re.search(r'Probe\s+\d+\s+\(([^)]*)\)', ln)
+            if m:
+                pts.append(tuple(float(v) for v in m.group(1).split()))
+        elif ln.strip():
+            try:
+                rows.append([float(v) for v in
+                             ln.replace('(', ' ').replace(')', ' ')
+                             .split()])
+            except ValueError:
+                continue        # partial last line mid-write
+    return pts, rows
 
-    Every time subdirectory of postProcessing/<name> is merged: a
-    restarted run appends a new subdir starting at the restart time
-    while the previous one may extend past it, so earlier chunks are
-    clipped to t < first_t of the next chunk (the later dir wins)."""
-    base = os.path.join(case_unc, 'postProcessing', name)
-    tdirs = list_sample_times(case_unc, name)
-    if not tdirs:
-        return None
 
+def _merge_chunks(base, tdirs, field, parse):
+    """Restart-chunk merge shared by every probe field: a restarted run
+    appends a new subdir starting at the restart time while the previous
+    one may extend past it, so earlier chunks are clipped to t < first_t
+    of the next chunk (the later dir wins)."""
     pts, rows = [], []
     for _t0, d in tdirs:
         path = os.path.join(base, d, field)
         if not os.path.isfile(path):
             continue
-        chunk_pts, chunk_rows = _parse_probes_file(path)
+        chunk_pts, chunk_rows = parse(path)
         if not pts:
             pts = chunk_pts
         if chunk_rows and rows:
             first_t = chunk_rows[0][0]
             rows = [r for r in rows if r[0] < first_t]
         rows.extend(chunk_rows)
+    return pts, rows
+
+
+def read_probes(case_unc, name='gauges', field='p'):
+    """blastProbes output -> dict(points, times, pressures) or None.
+
+    When the run also recorded U and rho (T44/N12) and their rows align
+    row-for-row with p's, the dict gains `speeds` (|U| per probe) and
+    `rhos`; consumers that only know `pressures` see exactly the shape
+    they always did."""
+    base = os.path.join(case_unc, 'postProcessing', name)
+    tdirs = list_sample_times(case_unc, name)
+    if not tdirs:
+        return None
+
+    pts, rows = _merge_chunks(base, tdirs, field, _parse_probes_file)
     if not pts and not rows:
         return None
     if not rows:
@@ -375,8 +405,25 @@ def read_probes(case_unc, name='gauges', field='p'):
     n_probes = ncol - 1
     if len(pts) != n_probes:            # header/columns mismatch
         pts = (pts + [(np.nan,) * 3] * n_probes)[:n_probes]
-    return dict(points=pts, times=a[:, 0],
-                pressures=[a[:, i + 1] for i in range(n_probes)])
+    out = dict(points=pts, times=a[:, 0],
+               pressures=[a[:, i + 1] for i in range(n_probes)])
+
+    # T44 extras, attached only when they align with p sample-for-sample
+    # (they are written by the same FO in lockstep; a torn tail degrades
+    # back to p-only rather than misaligning)
+    _p2, rrows = _merge_chunks(base, tdirs, 'rho', _parse_probes_file)
+    if rrows and len(rrows) == len(rows) \
+            and min(len(r) for r in rrows) >= ncol:
+        ra = np.array([r[:ncol] for r in rrows])
+        out['rhos'] = [ra[:, i + 1] for i in range(n_probes)]
+    _p3, urows = _merge_chunks(base, tdirs, 'U', _parse_probes_vec)
+    if urows and len(urows) == len(rows) \
+            and min(len(r) for r in urows) >= 1 + 3 * n_probes:
+        ua = np.array([r[:1 + 3 * n_probes] for r in urows])
+        out['speeds'] = [np.sqrt((ua[:, 1 + 3 * i:4 + 3 * i] ** 2)
+                                 .sum(axis=1))
+                         for i in range(n_probes)]
+    return out
 
 
 def to_grid(vals, spec, fill=0.0, mesh=None):

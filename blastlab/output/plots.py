@@ -183,11 +183,30 @@ def figure_gauges_1d(gauge_out, charge_kg, eos):
 
 # ── 2D/3D gauge figure ───────────────────────────────────────────────────────
 
-def figure_gauges_nd(gauge_out, meta):
-    """Gauge grid for 2D (x,y points) and 3D (x,y,z points)."""
+#: T44/N12: trace field -> (gauges key, y-label, transform)
+GAUGE_FIELDS = {
+    'p':   ('pressures', 'Overpressure [kPa]',
+            lambda a: (a - P_AIR) / 1e3),
+    '|U|': ('speeds', 'Speed [m/s]', lambda a: a),
+    'rho': ('rhos', 'Density [kg/m3]', lambda a: a),
+}
+
+
+def gauge_fields_available(gauge_out):
+    """Which of GAUGE_FIELDS this result actually recorded (native runs
+    and pre-T44 foam runs are p-only)."""
+    return [f for f, (key, _l, _t) in GAUGE_FIELDS.items()
+            if gauge_out.get(key)]
+
+
+def figure_gauges_nd(gauge_out, meta, field='p'):
+    """Gauge grid for 2D (x,y points) and 3D (x,y,z points). `field`
+    picks the trace: 'p' (default, always there), '|U|' or 'rho' when
+    the run recorded them (blastFoam since T44)."""
+    key, ylabel, tr = GAUGE_FIELDS[field]
     times  = gauge_out['times']
     points = gauge_out['points']
-    pdata  = gauge_out['pressures']
+    pdata  = gauge_out.get(key) or gauge_out['pressures']
 
     if len(points) == 0:
         return None
@@ -204,13 +223,13 @@ def figure_gauges_nd(gauge_out, meta):
 
     for k, (p_arr, pt, color) in enumerate(zip(pdata, points, colors)):
         ax  = axes[k // ncols][k % ncols]
-        ovp = (p_arr - P_AIR) / 1e3
+        ovp = tr(p_arr)
         ax.plot(times * 1e3, ovp, color=color, lw=1.2)
         ax.axhline(0, color='k', lw=0.7, ls='--', alpha=0.5)
         loc = ", ".join(f"{v:.2f}" for v in pt)
         ax.set_title(f'Gauge {k+1}  ({loc}) m', fontsize=10)
         ax.set_xlabel('Time [ms]')
-        ax.set_ylabel('Overpressure [kPa]')
+        ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.3)
 
     for k in range(n, nrows * ncols):

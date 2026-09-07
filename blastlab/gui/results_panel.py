@@ -189,6 +189,17 @@ class ResultsPanel(ctk.CTkFrame):
         # Gauges view: the traces + the per-gauge engineering summary
         # (peak, arrival, positive-phase duration/impulse, net impulse)
         gtab = ctk.CTkFrame(stack, fg_color='transparent')
+        # T44/N12: trace field selector - shown only when the current
+        # result recorded more than p (blastFoam runs since T44)
+        gbar = ctk.CTkFrame(gtab, fg_color='transparent')
+        gbar.pack(fill='x', pady=(0, 4))
+        self._gauge_field = 'p'
+        self._gauge_field_seg = ctk.CTkSegmentedButton(
+            gbar, values=['p'], width=170, height=26, font=theme.F_SMALL,
+            command=self._gauge_field_changed)
+        self._gauge_field_seg.set('p')
+        # packed on demand by _draw_gauges (p-only results keep the old
+        # bare layout, and winfo_manager() stays '' for the tests)
         self.gauge_canvas = EmbeddedFigure(gtab, figsize=(7, 5))
         self.gauge_canvas.pack(fill='both', expand=True)
         cols = ('gauge', 'peak', 'arrival', 't_peak', 'pos_dur', 'pos_imp',
@@ -539,16 +550,34 @@ class ResultsPanel(ctk.CTkFrame):
             mesh=mesh, robust=(is_peak or is_imp))
         self.field_canvas.set_figure(fig)
 
+    def _gauge_field_changed(self, _value=None):
+        self._gauge_field = self._gauge_field_seg.get()
+        self._draw_gauges()
+
     def _draw_gauges(self):
         ent = self._current()
         if ent is None:
             return
         res = ent.result
+        fields = plots.gauge_fields_available(res.gauges)
+        if len(fields) > 1 and ent.dim != 1:
+            self._gauge_field_seg.configure(values=fields)
+            if self._gauge_field not in fields:
+                self._gauge_field = 'p'
+                self._gauge_field_seg.set('p')
+            if not self._gauge_field_seg.winfo_manager():
+                self._gauge_field_seg.pack(side='left')
+        else:
+            self._gauge_field = 'p'
+            self._gauge_field_seg.set('p')
+            if self._gauge_field_seg.winfo_manager():
+                self._gauge_field_seg.pack_forget()
         if ent.dim == 1:
             fig = plots.figure_gauges_1d(res.gauges, res.meta['charge_kg'],
                                          res.meta['eos'])
         else:
-            fig = plots.figure_gauges_nd(res.gauges, res.meta)
+            fig = plots.figure_gauges_nd(res.gauges, res.meta,
+                                         field=self._gauge_field)
         if fig is not None:
             self.gauge_canvas.set_figure(fig)
         self._fill_summary(res)

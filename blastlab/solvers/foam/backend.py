@@ -482,6 +482,7 @@ def _gauges_from_probes(spec):
         else:
             radii.append(float(pt[0]))               # snapped location
     return dict(times=probes['times'], radii=radii,
+                **{k: probes[k] for k in ('speeds', 'rhos') if k in probes},
                 pressures=probes['pressures'])
 
 
@@ -1012,7 +1013,8 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
         gauge_out = dict(times=probes['times'],
                          points=[(pt[0], pt[1])
                                  for pt in probes['points']],
-                         pressures=probes['pressures'])
+                         pressures=probes['pressures'],
+                         **{k: probes[k] for k in ('speeds', 'rhos') if k in probes})
     else:
         gauge_out = dict(times=np.array([]), points=[], pressures=[])
 
@@ -1488,7 +1490,8 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     if probes:
         gauge_out = dict(times=probes['times'],
                          points=[tuple(pt) for pt in probes['points']],
-                         pressures=probes['pressures'])
+                         pressures=probes['pressures'],
+                         **{k: probes[k] for k in ('speeds', 'rhos') if k in probes})
     else:
         gauge_out = dict(times=np.array([]), points=[], pressures=[])
 

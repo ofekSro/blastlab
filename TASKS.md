@@ -109,7 +109,7 @@ Hard rules:
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [x] 2026-09-07 |
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [x] 2026-09-07 |
 | T43 | Resume a stopped foam run | N6 | M | [x] 2026-09-07 |
-| T44 | Gauge fields beyond p (foam) | N12 | S–M | [ ] |
+| T44 | Gauge fields beyond p (foam) | N12 | S–M | [x] 2026-09-07 |
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [ ] |
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [ ] |
 | T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [ ] |
@@ -1540,6 +1540,36 @@ Done when: green; N12 DONE.
 Commit: "T44: velocity and density gauge traces for blastFoam runs (N12)"
 ```
 
+**DONE (2026-09-07):** the gauges FO records `fields (p U rho)` (one line in the writer; the
+goldens' only diff). The reader gains `_parse_probes_vec` (vector probe rows are
+`t (ux uy uz) ...`) and a `_merge_chunks` shared by every probe field (same restart-chunk
+clipping as before); `read_probes` attaches `speeds` (|U| per gauge) and `rhos` ONLY when
+their rows align sample-for-sample with p's - a torn or missing extra degrades to p-only
+rather than ever misaligning (pinned by a torn-U fixture test). `Result.gauges` keeps
+`pressures` as-is, so every existing consumer is untouched; the three backend gauge_out
+sites and the 1D radii path pass the extras through.
+
+GUI: the Gauges tab gets a p / |U| / rho segmented selector that only appears when the
+current result recorded more than p (`plots.gauge_fields_available`; native and pre-T44 foam
+results keep the bare layout, `winfo_manager()`-checkable per the T34 convention).
+`figure_gauges_nd(field=...)` relabels the axis per field. The gauges TSV (2D and 3D
+writers) appends `U_mag_(...)` / `rho_(...)` columns when present; native gauge files are
+byte-identical (test_regression PASS).
+
+Verified live: the axisym `test_foam_2d` run's probes carry all three fields end-to-end
+(|U| max 4291 m/s at the near gauge of the planar case, rho 1.23-25.5 kg/m3), and the test
+gains a standing assert that a foam run records speeds+rhos aligned with times (lands on
+the next WSL sweep; today's run was checked directly with read_probes). Fixtures
+`probes_U`/`probes_rho` + 4 reader checks (incl. clean p-only degradation both ways).
+
+Also refreshed while here: `test_foam_2d`'s snapshot contract compared the foam grid's
+shape with the NATIVE run's - stale since T39 (8 vs 5 cells across the charge radius);
+it now asserts the snapshot matches the foam run's own grid.
+
+Tests: test_foam_reader, test_foam_writer --update (eyeballed: `fields (p)` ->
+`fields (p U rho)` per case, nothing else), test_gauge_summary, test_gui_gauge_summary,
+test_regression byte-identical; WSL: test_foam_2d PASS. No orphaned solvers.
+
 ### T45 — CSV export of field maps (N14) + one-click HTML report (N13)
 
 ```
@@ -1712,7 +1742,10 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - N9 user-named runs — DONE (2026-09-07, T30)
 - **N10** MUSCL second order — OPEN → **T47**
 - **N11** native materials beyond TNT — OPEN → **T46**
-- **N12** gauge fields beyond p — OPEN → **T44**
+- N12 gauge fields beyond p — DONE (2026-09-07, T44; `fields (p U rho)` in the gauges FO,
+  vector-probe parser + aligned-or-dropped merge, `speeds`/`rhos` in Result.gauges, a
+  p / |U| / rho selector on the Gauges tab and TSV columns; native stays p-only and
+  byte-pinned)
 - **N13** HTML report — OPEN → **T45**
 - **N14** CSV field maps — OPEN → **T45**
 - N15 local (static) refinement + show-mesh — DONE (T17–T19)

@@ -67,7 +67,7 @@ functions
             (3 0 0)
             (4 0 0)
         );
-        fields (p);
+        fields (p U rho);
     }
 }
 

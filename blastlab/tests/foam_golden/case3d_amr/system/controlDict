@@ -91,7 +91,7 @@ functions
         (
             (1.8 1 1)
         );
-        fields (p);
+        fields (p U rho);
     }
 }
 

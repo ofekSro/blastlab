@@ -83,9 +83,19 @@ def main():
 
     # contract: snapshots {p,rho,speed}, meta incl. final_state
     snap = foam.snapshots[list(foam.snapshots)[-1]]
+    # foam resolves the charge with 8 cells across the radius (T39),
+    # native with 5, so the two grids no longer share a shape - the
+    # contract is that the snapshot matches the FOAM run's own grid
     check('axi snapshot contract', set(snap) == {'p', 'rho', 'speed'}
-          and snap['p'].shape == nat.snapshots[
-              list(nat.snapshots)[-1]]['p'].shape)
+          and snap['p'].shape == (len(foam.meta['x_c']),
+                                  len(foam.meta['y_c'])))
+    # T44/N12: a foam run records |U| and rho gauge traces alongside p
+    check('axi gauge extras recorded (T44: speeds + rhos)',
+          'speeds' in foam.gauges and 'rhos' in foam.gauges
+          and len(foam.gauges['speeds']) == len(GAUGES)
+          and all(len(sp) == len(foam.gauges['times'])
+                  for sp in foam.gauges['speeds'])
+          and max(sp.max() for sp in foam.gauges['speeds']) > 50.0)
     fs = foam.meta['final_state']
     check('axi final_state contract',
           set(fs) == {'t', 'rho', 'u', 'v', 'e', 'p', 'phase'}

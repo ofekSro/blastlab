@@ -738,7 +738,9 @@ def _controldict(spec, case):
             'adjustLocations': spec.probe_adjust,
             'append': 'yes',
             'probeLocations': [tuple(p) for p in spec.probe_pts],
-            'fields': ['p'],
+            # p drives every existing consumer; U and rho are the T44
+            # extras (velocity-magnitude + density gauge traces, N12)
+            'fields': ['p', 'U', 'rho'],
         }
     if functions:
         d['functions'] = functions
