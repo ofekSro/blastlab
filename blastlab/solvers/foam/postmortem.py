@@ -17,7 +17,7 @@ import numpy as np
 from ...core import geometry
 from ...core.case import load_case
 from ..hooks import RunHooks
-from . import env, reader, writer
+from . import backend, env, reader, writer
 from .backend import (build_remap, finalize_1d, finalize_2d, finalize_3d,
                       mesh_at, read_2d, read_3d, slice_geom_3d)
 from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
@@ -87,13 +87,23 @@ def load_run(case_dir, hooks=None):
     if case.dim in (1, 2):              # finalize_1d/2d re-read T
         fields += ('T',)
     fields += spec.mesh_fields
-    if n_procs > 1:
+    if n_procs > 1 and not spec.decomposed:
         hooks.log(f'  [postmortem] reconstructing leftover parallel '
                   f'times ({n_procs} ranks)...')
         maybe_reconstruct(spec, fields, done=True)
+    elif spec.decomposed:
+        # parallel AMR (T42/N16-b): nothing to reconstruct - the times
+        # are read straight out of processor*/ and concatenated
+        hooks.log(f'  [postmortem] reading {n_procs} decomposed ranks '
+                  f'directly (AMR)')
 
-    times = [(t, name) for t, name in reader.list_times(unc)
-             if reader.time_ready(os.path.join(unc, name), fields)]
+    def _ready(name):
+        d = spec.time_dirs(name)
+        parts = d if isinstance(d, (list, tuple)) else [d]
+        return all(reader.time_ready(p, fields) for p in parts)
+
+    times = [(t, name) for t, name in reader.list_times(spec.time_root())
+             if _ready(name)]
     if not times:
         raise RuntimeError(f'no complete time directories in {unc}')
     n_frames = len(times)
@@ -105,10 +115,11 @@ def load_run(case_dir, hooks=None):
     # one dir reads - a real grid mismatch fails on every one of them.
     for _t, name in reversed(times):
         try:
-            mesh = mesh_at(spec, os.path.join(unc, name))
-            reader.read_scalar(os.path.join(unc, name, 'p'),
-                               spec.n_cells if mesh is None
-                               else mesh.n_cells)
+            dp = spec.time_dirs(name)
+            mesh = mesh_at(spec, dp)
+            backend.rd_scalar(spec, dp, 'p',
+                              spec.n_cells if mesh is None
+                              else mesh.n_cells)
             break
         except (ValueError, OSError):
             continue

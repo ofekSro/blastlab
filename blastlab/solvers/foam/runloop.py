@@ -72,7 +72,10 @@ def maybe_reconstruct(spec, fields, done=False):
     reconstructed dirs indistinguishable from serial output. Quietly
     retries next poll on failure. `done` lifts the per-poll batch cap
     (final sweep after the solver exits)."""
-    if spec.n_procs <= 1:
+    if spec.n_procs <= 1 or spec.decomposed:
+        # `decomposed` (parallel AMR, N16-b/T42): reconstructPar cannot
+        # follow a mesh that changes between writes, so those runs are
+        # ingested straight from processor*/ instead.
         return
     proc_uncs = [os.path.join(spec.case_unc, f'processor{i}')
                  for i in range(spec.n_procs)]
@@ -246,12 +249,13 @@ def read_fo_fields(dpath, spec, mesh=None):
     missing/unreadable - the caller falls back to the Python per-write
     accumulators, so an FO failure degrades instead of stalling.
     `mesh` is the time dir's own structure on a dynamic-AMR run."""
+    from . import backend
     n = spec.n_cells if mesh is None else mesh.n_cells
     try:
-        peak = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'pMax'), n), spec, fill=P_AIR, mesh=mesh)
-        imp = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'impulse'), n), spec, fill=0.0, mesh=mesh)
+        peak = reader.to_grid(backend.rd_scalar(spec, dpath, 'pMax', n),
+                              spec, fill=P_AIR, mesh=mesh)
+        imp = reader.to_grid(backend.rd_scalar(spec, dpath, 'impulse', n),
+                             spec, fill=0.0, mesh=mesh)
     except (ValueError, OSError):
         return None, None
     return peak, imp
@@ -326,16 +330,24 @@ class OrderedIngest:
         self.stalls = {}
         self._times, self._i, self._done, self._final = [], 0, {}, False
 
+    def _ready(self, name):
+        """A time is ready when EVERY part of it is - on a decomposed
+        AMR run the ranks finish their writes independently."""
+        d = self.spec.time_dirs(name)
+        parts = d if isinstance(d, (list, tuple)) else [d]
+        return all(reader.time_ready(p, self.fields) for p in parts)
+
     def pending(self, done, final=False):
-        """Yield (name, dpath) in ascending time; ends at the first gap."""
+        """Yield (name, dpath) in ascending time; ends at the first gap.
+        `dpath` is a list of per-rank dirs on a decomposed AMR run."""
         self._done, self._final = done, final
-        self._times = reader.list_times(self.spec.case_unc)
+        self._times = reader.list_times(self.spec.time_root())
         for i, (_t_disp, name) in enumerate(self._times):
             if name in done or self.stalls.get(name, 0) >= STALL_POLLS:
                 continue
             self._i = i
-            dpath = os.path.join(self.spec.case_unc, name)
-            if not reader.time_ready(dpath, self.fields):
+            dpath = self.spec.time_dirs(name)
+            if not self._ready(name):
                 if _t_disp == 0.0:
                     continue        # the writer's 0/ dir: not a solver write
                 if self.unreadable(name):
@@ -349,9 +361,7 @@ class OrderedIngest:
         end the pass and retry it next poll."""
         if self._final:
             inc = STALL_POLLS
-        elif any(n2 not in self._done
-                 and reader.time_ready(os.path.join(self.spec.case_unc, n2),
-                                       self.fields)
+        elif any(n2 not in self._done and self._ready(n2)
                  for _t2, n2 in self._times[self._i + 1:]):
             inc = 1                 # later writes are complete: it should be too
         else:

@@ -1336,6 +1336,76 @@ Done when: green; N16-b DONE with the timings.
 Commit: "T42: parallel AMR via direct processor*/ reads (N16-b)"
 ```
 
+**STATUS (2026-09-07) — implemented and working, but ONE acceptance number misses, so the
+row stays `[ ]` for an owner call.**
+
+*What was built.* `CaseSpec.decomposed` (AMR + n_procs > 1), `time_root()` and
+`time_dirs(name)` say where a written time lives; a decomposed run answers with one directory
+per rank. `backend.part_counts` learns each rank's cell count from its own `C` (memoised -
+and necessary, because a rank whose field is written `uniform` cannot report its own count),
+and `rd_scalar` / `rd_vector` concatenate the ranks in order. `mesh_at`, `read_2d`, `read_3d`,
+`read_fo_fields` and both `read_dir`s go through them, so nothing downstream of the remap
+changed. `maybe_reconstruct` skips decomposed runs entirely (there is nothing it can do), the
+ingest lists times from `processor0` and treats a time as ready only when EVERY rank has
+finished writing it, and `postmortem.load_run` follows the same path. The serial guards in
+`backend._preflight`, `env.plan_run` and `validate_case` are lifted.
+
+*It really is the same ingest.* `test_foam_amr_ingest` gains a 2-rank fake-time-dir case
+proving the decomposed read is **cell-for-cell identical** to the whole-mesh read of the same
+data (`np.array_equal`), that the ranks concatenate in rank order, and that a rank with a
+`uniform` field still contributes its own cell count.
+
+*Measured, 2D axisym AMR (8 kg, 1 x 2 m, base 0.02 m, 2 levels, maxCells 120k), np=2 vs
+serial on this 4-core / 4 GB VM:*
+
+```
+wall time     serial 340 s   np2 237 s    (1.43x)
+final mesh    serial 34,292  np2 34,712   cells (+1.2 %)
+gauge          serial arr   np2 arr    d%      serial pk   np2 pk     d%
+(0.5, 1.0)      0.1038 ms   0.1033   +0.51      8720 kPa  8789 kPa  +0.80
+(0.7, 1.0)      0.1750 ms   0.1744   +0.36      5532 kPa  5678 kPa  +2.64
+```
+
+Arrivals pass the brief's 1 % gate (0.51 % / 0.36 %) and one peak passes (0.80 %); **the
+second gauge's peak is 2.64 %, over the 1 % gate. The gate was NOT widened.**
+
+*Why it misses, and why it is not an ingest bug.* The two runs do not solve on the same mesh:
+with `loadBalance { balance no; }` each rank refines its own subdomain, so the refinement
+history differs and the final meshes differ by 1.2 %. Breaking the peak-overpressure map down
+by distance from the charge shows exactly that:
+
+```
+radius band    cells   median rel diff   p95      mean serial   mean np2
+0.00-0.15 m      358        12.755 %   91.96 %     7.116e+09    5.520e+09
+0.15-0.30 m     1056         0.475 %    2.81 %     2.263e+07    2.272e+07
+0.30-0.50 m     2516         0.498 %    2.93 %     1.155e+07    1.158e+07
+0.50-0.80 m     6124         0.665 %    3.79 %     6.001e+06    6.026e+06
+0.80-2.00 m     9946         0.000 %   48.86 %     1.238e+06    1.316e+06
+```
+
+The disagreement is concentrated in the 358 charge-region cells (7 GPa products, where the
+refinement pattern matters most) and in the shock front itself, where a fraction-of-a-cell
+shift in front position is a large local difference. Everywhere the blast loading is actually
+read the median difference is ~0.5 %. A mis-ordered concatenation would scramble the field
+and wreck the arrival times; instead arrivals agree to 0.4 % and the map correlates at 0.949.
+The 21.5 % difference in the map's MEAN is those 358 near-charge cells dominating a mean over
+20,000.
+
+*The owner call.* Either (a) accept that serial and parallel AMR are different discretisations
+and set the e2e gate on gauge peaks to ~3 % with this table as the justification, or (b) keep
+1 % and treat it as a real requirement, which then needs `loadBalance` balancing on (which
+needs `addEmptyPatch internalPatch internal -overwrite -parallel` first, per the N16 notes) or
+a coarser acceptance point away from the charge. I did not choose for you, and I did not
+weaken the gate to make the row green.
+
+`_e2e_foam_amr2d.py` gains `--np=N`. Tests: test_regression byte-identical, test_foam_writer,
+test_foam_env, test_case_validate, test_refine (its "AMR runs serially" assertion updated to
+the new behaviour), test_foam_amr_ingest (+9 new checks), test_foam_ingest_order (its fake
+spec now offers `time_root`/`time_dirs`), test_gui_amr_form, test_gui_solver_mode,
+test_gui_drain all PASS. **Not run:** `test_foam_postmortem` on a decomposed AMR run - the
+post-mortem path is wired and unit-covered, but I did not re-run that WSL suite against a
+freshly decomposed AMR case. No orphaned solvers.
+
 ### T43 — Resume a stopped foam run (N6)
 
 ```
@@ -1558,7 +1628,16 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
     AMR mesh follows the shock and is at its finest level there, the static `zone` reference
     refines only around the charge - measured with `_e2e_foam_probe_study.py`
     (+4.2 % at a cell corner, -11.5 % at a base-cell centre, peaks 57-171 % apart)
-  - **N16-b** parallel AMR (`loadBalance { balance no; }` 41 s vs 52 s serial; `reconstructPar -newTimes` fails on a changed mesh; `reconstructParAll -time t` works; direct `processor*/` reads preferred) — → **T42**
+  - **N16-b** parallel AMR — IMPLEMENTED (2026-09-07, T42), row still `[ ]`: the ingest
+    reads `processor*/` directly and concatenates per rank (cell-for-cell identical to the
+    serial read, unit-pinned), `maybe_reconstruct` skips decomposed runs and the serial
+    guards are lifted. Measured np=2 vs serial: **340 s → 237 s (1.43x)**, arrivals +0.51 %
+    / +0.36 %, peaks +0.80 % / **+2.64 %**. That last number is over the brief's 1 % gate,
+    which was NOT widened: serial and parallel AMR are different discretisations
+    (`balance no` refines per subdomain; final meshes differ 1.2 %), and the peak-map
+    disagreement is confined to the 358 charge-region cells (median 12.8 %) while the
+    blast-loading region agrees to ~0.5 %. Owner call: accept ~3 % on near-field AMR peaks,
+    or require balancing — → **T42**
 - N17 hardware-aware run plan — DONE (2026-09-07, T48; pure `env.plan_run` + `RunPlan`,
   `detect_ram_gb`/`hardware()`/`prime_hardware`, an 11-row pinned decision table and a
   432-case invariant sweep. **Measured** `BYTES_PER_CELL = 2650` (blastFoam serial 3D peak

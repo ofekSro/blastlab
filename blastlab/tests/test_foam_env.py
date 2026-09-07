@@ -57,7 +57,7 @@ def run_plan_checks():
         ('explicit request wins',      P(4, 10 ** 6, 8, 16, 3, 0), 4, True),
         ('explicit beats every floor', P(6, 1000, 8, 16, 3, 0), 6, True),
         ('1D is serial',               P(0, 10 ** 7, 8, 16, 1, 0), 1, True),
-        ('AMR is serial (T42)',        P(0, 10 ** 7, 8, 16, 3, 2), 1, True),
+        ('AMR goes parallel (T42)',    P(0, 10 ** 7, 8, 16, 3, 2), 7, True),
         ('tiny grid is serial',        P(0, 120_000, 8, 16, 3, 0), 1, True),
         ('cores-limited',              P(0, 10 ** 7, 8, 64, 3, 0), 7, True),
         ('cells-limited',              P(0, 300_000, 32, 64, 3, 0), 6, True),

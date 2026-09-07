@@ -626,9 +626,9 @@ def validate_case(case, pending_inputs=False):
                 rep.lmax = plan.lmax
                 rep.dx_fine = plan.dx_base / 2 ** plan.amr
                 rep.n_fine = plan.n_fine
-                if getattr(case, 'n_procs', 0) > 1:
-                    note("AMR runs serially in this version (MPI ranks "
-                         "ignored)")
+                # T42/N16-b: AMR runs in parallel; the ingest reads
+                # processor*/ directly (reconstructPar cannot follow a
+                # mesh that changes between writes)
     elif case.dim >= 2 and (zones or cref == 'zone'):
         if not foam:
             err("Local mesh refinement (refinement zones / charge "

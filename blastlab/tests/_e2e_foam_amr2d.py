@@ -84,7 +84,16 @@ def main():
     base = dict(geometry='planar', Lx=4.0, Ly=4.0, charge=100.0,
                 center=(2.0, 2.0), gauges=[(3.2, 2.0)], n_snapshots=2,
                 solver='blastfoam', material='TNT')
-    amr = Case2D(cell_size_m=0.2, amr_levels=3, **base)
+    # --np=N (T42/N16-b): run the AMR case on N MPI ranks. Its written
+    # times then stay in processor*/ and the ingest concatenates them,
+    # because reconstructPar cannot follow a mesh that changes.
+    np_req = 0
+    for a in sys.argv[1:]:
+        if a.startswith('--np='):
+            np_req = int(a.split('=', 1)[1])
+    amr = Case2D(cell_size_m=0.2, amr_levels=3, n_procs=np_req, **base)
+    if np_req:
+        print(f'  (AMR on {np_req} MPI ranks)')
     res, h, wall_amr = run(amr, 'AMR (base 0.2 m, 3 levels)')
     m = res.meta
 

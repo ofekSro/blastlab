@@ -10,6 +10,7 @@ a non-AMR spec yields `mesh_at(...) is None` and the old stage list.
 
 Run:  cd blastlab/tests && python test_foam_amr_ingest.py
 """
+import io
 import os
 import shutil
 import sys
@@ -288,6 +289,79 @@ def test_mesh_at_and_decode():
         shutil.rmtree(root, ignore_errors=True)
 
 
+
+def test_decomposed_parts():
+    """T42/N16-b: a parallel AMR run keeps its written times in
+    processor*/ (reconstructPar cannot follow a changing mesh), so the
+    ingest reads every rank and concatenates before the remap."""
+    print("\nT42: decomposed (processor*/) AMR ingest")
+    root = tempfile.mkdtemp(prefix='blastlab_amr_np_')
+    try:
+        case, spec = amr_spec(root)
+        spec.n_procs = 2
+        check('spec.decomposed only for parallel AMR', spec.decomposed)
+        spec.n_procs = 1
+        check('serial AMR is not decomposed', not spec.decomposed)
+        spec.n_procs = 2
+
+        # the same 7-cell t1 mesh as the serial test, split over 2 ranks:
+        # rank 0 keeps the three base cells, rank 1 the refined block
+        C0 = block_centres(0, 0, 0.5, 2)
+        C1 = np.vstack([C0[:3], block_centres(0.5, 0.5, 0.25, 2)])
+        lv1 = [0, 0, 0, 1, 1, 1, 1]
+        p1 = P_AIR + 1000.0 * np.arange(7)
+        for i, sl in enumerate((slice(0, 3), slice(3, 7))):
+            pu = os.path.join(root, f'processor{i}')
+            os.makedirs(pu, exist_ok=True)
+            write_time(pu, '1e-05', 1e-5, C1[sl], list(lv1)[sl], p1[sl])
+
+        d = spec.time_dirs('1e-05')
+        check('time_dirs -> one dir per rank, in rank order',
+              isinstance(d, list) and len(d) == 2
+              and d[0].endswith(os.path.join('processor0', '1e-05'))
+              and d[1].endswith(os.path.join('processor1', '1e-05')), str(d))
+        check('time_root is processor0',
+              spec.time_root().endswith('processor0'), spec.time_root())
+
+        check('part_counts reads each rank own cell count',
+              backend.part_counts(spec, d) == [3, 4],
+              str(backend.part_counts(spec, d)))
+        got = backend.rd_scalar(spec, d, 'p', None)
+        check('rd_scalar concatenates the ranks in order',
+              np.allclose(got, p1), str(got))
+
+        mesh = backend.mesh_at(spec, d)
+        check('mesh_at over the parts == the whole-mesh result',
+              mesh is not None and mesh.n_cells == 7,
+              str(None if mesh is None else mesh.n_cells))
+
+        # the same time written whole, for a value-for-value comparison
+        root2 = tempfile.mkdtemp(prefix='blastlab_amr_whole_')
+        try:
+            _c2, spec2 = amr_spec(root2)
+            write_time(root2, '1e-05', 1e-5, C1, lv1, p1)
+            whole = backend.read_2d(spec2.time_dirs('1e-05'), spec2,
+                                    ('p',), mesh=backend.mesh_at(
+                                        spec2, spec2.time_dirs('1e-05')))
+            split = backend.read_2d(d, spec, ('p',), mesh=mesh)
+            check('decomposed ingest == serial ingest, cell for cell',
+                  np.array_equal(whole['p'], split['p']),
+                  f"{whole['p'][:2, :2]} vs {split['p'][:2, :2]}")
+        finally:
+            shutil.rmtree(root2, ignore_errors=True)
+
+        # a rank whose field is written `uniform` still contributes its
+        # own cell count (that is why part_counts reads C, not the field)
+        pu = os.path.join(root, 'processor1', '1e-05')
+        with io.open(os.path.join(pu, 'p'), 'w', encoding='ascii',
+                     newline='\n') as f:
+            f.write(field_text('volScalarField', 'p', uniform=P_AIR))
+        got = backend.rd_scalar(spec, d, 'p', None)
+        check('a rank with a uniform field still yields its cell count',
+              len(got) == 7 and np.allclose(got[3:], P_AIR), str(got))
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
 def test_label_list():
     print("\nread_label_list (ascii + binary)")
     root = tempfile.mkdtemp(prefix='blastlab_amr_')
@@ -319,6 +393,7 @@ def test_label_list():
 if __name__ == '__main__':
     test_stages_and_static_inertness()
     test_mesh_at_and_decode()
+    test_decomposed_parts()
     test_label_list()
     print()
     print('FOAM AMR INGEST: ' + ('PASS' if not FAILS else f'FAIL ({len(FAILS)}): ' + ', '.join(FAILS)))

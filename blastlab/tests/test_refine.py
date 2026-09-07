@@ -494,8 +494,12 @@ def test_amr():
           any('AMR max cells' in e for e in validate_case(g).errors))
     g.amr_max_cells = 0
     g.n_procs = 4
-    check('AMR + MPI ranks -> serial note',
-          any('serially' in n for n in validate_case(g).notes))
+    # T42/N16-b: AMR runs in parallel now - the ingest reads
+    # processor*/ directly instead of reconstructing
+    check('AMR + MPI ranks -> the requested ranks, not a serial note',
+          any('4 MPI ranks' in n for n in validate_case(g).notes)
+          and not any('serially' in n for n in validate_case(g).notes),
+          str(validate_case(g).notes))
 
 
 def test_amr_centres():

@@ -65,7 +65,12 @@ def test_ordered_ingest():
     print("\nB16: strictly ordered ingest")
     root = tempfile.mkdtemp(prefix='blastlab_ingest_')
     try:
-        spec = types.SimpleNamespace(case_unc=root)
+        # the ingest asks the spec where a written time lives (T42:
+        # a decomposed AMR run answers with one dir per rank)
+        spec = types.SimpleNamespace(
+            case_unc=root, amr=0, n_procs=1, decomposed=False,
+            time_root=lambda: root,
+            time_dirs=lambda name: os.path.join(root, name))
         hooks = Log()
         order = runloop.OrderedIngest(spec, FIELDS, hooks)
         make_dir(root, '0')

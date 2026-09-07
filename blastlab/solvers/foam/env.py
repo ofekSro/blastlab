@@ -301,8 +301,8 @@ def plan_run(n_req, n_cells, cores=None, ram_gb=None, dim=3, amr=0,
         return plan(int(n_req), 'requested: %d MPI ranks' % int(n_req))
     if dim == 1:
         return plan(1, 'serial: 1D runs are a single wedge')
-    if amr:
-        return plan(1, 'serial: dynamic AMR (parallel AMR is T42)')
+    # dynamic AMR runs in parallel since T42 (N16-b) - the ingest reads
+    # processor*/ directly, so no reconstruction is needed
     if n_cells < AUTO_PARALLEL_MIN_CELLS:
         return plan(1, '1 rank: %s cells is below the %s-cell parallel '
                        'floor' % (format(int(n_cells), ','),

@@ -158,6 +158,46 @@ def build_remap(spec, hooks):
               f'{" x ".join(str(n) for n in spec.levels.shape)} grid)')
 
 
+def part_counts(spec, dpath):
+    """Cells per part of a decomposed time, learned from each part's own
+    `C` (memoised per time: every field read needs the same numbers, and
+    a rank whose field happens to be `uniform` cannot report its own
+    count). None for an ordinary single-directory time."""
+    if not isinstance(dpath, (list, tuple)):
+        return None
+    key = tuple(dpath)
+    memo = getattr(spec, '_part_n', None)
+    if memo is None:
+        memo = spec._part_n = {}
+    if key not in memo:
+        memo[key] = [len(reader.read_vector(os.path.join(d, 'C'), None))
+                     for d in dpath]
+    return memo[key]
+
+
+def rd_scalar(spec, dpath, field, n_cells):
+    """One scalar field of a time, whole or concatenated across ranks."""
+    if isinstance(dpath, (list, tuple)):
+        return np.concatenate([
+            reader.read_scalar(os.path.join(d, field), k)
+            for d, k in zip(dpath, part_counts(spec, dpath))])
+    return reader.read_scalar(os.path.join(dpath, field), n_cells)
+
+
+def rd_vector(spec, dpath, field, n_cells):
+    """One vector field of a time, whole or concatenated across ranks."""
+    if isinstance(dpath, (list, tuple)):
+        return np.concatenate([
+            reader.read_vector(os.path.join(d, field), k)
+            for d, k in zip(dpath, part_counts(spec, dpath))])
+    return reader.read_vector(os.path.join(dpath, field), n_cells)
+
+
+def first_part(dpath):
+    """The part that stands for the whole time dir (existence checks)."""
+    return dpath[0] if isinstance(dpath, (list, tuple)) else dpath
+
+
 def mesh_at(spec, dpath):
     """Dynamic AMR (N16): the structure of ONE written time dir - a
     core.refine.MeshMap built from that dir's cell centres `C` (the
@@ -170,16 +210,22 @@ def mesh_at(spec, dpath):
     display grid raises RuntimeError (fatal, case kept)."""
     if not spec.amr:
         return None
-    C = reader.read_vector(os.path.join(dpath, 'C'), None)
-    lv_path = os.path.join(dpath, 'cellLevel')
-    if os.path.isfile(lv_path):
-        lv = reader.read_scalar(lv_path, len(C))
-    else:
-        pm = os.path.join(dpath, 'polyMesh', 'cellLevel')
-        lv = (reader.read_label_list(pm) if os.path.isfile(pm)
-              else np.zeros(len(C), dtype=np.int64))
-        if len(lv) != len(C):
-            raise ValueError(f'{pm}: {len(lv)} levels for {len(C)} cells')
+    C = rd_vector(spec, dpath, 'C', None)
+    parts = dpath if isinstance(dpath, (list, tuple)) else [dpath]
+    ns = part_counts(spec, dpath) or [len(C)]
+    lv_chunks = []
+    for d, k in zip(parts, ns):
+        lv_path = os.path.join(d, 'cellLevel')
+        if os.path.isfile(lv_path):
+            lv_chunks.append(reader.read_scalar(lv_path, k))
+            continue
+        pm = os.path.join(d, 'polyMesh', 'cellLevel')
+        chunk = (reader.read_label_list(pm) if os.path.isfile(pm)
+                 else np.zeros(k, dtype=np.int64))
+        if len(chunk) != k:
+            raise ValueError(f'{pm}: {len(chunk)} levels for {k} cells')
+        lv_chunks.append(chunk)
+    lv = np.concatenate(lv_chunks) if len(lv_chunks) > 1 else lv_chunks[0]
     return refine.remap_from_centres(C[:, :spec.dim], lv, spec.grid,
                                      spec.display_level, spec.solid)
 
@@ -223,10 +269,12 @@ def _preflight(case, hooks):
     # effective rank count: 1D always serial; auto stays serial for
     # small grids (decompose overhead beats the speed-up there)
     plan = writer.plan_case(case)
-    # AMR runs are serial in this version (ROADMAP N16: reconstructPar
-    # cannot follow a changing mesh; the parallel path is a follow-up)
-    n_procs = 1 if (case.dim == 1 or plan.amr) else env.resolve_nprocs(
-        getattr(case, 'n_procs', 0), plan.n_cells)
+    # AMR runs go parallel too since T42 (N16-b): reconstructPar still
+    # cannot follow a changing mesh, so those runs are ingested straight
+    # from processor*/ instead of being reconstructed.
+    n_procs = 1 if case.dim == 1 else env.resolve_nprocs(
+        getattr(case, 'n_procs', 0), plan.n_cells,
+        dim=case.dim, amr=plan.amr)
     # the live-sample cadence follows the GUI's "Refresh every N steps"
     # from the first step (the run loop re-syncs it on later changes)
     spec = writer.write_case(
@@ -597,15 +645,13 @@ def read_2d(dpath, spec, what=('p',), mesh=None):
     out = {}
     n = spec.n_cells if mesh is None else mesh.n_cells
     if 'p' in what:
-        out['p'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
-            fill=P_AIR, mesh=mesh)
+        out['p'] = reader.to_grid(rd_scalar(spec, dpath, 'p', n), spec,
+                                  fill=P_AIR, mesh=mesh)
     if 'rho' in what:
-        out['rho'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
-            fill=RHO_AIR, mesh=mesh)
+        out['rho'] = reader.to_grid(rd_scalar(spec, dpath, 'rho', n), spec,
+                                    fill=RHO_AIR, mesh=mesh)
     if 'U' in what:
-        flat = reader.read_vector(os.path.join(dpath, 'U'), n)
+        flat = rd_vector(spec, dpath, 'U', n)
         out['u'] = reader.to_grid(flat[:, 0], spec, mesh=mesh)
         out['v'] = reader.to_grid(flat[:, 1], spec, mesh=mesh)
     return out
@@ -745,7 +791,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True):
     slice_solid = solid if solid.any() else None
 
     def read_dir(name, dpath):
-        t, _dt = reader.read_time(dpath)
+        t, _dt = reader.read_time(first_part(dpath))
         mesh = mesh_at(spec, dpath)         # None on a static mesh
         return t, read_2d(dpath, spec, mesh=mesh)['p'], mesh
 
@@ -830,31 +876,30 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     # final_state for save_profile_2d -> 3D remap: e from T (per-phase
     # Cv - blastFoam writes no e field), phase from the products alpha
     def read_final(name):
-        dpath = os.path.join(spec.case_unc, name)
+        dpath = spec.time_dirs(name)
         mesh = mesh_at(spec, dpath)
         n = spec.n_cells if mesh is None else mesh.n_cells
         got = read_2d(dpath, spec, ('p', 'rho', 'U'), mesh=mesh)
-        alpha = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, f'alpha.{spec.phase}'), n),
+        alpha = reader.to_grid(
+            rd_scalar(spec, dpath, f'alpha.{spec.phase}', n),
             spec, fill=0.0, mesh=mesh)
         phase = (alpha > 0.5).astype(int)
-        T = reader.to_grid(reader.read_scalar(
-            os.path.join(dpath, 'T'), n), spec,
-            fill=writer.T_AMB, mesh=mesh)
+        T = reader.to_grid(rd_scalar(spec, dpath, 'T', n), spec,
+                           fill=writer.T_AMB, mesh=mesh)
         return got, phase, np.where(phase == 1, m.Cv_products,
                                     writer.CV_AIR) * T, mesh
 
     names, (fin, phase, e_arr, mesh_fin) = _final_read(
         hooks, names, ingested.get, read_final)
     fin_name = names[-1]
-    dfin = os.path.join(spec.case_unc, fin_name)
+    dfin = spec.time_dirs(fin_name)
     snap_names = [n for n in snap_names if n in names]
 
     snapshots = {}
     for name in snap_names:
         if name == fin_name:
             continue
-        dp = os.path.join(spec.case_unc, name)
+        dp = spec.time_dirs(name)
         got = read_2d(dp, spec, ('p', 'rho', 'U'), mesh=mesh_at(spec, dp))
         t = ingested[name]
         label = f"t = {t*1e3:.3f} ms"
@@ -971,15 +1016,13 @@ def read_3d(dpath, spec, what=('p',), mesh=None):
     out = {}
     n = spec.n_cells if mesh is None else mesh.n_cells
     if 'p' in what:
-        out['p'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'p'), n), spec,
-            fill=P_AIR, mesh=mesh)
+        out['p'] = reader.to_grid(rd_scalar(spec, dpath, 'p', n), spec,
+                                  fill=P_AIR, mesh=mesh)
     if 'rho' in what:
-        out['rho'] = reader.to_grid(
-            reader.read_scalar(os.path.join(dpath, 'rho'), n), spec,
-            fill=RHO_AIR, mesh=mesh)
+        out['rho'] = reader.to_grid(rd_scalar(spec, dpath, 'rho', n), spec,
+                                    fill=RHO_AIR, mesh=mesh)
     if 'U' in what:
-        flat = reader.read_vector(os.path.join(dpath, 'U'), n)
+        flat = rd_vector(spec, dpath, 'U', n)
         out['U'] = np.stack([reader.to_grid(flat[:, i], spec, mesh=mesh)
                              for i in range(3)], axis=-1)
     return out
@@ -1204,7 +1247,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True):
     def read_dir(name, dpath):
         will_3d = (due_sparse(hooks.refresh3d, loop.st['step'], live3d)
                    or hooks.exec_will_pause()) and hooks.wants_frame3d()
-        t, _dt = reader.read_time(dpath)
+        t, _dt = reader.read_time(first_part(dpath))
         mesh = mesh_at(spec, dpath)         # None on a static mesh
         got = read_3d(dpath, spec, ('p', 'rho') if will_3d else ('p',),
                       mesh=mesh)
@@ -1310,7 +1353,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     names = sorted(ingested, key=ingested.get)
 
     def read_final(name):
-        dpath = os.path.join(spec.case_unc, name)
+        dpath = spec.time_dirs(name)
         mesh = mesh_at(spec, dpath)
         return read_3d(dpath, spec, ('p', 'rho', 'U'), mesh=mesh), mesh
 
@@ -1323,7 +1366,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     for name in snap_names:
         if name == fin_name:
             continue
-        dpath = os.path.join(spec.case_unc, name)
+        dpath = spec.time_dirs(name)
         got = read_3d(dpath, spec, ('p', 'rho', 'U'),
                       mesh=mesh_at(spec, dpath))
         t = ingested[name]
@@ -1338,7 +1381,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     # final-dir FO fields (per-step accumulation) supersede the per-write
     # Python accumulator; a stale FO read does not (B17)
     p_peak, impulse, peak_source = acc.final(
-        fin['p'], os.path.join(spec.case_unc, fin_name), t_fin, spec,
+        fin['p'], spec.time_dirs(fin_name), t_fin, spec,
         mesh=mesh_fin)
     if record_frames > 0 and (not frame_t or frame_t[-1] < t_fin):
         frame_t.append(t_fin)

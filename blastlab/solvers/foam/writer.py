@@ -114,6 +114,30 @@ class CaseSpec:
     t_start: float = 0.0
 
     @property
+    def decomposed(self):
+        """True while written times live in processor*/ instead of the
+        case root. Uniform parallel runs are reconstructed back to the
+        root by the run loop; a parallel AMR run cannot be (the mesh
+        changes under reconstructPar), so its times stay per-rank and
+        the ingest concatenates them - N16-b/T42."""
+        return bool(self.amr and self.n_procs > 1)
+
+    def time_root(self):
+        """The directory whose subdirs name the written times."""
+        return (os.path.join(self.case_unc, 'processor0')
+                if self.decomposed else self.case_unc)
+
+    def time_dirs(self, name):
+        """Directory (or, decomposed, directories) holding time `name`.
+        A list means "one part per rank, concatenate in order" - safe
+        because the AMR remap is geometric, so cell order carries no
+        meaning beyond matching C/cellLevel/fields within a part."""
+        if not self.decomposed:
+            return os.path.join(self.case_unc, name)
+        return [os.path.join(self.case_unc, 'processor%d' % i, name)
+                for i in range(self.n_procs)]
+
+    @property
     def start_dir(self):
         """Name of the time directory the initial fields live in. A
         profile stage continues an earlier stage's clock, so its state
