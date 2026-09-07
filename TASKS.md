@@ -592,8 +592,9 @@ Requirements:
    ResultsPanel, ChainPanel. Case.solver stays the persisted field - the selector writes
    it; do not fork the data model. Remove the Solver combo from the Numerics card.
 2. Open case… / Save case… sync the selector from/to the loaded case and re-layout.
-3. Chain tab: every stage inherits the global solver (simplest, matches "one mode"); a
-   per-stage override is out of scope - state that in the docs.
+3. Chain tab: every stage is PRESET from the global solver and can be overridden per
+   stage with a small native|blastFoam switch above its form (owner decision: a foam
+   1D stage can feed native 2D/3D stages today; T41 unlocks foam 2D/3D).
 4. Switching solver never loses input: hidden fields keep their Tk vars and come back on
    switch-back; validation considers only the fields relevant to the active solver.
 5. Show/hide re-flows the cards (grid_forget/regrid), the scrollable form re-measures, no
@@ -1076,7 +1077,6 @@ Commit: "T47: opt-in MUSCL second-order reconstruction for the native solvers (N
   `solver1d.py:242`); `n_snapshots` semantics differ 1D vs 2D/3D. Any of these that touches
   solver stdout needs a re-baseline.
 - Chain tab foam e2e driver (`_e2e_gui_foam.py`-style) once T41 lands.
-- Per-stage solver override in the Chain tab (T34 decided "global inherits").
 
 ---
 
@@ -1203,6 +1203,7 @@ python test_gui_gauge_summary.py  # Gauges-tab table + CSV (headless Tk)
 python test_gui_run_browser.py    # foam run browser (headless Tk)
 python test_gui_refine_preview.py # zones form/preview + show-mesh
 python test_gui_amr_form.py       # AMR card + per-frame mesh
+python test_gui_solver_mode.py    # sidebar solver mode: hide/show, strip, chain presets, persist
 python test_foam_ingest_order.py  # ordered ingest + accumulators
 python test_foam_amr_ingest.py    # AMR per-time ingest on fake time dirs
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py / test_viz3d_panel.py
