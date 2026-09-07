@@ -1944,7 +1944,8 @@ def _chain_forms(qa, planar2d=False, foam2d=False):
 
 @scenario('G01', 'G', est=90)
 def g01_chain_validation(qa):
-    """Every Chain validation dialog, incl. the foam-from-profile refusal."""
+    """Every Chain validation dialog; a foam stage fed by a profile is
+    accepted since T41 (N7)."""
     qa.goto('chain')
     _chain_forms(qa)
     ch = qa.app.chain
@@ -1968,17 +1969,25 @@ def g01_chain_validation(qa):
     ch.forms[2].v['geometry'].set('axisymmetric')
     ch.set_stage_solver(2, 'blastfoam')        # per-stage override (T34)
     qa.pump(0.3)
-    ch._run()
-    qa.pump(0.3)
-    dl = os.path.join(qa.out, 'dialogs.jsonl')
-    with open(dl, encoding='utf-8') as f:
-        recs = [json.loads(l) for l in f]
-    recs = [r for r in recs if r['scenario'] == 'G01']
-    texts = [r['text'] for r in recs]
-    qa.check(any('blastFoam stages cannot start from a profile yet' in t
-                 for t in texts),
-             'foam 2D stage fed by 1D -> N7 refusal dialog (uncommitted '
-             'stage_errors)', 'S1', evidence=str(texts[-1:]))
+    # T41/N7: a blastFoam stage fed by the 1D stage's profile is now
+    # wired and accepted, so this configuration no longer produces a
+    # refusal. Checked WITHOUT pressing Run (which would start a real
+    # multi-minute chain): the panel's own validator is what the Run
+    # button consults, so the same wiring is exercised.
+    from blastlab.gui.chain_panel import stage_errors as _stage_errors
+    from blastlab.core.case import Case1D, Case2D
+    _c1 = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                 profile_file='p1.txt')
+    _c2 = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
+                 cell_size_m=0.02, charge=1.0, center=(0.0, 1.0),
+                 solver='blastfoam', init_mode='profile1d',
+                 profile_file_in='p1.txt')
+    _errs = _stage_errors([1, 2], {1: _c1, 2: _c2})
+    qa.check(not any('cannot start from a profile' in e for e in _errs)
+             and _errs == [],
+             'foam 2D stage fed by 1D is accepted (N7 refusal gone)',
+             'S1', evidence=str(_errs))
+    qa.shot('chain_foam_stage_accepted')
     ch.set_stage_solver(2, 'native')
     ch.forms[2].v['Lx'].set('abc')
     qa.pump(0.3)

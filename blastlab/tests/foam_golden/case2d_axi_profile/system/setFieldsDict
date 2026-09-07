@@ -1,0 +1,19 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      setFieldsDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+fields (alpha.expl);
+nBufferLayers   1;
+defaultFieldValues
+(
+    volScalarFieldValue alpha.expl 0
+);
+regions ();
+
+// ************************************************************************* //

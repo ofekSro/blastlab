@@ -28,17 +28,10 @@ def stage_errors(stages, cases):
         case = cases[d]
         # every stage but the first is fed by the one before it, so its
         # profile input cannot exist on disk yet
+        # blastFoam stages fed by a profile are supported since T41 (N7):
+        # the remapped state is written into 0/ as nonuniform fields.
         msgs = list(validate_case(
             case, pending_inputs=(d != stages[0])).errors)
-        if (getattr(case, 'solver', 'native') == 'blastfoam'
-                and getattr(case, 'init_mode', 'charge') != 'charge'):
-            # the chain wired this profile init, not the user, so say so
-            # instead of repeating validate_case's generic phrasing
-            msgs = [m for m in msgs if 'Profile initialization' not in m]
-            msgs.insert(0, 'blastFoam stages cannot start from a profile '
-                           'yet (ROADMAP N7) - run this stage with the '
-                           'native solver, or drop the stage that feeds '
-                           'it')
         errors += [f'Stage {d} ({d}D): {m}' for m in msgs]
     return errors
 

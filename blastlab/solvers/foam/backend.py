@@ -97,7 +97,12 @@ def _mesh_stages(spec, hooks):
                    (f'{lbl} - refineMesh',
                     f'refineMesh -dict system/refineMeshDict.{lv} '
                     f'-overwrite')]
-    if spec.amr:
+    if not spec.charges:
+        # profile-initialised stage (N7): 0/ already holds the remapped
+        # state, and setRefinedFields would overwrite alpha with the
+        # dict's defaultFieldValues - skip it entirely
+        pass
+    elif spec.amr:
         # dynamic AMR (N16): setRefinedFields refines the charge region
         # to `maxRefinement` at t = 0 and writes the hexRef cellLevel the
         # run-time refiner continues from - the static path's -noRefine
@@ -112,8 +117,10 @@ def _mesh_stages(spec, hooks):
         stages.append(('writing cell centres (writeCellCentres)',
                        'postProcess -func writeCellCentres -time 0'))
     if spec.n_procs > 1:
+        # a profile stage's fields live at t0, not 0 (N7)
         stages.append((f'decomposing for {spec.n_procs} MPI ranks',
-                       'decomposePar -force'))
+                       'decomposePar -force'
+                       + ('' if not spec.t_start else ' -latestTime')))
     return stages
 
 
@@ -1018,15 +1025,16 @@ def _initial_frame(spec, hooks, live_sl=None):
     the plot shows a live view immediately instead of staying empty
     until the first time directory lands."""
     try:
-        p0 = reader.read_scalar(os.path.join(spec.case_unc, '0', 'p'),
-                                spec.n_cells)
+        p0 = reader.read_scalar(
+            os.path.join(spec.case_unc, spec.start_dir, 'p'), spec.n_cells)
     except (OSError, ValueError):
         return
+    t0 = spec.t_start
     if spec.dim == 1:
-        hooks.frame(np.array([spec.grid['r'], p0]), 0.0)
+        hooks.frame(np.array([spec.grid['r'], p0]), t0)
     else:
         p0 = reader.to_grid(p0, spec, fill=P_AIR, mesh=spec.mesh0)
-        hooks.frame(p0 if live_sl is None else p0[live_sl].copy(), 0.0)
+        hooks.frame(p0 if live_sl is None else p0[live_sl].copy(), t0)
 
 
 def _initial_frame3d(spec, hooks):
@@ -1038,8 +1046,8 @@ def _initial_frame3d(spec, hooks):
         return
     try:
         p0 = reader.to_grid(reader.read_scalar(
-            os.path.join(spec.case_unc, '0', 'p'), spec.n_cells), spec,
-            fill=P_AIR, mesh=spec.mesh0)
+            os.path.join(spec.case_unc, spec.start_dir, 'p'),
+            spec.n_cells), spec, fill=P_AIR, mesh=spec.mesh0)
     except (OSError, ValueError):
         return
     rho0 = np.full_like(p0, RHO_AIR)

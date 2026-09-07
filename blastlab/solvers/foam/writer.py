@@ -27,6 +27,8 @@ import math
 import os
 from dataclasses import dataclass, field
 
+import numpy as np
+
 from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS,
                                FOAM_CELLS_WARN)
 from ...core import refine
@@ -104,6 +106,21 @@ class CaseSpec:
     #: mesh can be a long way from the requested point and, under AMR,
     #: pins the sample to a cell that later refines under it (N16-a/T40).
     probe_adjust: str = 'yes'
+    #: profile-initialised stage (N7): (rho, u, v, w, e, phase) arrays on
+    #: the case grid plus the profile's start time. None = charge init.
+    init_state: dict = None
+    #: physical time the run starts at - 0 for a charge, the profile's
+    #: own time for a stage continuing an earlier one (N7)
+    t_start: float = 0.0
+
+    @property
+    def start_dir(self):
+        """Name of the time directory the initial fields live in. A
+        profile stage continues an earlier stage's clock, so its state
+        is written at t0 and picked up with `startFrom latestTime` -
+        blastFoam then takes the time from the directory NAME, which
+        avoids having to reproduce OpenFOAM's own time formatting."""
+        return '0' if not self.t_start else fmt(float(self.t_start))
     patches: list = field(default_factory=list)     # (name, kind)
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
     solid: object = None            # (nx,ny,nz) bool mask, None = none
@@ -234,7 +251,9 @@ def plan_case(case):
 
     if case.dim == 2:
         planar = case.geometry == 'planar'
-        r_exp = charge_radius(case.charge, m, planar=planar)
+        init_mode = getattr(case, 'init_mode', 'charge')
+        r_exp = (charge_radius(case.charge, m, planar=planar)
+                 if init_mode == 'charge' else 0.0)
         # base spacing (charge auto-refine unless charge_refine='zone')
         # + zones -> the fine display grid the reader scatters onto
         plan = refine.plan_levels(case, rho0=m.rho0)
@@ -246,7 +265,8 @@ def plan_case(case):
                         nx=grid['Nx'], ny=grid['Ny'], dx=dx, r_exp=r_exp,
                         center=(x0, y0, 0.0), grid=grid)
         spec.apply_plan(plan)
-        spec.charges = [((x0, y0, 0.0), float(case.charge))]
+        spec.charges = ([((x0, y0, 0.0), float(case.charge))]
+                        if init_mode == 'charge' else [])
         spec.det_points = [
             ((0.0 if not planar else float(px)), float(py), 0.0)
             for px, py in (getattr(case, 'det_points', None) or [])]
@@ -296,11 +316,15 @@ def plan_case(case):
     # 3D - the primary charge plus any extras; the grid resolves the
     # SMALLEST charge, snapshot radii start from the largest
     x0, y0, z0 = case.center
-    charges = [((float(x0), float(y0), float(z0)), float(case.charge))]
-    for ex, ey, ez, mass in getattr(case, 'charges', None) or []:
-        charges.append(((float(ex), float(ey), float(ez)), float(mass)))
-    r_exps = [charge_radius(mass, m) for _c, mass in charges]
-    r_exp = max(r_exps)
+    init_mode = getattr(case, 'init_mode', 'charge')
+    if init_mode == 'charge':
+        charges = [((float(x0), float(y0), float(z0)), float(case.charge))]
+        for ex, ey, ez, mass in getattr(case, 'charges', None) or []:
+            charges.append(((float(ex), float(ey), float(ez)), float(mass)))
+        r_exps = [charge_radius(mass, m) for _c, mass in charges]
+        r_exp = max(r_exps)
+    else:
+        charges, r_exps, r_exp = [], [0.0], 0.0
     plan = refine.plan_levels(case, rho0=m.rho0)
     grid, dx = plan.fine, plan.dx_fine
     Ls = (grid['x_face'][-1], grid['y_face'][-1], grid['z_face'][-1])
@@ -337,7 +361,10 @@ def plan_case(case):
     # per open side: distance from the NEAREST charge (B21), mirroring
     # core.geometry.stop_dists_3d so timing is sized for the front that
     # reaches the boundary first
-    side_d = {s: min(d(c) for c, _m in charges) for s, d in (
+    # a profile-initialised stage has no charge list: the burst point is
+    # the profile's own centre, which is `case.center` (N7)
+    src = charges or [((x0, y0, z0), 0.0)]
+    side_d = {s: min(d(c) for c, _m in src) for s, d in (
         ('x_lo', lambda c: c[0]), ('x_hi', lambda c: Ls[0] - c[0]),
         ('y_lo', lambda c: c[1]), ('y_hi', lambda c: Ls[1] - c[1]),
         ('z_lo', lambda c: c[2]), ('z_hi', lambda c: Ls[2] - c[2]))}
@@ -542,10 +569,14 @@ def _refine_dicts(spec, case):
 def _controldict(spec, case):
     d = {
         'application': 'blastFoam',
-        'startFrom': 'startTime',
-        'startTime': 0,
+        # a profile-initialised stage continues an earlier stage's clock:
+        # its state is the blast at t0, so the run starts there and every
+        # gauge/frame time the user sees stays on one physical timeline
+        # (the native solvers do the same with the remap's t0). N7/T41.
+        'startFrom': 'startTime' if not spec.t_start else 'latestTime',
+        'startTime': spec.t_start,
         'stopAt': 'endTime',
-        'endTime': spec.end_time,
+        'endTime': spec.t_start + spec.end_time,
         'deltaT': Raw('1e-7'),
         'writeControl': 'adjustableRunTime',
         'writeInterval': spec.write_interval,
@@ -744,7 +775,12 @@ def _setfieldsdict(spec, case):
         # refines from there and re-selects with the true radius
         return max(2.0 * r, 0.9 * spec.dx_base) if spec.amr else 2.0 * r
 
-    if spec.dim == 2 and case.geometry == 'planar':
+    if not spec.charges:
+        # profile-initialised stage (N7): the state is already in 0/,
+        # there is no charge sphere to mark and setRefinedFields is not
+        # run at all (it would reset alpha to the default value)
+        regions = []
+    elif spec.dim == 2 and case.geometry == 'planar':
         x0, y0, _ = spec.center
         if spec.amr:
             # mass-based cylinder through the slab (per-metre charge x
@@ -912,8 +948,17 @@ def _decomposepardict(n_procs):
 
 # ── 0/ field files ──────────────────────────────────────────────────────────
 
-def _bc_entry(fld, kind):
-    """Boundary entry dict for one field on one patch kind."""
+def _bc_entry(fld, kind, p_value='$internalField'):
+    """Boundary entry dict for one field on one patch kind.
+
+    `p_value` is what the open-boundary pressure patch takes as its
+    `value`. It is `$internalField` for the uniform (charge-init) fields,
+    but a profile-initialised case has a NONUNIFORM internalField, and
+    expanding that into a patch field would hand blastFoam a list the
+    size of the mesh for a patch of a few hundred faces - the run aborts
+    in advectiveFvPatchField's Field constructor. Those cases pass an
+    explicit ambient value instead (the profile is ambient out there;
+    validate_case warns when the shock already reaches a boundary)."""
     if kind == 'wedge':
         return {'type': 'wedge'}
     if kind == 'empty':
@@ -922,7 +967,7 @@ def _bc_entry(fld, kind):
         return {'type': 'slip'} if fld == 'U' else {'type': 'zeroGradient'}
     # open
     if fld == 'p':
-        return {'type': P_OPEN_BC, 'value': Raw('$internalField')}
+        return {'type': P_OPEN_BC, 'value': Raw(p_value)}
     return {'type': 'zeroGradient'}
 
 
@@ -951,6 +996,121 @@ def _zero_fields(spec):
     }
 
 
+# ── profile-initialised stages (N7) ─────────────────────────────────────────
+
+def profile_state(case, spec):
+    """Remap a chain stage's input profile onto this case's cell grid.
+
+    Returns dict(rho, u, v, w, e, phase, t0) of (nx, ny[, nz]) arrays -
+    the same remap the native solvers use, so a chain hands blastFoam
+    exactly the state a native stage would have started from. `w` is
+    None in 2D."""
+    from ...core import profiles
+    mode = getattr(case, 'init_mode', 'charge')
+    path = getattr(case, 'profile_file_in', None)
+    if mode == 'charge' or not path:
+        return None
+    g = spec.grid
+    if spec.dim == 2:
+        prof = profiles.load_profile(path)
+        U, phase, t0 = profiles.remap_profile_1d_to_2d(
+            prof, g['x_c'], g['y_c'], case.center[1])
+        rho = U[0]
+        u, v, w = U[1] / rho, U[2] / rho, None
+        ke = 0.5 * (u ** 2 + v ** 2)
+    elif mode == 'profile2d':
+        prof = profiles.load_profile_2d(path)
+        U, phase, t0 = profiles.remap_profile_2d_to_3d(
+            prof, g['x_c'], g['y_c'], g['z_c'],
+            case.center[0], case.center[1])
+        rho = U[0]
+        u, v, w = U[1] / rho, U[2] / rho, U[3] / rho
+        ke = 0.5 * (u ** 2 + v ** 2 + w ** 2)
+    else:
+        prof = profiles.load_profile(path)
+        U, phase, t0 = profiles.remap_profile_1d_to_3d(
+            prof, g['x_c'], g['y_c'], g['z_c'], case.center)
+        rho = U[0]
+        u, v, w = U[1] / rho, U[2] / rho, U[3] / rho
+        ke = 0.5 * (u ** 2 + v ** 2 + w ** 2)
+    e = U[-1] / rho - ke
+    return dict(rho=rho, u=u, v=v, w=w, e=e, phase=phase, t0=float(t0),
+                r_exp=float(prof.get('r_exp', 0.0) or 0.0))
+
+
+def _cell_order(arr, spec):
+    """Grid array -> the mesh's cell order: x fastest (F order), and on
+    an obstacle-carved mesh only the fluid cells, ascending - the exact
+    inverse of reader.to_grid."""
+    flat = np.asarray(arr).ravel(order='F')
+    solid = getattr(spec, 'solid', None)
+    if solid is not None:
+        flat = flat[~np.asarray(solid).ravel(order='F')]
+    return flat
+
+
+def _nonuniform(vals, vector=False):
+    """`nonuniform List<scalar|vector> N ( ... )` for an internalField."""
+    sep = chr(10)
+    if vector:
+        rows = ['(' + ' '.join(fmt(float(c)) for c in row) + ')'
+                for row in vals]
+        kind = 'vector'
+    else:
+        rows = [fmt(float(x)) for x in vals]
+        kind = 'scalar'
+    head = 'nonuniform List<' + kind + '>' + sep + str(len(rows))
+    return Raw(head + sep + '(' + sep + sep.join(rows) + sep + ')')
+
+
+def _profile_fields(spec, case):
+    """0/ files for a profile-initialised stage: every field carries the
+    remapped state instead of an ambient uniform value.
+
+    The two-phase split is sharp (the native profile carries one mixture
+    density and an integer phase flag), so alpha is 0 or 1 and only the
+    active phase's density is meaningful in a cell. T is the inverse of
+    the reader's `e = Cv(phase) T`, and p comes from the native EOS the
+    profile was produced with, so the handover is the same state the
+    native solver would have continued from."""
+    from ...core.eos import pressure_soundspeed
+    st = spec.init_state
+    m = MATERIALS[spec.material]
+    phase = st['phase']
+    rho, e = st['rho'], st['e']
+    p, _c = pressure_soundspeed(rho, e, phase, getattr(case, 'eos',
+                                                       'idealGas'))
+    Cv = np.where(phase == 1, m.Cv_products, CV_AIR)
+    T = e / Cv
+    comps = [st['u'], st['v']]
+    comps.append(st['w'] if st['w'] is not None else np.zeros_like(rho))
+    U = np.stack([_cell_order(c, spec) for c in comps], axis=1)
+    fields = {
+        '0/p': ('p', 'p', _nonuniform(_cell_order(p, spec)), False),
+        '0/T': ('T', 'T', _nonuniform(_cell_order(T, spec)), False),
+        '0/U': ('U', 'U', _nonuniform(U, vector=True), True),
+        f'0/alpha.{PHASE}': (f'alpha.{PHASE}', 'alpha',
+                             _nonuniform(_cell_order(
+                                 phase.astype(float), spec)), False),
+        f'0/rho.{PHASE}': (f'rho.{PHASE}', 'rho', _nonuniform(_cell_order(
+            np.where(phase == 1, rho, m.rho0), spec)), False),
+        '0/rho.air': ('rho.air', 'rho', _nonuniform(_cell_order(
+            np.where(phase == 1, RHO_AIR, rho), spec)), False),
+    }
+    out = {}
+    for rel, (obj, fld, internal, vec) in fields.items():
+        bfield = {name: _bc_entry(fld, kind, f'uniform {fmt(P_AIR)}')
+                  for name, kind in spec.patches}
+        body = block({
+            'dimensions': Raw(_DIMS[fld]),
+            'internalField': internal,
+            'boundaryField': bfield,
+        })
+        cls = 'volVectorField' if vec else 'volScalarField'
+        out[rel] = foam_file(obj, body, cls=cls)
+    return out
+
+
 # ── top level ───────────────────────────────────────────────────────────────
 
 def render_case(case, n_procs=1, live_steps=0):
@@ -964,6 +1124,14 @@ def render_case(case, n_procs=1, live_steps=0):
     spec.live_steps = max(0, int(live_steps or 0))
     spec.probe_adjust = ('no' if getattr(case, 'probe_adjust', True) is False
                          else 'yes')
+    # a chain stage fed by a profile carries its state instead of a
+    # charge sphere (N7): remapped once here, emitted into 0/ below
+    spec.init_state = profile_state(case, spec)
+    if spec.init_state is not None:
+        spec.t_start = float(spec.init_state['t0'])
+        # keep the SOURCE charge radius so the next stage in the chain
+        # (and the run meta) still knows how big the charge was
+        spec.r_exp = spec.init_state['r_exp']
     afterburn = getattr(case, 'afterburn', 'none') or 'none' 
     if spec.dim == 1:
         bmd = _blockmesh_1d(spec)
@@ -990,7 +1158,12 @@ def render_case(case, n_procs=1, live_steps=0):
     if spec.n_procs > 1:
         spec.files['system/decomposeParDict'] = \
             _decomposepardict(spec.n_procs)
-    spec.files.update(_zero_fields(spec))
+    if spec.init_state is None:
+        spec.files.update(_zero_fields(spec))
+    else:
+        d = spec.start_dir
+        spec.files.update({d + rel[1:]: text for rel, text
+                           in _profile_fields(spec, case).items()})
     return spec
 
 

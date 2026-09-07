@@ -313,8 +313,23 @@ def _validate_solver(case, rep):
         note("Obstacles: cells inside each box are carved out of "
              "the mesh (rigid walls)")
     if getattr(case, 'init_mode', 'charge') != 'charge':
-        err("Profile initialization is not supported by the blastFoam "
-            "backend yet")
+        # N7: the stage's state is written straight into 0/ as
+        # nonuniform internalFields, in the mesh's cell order. That
+        # order is only known ahead of time on the uniform mesh, so a
+        # profile stage cannot also refine locally in this version.
+        if case.dim == 1:
+            err("blastFoam 1D stages cannot start from a profile "
+                "(a 1D profile IS the 1D state - run the next stage "
+                "in 2D or 3D)")
+        if int(getattr(case, 'amr_levels', 0) or 0):
+            err("A profile-initialised blastFoam stage cannot use "
+                "dynamic AMR yet - the remapped state is written on "
+                "the uniform base mesh")
+        if (getattr(case, 'refine_zones', None)
+                or getattr(case, 'charge_refine', 'global') == 'zone'):
+            err("A profile-initialised blastFoam stage cannot use "
+                "refinement zones yet - the remapped state is written "
+                "on the uniform base mesh")
     if getattr(case, 'charge_resolution', 'resolve') == 'smear':
         note("Charge resolution 'smear' is ignored by the blastFoam "
              "backend (the grid is refined to resolve the charge)")

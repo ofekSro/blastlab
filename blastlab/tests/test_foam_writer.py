@@ -9,6 +9,8 @@ import math
 import os
 import sys
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
@@ -43,9 +45,21 @@ def norm(text):
     return ' '.join(text.split())
 
 
+#: 1D profile committed under foam_fixtures/ so the profile-initialised
+#: golden case (N7) renders from a fixed input on every machine
+PROFILE_1D = os.path.join(HERE, 'foam_fixtures', 'profile1d_chain.txt')
+
+
 def cases():
     """Reference cases spanning dims and materials (golden set)."""
     return {
+        # N7: a chain stage fed by a 1D profile - no charge sphere, the
+        # remapped state is written straight into 0/
+        'case2d_axi_profile': Case2D(
+            Lx=1.0, Ly=2.0, cell_size_m=0.05, center=(0.0, 1.0),
+            init_mode='profile1d', profile_file_in=PROFILE_1D,
+            gauges=[(0.8, 1.0)], n_snapshots=1, eos='idealGas',
+            solver='blastfoam', material='TNT'),
         'case1d_tnt': Case1D(
             radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
             gauge_radii=[1.0, 2.0, 3.0, 4.0],
@@ -548,12 +562,102 @@ def fresh_dir_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _parse_internal(text):
+    """(kind, values) of a nonuniform internalField."""
+    _head, sep, rest = text.partition("internalField")
+    assert sep and "nonuniform" in rest[:40], "not nonuniform"
+    kind = "vector" if "List<vector>" in rest[:60] else "scalar"
+    count, _, tail = rest.split("List<" + kind + ">", 1)[1].partition("(")
+    n = int(count.strip())
+    rows = [ln.strip() for ln in tail.rsplit(")", 1)[0].splitlines()
+            if ln.strip()]
+    if kind == "scalar":
+        vals = np.array([float(x) for x in rows])
+    else:
+        vals = np.array([[float(c) for c in ln.strip("()").split()]
+                         for ln in rows])
+    assert len(vals) == n, (len(vals), n)
+    return kind, vals
+
+
+def profile_checks(specs):
+    """N7: a profile-initialised stage writes the remapped state into
+    0/ as nonuniform fields, sets no charge region, and conserves the
+    profile's mass and energy on the case grid."""
+    from blastlab.core.grid import make_geometry
+    from blastlab.solvers.foam import writer as W
+    from blastlab.solvers.foam.materials import MATERIALS
+    sp = specs["case2d_axi_profile"]
+    # no charge sphere, but r_exp keeps the SOURCE charge radius so
+    # the next stage in the chain still knows the yield scale
+    check("profile: no charge sphere planned", sp.charges == []
+          and abs(sp.r_exp - 0.0527) < 1e-9,
+          f"{sp.charges} {sp.r_exp}")
+    sf = norm(sp.files["system/setFieldsDict"])
+    check("profile: setFieldsDict marks no region",
+          "sphericalMassToCell" not in sf and "cylinderToCell" not in sf,
+          sf[-120:])
+    st = sp.init_state
+    check("profile: init_state carries the remap", st is not None
+          and st["rho"].shape == (sp.nx, sp.ny)
+          and abs(st["t0"] - 0.0005) < 1e-12,
+          str(None if st is None else (st["rho"].shape, st["t0"])))
+    d = sp.start_dir
+    check("profile: fields live in a t0 time dir, not 0/",
+          d != "0" and abs(float(d) - 0.0005) < 1e-9
+          and f"{d}/p" in sp.files and "0/p" not in sp.files, d)
+    cd = norm(sp.files["system/controlDict"])
+    check("profile: the run starts from that dir (latestTime)",
+          "startFrom latestTime;" in cd
+          and f"startTime {d};" in cd, cd[:200])
+    n_cells = sp.nx * sp.ny
+    got = {}
+    for name in ("p", "T", "U", "alpha.expl", "rho.expl", "rho.air"):
+        rel = f"{d}/{name}"
+        kind, vals = _parse_internal(sp.files[rel])
+        got["0/" + name] = vals
+        check(f"profile: {name} nonuniform over every cell",
+              len(vals) == n_cells
+              and kind == ("vector" if name == "U" else "scalar"),
+              f"{len(vals)} vs {n_cells}, {kind}")
+    alpha = got["0/alpha.expl"]
+    phase = st["phase"].ravel(order="F")
+    check("profile: alpha is the phase flag, in mesh (F) order",
+          np.array_equal(alpha > 0.5, phase > 0.5)
+          and set(np.unique(alpha)) <= {0.0, 1.0}, str(np.unique(alpha)))
+    g = make_geometry("axisymmetric", sp.grid["x_face"][-1],
+                      sp.grid["y_face"][-1], sp.dx)
+    V = np.broadcast_to(g["V"], (sp.nx, sp.ny)).ravel(order="F")
+    rho_mix = np.where(alpha > 0.5, got["0/rho.expl"], got["0/rho.air"])
+    rho_ref = st["rho"].ravel(order="F")
+    e_ref = st["e"].ravel(order="F")
+    m = MATERIALS[sp.material]
+    Cv = np.where(alpha > 0.5, m.Cv_products, W.CV_AIR)
+    d_mass = abs((rho_mix * V).sum() - (rho_ref * V).sum()) / (rho_ref * V).sum()
+    e_back = Cv * got["0/T"]
+    ref_E = (rho_ref * e_ref * V).sum()
+    d_energy = abs((rho_mix * e_back * V).sum() - ref_E) / ref_E
+    check("profile: emitted mass equals the profile to 1e-6",
+          d_mass < 1e-6, f"rel {d_mass:.2e}")
+    check("profile: emitted internal energy equals the profile to 1e-6",
+          d_energy < 1e-6, f"rel {d_energy:.2e}")
+    ke_ref = (0.5 * (st["u"] ** 2 + st["v"] ** 2)).ravel(order="F")
+    ke_got = 0.5 * (got["0/U"] ** 2).sum(axis=1)
+    ref_K = (ke_ref * rho_ref * V).sum()
+    d_ke = abs((ke_got * rho_mix * V).sum() - ref_K) / ref_K
+    check("profile: emitted kinetic energy equals the profile to 1e-6",
+          d_ke < 1e-6, f"rel {d_ke:.2e}")
+    check("profile: U third component is zero in 2D",
+          np.all(got["0/U"][:, 2] == 0.0))
+
+
 def main():
     update = '--update' in sys.argv
     specs = {name: render_case(case) for name, case in cases().items()}
     # parallel golden variant: same 3D case rendered for 4 MPI ranks
     specs['case3d_c4_np4'] = render_case(cases()['case3d_c4'], n_procs=4)
     semantic_checks(specs)
+    profile_checks(specs)
     fresh_dir_checks()
     golden(specs, update)
     print()

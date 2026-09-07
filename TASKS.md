@@ -105,7 +105,7 @@ Hard rules:
 | T38 | Live-view niceties: foam cadence hint, 2D live Min/Max | G7 | S | [x] 2026-09-07 |
 | T39 | Charge-mass rasterisation deficit (foam) | N5 | S–M | [x] 2026-09-07 |
 | T40 | Arrival-time characterisation: AMR probe cell + foam near-field lag | N16-a, W1 | M (WSL time) | [x] 2026-09-07 |
-| T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [ ] |
+| T41 | Chains INTO blastFoam (profile-initialised foam stages) | N7 | M–L | [x] 2026-09-07 |
 | T48 | Hardware-aware run plan: WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI | N17 | S–M | [ ] |
 | T42 | Parallel AMR (direct `processor*/` reads) | N16-b | M | [ ] |
 | T43 | Resume a stopped foam run | N6 | M | [ ] |
@@ -1094,6 +1094,74 @@ Done when: green; N7 DONE with the measured agreement.
 Commit: "T41: profile-initialised blastFoam stages - nonuniform internalFields (N7)"
 ```
 
+**DONE (2026-09-07):** a blastFoam stage can start from a 1D or 2D profile. `writer.
+profile_state` runs the SAME remap the native solvers use (`remap_profile_1d_to_2d/3d`,
+`remap_profile_2d_to_3d`) onto the case grid, and `_profile_fields` emits p, T, U,
+`alpha.expl`, `rho.expl`, `rho.air` as `nonuniform List<scalar|vector>` internalFields in
+the mesh's cell order (`ravel(order='F')`, fluid cells only on a carved mesh - the exact
+inverse of `reader.to_grid`). T is the inverse of the reader's `e = Cv(phase) T` and p comes
+from the native EOS the profile was produced with, so the handover is the state the native
+solver would have continued from. The two-phase split is sharp: alpha is 0 or 1 and only the
+active phase's density is meaningful in a cell, which makes the mass transfer exact.
+
+**Two things the first working version got wrong, both found by running it:**
+1. The open-boundary pressure patch took `value $internalField`, which with a nonuniform
+   field expands to a mesh-sized list on a patch of a few hundred faces - blastFoam aborted
+   in `advectiveFvPatchField`'s Field constructor. Profile cases now pass an explicit
+   `uniform 101325`.
+2. The run started at t = 0 while the profile is the blast at t0, so the chained stage's
+   gauges were **53 % / 34 % early** against the direct run. The fields are now written into
+   a time directory named for t0 and picked up with `startFrom latestTime` (blastFoam takes
+   the time from the directory NAME, so OpenFOAM's own time formatting never has to be
+   reproduced); `endTime` is t0 + duration and `decomposePar` gets `-latestTime`. The native
+   solvers already continued the clock this way. With that fixed the same comparison is
+   **+2.31 % / +3.36 %**.
+
+`_e2e_foam_chain.py` (new, WSL): native 1D stopped at r = 0.4 m -> foam 2D axisym from that
+profile, against the same foam 2D domain initialised directly from the 1 kg charge. **Passes
+at the brief's tolerances:**
+
+```
+gauge        chained arr   direct arr    d%     chained pk   direct pk     d%
+(0.6, 1.0)     0.2067 ms    0.2115 ms   +2.31     2217 kPa    2114 kPa   +4.87
+(0.8, 1.0)     0.3367 ms    0.3484 ms   +3.36     1257 kPa    1216 kPa   +3.37
+gates: arrival within 5 %, peak within 10 %
+```
+
+It runs one stage per invocation (`--only chained|direct`, then `--report`) because a solve
+is 3-8 min and this PC's shell caps a foreground call at 10 min.
+
+No-WSL writer unit test (`profile_checks` in `test_foam_writer.py`, golden case
+`case2d_axi_profile` from the committed fixture `foam_fixtures/profile1d_chain.txt`): the
+emitted fields reproduce the profile's **mass to 0, internal energy to 5.7e-11 and kinetic
+energy to 1.2e-11** (gate 1e-6), alpha equals the phase flag in mesh order, and the fields
+sit in the t0 directory with `startFrom latestTime`.
+
+Onward handoff verified: the profile-initialised foam 2D run loads post-mortem and exports a
+2D profile at t = 0.4933 ms (absolute chain time) that round-trips through
+`save_profile_2d`/`load_profile_2d` on a 100 x 200 grid, so it can feed a 3D stage. `r_exp`
+carries the SOURCE charge radius through the chain rather than 0.
+
+`validate_case` no longer refuses profile init for blastFoam; the `chain_panel` N7 refusal is
+gone (the panel just reports `validate_case`'s errors now), and harness scenario G01 - whose
+whole point was that refusal - now asserts the configuration is ACCEPTED (run, green).
+
+**Limitation, deliberate and refused loudly:** a profile-initialised foam stage cannot also
+use refinement zones or dynamic AMR. The nonuniform field is written in the uniform base
+mesh's cell order, which is only known ahead of time there; on a refined mesh the order is
+whatever refineMesh produced. `validate_case` refuses both combinations with a message
+saying why, and `test_case_validate` pins both refusals. Lifting it means writing the 0/
+fields after the mesh stages from the cell centres blastFoam reports (0/C) - a backend
+change, not a writer one.
+
+Tests: test_regression PASS (byte-identical), test_foam_writer (+1 golden), test_case_validate,
+test_refine, test_foam_reader, test_gui_drain, test_gui_solver_mode, test_gui_refine_preview,
+test_gui_amr_form, test_foam_ingest_order, test_foam_amr_ingest, test_adaptive_interval,
+test_foam_env, test_foam_live_due all PASS; WSL: `_e2e_foam_chain` PASS, harness G01 PASS.
+**Not run:** a full GUI chain with a foam stage solving end to end (a modified G02). G01
+covers the wiring and the e2e covers the solve; the combined run is 15+ min of visible-window
+WSL work on a 7.7 GB machine whose free RAM is ~0.3 GB (see T40's note). No orphaned solvers.
+
 ### T48 — Hardware-aware run plan (N17): WSL cores + RAM → MPI ranks and a cell cap, visible in the GUI
 
 **Why:** `MPI ranks = 0 (auto)` already resolves to `min(MAX_AUTO_PROCS, physical WSL
@@ -1400,7 +1468,14 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   13.7/7.3/5.5/3.8 % → 4.5/1.5/1.3/0.7 %. `validate_case` now predicts the set mass and
   the run log forwards blastFoam's own set-volume line as a `[note]`)
 - **N6** resume a stopped run — OPEN → **T43**
-- **N7** chains INTO blastFoam (profile init) — OPEN → **T41**
+- N7 chains INTO blastFoam (profile init) — DONE (2026-09-07, T41; the stage's remapped
+  state is emitted as nonuniform `internalField`s into a time directory named for the
+  profile's t0 and picked up with `startFrom latestTime`, so the chain keeps ONE physical
+  clock - without that the chained gauges read 53 %/34 % early. Measured against the same
+  domain initialised directly from the charge: arrivals +2.31 %/+3.36 %, peaks +4.87 %/+3.37 %
+  (`_e2e_foam_chain.py`); emitted mass/energy match the profile to 1e-11. Refinement zones
+  and AMR are refused with a profile for now - the cell order is only predictable on the
+  uniform base mesh)
 - N8 foam run browser + auto-cleanup (settings in %APPDATA%\blastlab) — DONE (T14)
 - N9 user-named runs — DONE (2026-09-07, T30)
 - **N10** MUSCL second order — OPEN → **T47**

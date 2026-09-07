@@ -66,14 +66,21 @@ def chain_stage_checks():
                     profile_file_in='p1.txt')
         return [1, 2], {1: c1, 2: c2}
 
+    # N7 (T41): a blastFoam stage fed by a profile is accepted - the
+    # remapped state is written into 0/ as nonuniform internalFields
     errs = stage_errors(*wired('blastfoam'))
-    check('chain: foam stage fed by a profile is refused',
-          bool(errs), str(errs))
-    check('chain: the refusal names the stage and points at N7',
-          any(e.startswith('Stage 2 (2D):') and 'ROADMAP N7' in e
-              for e in errs), str(errs))
-    check('chain: no duplicate generic profile-init error',
-          sum('rofile' in e for e in errs) == 1, str(errs))
+    check('chain: foam stage fed by a profile is accepted',
+          errs == [], str(errs))
+    z = wired('blastfoam')
+    z[1][2].charge_refine = 'zone'
+    check('chain: profile + refinement zones is still refused',
+          any('refinement zones' in e for e in stage_errors(*z)),
+          str(stage_errors(*z)))
+    a = wired('blastfoam')
+    a[1][2].amr_levels = 2
+    check('chain: profile + AMR is still refused',
+          any('dynamic AMR' in e for e in stage_errors(*a)),
+          str(stage_errors(*a)))
 
     check('chain: the same wiring is fine on the native solver',
           stage_errors(*wired('native')) == [],
