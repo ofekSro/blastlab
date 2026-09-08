@@ -121,6 +121,7 @@ Hard rules:
 | T54 | AMR mesh in the exported video (verify, then fix) | N15 | S | [x] 2026-09-08 |
 | T55 | Bound the replay-frame record's memory | N15 | S | [x] 2026-09-08 |
 | T56 | MP4 export reachable (label, dialog, default, ffmpeg) | N15 | S | [x] 2026-09-08 |
+| T57 | Loading a PARALLEL AMR run (post-mortem) | N16-b | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1924,6 +1925,27 @@ converted with `-crf 18 -pix_fmt yuv420p -movflags +faststart`: 3.31 MB -> 0.37 
 Note for anyone reading a run log from before this: a GUI process started before the
 install keeps the old PATH, so it still writes gif until it is restarted.
 
+**T57 - loading a parallel AMR run never worked (owner: "I can't load a foam run").**
+`postmortem.load_run`'s ingest loop built its time path as `os.path.join(unc, name)` - the
+case root plus the time name. A parallel AMR run is never reconstructed (reconstructPar
+cannot follow a mesh that changes), so T42/N16-b keeps its written times in `processor*/`
+and `spec.time_dirs(name)` returns one directory per rank. The readiness gate and the
+sanity walk-back in the same function already used `time_dirs`; only this loop was left
+behind when T42 landed, so every time dir missed, every one was silently `_skip`ped, and
+the loader ended with "no readable time directory" - for one of the owner's runs, a run
+with **96 written times**. It predates this session (`git blame`: 2026-09-02/09-05).
+
+Fixed to `dpath = spec.time_dirs(name)` with `reader.read_time(first_part(dpath))`, the
+same pair the live backend uses (`backend.py:890`). Verified on the owner's own run
+directories: `20260908-142358_2d_p26780-00` now loads with 95 frames and 6 snapshots. The
+runs that still refuse are genuinely empty - one wrote nothing past `0/`, another is a
+refined run with no `0/C` - and both already say so.
+
+New `test_foam_postmortem_decomposed.py` loads a fake two-rank AMR case off the local disk
+(`_paths` pointed at a temp dir) and checks the frames, the per-frame level maps, the
+snapshots and the final state, plus the serial layout as a control. It reproduces the
+exact RuntimeError when the one-line fix is reverted.
+
 
 ---
 
@@ -2136,6 +2158,7 @@ python test_gui_results_fields.py # Results panel (fields, S2 QA checks)
 python test_gui_results_anim.py   # Animation tab
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
 python test_bc_trigger.py         # boundary kinds, end time, trigger gauge, gauge markers
+python test_foam_postmortem_decomposed.py  # loading a parallel AMR run (no WSL)
 python test_gauge_summary.py      # per-gauge peak/arrival/impulse
 python test_report.py             # field CSVs + HTML report (T45)
 python test_gui_gauge_summary.py  # Gauges-tab table + CSV (headless Tk)

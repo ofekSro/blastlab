@@ -126,7 +126,11 @@ class ResultsPanel(ctk.CTkFrame):
                      text_color=c('muted')).pack(side='left', padx=(0, GAP))
         self._export_btns = {}
         for label, name, kind in (('Profile', 'curve', 'profile'),
-                                  ('GIF', 'film', 'gif'),
+                                  # the kind key stays 'gif' (the
+                                  # panel and its tests index on
+                                  # it); the writer follows the
+                                  # extension the dialog returns
+                                  ('Animation', 'film', 'gif'),
                                   ('VTK', 'cube', 'vtk'),
                                   ('Summary CSV', 'table', 'summary'),
                                   ('Gauges TSV', 'table', 'tsv'),

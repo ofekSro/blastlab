@@ -19,7 +19,8 @@ from ...core.case import load_case
 from ..hooks import RunHooks
 from . import backend, env, reader, writer
 from .backend import (build_remap, finalize_1d, finalize_2d, finalize_3d,
-                      mesh_at, read_2d, read_3d, slice_geom_3d)
+                      first_part, mesh_at, read_2d, read_3d,
+                      slice_geom_3d)
 from .runloop import ARRIVAL_P, PeakImpulse, maybe_reconstruct
 
 
@@ -135,9 +136,11 @@ def load_run(case_dir, hooks=None):
     if case.dim == 1:
         store = {}
         for _t, name in times:
-            dpath = os.path.join(unc, name)
+            # 1D is never decomposed (no AMR), so this stays a plain
+            # per-time directory
+            dpath = spec.time_dirs(name)
             try:
-                t, _dt = reader.read_time(dpath)
+                t, _dt = reader.read_time(first_part(dpath))
                 entry = dict(
                     t=t,
                     p=reader.read_scalar(os.path.join(dpath, 'p'),
@@ -174,9 +177,17 @@ def load_run(case_dir, hooks=None):
     live_sl = slice_geom_3d(case, spec)[4] if case.dim == 3 else None
     frame_t, frame_p, frame_lv = [], [], []
     for _t, name in times:
-        dpath = os.path.join(unc, name)
+        # spec.time_dirs, NOT unc/name: a parallel AMR run is never
+        # reconstructed (the mesh moves under reconstructPar), so its
+        # times live in processor*/ and this returns one dir per rank.
+        # Building the root path instead made every time dir miss, and
+        # the loader then reported "no readable time directory" for a
+        # run that had 96 of them (T42 added the decomposed layout and
+        # the readiness check and the sanity walk-back below both use
+        # time_dirs already - only this loop was left behind).
+        dpath = spec.time_dirs(name)
         try:
-            t, _dt = reader.read_time(dpath)
+            t, _dt = reader.read_time(first_part(dpath))
             mesh = mesh_at(spec, dpath)         # None on a static mesh
             p = (read_2d(dpath, spec, mesh=mesh)['p'] if case.dim == 2
                  else read_3d(dpath, spec, mesh=mesh)['p'])
