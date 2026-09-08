@@ -38,7 +38,8 @@ def run(outdir):
         snaps2, gauges2, meta2 = blast2d.run_blast_2d(
             'axisymmetric', 1.2, 1.6, 0.02, charge=1.0,
             charge_center=(0.0, 0.7),
-            bcs=dict(x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'),
+            bcs=dict(x_lo='reflect', x_hi='terminate',
+                     y_lo='reflect', y_hi='terminate'),
             obstacles=[(0.7, 0.9, 0.2, 0.5)],
             eos='idealGas', n_snapshots=2,
             gauges=[(0.5, 0.7), (0.4, 0.2)])
@@ -48,7 +49,8 @@ def run(outdir):
         _, _, meta2p = blast2d.run_blast_2d(
             'axisymmetric', 0.5, 1.6, 0.02, charge=1.0,
             charge_center=(0.0, 0.7),
-            bcs=dict(x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'),
+            bcs=dict(x_lo='reflect', x_hi='terminate',
+                     y_lo='reflect', y_hi='terminate'),
             eos='idealGas', n_snapshots=1, gauges=[])
         blast2d.save_profile_2d(meta2p, path('b2_profile.npz'))
 
@@ -57,6 +59,9 @@ def run(outdir):
         _, gauges2r, _ = blast2d.run_blast_2d(
             'axisymmetric', 3.0, 6.0, 0.02, profile=prof1,
             charge_center=(0.0, 3.0), eos='JWL', n_snapshots=1,
+            # was the pre-T50 default (all 'open' = transmit + terminate)
+            bcs=dict(x_lo='terminate', x_hi='terminate',
+                     y_lo='terminate', y_hi='terminate'),
             gauges=[(2.4, 3.0)])
         blast2d.save_gauges(gauges2r, path('b2r_gauges.txt'))
 
@@ -65,6 +70,10 @@ def run(outdir):
             1.0, 1.0, 1.0, 0.025, charge=8.0, charge_center=(0.5, 0.5, 0.5),
             obstacles=[(0.62, 0.72, 0.4, 0.6, 0.3, 0.7)],
             eos='idealGas', n_snapshots=1,
+            # was the pre-T50 default (all 'open' = transmit + terminate)
+            bcs=dict(x_lo='terminate', x_hi='terminate',
+                     y_lo='terminate', y_hi='terminate',
+                     z_lo='reflect', z_hi='terminate'),
             gauges=[(0.85, 0.5, 0.5), (0.5, 0.85, 0.5)])
         blast3d.save_gauges(gauges3, path('b3_gauges.txt'))
 
@@ -72,8 +81,9 @@ def run(outdir):
         prof2 = blast3d.load_profile_2d(path('b2_profile.npz'))
         _, gauges3r, _ = blast3d.run_blast_3d(
             1.6, 1.6, 1.6, 0.02, profile2d=prof2, charge_center=(0.8, 0.8),
-            bcs=dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-                     z_lo='wall', z_hi='open'),
+            bcs=dict(x_lo='terminate', x_hi='terminate',
+                     y_lo='terminate', y_hi='terminate',
+                     z_lo='reflect', z_hi='terminate'),
             eos='idealGas', n_snapshots=1,
             gauges=[(1.35, 0.8, 0.7), (1.2, 0.8, 0.2)])
         blast3d.save_gauges(gauges3r, path('b3r_gauges.txt'))

@@ -10,8 +10,9 @@ from matplotlib import animation
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
-from .plots import (add_mesh_lines, mesh_for, overpressure_panel,
-                    set_frame, charge_label)
+from .plots import (add_gauge_markers, add_mesh_lines, gauge_points,
+                    mesh_for, overpressure_panel, set_frame,
+                    charge_label)
 
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
@@ -82,6 +83,10 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
         mesh=mesh_for(meta, xf, yf, sl) if show_mesh and not per_frame
         else None)
     lines = [None]
+    # gauges: fixed positions, so drawn once (3D keeps only the ones the
+    # animated plane actually cuts)
+    add_gauge_markers(ax, gauge_points(meta, sl),
+                      trigger=meta.get('trigger_gauge'))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     title = ax.set_title('')

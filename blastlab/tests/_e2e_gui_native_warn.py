@@ -41,8 +41,8 @@ def main():
     box = (1.2, 1.6, 0.0, 0.6)                    # (x0, x1, y0, y1)
     case = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
                   charge=20.0, center=(0.6, 0.0), obstacles=[box],
-                  bcs=dict(x_lo='wall', x_hi='open', y_lo='wall',
-                           y_hi='open'),
+                  bcs=dict(x_lo='reflect', x_hi='terminate', y_lo='reflect',
+                           y_hi='terminate'),
                   gauges=[(0.3, 0.8), (1.4, 0.3)],   # 2nd is inside the box
                   gauge_file=os.path.join(tempfile.gettempdir(),
                                           'blastlab_native_warn_gauges.txt'),

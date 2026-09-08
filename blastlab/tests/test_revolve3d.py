@@ -32,8 +32,8 @@ def main():
     obstacles = [(1.0, 1.2, 0.0, 0.8)]
     info = dict(r_c=r_c, z_c=z_c,
                 solid=solid_mask_2d(r_c, z_c, obstacles),
-                bcs=dict(x_lo='wall', x_hi='open',
-                         y_lo='wall', y_hi='open'),
+                bcs=dict(x_lo='reflect', x_hi='terminate',
+                         y_lo='reflect', y_hi='terminate'),
                 obstacles=obstacles,
                 z0=1.0, r_exp=0.2, R=R, Lz=Lz)
     rev = Revolver(info, max_dim=64)
@@ -44,8 +44,8 @@ def main():
     check('axis at domain centre, burst height kept',
           s['charge_center'] == (2.0, 2.0, 1.0))
     check('bcs mapped (ground from y_lo, sides from x_hi)',
-          s['bcs']['z_lo'] == 'wall' and s['bcs']['z_hi'] == 'open'
-          and all(s['bcs'][k] == 'open'
+          s['bcs']['z_lo'] == 'reflect' and s['bcs']['z_hi'] == 'terminate'
+          and all(s['bcs'][k] == 'terminate'
                   for k in ('x_lo', 'x_hi', 'y_lo', 'y_hi')))
     check('uniform cubic spacing',
           np.allclose(np.diff(s['x_c']), s['dx'])

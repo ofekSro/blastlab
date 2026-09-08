@@ -38,6 +38,12 @@ from blastlab.solvers import get_solver                          # noqa: E402
 from blastlab.solvers.foam import env                            # noqa: E402
 from blastlab.solvers.hooks import RunHooks                      # noqa: E402
 
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 #: Small on purpose: this PC has 7.7 GB with 4 GB inside the WSL VM, and
 #: the reference's display grid (whole domain at the finest level) is what
 #: runs the host out of memory - 0.8 m keeps it at 64^3.
@@ -117,10 +123,10 @@ def main():
                 material='TNT', probe_adjust=adjust)
     cases = {
         'AMR': Case3D(cell_size_m=0.05, amr_levels=2, amr_display_level=1,
-                      amr_max_cells=150_000, **base),
+                      amr_max_cells=150_000, **base, bcs=ALL_TERM_3D),
         # same finest cell as the AMR case (0.05 / 2^2 = 0.0125 m)
         'static': Case3D(cell_size_m=0.05, charge_refine='zone',
-                         n_procs=1, **base),
+                         n_procs=1, **base, bcs=ALL_TERM_3D),
     }
     tag_adjust = 'yes' if adjust else 'no'
     print('=== adjustLocations ' + tag_adjust + ' ===')

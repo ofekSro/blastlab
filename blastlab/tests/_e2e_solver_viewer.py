@@ -17,6 +17,10 @@ def main():
                         eos='idealGas',
                         obstacles=[(2.2, 2.6, 1.1, 1.9, 0.0, 0.8)],
                         gauges=[(2.8, 1.5, 1.0)], n_snapshots=4,
+                        # T50: the pre-T50 default (terminate + ground)
+                        bcs=dict(x_lo='terminate', x_hi='terminate',
+                                 y_lo='terminate', y_hi='terminate',
+                                 z_lo='reflect', z_hi='terminate'),
                         hooks=hooks)
     v = hooks.viewer3d
     assert v is not None and v.alive, "viewer died during the run"

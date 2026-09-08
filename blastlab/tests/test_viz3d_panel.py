@@ -30,8 +30,9 @@ center = (1.5, 2.0, 1.0)
 scene_info = dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=0.1, solid=solid,
                   obstacles=obstacles, Lx=4.0, Ly=4.0, Lz=4.0,
                   charge_center=center, r_exp=0.15,
-                  bcs=dict(x_lo='open', x_hi='open', y_lo='open',
-                           y_hi='open', z_lo='wall', z_hi='open'))
+                  bcs=dict(x_lo='terminate', x_hi='terminate',
+                           y_lo='terminate', y_hi='terminate',
+                           z_lo='reflect', z_hi='terminate'))
 
 X, Y, Z = np.meshgrid(x_c, y_c, z_c, indexing='ij')
 D = np.sqrt((X - center[0])**2 + (Y - center[1])**2 + (Z - center[2])**2)

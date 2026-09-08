@@ -25,7 +25,8 @@ face areas A, cell volumes V and a geometric source term:
 Scheme: unsplit first-order Godunov; per-direction HLL sweeps with the
 transverse momentum advected passively; forward-Euler in time.
 
-Boundaries: 'open' (transmissive) or 'wall' (reflective) per side via
+Boundaries: 'transmit' / 'terminate' (transmissive; terminate also ends
+the run on arrival) or 'reflect' per side via
 one ghost layer (mirror state with normal momentum negated). In
 axisymmetric mode the left boundary (r=0) is the symmetry axis.
 Rectangular obstacles are solid cell blocks whose faces get the same
@@ -86,7 +87,8 @@ def run_blast_2d(geometry, Lx, Ly, cell_size_m,
                  charge=None, charge_center=None, profile=None,
                  eos='idealGas', bcs=None, obstacles=None,
                  cfl=0.4, n_snapshots=6, gauges=None,
-                 record_frames=0, live=False):
+                 record_frames=0, live=False, t_end=0.0,
+                 trigger_gauge=None, trigger_action='terminate'):
     """Historical API: returns (snapshots, gauge_out, meta)."""
     hooks = ConsoleHooks(2, live=live)
     try:
@@ -94,7 +96,9 @@ def run_blast_2d(geometry, Lx, Ly, cell_size_m,
                             charge_center=charge_center, profile=profile,
                             eos=eos, bcs=bcs, obstacles=obstacles, cfl=cfl,
                             n_snapshots=n_snapshots, gauges=gauges,
-                            record_frames=record_frames, hooks=hooks)
+                            record_frames=record_frames, hooks=hooks,
+                            t_end=t_end, trigger_gauge=trigger_gauge,
+                            trigger_action=trigger_action)
     finally:
         hooks.close()
     return res.snapshots, res.gauges, res.meta
@@ -217,6 +221,10 @@ def _main():
         gauges        = params['gauges'],
         record_frames = 150 if params['anim_file'] else 0,
         live          = params['live'],
+        t_end         = params.get('t_end', 0.0),
+        trigger_gauge = params.get('trigger', {}).get('trigger_gauge'),
+        trigger_action=params.get('trigger', {}).get(
+            'trigger_action', 'terminate'),
     )
 
     if params['anim_file']:
@@ -225,6 +233,14 @@ def _main():
 
     if params['profile2d_file']:
         save_profile_2d(meta, params['profile2d_file'])
+
+    # T51: the remap the trigger gauge asked for, at ITS instant (only
+    # the non-terminating action needs this - see gui.app)
+    trig_state = meta.get('trigger_state')
+    trig_path = (params.get('trigger', {}).get('trigger_file')
+                 or params['profile2d_file'])
+    if trig_state is not None and trig_path:
+        save_profile_2d(dict(meta, final_state=trig_state), trig_path)
 
     if params['gauges']:
         save_gauges(gauge_out, params['gauge_file'])

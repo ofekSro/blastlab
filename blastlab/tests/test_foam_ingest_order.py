@@ -204,13 +204,17 @@ def dists(case, spec):
 def test_stop_dists():
     print("\nB21: 3D stop/progress distances use the nearest charge")
     case = types.SimpleNamespace(Lx=2.0, Ly=2.0, Lz=2.0,
-                                 bcs=dict(x_lo='wall', x_hi='open', y_lo='wall',
-                                          y_hi='wall', z_lo='wall', z_hi='open'))
+                                 bcs=dict(x_lo='reflect',
+                                          x_hi='terminate',
+                                          y_lo='reflect',
+                                          y_hi='reflect',
+                                          z_lo='reflect',
+                                          z_hi='terminate'))
     spec = types.SimpleNamespace(center=(0.7, 1.0, 1.0),
                                  charges=[((0.7, 1.0, 1.0), 4.0), ((1.4, 1.0, 0.5), 2.0)])
     d = dists(case, spec)
     check('x_hi from the secondary charge (0.6), z_hi from the primary (1.0 < 1.5)', np.allclose(sorted(d), [0.6, 1.0]), str(d))
-    case.bcs = {k: 'wall' for k in case.bcs}
+    case.bcs = {k: 'reflect' for k in case.bcs}
     d = dists(case, spec)
     check('closed box -> far corner from the primary', np.allclose(d, [np.sqrt(1.3**2 + 1 + 1)]), str(d))
 

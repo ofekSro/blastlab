@@ -16,6 +16,12 @@ import numpy as np                                             # noqa: E402
 from blastlab.core.case import Case2D                          # noqa: E402
 from blastlab.solvers.hooks import RunHooks                    # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAIL = []
 
 
@@ -98,7 +104,7 @@ def preflight_stop_checks():
     case = Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
                   cell_size_m=0.004, charge=8.0, center=(0.0, 1.25),
                   n_snapshots=2, record_frames=0,
-                  solver='blastfoam', material='TNT')
+                  solver='blastfoam', material='TNT', bcs=ALL_TERM)
     hooks = PreflightStopHooks()
     t0 = time.time()
     try:
@@ -146,7 +152,7 @@ def main():
     case = Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
                   cell_size_m=0.02, charge=8.0, center=(0.0, 1.25),
                   gauges=[(0.8, 1.25)], n_snapshots=4, record_frames=0,
-                  solver='blastfoam', material='TNT')
+                  solver='blastfoam', material='TNT', bcs=ALL_TERM)
     hooks = ScriptedHooks()
     res = get_solver(2, 'blastfoam')(case, hooks)
 

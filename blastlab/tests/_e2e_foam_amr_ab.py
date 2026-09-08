@@ -41,6 +41,12 @@ from blastlab.solvers import get_solver                         # noqa: E402
 from blastlab.solvers.foam import env                           # noqa: E402
 from blastlab.solvers.hooks import RunHooks                     # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAIL = []
 GAUGES = [(0.5, 1.0), (0.7, 1.0)]
 #: the domain (axisym r-z) and the loading-region band the map gate uses
@@ -67,7 +73,7 @@ def case(np_):
                   cell_size_m=0.02, charge=8.0, center=(0.0, CENTRE_Y),
                   gauges=list(GAUGES), n_snapshots=2, solver='blastfoam',
                   amr_levels=2, amr_display_level=1,
-                  amr_max_cells=120_000, n_procs=np_)
+                  amr_max_cells=120_000, n_procs=np_, bcs=ALL_TERM)
 
 
 def arrival(t, p, thr=0.05):

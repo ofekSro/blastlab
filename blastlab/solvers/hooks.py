@@ -12,6 +12,26 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
+def trigger_index(trigger_gauge, n_gauges, hooks):
+    """The 0-based index of the T51 trigger gauge, or None.
+
+    `trigger_gauge` is what the case carries: a 1-BASED gauge number so
+    it reads like the gauge table and the plot labels. Out-of-range (or
+    a run whose gauges were all dropped as outside/inside an obstacle)
+    warns and disables the trigger rather than failing the run."""
+    if trigger_gauge in (None, 0, ''):
+        return None
+    try:
+        k = int(trigger_gauge) - 1
+    except (TypeError, ValueError):
+        k = -1
+    if not 0 <= k < n_gauges:
+        hooks.log(f"  [warn] Trigger gauge {trigger_gauge} does not exist "
+                  f"({n_gauges} gauge(s)) - trigger disabled")
+        return None
+    return k
+
+
 @dataclass
 class Progress:
     step: int

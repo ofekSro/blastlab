@@ -25,6 +25,7 @@ import numpy as np
 
 from ..core import refine
 from ..core.refine import LEVEL_COLORS
+from ..core.bc import normalize_bc as _normalize_bc
 from ..core.constants import P_AIR
 from .sampling import FrameStore
 
@@ -161,7 +162,7 @@ def add_static_scenery(pl, geo):
                                  (px, py, float(geo['Lz']))))
         pl.add_mesh(parts[0].merge(parts[1:]), color='#6b7280',
                     line_width=1, opacity=0.5, name='domain')
-        if (geo.get('bcs') or {}).get('z_lo') == 'wall':
+        if _normalize_bc((geo.get('bcs') or {}).get('z_lo')) == 'reflect':
             pl.add_mesh(pv.Disc(center=(cx, cy, 0.0), inner=0.0,
                                 outer=R, normal=(0, 0, 1), c_res=96),
                         color='#39424e', opacity=0.35, name='ground')
@@ -180,7 +181,7 @@ def add_static_scenery(pl, geo):
         pl.add_mesh(pv.Box(bounds=bounds).extract_all_edges(),
                     color='#6b7280', line_width=1, opacity=0.5,
                     name='domain')
-        if (geo.get('bcs') or {}).get('z_lo') == 'wall':
+        if _normalize_bc((geo.get('bcs') or {}).get('z_lo')) == 'reflect':
             ground = pv.Plane(center=(geo['Lx'] / 2, geo['Ly'] / 2, 0.0),
                               direction=(0, 0, 1),
                               i_size=geo['Lx'], j_size=geo['Ly'])

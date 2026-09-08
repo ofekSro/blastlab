@@ -13,6 +13,8 @@ from tkinter import filedialog, ttk
 import customtkinter as ctk
 
 from ..core.case import Case1D, Case2D, Case3D
+from ..core.bc import BC_KINDS, normalize_bcs
+from ..core.case import TRIGGER_ACTIONS
 from ..solvers.foam.materials import MATERIAL_NAMES
 from . import mode as mode_mod
 from . import theme
@@ -66,6 +68,20 @@ def _combo(frame, var, values, width=176):
                            button_color=c('card2'),
                            button_hover_color=c('border'),
                            dropdown_font=theme.F_BODY)
+
+
+def _trig(var):
+    """The trigger-gauge box as a 1-based gauge number, or None when it
+    is blank/zero. A non-numeric entry is treated as off here and caught
+    by validate_case, which reports it with the other field errors."""
+    raw = str(var.get()).strip()
+    if not raw:
+        return None
+    try:
+        n = int(float(raw))
+    except ValueError:
+        return None
+    return n or None
 
 
 def _f(var, name):
@@ -263,6 +279,16 @@ class CaseForm(ctk.CTkFrame):
         self.v[name] = var
         return var
 
+    def _set_trigger(self, case):
+        """T51 trigger rows out of a case (shared by every dimension)."""
+        n = getattr(case, 'trigger_gauge', None)
+        self.v['trigger_gauge'].set('' if n in (None, 0) else str(int(n)))
+        self.v['trigger_action'].set(
+            getattr(case, 'trigger_action', 'terminate') or 'terminate')
+        if 'trigger_file' in self.v:
+            self.v['trigger_file'].set(
+                getattr(case, 'trigger_file', None) or '')
+
     def _bool(self, name, value=True):
         var = tk.BooleanVar(value=value)
         var.trace_add('write', lambda *a: self._on_change())
@@ -429,9 +455,11 @@ class CaseForm(ctk.CTkFrame):
             self._nproc_entry = _entry(num, self._var('n_procs', 0))
             r = self._srow(num, r, 'MPI ranks (0 = auto)',
                            self._nproc_entry, scope='blastfoam')[0]
+        # T52: every dimension can set an end time; whichever comes
+        # first wins - a terminate boundary, the trigger gauge, or this
+        r = _row(num, r, 'End time [s] (0 = auto)',
+                 _entry(num, self._var('t_end', 0.0)))
         if self.dim == 3:
-            r = _row(num, r, 'End time [s] (0 = auto)',
-                     _entry(num, self._var('t_end', 0.0)))
             r = _row(num, r, 'Live slice normal',
                      _combo(num, self._var('slice_axis', 'y'),
                             ['x', 'y', 'z']))
@@ -484,10 +512,12 @@ class CaseForm(ctk.CTkFrame):
             bcf.columnconfigure(2, minsize=GAP * 2)
             sides = (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2 else
                      ['x_lo', 'x_hi', 'y_lo', 'y_hi', 'z_lo', 'z_hi'])
-            defaults = (dict(x_lo='wall', x_hi='open', y_lo='wall',
-                             y_hi='open') if self.dim == 2 else
-                        dict(x_lo='open', x_hi='open', y_lo='open',
-                             y_hi='open', z_lo='wall', z_hi='open'))
+            defaults = (dict(x_lo='reflect', x_hi='transmit',
+                             y_lo='reflect', y_hi='transmit')
+                        if self.dim == 2 else
+                        dict(x_lo='transmit', x_hi='transmit',
+                             y_lo='transmit', y_hi='transmit',
+                             z_lo='reflect', z_hi='transmit'))
             self._bc_combos = {}
             for i, side in enumerate(sides):
                 ctk.CTkLabel(bcf, text=side, font=theme.F_BODY,
@@ -495,7 +525,7 @@ class CaseForm(ctk.CTkFrame):
                     row=i // 2, column=(i % 2) * 2, sticky='w',
                     padx=(0, GAP), pady=4)
                 cb = _combo(bcf, self._var(f'bc_{side}', defaults[side]),
-                            ['open', 'wall'], width=96)
+                            list(BC_KINDS), width=112)
                 cb.grid(row=i // 2, column=(i % 2) * 2 + 1, sticky='we',
                         padx=(0, GAP if i % 2 == 0 else 0), pady=4)
                 self._bc_combos[side] = cb
@@ -578,6 +608,22 @@ class CaseForm(ctk.CTkFrame):
             orow = _row(out, orow, 'Profile out (.npz)',
                         _entry(out, self._var('profile_out', '')))
 
+        # ── Trigger gauge (T51) ───────────────────────────────────────
+        # one gauge that ends the run and/or writes the remap file the
+        # moment the wave reaches it. 3D has no remap format, so only
+        # the terminate action is offered there.
+        trig = self._card(1, 'Trigger gauge')
+        trow = _row(trig, 0, 'Gauge number\n(blank = off)',
+                    _entry(trig, self._var('trigger_gauge', '')))
+        acts = ([a for a in TRIGGER_ACTIONS if 'remap' not in a]
+                if self.dim == 3 else list(TRIGGER_ACTIONS))
+        trow = _row(trig, trow, 'On arrival',
+                    _combo(trig, self._var('trigger_action', 'terminate'),
+                           acts))
+        if self.dim < 3:
+            _row(trig, trow, 'Remap file\n(blank = profile out)',
+                 _entry(trig, self._var('trigger_file', '')))
+
         self._sync_geometry()
         self._apply_mode()
 
@@ -617,7 +663,7 @@ class CaseForm(ctk.CTkFrame):
                 self._bc_combos['x_lo'].configure(
                     state='disabled' if axisym else 'readonly')
                 if axisym:
-                    self.v['bc_x_lo'].set('wall')
+                    self.v['bc_x_lo'].set('reflect')
             # axisym: the domain is the (r, z) half-plane revolved about
             # the axis - relabel, and pin the burst to the axis (r = 0)
             texts = (dict(Lx='Radius R [m]', Ly='Height Z [m]',
@@ -714,6 +760,10 @@ class CaseForm(ctk.CTkFrame):
                 eos=v['eos'].get(), cfl=_F('cfl', 'cfl'),
                 order=int(str(v['order'].get()).split()[0] or 1),
                 n_snapshots=_I('n_snapshots', 'snapshots'),
+                t_end=_F('t_end', 'end time'),
+                trigger_gauge=_trig(v['trigger_gauge']),
+                trigger_action=v['trigger_action'].get(),
+                trigger_file=v['trigger_file'].get() or None,
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
@@ -740,6 +790,11 @@ class CaseForm(ctk.CTkFrame):
             n_snapshots=_I('n_snapshots', 'snapshots'),
             gauges=self.gauges.get(),
             gauge_file=v['gauge_file'].get(),
+            t_end=_F('t_end', 'end time'),
+            trigger_gauge=_trig(v['trigger_gauge']),
+            trigger_action=v['trigger_action'].get(),
+            trigger_file=(v['trigger_file'].get() or None
+                          if self.dim < 3 else None),
             anim_file=v['anim_file'].get() or None,
             anim_mesh=bool(v['anim_mesh'].get()),
             record_frames=150 if v['record'].get() else 0,
@@ -784,7 +839,6 @@ class CaseForm(ctk.CTkFrame):
                                     _F('cz', 'burst z')),
                             charge_resolution=(v['charge_res'].get()
                                                if not foam else 'resolve'),
-                            t_end=_F('t_end', 'end time'),
                             slice_axis=v['slice_axis'].get(),
                             slice_pos=(_F('slice_pos', 'slice position')
                                        if slice_raw else None),
@@ -806,9 +860,11 @@ class CaseForm(ctk.CTkFrame):
                 case, 'order', 1) or 1) == 2 else '1 (Godunov)')
             v['cfl'].set(f'{case.cfl:g}')
             v['n_snapshots'].set(str(case.n_snapshots))
+            v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
             self.gauges.set([(g,) for g in case.gauge_radii])
             v['gauge_file'].set(case.gauge_file)
             v['profile_out'].set(case.profile_file or '')
+            self._set_trigger(case)
             return
         if self.dim == 2:
             v['geometry'].set(case.geometry)
@@ -819,9 +875,9 @@ class CaseForm(ctk.CTkFrame):
         v['cell'].set(f'{case.cell_size_m:g}')
         v['init_mode'].set(case.init_mode)
         v['charge'].set(f'{case.charge:g}' if case.charge is not None else '')
+        v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
         if self.dim == 3:
             v['charge_res'].set(getattr(case, 'charge_resolution', 'resolve'))
-            v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
             v['slice_axis'].set(getattr(case, 'slice_axis', 'y'))
             sp = getattr(case, 'slice_pos', None)
             v['slice_pos'].set('' if sp is None else f'{sp:g}')
@@ -849,7 +905,10 @@ class CaseForm(ctk.CTkFrame):
             case, 'order', 1) or 1) == 2 else '1 (Godunov)')
         v['cfl'].set(f'{case.cfl:g}')
         v['n_snapshots'].set(str(case.n_snapshots))
-        for side, val in case.bcs.items():
+        # a case built in code (not loaded through case_from_dict) can
+        # still carry the pre-T50 spellings; the combos only offer the
+        # three canonical ones
+        for side, val in normalize_bcs(dict(case.bcs)).items():
             v[f'bc_{side}'].set(val)
         self.gauges.set(case.gauges)
         self.obstacles.set(case.obstacles)
@@ -861,6 +920,7 @@ class CaseForm(ctk.CTkFrame):
         v['anim_file'].set(case.anim_file or '')
         v['anim_mesh'].set(bool(getattr(case, 'anim_mesh', False)))
         v['record'].set(case.record_frames > 0)
+        self._set_trigger(case)
         if self.dim == 2:
             v['profile_out'].set(case.profile_file or '')
 

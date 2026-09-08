@@ -15,6 +15,18 @@ import numpy as np                                             # noqa: E402
 from blastlab.core.case import Case2D, Case3D, validate_case   # noqa: E402
 from blastlab.core.constants import P_AIR                      # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 FAIL = []
 
 
@@ -40,7 +52,7 @@ def main():
                    charge=8.0, center=(0.35, 0.5, 0.5),
                    charges=[(1.05, 0.5, 0.5, 8.0)],
                    n_snapshots=3, record_frames=0,
-                   solver='blastfoam', material='TNT')
+                   solver='blastfoam', material='TNT', bcs=ALL_TERM_3D)
     rep = validate_case(case3)
     check('two-charge case validates', rep.ok, str(rep.errors))
     print('--- two-charge 3D run ---')
@@ -69,7 +81,7 @@ def main():
                    cell_size_m=0.02, charge=4.0, center=(0.0, 1.0),
                    gauges=[(0.8, 1.0)], n_snapshots=2, record_frames=0,
                    activation='none', solver='blastfoam',
-                   material='TNT')
+                   material='TNT', bcs=ALL_TERM)
     rep = validate_case(case2)
     check("activation 'none' validates", rep.ok, str(rep.errors))
     print("--- activation 'none' 2D run ---")

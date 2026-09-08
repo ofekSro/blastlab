@@ -10,7 +10,8 @@ from matplotlib.figure import Figure
 
 from ..core import refine
 from ..core.constants import P_AIR
-from ..output.plots import add_mesh_lines, overpressure_panel, set_frame
+from ..output.plots import (add_gauge_markers, add_mesh_lines,
+                            overpressure_panel, set_frame)
 from . import theme
 from .mpl import EmbeddedFigure
 from .theme import GAP, PAD, Card, c, icon
@@ -476,6 +477,19 @@ class RunPanel(ctk.CTkFrame):
             ax.set_xlabel('r [m]')
             ax.set_ylabel('Overpressure [kPa]')
             ax.grid(True, alpha=0.3)
+            # T53: gauge radii as vertical marks (the 1D pane is a line
+            # plot, so there is no field to put a dot on)
+            trig = info.get('trigger_gauge')
+            for n, gr, _ in info.get('gauges') or []:
+                ax.axvline(gr, color=theme.cur('muted'),
+                           lw=1.6 if n == trig else 1.0,
+                           ls=':' if n == trig else (0, (4, 3)),
+                           alpha=0.8, zorder=1.5)
+                ax.annotate(f'G{n}' + ('*' if n == trig else ''),
+                            (gr, 1.0), xycoords=('data', 'axes fraction'),
+                            textcoords='offset points', xytext=(3, -11),
+                            color=theme.cur('muted'), fontsize=7.5,
+                            zorder=1.5)
             self._title = ax.set_title('t = 0.000 ms')
         else:
             self._solid = info['solid']
@@ -493,6 +507,10 @@ class RunPanel(ctk.CTkFrame):
             ax.set_xlabel(info['xlabel'])
             ax.set_ylabel(info['ylabel'])
             self._title = ax.set_title(info.get('title', ''))
+            # gauge positions (3D: already reduced to the live plane by
+            # the solver) - fixed, so drawn once with the axes
+            add_gauge_markers(ax, info.get('gauges') or [],
+                              trigger=info.get('trigger_gauge'))
             fig.colorbar(self._mesh, ax=ax, label='Overpressure [kPa]',
                          shrink=0.85)
         fig.tight_layout()

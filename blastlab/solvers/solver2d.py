@@ -10,10 +10,10 @@ from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               E_AIR, MIN_EXP_CELLS,
                               CELLS_2D_WARN, CELLS_2D_MAX)
 from ..core.eos import material_jwl, pressure_soundspeed
-from ..core.bc import face_fluxes, solid_mask_2d as solid_mask
+from ..core.bc import face_fluxes, normalize_bcs, solid_mask_2d as solid_mask
 from ..core.grid import make_geometry
 from ..core.profiles import remap_profile_1d_to_2d as remap_profile
-from .hooks import ConsoleHooks, Progress, Result
+from .hooks import ConsoleHooks, Progress, Result, trigger_index
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -37,7 +37,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                   charge=None, charge_center=None, profile=None,
                   eos='idealGas', bcs=None, obstacles=None,
                   cfl=0.4, n_snapshots=6, gauges=None,
-                  record_frames=0, hooks=None):
+                  record_frames=0, hooks=None, t_end=0.0,
+                  trigger_gauge=None, trigger_action='terminate'):
     """
     Run a 2D planar or axisymmetric blast simulation.
 
@@ -54,7 +55,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     profile       : dict    Output of load_profile (axisym only) - remapped
                             1D initial condition instead of a fresh charge.
     eos           : 'JWL' or 'idealGas'
-    bcs           : dict    {'x_lo','x_hi','y_lo','y_hi'} -> 'open'|'wall'.
+    bcs           : dict    {'x_lo','x_hi','y_lo','y_hi'} ->
+                            'transmit' | 'reflect' | 'terminate' (T50;
+                            the pre-T50 'open'/'wall' still accepted).
                             Axisym x_lo is always the symmetry axis.
     obstacles     : list of (x0, x1, y0, y1) rectangles
     cfl           : float   2D CFL number (< 0.5 recommended for unsplit)
@@ -80,9 +83,11 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     if geometry not in ('planar', 'axisymmetric'):
         raise ValueError(f"Unknown geometry '{geometry}'")
     if bcs is None:
-        bcs = dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open')
+        bcs = dict(x_lo='transmit', x_hi='transmit',
+                   y_lo='transmit', y_hi='transmit')
+    bcs = normalize_bcs(bcs, hooks.log)
     if geometry == 'axisymmetric':
-        bcs = dict(bcs, x_lo='wall')   # symmetry axis
+        bcs = dict(bcs, x_lo='reflect')   # symmetry axis
     obstacles = obstacles or []
     dx = cell_size_m
 
@@ -124,7 +129,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         for over, side in overhangs:
             if over <= 0:
                 continue
-            if bcs[side] == 'wall':
+            if bcs[side] == 'reflect':
                 hooks.log(f"  [note] Charge is truncated by the {side} wall "
                       f"(surface burst)")
             else:
@@ -232,11 +237,15 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     c_amb      = np.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)
     arrival_p  = P_AIR * 1.001
     safety_cap = t0 + 10.0 * max(Lx, Ly) / c_amb
+    # T52: a user end time wins whenever it comes first
+    cap_is_end = bool(t_end) and t0 + t_end < safety_cap
+    if cap_is_end:
+        safety_cap = t0 + t_end
 
-    # Fluid cells adjacent to OPEN boundaries only (a wall reflection must
-    # not end the run).
-    open_edge = core_geometry.open_edge_mask((Nx, Ny), bcs, fluid=fluid)
-    has_open = open_edge.any()
+    # Fluid cells adjacent to TERMINATE boundaries only: neither a
+    # reflection nor a plain transmit side ends the run (T50).
+    term_edge = core_geometry.terminate_edge_mask((Nx, Ny), bcs, fluid=fluid)
+    has_term = term_edge.any()
 
     # Snapshots are triggered by shock-front POSITION, not time: a strong
     # blast crosses the domain much faster than the acoustic estimate, which
@@ -265,6 +274,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         gauge_actual.append((float(x_c[i]), float(y_c[j])))
     gauge_times_list  = []
     gauge_press_lists = [[] for _ in gauge_ij]
+    # T51 trigger gauge: 1-based on the way in, index on the way through
+    trig_k = trigger_index(trigger_gauge, len(gauge_ij), hooks)
+    trigger = trigger_state = None
 
     # ── Print summary ───────────────────────────────────────────────────────
     bc_lbl = ", ".join(f"{k}={v}" for k, v in bcs.items())
@@ -289,9 +301,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     hooks.log(f"  Obstacles       : {len(obstacles)}")
     hooks.log(f"  Gauges          : {len(gauge_ij)}")
     hooks.log(f"  Stop condition  : "
-          + ("shock arrival at an open boundary" if has_open
-             else "safety cap (no open boundaries)"))
-    hooks.log(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
+          + ("shock arrival at a terminate boundary" if has_term
+             else "safety cap (no terminate boundaries)"))
+    hooks.log(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
+              f"{safety_cap*1e3:.1f} ms")
     hooks.log(f"{'='*60}\n")
 
     # ── Live view & animation frame recording ───────────────────────────────
@@ -299,6 +312,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         dim=2, x_face=geom['x_face'], y_face=geom['y_face'], solid=solid,
         xlabel='r [m]' if geometry == 'axisymmetric' else 'x [m]',
         ylabel='z [m]' if geometry == 'axisymmetric' else 'y [m]',
+        # T53: where the gauges landed, numbered as in the gauge table
+        gauges=[(n + 1, gx, gy)
+                for n, (gx, gy) in enumerate(gauge_actual)],
+        trigger_gauge=None if trig_k is None else trig_k + 1,
         title='')
     if geometry == 'axisymmetric':
         # live (r, z) frames can be revolved into a 3D cylinder view
@@ -339,14 +356,32 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
             for k, (i, j) in enumerate(gauge_ij):
                 gauge_press_lists[k].append(p_f[i, j])
 
+        # ── Trigger gauge (T51) ───────────────────────────────────────
+        if trig_k is not None and trigger is None \
+                and p_f[gauge_ij[trig_k]] > arrival_p:
+            gx, gy = gauge_actual[trig_k]
+            trigger = dict(t=float(t), gauge=trig_k + 1,
+                           point=(gx, gy), action=trigger_action)
+            hooks.log(f"  Trigger gauge {trig_k + 1} ({gx:.4f}, "
+                      f"{gy:.4f}) m reached at t = {t*1e3:.3f} ms")
+            if 'remap' in trigger_action:
+                trigger_state = dict(t=float(t), rho=rho_f.copy(),
+                                     u=u_f.copy(), v=v_f.copy(),
+                                     e=e_f.copy(), p=p_f.copy(),
+                                     phase=phase.copy())
+            if 'terminate' in trigger_action:
+                stop_reason = (f'trigger gauge {trig_k + 1} reached '
+                               f'({gx:.4f}, {gy:.4f}) m')
+                break
+
         if hooks.should_stop():
             stop_reason = 'stopped by user'
             break
 
-        # ── Stop condition: shock at an open boundary ──────────────────────
-        if has_open and (p_f[open_edge] > arrival_p).any():
-            stop_reason = (f'shock arrived at an open boundary '
-                           f'(p_edge = {p_f[open_edge].max():.3e} Pa)')
+        # ── Stop condition: shock at a terminate boundary ──────────────────
+        if has_term and (p_f[term_edge] > arrival_p).any():
+            stop_reason = (f'shock arrived at a terminate boundary '
+                           f'(p_edge = {p_f[term_edge].max():.3e} Pa)')
             break
 
         # Shock-front position (progress + snapshot triggers)
@@ -448,6 +483,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         frame_p.append(p_f.astype(np.float32))
     hooks.frame(p_f, t)
 
+    if stop_reason == 'safety cap' and cap_is_end:
+        stop_reason = 'end time reached'
     hooks.log(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
 
@@ -465,9 +502,14 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                 # what the USER asked for; gauge_out['points'] is where
                 # they landed after snapping to cell centres (QA-33)
                 gauges=[tuple(float(v) for v in g) for g in gauges],
+                trigger_gauge=None if trig_k is None else trig_k + 1,
                 # per-step running peak pressure and net overpressure
                 # impulse, same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)
+    if trigger is not None:
+        meta['trigger'] = trigger
+    if trigger_state is not None:
+        meta['trigger_state'] = trigger_state
     # Full final field (for save_profile_2d -> 3D remap)
     meta['final_state'] = dict(t=t, rho=rho_f, u=u_f, v=v_f, e=e_f, p=p_f,
                                phase=phase)
@@ -492,4 +534,8 @@ def solve_2d(case, hooks=None, profile=None):
                          obstacles=[tuple(o) for o in case.obstacles],
                          cfl=case.cfl, n_snapshots=case.n_snapshots,
                          gauges=[tuple(g) for g in case.gauges],
-                         record_frames=case.record_frames, hooks=hooks)
+                         record_frames=case.record_frames, hooks=hooks,
+                         t_end=float(getattr(case, 't_end', 0.0) or 0.0),
+                         trigger_gauge=getattr(case, 'trigger_gauge', None),
+                         trigger_action=getattr(case, 'trigger_action',
+                                                'terminate'))

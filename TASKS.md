@@ -114,6 +114,11 @@ Hard rules:
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [x] 2026-09-08 |
 | T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [x] 2026-09-08 |
 | T49 | Mesh overlay on the animation a run writes | N15 | S | [x] 2026-09-08 |
+| T50 | Boundary kinds: transmit / reflect / terminate | N18 | M | [x] 2026-09-08 |
+| T51 | Trigger gauge: terminate and/or remap on arrival | N19 | M | [x] 2026-09-08 |
+| T52 | An end time for 1D and 2D runs too | N18 | S | [x] 2026-09-08 |
+| T53 | Gauges drawn in the live view and the animation | N19 | S | [x] 2026-09-08 |
+| T54 | AMR mesh in the exported video (verification) | N15 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1749,6 +1754,116 @@ test_gui_results_anim, test_gui_solver_mode PASS.
 
 ---
 
+### T50-T54 - boundary kinds, end time, trigger gauge, gauge markers (N18, N19)
+
+**Why (owner request, 2026-09-08):** `open` did two jobs at once - it was the
+transmissive ghost-copy AND it ended the run the moment `p > 1.001*P_air` reached it
+(`geometry.open_edge_mask` -> the stop condition in all three native solvers and in both
+foam backends). There was no way to let a wave leave and keep solving. Splitting that in
+two exposed three follow-ons the owner asked for in the same session: a run needs its own
+end time once nothing stops it by itself; the gauges should be visible while it runs; and
+one named gauge should be able to end the run or write the remap file at the instant the
+wave reaches it (the 1D->2D->3D hand-off, which until now could only happen at the end of
+a run).
+
+**DONE (2026-09-08):**
+
+*T50 - the vocabulary.* `core/bc.py` owns it: `BC_KINDS = (transmit, reflect,
+terminate)`, `BC_LEGACY = {open: transmit, wall: reflect}` and `normalize_bc(s)`, which
+every reader goes through, so pre-T50 case files and scripts still load (with one
+`[note]` naming the mapping - a silent `open` -> `transmit` would quietly drop a run's
+stop condition). `reflect` mirrors the normal momentum; `transmit` and `terminate` are
+the same ghost copy and differ only outside `bc.py`. Two different questions are asked of
+`bcs` and they no longer have the same answer: `geometry.terminate_edge_mask` (was
+`open_edge_mask`) feeds the stop condition and counts ONLY terminate sides, while
+`stop_dists_2d/3d` size the snapshot radii and the progress bar off EVERY non-reflecting
+side - the pre-T50 `open` set, so snapshot scheduling does not move. Ported: both native
+2D/3D solvers, both foam backends, the foam writer (`_patch_type` / `_bc_entry` map the
+new kinds onto the SAME OpenFOAM patch types, so `test_foam_writer` goldens are
+byte-identical), the GUI combos and 2D preview (a terminate side draws dotted), the CLI
+prompts, and the viz3d ground-plane checks.
+
+**Owner decision, and its cost:** legacy `open` maps to `transmit` and the shipped
+defaults are `transmit`, so a default run is no longer ended by the wave leaving - it runs
+to the safety cap (`10*max(L)/c_air`) or `t_end`. That is up to ~10x more solver time,
+worst on blastFoam. Mitigations in the same commit: `validate_case` warns when a case has
+no terminate side and no end time (naming the cap in ms), the run banner says
+`safety cap (no terminate boundaries)`, and T52 gives every dimension an end time.
+
+*Regression policy.* `make_baseline.py` spells its boundaries out as `terminate`/
+`reflect` (two cases were inheriting the old defaults and had to be made explicit - the
+3D one keeps its reflecting ground). **Every numeric baseline stayed byte-identical**
+(b1/b2/b2r/b3/b3r gauges + b2_profile.npz); only `transcript.txt` was re-baselined, for
+the reworded `Boundaries:` / `Stop condition:` / `Stopped:` lines - 30 lines, all wording.
+
+*T51 - the trigger gauge.* `trigger_gauge` (1-based, None = off), `trigger_action`
+(`terminate` | `remap` | `remap+terminate`) and `trigger_file` on all three case classes.
+The check sits in the gauge-sampling block each solver already had, so it costs one
+comparison per step and fires once; `hooks.trigger_index` resolves the number (an
+out-of-range one warns and disables rather than failing the run). A remap action captures
+`meta['trigger_state']` (2D, the `final_state` shape `save_profile_2d` wants) or
+`meta['trigger_profile']` (1D) at that instant; file writing stays with the callers
+(`gui/app.py::_write_trigger_remap`, the CLI flows), which is where every other output is
+written. 3D is terminate-only - there is no 3D remap format - and `validate_case` says so,
+as it does for a planar 2D case (only axisymmetric fields remap) and for a remap action
+with nowhere to write. blastFoam gets the same trigger on the ingested display grid,
+beside its terminate-edge stop, reading the full field back out of the trigger's own time
+directory when the action did not stop the run.
+
+**Bug found by the owner mid-task, and fixed:** a stopped blastFoam run died with
+`NameError: name 'trig_k' is not defined`. The trigger is armed inside `solve_2d_foam` /
+`solve_3d_foam`, but the meta is assembled in `finalize_2d` / `finalize_3d` - separate
+functions, also called by `postmortem.load_run`, which never watched the run. Both now
+take `trig_k` / `trigger` as keyword arguments defaulting to None, and both solve
+functions pass them on; `test_bc_trigger` pins the signatures and the hand-over so the
+split cannot silently reopen.
+
+*T52 - end time.* `t_end` on `Case1D`/`Case2D` (`Case3D` already had it), honoured
+exactly as `solver3d` did (`cap_is_end` -> `stop_reason = 'end time reached'`), and the
+"End time [s] (0 = auto)" row moved out of the 3D-only block. Deliberately
+transcript-neutral at `t_end = 0`: the banner keeps the exact `  Safety cap      : `
+spelling through the same `:<16` padding. The foam writer already read `t_end` through
+`getattr`, so blastFoam 2D honours it the moment the field exists. Precedence: whichever
+comes first - a terminate boundary, the trigger gauge, or the end time.
+
+*T53 - gauge markers.* `plots.gauge_points` / `plots.add_gauge_markers`: a ringed dot
+plus `G<n>` per gauge, the trigger gauge heavier and starred. Drawn once in the live pane
+(`run_panel.on_run_started`, from a new `run_info['gauges']`) and once in
+`write_animation`. 3D keeps only the gauges the plotted plane actually cuts
+(`geometry.plane_gauges`, tolerance one cell) - a gauge a metre off the slice must not be
+drawn as if it sat on it.
+
+*T54 - AMR in the video.* Verified rather than fixed: `write_animation` already rebuilt
+the overlay per frame from `frames['levels']` and `_amr_meta` already recorded them for
+2D and 3D - what was missing was T49, the `show_mesh` flag on the run's OWN animation. A
+synthetic record whose refined block slides between frames confirms the overlay follows
+it (all frames differ from frame 0).
+
+*Call sites that inherited the old default.* Anything that RUNS a solver without naming
+its boundaries used to get all-`open` (transmit AND terminate); with the new default it
+would run to the safety cap - ~10x the solver time, and in the comparison tests a
+different stop time on each side (T6's half-domain-wall check compares two final
+snapshots). Every such call site now spells the old behaviour out: `make_baseline.py`,
+`test_blast2d.py` (an `ALL_TERM` constant), `test_viz3d_hooks.py`'s CASE/SCASE, the WSL
+foam suites and the `_e2e_*` scripts. Cases built only for validation, writer goldens or
+GUI forms were deliberately left on the new defaults - that is what those tests should be
+checking.
+
+Tests: new `test_bc_trigger.py` (39 checks: vocabulary + legacy mapping, the two mask
+questions, transmit-does-not-stop vs terminate-does on a real 2D run, t_end in 1D and 2D,
+every trigger action and its validation, and the gauge-marker helpers). test_regression
+numeric baselines byte-identical with `transcript.txt` re-baselined, test_foam_writer
+goldens unmoved, test_refine (schema-version literal replaced by `VERSION`),
+test_case_validate, test_foam_reader, test_gauge_summary, test_adaptive_interval,
+test_foam_live_due, test_gui_drain, test_gui_refine_preview, test_gui_amr_form,
+test_gui_results_fields/anim, test_gui_solver_mode, test_revolve3d, test_viz3d_sampling
+PASS. NOT RUN: the WSL suites (test_foam_2d / _3d_smoke / the foam e2e scripts) - the
+foam backend changes here are the trigger check and the mask rename, and they need an
+idle WSL; run them before relying on a blastFoam trigger run.
+
+
+---
+
 ## 5. Unscheduled / nice-to-have (not in the queue; pick up on request)
 
 - Non-box obstacles (STL → snappyHexMesh) — needs the same resampler as AMR.
@@ -1879,6 +1994,8 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
   impulse / snapshot fields on the result's own grid, 1D as r,value)
 - N15 local (static) refinement + show-mesh — DONE (T17–T19)
 - N15-a mesh overlay on the run's own animation (`case.anim_mesh`) - DONE (T49)
+- N18 boundary kinds transmit/reflect/terminate + a per-run end time - DONE (T50, T52)
+- N19 trigger gauge (terminate / remap on arrival) + gauge markers - DONE (T51, T53)
 - N16 dynamic AMR (`adaptiveFvMesh`; default estimator densityGradient; AMR and static zones mutually exclusive; display level caps the display grid; serial in v1; an uncapped 3D AMR case once killed the 4 GB WSL VM — the 3D e2e caps at 300k cells) — DONE (T20–T24). Open follow-ups:
   - N16-a 3D AMR gauge arrival +18 % vs static (peak within 2.7 %) — DONE (2026-09-07, T40).
     `adjustLocations` REFUTED: switching it off moves the AMR-vs-static arrival by 0.15
@@ -1955,6 +2072,7 @@ python test_gui_drain.py          # GUI queue-drain resilience
 python test_gui_results_fields.py # Results panel (fields, S2 QA checks)
 python test_gui_results_anim.py   # Animation tab
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
+python test_bc_trigger.py         # boundary kinds, end time, trigger gauge, gauge markers
 python test_gauge_summary.py      # per-gauge peak/arrival/impulse
 python test_report.py             # field CSVs + HTML report (T45)
 python test_gui_gauge_summary.py  # Gauges-tab table + CSV (headless Tk)

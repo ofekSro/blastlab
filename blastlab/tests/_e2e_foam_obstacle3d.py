@@ -25,6 +25,12 @@ import numpy as np                                             # noqa: E402
 from blastlab.core.case import Case3D, validate_case           # noqa: E402
 from blastlab.core.constants import P_AIR                      # noqa: E402
 
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 FAIL = []
 
 
@@ -51,7 +57,7 @@ def main():
                           (0.06, c, c)],     # mirrored free side
                   n_snapshots=3, record_frames=50,
                   solver='blastfoam', material='TNT',
-                  n_procs=4 if '--np4' in sys.argv else 1)
+                  n_procs=4 if '--np4' in sys.argv else 1, bcs=ALL_TERM_3D)
     rep = validate_case(case)
     check('validate ok', rep.ok, str(rep.errors))
     if not rep.ok:

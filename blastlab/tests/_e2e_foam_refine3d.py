@@ -24,6 +24,12 @@ from blastlab.core.constants import P_AIR                       # noqa: E402
 from blastlab.solvers import get_solver                         # noqa: E402
 from blastlab.solvers.hooks import RunHooks                     # noqa: E402
 
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 FAILS = []
 
 
@@ -71,7 +77,7 @@ def main():
                 # the open boundary is still rising when the arrival stop lands)
                 gauges=[(0.65, 0.5, 0.5)], n_snapshots=2, record_frames=20,
                 solver='blastfoam', material='TNT')
-    case = Case3D(**base)
+    case = Case3D(**base, bcs=ALL_TERM_3D)
     plan = refine.plan_levels(case, rho0=1630.0)
     print(f'plan: lmax {plan.lmax}, finest {plan.dx_fine:.4g} m, '
           f'{plan.n_pred:,} predicted cells, display {plan.fine["Nx"]}^3')
@@ -100,7 +106,7 @@ def main():
     check('recorded frames are slices of the fine grid',
           m['frames']['pressures'][0].shape == (80, 80))
 
-    par = Case3D(n_procs=2, **base)
+    par = Case3D(n_procs=2, **base, bcs=ALL_TERM_3D)
     res2, h2 = run(par, 'np=2')
     m2 = res2.meta
     check('np=2: mesh matched (centres written before decomposePar)',

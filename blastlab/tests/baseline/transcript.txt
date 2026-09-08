@@ -30,10 +30,10 @@
   Explosive radius: 0.0527 m
   Domain          : 1.2 x 1.6 m,  cell 0.0105263 m  (114 x 152 = 17,328 cells)
   EOS             : idealGas
-  Boundaries      : x_lo=wall, x_hi=open, y_lo=wall, y_hi=open  (x_lo = symmetry axis)
+  Boundaries      : x_lo=reflect, x_hi=terminate, y_lo=reflect, y_hi=terminate  (x_lo = symmetry axis)
   Obstacles       : 1
   Gauges          : 2
-  Stop condition  : shock arrival at an open boundary
+  Stop condition  : shock arrival at a terminate boundary
   Safety cap      : 47.0 ms
 ============================================================
 
@@ -41,7 +41,7 @@
   step     200  t =   0.158 ms  dt = 9.66e-07 s  p_max = 3.233e+06 Pa
 
   Done. 382 steps, t_final = 0.375 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+  Stopped: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)
 
   Gauge data saved: <OUT>\b2_gauges.txt  (383 rows x 2 gauges)
   [auto] Cell size reduced to 0.01042 m (5 cells across charge radius)
@@ -54,16 +54,16 @@
   Explosive radius: 0.0527 m
   Domain          : 0.5 x 1.6 m,  cell 0.0104167 m  (48 x 154 = 7,392 cells)
   EOS             : idealGas
-  Boundaries      : x_lo=wall, x_hi=open, y_lo=wall, y_hi=open  (x_lo = symmetry axis)
+  Boundaries      : x_lo=reflect, x_hi=terminate, y_lo=reflect, y_hi=terminate  (x_lo = symmetry axis)
   Obstacles       : 0
   Gauges          : 0
-  Stop condition  : shock arrival at an open boundary
+  Stop condition  : shock arrival at a terminate boundary
   Safety cap      : 47.0 ms
 ============================================================
 
 
   Done. 171 steps, t_final = 0.127 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+  Stopped: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)
 
   2D field profile saved: <OUT>\b2_profile.npz  (48 x 154 cells, t = 0.127 ms)
 
@@ -74,17 +74,17 @@
   Explosive radius: 0.0527 m
   Domain          : 3 x 6 m,  cell 0.02 m  (150 x 300 = 45,000 cells)
   EOS             : JWL
-  Boundaries      : x_lo=wall, x_hi=open, y_lo=open, y_hi=open  (x_lo = symmetry axis)
+  Boundaries      : x_lo=reflect, x_hi=terminate, y_lo=terminate, y_hi=terminate  (x_lo = symmetry axis)
   Obstacles       : 0
   Gauges          : 1
-  Stop condition  : shock arrival at an open boundary
+  Stop condition  : shock arrival at a terminate boundary
   Safety cap      : 178.2 ms
 ============================================================
 
   step     200  t =   2.787 ms  dt = 5.36e-06 s  p_max = 1.901e+05 Pa
 
   Done. 347 steps, t_final = 3.615 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.014e+05 Pa)
+  Stopped: shock arrived at a terminate boundary (p_edge = 1.014e+05 Pa)
 
   Gauge data saved: <OUT>\b2r_gauges.txt  (348 rows x 1 gauges)
   [auto] Cell size reduced to 0.02083 m (5 cells across charge radius)
@@ -99,10 +99,10 @@
   Domain          : 1 x 1 x 1 m,  cell 0.0208333 m
   Grid            : 48 x 48 x 48 = 110,592 cells
   EOS             : idealGas
-  Boundaries      : x_lo=open, x_hi=open, y_lo=open, y_hi=open, z_lo=wall, z_hi=open
+  Boundaries      : x_lo=terminate, x_hi=terminate, y_lo=terminate, y_hi=terminate, z_lo=reflect, z_hi=terminate
   Obstacles       : 1
   Gauges          : 2
-  Stop condition  : shock arrival at an open boundary
+  Stop condition  : shock arrival at a terminate boundary
   Safety cap      : 29.4 ms
   (3D steps are slow: expect roughly 1-1 s/step)
 ==============================================================
@@ -110,7 +110,7 @@
   step     50  t =   0.040 ms  dt = 7.13e-07 s  p_max = 1.678e+09 Pa
 
   Done. 83 steps, t_final = 0.063 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+  Stopped: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)
 
   Gauge data saved: <OUT>\b3_gauges.txt  (84 rows x 2 gauges)
 
@@ -123,10 +123,10 @@
   Domain          : 1.6 x 1.6 x 1.6 m,  cell 0.02 m
   Grid            : 80 x 80 x 80 = 512,000 cells
   EOS             : idealGas
-  Boundaries      : x_lo=open, x_hi=open, y_lo=open, y_hi=open, z_lo=wall, z_hi=open
+  Boundaries      : x_lo=terminate, x_hi=terminate, y_lo=terminate, y_hi=terminate, z_lo=reflect, z_hi=terminate
   Obstacles       : 0
   Gauges          : 2
-  Stop condition  : shock arrival at an open boundary
+  Stop condition  : shock arrival at a terminate boundary
   Safety cap      : 47.1 ms
   (3D steps are slow: expect roughly 1-1 s/step)
 ==============================================================
@@ -135,6 +135,6 @@
   step    100  t =   0.235 ms  dt = 1.21e-06 s  p_max = 1.998e+06 Pa
 
   Done. 117 steps, t_final = 0.256 ms
-  Stopped: shock arrived at an open boundary (p_edge = 1.015e+05 Pa)
+  Stopped: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)
 
   Gauge data saved: <OUT>\b3r_gauges.txt  (118 rows x 2 gauges)

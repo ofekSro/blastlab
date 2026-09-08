@@ -91,8 +91,8 @@ for geometry in ('planar', 'axisymmetric'):
     geom = make_geometry(geometry, 1.0, 1.0, 0.02)
     Nx, Ny = geom['Nx'], geom['Ny']
     solid = solid_mask(geom['x_c'], geom['y_c'], [(0.4, 0.6, 0.4, 0.6)])
-    bcs = dict(x_lo='wall' if geometry == 'axisymmetric' else 'open',
-               x_hi='open', y_lo='wall', y_hi='open')
+    bcs = dict(x_lo='reflect' if geometry == 'axisymmetric' else 'terminate',
+               x_hi='terminate', y_lo='reflect', y_hi='terminate')
     U0 = ambient(Nx, Ny)
     U1 = steps(U0.copy(), np.zeros((Nx, Ny), int), geom, bcs, solid, geometry)
     err = np.abs(U1 - U0).max() / np.abs(U0).max()
@@ -107,16 +107,24 @@ U = ambient(Nx, Ny)
 blob = ((geom['x_c'][:, None]-0.5)**2 + (geom['y_c'][None, :]-0.5)**2) < 0.1**2
 U[3][blob] *= 20.0        # hot spot
 E0 = (U[3] * geom['V'][:, 0][:, None]).sum()
-bcs = dict(x_lo='wall', x_hi='wall', y_lo='wall', y_hi='wall')
+bcs = dict(x_lo='reflect', x_hi='reflect', y_lo='reflect', y_hi='reflect')
 U = steps(U, np.zeros((Nx, Ny), int), geom, bcs, solid, 'planar', nsteps=500)
 E1 = (U[3] * geom['V'][:, 0][:, None]).sum()
 check("total energy conserved", abs(E1-E0)/E0 < 1e-3,
       f"(drift {(E1-E0)/E0:.2e})")
 
+#: T50: the pre-T50 solver default - every side lets the wave out AND
+#: ends the run on arrival. Spelled out because the default is now plain
+#: 'transmit', which would run these comparisons to the safety cap.
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
+
 # ── T5: planar free-air symmetry (x<->y) via run_blast_2d ────────────────────
 print("\nT5: planar symmetry")
 snaps, _, meta = run_blast_2d('planar', 2.0, 2.0, 0.02,
                               charge=60.0, charge_center=(1.0, 1.0),
+                              bcs=ALL_TERM,
                               eos='idealGas', n_snapshots=1, gauges=[])
 p_fin = list(snaps.values())[-1]['p']
 check("x<->y transpose symmetry", np.allclose(p_fin, p_fin.T, rtol=1e-9))
@@ -126,11 +134,12 @@ check("x-mirror symmetry", np.allclose(p_fin, p_fin[::-1, :], rtol=1e-9))
 print("\nT6: wall mirror test")
 snapsA, _, _ = run_blast_2d('planar', 2.0, 2.0, 0.02,
                             charge=60.0, charge_center=(1.0, 1.0),
+                            bcs=ALL_TERM,
                             eos='idealGas', n_snapshots=1, gauges=[])
 snapsB, _, _ = run_blast_2d('planar', 2.0, 1.0, 0.02,
                             charge=60.0, charge_center=(1.0, 1.0),
-                            bcs=dict(x_lo='open', x_hi='open',
-                                     y_lo='open', y_hi='wall'),
+                            bcs=dict(x_lo='terminate', x_hi='terminate',
+                                     y_lo='terminate', y_hi='reflect'),
                             eos='idealGas', n_snapshots=1, gauges=[])
 pA = list(snapsA.values())[-1]['p']
 pB = list(snapsB.values())[-1]['p']
@@ -144,9 +153,11 @@ print("\nT7: obstacle reflection")
 gauge = [(0.55, 1.0)]                     # just in front of the block face
 free_s, free_g, _ = run_blast_2d('planar', 2.0, 2.0, 0.02,
                                  charge=60.0, charge_center=(1.0, 1.0),
+                                 bcs=ALL_TERM,
                                  eos='idealGas', n_snapshots=1, gauges=gauge)
 obs_s, obs_g, obs_m = run_blast_2d('planar', 2.0, 2.0, 0.02,
                                    charge=60.0, charge_center=(1.0, 1.0),
+                                   bcs=ALL_TERM,
                                    obstacles=[(0.3, 0.5, 0.6, 1.4)],
                                    eos='idealGas', n_snapshots=1, gauges=gauge)
 pk_free = free_g['pressures'][0].max() - P_AIR
@@ -164,7 +175,7 @@ _, gauges1d, _ = blast1d.run_blast(4.0, charge, cell, eos='idealGas',
                                    n_snapshots=1, gauge_radii=g1d)
 snap2, gauges2d, meta2 = run_blast_2d(
     'axisymmetric', 4.0, 8.0, cell, charge=charge, charge_center=(0.0, 4.0),
-    eos='idealGas', n_snapshots=1,
+    bcs=ALL_TERM, eos='idealGas', n_snapshots=1,
     gauges=[(r, 4.0) for r in g1d])
 
 def arrival_peak(times, p, thresh=0.05):
@@ -250,7 +261,7 @@ check("profile metadata", loaded['eos'] == 'idealGas'
 
 snapR, gaugesR, metaR = run_blast_2d(
     'axisymmetric', 4.0, 8.0, prof['r'][1] - prof['r'][0],
-    profile=loaded, charge_center=(0.0, 4.0),
+    profile=loaded, charge_center=(0.0, 4.0), bcs=ALL_TERM,
     eos='idealGas', n_snapshots=1, gauges=[(3.5, 4.0)])
 aR, pR = arrival_peak(gaugesR['times'], gaugesR['pressures'][0])
 a1, p1 = arrival_peak(gauges1d['times'], gauges1d['pressures'][2])  # r=3.5 straight 1D

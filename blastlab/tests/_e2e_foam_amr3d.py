@@ -40,6 +40,12 @@ from blastlab.solvers import get_solver                         # noqa: E402
 from blastlab.solvers.foam import env                           # noqa: E402
 from blastlab.solvers.hooks import RunHooks                     # noqa: E402
 
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 FAILS = []
 
 
@@ -101,7 +107,7 @@ def main():
     # maxCells bounds the solver's memory: the WSL VM has 4 GB and an
     # uncapped run took it down (2026-09-05)
     amr = Case3D(cell_size_m=0.1, amr_levels=2, amr_display_level=1,
-                 amr_max_cells=300_000, **base)
+                 amr_max_cells=300_000, **base, bcs=ALL_TERM_3D)
     reuse = [a.split('=', 1)[1] for a in sys.argv[1:] if a.startswith('--amr-dir=')]
     if reuse:
         # reload a finished AMR run (post-mortem) instead of the ~23 min solve
@@ -172,7 +178,8 @@ def main():
               abs(fo_pk - g_pk) / g_pk < 0.20, f'{fo_pk/1e3:.0f} vs {g_pk/1e3:.0f} kPa')
 
     # serial like the AMR run (auto would pick 2 ranks at 228k cells)
-    ref_case = Case3D(cell_size_m=0.05, charge_refine='zone', n_procs=1, **base)
+    ref_case = Case3D(cell_size_m=0.05, charge_refine='zone',
+                      n_procs=1, bcs=ALL_TERM_3D, **base)
     ref_res, hr, wall_ref = run(ref_case, 'static reference (5 cm base + charge zones)')
     print(f'  wall time: AMR {wall_amr:.0f} s ({h.steps} steps) vs static 5 cm '
           f'{wall_ref:.0f} s ({hr.steps} steps)')

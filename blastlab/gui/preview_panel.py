@@ -14,6 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Circle, Rectangle
 
 from ..core import refine
+from ..core.bc import normalize_bc
 from ..core.case import _charge_radius
 from ..core.constants import MIN_EXP_CELLS
 from ..viz3d import MISSING_MSG, pyvista_available
@@ -228,15 +229,19 @@ class Preview2DPanel(ctk.CTkFrame):
         Lx, Ly = case.Lx, case.Ly
         axisym = case.geometry == 'axisymmetric'
 
-        # boundary sides: wall = solid bold, open = dashed light
+        # boundary sides: reflect = solid bold, transmit/terminate =
+        # dashed light (terminate additionally dotted-thick, see below)
         for side, seg in (('x_lo', ((0, 0), (0, Ly))),
                           ('x_hi', ((Lx, Lx), (0, Ly))),
                           ('y_lo', ((0, Lx), (0, 0))),
                           ('y_hi', ((0, Lx), (Ly, Ly)))):
-            is_wall = case.bcs.get(side) == 'wall'
+            kind = normalize_bc(case.bcs.get(side))
+            is_wall = kind == 'reflect'
             ax.plot(*seg, color=wall if is_wall else open_,
                     lw=2.5 if is_wall else 1.2,
-                    ls='-' if is_wall else (0, (4, 3)), zorder=2)
+                    ls=('-' if is_wall else
+                        (0, (1, 2)) if kind == 'terminate' else
+                        (0, (4, 3))), zorder=2)
 
         for (x0, x1, y0, y1) in case.obstacles:
             ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0,

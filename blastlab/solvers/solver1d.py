@@ -10,7 +10,7 @@ from ..core.eos import (air_pressure, jwl_pressure, material_jwl,
                         pressure_soundspeed)
 from ..core.riemann import hll_fluxes_1d as hll_fluxes
 from ..core.grid import make_grid_1d
-from .hooks import ConsoleHooks, Progress, Result
+from .hooks import ConsoleHooks, Progress, Result, trigger_index
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -31,7 +31,8 @@ def primitives(U, phase, eos, jwl=JWL_TNT):
 def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
                   order=1,
                   eos='idealGas', cfl=0.5, n_snapshots=5,
-                  gauge_radii=None, hooks=None):
+                  gauge_radii=None, hooks=None, t_end=0.0,
+                  trigger_gauge=None, trigger_action='terminate'):
     """
     Run a 1D spherical blast wave simulation. The run stops when the shock
     front reaches the outer boundary (detected via a pressure rise in the
@@ -120,6 +121,10 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     c_amb        = np.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)        # ~340 m/s
     arrival_p    = P_AIR * 1.001                                # 0.1 % overpressure
     safety_cap   = 10.0 * radius_m / c_amb                      # absolute upper bound
+    # T52: a user end time wins whenever it comes first
+    cap_is_end   = bool(t_end) and t_end < safety_cap
+    if cap_is_end:
+        safety_cap = t_end
 
     # Snapshots are triggered by shock-front POSITION, not time, exactly as
     # in 2D/3D: the blast crosses the domain far faster than the acoustic
@@ -139,8 +144,15 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     gauge_actual  = [float(r[i]) for i in gauge_indices]
     gauge_times_list  = []
     gauge_press_lists = [[] for _ in gauge_radii]
+    # T51 trigger gauge: 1-based on the way in, index on the way through
+    trig_k = trigger_index(trigger_gauge, len(gauge_indices), hooks)
+    trigger = trigger_profile = None
 
-    hooks.run_started(dict(dim=1, r=r, radius_m=radius_m))
+    hooks.run_started(dict(dim=1, r=r, radius_m=radius_m,
+                           gauges=[(n + 1, float(g), 0.0)
+                                   for n, g in enumerate(gauge_actual)],
+                           trigger_gauge=None if trig_k is None
+                           else trig_k + 1))
     import time as _time
     _last_draw = 0.0
 
@@ -156,7 +168,8 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     hooks.log(f"  EOS             : {eos}")
     hooks.log(f"  Initial p (exp) : {p0_exp:.3e} Pa  ({p0_exp/1e9:.2f} GPa)")
     hooks.log(f"  Stop condition  : shock arrival at r = {radius_m} m")
-    hooks.log(f"  Safety cap      : {safety_cap*1e3:.1f} ms")
+    hooks.log(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
+              f"{safety_cap*1e3:.1f} ms")
     hooks.log(f"{'='*55}\n")
 
     # ── Time integration (Godunov, 1st order) ──────────────────────────────
@@ -173,6 +186,26 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
             gauge_times_list.append(t)
             for k, idx in enumerate(gauge_indices):
                 gauge_press_lists[k].append(p_f[idx])
+
+        # ── Trigger gauge (T51) ───────────────────────────────────────
+        if trig_k is not None and trigger is None \
+                and p_f[gauge_indices[trig_k]] > arrival_p:
+            trigger = dict(t=float(t), gauge=trig_k + 1,
+                           point=(gauge_actual[trig_k],),
+                           action=trigger_action)
+            hooks.log(f"  Trigger gauge {trig_k + 1} (r = "
+                      f"{gauge_actual[trig_k]:.4f} m) reached at "
+                      f"t = {t*1e3:.3f} ms")
+            if 'remap' in trigger_action:
+                trigger_profile = dict(
+                    t=t, r=r.copy(), rho=rho_f.copy(), u=u_f.copy(),
+                    e=e_f.copy(), p=p_f.copy(), phase=phase.copy(),
+                    charge_kg=charge_kg, eos=eos, r_exp=r_exp,
+                    radius_m=radius_m)
+            if 'terminate' in trigger_action:
+                stop_reason = (f'trigger gauge {trig_k + 1} reached '
+                               f'(r = {gauge_actual[trig_k]:.4f} m)')
+                break
 
         if hooks.should_stop():
             stop_reason = 'stopped by user'
@@ -294,6 +327,8 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
                          charge_kg=charge_kg, eos=eos, r_exp=r_exp,
                          radius_m=radius_m)
 
+    if stop_reason == 'safety cap' and cap_is_end:
+        stop_reason = 'end time reached'
     hooks.log(f"\n  Done. {step} steps, t_final = {t*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
 
@@ -304,7 +339,12 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     )
     hooks.frame(np.array([r, p_f]), t)
     meta = dict(final_profile=final_profile, r=r, radius_m=radius_m,
-                charge_kg=charge_kg, eos=eos, r_exp=r_exp)
+                charge_kg=charge_kg, eos=eos, r_exp=r_exp,
+                trigger_gauge=None if trig_k is None else trig_k + 1)
+    if trigger is not None:
+        meta['trigger'] = trigger
+    if trigger_profile is not None:
+        meta['trigger_profile'] = trigger_profile
     return Result(snapshots, gauge_out, meta, stop_reason,
                   stop_reason == 'stopped by user')
 
@@ -316,4 +356,8 @@ def solve_1d(case, hooks=None):
                          order=int(getattr(case, 'order', 1) or 1),
                          eos=case.eos, cfl=case.cfl,
                          n_snapshots=case.n_snapshots,
-                         gauge_radii=list(case.gauge_radii), hooks=hooks)
+                         gauge_radii=list(case.gauge_radii), hooks=hooks,
+                         t_end=float(getattr(case, 't_end', 0.0) or 0.0),
+                         trigger_gauge=getattr(case, 'trigger_gauge', None),
+                         trigger_action=getattr(case, 'trigger_action',
+                                                'terminate'))

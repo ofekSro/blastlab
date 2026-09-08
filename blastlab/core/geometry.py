@@ -1,8 +1,13 @@
 """Domain geometry shared by the native 2D/3D solvers, the blastFoam
-backend and the post-mortem loader (ROADMAP A2): open-boundary edge
-masks, the charge-to-boundary distances that drive the arrival stop /
-progress / snapshot scheduling, the snapshot trigger radii and the
+backend and the post-mortem loader (ROADMAP A2): terminating-boundary
+edge masks, the charge-to-boundary distances that drive the arrival stop
+/ progress / snapshot scheduling, the snapshot trigger radii and the
 per-cell distance-to-charge fields.
+
+Two different questions are asked of `bcs` here and they no longer have
+the same answer (T50): only a `terminate` side ENDS a run, while ANY
+non-`reflect` side is one the wave leaves through, which is what sizes
+the snapshot radii and the progress bar.
 
 Every function is a pure drop-in for the inline code it replaced. The
 native solvers' byte-pinned transcripts (test_regression) depend on the
@@ -10,6 +15,8 @@ numbers being identical, so keep the expressions exactly as they are.
 """
 
 import numpy as np
+
+from .bc import normalize_bc
 
 SIDES_2D = ('x_lo', 'x_hi', 'y_lo', 'y_hi')
 SIDES_3D = SIDES_2D + ('z_lo', 'z_hi')
@@ -21,8 +28,15 @@ def _side_slice(side, ndim):
     return tuple(sl)
 
 
-def open_edge_mask(shape, bcs, fluid=None, sides=None):
-    """Cells on an OPEN boundary (a wall reflection must not end a run).
+def _leaves(bcs, side):
+    """True where the wave leaves the domain: anything but a reflection."""
+    return normalize_bc(bcs[side]) != 'reflect'
+
+
+def terminate_edge_mask(shape, bcs, fluid=None, sides=None):
+    """Cells on a TERMINATE boundary - the sides whose shock arrival ends
+    the run. A reflection never does, and since T50 neither does a plain
+    `transmit` side (pre-T50 `open` did both; normalize_bcs maps it).
 
     `fluid` (bool mask) drops solid/carved cells - they hold frozen
     ambient air; `sides` restricts which boundaries count (the backend's
@@ -31,7 +45,7 @@ def open_edge_mask(shape, bcs, fluid=None, sides=None):
         sides = SIDES_2D if len(shape) == 2 else SIDES_3D
     edge = np.zeros(shape, dtype=bool)
     for side in sides:
-        if bcs[side] == 'open':
+        if normalize_bc(bcs[side]) == 'terminate':
             edge[_side_slice(side, len(shape))] = True
     if fluid is not None:
         edge &= fluid
@@ -39,30 +53,33 @@ def open_edge_mask(shape, bcs, fluid=None, sides=None):
 
 
 def stop_dists_2d(Lx, Ly, x0, y0, bcs, x_lo_counts=True):
-    """Charge-to-open-boundary distances (2D). `x_lo_counts=False` for
-    axisymmetric runs, where x_lo is the axis. Closed box: the far
-    corner, so snapshots cover the whole domain (the safety cap stops
-    such a run)."""
+    """Charge-to-boundary distances over the sides the wave leaves
+    through - transmit AND terminate, which is the pre-T50 `open` set, so
+    snapshot radii and the progress bar are unchanged by the rename.
+    `x_lo_counts=False` for axisymmetric runs, where x_lo is the axis.
+    Fully reflecting box: the far corner, so snapshots cover the whole
+    domain (the safety cap stops such a run)."""
     dists = []
-    if bcs['x_hi'] == 'open':
+    if _leaves(bcs, 'x_hi'):
         dists.append(Lx - x0)
-    if bcs['x_lo'] == 'open' and x_lo_counts:
+    if _leaves(bcs, 'x_lo') and x_lo_counts:
         dists.append(x0)
-    if bcs['y_lo'] == 'open':
+    if _leaves(bcs, 'y_lo'):
         dists.append(y0)
-    if bcs['y_hi'] == 'open':
+    if _leaves(bcs, 'y_hi'):
         dists.append(Ly - y0)
-    if not dists:   # closed box: cover the whole domain
+    if not dists:   # fully reflecting box: cover the whole domain
         corners = [(0.0, 0.0), (Lx, 0.0), (0.0, Ly), (Lx, Ly)]
         dists.append(max(np.hypot(cx - x0, cy - y0) for cx, cy in corners))
     return dists
 
 
 def stop_dists_3d(Lx, Ly, Lz, centers, bcs):
-    """Charge-to-open-boundary distances (3D): per open side the distance
-    from the NEAREST charge centre (ROADMAP B21 - the stop itself is
-    pressure-based; these only size progress and snapshots). Closed box:
-    the far corner from the primary (first) centre."""
+    """Charge-to-boundary distances (3D) over the sides the wave leaves
+    through (see stop_dists_2d): per side the distance from the NEAREST
+    charge centre (ROADMAP B21 - the stop itself is pressure-based; these
+    only size progress and snapshots). Fully reflecting box: the far
+    corner from the primary (first) centre."""
     x0, y0, z0 = centers[0]
     dists = []
     for side, d_of in (('x_lo', lambda c: c[0]),
@@ -71,13 +88,32 @@ def stop_dists_3d(Lx, Ly, Lz, centers, bcs):
                        ('y_hi', lambda c: Ly - c[1]),
                        ('z_lo', lambda c: c[2]),
                        ('z_hi', lambda c: Lz - c[2])):
-        if bcs[side] == 'open':
+        if _leaves(bcs, side):
             dists.append(min(float(d_of(c)) for c in centers))
-    if not dists:   # closed box: cover the whole domain
+    if not dists:   # fully reflecting box: cover the whole domain
         dists = [max(float(np.hypot(np.hypot(cx - x0, cy - y0), cz - z0))
                      for cx in (0, Lx) for cy in (0, Ly)
                      for cz in (0, Lz))]
     return dists
+
+
+def plane_gauges(points, sl, coords, tol):
+    """The gauges a 3D live/animated plane actually cuts, as
+    [(number, u, v), ...] in that plane's own coordinates (T53).
+
+    `sl` is the plane selector (a tuple with one integer index), `coords`
+    the (x_c, y_c, z_c) cell centres and `tol` the half-width that still
+    counts as "on the plane" (one cell). A gauge a metre off the slice
+    must not be drawn as if it sat on it."""
+    axis = next(a for a, x in enumerate(sl) if not isinstance(x, slice))
+    plane = float(coords[axis][int(sl[axis])])
+    keep = [a for a in range(3) if a != axis]
+    out = []
+    for n, pt in enumerate(points):
+        if abs(float(pt[axis]) - plane) > tol:
+            continue
+        out.append((n + 1, float(pt[keep[0]]), float(pt[keep[1]])))
+    return out
 
 
 def snap_radii(r_start, dists, n_snapshots):

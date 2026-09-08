@@ -14,7 +14,13 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
-import numpy as np                                             # noqa: E402
+import numpy as np                                             # noqa: E402
+
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
 
 FAIL = []
 
@@ -61,7 +67,7 @@ def main():
     case = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
                   cell_size_m=0.02, charge=4.0, center=(0.0, 1.0),
                   n_snapshots=3, gauges=[(0.6, 1.0)], record_frames=0,
-                  solver='blastfoam', material='TNT')
+                  solver='blastfoam', material='TNT', bcs=ALL_TERM)
     live = get_solver(2, 'blastfoam')(case)
     loaded = pm.load_run(live.meta['case_dir'])
 

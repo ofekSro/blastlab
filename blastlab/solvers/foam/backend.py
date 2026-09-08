@@ -604,7 +604,11 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
 
     _log_banner_1d(hooks, case, spec)
-    hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m))
+    hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m,
+                           # T53: gauge radii for the live pane
+                           gauges=[(n + 1, float(g), 0.0) for n, g
+                                   in enumerate(case.gauge_radii
+                                                or [])]))
     _initial_frame(spec, hooks)
 
     store = {}                      # dirname -> dict(t, p, rho, u)
@@ -762,7 +766,7 @@ def _refine_lines(spec):
             f'{disp} grid at {spec.dx:g} m)']
 
 
-def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
+def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
     m = MATERIALS[spec.material]
     bar = '=' * 60
     bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
@@ -794,8 +798,8 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_open):
                if spec.obstacles else ''),
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
-            + ('shock arrival at an open boundary' if has_open
-               else 'safety cap (no open boundaries)'),
+            + ('shock arrival at a terminate boundary' if has_term
+               else 'safety cap (no terminate boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
             f'(initial, adaptive)',
@@ -834,24 +838,29 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     solid = (spec.solid if spec.solid is not None
              else np.zeros((Nx, Ny), dtype=bool))
 
-    # open-boundary edge mask + distances (native logic, solver2d): the
-    # axisymmetric x_lo is the symmetry axis, carved cells read back as
-    # ambient
-    open_edge = geometry.open_edge_mask(
+    # terminate-boundary edge mask + distances (native logic, solver2d):
+    # the axisymmetric x_lo is the symmetry axis, carved cells read back
+    # as ambient
+    term_edge = geometry.terminate_edge_mask(
         (Nx, Ny), bcs, fluid=~solid,
         sides=geometry.SIDES_2D if not axisym else ('x_hi', 'y_lo', 'y_hi'))
-    has_open = open_edge.any()
+    has_term = term_edge.any()
+    trig_k, trig_cell = _trigger_cells(case, (x_c, y_c), (Nx, Ny))
+    trigger = {}
     d_charge = geometry.d_charge_2d(x_c, y_c, x0, y0)
     dists = geometry.stop_dists_2d(case.Lx, case.Ly, x0, y0, bcs,
                                    x_lo_counts=not axisym)
     stop_dist = min(dists)
     snap_radii = geometry.snap_radii(spec.r_exp, dists, case.n_snapshots)
 
-    _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_open)
+    _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_term)
     run_info = dict(
         dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
         xlabel='r [m]' if axisym else 'x [m]',
         ylabel='z [m]' if axisym else 'y [m]', title='',
+        # T53: what the user asked for (the probes snap in the mesh)
+        gauges=[(n + 1, float(pt[0]), float(pt[1]))
+                for n, pt in enumerate(case.gauges or [])],
         mesh_src=(refine.slice_src(spec.levels, spec.lmax,
                                    solid_fine=spec.solid)
                   if spec.lmax and not spec.amr else None),
@@ -919,10 +928,16 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
-        if not loop.stop_requested and has_open \
-                and (p[open_edge] > ARRIVAL_P).any():
-            loop.request_stop('shock arrived at an open boundary '
-                              f'(p_edge = {p[open_edge].max():.3e} Pa)')
+        if trig_k is not None and not trigger \
+                and p[trig_cell] > ARRIVAL_P:
+            trigger.update(
+                _trigger_fire(loop, hooks, case, trig_k, t,
+                              float(p[trig_cell])),
+                time_dir=name)
+        if not loop.stop_requested and has_term \
+                and (p[term_edge] > ARRIVAL_P).any():
+            loop.request_stop('shock arrived at a terminate boundary '
+                              f'(p_edge = {p[term_edge].max():.3e} Pa)')
         loop.note_pause(will_pause)
         loop.gated_step()
         return True
@@ -940,14 +955,19 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     stop_reason = loop.run()
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
-                       record_frames, acc, frame_lv=frame_lv)
+                       record_frames, acc, frame_lv=frame_lv,
+                       trig_k=trig_k, trigger=trigger)
 
 
 def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None):
+                 frame_lv=None, trig_k=None, trigger=None):
     """Build the exact native-shaped 2D Result via a two-pass snapshot
-    re-read (also used by postmortem.load_run)."""
+    re-read (also used by postmortem.load_run).
+
+    `trig_k` / `trigger` are the T51 trigger-gauge index and record from
+    the run loop; postmortem.load_run has neither (it never watched the
+    run) and passes nothing."""
     m = MATERIALS[spec.material]
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
@@ -1040,6 +1060,25 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     meta['final_state'] = dict(t=t_fin, rho=fin['rho'], u=fin['u'],
                                v=fin['v'], e=e_arr, p=fin['p'],
                                phase=phase)
+    # T51: the trigger's own instant, read back from its time dir when
+    # the action asked for a remap the run did not stop at
+    meta['trigger_gauge'] = None if trig_k is None else trig_k + 1
+    if trigger:
+        trigger = dict(trigger)
+        tname = trigger.pop('time_dir', None)
+        meta['trigger'] = trigger
+        if 'remap' in trigger['action'] and tname:
+            if tname == fin_name:
+                meta['trigger_state'] = meta['final_state']
+            else:
+                try:
+                    tg, tphase, te, _m = read_final(tname)
+                    meta['trigger_state'] = dict(
+                        t=float(trigger['t']), rho=tg['rho'], u=tg['u'],
+                        v=tg['v'], e=te, p=tg['p'], phase=tphase)
+                except Exception as exc:      # noqa: BLE001
+                    hooks.log(f"  [warn] trigger remap state could not "
+                              f"be read from time dir {tname}: {exc}")
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames)
@@ -1066,6 +1105,41 @@ def _emit_frame(hooks, p, t, mesh, sl=None):
     else:
         hooks.frame(field, t,
                     levels=mesh.levels if sl is None else mesh.levels[sl])
+
+
+def _trigger_cells(case, coords, shape):
+    """T51: (index, cell) for the trigger gauge on a display grid, or
+    (None, None). `coords` are the cell centres per axis; the gauge is
+    snapped to its nearest cell exactly as the native solvers do."""
+    n = getattr(case, 'trigger_gauge', None)
+    gauges = list(case.gauges or [])
+    if n in (None, 0, '') or not gauges:
+        return None, None
+    try:
+        k = int(n) - 1
+    except (TypeError, ValueError):
+        return None, None
+    if not 0 <= k < len(gauges):
+        return None, None
+    pt = tuple(float(v) for v in gauges[k])
+    cell = tuple(int(np.argmin(np.abs(np.asarray(c) - pt[a])))
+                 for a, c in enumerate(coords))
+    if any(not 0 <= c < s for c, s in zip(cell, shape)):
+        return None, None
+    return k, cell
+
+
+def _trigger_fire(loop, hooks, case, k, t, p_at):
+    """Log the arrival and ask the run loop to stop when the action says
+    so. Returns the trigger record for meta."""
+    action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
+    pt = tuple(float(v) for v in list(case.gauges)[k])
+    hooks.log(f"  Trigger gauge {k + 1} ("
+              + ", ".join(f"{v:.4f}" for v in pt)
+              + f") m reached at t = {t*1e3:.3f} ms (p = {p_at:.3e} Pa)")
+    if 'terminate' in action and not loop.stop_requested:
+        loop.request_stop(f'trigger gauge {k + 1} reached')
+    return dict(t=float(t), gauge=k + 1, point=pt, action=action)
 
 
 def _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames):
@@ -1211,7 +1285,7 @@ def slice_geom_3d(case, spec):
             live_title)
 
 
-def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
+def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
     m = MATERIALS[spec.material]
     bar = '=' * 62
     bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
@@ -1241,8 +1315,8 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_open):
             if spec.obstacles else '  Obstacles       : 0',
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
-            + ('shock arrival at an open boundary' if has_open
-               else 'safety cap (no open boundaries)'),
+            + ('shock arrival at a terminate boundary' if has_term
+               else 'safety cap (no terminate boundaries)'),
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
@@ -1288,10 +1362,15 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                   f"{max_snaps} to bound snapshot memory")
         n_snapshots = max_snaps
 
-    # open-boundary edge mask + stop/snapshot distances (native logic;
-    # carved cells read back as ambient, distances to the nearest charge)
-    open_edge = geometry.open_edge_mask((Nx, Ny, Nz), bcs, fluid=~solid)
-    has_open = open_edge.any()
+    # terminate-boundary edge mask + stop/snapshot distances (native
+    # logic; carved cells read back as ambient, distances to the nearest
+    # charge)
+    term_edge = geometry.terminate_edge_mask((Nx, Ny, Nz), bcs,
+                                             fluid=~solid)
+    has_term = term_edge.any()
+    trig_k, trig_cell = _trigger_cells(case, (x_c, y_c, z_c),
+                                       (Nx, Ny, Nz))
+    trigger = {}
     d_charge = geometry.d_charge_3d(x_c, y_c, z_c, centers)
     dists = geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz, centers, bcs)
     stop_dist = min(dists)
@@ -1301,12 +1380,15 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     (j0, k0, slice_axis, s0, live_sl, live_faces, live_labels,
      live_title) = slice_geom_3d(case, spec)
 
-    _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_open)
+    _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_term)
     ax_i = 'xyz'.index(slice_axis)
     hooks.run_started(dict(
         dim=3, x_face=live_faces[0], y_face=live_faces[1],
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
+        gauges=geometry.plane_gauges(
+            [tuple(float(v) for v in g) for g in (case.gauges or [])],
+            live_sl, (x_c, y_c, z_c), dx),
         mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
                                    solid_fine=spec.solid)
                   if spec.lmax and not spec.amr else None),
@@ -1394,10 +1476,15 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                                   **_levels_of(mesh)))
             live3d['step'] = st['step']
             live3d['draw'] = _time.time()
-        if not loop.stop_requested and has_open \
-                and (p[open_edge] > ARRIVAL_P).any():
-            loop.request_stop('shock arrived at an open boundary '
-                              f'(p_edge = {p[open_edge].max():.3e} Pa)')
+        if trig_k is not None and not trigger \
+                and p[trig_cell] > ARRIVAL_P:
+            trigger.update(_trigger_fire(
+                loop, hooks, case, trig_k, t,
+                float(p[trig_cell])))
+        if not loop.stop_requested and has_term \
+                and (p[term_edge] > ARRIVAL_P).any():
+            loop.request_stop('shock arrived at a terminate boundary '
+                              f'(p_edge = {p[term_edge].max():.3e} Pa)')
         loop.note_pause(will_pause)
         loop.gated_step()
         return True
@@ -1421,14 +1508,18 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     return finalize_3d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
-                       record_frames, acc, frame_lv=frame_lv)
+                       record_frames, acc, frame_lv=frame_lv,
+                       trig_k=trig_k, trigger=trigger)
 
 
 def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None):
+                 frame_lv=None, trig_k=None, trigger=None):
     """Build the exact native-shaped 3D Result via a two-pass snapshot
-    re-read - bounds run-time memory (also used by postmortem)."""
+    re-read - bounds run-time memory (also used by postmortem).
+
+    `trig_k` / `trigger`: see finalize_2d (3D is terminate-only, so
+    there is no remap state to carry)."""
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
     dx = spec.dx
@@ -1514,5 +1605,9 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames)
+    # T51 (3D is terminate-only: no remap state to carry)
+    meta['trigger_gauge'] = None if trig_k is None else trig_k + 1
+    if trigger:
+        meta['trigger'] = dict(trigger)
     return Result(snapshots, gauge_out, meta, stop_reason,
                   stop_reason == 'stopped by user')

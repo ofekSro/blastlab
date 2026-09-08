@@ -772,8 +772,8 @@ def cases():
     C['N2D'] = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
                       charge=20.0, center=(0.6, 0.0),
                       obstacles=[(1.2, 1.6, 0.0, 0.6)],
-                      bcs=dict(x_lo='wall', x_hi='open', y_lo='wall',
-                               y_hi='open'),
+                      bcs=dict(x_lo='reflect', x_hi='terminate',
+                               y_lo='reflect', y_hi='terminate'),
                       gauges=[(0.3, 0.8), (1.4, 0.3)], n_snapshots=3,
                       record_frames=60, anim_file='blast_2d_animation.gif')
     C['N3D'] = Case3D(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05, charge=50.0,

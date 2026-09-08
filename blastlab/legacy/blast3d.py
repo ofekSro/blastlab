@@ -94,7 +94,8 @@ def run_blast_3d(Lx, Ly, Lz, cell_size_m,
                  cfl=0.30, n_snapshots=6, gauges=None,
                  record_frames=0, live=False, view3d=False,
                  charge_resolution='resolve', slice_axis='y',
-                 slice_pos=None):
+                 slice_pos=None, t_end=None,
+                 trigger_gauge=None, trigger_action='terminate'):
     """Historical API: returns (snapshots, gauge_out, meta)."""
     hooks = ConsoleHooks(3, live=live)
     if view3d:
@@ -108,7 +109,9 @@ def run_blast_3d(Lx, Ly, Lz, cell_size_m,
                             n_snapshots=n_snapshots, gauges=gauges,
                             record_frames=record_frames, hooks=hooks,
                             charge_resolution=charge_resolution,
-                            slice_axis=slice_axis, slice_pos=slice_pos)
+                            slice_axis=slice_axis, slice_pos=slice_pos,
+                            t_end=t_end, trigger_gauge=trigger_gauge,
+                            trigger_action=trigger_action)
     finally:
         hooks.close()
         if hooks.viewer3d is not None:
@@ -264,6 +267,10 @@ def _main():
         record_frames = 150 if params['anim_file'] else 0,
         live          = params['live'],
         view3d        = params.get('view3d', False),
+        t_end         = params.get('t_end', 0.0) or None,
+        trigger_gauge = params.get('trigger', {}).get('trigger_gauge'),
+        trigger_action=params.get('trigger', {}).get(
+            'trigger_action', 'terminate'),
     )
 
     if params['anim_file']:

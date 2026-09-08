@@ -79,8 +79,8 @@ def main():
         box = (2.0, 2.2, 0.0, 1.0)
         case = Case2D(Lx=4.0, Ly=3.0, cell_size_m=0.04, charge=2.0,
                       center=(0.0, 0.0), obstacles=[box],
-                      bcs=dict(x_lo='wall', x_hi='open', y_lo='wall',
-                               y_hi='open'),
+                      bcs=dict(x_lo='reflect', x_hi='terminate',
+                               y_lo='reflect', y_hi='terminate'),
                       gauges=[(1.0, 0.5)], n_snapshots=3,
                       record_frames=40,
                       solver='blastfoam', material='TNT')
@@ -103,8 +103,8 @@ def main():
         case = Case2D(geometry='planar', Lx=2.4, Ly=1.6,
                       cell_size_m=0.04, charge=20.0, center=(0.6, 0.0),
                       obstacles=[box],
-                      bcs=dict(x_lo='wall', x_hi='open', y_lo='wall',
-                               y_hi='open'),
+                      bcs=dict(x_lo='reflect', x_hi='terminate',
+                               y_lo='reflect', y_hi='terminate'),
                       gauges=[(1.2, 0.4)], n_snapshots=3,
                       record_frames=40,
                       solver='blastfoam', material='TNT')

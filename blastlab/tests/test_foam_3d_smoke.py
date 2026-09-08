@@ -18,6 +18,12 @@ import numpy as np                                             # noqa: E402
 from blastlab.core.case import Case3D                          # noqa: E402
 from blastlab.core.constants import P_AIR                      # noqa: E402
 
+#: T50: the pre-T50 3D solver default - terminating sides over a
+#: reflecting ground.
+ALL_TERM_3D = dict(x_lo='terminate', x_hi='terminate',
+                   y_lo='terminate', y_hi='terminate',
+                   z_lo='reflect', z_hi='terminate')
+
 FAIL = []
 SNAP_KEYS = {'p', 'rho_xz', 'rho_xy', 'speed_xz', 'speed_xy', 't', 'rho3'}
 META_KEYS = {'x_c', 'y_c', 'z_c', 'x_face', 'y_face', 'z_face',
@@ -47,7 +53,7 @@ def main():
                   charge=8.0, center=(c, c, c),
                   gauges=[(L - 0.15, c, c), (c, L - 0.15, c)],
                   n_snapshots=4, record_frames=150,
-                  solver='blastfoam', material='TNT')
+                  solver='blastfoam', material='TNT', bcs=ALL_TERM_3D)
     from blastlab.solvers import get_solver
     res = get_solver(3, 'blastfoam')(case)
 

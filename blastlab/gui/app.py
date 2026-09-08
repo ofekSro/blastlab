@@ -57,6 +57,24 @@ def _error_headline(text):
     return lines[-1] if lines else str(text).strip()
 
 
+def _write_trigger_remap(case, res):
+    """T51: the remap file a trigger gauge asked for, written at the
+    instant the wave reached it.
+
+    Only the 'remap' (keep running) action needs this: the terminating
+    actions stop the run there, so the state the normal profile write
+    already saves IS the trigger state. The path is the case's trigger
+    file, falling back to its profile output."""
+    path = getattr(case, 'trigger_file', None) or case.profile_file
+    if not path:
+        return
+    if case.dim == 1 and res.meta.get('trigger_profile') is not None:
+        save_profile(res.meta['trigger_profile'], path)
+    elif case.dim == 2 and res.meta.get('trigger_state') is not None:
+        save_profile_2d(dict(res.meta,
+                             final_state=res.meta['trigger_state']), path)
+
+
 def _solve_stage(dim, case):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
     callable also writes the case's own output files (gauges, animation,
@@ -71,6 +89,7 @@ def _solve_stage(dim, case):
                 save_gauges_1d(res.gauges, case.gauge_file)
             if case.profile_file:
                 save_profile(res.meta['final_profile'], case.profile_file)
+            _write_trigger_remap(case, res)
         elif dim == 2:
             if case.gauges:
                 save_gauges_2d(res.gauges, case.gauge_file)
@@ -80,6 +99,7 @@ def _solve_stage(dim, case):
                                                   False))
             if case.profile_file:
                 save_profile_2d(res.meta, case.profile_file)
+            _write_trigger_remap(case, res)
         else:
             if case.gauges:
                 save_gauges_3d(res.gauges, case.gauge_file)

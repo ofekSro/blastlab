@@ -33,8 +33,9 @@ grid = make_grid(4.0, 4.0, 4.0, 0.1)
 x_c, y_c, z_c = grid['x_c'], grid['y_c'], grid['z_c']
 obstacles = [(2.5, 3.0, 1.5, 2.5, 0.0, 1.0)]
 solid = solid_mask_3d(x_c, y_c, z_c, obstacles)
-bcs = dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-           z_lo='wall', z_hi='open')
+bcs = dict(x_lo='terminate', x_hi='terminate',
+           y_lo='terminate', y_hi='terminate',
+           z_lo='reflect', z_hi='terminate')
 stride = choose_stride(solid.shape)
 specs = build_face_index(obstacles, x_c, y_c, z_c, solid, bcs)
 center = (1.5, 2.0, 1.0)

@@ -39,8 +39,9 @@ grid = make_grid(2.0, 2.0, 2.0, 0.1)
 x_c, y_c, z_c = grid['x_c'], grid['y_c'], grid['z_c']
 box = (0.5, 1.0, 0.5, 1.0, 0.0, 0.5)          # sits on the ground
 solid = solid_mask_3d(x_c, y_c, z_c, [box])
-bcs = dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-           z_lo='wall', z_hi='open')
+bcs = dict(x_lo='terminate', x_hi='terminate',
+           y_lo='terminate', y_hi='terminate',
+           z_lo='reflect', z_hi='terminate')
 specs = build_face_index([box], x_c, y_c, z_c, solid, bcs)
 ids = {s.face_id for s in specs}
 check("5 box faces + ground", ids == {'box0:x_lo', 'box0:x_hi',
@@ -78,7 +79,7 @@ check("ground buried under box",
 
 # no ground spec when z_lo is open
 specs_open = build_face_index([box], x_c, y_c, z_c, solid,
-                              dict(bcs, z_lo='open'))
+                              dict(bcs, z_lo='terminate'))
 check("no ground when z_lo open",
       'ground' not in {s.face_id for s in specs_open})
 

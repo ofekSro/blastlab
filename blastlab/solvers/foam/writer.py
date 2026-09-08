@@ -32,6 +32,7 @@ import numpy as np
 from ...core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, MIN_EXP_CELLS,
                                FOAM_CELLS_WARN)
 from ...core import refine
+from ...core.bc import normalize_bc
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
@@ -328,7 +329,7 @@ def plan_case(case):
         if not planar:
             side_d.pop('x_lo')      # collapsed wedge axis, never open
         opens = [d for s, d in side_d.items()
-                 if case.bcs.get(s) == 'open']
+                 if normalize_bc(case.bcs.get(s)) != 'reflect']
         corners = [(cx, cy) for cx in (0.0, Lx_eff)
                    for cy in (0.0, Ly_eff)]
         far = max(math.hypot(cx - x0, cy - y0) for cx, cy in corners)
@@ -392,7 +393,8 @@ def plan_case(case):
         ('x_lo', lambda c: c[0]), ('x_hi', lambda c: Ls[0] - c[0]),
         ('y_lo', lambda c: c[1]), ('y_hi', lambda c: Ls[1] - c[1]),
         ('z_lo', lambda c: c[2]), ('z_hi', lambda c: Ls[2] - c[2]))}
-    opens = [d for s, d in side_d.items() if case.bcs.get(s) == 'open']
+    opens = [d for s, d in side_d.items()
+             if normalize_bc(case.bcs.get(s)) != 'reflect']
     corners = [(cx, cy, cz) for cx in (0.0, Ls[0])
                for cy in (0.0, Ls[1]) for cz in (0.0, Ls[2])]
     far = max(math.sqrt((cx - x0) ** 2 + (cy - y0) ** 2
@@ -418,8 +420,14 @@ def _bmd(vertices, block_line, boundary, convert=1):
 
 
 def _patch_type(kind):
-    return dict(wall='wall', open='patch', empty='empty',
-                wedge='wedge')[kind]
+    """OpenFOAM patch type for one boundary kind. The three T50 kinds
+    map onto the same two OpenFOAM types the pre-T50 names did (a
+    terminate side is an outflow patch; the run-ending part is ours, not
+    the solver's), and the legacy spellings stay accepted - so a written
+    case is byte-identical either way."""
+    return dict(reflect='wall', wall='wall',
+                transmit='patch', terminate='patch', open='patch',
+                empty='empty', wedge='wedge')[kind]
 
 
 def _blockmesh_1d(spec):
@@ -989,9 +997,9 @@ def _bc_entry(fld, kind, p_value='$internalField'):
         return {'type': 'wedge'}
     if kind == 'empty':
         return {'type': 'empty'}
-    if kind == 'wall':
+    if kind in ('reflect', 'wall'):
         return {'type': 'slip'} if fld == 'U' else {'type': 'zeroGradient'}
-    # open
+    # transmit / terminate: both are outflow patches
     if fld == 'p':
         return {'type': P_OPEN_BC, 'value': Raw(p_value)}
     return {'type': 'zeroGradient'}

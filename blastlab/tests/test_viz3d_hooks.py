@@ -36,6 +36,11 @@ class StubClient:
 CASE = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=900.0,
             charge_center=(1.0, 1.0, 1.0), eos='idealGas',
             obstacles=[(1.6, 1.9, 0.8, 1.2, 0.0, 0.6)],
+            # T50: the pre-T50 default (transmit AND terminate); the
+            # plain 'transmit' default would run these to the safety cap
+            bcs=dict(x_lo='terminate', x_hi='terminate',
+                     y_lo='terminate', y_hi='terminate',
+                     z_lo='reflect', z_hi='terminate'),
             gauges=[(1.0, 1.0, 1.8), (1.0, 0.2, 0.5)],
             n_snapshots=3)
 
@@ -198,6 +203,9 @@ class SliceHooks(RunHooks):
 # so the grid is NOT auto-refined.
 SCASE = dict(Lx=2.0, Ly=2.0, Lz=1.2, cell_size_m=0.1, charge=900.0,
              charge_center=(1.0, 1.0, 0.6), eos='idealGas',
+             bcs=dict(x_lo='terminate', x_hi='terminate',
+                      y_lo='terminate', y_hi='terminate',
+                      z_lo='reflect', z_hi='terminate'),
              n_snapshots=1, gauges=[])
 
 sh_y = SliceHooks()

@@ -6,6 +6,8 @@ prompt -> solve -> save -> plot pipeline the standalone scripts always had.
 import numpy as np
 from matplotlib import animation
 
+from .core.bc import BC_KINDS
+from .core.case import TRIGGER_ACTIONS
 from .core.constants import CELLS_WARN, CELLS_REFUSE
 from .core.profiles import load_profile, load_profile_2d
 
@@ -149,6 +151,41 @@ def _ask_obstacles(Lx, Ly):
             continue
         obstacles.append((x0, x1, y0, y1))
     return obstacles
+
+
+def _ask_trigger(n_gauges, remap=True):
+    """The T51 trigger-gauge questions, as the kwargs a Case takes.
+
+    Asked only when the run actually has gauges. `remap=False` for 3D,
+    which has no remap format - there the trigger can only end the run.
+    """
+    off = dict(trigger_gauge=None, trigger_action='terminate',
+               trigger_file=None)
+    if not n_gauges:
+        return off
+    raw = _ask(f"Trigger gauge number 1-{n_gauges} ('-' = none), which "
+               f"ends the run and/or writes the remap when the wave "
+               f"reaches it", default='-', cast=str)
+    raw = raw.strip()
+    if raw in ('-', ''):
+        return off
+    try:
+        n = int(float(raw))
+    except ValueError:
+        n = 0
+    if not 1 <= n <= n_gauges:
+        print(f"    [note] no gauge {raw} - trigger left off")
+        return off
+    acts = list(TRIGGER_ACTIONS) if remap else ['terminate']
+    action = (_ask_choice("On arrival", acts, 'terminate')
+              if len(acts) > 1 else 'terminate')
+    path = None
+    if 'remap' in action:
+        path = _ask("Remap file ('-' = the case's profile output)",
+                    default='-', cast=str).strip()
+        path = None if path in ('-', '') else path
+    return dict(trigger_gauge=n, trigger_action=action,
+                trigger_file=path)
 
 
 def _ask_gauges_2d(Lx, Ly, x0, y0):
@@ -389,19 +426,24 @@ def ask_user_2d():
         print("  Left boundary (r=0) is the symmetry axis.")
         bcs['x_lo'] = 'wall'
         bcs['y_lo'] = _ask_choice("Bottom boundary (ground?)",
-                                  ['wall', 'open'], 'wall')
-        bcs['y_hi'] = _ask_choice("Top boundary", ['open', 'wall'], 'open')
-        bcs['x_hi'] = _ask_choice("Right boundary", ['open', 'wall'], 'open')
+                                  BC_KINDS, 'reflect')
+        bcs['y_hi'] = _ask_choice("Top boundary", BC_KINDS, 'terminate')
+        bcs['x_hi'] = _ask_choice("Right boundary", BC_KINDS, 'terminate')
     else:
         for key, name in (('x_lo', 'Left'), ('x_hi', 'Right'),
                           ('y_lo', 'Bottom'), ('y_hi', 'Top')):
-            bcs[key] = _ask_choice(f"{name} boundary", ['open', 'wall'], 'open')
+            bcs[key] = _ask_choice(f"{name} boundary", BC_KINDS,
+                                   'terminate')
 
     obstacles   = _ask_obstacles(Lx, Ly)
     n_snapshots = _ask("Number of field snapshots", default=6, cast=int,
                        validator=lambda v: None if v >= 1 else "Must be >= 1.")
     gauges      = _ask_gauges_2d(Lx, Ly, x0, y0)
     gauge_file  = _ask("Gauge output filename", default='gauges_2d.txt', cast=str)
+
+    t_end = _ask("End time [s] (0 = auto)", default=0.0,
+                 validator=lambda v: None if v >= 0 else "Must be >= 0.")
+    trig = _ask_trigger(len(gauges), remap=(geometry == 'axisymmetric'))
 
     live = _ask_choice("Live view while running?", ['yes', 'no'], 'yes') == 'yes'
     default_anim = ('blast_2d_animation.mp4'
@@ -476,6 +518,8 @@ def ask_user_2d():
         gauges        = gauges,
         gauge_file    = gauge_file,
         live          = live,
+        t_end         = t_end,
+        trigger       = trig,
         anim_file     = anim_file,
         anim_mesh     = anim_mesh,
         profile2d_file= profile2d_file,
@@ -565,11 +609,11 @@ def ask_user_3d():
     # ── Boundary conditions ────────────────────────────────────────────────
     bcs = {}
     bcs['z_lo'] = _ask_choice("Bottom boundary z=0 (ground?)",
-                              ['wall', 'open'], 'wall')
-    bcs['z_hi'] = _ask_choice("Top boundary", ['open', 'wall'], 'open')
+                              BC_KINDS, 'reflect')
+    bcs['z_hi'] = _ask_choice("Top boundary", BC_KINDS, 'terminate')
     for key, name in (('x_lo', 'x=0'), ('x_hi', f'x={Lx:g}'),
                       ('y_lo', 'y=0'), ('y_hi', f'y={Ly:g}')):
-        bcs[key] = _ask_choice(f"Boundary {name}", ['open', 'wall'], 'open')
+        bcs[key] = _ask_choice(f"Boundary {name}", BC_KINDS, 'terminate')
 
     obstacles   = _ask_obstacles_3d(Lx, Ly, Lz)
     n_snapshots = _ask("Number of field snapshots", default=6, cast=int,
@@ -578,6 +622,10 @@ def ask_user_3d():
     gauge_file  = _ask("Gauge output filename", default='gauges_3d.txt', cast=str)
 
     live = _ask_choice("Live view while running?", ['yes', 'no'], 'yes') == 'yes'
+    t_end = _ask("End time [s] (0 = auto)", default=0.0,
+                 validator=lambda v: None if v >= 0 else "Must be >= 0.")
+    trig = _ask_trigger(len(gauges), remap=False)
+
     from .viz3d import MISSING_MSG, pyvista_available
     if pyvista_available():
         view3d = _ask_choice("Interactive 3D viewer while running?",
@@ -642,7 +690,7 @@ def ask_user_3d():
         eos=eos, bcs=bcs, obstacles=obstacles,
         n_snapshots=n_snapshots, gauges=gauges, gauge_file=gauge_file,
         live=live, view3d=view3d, anim_file=anim_file,
-        anim_mesh=anim_mesh,
+        anim_mesh=anim_mesh, t_end=t_end, trigger=trig,
     )
 
 

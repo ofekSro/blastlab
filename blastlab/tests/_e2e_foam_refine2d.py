@@ -25,6 +25,12 @@ from blastlab.core.constants import P_AIR                       # noqa: E402
 from blastlab.solvers import get_solver                         # noqa: E402
 from blastlab.solvers.hooks import RunHooks                     # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAILS = []
 
 
@@ -71,7 +77,8 @@ def main():
                 n_snapshots=2, solver='blastfoam', material='TNT')
     refined = Case2D(charge_refine='zone',
                      refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),
-                                   (1.7, 2.3, 1.4, 1.8, 2)], **base)
+                                   (1.7, 2.3, 1.4, 1.8, 2)],
+                     bcs=ALL_TERM, **base)
     plan = refine.plan_levels(refined, rho0=1630.0)
     print(f'plan: lmax {plan.lmax}, finest {plan.dx_fine:.4g} m, '
           f'{plan.n_pred:,} predicted cells, display {plan.fine["Nx"]}x{plan.fine["Ny"]}')
@@ -109,7 +116,7 @@ def main():
     check("no spurious '0' dir stall message",
           not any('time dir 0 ' in l for l in h.lines))
 
-    ref_case = Case2D(charge_refine='global', **base)
+    ref_case = Case2D(charge_refine='global', **base, bcs=ALL_TERM)
     ref, _ = run(ref_case, 'uniform reference')
     g_r, g_u = res.gauges, ref.gauges
     check('both runs recorded the gauge',

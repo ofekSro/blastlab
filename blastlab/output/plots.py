@@ -66,6 +66,55 @@ def add_mesh_lines(ax, segments, color='0.6'):
 MESH_MAX_LINES = 60
 
 
+def gauge_points(meta, sl=None, tol=None):
+    """The gauge positions to draw on one field plot, as (x, y) pairs in
+    plot coordinates, with their 1-based numbers: [(n, x, y), ...].
+
+    2D: every gauge. 3D: the ones the plotted plane actually cuts - a
+    gauge a metre off the slice would otherwise be drawn as if it sat on
+    it. `sl` is the plane selector write_animation/plots build (a tuple
+    with one integer index); `tol` defaults to one cell.
+    """
+    pts = [tuple(float(v) for v in g) for g in (meta.get('gauges') or [])]
+    if not pts:
+        return []
+    if sl is None or len(pts[0]) < 3:
+        return [(i + 1, p[0], p[1]) for i, p in enumerate(pts)]
+    axis = next(a for a, x in enumerate(sl) if not isinstance(x, slice))
+    coord = meta['xyz'[axis] + '_c'][int(sl[axis])]
+    if tol is None:
+        tol = float(meta.get('dx') or 0.0) or None
+    keep = [a for a in range(3) if a != axis]
+    out = []
+    for i, p in enumerate(pts):
+        if tol is not None and abs(p[axis] - coord) > tol:
+            continue
+        out.append((i + 1, p[keep[0]], p[keep[1]]))
+    return out
+
+
+def add_gauge_markers(ax, points, trigger=None, color='#00e5ff'):
+    """Draw gauge positions on a field axis: a ringed dot per gauge with
+    its number. `points` comes from gauge_points; `trigger` is the
+    1-based number of the trigger gauge (T51), drawn heavier.
+
+    Returns the artists so a live pane can remove them again."""
+    arts = []
+    for n, x, y in points:
+        is_trig = (trigger is not None and n == trigger)
+        arts.append(ax.plot(
+            [x], [y], marker='o', markersize=6 if is_trig else 5,
+            markerfacecolor='none', markeredgecolor=color,
+            markeredgewidth=1.8 if is_trig else 1.1,
+            linestyle='none', zorder=3.5)[0])
+        arts.append(ax.annotate(
+            f'G{n}' + ('*' if is_trig else ''), (x, y),
+            textcoords='offset points', xytext=(6, 4), color=color,
+            fontsize=7.5, fontweight='bold' if is_trig else 'normal',
+            zorder=3.5))
+    return arts
+
+
 def mesh_for(meta, xf, yf, sl=None, levels=None):
     """Cell-edge segments for a field plot with faces xf/yf: the TRUE
     cells of a refined blastFoam run (meta['refine'], coarse cells drawn

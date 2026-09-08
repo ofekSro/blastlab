@@ -12,19 +12,28 @@ from dataclasses import dataclass, field, asdict
 
 import numpy as np
 
+from .bc import BC_KINDS, normalize_bcs
 from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE,
                         BYTES_PER_CELL)
 
+#: T51 trigger-gauge actions. 'remap' writes the remap file at the
+#: arrival instant and lets the run continue; the other two end it.
+TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
+
 SCHEMA = 'blastlab-case'
-VERSION = 6     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 9     # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
                 # v6: anim_mesh (cell-edge overlay in the run's
                 #     exported animation)
+                # v7: boundary kinds transmit|reflect|terminate
+                #     (T50; 'open'/'wall' still read and mapped)
+                # v8: t_end on 1D/2D as well (T52)
+                # v9: trigger_gauge / trigger_action / trigger_file (T51)
 
 
 @dataclass
@@ -35,10 +44,18 @@ class Case1D:
     cell_size_m: float = 0.001
     eos: str = 'idealGas'
     cfl: float = 0.5
+    t_end: float = 0.0                # stop at t_end [s]; 0 = auto (T52)
     n_snapshots: int = 5
     gauge_radii: list = field(default_factory=list)
     gauge_file: str = 'gauges.txt'
     profile_file: str = None          # save final field for 2D/3D remap
+    #: T51 trigger gauge: 1-based index into gauge_radii (2D/3D: gauges),
+    #: None = off. When the wave reaches it the run ends and/or the remap
+    #: file is written at THAT instant - the chain hand-off that used to
+    #: be possible only at the end of a run.
+    trigger_gauge: int = None
+    trigger_action: str = 'terminate'  # see core.case.TRIGGER_ACTIONS
+    trigger_file: str = None           # remap path; None = profile_file
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
     activation: str = 'linear'        # blastFoam detonation model:
@@ -74,8 +91,11 @@ class Case2D:
     profile_file_in: str = None       # 1D profile to remap
     center: tuple = (0.0, 2.0)        # (x0, y0); axisym forces x0 = 0
     eos: str = 'idealGas'
+    #: T50: 'transmit' (wave leaves, run carries on) | 'reflect' (wall)
+    #: | 'terminate' (wave leaves AND ends the run - the pre-T50 'open')
     bcs: dict = field(default_factory=lambda: dict(
-        x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'))
+        x_lo='reflect', x_hi='transmit',
+        y_lo='reflect', y_hi='transmit'))
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1)
     refine_zones: list = field(default_factory=list)  # blastFoam local
                                       # refinement: (x0,x1,y0,y1,level),
@@ -100,9 +120,14 @@ class Case2D:
     amr_display_level: int = None     # display grid level (None = deepest
                                       # level under the display cap)
     cfl: float = 0.4
+    t_end: float = 0.0                # stop at t_end [s]; 0 = auto (T52)
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y)
     gauge_file: str = 'gauges_2d.txt'
+    #: see Case1D.trigger_gauge
+    trigger_gauge: int = None
+    trigger_action: str = 'terminate'
+    trigger_file: str = None
     anim_file: str = None
     anim_mesh: bool = False           # overlay the cell edges on the
                                       # animation written after the run
@@ -144,9 +169,10 @@ class Case3D:
     profile_file_in: str = None
     center: tuple = (5.0, 5.0, 5.0)   # z ignored for profile2d
     eos: str = 'idealGas'
+    #: see Case2D.bcs
     bcs: dict = field(default_factory=lambda: dict(
-        x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-        z_lo='wall', z_hi='open'))
+        x_lo='transmit', x_hi='transmit', y_lo='transmit',
+        y_hi='transmit', z_lo='reflect', z_hi='transmit'))
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
     refine_zones: list = field(default_factory=list)  # blastFoam local
                                       # refinement: (x0,x1,y0,y1,z0,z1,level)
@@ -173,6 +199,10 @@ class Case3D:
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y, z)
     gauge_file: str = 'gauges_3d.txt'
+    #: see Case1D.trigger_gauge
+    trigger_gauge: int = None
+    trigger_action: str = 'terminate'
+    trigger_file: str = None
     anim_file: str = None
     anim_mesh: bool = False           # overlay the cell edges on the
                                       # animation written after the run
@@ -227,6 +257,8 @@ def case_from_dict(d):
     case = cls(**d)
     if hasattr(case, 'center') and case.center is not None:
         case.center = tuple(case.center)
+    if getattr(case, 'bcs', None):
+        case.bcs = normalize_bcs(case.bcs)
     if hasattr(case, 'obstacles'):
         case.obstacles = [tuple(o) for o in case.obstacles]
     if getattr(case, 'refine_zones', None):
@@ -437,6 +469,40 @@ def validate_case(case, pending_inputs=False):
     zones = list(getattr(case, 'refine_zones', None) or [])
     amr = int(getattr(case, 'amr_levels', 0) or 0) if foam else 0
 
+    # ── Trigger gauge (T51) ────────────────────────────────────────────
+    trig = getattr(case, 'trigger_gauge', None)
+    action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
+    if trig not in (None, 0, ''):
+        n_g = len(case.gauge_radii if case.dim == 1 else case.gauges)
+        try:
+            trig_i = int(trig)
+        except (TypeError, ValueError):
+            trig_i = 0
+            err("Trigger gauge must be a gauge number")
+        if trig_i and not 1 <= trig_i <= n_g:
+            err(f"Trigger gauge {trig_i}: the case has {n_g} gauge(s)")
+        if action not in TRIGGER_ACTIONS:
+            err(f"Trigger action '{action}': expected one of "
+                f"{', '.join(TRIGGER_ACTIONS)}")
+        elif 'remap' in action:
+            if case.dim == 3:
+                err("Trigger action 'remap' is not available in 3D - "
+                    "there is no 3D remap format; use 'terminate'")
+            elif case.dim == 2 and case.geometry != 'axisymmetric':
+                err("Trigger action 'remap' needs an axisymmetric 2D "
+                    "case (only those can be remapped into 3D)")
+            elif not (getattr(case, 'trigger_file', None)
+                      or case.profile_file):
+                err("Trigger action 'remap' needs a remap filename "
+                    "(trigger file, or the case's profile output)")
+            else:
+                note(f"Gauge {trig_i} will write the remap file when the "
+                     f"wave reaches it"
+                     + ("" if 'terminate' in action
+                        else " (the run then continues)"))
+        else:
+            note(f"The run ends when the wave reaches gauge {trig_i}")
+
     if case.dim == 1:
         if case.charge_kg <= 0:
             err("Charge must be > 0")
@@ -465,6 +531,19 @@ def validate_case(case, pending_inputs=False):
         return rep
     if getattr(case, 't_end', 0.0) < 0:
         err("End time must be >= 0 (0 = automatic stop condition)")
+    # ── Boundary kinds (T50) ───────────────────────────────────────────
+    bcs = normalize_bcs(dict(case.bcs or {}))
+    for side, kind in sorted(bcs.items()):
+        if kind not in BC_KINDS:
+            err(f"Boundary {side}: unknown kind '{kind}' "
+                f"(expected one of {', '.join(BC_KINDS)})")
+    ends_itself = any(k == 'terminate' for k in bcs.values())
+    if not ends_itself and not getattr(case, 't_end', 0.0):
+        c_air = float(np.sqrt(1.4 * 101325.0 / 1.225))
+        cap_ms = 10.0 * max(dims) / c_air * 1e3
+        warn(f"No terminate boundary and no end time: the run is bounded "
+             f"only by the safety cap (~{cap_ms:.0f} ms). Set a side to "
+             f"'terminate' to stop when the wave reaches it.")
     if case.dim == 3:
         s_ax = getattr(case, 'slice_axis', 'y')
         if s_ax not in ('x', 'y', 'z'):
@@ -519,7 +598,7 @@ def validate_case(case, pending_inputs=False):
         for over, side in overhangs:
             if over <= 0:
                 continue
-            if case.bcs.get(side) == 'wall':
+            if bcs.get(side) == 'reflect':
                 note(f"Charge is truncated by the {side} wall (surface burst)")
             else:
                 err(f"Charge (r_exp = {r_exp:.4f} m) pokes through the "
@@ -579,7 +658,7 @@ def validate_case(case, pending_inputs=False):
                                (r_i - (case.Lz - ez), 'z_hi')):
                 if over <= 0:
                     continue
-                if case.bcs.get(side) == 'wall':
+                if bcs.get(side) == 'reflect':
                     note(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) is "
                          f"truncated by the {side} wall")
                 else:

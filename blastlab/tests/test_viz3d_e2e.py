@@ -30,8 +30,8 @@ def main():
     scene = dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=0.05, solid=solid,
                  obstacles=obstacles, Lx=4.0, Ly=4.0, Lz=4.0,
                  charge_center=center, r_exp=0.15,
-                 bcs=dict(x_lo='open', x_hi='open', y_lo='open',
-                          y_hi='open', z_lo='wall', z_hi='open'))
+                 bcs=dict(x_lo='terminate', x_hi='terminate', y_lo='terminate',
+                          y_hi='terminate', z_lo='reflect', z_hi='terminate'))
 
     print("\nE1: spawn viewer process")
     t0 = time.time()

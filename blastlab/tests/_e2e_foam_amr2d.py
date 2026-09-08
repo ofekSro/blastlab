@@ -30,6 +30,12 @@ from blastlab.solvers import get_solver                         # noqa: E402
 from blastlab.solvers.foam import env                           # noqa: E402
 from blastlab.solvers.hooks import RunHooks                     # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAILS = []
 
 
@@ -91,7 +97,8 @@ def main():
     for a in sys.argv[1:]:
         if a.startswith('--np='):
             np_req = int(a.split('=', 1)[1])
-    amr = Case2D(cell_size_m=0.2, amr_levels=3, n_procs=np_req, **base)
+    amr = Case2D(cell_size_m=0.2, amr_levels=3, n_procs=np_req,
+                 bcs=ALL_TERM, **base)
     if np_req:
         print(f'  (AMR on {np_req} MPI ranks)')
     res, h, wall_amr = run(amr, 'AMR (base 0.2 m, 3 levels)')
@@ -150,7 +157,7 @@ def main():
               '(mapped across every mesh change)',
               abs(fo_pk - g_pk) / g_pk < 0.10, f'{fo_pk/1e3:.0f} vs {g_pk/1e3:.0f} kPa')
 
-    uni = Case2D(cell_size_m=0.025, **base)
+    uni = Case2D(cell_size_m=0.025, **base, bcs=ALL_TERM)
     ref_res, _hu, wall_uni = run(uni, 'uniform 0.025 m reference')
     print(f'  wall time: AMR {wall_amr:.0f} s vs uniform {wall_uni:.0f} s '
           f'-> ratio {wall_uni / max(wall_amr, 1e-9):.2f}x')
@@ -195,7 +202,7 @@ def main():
         for pair in arg.split(','):
             lo, un = (float(v) for v in pair.split(':'))
             c = Case2D(cell_size_m=0.2, amr_levels=3, amr_refine=lo,
-                       amr_unrefine=un, **base)
+                       amr_unrefine=un, **base, bcs=ALL_TERM)
             r_i, h_i, w_i = run(c, f'AMR {lo:g}/{un:g}')
             n_i = [int(re.search(r'ms: (\d[\d,]*) cells', l).group(1).replace(',', ''))
                    for l in h_i.lines if '[blastfoam] AMR t = ' in l]

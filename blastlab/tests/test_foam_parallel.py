@@ -16,7 +16,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 import numpy as np                                             # noqa: E402
 
 from blastlab.core.case import Case2D                          # noqa: E402
-from blastlab.core.constants import P_AIR                      # noqa: E402
+from blastlab.core.constants import P_AIR                      # noqa: E402
+
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
 
 FAIL = []
 GAUGES = [(0.6, 1.25), (1.0, 1.25)]
@@ -40,7 +46,8 @@ def _case(n_procs):
     return Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
                   cell_size_m=0.02, charge=8.0, center=(0.0, 1.25),
                   n_snapshots=3, gauges=list(GAUGES), record_frames=0,
-                  solver='blastfoam', material='TNT', n_procs=n_procs)
+                  solver='blastfoam', material='TNT',
+                  n_procs=n_procs, bcs=ALL_TERM)
 
 
 def _arrival(times, p):

@@ -1,5 +1,15 @@
 """Face-flux assembly with boundary conditions and obstacle walls.
 
+Three boundary kinds (T50). `reflect` mirrors the normal momentum into
+the ghost layer; `transmit` and `terminate` both copy it (identical
+fluxes) and differ only outside this module: a `terminate` side ENDS the
+run when the shock reaches it (geometry.terminate_edge_mask feeds the
+solvers' stop condition), a `transmit` side lets the wave leave and the
+run carry on. Until T50 there were two kinds, `open` and `wall`, and
+`open` meant "transmit AND terminate"; `normalize_bcs` maps those legacy
+values (`open` -> `transmit`, `wall` -> `reflect`) so old case files and
+scripts keep loading.
+
 `_face_fluxes_axis0` is dimension-agnostic: it sweeps spatial axis 0 with
 the normal momentum in row 1, and only slices axes 0/1, so any number of
 trailing spatial axes works. `face_fluxes` dispatches other directions by
@@ -9,6 +19,33 @@ swapping momentum rows and moving the sweep axis to the front.
 import numpy as np
 
 from .riemann import hll_fluxes
+
+#: the canonical boundary kinds (T50)
+BC_KINDS = ('transmit', 'reflect', 'terminate')
+#: pre-T50 spellings, still accepted in case files and legacy scripts
+BC_LEGACY = {'open': 'transmit', 'wall': 'reflect'}
+
+
+def normalize_bc(kind):
+    """One boundary value in canonical spelling; legacy names mapped."""
+    return BC_LEGACY.get(kind, kind)
+
+
+def normalize_bcs(bcs, log=None):
+    """A `bcs` dict in canonical spelling. `log` (a callable) is given one
+    note when legacy values were mapped - a silent `open` -> `transmit`
+    would quietly drop a run's stop condition."""
+    if not bcs:
+        return bcs
+    out = {k: normalize_bc(v) for k, v in bcs.items()}
+    if log is not None:
+        old = sorted({v for v in bcs.values() if v in BC_LEGACY})
+        if old:
+            log("  [note] boundary value(s) "
+                + ", ".join(f"'{v}' read as '{BC_LEGACY[v]}'" for v in old)
+                + " - 'transmit' does NOT stop the run; use 'terminate' "
+                  "for the pre-T50 behaviour")
+    return out
 
 
 def minmod(a, b):
@@ -56,8 +93,9 @@ def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid,
                        order=1, phase=None, pc_of=None):
     """
     HLL fluxes at all faces along spatial axis 0 (normal momentum = row 1),
-    with one ghost layer per side ('open' copy / 'wall' mirror) and mirror
-    treatment at fluid|solid faces. Returns F (N, Na+1, ...).
+    with one ghost layer per side ('reflect' mirrors the normal
+    momentum, 'transmit'/'terminate' copy) and mirror treatment at
+    fluid|solid faces. Returns F (N, Na+1, ...).
 
     `order=2` (T47/N10, opt-in) reconstructs the face states with
     limited MUSCL slopes and recomputes each side's p and c from its
@@ -66,10 +104,10 @@ def _face_fluxes_axis0(U, p, c, bc_lo, bc_hi, solid,
     there. The default order-1 path is untouched and byte-identical.
     """
     g_lo = U[:, :1].copy()
-    if bc_lo == 'wall':
+    if normalize_bc(bc_lo) == 'reflect':
         g_lo[1] = -g_lo[1]
     g_hi = U[:, -1:].copy()
-    if bc_hi == 'wall':
+    if normalize_bc(bc_hi) == 'reflect':
         g_hi[1] = -g_hi[1]
 
     U_ext = np.concatenate([g_lo, U, g_hi], axis=1)

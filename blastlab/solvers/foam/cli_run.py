@@ -224,6 +224,8 @@ def _run_2d():
                       validator=_positive("Snapshots")))
     gauges = _ask_gauges_2d(Lx, Ly, x0, y0)
     gauge_file = _ask("Gauge TSV file", default='gauges_2d.txt', cast=str)
+    t_end = _ask("End time [s] (0 = auto)", default=0.0)
+    trig = _ask_trigger(len(gauges), remap=True)
     anim = _ask("Animation gif ('-' = skip)",
                 default='blast_2d_animation.gif', cast=str)
     anim = None if anim.strip() in ('-', '') else anim
@@ -239,6 +241,7 @@ def _run_2d():
     case = Case2D(geometry=geometry, Lx=Lx, Ly=Ly, cell_size_m=cell,
                   charge=charge, center=(x0, y0), gauges=gauges,
                   n_snapshots=n_snap, gauge_file=gauge_file,
+                  t_end=t_end, **trig,
                   anim_file=anim, anim_mesh=anim_mesh,
                   record_frames=150 if anim else 0,
                   profile_file=profile_out,
@@ -281,6 +284,7 @@ def _run_3d():
                       validator=_positive("Snapshots")))
     gauges = _ask_gauges_3d(Lx, Ly, Lz, x0, y0, z0)
     gauge_file = _ask("Gauge TSV file", default='gauges_3d.txt', cast=str)
+    trig = _ask_trigger(len(gauges), remap=False)
     anim = _ask("Animation gif ('-' = skip)",
                 default='blast_3d_animation.gif', cast=str)
     anim = None if anim.strip() in ('-', '') else anim
@@ -289,7 +293,7 @@ def _run_3d():
 
     case = Case3D(Lx=Lx, Ly=Ly, Lz=Lz, cell_size_m=cell, charge=charge,
                   center=(x0, y0, z0), t_end=t_end, gauges=gauges,
-                  n_snapshots=n_snap, gauge_file=gauge_file,
+                  n_snapshots=n_snap, gauge_file=gauge_file, **trig,
                   anim_file=anim, anim_mesh=anim_mesh,
                   record_frames=150 if anim else 0,
                   solver='blastfoam', material=material)

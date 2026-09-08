@@ -9,6 +9,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ..core.bc import normalize_bc
+
 MAX_VIEW_DIM = 128          # decimate fields so no axis exceeds this
 FRAME_MEM_CAP = 1.5e9       # playback history budget [bytes]
 
@@ -96,7 +98,7 @@ def build_face_index(obstacles, x_c, y_c, z_c, solid, bcs):
                     continue
                 specs.append(spec)
 
-    if (bcs or {}).get('z_lo') == 'wall':
+    if normalize_bc((bcs or {}).get('z_lo')) == 'reflect':
         Nx, Ny = len(coords[0]), len(coords[1])
         specs.append(FaceSpec(
             face_id='ground', axis=2, side=+1, layer=0,
@@ -186,7 +188,7 @@ class Revolver:
     outer boundary is quiet). `scene3d` is a standard scene_info dict,
     so the whole Feed3D / BlastScene pipeline is reused unchanged: the
     symmetry axis lands at the domain centre (R, R), the 2D y axis
-    becomes 3D z (y_lo = 'wall' gives the ground plane + its loads).
+    becomes 3D z (y_lo = 'reflect' gives the ground plane + its loads).
     Read-only after construction - safe to use on the solver thread."""
 
     def __init__(self, info, max_dim=MAX_VIEW_DIM):
@@ -207,7 +209,7 @@ class Revolver:
         self._zi = np.clip(np.rint((z3_c - z_c[0]) / dz).astype(np.intp),
                            0, len(z_c) - 1)
         bcs2 = dict(info.get('bcs') or {})
-        side = bcs2.get('x_hi', 'open')
+        side = normalize_bc(bcs2.get('x_hi', 'transmit'))
         # box corners beyond the outer radius are not part of the
         # domain: marked solid so face loads blank there, and the `cyl`
         # entry lets the viewer draw/clip a true cylinder
@@ -226,8 +228,8 @@ class Revolver:
             r_exp=float(info.get('r_exp') or 0.0),
             cyl=dict(cx=R, cy=R, R=R),
             bcs=dict(x_lo=side, x_hi=side, y_lo=side, y_hi=side,
-                     z_lo=bcs2.get('y_lo', 'open'),
-                     z_hi=bcs2.get('y_hi', 'open')))
+                     z_lo=normalize_bc(bcs2.get('y_lo', 'transmit')),
+                     z_hi=normalize_bc(bcs2.get('y_hi', 'transmit'))))
 
     def revolve(self, field2d):
         """One (Nr, Nz) frame -> (n_xy, n_xy, n_z) revolved block."""

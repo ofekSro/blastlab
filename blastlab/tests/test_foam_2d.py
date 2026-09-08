@@ -17,6 +17,12 @@ import numpy as np                                             # noqa: E402
 from blastlab.core.case import Case2D                          # noqa: E402
 from blastlab.core.constants import P_AIR                      # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAIL = []
 GAUGES = [(0.6, 1.25), (1.0, 1.25)]
 PEAK_RATIO = (0.5, 2.0)
@@ -40,7 +46,7 @@ def _axi_case(solver):
     return Case2D(Lx=2.5, Ly=2.5, cell_size_m=0.025, charge=8.0,
                   center=(0.0, 1.25), gauges=list(GAUGES),
                   n_snapshots=4, record_frames=100, eos='JWL',
-                  solver=solver, material='TNT')
+                  solver=solver, material='TNT', bcs=ALL_TERM)
 
 
 def _arrival(times, p):
@@ -125,7 +131,7 @@ def main():
                     cell_size_m=0.025, charge=50.0, center=(1.0, 1.0),
                     gauges=[(0.5, 1.0)], n_snapshots=3,
                     record_frames=50, solver='blastfoam',
-                    material='TNT')
+                    material='TNT', bcs=ALL_TERM)
     resp = get_solver(2, 'blastfoam')(planar)
     check('planar arrival stop',
           resp.stop_reason.startswith('shock arrived'), resp.stop_reason)

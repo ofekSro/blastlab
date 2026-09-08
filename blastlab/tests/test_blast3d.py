@@ -47,7 +47,7 @@ solid2 = np.zeros((Nx, Ny), bool); solid2[8:12, 5:9] = True
 solid3 = solid2[..., None]
 p3, c3 = p2[..., None], c2[..., None]
 ok = True
-for n, blo, bhi in ((1, 'wall', 'open'), (2, 'open', 'wall')):
+for n, blo, bhi in ((1, 'reflect', 'terminate'), (2, 'terminate', 'reflect')):
     F2 = blast2d.face_fluxes(U2, p2, c2, n, blo, bhi, solid2)
     F3 = blast3d.face_fluxes(U3, p3, c3, n, blo, bhi, solid3)
     ok &= np.array_equal(F2, F3[[0, 1, 2, 4], ..., 0])
@@ -85,8 +85,8 @@ print("\nT2: well-balance (50 steps)")
 shape = (40, 40, 40)
 x = np.arange(40) * 0.025 + 0.0125
 solid = blast3d.solid_mask(x, x, x, [(0.3, 0.5, 0.3, 0.5, 0.3, 0.5)])
-bcs = dict(x_lo='wall', x_hi='wall', y_lo='wall', y_hi='wall',
-           z_lo='wall', z_hi='open')
+bcs = dict(x_lo='reflect', x_hi='reflect', y_lo='reflect', y_hi='reflect',
+           z_lo='reflect', z_hi='terminate')
 U0 = ambient3(shape)
 U1 = steps3(U0.copy(), np.zeros(shape, int), 0.025, bcs, solid)
 err = np.abs(U1 - U0).max() / np.abs(U0).max()
@@ -103,7 +103,8 @@ rho = np.where(is_exp, JWL_TNT['rho0'], RHO_AIR)
 e   = np.where(is_exp, JWL_TNT['e0'], E_AIR)
 U = np.zeros((5, 57, 57, 57)); U[0] = rho; U[4] = rho*e
 E0 = U[4].sum()
-bcs_all_wall = {k: 'wall' for k in ('x_lo','x_hi','y_lo','y_hi','z_lo','z_hi')}
+bcs_all_wall = {k: 'reflect'
+                for k in ('x_lo','x_hi','y_lo','y_hi','z_lo','z_hi')}
 U = steps3(U, phase, dx3, bcs_all_wall, np.zeros((57,57,57), bool), nsteps=200)
 E1 = U[4].sum()
 check("total energy conserved", abs(E1-E0)/E0 < 1e-12,
@@ -112,7 +113,8 @@ check("total energy conserved", abs(E1-E0)/E0 < 1e-12,
 # ── T4: free-air symmetry under axis permutations/flips ─────────────────────
 # dx must divide the domain exactly so the grid is symmetric about the charge.
 print("\nT4: 3D symmetry")
-bcs_open = {k: 'open' for k in ('x_lo','x_hi','y_lo','y_hi','z_lo','z_hi')}
+bcs_open = {k: 'terminate'
+            for k in ('x_lo','x_hi','y_lo','y_hi','z_lo','z_hi')}
 snaps, _, meta4 = run_blast_3d(0.8, 0.8, 0.8, 0.8 / 38, charge=8.0,
                                charge_center=(0.4, 0.4, 0.4),
                                bcs=bcs_open, eos='idealGas',
@@ -195,7 +197,8 @@ print("\nT7: 2D -> 3D remap (takes a few minutes)")
 cell2 = 0.005
 _, _, meta_p = blast2d.run_blast_2d(
     'axisymmetric', 0.5, 1.6, cell2, charge=1.0, charge_center=(0.0, 0.7),
-    bcs=dict(x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'),
+    bcs=dict(x_lo='reflect', x_hi='terminate',
+             y_lo='reflect', y_hi='terminate'),
     eos='idealGas', n_snapshots=1, gauges=[])
 blast2d.save_profile_2d(meta_p, 'test_profile_2d.npz')
 prof2 = load_profile_2d('test_profile_2d.npz')
@@ -208,14 +211,16 @@ g2d = [(0.55, 0.7), (0.45, 0.25), (0.3, 1.2)]   # all outside the remap radius (
 # extra peak clipping (first order) would be misread as remap error.
 _, gauges2d, _ = blast2d.run_blast_2d(
     'axisymmetric', 1.2, 1.6, 0.016, charge=1.0, charge_center=(0.0, 0.7),
-    bcs=dict(x_lo='wall', x_hi='open', y_lo='wall', y_hi='open'),
+    bcs=dict(x_lo='reflect', x_hi='terminate',
+             y_lo='reflect', y_hi='terminate'),
     eos='idealGas', n_snapshots=1, gauges=g2d)
 # 3D continuation from the profile (coarser grid: 1.6/0.016 = 100 cells)
 g3d = [(0.8 + r, 0.8, z) for (r, z) in g2d]
 _, gauges3r, _ = run_blast_3d(
     1.6, 1.6, 1.6, 0.016, profile2d=prof2, charge_center=(0.8, 0.8),
-    bcs=dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-             z_lo='wall', z_hi='open'),
+    bcs=dict(x_lo='terminate', x_hi='terminate',
+             y_lo='terminate', y_hi='terminate',
+             z_lo='reflect', z_hi='terminate'),
     eos='idealGas', n_snapshots=1, gauges=g3d)
 print("    (r,z)        arr_2d     arr_3d    darr%   peak_2d    peak_3d   dpk%")
 ok_arr = ok_pk = True
@@ -233,8 +238,9 @@ check("2D->3D peak within 15% of 2D", ok_pk)
 
 # ── T8: obstacle shadowing ───────────────────────────────────────────────────
 print("\nT8: obstacle box")
-bcs_g = dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-             z_lo='wall', z_hi='open')
+bcs_g = dict(x_lo='terminate', x_hi='terminate',
+             y_lo='terminate', y_hi='terminate',
+             z_lo='reflect', z_hi='terminate')
 snap8, gauges8, meta8 = run_blast_3d(
     1.0, 1.0, 1.0, 0.021, charge=8.0, charge_center=(0.5, 0.5, 0.5),
     bcs=bcs_g, obstacles=[(0.62, 0.72, 0.4, 0.6, 0.3, 0.7)],

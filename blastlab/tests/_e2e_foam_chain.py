@@ -34,6 +34,12 @@ from blastlab.core import profiles                                # noqa: E402
 from blastlab.solvers import get_solver                           # noqa: E402
 from blastlab.solvers.foam import env                             # noqa: E402
 
+#: T50: the pre-T50 solver default - every side lets the wave out
+#: AND ends the run when it arrives (the plain 'transmit'
+#: default would run this to the safety cap).
+ALL_TERM = dict(x_lo='terminate', x_hi='terminate',
+                y_lo='terminate', y_hi='terminate')
+
 FAIL = []
 #: the 2D stages: 1 m radius, burst 1 m up, gauges out at 0.6/0.8 m
 GAUGES = [(0.6, 1.0), (0.8, 1.0)]
@@ -120,8 +126,9 @@ def main():
     dom = dict(geometry='axisymmetric', Lx=1.0, Ly=2.0, cell_size_m=0.01,
                center=(0.0, 1.0), gauges=list(GAUGES), n_snapshots=1,
                eos='idealGas', solver='blastfoam', material='TNT')
-    chained = Case2D(init_mode='profile1d', profile_file_in=prof, **dom)
-    direct = Case2D(charge=1.0, **dom)
+    chained = Case2D(init_mode='profile1d', profile_file_in=prof,
+                     bcs=ALL_TERM, **dom)
+    direct = Case2D(charge=1.0, **dom, bcs=ALL_TERM)
 
     for label, case in (('chained', chained), ('direct', direct)):
         if only and label != only:

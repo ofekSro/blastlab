@@ -15,8 +15,9 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from blastlab.core import refine                                # noqa: E402
-from blastlab.core.case import (Case2D, Case3D, case_from_dict,  # noqa: E402
-                                case_to_dict, validate_case)
+from blastlab.core.case import (VERSION, Case2D, Case3D,        # noqa: E402
+                                case_from_dict, case_to_dict,
+                                validate_case)
 
 FAILS = []
 
@@ -232,8 +233,10 @@ def test_case_roundtrip_and_validation():
           back.refine_zones == c.refine_zones
           and all(isinstance(z[-1], int) for z in back.refine_zones)
           and back.charge_refine == 'zone', str(back.refine_zones))
-    check('schema version is current (5: amr)', d['version'] == 5,
-          str(d['version']))
+    # the literal used to be pinned here; it moved every time a field
+    # was added (v6 anim_mesh, v7 boundary kinds, v8 t_end, v9 trigger)
+    check('schema version is the current one', d['version'] == VERSION,
+          f"{d['version']} vs {VERSION}")
     n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.5, charge=100.0,
                center=(1.0, 1.0), solver='native')
     n.refine_zones = [(0.5, 1.5, 0.5, 1.5, 1)]
@@ -440,7 +443,8 @@ def test_amr():
     back = case_from_dict(d)
     check('v5 round trip coerces the amr ints', back.amr_levels == 3
           and isinstance(back.amr_levels, int) and back.amr_display_level == 1
-          and back.amr_estimator == 'densityGradient' and d['version'] == 5)
+          and back.amr_estimator == 'densityGradient'
+          and d['version'] == VERSION)
     n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
                center=(1.0, 1.0), solver='native', amr_levels=2)
     check('native + AMR -> error naming blastFoam',

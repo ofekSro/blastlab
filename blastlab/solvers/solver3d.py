@@ -10,11 +10,12 @@ from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               E_AIR, CELLS_WARN, CELLS_REFUSE,
                               MIN_EXP_CELLS)
 from ..core.eos import material_jwl, pressure_soundspeed
-from ..core.bc import face_fluxes, solid_mask_3d as solid_mask
+from ..core.bc import (face_fluxes, normalize_bcs,
+                       solid_mask_3d as solid_mask)
 from ..core.grid import make_grid
 from ..core.profiles import (remap_profile_1d_to_3d as remap_profile_1d,
                              remap_profile_2d_to_3d as remap_profile_2d)
-from .hooks import ConsoleHooks, Progress, Result
+from .hooks import ConsoleHooks, Progress, Result, trigger_index
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -57,7 +58,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                   cfl=0.30, n_snapshots=6, gauges=None,
                   record_frames=0, hooks=None,
                   charge_resolution='resolve', t_end=None,
-                  slice_axis='y', slice_pos=None):
+                  slice_axis='y', slice_pos=None,
+                  trigger_gauge=None, trigger_action='terminate'):
     """
     Run a 3D Cartesian blast simulation. z is vertical.
 
@@ -73,8 +75,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     profile2d     : dict    load_profile_2d(...) - axisymmetric remap
     eos           : 'JWL' or 'idealGas'
     bcs           : dict    {'x_lo','x_hi','y_lo','y_hi','z_lo','z_hi'}
-                            -> 'open'|'wall'. Default: all open except
-                            z_lo='wall' (ground).
+                            -> 'transmit' | 'reflect' | 'terminate'
+                            (T50; pre-T50 'open'/'wall' still accepted).
+                            Default: all transmit except z_lo='reflect'
+                            (ground).
     obstacles     : list of (x0,x1,y0,y1,z0,z1) boxes
     cfl           : float   Sum of the three directional Courant numbers
     n_snapshots   : int     3D overpressure snapshots (may be auto-reduced
@@ -108,8 +112,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     if hooks is None:
         hooks = ConsoleHooks(3)
     if bcs is None:
-        bcs = dict(x_lo='open', x_hi='open', y_lo='open', y_hi='open',
-                   z_lo='wall', z_hi='open')
+        bcs = dict(x_lo='transmit', x_hi='transmit', y_lo='transmit',
+                   y_hi='transmit', z_lo='reflect', z_hi='transmit')
+    bcs = normalize_bcs(bcs, hooks.log)
     obstacles = obstacles or []
     dx = cell_size_m
     n_init = sum(x is not None for x in (charge, profile, profile2d))
@@ -156,13 +161,14 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         if not (0 <= x0 <= Lx and 0 <= y0 <= Ly and 0 <= z0 <= Lz):
             raise ValueError(f"Charge centre ({x0:g}, {y0:g}, {z0:g}) is "
                              f"outside the domain")
-        # Crossing a wall is a surface burst; poking an open boundary is not.
+        # Crossing a reflecting side is a surface burst; poking a side the
+        # wave leaves through is not.
         for over, side in ((r_src - x0, 'x_lo'), (r_src - (Lx - x0), 'x_hi'),
                            (r_src - y0, 'y_lo'), (r_src - (Ly - y0), 'y_hi'),
                            (r_src - z0, 'z_lo'), (r_src - (Lz - z0), 'z_hi')):
             if over <= 0:
                 continue
-            if bcs[side] == 'wall':
+            if bcs[side] == 'reflect':
                 hooks.log(f"  [note] Charge is truncated by the {side} wall "
                       f"(surface burst)")
             else:
@@ -315,8 +321,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     if cap_is_end:
         safety_cap = t0 + t_end
 
-    open_edge = core_geometry.open_edge_mask((Nx, Ny, Nz), bcs, fluid=fluid)
-    has_open = open_edge.any()
+    term_edge = core_geometry.terminate_edge_mask((Nx, Ny, Nz), bcs,
+                                                  fluid=fluid)
+    has_term = term_edge.any()
 
     d_charge = core_geometry.d_charge_3d(x_c, y_c, z_c, [(x0, y0, z0)])
     dists = core_geometry.stop_dists_3d(Lx, Ly, Lz, [(x0, y0, z0)], bcs)
@@ -341,6 +348,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         gauge_actual.append((float(x_c[i]), float(y_c[j]), float(z_c[k])))
     gauge_times_list  = []
     gauge_press_lists = [[] for _ in gauge_ijk]
+    # T51 trigger gauge. 3D has no remap output, so validate_case gates
+    # the remap actions here and only the terminate half can fire.
+    trig_k = trigger_index(trigger_gauge, len(gauge_ijk), hooks)
+    trigger = None
 
     # Slice indices for the 3D snapshots (always through the burst)
     j0 = int(np.argmin(np.abs(y_c - y0)))   # vertical x-z plane through burst
@@ -384,8 +395,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     hooks.log(f"  Obstacles       : {len(obstacles)}")
     hooks.log(f"  Gauges          : {len(gauge_ijk)}")
     hooks.log(f"  Stop condition  : "
-          + ("shock arrival at an open boundary" if has_open
-             else "safety cap (no open boundaries)"))
+          + ("shock arrival at a terminate boundary" if has_term
+             else "safety cap (no terminate boundaries)"))
     hooks.log(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
           f"{safety_cap*1e3:.1f} ms")
     hooks.log(f"  (3D steps are slow: expect roughly "
@@ -401,6 +412,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         dim=3, x_face=live_faces[0], y_face=live_faces[1],
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
+        gauges=core_geometry.plane_gauges(gauge_actual, live_sl,
+                                          (x_c, y_c, z_c), dx),
+        trigger_gauge=None if trig_k is None else trig_k + 1,
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=obstacles, Lx=Lx, Ly=Ly, Lz=Lz,
                      charge_center=(x0, y0, z0), r_exp=r_src, bcs=bcs)))
@@ -432,14 +446,28 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
             for g, (i, j, k) in enumerate(gauge_ijk):
                 gauge_press_lists[g].append(p_f[i, j, k])
 
+        # ── Trigger gauge (T51) ───────────────────────────────────────
+        if trig_k is not None and trigger is None \
+                and p_f[gauge_ijk[trig_k]] > arrival_p:
+            gp = gauge_actual[trig_k]
+            trigger = dict(t=float(t), gauge=trig_k + 1, point=gp,
+                           action=trigger_action)
+            hooks.log(f"  Trigger gauge {trig_k + 1} "
+                      f"({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m "
+                      f"reached at t = {t*1e3:.3f} ms")
+            if 'terminate' in trigger_action:
+                stop_reason = (f'trigger gauge {trig_k + 1} reached '
+                               f'({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m')
+                break
+
         if hooks.should_stop():
             stop_reason = 'stopped by user'
             break
 
-        # ── Stop condition: shock at an open boundary ──────────────────────
-        if has_open and (p_f[open_edge] > arrival_p).any():
-            stop_reason = (f'shock arrived at an open boundary '
-                           f'(p_edge = {p_f[open_edge].max():.3e} Pa)')
+        # ── Stop condition: shock at a terminate boundary ──────────────────
+        if has_term and (p_f[term_edge] > arrival_p).any():
+            stop_reason = (f'shock arrived at a terminate boundary '
+                           f'(p_edge = {p_f[term_edge].max():.3e} Pa)')
             break
 
         # Shock-front position (progress + snapshot triggers)
@@ -570,9 +598,12 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                 # what the USER asked for; gauge_out['points'] is where
                 # they landed after snapping to cell centres (QA-33)
                 gauges=[tuple(float(v) for v in g) for g in (gauges or [])],
+                trigger_gauge=None if trig_k is None else trig_k + 1,
                 # per-step running peak pressure and net overpressure
                 # impulse (the viewer fields), same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)
+    if trigger is not None:
+        meta['trigger'] = trigger
     if record_frames > 0:
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     return Result(snapshots, gauge_out, meta, stop_reason,
@@ -602,4 +633,7 @@ def solve_3d(case, hooks=None, profile=None, profile2d=None):
                                                    'resolve'),
                          t_end=getattr(case, 't_end', 0.0) or None,
                          slice_axis=getattr(case, 'slice_axis', 'y'),
-                         slice_pos=getattr(case, 'slice_pos', None))
+                         slice_pos=getattr(case, 'slice_pos', None),
+                         trigger_gauge=getattr(case, 'trigger_gauge', None),
+                         trigger_action=getattr(case, 'trigger_action',
+                                                'terminate'))
