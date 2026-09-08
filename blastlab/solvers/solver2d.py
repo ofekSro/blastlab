@@ -13,7 +13,8 @@ from ..core.eos import material_jwl, pressure_soundspeed
 from ..core.bc import face_fluxes, normalize_bcs, solid_mask_2d as solid_mask
 from ..core.grid import make_geometry
 from ..core.profiles import remap_profile_1d_to_2d as remap_profile
-from .hooks import ConsoleHooks, Progress, Result, trigger_index
+from .hooks import (ConsoleHooks, Progress, Result, frame_budget,
+                    trigger_index)
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -66,8 +67,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     record_frames : int     ~number of pressure frames to keep for an
                             animation (0 = off). Captured every few steps
                             with adaptive decimation, so any run length
-                            ends up with record_frames..2*record_frames
-                            frames. Stored float32 -> meta['frames'].
+                            ends up with record_frames/2..record_frames
+                            frames - never more than asked for, which is
+                            also what bounds the memory the record holds.
+                            Stored float32 -> meta['frames'].
     live          : bool    Show a live-updating pressure window while the
                             simulation runs (needs an interactive
                             matplotlib backend; silently skipped otherwise)
@@ -330,6 +333,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
 
     hooks.run_started(run_info)
     frame_t, frame_p = [], []
+    record_frames    = frame_budget(record_frames, Nx * Ny, hooks)
     frame_stride     = 1
     last_draw        = 0.0
 
@@ -403,7 +407,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         if record_frames > 0 and step % frame_stride == 0:
             frame_t.append(t)
             frame_p.append(p_f.astype(np.float32))
-            if len(frame_p) >= 2 * record_frames:
+            # thin AT the requested count, not at twice it: holding 2x
+            # was half a gigabyte on a 640^2 AMR run, and nobody asked
+            # for more frames than record_frames anyway
+            if len(frame_p) > record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
                 frame_stride *= 2

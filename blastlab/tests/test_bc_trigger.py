@@ -285,6 +285,47 @@ def main():
     check("a plain 'remap' action does not stop the foam run",
           lp2.stop_requested is False)
 
+    print("\nreplay-frame memory budget")
+    from blastlab.solvers.hooks import FRAME_MEM_BUDGET, frame_budget
+
+    class _Log:
+        def __init__(self):
+            self.msgs = []
+
+        def log(self, m):
+            self.msgs.append(m)
+
+    check('off stays off', frame_budget(0, 640 * 640, None) == 0)
+    check('a small grid is not capped',
+          frame_budget(150, 80 * 60, None) == 150)
+    # the owner's run: a 640^2 AMR display grid at 150 frames held up to
+    # 614 MB (the recorder grew to 2x record_frames), and the ingest then
+    # failed allocating 400 KiB
+    lg = _Log()
+    n_amr = frame_budget(150, 640 * 640, lg, amr=True)
+    check('a 640^2 AMR run is capped to fit the budget',
+          n_amr < 150 and 5 * 640 * 640 * n_amr <= FRAME_MEM_BUDGET,
+          f'{n_amr} frames')
+    check('...and says so once', len(lg.msgs) == 1
+          and 'Replay frames reduced' in lg.msgs[0], str(lg.msgs))
+    check('an AMR run costs more per frame than a plain one',
+          frame_budget(500, 640 * 640, None, amr=True)
+          < frame_budget(500, 640 * 640, None))
+    check('even an absurd grid keeps a few frames',
+          frame_budget(150, 4096 * 4096, None, amr=True) >= 8)
+    check('no note when nothing is capped',
+          not _Log().msgs and frame_budget(10, 640 * 640, _Log()) == 10)
+
+    # the recorders must thin AT record_frames, never at twice it
+    import inspect
+    from blastlab.solvers import solver2d, solver3d
+    from blastlab.solvers.foam import backend as fbk
+    for mod in (solver2d, solver3d, fbk):
+        src = inspect.getsource(mod)
+        check(f'{mod.__name__.split(".")[-1]} never holds 2x the frames',
+              '2 * record_frames' not in src
+              and 'len(frame_p) > record_frames' in src)
+
     print("\nT53 gauge markers")
     meta2 = dict(gauges=[(0.25, 0.6), (0.5, 0.6)], dx=0.03)
     pts = plots.gauge_points(meta2)

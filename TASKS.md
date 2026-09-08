@@ -118,7 +118,8 @@ Hard rules:
 | T51 | Trigger gauge: terminate and/or remap on arrival | N19 | M | [x] 2026-09-08 |
 | T52 | An end time for 1D and 2D runs too | N18 | S | [x] 2026-09-08 |
 | T53 | Gauges drawn in the live view and the animation | N19 | S | [x] 2026-09-08 |
-| T54 | AMR mesh in the exported video (verification) | N15 | S | [x] 2026-09-08 |
+| T54 | AMR mesh in the exported video (verify, then fix) | N15 | S | [x] 2026-09-08 |
+| T55 | Bound the replay-frame record's memory | N15 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1853,6 +1854,26 @@ so the Results fields, the replay and the animation are fixed together.
 `lmax` - in every shipped configuration the two are equal, so that half is a guard, not a
 fix. `test_gui_amr_form` gained the real 640^2 shape and a 2048^2 coarsening check; the
 old fixtures could never have caught this.
+
+**T55 - the replay record ran the machine out of memory (owner, same session).** The AMR
+run above then died mid-ingest with `_ArrayMemoryError: Unable to allocate 400. KiB for an
+array with shape (640, 640)` inside `mesh_at`, alongside Windows' own `0xc000012d`
+(STATUS_COMMITMENT_LIMIT) in an unrelated process - the machine, not blastlab, was out of
+commit. But blastlab was a large part of why: **the frame recorders grew to
+`2 * record_frames` before thinning**, so a run asking for 150 frames held up to 300, and
+at 640^2 with per-frame AMR level maps that is 2.05 MB x 300 = **614 MB** of replay record
+alone. Nothing capped `record_frames` by grid size either, though the same function has
+capped `n_snapshots` that way since T24.
+
+Both fixed. All four recorders (native 2D/3D, foam 2D/3D) now thin at `record_frames`
+rather than twice it - nobody asked for more frames than that, and it halves the peak -
+and `hooks.frame_budget` caps `record_frames` against `FRAME_MEM_BUDGET = 200 MB`,
+counting 4 bytes per display cell plus 1 more on an AMR run for its int8 level map, with
+a `[note]` naming the per-frame cost and what to lower. The owner's case: 150 frames ->
+97, peak 614 MB -> 199 MB. The helper lives in `solvers/hooks.py`, not in the foam
+runloop, so the native solvers do not have to import the blastFoam backend to use it.
+Small runs are untouched (a 80x60 2D run keeps all 150), so test_regression stays
+byte-identical.
 
 *T54 - the original verification.* Verified rather than fixed: `write_animation` already rebuilt
 the overlay per frame from `frames['levels']` and `_amr_meta` already recorded them for

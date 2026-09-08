@@ -12,6 +12,33 @@ from dataclasses import dataclass, field
 import numpy as np
 
 
+#: memory budget for the recorded replay frames [bytes]. The record
+#: is a convenience (the Animation tab and the exported video), not
+#: the run's result, so it must never be what makes a run run out of
+#: RAM - which is what happened on a 640^2 AMR run holding 614 MB of
+#: frames while blastFoam and the GUI wanted the same memory.
+FRAME_MEM_BUDGET = 200_000_000
+
+
+def frame_budget(record_frames, n_disp, hooks=None, amr=False):
+    """`record_frames` capped so the replay record fits the budget.
+
+    One frame costs 4 bytes per display cell (the float32 pressure)
+    plus 1 more on an AMR run, which also records that frame's int8
+    level map."""
+    if record_frames <= 0 or n_disp <= 0:
+        return record_frames
+    per_frame = (5 if amr else 4) * int(n_disp)
+    cap = max(8, int(FRAME_MEM_BUDGET // per_frame))
+    if record_frames > cap and hooks is not None:
+        hooks.log(f"  [note] Replay frames reduced {record_frames} -> "
+                  f"{cap} to bound frame memory "
+                  f"({per_frame / 1e6:.2f} MB per frame at "
+                  f"{int(n_disp):,} display cells; a coarser cell or a "
+                  f"lower AMR display level buys more frames)")
+    return min(record_frames, cap)
+
+
 def trigger_index(trigger_gauge, n_gauges, hooks):
     """The 0-based index of the T51 trigger gauge, or None.
 

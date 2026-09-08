@@ -31,6 +31,7 @@ from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, FoamRunLoop, PeakImpulse,
                       due_sparse, new_live)
 from .runloop import amr_note, level_counts
+from ..hooks import frame_budget
 
 #: dims with a working blastFoam backend (grows per phase)
 IMPLEMENTED = frozenset({1, 2, 3})
@@ -874,7 +875,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks.run_started(run_info)
     _initial_frame(spec, hooks)
 
-    record_frames = case.record_frames
+    record_frames = frame_budget(case.record_frames, Nx * Ny, hooks,
+                                 amr=bool(spec.amr))
     frame_t, frame_p, frame_lv = [], [], []
     # T is in the readiness tuple because finalize_2d re-reads it;
     # AMR runs add the per-time mesh files (C, cellLevel)
@@ -916,7 +918,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
             frame_p.append(p.astype(np.float32))
             if mesh is not None:
                 frame_lv.append(mesh.levels)
-            if len(frame_p) >= 2 * record_frames:
+            # thin AT the requested count, not at twice it: holding 2x
+            # was half a gigabyte on a 640^2 AMR run, and nobody asked
+            # for more frames than record_frames anyway
+            if len(frame_p) > record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
                 frame_lv = frame_lv[::2]
@@ -1401,7 +1406,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     _initial_frame(spec, hooks, live_sl)
     _initial_frame3d(spec, hooks)
 
-    record_frames = case.record_frames
+    # the 3D record holds the live PLANE, not the volume
+    record_frames = frame_budget(
+        case.record_frames,
+        solid[live_sl].size, hooks, amr=bool(spec.amr))
     frame_t, frame_p, frame_lv = [], [], []
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}') + spec.mesh_fields
     ingested = {}               # dirname -> t (full arrays NOT retained)
@@ -1455,7 +1463,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
             frame_p.append(p[live_sl].astype(np.float32))
             if mesh is not None:
                 frame_lv.append(mesh.levels[live_sl])
-            if len(frame_p) >= 2 * record_frames:
+            # thin AT the requested count, not at twice it: holding 2x
+            # was half a gigabyte on a 640^2 AMR run, and nobody asked
+            # for more frames than record_frames anyway
+            if len(frame_p) > record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
                 frame_lv = frame_lv[::2]

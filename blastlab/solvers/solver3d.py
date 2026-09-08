@@ -15,7 +15,8 @@ from ..core.bc import (face_fluxes, normalize_bcs,
 from ..core.grid import make_grid
 from ..core.profiles import (remap_profile_1d_to_3d as remap_profile_1d,
                              remap_profile_2d_to_3d as remap_profile_2d)
-from .hooks import ConsoleHooks, Progress, Result, trigger_index
+from .hooks import (ConsoleHooks, Progress, Result, frame_budget,
+                    trigger_index)
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -419,6 +420,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                      obstacles=obstacles, Lx=Lx, Ly=Ly, Lz=Lz,
                      charge_center=(x0, y0, z0), r_exp=r_src, bcs=bcs)))
     frame_t, frame_p = [], []
+    # the 3D record holds the live PLANE, not the volume
+    record_frames    = frame_budget(record_frames,
+                                    solid[live_sl].size, hooks)
     frame_stride     = 1
     last_draw        = 0.0
     last_draw3d      = 0.0
@@ -488,7 +492,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         if record_frames > 0 and step % frame_stride == 0:
             frame_t.append(t)
             frame_p.append(p_f[live_sl].astype(np.float32))
-            if len(frame_p) >= 2 * record_frames:
+            # thin AT the requested count, not at twice it: holding 2x
+            # was half a gigabyte on a 640^2 AMR run, and nobody asked
+            # for more frames than record_frames anyway
+            if len(frame_p) > record_frames:
                 frame_t = frame_t[::2]
                 frame_p = frame_p[::2]
                 frame_stride *= 2
