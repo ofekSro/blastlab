@@ -472,8 +472,14 @@ class RunPanel(ctk.CTkFrame):
                                     color=theme.cur('accent'))
             ax.set_xlim(0, info['radius_m'])
             # before the first frame an empty autoscaled axis showed a
-            # meaningless -0.04..0.04 kPa range
-            ax.set_ylim(0, 10)
+            # meaningless -0.04..0.04 kPa range.
+            # auto=True is load-bearing: a plain set_ylim turns y
+            # autoscaling OFF, and on_frame's autoscale_view(scalex=False)
+            # then does nothing - which pinned the 1D live pane to
+            # 0..10 kPa for every run since this placeholder was added
+            # (T61). The data limits were right all along; only the axis
+            # never followed them.
+            ax.set_ylim(0, 10, auto=True)
             ax.set_xlabel('r [m]')
             ax.set_ylabel('Overpressure [kPa]')
             ax.grid(True, alpha=0.3)

@@ -125,6 +125,7 @@ Hard rules:
 | T58 | A title line of your own on the Results figures | N20 | S | [x] 2026-09-08 |
 | T59 | 1D model preview: the spherical sector | N20 | S | [x] 2026-09-08 |
 | T60 | A boundary kind for the end of the 1D sector | N18 | S | [x] 2026-09-08 |
+| T61 | The 1D live pane was pinned to 10 kPa | G14 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -2015,6 +2016,28 @@ trip, a distinct arc style per kind - `get_linestyle()` normalises both dash pat
 two checks that the sector now sits on the axis and opens to 30 degrees. test_regression
 (numeric baselines byte-identical), test_case_validate, test_refine, test_bc_trigger,
 test_gui_solver_mode, test_foam_writer, test_gui_refine_preview PASS.
+
+**T61 - the 1D live pane was drawn against a 10 kPa ceiling (owner: "something in the 1D
+live slice is not right, is it limited to 10 kPa?").** It was. `on_run_started` pinned the
+empty axis with `ax.set_ylim(0, 10)` so the first frame would not show a meaningless
+-0.04..0.04 kPa range - but **a plain `set_ylim` turns y autoscaling OFF**, and the
+per-frame `ax.relim(); ax.autoscale_view(scalex=False)` only acts while it is on. Every 1D
+run since has been drawn against a 10 kPa ceiling with its shock clipped flat. Measured on
+the real panel: frames of 50, 900 and 12,000 kPa all left `ylim = (0, 10)` while
+`dataLim` read `[0, 12000]` - the data were right the whole time, only the axis never
+followed.
+
+`git log -S` dates it to `3cb800c` (2026-09-07, the S4 QA batch that added the
+placeholder); the owner suspected the T53 gauge lines added the day after, so that was
+checked first and ruled out by measurement - the pane is pinned identically with and
+without them. 2D is unaffected (it sets a colour range per frame, not an axis), and so is
+the Results 1D view (a fresh figure each time).
+
+Fixed by `ax.set_ylim(0, 10, auto=True)`: the placeholder range survives for the empty
+axis and autoscaling stays on for the frames. `test_gui_amr_form` gained a RunPanel 1D
+section - the placeholder, `get_autoscaley_on()`, three frames that must each rescale the
+axis, and one decaying frame that must bring it back down. Verified to fail on exactly
+those checks when the `auto=True` is removed.
 
 
 ---

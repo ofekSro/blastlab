@@ -256,6 +256,35 @@ def main():
     rp._rebuild_overlay()
     check('overlay removed', rp._mesh_lines is None)
 
+    print("\nRunPanel: the 1D live pane follows its data (T61)")
+    # on_run_started pins ylim to (0, 10) so an empty axis does not show
+    # a meaningless -0.04..0.04 range. A plain set_ylim turns y
+    # autoscaling OFF, so on_frame's autoscale_view(scalex=False) did
+    # nothing and every 1D run was drawn against a 10 kPa ceiling - the
+    # data limits were right, only the axis never moved.
+    from blastlab.core.constants import P_AIR
+    r1 = np.linspace(0.01, 4.0, 200)
+    rp.on_run_started(dict(dim=1, r=r1, radius_m=4.0,
+                           gauges=[(1, 1.5, 0.0), (2, 3.0, 0.0)],
+                           trigger_gauge=2))
+    ax1 = rp._line.axes
+    check('an empty 1D axis still opens at the 0..10 kPa placeholder',
+          ax1.get_ylim() == (0.0, 10.0), str(ax1.get_ylim()))
+    check('...with y autoscaling left ON', ax1.get_autoscaley_on())
+
+    def shock(peak_kpa):
+        p = P_AIR + peak_kpa * 1e3 * np.exp(-((r1 - 1.0) / 0.25) ** 2)
+        return np.array([r1, p])
+
+    for peak in (50.0, 900.0, 12000.0):
+        rp.on_frame(shock(peak), 1e-4)
+        top = ax1.get_ylim()[1]
+        check(f'a {peak:,.0f} kPa frame rescales the axis to fit it',
+              top >= 0.9 * peak, f'ylim top = {top:.1f} kPa')
+    rp.on_frame(shock(20.0), 2e-4)
+    check('and it comes back down as the wave decays',
+          ax1.get_ylim()[1] < 100.0, f'ylim top = {ax1.get_ylim()[1]:.1f}')
+
     print("\nResultsPanel replay: per-frame overlay")
     panel = ResultsPanel(root)
     panel.add_result('AMR 2D', 2, res)
