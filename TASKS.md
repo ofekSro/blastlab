@@ -1833,7 +1833,28 @@ plus `G<n>` per gauge, the trigger gauge heavier and starred. Drawn once in the 
 (`geometry.plane_gauges`, tolerance one cell) - a gauge a metre off the slice must not be
 drawn as if it sat on it.
 
-*T54 - AMR in the video.* Verified rather than fixed: `write_animation` already rebuilt
+*T54 - AMR in the video (the real defect, found by the owner).* The first pass here
+verified the per-frame machinery on a synthetic record and concluded it already worked.
+It did not: on the owner's own run - 20 x 20 m axisym, 0.5 m base, `amr_levels=4`, a
+**640 x 640 = 409,600-cell display grid** - `plots.mesh_for` hit its
+`if src.size > 400_000` guard and *replaced* the overlay with a uniform base grid
+(`mesh_segments_2d(None, xf[::2**lmax], ...)`), so the exported video and the Results
+field views showed no refinement at all. The live pane never had that fallback, which is
+exactly why the mesh was visible while running and gone in the video. The synthetic
+fixtures were all 8 x 8, three orders of magnitude under the guard.
+
+Fixed by coarsening instead of discarding: `_fit_overlay` max-pools the level map (and
+halves the faces and the depth with it) until it fits under `MESH_MAX_CELLS = 1_200_000`,
+so the refined REGIONS survive at a coarser resolution. Measured on that grid: fine_src +
+mesh_segments_2d cost ~45 ms per frame (~7 s over a 150-frame gif), a cost the live pane
+already paid every frame. All four `mesh_for` branches now go through one level-map path,
+so the Results fields, the replay and the animation are fixed together.
+`_levels_depth` additionally pins the AMR depth to `display_level` rather than the static
+`lmax` - in every shipped configuration the two are equal, so that half is a guard, not a
+fix. `test_gui_amr_form` gained the real 640^2 shape and a 2048^2 coarsening check; the
+old fixtures could never have caught this.
+
+*T54 - the original verification.* Verified rather than fixed: `write_animation` already rebuilt
 the overlay per frame from `frames['levels']` and `_amr_meta` already recorded them for
 2D and 3D - what was missing was T49, the `show_mesh` flag on the run's OWN animation. A
 synthetic record whose refined block slides between frames confirms the overlay follows

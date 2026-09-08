@@ -115,6 +115,62 @@ def add_gauge_markers(ax, points, trigger=None, color='#00e5ff'):
     return arts
 
 
+def _levels_depth(ref, levels=None):
+    """How deep the grid a level map lives on is - the `lmax` fine_src /
+    slice_src need.
+
+    For STATIC refinement that is `ref['lmax']`. For a dynamic-AMR record
+    it is NOT: those level maps (both meta['refine']['levels'] and the
+    per-frame ones) live on the DISPLAY grid, whose depth is
+    `display_level`, while `lmax` counts only the static refinement - 0
+    on a run with no refine zones. Using it there made fine_src shift by
+    a NEGATIVE count, which merged the refined block into one huge cell
+    and left the coarse field split per cell: the overlay stopped looking
+    like the AMR mesh at all (the live pane never had the bug - it sizes
+    the blocks from display_level itself).
+
+    The final max() is a guard: a level deeper than the recorded depth
+    can only come from a mismatched record, and a negative shift there
+    would be nonsense rather than a wrong-looking picture."""
+    lmax = int(ref.get('lmax') or 0)
+    if ref.get('amr'):
+        lmax = int(ref.get('display_level') or 0) or lmax
+    for lv in (levels, ref.get('levels')):
+        if lv is not None:
+            lmax = max(lmax, int(np.asarray(lv).max()))
+            break
+    return lmax
+
+
+#: display cells above which a mesh overlay is COARSENED (the level map
+#: is max-pooled 2x2 and the faces halved with it). Measured on a real
+#: 640^2 level-4 AMR frame: fine_src + mesh_segments_2d cost ~45 ms
+#: there, which the live pane already pays every frame, so the cap sits
+#: well above it. What used to happen instead was worse than slow: over
+#: 400_000 cells the overlay was REPLACED by a uniform base-grid mesh,
+#: so a 640^2 AMR run (409,600 cells - just over the old cap) showed no
+#: refinement at all in the exported video or the Results fields, while
+#: the live pane, which never had that fallback, showed it correctly.
+MESH_MAX_CELLS = 1_200_000
+
+
+def _fit_overlay(lv, xf, yf, lmax):
+    """Halve a plane's level map (and its faces) until it is under
+    MESH_MAX_CELLS. Levels are max-pooled so the refined REGIONS survive
+    the coarsening; carved cells (-1) survive only where a whole block is
+    carved. Returns (levels, u_face, v_face, lmax)."""
+    lv = np.asarray(lv)
+    xf, yf = np.asarray(xf), np.asarray(yf)
+    while lv.size > MESH_MAX_CELLS and lmax > 0 and min(lv.shape) > 1:
+        nu, nv = (lv.shape[0] // 2) * 2, (lv.shape[1] // 2) * 2
+        block = lv[:nu, :nv].reshape(nu // 2, 2, nv // 2, 2)
+        carved = (block < 0).all(axis=(1, 3))
+        lv = np.where(carved, -1, np.maximum(block, 0).max(axis=(1, 3)))
+        xf, yf = xf[:nu + 1:2], yf[:nv + 1:2]
+        lmax -= 1
+    return lv, xf, yf, lmax
+
+
 def mesh_for(meta, xf, yf, sl=None, levels=None):
     """Cell-edge segments for a field plot with faces xf/yf: the TRUE
     cells of a refined blastFoam run (meta['refine'], coarse cells drawn
@@ -128,23 +184,19 @@ def mesh_for(meta, xf, yf, sl=None, levels=None):
     if ref is None:
         return refine.mesh_segments_2d(None, xf, yf,
                                        max_lines=MESH_MAX_LINES)
-    lmax = ref['lmax']
+    lmax = _levels_depth(ref, levels)
     if levels is not None:
         lv = np.asarray(levels)
-        src = refine.fine_src(np.maximum(lv, 0), lmax,
-                              solid_fine=(lv < 0) if (lv < 0).any() else None)
     elif sl is None:
-        levels = ref['levels']
-        src = refine.slice_src(levels, lmax)
+        lv = np.asarray(ref['levels'])
     else:
-        levels = ref['levels']
         axis = next(a for a, s in enumerate(sl) if not isinstance(s, slice))
-        src = refine.slice_src(levels, lmax, axis, int(sl[axis]))
-    if src.size > 400_000:
-        step = 2 ** lmax
-        return refine.mesh_segments_2d(None, np.asarray(xf)[::step],
-                                       np.asarray(yf)[::step],
-                                       max_lines=MESH_MAX_LINES)
+        lv = np.asarray(ref['levels'])[
+            tuple(int(sl[axis]) if a == axis else slice(None)
+                  for a in range(3))]
+    lv, xf, yf, lmax = _fit_overlay(lv, xf, yf, lmax)
+    src = refine.fine_src(np.maximum(lv, 0), lmax,
+                          solid_fine=(lv < 0) if (lv < 0).any() else None)
     return refine.mesh_segments_2d(src, xf, yf, max_lines=MESH_MAX_LINES)
 
 

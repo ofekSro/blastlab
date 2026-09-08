@@ -181,6 +181,60 @@ def main():
     check('carved cells (-1) are left out',
           len(plots.mesh_for(meta, xf, yf, levels=lvc)) < want)
 
+    print("\nplots.mesh_for on a REAL-SIZE AMR display grid")
+    # the shape a 20 x 20 m axisym run at 0.5 m base with amr_levels=4
+    # produces: a 640^2 display grid = 409,600 cells. That is just over
+    # the old 400,000 guard, which REPLACED the overlay with a uniform
+    # base grid - the AMR mesh vanished from the exported video and the
+    # Results fields while the live pane still showed it.
+    big = 640
+    bxf = np.linspace(0.0, 20.0, big + 1)
+    byf = np.linspace(0.0, 20.0, big + 1)
+    jj, ii = np.meshgrid(np.arange(big), np.arange(big), indexing='ij')
+    rad = np.hypot(ii, jj - big / 2)
+
+    def band_map(bands):
+        m = np.zeros((big, big), dtype=np.int8)
+        for lvl, lo, hi in bands:
+            m[(rad > lo) & (rad < hi)] = lvl
+        return m
+
+    big_lv = band_map(((1, 150, 300), (2, 185, 275),
+                       (3, 205, 255), (4, 220, 243)))
+    big_meta = dict(refine=dict(levels=big_lv, lmax=4, dx_base=0.5,
+                                zones=[], amr=4, display_level=4))
+    n_uni = len(plots.mesh_for(dict(refine=None), bxf, byf))
+    n_amr = len(plots.mesh_for(big_meta, bxf, byf, levels=big_lv))
+    check('a 640^2 AMR frame keeps its refinement (not a uniform grid)',
+          n_amr > 10 * n_uni, f'{n_amr} segments vs {n_uni} uniform')
+    check('the same holds without per-frame levels (Results fields)',
+          len(plots.mesh_for(big_meta, bxf, byf)) == n_amr)
+    shifted = band_map(((1, 190, 340), (2, 225, 315),
+                        (3, 245, 295), (4, 260, 283)))
+    check('and it still moves with the shock',
+          len(plots.mesh_for(big_meta, bxf, byf, levels=shifted)) != n_amr)
+
+    # far above the cap the map is COARSENED, never discarded
+    huge = 2048
+    hxf = np.linspace(0.0, 20.0, huge + 1)
+    hyf = np.linspace(0.0, 20.0, huge + 1)
+    huge_lv = np.zeros((huge, huge), dtype=np.int8)
+    huge_lv[900:1150, 900:1150] = 3
+    huge_meta = dict(refine=dict(levels=huge_lv, lmax=3, dx_base=0.5,
+                                 zones=[], amr=3, display_level=3))
+    n_huge = len(plots.mesh_for(huge_meta, hxf, hyf, levels=huge_lv))
+    check('above the cap the level map is coarsened, not dropped',
+          n_huge > len(plots.mesh_for(dict(refine=None), hxf, hyf)),
+          str(n_huge))
+    lv_fit, xf_fit, yf_fit, lmax_fit = plots._fit_overlay(
+        huge_lv, hxf, hyf, 3)
+    check('coarsening halves the map, the faces and the depth together',
+          lv_fit.size <= plots.MESH_MAX_CELLS
+          and len(xf_fit) == lv_fit.shape[0] + 1
+          and len(yf_fit) == lv_fit.shape[1] + 1
+          and lmax_fit < 3 and lv_fit.max() == 3,
+          f'{lv_fit.shape} {lmax_fit}')
+
     print("\nRunPanel: live overlay follows the frame levels")
     rp = RunPanel(root, on_run=lambda *a: None, on_stop=lambda *a: None)
     info = dict(dim=2, x_face=xf, y_face=yf, solid=np.zeros((8, 8), bool),
