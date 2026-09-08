@@ -120,6 +120,7 @@ Hard rules:
 | T53 | Gauges drawn in the live view and the animation | N19 | S | [x] 2026-09-08 |
 | T54 | AMR mesh in the exported video (verify, then fix) | N15 | S | [x] 2026-09-08 |
 | T55 | Bound the replay-frame record's memory | N15 | S | [x] 2026-09-08 |
+| T56 | MP4 export reachable (label, dialog, default, ffmpeg) | N15 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1902,6 +1903,26 @@ test_gui_results_fields/anim, test_gui_solver_mode, test_revolve3d, test_viz3d_s
 PASS. NOT RUN: the WSL suites (test_foam_2d / _3d_smoke / the foam e2e scripts) - the
 foam backend changes here are the trigger check and the mask rename, and they need an
 idle WSL; run them before relying on a blastFoam trigger run.
+
+**T56 - MP4 export (owner, 2026-09-08).** `write_animation` has always picked its writer
+from the extension - `FFMpegWriter` for `.mp4`, `PillowWriter` otherwise, with a `[note]`
+when it falls back - but nothing in the GUI said so: the Setup field was labelled
+"Animation (gif)" and the Results export dialog was titled "Save animation GIF" with no
+filetypes list, so `.mp4` was reachable only by typing the extension. And on this machine
+it would have fallen back anyway: **ffmpeg was installed nowhere** - not on Windows, not
+in WSL - which is why every run produced a gif.
+
+Installed `Gyan.FFmpeg` via winget (9.0.1). The field is now "Animation (.gif / .mp4)",
+the dialog offers both types, and both the field's default filename and the dialog's
+default extension follow `FFMpegWriter.isAvailable()` - the same test `cli.py` already
+used - so a machine with ffmpeg gets mp4 without anyone editing anything. Verified end to
+end through `gui/app.py::_solve_stage`: a 2D run with `anim_mesh=True` wrote a real 222 kB
+`.mp4` (yuv420p, no stray `.gif` beside it). The owner's two gifs under `run/1` were
+converted with `-crf 18 -pix_fmt yuv420p -movflags +faststart`: 3.31 MB -> 0.37 MB and
+4.59 MB -> 0.84 MB, both 700x800 / 95 frames / 16.67 fps, identical to the source.
+
+Note for anyone reading a run log from before this: a GUI process started before the
+install keeps the old PATH, so it still writes gif until it is restarted.
 
 
 ---

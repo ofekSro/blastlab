@@ -583,10 +583,15 @@ class CaseForm(ctk.CTkFrame):
         if self.dim > 1:
             # write_animation picks the writer from the extension:
             # .mp4 when ffmpeg is on PATH, .gif otherwise (and it says
-            # so in the log when it has to fall back)
+            # so in the log when it has to fall back). Default to the one
+            # this machine can actually write, as cli.py already does -
+            # mp4 is both smaller and free of the gif 256-colour banding.
+            from matplotlib import animation as _mplanim
+            _ext = '.mp4' if _mplanim.FFMpegWriter.isAvailable() else '.gif'
             orow = _row(out, orow, 'Animation (.gif / .mp4)',
                         _entry(out, self._var(
-                            'anim_file', f'blast_{self.dim}d_animation.gif')))
+                            'anim_file',
+                            f'blast_{self.dim}d_animation{_ext}')))
             ctk.CTkCheckBox(out, text='Record replay frames',
                             variable=self._bool('record', True),
                             font=theme.F_BODY, corner_radius=6,
