@@ -9,6 +9,7 @@
   Cell size       : 0.010526315789473684 m  (190 cells)
   EOS             : JWL
   Initial p (exp) : 8.381e+09 Pa  (8.38 GPa)
+  Outer boundary  : terminate
   Stop condition  : shock arrival at r = 2.0 m
   Safety cap      : 58.8 ms
 =======================================================

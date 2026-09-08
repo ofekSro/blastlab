@@ -1,4 +1,4 @@
-"""The Results title line (T58) and the 1D model preview (T59).
+"""The Results title line (T58) and the 1D model preview (T59, T60).
 
 T58: a line of the user's own is added ABOVE the automatic title (which
      carries the charge, the field and, on an animation, the running
@@ -7,11 +7,14 @@ T58: a line of the user's own is added ABOVE the automatic title (which
      the Results panel, not on the case.
 T59: 1D gets a model preview: the spherical sector blastFoam meshes,
      with the charge radius inside it, the gauge radii marked and an
-     optional cell-face overlay.
+     optional cell-face overlay. Drawn from the axis (0 deg) to 30 deg.
+T60: the far end of that sector takes the same three boundary kinds the
+     2D/3D sides do, and the preview draws it in the same language.
 
 Headless (Agg, hidden Tk root). Needs customtkinter, no WSL.
 Run:  cd blastlab/tests && python test_gui_title_preview1d.py
 """
+import math
 import os
 import sys
 
@@ -121,8 +124,15 @@ def main():
     check('the charge is a filled patch inside it',
           len(ax.patches) + len(ax.collections) >= 1)
     ttl = ax.get_title()
-    check('the title says the drawn angle AND the meshed one',
-          '24' in ttl and '1' in ttl and 'sector' in ttl, ttl)
+    check('the title is just the sector and its radius (T60)',
+          ttl.startswith('1D spherical sector') and 'R = 4 m' in ttl
+          and 'drawn at' not in ttl, ttl)
+    ys = [y for ln in ax.lines for y in ln.get_ydata()]
+    check('the sector sits on the axis: nothing below y = 0 (T60)',
+          min(ys) >= -1e-9, f'min y = {min(ys):.3g}')
+    check('...and opens to 30 degrees',
+          abs(max(ys) - 4.0 * math.sin(math.radians(30.0))) < 1e-6,
+          f'max y = {max(ys):.4g}')
     from blastlab.core.case import validate_case as _vc
     check('the charge label carries the true radius',
           any(f'{_vc(case).r_exp:.4g}' in t.get_text() for t in ax.texts),
@@ -154,6 +164,42 @@ def main():
     # a case that cannot be drawn must not raise
     p1.show_case(Case1D(radius_m=0.0, charge_kg=1.0))
     check('a zero radius is handled, not raised', True)
+
+    print("\nT60 the outer boundary kind")
+    from blastlab.core.bc import BC_KINDS
+    from blastlab.core.case import case_from_dict, case_to_dict
+    check('the default is what 1D always did',
+          Case1D().bc_outer == 'terminate')
+    check('it round-trips through a case file',
+          case_from_dict(case_to_dict(
+              Case1D(bc_outer='reflect'))).bc_outer == 'reflect')
+    styles = {}
+    for kind in BC_KINDS:
+        p1.show_case(Case1D(radius_m=4.0, charge_kg=8.0,
+                            cell_size_m=0.05, bc_outer=kind))
+        # the outlet arc is the last of the three boundary lines drawn.
+        # get_linestyle() normalises every custom dash to '--', so the
+        # dash pattern itself is what tells transmit from terminate
+        arc = p1._ax.lines[2]
+        styles[kind] = (arc.get_linestyle(),
+                        arc._unscaled_dash_pattern,
+                        round(arc.get_linewidth(), 2))
+    check('each kind draws the outer arc differently',
+          len(set(styles.values())) == 3, str(styles))
+    check('a reflecting end is the bold solid one, as in 2D',
+          styles['reflect'][2] > styles['transmit'][2]
+          and styles['reflect'][0] == '-', str(styles))
+    check('terminate and transmit are both dashed but not alike',
+          styles['terminate'][0] == styles['transmit'][0] == '--'
+          and styles['terminate'][1] != styles['transmit'][1],
+          str(styles))
+
+    from blastlab.gui.forms import CaseForm
+    f1 = CaseForm(root, 1)
+    check('the 1D form defaults to terminate',
+          f1.get_case().bc_outer == 'terminate')
+    f1.set_case(Case1D(bc_outer='transmit'))
+    check('the form round-trips it', f1.get_case().bc_outer == 'transmit')
 
     print("\nT59 the Setup panel routes 1D to it")
     from blastlab.gui.forms import SetupPanel

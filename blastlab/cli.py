@@ -309,6 +309,7 @@ def ask_user_1d():
                        else f"Cell size must be in (0, {radius_m}) m.")
 
     eos = _ask_eos(default='idealGas')
+    bc_outer = _ask_choice("Outer boundary (r = R)", BC_KINDS, 'terminate')
 
     n_snapshots = _ask("Number of field snapshots", default=5, cast=int,
                        validator=lambda v: None if v >= 1 else "Must be >= 1.")
@@ -355,6 +356,7 @@ def ask_user_1d():
         radius_m    = radius_m,
         cell_size_m = cell_size_m,
         eos         = eos,
+        bc_outer    = bc_outer,
         n_snapshots = n_snapshots,
         gauge_radii = gauge_radii,
         gauge_file  = gauge_file,

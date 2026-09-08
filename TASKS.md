@@ -124,6 +124,7 @@ Hard rules:
 | T57 | Loading a PARALLEL AMR run (post-mortem) | N16-b | S | [x] 2026-09-08 |
 | T58 | A title line of your own on the Results figures | N20 | S | [x] 2026-09-08 |
 | T59 | 1D model preview: the spherical sector | N20 | S | [x] 2026-09-08 |
+| T60 | A boundary kind for the end of the 1D sector | N18 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1983,6 +1984,37 @@ enlarged-charge case, a zero radius, and the Setup panel routing 1D to the new w
 `test_gui_solver_mode`'s pinned export-button order updated for the `GIF` -> `Animation`
 label. test_gui_results_fields/anim, test_gui_refine_preview, test_gui_amr_form,
 test_report, test_gui_gauge_summary, test_bc_trigger PASS.
+
+**T60 - the end of the 1D sector is a boundary like any other (owner request).** T50 gave
+2D and 3D three boundary kinds but left 1D hard-wired: the outer face was a transmissive
+outflow that ALSO ended the run when the shock reached it - exactly the pre-T50 `open`,
+with no way to say otherwise. `Case1D.bc_outer` (default `terminate`, so nothing changes
+for an existing case) now takes the same three kinds. `reflect` mirrors a ghost through
+the same Riemann solver `core.bc` uses for a reflecting 2D/3D side, rather than a
+hand-written wall flux; `transmit` and `terminate` share the outflow flux and differ only
+in whether the arrival ends the run. blastFoam follows: the sector's `outlet` patch is
+written from the kind (so a reflecting end is a `wall` patch, not a `patch`), and the 1D
+ingest only stops on `terminate`. `validate_case` rejects an unknown kind and warns when
+a non-terminating end has no `t_end`, mirroring the 2D/3D warning. The GUI grows a
+Boundaries card in the 1D form - one row, because the apex is the symmetry centre - and
+both CLIs ask. The 1D preview draws the outer arc in the same language the 2D preview
+uses for its sides: solid and bold for reflect, dotted for terminate, dashed for transmit.
+
+Same commit, two adjustments to T59's drawing the owner asked for: the sector is drawn
+from the axis (0 deg) to 30 deg instead of symmetrically about it, so its lower edge IS
+the axis; and the title is just `1D spherical sector · R = X m` - the drawn-vs-meshed
+angle note is gone (the mesh line under it, when Show mesh is on, stays).
+
+**Re-baselined:** `transcript.txt` only, for the one `Outer boundary  : terminate` line
+the 1D banner now prints beside `Stop condition` - additions only, and every numeric
+baseline stayed byte-identical.
+
+Tests: `test_gui_title_preview1d` gained a T60 section (the default, the case-file round
+trip, a distinct arc style per kind - `get_linestyle()` normalises both dash patterns to
+`'--'`, so the dash pattern itself is what is compared - and the form round trip) plus
+two checks that the sector now sits on the axis and opens to 30 degrees. test_regression
+(numeric baselines byte-identical), test_case_validate, test_refine, test_bc_trigger,
+test_gui_solver_mode, test_foam_writer, test_gui_refine_preview PASS.
 
 
 ---

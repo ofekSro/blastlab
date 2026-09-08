@@ -266,7 +266,10 @@ def plan_case(case):
                         r_exp=r_exp, center=(0.0, 0.0, 0.0), grid=grid)
         spec.charges = [((0.0, 0.0, 0.0), float(case.charge_kg))]
         R_out = r_face[-1]
-        spec.patches = [('outlet', 'open'), ('wedge', 'wedge')]
+        spec.patches = [('outlet',
+                         normalize_bc(getattr(case, 'bc_outer',
+                                              'terminate'))),
+                        ('wedge', 'wedge')]
         gauges = [g for g in case.gauge_radii if 0.0 < g <= R_out]
         spec.gauge_ids = gauges
         spec.probe_pts = [(g, 0.0, 0.0) for g in gauges]

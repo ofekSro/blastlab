@@ -27,6 +27,7 @@ def run(dim):
 
 def _run_1d():
     from ...cli import _ask, _ask_choice, _ask_gauges, _positive
+    from ...core.bc import BC_KINDS
     from ...core.case import Case1D, validate_case
     from ...output.gauges import save_gauges_1d
     from ...core.profiles import save_profile
@@ -51,6 +52,8 @@ def _run_1d():
     case = Case1D(radius_m=radius, charge_kg=charge, cell_size_m=cell,
                   n_snapshots=n_snap, gauge_radii=gauges,
                   gauge_file=gauge_file, profile_file=profile_out,
+                  bc_outer=_ask_choice("Outer boundary (r = R)",
+                                       BC_KINDS, 'terminate'),
                   solver='blastfoam', material=material)
     rep = validate_case(case)
     for msg in rep.notes:

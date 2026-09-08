@@ -353,13 +353,14 @@ class Preview1DPanel(ctk.CTkFrame):
     filled at its own radius inside it, the gauge radii marked, and (with
     Show mesh) the radial cell faces as arcs.
 
-    The real half-angle is `writer.HALF_ANGLE_DEG` = 1 degree, which
-    would draw as a bare line, so the wedge is opened up for legibility
-    and the title says what the mesh actually uses.
+    The real opening is `writer.HALF_ANGLE_DEG` = 1 degree, which would
+    draw as a bare line, so the wedge is opened up for legibility. It is
+    drawn from 0 to DRAW_DEG rather than symmetrically about the axis:
+    the lower edge IS the axis, which is how a sector is usually read.
     """
 
-    #: drawn half-angle - legibility only; the mesh uses HALF_ANGLE_DEG
-    DRAW_HALF_DEG = 24.0
+    #: drawn opening angle - legibility only; the mesh uses HALF_ANGLE_DEG
+    DRAW_DEG = 30.0
 
     def __init__(self, parent):
         super().__init__(parent, fg_color='transparent', corner_radius=0)
@@ -370,14 +371,13 @@ class Preview1DPanel(ctk.CTkFrame):
         self.canvas.set_figure(self._fig)
 
     @staticmethod
-    def _arc(r, half, n=64):
-        """(x, y) of the arc of radius `r` over +-`half` radians."""
-        th = np.linspace(-half, half, n)
+    def _arc(r, ang, n=64):
+        """(x, y) of the arc of radius `r` from 0 to `ang` radians."""
+        th = np.linspace(0.0, ang, n)
         return r * np.cos(th), r * np.sin(th)
 
     def show_case(self, case, show_mesh=False):
         from ..core.case import validate_case
-        from ..solvers.foam.writer import HALF_ANGLE_DEG
 
         dark = ctk.get_appearance_mode() == 'Dark'
         edge = '#e8e8e8' if dark else '#37474f'
@@ -390,17 +390,23 @@ class Preview1DPanel(ctk.CTkFrame):
             ax.set_axis_off()
             self.canvas.draw()
             return
-        half = math.radians(self.DRAW_HALF_DEG)
+        half = math.radians(self.DRAW_DEG)
 
-        # the sector: two straight lateral faces (reflecting wedges) and
-        # the outlet arc, which is where the run's stop condition lives
+        # the sector: the axis (0 deg), the second lateral face, and the
+        # outlet arc - drawn in the language the 2D preview uses, so the
+        # outer boundary kind is visible (T60)
         ax.fill(*self._sector_xy(R, half), facecolor=open_, alpha=0.12,
                 edgecolor='none', zorder=0.5)
-        for sgn in (-1, 1):
-            ax.plot([0, R * math.cos(half)], [0, sgn * R * math.sin(half)],
-                    color=edge, lw=2.0, zorder=2)
-        ax.plot(*self._arc(R, half), color=open_, lw=1.4,
-                ls=(0, (4, 3)), zorder=2)
+        ax.plot([0, R], [0, 0], color=edge, lw=2.0, zorder=2)
+        ax.plot([0, R * math.cos(half)], [0, R * math.sin(half)],
+                color=edge, lw=2.0, zorder=2)
+        kind = normalize_bc(getattr(case, 'bc_outer', 'terminate'))
+        ax.plot(*self._arc(R, half),
+                color=edge if kind == 'reflect' else open_,
+                lw=2.5 if kind == 'reflect' else 1.4,
+                ls=('-' if kind == 'reflect' else
+                    (0, (1, 2)) if kind == 'terminate' else (0, (4, 3))),
+                zorder=2)
 
         # the charge, at its own radius, inside the sector
         rep = validate_case(case)
@@ -441,14 +447,13 @@ class Preview1DPanel(ctk.CTkFrame):
 
         pad = 0.06 * R
         ax.set_xlim(-pad, R + pad)
-        ax.set_ylim(-(R * math.sin(half) + pad), R * math.sin(half) + pad)
+        ax.set_ylim(-pad, R * math.sin(half) + pad)
         ax.set_aspect('equal')
         ax.set_xlabel('r [m]')
         ax.set_ylabel('')
         ax.set_yticks([])
-        ax.set_title(f'1D spherical sector · R = {R:g} m · drawn at '
-                     f'±{self.DRAW_HALF_DEG:g}° (mesh: '
-                     f'±{HALF_ANGLE_DEG:g}°)' + note, fontsize=9)
+        ax.set_title(f'1D spherical sector · R = {R:g} m' + note,
+                     fontsize=9)
         if show_mesh:
             ax.grid(False)
         else:
@@ -457,9 +462,9 @@ class Preview1DPanel(ctk.CTkFrame):
         self._fig.tight_layout()
         self.canvas.draw()
 
-    def _sector_xy(self, r, half):
+    def _sector_xy(self, r, ang):
         """Closed polygon of the sector from the apex out to `r`."""
-        x, y = self._arc(r, half)
+        x, y = self._arc(r, ang)
         return np.concatenate([[0.0], x, [0.0]]), \
             np.concatenate([[0.0], y, [0.0]])
 

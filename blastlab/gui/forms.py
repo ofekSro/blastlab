@@ -13,7 +13,7 @@ from tkinter import filedialog, ttk
 import customtkinter as ctk
 
 from ..core.case import Case1D, Case2D, Case3D
-from ..core.bc import BC_KINDS, normalize_bcs
+from ..core.bc import BC_KINDS, normalize_bc, normalize_bcs
 from ..core.case import TRIGGER_ACTIONS
 from ..solvers.foam.materials import MATERIAL_NAMES
 from . import mode as mode_mod
@@ -505,6 +505,13 @@ class CaseForm(ctk.CTkFrame):
             self._amr_rows.append((lbl, w))
 
         # ── Boundaries ─────────────────────────────────────────────────
+        if self.dim == 1:
+            # T60: the far end of the sector - the apex is the symmetry
+            # centre, so there is only the one boundary to choose
+            bcf = self._card(0, 'Boundaries')
+            _row(bcf, 0, 'Outer boundary (r = R)',
+                 _combo(bcf, self._var('bc_outer', 'terminate'),
+                        list(BC_KINDS)))
         if self.dim > 1:
             bcf = self._card(0, 'Boundaries')
             for col in (1, 3):
@@ -767,6 +774,7 @@ class CaseForm(ctk.CTkFrame):
                 cell_size_m=_F('cell', 'cell size'),
                 eos=v['eos'].get(), cfl=_F('cfl', 'cfl'),
                 order=int(str(v['order'].get()).split()[0] or 1),
+                bc_outer=v['bc_outer'].get(),
                 n_snapshots=_I('n_snapshots', 'snapshots'),
                 t_end=_F('t_end', 'end time'),
                 trigger_gauge=_trig(v['trigger_gauge']),
@@ -867,6 +875,8 @@ class CaseForm(ctk.CTkFrame):
             v['order'].set('2 (MUSCL)' if int(getattr(
                 case, 'order', 1) or 1) == 2 else '1 (Godunov)')
             v['cfl'].set(f'{case.cfl:g}')
+            v['bc_outer'].set(normalize_bc(
+                getattr(case, 'bc_outer', 'terminate')))
             v['n_snapshots'].set(str(case.n_snapshots))
             v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
             self.gauges.set([(g,) for g in case.gauge_radii])

@@ -56,10 +56,11 @@ from ..solvers.hooks import ConsoleHooks
 
 def run_blast(radius_m, charge_kg, cell_size_m,
               eos='idealGas', cfl=0.5, n_snapshots=5,
-              gauge_radii=None):
+              gauge_radii=None, bc_outer='terminate', t_end=0.0):
     """Historical API: returns (snapshots, gauge_out, final_profile)."""
     res = _run_blast_1d(radius_m, charge_kg, cell_size_m, eos=eos, cfl=cfl,
                         n_snapshots=n_snapshots, gauge_radii=gauge_radii,
+                        bc_outer=bc_outer, t_end=t_end,
                         hooks=ConsoleHooks(1))
     return res.snapshots, res.gauges, res.meta['final_profile']
 
@@ -133,6 +134,7 @@ def _main():
         charge_kg   = params['charge_kg'],
         cell_size_m = params['cell_size_m'],
         eos         = params['eos'],
+        bc_outer    = params.get('bc_outer', 'terminate'),
         n_snapshots = params['n_snapshots'],
         gauge_radii = params['gauge_radii'],
     )

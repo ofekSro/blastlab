@@ -8,6 +8,8 @@ T51  the trigger gauge: it ends the run and/or captures the remap state
 T52  a user end time on 1D and 2D as well.
 T53  gauge markers on a field axis (2D straight through, 3D reduced to
      the plotted plane).
+T60  the 1D outer boundary takes the same three kinds - and a
+     reflecting one really reflects.
 
 Tiny grids, no WSL, no GUI.  Run:  cd blastlab/tests && python test_bc_trigger.py
 """
@@ -24,6 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core import geometry                              # noqa: E402
+from blastlab.core.constants import P_AIR                       # noqa: E402
 from blastlab.core.bc import (BC_KINDS, normalize_bc,           # noqa: E402
                               normalize_bcs)
 from blastlab.core.case import (Case1D, Case2D, Case3D,         # noqa: E402
@@ -147,6 +150,35 @@ def main():
                                    t_end=2e-4), ConsoleHooks(1))
     check('1D honours t_end', r1.stop_reason == 'end time reached',
           r1.stop_reason)
+
+    print("\nT60 the 1D outer boundary")
+
+    def one_d(kind):
+        c = Case1D(radius_m=1.0, charge_kg=0.5, cell_size_m=0.005,
+                   n_snapshots=1, bc_outer=kind, t_end=1.2e-3,
+                   gauge_radii=[0.98])
+        r, log = quiet(solve_1d, c, ConsoleHooks(1))
+        return r, log, float(r.gauges['pressures'][0].max() - P_AIR)
+
+    r_t, log_t, pk_t = one_d('terminate')
+    check('terminate ends the run at the outer face, as 1D always did',
+          r_t.stop_reason.startswith('shock arrived at outer boundary'),
+          r_t.stop_reason)
+    r_x, log_x, pk_x = one_d('transmit')
+    check('transmit lets the wave leave and runs to the end time',
+          r_x.stop_reason == 'end time reached', r_x.stop_reason)
+    r_r, log_r, pk_r = one_d('reflect')
+    check('reflect also runs on', r_r.stop_reason == 'end time reached',
+          r_r.stop_reason)
+    # the physics, not just the plumbing: a wall one cell out doubles
+    # and more, a transmissive end does not
+    check('a reflecting end really reflects (wall overshoot)',
+          pk_r > 1.3 * pk_x,
+          f'reflect {pk_r/1e3:.0f} kPa vs transmit {pk_x/1e3:.0f} kPa')
+    check('the banner names the kind and the stop condition it implies',
+          'Outer boundary  : reflect' in log_r
+          and 'does not stop it' in log_r
+          and 'shock arrival at r' in log_t)
 
     print("\nT51 trigger gauge")
     check('the actions', TRIGGER_ACTIONS

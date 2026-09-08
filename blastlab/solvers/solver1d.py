@@ -8,6 +8,7 @@ from ..core.constants import (GAMMA_AIR, RHO_AIR, P_AIR, JWL_TNT,
                               MIN_EXP_CELLS)
 from ..core.eos import (air_pressure, jwl_pressure, material_jwl,
                         pressure_soundspeed)
+from ..core.bc import normalize_bc
 from ..core.riemann import hll_fluxes_1d as hll_fluxes
 from ..core.grid import make_grid_1d
 from .hooks import ConsoleHooks, Progress, Result, trigger_index
@@ -32,7 +33,8 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
                   order=1,
                   eos='idealGas', cfl=0.5, n_snapshots=5,
                   gauge_radii=None, hooks=None, t_end=0.0,
-                  trigger_gauge=None, trigger_action='terminate'):
+                  trigger_gauge=None, trigger_action='terminate',
+                  bc_outer='terminate'):
     """
     Run a 1D spherical blast wave simulation. The run stops when the shock
     front reaches the outer boundary (detected via a pressure rise in the
@@ -167,7 +169,11 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     hooks.log(f"  Cell size       : {dr} m  ({N} cells)")
     hooks.log(f"  EOS             : {eos}")
     hooks.log(f"  Initial p (exp) : {p0_exp:.3e} Pa  ({p0_exp/1e9:.2f} GPa)")
-    hooks.log(f"  Stop condition  : shock arrival at r = {radius_m} m")
+    hooks.log(f"  Outer boundary  : {bc_outer}")
+    hooks.log(f"  Stop condition  : "
+              + (f"shock arrival at r = {radius_m} m"
+                 if bc_outer == 'terminate'
+                 else "safety cap (the outer boundary does not stop it)"))
     hooks.log(f"  {'End time' if cap_is_end else 'Safety cap':<16}: "
               f"{safety_cap*1e3:.1f} ms")
     hooks.log(f"{'='*55}\n")
@@ -221,8 +227,8 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
             stop_reason = 'stopped by user'
             break
 
-        # ── Stop condition: shock has arrived at the outermost cell ───────
-        if p_f[-1] > arrival_p:
+        # ── Stop condition: shock at a TERMINATE outer boundary ───────────
+        if bc_outer == 'terminate' and p_f[-1] > arrival_p:
             stop_reason = f'shock arrived at outer boundary (p_last = {p_f[-1]:.3e} Pa)'
             break
 
@@ -280,11 +286,19 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
 
         F = np.zeros((3, N + 1))
         F[:, 1:N] = F_int
-        # Outer face (transmissive outflow)
-        u_out = u_f[-1]
-        F[:, N] = [U[0, -1] * u_out,
-                   U[0, -1] * u_out**2 + p_f[-1],
-                   (U[2, -1] + p_f[-1]) * u_out]
+        if bc_outer == 'reflect':
+            # T60: a mirrored ghost through the same Riemann solver, as
+            # core.bc does for a reflecting 2D/3D side
+            g = U[:, -1:].copy()
+            g[1] = -g[1]
+            F[:, N:] = hll_fluxes(U[:, -1:], g, p_f[-1:], p_f[-1:],
+                                  c_f[-1:], c_f[-1:])
+        else:
+            # transmit / terminate: transmissive outflow
+            u_out = u_f[-1]
+            F[:, N] = [U[0, -1] * u_out,
+                       U[0, -1] * u_out**2 + p_f[-1],
+                       (U[2, -1] + p_f[-1]) * u_out]
 
         # ── Divergence + spherical source ──────────────────────────────────
         div_F = (A_face[1:] * F[:, 1:] - A_face[:-1] * F[:, :-1]) / V_cell
@@ -360,4 +374,6 @@ def solve_1d(case, hooks=None):
                          t_end=float(getattr(case, 't_end', 0.0) or 0.0),
                          trigger_gauge=getattr(case, 'trigger_gauge', None),
                          trigger_action=getattr(case, 'trigger_action',
-                                                'terminate'))
+                                                'terminate'),
+                         bc_outer=normalize_bc(
+                             getattr(case, 'bc_outer', 'terminate')))

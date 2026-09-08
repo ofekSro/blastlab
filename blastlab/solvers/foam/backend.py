@@ -23,6 +23,7 @@ import time as _time
 
 import numpy as np
 
+from ...core.bc import normalize_bc
 from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Result, RunHooks, StoppedBeforeStart
@@ -604,6 +605,9 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     # T is in the readiness tuple because finalize_1d re-reads it
     fields = ('p', 'rho', 'U', 'T', f'alpha.{spec.phase}')
 
+    # T60: only a TERMINATE outer boundary ends the run
+    terminates = normalize_bc(
+        getattr(case, 'bc_outer', 'terminate')) == 'terminate'
     _log_banner_1d(hooks, case, spec)
     hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m,
                            # T53: gauge radii for the live pane
@@ -641,7 +645,8 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
             st['t_frame'] = entry['t']
             live['step'] = st['step']
             live['draw'] = _time.time()
-        if not loop.stop_requested and entry['p'][-1] > ARRIVAL_P:
+        if not loop.stop_requested and terminates \
+                and entry['p'][-1] > ARRIVAL_P:
             loop.request_stop('shock arrived at outer boundary '
                               f"(p_last = {entry['p'][-1]:.3e} Pa)")
         loop.note_pause(will_pause)

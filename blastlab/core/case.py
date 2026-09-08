@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, asdict
 
 import numpy as np
 
-from .bc import BC_KINDS, normalize_bcs
+from .bc import BC_KINDS, normalize_bc, normalize_bcs
 from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
@@ -24,7 +24,7 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
 TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 
 SCHEMA = 'blastlab-case'
-VERSION = 9     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 10    # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
@@ -34,6 +34,7 @@ VERSION = 9     # v2: n_procs, activation, charges, det_points (foam)
                 #     (T50; 'open'/'wall' still read and mapped)
                 # v8: t_end on 1D/2D as well (T52)
                 # v9: trigger_gauge / trigger_action / trigger_file (T51)
+                # v10: bc_outer on Case1D (T60)
 
 
 @dataclass
@@ -43,6 +44,9 @@ class Case1D:
     charge_kg: float = 1.0
     cell_size_m: float = 0.001
     eos: str = 'idealGas'
+    #: T60: the far end of the spherical sector - the same three kinds
+    #: the 2D/3D sides take. 'terminate' is what 1D always did.
+    bc_outer: str = 'terminate'
     cfl: float = 0.5
     t_end: float = 0.0                # stop at t_end [s]; 0 = auto (T52)
     n_snapshots: int = 5
@@ -504,6 +508,15 @@ def validate_case(case, pending_inputs=False):
             note(f"The run ends when the wave reaches gauge {trig_i}")
 
     if case.dim == 1:
+        kind = normalize_bc(getattr(case, 'bc_outer', 'terminate'))
+        if kind not in BC_KINDS:
+            err(f"Outer boundary: unknown kind '{kind}' "
+                f"(expected one of {', '.join(BC_KINDS)})")
+        elif kind != 'terminate' and not getattr(case, 't_end', 0.0):
+            c_air = float(np.sqrt(1.4 * 101325.0 / 1.225))
+            warn(f"The outer boundary is '{kind}' and no end time is "
+                 f"set: the run is bounded only by the safety cap "
+                 f"(~{10.0 * case.radius_m / c_air * 1e3:.0f} ms).")
         if case.charge_kg <= 0:
             err("Charge must be > 0")
         if case.radius_m <= 0:
