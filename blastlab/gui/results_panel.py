@@ -870,9 +870,17 @@ class ResultsPanel(ctk.CTkFrame):
             if not res.meta.get('frames'):
                 self._log('No recorded frames in this result.')
                 return
+            # .mp4 needs ffmpeg on PATH; write_animation falls back to
+            # .gif (with a note) when it is missing, so offer whichever
+            # this machine can actually write as the default
+            from matplotlib import animation as _mplanim
+            ext = ('.mp4' if _mplanim.FFMpegWriter.isAvailable()
+                   else '.gif')
             target = filedialog.asksaveasfilename(
-                title='Save animation GIF', defaultextension='.gif',
-                initialfile=f'{pre}blast_{dim}d_animation.gif')
+                title='Save animation', defaultextension=ext,
+                filetypes=[('MP4 video', '*.mp4'),
+                           ('Animated GIF', '*.gif')],
+                initialfile=f'{pre}blast_{dim}d_animation{ext}')
         elif kind == 'profile':
             if dim == 3:
                 self._log('3D results have no profile export.')

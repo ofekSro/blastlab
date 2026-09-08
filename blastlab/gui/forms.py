@@ -581,7 +581,10 @@ class CaseForm(ctk.CTkFrame):
                                           f'gauges_{self.dim}d.txt'
                                           if self.dim > 1 else 'gauges.txt')))
         if self.dim > 1:
-            orow = _row(out, orow, 'Animation (gif)',
+            # write_animation picks the writer from the extension:
+            # .mp4 when ffmpeg is on PATH, .gif otherwise (and it says
+            # so in the log when it has to fall back)
+            orow = _row(out, orow, 'Animation (.gif / .mp4)',
                         _entry(out, self._var(
                             'anim_file', f'blast_{self.dim}d_animation.gif')))
             ctk.CTkCheckBox(out, text='Record replay frames',
