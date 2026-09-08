@@ -258,8 +258,11 @@ def main():
         except Exception:
             pass
     check('export button order restored after re-show',
-          order == ['Export', 'Profile', 'GIF', 'VTK', 'Summary CSV',
-                    'Gauges TSV', 'Field CSV', 'Report', 'PNGs'],
+          # 'GIF' became 'Animation' when the export learned to write
+          # .mp4 as well (T56); the kind key behind it is still 'gif'
+          order == ['Export', 'Profile', 'Animation', 'VTK',
+                    'Summary CSV', 'Gauges TSV', 'Field CSV', 'Report',
+                    'PNGs'],
           str(order))
 
     print('\nPersistence')

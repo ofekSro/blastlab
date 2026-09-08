@@ -122,6 +122,8 @@ Hard rules:
 | T55 | Bound the replay-frame record's memory | N15 | S | [x] 2026-09-08 |
 | T56 | MP4 export reachable (label, dialog, default, ffmpeg) | N15 | S | [x] 2026-09-08 |
 | T57 | Loading a PARALLEL AMR run (post-mortem) | N16-b | S | [x] 2026-09-08 |
+| T58 | A title line of your own on the Results figures | N20 | S | [x] 2026-09-08 |
+| T59 | 1D model preview: the spherical sector | N20 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1946,6 +1948,42 @@ New `test_foam_postmortem_decomposed.py` loads a fake two-rank AMR case off the 
 snapshots and the final state, plus the serial layout as a control. It reproduces the
 exact RuntimeError when the one-line fix is reverted.
 
+**T58 - a title of your own on the Results figures (owner request).** Everything the
+Results tab draws was titled automatically and only automatically, so a figure taken into
+a report had to be relabelled outside the app. A `Title` box on the panel now adds a line
+of the user's own; `plots.titled(base, extra)` puts it ABOVE the automatic title rather
+than replacing it (owner's choice), so a titled animation still shows its running `t` and
+a titled field map still says which field it is. It reaches the field maps, the gauge
+plots, the replay, the exported PNGs, the exported .mp4/.gif and the HTML report heading
+- `title_extra=` on `figure_results_1d`, `figure_gauges_1d/nd`, `figures_fields_2d/3d`
+and `figure_isosurfaces_3d`, `title=` on `write_animation`. It lives on the panel, not on
+the case (owner's choice): it describes this presentation of a result, typed just before
+an export. The box is read on the Tk thread and handed to the worker as a plain string -
+a Tk variable must not be touched off-thread. Typing in it retitles what is on screen,
+and the replay stays on the frame it is on rather than jumping back to the start.
+
+**T59 - a model preview for 1D.** 1D was the one dimension with no preview ("Select 2D
+or 3D to preview the model here"). A 1D run is not a line: blastFoam solves it on the
+spherical SECTOR `_blockmesh_1d` builds - apex at the origin, four wedge lateral faces,
+the outlet arc at `radius_m`. `Preview1DPanel` draws that sector in the plane through its
+axis with the charge filled at its own radius inside it, the gauge radii as arcs, and,
+with Show mesh, the radial cell faces (thinned to `MESH_MAX_LINES` - a default 1D case is
+10,000 cells across and would ink the sector solid; the title says which face spacing is
+drawn). Two things the drawing deliberately does not take literally, both stated in the
+picture: the real half-angle is 1 degree, which would draw as a bare line, so the wedge
+is opened to 24 degrees and the title gives both; and a charge whose radius is under
+1.5 % of the domain is drawn at that floor and labelled `(drawn enlarged)` with its true
+radius, because at 0.25 kg on a 10 m domain it is otherwise a dot at the apex that reads
+as no charge at all. Radii and cell size come from `validate_case`, so the preview and
+the validation strip cannot disagree.
+
+Tests: new `test_gui_title_preview1d.py` (30 checks: `titled()`, every builder carrying
+the line, the panel's box and its off-thread read, the sector, the mesh thinning, the
+enlarged-charge case, a zero radius, and the Setup panel routing 1D to the new widget).
+`test_gui_solver_mode`'s pinned export-button order updated for the `GIF` -> `Animation`
+label. test_gui_results_fields/anim, test_gui_refine_preview, test_gui_amr_form,
+test_report, test_gui_gauge_summary, test_bc_trigger PASS.
+
 
 ---
 
@@ -2159,6 +2197,7 @@ python test_gui_results_anim.py   # Animation tab
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
 python test_bc_trigger.py         # boundary kinds, end time, trigger gauge, gauge markers
 python test_foam_postmortem_decomposed.py  # loading a parallel AMR run (no WSL)
+python test_gui_title_preview1d.py # Results title line + the 1D model preview
 python test_gauge_summary.py      # per-gauge peak/arrival/impulse
 python test_report.py             # field CSVs + HTML report (T45)
 python test_gui_gauge_summary.py  # Gauges-tab table + CSV (headless Tk)

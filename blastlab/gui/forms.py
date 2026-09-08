@@ -938,7 +938,7 @@ class SetupPanel(ctk.CTkFrame):
     with a live model preview on the right (2D matplotlib drawing or
     3D pyvista render)."""
 
-    _PREV_HINT = 'Select 2D or 3D to preview the model here.'
+    _PREV_HINT = 'Enter a valid case to preview the model here.'
 
     def __init__(self, parent, on_change=None, mode=None):
         super().__init__(parent, fg_color='transparent')
@@ -1006,7 +1006,8 @@ class SetupPanel(ctk.CTkFrame):
         self._prev_msg = ctk.CTkLabel(host, text=self._PREV_HINT,
                                       font=theme.F_BODY,
                                       text_color=c('muted'))
-        from .preview_panel import Preview2DPanel
+        from .preview_panel import Preview1DPanel, Preview2DPanel
+        self.preview1d = Preview1DPanel(host)
         self.preview2d = Preview2DPanel(host)
         self.preview = None                      # the 3D panel
         from ..viz3d import MISSING_MSG, pyvista_available
@@ -1067,13 +1068,17 @@ class SetupPanel(ctk.CTkFrame):
         when the form doesn't parse - the last good preview is kept).
         Called via the App's debounce."""
         if case is None:
-            if self.dim_var.get() == 1:
-                self._prev_msg.configure(text=self._PREV_HINT)
-                self._show_preview_widget(self._prev_msg)
+            # the form does not parse: keep the last good preview rather
+            # than blanking the pane on every keystroke
             return
         self._last_case = case
         show_mesh = bool(self.show_mesh_var.get())
-        if case.dim == 2:
+        if case.dim == 1:
+            # T59: the spherical sector blastFoam actually meshes, with
+            # the charge radius inside it
+            self.preview1d.show_case(case, show_mesh=show_mesh)
+            self._show_preview_widget(self.preview1d)
+        elif case.dim == 2:
             self.preview2d.show_case(case, show_mesh=show_mesh)
             self._show_preview_widget(self.preview2d)
         elif case.dim == 3:

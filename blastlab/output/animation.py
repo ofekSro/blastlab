@@ -12,11 +12,12 @@ from matplotlib.figure import Figure
 
 from .plots import (add_gauge_markers, add_mesh_lines, gauge_points,
                     mesh_for, overpressure_panel, set_frame,
-                    charge_label)
+                    charge_label, titled)
 
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
-                    progress_callback=None, show_mesh=False):
+                    progress_callback=None, show_mesh=False,
+                    title=None):
     """
     Write the frames recorded by a run (meta['frames'] from
     record_frames > 0) to an animated .gif or .mp4.
@@ -89,7 +90,7 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
                       trigger=meta.get('trigger_gauge'))
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    title = ax.set_title('')
+    title_art = ax.set_title('')
     fig.colorbar(mesh, ax=ax, label='Overpressure [kPa]', shrink=0.85)
     fig.tight_layout()
 
@@ -101,8 +102,9 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
             lv = levels[min(k, len(levels) - 1)]
             lines[0] = add_mesh_lines(ax, mesh_for(meta, xf, yf, sl,
                                                    levels=lv))
-        title.set_text(f"{charge_label(meta)}  {plane}"
-                       f"t = {times[k]*1e3:.3f} ms")
+        title_art.set_text(titled(
+            f"{charge_label(meta)}  {plane}"
+            f"t = {times[k]*1e3:.3f} ms", title))
         return (mesh, lines[0]) if per_frame else (mesh,)
 
     print(f"  Writing animation ({len(pressures)} frames) ... ",

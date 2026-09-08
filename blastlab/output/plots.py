@@ -20,6 +20,18 @@ except ImportError:
 from ..core.constants import P_AIR
 
 
+def titled(base, extra=None):
+    """A figure title with the user's own line above the automatic one.
+
+    The automatic title carries what the picture IS (charge, field, and
+    on an animation the running time), so `extra` is added ABOVE it
+    rather than replacing it - a titled video still shows t. Empty or
+    None gives the automatic title unchanged.
+    """
+    extra = (extra or '').strip()
+    return f'{extra}\n{base}' if extra else base
+
+
 def charge_label(meta):
     fp = meta.get('from_profile')
     if fp in (True, '1d'):
@@ -218,7 +230,8 @@ def set_frame(mesh, p, solid, clim=None):
 
 # ── 1D figures ────────────────────────────────────────────────────────────────
 
-def figure_results_1d(snapshots, eos, charge_kg, radius_m):
+def figure_results_1d(snapshots, eos, charge_kg, radius_m,
+                      title_extra=None):
     fig = Figure(figsize=(10, 10))
     axes = fig.subplots(3, 1, sharex=True)
 
@@ -234,7 +247,9 @@ def figure_results_1d(snapshots, eos, charge_kg, radius_m):
     axes[2].set_ylabel('Particle velocity [m/s]')
     axes[2].set_xlabel('Radius [m]')
 
-    axes[0].set_title(f'1D Spherical Blast - {charge_kg} kg TNT - EOS: {eos}')
+    axes[0].set_title(titled(
+        f'1D Spherical Blast - {charge_kg} kg TNT - EOS: {eos}',
+        title_extra))
     axes[0].axhline(P_AIR / 1e3, color='k', lw=0.8, ls='--', alpha=0.4,
                     label='Ambient')
     axes[0].legend(loc='upper right', fontsize=8)
@@ -247,7 +262,7 @@ def figure_results_1d(snapshots, eos, charge_kg, radius_m):
     return fig
 
 
-def figure_gauges_1d(gauge_out, charge_kg, eos):
+def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
     times  = gauge_out['times']
     radii  = gauge_out['radii']
     pdata  = gauge_out['pressures']
@@ -262,7 +277,9 @@ def figure_gauges_1d(gauge_out, charge_kg, eos):
 
     fig = Figure(figsize=(7 * ncols, 4 * nrows))
     axes = fig.subplots(nrows, ncols, squeeze=False)
-    fig.suptitle(f'Gauge Time Histories - {charge_kg} kg TNT - EOS: {eos}',
+    fig.suptitle(titled(
+        f'Gauge Time Histories - {charge_kg} kg TNT - EOS: {eos}',
+        title_extra),
                  fontsize=12)
 
     for k, (p_arr, r_val, color) in enumerate(zip(pdata, radii, colors)):
@@ -300,7 +317,7 @@ def gauge_fields_available(gauge_out):
             if gauge_out.get(key)]
 
 
-def figure_gauges_nd(gauge_out, meta, field='p'):
+def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
     """Gauge grid for 2D (x,y points) and 3D (x,y,z points). `field`
     picks the trace: 'p' (default, always there), '|U|' or 'rho' when
     the run recorded them (blastFoam since T44)."""
@@ -319,8 +336,8 @@ def figure_gauges_nd(gauge_out, meta, field='p'):
 
     fig = Figure(figsize=(7 * ncols, 4 * nrows))
     axes = fig.subplots(nrows, ncols, squeeze=False)
-    fig.suptitle(f"Gauge Time Histories - {charge_label(meta)} - "
-                 f"EOS: {meta['eos']}", fontsize=12)
+    fig.suptitle(titled(f"Gauge Time Histories - {charge_label(meta)} - "
+                        f"EOS: {meta['eos']}", title_extra), fontsize=12)
 
     for k, (p_arr, pt, color) in enumerate(zip(pdata, points, colors)):
         ax  = axes[k // ncols][k % ncols]
@@ -417,13 +434,17 @@ def peak_items(meta, sl=None):
 
 
 def figures_fields_2d(snapshots, meta, include_peak=False,
-                      show_mesh=False):
+                      show_mesh=False, title_extra=None):
     """The two 2D field figures: [(filename, Figure), ...]; with
     `include_peak` (and maps present) also the whole-run peak
     overpressure and net impulse figures; `show_mesh` overlays the cell
     edges (see mesh_for)."""
     base = (f"2D Blast ({meta['geometry']}) - {charge_label(meta)} - "
             f"EOS: {meta['eos']}")
+    # titled() wraps each panel title, so the user's line sits above
+    # every figure of the set (see figures_fields_3d)
+    def _t(label):
+        return titled(f'{label} - {base}', title_extra)
     xlabel = 'r [m]' if meta['geometry'] == 'axisymmetric' else 'x [m]'
     ylabel = 'z [m]' if meta['geometry'] == 'axisymmetric' else 'y [m]'
     common = dict(solid_sl=meta['solid'], xf=meta['x_face'],
@@ -435,19 +456,19 @@ def figures_fields_2d(snapshots, meta, include_peak=False,
     out = []
     out.append(('blast_2d_pressure.png', _panel_grid_figure(
         [(lbl, (d['p'] - P_AIR) / 1e3) for lbl, d in snapshots.items()],
-        title=f'Overpressure - {base}', cbar_label='Overpressure [kPa]',
+        title=_t('Overpressure'), cbar_label='Overpressure [kPa]',
         **common)))
     out.append(('blast_2d_density.png', _panel_grid_figure(
         [(lbl, d['rho']) for lbl, d in snapshots.items()],
-        title=f'Density - {base}', cbar_label='Density [kg/m³]',
+        title=_t('Density'), cbar_label='Density [kg/m³]',
         **common)))
     if include_peak and has_peak_maps(meta):
         (pk_lbl, pk), (im_lbl, im) = peak_items(meta)
         out.append(('blast_2d_peak_overpressure.png', _panel_grid_figure(
-            [('whole run', pk)], title=f'Peak overpressure - {base}',
+            [('whole run', pk)], title=_t('Peak overpressure'),
             cbar_label=PEAK_LABEL, robust=True, **common)))
         out.append(('blast_2d_impulse.png', _panel_grid_figure(
-            [('whole run', im)], title=f'Net overpressure impulse - {base}',
+            [('whole run', im)], title=_t('Net overpressure impulse'),
             cbar_label=IMPULSE_LABEL, robust=True, **common)))
     return out
 
@@ -455,7 +476,7 @@ def figures_fields_2d(snapshots, meta, include_peak=False,
 # ── 3D slice figures ─────────────────────────────────────────────────────────
 
 def figures_fields_3d(snapshots, meta, include_peak=False,
-                      show_mesh=False):
+                      show_mesh=False, title_extra=None):
     """The four 3D slice figures: [(filename, Figure), ...]; with
     `include_peak` (and maps present) also the whole-run peak
     overpressure and net impulse maps on the same two planes;
@@ -516,8 +537,9 @@ def figures_fields_3d(snapshots, meta, include_peak=False,
                           [('whole run', im)], solid_sl, xf, yf, xl, yl,
                           f'Net overpressure impulse, {plane} plane {pos} '
                           f'- {base}', IMPULSE_LABEL, ar))
+    # one wrap covers all six figures of the set
     return [(fn, _panel_grid_figure(items, solid_sl, xf, yf, xl, yl,
-                                    title, cl, ar,
+                                    titled(title, title_extra), cl, ar,
                                     mesh=mesh_v if 'vertical' in fn
                                     else mesh_h,
                                     robust=('peak' in fn or 'impulse' in fn)))
@@ -538,7 +560,7 @@ def _obstacle_wireframe(ax, box):
         ax.plot(*zip(a, b), color='0.4', lw=1.0)
 
 
-def figure_isosurfaces_3d(snapshots, meta):
+def figure_isosurfaces_3d(snapshots, meta, title_extra=None):
     """
     One 3D panel per snapshot showing the shock front: a pressure
     isosurface at 10% of the current peak overpressure. Uses
@@ -549,7 +571,9 @@ def figure_isosurfaces_3d(snapshots, meta):
     ncols = min(n, 3)
     nrows = (n + ncols - 1) // ncols
     fig = Figure(figsize=(5.5 * ncols, 5.0 * nrows))
-    fig.suptitle(f"Shock front - {charge_label(meta)} - EOS: {meta['eos']}",
+    fig.suptitle(titled(
+        f"Shock front - {charge_label(meta)} - EOS: {meta['eos']}",
+        title_extra),
                  fontsize=12)
     x_c, y_c, z_c = meta['x_c'], meta['y_c'], meta['z_c']
     dx = meta['dx']

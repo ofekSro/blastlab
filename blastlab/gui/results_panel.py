@@ -146,6 +146,26 @@ class ResultsPanel(ctk.CTkFrame):
             b.pack(side='left', padx=(0, GAP))
             self._export_btns[kind] = b
         self._sync_export_buttons(None)   # nothing selected yet
+
+        # ── Title (T58) ─────────────────────────────────────────────
+        # A line of the user's own ABOVE the automatic title, on every
+        # figure this tab shows or exports. It lives here rather than on
+        # the case because it describes this presentation of a result -
+        # typically typed just before exporting a figure for a report.
+        bar3 = ctk.CTkFrame(top.body, fg_color='transparent')
+        bar3.pack(fill='x', pady=(GAP, 0))
+        ctk.CTkLabel(bar3, text='Title', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='left',
+                                                 padx=(0, GAP))
+        self.title_var = tk.StringVar(value='')
+        self._title_entry = ctk.CTkEntry(
+            bar3, textvariable=self.title_var, width=420,
+            font=theme.F_BODY, corner_radius=8, fg_color=c('entry'),
+            border_color=c('border'),
+            placeholder_text='optional - added above the automatic title')
+        self._title_entry.pack(side='left')
+        self.title_var.trace_add('write',
+                                 lambda *a: self._title_changed())
         if mode is not None:
             mode.subscribe(self.set_solver_mode)
             self.set_solver_mode(mode.get())
@@ -482,13 +502,14 @@ class ResultsPanel(ctk.CTkFrame):
         if dim == 1:
             fig = plots.figure_results_1d(
                 res.snapshots, res.meta['eos'], res.meta['charge_kg'],
-                res.meta['radius_m'])
+                res.meta['radius_m'], title_extra=self.title_extra())
             self.field_canvas.set_figure(fig)
             return
 
         meta = res.meta
         if dim == 3 and field == 'isosurface':
-            fig = plots.figure_isosurfaces_3d(res.snapshots, meta)
+            fig = plots.figure_isosurfaces_3d(
+                res.snapshots, meta, title_extra=self.title_extra())
             self.field_canvas.set_figure(fig)
             return
 
@@ -552,9 +573,32 @@ class ResultsPanel(ctk.CTkFrame):
             mesh = plots.mesh_for(meta, xf, yf, sl if dim == 3 else None)
         fig = plots._panel_grid_figure(
             [(label, data)], solid_sl, xf, yf, xl, yl,
-            f"{field} - {plots.charge_label(meta)}", unit, aspect,
+            plots.titled(f"{field} - {plots.charge_label(meta)}",
+                         self.title_extra()), unit, aspect,
             mesh=mesh, robust=(is_peak or is_imp))
         self.field_canvas.set_figure(fig)
+
+    def title_extra(self):
+        """The user's title line, or None when the box is empty."""
+        try:
+            return self.title_var.get().strip() or None
+        except Exception:                       # pragma: no cover - no Tk
+            return None
+
+    def _title_changed(self):
+        """Retitle whatever is on screen. The animation is redrawn at
+        the frame it is on - retyping a title must not jump the replay
+        back to the start."""
+        try:
+            view = self._view_seg.get()
+        except Exception:                       # pragma: no cover
+            return
+        if view == 'Fields':
+            self._draw_field()
+        elif view == 'Gauges':
+            self._draw_gauges()
+        elif view == 'Animation' and self._anim_title is not None:
+            self._show_frame(float(self.frame_slider.get()))
 
     def _gauge_field_changed(self, _value=None):
         self._gauge_field = self._gauge_field_seg.get()
@@ -579,11 +623,13 @@ class ResultsPanel(ctk.CTkFrame):
             if self._gauge_field_seg.winfo_manager():
                 self._gauge_field_seg.pack_forget()
         if ent.dim == 1:
-            fig = plots.figure_gauges_1d(res.gauges, res.meta['charge_kg'],
-                                         res.meta['eos'])
+            fig = plots.figure_gauges_1d(
+                res.gauges, res.meta['charge_kg'], res.meta['eos'],
+                title_extra=self.title_extra())
         else:
-            fig = plots.figure_gauges_nd(res.gauges, res.meta,
-                                         field=self._gauge_field)
+            fig = plots.figure_gauges_nd(
+                res.gauges, res.meta, field=self._gauge_field,
+                title_extra=self.title_extra())
         if fig is not None:
             self.gauge_canvas.set_figure(fig)
         self._fill_summary(res)
@@ -719,8 +765,9 @@ class ResultsPanel(ctk.CTkFrame):
             self._anim_lines = plots.add_mesh_lines(
                 self._anim_mesh.axes,
                 plots.mesh_for(meta, xf, yf, sl, levels=lv))
-        self._anim_title.set_text(
-            f"{self._anim_plane}t = {frames['times'][k]*1e3:.3f} ms")
+        self._anim_title.set_text(plots.titled(
+            f"{self._anim_plane}t = {frames['times'][k]*1e3:.3f} ms",
+            self.title_extra()))
         self.anim_canvas.draw()
 
     def _slider_moved(self, value):
@@ -837,6 +884,9 @@ class ResultsPanel(ctk.CTkFrame):
         res, dim = ent.result, ent.dim
         pre = self._name_prefix(res)
         show_mesh = bool(self.show_mesh_var.get())
+        # read on the Tk thread; the worker below must not touch
+        # a Tk variable
+        title_extra = self.title_extra()
 
         # File dialogs must run on the Tk main thread; only the heavy
         # figure building / writing goes to the worker thread.
@@ -907,28 +957,33 @@ class ResultsPanel(ctk.CTkFrame):
                                  plots.figure_results_1d(
                                      res.snapshots, res.meta['eos'],
                                      res.meta['charge_kg'],
-                                     res.meta['radius_m'])),
+                                     res.meta['radius_m'],
+                                     title_extra=title_extra)),
                                 ('blast_1d_gauges.png',
                                  plots.figure_gauges_1d(
                                      res.gauges, res.meta['charge_kg'],
-                                     res.meta['eos']))]
+                                     res.meta['eos'],
+                                     title_extra=title_extra))]
                     elif dim == 2:
-                        figs = plots.figures_fields_2d(res.snapshots, res.meta,
-                                                       include_peak=True,
-                                                       show_mesh=show_mesh)
+                        figs = plots.figures_fields_2d(
+                            res.snapshots, res.meta, include_peak=True,
+                            show_mesh=show_mesh, title_extra=title_extra)
                         figs.append(('blast_2d_gauges.png',
-                                     plots.figure_gauges_nd(res.gauges,
-                                                            res.meta)))
+                                     plots.figure_gauges_nd(
+                                         res.gauges, res.meta,
+                                         title_extra=title_extra)))
                     else:
-                        figs = plots.figures_fields_3d(res.snapshots, res.meta,
-                                                       include_peak=True,
-                                                       show_mesh=show_mesh)
+                        figs = plots.figures_fields_3d(
+                            res.snapshots, res.meta, include_peak=True,
+                            show_mesh=show_mesh, title_extra=title_extra)
                         figs.append(('blast_3d_gauges.png',
-                                     plots.figure_gauges_nd(res.gauges,
-                                                            res.meta)))
+                                     plots.figure_gauges_nd(
+                                         res.gauges, res.meta,
+                                         title_extra=title_extra)))
                         figs.append(('blast_3d_isosurface.png',
                                      plots.figure_isosurfaces_3d(
-                                         res.snapshots, res.meta)))
+                                         res.snapshots, res.meta,
+                                         title_extra=title_extra)))
                     for name, fig in figs:
                         if fig is None:
                             continue
@@ -957,10 +1012,12 @@ class ResultsPanel(ctk.CTkFrame):
                         figs = [('Results', plots.figure_results_1d(
                                     res.snapshots, res.meta['eos'],
                                     res.meta['charge_kg'],
-                                    res.meta['radius_m'])),
+                                    res.meta['radius_m'],
+                                    title_extra=title_extra)),
                                 ('Gauges', plots.figure_gauges_1d(
                                     res.gauges, res.meta['charge_kg'],
-                                    res.meta['eos']))]
+                                    res.meta['eos'],
+                                    title_extra=title_extra))]
                     else:
                         builder = (plots.figures_fields_2d if dim == 2
                                    else plots.figures_fields_3d)
@@ -968,12 +1025,16 @@ class ResultsPanel(ctk.CTkFrame):
                                 for n, f in builder(
                                     res.snapshots, res.meta,
                                     include_peak=True,
-                                    show_mesh=show_mesh)]
+                                    show_mesh=show_mesh,
+                                    title_extra=title_extra)]
                         figs.append(('Gauges', plots.figure_gauges_nd(
-                            res.gauges, res.meta)))
+                            res.gauges, res.meta,
+                            title_extra=title_extra)))
                     report_mod.save_html_report(
                         res, dim, target, figures=figs,
-                        title=ent.label)
+                        # the user's own line wins over the run
+                        # name for the report's heading (T58)
+                        title=title_extra or ent.label)
                     self._log(f'Saved {target}')
                     try:
                         os.startfile(target)
@@ -998,7 +1059,9 @@ class ResultsPanel(ctk.CTkFrame):
                     except OSError as exc:
                         self._log(f'(could not open the folder: {exc})')
                 elif kind == 'gif':
-                    write_animation(res.meta, target, show_mesh=show_mesh)
+                    write_animation(res.meta, target,
+                                    show_mesh=show_mesh,
+                                    title=title_extra)
                     self._log(f'Saved {target}')
                 elif kind == 'profile':
                     if dim == 1:

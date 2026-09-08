@@ -6,9 +6,11 @@ debounce as the validation strip so they follow the form as you type:
 - Preview2DPanel: matplotlib drawing of the Case2D domain (boundary
   types, obstacles, charge, gauges) - no pyvista needed."""
 
+import math
 import time
 
 import customtkinter as ctk
+import numpy as np
 from matplotlib.collections import LineCollection
 from matplotlib.figure import Figure
 from matplotlib.patches import Circle, Rectangle
@@ -339,3 +341,142 @@ class Preview2DPanel(ctk.CTkFrame):
                                          linewidths=0.35, alpha=0.6,
                                          zorder=1.5))
         return note
+
+
+class Preview1DPanel(ctk.CTkFrame):
+    """Matplotlib preview of a Case1D (T59).
+
+    A 1D run is not a line: blastFoam solves it on the spherical SECTOR
+    `_blockmesh_1d` builds - a collapsed hex with its apex at the origin,
+    four wedge lateral faces and the outlet arc at `radius_m`. This draws
+    that sector in the plane through its axis, with the charge sphere
+    filled at its own radius inside it, the gauge radii marked, and (with
+    Show mesh) the radial cell faces as arcs.
+
+    The real half-angle is `writer.HALF_ANGLE_DEG` = 1 degree, which
+    would draw as a bare line, so the wedge is opened up for legibility
+    and the title says what the mesh actually uses.
+    """
+
+    #: drawn half-angle - legibility only; the mesh uses HALF_ANGLE_DEG
+    DRAW_HALF_DEG = 24.0
+
+    def __init__(self, parent):
+        super().__init__(parent, fg_color='transparent', corner_radius=0)
+        self.canvas = EmbeddedFigure(self, figsize=(5, 5), toolbar=False)
+        self.canvas.pack(fill='both', expand=True)
+        self._fig = Figure(figsize=(5, 5))
+        self._ax = self._fig.add_subplot()
+        self.canvas.set_figure(self._fig)
+
+    @staticmethod
+    def _arc(r, half, n=64):
+        """(x, y) of the arc of radius `r` over +-`half` radians."""
+        th = np.linspace(-half, half, n)
+        return r * np.cos(th), r * np.sin(th)
+
+    def show_case(self, case, show_mesh=False):
+        from ..core.case import validate_case
+        from ..solvers.foam.writer import HALF_ANGLE_DEG
+
+        dark = ctk.get_appearance_mode() == 'Dark'
+        edge = '#e8e8e8' if dark else '#37474f'
+        open_ = '#5c6672' if dark else '#b0bec5'
+
+        ax = self._ax
+        ax.clear()
+        R = float(case.radius_m or 0.0)
+        if R <= 0:
+            ax.set_axis_off()
+            self.canvas.draw()
+            return
+        half = math.radians(self.DRAW_HALF_DEG)
+
+        # the sector: two straight lateral faces (reflecting wedges) and
+        # the outlet arc, which is where the run's stop condition lives
+        ax.fill(*self._sector_xy(R, half), facecolor=open_, alpha=0.12,
+                edgecolor='none', zorder=0.5)
+        for sgn in (-1, 1):
+            ax.plot([0, R * math.cos(half)], [0, sgn * R * math.sin(half)],
+                    color=edge, lw=2.0, zorder=2)
+        ax.plot(*self._arc(R, half), color=open_, lw=1.4,
+                ls=(0, (4, 3)), zorder=2)
+
+        # the charge, at its own radius, inside the sector
+        rep = validate_case(case)
+        r_exp = rep.r_exp or 0.0
+        if r_exp > 0:
+            # a small charge on a big domain is a dot at the apex and
+            # reads as "no charge at all", so it is drawn at a floor and
+            # the label carries the true radius (the 2D preview does the
+            # same for its charge circle)
+            r_draw = min(max(r_exp, 0.015 * R), R)
+            ax.fill(*self._sector_xy(r_draw, half),
+                    facecolor='#ff8f00', edgecolor='#e65100', lw=1.0,
+                    zorder=4)
+            ax.text(0.02, 0.97,
+                    f'{case.charge_kg:g} kg '
+                    f'{getattr(case, "material", "TNT")}\n'
+                    f'r = {r_exp:.4g} m'
+                    + ('  (drawn enlarged)' if r_draw > r_exp * 1.01
+                       else ''),
+                    transform=ax.transAxes, ha='left', va='top',
+                    fontsize=7.5, color='#ff8f00', zorder=4.5)
+
+        note = ''
+        if show_mesh:
+            note = self._draw_mesh(ax, case, rep, R, half)
+
+        gauge_c = theme.cur('accent')
+        for k, g in enumerate(case.gauge_radii or []):
+            g = float(g)
+            if not 0 < g <= R:
+                continue
+            ax.plot(*self._arc(g, half), color=gauge_c, lw=1.0,
+                    alpha=0.9, zorder=5)
+            ax.annotate(f'G{k + 1}', (g * math.cos(half * 0.55),
+                                      g * math.sin(half * 0.55)),
+                        textcoords='offset points', xytext=(3, 3),
+                        fontsize=7, color=gauge_c, zorder=5)
+
+        pad = 0.06 * R
+        ax.set_xlim(-pad, R + pad)
+        ax.set_ylim(-(R * math.sin(half) + pad), R * math.sin(half) + pad)
+        ax.set_aspect('equal')
+        ax.set_xlabel('r [m]')
+        ax.set_ylabel('')
+        ax.set_yticks([])
+        ax.set_title(f'1D spherical sector · R = {R:g} m · drawn at '
+                     f'±{self.DRAW_HALF_DEG:g}° (mesh: '
+                     f'±{HALF_ANGLE_DEG:g}°)' + note, fontsize=9)
+        if show_mesh:
+            ax.grid(False)
+        else:
+            ax.grid(True, alpha=0.25)
+        theme.style_figure(self._fig)
+        self._fig.tight_layout()
+        self.canvas.draw()
+
+    def _sector_xy(self, r, half):
+        """Closed polygon of the sector from the apex out to `r`."""
+        x, y = self._arc(r, half)
+        return np.concatenate([[0.0], x, [0.0]]), \
+            np.concatenate([[0.0], y, [0.0]])
+
+    def _draw_mesh(self, ax, case, rep, R, half):
+        """The radial cell faces as arcs. Thinned to MESH_MAX_LINES: a
+        default 1D case is 10,000 cells across, which would ink the whole
+        sector solid. Returns a title suffix."""
+        dx = rep.effective_dx or case.cell_size_m
+        n = int(rep.n_cells or max(1, round(R / max(dx, 1e-12))))
+        if n < 1:
+            return ''
+        step = max(1, math.ceil(n / MESH_MAX_LINES))
+        col = theme.cur('muted')
+        for i in range(step, n, step):
+            ax.plot(*self._arc(i * (R / n), half), color=col, lw=0.35,
+                    alpha=0.6, zorder=1.5)
+        drawn = 'every face' if step == 1 else f'every {step}th face'
+        return (f'\ncell {dx:.4g} m · {n:,} cells · {drawn} drawn'
+                + (' · refined to resolve the charge' if rep.notes
+                   and any('refined' in t for t in rep.notes) else ''))
