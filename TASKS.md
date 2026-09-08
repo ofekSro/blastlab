@@ -113,6 +113,7 @@ Hard rules:
 | T45 | CSV export of field maps + one-click HTML report | N14, N13 | M | [x] 2026-09-07 |
 | T46 | Materials beyond TNT for the native solvers | N11 | M | [x] 2026-09-08 |
 | T47 | MUSCL second-order native reconstruction (opt-in) | N10 | L | [x] 2026-09-08 |
+| T49 | Mesh overlay on the animation a run writes | N15 | S | [x] 2026-09-08 |
 
 Dependencies: T27–T33 independent of each other (do them before T34, which re-lays the
 GUI out); T35 before any task that runs `test_foam_parallel`; T40 before T42 (the probe
@@ -1721,6 +1722,33 @@ WSL: test_foam_1d_vs_native PASS both plain and `--order2`.
 
 ---
 
+### T49 - Mesh overlay on the animation a run writes (N15)
+
+**Why:** `write_animation` has taken `show_mesh=` since T17, and the Results tab's
+"Show mesh" checkbox feeds the manual export - but the animation a run writes by itself
+from `case.anim_file` was always called without it, so the produced video could never
+show the mesh. The option needed to live on the case, beside `anim_file`.
+
+**DONE (2026-09-08):** new case field `anim_mesh: bool = False` on `Case2D`/`Case3D`
+(case-file `VERSION` 5 -> 6, `# v6: anim_mesh`), handed to the existing
+`write_animation(..., show_mesh=)` at every automatic export: `gui/app.py::_solve_stage`
+(both dims), `solvers/foam/cli_run.py::_run_2d/_run_3d`, and the native interactive CLI
+(`cli.py::ask_user_2d/ask_user_3d` ask "Draw the mesh on the animation?" only when an
+animation file was given and show it in the review summary as `<file> + mesh`;
+`legacy/blast2d.py`/`blast3d.py::save_animation` gained a `show_mesh` passthrough).
+GUI: a "Mesh overlay in the animation" checkbox in the Outputs card under "Record replay
+frames", round-tripped by `CaseForm.get_case`/`set_case` through the shared `common` dict.
+No solver code touched. The AMR per-frame overlay path in `write_animation` is reused
+as-is, so a dynamic-AMR run's exported video follows the moving mesh.
+
+Tests: `test_gui_refine_preview` gained an `anim_mesh` section (default off, form
+round-trip both ways, case-file round-trip, and `_solve_stage` handing the flag to
+`write_animation` for 2D and 3D with the solver/writer patched). test_regression
+byte-identical, test_foam_writer, test_case_validate, test_gui_amr_form,
+test_gui_results_anim, test_gui_solver_mode PASS.
+
+---
+
 ## 5. Unscheduled / nice-to-have (not in the queue; pick up on request)
 
 - Non-box obstacles (STL → snappyHexMesh) — needs the same resampler as AMR.
@@ -1850,6 +1878,7 @@ Status: DONE (date) or OPEN → task. Details of DONE items: `git show 73ca834:R
 - N14 CSV field maps — DONE (2026-09-07, T45; long-format per-field CSVs of p_peak /
   impulse / snapshot fields on the result's own grid, 1D as r,value)
 - N15 local (static) refinement + show-mesh — DONE (T17–T19)
+- N15-a mesh overlay on the run's own animation (`case.anim_mesh`) - DONE (T49)
 - N16 dynamic AMR (`adaptiveFvMesh`; default estimator densityGradient; AMR and static zones mutually exclusive; display level caps the display grid; serial in v1; an uncapped 3D AMR case once killed the 4 GB WSL VM — the 3D e2e caps at 300k cells) — DONE (T20–T24). Open follow-ups:
   - N16-a 3D AMR gauge arrival +18 % vs static (peak within 2.7 %) — DONE (2026-09-07, T40).
     `adjustLocations` REFUTED: switching it off moves the AMR-vs-static arrival by 0.15

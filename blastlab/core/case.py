@@ -19,10 +19,12 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         BYTES_PER_CELL)
 
 SCHEMA = 'blastlab-case'
-VERSION = 5     # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 6     # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
+                # v6: anim_mesh (cell-edge overlay in the run's
+                #     exported animation)
 
 
 @dataclass
@@ -102,6 +104,8 @@ class Case2D:
     gauges: list = field(default_factory=list)      # (x, y)
     gauge_file: str = 'gauges_2d.txt'
     anim_file: str = None
+    anim_mesh: bool = False           # overlay the cell edges on the
+                                      # animation written after the run
     record_frames: int = 150
     live: bool = True
     profile_file: str = None          # save .npz for 3D remap (axisym only)
@@ -170,6 +174,8 @@ class Case3D:
     gauges: list = field(default_factory=list)      # (x, y, z)
     gauge_file: str = 'gauges_3d.txt'
     anim_file: str = None
+    anim_mesh: bool = False           # overlay the cell edges on the
+                                      # animation written after the run
     record_frames: int = 150
     live: bool = True
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)

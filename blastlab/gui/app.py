@@ -75,14 +75,18 @@ def _solve_stage(dim, case):
             if case.gauges:
                 save_gauges_2d(res.gauges, case.gauge_file)
             if case.anim_file and res.meta.get('frames'):
-                write_animation(res.meta, case.anim_file)
+                write_animation(res.meta, case.anim_file,
+                                show_mesh=getattr(case, 'anim_mesh',
+                                                  False))
             if case.profile_file:
                 save_profile_2d(res.meta, case.profile_file)
         else:
             if case.gauges:
                 save_gauges_3d(res.gauges, case.gauge_file)
             if case.anim_file and res.meta.get('frames'):
-                write_animation(res.meta, case.anim_file)
+                write_animation(res.meta, case.anim_file,
+                                show_mesh=getattr(case, 'anim_mesh',
+                                                  False))
         return res
     label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
     return (label, solve)

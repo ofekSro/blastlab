@@ -151,8 +151,9 @@ def plot_gauges(gauge_out, meta):
     plt.show()
 
 
-def save_animation(meta, filename='blast_2d_animation.gif', fps=15):
-    write_animation(meta, filename, fps)
+def save_animation(meta, filename='blast_2d_animation.gif', fps=15,
+                   show_mesh=False):
+    write_animation(meta, filename, fps, show_mesh=show_mesh)
 
 
 
@@ -219,7 +220,8 @@ def _main():
     )
 
     if params['anim_file']:
-        save_animation(meta, params['anim_file'])
+        save_animation(meta, params['anim_file'],
+                       show_mesh=params.get('anim_mesh', False))
 
     if params['profile2d_file']:
         save_profile_2d(meta, params['profile2d_file'])

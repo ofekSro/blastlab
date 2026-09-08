@@ -227,6 +227,8 @@ def _run_2d():
     anim = _ask("Animation gif ('-' = skip)",
                 default='blast_2d_animation.gif', cast=str)
     anim = None if anim.strip() in ('-', '') else anim
+    anim_mesh = bool(anim) and _ask_choice(
+        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
     profile_out = None
     if axisym:
         profile_out = _ask("Profile out (.npz, '-' = skip)", default='-',
@@ -237,7 +239,8 @@ def _run_2d():
     case = Case2D(geometry=geometry, Lx=Lx, Ly=Ly, cell_size_m=cell,
                   charge=charge, center=(x0, y0), gauges=gauges,
                   n_snapshots=n_snap, gauge_file=gauge_file,
-                  anim_file=anim, record_frames=150 if anim else 0,
+                  anim_file=anim, anim_mesh=anim_mesh,
+                  record_frames=150 if anim else 0,
                   profile_file=profile_out,
                   solver='blastfoam', material=material)
     _validate_or_exit(case)
@@ -248,7 +251,7 @@ def _run_2d():
     if gauges:
         save_gauges_2d(res.gauges, gauge_file)
     if anim and res.meta.get('frames'):
-        write_animation(res.meta, anim)
+        write_animation(res.meta, anim, show_mesh=anim_mesh)
     if profile_out:
         save_profile_2d(res.meta, profile_out)
     return res
@@ -281,11 +284,14 @@ def _run_3d():
     anim = _ask("Animation gif ('-' = skip)",
                 default='blast_3d_animation.gif', cast=str)
     anim = None if anim.strip() in ('-', '') else anim
+    anim_mesh = bool(anim) and _ask_choice(
+        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
 
     case = Case3D(Lx=Lx, Ly=Ly, Lz=Lz, cell_size_m=cell, charge=charge,
                   center=(x0, y0, z0), t_end=t_end, gauges=gauges,
                   n_snapshots=n_snap, gauge_file=gauge_file,
-                  anim_file=anim, record_frames=150 if anim else 0,
+                  anim_file=anim, anim_mesh=anim_mesh,
+                  record_frames=150 if anim else 0,
                   solver='blastfoam', material=material)
     _validate_or_exit(case)
 
@@ -295,7 +301,7 @@ def _run_3d():
     if gauges:
         save_gauges_3d(res.gauges, gauge_file)
     if anim and res.meta.get('frames'):
-        write_animation(res.meta, anim)
+        write_animation(res.meta, anim, show_mesh=anim_mesh)
     return res
 
 

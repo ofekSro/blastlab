@@ -194,8 +194,9 @@ def plot_isosurfaces(snapshots, meta):
     _adopt(fig)
 
 
-def save_animation(meta, filename='blast_3d_animation.gif', fps=15):
-    write_animation(meta, filename, fps)
+def save_animation(meta, filename='blast_3d_animation.gif', fps=15,
+                   show_mesh=False):
+    write_animation(meta, filename, fps, show_mesh=show_mesh)
 
 
 
@@ -266,7 +267,8 @@ def _main():
     )
 
     if params['anim_file']:
-        save_animation(meta, params['anim_file'])
+        save_animation(meta, params['anim_file'],
+                       show_mesh=params.get('anim_mesh', False))
 
     if params['gauges']:
         save_gauges(gauge_out, params['gauge_file'])

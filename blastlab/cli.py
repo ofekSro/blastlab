@@ -410,6 +410,8 @@ def ask_user_2d():
     anim_file = _ask("Animation file (.gif / .mp4), or '-' to skip",
                      default=default_anim, cast=str)
     anim_file = None if anim_file.strip() in ('-', '') else anim_file.strip()
+    anim_mesh = bool(anim_file) and _ask_choice(
+        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
 
     profile2d_file = None
     if axisym:
@@ -443,7 +445,8 @@ def ask_user_2d():
     print(f"  8. Gauges         : {gaug_lbl}  ({len(gauges)} total)")
     print(f"  9. Gauge file     : {gauge_file}")
     print(f" 10. Live view      : {'yes' if live else 'no'}")
-    print(f" 11. Animation      : {anim_file if anim_file else '(not saved)'}")
+    print(f" 11. Animation      : "
+          f"{(anim_file + (' + mesh' if anim_mesh else '')) if anim_file else '(not saved)'}")
     if axisym:
         print(f" 12. 2D profile     : "
               f"{profile2d_file if profile2d_file else '(not saved)'}")
@@ -474,6 +477,7 @@ def ask_user_2d():
         gauge_file    = gauge_file,
         live          = live,
         anim_file     = anim_file,
+        anim_mesh     = anim_mesh,
         profile2d_file= profile2d_file,
     )
 
@@ -587,6 +591,8 @@ def ask_user_3d():
     anim_file = _ask("Animation file (.gif / .mp4), or '-' to skip",
                      default=default_anim, cast=str)
     anim_file = None if anim_file.strip() in ('-', '') else anim_file.strip()
+    anim_mesh = bool(anim_file) and _ask_choice(
+        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
 
     # ── Confirmation summary ───────────────────────────────────────────────
     if profile is not None:
@@ -615,7 +621,8 @@ def ask_user_3d():
     print(f"  8. Gauge file     : {gauge_file}")
     print(f"  9. Live view      : {'yes' if live else 'no'}")
     print(f" 10. 3D viewer      : {'yes' if view3d else 'no'}")
-    print(f" 11. Animation      : {anim_file if anim_file else '(not saved)'}")
+    print(f" 11. Animation      : "
+          f"{(anim_file + (' + mesh' if anim_mesh else '')) if anim_file else '(not saved)'}")
     print("-" * 58)
     try:
         confirm = input("  Press Enter to run, or 'r' to re-enter all "
@@ -635,6 +642,7 @@ def ask_user_3d():
         eos=eos, bcs=bcs, obstacles=obstacles,
         n_snapshots=n_snapshots, gauges=gauges, gauge_file=gauge_file,
         live=live, view3d=view3d, anim_file=anim_file,
+        anim_mesh=anim_mesh,
     )
 
 

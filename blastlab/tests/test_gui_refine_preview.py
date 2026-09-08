@@ -9,7 +9,9 @@
 - ResultsPanel's checkbox renders every field with the overlay, for a
   uniform result and for one carrying meta['refine'];
 - plots.figures_fields_2d/3d(show_mesh=True) keep the figure set and add
-  the overlay; write_animation accepts show_mesh.
+  the overlay; write_animation accepts show_mesh;
+- the case's own `anim_mesh` flag round-trips through the form and
+  the case file, and reaches write_animation on the run path.
 Headless (Agg backend, hidden Tk root) - needs customtkinter, no WSL.
 
 Run:  cd blastlab/tests && python test_gui_refine_preview.py
@@ -292,6 +294,45 @@ def main():
         check('write_animation(show_mesh=True) writes', os.path.getsize(out) > 0)
     except Exception as exc:
         check('write_animation(show_mesh=True) writes', False, str(exc))
+
+    print("\nanim_mesh (the run's own animation)")
+    from blastlab.core.case import case_from_dict, case_to_dict
+    check('default off',
+          Case2D().anim_mesh is False and Case3D().anim_mesh is False)
+    form3 = CaseForm(root, 2)
+    form3.set_case(Case2D(anim_file='a.gif', anim_mesh=True))
+    check('anim_mesh round-trips through the form',
+          form3.get_case().anim_mesh is True)
+    form3.v['anim_mesh'].set(False)
+    check('unchecking it clears the case flag',
+          form3.get_case().anim_mesh is False)
+    check('anim_mesh round-trips through a case file',
+          case_from_dict(case_to_dict(Case2D(anim_mesh=True))).anim_mesh
+          is True)
+
+    # the flag reaches write_animation on the GUI run path
+    import blastlab.solvers as solvers_mod
+    import blastlab.gui.app as app_mod
+
+    class _Res:
+        gauges = None
+        meta = {'frames': dict(times=[0.0], pressures=[0.0])}
+
+    seen = {}
+    real_solver, real_write = solvers_mod.get_solver, app_mod.write_animation
+    solvers_mod.get_solver = lambda dim, backend: (lambda case, hooks: _Res())
+    app_mod.write_animation = lambda meta, fn, **kw: seen.update(kw)
+    try:
+        for dim, flag in ((2, True), (3, False)):
+            cls = Case2D if dim == 2 else Case3D
+            seen.clear()
+            app_mod._solve_stage(dim, cls(anim_file='a.gif',
+                                          anim_mesh=flag))[1](None)
+            check(f'{dim}D run export passes show_mesh={flag}',
+                  seen.get('show_mesh') is flag, str(seen))
+    finally:
+        solvers_mod.get_solver, app_mod.write_animation = (real_solver,
+                                                           real_write)
 
     root.destroy()
 

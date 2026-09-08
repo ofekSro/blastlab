@@ -562,6 +562,14 @@ class CaseForm(ctk.CTkFrame):
                             hover_color=c('accent_hover')).grid(
                 row=orow, column=0, columnspan=2, sticky='w', pady=(GAP, 4))
             orow += 1
+            ctk.CTkCheckBox(out, text='Mesh overlay in the animation',
+                            variable=self._bool('anim_mesh', False),
+                            font=theme.F_BODY, corner_radius=6,
+                            border_color=c('border'),
+                            fg_color=c('accent'),
+                            hover_color=c('accent_hover')).grid(
+                row=orow, column=0, columnspan=2, sticky='w', pady=(0, 4))
+            orow += 1
         if self.dim == 1:
             orow = _row(out, orow, 'Profile out (.txt)',
                         _entry(out, self._var('profile_out',
@@ -733,6 +741,7 @@ class CaseForm(ctk.CTkFrame):
             gauges=self.gauges.get(),
             gauge_file=v['gauge_file'].get(),
             anim_file=v['anim_file'].get() or None,
+            anim_mesh=bool(v['anim_mesh'].get()),
             record_frames=150 if v['record'].get() else 0,
             solver=self._mode,
             material=v['material'].get() if foam else 'TNT',
@@ -850,6 +859,7 @@ class CaseForm(ctk.CTkFrame):
         self.det_pts.set(getattr(case, 'det_points', None) or [])
         v['gauge_file'].set(case.gauge_file)
         v['anim_file'].set(case.anim_file or '')
+        v['anim_mesh'].set(bool(getattr(case, 'anim_mesh', False)))
         v['record'].set(case.record_frames > 0)
         if self.dim == 2:
             v['profile_out'].set(case.profile_file or '')
