@@ -74,6 +74,16 @@ def main():
     from blastlab.gui.forms import CaseForm
     from blastlab.gui.results_panel import ResultsPanel
     from blastlab.gui.run_panel import RunPanel
+    from blastlab.core import hardware
+    from blastlab.solvers.foam import env
+
+    # N21: this suite is about the AMR FORM, not about cell caps, but it
+    # validates real cases - and an unprobed machine now caps at an
+    # assumed 4 GB VM, which refuses the 3.4M-cell round-trip case. Pin
+    # a machine so the checks test what they are named after.
+    env.forget_hardware()
+    env.prime_hardware(cores=8, ram_gb=512, source=hardware.MEASURED)
+    hardware.prime_host(ram_gb=256, source=hardware.MEASURED)
 
     root = ctk.CTk()
     root.withdraw()
@@ -265,8 +275,7 @@ def main():
     from blastlab.core.constants import P_AIR
     r1 = np.linspace(0.01, 4.0, 200)
     rp.on_run_started(dict(dim=1, r=r1, radius_m=4.0,
-                           gauges=[(1, 1.5, 0.0), (2, 3.0, 0.0)],
-                           trigger_gauge=2))
+                           gauges=[(1, 1.5, 0.0), (2, 3.0, 0.0)]))
     ax1 = rp._line.axes
     check('an empty 1D axis still opens at the 0..10 kPa placeholder',
           ax1.get_ylim() == (0.0, 10.0), str(ax1.get_ylim()))

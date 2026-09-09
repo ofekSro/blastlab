@@ -15,8 +15,10 @@ from blastlab.solvers.foam import env                          # noqa: E402
 from blastlab.core.constants import (BYTES_PER_CELL,           # noqa: E402
                                      CELLS_PER_RANK,
                                      FOAM_CELLS_REFUSE,
-                                     FOAM_CELLS_WARN)
+                                     FOAM_CELLS_WARN,
+                                     FOAM_VM_GB_ASSUMED)
 from blastlab.solvers.foam.env import MAX_AUTO_PROCS           # noqa: E402
+from blastlab.core import hardware                             # noqa: E402
 
 FAIL = []
 
@@ -26,6 +28,33 @@ def check(name, ok, detail=''):
           + (f' - {detail}' if detail and not ok else ''))
     if not ok:
         FAIL.append(name)
+
+
+#: N21: the hardware cache is now a value + a source + a probe-attempt
+#: flag per field, and only MEASURED suppresses a live probe. A test that
+#: pokes the values alone would silently trigger a real WSL round trip
+#: (and then plan against THIS machine), so save/restore all nine.
+_HW_ATTRS = ('_cores', '_slots', '_ram_gb',
+             '_cores_src', '_slots_src', '_ram_src',
+             '_cores_tried', '_slots_tried', '_ram_tried')
+
+
+def _save_hw():
+    return tuple(getattr(env, a) for a in _HW_ATTRS)
+
+
+def _restore_hw(saved):
+    for a, v in zip(_HW_ATTRS, saved):
+        setattr(env, a, v)
+
+
+def _pin_hw(cores=None, slots=None, ram_gb=None):
+    """Pin the caches as MEASURED so nothing probes WSL during a test."""
+    env._cores, env._slots, env._ram_gb = cores, slots, ram_gb
+    env._cores_src = hardware.MEASURED if cores else hardware.UNKNOWN
+    env._slots_src = hardware.MEASURED if slots else hardware.UNKNOWN
+    env._ram_src = hardware.MEASURED if ram_gb else hardware.UNKNOWN
+    env._cores_tried = env._slots_tried = env._ram_tried = True
 
 
 def _reset():
@@ -50,6 +79,21 @@ def run_plan_checks():
           and env.parse_free_gb('Mem: notanumber') == 0
           and env.parse_free_gb('Total: 8') == 0)
 
+    # (a2) N21: /proc/meminfo is the real probe now - `free -g` truncates,
+    # so a sub-GiB VM and a failed probe both used to read as 0
+    MI = 'MemTotal:       %d kB\nMemFree:  123 kB\nSwapTotal: 0 kB'
+    check('meminfo: exact kB -> rounded GiB',
+          env.parse_meminfo_gb(MI % 65_290_840) == 62
+          and env.parse_meminfo_gb(MI % 133_000_000) == 127)
+    check('meminfo: rounds up rather than truncating (7.7 GiB is not 7)',
+          env.parse_meminfo_gb(MI % 8_074_000) == 8)
+    check('meminfo: a sub-GiB VM is 1, never 0 - 0 means "unknown"',
+          env.parse_meminfo_gb(MI % 700_000) == 1)
+    check('meminfo: nothing usable -> None (distinct from a real 0)',
+          env.parse_meminfo_gb('') is None
+          and env.parse_meminfo_gb('MemTotal: notanumber') is None
+          and env.parse_meminfo_gb(None) is None)
+
     # (b) pinned decision table: (n_req, cells, cores, ram, dim, amr) ->
     #     ranks, and whether the caps came from RAM
     P = env.plan_run
@@ -62,8 +106,12 @@ def run_plan_checks():
         ('cores-limited',              P(0, 10 ** 7, 8, 64, 3, 0), 7, True),
         ('cells-limited',              P(0, 300_000, 32, 64, 3, 0), 6, True),
         ('RAM-limited',                P(0, 10 ** 7, 32, 8, 3, 0), 4, True),
-        ('rank cap',                   P(0, 10 ** 8, 64, 256, 3, 0), 16, True),
-        ('unknown RAM -> fixed caps',  P(0, 10 ** 7, 8, None, 3, 0), 7, False),
+        ('measured cores beat the rank cap (N21)',
+                                       P(0, 10 ** 8, 64, 256, 3, 0), 63, True),
+        ('unknown cores fall back to the rank cap',
+                                       P(0, 10 ** 8, 0, 256, 3, 0), 16, True),
+        ('unknown RAM -> conservative caps',
+                                       P(0, 10 ** 7, 8, None, 3, 0), 7, False),
         ('single core still runs',     P(0, 10 ** 7, 1, 16, 3, 0), 1, True),
     ]
     for name, plan, want, from_mem in table:
@@ -73,9 +121,57 @@ def run_plan_checks():
               f'{plan.reason}')
     check('plan: every row explains itself',
           all(p.reason for _n, p, _w, _f in table))
-    check('plan: unknown RAM falls back to the fixed constants',
-          P(0, 10 ** 7, 8, None, 3, 0).cell_cap_refuse == FOAM_CELLS_REFUSE
-          and P(0, 10 ** 7, 8, None, 3, 0).cell_cap_warn == FOAM_CELLS_WARN)
+    # N21: unknown hardware must TIGHTEN the caps, not loosen them. This
+    # assertion used to pin the opposite (== FOAM_CELLS_*, i.e. 120M
+    # cells on a machine nothing had been measured on).
+    p_unknown = P(0, 10 ** 7, 8, None, 3, 0)
+    p_assumed = P(0, 10 ** 7, 8, FOAM_VM_GB_ASSUMED, 3, 0)
+    check('plan: unknown RAM -> the assumed-VM caps, not the ceilings',
+          p_unknown.cell_cap_refuse == p_assumed.cell_cap_refuse
+          and p_unknown.cell_cap_warn == p_assumed.cell_cap_warn
+          and p_unknown.cell_cap_refuse < FOAM_CELLS_REFUSE,
+          f'{p_unknown.cell_cap_refuse:,}')
+    check('plan: unknown RAM is honest about it (from_memory False, '
+          'ram_source UNKNOWN)',
+          p_unknown.from_memory is False
+          and p_unknown.ram_source == hardware.UNKNOWN)
+    check('plan: FOAM_CELLS_* are a ceiling now - a huge VM cannot '
+          'exceed them',
+          P(0, 10 ** 7, 8, 4096, 3, 0).cell_cap_refuse == FOAM_CELLS_REFUSE
+          and P(0, 10 ** 7, 8, 4096, 3, 0).cell_cap_warn == FOAM_CELLS_WARN)
+    check('plan: a measured VM below the ceiling still sets the cap',
+          P(0, 10 ** 7, 8, 62, 3, 0).cell_cap_refuse < FOAM_CELLS_REFUSE
+          and P(0, 10 ** 7, 8, 62, 3, 0).from_memory is True)
+    # N21: rank_ceiling - hard limits only, and silent when unknown
+    rc = env.rank_ceiling
+    check('ceiling: cores - headroom when RAM is unknown',
+          rc(8, None, 1) == (7, '8 physical cores - 1 headroom'),
+          str(rc(8, None, 1)))
+    check('ceiling: RAM wins when it is the tighter limit',
+          rc(64, 8, 1)[0] == 4, str(rc(64, 8, 1)))
+    check('ceiling: nothing known -> None, so an explicit ask stands '
+          '(the app must stay usable with WSL down)',
+          rc(0, None, 1) == (None, ''))
+    check('ceiling: never below 1',
+          rc(1, 1, 1)[0] == 1 and rc(1, None, 4)[0] == 1)
+    check('ceiling: ignores the cells/rank floor and the rank cap - '
+          'those are efficiency, not physics',
+          rc(64, 256, 1)[0] == 63)
+
+    check('plan: an explicit request above the ceiling is clamped, and '
+          'says so',
+          P(99, 10 ** 7, 8, 16, 3, 0).ranks == 7
+          and P(99, 10 ** 7, 8, 16, 3, 0).clamped is True
+          and P(99, 10 ** 7, 8, 16, 3, 0).clamped_from == 99
+          and 'clamped to 7' in P(99, 10 ** 7, 8, 16, 3, 0).reason,
+          P(99, 10 ** 7, 8, 16, 3, 0).reason)
+    check('plan: an explicit request that fits is untouched and not '
+          'marked clamped',
+          P(4, 10 ** 6, 8, 16, 3, 0).ranks == 4
+          and P(4, 10 ** 6, 8, 16, 3, 0).clamped is False
+          and P(4, 10 ** 6, 8, 16, 3, 0).requested == 4)
+    check('plan: with no hardware known, an explicit request stands',
+          P(32, 10 ** 7, 0, None, 3, 0).ranks == 32)
     p4 = P(0, 10 ** 6, 8, 4, 3, 0)
     check('plan: 4 GB VM -> ~1.1M cell refuse cap, warn at half',
           abs(p4.cell_cap_refuse - 0.70 * 4 * 2 ** 30 / BYTES_PER_CELL) < 1
@@ -85,7 +181,7 @@ def run_plan_checks():
 
     # (c) invariants over a sweep, not just the pinned rows
     bad = []
-    for cores in (1, 2, 4, 8, 16, 64):
+    for cores in (0, 1, 2, 4, 8, 16, 64):
         for ram in (None, 2, 4, 8, 16, 128):
             for cells in (0, 1000, 199_999, 200_000, 10 ** 6, 10 ** 8):
                 for dim in (2, 3):
@@ -97,14 +193,17 @@ def run_plan_checks():
                     if pl.ranks > 1 and \
                             pl.ranks * CELLS_PER_RANK > cells:
                         bad.append((cores, ram, cells, 'below the floor'))
-                    if pl.ranks > MAX_AUTO_PROCS:
+                    # N21: MAX_AUTO_PROCS bounds the plan only when the
+                    # core count is unknown; a measured machine is
+                    # bounded by its own cores instead (checked above)
+                    if not cores and pl.ranks > MAX_AUTO_PROCS:
                         bad.append((cores, ram, cells, 'above the cap'))
     check('plan: sweep keeps every invariant '
           '(1 <= ranks <= cores - headroom, cells/rank floor, rank cap)',
           not bad, str(bad[:3]))
 
     # (d) the caches: primed from settings, dropped on demand
-    old = (env._cores, env._slots, env._ram_gb)
+    old = _save_hw()
     try:
         env.forget_hardware()
         check('hardware(): None until something is known',
@@ -112,7 +211,13 @@ def run_plan_checks():
         env.prime_hardware(cores=6, ram_gb=12)
         hw = env.hardware()
         check('hardware(): primed values are returned without a probe',
-              hw == dict(cores=6, logical=None, ram_gb=12), str(hw))
+              hw == dict(cores=6, logical=None, ram_gb=12,
+                         cores_source=hardware.CACHED,
+                         ram_source=hardware.CACHED), str(hw))
+        check('N21: primed values are CACHED, not MEASURED - so the live '
+              'probe still runs and a .wslconfig change is noticed',
+              env._slots_src == hardware.CACHED
+              and env._ram_src == hardware.CACHED)
         env.prime_hardware(cores=99, ram_gb=99)
         check('hardware(): priming never overwrites a known value',
               env.hardware()['cores'] == 6
@@ -120,8 +225,11 @@ def run_plan_checks():
         env.forget_hardware()
         check('forget_hardware(): back to unknown',
               env.hardware() is None)
+        check('forget_hardware(): sources and probe-attempt flags reset too',
+              env._slots_src == hardware.UNKNOWN
+              and not env._ram_tried and not env._slots_tried)
     finally:
-        env._cores, env._slots, env._ram_gb = old
+        _restore_hw(old)
 
     # (e) the hw_* keys survive a settings round trip
     import tempfile
@@ -339,20 +447,23 @@ def main():
 
     # slots-aware auto parallel (mocked counts: 12 physical / 20 logical,
     # RAM unknown so the rank count is not RAM-limited)
-    old_slots, old_cores = env._slots, env._cores
-    old_ram = env._ram_gb
+    old_hw = _save_hw()
     try:
-        env._slots, env._cores, env._ram_gb = 12, 20, 0
+        _pin_hw(cores=20, slots=12, ram_gb=None)
         check('auto ranks = physical cores - headroom (T48: 1, was 2)',
               env.resolve_nprocs(0, 10 ** 6, headroom=1) == 11,
               str(env.resolve_nprocs(0, 10 ** 6, headroom=1)))
         check('auto stays serial on small grids',
               env.resolve_nprocs(0, 10 ** 5) == 1)
-        check('explicit ranks honored as-is',
-              env.resolve_nprocs(16, 10 ** 6) == 16)
+        # N21: an explicit ask above what the machine has is clamped,
+        # not honoured. This row used to pin 16 ranks on a 12-core VM.
+        check('explicit ranks clamped to what the machine has',
+              env.resolve_nprocs(16, 10 ** 6, headroom=1) == 11,
+              str(env.resolve_nprocs(16, 10 ** 6, headroom=1)))
+        check('explicit ranks below the ceiling are honoured exactly',
+              env.resolve_nprocs(4, 10 ** 6, headroom=1) == 4)
     finally:
-        env._slots, env._cores = old_slots, old_cores
-        env._ram_gb = old_ram
+        _restore_hw(old_hw)
 
     _reset()
     if shutil.which('wsl.exe'):

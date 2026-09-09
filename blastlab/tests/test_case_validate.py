@@ -25,7 +25,25 @@ def cells_err(rep):
 
 def amr_cap_checks():
     """N16: AMR caps apply to maxCells (the mesh grows) and to the
-    display grid, never to the t=0 base count."""
+    display grid, never to the t=0 base count.
+
+    Pins a large VM (N21): these rows assert against FOAM_CELLS_WARN /
+    FOAM_CELLS_REFUSE, which are the ceiling only when the measured RAM
+    is at least that big. Unpinned, the conservative caps would turn the
+    'warned' row into a refusal."""
+    from blastlab.solvers.foam import env
+    from blastlab.core import hardware
+    old = tuple(getattr(env, a) for a in _HW_ATTRS)
+    try:
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=512, source=hardware.MEASURED)
+        _amr_cap_checks()
+    finally:
+        for a, v in zip(_HW_ATTRS, old):
+            setattr(env, a, v)
+
+
+def _amr_cap_checks():
     amr = dict(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=8.0,
                center=(2.0, 2.0, 2.0), solver='blastfoam', amr_levels=4)
     rep = validate_case(Case3D(**amr))
@@ -76,11 +94,24 @@ def chain_stage_checks():
     check('chain: profile + refinement zones is still refused',
           any('refinement zones' in e for e in stage_errors(*z)),
           str(stage_errors(*z)))
+    # T70: AMR, unlike static zones, IS available to a profile stage -
+    # the t = 0 mesh under AMR is the uniform base mesh, which is
+    # exactly the one the remapped state is written on
     a = wired('blastfoam')
     a[1][2].amr_levels = 2
-    check('chain: profile + AMR is still refused',
-          any('dynamic AMR' in e for e in stage_errors(*a)),
-          str(stage_errors(*a)))
+    check('chain: profile + AMR is accepted',
+          stage_errors(*a) == [], str(stage_errors(*a)))
+    rep_a = validate_case(a[1][2], pending_inputs=True)
+    check('chain: profile + AMR says the state lands on the base mesh',
+          rep_a.amr_levels == 2
+          and any('base mesh and the AMR refines' in n
+                  for n in rep_a.notes), str(rep_a.notes))
+    az = wired('blastfoam')
+    az[1][2].amr_levels = 2
+    az[1][2].refine_zones = [(0.0, 0.5, 0.5, 1.5, 1)]
+    check('chain: profile + AMR + zones is refused (mutually exclusive)',
+          any('mutually exclusive' in e for e in stage_errors(*az)),
+          str(stage_errors(*az)))
 
     check('chain: the same wiring is fine on the native solver',
           stage_errors(*wired('native')) == [],
@@ -154,24 +185,51 @@ def shared_constant_checks():
 
 def run_plan_checks():
     """N17/T48: the cell caps follow the WSL VM's RAM once a probe has
-    run, and fall back to the fixed constants when it has not."""
+    run. N21: when it has not, they assume a small VM rather than
+    falling back to the fixed constants."""
     from blastlab.solvers.foam import env
-    print("\nT48: memory-derived cell caps")
+    print("\nT48/N21: memory-derived cell caps")
 
     def case(dx):
         return Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=dx,
                       charge=4000.0, center=(2.0, 2.0, 2.0),
                       gauges=[(3.0, 2.0, 2.0)], solver='blastfoam')
 
-    old = (env._cores, env._slots, env._ram_gb)
+    old = tuple(getattr(env, a) for a in _HW_ATTRS)
     try:
-        # (a) no probe yet -> the fixed FOAM_CELLS_* caps, as before
+        # (a) no probe yet -> conservative caps. This check INVERTS at
+        # N21: it used to assert that an unprobed machine still allowed
+        # 8M cells, which is the permissive-on-ignorance bug itself.
         env.forget_hardware()
         rep = validate_case(case(0.02))          # 8M cells
-        check('no hardware probe -> fixed caps still allow 8M cells',
-              not cells_err(rep), str(rep.errors))
+        check('no hardware probe -> conservative caps refuse 8M cells',
+              bool(cells_err(rep)), str(rep.errors))
+        check('no hardware probe -> the refusal says the size is unknown '
+              'and how to fix it',
+              any('assumed' in e and 'Re-detect' in e
+                  for e in cells_err(rep)), str(rep.errors))
+        check('no hardware probe -> a warning, not just an error',
+              any('WSL hardware not detected' in w for w in rep.warnings),
+              str(rep.warnings))
         check('no hardware probe -> the rank note still explains itself',
               any(n.startswith('Parallel run: ') for n in rep.notes),
+              str(rep.notes))
+
+        # (a2) a case that fits the assumption still validates: an
+        # unknown machine must be cautious, not unusable
+        rep = validate_case(case(0.05))          # 512k cells
+        check('no hardware probe -> a small case still runs',
+              not cells_err(rep), str(rep.errors))
+
+        # (a3) values restored from settings are CACHED: usable, and
+        # said out loud, so the caps are not silently a week old
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=64)   # source defaults to CACHED
+        rep = validate_case(case(0.02))
+        check('cached hardware -> 8M cells allowed, with a note saying '
+              'the numbers are from an earlier session',
+              not cells_err(rep)
+              and any('earlier session' in n for n in rep.notes),
               str(rep.notes))
 
         # (b) a 4 GB VM cannot hold 8M cells at ~2.6 KB each
@@ -204,10 +262,56 @@ def run_plan_checks():
               any('physical cores' in n for n in rep.notes),
               str(rep.notes))
     finally:
-        env._cores, env._slots, env._ram_gb = old
+        for a, v in zip(_HW_ATTRS, old):
+            setattr(env, a, v)
+
 
 def main():
     run_plan_checks()
+    # N21: these cases test the CAPS, so the hardware they are capped
+    # against must be pinned. Before N21 they ran against whatever the
+    # ambient env cache happened to hold - which was "unknown" here, and
+    # "unknown" used to mean the most permissive caps in the app. Now it
+    # means the most conservative ones, so an unpinned run would refuse
+    # every case below and the suite would silently invert.
+    from blastlab.solvers.foam import env
+    from blastlab.core import hardware
+    old = tuple(getattr(env, a) for a in _HW_ATTRS)
+    old_host = (hardware._host_ram_gb, hardware._host_ram_src,
+                hardware._host_probed)
+    try:
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=512, source=hardware.MEASURED)
+        # N21: the NATIVE caps follow the Windows host's RAM, so pin that
+        # too - otherwise this suite passes or fails by which machine
+        # runs it (a 7 GB laptop derives a 7.2M-cell 3D cap).
+        hardware.forget_host()
+        hardware.prime_host(ram_gb=256, source=hardware.MEASURED)
+        _cap_checks()
+    finally:
+        for a, v in zip(_HW_ATTRS, old):
+            setattr(env, a, v)
+        (hardware._host_ram_gb, hardware._host_ram_src,
+         hardware._host_probed) = old_host
+
+    chain_stage_checks()
+    shared_constant_checks()
+    amr_cap_checks()
+
+    if FAIL:
+        print(f"\nCASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
+        return 1
+    print("\nCASE VALIDATE: PASS")
+    return 0
+
+
+#: env hardware-cache attributes to save/restore around a pinned block
+_HW_ATTRS = ('_cores', '_slots', '_ram_gb',
+             '_cores_src', '_slots_src', '_ram_src',
+             '_cores_tried', '_slots_tried', '_ram_tried')
+
+
+def _cap_checks():
     # ~64M cells: 40 m cube at 0.1 m with a large charge. The charge is
     # big enough (r_exp = 0.85 m) that the 0.1 m cell already gives the
     # 8 cells across the radius blastFoam wants (T39), so these cases
@@ -278,17 +382,6 @@ def main():
         rep = validate_case(Case3D(solver=solver, **small))
         check(f'{solver} small clean', not cells_err(rep)
               and not any('Large grid' in w for w in rep.warnings))
-
-    chain_stage_checks()
-    shared_constant_checks()
-    amr_cap_checks()
-
-    print()
-    if FAIL:
-        print(f"CASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
-        return 1
-    print("CASE VALIDATE: PASS")
-    return 0
 
 
 if __name__ == '__main__':

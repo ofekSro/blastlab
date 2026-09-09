@@ -1,6 +1,46 @@
 __pycache__/
 *.pyc
+
+# Research scratch directories (measurement studies, kept out of the repo)
 blastlab/tests/_probe_study/
 blastlab/tests/_chain_study/
 blastlab/tests/_t42/
 blastlab/tests/_amr_ab/
+
+# ---------------------------------------------------------------------------
+# Run outputs (P0-3). Everything below is WRITTEN by the app, the CLI or a test
+# and re-read only within the same run - nothing here is a fixture.
+# The tracked test DATA lives in blastlab/tests/baseline/, foam_fixtures/ and
+# foam_golden/ and is deliberately NOT matched by these patterns
+# (the baselines are named b1_*/b2_*/b3_*/transcript.txt).
+# Do not add logo.gif here: it is a GUI asset (gui/app.py::_LOGO).
+# ---------------------------------------------------------------------------
+
+# Run/workspace directories
+/run/
+/chain_workspace/
+blastlab/chain_workspace/
+
+# Cases and gauge/profile outputs
+/case.json
+gauges.txt
+gauges_1d.txt
+gauges_2d.txt
+gauges_3d.txt
+blast_profile.txt
+test_profile.txt
+test_profile_2d.npz
+test_profile_3d.txt
+
+# Figures and animations written by runs and by the test suites
+anim3d_test.gif
+viz3d_scene_test.png
+viz3d_embedded_render.png
+blast_1d_*.png
+blast_2d_*.png
+blast_3d_*.png
+blast_2d_animation.*
+blast_3d_animation.*
+
+# QA harness output (also written under ~/blastlab_qa)
+blastlab_qa/

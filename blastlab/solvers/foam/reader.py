@@ -193,11 +193,12 @@ def read_label_list(path):
     return vals
 
 
-def read_cell_centres(case_unc):
+def read_cell_centres(case_unc, time='0'):
     """(n, 3) cell centres written by `postProcess -func
-    writeCellCentres -time 0` (0/C) - the refined mesh's own account of
-    its cells, matched against core.refine's prediction."""
-    return read_vector(os.path.join(case_unc, '0', 'C'), None)
+    writeCellCentres -time <time>` (<time>/C) - the refined mesh's own
+    account of its cells, matched against core.refine's prediction.
+    `time` is the run's start dir, which a profile stage names t0."""
+    return read_vector(os.path.join(case_unc, time, 'C'), None)
 
 
 def read_time(dir_path):

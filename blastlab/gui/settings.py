@@ -8,6 +8,13 @@ writes are best-effort.
 
 import json
 import os
+import threading
+
+#: N21: `update()` is a load-modify-save, and two threads in this one
+#: process race on it - the hardware probe thread writes hw_* while the
+#: main thread writes the window geometry on close, and whichever loaded
+#: first wins. The file write itself is already atomic (os.replace).
+_lock = threading.Lock()
 
 DEFAULTS = dict(
     auto_cleanup=True,          # sweep old/large foam run dirs at GUI start
@@ -26,10 +33,20 @@ DEFAULTS = dict(
     # caps show real numbers before the first probe of a session
     # returns. mpi_headroom is the cores left free for the rest of
     # the machine when the rank count is automatic.
-    hw_cores=0,
-    hw_ram_gb=0,
-    hw_stamp='',
+    hw_cores=0,                 # WSL VM physical cores
+    hw_ram_gb=0,                # WSL VM RAM, GiB
+    hw_stamp='',                # when the probe ran (ISO-8601)
+    # N21: which machine those numbers describe, and the Windows host's
+    # own RAM (the native solvers run in THIS process, not in the VM).
+    # Without the fingerprint a settings file carried to another machine
+    # - or a .wslconfig edit on this one - pinned stale caps silently;
+    # hw_stamp was written but never read.
+    hw_fingerprint='',
+    hw_host_ram_gb=0,
     mpi_headroom=1,
+    #: N21: hard rank ceiling (0 = auto). MAX_AUTO_PROCS is
+    #: now only the fallback for an unknown core count.
+    mpi_max_ranks=0,
 )
 
 
@@ -64,7 +81,9 @@ def save(settings, path=None):
     path = path or config_path()
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        tmp = path + '.tmp'
+        # pid-unique: a GUI and a CLI writing at once used to collide on
+        # one fixed '.tmp' name and could publish a half-written file
+        tmp = f'{path}.{os.getpid()}.tmp'
         with open(tmp, 'w', encoding='utf-8') as f:
             json.dump(settings, f, indent=2)
         os.replace(tmp, path)
@@ -74,8 +93,12 @@ def save(settings, path=None):
 
 
 def update(**kw):
-    """load -> update -> save; returns the merged dict."""
-    s = load()
-    s.update(kw)
-    save(s)
-    return s
+    """load -> update -> save; returns the merged dict.
+
+    Serialised: the read-modify-write is not atomic, and the hardware
+    probe thread and the main thread both call it."""
+    with _lock:
+        s = load()
+        s.update(kw)
+        save(s)
+        return s

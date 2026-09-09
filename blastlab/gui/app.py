@@ -6,12 +6,14 @@ import os
 import queue
 import sys
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
 from .. import __version__
+from ..core import hardware
 from ..core.case import load_case, save_case, validate_case
 from ..core.profiles import save_profile, save_profile_2d
 from ..output.animation import write_animation
@@ -64,13 +66,12 @@ def _write_trigger_remap(case, res):
     Only the 'remap' (keep running) action needs this: the terminating
     actions stop the run there, so the state the normal profile write
     already saves IS the trigger state. The path is the case's trigger
-    file, falling back to its profile output."""
+    file, falling back to its profile output. 2D only - 3D has no remap
+    format and 1D has no trigger gauge (T63)."""
     path = getattr(case, 'trigger_file', None) or case.profile_file
     if not path:
         return
-    if case.dim == 1 and res.meta.get('trigger_profile') is not None:
-        save_profile(res.meta['trigger_profile'], path)
-    elif case.dim == 2 and res.meta.get('trigger_state') is not None:
+    if case.dim == 2 and res.meta.get('trigger_state') is not None:
         save_profile_2d(dict(res.meta,
                              final_state=res.meta['trigger_state']), path)
 
@@ -89,7 +90,6 @@ def _solve_stage(dim, case):
                 save_gauges_1d(res.gauges, case.gauge_file)
             if case.profile_file:
                 save_profile(res.meta['final_profile'], case.profile_file)
-            _write_trigger_remap(case, res)
         elif dim == 2:
             if case.gauges:
                 save_gauges_2d(res.gauges, case.gauge_file)
@@ -150,9 +150,12 @@ class App:
         st = gui_settings.load()
         self.solver_mode = SolverMode(st.get('solver', mode_mod.DEFAULT))
         # N17/T48: show last session's WSL hardware immediately; the
-        # live probe (started with blastFoam mode) overwrites it
-        foam_env.prime_hardware(cores=st.get('hw_cores'),
-                                ram_gb=st.get('hw_ram_gb'))
+        # live probe (started with blastFoam mode) overwrites it.
+        # N21: only when those numbers belong to THIS machine and are not
+        # stale. A rejected cache leaves the hardware UNKNOWN, which now
+        # means conservative caps until the probe lands - seconds, and
+        # far better than sizing a run against another machine.
+        self._prime_hardware_from(st)
 
         root.grid_columnconfigure(1, weight=1)
         root.grid_rowconfigure(0, weight=1)
@@ -251,8 +254,64 @@ class App:
         if hw.get('cores'):
             bits.append(f"{hw['cores']} cores")
         if hw.get('ram_gb'):
-            bits.append(f"{hw['ram_gb']} GB")
-        return (' \u00b7 ' + ' \u00b7 '.join(bits)) if bits else ''
+            bits.append(f"{hw['ram_gb']} GB VM")
+        if not bits:
+            return ' \u00b7 hardware unknown'
+        if hw.get('ram_source') == hardware.CACHED:
+            bits.append('cached')
+        return ' \u00b7 ' + ' \u00b7 '.join(bits)
+
+    def _hw_tooltip(self):
+        """The long form of the same thing, for the hint's tooltip."""
+        hw = foam_env.hardware() or {}
+        if not hw.get('ram_gb') and not hw.get('cores'):
+            return ('WSL has not answered the hardware probe. Cell caps '
+                    'are conservative until it does - click Re-detect.')
+        bits = [f"WSL VM: {hw.get('cores') or '?'} physical cores, "
+                f"{hw.get('ram_gb') or '?'} GB"]
+        host_ram = hardware.host().get('ram_gb')
+        if host_ram:
+            bits.append(f"Windows host: {host_ram} GB")
+        stamp = gui_settings.load().get('hw_stamp')
+        if stamp:
+            bits.append(f"measured {str(stamp).replace('T', ' ')}")
+        return '. '.join(bits) + '.'
+
+    def _prime_hardware_from(self, st):
+        """Seed the hardware caches from settings, but only when the
+        saved numbers belong to this machine and are inside the TTL."""
+        try:
+            hardware.prime_host(ram_gb=st.get('hw_host_ram_gb'))
+            fp = hardware.machine_fingerprint(foam_env.WSL_DISTRO)
+            if hardware.cache_is_valid(st.get('hw_fingerprint'),
+                                       st.get('hw_stamp'), fp,
+                                       time.time()):
+                foam_env.prime_hardware(cores=st.get('hw_cores'),
+                                        ram_gb=st.get('hw_ram_gb'))
+        except Exception:
+            pass
+
+    def _persist_hardware(self, hw):
+        """Save ONLY what was measured this session.
+
+        The old version wrote whatever `hardware()` returned, so a failed
+        probe overwrote a good measurement with `hw_ram_gb=0` and a
+        fabricated 4-core count - a plausible lie is worse than a gap."""
+        import datetime
+        upd = {}
+        if hw.get('cores_source') == hardware.MEASURED and hw.get('cores'):
+            upd['hw_cores'] = int(hw['cores'])
+        if hw.get('ram_source') == hardware.MEASURED and hw.get('ram_gb'):
+            upd['hw_ram_gb'] = int(hw['ram_gb'])
+        if not upd:
+            return
+        host = hardware.host()
+        upd['hw_host_ram_gb'] = int(host.get('ram_gb') or 0)
+        upd['hw_fingerprint'] = hardware.machine_fingerprint(
+            foam_env.WSL_DISTRO)
+        upd['hw_stamp'] = datetime.datetime.now().isoformat(
+            timespec='seconds')
+        gui_settings.update(**upd)
 
     def _probe_hw_async(self):
         """Probe the WSL VM's cores + RAM off-thread and persist them, so
@@ -260,16 +319,11 @@ class App:
         def work():
             try:
                 hw = foam_env.hardware(probe=True) or {}
+                hardware.detect_host_ram_gb()
             except Exception:
                 return
             try:
-                import datetime
-                gui_settings.save(dict(
-                    gui_settings.load(),
-                    hw_cores=int(hw.get('cores') or 0),
-                    hw_ram_gb=int(hw.get('ram_gb') or 0),
-                    hw_stamp=datetime.datetime.now().isoformat(
-                        timespec='seconds')))
+                self._persist_hardware(hw)
             except Exception:
                 pass
             try:
@@ -301,14 +355,21 @@ class App:
         if state == 'checking':
             text, colour = 'WSL: checking blastFoam…', c('muted')
         elif state == 'ok':
-            text, colour = 'WSL: blastFoam ready' + self._hw_suffix(), c('ok')
+            suffix = self._hw_suffix()
+            # N21: hardware still unknown while blastFoam itself is
+            # ready is not an "all good" state - the caps are an
+            # assumption, so the line says so in the warning colour
+            colour = c('warn') if 'unknown' in suffix else c('ok')
+            text = 'WSL: blastFoam ready' + suffix
         elif state == 'fail':
             text, colour = 'WSL: unavailable - ' + detail[:60], c('warn')
         else:
             text, colour = 'WSL: verified at run start', c('muted')
         try:
             self._wsl_hint.configure(text=text, text_color=colour)
-            theme.tooltip(self._wsl_hint, detail if state == 'fail' else '')
+            theme.tooltip(self._wsl_hint,
+                          detail if state == 'fail'
+                          else (self._hw_tooltip() if state == 'ok' else ''))
         except Exception:
             return
         if state == 'checking':

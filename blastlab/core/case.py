@@ -17,14 +17,17 @@ from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE,
+                        FOAM_VM_GB_ASSUMED,
                         BYTES_PER_CELL)
+from . import hardware as _hardware
 
-#: T51 trigger-gauge actions. 'remap' writes the remap file at the
-#: arrival instant and lets the run continue; the other two end it.
+#: T51 trigger-gauge actions (2D/3D only - T63 removed the 1D trigger).
+#: 'remap' writes the remap file at the arrival instant and lets the run
+#: continue; the other two end it.
 TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 
 SCHEMA = 'blastlab-case'
-VERSION = 10    # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 11    # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
@@ -35,6 +38,8 @@ VERSION = 10    # v2: n_procs, activation, charges, det_points (foam)
                 # v8: t_end on 1D/2D as well (T52)
                 # v9: trigger_gauge / trigger_action / trigger_file (T51)
                 # v10: bc_outer on Case1D (T60)
+                # v11: the 1D trigger gauge is gone (T63); the keys are
+                #      dropped from older 1D files rather than refused
 
 
 @dataclass
@@ -53,13 +58,10 @@ class Case1D:
     gauge_radii: list = field(default_factory=list)
     gauge_file: str = 'gauges.txt'
     profile_file: str = None          # save final field for 2D/3D remap
-    #: T51 trigger gauge: 1-based index into gauge_radii (2D/3D: gauges),
-    #: None = off. When the wave reaches it the run ends and/or the remap
-    #: file is written at THAT instant - the chain hand-off that used to
-    #: be possible only at the end of a run.
-    trigger_gauge: int = None
-    trigger_action: str = 'terminate'  # see core.case.TRIGGER_ACTIONS
-    trigger_file: str = None           # remap path; None = profile_file
+    #: T63: 1D has no trigger gauge. The whole 1D run is the hand-off
+    #: (`profile_file` is written at the end) and `bc_outer='terminate'`
+    #: already stops it at the sector's end, so a per-gauge trigger only
+    #: ever duplicated those two - in blastFoam 1D it did nothing at all.
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
     activation: str = 'linear'        # blastFoam detonation model:
@@ -128,7 +130,10 @@ class Case2D:
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y)
     gauge_file: str = 'gauges_2d.txt'
-    #: see Case1D.trigger_gauge
+    #: T51 trigger gauge: 1-based index into `gauges`, None = off. When
+    #: the wave reaches it the run ends and/or the remap file is written
+    #: at THAT instant - the chain hand-off that used to be possible
+    #: only at the end of a run. 2D/3D only (T63).
     trigger_gauge: int = None
     trigger_action: str = 'terminate'
     trigger_file: str = None
@@ -203,7 +208,7 @@ class Case3D:
     n_snapshots: int = 6
     gauges: list = field(default_factory=list)      # (x, y, z)
     gauge_file: str = 'gauges_3d.txt'
-    #: see Case1D.trigger_gauge
+    #: see Case2D.trigger_gauge ('remap' is refused in 3D)
     trigger_gauge: int = None
     trigger_action: str = 'terminate'
     trigger_file: str = None
@@ -254,6 +259,13 @@ def case_from_dict(d):
         raise ValueError("Case file from a newer blastlab version")
     dim = d.pop('dim')
     cls = _CASE_TYPES[int(dim)]
+    if int(dim) == 1:
+        # T63: the 1D trigger gauge was removed. Case files written
+        # before that still carry the three keys, and refusing to load
+        # them would strand every saved 1D case and run (post-mortem
+        # reads case.json) - drop them instead.
+        for _k in ('trigger_gauge', 'trigger_action', 'trigger_file'):
+            d.pop(_k, None)
     fields = {f for f in cls.__dataclass_fields__}
     unknown = set(d) - fields
     if unknown:
@@ -386,18 +398,16 @@ def _validate_solver(case, rep):
         note("Obstacles: cells inside each box are carved out of "
              "the mesh (rigid walls)")
     if getattr(case, 'init_mode', 'charge') != 'charge':
-        # N7: the stage's state is written straight into 0/ as
-        # nonuniform internalFields, in the mesh's cell order. That
-        # order is only known ahead of time on the uniform mesh, so a
-        # profile stage cannot also refine locally in this version.
+        # N7: the stage's state is written straight into the start time
+        # dir as nonuniform internalFields, in the mesh's cell order.
+        # That order is only known ahead of time on a mesh blockMesh
+        # alone builds - the uniform grid, or an AMR case's base grid
+        # (which is the same thing at t0; T70). refineMesh renumbers,
+        # so static zones stay out.
         if case.dim == 1:
             err("blastFoam 1D stages cannot start from a profile "
                 "(a 1D profile IS the 1D state - run the next stage "
                 "in 2D or 3D)")
-        if int(getattr(case, 'amr_levels', 0) or 0):
-            err("A profile-initialised blastFoam stage cannot use "
-                "dynamic AMR yet - the remapped state is written on "
-                "the uniform base mesh")
         if (getattr(case, 'refine_zones', None)
                 or getattr(case, 'charge_refine', 'global') == 'zone'):
             err("A profile-initialised blastFoam stage cannot use "
@@ -476,8 +486,8 @@ def validate_case(case, pending_inputs=False):
     # ── Trigger gauge (T51) ────────────────────────────────────────────
     trig = getattr(case, 'trigger_gauge', None)
     action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
-    if trig not in (None, 0, ''):
-        n_g = len(case.gauge_radii if case.dim == 1 else case.gauges)
+    if case.dim >= 2 and trig not in (None, 0, ''):
+        n_g = len(case.gauges)
         try:
             trig_i = int(trig)
         except (TypeError, ValueError):
@@ -734,7 +744,10 @@ def validate_case(case, pending_inputs=False):
             "exclusive - clear the zones and set charge refinement to "
             "'global' (the charge is refined at t = 0 by the AMR itself)")
     elif amr:
-        if init == 'charge' and not rep.errors:
+        # T70: a profile-initialised stage plans exactly the same way -
+        # `_plan_amr` never looks at the charge and `validate_amr` skips
+        # its "resolve the charge" rule when there is none
+        if not rep.errors:
             from .refine import plan_levels, validate_amr
             try:
                 plan = plan_levels(case, rho0)
@@ -753,6 +766,11 @@ def validate_case(case, pending_inputs=False):
                 rep.lmax = plan.lmax
                 rep.dx_fine = plan.dx_base / 2 ** plan.amr
                 rep.n_fine = plan.n_fine
+                if init != 'charge':
+                    note(f"The remapped state is written on the "
+                         f"{plan.dx_base:.5g} m base mesh and the AMR "
+                         f"refines from there - the base cell, not the "
+                         f"AMR level, sets how sharp the hand-off is")
                 # T42/N16-b: AMR runs in parallel; the ingest reads
                 # processor*/ directly (reconstructPar cannot follow a
                 # mesh that changes between writes)
@@ -835,23 +853,59 @@ def validate_case(case, pending_inputs=False):
                  f"{n_exp} cells across the radius)")
 
     # N17/T48: the caps come from the WSL VM's measured RAM when a probe
-    # has run (BYTES_PER_CELL), and from the fixed FOAM_CELLS_* constants
-    # when it has not - `hardware()` never touches WSL, so validation
-    # stays instant.
+    # has run (BYTES_PER_CELL). N21: when it has NOT, they come from a
+    # conservatively assumed VM rather than the fixed FOAM_CELLS_*
+    # constants - an unknown machine must not be treated as a large one.
+    # `hardware()` never touches WSL, so validation stays instant.
     from ..solvers.foam import env as _env
     _hw = _env.hardware() or {}
     _caps = _env.plan_run(0, 0, cores=_hw.get('cores'),
-                          ram_gb=_hw.get('ram_gb'), dim=case.dim)
+                          ram_gb=_hw.get('ram_gb'), dim=case.dim,
+                          ram_source=_hw.get('ram_source'),
+                          cores_source=_hw.get('cores_source'))
     cap_warn, cap_refuse = _caps.cell_cap_warn, _caps.cell_cap_refuse
+
+    # N21: the native solvers run in THIS process on the host's RAM, so
+    # they get their own plan. `host()` is cache-only (ctypes, no I/O on
+    # the validation path) and the derived cap can only lower the fixed
+    # CELLS_* constants - the solvers keep enforcing those unchanged.
+    _nat = _hardware.plan_native(
+        dim=case.dim, order=int(getattr(case, 'order', 1) or 1),
+        n_snapshots=int(getattr(case, 'n_snapshots', 6) or 6),
+        ram_gb=_hardware.host().get('ram_gb'))
+    nat_warn, nat_refuse = _nat.cell_cap_warn, _nat.cell_cap_refuse
+
+    def host_hint():
+        """Why the native cap is what it is, when RAM set it."""
+        if not _nat.from_memory or nat_refuse >= (
+                CELLS_2D_MAX if case.dim == 2 else CELLS_REFUSE):
+            return ""
+        return (f" (~{_nat.est_bytes(nat_refuse) / 2 ** 30:.1f} GB of the "
+                f"{_nat.ram_gb} GB this PC has, at "
+                f"~{_nat.bytes_per_cell / 1000:.2f} KB/cell) - the native "
+                f"solver runs inside this app, so it cannot page out")
 
     def ram_hint():
         """Why the cap is what it is, in the units the user can act on."""
+        gb = f"~{cap_refuse * BYTES_PER_CELL / 2 ** 30:.1f} GB"
+        kb = f"~{BYTES_PER_CELL / 1000:.1f} KB/cell"
         if not _caps.from_memory:
-            return ""
-        return (f" (~{cap_refuse * BYTES_PER_CELL / 2 ** 30:.1f} GB of the "
-                f"{_hw['ram_gb']} GB WSL VM at ~{BYTES_PER_CELL / 1000:.1f} "
-                f"KB/cell) - shrink the case, raise `memory=` in "
+            return (f" ({gb} of an assumed {FOAM_VM_GB_ASSUMED} GB WSL VM "
+                    f"at {kb} - the real size is unknown) - let the WSL "
+                    f"hardware probe finish, or click Re-detect")
+        return (f" ({gb} of the {_hw['ram_gb']} GB WSL VM at {kb}) - "
+                f"shrink the case, raise `memory=` in "
                 f"%USERPROFILE%\\.wslconfig, or use AMR")
+
+    if foam and not _caps.from_memory:
+        warn(f"WSL hardware not detected - cell caps assume a "
+             f"{FOAM_VM_GB_ASSUMED} GB VM ({cap_refuse:,} cells). A case "
+             f"that validated on another machine may be refused here; "
+             f"click Re-detect once WSL is up.")
+    elif foam and _caps.ram_source == _hardware.CACHED:
+        note(f"Cell caps from hardware measured on this machine in an "
+             f"earlier session ({_hw['ram_gb']} GB VM); re-checking in "
+             f"the background.")
 
     rep.effective_dx = dx
     if plan is not None and plan.amr:
@@ -889,11 +943,12 @@ def validate_case(case, pending_inputs=False):
             elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect a long run "
                      f"and GBs of case files on the WSL disk")
-        elif n > CELLS_2D_MAX:
-            err(f"~{n:,} cells exceeds the 2D cap of {CELLS_2D_MAX:,}"
-                + scale_hint())
-        elif n > CELLS_2D_WARN:
-            warn(f"Large grid: ~{n:,} cells - expect a long run")
+        elif n > nat_refuse:
+            err(f"~{n:,} cells exceeds the 2D cap of {nat_refuse:,}"
+                + host_hint() + scale_hint())
+        elif n > nat_warn:
+            warn(f"Large grid: ~{n:,} cells - expect a long run"
+                 f" and ~{_nat.est_bytes(n) / 2 ** 30:.1f} GB of RAM")
     else:
         n = int(case.Lx / dx) * int(case.Ly / dx) * int(case.Lz / dx)
         if plan is not None and (plan.refined or plan.amr):
@@ -907,19 +962,27 @@ def validate_case(case, pending_inputs=False):
             elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect hours of wall "
                      f"time and GBs of case files on the WSL disk")
-        elif n > CELLS_REFUSE:
-            err(f"~{n:,} cells exceeds the 3D cap of {CELLS_REFUSE:,}"
-                + scale_hint())
-        elif n > CELLS_WARN:
-            warn(f"Large grid: ~{n:,} cells - expect a long run and GBs of RAM")
+        elif n > nat_refuse:
+            err(f"~{n:,} cells exceeds the 3D cap of {nat_refuse:,}"
+                + host_hint() + scale_hint())
+        elif n > nat_warn:
+            warn(f"Large grid: ~{n:,} cells - expect a long run and "
+                 f"~{_nat.est_bytes(n) / 2 ** 30:.1f} GB of RAM")
     rep.n_cells = n
     if foam:
         # N17/T48: resolve the rank count with the real cell count and
         # say what was decided, for auto (0) as well as an explicit ask
+        # every argument the RUN will use, so what validation reports is
+        # what actually launches (N21: sources and the settings rank
+        # limit included - without max_ranks the note would promise more
+        # ranks than resolve_nprocs goes on to ask for)
         rep.run_plan = _env.plan_run(
             int(getattr(case, 'n_procs', 0) or 0), n,
             cores=_hw.get('cores'), ram_gb=_hw.get('ram_gb'),
-            dim=case.dim, amr=amr, headroom=_env.mpi_headroom())
+            dim=case.dim, amr=amr, headroom=_env.mpi_headroom(),
+            ram_source=_hw.get('ram_source'),
+            cores_source=_hw.get('cores_source'),
+            max_ranks=_env.mpi_max_ranks())
         if case.dim > 1:
             note("Parallel run: " + rep.run_plan.reason)
     if plan is not None and plan.refined:

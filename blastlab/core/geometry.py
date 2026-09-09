@@ -80,6 +80,8 @@ def stop_dists_3d(Lx, Ly, Lz, centers, bcs):
     charge centre (ROADMAP B21 - the stop itself is pressure-based; these
     only size progress and snapshots). Fully reflecting box: the far
     corner from the primary (first) centre."""
+    if not centers:     # see d_charge_3d: pass the burst point instead
+        raise ValueError('stop_dists_3d needs at least one centre')
     x0, y0, z0 = centers[0]
     dists = []
     for side, d_of in (('x_lo', lambda c: c[0]),
@@ -133,6 +135,10 @@ def d_charge_2d(x_c, y_c, x0, y0):
 def d_charge_3d(x_c, y_c, z_c, centers):
     """Per-cell distance to the NEAREST charge centre (multi-charge
     aware), float32 to bound memory on big grids."""
+    if not len(centers):
+        # a profile-initialised stage has no charge list - the caller
+        # must pass the burst point (the profile's own centre) instead
+        raise ValueError('d_charge_3d needs at least one centre')
     d = None
     for cx, cy, cz in centers:
         di = np.sqrt((x_c[:, None, None] - cx) ** 2

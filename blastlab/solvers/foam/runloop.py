@@ -348,8 +348,13 @@ class OrderedIngest:
             self._i = i
             dpath = self.spec.time_dirs(name)
             if not self._ready(name):
-                if _t_disp == 0.0:
-                    continue        # the writer's 0/ dir: not a solver write
+                # the writer's own initial-condition dir, not a solver
+                # write: '0' for a charge case, t0 for a profile stage,
+                # which under AMR has no cellLevel of its own to be
+                # "ready" with (T70). Either way the initial state
+                # reaches the view through _initial_frame.
+                if _t_disp == 0.0 or name == self.spec.start_dir:
+                    continue
                 if self.unreadable(name):
                     continue
                 return

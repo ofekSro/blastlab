@@ -27,7 +27,7 @@ from ..core import refine
 from ..core.refine import LEVEL_COLORS
 from ..core.bc import normalize_bc as _normalize_bc
 from ..core.constants import P_AIR
-from .sampling import FrameStore
+from .sampling import FRAME_MEM_CAP, FrameStore
 
 CMAP = 'turbo'
 BG_BOTTOM, BG_TOP = '#10131a', '#2a2f3a'
@@ -306,7 +306,8 @@ class BlastScene(_CameraOps):
         self.pl = plotter
         self.embedded = embedded
         self.init = init
-        self.store = FrameStore()
+        self.store = FrameStore(
+            mem_cap=init.get('frame_mem_cap') or FRAME_MEM_CAP)
         self.frame = None            # current frame payload
         self.t = 0.0
         self.index = -1

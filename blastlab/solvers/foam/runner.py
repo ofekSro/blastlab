@@ -232,7 +232,11 @@ class FoamRun:
             # pipe and the detached solver dies on SIGPIPE
             # Open MPI's default slot count is the physical-core
             # count: ranks beyond it need explicit opt-in or mpirun
-            # refuses to launch ("not enough slots")
+            # refuses to launch ("not enough slots").
+            # Since N21 `plan_run` clamps the rank count to the cores
+            # the machine has, so this is mostly defence in depth - but
+            # it stays: a resume reads n_procs back off disk, and the
+            # slot count at launch may differ from the one the plan saw.
             flags = ''
             if self.n_procs > env.detect_slots():
                 flags = ' --use-hwthread-cpus'

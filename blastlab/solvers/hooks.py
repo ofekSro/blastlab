@@ -20,7 +20,17 @@ import numpy as np
 FRAME_MEM_BUDGET = 200_000_000
 
 
-def frame_budget(record_frames, n_disp, hooks=None, amr=False):
+def frame_mem_budget(host_ram_gb=None):
+    """N21: the same budget, sized to the host. Unlike the viewer's
+    playback store this one lives in the GUI process itself - the one
+    that actually dies of a MemoryError - so a small machine must get
+    less than the fixed 200 MB."""
+    from ..core.hardware import memory_budget
+    return memory_budget(host_ram_gb, 0.03, 50_000_000, FRAME_MEM_BUDGET)
+
+
+def frame_budget(record_frames, n_disp, hooks=None, amr=False,
+                 budget=None):
     """`record_frames` capped so the replay record fits the budget.
 
     One frame costs 4 bytes per display cell (the float32 pressure)
@@ -29,7 +39,10 @@ def frame_budget(record_frames, n_disp, hooks=None, amr=False):
     if record_frames <= 0 or n_disp <= 0:
         return record_frames
     per_frame = (5 if amr else 4) * int(n_disp)
-    cap = max(8, int(FRAME_MEM_BUDGET // per_frame))
+    if budget is None:
+        from ..core.hardware import host
+        budget = frame_mem_budget(host().get('ram_gb'))
+    cap = max(8, int(budget // per_frame))
     if record_frames > cap and hooks is not None:
         hooks.log(f"  [note] Replay frames reduced {record_frames} -> "
                   f"{cap} to bound frame memory "

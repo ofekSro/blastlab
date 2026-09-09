@@ -484,14 +484,12 @@ class RunPanel(ctk.CTkFrame):
             ax.set_ylabel('Overpressure [kPa]')
             ax.grid(True, alpha=0.3)
             # T53: gauge radii as vertical marks (the 1D pane is a line
-            # plot, so there is no field to put a dot on)
-            trig = info.get('trigger_gauge')
+            # plot, so there is no field to put a dot on). Every mark is
+            # alike - 1D has no trigger gauge to single out (T63).
             for n, gr, _ in info.get('gauges') or []:
-                ax.axvline(gr, color=theme.cur('muted'),
-                           lw=1.6 if n == trig else 1.0,
-                           ls=':' if n == trig else (0, (4, 3)),
-                           alpha=0.8, zorder=1.5)
-                ax.annotate(f'G{n}' + ('*' if n == trig else ''),
+                ax.axvline(gr, color=theme.cur('muted'), lw=1.0,
+                           ls=(0, (4, 3)), alpha=0.8, zorder=1.5)
+                ax.annotate(f'G{n}',
                             (gr, 1.0), xycoords=('data', 'axes fraction'),
                             textcoords='offset points', xytext=(3, -11),
                             color=theme.cur('muted'), fontsize=7.5,

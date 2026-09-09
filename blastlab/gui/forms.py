@@ -280,7 +280,8 @@ class CaseForm(ctk.CTkFrame):
         return var
 
     def _set_trigger(self, case):
-        """T51 trigger rows out of a case (shared by every dimension)."""
+        """T51 trigger rows out of a case (2D/3D - 1D has no trigger
+        card since T63)."""
         n = getattr(case, 'trigger_gauge', None)
         self.v['trigger_gauge'].set('' if n in (None, 0) else str(int(n)))
         self.v['trigger_action'].set(
@@ -626,18 +627,21 @@ class CaseForm(ctk.CTkFrame):
         # ── Trigger gauge (T51) ───────────────────────────────────────
         # one gauge that ends the run and/or writes the remap file the
         # moment the wave reaches it. 3D has no remap format, so only
-        # the terminate action is offered there.
-        trig = self._card(1, 'Trigger gauge')
-        trow = _row(trig, 0, 'Gauge number\n(blank = off)',
-                    _entry(trig, self._var('trigger_gauge', '')))
-        acts = ([a for a in TRIGGER_ACTIONS if 'remap' not in a]
-                if self.dim == 3 else list(TRIGGER_ACTIONS))
-        trow = _row(trig, trow, 'On arrival',
-                    _combo(trig, self._var('trigger_action', 'terminate'),
-                           acts))
-        if self.dim < 3:
-            _row(trig, trow, 'Remap file\n(blank = profile out)',
-                 _entry(trig, self._var('trigger_file', '')))
+        # the terminate action is offered there. 1D has no trigger at
+        # all (T63): its outer boundary already ends the run and the
+        # profile it writes at the end IS the hand-off.
+        if self.dim > 1:
+            trig = self._card(1, 'Trigger gauge')
+            trow = _row(trig, 0, 'Gauge number\n(blank = off)',
+                        _entry(trig, self._var('trigger_gauge', '')))
+            acts = ([a for a in TRIGGER_ACTIONS if 'remap' not in a]
+                    if self.dim == 3 else list(TRIGGER_ACTIONS))
+            trow = _row(trig, trow, 'On arrival',
+                        _combo(trig, self._var('trigger_action',
+                                               'terminate'), acts))
+            if self.dim < 3:
+                _row(trig, trow, 'Remap file\n(blank = profile out)',
+                     _entry(trig, self._var('trigger_file', '')))
 
         self._sync_geometry()
         self._apply_mode()
@@ -777,9 +781,6 @@ class CaseForm(ctk.CTkFrame):
                 bc_outer=v['bc_outer'].get(),
                 n_snapshots=_I('n_snapshots', 'snapshots'),
                 t_end=_F('t_end', 'end time'),
-                trigger_gauge=_trig(v['trigger_gauge']),
-                trigger_action=v['trigger_action'].get(),
-                trigger_file=v['trigger_file'].get() or None,
                 gauge_radii=[g[0] for g in self.gauges.get()],
                 gauge_file=v['gauge_file'].get(),
                 profile_file=v['profile_out'].get() or None,
@@ -882,7 +883,6 @@ class CaseForm(ctk.CTkFrame):
             self.gauges.set([(g,) for g in case.gauge_radii])
             v['gauge_file'].set(case.gauge_file)
             v['profile_out'].set(case.profile_file or '')
-            self._set_trigger(case)
             return
         if self.dim == 2:
             v['geometry'].set(case.geometry)

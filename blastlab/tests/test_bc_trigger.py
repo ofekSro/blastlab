@@ -231,16 +231,27 @@ def main():
           '[warn] Trigger gauge 9' in log3
           and res3.stop_reason == 'end time reached')
 
-    # 1D remap: the chain hand-off at a chosen radius
+    # T63: 1D has no trigger gauge at all. The 1D hand-off is the run's
+    # own profile output, and bc_outer='terminate' ends the run at the
+    # end of the sector - the per-gauge trigger only duplicated those in
+    # the native solver and did nothing whatsoever on blastFoam.
+    check('Case1D carries no trigger fields',
+          not any(hasattr(Case1D(), f) for f in
+                  ('trigger_gauge', 'trigger_action', 'trigger_file')))
     r1t, _ = quiet(solve_1d, Case1D(radius_m=1.0, charge_kg=0.2,
                                     cell_size_m=0.005, n_snapshots=1,
-                                    gauge_radii=[0.3, 0.6],
-                                    trigger_gauge=1,
-                                    trigger_action='remap+terminate'),
+                                    gauge_radii=[0.3, 0.6]),
                    ConsoleHooks(1))
-    check('1D remap+terminate stops at the gauge and holds the profile',
-          r1t.stop_reason.startswith('trigger gauge 1 reached')
-          and r1t.meta['trigger_profile']['t'] == r1t.meta['trigger']['t'])
+    check('a 1D run records no trigger in its meta',
+          not any(k in r1t.meta for k in
+                  ('trigger', 'trigger_profile', 'trigger_gauge')))
+    old1d = dict(case_to_dict(Case1D(radius_m=1.0, gauge_radii=[0.3])),
+                 version=10, trigger_gauge=1,
+                 trigger_action='remap+terminate', trigger_file='x.txt')
+    c_old = case_from_dict(old1d)
+    check('a pre-T63 1D case file still loads, without the trigger keys',
+          c_old.radius_m == 1.0 and c_old.gauge_radii == [0.3]
+          and not hasattr(c_old, 'trigger_gauge'))
 
     print("\nT51 validation")
     check('remap is refused in 3D',

@@ -543,12 +543,19 @@ def ask_user_3d():
         if not 0 < v < min(Lx, Ly, Lz):
             return f"Cell size must be in (0, {min(Lx, Ly, Lz)}) m."
         n_est = int(Lx / v) * int(Ly / v) * int(Lz / v)
-        if n_est > CELLS_REFUSE:
-            return (f"{n_est:,} cells exceeds the {CELLS_REFUSE:,} cap - "
+        # N21: same host-RAM plan validate_case uses. It can only lower
+        # CELLS_REFUSE, never raise it, so an unknown host behaves as
+        # this prompt always did.
+        from .core.hardware import host, plan_native
+        nat = plan_native(dim=3, ram_gb=host(probe=True).get('ram_gb'))
+        if n_est > nat.cell_cap_refuse:
+            return (f"{n_est:,} cells exceeds the "
+                    f"{nat.cell_cap_refuse:,} cap ({nat.reason}) - "
                     f"use a coarser cell or a smaller domain.")
-        if n_est > CELLS_WARN:
+        if n_est > nat.cell_cap_warn:
             print(f"    [warn] {n_est:,} cells - this will be slow and "
-                  f"RAM-hungry")
+                  f"RAM-hungry (~"
+                  f"{nat.est_bytes(n_est) / 2 ** 30:.1f} GB)")
         return None
     cell_size_m = _ask("Cell size [m]", default=0.1, validator=_cell_ok)
 

@@ -1,0 +1,21 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "constant";
+    object      dynamicMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dynamicFvMesh   adaptiveFvMesh;
+errorEstimator  densityGradient;
+refineInterval  2;
+lowerRefineLevel 0.4;
+unrefineLevel   0.2;
+nBufferLayers   2;
+maxRefinement   2;
+maxCells        8000000;
+dumpLevel       yes;
+
+// ************************************************************************* //

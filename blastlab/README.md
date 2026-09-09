@@ -190,7 +190,7 @@ same way a written time does), the log reports the cell
 count and per-level histogram at every write, and **Show mesh** follows the
 frame in the live plot, the Results replay, the animation export and the 3D
 viewer. AMR runs are serial in this version (blastFoam's `reconstructPar`
-cannot follow a changing mesh; the measured parallel options are in TASKS.md (reference entry
+cannot follow a changing mesh; the measured parallel options are in DONE.md (reference entry
 N16). E2E drivers: `tests/_e2e_foam_amr2d.py` (`--sweep=0.2:0.1,...` adds
 a threshold table), `tests/_e2e_foam_amr3d.py`.
 
@@ -218,6 +218,7 @@ blastlab/
 ```
 cd blastlab/tests
 python test_regression.py    # reruns baseline cases, byte-compares outputs
+python test_hardware.py      # hardware model: identity, staleness, memory caps
 python test_blast2d.py       # 2D physics suite (19 checks)
 python test_blast3d.py       # 3D physics suite (T1-T10)
 python test_viz3d_sampling.py  # viewer decimation/face-load unit tests

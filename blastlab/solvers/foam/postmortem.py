@@ -46,8 +46,7 @@ def _snap_radii(case, spec):
         n_snapshots = case.n_snapshots
     else:
         dists = geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz,
-                                       [c for c, _m in spec.charges],
-                                       case.bcs)
+                                       spec.burst_points, case.bcs)
         n_snapshots = min(case.n_snapshots,
                           max(1, int(1.5e9 / (4 * spec.n_cells)) - 1))
     return geometry.snap_radii(spec.r_exp, dists, n_snapshots)
@@ -75,13 +74,15 @@ def load_run(case_dir, hooks=None):
     spec.files = None                   # nothing is written
     if spec.lmax or spec.amr:
         # refined mesh: rebuild the fine-grid gather map from the cell
-        # centres the run wrote (0/C is kept on disk for exactly this);
-        # AMR runs rebuild the t = 0 map the same way and every later
-        # time dir carries its own C + cellLevel (mesh_at)
-        if not os.path.isfile(os.path.join(unc, '0', 'C')):
+        # centres the run wrote (C is kept in the start-time dir for
+        # exactly this - '0', or t0 for a profile stage, T70); AMR runs
+        # rebuild the start map the same way and every later time dir
+        # carries its own C + cellLevel (mesh_at)
+        if not os.path.isfile(os.path.join(unc, spec.start_dir, 'C')):
             raise RuntimeError(
-                f'{unc} is a locally refined run without 0/C (cell '
-                f'centres) - re-run it with the current blastlab')
+                f'{unc} is a locally refined run without '
+                f'{spec.start_dir}/C (cell centres) - re-run it with the '
+                f'current blastlab')
         build_remap(spec, hooks)
 
     fields = ('p', 'rho', 'U', f'alpha.{spec.phase}')
@@ -165,7 +166,7 @@ def load_run(case_dir, hooks=None):
         d_charge = geometry.d_charge_2d(g['x_c'], g['y_c'], x0, y0)
     else:
         d_charge = geometry.d_charge_3d(g['x_c'], g['y_c'], g['z_c'],
-                                        [c for c, _m in spec.charges])
+                                        spec.burst_points)
     snap_radii = _snap_radii(case, spec)
     ingested, snap_names = {}, []
     acc = PeakImpulse()

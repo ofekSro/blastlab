@@ -100,10 +100,14 @@ def _mesh_stages(spec, hooks):
                     f'refineMesh -dict system/refineMeshDict.{lv} '
                     f'-overwrite')]
     if not spec.charges:
-        # profile-initialised stage (N7): 0/ already holds the remapped
-        # state, and setRefinedFields would overwrite alpha with the
-        # dict's defaultFieldValues - skip it entirely
-        pass
+        # profile-initialised stage (N7): the state IS the initial
+        # condition, so setRefinedFields is skipped entirely (it would
+        # overwrite alpha with the dict's defaultFieldValues). The
+        # state lands here rather than with the rest of the case: it is
+        # nonuniform over the final cells, and subsetMesh/refineMesh
+        # read every field they find at the mesh they start from, so an
+        # earlier write aborts them on the count mismatch (T62)
+        stages.append(('writing the remapped state', writer.write_deferred))
     elif spec.amr:
         # dynamic AMR (N16): setRefinedFields refines the charge region
         # to `maxRefinement` at t = 0 and writes the hexRef cellLevel the
@@ -116,8 +120,10 @@ def _mesh_stages(spec, hooks):
         stages.append(('charge init (setRefinedFields)',
                        'setRefinedFields -noRefine'))
     if spec.lmax or spec.amr:
+        # the start dir, which a profile stage names t0, not 0 (N7)
         stages.append(('writing cell centres (writeCellCentres)',
-                       'postProcess -func writeCellCentres -time 0'))
+                       'postProcess -func writeCellCentres '
+                       f'-time {spec.start_dir}'))
     if spec.n_procs > 1:
         # a profile stage's fields live at t0, not 0 (N7)
         stages.append((f'decomposing for {spec.n_procs} MPI ranks',
@@ -136,7 +142,7 @@ def build_remap(spec, hooks):
     if spec.amr:
         return _build_remap_amr(spec, hooks)
     try:
-        C = reader.read_cell_centres(spec.case_unc)
+        C = reader.read_cell_centres(spec.case_unc, spec.start_dir)
     except (OSError, ValueError) as exc:
         raise RuntimeError(
             f'refined mesh: cannot read cell centres 0/C ({exc}) - case '
@@ -233,20 +239,24 @@ def mesh_at(spec, dpath):
 
 
 def _build_remap_amr(spec, hooks):
-    """AMR twin of build_remap: read the t = 0 mesh (charge refined by
-    setRefinedFields), keep its MeshMap on `spec.mesh0` for the initial
-    frames and record the starting cell count."""
-    d0 = os.path.join(spec.case_unc, '0')
+    """AMR twin of build_remap: read the start-time mesh (charge refined
+    by setRefinedFields), keep its MeshMap on `spec.mesh0` for the
+    initial frames and record the starting cell count. A profile stage
+    starts at t0, not 0, and has no cellLevel there at all - mesh_at
+    reads that as level 0 throughout, which is what its base mesh is
+    (T70)."""
+    d0 = os.path.join(spec.case_unc, spec.start_dir)
     try:
         mm = mesh_at(spec, d0)
     except (OSError, ValueError) as exc:
         raise RuntimeError(
-            f'AMR mesh: cannot read the t = 0 cell centres / levels '
-            f'({exc}) - case kept at {spec.case_unc}') from exc
+            f'AMR mesh: cannot read the cell centres / levels of '
+            f'{spec.start_dir} ({exc}) - case kept at '
+            f'{spec.case_unc}') from exc
     except RuntimeError as exc:
         raise RuntimeError(
-            f'AMR mesh at t = 0 does not tile the display grid: {exc} - '
-            f'case kept at {spec.case_unc}') from exc
+            f'AMR mesh at t = {spec.start_dir} does not tile the display '
+            f'grid: {exc} - case kept at {spec.case_unc}') from exc
     spec.mesh0 = mm
     spec.n_cells_actual = int(mm.n_cells)
     for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
@@ -254,7 +264,8 @@ def _build_remap_amr(spec, hooks):
             os.remove(os.path.join(d0, f))
         except OSError:
             pass
-    hooks.log(f'  [blastfoam] AMR mesh at t = 0: {mm.n_cells:,} cells '
+    hooks.log(f'  [blastfoam] AMR mesh at t = {spec.start_dir}: '
+              f'{mm.n_cells:,} cells '
               f'({level_counts(mm.counts)}), displayed on a '
               f'{" x ".join(str(n) for n in mm.remap.shape)} grid at '
               f'level {spec.display_level} ({spec.dx:.5g} m)')
@@ -290,6 +301,9 @@ def _preflight(case, hooks):
     for label, cmd in _mesh_stages(spec, hooks):
         _stop_check(hooks, label)
         hooks.log(f'  [blastfoam] {label}...')
+        if callable(cmd):       # a Python stage, e.g. write_deferred
+            cmd(spec)
+            continue
         out.append(runner.run_stage_stoppable(
             spec.case_posix, cmd, should_stop=hooks.should_stop))
     # scanned once over every stage's output, as when this was a single
@@ -550,10 +564,12 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
     spec.files = None                   # everything is already on disk
     spec.adaptive_write = bool(adaptive_write)
     if spec.lmax or spec.amr:
-        if not os.path.isfile(os.path.join(unc, '0', 'C')):
+        # a profile-initialised stage keeps its mesh at t0, not 0 (T70)
+        if not os.path.isfile(os.path.join(unc, spec.start_dir, 'C')):
             raise RuntimeError(
-                f'{unc} is a locally refined run without 0/C (cell '
-                f'centres) - cannot rebuild the remap to resume')
+                f'{unc} is a locally refined run without '
+                f'{spec.start_dir}/C (cell centres) - cannot rebuild the '
+                f'remap to resume')
         build_remap(spec, hooks)
 
     times = [n for _t, n in reader.list_times(spec.time_root())
@@ -751,11 +767,25 @@ def _refine_lines(spec):
     """Banner lines for a locally refined mesh ([] when uniform)."""
     if spec.amr:
         disp = ' x '.join(str(n) for n in spec.levels.shape)
-        return [f'  Dynamic AMR     : up to level {spec.amr} '
-                f'({spec.dx_base / 2 ** spec.amr:g} m cells); displayed at '
-                f'level {spec.display_level} ({disp} grid at {spec.dx:g} m)',
-                f'  Mesh cells      : {spec.n_cells:,} at t = 0 '
-                f'(follows the shock)']
+        lines = [f'  Dynamic AMR     : up to level {spec.amr} '
+                 f'({spec.dx_base / 2 ** spec.amr:g} m cells); displayed at '
+                 f'level {spec.display_level} ({disp} grid at {spec.dx:g} m)',
+                 f'  Mesh cells      : {spec.n_cells:,} at t = '
+                 f'{spec.start_dir} (follows the shock)']
+        # T70: a profile stage starts on the base mesh - the refiner has
+        # nothing to refine until the run steps, so the base cell is what
+        # the hand-off is resampled onto, however deep the AMR goes
+        if spec.init_state is not None:
+            lines.append(f'  Initial state   : written on the '
+                         f'{spec.dx_base:g} m base mesh, refined from '
+                         f'there')
+            dx_src = float(spec.init_state.get('dx_src') or 0.0)
+            if dx_src and spec.dx_base > 2.0 * dx_src:
+                lines.append(f'  [warn] the profile was solved at '
+                             f'{dx_src:g} m: this base cell coarsens it '
+                             f'{spec.dx_base / dx_src:.1f}x at the '
+                             f'hand-off - lower the base cell size')
+        return lines
     if not spec.lmax:
         return []
     lv = np.asarray(spec.levels)
@@ -772,21 +802,35 @@ def _refine_lines(spec):
             f'{disp} grid at {spec.dx:g} m)']
 
 
+def _source_lines(case, spec, charge_lbl):
+    """Where the run's initial state comes from: the charge, or - for a
+    chain stage fed by a profile (N7) - the file and the instant it was
+    captured at. `case.charge` is meaningless for the latter (it keeps
+    whatever the form last held), so it is not printed there."""
+    if spec.init_state is None:
+        return [f'  Charge          : {charge_lbl}',
+                f'  Explosive radius: {spec.r_exp:.4f} m']
+    src = os.path.basename(getattr(case, 'profile_file_in', '') or '?')
+    return [f'  Initialised from: {src} at t = {spec.t_start * 1e3:.3f} ms',
+            f'  Source charge   : explosive radius {spec.r_exp:.4f} m '
+            f'({spec.material})']
+
+
 def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
     m = MATERIALS[spec.material]
     bar = '=' * 60
     bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
     x0, y0, _ = spec.center
     axisym = case.geometry == 'axisymmetric'
-    charge_lbl = (f'{case.charge:g} kg {spec.material} (sphere) on axis '
-                  f'at height {y0:g} m' if axisym else
-                  f'{case.charge:g} kg {spec.material} per metre '
-                  f'(infinite cylinder) at ({x0:g}, {y0:g}) m')
+    charge_lbl = None if spec.init_state is not None else (
+        f'{case.charge:g} kg {spec.material} (sphere) on axis '
+        f'at height {y0:g} m' if axisym else
+        f'{case.charge:g} kg {spec.material} per metre '
+        f'(infinite cylinder) at ({x0:g}, {y0:g}) m')
     for line in (
             '', bar, f'  2D Blast - blastFoam (WSL) ({case.geometry})',
             bar,
-            f'  Charge          : {charge_lbl}',
-            f'  Explosive radius: {spec.r_exp:.4f} m',
+            *_source_lines(case, spec, charge_lbl),
             (f'  Domain          : {case.Lx:g} x {case.Ly:g} m,  cell '
              f'{spec.dx:g} m  ({spec.nx} x {spec.ny} = '
              f'{spec.n_cells:,} cells)') if not (spec.lmax or spec.amr)
@@ -1302,10 +1346,10 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
     x0, y0, z0 = spec.center
     for line in (
             '', bar, '  3D Blast - blastFoam (WSL)', bar,
-            f'  Charge          : {case.charge:g} kg {spec.material} '
-            f'(sphere)',
+            *_source_lines(case, spec,
+                           None if spec.init_state is not None else
+                           f'{case.charge:g} kg {spec.material} (sphere)'),
             f'  Burst point     : ({x0:g}, {y0:g}, {z0:g}) m',
-            f'  Explosive radius: {spec.r_exp:.4f} m',
             f'  Domain          : {case.Lx:g} x {case.Ly:g} x '
             f'{case.Lz:g} m,  cell '
             f'{spec.dx if not (spec.lmax or spec.amr) else spec.dx_base:g} m'
@@ -1361,7 +1405,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     bcs = dict(case.bcs)
     solid = (spec.solid if spec.solid is not None
              else np.zeros((Nx, Ny, Nz), dtype=bool))
-    centers = [c for c, _m in spec.charges]
+    centers = spec.burst_points
 
     n_snapshots = case.n_snapshots
     n_disp = (spec.nx * spec.ny * spec.nz if (spec.lmax or spec.amr)

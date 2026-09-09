@@ -11,8 +11,23 @@ import numpy as np
 
 from ..core.bc import normalize_bc
 
+#: N21: deliberately NOT derived from RAM. 128^3 float32 is only 8.4 MB
+#: - the binding constraint is the VTK render rate, not memory - and
+#: deriving it would change WHAT THE USER SEES between machines, which is
+#: a reproducibility hazard in a tool built for comparing runs.
 MAX_VIEW_DIM = 128          # decimate fields so no axis exceeds this
-FRAME_MEM_CAP = 1.5e9       # playback history budget [bytes]
+FRAME_MEM_CAP = 1.5e9       # playback history budget [bytes] (the ceiling)
+
+
+def frame_mem_cap(host_ram_gb=None):
+    """Playback history budget for a host of this size (N21).
+
+    ~35 frames of a full 128^3 payload at the ceiling. Fine on a large
+    machine, fatal on a small one - so a measured host gets a tenth of
+    its RAM, bounded by the old constant above and a floor that still
+    holds a usable timeline."""
+    from ..core.hardware import memory_budget
+    return memory_budget(host_ram_gb, 0.10, 250_000_000, FRAME_MEM_CAP)
 
 
 def choose_stride(shape, max_dim=MAX_VIEW_DIM):
@@ -153,8 +168,12 @@ def build_scene_init(scene_info, max_dim=MAX_VIEW_DIM):
     face_specs = build_face_index(
         scene_info['obstacles'], scene_info['x_c'], scene_info['y_c'],
         scene_info['z_c'], solid, scene_info['bcs'])
+    from ..core.hardware import host as _host
     init = dict(
         stride=stride,
+        # computed here, in the parent: the viewer child must not probe
+        # (and the two must not disagree about the budget)
+        frame_mem_cap=frame_mem_cap(_host().get('ram_gb')),
         x_c=np.asarray(scene_info['x_c']),
         y_c=np.asarray(scene_info['y_c']),
         z_c=np.asarray(scene_info['z_c']),

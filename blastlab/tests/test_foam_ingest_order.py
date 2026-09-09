@@ -69,6 +69,7 @@ def test_ordered_ingest():
         # a decomposed AMR run answers with one dir per rank)
         spec = types.SimpleNamespace(
             case_unc=root, amr=0, n_procs=1, decomposed=False,
+            start_dir='0',
             time_root=lambda: root,
             time_dirs=lambda name: os.path.join(root, name))
         hooks = Log()
@@ -133,6 +134,30 @@ def test_ordered_ingest():
         order4.skip('0.002')
         got = names(order4, {'0': 0.0}, final=True)
         check('skip() removes a dir from every later pass', got == [] and len(hooks4.lines) == 1, str(got))
+
+        # T70: a profile stage starts at t0, not 0, and under AMR that
+        # dir has no cellLevel of its own - it is the writer's initial
+        # condition, not a solver write, so it is passed over in silence
+        # exactly like a charge case's 0/ dir
+        root2 = tempfile.mkdtemp(prefix='blastlab_ingest_t0_')
+        try:
+            spec_p = types.SimpleNamespace(
+                case_unc=root2, amr=2, n_procs=1, decomposed=False,
+                start_dir='5e-05',
+                time_root=lambda: root2,
+                time_dirs=lambda name: os.path.join(root2, name))
+            hooks5 = Log()
+            order5 = runloop.OrderedIngest(spec_p, FIELDS, hooks5)
+            make_dir(root2, '5e-05', complete=False)   # the remapped state
+            make_dir(root2, '0.001')
+            for _ in range(2 * runloop.STALL_POLLS):
+                got = names(order5, {})
+            check("the profile stage's t0 dir is passed over silently",
+                  got == ['0.001'] and not hooks5.lines
+                  and '5e-05' not in order5.stalls,
+                  f'{got} {hooks5.lines} {order5.stalls}')
+        finally:
+            shutil.rmtree(root2, ignore_errors=True)
     finally:
         shutil.rmtree(root, ignore_errors=True)
 

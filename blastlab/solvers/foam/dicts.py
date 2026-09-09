@@ -25,6 +25,10 @@ P_OPEN_BC = 'pressureWaveTransmissive'
 #: Lohner error-estimator noise floor (adaptiveFvMesh `epsilon`); the
 #: classic value for pressure-based blast refinement
 LOHNER_EPS = 0.05
+#: controlDict `timePrecision` - and, because `startFrom latestTime`
+#: re-derives the time NAME from the value it read, the precision any
+#: time directory this side writes must be named at. See tfmt().
+TIME_PRECISION = 8
 
 
 class Raw(str):
@@ -42,6 +46,18 @@ def fmt(v):
     if isinstance(v, (tuple, list)):
         return '(' + ' '.join(fmt(x) for x in v) + ')'
     return str(v)
+
+
+def tfmt(v):
+    """Format a time the way OpenFOAM names its own time directories -
+    `timeFormat general` is %g at `timePrecision` significant digits.
+
+    A directory we write must carry exactly this name: `startFrom
+    latestTime` keeps the VALUE it scanned and rebuilds the name from
+    it, so a name with more digits than timePrecision (fmt's %.10g on a
+    remap t0, say) is asked for back at 8 and the run dies on a missing
+    field file."""
+    return format(float(v), f'.{TIME_PRECISION}g')
 
 
 def _is_scalar(e):

@@ -37,8 +37,8 @@ from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
 from . import env
-from .dicts import (FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC, Raw, block, fmt,
-                    foam_file)
+from .dicts import (FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC, TIME_PRECISION,
+                    Raw, block, fmt, foam_file, tfmt)
 from .materials import AFTERBURN, MATERIALS, E0, charge_radius
 
 PHASE = 'expl'                  # fixed phase name for every material
@@ -113,6 +113,21 @@ class CaseSpec:
     #: physical time the run starts at - 0 for a charge, the profile's
     #: own time for a stage continuing an earlier one (N7)
     t_start: float = 0.0
+    #: `files` entries held back until the mesh stages have finished
+    #: changing the cell count (T62). A profile stage's fields are
+    #: nonuniform over the FINAL cells, so subsetMesh/refineMesh must
+    #: not find them lying in the time dir - they read every field at
+    #: the current mesh and abort on the count mismatch. A charge case
+    #: writes uniform fields, which map onto any mesh, and defers none.
+    deferred: tuple = ()
+
+    @property
+    def burst_points(self):
+        """Centres the shock front is measured from, as [(x, y, z), ...].
+        The charge centres, or - for a profile-initialised stage, which
+        has no charge list (N7) - the profile's own centre, which is
+        `case.center`."""
+        return [c for c, _m in self.charges] or [tuple(self.center)]
 
     @property
     def decomposed(self):
@@ -143,9 +158,10 @@ class CaseSpec:
         """Name of the time directory the initial fields live in. A
         profile stage continues an earlier stage's clock, so its state
         is written at t0 and picked up with `startFrom latestTime` -
-        blastFoam then takes the time from the directory NAME, which
-        avoids having to reproduce OpenFOAM's own time formatting."""
-        return '0' if not self.t_start else fmt(float(self.t_start))
+        which keeps the value it scanned and rebuilds the name from it,
+        so the name has to be OpenFOAM's own (tfmt, not fmt) or the
+        fields are asked for under a name nothing wrote (T62)."""
+        return '0' if not self.t_start else tfmt(self.t_start)
     patches: list = field(default_factory=list)     # (name, kind)
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
     solid: object = None            # (nx,ny,nz) bool mask, None = none
@@ -157,6 +173,7 @@ class CaseSpec:
     # on the base counts `nb`, refineMesh passes realise `zones`
     dx_base: float = 0.0
     nb: tuple = ()                  # base (nx, ny[, nz]) for blockMesh
+    grid_base: dict = None          # core.grid dict of the base grid
     levels: object = None           # int8 level map on the fine grid
     lmax: int = 0
     zones: list = field(default_factory=list)       # snapped (box.., level)
@@ -191,6 +208,25 @@ class CaseSpec:
         return n
 
     @property
+    def init_grid(self):
+        """The grid a profile-initialised stage's state is written on:
+        the mesh that exists when those fields land (T70/N7).
+
+        Uniform case: base and display grid are the same object, so this
+        is `grid` as before. AMR: the t = 0 mesh IS the uniform base grid
+        - blockMesh builds it from `nb` and adaptiveFvMesh refines only
+        once the run is stepping - while `grid` sits at `display_level`,
+        which would be 2**(dim*D) times too many values. A statically
+        refined mesh never gets here (validation refuses zones for a
+        profile stage: refineMesh renumbers the cells)."""
+        return self.grid_base if self.amr else self.grid
+
+    @property
+    def init_solid(self):
+        """Obstacle mask on `init_grid` (see there)."""
+        return self.solid_base if self.amr else self.solid
+
+    @property
     def mesh_fields(self):
         """Per-time mesh files the readiness gate must see (AMR only)."""
         return ('C', 'cellLevel') if self.amr else ()
@@ -202,6 +238,7 @@ class CaseSpec:
         self.dx_base = float(plan.dx_base)
         self.nb = tuple(int(plan.base[k]) for k in
                         (('Nx', 'Ny') if plan.dim == 2 else ('Nx', 'Ny', 'Nz')))
+        self.grid_base = plan.base
         self.levels, self.lmax = plan.levels, plan.lmax
         self.zones = list(plan.zones)
         self.solid_base = plan.solid_base
@@ -389,10 +426,8 @@ def plan_case(case):
     # per open side: distance from the NEAREST charge (B21), mirroring
     # core.geometry.stop_dists_3d so timing is sized for the front that
     # reaches the boundary first
-    # a profile-initialised stage has no charge list: the burst point is
-    # the profile's own centre, which is `case.center` (N7)
-    src = charges or [((x0, y0, z0), 0.0)]
-    side_d = {s: min(d(c) for c, _m in src) for s, d in (
+    src = spec.burst_points     # the profile's own centre with no charges
+    side_d = {s: min(d(c) for c in src) for s, d in (
         ('x_lo', lambda c: c[0]), ('x_hi', lambda c: Ls[0] - c[0]),
         ('y_lo', lambda c: c[1]), ('y_hi', lambda c: Ls[1] - c[1]),
         ('z_lo', lambda c: c[2]), ('z_hi', lambda c: Ls[2] - c[2]))}
@@ -623,7 +658,7 @@ def _controldict(spec, case):
         'writePrecision': 6,
         'writeCompression': 'off',
         'timeFormat': 'general',
-        'timePrecision': 8,
+        'timePrecision': TIME_PRECISION,
         'runTimeModifiable': 'true',
         'adjustTimeStep': 'yes',
         'maxCo': case.cfl,
@@ -1038,16 +1073,18 @@ def _zero_fields(spec):
 def profile_state(case, spec):
     """Remap a chain stage's input profile onto this case's cell grid.
 
-    Returns dict(rho, u, v, w, e, phase, t0) of (nx, ny[, nz]) arrays -
-    the same remap the native solvers use, so a chain hands blastFoam
-    exactly the state a native stage would have started from. `w` is
-    None in 2D."""
+    Returns dict(rho, u, v, w, e, phase, t0) of arrays shaped like
+    `spec.init_grid` - the same remap the native solvers use, so a chain
+    hands blastFoam exactly the state a native stage would have started
+    from. `w` is None in 2D. `dx_src` is the source profile's own cell
+    size, which the banner compares against the mesh the state lands
+    on (T70)."""
     from ...core import profiles
     mode = getattr(case, 'init_mode', 'charge')
     path = getattr(case, 'profile_file_in', None)
     if mode == 'charge' or not path:
         return None
-    g = spec.grid
+    g = spec.init_grid
     if spec.dim == 2:
         prof = profiles.load_profile(path)
         U, phase, t0 = profiles.remap_profile_1d_to_2d(
@@ -1072,15 +1109,34 @@ def profile_state(case, spec):
         ke = 0.5 * (u ** 2 + v ** 2 + w ** 2)
     e = U[-1] / rho - ke
     return dict(rho=rho, u=u, v=v, w=w, e=e, phase=phase, t0=float(t0),
-                r_exp=float(prof.get('r_exp', 0.0) or 0.0))
+                r_exp=float(prof.get('r_exp', 0.0) or 0.0),
+                dx_src=_source_dx(prof, mode))
+
+
+def _source_dx(prof, mode):
+    """Cell size of the profile the stage starts from, or 0.0 when it
+    cannot be told. The mesh the state lands on should not be much
+    coarser than this - see the T70 banner warning."""
+    axes = ([prof['r_c'], prof['z_c']] if mode == 'profile2d'
+            else [prof['r']])
+    out = []
+    for a in axes:
+        a = np.asarray(a, dtype=float)
+        if a.size > 1:
+            d = np.diff(a)
+            d = d[np.isfinite(d) & (d > 0)]
+            if d.size:
+                out.append(float(d.min()))
+    return min(out) if out else 0.0
 
 
 def _cell_order(arr, spec):
     """Grid array -> the mesh's cell order: x fastest (F order), and on
     an obstacle-carved mesh only the fluid cells, ascending - the exact
-    inverse of reader.to_grid."""
+    inverse of reader.to_grid. The grid is `spec.init_grid`, which is
+    the base mesh under AMR (T70)."""
     flat = np.asarray(arr).ravel(order='F')
-    solid = getattr(spec, 'solid', None)
+    solid = spec.init_solid
     if solid is not None:
         flat = flat[~np.asarray(solid).ravel(order='F')]
     return flat
@@ -1122,6 +1178,13 @@ def _profile_fields(spec, case):
     comps = [st['u'], st['v']]
     comps.append(st['w'] if st['w'] is not None else np.zeros_like(rho))
     U = np.stack([_cell_order(c, spec) for c in comps], axis=1)
+    # the lists below are read by OpenFOAM against the mesh that exists
+    # when they land; a mismatch is a FOAM FATAL three stages later, with
+    # a message that names neither the cause nor this file (T70)
+    if len(U) != spec.n_cells:
+        raise RuntimeError(
+            f'profile state has {len(U):,} values for a {spec.n_cells:,}'
+            f'-cell mesh - the remap grid and the mesh disagree')
     fields = {
         '0/p': ('p', 'p', _nonuniform(_cell_order(p, spec)), False),
         '0/T': ('T', 'T', _nonuniform(_cell_order(T, spec)), False),
@@ -1165,7 +1228,10 @@ def render_case(case, n_procs=1, live_steps=0):
     # charge sphere (N7): remapped once here, emitted into 0/ below
     spec.init_state = profile_state(case, spec)
     if spec.init_state is not None:
-        spec.t_start = float(spec.init_state['t0'])
+        # snapped to the clock OpenFOAM can actually name (T62): the run
+        # and every time this side writes or reads then agree digit for
+        # digit, at a cost of <1e-8 relative on the start time
+        spec.t_start = float(tfmt(spec.init_state['t0']))
         # keep the SOURCE charge radius so the next stage in the chain
         # (and the run meta) still knows how big the charge was
         spec.r_exp = spec.init_state['r_exp']
@@ -1199,9 +1265,27 @@ def render_case(case, n_procs=1, live_steps=0):
         spec.files.update(_zero_fields(spec))
     else:
         d = spec.start_dir
-        spec.files.update({d + rel[1:]: text for rel, text
-                           in _profile_fields(spec, case).items()})
+        prof = {d + rel[1:]: text for rel, text
+                in _profile_fields(spec, case).items()}
+        spec.files.update(prof)
+        spec.deferred = tuple(prof)     # written after the mesh stages
     return spec
+
+
+def _write_files(spec, rels):
+    """Write the named `spec.files` entries into the case dir."""
+    for rel in rels:
+        path = os.path.join(spec.case_unc, *rel.split('/'))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w', encoding='ascii', newline='\n') as f:
+            f.write(spec.files[rel])
+
+
+def write_deferred(spec):
+    """Write the held-back initial state (see CaseSpec.deferred). Runs
+    as a mesh stage, once the mesh has its final cells and before
+    anything reads the time dir."""
+    _write_files(spec, spec.deferred)
 
 
 def write_case(case, case_posix=None, n_procs=1, live_steps=0):
@@ -1222,11 +1306,8 @@ def write_case(case, case_posix=None, n_procs=1, live_steps=0):
         case_unc = env.unc(case_posix)
     spec.case_posix, spec.case_unc = case_posix, case_unc
     os.makedirs(case_unc, exist_ok=not fresh)
-    for rel, text in spec.files.items():
-        path = os.path.join(case_unc, *rel.split('/'))
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w', encoding='ascii', newline='\n') as f:
-            f.write(text)
+    _write_files(spec, (rel for rel in spec.files
+                        if rel not in spec.deferred))
     # the source Case rides along so a finished run can be reloaded
     # later (postmortem.load_run); disk-side only - not part of the
     # rendered case text pinned by the goldens

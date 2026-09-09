@@ -60,6 +60,14 @@ def cases():
             init_mode='profile1d', profile_file_in=PROFILE_1D,
             gauges=[(0.8, 1.0)], n_snapshots=1, eos='idealGas',
             solver='blastfoam', material='TNT'),
+        # T70: the same stage with dynamic AMR - the state lands on the
+        # BASE mesh (which is what blockMesh builds at t0) and the run
+        # time refiner takes it from there
+        'case2d_axi_profile_amr': Case2D(
+            Lx=1.0, Ly=2.0, cell_size_m=0.05, center=(0.0, 1.0),
+            init_mode='profile1d', profile_file_in=PROFILE_1D,
+            gauges=[(0.8, 1.0)], n_snapshots=1, eos='idealGas',
+            solver='blastfoam', material='TNT', amr_levels=2),
         'case1d_tnt': Case1D(
             radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
             gauge_radii=[1.0, 2.0, 3.0, 4.0],
@@ -651,6 +659,194 @@ def profile_checks(specs):
           np.all(got["0/U"][:, 2] == 0.0))
 
 
+def profile_amr_checks(specs):
+    """T70: a profile stage may also run dynamic AMR. Its state is
+    written on the base mesh - the mesh blockMesh builds and the only
+    one whose cell order is known before the run starts - NOT on the
+    display grid `spec.grid` sits on, which is 2**(dim*D) times bigger.
+    """
+    from blastlab.solvers.foam import backend
+    sp = specs['case2d_axi_profile_amr']
+    n_base = sp.nb[0] * sp.nb[1]
+    check('profile+amr: display grid is 2 levels above the base mesh',
+          sp.amr == 2 and sp.display_level == 2 and sp.nb == (20, 40)
+          and (sp.nx, sp.ny) == (80, 160) and sp.n_cells == n_base,
+          f'{sp.nb} {(sp.nx, sp.ny)} {sp.n_cells}')
+    check('profile+amr: init_grid is the base grid, not the display grid',
+          sp.init_grid is sp.grid_base
+          and sp.init_state['rho'].shape == sp.nb,
+          str(sp.init_state['rho'].shape))
+    d = sp.start_dir
+    for name in ('p', 'T', 'U', 'alpha.expl', 'rho.expl', 'rho.air'):
+        kind, vals = _parse_internal(sp.files[f'{d}/{name}'])
+        check(f'profile+amr: {name} sized for the base mesh',
+              len(vals) == n_base, f'{len(vals)} vs {n_base}')
+    check('profile+amr: blockMesh builds the base counts',
+          '(20 40 1)' in norm(sp.files['system/blockMeshDict']))
+    check('profile+amr: adaptiveFvMesh, no static refine dicts',
+          'dynamicFvMesh adaptiveFvMesh;'
+          in norm(sp.files['constant/dynamicMeshDict'])
+          and not any('refineMeshDict' in k for k in sp.files))
+    cmds = [c if isinstance(c, str) else '<python>'
+            for _l, c in backend._mesh_stages(sp, None)]
+    i_state = cmds.index('<python>')
+    i_cc = next(i for i, c in enumerate(cmds) if 'writeCellCentres' in c)
+    check('profile+amr: state written, THEN the cell centres of that mesh',
+          i_state < i_cc and f'-time {d}' in cmds[i_cc]
+          and not any('setRefinedFields' in c for c in cmds)
+          and not any('refineMesh' in c for c in cmds), str(cmds))
+    check('profile+amr: the source profile spacing rides along',
+          abs(sp.init_state['dx_src'] - 0.01) < 1e-6,
+          str(sp.init_state['dx_src']))
+
+
+def burst_point_checks():
+    """T62: a profile-initialised 3D stage has no charge list, so the
+    shock-front metrics must fall back to the profile's own centre.
+    They used to be fed the empty list straight from spec.charges,
+    which crashed the run loop before the first frame."""
+    from blastlab.core import geometry
+    case = Case3D(Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.05,
+                  center=(0.5, 0.5, 0.5), init_mode='profile1d',
+                  profile_file_in=PROFILE_1D, n_snapshots=2,
+                  solver='blastfoam', material='TNT')
+    sp = render_case(case)
+    check("3D profile: no charge sphere planned", sp.charges == [],
+          str(sp.charges))
+    check("3D profile: burst point is the profile centre",
+          sp.burst_points == [(0.5, 0.5, 0.5)], str(sp.burst_points))
+    # exactly what solve_3d_foam / postmortem do with them
+    g = sp.grid
+    d = geometry.d_charge_3d(g['x_c'], g['y_c'], g['z_c'], sp.burst_points)
+    check("3D profile: d_charge spans the grid, zero at the centre",
+          d.shape == (sp.nx, sp.ny, sp.nz) and d.min() < sp.dx,
+          f"{d.shape} min {d.min():.4g}")
+    dists = geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz,
+                                   sp.burst_points, case.bcs)
+    check("3D profile: stop distances measured from it",
+          dists and min(dists) > 0, str(dists))
+    for name, fn in (('d_charge_3d',
+                      lambda: geometry.d_charge_3d(g['x_c'], g['y_c'],
+                                                   g['z_c'], [])),
+                     ('stop_dists_3d',
+                      lambda: geometry.stop_dists_3d(1.0, 1.0, 1.0, [],
+                                                     case.bcs))):
+        try:
+            fn()
+            ok, detail = False, 'no error'
+        except ValueError as exc:
+            ok, detail = True, str(exc)
+        except Exception as exc:               # noqa: BLE001
+            ok, detail = False, f'{type(exc).__name__}: {exc}'
+        check(f"3D profile: {name} rejects an empty centre list", ok, detail)
+
+
+def time_name_checks():
+    """T62: `startFrom latestTime` keeps the time VALUE it scanned and
+    rebuilds the name from it at controlDict's timePrecision, so a time
+    directory named with more digits than that is asked for back under a
+    name nothing wrote - the run dies on a missing field file. Every
+    emitted time dir must survive that value -> name round trip."""
+    from blastlab.solvers.foam.dicts import TIME_PRECISION, tfmt
+    # a remap t0 needing more digits than timePrecision - the profile
+    # fixture's own t0 is short enough to have hidden this for a year
+    for t0 in (0.0005, 0.0009331866336, 1.0 / 3.0, 0.1234567891234):
+        d = tfmt(t0)
+        check(f"time name {d} round-trips through its value",
+              tfmt(float(d)) == d, f"{d} -> {tfmt(float(d))}")
+    sp = specs_time_name()
+    check("profile start dir is named at timePrecision",
+          sp.start_dir == format(sp.t_start, f'.{TIME_PRECISION}g'),
+          f"{sp.start_dir} vs t_start {sp.t_start!r}")
+    check("profile fields live in the dir the run will ask for",
+          f"{sp.start_dir}/p" in sp.files, sorted(sp.files)[:3])
+    cd = norm(sp.files["system/controlDict"])
+    check("controlDict startTime matches that dir",
+          f"startTime {sp.start_dir};" in cd
+          and f"timePrecision {TIME_PRECISION};" in cd,
+          cd[:220])
+
+
+def deferred_state_checks():
+    """T62: a profile stage's fields are nonuniform over the FINAL
+    cells, so they must not be on disk while subsetMesh/refineMesh are
+    still reshaping the mesh - those read every field at the mesh they
+    start from and abort on the count mismatch."""
+    import shutil
+    import tempfile
+    from blastlab.solvers.foam import backend, writer as fw
+
+    case = Case3D(Lx=10.0, Ly=10.0, Lz=10.0, cell_size_m=0.5,
+                  center=(5.0, 5.0, 0.0), init_mode='profile1d',
+                  profile_file_in=PROFILE_1D, charge=50.0,
+                  obstacles=[(7.0, 10.0, 7.0, 10.0, 0.0, 5.0)],
+                  n_snapshots=1, solver='blastfoam', material='TNT')
+    tmp = tempfile.mkdtemp(prefix='blastlab_defer_')
+    dest = os.path.join(tmp, 'case_3d')
+    real_new = fw.env.new_case_dir
+    try:
+        fw.env.new_case_dir = lambda dim, stamp=None: ('/root/case_3d', dest)
+        sp = fw.write_case(case, n_procs=4)
+    finally:
+        fw.env.new_case_dir = real_new
+    try:
+        d = sp.start_dir
+        check("carved profile case defers its state",
+              set(sp.deferred) == {f'{d}/{n}' for n in
+                                   ('p', 'T', 'U', 'alpha.expl',
+                                    'rho.expl', 'rho.air')},
+              str(sp.deferred))
+        check("state is absent while the mesh is still being carved",
+              not os.path.isdir(os.path.join(dest, d))
+              and os.path.isfile(os.path.join(dest, 'system',
+                                              'controlDict')))
+        fw.write_deferred(sp)
+        check("write_deferred lands every field",
+              all(os.path.isfile(os.path.join(dest, *r.split('/')))
+                  for r in sp.deferred))
+        # the fields describe the carved mesh, not the block mesh
+        n_carved = sp.n_cells
+        kind, vals = _parse_internal(sp.files[f'{d}/p'])
+        check("state is sized for the carved mesh",
+              len(vals) == n_carved < sp.nx * sp.ny * sp.nz,
+              f"{len(vals)} vs {n_carved} of {sp.nx * sp.ny * sp.nz}")
+        labels = [lbl for lbl, _cmd in backend._mesh_stages(sp, None)]
+        cmds = [c if isinstance(c, str) else '<python>'
+                for _l, c in backend._mesh_stages(sp, None)]
+        i_state = next(i for i, c in enumerate(cmds) if c == '<python>')
+        i_sub = max(i for i, c in enumerate(cmds) if 'subsetMesh' in c)
+        i_dec = next(i for i, c in enumerate(cmds) if 'decomposePar' in c)
+        check("state is written after carving and before decomposing",
+              i_sub < i_state < i_dec, str(labels))
+        check("no setRefinedFields on a profile stage",
+              not any('setRefinedFields' in c for c in cmds), str(cmds))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def specs_time_name():
+    """A profile stage whose t0 needs more digits than timePrecision."""
+    import numpy as np
+    from blastlab.solvers.foam import writer as W
+    case = Case2D(Lx=1.0, Ly=2.0, cell_size_m=0.05, center=(0.0, 1.0),
+                  init_mode='profile1d', profile_file_in=PROFILE_1D,
+                  n_snapshots=1, eos='idealGas',
+                  solver='blastfoam', material='TNT')
+    real = W.profile_state
+
+    def long_t0(c, s):
+        st = real(c, s)
+        if st is not None:
+            st = dict(st, t0=0.0009331866336)
+        return st
+
+    W.profile_state = long_t0
+    try:
+        return render_case(case)
+    finally:
+        W.profile_state = real
+
+
 def main():
     update = '--update' in sys.argv
     specs = {name: render_case(case) for name, case in cases().items()}
@@ -658,6 +854,10 @@ def main():
     specs['case3d_c4_np4'] = render_case(cases()['case3d_c4'], n_procs=4)
     semantic_checks(specs)
     profile_checks(specs)
+    profile_amr_checks(specs)
+    burst_point_checks()
+    time_name_checks()
+    deferred_state_checks()
     fresh_dir_checks()
     golden(specs, update)
     print()
