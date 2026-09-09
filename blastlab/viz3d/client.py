@@ -83,7 +83,9 @@ def scene_from_meta(meta):
                 obstacles=meta['obstacles'], Lx=meta['Lx'], Ly=meta['Ly'],
                 Lz=meta['Lz'], charge_center=meta['charge_center'],
                 r_exp=meta.get('r_src', meta.get('r_exp')), bcs=meta['bcs'],
-                refine=meta.get('refine'))
+                refine=meta.get('refine'),
+                # P2-2: which backend produced the energy field
+                solver=meta.get('solver'))
 
 
 def _send_blocking(client, msg, timeout=30.0):

@@ -522,6 +522,124 @@ def _log_banner_1d(hooks, case, spec):
         hooks.log(line)
 
 
+#: P1-5: the per-step function objects whose fields blastFoam re-reads at
+#: a restart. They are accumulators, so the restart CONTINUES them - which
+#: is why an inconsistent one is fatal rather than ignorable.
+_FO_FIELDS = ('pMax', 'impulse')
+
+
+def _disable_fo_accumulators(spec, case, hooks):
+    """Take the per-step pMax/impulse function objects out of a RESUMED
+    AMR run, and say what that costs. Returns True when it applied.
+
+    Measured on a reproduction of the owner's failure - a
+    profile-initialised AMR stage stopped after 12 frames and resumed:
+
+        Selected 17 cells for refinement out of 5138.
+        Refined from 5138 to 5189 cells.
+        --> FOAM Warning : fieldMinMax pMax cannot find required object p
+        --> FOAM FATAL IO ERROR: size 5138 is not equal to the given
+            value of 5189
+        file: .../6.8841367e-05/pMax
+
+    The written directory is not torn - mesh, p, pMax and impulse all
+    hold 5138 values. The mismatch is made during the restart: `p` is not
+    in the registry when the function objects are constructed, so they
+    construct late, and by then the run-time refiner has already taken
+    its first step and the mesh is 5189 cells. The FO then reads its
+    stored 5138-value field onto that mesh and the solver dies before its
+    first write. Deleting the stored fields does not help either - the FO
+    then aborts with `pMax not found in table` (measured) - and nothing
+    on our side can order the refiner against the FO construction.
+
+    So the resumed leg runs without them. Peak and impulse are then
+    tracked by the Python per-write accumulator, which covers the WHOLE
+    run because the resume's ingest replays every write the stopped run
+    left; the maps lose per-step resolution, not coverage, and
+    `Result.meta['peak_source']` says so ('python-fallback'). A fresh run
+    is untouched, and so is a resumed run on a fixed mesh, where the FOs
+    restart correctly."""
+    if not (spec.amr and spec.dim >= 2):
+        return False                    # a fixed mesh restarts them fine
+    spec.fo_accumulators = False
+    path = os.path.join(spec.case_unc, 'system', 'controlDict')
+    try:
+        with open(path, 'w', encoding='ascii', newline='\n') as fh:
+            fh.write(writer._controldict(spec, case))
+    except OSError as exc:
+        spec.fo_accumulators = True
+        hooks.log(f'  [blastfoam] could not rewrite the controlDict for the '
+                  f'resume ({exc}) - the run may abort on a mesh-size '
+                  f'mismatch')
+        return False
+    hooks.log('  [blastfoam] the per-step pMax/impulse function objects are '
+              'off for this resumed AMR run: blastFoam cannot restart them '
+              'across a mesh change. Peak and impulse are accumulated per '
+              'write instead (the whole run, including everything before '
+              'the stop) - see peak_source in the result.')
+    return True
+
+
+def _time_is_whole(spec, name):
+    """Can blastFoam restart from time `name`? (ok, detail)
+
+    A write is only usable as a restart point when every field in it has
+    the same number of values as that write's own mesh. On a dynamic-AMR
+    run the accumulating function objects can miss a mesh update and land
+    at the previous cell count, and the solver then dies on the FIRST
+    read - `size 5138 is not equal to the given value of 5189` - before
+    it has taken a step. The write's own cell centres (writeCellCentres,
+    one per time dir on an AMR run) are the authority on how many cells
+    it has; `p` stands in when they are absent (a uniform-mesh run, where
+    the count cannot drift anyway)."""
+    parts = spec.time_dirs(name)
+    parts = parts if isinstance(parts, list) else [parts]
+    for dpath in parts:
+        n_mesh = None
+        c_path = os.path.join(dpath, 'C')
+        try:
+            if os.path.isfile(c_path):
+                n_mesh = len(reader.read_vector(c_path, None))
+            else:
+                n_mesh = reader.scalar_size(os.path.join(dpath, 'p'))
+        except (OSError, ValueError) as exc:
+            return False, f'{os.path.basename(dpath)}: {exc}'
+        if n_mesh is None:              # uniform p and no C: nothing to compare
+            continue
+        for fname in _FO_FIELDS:
+            fpath = os.path.join(dpath, fname)
+            if not os.path.isfile(fpath):
+                continue                # never written - the run has no FO
+            try:
+                n = reader.scalar_size(fpath)
+            except (OSError, ValueError) as exc:
+                return False, f'{fname}: {exc}'
+            if n is not None and n != n_mesh:
+                return False, (f'{fname} holds {n} values but the mesh '
+                               f'written with it has {n_mesh} cells')
+    return True, ''
+
+
+def _resume_start_time(spec, times, hooks):
+    """The newest written time blastFoam can actually restart from.
+
+    Returns (name, skipped). `skipped` is the inconsistent writes newer
+    than it - each one costs only re-solving an interval the run was
+    going to re-solve anyway. Raises when nothing is whole, which is a
+    refusal with a reason rather than a solver that dies at t0."""
+    skipped = []
+    for name in reversed(times):
+        ok, detail = _time_is_whole(spec, name)
+        if ok:
+            return name, skipped
+        skipped.append((name, detail))
+        hooks.log(f'  [blastfoam] cannot restart from t = {name}: {detail}')
+    raise RuntimeError(
+        'no written time in this run can be restarted from - every one is '
+        'internally inconsistent (' + '; '.join(f'{n}: {d}' for n, d
+                                                in skipped[:3]) + ')')
+
+
 def resume_run(case_dir, hooks=None, adaptive_write=True):
     """Continue a STOPPED blastFoam run from its last written time (N6).
 
@@ -583,11 +701,32 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
     if not runner.rewrite_control_entry(posix, unc, 'stopAt', 'endTime',
                                         log=hooks.log):
         raise RuntimeError('could not reset stopAt in the controlDict')
-    if not runner.rewrite_control_entry(posix, unc, 'startFrom',
-                                        'latestTime', log=hooks.log):
+    # P1-5: `latestTime` is right only while the latest time is WHOLE.
+    # An AMR run can leave a write whose accumulating FO fields sit at
+    # the previous cell count, and blastFoam dies reading it before it
+    # takes a step. Walk back to the newest write that is consistent and
+    # name it explicitly; the FO accumulators then continue from a state
+    # that matches its mesh, which is what keeps the peak/impulse maps
+    # continuous across the resume.
+    start_name, skipped = _resume_start_time(spec, times, hooks)
+    # ...and under AMR the accumulating FOs cannot be restarted at all
+    _disable_fo_accumulators(spec, case, hooks)
+    if skipped:
+        if not runner.rewrite_control_entry(posix, unc, 'startTime',
+                                            start_name, log=hooks.log):
+            raise RuntimeError('could not set startTime for the resume')
+        if not runner.rewrite_control_entry(posix, unc, 'startFrom',
+                                           'startTime', log=hooks.log):
+            raise RuntimeError('could not set startFrom startTime')
+        hooks.log(f'  [blastfoam] restarting from t = {start_name} instead '
+                  f'of the latest write: {len(skipped)} newer write(s) are '
+                  f'internally inconsistent and would abort the solver. '
+                  f'That interval is simply re-solved.')
+    elif not runner.rewrite_control_entry(posix, unc, 'startFrom',
+                                          'latestTime', log=hooks.log):
         raise RuntimeError('could not set startFrom latestTime')
-    hooks.log(f'  [blastfoam] resuming {posix} from its latest written '
-              f'time ({len(times)} already on disk'
+    hooks.log(f'  [blastfoam] resuming {posix} from t = {start_name} '
+              f'({len(times)} already on disk'
               + (f', {n_procs} MPI ranks' if n_procs > 1 else '') + ')')
 
     solve = {1: solve_1d_foam, 2: solve_2d_foam, 3: solve_3d_foam}[case.dim]
@@ -1478,7 +1617,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                      obstacles=[tuple(o) for o in spec.obstacles],
                      Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
                      charge_center=(x0, y0, z0), r_exp=spec.r_exp,
-                     bcs=bcs, refine=spec.refine_meta())))
+                     bcs=bcs, refine=spec.refine_meta(),
+                     # P2-2: the live energy field is the ideal-gas
+                     # stand-in this backend derives, not a solved one
+                     solver='blastfoam')))
     _initial_frame(spec, hooks, live_sl)
     _initial_frame3d(spec, hooks)
 

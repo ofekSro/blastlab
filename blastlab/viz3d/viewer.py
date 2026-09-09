@@ -42,8 +42,15 @@ FIELDS = {
                    label='Pressure'),
     'rho':    dict(title=RHO_TITLE,                  ovp=False,
                    label='Density'),
+    # P2-2: blastFoam does not hand back internal energy, so the foam
+    # backend derives one as the ideal-gas p/((gamma-1) rho) - which is
+    # simply wrong inside the products, where the EOS is JWL. The number
+    # is still useful as a picture of where the hot gas is, so it stays,
+    # but a run that computed it that way says so (see `approx_title`).
+    # The native solvers carry the real solved e and keep the plain title.
     'e':      dict(title='Energy [J/kg]',            ovp=False,
-                   label='Energy'),
+                   label='Energy',
+                   approx_title='Energy [J/kg] (approx)'),
     'p_peak': dict(title='Peak overpressure [kPa]',  ovp=True,
                    label='Peak overpressure'),
     #: net (not positive-phase) overpressure impulse - see README.md
@@ -292,6 +299,17 @@ class _Layer:
         """Rebuild/update the layer's actors for the current frame."""
 
 
+def field_title(scene, key):
+    """Scalar-bar title for `key` in this scene. P2-2: the energy field
+    of a blastFoam run is an ideal-gas stand-in (the solver returns no
+    internal energy), so it is labelled approximate; everything else, and
+    every native run, keeps its plain title."""
+    f = FIELDS[key]
+    if getattr(scene, 'e_approx', False) and 'approx_title' in f:
+        return f['approx_title']
+    return f['title']
+
+
 class BlastScene(_CameraOps):
     """The 3D scene. Two hosts use it:
     - the standalone window (CLI): VTK checkbox/slider/plane widgets,
@@ -309,6 +327,9 @@ class BlastScene(_CameraOps):
         self.store = FrameStore(
             mem_cap=init.get('frame_mem_cap') or FRAME_MEM_CAP)
         self.frame = None            # current frame payload
+        #: P2-2: this run's energy field is the foam backend's ideal-gas
+        #: stand-in, not a solved one - the scalar bar says so
+        self.e_approx = init.get('solver') == 'blastfoam'
         self.t = 0.0
         self.index = -1
         self.done = False
@@ -760,12 +781,12 @@ class _CutPlane(_Layer):
         clim = s.active_clim()
         if self._actor is None or scal != self._scalars:
             s.pl.remove_actor(self.name)
-            title = FIELDS[s.field]['title']
+            title = field_title(s, s.field)
             if self._scalars is not None and self._scalars != scal:
                 # pyvista keeps a removed actor's scalar bar: drop the old
                 # field's bar so it does not overprint the new one (B19)
                 try:
-                    s.pl.remove_scalar_bar(FIELDS[self._scalars]['title'],
+                    s.pl.remove_scalar_bar(field_title(s, self._scalars),
                                            render=False)
                 except Exception:
                     pass

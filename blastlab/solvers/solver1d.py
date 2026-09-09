@@ -294,8 +294,18 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
         t    += dt
         step += 1
 
+        # P2-1: progress against what will ACTUALLY stop this run. 1D used
+        # t / safety_cap unconditionally, and the safety cap is ~10x the
+        # real length of a run that ends when the front arrives - so the
+        # bar crawled to about a tenth and then jumped. 2D/3D have always
+        # measured the front against the distance it has to cover; do the
+        # same whenever the front is what ends the run, and keep the time
+        # ratio when an end time or a non-terminating boundary means the
+        # clock really is the bound (T52/T60).
+        frac = (t / safety_cap if cap_is_end or bc_outer != 'terminate'
+                else r_front / radius_m)
         hooks.progress(Progress(step=step, t=t, dt=dt, p_max=p_f.max(),
-                                frac=min(1.0, t / safety_cap)))
+                                frac=min(1.0, max(0.0, frac))))
 
     # ── Final snapshot at stop time ────────────────────────────────────────
     rho_f, u_f, e_f, p_f, _ = primitives(U, phase, eos, jwl)

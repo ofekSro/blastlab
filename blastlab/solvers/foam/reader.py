@@ -114,6 +114,34 @@ def _binary_internal(buf, path, n_cells, ncomp):
                          offset=start).copy()
 
 
+def scalar_size(path):
+    """How many values a volScalarField's internalField actually holds,
+    without being told what to expect - or None when it is `uniform`,
+    which fits any mesh.
+
+    P1-5: a time directory can be internally inconsistent. The per-step
+    function objects (pMax, impulse) write at `writeTime` like everything
+    else, but on a dynamic-AMR run a field that missed the mesh update is
+    written at the PREVIOUS cell count, and blastFoam then refuses to
+    restart from that directory ('size 5138 is not equal to the given
+    value of 5189'). Comparing sizes here is what lets `resume_run` walk
+    back to a directory that is whole. Raises for a missing or malformed
+    file, like every other reader."""
+    buf = _read_bytes(path)
+    if _format_is_binary(buf):
+        i = buf.find(b'internalField')
+        if i < 0:
+            raise ValueError(f'no internalField in {path}')
+        m = _RE_BIN_COUNT.match(buf, i)
+        if m is not None:
+            return int(m.group(1))
+        # uniform: still inline text, fall through to the ascii path
+    text = buf.decode('ascii', 'replace')
+    if _kind(text, path) == 'uniform':
+        return None
+    return len(_floats('\n'.join(_nonuniform_body(text, path))))
+
+
 def read_scalar(path, n_cells):
     """volScalarField internalField -> (n_cells,) float64."""
     buf = _read_bytes(path)

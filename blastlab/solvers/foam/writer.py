@@ -120,6 +120,13 @@ class CaseSpec:
     #: the current mesh and abort on the count mismatch. A charge case
     #: writes uniform fields, which map onto any mesh, and defers none.
     deferred: tuple = ()
+    #: P1-5: emit the per-step pMax/impulse function objects at all. True
+    #: everywhere except the resumed leg of an AMR run, where blastFoam
+    #: cannot restart them across a mesh change - see
+    #: backend._disable_fo_accumulators. The Python per-write accumulator
+    #: then carries the peak/impulse maps, which it can, because the
+    #: resume's ingest replays every write the stopped run left.
+    fo_accumulators: bool = True
 
     @property
     def burst_points(self):
@@ -675,7 +682,7 @@ def _controldict(spec, case):
         },
     }
     functions = {}
-    if spec.dim >= 2:
+    if spec.dim >= 2 and spec.fo_accumulators:
         # Per-step peak-pressure / impulse accumulation on the foam side
         # (matches the native solvers' per-step tracking; the backend's
         # Python per-write accumulators remain as a fallback). Field
