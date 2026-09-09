@@ -72,8 +72,12 @@ def run(case, label):
 def main():
     # y extent 3.2 m: the nearest open boundary (x_hi, 1.2 m) is farther
     # than the gauge (0.8 m), so the arrival stop comes after the gauge peak
+    # 80 kg/m, not 20: T39 raised the charge target to 8 cells across
+    # the radius (FOAM_EXP_CELLS), and 20 kg/m then planned level 4 -
+    # four checks here assert level 3 / lmax 3, which is what the whole
+    # fixture is about (auto zones to 1 cm plus user zones at 4 cm).
     base = dict(geometry='planar', Lx=2.4, Ly=3.2, cell_size_m=0.08,
-                charge=20.0, center=(1.2, 1.6), gauges=[(2.0, 1.6)],
+                charge=80.0, center=(1.2, 1.6), gauges=[(2.0, 1.6)],
                 n_snapshots=2, solver='blastfoam', material='TNT')
     refined = Case2D(charge_refine='zone',
                      refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),

@@ -2,9 +2,18 @@
 refinement (adaptiveFvMesh, ROADMAP N16) against a uniform run at the
 same finest cell.
 
-A 100 kg/m line charge in a 4 x 4 m planar box on a 20 cm base with 3
+A 400 kg/m line charge in a 4 x 4 m planar box on a 20 cm base with 3
 AMR levels (finest 2.5 cm, the display grid) versus the same case on a
-uniform 2.5 cm grid (160 x 160 = 25,600 cells). Checks the AMR mesh
+uniform 2.5 cm grid (160 x 160 = 25,600 cells).
+
+The charge was 100 kg/m until 2026-09-09. T39 raised the blastFoam
+charge target from 5 cells across the radius to 8 (FOAM_EXP_CELLS), and
+100 kg/m then needed AMR level 4 - so this suite stopped before the
+solver even started, with "Resolving the charge (8 cells across its
+radius) needs AMR level 4". Raising the charge restores the invariant
+this comparison is built on - AMR's finest cell IS the uniform grid's
+cell - which adding a level would have broken (it would have made the
+uniform reference 4x more expensive and no longer the same cell size). Checks the AMR mesh
 stages, the per-time structure (C + cellLevel -> display remap), the
 per-write log line, the per-frame level maps, gauge agreement with the
 uniform reference (peak / arrival / positive-phase impulse), the FO
@@ -87,7 +96,7 @@ def run(case, label):
 
 
 def main():
-    base = dict(geometry='planar', Lx=4.0, Ly=4.0, charge=100.0,
+    base = dict(geometry='planar', Lx=4.0, Ly=4.0, charge=400.0,
                 center=(2.0, 2.0), gauges=[(3.2, 2.0)], n_snapshots=2,
                 solver='blastfoam', material='TNT')
     # --np=N (T42/N16-b): run the AMR case on N MPI ranks. Its written
