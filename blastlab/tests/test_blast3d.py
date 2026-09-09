@@ -1,4 +1,17 @@
-"""Verification suite for blast3d.py (run with cwd = scratchpad)."""
+"""Verification suite for blast3d.py (run with cwd = scratchpad).
+
+SLOW - not part of the fast no-WSL matrix (P2-9). It solves several
+real 3D cases and takes ~25 minutes on a 12-thread laptop; a run under
+a 10-minute timeout gets killed mid-case while making perfectly good
+progress, which reads like a failure and is not one. Run it on its own,
+without a timeout, when the native 3D solver or its EOS/geometry paths
+have changed:
+
+    cd blastlab/tests && python test_blast3d.py
+
+Its cheap parts (grid/geometry/regression of the 3D writer) are covered
+by test_regression, test_refine and test_viz3d_* in the fast matrix.
+"""
 import os, sys
 import numpy as np
 

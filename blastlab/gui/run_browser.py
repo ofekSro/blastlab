@@ -77,7 +77,7 @@ class FoamRunBrowser(ctk.CTkToplevel):
 
     def __init__(self, parent, on_load, log=print, lister=None, sizer=None,
                  deleter=None, confirm=None, autorefresh=True,
-                 on_resume=None):
+                 on_resume=None, warner=None):
         super().__init__(parent)
         self.title('blastFoam runs')
         self.geometry('760x420')
@@ -88,6 +88,13 @@ class FoamRunBrowser(ctk.CTkToplevel):
         self._lister = lister or _default_lister
         self._sizer = sizer or _default_sizer
         self._deleter = deleter or _default_deleter
+        # P2-8: the refusal dialog is injectable like `confirm`. It was
+        # not, so a headless test that exercised a refused delete blocked
+        # on a real modal until its timeout - the outcome depended on
+        # which window had focus, which made test_gui_run_browser
+        # non-deterministic.
+        self._warn = warner or (lambda title, msg: messagebox.showwarning(
+            title, msg, parent=self))
         self._confirm = confirm or (lambda title, msg: messagebox.askyesno(
             title, msg, parent=self))
         self.rows = {}              # name -> dict(unc, posix, alive, bytes)
@@ -292,8 +299,7 @@ class FoamRunBrowser(ctk.CTkToplevel):
             self.status.configure(text=f'not deleting {name}: {why}',
                                   text_color=c('danger'))
             self._log(f'  [runs] refused to delete {name}: {why}')
-            messagebox.showwarning(
-                'Delete run', f'{name} was not deleted: {why}.', parent=self)
+            self._warn('Delete run', f'{name} was not deleted: {why}.')
             return
         size = human_size(r['bytes'])
         if not self._confirm('Delete run', f'Delete {name} ({size}) from the '

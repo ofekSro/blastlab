@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 import numpy as np                                             # noqa: E402
 
 from blastlab.core.case import Case2D                          # noqa: E402
-from blastlab.core.constants import P_AIR                      # noqa: E402
-
+from blastlab.core.constants import P_AIR                      # noqa: E402
+
 #: T50: the pre-T50 solver default - every side lets the wave out
 #: AND ends the run when it arrives (the plain 'transmit'
 #: default would run this to the safety cap).
@@ -63,6 +63,22 @@ def main():
         print(f"  [SKIP] blastFoam unavailable: {detail}")
         print("\nFOAM PARALLEL: SKIP")
         return
+
+    # P2-7: since T68 an explicit rank count is clipped to what the
+    # machine can take (env.rank_ceiling: cores minus headroom, and RAM
+    # over RAM_GB_PER_RANK). On a VM of 3 GB or less that ceiling is 1,
+    # so `_case(2)` would quietly run on ONE rank and this suite would
+    # compare np1 against np1 and pass without testing anything. Say so
+    # and skip instead.
+    hw = env.hardware(probe=True) or {}
+    ceiling, why = env.rank_ceiling(hw.get('cores'), hw.get('ram_gb'))
+    if ceiling is not None and ceiling < 2:
+        print(f"  [SKIP] this machine allows only {ceiling} MPI rank "
+              f"({why}) - np=2 would silently run on one rank")
+        print("\nFOAM PARALLEL: SKIP")
+        return
+    print(f"  rank ceiling here: {ceiling if ceiling else 'unknown'}"
+          + (f" ({why})" if why else ""))
 
     from blastlab.solvers import get_solver
     solve = get_solver(2, 'blastfoam')

@@ -70,12 +70,18 @@ def main():
         deleted.extend(d.rsplit('/', 1)[-1] for d in dirs)
         return True
 
+    warned = []
     root = ctk.CTk()
     root.withdraw()
     win = FoamRunBrowser(root, on_load=loaded.append, log=lambda s: None,
                          lister=lister, sizer=lambda d: sizes,
                          deleter=deleter,
                          confirm=lambda t, m: asked.append(m) or True,
+                         # P2-8: without this the refused-delete path
+                         # opened a real modal and the test hung there
+                         # until its timeout (focus-dependent, so it
+                         # sometimes passed) - see run_browser.warner
+                         warner=lambda t, m: warned.append(m),
                          on_resume=resumed.append)
     win.withdraw()
     ok = pump(root, 3.0, until=lambda: not win._busy)
@@ -105,6 +111,11 @@ def main():
     win.table.selection_set('20260905-140000_1d_p3-00')
     win.delete_selected()
     check('Delete refuses an unknown-state run', deleted == [] and not asked)
+    # P2-8: the refusal must reach a DIALOG, not only the status line -
+    # QA-30 added it precisely because a muted line was missed
+    check('...and says so in a dialog, not only the status line',
+          len(warned) == 2
+          and all('was not deleted' in m for m in warned), str(warned))
     win.table.selection_set('20260905-120000_2d_p1-00')
     win.delete_selected()
     ok = pump(root, 3.0, until=lambda: not win._busy and deleted)

@@ -136,6 +136,13 @@ Hard rules:
 
 ## P1 — פוגע במשתמש או בנכונות
 
+> **✅ P1 כולו נסגר ב-2026-09-09** (קומיטים `62870b5`, `6b0407c`).
+> P1-1: `Case3D` ירדה לערכים שה-GUI כבר פותח איתם (1.5 מ' / 25 ק"ג) — שלוש ברירות
+> המחדל עוברות עכשיו ולידציה בשני ה-backends. P1-2: הערת W2 בשלושת ה-finalizers.
+> P1-3: הרשימה הריקה נשמרה (היא נכונה לשלב profile) ונוסף שומר לכיוון ההפוך.
+> P1-4: חמשת החומרים הלא-מכוילים מקבלים אזהרה במקום הערה ששיקרה.
+> P1-5: **שוחזר, אובחן ותוקן מול WSL** — ראה למטה.
+
 ### P1-1 · המקרה הדו-ממדי שנשלח כברירת מחדל נדחה על המכונה הזו · **החלטת בעלים**
 
 תוצאת T48/N17: ברירת המחדל היא ~2.3M תאים ≈ 6.1 GB, וה-VM של WSL הוא 4 GB, אז
@@ -207,6 +214,10 @@ file: .../<t_last>/pMax
 ---
 
 ## P2 — תצוגה מטעה וכיסוי בדיקות חסר
+
+> **מצב 2026-09-09:** P2-1, P2-2, P2-7, P2-8, P2-9 נסגרו (קומיטים `6b0407c` והבא
+> אחריו). P2-6 — המנוע נכתב (`_e2e_gui_chain_foam.py`), ממתין להרצת WSL.
+> P2-3/P2-4 — ההרצות הארוכות בעיצומן. P2-5 — נשאר בעיקר עליך.
 
 ### P2-1 · פס ההתקדמות של 1D מטעה פי ~10
 
@@ -396,6 +407,7 @@ python test_gui_results_anim.py   # Animation tab
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
 python test_bc_trigger.py         # boundary kinds, end time, trigger gauge, gauge markers
 python test_foam_postmortem_decomposed.py  # loading a parallel AMR run
+python test_foam_resume.py        # P1-5: restart points + the AMR FO disable
 python test_gui_title_preview1d.py # Results title line + the 1D model preview
 python test_gauge_summary.py      # per-gauge peak/arrival/impulse
 python test_report.py             # field CSVs + HTML report
@@ -408,8 +420,10 @@ python test_foam_ingest_order.py  # ordered ingest + accumulators
 python test_foam_amr_ingest.py    # AMR per-time ingest on fake time dirs
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py / test_viz3d_panel.py
 python test_blast2d.py            # 2D native physics
-python test_blast3d.py            # 3D native physics
 python _qa_gui_harness.py --smoke # visible-window harness smoke (~1 min)
+
+# slow, no WSL - run on its own, WITHOUT a timeout (P2-9)
+python test_blast3d.py            # 3D native physics, ~25 min here
 
 # WSL (קודם לוודא WSL פנוי: wsl.exe -d Ubuntu -- pgrep -a blastFoam ריק)
 python test_foam_1d_vs_native.py  # physics gates (~2 min)
