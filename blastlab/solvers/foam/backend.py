@@ -686,6 +686,31 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
                        loop.st['step'])
 
 
+#: W2 (P1-2): every stop except the solver reaching its own endTime goes
+#: through `stopAt writeNow`, and blastProbes flushes what it has buffered
+#: only in the function-object destructors at a graceful End. The run loop
+#: already waits up to 10 s for that End before its safety-net kill, but a
+#: solver that is killed - or one whose End lands after the wait - takes
+#: the tail with it (measured: 5 of ~600 samples, with or without a resume).
+#: A real fix needs a foam-side flush knob, so until then the run says so.
+_NATURAL_END = ('safety cap', 'end time reached')
+
+
+def note_gauge_tail(hooks, stop_reason):
+    """One line after `Stopped:` when the gauge record can be short."""
+    if stop_reason in _NATURAL_END:
+        return
+    hooks.log('  [note] the run was stopped before its end time, so the '
+              'last few gauge\n'
+              '         samples may be missing (blastFoam flushes buffered '
+              'probe samples\n'
+              '         only at a graceful End; measured: 5 of ~600). Peaks '
+              'and arrival\n'
+              '         times already recorded are unaffected - the impulse '
+              'tail is what\n'
+              '         comes up short.\n')
+
+
 def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
     """Build the exact native-shaped 1D Result from ingested time-dir
     entries (also used by postmortem.load_run)."""
@@ -731,6 +756,7 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{fin['t']*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
+    note_gauge_tail(hooks, stop_reason)
     hooks.frame(np.array([r, fin['p']]), fin['t'])
 
     meta = dict(final_profile=final_profile, r=r, radius_m=case.radius_m,
@@ -1081,6 +1107,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
+    note_gauge_tail(hooks, stop_reason)
 
     probes = reader.read_probes(spec.case_unc) if spec.probe_pts else None
     if probes:
@@ -1636,6 +1663,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{t_fin*1e3:.3f} ms")
     hooks.log(f"  Stopped: {stop_reason}\n")
+    note_gauge_tail(hooks, stop_reason)
 
     probes = reader.read_probes(spec.case_unc) if spec.probe_pts else None
     if probes:

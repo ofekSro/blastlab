@@ -65,6 +65,13 @@ Hard rules:
 
 ## P0 — דחוף: סיכון לאיבוד עבודה / הריפו שבור
 
+> **✅ P0 כולו נסגר ב-2026-09-09, קומיט `e344d17`.** שלושת הפריטים טופלו יחד:
+> `.gitignore` הורחב ופלטי הריצה הוצאו מה-index (נשארו על הדיסק); חמשת הקבצים
+> ה-untracked + `TODO.md`/`DONE.md` נוספו; ארבעת המסמכים שאוחדו נמחקו.
+> אומת בקלון טרי: `import blastlab` עובר, `test_foam_reader`, `test_foam_writer`
+> ו-`test_hardware` PASS. המטריצה המהירה: 28 חבילות, כולן PASS, `test_regression`
+> בייט-זהה.
+
 ### P0-1 · העבודה של T62/T63/T48 אינה מחויבת, וקובץ קריטי אינו ב-git כלל
 
 `blastlab/core/hardware.py` הוא **untracked**, ו-`blastlab/solvers/foam/env.py:36` בעץ העבודה

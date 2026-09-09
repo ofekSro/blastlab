@@ -35,6 +35,58 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
+def w2_note_checks():
+    """W2 (P1-2): a run that was stopped says its gauge tail may be short.
+
+    Owner decision 2026-09-09: document it rather than chase a foam-side
+    flush knob. The note must appear for every stop that goes through
+    `stopAt writeNow` - the user's Stop, a terminate boundary, the trigger
+    gauge - and must stay quiet when the solver reached its own endTime,
+    where the function-object destructors do run and nothing is lost.
+    """
+    from blastlab.solvers.foam import backend
+
+    print("")
+    print("W2: a stopped run says the gauge tail may be short")
+
+    class _Log:
+        def __init__(self):
+            self.lines = []
+
+        def log(self, msg):
+            self.lines.append(str(msg))
+
+    def note_for(reason):
+        rec = _Log()
+        backend.note_gauge_tail(rec, reason)
+        return ' '.join(rec.lines)
+
+    for reason in ('safety cap', 'end time reached'):
+        check(f'natural end ({reason}): silent', note_for(reason) == '')
+
+    for reason in ('stopped by user',
+                   'trigger gauge 2 reached',
+                   'shock arrived at a terminate boundary (r = 4.0 m)'):
+        txt = note_for(reason)
+        check(f'{reason}: one note', txt.count('[note]') == 1, txt)
+        check(f'{reason}: names the cause and the consequence',
+              'gauge' in txt and 'graceful End' in txt and 'impulse' in txt,
+              txt)
+
+    check('the note does not claim peaks are wrong',
+          'unaffected' in note_for('stopped by user'))
+    # finalize_1d / _2d / _3d each call it; the `def` line must not count
+    check('every finalizer calls it (1D, 2D, 3D)', _call_sites() == 3,
+          f'{_call_sites()} call sites')
+
+
+def _call_sites():
+    from blastlab.solvers.foam import backend
+    with open(backend.__file__, encoding='utf-8') as fh:
+        return sum(1 for ln in fh
+                   if ln.strip() == 'note_gauge_tail(hooks, stop_reason)')
+
+
 def canary_checks(_st):
     """A6/A7: the two silent-degradation paths must say something once.
 
@@ -308,6 +360,7 @@ def main():
         runner.rewrite_control_entry = orig
 
     canary_checks(_st)
+    w2_note_checks()
 
     print()
     if FAIL:

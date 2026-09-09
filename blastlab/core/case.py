@@ -166,17 +166,26 @@ class Case2D:
 @dataclass
 class Case3D:
     dim = 3
-    Lx: float = 10.0
-    Ly: float = 10.0
-    Lz: float = 10.0
-    cell_size_m: float = 0.1
+    # P1-1: the same rule the 2D default follows, and the values the GUI's
+    # 3D form has opened with since QA-14 - there is one shipped 3D default
+    # now, not two. `resolve` forces dx = r_charge / 8 (blastFoam, T39)
+    # across the WHOLE domain, so the domain a charge allows is set by the
+    # charge: 1 kg in 10 m is 3.5 BILLION cells and is refused on every
+    # backend, while 25 kg (r = 0.154 m -> dx = 0.0193 m) in 1.5 m is 474k
+    # cells on blastFoam and 116k native - valid and warning-free out of
+    # the box on the smallest supported machine. Keeping 1 kg here would
+    # have meant a 0.74 m domain, which is not a free-air case at all.
+    Lx: float = 1.5
+    Ly: float = 1.5
+    Lz: float = 1.5
+    cell_size_m: float = 0.025
     init_mode: str = 'charge'         # 'charge' | 'profile1d' | 'profile2d'
-    charge: float = 1.0
+    charge: float = 25.0
     charge_resolution: str = 'resolve'  # 'resolve' (refine grid to charge)
                                         # | 'smear' (keep cell size,
                                         #   energy-conserving source ball)
     profile_file_in: str = None
-    center: tuple = (5.0, 5.0, 5.0)   # z ignored for profile2d
+    center: tuple = (0.75, 0.75, 0.75)  # z ignored for profile2d
     eos: str = 'idealGas'
     #: see Case2D.bcs
     bcs: dict = field(default_factory=lambda: dict(
@@ -347,6 +356,7 @@ def _validate_solver(case, rep):
     to size r_exp (material-aware for blastfoam), or None on a fatal
     backend error."""
     err, note = rep.errors.append, rep.notes.append
+    warn = rep.warnings.append          # P1-4: the uncalibrated afterburn
     solver = getattr(case, 'solver', 'native')
     material = getattr(case, 'material', 'TNT')
     n_procs = getattr(case, 'n_procs', 0)
@@ -437,10 +447,21 @@ def _validate_solver(case, rep):
         ab = AFTERBURN.get(material)
         if ab is None:
             err(f"No afterburn parameters for '{material}'")
-        else:
+        elif material == 'TNT':
             note(f"Afterburn (Miller): up to {ab.Q0/1e6:g} MJ/kg released "
                  f"as the products burn with atmospheric oxygen - "
-                 f"calibrated against Kingery-Bulmash, see ROADMAP N3")
+                 f"calibrated against Kingery-Bulmash (DONE.md N3: the "
+                 f"anchor reads 1.02-1.20 of KB with this model on)")
+        else:
+            # P1-4 (owner decision 2026-09-09): only TNT was ever
+            # calibrated. Every other material's Q0 comes from its oxygen
+            # balance alone - the right order of magnitude, but nothing
+            # was fitted to data, and the note used to claim otherwise.
+            warn(f"Afterburn for {material} is NOT calibrated: "
+                 f"Q0 = {ab.Q0/1e6:g} MJ/kg is derived from the oxygen "
+                 f"balance alone (only TNT is calibrated, against "
+                 f"Kingery-Bulmash). The order of magnitude is right - do "
+                 f"not quote these numbers without a source of your own.")
     if n_procs > 1 and case.dim == 1:
         note("1D cases always run serial (MPI ranks ignored)")
     from ..solvers.foam import env as foam_env

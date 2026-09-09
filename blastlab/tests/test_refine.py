@@ -588,8 +588,14 @@ def test_plan_guards():
     check('non-finite charge -> ValueError (not a nan int cast)',
           raises(Case2D(charge=float('inf')))
           and raises(Case2D(charge=float('nan'))))
-    check('default 3D case is too fine to plan -> ValueError (was 6 GB OOM)',
-          raises(Case3D()))
+    # P1-1 moved the shipped 3D default to a case that validates, so the
+    # guard is stated explicitly here: this IS the pre-P1-1 default (1 kg
+    # in 10 m at 0.1 m), the one that planned 3.5e9 cells and OOM'd at 6 GB.
+    check('a too-fine 3D case is refused at plan time -> ValueError (was 6 GB OOM)',
+          raises(Case3D(Lx=10.0, Ly=10.0, Lz=10.0, cell_size_m=0.1,
+                        charge=1.0, center=(5.0, 5.0, 5.0))))
+    check('the shipped 3D default plans and validates',
+          (not raises(Case3D())) and validate_case(Case3D()).errors == [])
     check('AMR display grid computed without an int64 blow-up',
           refine.plan_levels(
               Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=8.0,

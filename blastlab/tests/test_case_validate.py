@@ -383,6 +383,44 @@ def _cap_checks():
         check(f'{solver} small clean', not cells_err(rep)
               and not any('Large grid' in w for w in rep.warnings))
 
+    afterburn_calibration_checks()
+
+
+def afterburn_calibration_checks():
+    """P1-4 (owner decision 2026-09-09): only TNT's afterburn is
+    calibrated. The note used to claim 'calibrated against
+    Kingery-Bulmash' for every material, including the five whose Q0 is
+    an oxygen-balance estimate - so a user could quote an uncalibrated
+    number believing it was fitted to data."""
+    print()
+    print("P1-4: afterburn says which materials are calibrated")
+
+    def msgs(mat, ab='miller'):
+        rep = validate_case(Case2D(solver='blastfoam', material=mat,
+                                   afterburn=ab))
+        return ([w for w in rep.warnings if 'fterburn' in w],
+                [n for n in rep.notes if 'fterburn' in n])
+
+    warns, notes = msgs('TNT')
+    check('TNT: a note, no warning', not warns and len(notes) == 1, notes)
+    check('TNT: still says it is calibrated',
+          notes and 'calibrated against Kingery-Bulmash' in notes[0])
+
+    for mat in ('C4', 'RDX', 'HMX', 'PETN', 'ANFO'):
+        warns, notes = msgs(mat)
+        check(f'{mat}: warned, not quietly noted',
+              len(warns) == 1 and not notes, (warns, notes))
+        check(f'{mat}: says NOT calibrated and why',
+              warns and 'NOT calibrated' in warns[0]
+              and 'oxygen balance' in warns[0], warns)
+        check(f'{mat}: does not claim a KB calibration',
+              warns and 'calibrated against Kingery-Bulmash' not in warns[0])
+
+    for mat in ('TNT', 'C4'):
+        warns, notes = msgs(mat, ab='none')
+        check(f'{mat}: silent while afterburn is off',
+              not warns and not notes, (warns, notes))
+
 
 if __name__ == '__main__':
     sys.exit(main())

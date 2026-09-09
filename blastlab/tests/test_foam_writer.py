@@ -740,6 +740,38 @@ def burst_point_checks():
             ok, detail = False, f'{type(exc).__name__}: {exc}'
         check(f"3D profile: {name} rejects an empty centre list", ok, detail)
 
+    # P1-3: the last member of that family - phaseProperties' detonation
+    # points. The empty list is CORRECT for a profile stage (its material
+    # arrives already reacted; lighting the profile centre would detonate
+    # it twice), so the emitted file must not change; what must not stay
+    # silent is a CHARGE case that ends up with nothing to light.
+    from blastlab.solvers.foam import writer as _w
+    pp = _w._phaseproperties(sp, activation='linear', afterburn='none')
+    check("profile stage still emits an empty detonation points list",
+          'points ();' in pp,
+          [ln for ln in pp.splitlines() if 'points' in ln])
+    check("profile stage keeps its activation model",
+          'activationModel linear;' in pp,
+          [ln for ln in pp.splitlines() if 'activationModel' in ln])
+
+    class _NoCentres(list):
+        """A charge list that is truthy but yields no centres - the shape
+        the guard exists for. Normal code cannot reach it today, which is
+        the point: if a future edit drops the centres, the writer must
+        refuse instead of emitting a case that never ignites."""
+
+        def __iter__(self):
+            return iter(())
+
+    sp.charges = _NoCentres([((0.5, 0.5, 0.5), 1.0)])
+    try:
+        _w._phaseproperties(sp, activation='linear', afterburn='none')
+        ok, detail = False, 'wrote a phaseProperties that never ignites'
+    except ValueError as exc:
+        ok, detail = 'never ignite' in str(exc), str(exc)
+    check("a charge case with no detonation points is refused, loudly",
+          ok, detail)
+
 
 def time_name_checks():
     """T62: `startFrom latestTime` keeps the time VALUE it scanned and

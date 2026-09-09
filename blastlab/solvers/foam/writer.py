@@ -910,10 +910,25 @@ def _phaseproperties(spec, activation='linear', afterburn='none'):
     if activation == 'none':
         initiation = {'E0': E0(m)}
     else:
+        # P1-3: `det_points or charge centres` used to fall through to an
+        # EMPTY list on a profile-initialised stage (N7), which has no
+        # charge list on purpose - the same missing-fallback shape that
+        # made T62's three blockers. Here the empty list is DELIBERATE and
+        # must stay: that stage's material arrives already reacted from
+        # the previous stage, so there is nothing to light, and lighting
+        # the profile's centre (spec.burst_points) would detonate it a
+        # second time. What must never be silent is the other way round -
+        # a charge case that somehow reaches this with nothing to light.
+        points = spec.det_points or [c for c, _mass in spec.charges]
+        if not points and spec.charges:
+            raise ValueError(
+                'no detonation points for a charge case: '
+                f'{len(spec.charges)} charge(s) but neither det_points nor '
+                'their centres survived - refusing to write a '
+                'phaseProperties that would never ignite')
         initiation = {
             'E0': E0(m),
-            'points': (spec.det_points
-                       or [c for c, _mass in spec.charges]),
+            'points': points,
             'vDet': m.vDet,
         }
     body = block({
