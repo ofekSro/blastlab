@@ -34,7 +34,12 @@ from . import reader, runner, writer
 
 _RE_TIME = re.compile(r'^Time = ([0-9.eE+-]+)s?$')
 _RE_DT = re.compile(r'^deltaT = ([0-9.eE+-]+)$')
-_RE_MAXP = re.compile(r'^max\(p\):\s*([0-9.eE+-]+)')
+#: blastFoam prints `max(p): X, min(p): Y` on one line. The min was
+#: parsed away for years; it is captured now for the instability message
+#: only - a strong rarefaction can dip negative and recover, so it is NOT
+#: a stop trigger. group(1) is unchanged, so every existing match is too.
+_RE_MAXP = re.compile(r'^max\(p\):\s*([0-9.eE+-]+)'
+                      r'(?:,\s*min\(p\):\s*([0-9.eE+-]+))?')
 
 ARRIVAL_P = 1.001 * P_AIR       # native shock-arrival threshold
 STOP_GRACE_S = 60.0             # writeNow -> kill escalation window
@@ -50,6 +55,27 @@ ADAPT_EVERY = 3
 #: after this many lines is the canary (A6). blastFoam's own header is
 #: well under 100 lines.
 TIME_CANARY_LINES = 500
+
+#: A blastFoam run whose deltaT collapses toward zero does not fail fast:
+#: it spins, the solver clock stops advancing at print precision, and it
+#: finally dies inside compressibleBlastSystem::decode() dividing rhoU by
+#: a zero density - SIGFPE, exit 136, no result at all. Measured on a
+#: profile+AMR 3D case: deltaT fell 6.4e-06 -> 1e-08 -> 7.5e-12 over ~43
+#: steps with the clock frozen, and the user just waited.
+#: deltaT is compared to its own RUNNING MAXIMUM, so the small-and-growing
+#: deltaT of a healthy start cannot trip this, and neither can a run with
+#: adjustTimeStep off (dt == dt_max forever). The stalled-clock conjunct
+#: is what separates "unstable" from "legitimately tiny fixed step".
+DT_COLLAPSE_FRAC = 1e-3
+COLLAPSE_STEPS = 15
+COLLAPSE_STEPS_HARD = 60
+CLOCK_STUCK_STEPS = 3
+MIN_STABLE_STEPS = 20
+
+#: stop_reason for the above. Deliberately NOT 'stopped by user' (the
+#: exact string three backends key stopped_early off) and deliberately
+#: not in backend._NATURAL_END, so the W2 gauge-tail note still fires.
+STOP_UNSTABLE = 'numerical instability'
 
 #: FOAM warnings that are inherent to the collapsed-hex sector/wedge
 #: meshes (1D sector, 2D axisym): the apex face degenerates into the
@@ -105,6 +131,46 @@ def maybe_reconstruct(spec, fields, done=False):
         pass                        # transient (mid-write): next poll
 
 
+def check_stability(st, hooks, t):
+    """Latch st['unstable'] when the run has gone numerically unstable.
+
+    Called once per `Time =` line, BEFORE st['t'] is overwritten, so `t`
+    is the new value and st['t'] is still the previous one.
+
+    Same shape as the A6 time canary: this only sets a flag and logs
+    once - `progress_line` stays a pure module-level function with no
+    reference to the loop, and the loop body decides what to do. Returns
+    True once tripped.
+    """
+    if st.get('unstable'):
+        return True
+    dt, dt_max = st.get('dt', 0.0), st.get('dt_max', 0.0)
+    if dt_max > 0.0 and 0.0 < dt < DT_COLLAPSE_FRAC * dt_max:
+        st['dt_low'] = st.get('dt_low', 0) + 1
+    else:
+        st['dt_low'] = 0
+    st['t_stuck'] = (st.get('t_stuck', 0) + 1) if t <= st.get('t', 0.0) else 0
+    low, stuck = st['dt_low'], st['t_stuck']
+    if st.get('step', 0) < MIN_STABLE_STEPS:
+        return False
+    if not (low >= COLLAPSE_STEPS_HARD
+            or (low >= COLLAPSE_STEPS and stuck >= CLOCK_STUCK_STEPS)):
+        return False
+    st['unstable'] = STOP_UNSTABLE
+    pmin = st.get('p_min')
+    hooks.log(
+        f"  [blastfoam] the solve has gone unstable: deltaT collapsed to "
+        f"{dt:.2e} s ({dt / dt_max:.1e} of the {dt_max:.2e} s it had "
+        f"reached)" + (f", min(p) = {pmin:.3e} Pa" if pmin is not None else "")
+        + f", and the solver clock has not advanced for {stuck} steps at "
+        f"t = {t:.6g} s.\n"
+        f"  [blastfoam] stopping at the next written frame - waiting it "
+        f"out ends in a divide-by-zero density (SIGFPE) with no result at "
+        f"all. What is already written is kept; a lower CFL number or a "
+        f"lower AMR level usually clears it.")
+    return True
+
+
 def progress_line(line, st, hooks, end_time):
     """Parse one solver stdout line into Progress state. st['frac'],
     when not None, overrides the t/end_time estimate (3D uses the
@@ -122,7 +188,9 @@ def progress_line(line, st, hooks, end_time):
                       "'Time =' lines yet - live cadence and progress "
                       "may stall")
     if m:
-        st['t'] = float(m.group(1))
+        t = float(m.group(1))
+        check_stability(st, hooks, t)
+        st['t'] = t
         st['step'] += 1
         frac = st.get('frac')
         if frac is None:
@@ -133,10 +201,13 @@ def progress_line(line, st, hooks, end_time):
     m = _RE_DT.match(line)
     if m:
         st['dt'] = float(m.group(1))
+        st['dt_max'] = max(st.get('dt_max', 0.0), st['dt'])
         return
     m = _RE_MAXP.match(line)
     if m:
         st['p_max'] = float(m.group(1))
+        if m.group(2) is not None:
+            st['p_min'] = float(m.group(2))
         return
     if 'FOAM FATAL' in line:
         hooks.log('  [foam] ' + line.rstrip())
@@ -576,6 +647,10 @@ class FoamRunLoop:
                 self._ingest_ready()
                 if hooks.should_stop() and not foam.stop_requested:
                     self.request_stop('stopped by user')
+                # after the user's stop, so an explicit stop still wins
+                # and keeps its own reason
+                if self.st.get('unstable') and not foam.stop_requested:
+                    self.request_stop(STOP_UNSTABLE)
                 if self.stop_deadline and foam.running \
                         and _time.time() > self.stop_deadline:
                     hooks.log('  [blastfoam] solver did not stop cleanly '

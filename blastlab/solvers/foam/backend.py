@@ -29,8 +29,8 @@ from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Result, RunHooks, StoppedBeforeStart
 from . import env, reader, runner, writer
 from .materials import MATERIALS
-from .runloop import (ARRIVAL_P, BENIGN_WARN, FoamRunLoop, PeakImpulse,
-                      due_sparse, new_live)
+from .runloop import (ARRIVAL_P, BENIGN_WARN, STOP_UNSTABLE, FoamRunLoop,
+                      PeakImpulse, due_sparse, new_live)
 from .runloop import amr_note, level_counts
 from ..hooks import frame_budget
 
@@ -834,6 +834,18 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 #: A real fix needs a foam-side flush knob, so until then the run says so.
 _NATURAL_END = ('safety cap', 'end time reached')
 
+#: Reasons that mean "this run did not get where it was going": they
+#: leave the progress bar where it stopped and tag the result
+#: ' (stopped)'. An instability stop belongs here - a run cut short by a
+#: collapsing deltaT must not report a filled bar. A trigger gauge or a
+#: terminate boundary does NOT: those runs achieved what they were asked.
+_STOPPED_EARLY = ('stopped by user', STOP_UNSTABLE)
+
+
+def _stopped_early(stop_reason):
+    """Did the run end short of what it was asked to do?"""
+    return stop_reason in _STOPPED_EARLY
+
 
 def note_gauge_tail(hooks, stop_reason):
     """One line after `Stopped:` when the gauge record can be short."""
@@ -903,7 +915,7 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
                 solver='blastfoam', material=spec.material,
                 case_dir=spec.case_unc)
     return Result(snapshots, _gauges_from_probes(spec), meta,
-                  stop_reason, stop_reason == 'stopped by user')
+                  stop_reason, _stopped_early(stop_reason))
 
 
 # ── 2D ──────────────────────────────────────────────────────────────────────
@@ -1303,7 +1315,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
         meta['frames'] = dict(times=np.array(frame_t), pressures=frame_p)
     _amr_meta(meta, spec, mesh_fin, frame_lv, record_frames)
     return Result(snapshots, gauge_out, meta, stop_reason,
-                  stop_reason == 'stopped by user')
+                  _stopped_early(stop_reason))
 
 
 # ── 3D ──────────────────────────────────────────────────────────────────────
@@ -1840,4 +1852,4 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
     if trigger:
         meta['trigger'] = dict(trigger)
     return Result(snapshots, gauge_out, meta, stop_reason,
-                  stop_reason == 'stopped by user')
+                  _stopped_early(stop_reason))

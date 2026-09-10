@@ -64,9 +64,11 @@ def w2_note_checks():
     for reason in ('safety cap', 'end time reached'):
         check(f'natural end ({reason}): silent', note_for(reason) == '')
 
+    from blastlab.solvers.foam.runloop import STOP_UNSTABLE
     for reason in ('stopped by user',
                    'trigger gauge 2 reached',
-                   'shock arrived at a terminate boundary (r = 4.0 m)'):
+                   'shock arrived at a terminate boundary (r = 4.0 m)',
+                   STOP_UNSTABLE):
         txt = note_for(reason)
         check(f'{reason}: one note', txt.count('[note]') == 1, txt)
         check(f'{reason}: names the cause and the consequence',
@@ -85,6 +87,126 @@ def _call_sites():
     with open(backend.__file__, encoding='utf-8') as fh:
         return sum(1 for ln in fh
                    if ln.strip() == 'note_gauge_tail(hooks, stop_reason)')
+
+
+def instability_checks(_st):
+    """A run whose deltaT collapses must be stopped and named, not left
+    to spin until blastFoam divides rhoU by a zero density.
+
+    Calibrated against a real crash (profile+AMR 3D, 13 ranks): deltaT
+    fell 6.4e-06 -> 1e-08 -> 7.5e-12 across ~43 steps with the solver
+    clock frozen, then SIGFPE in compressibleBlastSystem::decode().
+    """
+    from blastlab.solvers.foam import runloop, backend
+
+    print("")
+    print("A8: a collapsing deltaT is caught before the SIGFPE")
+
+    class _Log:
+        def __init__(self):
+            self.lines = []
+
+        def log(self, msg):
+            self.lines.append(str(msg))
+
+        def progress(self, p):
+            pass
+
+    def feed(rec, st, pairs):
+        """One solver step is a deltaT line then a Time line, in the
+        order blastFoam prints them."""
+        for dt, t in pairs:
+            runloop.progress_line(f'deltaT = {dt:.6e}', st, rec, 1e-3)
+            runloop.progress_line(f'Time = {t:.9e}', st, rec, 1e-3)
+
+    def ramp(n=60, cap=6.4e-6, dt=1e-7, t=0.0):
+        out = []
+        for _ in range(n):
+            dt = min(cap, dt * 1.2)
+            t += dt
+            out.append((dt, t))
+        return out, t
+
+    # a healthy start: deltaT is tiny AND growing, which is the normal
+    # opening of every blastFoam run - it must never look unstable
+    rec, st = _Log(), _st()
+    grow, _ = ramp(200, cap=1e30)
+    feed(rec, st, grow)
+    check('a growing deltaT never trips the guard',
+          not st.get('unstable') and not rec.lines, str(rec.lines[:1]))
+
+    # adjustTimeStep off: a small FIXED deltaT prints a clock that looks
+    # stalled at OpenFOAM's 6-significant-digit precision. Without the
+    # deltaT conjunct this is a false positive.
+    rec, st = _Log(), _st()
+    feed(rec, st, [(1e-7, 100.0)] * 200)
+    check('a fixed small deltaT with a print-stalled clock is not '
+          'instability', not st.get('unstable'), str(rec.lines[:1]))
+
+    # the measured collapse
+    rec, st = _Log(), _st()
+    pairs, t = ramp()
+    feed(rec, st, pairs + [(7.5e-12, t)] * 20)
+    check('the measured collapse is caught',
+          st.get('unstable') == runloop.STOP_UNSTABLE, str(st.get('unstable')))
+    check('it says so exactly once', len(rec.lines) == 1, str(len(rec.lines)))
+    txt = rec.lines[0] if rec.lines else ''
+    check('the message names deltaT, the value and the consequence',
+          'deltaT' in txt and '7.50e-12' in txt and 'unstable' in txt
+          and 'SIGFPE' in txt, txt[:120])
+    feed(rec, st, [(7.5e-12, t)] * 100)
+    check('latched: still one line however long it lasts',
+          len(rec.lines) == 1, str(len(rec.lines)))
+
+    # a dip that recovers is not a collapse
+    rec, st = _Log(), _st()
+    pairs, t = ramp()
+    dip = [(7.5e-12, t)] * 10
+    back = []
+    for _ in range(5):
+        t += 6.4e-6
+        back.append((6.4e-6, t))
+    feed(rec, st, pairs + dip + back + [(7.5e-12, t)] * 10)
+    check('a transient dip that recovers resets the streak',
+          not st.get('unstable'), str(rec.lines[:1]))
+
+    # never before the run has really started
+    rec, st = _Log(), _st()
+    feed(rec, st, [(1e-6, 1e-6), (1e-12, 1e-6)]
+         + [(1e-12, 1e-6)] * (runloop.MIN_STABLE_STEPS - 3))
+    check('never fires before MIN_STABLE_STEPS',
+          not st.get('unstable'), str(rec.lines[:1]))
+
+    # the A6 canary feeds Courant lines as filler: the guard must not see
+    # them, which is why it keys off deltaT and Time only
+    rec, st = _Log(), _st()
+    for k in range(runloop.TIME_CANARY_LINES - 1):
+        runloop.progress_line(f'Courant Number mean: {k}', st, rec, 1e-4)
+    check('Courant filler lines are invisible to the guard',
+          not st.get('unstable') and st.get('dt_low', 0) == 0)
+
+    # the reason-string contract
+    check('the reason is not the user-stop string',
+          runloop.STOP_UNSTABLE != 'stopped by user')
+    check('an instability stop counts as stopped early',
+          backend._stopped_early(runloop.STOP_UNSTABLE)
+          and backend._stopped_early('stopped by user'))
+    check('a run that achieved what it was asked does not',
+          not backend._stopped_early('end time reached')
+          and not backend._stopped_early('safety cap')
+          and not backend._stopped_early('trigger gauge 1 reached'))
+
+    # wiring: the loop asks for the stop, and the user's stop still wins
+    with open(runloop.__file__, encoding='utf-8') as fh:
+        src = fh.readlines()
+    mine = [i for i, ln in enumerate(src)
+            if ln.strip() == 'self.request_stop(STOP_UNSTABLE)']
+    user = [i for i, ln in enumerate(src)
+            if ln.strip() == "self.request_stop('stopped by user')"]
+    check('the run loop requests the stop exactly once',
+          len(mine) == 1, f'{len(mine)} call sites')
+    check("the user's stop is checked first, so it keeps its own reason",
+          bool(mine) and bool(user) and user[0] < mine[0])
 
 
 def canary_checks(_st):
@@ -360,6 +482,7 @@ def main():
         runner.rewrite_control_entry = orig
 
     canary_checks(_st)
+    instability_checks(_st)
     w2_note_checks()
 
     print()
