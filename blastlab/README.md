@@ -8,8 +8,9 @@ remapping, a prompt-based CLI and a Tkinter GUI.
   obstacles
 - **3D Cartesian** — box obstacles, slice views, shock-front isosurfaces.
   Direct charge init offers two resolutions: `resolve` (refine the grid
-  to 5 cells across the charge radius — accurate but cubic in cost, so
-  small charges in large domains exceed the cell cap) and `smear` (keep
+  to 8 cells across the charge radius on blastFoam, 5 on the native
+  solvers — accurate but cubic in cost, so small charges in large
+  domains exceed the cell cap) and `smear` (keep
   your cell size; the charge's mass and detonation energy are deposited
   into a source ball of a few cells — coarse near-field, correct yield)
 - **Interactive 3D viewer** — a live VTK window (optional, `pip install

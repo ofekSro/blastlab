@@ -20,7 +20,8 @@ What this drives, all through the panel's own widgets:
   * one physical clock across the stages (N7/T41): the 2D and 3D stages
     must start at the profile's t0, not at 0.
 
-Small domains, ~10-20 minutes. Needs an idle WSL.
+Small domains, but the 3D stage runs to its safety cap: measured ~31 min
+end to end on a 20-core / 62 GiB-VM machine. Needs an idle WSL.
 
 Run:  cd blastlab/tests && python _e2e_gui_chain_foam.py
 """

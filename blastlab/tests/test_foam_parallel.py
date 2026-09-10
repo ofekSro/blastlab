@@ -3,8 +3,10 @@
 parallel run-machinery contract (processor dirs, reconstructed times,
 case-level probes). The fvSolution 'diagonal' solver has no global
 sums, so the two runs should agree to near round-off. Auto-SKIPs
-without WSL. Wall ~5 min (four runs: np1, np2, and a determinism pair
-with the adaptive writeInterval controller switched off - see B23).
+without WSL. Wall ~16 min (four runs: np1, np2, and a determinism pair
+with the adaptive writeInterval controller switched off - see B23;
+measured 2026-09-10 on a 20-core / 62 GiB-VM machine, where the old
+"~5 min" was already 3x optimistic after T39).
 """
 
 import os

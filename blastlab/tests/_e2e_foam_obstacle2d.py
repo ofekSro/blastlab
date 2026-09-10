@@ -9,7 +9,11 @@ wedge-cell centres, which sit slightly off the uniform x_c):
   - a pressure shadow behind the wall.
 
 Run:  python _e2e_foam_obstacle2d.py [axi|planar|both]
-      (default both; planar ~5 min, axisym ~30 min wall)
+      (default both. The axisym half is LONG: measured ~105 min on a
+      20-core / 62 GiB-VM machine - 171,604 cells serial at ~2.85 s per
+      step. The old "~30 min" here predates T39, which raised the charge
+      target from 5 to 8 cells across the radius and so multiplied 2D
+      cost by ~4. Budget accordingly.)
 Auto-SKIPs when WSL/blastFoam is unavailable.
 """
 

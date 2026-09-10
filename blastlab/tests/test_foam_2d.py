@@ -1,6 +1,8 @@
 """2D blastFoam backend: axisymmetric native-vs-foam spot comparison
 (looser gates than 1D - different schemes AND wedge vs r-z metrics)
-plus a planar smoke run. Auto-SKIPs without WSL. Wall ~2-3 min.
+plus a planar smoke run. Auto-SKIPs without WSL. Wall ~7 min (measured
+2026-09-10 on a 20-core / 62 GiB-VM machine; the older "~2-3 min"
+predates T39's 5 -> 8 cells across the charge radius).
 
 Case: 8 kg TNT on the axis at height 1.25 m in a 2.5 x 2.5 m domain
 (ground wall below); gauges inside the shock-arrival stop distance.

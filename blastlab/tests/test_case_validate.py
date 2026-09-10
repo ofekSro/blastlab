@@ -232,7 +232,7 @@ def run_plan_checks():
               and any('earlier session' in n for n in rep.notes),
               str(rep.notes))
 
-        # (b) a 4 GB VM cannot hold 8M cells at ~2.6 KB each
+        # (b) a 4 GB VM cannot hold 8M cells at ~2.7 KB each
         env.forget_hardware()
         env.prime_hardware(cores=8, ram_gb=4)
         rep = validate_case(case(0.02))
@@ -241,8 +241,9 @@ def run_plan_checks():
         check('the refusal names the VM, the per-cell cost and the fix',
               any('GB WSL VM' in e and 'KB/cell' in e
                   and '.wslconfig' in e for e in errs), str(errs))
+        # re-baselined 2026-09-10 with BYTES_PER_CELL 2650 -> 2700
         check('the memory cap is ~1.1M cells, not the fixed 120M',
-              any('1,134,519' in e for e in errs), str(errs))
+              any('1,113,510' in e for e in errs), str(errs))
 
         # (c) the same VM is fine with a grid that fits
         rep = validate_case(case(0.05))          # 512k cells

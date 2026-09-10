@@ -4,7 +4,8 @@ contract (snapshot keys/dtypes/shapes incl. rho3, gauges, meta incl.
 j0/k0/s0, frames) plus x/y gauge symmetry and the arrival-watcher
 stop. Auto-SKIPs when WSL/blastFoam is unavailable.
 
-Pass --tiny for a 0.6 m box (~30-60 s) while iterating.
+Pass --tiny for a 0.6 m box (~2.5 min measured 2026-09-10 on a 20-core
+/ 62 GiB-VM machine; the old "~30-60 s" predates T39).
 """
 
 import os

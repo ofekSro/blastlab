@@ -2,7 +2,8 @@
 two distinct high-pressure foci in the per-step peak map, and an
 activation='none' (instant detonation) 2D run must complete via the
 arrival watcher with a shocked gauge. Auto-SKIPs without WSL.
-Wall ~3 min."""
+Wall ~11 min (measured 2026-09-10 on a 20-core / 62 GiB-VM machine;
+the old "~3 min" predates T39's 5 -> 8 cells across the charge)."""
 
 import os
 import sys

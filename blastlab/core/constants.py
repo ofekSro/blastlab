@@ -59,7 +59,16 @@ FOAM_VM_GB_ASSUMED = 4
 #: and 262,144 cells -> 843.3 MB, i.e. ~2.65 KB per cell at the margin on
 #: top of a ~148 MB fixed cost. The per-cell figure is what scales, so it is
 #: what the caps use; the fixed cost is inside the 30 % headroom below.
-BYTES_PER_CELL = 2650
+#:
+#: Re-measured 2026-09-10 on completely different hardware (i7-14700,
+#: 128 GB host, 62 GiB WSL VM) with three serial 3D points - 32,768 cells
+#: -> 224.9 MiB, 74,088 -> 326.2 MiB, 140,608 -> 501.5 MiB. Least-squares
+#: slope 2,696 B/cell with R^2 = 0.9996, constant 138.8 MiB. So the model
+#: holds across machines to under 2 % and does NOT need measuring per
+#: machine - but both that fit and a recomputation of T48's own two points
+#: land slightly ABOVE 2,650, i.e. the old value under-estimated memory and
+#: approved marginally-too-large cases. Rounded up rather than down.
+BYTES_PER_CELL = 2700
 
 #: a rank below this many cells spends more time in decompose/reconstruct
 #: and halo exchange than it saves
