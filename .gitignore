@@ -44,3 +44,8 @@ blast_3d_animation.*
 
 # QA harness output (also written under ~/blastlab_qa)
 blastlab_qa/
+
+# Raw logs and helper scripts from an unattended night run. The findings
+# live in NIGHT_RESULTS.md / NIGHT_LOG.md, which ARE tracked; these are
+# the evidence behind them and do not need to be.
+night_artifacts/
