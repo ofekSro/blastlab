@@ -922,7 +922,8 @@ def validate_case(case, pending_inputs=False):
         warn(f"WSL hardware not detected - cell caps assume a "
              f"{FOAM_VM_GB_ASSUMED} GB VM ({cap_refuse:,} cells). A case "
              f"that validated on another machine may be refused here; "
-             f"click Re-detect once WSL is up.")
+             f"click Re-detect once WSL is up. Headless callers should "
+             f"call solvers.foam.env.prime_from_settings() at start-up.")
     elif foam and _caps.ram_source == _hardware.CACHED:
         note(f"Cell caps from hardware measured on this machine in an "
              f"earlier session ({_hw['ram_gb']} GB VM); re-checking in "

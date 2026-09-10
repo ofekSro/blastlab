@@ -289,39 +289,22 @@ class App:
 
     def _prime_hardware_from(self, st):
         """Seed the hardware caches from settings, but only when the
-        saved numbers belong to this machine and are inside the TTL."""
-        try:
-            hardware.prime_host(ram_gb=st.get('hw_host_ram_gb'))
-            fp = hardware.machine_fingerprint(foam_env.WSL_DISTRO)
-            if hardware.cache_is_valid(st.get('hw_fingerprint'),
-                                       st.get('hw_stamp'), fp,
-                                       time.time()):
-                foam_env.prime_hardware(cores=st.get('hw_cores'),
-                                        ram_gb=st.get('hw_ram_gb'))
-        except Exception:
-            pass
+        saved numbers belong to this machine and are inside the TTL.
+
+        Delegates: the CLI and plain scripts need the same thing, and
+        when this lived only here every non-GUI caller sized its cases
+        against the assumed 4 GB VM."""
+        return foam_env.prime_from_settings(st)
 
     def _persist_hardware(self, hw):
         """Save ONLY what was measured this session.
 
         The old version wrote whatever `hardware()` returned, so a failed
         probe overwrote a good measurement with `hw_ram_gb=0` and a
-        fabricated 4-core count - a plausible lie is worse than a gap."""
-        import datetime
-        upd = {}
-        if hw.get('cores_source') == hardware.MEASURED and hw.get('cores'):
-            upd['hw_cores'] = int(hw['cores'])
-        if hw.get('ram_source') == hardware.MEASURED and hw.get('ram_gb'):
-            upd['hw_ram_gb'] = int(hw['ram_gb'])
-        if not upd:
-            return
-        host = hardware.host()
-        upd['hw_host_ram_gb'] = int(host.get('ram_gb') or 0)
-        upd['hw_fingerprint'] = hardware.machine_fingerprint(
-            foam_env.WSL_DISTRO)
-        upd['hw_stamp'] = datetime.datetime.now().isoformat(
-            timespec='seconds')
-        gui_settings.update(**upd)
+        fabricated 4-core count - a plausible lie is worse than a gap.
+
+        Delegates for the same reason as _prime_hardware_from."""
+        return foam_env.persist_hardware(hw)
 
     def _probe_hw_async(self):
         """Probe the WSL VM's cores + RAM off-thread and persist them, so

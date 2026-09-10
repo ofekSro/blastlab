@@ -22,6 +22,15 @@ def run(dim):
     print(f"  {detail}")
     if not ok:
         _unavailable()
+    # check_available() already paid the WSL cold-start cost, and we are
+    # about to run a solver in that VM - so this is the one entry point
+    # where a blocking probe is unambiguously right. It also persists the
+    # numbers, which is what lets a headless machine size correctly on
+    # its very first run (prime_from_settings alone only helps once the
+    # GUI has run at least once).
+    hw = env.probe_and_persist() or {}
+    if hw.get('ram_gb'):
+        print(f"  WSL VM: {hw.get('cores')} cores, {hw['ram_gb']} GB")
     return {'1': _run_1d, '2': _run_2d, '3': _run_3d}[dim]()
 
 

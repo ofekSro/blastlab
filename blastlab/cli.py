@@ -707,6 +707,10 @@ def main(dim, solver='native'):
     """Run the prompt workflow for '1d', '2d' or '3d'. The historical
     (native) flow lives in legacy/; the blastFoam backend has its own
     prompt flow so the byte-pinned legacy modules stay untouched."""
+    # also here, not only in __main__: a script that imports
+    # `blastlab.cli.main` directly must size against the real machine too
+    from .solvers.foam.env import prime_from_settings
+    prime_from_settings()
     dim = str(dim).lower().lstrip('-')
     if dim not in ('1', '1d', '2', '2d', '3', '3d'):
         raise SystemExit(f"Unknown dimension '{dim}' (use 1d, 2d or 3d)")

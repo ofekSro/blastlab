@@ -40,6 +40,13 @@ def main():
                          'path) and report its contents, then exit')
     args = ap.parse_args()
 
+    # N21 follow-up: the hardware probe is process-local, and until this
+    # call existed only the GUI restored it. Every other entry point
+    # sized its cases against FOAM_VM_GB_ASSUMED (4 GB) and refused
+    # perfectly runnable cases on a big machine. Idempotent gap-fill.
+    from .solvers.foam.env import prime_from_settings
+    prime_from_settings()
+
     if args.clean_foam_runs:
         from .solvers.foam.cli_run import clean_runs
         clean_runs(force=args.force, older_than_days=args.older_than,

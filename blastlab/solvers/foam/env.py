@@ -34,7 +34,10 @@ from ...core.constants import (BYTES_PER_CELL, CELLS_PER_RANK,
                                FOAM_VM_GB_ASSUMED,
                                RAM_GB_PER_RANK, RAM_REFUSE_FRACTION,
                                RAM_WARN_FRACTION)
-from ...core.hardware import CACHED, MEASURED, UNKNOWN, parse_meminfo_kb
+from ...core.hardware import (CACHED, MEASURED, UNKNOWN, cache_is_valid,
+                              detect_host_ram_gb, host,
+                              machine_fingerprint, parse_meminfo_kb,
+                              prime_host)
 
 WSL_DISTRO  = 'Ubuntu'
 FOAM_BASHRC = '/root/OpenFOAM/OpenFOAM-9/etc/bashrc'
@@ -319,6 +322,88 @@ def forget_hardware():
     _cores = _slots = _ram_gb = None
     _cores_src = _slots_src = _ram_src = UNKNOWN
     _cores_tried = _slots_tried = _ram_tried = False
+
+
+def prime_from_settings(st=None, now=None):
+    """Seed the host + WSL caches from the persisted settings.
+
+    The one implementation the GUI, the CLI and scripts share. Without
+    it a non-GUI caller sizes every case against FOAM_VM_GB_ASSUMED (4
+    GB) no matter what machine it is on: the probe result is
+    process-local, and until now only gui/app.py persisted and restored
+    it. A 62 GiB VM was being told it had 4.
+
+    `st` is an already-loaded settings dict when the caller has one;
+    None loads it here. Never raises. Gap-fills only - a value already
+    known (live or primed) is left alone - and what it seeds stays
+    CACHED, so the live probe still runs and a .wslconfig edit is still
+    noticed.
+
+    Deliberately NOT called at import time: the cap tests forget and
+    prime their own hardware in setup, and an import-time prime would
+    fight them. Entry points call it explicitly.
+
+    Returns True when the VM numbers were accepted (this machine, inside
+    the TTL), False otherwise.
+    """
+    try:
+        if st is None:
+            from ...gui import settings as _settings
+            st = _settings.load()
+        # Unconditional and FIRST: machine_fingerprint hashes the host
+        # RAM out of this same cache, so the fingerprint check below is
+        # only meaningful once the host has been primed.
+        prime_host(ram_gb=st.get('hw_host_ram_gb'))
+        if not cache_is_valid(st.get('hw_fingerprint'), st.get('hw_stamp'),
+                              machine_fingerprint(WSL_DISTRO),
+                              time.time() if now is None else now):
+            return False
+        prime_hardware(cores=st.get('hw_cores'), ram_gb=st.get('hw_ram_gb'))
+        return True
+    except Exception:
+        return False
+
+
+def persist_hardware(hw):
+    """Save ONLY what was measured this session.
+
+    A failed probe must not overwrite a good measurement with
+    hw_ram_gb=0 and a fabricated core count - a plausible lie is worse
+    than a gap. Returns True when something was written.
+    """
+    import datetime
+    try:
+        upd = {}
+        if hw.get('cores_source') == MEASURED and hw.get('cores'):
+            upd['hw_cores'] = int(hw['cores'])
+        if hw.get('ram_source') == MEASURED and hw.get('ram_gb'):
+            upd['hw_ram_gb'] = int(hw['ram_gb'])
+        if not upd:
+            return False
+        upd['hw_host_ram_gb'] = int(host().get('ram_gb') or 0)
+        upd['hw_fingerprint'] = machine_fingerprint(WSL_DISTRO)
+        upd['hw_stamp'] = datetime.datetime.now().isoformat(
+            timespec='seconds')
+        from ...gui import settings as _settings
+        _settings.update(**upd)
+        return True
+    except Exception:
+        return False
+
+
+def probe_and_persist(timeout=30):
+    """Blocking WSL probe + host RAM, saved for the next session.
+
+    For an entry point that is about to launch a solver in that VM
+    anyway and has already paid the cold-start cost. Returns the
+    hardware() dict, or None."""
+    try:
+        hw = hardware(probe=True) or {}
+        detect_host_ram_gb()
+        persist_hardware(hw)
+        return hw or None
+    except Exception:
+        return None
 
 
 @dataclass(frozen=True)
