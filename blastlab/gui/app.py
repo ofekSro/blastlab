@@ -122,6 +122,16 @@ class App:
     _run_errored = False
     #: True from _start until the drain sees the worker's 'done'
     _drain_pending = False
+    #: How a failed run is reported. Injectable for the same reason
+    #: `run_browser` takes `confirm=`: `messagebox.showerror` is MODAL,
+    #: so an unattended driver (_e2e_gui_*, _qa_gui_harness) that reaches
+    #: it stops dead until someone clicks OK. A headless caller replaces
+    #: this with a recorder and keeps going.
+    #: Resolved through the module at CALL time, not bound here, so
+    #: swapping `app.messagebox` wholesale still works - that is how
+    #: test_gui_drain.py:241-242 stubs the dialog.
+    show_error = staticmethod(
+        lambda title, msg: messagebox.showerror(title, msg))
 
     def __init__(self, root, case_file=None):
         self.root = root
@@ -882,7 +892,7 @@ class App:
         elif tag == 'error':
             self._run_errored = True
             self.run_panel.on_log(msg[1])
-            messagebox.showerror(
+            self.show_error(
                 'Run failed',
                 _error_headline(msg[1]) + '\n\nSee the run log for details.')
             self._finish_view3d('run failed')

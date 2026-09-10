@@ -77,6 +77,12 @@ def main():
     root = ctk.CTk()
     root.withdraw()
     app = App(root)
+    # messagebox.showerror is MODAL: unattended, a failed stage would
+    # park this script on a dialog nobody can click. Record instead, and
+    # print the traceback - a chain failure has to be readable, not a
+    # window that never closes.
+    errors = []
+    app.show_error = lambda title, msg: errors.append((title, msg))
     pump(root, 1.0)
 
     chain = app.chain
@@ -119,6 +125,15 @@ def main():
     print(f'  --- chain finished in {wall:.0f} s ---')
     check('the chain ran to completion (worker exited)', done)
 
+    # The worker queues the LAST stage's ('result'|'error', ...) and then
+    # ('done',) microseconds before its thread dies, but App._drain is a
+    # root.after(50) callback - so without this wait the final stage's
+    # message is structurally unreachable and the run looks like it
+    # produced one result fewer than it did. _e2e_gui_foam.py:100 and
+    # _qa_gui_harness.py:599 already do this; this script did not.
+    pump(root, 15, until=lambda: not app._drain_pending)
+    pump(root, 1.0)
+
     # the panel's own workspace holds the hand-offs it wired
     p1 = os.path.join(WS, 'stage1_profile.txt')
     p2 = os.path.join(WS, 'stage2_profile.npz')
@@ -127,6 +142,16 @@ def main():
     for d in (1, 2, 3):
         check(f'stage {d} case.json saved in the workspace',
               os.path.isfile(os.path.join(WS, f'stage{d}_case.json')))
+
+    # A stage that raised is the single most useful thing this script can
+    # tell you, and it used to be thrown away entirely.
+    if app.worker is not None and getattr(app.worker, 'error', None):
+        print(f'\n  !! stage {app.worker.error_stage + 1} raised:\n')
+        for ln in app.worker.error.rstrip().splitlines():
+            print(f'     {ln}')
+        print()
+    for title, msg in errors:
+        print(f'  !! {title}: {msg}')
 
     results = [e.result for e in app.results._entries[n_before:]]
     check('three results reached the Results panel', len(results) >= 3,
@@ -138,8 +163,13 @@ def main():
     # profile's t0, so its gauge times do not restart from zero
     times = []
     for res in results[-3:]:
-        g = getattr(res, 'gauges', None) or {}
-        ts = list(g.get('times') or [])
+        # `gauges['times']` is a numpy array, so `x or []` raises
+        # ValueError("truth value of an array ... is ambiguous") - test
+        # against None instead (gauge_summary.py:107 does the same).
+        g = getattr(res, 'gauges', None)
+        g = {} if g is None else g
+        _t = g.get('times')
+        ts = [] if _t is None else list(_t)
         times.append((ts[0] if ts else None, ts[-1] if ts else None))
     print(f'  gauge time spans per stage: {times}')
     if len(times) == 3 and all(t[0] is not None for t in times):
@@ -150,11 +180,26 @@ def main():
               times[2][0] > 0.9 * times[1][1],
               f'{times[2][0]:.3e} vs {times[1][1]:.3e}')
 
-    for lbl, res in zip(labels[-3:], results[-3:]):
-        pk = getattr(res, 'meta', {}).get('p_peak')
-        check(f'{lbl}: a finite peak map',
-              pk is not None and float(pk.max()) > 0,
-              str(None if pk is None else pk.max()))
+    # A peak MAP is a 2D/3D thing: the 1D solvers (native and foam alike)
+    # return a radial `final_profile`, and never set meta['p_peak'] -
+    # asserting one for stage 1 was asking for something 1D has never
+    # produced. Check each stage against its own contract.
+    dims = [e.dim for e in app.results._entries[n_before:]][-3:]
+    for lbl, dim, res in zip(labels[-3:], dims, results[-3:]):
+        meta = getattr(res, 'meta', {})
+        if dim == 1:
+            # final_profile is a dict (t, r, rho, u, e, p, ...), not an
+            # array - the 1D contract is a radial pressure profile.
+            prof = meta.get('final_profile') or {}
+            p = prof.get('p')
+            check(f'{lbl}: a finite radial pressure profile',
+                  p is not None and len(p) and float(max(p)) > 0,
+                  str(None if p is None else max(p)))
+        else:
+            pk = meta.get('p_peak')
+            check(f'{lbl}: a finite peak map',
+                  pk is not None and float(pk.max()) > 0,
+                  str(None if pk is None else pk.max()))
 
     check('no Python warnings during the chain', not caught, str(caught[:5]))
 

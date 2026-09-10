@@ -228,6 +228,13 @@ class SolverWorker(threading.Thread):
         self.hooks = GuiHooks(self.q, self.stop_event)
         self._stages = stages
         self.results = [None] * len(stages)
+        #: traceback of the stage that failed, kept alongside `results`.
+        #: The queue copy is the GUI's; this one survives for anyone
+        #: inspecting the worker after is_alive() goes False - without it
+        #: a failed stage is invisible to a caller that is not draining
+        #: the queue (a chain's LAST stage is the usual victim).
+        self.error = None
+        self.error_stage = None
 
     def run(self):
         try:
@@ -242,7 +249,9 @@ class SolverWorker(threading.Thread):
                     self.q.put(('log', f'  [{exc}]'))
                     break
                 except Exception:
-                    self.q.put(('error', traceback.format_exc()))
+                    self.error_stage = k
+                    self.error = traceback.format_exc()
+                    self.q.put(('error', self.error))
                     break
                 self.results[k] = res
                 self.hooks.flush_progress()   # chips show the true final step
