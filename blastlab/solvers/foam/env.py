@@ -386,7 +386,12 @@ def persist_hardware(hw):
             timespec='seconds')
         from ...gui import settings as _settings
         _settings.update(**upd)
-        return True
+        # Verify rather than assume: `update` drops `save`'s result, so a
+        # write that never landed is indistinguishable from one that did -
+        # and losing the measurement silently sends the next headless run
+        # back to the assumed 4 GB VM.
+        back = _settings.load()
+        return all(back.get(k) == v for k, v in upd.items())
     except Exception:
         return False
 

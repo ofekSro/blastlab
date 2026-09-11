@@ -8,7 +8,11 @@ writes are best-effort.
 
 import json
 import os
+import sys
 import threading
+
+#: one warning per process when a write fails - see save()
+_warned = False
 
 #: N21: `update()` is a load-modify-save, and two threads in this one
 #: process race on it - the hardware probe thread writes hw_* while the
@@ -77,7 +81,13 @@ def load(path=None):
 
 
 def save(settings, path=None):
-    """Write the dict; returns True on success."""
+    """Write the dict; returns True on success.
+
+    A failure used to be completely silent - `update` ignores the return
+    value, so a settings write that never landed looked exactly like one
+    that did. That is how a measured hardware probe can be lost, which
+    sends the next headless run back to the assumed 4 GB VM. Say so once,
+    on stderr, rather than returning False into nothing."""
     path = path or config_path()
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -88,7 +98,12 @@ def save(settings, path=None):
             json.dump(settings, f, indent=2)
         os.replace(tmp, path)
         return True
-    except OSError:
+    except OSError as exc:
+        global _warned
+        if not _warned:
+            _warned = True
+            print(f'[blastlab] could not write settings ({path}): {exc}',
+                  file=sys.stderr)
         return False
 
 
