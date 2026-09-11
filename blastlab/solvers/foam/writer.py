@@ -37,7 +37,8 @@ from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
 from . import env
-from .dicts import (FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC, TIME_PRECISION,
+from .dicts import (AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
+                    TIME_PRECISION,
                     Raw, block, fmt, foam_file, tfmt)
 from .materials import AFTERBURN, MATERIALS, E0, charge_radius
 
@@ -1023,19 +1024,7 @@ def _dynamicmeshdict(spec=None, case=None):
         'dumpLevel': True,
     })
     if spec.n_procs > 1:
-        # Fixed decomposition. Balancing needs an `internal` patch, and
-        # this is not a default we can simply flip: measured 2026-09-10,
-        # `balance yes` on an otherwise working 13-rank AMR case dies in
-        # 11 s with
-        #   FOAM FATAL ERROR: When balancing is enabled, an internal
-        #   patch should be added to the mesh. To add the necessary
-        #   patch ... use "addEmptyPatch patchName internal -overwrite"
-        #   (fvMeshBalance::checkForInternal, fvMeshBalance.C:112)
-        # so enabling it means adding an addEmptyPatch stage to the
-        # preflight pipeline (and to the resume path), not changing this
-        # line. Worth doing: the same run showed a 1:64 cell imbalance
-        # between ranks (586 vs 37,230). See TODO.md.
-        d['loadBalance'] = {'balance': False}
+        d['loadBalance'] = {'balance': bool(AMR_LOAD_BALANCE)}
     return foam_file('dynamicMeshDict', block(d), location='constant')
 
 

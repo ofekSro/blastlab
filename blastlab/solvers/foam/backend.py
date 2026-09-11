@@ -27,7 +27,7 @@ from ...core.bc import normalize_bc
 from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Result, RunHooks, StoppedBeforeStart
-from . import env, reader, runner, writer
+from . import dicts, env, reader, runner, writer
 from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, STOP_UNSTABLE, FoamRunLoop,
                       PeakImpulse, due_sparse, new_live)
@@ -124,6 +124,21 @@ def _mesh_stages(spec, hooks):
         stages.append(('writing cell centres (writeCellCentres)',
                        'postProcess -func writeCellCentres '
                        f'-time {spec.start_dir}'))
+    if spec.n_procs > 1 and spec.amr and dicts.AMR_LOAD_BALANCE:
+        # Parallel AMR rebalances the decomposition as the refined region
+        # moves, and blastFoam's fvMeshBalance refuses to start without a
+        # patch of type `internal` on the mesh:
+        #   FOAM FATAL ERROR: When balancing is enabled, an internal patch
+        #   should be added to the mesh ... "addEmptyPatch patchName
+        #   internal -overwrite"   (fvMeshBalance.C:112)
+        # It has to run after the fields exist (it patches their
+        # boundaryField too) and before decomposePar. Without balancing a
+        # 13-rank AMR run was measured at a 1:64 cell imbalance between
+        # the busiest and idlest rank - most of the machine waiting.
+        stages.append(('adding the internal patch for load balancing '
+                       '(addEmptyPatch)',
+                       'addEmptyPatch internal internal -overwrite'
+                       + ('' if not spec.t_start else ' -latestTime')))
     if spec.n_procs > 1:
         # a profile stage's fields live at t0, not 0 (N7)
         stages.append((f'decomposing for {spec.n_procs} MPI ranks',

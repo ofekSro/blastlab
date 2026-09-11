@@ -25,6 +25,13 @@ P_OPEN_BC = 'pressureWaveTransmissive'
 #: Lohner error-estimator noise floor (adaptiveFvMesh `epsilon`); the
 #: classic value for pressure-based blast refinement
 LOHNER_EPS = 0.05
+#: Rebalance the decomposition as the refined region moves (parallel AMR
+#: only). ONE switch on purpose: it drives both the `loadBalance` entry
+#: in dynamicMeshDict and the addEmptyPatch mesh stage in
+#: backend._mesh_stages, and blastFoam refuses to start if the dict says
+#: yes without that patch (fvMeshBalance.C:112). Flipping this flips
+#: both, so the two can never drift apart.
+AMR_LOAD_BALANCE = True
 #: controlDict `timePrecision` - and, because `startFrom latestTime`
 #: re-derives the time NAME from the value it read, the precision any
 #: time directory this side writes must be named at. See tfmt().

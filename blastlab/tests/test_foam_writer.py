@@ -248,10 +248,28 @@ def amr_checks(specs):
     check('amr 2D: adaptiveFvMesh + densityGradient with the required keys',
           all(k in dm for k in (
               'dynamicFvMesh adaptiveFvMesh;', 'errorEstimator densityGradient;',
-              'refineInterval 2;', 'lowerRefineLevel 0.4;', 'unrefineLevel 0.2;',
+              # re-tuned 2026-09-10, see Case2D.amr_refine
+              'refineInterval 2;', 'lowerRefineLevel 0.2;', 'unrefineLevel 0.1;',
               'nBufferLayers 2;', 'maxRefinement 3;', 'maxCells 8000000;',
               'dumpLevel yes;'))
           and 'epsilon' not in dm and 'loadBalance' not in dm, dm)
+    # parallel AMR: balancing on, and it MUST be paired with the
+    # addEmptyPatch stage or blastFoam refuses to start (fvMeshBalance.C:112)
+    dmp = norm(specs['case2d_planar_amr_np4'].files[
+        'constant/dynamicMeshDict'])
+    check('amr 2D np4: loadBalance is on for a parallel AMR run',
+          'loadBalance' in dmp and 'balance yes;' in dmp, dmp)
+    from blastlab.solvers.foam import backend as _be
+    _stages = [c for _l, c in _be._mesh_stages(
+        specs['case2d_planar_amr_np4'], None) if isinstance(c, str)]
+    check('amr 2D np4: addEmptyPatch runs, and before decomposePar',
+          any('addEmptyPatch' in c for c in _stages)
+          and next(i for i, c in enumerate(_stages) if 'addEmptyPatch' in c)
+          < next(i for i, c in enumerate(_stages) if 'decomposePar' in c),
+          str(_stages))
+    _ser = [c for _l, c in _be._mesh_stages(s2, None) if isinstance(c, str)]
+    check('amr 2D serial: no addEmptyPatch (nothing to balance)',
+          not any('addEmptyPatch' in c for c in _ser), str(_ser))
     check('amr 2D: base blockMesh, display grid at the finest level',
           s2.amr == 3 and s2.display_level == 3 and s2.nb == (20, 20)
           and (s2.nx, s2.ny) == (160, 160) and abs(s2.dx - 0.0125) < 1e-12
@@ -884,6 +902,12 @@ def main():
     specs = {name: render_case(case) for name, case in cases().items()}
     # parallel golden variant: same 3D case rendered for 4 MPI ranks
     specs['case3d_c4_np4'] = render_case(cases()['case3d_c4'], n_procs=4)
+    # parallel AMR: the loadBalance branch in writer._dynamicmeshdict
+    # fires ONLY for n_procs > 1 AND amr, and had no golden at all - so
+    # nothing would have noticed it changing. It pairs with the
+    # addEmptyPatch mesh stage; see backend._mesh_stages.
+    specs['case2d_planar_amr_np4'] = render_case(
+        cases()['case2d_planar_amr'], n_procs=4)
     semantic_checks(specs)
     profile_checks(specs)
     profile_amr_checks(specs)
