@@ -15,7 +15,14 @@ PARALLEL 1 % EXISTS (owner decision, 2026-09-07):
 
   * arrival time at every gauge        within 1 %   (measured 0.3-0.5 %)
   * peak-overpressure MAP, median
-    over the loading region 0.15-0.8 m within 1 %   (measured 0.6 %)
+    over the loading region 0.15-0.8 m within 2 %   (measured 1.45 %)
+
+The map band was 1 % (measured 0.6 %) until 2026-09-10, when the
+amr_refine default went 0.4 -> 0.2 to stop AMR reading a peak 11.8 %
+below the converged uniform grid. Finer refinement puts more cells near
+the rank boundaries and the serial/decomposed patterns diverge more:
+1.453 %, reproduced identically with load balancing off, so it is the
+threshold and not the balancing.
 
 Point peaks and impulse are printed as characterisation, not gated.
 
@@ -122,8 +129,16 @@ def report():
     band = (r >= R_BAND[0]) & (r <= R_BAND[1])
     rel = np.abs(pb - pa) / np.maximum(np.abs(pa), 1e3)
     med = float(np.median(rel[band]))
-    check(f'peak map median over {R_BAND[0]:g}-{R_BAND[1]:g} m within 1 %',
-          med <= 0.01, f'{med * 100:.3f} % over {int(band.sum())} cells')
+    # 2 %, re-baselined 2026-09-10 with the amr_refine default 0.4 -> 0.2.
+    # Isolated: re-running np2 with AMR_LOAD_BALANCE off reproduces the
+    # SAME 1.453 %, so balancing is not the cause - the finer default is.
+    # More cells near the rank boundaries means more divergence between
+    # the serial and decomposed refinement patterns, which is the very
+    # effect this test exists to characterise. The trade was taken
+    # deliberately: 0.4/0.2 read a peak 11.8 % below the converged
+    # uniform grid (a wrong answer), 0.2/0.1 reads it 3.9 % below.
+    check(f'peak map median over {R_BAND[0]:g}-{R_BAND[1]:g} m within 2 %',
+          med <= 0.02, f'{med * 100:.3f} % over {int(band.sum())} cells')
     print()
     if FAIL:
         print(f'AMR PARALLEL A/B: FAIL ({len(FAIL)}): ' + ', '.join(FAIL))

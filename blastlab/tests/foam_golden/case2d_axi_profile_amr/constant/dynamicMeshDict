@@ -11,8 +11,8 @@ FoamFile
 dynamicFvMesh   adaptiveFvMesh;
 errorEstimator  densityGradient;
 refineInterval  2;
-lowerRefineLevel 0.4;
-unrefineLevel   0.2;
+lowerRefineLevel 0.2;
+unrefineLevel   0.1;
 nBufferLayers   2;
 maxRefinement   2;
 maxCells        8000000;

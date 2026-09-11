@@ -114,12 +114,21 @@ class Case2D:
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
     amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
-    amr_refine: float = 0.4           # lowerRefineLevel (refine above);
-                                      # 0.4/0.2 measured on the 2D e2e:
-                                      # 1.2x faster than uniform at ~3.6 %
-                                      # gauge error (the tutorials' 0.1/0.1
+    amr_refine: float = 0.2           # lowerRefineLevel (refine above);
+                                      # RE-TUNED 2026-09-10. 0.4/0.2 was
+                                      # chosen for ~3.6 % gauge error, but
+                                      # T39 (5 -> 8 cells across the charge
+                                      # radius) moved the case underneath
+                                      # it and the same sweep now measures
+                                      # -11.8 %. Re-running that sweep:
+                                      #   0.4/0.2  -11.8 %  55 s  17,425
+                                      #   0.2/0.1   -3.9 %  54 s  20,224
+                                      #   0.1/0.05  -2.9 %  54 s  20,377
+                                      # 0.2/0.1 restores the accuracy the
+                                      # default was picked for, at no wall
+                                      # -time cost (the tutorials' 0.1/0.1
                                       # refines nearly everything)
-    amr_unrefine: float = 0.2         # unrefineLevel (unrefine below)
+    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
     amr_interval: int = 2             # refineInterval [steps]
     amr_buffer: int = 2               # nBufferLayers
     amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN
@@ -199,12 +208,21 @@ class Case3D:
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
     amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
-    amr_refine: float = 0.4           # lowerRefineLevel (refine above);
-                                      # 0.4/0.2 measured on the 2D e2e:
-                                      # 1.2x faster than uniform at ~3.6 %
-                                      # gauge error (the tutorials' 0.1/0.1
+    amr_refine: float = 0.2           # lowerRefineLevel (refine above);
+                                      # RE-TUNED 2026-09-10. 0.4/0.2 was
+                                      # chosen for ~3.6 % gauge error, but
+                                      # T39 (5 -> 8 cells across the charge
+                                      # radius) moved the case underneath
+                                      # it and the same sweep now measures
+                                      # -11.8 %. Re-running that sweep:
+                                      #   0.4/0.2  -11.8 %  55 s  17,425
+                                      #   0.2/0.1   -3.9 %  54 s  20,224
+                                      #   0.1/0.05  -2.9 %  54 s  20,377
+                                      # 0.2/0.1 restores the accuracy the
+                                      # default was picked for, at no wall
+                                      # -time cost (the tutorials' 0.1/0.1
                                       # refines nearly everything)
-    amr_unrefine: float = 0.2         # unrefineLevel (unrefine below)
+    amr_unrefine: float = 0.1         # unrefineLevel (unrefine below)
     amr_interval: int = 2             # refineInterval [steps]
     amr_buffer: int = 2               # nBufferLayers
     amr_max_cells: int = 0            # maxCells, 0 = FOAM_CELLS_WARN

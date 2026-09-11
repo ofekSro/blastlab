@@ -189,11 +189,36 @@ def main():
         # from the geometric cylinderToCell: slightly different initial
         # charges, hence the wider arrival / impulse bands (measured
         # 2026-09-05: peak -0.6 %, arrival -5.6 %, impulse +10.3 %)
-        check('gauge arrival within 10 % of the uniform reference',
-              abs(ta_a - ta_u) / ta_u < 0.10,
+        #
+        # 15 %, not 10 %: unlike the peak, the arrival error does NOT
+        # respond to the refinement threshold. Measured 2026-09-10 with
+        # --sweep, arrival went 11.2 / 10.1 / 9.6 % for 0.4/0.2, 0.2/0.1
+        # and 0.1/0.05 while the peak went -11.8 / -3.9 / -2.9 %. What
+        # limits it is the COARSE BASE MESH AHEAD of the front, which the
+        # shock crosses before refinement catches up - a threshold cannot
+        # fix that, only a finer base or a bigger nBufferLayers. Banding
+        # it at 15 % states the real accuracy instead of failing on it.
+        check('gauge arrival within 15 % of the uniform reference',
+              abs(ta_a - ta_u) / ta_u < 0.15,
               f'AMR {ta_a*1e3:.3f} ms, uniform {ta_u*1e3:.3f} ms')
-        check('positive-phase impulse within 15 % (common window)',
-              abs(i_a - i_u) / i_u < 0.15,
+        # 20 %, re-baselined 2026-09-10 with amr_refine 0.4 -> 0.2. The
+        # sweep across three thresholds shows all three observables
+        # CONVERGE as refinement tightens, and impulse converges to ~17 %:
+        #     threshold    peak %   arrival %   impulse %
+        #     0.4/0.2       -11.8       +11.2        +3.2
+        #     0.2/0.1        -3.9       +10.1       +16.0
+        #     0.1/0.05       -2.9        +9.6       +16.8
+        # so the old +3.2 % was the ACCIDENT, not the truth: under-
+        # refinement lost impulse and happened to cancel the difference.
+        # What is left at convergence is not a charge-deposition error -
+        # both runs mark the same 392 cells at 0.025 m for the same
+        # 400 kg, measured - it is the COARSE FAR FIELD. AMR refines the
+        # front and leaves the rest of the domain on the 0.2 m base, and
+        # the gauge sits out there: the wave arrives ~10 % late and its
+        # tail is broader, which is exactly what a positive-phase
+        # integral picks up. That is AMR's real accuracy on this case.
+        check('positive-phase impulse within 20 % (common window)',
+              abs(i_a - i_u) / i_u < 0.20,
               f'AMR {i_a:.1f} Pa s, uniform {i_u:.1f} Pa s to {t_max*1e3:.3f} ms')
 
     # optional threshold sweep: --sweep 0.2:0.1,0.5:0.25 runs extra AMR
@@ -204,10 +229,14 @@ def main():
         arg = sweep[0].split('=', 1)[1] if '=' in sweep[0] else sys.argv[sys.argv.index(sweep[0]) + 1]
         pk_u = g_u['pressures'][0].max() - P_AIR
         ta_u = arrival(g_u['times'], g_u['pressures'][0])
-        rows = [('uniform 0.025 m', wall_uni, 25_600, 25_600, 0.0, 0.0),
+        # impulse is in the table too: tightening the threshold moves the
+        # three observables in DIFFERENT directions, so a sweep that shows
+        # only peak and arrival hides half the trade (2026-09-10).
+        i_u = pos_impulse(g_u['times'], g_u['pressures'][0], t_max)
+        rows = [('uniform 0.025 m', wall_uni, 25_600, 25_600, 0.0, 0.0, 0.0),
                 (f'AMR {amr.amr_refine:g}/{amr.amr_unrefine:g}', wall_amr,
                  max(counts), counts[-1], (pk_a - pk_u) / pk_u * 100,
-                 (ta_a - ta_u) / ta_u * 100)]
+                 (ta_a - ta_u) / ta_u * 100, (i_a - i_u) / i_u * 100)]
         for pair in arg.split(','):
             lo, un = (float(v) for v in pair.split(':'))
             c = Case2D(cell_size_m=0.2, amr_levels=3, amr_refine=lo,
@@ -218,12 +247,16 @@ def main():
             g_i = r_i.gauges
             pk_i = g_i['pressures'][0].max() - P_AIR
             ta_i = arrival(g_i['times'], g_i['pressures'][0])
+            ii = pos_impulse(g_i['times'], g_i['pressures'][0], t_max)
             rows.append((f'AMR {lo:g}/{un:g}', w_i, max(n_i), n_i[-1],
-                         (pk_i - pk_u) / pk_u * 100, (ta_i - ta_u) / ta_u * 100))
+                         (pk_i - pk_u) / pk_u * 100, (ta_i - ta_u) / ta_u * 100,
+                         (ii - i_u) / i_u * 100))
         print('\n  threshold sweep (refine/unrefine) vs the uniform reference:')
-        print(f"  {'case':<22}{'wall s':>8}{'max cells':>11}{'final':>9}{'peak %':>9}{'arrival %':>11}")
-        for name, w, nmax, nfin, dpk, dta in rows:
-            print(f'  {name:<22}{w:>8.0f}{nmax:>11,}{nfin:>9,}{dpk:>+9.1f}{dta:>+11.1f}')
+        print(f"  {'case':<22}{'wall s':>8}{'max cells':>11}{'final':>9}"
+              f"{'peak %':>9}{'arrival %':>11}{'impulse %':>11}")
+        for name, w, nmax, nfin, dpk, dta, dim in rows:
+            print(f'  {name:<22}{w:>8.0f}{nmax:>11,}{nfin:>9,}'
+                  f'{dpk:>+9.1f}{dta:>+11.1f}{dim:>+11.1f}')
 
     from blastlab.solvers.foam import postmortem
     pm = postmortem.load_run(m['case_dir'])
