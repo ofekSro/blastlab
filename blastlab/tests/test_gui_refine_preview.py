@@ -161,6 +161,34 @@ def main():
     check('uniform case: every base face drawn (4x4 -> 10 segments)',
           len(lcs) == 1 and len(lcs[0].get_segments()) == 10,
           str(len(lcs[0].get_segments()) if lcs else 0))
+
+    # N2-07: the preview must plan with the MATERIAL's rho0. It used to
+    # call plan_levels bare (TNT default), so on ANFO it drew one whole
+    # extra refinement level than validate_case reported and the writer
+    # built - and this file's only plan_levels call was ALSO bare, so
+    # the test reproduced the bug instead of catching it. TNT is the one
+    # material with no gap, which is why every TNT-only check passed.
+    print("\nN2-07: preview plans with the material's rho0")
+    from blastlab.gui.preview_panel import _plan
+    from blastlab.core.case import material_rho0
+    ca = Case2D(geometry='planar', Lx=4.0, Ly=3.0, cell_size_m=0.08,
+                charge=20.0, center=(1.5, 1.6), solver='blastfoam',
+                material='ANFO', charge_refine='zone',
+                refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),
+                              (1.7, 2.3, 1.4, 1.8, 2)])
+    pv_plan = _plan(ca)
+    true_plan = refine.plan_levels(ca, rho0=material_rho0(ca))
+    tnt_plan = refine.plan_levels(ca)        # the old, wrong default
+    check('ANFO: preview plan matches the validated plan',
+          pv_plan is not None
+          and (pv_plan.lmax, pv_plan.n_pred, pv_plan.dx_fine)
+          == (true_plan.lmax, true_plan.n_pred, true_plan.dx_fine),
+          f'preview {pv_plan and (pv_plan.lmax, pv_plan.n_pred)} vs '
+          f'validated {(true_plan.lmax, true_plan.n_pred)}')
+    check('ANFO: and that differs from the bare-TNT plan it used to draw',
+          (true_plan.lmax, true_plan.n_pred)
+          != (tnt_plan.lmax, tnt_plan.n_pred),
+          f'both {(tnt_plan.lmax, tnt_plan.n_pred)}')
     # native case with zones: preview still draws (validation reports the error)
     c2.solver = 'native'
     c2.refine_zones = [(0.5, 1.5, 0.5, 1.5, 1)]

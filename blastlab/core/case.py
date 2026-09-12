@@ -338,6 +338,28 @@ def load_case(path):
     return case
 
 
+def material_rho0(case):
+    """rho0 of the case's material under ITS solver - the same lookup
+    validate_case performs, exposed so the setup preview can plan with
+    it (N2-07: preview_panel used to call plan_levels with NO rho0,
+    which defaults to TNT's 1630 - so for any other material the
+    preview drew a different mesh than the one validate_case reported
+    and the writer built; measured on ANFO: a whole extra refinement
+    level and a finest cell 2x too small, while the strip on the same
+    screen showed the correct numbers). Returns None when the material
+    is unknown to the table - callers then fall back to plan_levels'
+    TNT default, and validation is already erroring about the material
+    itself. Both solvers read the same table (N11/T46: the native
+    solvers take their JWL set from blastFoam's material table), so one
+    lookup serves either."""
+    material = getattr(case, 'material', 'TNT') or 'TNT'
+    try:
+        from ..solvers.foam.materials import MATERIALS
+        return float(MATERIALS[material].rho0)
+    except (KeyError, ImportError, AttributeError):
+        return None
+
+
 def fmt_cells(n):
     """Cell counts for messages: thousands separators while the number is
     readable, scientific once it is not. `cell = 1e-9` on a 4 m domain

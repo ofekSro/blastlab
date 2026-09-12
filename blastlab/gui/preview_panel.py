@@ -17,7 +17,7 @@ from matplotlib.patches import Circle, Rectangle
 
 from ..core import refine
 from ..core.bc import normalize_bc
-from ..core.case import _charge_radius
+from ..core.case import _charge_radius, material_rho0
 from ..core.constants import MIN_EXP_CELLS
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import theme
@@ -39,7 +39,13 @@ def _plan(case):
     ValueError now; catch the residual numeric blow-ups too so a preview
     can never take the app down."""
     try:
-        return refine.plan_levels(case)
+        # N2-07: plan with the MATERIAL's rho0, exactly as validate_case
+        # and the writer do. Calling plan_levels bare defaults rho0 to
+        # TNT's 1630, so for any other material this panel drew a mesh
+        # that disagreed with the numbers on the validation strip and
+        # with the mesh blastFoam then built (ANFO: one whole extra
+        # refinement level, finest cell 2x too small).
+        return refine.plan_levels(case, rho0=material_rho0(case))
     except (ValueError, ZeroDivisionError, MemoryError, OverflowError,
             FloatingPointError):
         return None
