@@ -174,12 +174,33 @@ def main():
         times.append((ts[0] if ts else None, ts[-1] if ts else None))
     print(f'  gauge time spans per stage: {times}')
     if len(times) == 3 and all(t[0] is not None for t in times):
-        check('stage 2 starts where stage 1 ended, not at 0',
-              times[1][0] > 0.9 * times[0][1],
-              f'{times[1][0]:.3e} vs {times[0][1]:.3e}')
-        check('stage 3 starts where stage 2 ended, not at 0',
-              times[2][0] > 0.9 * times[1][1],
-              f'{times[2][0]:.3e} vs {times[1][1]:.3e}')
+        # N2-13 made the hand-off exact: an arrival-stopped stage pins
+        # its final state to the ARRIVAL write, so the next stage starts
+        # at the profile's own recorded time - not merely "after 90 % of
+        # the previous gauge tail", which also spans the wall-clock
+        # overshoot the pin exists to remove. Assert equality against
+        # the profile headers the panel actually wrote.
+        def profile_t(path):
+            if path.endswith('.npz'):
+                import numpy as _np
+                with _np.load(path) as z:
+                    return float(z['t'])
+            with open(path, encoding='ascii') as f:
+                for ln in f:
+                    if ln.startswith('# time_s'):
+                        return float(ln.split('=')[1])
+            return None
+
+        for d, src in ((2, p1), (3, p2)):
+            t_src = profile_t(src)
+            t0 = times[d - 1][0]
+            check(f'stage {d} starts at the stage-{d-1} profile time',
+                  t_src is not None and abs(t0 - t_src) <=
+                  max(1e-9, 1e-6 * abs(t_src)),
+                  f'gauge t0 {t0:.9e} vs profile {t_src}')
+        check('stage times only move forward across the chain',
+              times[0][0] < times[1][0] < times[2][0],
+              f'{[t[0] for t in times]}')
 
     # A peak MAP is a 2D/3D thing: the 1D solvers (native and foam alike)
     # return a radial `final_profile`, and never set meta['p_peak'] -
