@@ -275,7 +275,15 @@ def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
     nrows  = (n + ncols - 1) // ncols
     colors = mpl.colormaps['tab10'](np.linspace(0, 0.9, n))
 
-    fig = Figure(figsize=(7 * ncols, 4 * nrows))
+    # N2-11: constrained layout, not the one-shot tight_layout() this used
+    # to call at the bottom. The embedded canvas RESIZES the figure after
+    # creation, and a tight_layout computed at 14x4 in leaves the panels
+    # colliding at the ~10x3 in the widget actually gives them - the left
+    # panel's y-label sat on its own tick labels and the right panel's
+    # label landed between the panels. Constrained layout is recomputed
+    # on every draw, so it survives any resize. (figure_gauges_nd below
+    # had the identical latent pattern and gets the identical fix.)
+    fig = Figure(figsize=(7 * ncols, 4 * nrows), layout='constrained')
     axes = fig.subplots(nrows, ncols, squeeze=False)
     fig.suptitle(titled(
         f'Gauge Time Histories - {charge_kg} kg TNT - EOS: {eos}',
@@ -295,7 +303,6 @@ def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
-    fig.tight_layout()
     return fig
 
 
@@ -334,7 +341,7 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
     nrows  = (n + ncols - 1) // ncols
     colors = mpl.colormaps['tab10'](np.linspace(0, 0.9, n))
 
-    fig = Figure(figsize=(7 * ncols, 4 * nrows))
+    fig = Figure(figsize=(7 * ncols, 4 * nrows), layout='constrained')
     axes = fig.subplots(nrows, ncols, squeeze=False)
     fig.suptitle(titled(f"Gauge Time Histories - {charge_label(meta)} - "
                         f"EOS: {meta['eos']}", title_extra), fontsize=12)
@@ -353,7 +360,6 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
-    fig.tight_layout()
     return fig
 
 

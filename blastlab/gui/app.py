@@ -626,7 +626,9 @@ class App:
         rep = validate_case(case)
         extra = []
         if rep.n_cells:
-            line = f'~{rep.n_cells:,} cells at dx = {rep.effective_dx:g} m'
+            from ..core.case import fmt_cells
+            line = (f'~{fmt_cells(rep.n_cells)} cells '
+                    f'at dx = {rep.effective_dx:g} m')
             if getattr(rep, 'amr_levels', 0):
                 line += (f' at t = 0; AMR up to level {rep.amr_levels} '
                          f'(finest {rep.dx_fine:g} m), displayed at level '

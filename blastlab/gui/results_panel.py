@@ -145,6 +145,11 @@ class ResultsPanel(ctk.CTkFrame):
                               command=lambda k=kind: self._export(k))
             b.pack(side='left', padx=(0, GAP))
             self._export_btns[kind] = b
+        # N2-10: 'Summary CSV' is the one label that does not fit the
+        # shared 104 px next to a 14 px icon - it rendered as "ummary CSV"
+        # in every Results screenshot. The row has ~100 px of slack, so
+        # widening just this button costs nothing.
+        self._export_btns['summary'].configure(width=122)
         self._sync_export_buttons(None)   # nothing selected yet
 
         # ── Title (T58) ─────────────────────────────────────────────

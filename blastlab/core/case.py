@@ -338,6 +338,15 @@ def load_case(path):
     return case
 
 
+def fmt_cells(n):
+    """Cell counts for messages: thousands separators while the number is
+    readable, scientific once it is not. `cell = 1e-9` on a 4 m domain
+    used to print ~15,999,999,992,000,000,001 in the middle of a sentence
+    (N2-06); nobody counts twenty digits, '1.6e+19' is the information."""
+    n = int(n)
+    return f'{n:,}' if n < 10 ** 9 else f'{n:.3g}'
+
+
 # ── Pre-flight validation (mirror of the solvers' run-time guard rails) ─────
 
 @dataclass
@@ -978,13 +987,13 @@ def validate_case(case, pending_inputs=False):
             # blastFoam solves in WSL; Python only ingests written
             # frames, so the cap reflects wall time/disk, not RAM
             if n > cap_refuse:
-                err(f"~{n:,} cells exceeds the blastFoam cap of "
+                err(f"~{fmt_cells(n)} cells exceeds the blastFoam cap of "
                     f"{cap_refuse:,}" + ram_hint() + scale_hint())
             elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect a long run "
                      f"and GBs of case files on the WSL disk")
         elif n > nat_refuse:
-            err(f"~{n:,} cells exceeds the 2D cap of {nat_refuse:,}"
+            err(f"~{fmt_cells(n)} cells exceeds the 2D cap of {nat_refuse:,}"
                 + host_hint() + scale_hint())
         elif n > nat_warn:
             warn(f"Large grid: ~{n:,} cells - expect a long run"
@@ -997,13 +1006,13 @@ def validate_case(case, pending_inputs=False):
             pass
         elif foam:
             if n > cap_refuse:
-                err(f"~{n:,} cells exceeds the blastFoam cap of "
+                err(f"~{fmt_cells(n)} cells exceeds the blastFoam cap of "
                     f"{cap_refuse:,}" + ram_hint() + scale_hint())
             elif n > cap_warn:
                 warn(f"Large grid: ~{n:,} cells - expect hours of wall "
                      f"time and GBs of case files on the WSL disk")
         elif n > nat_refuse:
-            err(f"~{n:,} cells exceeds the 3D cap of {nat_refuse:,}"
+            err(f"~{fmt_cells(n)} cells exceeds the 3D cap of {nat_refuse:,}"
                 + host_hint() + scale_hint())
         elif n > nat_warn:
             warn(f"Large grid: ~{n:,} cells - expect a long run and "
