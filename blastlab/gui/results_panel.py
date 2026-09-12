@@ -227,7 +227,15 @@ class ResultsPanel(ctk.CTkFrame):
         # packed on demand by _draw_gauges (p-only results keep the old
         # bare layout, and winfo_manager() stays '' for the tests)
         self.gauge_canvas = EmbeddedFigure(gtab, figsize=(7, 5))
-        self.gauge_canvas.pack(fill='both', expand=True)
+        # N2-09: the canvas is packed AFTER the table, at the bottom of
+        # this block. It used to be packed first with expand=True, and in
+        # pack the LAST-packed widget is the one starved when space runs
+        # out - the canvas requests 442 px (figsize 7x5), so below a
+        # 960 px window the table was mapped=False, i.e. simply not on
+        # screen, and it only became usable at ~1060 px on a 1080 px
+        # display. The table is the ONLY place peak / arrival / phase /
+        # impulse numbers appear in the UI. Packing it first (bottom)
+        # makes the canvas the one that shrinks instead.
         cols = ('gauge', 'peak', 'arrival', 't_peak', 'pos_dur', 'pos_imp',
                 'net_imp', 'complete')
         # headers used to be clipped ("Pos. impulse [Pa" ...) and
@@ -262,7 +270,8 @@ class ResultsPanel(ctk.CTkFrame):
                 col, width=150 if col == 'gauge' else 104, stretch=True,
                 minwidth=90 if col != 'gauge' else 120,
                 anchor='e' if col != 'gauge' else 'w')
-        self.summary_table.pack(fill='x', pady=(GAP, 0))
+        self.summary_table.pack(side='bottom', fill='x', pady=(GAP, 0))
+        self.gauge_canvas.pack(fill='both', expand=True)
         self._head_tip = theme.tooltip(self.summary_table, '')
         self.summary_table.bind('<Motion>', self._table_hover, add='+')
 
