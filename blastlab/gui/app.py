@@ -112,6 +112,17 @@ def _solve_stage(dim, case):
     return (label, solve)
 
 
+def _warm_pyvista():
+    """Import pyvista once, off the critical path (N2-12). Python caches
+    the import forever after, so whichever code path touches pyvista
+    next - the worker's auto3d, the embedded viewer, an export - finds
+    it warm instead of paying the VTK avalanche mid-run."""
+    try:
+        import pyvista                                     # noqa: F401
+    except Exception:
+        pass          # viewer paths handle a missing pyvista themselves
+
+
 class App:
     #: Per-run outcome flags, reset by _start and set from the drained
     #: 'result'/'error' messages: only a run that finished on its own
@@ -219,6 +230,20 @@ class App:
 
         if case_file:
             self._open_case(case_file)
+
+        # N2-12: the first pyvista import is an avalanche of ~120 dynamic
+        # C modules (VTK). It used to land mid-run - the worker's auto3d
+        # path or the first viewer build triggered it - and C-extension
+        # init holds the GIL, so the WINDOW froze for 11-13 s right after
+        # the user clicked Run on a 3D case (D04 11.3 s, F06 10.9 s;
+        # _run_single itself measured 57 ms). Warm it in a daemon thread
+        # a second after launch instead: measured 652 ms when idle, and
+        # the same click's worst event-loop gap drops 13,266 -> 2,795 ms
+        # (the remainder is the viewer's own first build - N2-08).
+        if pyvista_available():
+            root.after(1000, lambda: threading.Thread(
+                target=_warm_pyvista, name='pyvista-warm',
+                daemon=True).start())
 
     # ── T34: app-level solver mode ───────────────────────────────────────
     @property
