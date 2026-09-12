@@ -194,17 +194,30 @@ def snap_zone(zone, dx_base, dim):
 def level_map(centres, zones):
     """int8 array (Nx, Ny[, Nz]) of the max zone level whose box holds
     the cell centre (inclusive - the boxToCell criterion, as in
-    core.bc.solid_mask_*). `centres` are the FINE grid axes."""
+    core.bc.solid_mask_*). `centres` are the FINE grid axes.
+
+    N2-05: this used to allocate a full-grid boolean mask PER ZONE
+    (np.ones(shape) + three broadcast compares + a same-size np.where),
+    so its cost scaled with the domain, not with the zones - on a
+    320^3 fine grid (32.8 M cells) with a handful of zones it was
+    ~1.8 s per plan_levels call, and set_case calls plan_levels twice.
+    The axes are ascending, so each zone's inclusive box is exactly an
+    index sub-block: searchsorted(lo, 'left') is the first centre
+    >= lo and searchsorted(hi, 'right') the first > hi - the same
+    cells the mask selected, updated in place on a view. Bit-identical
+    by construction and verified against captured baselines
+    (night_artifacts/NIGHT2/scripts/n2_levelmap_baseline.py)."""
     dim = len(centres)
     shape = tuple(len(c) for c in centres)
     lv = np.zeros(shape, dtype=np.int8)
     for zone in zones:
         box, level = zone[:2 * dim], zone_level(zone)
-        m = np.ones(shape, dtype=bool)
-        for a in range(dim):
-            c = centres[a].reshape([-1 if i == a else 1 for i in range(dim)])
-            m &= (c >= box[2 * a]) & (c <= box[2 * a + 1])
-        lv = np.maximum(lv, np.where(m, level, 0).astype(np.int8))
+        idx = tuple(
+            slice(np.searchsorted(centres[a], box[2 * a], side='left'),
+                  np.searchsorted(centres[a], box[2 * a + 1], side='right'))
+            for a in range(dim))
+        sub = lv[idx]                      # a view - updated in place
+        np.maximum(sub, np.int8(level), out=sub)
     return lv
 
 
