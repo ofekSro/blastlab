@@ -498,6 +498,77 @@ def _final_read(hooks, names, t_of, read):
             kept.pop()
 
 
+def _arrival_pin(names, t_of, stop_reason, arrived, hooks):
+    """N2-13: the write an arrival-stopped run should HAND ON, as
+    opposed to wherever the solver had got to when Python noticed.
+
+    The stop is `stopAt writeNow` requested by the ingest loop, and the
+    ingest runs behind the solver (per-poll batch caps, the WSL 9p
+    filesystem), so the overshoot past the arrival is WALL CLOCK: five
+    runs of an identical chain fixture measured stage ends spread +/-7%
+    (stage 1) and 2.3x (stage 2), which makes a chain unreproducible -
+    every stage hands the next one a different state. The
+    physics-determined instant is the first write at which the arrival
+    criterion holds on the written data itself.
+
+    ONLY the hand-off surface is pinned (1D final_profile, 2D
+    final_state): gauges, snapshots, frames and the accumulated
+    peak/impulse maps are OBSERVATIONS of the run that happened and
+    keep their full record. (The first cut of this pinned the whole
+    finalize - and an A/B report that straddled the edit promptly
+    compared a full-length serial map against an arrival-length np2
+    map, 45,803 cells vs 6,068. Observations and hand-offs are
+    different things.)
+
+    The pin is the last write BEFORE the arrival criterion holds. The
+    crossing itself falls between scheduled writes and is detected on
+    the live-sample cadence, so the only post-crossing write is usually
+    the wall-clock-placed stopAt-writeNow one - measured on the isolated
+    chain stage 1: identical detection in both runs (the stop reason
+    carries p_last = 2.212e+06 Pa to the digit) yet writeNow states at
+    1.318e-4 vs 1.150e-4 s. The last PRE-arrival write sits on the
+    pinned schedule grid, so it is the same write in every identical
+    run, whatever the overshoot - and physically it is the state the
+    chain wants anyway: the shock still inside the domain, before any
+    boundary interaction.
+
+    Scans FORWARD for the first write at which `arrived` holds. A
+    backward walk was tried first and is wrong: the criterion is NOT
+    monotone over the whole record - the overshoot past arrival can be
+    long (measured: detection at t = 5.2e-5 s, stopAt-writeNow landing
+    at 1.16e-4 s, half the run again), and by then the boundary cell
+    has vented back BELOW the arrival threshold, so the tail writes
+    read arrived=False and the walk kept the wall-clock final write.
+    Forward, the prefix is clean: quiet ... quiet, first arrived write,
+    and the pin is the one before it. A predicate error aborts the pin
+    (None) rather than guessing. Returns the pin name, or None when
+    there is nothing usable (arrival on the very first write, or the
+    criterion never holding on any write)."""
+    if not str(stop_reason).startswith('shock arrived') or not names:
+        return None
+    first = None
+    for i, name in enumerate(names):
+        try:
+            if arrived(name):
+                first = i
+                break
+        except Exception:
+            return None
+    if not first:          # None (never arrived) or 0 (no quiet prefix)
+        return None
+    pin = names[first - 1]
+    hooks.log(f'  [blastfoam] hand-off state pinned to the last write '
+              f'before arrival, t = {t_of(pin)*1e3:.4f} ms '
+              f'({len(names) - first} later write(s) remain part of '
+              f'the run record) (N2-13)')
+    return pin
+
+
+# how the 2D pin keeps its cost bounded: arrived_2d reads one field per
+# probed write, and the forward scan touches only the quiet prefix plus
+# the crossing write itself - the long post-arrival tail is never read
+
+
 def _gauges_from_probes(spec):
     """blastProbes output -> the native gauges dict (1D: radii)."""
     empty = dict(times=np.array([]), radii=[], pressures=[])
@@ -761,11 +832,19 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     `adaptive_write=False` pins writeInterval for the whole run - see
     CaseSpec.adaptive_write (B23); a caller-supplied `spec` skips the
-    preflight (resume, N6/T43 - see solve_2d_foam)."""
+    preflight (resume, N6/T43 - see solve_2d_foam).
+
+    The case itself can also pin it (`case.adaptive_write = False`) -
+    the chain panel does, because the adaptive controller keys on what
+    the INGEST has kept up with (wall clock), so with it on the write
+    schedule differs between identical runs and the arrival-pinned
+    hand-off lands on a different write each time (N2-13). Either side
+    saying False wins; same rule in solve_2d_foam / solve_3d_foam."""
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
-    spec.adaptive_write = bool(adaptive_write)
+    spec.adaptive_write = (bool(adaptive_write)
+                           and bool(getattr(case, 'adaptive_write', True)))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
@@ -903,6 +982,21 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
     fin_name = names[-1]
     fin = store[fin_name]
 
+    # N2-13: the profile handed to the next chain stage is pinned to the
+    # arrival write; everything else below keeps describing the full run
+    pin = _arrival_pin(names, lambda n: store[n]['t'], stop_reason,
+                       lambda n: float(store[n]['p'][-1]) > ARRIVAL_P,
+                       hooks)
+    prof_name, prof_phase, prof_e = fin_name, phase, e_arr
+    if pin is not None:
+        try:
+            prof_phase, prof_e = read_final(pin)
+            prof_name = pin
+        except (ValueError, OSError) as exc:
+            hooks.log(f'  [warn] arrival write unreadable ({exc}) - '
+                      f'hand-off falls back to the last write')
+    prof = store[prof_name]
+
     snapshots = {}
     for name in _pick_snapshots(store, names, case.n_snapshots):
         e = store[name]
@@ -913,9 +1007,10 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
     snapshots[f"t = {fin['t']*1e3:.3f} ms (final)"] = dict(
         r=r.copy(), p=fin['p'], rho=fin['rho'], u=fin['u'])
 
-    final_profile = dict(t=fin['t'], r=r.copy(), rho=fin['rho'].copy(),
-                         u=fin['u'].copy(), e=e_arr, p=fin['p'].copy(),
-                         phase=phase, charge_kg=case.charge_kg,
+    final_profile = dict(t=prof['t'], r=r.copy(), rho=prof['rho'].copy(),
+                         u=prof['u'].copy(), e=prof_e,
+                         p=prof['p'].copy(),
+                         phase=prof_phase, charge_kg=case.charge_kg,
                          eos='JWL', r_exp=spec.r_exp,
                          radius_m=case.radius_m)
 
@@ -1003,9 +1098,17 @@ def _source_lines(case, spec, charge_lbl):
         return [f'  Charge          : {charge_lbl}',
                 f'  Explosive radius: {spec.r_exp:.4f} m']
     src = os.path.basename(getattr(case, 'profile_file_in', '') or '?')
-    return [f'  Initialised from: {src} at t = {spec.t_start * 1e3:.3f} ms',
-            f'  Source charge   : explosive radius {spec.r_exp:.4f} m '
-            f'({spec.material})']
+    lines = [f'  Initialised from: {src} at t = {spec.t_start * 1e3:.3f} ms',
+             f'  Source charge   : explosive radius {spec.r_exp:.4f} m '
+             f'({spec.material})']
+    n_fl = int(spec.init_state.get('n_floored', 0) or 0)
+    if n_fl:
+        # N2-14: say it when the hand-off carried near-vacuum cells the
+        # remap replaced with quiescent thin gas - silence here is how a
+        # 6% intermittent crash stayed unexplained for two nights
+        lines.append(f'  Hand-off floor  : {n_fl} near-vacuum cell(s) '
+                     f'replaced with quiescent thin gas (N2-14)')
+    return lines
 
 
 def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
@@ -1065,7 +1168,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
-    spec.adaptive_write = bool(adaptive_write)
+    # either side saying False pins the write schedule (N2-13; see the
+    # solve_1d_foam docstring)
+    spec.adaptive_write = (bool(adaptive_write)
+                           and bool(getattr(case, 'adaptive_write', True)))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
@@ -1307,6 +1413,34 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     meta['final_state'] = dict(t=t_fin, rho=fin['rho'], u=fin['u'],
                                v=fin['v'], e=e_arr, p=fin['p'],
                                phase=phase)
+
+    # N2-13: the state handed to the next chain stage is pinned to the
+    # arrival write. Everything above - maps, snapshots, frames, gauges -
+    # keeps describing the run that actually happened.
+    def arrived_2d(name):
+        """The loop's own stop criterion ('shock arrived at a terminate
+        boundary'), re-evaluated on the WRITTEN data of one time dir -
+        deterministic where the stop instant is not."""
+        dp = spec.time_dirs(name)
+        pg = read_2d(dp, spec, ('p',), mesh=mesh_at(spec, dp))['p']
+        for side, sl in (('x_lo', np.s_[0, :]), ('x_hi', np.s_[-1, :]),
+                         ('y_lo', np.s_[:, 0]), ('y_hi', np.s_[:, -1])):
+            if bcs.get(side) == 'terminate' \
+                    and bool(np.any(pg[sl] > ARRIVAL_P)):
+                return True
+        return False
+
+    pin = _arrival_pin(names, ingested.get, stop_reason, arrived_2d,
+                       hooks)
+    if pin is not None:
+        try:
+            pg, pphase, pe, _pm = read_final(pin)
+            meta['final_state'] = dict(
+                t=float(ingested[pin]), rho=pg['rho'], u=pg['u'],
+                v=pg['v'], e=pe, p=pg['p'], phase=pphase)
+        except (ValueError, OSError) as exc:
+            hooks.log(f'  [warn] arrival write unreadable ({exc}) - '
+                      f'hand-off falls back to the last write')
     # T51: the trigger's own instant, read back from its time dir when
     # the action asked for a remap the run did not stop at
     meta['trigger_gauge'] = None if trig_k is None else trig_k + 1
@@ -1584,7 +1718,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
-    spec.adaptive_write = bool(adaptive_write)
+    # either side saying False pins the write schedule (N2-13; see the
+    # solve_1d_foam docstring)
+    spec.adaptive_write = (bool(adaptive_write)
+                           and bool(getattr(case, 'adaptive_write', True)))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)

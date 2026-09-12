@@ -217,6 +217,16 @@ class ChainPanel(ctk.CTkFrame):
                     for ln in str(exc).splitlines() if ln.strip()))
                 return
 
+        # N2-13: a chain must be reproducible, so every stage runs on a
+        # PINNED write schedule. The adaptive-writeInterval controller
+        # rewrites writeInterval mid-run from what the ingest has managed
+        # to keep up with - wall clock - so with it on, the set of write
+        # times differs between identical runs, and the arrival-pinned
+        # hand-off lands on a different write each time (measured: stage
+        # ends spread +/-7% / 2.3x over five identical chains).
+        for c in cases.values():
+            c.adaptive_write = False
+
         # auto-wire profile hand-offs
         if 1 in cases:
             cases[1].profile_file = p1

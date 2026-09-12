@@ -1129,8 +1129,41 @@ def profile_state(case, spec):
         u, v, w = U[1] / rho, U[2] / rho, U[3] / rho
         ke = 0.5 * (u ** 2 + v ** 2 + w ** 2)
     e = U[-1] / rho - ke
+
+    # N2-14: the remap interpolates CONSERVED quantities, so u = rhoU/rho
+    # and e = rhoE/rho amplify interpolation residue into fabricated
+    # state wherever the interpolated rho is near zero. Measured on the
+    # preserved crashing stage-3 hand-off (night_artifacts/NIGHT2): 408
+    # cells with rho down to 1.6e-6 kg/m3 carrying |U| up to 3.6e4 m/s
+    # and T up to 8.3e6 K - and those cells seeded a density runaway that
+    # SIGFPE'd blastFoam's decode() (rhoU/rho at rho ~ machine epsilon)
+    # in ~6% of chain runs. A cell whose density landed below a physical
+    # floor carries no usable information, so it becomes a QUIESCENT,
+    # self-consistent thin gas instead: rho at the floor, at rest, at
+    # ambient temperature (e = Cv(phase) * 288 K, so _profile_fields's
+    # T = e/Cv and the EOS's p come out consistent). Flooring single
+    # fields while keeping the fabricated e and U was measured to only
+    # postpone the runaway (experiments B1/B2 vs C: the as-is case dies
+    # +21 us after hand-off, single-field floors die at +255 us, the
+    # full-state replacement survives past +530 us with max(T) six
+    # orders of magnitude lower through the original window).
+    RHO_MIN = 1e-3                                     # kg/m3
+    bad = ~np.isfinite(rho) | (rho < RHO_MIN)
+    for a in (u, v, e) + (() if w is None else (w,)):
+        bad |= ~np.isfinite(a)
+    if np.any(bad):
+        m = MATERIALS[spec.material]
+        cv = np.where(np.asarray(phase) == 1, m.Cv_products, CV_AIR)
+        rho = np.where(bad, RHO_MIN, rho)
+        u = np.where(bad, 0.0, u)
+        v = np.where(bad, 0.0, v)
+        if w is not None:
+            w = np.where(bad, 0.0, w)
+        e = np.where(bad, cv * 288.0, e)
+
     return dict(rho=rho, u=u, v=v, w=w, e=e, phase=phase, t0=float(t0),
                 r_exp=float(prof.get('r_exp', 0.0) or 0.0),
+                n_floored=int(np.count_nonzero(bad)),
                 dx_src=_source_dx(prof, mode))
 
 
