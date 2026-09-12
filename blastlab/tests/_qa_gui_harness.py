@@ -538,7 +538,26 @@ class QA:
         return text in self.run_log()
 
     def wait_log(self, text, timeout=60):
-        ok = self.pump(timeout, until=lambda: text in self.run_log())
+        """Wait for `text` to appear in log output written AFTER this call.
+
+        It used to test `text in self.run_log()` against the CUMULATIVE
+        log, so a scenario whose run never started matched the PREVIOUS
+        scenario's run and returned instantly. F05 did exactly that: its
+        Run button was disabled (its case does not validate), the click
+        did nothing, and the three wait_log calls all matched F04's run -
+        so F05 recorded three screenshots, a passing B7 check, a
+        'progress at first write = 1.000' and a 7 s wall that were every
+        one of them F04's. Fabricated observations are worse than a
+        timeout, because they read as evidence.
+        """
+        base = len(self.run_log())
+
+        def seen():
+            cur = self.run_log()
+            # the widget can be trimmed; then fall back to the whole log
+            return text in (cur[base:] if len(cur) >= base else cur)
+
+        ok = self.pump(timeout, until=seen)
         if not ok:
             self.log(f'wait_log TIMEOUT for {text!r}')
         return ok
@@ -850,11 +869,19 @@ def cases():
                           material='TNT', charge_refine='zone',
                           refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),
                                         (1.7, 2.3, 1.4, 1.8, 2)])
-    C['F2D_AMR'] = Case2D(geometry='planar', Lx=4.0, Ly=4.0, cell_size_m=0.2,
+    # Both AMR fixtures used to be INVALID cases - validate_case put
+    # "Resolving the charge (8 cells across its radius) needs AMR level N"
+    # in rep.errors, the product correctly disabled Run, and so the only
+    # two dynamic-AMR scenarios in the matrix never ran AMR at all. The
+    # base cells below are the ones the error message itself names as the
+    # largest that work (0.1 m for 2D, 0.05 m for 3D); measured:
+    # 2D 1,600 cells / 3D 27,000 cells, both with zero validation errors.
+    C['F2D_AMR'] = Case2D(geometry='planar', Lx=4.0, Ly=4.0, cell_size_m=0.1,
                           charge=100.0, center=(2.0, 2.0), gauges=[(3.2, 2.0)],
                           n_snapshots=2, record_frames=60, solver='blastfoam',
                           material='TNT', amr_levels=3)
-    C['F3D_AMR'] = Case3D(Lx=1.5, Ly=1.5, Lz=1.5, cell_size_m=0.1, charge=20.0,
+    C['F3D_AMR'] = Case3D(Lx=1.5, Ly=1.5, Lz=1.5, cell_size_m=0.05,
+                          charge=20.0,
                           center=(0.75, 0.75, 0.75), gauges=[(1.25, 0.75, 0.75)],
                           amr_levels=2, amr_display_level=1,
                           amr_max_cells=150_000, n_snapshots=2,
@@ -2213,7 +2240,15 @@ def _foam_run(qa, case, label, timeout, show_mesh=False):
     qa.goto('run')
     qa.app.run_panel.show_mesh_var.set(show_mesh)
     t0 = time.perf_counter()
-    qa.click(qa.app.run_panel.run_btn, 'Run')
+    # A disabled Run button means the case does not validate. Going on
+    # anyway is how F05 came to report F04's run as its own, so stop here
+    # instead: no run started, so there is nothing to observe.
+    if not qa.click(qa.app.run_panel.run_btn, 'Run'):
+        qa.check(False, f'Run is enabled for {label} (its case validates)',
+                 'S1', evidence=' | '.join(qa.strip_text()))
+        qa.note(f'{label}: Run disabled - no run started, skipping the run '
+                f'observations rather than attributing another run to it')
+        return
     if qa.wait_log('checking WSL', 20):
         qa.shot(f'{label}_checking_wsl')
     if qa.wait_log('blockMesh', 120):
@@ -2377,6 +2412,9 @@ def f05_foam_2d_amr(qa):
     qa.goto('setup')
     qa.set_case(cases()['F2D_AMR'], settle=1.5)
     strip = qa.strip_text()
+    # app.py:631 does emit this, but only for a case that validates - the
+    # fixture above used to fail validation, so the line never appeared
+    # and this check failed for a reason that had nothing to do with it.
     qa.check(any('AMR up to level' in s for s in strip),
              'validation line names the AMR levels / display level', 'S2',
              evidence=str(strip))
@@ -2413,8 +2451,17 @@ def f06_foam_3d_amr(qa):
     qa.set_case(C['F3D_AMR'], settle=1.5)
     strip = qa.strip_text()
     qa.note('3D AMR strip: ' + ' | '.join(strip))
-    if any('error' in s.lower() for s in strip):
-        qa.note('3D AMR case does not validate - skipping the run')
+    # The guard used to look for the literal word "error" in the strip
+    # text. No validation message contains it - "Resolving the charge ...
+    # needs AMR level 3" does not - so the guard never fired and F06 ran
+    # an invalid case anyway. Ask the report, not the rendered text.
+    from blastlab.core.case import validate_case
+    rep = validate_case(qa.app.setup.get_case())
+    if rep.errors:
+        qa.check(False, 'the 3D AMR case validates', 'S1',
+                 evidence=' | '.join(rep.errors))
+        qa.note('3D AMR case does not validate - skipping the run: '
+                + ' | '.join(rep.errors))
         return
     qa.goto('run')
     t0 = time.perf_counter()
