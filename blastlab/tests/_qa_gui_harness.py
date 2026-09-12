@@ -998,14 +998,25 @@ def b05_resize(qa):
 
 @scenario('B06', 'B', est=30)
 def b06_keyboard(qa):
-    """Accelerators (none expected), Tab focus ring, Return in a list."""
+    """G9 accelerators, Tab focus ring, Return in a list."""
     before = qa.ckpt['shot_counter']
-    for key in ('<Control-o>', '<Control-s>', '<F5>'):
+    for key in ('<Control-o>', '<Control-s>'):
         qa.root.event_generate(key)
         qa.pump(0.5)
     n_dialogs = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
-    qa.note(f'Ctrl+O / Ctrl+S / F5 generated: dialogs recorded so far = '
+    qa.note(f'Ctrl+O / Ctrl+S generated: dialogs recorded so far = '
             f'{n_dialogs} (an Open dialog would have appeared as one)')
+    # F5 is bound to _run_single(), so it starts a REAL solver. The pair
+    # F5/Esc has to be closed inside the scenario or the worker leaks into
+    # the next one and neutral() reports it as an S1.
+    prev = qa.app.worker
+    qa.root.event_generate('<F5>')
+    qa.pump(5, until=lambda: qa.app.worker is not prev)
+    qa.check(qa.app.worker is not prev, 'F5 starts a run (G9 accelerator)',
+             'S3')
+    qa.root.event_generate('<Escape>')
+    qa.check(qa.pump(90, until=lambda: not qa.worker_alive()),
+             'Esc stops the run that F5 started', 'S2')
     form = qa.app.setup.form
     ent = _entry_widget(form.gauges)          # the entry under the tree
     ent._entry.focus_set()
@@ -2878,8 +2889,15 @@ def i05_input_stress(qa):
         qa.shot('charge_' + val.strip().replace(',', 'comma').replace(' ', ''))
     qa.field('charge', '1.0')
     qa.field('n_snapshots', '2.7')
+    # Rejecting 2.7 is the CORRECT answer, so get_case() raising here is a
+    # pass, not a crash - it must be recorded, never propagated.
+    try:
+        parsed = f'parsed as {qa.app.setup.get_case().n_snapshots}'
+    except Exception as exc:
+        parsed = ('rejected: ' + type(exc).__name__ + ': '
+                  + ' / '.join(str(exc).splitlines()))
     qa.note('n_snapshots=2.7: ' + ' | '.join(qa.strip_text()) +
-            f' (parsed as {qa.app.setup.get_case().n_snapshots})')
+            f' ({parsed})')
     qa.field('n_snapshots', '6')
     qa.field('cell', '1e-9')
     qa.note('cell=1e-9: ' + ' | '.join(qa.strip_text()))
