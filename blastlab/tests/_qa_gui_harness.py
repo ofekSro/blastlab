@@ -407,18 +407,59 @@ class QA:
                     w.winfo_rooty() + w.winfo_height())
             capture = 'imagegrab-client'
         sw, sh = user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-        bbox = (max(0, bbox[0]), max(0, bbox[1]),
-                min(sw, bbox[2]), min(sh, bbox[3]))
-        img = ImageGrab.grab(bbox=bbox, all_screens=True)
-        lum = ImageStat.Stat(img.convert('L')).mean[0]
-        if lum < 6:
-            self.pump(0.5)
-            img = ImageGrab.grab(bbox=bbox, all_screens=True)
-            lum = ImageStat.Stat(img.convert('L')).mean[0]
-            if lum < 6:
-                img = print_window(hwnd, bbox[2] - bbox[0], bbox[3] - bbox[1])
-                capture = 'printwindow'
-                lum = ImageStat.Stat(img.convert('L')).mean[0]
+        if sw > 0 and sh > 0:
+            bbox = (max(0, bbox[0]), max(0, bbox[1]),
+                    min(sw, bbox[2]), min(sh, bbox[3]))
+        else:
+            # no screen metrics at all: clamping against 0 would collapse
+            # the bbox to zero width and take PrintWindow down with it
+            bbox = (max(0, bbox[0]), max(0, bbox[1]),
+                    max(bbox[0] + 1, bbox[2]), max(bbox[1] + 1, bbox[3]))
+
+        def _grab():
+            """ImageGrab needs a real screen surface. In a disconnected
+            session it raises OSError('screen grab failed'); None lets the
+            caller fall through to PrintWindow, which renders from the
+            window's own DC and does not need one. OSError only - a real
+            PIL bug must stay visible."""
+            try:
+                return ImageGrab.grab(bbox=bbox, all_screens=True)
+            except OSError:
+                return None
+
+        def _lum(im):
+            return ImageStat.Stat(im.convert('L')).mean[0]
+
+        img = _grab()
+        lum = _lum(img) if img is not None else 0.0
+        if img is None or lum < 6:
+            if img is not None:          # dark, not absent: one retry
+                self.pump(0.5)
+                img = _grab()
+                lum = _lum(img) if img is not None else 0.0
+            if img is None or lum < 6:
+                try:
+                    img = print_window(hwnd, bbox[2] - bbox[0],
+                                       bbox[3] - bbox[1])
+                    capture = 'printwindow'
+                    lum = _lum(img)
+                except Exception:
+                    img = None
+        if img is None:
+            # Every capture path failed. Record the gap and carry on: a
+            # missing pixel must never end a scenario. Before this the bare
+            # OSError propagated out, the harness marked the scenario
+            # `crashed`, and --resume skips `crashed` forever - so one
+            # headless run burned all 59 scenarios permanently.
+            self._no_capture = getattr(self, '_no_capture', 0) + 1
+            if self._no_capture == 1:
+                self.finding('S2', 'capture-unavailable',
+                             'no screen capture in this session (ImageGrab '
+                             'and PrintWindow both failed) - visual checks '
+                             'are BLOCKED; assertions still run. Further '
+                             'misses are counted as notes, not repeated.')
+            self.note(f'shot skipped, no capture available: {state}')
+            return None
         n = self.ckpt['shot_counter'] = self.ckpt['shot_counter'] + 1
         name = f'{n:03d}_{self.scenario_id}_{tab or self.tab}_{state}_{self.mode}.png'
         path = os.path.join(self.dirs['shots'], name)
@@ -435,8 +476,17 @@ class QA:
         self._shots_this.append(name)
         self.log(f'SHOT {name} ({capture}, lum {lum:.0f})')
         if lum < 6:
-            self.finding('S1', 'capture-black', f'black capture for {state}',
-                         shots=[name])
+            # Deduped: one S1 per invocation, the rest as notes. A capture
+            # path that degrades goes black for EVERY shot, and 55 identical
+            # S1s bury the real ones.
+            self._black = getattr(self, '_black', 0) + 1
+            if self._black == 1:
+                self.finding('S1', 'capture-black',
+                             f'black capture for {state} (capture={capture}) '
+                             f'- further black captures are counted as notes',
+                             shots=[name])
+            else:
+                self.note(f'black capture #{self._black} ({capture}): {state}')
         return name
 
     def _geom(self):
