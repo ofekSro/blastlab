@@ -133,6 +133,7 @@ class QA:
         self.tab = 'setup'
         self.mode = 'dark'
         self.action = ''
+        self._log_mark = None
         self.gaps = []                  # (dt, action) for the running scenario
         self._shots_this = []
         self._dialogs_since_shot = []
@@ -538,19 +539,36 @@ class QA:
         return text in self.run_log()
 
     def wait_log(self, text, timeout=60):
-        """Wait for `text` to appear in log output written AFTER this call.
+        """Wait for `text` in log output written since THE LAST click()
+        (falling back to output after this call when nothing was clicked
+        this scenario).
 
-        It used to test `text in self.run_log()` against the CUMULATIVE
-        log, so a scenario whose run never started matched the PREVIOUS
-        scenario's run and returned instantly. F05 did exactly that: its
-        Run button was disabled (its case does not validate), the click
-        did nothing, and the three wait_log calls all matched F04's run -
-        so F05 recorded three screenshots, a passing B7 check, a
-        'progress at first write = 1.000' and a 7 s wall that were every
-        one of them F04's. Fabricated observations are worse than a
-        timeout, because they read as evidence.
+        Two wrong versions preceded this one, and each broke a different
+        caller, so the reasoning stays here in full:
+
+        1. `text in self.run_log()` - the CUMULATIVE log. A scenario whose
+           run never started matched the PREVIOUS scenario's run: F05's
+           Run button was disabled, the click did nothing, and its three
+           wait_log calls matched F04's lines, so F05 recorded shots, a
+           passing B7 check and a wall time that were all F04's.
+           Fabricated observations read as evidence.
+        2. Baseline at the wait_log call itself. That misses anything the
+           TRIGGERING action emitted synchronously: E03's export runs
+           inside click()'s own pump, so 'Saved <fname>' was already in
+           the log before wait_log took its baseline - 30 s timeout and a
+           false S2 for an export that demonstrably wrote its file one
+           second after the click.
+
+        The baseline that is right for both is the moment of the trigger:
+        click() records the log length just before invoking, begin()
+        resets it at scenario start so a mark can never leak across
+        scenarios, and consecutive wait_log calls after one click (the
+        _foam_run pattern: checking WSL -> blockMesh -> first write) all
+        measure from that same click.
         """
-        base = len(self.run_log())
+        base = self._log_mark
+        if base is None:
+            base = len(self.run_log())
 
         def seen():
             cur = self.run_log()
@@ -603,6 +621,9 @@ class QA:
         self.action = f'click {label or btn.cget("text")}'
         if st == 'disabled':
             self.log(f'click on DISABLED button {label or btn.cget("text")}')
+        # wait_log baselines from here: whatever this click emits -
+        # synchronously or later - is "new" to the waits that follow it
+        self._log_mark = len(self.run_log())
         btn.invoke()
         self.pump(0.3)
         self.action = ''
@@ -752,6 +773,7 @@ class QA:
         self._shots_this = []
         self._t_scn = time.perf_counter()
         self.answers, self.paths = [], []
+        self._log_mark = None       # a click mark never crosses scenarios
         self.log(f'=== BEGIN {sid} ===')
 
     def end(self, sid, status, err=None):
