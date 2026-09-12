@@ -1363,8 +1363,13 @@ def c10_preview_show_mesh(qa):
     qa.shot('3d_zones_preview')
     strip = qa.strip_text()
     qa.note('3D zones strip: ' + ' | '.join(strip))
-    qa.check(any('Local refinement' in s for s in strip),
-             'strip says "Local refinement: N level(s)" for charge_refine=zone',
+    # 1 kg at a 0.5 m base cell needs level 6, over the level cap, so
+    # plan_levels() raises and there is deliberately NO refinement note:
+    # the error is the right answer and is what has to be asserted here.
+    # The "Local refinement" caption is checked below on F2D_REF, a case
+    # that does validate.
+    qa.check(any('needs level' in s and 'base cell' in s for s in strip),
+             'strip explains that the charge needs a level over the cap',
              'S2')
     qa.app.setup.show_mesh_var.set(True)
     qa.app.setup._mesh_toggled()
@@ -1373,7 +1378,11 @@ def c10_preview_show_mesh(qa):
     qa.set_case(C['F2D_REF'])
     qa.pump(1.5)
     qa.shot('2d_refine_mesh')
-    qa.note('2D refine strip: ' + ' | '.join(qa.strip_text()))
+    strip2 = qa.strip_text()
+    qa.note('2D refine strip: ' + ' | '.join(strip2))
+    qa.check(any('Local refinement' in s for s in strip2),
+             'strip says "Local refinement: N level(s)" for charge_refine='
+             'zone on a case that validates', 'S2')
     qa.set_case(C['F2D_AMR'])
     qa.pump(1.5)
     qa.shot('2d_amr_mesh')
