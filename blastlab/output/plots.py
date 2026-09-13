@@ -6,10 +6,24 @@ embedded in the Tkinter GUI, or rendered on a worker thread. The legacy
 plot_* wrappers add the historical filenames/printing/plt.show().
 """
 
+import warnings
+
 import matplotlib as mpl
 import numpy as np
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection  # registers 3d proj
+
+# N2-11 follow-up (N3 round, I06): the gauge figures use constrained
+# layout so their margins survive canvas resizes - but when the window is
+# squeezed BELOW its minimum the axes collapse to zero and matplotlib
+# emits "constrained_layout not applied because axes sizes collapsed to
+# zero" on every draw. tight_layout was simply silent there. The warning
+# is pure noise at degenerate sizes (there is no layout to apply), and
+# the QA harness rightly flags stray warnings, so this one specific
+# message is filtered; every other layout warning still surfaces.
+warnings.filterwarnings(
+    'ignore',
+    message='constrained_layout not applied because axes sizes collapsed')
 
 try:
     from skimage import measure as _sk_measure
