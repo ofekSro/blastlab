@@ -601,7 +601,8 @@ def _log_banner_1d(hooks, case, spec):
             f'  vDet            : {m.vDet:g} m/s',
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            f'(initial, adaptive)',
+            + ('(initial, adaptive)' if spec.adaptive_write
+               else '(pinned schedule)'),
             f'  Live profile    : p(r) sampled every '
             f'{spec.live_steps or writer.live_sample_steps(1)} steps',
             bar, ''):
@@ -1147,7 +1148,8 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
                else 'safety cap (no terminate boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            f'(initial, adaptive)',
+            + ('(initial, adaptive)' if spec.adaptive_write
+               else '(pinned schedule)'),
             f'  Live slice      : p sampled every '
             f'{spec.live_steps or writer.live_sample_steps(2)} steps'
             + (' + every written time (AMR)' if spec.amr else ''),
@@ -1302,6 +1304,39 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     else:
         decode = lambda tdir: _decode_surface(              # noqa: E731
             spec, tdir, (Nx, Ny), 0, 1, slice_solid, remap_sl=spec.remap)
+
+    # N2-15: evaluate the arrival stop on the LIVE sample as well. The
+    # on_frame check above is ingest-gated - each written dir of a large
+    # case is a full multi-field binary read over the WSL 9p mount, and
+    # when the solver outwrites the ingest the stop recedes with the
+    # backlog: R2's 171,604-cell case ran 8.7 h past a ~10 ms arrival
+    # with 2,193 live samples pending. The live sample is one raw
+    # surface, cheap, and tail_live always decodes the NEWEST one, so
+    # this sees the current edge state however far the written ingest
+    # has fallen behind. In 2D the live surface IS the display grid, so
+    # term_edge indexes it directly; a shape surprise falls through to
+    # the written-dir check, which is the pre-N2-15 status quo. (1D
+    # never drowned only because its 100-cell dirs ingest faster than
+    # the solver writes them; 3D's live sample is a single plane, not
+    # the domain boundary, so its copy of this problem needs its own
+    # design - see TODO.)
+    if has_term:
+        _base_decode = decode
+
+        def decode(tdir):                                   # noqa: F811
+            payload = _base_decode(tdir)
+            if payload is not None and not loop.stop_requested:
+                pl = payload[0] if isinstance(payload, tuple) else payload
+                try:
+                    if (pl[term_edge] > ARRIVAL_P).any():
+                        loop.request_stop(
+                            'shock arrived at a terminate boundary '
+                            f'(p_edge = {pl[term_edge].max():.3e} Pa, '
+                            f'live sample)')
+                except (IndexError, TypeError):
+                    pass
+            return payload
+
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
     stop_reason = loop.run()
@@ -1701,7 +1736,8 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            f'(initial, adaptive)',
+            + ('(initial, adaptive)' if spec.adaptive_write
+               else '(pinned schedule)'),
             ('  Live slice      : p of every written time (AMR)'
              if spec.amr else '  Live slice      : p sampled every step'),
             bar, ''):
