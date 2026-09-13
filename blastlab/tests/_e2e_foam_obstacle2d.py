@@ -79,8 +79,20 @@ def main():
     which = sys.argv[1] if len(sys.argv) > 1 else 'both'
 
     if which in ('axi', 'both'):
-        # ground burst, ring wall at r = 2.0..2.2 m, height 1 m
-        box = (2.0, 2.2, 0.0, 1.0)
+        # ground burst, ring wall at r = 2.0..2.2 m, height ~1 m.
+        #
+        # The wall top is 0.996 and NOT 1.0 on purpose: the 2 kg charge
+        # forces a global refine to dx = 4/482 m, and (120 + 0.5) * dx
+        # is EXACTLY 1.0 - the old top edge sat precisely on a
+        # cell-centre line, a float tie that python's carve and foam's
+        # boxToCell broke in opposite directions (171,580 vs 171,604
+        # fluid cells). Every count-checked reader then refused every
+        # write and the run could neither ingest nor stop (N2-16 hunt,
+        # 13.09: two 6-9 h runs died of it). 0.996 leaves half a cell
+        # of margin on both sides of the nearest centre line. The real
+        # cure - snapping obstacle boxes to cell faces like refinement
+        # zones already snap - is a product design item in TODO.
+        box = (2.0, 2.2, 0.0, 0.996)
         case = Case2D(Lx=4.0, Ly=3.0, cell_size_m=0.04, charge=2.0,
                       center=(0.0, 0.0), obstacles=[box],
                       bcs=dict(x_lo='reflect', x_hi='terminate',
