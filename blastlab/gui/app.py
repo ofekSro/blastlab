@@ -244,6 +244,33 @@ class App:
             root.after(1000, lambda: threading.Thread(
                 target=_warm_pyvista, name='pyvista-warm',
                 daemon=True).start())
+            # N2-08, stage two: the first pv.Plotter in a process pays
+            # the cold GL-context / VTK-DLL cost (~1.3 s here - an RDP
+            # session renders software GL). VTK rendering is main-thread
+            # only, so this cannot ride the daemon; instead a throwaway
+            # off-screen plotter is built and dropped at idle, ~3.5 s
+            # after launch, while the user is still looking at the
+            # window. Measured: the first real 3D feed then drops
+            # 1,683 -> 980 ms, under the harness's 1,000 ms G4 budget
+            # (the remainder is the per-result scene build; repeats are
+            # ~165 ms).
+            root.after(3500, self._prewarm_gl)
+
+    def _prewarm_gl(self):
+        """N2-08 stage two (see __init__): pay the process-first GL/VTK
+        cost on a throwaway off-screen plotter at idle. Never competes
+        with a live run, and any failure is silently irrelevant - the
+        real viewer path pays its own way exactly as before."""
+        if self.worker is not None and self.worker.is_alive():
+            return
+        try:
+            import pyvista as pv
+            pl = pv.Plotter(off_screen=True, window_size=(64, 64))
+            pl.render()
+            pl.screenshot(return_img=True)
+            pl.close()
+        except Exception:
+            pass
 
     # ── T34: app-level solver mode ───────────────────────────────────────
     @property
