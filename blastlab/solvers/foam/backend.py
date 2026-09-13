@@ -467,9 +467,17 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
     # the expected count is placed by its coordinates instead (the
     # remap branch above already trusts coordinates); a genuinely
     # mid-write sample is short by far more and is still refused.
-    if abs(len(vals) - want) > max(64, want // 100):
+    # tolerance: 1% of the expected count. NOT a fixed floor - a first
+    # cut used max(64, 1%) and test_foam_reader immediately objected: on
+    # a 9-cell fixture that accepts a sample short by two rows, which IS
+    # a torn write there. 1% covers the measured tie (24 of 171,580)
+    # and rounds to zero on tiny grids, where the old strict behaviour
+    # is the right one.
+    if abs(len(vals) - want) > want // 100:
         return _surface_refused(spec, len(vals), want)
-    dxf = float(spec.dx)
+    dxf = float(getattr(spec, 'dx', 0) or 0)
+    if not dxf > 0:
+        return _surface_refused(spec, len(vals), want)
     iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
                  shape[0] - 1)
     iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,

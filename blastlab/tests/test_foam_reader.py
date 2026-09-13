@@ -336,6 +336,40 @@ def main():
           backend._decode_surface(sspec, '0.001', (sx, sy), 0, 1,
                                   smask) is None)
 
+    # N2-16: a count within 1% of expected is a python-carve vs
+    # boxToCell centre-line tie, not a torn write - the rows are placed
+    # by their coordinates instead of refused (R2's 171,604-row samples
+    # against a 171,580-cell mask killed the whole live path). On a
+    # large enough grid, one extra row must be accepted and land in the
+    # right cell; the tiny 3x3 fixture above stays strict because 1%
+    # of 9 rounds to zero.
+    bx, by = 20, 10
+    bmask = np.zeros((bx, by), dtype=bool)
+    brows = ['# x y z p']
+    bwant = {}
+    for i in range(bx):
+        for j in range(by):
+            v = 1000.0 + i * by + j
+            bwant[(i, j)] = v
+            brows.append(f'{(i + 0.5):.3f} {(j + 0.5):.3f} 0 {v}')
+    # the "tie row": one extra sampled row, as boxToCell keeping a row
+    # the python mask carved - its coordinates land it in cell (5, 5)
+    brows.append(f'{5.5:.3f} {5.5:.3f} 0 {7777.0}')
+    # time dir 0.004: the AMR checks further down own 0.003 in the same
+    # tmp tree, and read_surface_sample reads whatever .raw sits in the
+    # dir - sharing it made those checks read THIS fixture's rows
+    bdir = os.path.join(tmp, 'postProcessing', 'liveSlice', '0.004')
+    os.makedirs(bdir, exist_ok=True)
+    with open(os.path.join(bdir, 'p_big.raw'), 'w') as f:
+        f.write('\n'.join(brows) + '\n')
+    bspec = SimpleNamespace(dim=2, nx=bx, ny=by, case_unc=tmp,
+                            solid=bmask, dx=1.0)
+    bout = backend._decode_surface(bspec, '0.004', (bx, by), 0, 1, bmask)
+    check('tie-sized surplus decodes by coordinates (N2-16)',
+          bout is not None and bout[5, 5] == 7777.0
+          and bout[0, 0] == bwant[(0, 0)]
+          and bout[bx - 1, by - 1] == bwant[(bx - 1, by - 1)])
+
     # remap branch: rows are cut-polygon centroids (= in-plane centres);
     # a 2x2 fine plane where the left column is one coarse cell
     rmap = np.array([[0, 0], [1, 2]], dtype=np.int32)
