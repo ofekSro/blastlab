@@ -448,13 +448,34 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
         order = np.lexsort((pts[:, ax_u], pts[:, ax_v]))
         return _surface_ok(spec, vals[order].reshape(shape, order='F'))
     fluid = ~slice_mask
-    if len(vals) != int(fluid.sum()):
-        return _surface_refused(spec, len(vals), int(fluid.sum()))
-    # boolean-mask assignment fills in C order (ax_v fastest), so sort
-    # ax_u primary / ax_v secondary to match
-    order = np.lexsort((pts[:, ax_v], pts[:, ax_u]))
+    want = int(fluid.sum())
+    if len(vals) == want:
+        # boolean-mask assignment fills in C order (ax_v fastest), so
+        # sort ax_u primary / ax_v secondary to match
+        order = np.lexsort((pts[:, ax_v], pts[:, ax_u]))
+        full = np.full(shape, float(P_AIR))
+        full[fluid] = vals[order]
+        return _surface_ok(spec, full)
+    # N2-16: the python carve and foam's boxToCell can disagree by one
+    # cell row when an obstacle face lands exactly on a cell-centre
+    # line at this dx - measured on R2's obstacle case: every sample
+    # carried 171,604 cells against a 171,580-cell mask, one 24-cell
+    # row at the obstacle's top face. That is a STABLE count, not a
+    # torn write, and refusing it silently killed the entire live path
+    # for the whole run - the live view never updated and the live
+    # arrival stop never saw an edge. A sample within a row's worth of
+    # the expected count is placed by its coordinates instead (the
+    # remap branch above already trusts coordinates); a genuinely
+    # mid-write sample is short by far more and is still refused.
+    if abs(len(vals) - want) > max(64, want // 100):
+        return _surface_refused(spec, len(vals), want)
+    dxf = float(spec.dx)
+    iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
+                 shape[0] - 1)
+    iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,
+                 shape[1] - 1)
     full = np.full(shape, float(P_AIR))
-    full[fluid] = vals[order]
+    full[iu, iv] = vals
     return _surface_ok(spec, full)
 
 
