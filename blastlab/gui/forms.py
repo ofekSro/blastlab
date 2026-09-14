@@ -130,10 +130,13 @@ class _PointList(ctk.CTkFrame):
         self.columnconfigure(0, weight=1)
 
         self.entry_var = tk.StringVar()
+        # UX-03: placeholder_text is dead with a textvariable bound -
+        # CTkEntry 6.0 compares the StringVar OBJECT to "" and never
+        # activates it - so the format hint lives in the label below
+        # instead (muted when idle, red when a row is refused)
         ent = ctk.CTkEntry(self, textvariable=self.entry_var,
                            font=theme.F_BODY, corner_radius=8,
-                           fg_color=c('entry'), border_color=c('border'),
-                           placeholder_text=' '.join(columns))
+                           fg_color=c('entry'), border_color=c('border'))
         ent.grid(row=1, column=0, sticky='we', padx=(0, GAP))
         ent.bind('<Return>', lambda e: self._add())
         self._entry = ent
@@ -145,22 +148,25 @@ class _PointList(ctk.CTkFrame):
                           command=cmd).grid(row=1, column=col,
                                             padx=(0, GAP if col == 1 else 0))
         # a rejected row used to vanish in silence: the text stayed in the
-        # box, nothing was added and nothing said why
-        self._hint = ctk.CTkLabel(self, text='', font=theme.F_SMALL,
-                                  text_color=theme.c('error'), anchor='w',
+        # box, nothing was added and nothing said why. At rest the same
+        # label carries the format hint (UX-03).
+        self._hint_rest = 'add a row: ' + '  '.join(columns)
+        self._hint = ctk.CTkLabel(self, text=self._hint_rest,
+                                  font=theme.F_SMALL,
+                                  text_color=c('muted'), anchor='w',
                                   justify='left', wraplength=240)
         self._hint.grid(row=2, column=0, columnspan=3, sticky='we',
                         pady=(2, 0))
 
     def _reject(self, msg):
-        self._hint.configure(text=msg)
+        self._hint.configure(text=msg, text_color=theme.c('error'))
         try:
             self._entry.configure(border_color=theme.c('error'))
         except Exception:
             pass
 
     def _accept(self):
-        self._hint.configure(text='')
+        self._hint.configure(text=self._hint_rest, text_color=c('muted'))
         try:
             self._entry.configure(border_color=c('border'))
         except Exception:
@@ -377,10 +383,15 @@ class CaseForm(ctk.CTkFrame):
                      else ['charge', 'profile1d', 'profile2d'])
             r = _row(chg, r, 'Initialize from',
                      _combo(chg, self._var('init_mode', 'charge'), modes))
-            r = _row(chg, r, 'Charge [kg TNT]' + (' or kg/m' if
-                                                  self.dim == 2 else ''),
-                     _entry(chg, self._var('charge',
-                                           1.0 if self.dim == 2 else 25.0)))
+            # UX-02: the unit follows the geometry - kg for axisym/3D,
+            # kg per metre of depth for planar - via _sync_geometry,
+            # instead of one label that squeezes both units in
+            r, chg_lbl = _row_lbl(chg, r, 'Charge [kg TNT]',
+                                  _entry(chg, self._var(
+                                      'charge',
+                                      1.0 if self.dim == 2 else 25.0)))
+            if self.dim == 2:
+                self._dyn_labels['charge'] = chg_lbl
             self._mat_combo = _combo(chg, self._var('material', 'TNT'),
                                      MATERIAL_NAMES)
             # N11/T46: the native solvers share the JWL material table,
@@ -520,10 +531,18 @@ class CaseForm(ctk.CTkFrame):
             bcf.columnconfigure(2, minsize=GAP * 2)
             sides = (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2 else
                      ['x_lo', 'x_hi', 'y_lo', 'y_hi', 'z_lo', 'z_hi'])
-            defaults = (dict(x_lo='reflect', x_hi='transmit',
+            # UX-01: the FORM defaults give the new user one terminate
+            # side (x_hi - the radial outer boundary in axisym, matching
+            # the 1D default), so the very first screen validates clean
+            # instead of greeting them with the red "No terminate
+            # boundary..." warning about its own defaults. The Case2D/3D
+            # dataclass defaults stay all-transmit: dozens of tests and
+            # programmatic cases rely on them, and a case built in code
+            # earns the warning honestly.
+            defaults = (dict(x_lo='reflect', x_hi='terminate',
                              y_lo='reflect', y_hi='transmit')
                         if self.dim == 2 else
-                        dict(x_lo='transmit', x_hi='transmit',
+                        dict(x_lo='transmit', x_hi='terminate',
                              y_lo='transmit', y_hi='transmit',
                              z_lo='reflect', z_hi='transmit'))
             self._bc_combos = {}
@@ -686,9 +705,11 @@ class CaseForm(ctk.CTkFrame):
             # axisym: the domain is the (r, z) half-plane revolved about
             # the axis - relabel, and pin the burst to the axis (r = 0)
             texts = (dict(Lx='Radius R [m]', Ly='Height Z [m]',
-                          cx='Burst r [m]', cy='Burst z [m]') if axisym
+                          cx='Burst r [m]', cy='Burst z [m]',
+                          charge='Charge [kg TNT]') if axisym
                      else dict(Lx='Lx [m]', Ly='Ly [m]',
-                               cx='Burst x [m]', cy='Burst y [m]'))
+                               cx='Burst x [m]', cy='Burst y [m]',
+                               charge='Charge [kg TNT/m]'))
             for key, lbl in getattr(self, '_dyn_labels', {}).items():
                 lbl.configure(text=texts[key])
             if hasattr(self, '_burst_x_entry'):

@@ -1218,9 +1218,11 @@ def c04_point_lists(qa):
                 + ' | '.join(qa.strip_text()))
         if n1 == n0 and text not in ('',):
             # G3 fix: the row is still refused (correct) but the list now
-            # says why, right under the entry
+            # says why, right under the entry. (UX-03 gave the label a
+            # resting format hint, so 'non-empty' alone proves nothing -
+            # it must have LEFT the resting text.)
             hint = form.gauges._hint.cget('text')
-            qa.check(bool(hint),
+            qa.check(bool(hint) and hint != form.gauges._hint_rest,
                      f'row {text!r} refused WITH a visible reason '
                      f'({hint!r})', 'S3')
     form.gauges.entry_var.set('')
@@ -1228,7 +1230,8 @@ def c04_point_lists(qa):
     qa.pump(0.4)
     form.gauges._remove()
     qa.pump(0.3)
-    qa.check(bool(form.gauges._hint.cget('text')),
+    qa.check(form.gauges._hint.cget('text')
+             not in ('', form.gauges._hint_rest),
              'Remove with nothing selected explains itself', 'S3')
     _set_rows(qa, form.gauges, [])
 

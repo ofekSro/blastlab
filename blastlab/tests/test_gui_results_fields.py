@@ -271,9 +271,11 @@ def qa_s2_checks(panel):
           'not numbers' in form.gauges._hint.cget('text'))
     form.gauges.entry_var.set('1 2')
     form.gauges._add()
-    check('a good row is accepted and clears the hint',
+    # UX-03: at rest the label carries the format hint, not ''
+    check('a good row is accepted and the error clears',
           len(form.gauges.get()) == 1
-          and form.gauges._hint.cget('text') == '')
+          and form.gauges._hint.cget('text')
+          == form.gauges._hint_rest)
     form.destroy()
 
     print("\nQA S4: polish")
