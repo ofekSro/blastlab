@@ -73,10 +73,19 @@ def main():
     # refines dx below cell_size_m - dx_fine = L/76 here, not 0.025):
     # (a, b, b) <-> (b, a, b) map onto each other under the x<->y swap,
     # so what remains in the gate is the solver, not probe placement.
-    # Measured with both fixes: asym = 4.85 %, digit-identical across
-    # runs - a real, deterministic directional bias of the solution
-    # (the y-gauge peaks 1.9 us later and 413 kPa lower; worth its own
-    # investigation, tracked in TODO).
+    # Measured with both fixes the residual asymmetry is REAL and comes
+    # from the MPI decomposition - same case, mirror probes, pinned
+    # schedule: np=1 -> 0.10 %, np=2 -> 0.26 %, np=8 (this machine's
+    # auto) -> 4.85 %, digit-identical per np and INDEPENDENT of the
+    # live-slice axis (slice x reproduces slice y's digits exactly).
+    # So the gate's number is a function of whatever rank count `auto`
+    # resolves to on the running machine. Pin np=2: deterministic
+    # across machines, still exercises the parallel path, and the 5 %
+    # gate then holds a ~19x margin instead of a 3 % one. (A machine
+    # whose rank ceiling is 1 clamps to serial - also fine.) The
+    # parallel-vs-serial near-field deviation itself is tracked in
+    # TODO as an accuracy observation.
+    case.n_procs = 2
     from blastlab.core import refine
     from blastlab.core.case import material_rho0
     plan = refine.plan_levels(case, rho0=material_rho0(case))
@@ -137,11 +146,9 @@ def main():
     py = res.gauges['pressures'][1].max() - P_AIR
     check('gauges shocked', px > 2 * P_AIR and py > 2 * P_AIR,
           f'{px/1e3:.0f} / {py/1e3:.0f} kPa')
-    # Since N3-01 the probes are exact mirrors and the record is
-    # deterministic, so this is a stable number per tree: 4.85 % at
-    # full size (a real directional bias of the solution, see above).
-    # --tiny keeps its wider band - its extreme near field sits deeper
-    # in that bias.
+    # Since N3-01 the probes are exact mirrors, the schedule is pinned
+    # and np is pinned to 2, so this is a stable number per tree:
+    # 0.26 % at full size (the decomposition's residual - see above).
     sym_tol = 0.10 if '--tiny' in sys.argv else 0.05
     check('x/y symmetry', abs(px - py) <= sym_tol * max(px, py),
           f'{px/1e3:.0f} vs {py/1e3:.0f} kPa')
