@@ -208,26 +208,31 @@ def main():
         pk_u = g_u['pressures'][0].max() - P_AIR
         ta_a = arrival(g_a['times'], g_a['pressures'][0])
         ta_u = arrival(g_u['times'], g_u['pressures'][0])
-        check('gauge peak within 10 % of the static reference',
-              abs(pk_a - pk_u) / pk_u < 0.10,
+        # Bands RE-TUNED 2026-09-14 (the P5-2 default change reached this
+        # test late). The 10 % / 25 % bands were calibrated against the
+        # old amr_refine=0.4 default; 2dc4c9f tightened it to 0.2/0.1 (a
+        # deliberate accuracy fix, amr2d's bands were re-tuned in that
+        # commit) and this e2e simply was not rerun until the 14.09
+        # sweep. Measured then: the finer-refining AMR run diverges
+        # UPWARD from the deliberately coarse 5 cm static reference -
+        # peak +23.1 % / +25.2 %, arrival +28.2 % / +28.1 % on the two
+        # gauges. The two gauges (cell corner vs base-cell centre)
+        # agreeing to 0.1 pp also confirms T40's refutation of the
+        # probe-snapping hypothesis: this is field resolution, not
+        # sampling. The reference is NOT ground truth - a true uniform
+        # 2.5 cm run is 1.7M cells, infeasible here - so these stay
+        # sanity bands around the measured offsets: 30 % peak, 35 %
+        # arrival.
+        check('gauge peak within 30 % of the static reference (sanity '
+              'band; measured +23 % after the 0.2/0.1 re-tune)',
+              abs(pk_a - pk_u) / pk_u < 0.30,
               f'AMR {pk_a/1e3:.0f} kPa, static {pk_u/1e3:.0f} kPa')
-        # measured 2026-09-06: AMR 0.298 ms vs static 0.252 ms (+18 %) at a
-        # 2.7 % peak agreement. T40 tested the blastProbes `adjustLocations`
-        # hypothesis with _e2e_foam_probe_study.py and REFUTED it: turning
-        # adjustLocations off moves the AMR-vs-static arrival by 0.15
-        # percentage points (+4.23 % -> +4.38 % at a cell corner, -11.48 %
-        # unchanged at a base-cell centre) - blastProbes reports the
-        # containing cell's value either way. What does move it is which
-        # cell the gauge lands in: the AMR mesh follows the shock and is at
-        # its finest level around the gauge while the static reference only
-        # refines around the CHARGE, so the two sample different-sized
-        # cells. That is a real resolution difference, not a probe artefact,
-        # which is why this band stays a sanity band.
         print(f'  gauge arrival: AMR {ta_a*1e3:.3f} ms, static {ta_u*1e3:.3f} ms '
               f'({(ta_a - ta_u) / ta_u * 100:+.1f} %)')
-        check('gauge arrival within 25 % of the static reference (sanity band; '
-              'the 18 % offset is an open N16 finding)',
-              abs(ta_a - ta_u) / ta_u < 0.25,
+        check('gauge arrival within 35 % of the static reference (sanity '
+              'band; measured +28 % - the open N16 offset, grown by the '
+              '0.2/0.1 re-tune)',
+              abs(ta_a - ta_u) / ta_u < 0.35,
               f'AMR {ta_a*1e3:.3f} ms, static {ta_u*1e3:.3f} ms')
 
     from blastlab.solvers.foam import postmortem
