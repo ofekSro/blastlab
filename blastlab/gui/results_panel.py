@@ -221,12 +221,17 @@ class ResultsPanel(ctk.CTkFrame):
         # (peak, arrival, positive-phase duration/impulse, net impulse)
         gtab = ctk.CTkFrame(stack, fg_color='transparent')
         # T44/N12: trace field selector - shown only when the current
-        # result recorded more than p (blastFoam runs since T44)
-        gbar = ctk.CTkFrame(gtab, fg_color='transparent')
-        gbar.pack(fill='x', pady=(0, 4))
+        # result recorded more than p (blastFoam runs since T44).
+        # UX-05: the bar is NOT packed here. An empty CTkFrame keeps its
+        # default requested height of 200 px, and this bar IS empty for
+        # every p-only result - it painted a 200 px dead band above the
+        # gauge figure (glaring at 1900 px wide). _draw_gauges packs and
+        # unpacks it together with the selector it exists to hold.
+        self._gauge_bar = ctk.CTkFrame(gtab, fg_color='transparent')
         self._gauge_field = 'p'
         self._gauge_field_seg = ctk.CTkSegmentedButton(
-            gbar, values=['p'], width=170, height=26, font=theme.F_SMALL,
+            self._gauge_bar, values=['p'], width=170, height=26,
+            font=theme.F_SMALL,
             command=self._gauge_field_changed)
         self._gauge_field_seg.set('p')
         # packed on demand by _draw_gauges (p-only results keep the old
@@ -631,11 +636,16 @@ class ResultsPanel(ctk.CTkFrame):
                 self._gauge_field_seg.set('p')
             if not self._gauge_field_seg.winfo_manager():
                 self._gauge_field_seg.pack(side='left')
+            if not self._gauge_bar.winfo_manager():
+                self._gauge_bar.pack(fill='x', pady=(0, 4),
+                                     before=self.gauge_canvas)
         else:
             self._gauge_field = 'p'
             self._gauge_field_seg.set('p')
             if self._gauge_field_seg.winfo_manager():
                 self._gauge_field_seg.pack_forget()
+            if self._gauge_bar.winfo_manager():
+                self._gauge_bar.pack_forget()
         if ent.dim == 1:
             fig = plots.figure_gauges_1d(
                 res.gauges, res.meta['charge_kg'], res.meta['eos'],
@@ -1028,22 +1038,36 @@ class ResultsPanel(ctk.CTkFrame):
                                     res.meta['charge_kg'],
                                     res.meta['radius_m'],
                                     title_extra=title_extra)),
-                                ('Gauges', plots.figure_gauges_1d(
+                                ('Gauge time histories',
+                                 plots.figure_gauges_1d(
                                     res.gauges, res.meta['charge_kg'],
                                     res.meta['eos'],
                                     title_extra=title_extra))]
                     else:
                         builder = (plots.figures_fields_2d if dim == 2
                                    else plots.figures_fields_3d)
-                        figs = [(n.rsplit('.', 1)[0].replace('_', ' '), f)
+                        # UX-06: section headings from the field name,
+                        # not the file name - 'blast_2d_pressure.png'
+                        # used to become the heading 'blast 2d pressure'
+                        def _cap(fname):
+                            stem = fname.rsplit('.', 1)[0]
+                            pre = f'blast_{dim}d_'
+                            if stem.startswith(pre):
+                                stem = stem[len(pre):]
+                            stem = stem.replace('_', ' ')
+                            return stem[:1].upper() + stem[1:]
+                        figs = [(_cap(n), f)
                                 for n, f in builder(
                                     res.snapshots, res.meta,
                                     include_peak=True,
                                     show_mesh=show_mesh,
                                     title_extra=title_extra)]
-                        figs.append(('Gauges', plots.figure_gauges_nd(
-                            res.gauges, res.meta,
-                            title_extra=title_extra)))
+                        # 'Gauge time histories', not a second 'Gauges'
+                        # heading duplicating the table section's
+                        figs.append(('Gauge time histories',
+                                     plots.figure_gauges_nd(
+                                         res.gauges, res.meta,
+                                         title_extra=title_extra)))
                     report_mod.save_html_report(
                         res, dim, target, figures=figs,
                         # the user's own line wins over the run
