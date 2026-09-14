@@ -1,5 +1,6 @@
 """3D blastFoam backend smoke test: 8 kg TNT centred in a 1 m box
-(~104k cells, ~1.5-3 min wall). Asserts the full native Result
+(76^3 = ~439k cells after the charge refine, ~2-3 min wall). Asserts
+the full native Result
 contract (snapshot keys/dtypes/shapes incl. rho3, gauges, meta incl.
 j0/k0/s0, frames) plus x/y gauge symmetry and the arrival-watcher
 stop. Auto-SKIPs when WSL/blastFoam is unavailable.
@@ -55,6 +56,34 @@ def main():
                   gauges=[(L - 0.15, c, c), (c, L - 0.15, c)],
                   n_snapshots=4, record_frames=150,
                   solver='blastfoam', material='TNT', bcs=ALL_TERM_3D)
+    # N3-01 (14.09): two determinism fixes, both measured on this case.
+    # (1) The x/y gate was BIMODAL - PASS/FAIL flipping run to run with
+    # digit-identical fail values (8579/8084 kPa). Root: the adaptive
+    # writeInterval rewrite lands at an ingest-(wall-clock-)dependent
+    # step, and `writeControl adjustableRunTime` clips deltaT onto the
+    # write times, so two write schedules fork the whole float
+    # trajectory (peaks 8579/8084 in one mode, 8469/8050 in the other -
+    # even the peak SAMPLE TIMES differ). Pinning the schedule (B23)
+    # makes the record digit-identical across runs.
+    case.adaptive_write = False
+    # (2) The requested gauge coordinates (0.85, 0.5) are exact FACE
+    # coordinates of the refined grid, so adjustLocations snapped the
+    # two probes to non-mirror cells. Align them to exact mirror CELL
+    # CENTRES of the grid the writer really builds (the charge rule
+    # refines dx below cell_size_m - dx_fine = L/76 here, not 0.025):
+    # (a, b, b) <-> (b, a, b) map onto each other under the x<->y swap,
+    # so what remains in the gate is the solver, not probe placement.
+    # Measured with both fixes: asym = 4.85 %, digit-identical across
+    # runs - a real, deterministic directional bias of the solution
+    # (the y-gauge peaks 1.9 us later and 413 kPa lower; worth its own
+    # investigation, tracked in TODO).
+    from blastlab.core import refine
+    from blastlab.core.case import material_rho0
+    plan = refine.plan_levels(case, rho0=material_rho0(case))
+    dxf = float(plan.fine['dx'])
+    a = (round((L - 0.15) / dxf - 0.5) + 0.5) * dxf
+    b = (round(c / dxf - 0.5) + 0.5) * dxf
+    case.gauges = [(a, b, b), (b, a, b)]
     from blastlab.solvers import get_solver
     res = get_solver(3, 'blastfoam')(case)
 
@@ -108,9 +137,11 @@ def main():
     py = res.gauges['pressures'][1].max() - P_AIR
     check('gauges shocked', px > 2 * P_AIR and py > 2 * P_AIR,
           f'{px/1e3:.0f} / {py/1e3:.0f} kPa')
-    # --tiny gauges land on cell faces (0.45/0.025 = 18): the two probes
-    # snap to non-mirror cells, so the extreme near field reads ~8%
-    # apart; the full-size case stays within 5%.
+    # Since N3-01 the probes are exact mirrors and the record is
+    # deterministic, so this is a stable number per tree: 4.85 % at
+    # full size (a real directional bias of the solution, see above).
+    # --tiny keeps its wider band - its extreme near field sits deeper
+    # in that bias.
     sym_tol = 0.10 if '--tiny' in sys.argv else 0.05
     check('x/y symmetry', abs(px - py) <= sym_tol * max(px, py),
           f'{px/1e3:.0f} vs {py/1e3:.0f} kPa')

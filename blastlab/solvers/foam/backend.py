@@ -1973,6 +1973,44 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
         decode = lambda tdir: _decode_surface(              # noqa: E731
             spec, tdir, lshape, uv[0], uv[1], slice_solid,
             remap_sl=None if spec.remap is None else spec.remap[live_sl])
+
+    # N3-01: evaluate the arrival stop on the LIVE slice as well - the
+    # 3D copy of N2-15. The on_frame check above is ingest-gated, and a
+    # 3D write is the largest read of all over the WSL 9p mount, so the
+    # stop recedes with the backlog exactly as R2's did in 2D; measured
+    # here as the bimodal test_foam_3d_smoke gate (the overshoot
+    # quantized to whichever terminal write the lagging ingest reached).
+    # The live slice passes through the burst point, so the four
+    # IN-PLANE boundaries are reached first ON this very plane - the
+    # slice rim sees the arrival the step it happens, however far the
+    # written ingest has fallen behind. A terminate side normal to the
+    # slice axis stays invisible here and keeps the written-dir check
+    # (the pre-N3-01 status quo); a shape surprise falls through the
+    # same way.
+    rim_edge = geometry.terminate_edge_mask(
+        lshape,
+        dict(x_lo=bcs[f'{"xyz"[uv[0]]}_lo'],
+             x_hi=bcs[f'{"xyz"[uv[0]]}_hi'],
+             y_lo=bcs[f'{"xyz"[uv[1]]}_lo'],
+             y_hi=bcs[f'{"xyz"[uv[1]]}_hi']),
+        fluid=None if slice_solid is None else ~slice_solid)
+    if has_term and rim_edge.any():
+        _base_decode3 = decode
+
+        def decode(tdir):                                   # noqa: F811
+            payload = _base_decode3(tdir)
+            if payload is not None and not loop.stop_requested:
+                pl = payload[0] if isinstance(payload, tuple) else payload
+                try:
+                    if (pl[rim_edge] > ARRIVAL_P).any():
+                        loop.request_stop(
+                            'shock arrived at a terminate boundary '
+                            f'(p_edge = {pl[rim_edge].max():.3e} Pa, '
+                            f'live slice)')
+                except (IndexError, TypeError):
+                    pass
+            return payload
+
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
     stop_reason = loop.run()
