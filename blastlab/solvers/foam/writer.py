@@ -171,7 +171,10 @@ class CaseSpec:
         fields are asked for under a name nothing wrote (T62)."""
         return '0' if not self.t_start else tfmt(self.t_start)
     patches: list = field(default_factory=list)     # (name, kind)
+    #: face-snapped by the plan (snap_obstacles) - never the raw case
+    #: boxes; obstacles_moved keeps (original, snapped) for the run log
     obstacles: list = field(default_factory=list)   # (x0,x1,y0,y1,z0,z1)
+    obstacles_moved: list = field(default_factory=list)
     solid: object = None            # (nx,ny,nz) bool mask, None = none
     files: dict = field(default_factory=dict)       # relpath -> text
     case_posix: str = ''
@@ -251,6 +254,13 @@ class CaseSpec:
         self.zones = list(plan.zones)
         self.solid_base = plan.solid_base
         self.solid = plan.solid_fine
+        # obstacle boxes SNAPPED outward to base-cell faces by the plan
+        # (snap_obstacles): topoSet's boxToCell and the Python masks all
+        # consume these, so they agree cell-for-cell by construction
+        self.obstacles = [tuple(b) for b in
+                          (getattr(plan, 'obstacles', None) or [])]
+        self.obstacles_moved = list(
+            getattr(plan, 'obstacles_moved', None) or [])
 
     def refine_meta(self):
         """meta['refine'] payload (None for a uniform mesh). For AMR the
@@ -353,11 +363,10 @@ def plan_case(case):
                             for s in ('x_hi', 'y_lo', 'y_hi')]
             spec.patches.append(('wedge', 'wedge'))
         # obstacle rectangles in the (x, y) / (r, z) plane, carved out
-        # by topoSet/subsetMesh exactly like the 3D boxes (the Python
-        # mask mirrors boxToCell's cell-centre criterion)
-        spec.obstacles = [tuple(float(v) for v in box)
-                          for box in (getattr(case, 'obstacles', None)
-                                      or [])]
+        # by topoSet/subsetMesh exactly like the 3D boxes. apply_plan
+        # already adopted the plan's FACE-SNAPPED boxes (snap_obstacles)
+        # - the raw case boxes are never handed to the carve, so a box
+        # edge can no longer tie with a cell-centre line (N2-16).
         if spec.obstacles:
             # mask evaluated on the BASE grid by the plan (boxToCell
             # carves before refinement) and expanded to the fine grid
@@ -412,12 +421,10 @@ def plan_case(case):
                     for s in ('x_lo', 'x_hi', 'y_lo', 'y_hi',
                               'z_lo', 'z_hi')]
     # obstacles: axis-aligned boxes carved out of the mesh by
-    # topoSet(boxToCell)/subsetMesh; the Python-side mask mirrors
-    # boxToCell's criterion (cell CENTRE inside the box, inclusive)
-    # so read-back scatters fluid values onto the full native grid
-    spec.obstacles = [tuple(float(v) for v in box)
-                      for box in (getattr(case, 'obstacles', None)
-                                  or [])]
+    # topoSet(boxToCell)/subsetMesh. apply_plan already adopted the
+    # plan's FACE-SNAPPED boxes (snap_obstacles), so boxToCell and the
+    # Python-side mask (cell CENTRE inside, inclusive) agree by
+    # construction and read-back scatters onto the full native grid.
     if spec.obstacles:
         spec.patches.append(('obstacles', 'wall'))   # mask: see apply_plan
 

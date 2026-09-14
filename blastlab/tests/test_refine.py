@@ -62,6 +62,32 @@ def test_snap():
     z, moved = refine.snap_zone((0.5, 1.5, 0.5, 1.5, 1), 0.5, 2)
     check('aligned zone unchanged', not moved and np.allclose(z[:4], (0.5, 1.5, 0.5, 1.5)))
 
+    # obstacle snap (foam carve): outward to BASE faces, so a box edge
+    # can never tie with a cell-centre line (N2-16's root)
+    obs, mv = refine.snap_obstacles([(0.37, 1.27, 0.5, 1.5)], 0.1, 2)
+    check('obstacle snaps outward to base faces',
+          np.allclose(obs[0], (0.3, 1.3, 0.5, 1.5)) and len(mv) == 1,
+          str(obs))
+    check('snap records (original, snapped)',
+          mv and mv[0][0] == (0.37, 1.27, 0.5, 1.5)
+          and np.allclose(mv[0][1], (0.3, 1.3, 0.5, 1.5)), str(mv))
+    obs, mv = refine.snap_obstacles([(0.5, 1.0, 0.0, 1.5)], 0.5, 2)
+    check('aligned obstacle unchanged',
+          not mv and np.allclose(obs[0], (0.5, 1.0, 0.0, 1.5)))
+    # the historic tie: an edge ON a cell-centre line moves OFF it
+    dx = 4.0 / 482.0
+    obs, mv = refine.snap_obstacles([(2.0, 2.2, 0.0, 120.5 * dx)], dx, 2)
+    y1 = obs[0][3]
+    check('centre-line edge (120.5 dx) lands on a face, off the centres',
+          abs(y1 / dx - round(y1 / dx)) < 1e-9
+          and abs(y1 - 120.5 * dx) > 0.4 * dx, str(obs))
+    obs, mv = refine.snap_obstacles(
+        [(0.2, 0.3, 0.2, 0.3, 0.2, 0.3)], 0.25, 3)
+    check('3D box grows to the enclosing cell',
+          np.allclose(obs[0], (0.0, 0.5, 0.0, 0.5, 0.0, 0.5)), str(obs))
+    obs, mv = refine.snap_obstacles([], 0.1, 2)
+    check('no obstacles: empty in, empty out', obs == [] and mv == [])
+
 
 def test_plan_2d():
     print("\n2D plan: nested zones on a 4x4 base")

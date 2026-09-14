@@ -459,11 +459,19 @@ def semantic_checks(specs):
     from blastlab.core.bc import solid_mask_3d
     so = specs['case3d_obstacle']
     tsd = norm(so.files.get('system/topoSetDict', ''))
+    # the box is SNAPPED outward to base-cell faces (dx_base = 2/192 m):
+    # 1.2/dx = 115.2 -> 115 (1.197916667), 0.6/dx = 57.6 -> 57 (0.59375),
+    # 1.4/dx = 134.4 -> 135 (1.40625), 1.2/dx = 115.2 -> 116
+    # (1.208333333); 1.5 and 0 are exact multiples and stay
     check('obstacle: topoSetDict box + invert',
           'source boxToCell; sourceInfo '
-          '{ box (1.2 0.6 0) (1.5 1.4 1.2); }' in tsd
+          '{ box (1.197916667 0.59375 0) (1.5 1.40625 1.208333333); }'
+          in tsd
           and 'action invert;' in tsd
           and tsd.count('name fluid;') == 2)
+    check('obstacle: snap recorded for the run log',
+          [tuple(b) for b, _s in so.obstacles_moved]
+          == [(1.2, 1.5, 0.6, 1.4, 0.0, 1.2)])
     bmdo = norm(so.files['system/blockMeshDict'])
     check('obstacle: zero-face wall patch in blockMesh',
           'obstacles' in bmdo and 'faces ();' in bmdo)
@@ -488,8 +496,11 @@ def semantic_checks(specs):
     so2 = specs['case2d_axi_obstacle']
     tsd2 = norm(so2.files.get('system/topoSetDict', ''))
     zpad = fmt(float(so2.grid['x_face'][-1]))
+    # snapped outward to base faces (dx_base = 4/608 m): 2.4/dx = 364.8
+    # -> 365 (2.401315789), 1.6/dx = 243.2 -> 244 (1.605263158); 2.0 and
+    # 0 are exact multiples (304, 0) and stay put
     check('2d obstacle: z-unbounded carve box',
-          f'box (2 0 -{zpad}) (2.4 1.6 {zpad});' in tsd2
+          f'box (2 0 -{zpad}) (2.401315789 1.605263158 {zpad});' in tsd2
           and 'action invert;' in tsd2)
     bmdo2 = norm(so2.files['system/blockMeshDict'])
     check('2d obstacle: wall patch + field entries',

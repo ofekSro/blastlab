@@ -10,7 +10,7 @@ FoamFile
 
 actions
 (
-    { name fluid; type cellSet; action new; source boxToCell; sourceInfo { box (1.2 0.6 0) (1.5 1.4 1.2); } }
+    { name fluid; type cellSet; action new; source boxToCell; sourceInfo { box (1.197916667 0.59375 0) (1.5 1.40625 1.208333333); } }
     { name fluid; type cellSet; action invert; }
 );
 

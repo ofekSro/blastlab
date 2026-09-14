@@ -1080,6 +1080,19 @@ def read_2d(dpath, spec, what=('p',), mesh=None):
     return out
 
 
+def _obstacle_snap_lines(spec):
+    """Banner lines for obstacle boxes the plan snapped outward onto
+    base-cell faces ([] when every box was already face-aligned)."""
+    lines = []
+    for orig, snap in (getattr(spec, 'obstacles_moved', None) or []):
+        o = ', '.join(f'{v:g}' for v in orig)
+        s = ', '.join(f'{v:g}' for v in snap)
+        lines.append(f'  Obstacle snapped: ({o}) -> ({s}) m '
+                     f'(outward, to {spec.dx_base or spec.dx:g} m '
+                     f'cell faces)')
+    return lines
+
+
 def _refine_lines(spec):
     """Banner lines for a locally refined mesh ([] when uniform)."""
     if spec.amr:
@@ -1171,6 +1184,7 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
             f'  Obstacles       : {len(spec.obstacles)}'
             + (' (carved out of the mesh, rigid walls)'
                if spec.obstacles else ''),
+            *_obstacle_snap_lines(spec),
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
             + ('shock arrival at a terminate boundary' if has_term
@@ -1758,6 +1772,7 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
             f'  Obstacles       : {len(spec.obstacles)} '
             f'(carved out of the mesh, rigid walls)'
             if spec.obstacles else '  Obstacles       : 0',
+            *_obstacle_snap_lines(spec),
             f'  Gauges          : {n_gauges}',
             '  Stop condition  : '
             + ('shock arrival at a terminate boundary' if has_term

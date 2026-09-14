@@ -191,6 +191,31 @@ def snap_zone(zone, dx_base, dim):
     return (*out, level), moved
 
 
+def snap_obstacles(obstacles, dx_base, dim):
+    """Obstacle boxes moved OUTWARD onto BASE-cell faces (multiples of
+    dx_base), foam only. An edge on a face can never tie with a cell
+    CENTRE - at any refinement level: centres are odd multiples of
+    (level cell)/2, base faces are even ones - so the Python carve and
+    foam's boxToCell agree cell-for-cell BY CONSTRUCTION instead of by
+    float luck (N2-16 was one such tie: y = 1.0 == 120.5 * (4/482)
+    exactly, and the two sides broke in opposite directions).
+    Returns (snapped list, [(original, snapped) that moved])."""
+    out, moved = [], []
+    for box in obstacles or []:
+        b = [float(v) for v in box[:2 * dim]]
+        s = []
+        for a in range(dim):
+            lo, hi = b[2 * a], b[2 * a + 1]
+            s.append(math.floor(lo / dx_base + 1e-6) * dx_base)
+            s.append(math.ceil(hi / dx_base - 1e-6) * dx_base)
+        s = tuple(s)
+        if any(abs(o - v) > 1e-9 * max(1.0, dx_base)
+               for o, v in zip(s, b)):
+            moved.append((tuple(b), s))
+        out.append(s)
+    return out, moved
+
+
 def level_map(centres, zones):
     """int8 array (Nx, Ny[, Nz]) of the max zone level whose box holds
     the cell centre (inclusive - the boxToCell criterion, as in
@@ -273,6 +298,10 @@ class Plan:
     moved: list = field(default_factory=list)   # user zones that snapped
     amr: int = 0                     # dynamic AMR max level (0 = static)
     display_level: int = 0           # AMR: level of the display grid
+    #: obstacle boxes snapped OUTWARD to base-cell faces (foam carve /
+    #: solid_base use THESE; the native solvers keep the case's own)
+    obstacles: list = field(default_factory=list)
+    obstacles_moved: list = field(default_factory=list)  # (orig, snapped)
 
     @property
     def dx_fine(self):
@@ -401,10 +430,13 @@ def plan_levels(case, rho0=None):
     levels = level_map(centres, [z for z in zones
                                  if 1 <= zone_level(z) <= MAX_LEVEL])
 
+    obs, obs_moved = snap_obstacles(
+        getattr(case, 'obstacles', None) or [], dx_base, dim)
     plan = Plan(dim=dim, dx_base=dx_base, base=base, fine=fine,
                 levels=levels, lmax=lmax, zones=zones, user_zones=user,
                 auto_zones=auto, auto_level=auto_level,
-                solid_base=_solid_base(case, base), moved=moved)
+                solid_base=_solid_base(obs, base, dim), moved=moved,
+                obstacles=obs, obstacles_moved=obs_moved)
     plan.n_fine = int(levels.size)
     plan.n_pred = n_cells_from_levels(levels, lmax, plan.solid_fine)
     return plan
@@ -416,11 +448,12 @@ def _grid(case, dx):
     return make_grid(case.Lx, case.Ly, case.Lz, dx)
 
 
-def _solid_base(case, base):
-    obstacles = getattr(case, 'obstacles', None) or []
+def _solid_base(obstacles, base, dim):
+    """Mask on the base grid from ALREADY-SNAPPED obstacle boxes (the
+    plan snaps once; carve, mask and topoSet all consume the result)."""
     if not obstacles:
         return None
-    if case.dim == 2:
+    if dim == 2:
         return solid_mask_2d(base['x_c'], base['y_c'], obstacles)
     return solid_mask_3d(base['x_c'], base['y_c'], base['z_c'], obstacles)
 
@@ -451,10 +484,13 @@ def _plan_amr(case, dims, amr):
             f"AMR display grid of ~{n_fine:,} cells is too large to plan "
             f"- lower the display level or the base cell size")
     levels = np.zeros(shape, dtype=np.int8)
+    obs, obs_moved = snap_obstacles(
+        getattr(case, 'obstacles', None) or [], dx_base, dim)
     plan = Plan(dim=dim, dx_base=dx_base, base=base, fine=fine,
                 levels=levels, lmax=D, zones=[],
-                solid_base=_solid_base(case, base), amr=amr,
-                display_level=D)
+                solid_base=_solid_base(obs, base, dim), amr=amr,
+                display_level=D,
+                obstacles=obs, obstacles_moved=obs_moved)
     plan.n_fine = int(levels.size)
     # t = 0 mesh is the base grid (all display cells are level 0); compute
     # it arithmetically rather than through n_cells_from_levels, whose
