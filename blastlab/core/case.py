@@ -673,6 +673,11 @@ def validate_case(case, pending_inputs=False):
         if case.dim == 2:
             x0, y0 = (0.0 if case.geometry == 'axisymmetric'
                       else center[0]), center[1]
+            # UX-04: this pin used to be silent - a case file carrying
+            # x != 0 was quietly recentred without a word
+            if case.geometry == 'axisymmetric' and center[0]:
+                note(f"Axisymmetric: the charge sits on the axis - "
+                     f"burst x = {center[0]:g} is ignored (r = 0)")
             overhangs = [(r_exp - (case.Lx - x0), 'x_hi'),
                          (r_exp - y0, 'y_lo'),
                          (r_exp - (case.Ly - y0), 'y_hi')]

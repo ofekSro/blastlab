@@ -298,6 +298,7 @@ def main():
     chain_stage_checks()
     shared_constant_checks()
     amr_cap_checks()
+    axisym_pin_note_checks()
 
     if FAIL:
         print(f"\nCASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
@@ -421,6 +422,27 @@ def afterburn_calibration_checks():
         warns, notes = msgs(mat, ab='none')
         check(f'{mat}: silent while afterburn is off',
               not warns and not notes, (warns, notes))
+
+
+def axisym_pin_note_checks():
+    """UX-04: axisym pins the burst to the axis (by design), but the pin
+    used to be silent - a case file carrying x != 0 was recentred
+    without a word."""
+    print()
+    print("UX-04: axisym says when it ignores burst x")
+
+    rep = validate_case(Case2D(geometry='axisymmetric',
+                               center=(1.0, 2.0)))
+    check('axisym with x != 0: a note says x is ignored',
+          any('burst x = 1 is ignored' in n for n in rep.notes),
+          str(rep.notes))
+    rep = validate_case(Case2D(geometry='axisymmetric',
+                               center=(0.0, 2.0)))
+    check('axisym with x = 0: no such note',
+          not any('is ignored' in n for n in rep.notes), str(rep.notes))
+    rep = validate_case(Case2D(geometry='planar', center=(2.0, 2.0)))
+    check('planar keeps its burst x, no note',
+          not any('is ignored' in n for n in rep.notes), str(rep.notes))
 
 
 if __name__ == '__main__':
