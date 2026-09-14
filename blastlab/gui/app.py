@@ -255,6 +255,15 @@ class App:
             # (the remainder is the per-result scene build; repeats are
             # ~165 ms).
             root.after(3500, self._prewarm_gl)
+            # E06, stage three: the ~1 s "per-result scene build" the
+            # stage-two note points at is NOT per-result - profiled, it
+            # is the process-FIRST BlastScene.__init__ (809 of 924 ms:
+            # first volume mapper / iso / lut construction under
+            # software GL; the second scene costs 14 ms). An empty
+            # plotter never touches those mappers, so stage two cannot
+            # absorb it. Stage three builds a throwaway 4x4x4 BlastScene
+            # at idle; the first real feed then drops ~980 -> ~130 ms.
+            root.after(5200, self._prewarm_scene)
 
     def _prewarm_gl(self):
         """N2-08 stage two (see __init__): pay the process-first GL/VTK
@@ -266,6 +275,36 @@ class App:
         try:
             import pyvista as pv
             pl = pv.Plotter(off_screen=True, window_size=(64, 64))
+            pl.render()
+            pl.screenshot(return_img=True)
+            pl.close()
+        except Exception:
+            pass
+
+    def _prewarm_scene(self):
+        """E06 stage three (see __init__): pay the process-first
+        BlastScene cost on a throwaway 4x4x4 scene at idle. Skipped when
+        a run is live or a real scene already paid it."""
+        if self.worker is not None and self.worker.is_alive():
+            return
+        view3d = getattr(getattr(self, 'results', None), 'view3d', None)
+        if view3d is not None and getattr(view3d, '_scene', None) \
+                is not None:
+            return
+        try:
+            import numpy as np
+            import pyvista as pv
+            from ..viz3d.viewer import BlastScene
+            from .view3d_panel import Feed3D, N_PLANES
+            n = 4
+            c = np.linspace(0.1, 0.7, n)
+            feed = Feed3D(dict(
+                x_c=c, y_c=c, z_c=c, dx=0.2,
+                solid=np.zeros((n, n, n), dtype=bool), obstacles=[],
+                Lx=0.8, Ly=0.8, Lz=0.8, charge_center=(0.4, 0.4, 0.4),
+                r_exp=0.1, bcs={}, refine=None, solver=None))
+            pl = pv.Plotter(off_screen=True, window_size=(64, 64))
+            BlastScene(pl, feed.init, embedded=True, n_planes=N_PLANES)
             pl.render()
             pl.screenshot(return_img=True)
             pl.close()
