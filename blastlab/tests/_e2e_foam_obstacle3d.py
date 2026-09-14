@@ -70,7 +70,18 @@ def main():
     solid = m['solid']
     check('solid mask carved', solid.any(),
           f'{int(solid.sum())} solid cells')
-    check('obstacles in meta', m['obstacles'] == [box], str(m['obstacles']))
+    # since the face-snap (4e97108) meta carries the box the mesh was
+    # REALLY carved with - every edge moved outward onto a base-cell
+    # face - not the raw case box
+    from blastlab.core import refine as _refine
+    from blastlab.core.case import material_rho0
+    plan = _refine.plan_levels(case, rho0=material_rho0(case))
+    exp_obs, _mv = _refine.snap_obstacles([box], plan.dx_base, 3)
+    check('obstacles in meta are the face-snapped boxes',
+          m['obstacles'] == [tuple(exp_obs[0])]
+          and all((s <= o) if i % 2 == 0 else (s >= o)
+                  for i, (s, o) in enumerate(zip(exp_obs[0], box))),
+          f"meta {m['obstacles']} vs snapped {exp_obs}")
 
     labels = list(res.snapshots)
     p_fin = res.snapshots[labels[-1]]['p'].astype(np.float64)
