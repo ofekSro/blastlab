@@ -1088,6 +1088,25 @@ def validate_case(case, pending_inputs=False):
         if any(a >= b for a, b in zip(lo, hi)) or \
            any(b > L or a < 0 for a, b, L in zip(lo, hi, dims)):
             err(f"Obstacle {box} is not a valid in-domain box")
+            continue
+        # A wall carved a single cell thick is a numerical hazard: shock
+        # diffraction over a one-cell blade collapses deltaT and can end
+        # in SIGFPE (measured: 0.3 m wall on a 0.5 m base mesh). The
+        # carve uses base-cell FACES (refine.snap_obstacles outward for
+        # foam), so the count below is the snapped width, not len/dx.
+        dxb = plan.dx_base if plan is not None else dx
+        if dxb and dxb > 0:
+            for ax, (a, b) in enumerate(zip(lo, hi)):
+                n_side = (int(np.ceil(b / dxb - 1e-6))
+                          - int(np.floor(a / dxb + 1e-6)))
+                if n_side <= 1:
+                    warn(f"Obstacle {box} is only one cell thick along "
+                         f"{'xyz'[ax]} ({b - a:g} m wall, {dxb:g} m base "
+                         f"cell) - shock reflection off a single-cell "
+                         f"wall tends to go numerically unstable. Use a "
+                         f"base cell <= {(b - a) / 2:g} m so the wall is "
+                         f"at least 2 cells thick")
+                    break
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
         err("2D profile export (for 3D remap) requires axisymmetric geometry")

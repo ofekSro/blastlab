@@ -299,6 +299,7 @@ def main():
     shared_constant_checks()
     amr_cap_checks()
     axisym_pin_note_checks()
+    thin_obstacle_warn_checks()
 
     if FAIL:
         print(f"\nCASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
@@ -443,6 +444,44 @@ def axisym_pin_note_checks():
     rep = validate_case(Case2D(geometry='planar', center=(2.0, 2.0)))
     check('planar keeps its burst x, no note',
           not any('is ignored' in n for n in rep.notes), str(rep.notes))
+
+
+def thin_obstacle_warn_checks():
+    """A wall carved a single cell thick is a numerical hazard (run
+    20260915-090553: 0.3 m wall on a 0.5 m base mesh -> deltaT collapse
+    -> SIGFPE in decode). Setup must say so before the run."""
+    print()
+    print("thin obstacle: single-cell wall warns in Setup")
+
+    def rep_for(cell, wall_hi, **kw):
+        return validate_case(
+            Case2D(geometry='axisymmetric', Lx=10.0, Ly=10.0,
+                   cell_size_m=cell, init_mode='profile1d',
+                   profile_file_in='missing_ok.txt',
+                   obstacles=[(5.0, wall_hi, 0.0, 5.0)], **kw),
+            pending_inputs=True)
+
+    def thin_warns(rep):
+        return [w for w in rep.warnings if 'one cell thick' in w]
+
+    # the incident: blastfoam + AMR (plan.dx_base path)
+    rep = rep_for(0.5, 5.3, solver='blastfoam', amr_levels=2)
+    w = thin_warns(rep)
+    check('0.3 m wall on 0.5 m foam+AMR base mesh warns', bool(w),
+          str(rep.warnings))
+    check('the warning names the fix (cell <= 0.15 m)',
+          bool(w) and '0.15' in w[0], w[0] if w else '')
+    # same geometry, native solver (plan is None -> effective-dx path)
+    rep = rep_for(0.5, 5.3)
+    check('native solver warns too', bool(thin_warns(rep)),
+          str(rep.warnings))
+    # controls: a 2-cell wall and a refined base are both silent
+    rep = rep_for(0.5, 6.0, solver='blastfoam', amr_levels=2)
+    check('1.0 m wall (2 cells): silent', not thin_warns(rep),
+          str(rep.warnings))
+    rep = rep_for(0.1, 5.3, solver='blastfoam', amr_levels=2)
+    check('0.1 m base cell (3-cell wall): silent', not thin_warns(rep),
+          str(rep.warnings))
 
 
 if __name__ == '__main__':
