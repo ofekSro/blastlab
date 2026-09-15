@@ -471,10 +471,15 @@ def thin_obstacle_warn_checks():
           str(rep.warnings))
     check('the warning names the fix (cell <= 0.15 m)',
           bool(w) and '0.15' in w[0], w[0] if w else '')
+    check('foam: says AMR levels do not help (carve is base-mesh)',
+          bool(w) and 'AMR levels do not help' in w[0],
+          w[0] if w else '')
     # same geometry, native solver (plan is None -> effective-dx path)
     rep = rep_for(0.5, 5.3)
-    check('native solver warns too', bool(thin_warns(rep)),
-          str(rep.warnings))
+    w = thin_warns(rep)
+    check('native solver warns too', bool(w), str(rep.warnings))
+    check('native: no AMR clause (no AMR to reach for)',
+          bool(w) and 'AMR' not in w[0], w[0] if w else '')
     # controls: a 2-cell wall and a refined base are both silent
     rep = rep_for(0.5, 6.0, solver='blastfoam', amr_levels=2)
     check('1.0 m wall (2 cells): silent', not thin_warns(rep),

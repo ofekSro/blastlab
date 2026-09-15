@@ -1105,7 +1105,14 @@ def validate_case(case, pending_inputs=False):
                          f"cell) - shock reflection off a single-cell "
                          f"wall tends to go numerically unstable. Use a "
                          f"base cell <= {(b - a) / 2:g} m so the wall is "
-                         f"at least 2 cells thick")
+                         f"at least 2 cells thick"
+                         # the obvious "just add AMR" does not work, and
+                         # the crashing run (20260915-090553) proved it:
+                         # it ran amr_levels = 2 and still hit SIGFPE
+                         + (" (AMR levels do not help: obstacles are "
+                            "carved on the base mesh, so the wall stays "
+                            "one base cell at every level)"
+                            if foam else ""))
                     break
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
