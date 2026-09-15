@@ -505,8 +505,15 @@ def test_amr():
     ax = Case2D(Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=1.0, center=(0.0, 1.0),
                 solver='blastfoam', amr_levels=4)
     rep = validate_case(ax)
-    check('axisymmetric AMR -> axis warning, no error',
-          not rep.errors and any('Axisymmetric AMR' in w for w in rep.warnings),
+    check('axisym AMR + densityGradient -> crash warning naming Lohner',
+          not rep.errors and any('Axisymmetric AMR' in w and 'Lohner' in w
+                                 for w in rep.warnings),
+          f'{rep.errors} {rep.warnings}')
+    ax.amr_estimator = 'Lohner'
+    rep = validate_case(ax)
+    check('axisym AMR + Lohner -> no crash warning',
+          not rep.errors and not any('Axisymmetric AMR' in w
+                                     for w in rep.warnings),
           f'{rep.errors} {rep.warnings}')
     g = Case3D(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=8.0, center=(2.0, 2.0, 2.0),
                solver='blastfoam', amr_levels=4)

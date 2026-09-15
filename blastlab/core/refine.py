@@ -951,9 +951,23 @@ def validate_amr(case, plan, rho0=None):
                 f"lower the base cell to at most "
                 f"{dx_base * 2 ** (amr - need):.5g} m")
     if plan.dim == 2 and case.geometry == 'axisymmetric':
-        warnings.append("Axisymmetric AMR: the wedge axis cells are prisms "
-                        "and never refine, so the charge stays coarse on "
-                        "the axis column (planar 2D refines everywhere)")
+        # Measured 2026-09-15 (9 user runs + a 10-variant A/B matrix on
+        # the kept reproducer): adaptiveFvMesh DOES refine the wedge
+        # axis cells (cellLevel 1 on the axis column, contrary to what
+        # this warning used to claim), and with densityGradient the
+        # near-axis charge crater - strong density gradient, flat
+        # pressure - keeps them refined until they drain to vacuum
+        # (rho ~ 1e-13) and blastFoam dies with SIGFPE at 3-7 ms. No
+        # refine/unrefine knob changes this; swapping the estimator to
+        # Lohner (pressure-based, blind to the crater) runs the same
+        # case clean.
+        if est == 'densityGradient':
+            warnings.append(
+                "Axisymmetric AMR with the densityGradient estimator is "
+                "known to crash (SIGFPE): it keeps the near-axis charge "
+                "crater refined until those wedge cells drain to vacuum. "
+                "Set the error estimator to Lohner (pressure-based) - "
+                "the same case then runs clean")
     if errors:
         return errors, warnings, notes
     Dp = plan.display_level
