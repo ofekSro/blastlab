@@ -10,65 +10,24 @@ sources are injectable (`lister`, `sizer`, `deleter`, `confirm`) so the
 headless test drives the widget without WSL.
 """
 
-import json
 import os
 import queue
 import threading
-import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 import customtkinter as ctk
 
+# moved to solvers/foam/runs.py (shared with the Qt browser) and
+# re-exported here, so this module's importers and its test are unchanged
+from ..solvers.foam.runs import (COLS, HEADS, WIDTHS,     # noqa: F401
+                                 default_deleter as _default_deleter,
+                                 default_lister as _default_lister,
+                                 default_sizer as _default_sizer,
+                                 dims_from_case_json, human_size,
+                                 started_from_name)
 from . import theme
 from .theme import GAP, PAD, Card, c
-
-COLS = ('name', 'dims', 'size', 'date', 'state')
-HEADS = ('Run', 'Dim', 'Size', 'Started', 'State')
-WIDTHS = (260, 50, 90, 150, 110)
-
-
-def human_size(n):
-    if n is None:
-        return '?'
-    n = float(n)
-    for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
-        if n < 1024 or unit == 'TB':
-            return f'{n:.0f} {unit}' if unit == 'B' else f'{n:.1f} {unit}'
-        n /= 1024.0
-
-
-def started_from_name(name):
-    """'20260905-162157_2d_p26412-00' -> '2026-09-05 16:21:57' ('' if
-    the name does not carry a stamp)."""
-    try:
-        t = time.strptime(name[:15], '%Y%m%d-%H%M%S')
-        return time.strftime('%Y-%m-%d %H:%M:%S', t)
-    except ValueError:
-        return ''
-
-
-def dims_from_case_json(unc):
-    try:
-        with open(os.path.join(unc, 'case.json'), encoding='utf-8') as f:
-            return f"{int(json.load(f).get('dim'))}D"
-    except (OSError, ValueError, TypeError):
-        return '?'
-
-
-def _default_lister():
-    from ..solvers.foam.postmortem import list_runs
-    return list_runs(check_alive=True)
-
-
-def _default_sizer(posix_dirs):
-    from ..solvers.foam import env
-    return env.run_info(posix_dirs)
-
-
-def _default_deleter(posix_dirs):
-    from ..solvers.foam import env
-    return env.delete_runs(posix_dirs)
 
 
 class FoamRunBrowser(ctk.CTkToplevel):

@@ -22,6 +22,7 @@ from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
 from .bridge import ThreadBridge
+from .chain_panel import ChainPanel
 from .results_panel import ResultsPanel
 from .run_controller import RunController
 from .run_panel import RunPanel
@@ -29,24 +30,12 @@ from .setup_panel import SetupPanel
 from .theme import GAP, PAD
 from .view3d_host import View3DHost
 from .viewer_link import ViewerLink
-from .widgets import Card, Segmented, button, label, refresh_icons
+from .widgets import Segmented, button, label, refresh_icons
 
 _LOGO = os.path.join(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))), 'logo.gif')
 
 CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
-
-
-class TabStub(QWidget):
-    def __init__(self, title, note, parent=None):
-        super().__init__(parent)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.addWidget(label(title, 'h1'))
-        card = Card()
-        card.add(label(note, 'muted', wrap=True))
-        root.addWidget(card)
-        root.addStretch(1)
 
 
 class MainWindow(QMainWindow):
@@ -118,8 +107,9 @@ class MainWindow(QMainWindow):
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run,
                                     bridge=self.bridge)
-        self.chain = TabStub('Chain', 'The Chain tab arrives with milestone '
-                             'M4 of the Qt port.')
+        self.chain = ChainPanel(on_run_chain=self._run_chain,
+                                mode=self.solver_mode,
+                                log_fn=self._log_threadsafe)
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
@@ -498,6 +488,15 @@ class MainWindow(QMainWindow):
                                   run_name=self.run_panel.current_run_name()):
             self._show('run')
 
+    def _run_chain(self, dim_cases, workspace):
+        """The Chain panel has already validated and wired the stages and
+        written their case JSONs; all that is left is to launch them as
+        one worker, so the Run tab, Stop and Results behave as usual."""
+        self.notify(f'Chain: {len(dim_cases)} stage(s) in {workspace}')
+        if self.ctrl.start_stages(
+                dim_cases, run_name=self.run_panel.current_run_name()):
+            self._show('run')
+
     def _init_model(self):
         """VIPER-style 'Initialise Model': start the run held at step 0
         so the initial field is visible; Exec buttons advance it."""
@@ -541,6 +540,9 @@ class MainWindow(QMainWindow):
 
     def on_running(self, running):
         self.run_panel.set_running(running)
+        # a second start while a run is live would orphan the drain loop
+        # and drop the finished result
+        self.chain.set_running(running)
 
     def on_result(self, k, dim, label_, res):
         self._results.append((label_, dim, res))

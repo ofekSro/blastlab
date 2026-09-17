@@ -211,9 +211,23 @@ def main():
     check('and blastFoam mode brings both back',
           not p._foam_runs_btn.isHidden()
           and not p._export_btns['vtk'].isHidden())
-    check('the run browser is not here yet, and says so',
-          p.open_run_browser() is None
-          and any('run browser' in s for s in log))
+    # the browser's data sources are injectable precisely so this does
+    # not reach WSL
+    from blastlab.ui import run_browser as rb
+    real_list, real_size = rb.default_lister, rb.default_sizer
+    rb.default_lister = lambda: []
+    rb.default_sizer = lambda dirs: {}
+    try:
+        win = p.open_run_browser()
+        pump(40)
+        check('the Foam runs button opens the browser', win is not None
+              and win.isVisible())
+        check('and asking again raises the same one, it does not stack',
+              p.open_run_browser() is win)
+        win.close()
+        pump(20)
+    finally:
+        rb.default_lister, rb.default_sizer = real_list, real_size
 
     print('\nR3: Fields - one panel, reused where it can be')
     p.sel.setCurrentIndex(0)                      # the plain 2D result
@@ -456,6 +470,31 @@ def main():
           p.export_opts()['anim_scale'] == 'manual'
           and p.export_opts()['anim_clim'] is None,
           str(p.export_opts()))
+    # the whole-video range costs a pass over every recorded frame
+    # (measured: 2.6 s for 150 frames of 1000x1000), so toggling the
+    # selector back and forth must not pay for it again
+    from blastlab.output import animation as anim_mod
+    calls = []
+    real_resolve = anim_mod.resolve_clim
+    anim_mod.resolve_clim = lambda *a, **k: (calls.append(1)
+                                             or real_resolve(*a, **k))
+    try:
+        an.scale_sel.setCurrentText(ANIM_SCALE_LABELS['run'])
+        pump(20)
+        an._clim_cache.clear()                # measure from cold
+        calls.clear()
+        for scale in ('frame', 'run', 'frame', 'run'):
+            an.scale_sel.setCurrentText(ANIM_SCALE_LABELS[scale])
+            pump(20)
+        check('four switches over two scales cost two computations',
+              len(calls) == 2, f'{len(calls)} calls')
+    finally:
+        anim_mod.resolve_clim = real_resolve
+    prev = dict(an._clim_cache)
+    an.set_result(fr)
+    pump(20)
+    check('but a different result starts from scratch',
+          an._clim_cache != prev or not prev, str(len(an._clim_cache)))
     an.scale_sel.setCurrentText(ANIM_SCALE_LABELS['run'])
     pump(20)
     mres = frames_on(fake_2d(), scale='manual', clim=(10.0, 40.0))

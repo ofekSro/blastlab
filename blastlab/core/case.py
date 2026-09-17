@@ -28,7 +28,7 @@ from . import hardware as _hardware
 TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 
 SCHEMA = 'blastlab-case'
-VERSION = 12    # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 13    # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
@@ -44,6 +44,11 @@ VERSION = 12    # v2: n_procs, activation, charges, det_points (foam)
                 # v12: anim_scale / anim_clim (the exported animation's
                 #      colour range: one for the whole video by default,
                 #      per frame as before, or a range you pin)
+                # v13: adaptive_write. The chain has always pinned it to
+                #      False for reproducibility (N2-13), but as an
+                #      ad-hoc attribute, which asdict() does not see - so
+                #      the stage JSONs it saved "for reproducibility"
+                #      lost exactly the flag that made them reproducible
 
 
 @dataclass
@@ -80,6 +85,11 @@ class Case1D:
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
+    #: B23/N2-13: False pins writeInterval for the whole run. The
+    #: adaptive controller rewrites it mid-run from what the ingest has
+    #: kept up with - wall clock - so the set of write times differs
+    #: between identical runs. The Chain tab pins it on every stage.
+    adaptive_write: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
                                       # 1D always runs serial)
 
@@ -175,6 +185,7 @@ class Case2D:
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
+    adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y), ...] (axisym: x = 0);
@@ -270,6 +281,7 @@ class Case3D:
     #: blastProbes adjustLocations: True snaps each gauge onto the
     #: centre of the cell holding it at t = 0 (N16-a/T40)
     probe_adjust: bool = True
+    adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     charges: list = None              # blastFoam: ADDITIONAL charges
                                       # [(x, y, z, mass_kg), ...] on top

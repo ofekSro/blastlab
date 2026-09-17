@@ -368,12 +368,7 @@ class ResultsPanel(QWidget):
 
     # ── post-mortem load of a finished blastFoam case dir ────────────────
     def open_run_browser(self):
-        try:
-            from .run_browser import FoamRunBrowser
-        except ImportError:             # lands with M4
-            self._log('The foam run browser arrives with the next '
-                      'milestone of the Qt port.')
-            return None
+        from .run_browser import FoamRunBrowser
         win = self._run_browser
         if win is not None and win.isVisible():
             win.raise_()
@@ -382,7 +377,7 @@ class ResultsPanel(QWidget):
             return win
         self._run_browser = FoamRunBrowser(
             self, on_load=self.load_foam_run_path, log=self._log,
-            on_resume=self._on_resume)
+            on_resume=self._on_resume, bridge=self._bridge)
         self._run_browser.show()
         return self._run_browser
 
