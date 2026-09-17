@@ -52,6 +52,8 @@ class ViewerLink(QObject):
             return True
         if not pyvista_available():
             return False
+        if self._dead():
+            return False
         self._ready = False
         self._pending = []
         self._windows = {}
@@ -79,7 +81,23 @@ class ViewerLink(QObject):
             return True
         return self._proc.send(msg)
 
+    def _dead(self):
+        """True once Qt has destroyed our poll timer.
+
+        At application teardown the C++ objects go first, and a host's
+        `hideEvent` still fires afterwards - which reaches `send`, then
+        `ensure_started`, and starting a deleted QTimer raises. Nothing
+        can usefully be sent at that point, so say so instead.
+        """
+        try:
+            self._timer.isActive()
+            return False
+        except RuntimeError:
+            return True
+
     def close(self):
+        if self._dead():
+            return
         self._timer.stop()
         if self._proc is not None:
             self._proc.close()
