@@ -189,6 +189,7 @@ class Chip(QFrame):
     def __init__(self, caption, parent=None):
         super().__init__(parent)
         self.setObjectName('chip')
+        self.caption = caption
         lay = QVBoxLayout(self)
         lay.setContentsMargins(10, 5, 10, 5)
         lay.setSpacing(0)

@@ -255,6 +255,18 @@ class RunPanel(QWidget):
     def current_run_name(self):
         return self.run_name.text().strip()
 
+    # ── readouts, for the QA harness and the e2e suites ──────────────────
+    def chip_texts(self):
+        """The stat chips as {label: value}, so a test reads what the
+        user reads instead of walking widgets."""
+        return {c.caption: c.value.text() for c in
+                (self._chip_step, self._chip_t, self._chip_dt,
+                 self._chip_pmax, self._chip_cells)}
+
+    def paused_text(self):
+        """What the run state says about a stepped run being held."""
+        return self._paused_lbl.text()
+
     # ── body sash ────────────────────────────────────────────────────────
     def showEvent(self, event):
         super().showEvent(event)

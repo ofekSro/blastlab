@@ -189,6 +189,14 @@ class FieldsView(QWidget):
     def set_title_extra(self, text):
         self._title_extra = text or None
 
+    def _unreadable(self, text):
+        """Say so on the placeholder page, but KEEP the entry: the user
+        can still pick another field or snapshot, which is the whole
+        point of not having raised."""
+        self._drop_image()
+        self.hint.setText(text)
+        self.stack.setCurrentIndex(2)
+
     def clear(self, text=None):
         self._ent = None
         self._drop_image()
@@ -248,8 +256,18 @@ class FieldsView(QWidget):
         if ent is None or not ent.result.snapshots:
             self.clear()
             return
-        sel = select_field(ent.result, ent.dim, self.snapshot(),
-                           self.field(), self._title_extra)
+        try:
+            sel = select_field(ent.result, ent.dim, self.snapshot(),
+                               self.field(), self._title_extra)
+        except (KeyError, IndexError, ValueError) as exc:
+            # A result whose meta does not match the dimension it was
+            # filed under - a 3D entry holding a 2D result, say - used to
+            # raise straight out of a refresh and take the panel with it.
+            # A result the panel cannot read is a blank panel that says
+            # so, not a traceback.
+            self._unreadable(f'{self.field()} cannot be read from this '
+                             f'result ({type(exc).__name__}: {exc}).')
+            return
         if sel is None:
             self._draw_figure(ent)
             return
