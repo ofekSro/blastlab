@@ -3,13 +3,12 @@
 Finite-volume blast wave solvers (pure NumPy) with cross-dimension
 remapping, a prompt-based CLI and a desktop GUI.
 
-> **GUI port in progress.** The shipping GUI is the Tkinter one
-> (`blastlab/gui/`, `python -m blastlab`). A PySide6 rewrite lives in
-> `blastlab/ui/` and is reached with `python -m blastlab --qt`; it
-> currently covers the window shell and the **Run** tab (live slice in
-> pyqtgraph, log, progress, stepped execution, refresh policy) plus the
-> 3D viewer, and loads a case with `--case FILE`. Setup, Results and
-> Chain are still Tk-only. See "The PySide6 front-end" below.
+> **The GUI is the PySide6 one** (`blastlab/ui/`) as of 2026-09-17:
+> `python -m blastlab` opens it, and all four tabs - Setup, Run, Results
+> and Chain - are real, along with the run browser and the embedded 3D
+> viewer. The Tkinter original (`blastlab/gui/`) is kept for one release
+> behind `python -m blastlab --tk`; `--qt` is still accepted and does
+> nothing. See "The PySide6 front-end" below.
 
 - **1D spherical** — fast free-air charges, JWL or ideal-gas EOS
 - **2D planar / axisymmetric** — ground reflection, walls, rectangular
@@ -31,11 +30,18 @@ remapping, a prompt-based CLI and a desktop GUI.
 ## Launch
 
 ```
-blastlab.bat                    # GUI (or: python -m blastlab)
-python -m blastlab --qt         # the PySide6 GUI in progress (+ --case FILE)
+blastlab_qt.bat                 # the GUI, double-clickable from anywhere
+blastlab.bat                    # the same thing (or: python -m blastlab)
+python -m blastlab --case a.json   # open a case at startup
+python -m blastlab --tk         # the old Tkinter GUI, kept for one release
 python -m blastlab --cli 2d     # historical prompt workflow
 python blast1d.py               # the old scripts still work (thin wrappers)
 ```
+
+`blastlab_qt.bat` runs from its own folder, so it works wherever it is
+launched from, and it says which of Python / the package / PySide6 is
+missing instead of showing a traceback. It forwards its arguments, so
+`blastlab_qt.bat --case a.json` works too.
 
 Dependencies are listed in `requirements.txt` (`pip install -r
 requirements.txt`); `pyvista` + `pyvistaqt` are optional and only the
@@ -121,10 +127,10 @@ unchanged.
 
 ## The PySide6 front-end
 
-`blastlab/ui/` is the Qt rewrite of the GUI (`python -m blastlab --qt`).
-It keeps the Tk layout - sidebar, cards, dark/light, Ctrl+O / Ctrl+S /
-F5 / Esc - and everything below the GUI is shared code, so both
-front-ends run the same solvers, hooks and exports.
+`blastlab/ui/` is the GUI (`python -m blastlab`). It keeps the Tk layout
+- sidebar, cards, dark/light, Ctrl+O / Ctrl+S / F5 / Esc - and everything
+below the GUI is shared code, so both front-ends run the same solvers,
+hooks and exports.
 
 What is different under the hood:
 
@@ -142,6 +148,14 @@ What is different under the hood:
   session never pays for a VTK process.
 - The solver still runs on one worker thread talking to the GUI through
   the tagged-tuple queue of `solvers/worker.py`, drained by a QTimer.
+- **The Results tab keeps one live panel** instead of rebuilding a
+  matplotlib figure per click: changing snapshot or field is a single
+  array upload. `PNGs` and `Report` still write the full multi-panel
+  grid, so the screen and the file differ on purpose and the button
+  tooltips say so.
+- **No `matplotlib.pyplot` in the GUI process** (pinned by
+  `test_ui_no_mpl_pyplot.py`), because its global figure manager fights
+  the event loop.
 
 ## Afterburn (blastFoam)
 
