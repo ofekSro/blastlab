@@ -17,7 +17,7 @@ writes into (`viz3d.protocol`); the host only hands the child the
 scene init and the ring's name.
 """
 
-from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QWindow
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                                QComboBox, QGridLayout, QHBoxLayout, QLabel,
@@ -357,6 +357,49 @@ class View3DHost(QWidget):
         super().resizeEvent(event)
         if self._built and not self._ctl_user and event.size().width() > 1:
             self.set_controls_collapsed(event.size().width() < self.COLLAPSE_W)
+        self._sync_soon()
+
+    # ── keeping the embedded window where it belongs ─────────────────────
+    def _sync_soon(self):
+        """Put the window right, and again once Qt has had its turn.
+
+        Doing it synchronously is not enough. Once Qt's own tracking is
+        broken it re-applies its wrong position on every later geometry
+        change, and inside `resizeEvent` that happens AFTER us: measured
+        on a window resize, a synchronous sync alone still left the
+        render window 258 px left and 48 px up. The deferred pass runs
+        last and wins.
+        """
+        self.sync_foreign_geometry()
+        QTimer.singleShot(0, self.sync_foreign_geometry)
+
+    def sync_foreign_geometry(self):
+        """Put the embedded render window back over its container.
+
+        `createWindowContainer` does NOT make the foreign window a child
+        of the container: measured with Win32 GetParent, it re-parents it
+        to the TOP-LEVEL window and then Qt keeps its geometry in step by
+        hand. After the container is hidden and shown again - which is
+        what a tab switch does - Qt stops: measured 20 px left and 42 px
+        up from the container, and it never recovers. That is the 3D
+        preview "jumping to the left".
+
+        Of the obvious remedies, only this one works. Measured on a
+        stand-in foreign window: a resize nudge, `updateGeometry()` and
+        hiding and showing the container all left it misaligned; setting
+        the QWindow's geometry explicitly is what puts it back.
+        """
+        fw, container = self._foreign, self._container
+        if fw is None or container is None:
+            return
+        top = container.window()
+        if top is None or container.width() < 2:
+            return
+        try:
+            corner = container.mapTo(top, QPoint(0, 0))
+            fw.setGeometry(QRect(corner, container.size()))
+        except Exception:
+            pass
 
     # ── window embedding ─────────────────────────────────────────────────
     # The container is built ONCE per native window and then only moved
@@ -442,6 +485,7 @@ class View3DHost(QWidget):
             return
         self._view_stack.addWidget(self._container)
         self._view_stack.setCurrentWidget(self._container)
+        self._sync_soon()
 
     def set_floating(self, floating):
         """Move the render window into its own top-level window, or bring
@@ -495,6 +539,8 @@ class View3DHost(QWidget):
         super().showEvent(event)
         # a no-op once embedded: the target container has not changed
         self._claim_if_visible()
+        # the container's final geometry is not known yet at show time
+        self._sync_soon()
 
     def hideEvent(self, event):
         super().hideEvent(event)
