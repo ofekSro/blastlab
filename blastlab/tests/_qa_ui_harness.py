@@ -595,6 +595,66 @@ class QA:
         ents = self.win.results.entries()
         return ents[-1].result if ents else None
 
+    # ── WSL, for the foam group ─────────────────────────────────────────
+    def wsl_pgrep(self):
+        """Every blastFoam alive in the distro, ours or not. A foreign
+        solver makes every timing in group F meaningless."""
+        import subprocess
+        try:
+            r = subprocess.run(['wsl.exe', '-d', 'Ubuntu', '--', 'pgrep',
+                                '-a', 'blastFoam'], capture_output=True,
+                               text=True, timeout=60,
+                               stdin=subprocess.DEVNULL,
+                               creationflags=0x08000000)
+            return [ln for ln in r.stdout.splitlines() if ln.strip()]
+        except Exception as exc:
+            return [f'<pgrep failed: {exc}>']
+
+    def own_runs(self):
+        """The run directories this process made, by its pid tag."""
+        from blastlab.solvers.foam import env
+        tag = f'_p{os.getpid()}-'
+        try:
+            recs = env.scan_runs()
+        except Exception as exc:
+            self.log(f'scan_runs failed: {exc}')
+            return {}
+        return {d: r for d, r in recs.items() if tag in os.path.basename(d)}
+
+    def reap_own(self):
+        """A solver of ours still alive after its run ended is an orphan
+        that will keep eating the disk; report it and kill it."""
+        from blastlab.solvers.foam import env
+        own = self.own_runs()
+        alive = [r for r in own.values() if r.alive]
+        if alive:
+            pids = [r.pid for r in alive if r.pid]
+            self.finding('S1', 'orphan',
+                         f'a solver of ours is still alive after the run '
+                         f'ended: {[r.dir for r in alive]}')
+            env._signal_pids(pids, 'TERM')
+            time.sleep(5)
+            env._signal_pids(pids, 'KILL')
+        return own
+
+    def disk_gate(self):
+        """Refuse to start a foam group that cannot finish: filling C: is
+        how WSL was brought down once already."""
+        import shutil
+        import subprocess
+        free_c = shutil.disk_usage('C:\\').free / 1e9
+        try:
+            r = subprocess.run(['wsl.exe', '-d', 'Ubuntu', '--', 'df',
+                                '-B1', '--output=avail', '/'],
+                               capture_output=True, text=True, timeout=60,
+                               stdin=subprocess.DEVNULL,
+                               creationflags=0x08000000)
+            avail = int(r.stdout.strip().splitlines()[-1]) / 1e9
+        except Exception:
+            avail = -1.0
+        self.log(f'disk: C: {free_c:.0f} GB free, WSL / {avail:.0f} GB free')
+        return free_c >= 10 and (avail < 0 or avail >= 5)
+
     # ── scenario lifecycle ──────────────────────────────────────────────
     def begin(self, sid):
         self.scenario_id = sid
@@ -928,6 +988,200 @@ def _nlines(path):
             return sum(1 for _ in f)
     except OSError:
         return 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group Q - what only exists because of the port
+# ═══════════════════════════════════════════════════════════════════════
+@scenario('Q01', 'Q', est=120)
+def q01_viewer_lifecycle(qa):
+    """One viewer child, three surfaces, no window left behind.
+
+    Tk had a single 3D view. The port gives Setup, Run and Results one
+    each, sharing ONE child process - which is where a dangling window
+    handle would come from, so the claim and release choreography is
+    what this watches.
+    """
+    from blastlab.viz3d import pyvista_available
+    if not pyvista_available():
+        qa.note('pyvista is not installed - nothing to embed')
+        return
+    hosts = {'setup': qa.win.setup.view3d,
+             'run': qa.win.run_panel.view3d,
+             'results': qa.win.results.view3d}
+    qa.note('hosts: ' + ', '.join(
+        f'{k}={type(v).__name__}' for k, v in hosts.items()))
+    link = qa.win.viewer_link
+    qa.goto('setup')
+    qa.dim(3)
+    qa.win.setup.update_preview(qa.win.setup.get_case())
+    qa.until(lambda: bool(getattr(hosts['setup'], '_hwnd', None)), 120)
+    qa.shot('setup_3d')
+    setup_hwnd = getattr(hosts['setup'], '_hwnd', None)
+    qa.check(setup_hwnd is not None,
+             'the Setup preview got a render window from the child', 'S2')
+    for _ in range(3):
+        qa.goto('run')
+        qa.goto('results')
+        qa.goto('setup')
+    qa.check(getattr(hosts['setup'], '_hwnd', None) == setup_hwnd,
+             'and it is the SAME window after three tab round trips - a '
+             'new one each time would mean the child is re-creating them',
+             'S1')
+    qa.check(link.alive,
+             'one viewer child is still alive for all three surfaces',
+             'S1')
+    seen = {k: getattr(v, '_hwnd', None) for k, v in hosts.items()}
+    qa.note(f'render windows per surface: {seen}')
+    handles = [h for h in seen.values() if h]
+    qa.check(len(set(handles)) == len(handles),
+             'no two surfaces share a render window', 'S1',
+             evidence=str(seen))
+    qa.dim(2)
+    qa.win.setup.update_preview(qa.win.setup.get_case())
+    qa.pump(1.0)
+    qa.shot('back_to_2d')
+    qa.check(link.alive,
+             'and leaving 3D does not take the child down with it', 'S2')
+
+
+@scenario('Q02', 'Q', est=90)
+def q02_repolish_everywhere(qa):
+    """A palette change repaints every panel, with nothing left dark.
+
+    Qt restyles through a style sheet, so a widget that was built before
+    a rule existed keeps the old look until it is repolished. The Tk app
+    could not have this bug; the port can.
+    """
+    from blastlab.ui import theme
+    for mode in ('light', 'dark', 'light', 'dark'):
+        qa.set_mode(mode)
+        for tab in ('setup', 'run', 'results', 'chain'):
+            qa.goto(tab)
+            qa.shot(f'{mode}_{tab}')
+        qa.check(theme.mode() == mode,
+                 f'the theme really is {mode}', 'S2')
+    qa.set_mode('dark')
+    # the title colour was stripped of its '#' for months and the failure
+    # was swallowed by a bare except, so the titles were never recoloured
+    pal = theme.pal()
+    bad = [k for k, v in pal.items()
+           if isinstance(v, str) and v.startswith('#')
+           and len(v) not in (4, 7, 9)]
+    qa.check(not bad, 'every palette colour is a usable hex string', 'S2',
+             evidence=str({k: pal[k] for k in bad}))
+
+
+@scenario('Q03', 'Q', est=120)
+def q03_screen_vs_file(qa):
+    """The Fields panel beside the grid its export writes.
+
+    The owner chose "one large panel + selectors" on screen while the
+    exports keep the full matplotlib grid, so screen and file are
+    deliberately different. This is the evidence for that decision, and
+    the check that the difference is the intended one.
+    """
+    ensure_results(qa, names=('native2d',))
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    rs = qa.win.results
+    rs.show_view('Fields')
+    qa.pump(0.8)
+    qa.shot('screen_one_field')
+    qa.note(f'on screen: page={rs.fields.page()!r} '
+            f'field={rs.fields.field_sel.currentText()!r} '
+            f'snapshot={rs.fields.snapshot()!r}')
+    out = qa.dirs['exports']
+    before = set(_walk(out))
+    rs.export('pngs', threaded=False)
+    qa.until(lambda: any(p.endswith('.png')
+                         for p in set(_walk(out)) - before), 120)
+    pngs = sorted(p for p in set(_walk(out)) - before
+                  if p.endswith('.png'))
+    qa.note('exported: ' + str([os.path.basename(p) for p in pngs]))
+    qa.check(len(pngs) > 1,
+             'the file is the whole grid, several images, while the '
+             'screen shows one field - the owner\'s decision, made '
+             'visible', 'S2')
+    qa.contact_sheet([os.path.basename(p) for p in pngs[:4]],
+                     'exported grid')
+
+
+@scenario('Q04', 'Q', est=90)
+def q04_dpi_scaling(qa):
+    """Nothing clips at 125 % and 150 %.
+
+    Qt sizes from the font, so a larger UI font is the honest stand-in
+    for a DPI change inside one process: every label has to still fit.
+    """
+    from blastlab.ui import theme
+    base = theme.font('body').pointSizeF()
+    if base <= 0:
+        qa.note('the body font has no point size to scale')
+        return
+    for factor in (1.25, 1.5):
+        app = qa.app
+        f = app.font()
+        f.setPointSizeF(base * factor)
+        app.setFont(f)
+        qa.pump(1.0)
+        for tab in ('setup', 'run', 'results', 'chain'):
+            qa.goto(tab)
+            qa.shot(f'dpi{int(factor * 100)}_{tab}')
+        clipped = _clipped_labels(qa.win)
+        qa.check(not clipped,
+                 f'nothing is clipped at {int(factor * 100)} %', 'S2',
+                 evidence='; '.join(clipped[:6]))
+        qa.note(f'{int(factor * 100)} %: {len(clipped)} clipped widget(s)')
+    f = qa.app.font()
+    f.setPointSizeF(base)
+    qa.app.setFont(f)
+    qa.pump(1.0)
+    qa.goto('setup')
+
+
+def _clipped_labels(root):
+    """Widgets whose text needs more room than they have.
+
+    Two things this gets right that the obvious version does not.
+
+    Compared against the GLYPH width, not against sizeHint: a button with
+    QSS padding can sit under its hint and still render every letter, and
+    'blastFoam' does.
+
+    And a word-WRAPPING label is skipped entirely. It is not meant to fit
+    on one line, so 'Domain radius [m]' needing 141 px in a 132 px column
+    means it uses two lines, not that it is clipped. For those the
+    question is height, which Qt's own heightForWidth answers.
+    """
+    from PySide6.QtWidgets import (QAbstractButton, QCheckBox, QLabel,
+                                   QWidget)
+    out = []
+    for w in root.findChildren(QWidget):
+        if not w.isVisible():
+            continue
+        text = ''
+        if isinstance(w, (QLabel, QAbstractButton)):
+            text = w.text()
+        if not text or '\n' in text or w.width() < 2:
+            continue
+        if isinstance(w, QLabel) and w.wordWrap():
+            want = w.heightForWidth(w.width())
+            if want > w.height() + 1:
+                out.append(f'QLabel({text[:40]!r}) wraps to {want} px '
+                           f'in {w.height()}')
+            continue
+        need = w.fontMetrics().horizontalAdvance(text)
+        room = w.width()
+        if isinstance(w, QAbstractButton) and not w.icon().isNull():
+            room -= w.iconSize().width() + 6
+        if isinstance(w, QCheckBox):
+            room -= 22
+        if need > room + 1:
+            out.append(f'{type(w).__name__}({text!r}) needs {need} '
+                       f'has {room}')
+    return out
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1411,6 +1665,36 @@ def cases():
                       gauges=[(0.45, 0.3, 0.3), (0.3, 0.45, 0.3)],
                       n_snapshots=4, record_frames=150,
                       solver='blastfoam', material='TNT')
+    C['F2D_REF'] = Case2D(geometry='planar', Lx=2.4, Ly=3.2,
+                          cell_size_m=0.08, charge=20.0,
+                          center=(1.2, 1.6), gauges=[(2.0, 1.6)],
+                          n_snapshots=2, record_frames=60,
+                          solver='blastfoam', material='TNT',
+                          charge_refine='zone',
+                          refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),
+                                        (1.7, 2.3, 1.4, 1.8, 2)])
+    # Both AMR fixtures were once INVALID: validate_case put "Resolving
+    # the charge ... needs AMR level N" in rep.errors, the product
+    # correctly disabled Run, and the only two dynamic-AMR scenarios in
+    # the matrix never ran AMR at all. These base cells are the largest
+    # the error message itself names as workable.
+    C['F2D_AMR'] = Case2D(geometry='planar', Lx=4.0, Ly=4.0,
+                          cell_size_m=0.1, charge=100.0,
+                          center=(2.0, 2.0), gauges=[(3.2, 2.0)],
+                          n_snapshots=2, record_frames=60,
+                          solver='blastfoam', material='TNT',
+                          amr_levels=3)
+    C['F3D_AMR'] = Case3D(Lx=1.5, Ly=1.5, Lz=1.5, cell_size_m=0.05,
+                          charge=20.0, center=(0.75, 0.75, 0.75),
+                          gauges=[(1.25, 0.75, 0.75)], amr_levels=2,
+                          amr_display_level=1, amr_max_cells=150_000,
+                          n_snapshots=2, record_frames=30,
+                          solver='blastfoam', material='TNT')
+    C['F_STOP'] = Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
+                         cell_size_m=0.02, charge=8.0,
+                         center=(0.0, 1.25), gauges=[(0.8, 1.25)],
+                         n_snapshots=4, record_frames=60,
+                         solver='blastfoam', material='TNT')
     return C
 
 
@@ -1973,6 +2257,652 @@ def _walk(root):
     for base, _dirs, files in os.walk(root):
         out.extend(os.path.join(base, f) for f in files)
     return out
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group F - real blastFoam runs in WSL
+# ═══════════════════════════════════════════════════════════════════════
+def _foreign_busy(qa):
+    return [ln for ln in qa.wsl_pgrep() if ln and not ln.startswith('<')]
+
+
+def _foam_run(qa, case, label, timeout, show_mesh=False):
+    """Set a foam case, run it from the Run tab, and photograph the
+    stages the backend actually goes through.
+
+    A disabled Run button means the case does not validate. Carrying on
+    anyway is how one scenario came to report another's run as its own,
+    so this stops instead: no run started, nothing to observe.
+    """
+    qa.goto('setup')
+    qa.set_case(case)
+    qa.shot(f'{label}_setup')
+    qa.note(f'{label} strip: ' + ' | '.join(qa.strip_text()))
+    qa.goto('run')
+    rp = qa.win.run_panel
+    rp.show_mesh.setChecked(show_mesh)
+    t0 = time.perf_counter()
+    if not qa.click(rp.run_btn, 'Run'):
+        qa.check(False,
+                 f'Run is enabled for {label}, i.e. its case validates',
+                 'S1', evidence=' | '.join(qa.strip_text()))
+        qa.note(f'{label}: Run disabled, so no run started - not '
+                f'attributing someone else\'s run to it')
+        return False
+    if qa.wait_log('checking WSL', 20):
+        qa.shot(f'{label}_checking_wsl')
+    if qa.wait_log('blockMesh', 150):
+        qa.pump(0.5)
+        qa.shot(f'{label}_meshing')
+    if qa.wait_log('[blastfoam] write', 300):
+        frac = rp.progress.value() / max(1, rp.progress.maximum())
+        qa.note(f'{label}: progress at the first write = {frac:.3f} '
+                f'({time.perf_counter() - t0:.0f} s after Run)')
+        qa.check(frac > 0.0,
+                 'the progress bar has moved by the first write (B7)',
+                 'S3')
+        qa.pump(2.5)
+        qa.shot(f'{label}_first_write')
+    qa.check(qa.run_wait(timeout), f'{label} finished', 'S1')
+    qa.note(f'{label} wall {time.perf_counter() - t0:.0f} s')
+    qa.shot(f'{label}_finished')
+    own = qa.reap_own()
+    qa.note(f'own runs after {label}: '
+            + ', '.join(f'{os.path.basename(d)} alive={r.alive}'
+                        for d, r in own.items()))
+    return True
+
+
+@scenario('F00', 'F', est=480)
+def f00_gate(qa):
+    """WSL availability, foreign solvers, and the disk gate.
+
+    Deferred rather than failed when the distro is busy or absent: a
+    foreign solver makes every timing in this group meaningless, and a
+    full disk is how WSL was brought down once already.
+    """
+    from blastlab.solvers.foam import env
+    box = {}
+
+    def probe():
+        box['r'] = env.check_available()
+    th = threading.Thread(target=probe, daemon=True)
+    th.start()
+    qa.until(lambda: not th.is_alive(), 150)
+    qa.note(f'check_available -> {box.get("r")}')
+    if not box.get('r', (False,))[0]:
+        raise Deferred('blastFoam is unavailable')
+    t0 = time.perf_counter()
+    busy = _foreign_busy(qa)
+    while busy and time.perf_counter() - t0 < 400:
+        qa.log(f'foreign solvers still running: {busy} - waiting')
+        qa.pump(30)
+        busy = _foreign_busy(qa)
+    qa.ckpt.setdefault('f00_attempts', 0)
+    qa.ckpt['f00_attempts'] += 1
+    if busy and qa.ckpt['f00_attempts'] < 3:
+        raise Deferred(f'foreign solvers busy: {busy}')
+    if busy:
+        qa.note(f'proceeding with foreign solvers running: {busy} '
+                f'(timings contaminated)')
+    qa.ckpt['pre_f_pgrep'] = qa.wsl_pgrep()
+    qa.check(qa.disk_gate(), 'the disk gate passes before the foam runs',
+             'S1')
+    try:
+        info = env.run_info()
+        before = sum((i.get('bytes') or 0) for i in info.values())
+        qa.ckpt['runs_root_bytes_before'] = before
+        qa.note(f'runs root before F: {len(info)} runs, '
+                f'{before / 1e9:.1f} GB')
+    except Exception as exc:
+        qa.log(f'run_info failed: {exc}')
+
+
+@scenario('F01', 'F', est=420)
+def f01_foam_1d(qa):
+    """1D blastFoam (C4) through the Run tab."""
+    if not _foam_run(qa, cases()['F1D'], 'foam1d', 600):
+        return
+    qa.goto('results')
+    qa.shot('results_fields')
+    qa.win.results.show_view('Gauges')
+    qa.pump(0.8)
+    qa.shot('results_gauges')
+    qa.check(bool(qa.win.results.gauges.rows()),
+             'the foam gauges reached the summary table', 'S2')
+    qa.win.results.show_view('Fields')
+    _cache_result(qa, 'foam1d', dim=1)
+
+
+@scenario('F02', 'F', est=480)
+def f02_foam_2d_planar(qa):
+    """2D planar blastFoam: every field, replay, and the VTK export."""
+    if not _foam_run(qa, cases()['F2D'], 'foam2d', 700, show_mesh=True):
+        return
+    qa.goto('results')
+    rs = qa.win.results
+    fields = _combo_items(rs.fields.field_sel)
+    meta = rs.current().result.meta if rs.current() else {}
+    qa.note(f'foam 2D fields: {fields}; '
+            f'peak_source={meta.get("peak_source")}')
+    for f in fields:
+        rs.fields.field_sel.setCurrentText(f)
+        qa.pump(0.6)
+        qa.shot(f.replace(' ', '_'))
+    rs.show_view('Gauges')
+    qa.pump(0.8)
+    qa.shot('gauges')
+    rs.show_view('Animation')
+    qa.pump(0.8)
+    qa.shot('anim')
+    rs.show_view('Fields')
+    qa.check(rs.export_enabled('vtk'),
+             'the VTK export is offered for a foam run', 'S2')
+    qa.click(rs._export_btns['vtk'], 'VTK')
+    ok = qa.wait_log('VTK export done', 300)
+    tail = qa.run_log().strip().splitlines()[-4:]
+    qa.note('VTK export log: ' + ' / '.join(tail))
+    qa.check(ok, 'and it finishes', 'S2', evidence=' / '.join(tail))
+    qa.shot('after_vtk')
+    _cache_result(qa, 'foam2d', dim=2)
+
+
+@scenario('F03', 'F', est=420)
+def f03_foam_3d_tiny(qa):
+    """3D blastFoam: the live 3D view, then Results playback with p_peak."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['F3D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    t0 = time.perf_counter()
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.until(lambda: rp.view3d_btn.isEnabled(), 300),
+             '3D View is enabled for the foam 3D run', 'S2')
+    qa.wait_log('[blastfoam] write', 300)
+    qa.pump(3.0)
+    rp.show_3d_tab()
+    qa.pump(1.5)
+    qa.shot('live_3d')
+    rp.show_slice_tab()
+    qa.pump(0.5)
+    qa.shot('live_slice')
+    qa.check(qa.run_wait(900), 'the foam 3D run finished', 'S1')
+    qa.note(f'foam3d wall {time.perf_counter() - t0:.0f} s')
+    qa.shot('finished')
+    qa.reap_own()
+    qa.goto('results')
+    rs = qa.win.results
+    rs.open_3d()
+    qa.pump(2.0)
+    qa.shot('results_3d')
+    v = rs.view3d
+    if hasattr(v, '_field_btns'):
+        qa.note('3D viewer fields for foam: ' + ', '.join(
+            f'{k}={b.isEnabled()}' for k, b in v._field_btns.items()))
+        peak = v._field_btns.get('p_peak')
+        if peak is not None and peak.isEnabled():
+            peak.setChecked(True)
+            qa.pump(1.5)
+            qa.shot('results_3d_ppeak')
+        v._field_btns['p'].setChecked(True)
+        v._checks['mesh'].setChecked(True)
+        qa.pump(1.5)
+        qa.shot('results_3d_mesh')
+        v._checks['mesh'].setChecked(False)
+    rs.show_view('Fields')
+    _cache_result(qa, 'foam3d', dim=3)
+
+
+@scenario('F04', 'F', est=420)
+def f04_foam_2d_refine(qa):
+    """2D planar with static refinement zones, and Show mesh everywhere."""
+    qa.goto('setup')
+    qa.win.setup.show_mesh.setChecked(True)
+    ran = _foam_run(qa, cases()['F2D_REF'], 'refine2d', 700,
+                    show_mesh=True)
+    qa.win.setup.show_mesh.setChecked(False)
+    if not ran:
+        return
+    qa.goto('results')
+    rs = qa.win.results
+    rs.fields.show_mesh.setChecked(True)
+    qa.pump(1.0)
+    qa.shot('fields_mesh')
+    rs.show_view('Animation')
+    qa.pump(0.8)
+    qa.shot('replay_mesh')
+    an = rs.anim
+    an.slider.setValue(an.slider.maximum())
+    qa.pump(0.8)
+    qa.shot('replay_last_mesh')
+    rs.show_view('Fields')
+    out = qa.dirs['exports']
+    before = set(_walk(out))
+    rs.export('pngs', threaded=False)
+    qa.until(lambda: any(p.endswith('.png')
+                         for p in set(_walk(out)) - before), 150)
+    files = sorted(os.path.basename(p) for p in set(_walk(out)) - before)
+    qa.note(f'PNG export with mesh: {files}')
+    qa.check(bool(files), 'the PNG export wrote files', 'S2')
+    rs.fields.show_mesh.setChecked(False)
+    _cache_result(qa, 'foam2d_refine', dim=2)
+
+
+@scenario('F05', 'F', est=420)
+def f05_foam_2d_amr(qa):
+    """2D planar dynamic AMR: a per-write mesh in the live view and replay."""
+    qa.goto('setup')
+    qa.set_case(cases()['F2D_AMR'])
+    strip = qa.strip_text()
+    qa.check(any('AMR up to level' in s for s in strip),
+             'the report names the AMR levels and the display level',
+             'S2', evidence=str(strip))
+    if not _foam_run(qa, cases()['F2D_AMR'], 'amr2d', 700, show_mesh=True):
+        return
+    lines = [ln for ln in qa.run_log().splitlines() if 'AMR t =' in ln]
+    qa.note(f'{len(lines)} AMR log lines; first {lines[:1]}, '
+            f'last {lines[-1:]}')
+    qa.check(bool(lines), 'the mesh really did adapt during the run', 'S2')
+    qa.goto('results')
+    rs = qa.win.results
+    rs.fields.show_mesh.setChecked(True)
+    rs.show_view('Animation')
+    qa.pump(0.8)
+    qa.shot('replay_frame0_mesh')
+    an = rs.anim
+    an.slider.setValue(an.slider.maximum())
+    qa.pump(0.8)
+    qa.shot('replay_last_mesh')
+    frames = (rs.current().result.meta or {}).get('frames') or {}
+    lv = frames.get('levels')
+    n = len(frames.get('pressures') or [])
+    qa.check(lv is not None and len(lv) == n,
+             'a level map was recorded per frame, so the replay can draw '
+             'the mesh the solver actually had', 'S2',
+             evidence=f'{None if lv is None else len(lv)} of {n}')
+    rs.show_view('Fields')
+    qa.shot('fields_mesh')
+    rs.fields.show_mesh.setChecked(False)
+    _cache_result(qa, 'foam2d_amr', dim=2)
+
+
+@scenario('F06', 'F', est=200)
+def f06_foam_3d_amr(qa):
+    """3D dynamic AMR: a per-frame mesh in the 3D viewer."""
+    from blastlab.core.case import validate_case
+    qa.goto('setup')
+    qa.set_case(cases()['F3D_AMR'])
+    qa.note('3D AMR strip: ' + ' | '.join(qa.strip_text()))
+    # ask the REPORT, not the rendered text: the old guard looked for the
+    # word "error" in the strip, no message contains it, so the guard
+    # never fired and this scenario ran an invalid case for months
+    rep = validate_case(qa.win.setup.get_case())
+    if rep.errors:
+        qa.check(False, 'the 3D AMR fixture validates', 'S2',
+                 evidence=str(rep.errors))
+        return
+    if not _foam_run(qa, cases()['F3D_AMR'], 'amr3d', 900):
+        return
+    qa.goto('results')
+    rs = qa.win.results
+    rs.open_3d()
+    qa.pump(2.5)
+    qa.shot('results_3d_amr')
+    v = rs.view3d
+    if hasattr(v, '_checks'):
+        v._checks['mesh'].setChecked(True)
+        qa.pump(2.0)
+        qa.shot('results_3d_amr_mesh')
+        v._checks['mesh'].setChecked(False)
+    rs.show_view('Fields')
+    _cache_result(qa, 'foam3d_amr', dim=3)
+
+
+@scenario('F07', 'F', est=120)
+def f07_stop_during_meshing(qa):
+    """Stop while blockMesh is running.
+
+    The thing being checked is what must NOT happen: a "Run failed"
+    dialog, and a Results entry for a run that never started.
+    """
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D(geometry='axisymmetric', Lx=5.0, Ly=5.0,
+                       cell_size_m=0.004, charge=8.0, center=(0.0, 2.5),
+                       n_snapshots=2, record_frames=0,
+                       solver='blastfoam', material='TNT'))
+    qa.goto('run')
+    rp = qa.win.run_panel
+    n_res = len(qa.win.results.entries())
+    d0 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('blockMesh', 200),
+             'the blockMesh stage line appeared', 'S2')
+    t0 = time.perf_counter()
+    qa.click(rp.stop_btn, 'Stop')
+    qa.shot('stop_during_meshing')
+    qa.check(qa.run_wait(150), 'the run ended', 'S1')
+    dt = time.perf_counter() - t0
+    qa.note(f'stop during meshing -> the run ended in {dt:.1f} s')
+    qa.check(dt < 15, f'a stop during meshing returns in {dt:.1f} s', 'S2')
+    d1 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    qa.check(d1 == d0,
+             'no "Run failed" dialog for a deliberate stop', 'S2')
+    qa.check(len(qa.win.results.entries()) == n_res,
+             'and no Results entry for a run that never started', 'S2')
+    qa.shot('after_stop')
+    qa.note('log tail: '
+            + ' / '.join(qa.run_log().strip().splitlines()[-4:]))
+    qa.reap_own()
+
+
+@scenario('F08', 'F', est=200)
+def f08_stop_during_solve(qa):
+    """Stop while solving; the revolved 3D view; the browser's 'running'."""
+    qa.goto('setup')
+    qa.set_case(cases()['F_STOP'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('[blastfoam] write', 300),
+             'the axisymmetric stop case reached its first write', 'S2')
+    qa.pump(2.0)
+    rp.show_3d_tab()
+    qa.pump(3.0)
+    qa.shot('revolved_3d')
+    rp.show_slice_tab()
+    browser = qa.win.results.open_run_browser()
+    if browser is not None:
+        qa.until(lambda: not browser._busy, 120)
+        qa.shot('browser_with_running', widget=browser)
+        tag = f'_p{os.getpid()}-'
+        own = sorted((n for n in browser.names() if tag in n),
+                     reverse=True)
+        qa.note(f'browser rows: {len(browser.names())}; own: {own}; '
+                f'status {browser.status.text()!r}')
+        if own:
+            browser.select(own[0])
+            qa.pump(0.3)
+            row = browser.rows.get(own[0]) or {}
+            qa.check(row.get('alive') is True,
+                     'the browser reports the live run as running', 'S2',
+                     evidence=str(row.get('alive')))
+            qa.script_answers(False)
+            browser.delete_selected()
+            qa.pump(0.6)
+            qa.shot('browser_delete_refused', widget=browser)
+            qa.note(f'status after Delete on a running run: '
+                    f'{browser.status.text()!r}')
+        browser.close()
+        qa.pump(0.5)
+    t0 = time.perf_counter()
+    qa.click(rp.stop_btn, 'Stop')
+    qa.check(qa.run_wait(300), 'the run stopped', 'S1')
+    qa.note(f'a graceful stop during the solve took '
+            f'{time.perf_counter() - t0:.1f} s')
+    qa.check(not qa.log_has('did not stop cleanly'),
+             'and it was graceful', 'S2')
+    labels = [e.label for e in qa.win.results.entries()]
+    qa.check(labels and labels[-1].endswith('(stopped)'),
+             'the stopped foam run is labelled "(stopped)"', 'S2',
+             evidence=str(labels))
+    qa.shot('stopped')
+    qa.reap_own()
+    _cache_result(qa, 'foam2d_axi_stopped', dim=2)
+
+
+@scenario('F09', 'F', est=240)
+def f09_run_browser(qa):
+    """The run browser: list, Load (post-mortem == live), Delete."""
+    qa.goto('results')
+    browser = qa.win.results.open_run_browser()
+    if browser is None:
+        qa.check(False, 'the run browser opened', 'S1')
+        return
+    qa.pump(1.0)
+    qa.shot('browser_listing', widget=browser)
+    qa.until(lambda: not browser._busy, 180)
+    qa.shot('browser_sized', widget=browser)
+    qa.note(f'browser: {len(browser.names())} rows; '
+            f'status {browser.status.text()!r}')
+    cached = qa.cached('foam2d')
+    name = ''
+    if cached is not None:
+        name = os.path.basename(
+            str((cached.meta or {}).get('case_dir', '')).rstrip('/\\'))
+    qa.note(f'F02 run dir: {name!r}; in the browser: '
+            f'{name in browser.names()}')
+    if name and name in browser.names():
+        browser.select(name)
+        qa.pump(0.3)
+        n_before = len(qa.win.results.entries())
+        browser.load_selected()
+        ok = qa.wait_log('Loaded:', 300)
+        qa.pump(1.5)
+        qa.check(ok, 'the post-mortem load succeeded', 'S1',
+                 evidence=qa.run_log()[-400:])
+        qa.check(len(qa.win.results.entries()) > n_before,
+                 'and it arrived in the Results picker', 'S2')
+        qa.shot('after_load', widget=browser)
+        qa.shot('results_loaded')
+    browser.close()
+    qa.pump(0.5)
+
+
+@scenario('F10', 'F', est=100)
+def f10_foam_dialogs(qa):
+    """The foam-only exports on a native result, and the other way round."""
+    ensure_results(qa, names=('native2d',))
+    qa.goto('results')
+    rs = qa.win.results
+    if select_result(qa, 'QA native2d'):
+        qa.check(not rs.export_enabled('vtk'),
+                 'VTK is NOT offered for a native result', 'S2')
+        btn = rs._export_btns.get('vtk')
+        if btn is not None and not btn.isEnabled():
+            qa.check(bool((btn.toolTip() or '').strip()),
+                     'and it says why rather than just being grey', 'S3',
+                     evidence=repr(btn.toolTip()))
+        qa.shot('native_exports')
+    if qa.cached('foam2d') is not None:
+        ensure_results(qa, names=('foam2d',))
+        if select_result(qa, 'QA foam2d'):
+            qa.check(rs.export_enabled('vtk'),
+                     'and it IS offered for a foam result', 'S2')
+            qa.shot('foam_exports')
+
+
+@scenario('F11', 'F', est=200, terminal=True)
+def f11_close_during_foam(qa):
+    """Close the window mid-foam-run: the solver must not be orphaned.
+
+    Terminal: the window is gone afterwards.
+    """
+    qa.goto('setup')
+    qa.set_case(cases()['F_STOP'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.check(qa.wait_log('[blastfoam] write', 300),
+             'the run reached its first write', 'S1')
+    qa.pump(2.0)
+    t0 = time.perf_counter()
+    qa.win.close()
+    qa.pump(1.0)
+    dt = time.perf_counter() - t0
+    qa.note(f'closing during a foam run returned in {dt:.1f} s')
+    qa.check(dt < 20, f'and it returned promptly ({dt:.1f} s)', 'S2')
+    qa.pump(8.0)
+    own = qa.reap_own()           # reports an orphan as an S1 by itself
+    qa.note('own runs after the close: '
+            + ', '.join(f'{os.path.basename(d)} alive={r.alive}'
+                        for d, r in own.items()))
+    qa.win = None
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group G - the Chain tab
+# ═══════════════════════════════════════════════════════════════════════
+def _chain_forms(qa):
+    """A small 1D -> 2D -> 3D chain, all three stages checked."""
+    from blastlab.core.case import Case1D, Case2D, Case3D
+    ch = qa.win.chain
+    ch.ws_box.setText(os.path.join(qa.out, 'chain_ws'))
+    ch.set_stage_case(1, Case1D(radius_m=0.6, charge_kg=0.5,
+                                cell_size_m=0.004, n_snapshots=1,
+                                gauge_radii=[], gauge_file=None))
+    ch.set_stage_case(2, Case2D(geometry='axisymmetric', Lx=1.0, Ly=1.6,
+                                cell_size_m=0.03, charge=0.5,
+                                center=(0.0, 0.8), n_snapshots=1,
+                                gauges=[], gauge_file=None,
+                                anim_file=None, record_frames=0))
+    ch.set_stage_case(3, Case3D(Lx=1.2, Ly=1.2, Lz=1.2, cell_size_m=0.08,
+                                charge=0.5, center=(0.6, 0.6, 0.6),
+                                n_snapshots=1, gauges=[],
+                                gauge_file=None, anim_file=None,
+                                record_frames=0))
+    for d in (1, 2, 3):
+        ch.use[d].setChecked(True)
+    qa.pump(0.5)
+    return ch
+
+
+@scenario('G01', 'G', est=90)
+def g01_chain_validation(qa):
+    """Every Chain refusal, and the workspace that must NOT appear."""
+    qa.goto('chain')
+    ch = _chain_forms(qa)
+    qa.shot('chain_default')
+    # a workspace path of its own, so the assertion below cannot be
+    # satisfied by a directory some earlier session left behind
+    ws = os.path.join(qa.out, 'chain_ws_refused')
+    ch.ws_box.setText(ws)
+    refusals = []
+    ch.error_sink = lambda title, lines: refusals.append(list(lines))
+
+    def refuse(tag):
+        n = len(refusals)
+        started = ch.run()
+        qa.pump(0.3)
+        qa.check(started is not True and len(refusals) > n,
+                 f'{tag} is refused, with a reason', 'S2',
+                 evidence=str(refusals[-1] if refusals else []))
+        qa.note(f'{tag}: {refusals[-1] if refusals else []}')
+
+    for d in (1, 2, 3):
+        ch.use[d].setChecked(False)
+    refuse('no stage checked')
+    ch.use[1].setChecked(True)
+    ch.use[3].setChecked(True)
+    refuse('a gap in the chain (1 and 3)')
+    ch.use[2].setChecked(True)
+    ch.forms[2].v['geometry'].set('planar')
+    qa.pump(0.3)
+    refuse('a planar stage 2 with a 3D stage after it')
+    ch.forms[2].v['geometry'].set('axisymmetric')
+    qa.pump(0.3)
+    ch.forms[2].v['Lx'].set('abc')
+    qa.pump(0.3)
+    refuse('a stage-2 field that does not parse')
+    qa.check(any('Stage 2' in ln for ln in (refusals[-1] if refusals
+                                            else [])),
+             'and the refusal names the stage', 'S2',
+             evidence=str(refusals[-1] if refusals else []))
+    ch.forms[2].v['Lx'].set('1.0')
+    ch.forms[2].v['cy'].set('99')
+    qa.pump(0.3)
+    refuse('a charge outside stage 2')
+    ch.forms[2].v['cy'].set('0.8')
+    qa.pump(0.3)
+    qa.shot('after_refusals')
+    qa.note(f'stage switcher after the refusals: stage {ch.stage()} '
+            '(a refusal naming stage 2 should have brought it forward)')
+    # QA-23/T28: the workspace is created only once a chain will really
+    # run. This assertion used to encode the defect and now holds the fix.
+    qa.check(not os.path.isdir(ws),
+             'no workspace directory was created while every run was '
+             'refused', 'S2')
+    qa.check(ch.run_btn.isEnabled(),
+             'Run chain is still enabled after refused starts', 'S2')
+
+
+@scenario('G02', 'G', est=420)
+def g02_chain_run(qa):
+    """A 1D -> 2D -> 3D native chain, end to end."""
+    qa.goto('chain')
+    ch = _chain_forms(qa)
+    refusals = []
+    ch.error_sink = lambda title, lines: refusals.append(list(lines))
+    t0 = time.perf_counter()
+    started = ch.run()
+    qa.pump(0.6)
+    qa.check(started is True, 'the chain started', 'S1', str(refusals))
+    if started is not True:
+        return
+    qa.check(not ch.run_btn.isEnabled(),
+             'Run chain is disabled while the chain runs', 'S2')
+    qa.goto('chain')
+    qa.shot('chain_running')
+    qa.goto('run')
+    qa.shot('stage1')
+    qa.check(qa.wait_log('=== Stage 2D ===', 300), 'stage 2 started',
+             'S1')
+    qa.pump(2.0)
+    qa.shot('stage2')
+    qa.check(qa.wait_log('=== Stage 3D ===', 600), 'stage 3 started',
+             'S1')
+    qa.pump(3.0)
+    qa.shot('stage3')
+    qa.win.run_panel.show_3d_tab()
+    qa.pump(1.5)
+    qa.shot('stage3_3d')
+    qa.win.run_panel.show_slice_tab()
+    qa.check(qa.run_wait(900), 'the chain finished', 'S1')
+    qa.note(f'chain wall {time.perf_counter() - t0:.0f} s')
+    qa.shot('chain_done')
+    qa.check(ch.run_btn.isEnabled(),
+             'Run chain is enabled again afterwards', 'S2')
+    labels = [e.label for e in qa.win.results.entries()]
+    qa.note(f'results after the chain: {labels}')
+    ws = ch.ws_box.text()
+    files = sorted(os.listdir(ws)) if os.path.isdir(ws) else []
+    qa.note(f'workspace files: {files}')
+    qa.check(all(f in files for f in ('stage1_case.json',
+                                      'stage2_case.json',
+                                      'stage3_case.json')),
+             'the workspace holds a case JSON per stage', 'S2',
+             evidence=str(files))
+    qa.check(any('profile' in f for f in files),
+             'and the profiles that were handed over', 'S2',
+             evidence=str(files))
+    qa.goto('results')
+    qa.shot('results_picker')
+    _cache_result(qa, 'chain3d', dim=3)
+
+
+@scenario('G03', 'G', est=120)
+def g03_cross_tab_guard(qa):
+    """Run chain while a Run-tab run is live."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.check(qa.wait_log('2D Blast Solver', 40), 'the run started', 'S1')
+    qa.goto('chain')
+    ch = _chain_forms(qa)
+    qa.shot('chain_while_running')
+    qa.check(not ch.run_btn.isEnabled(),
+             'Run chain is disabled during a Run-tab run', 'S2')
+    refusals = []
+    ch.error_sink = lambda title, lines: refusals.append(list(lines))
+    started = ch.run()          # the callback behind the disabled button
+    qa.pump(0.4)
+    qa.check(started is not True,
+             'and the callback behind it refuses too, so the guard is '
+             'not just a greyed button', 'S1', str(refusals))
+    qa.win.ctrl.stop()
+    qa.check(qa.run_wait(300), 'the Run-tab run still stops', 'S1')
 
 
 # ═══════════════════════════════════════════════════════════════════════
