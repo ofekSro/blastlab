@@ -17,6 +17,8 @@ writes into (`viz3d.protocol`); the host only hands the child the
 scene init and the ring's name.
 """
 
+import time
+
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QWindow
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
@@ -125,6 +127,9 @@ class View3DHost(QWidget):
         # sent once per container and not once per edited case
         self._claimed = None
         self._claimed_ok = False
+        self._sync_timer = None       # keeps the embedded window in place
+        self._syncing = False
+        self._burst_until = 0.0
         self._build()
         self._built = True
         link.register(surface, self)
@@ -337,7 +342,12 @@ class View3DHost(QWidget):
         self._tabs.setCurrentWidget(self._tab_widgets[value])
 
     def _retheme(self, _mode=None):
-        pass
+        # A palette change re-runs the whole layout, which moves the
+        # container inside the top-level and breaks the embedded window's
+        # alignment (measured: 751 px left, 121 px up). Nothing here has
+        # to be redrawn - pyqtgraph and the icons are elsewhere - but the
+        # geometry does have to be re-asserted once the layout settles.
+        self._sync_soon()
 
     # ── control-column collapse ──────────────────────────────────────────
     def _collapse_clicked(self):
@@ -360,46 +370,137 @@ class View3DHost(QWidget):
         self._sync_soon()
 
     # ── keeping the embedded window where it belongs ─────────────────────
-    def _sync_soon(self):
-        """Put the window right, and again once Qt has had its turn.
+    #
+    # `createWindowContainer` does NOT make the foreign window a child of
+    # the container. Measured with Win32 GetParent: it re-parents it to
+    # the TOP-LEVEL window, and Qt then keeps its geometry in step BY
+    # HAND. That bookkeeping breaks, and stays broken, under several
+    # unrelated operations - each measured on a stand-in foreign window
+    # inside the real SetupPanel:
+    #
+    #   hiding and showing the tab      258 px left, 48 px up
+    #   resizing the window             258 px left, 48 px up
+    #   switching the dimension away    878 px left, 121 px up
+    #   switching to light mode         751 px left, 121 px up
+    #
+    # Every one of them lands the render window in the corner of the
+    # client area, over the sidebar and the form. Enumerating the
+    # triggers failed three times, so the geometry is now asserted from
+    # STATE rather than from events, in two layers:
+    #
+    # 1. The QWindow's own `xChanged`/`yChanged`/`widthChanged`/
+    #    `heightChanged` signals. This is the move itself, not a guess at
+    #    what caused it: the instant Qt puts the window somewhere else we
+    #    put it back, inside the same frame. Measured, this is what keeps
+    #    the correction invisible - the timer alone left the window
+    #    visibly out of place for 53 to 157 ms.
+    # 2. A timer as the backstop, for a break that arrives without any
+    #    signal at all. Switching the theme is one: the window is not
+    #    moved, the CONTAINER is, because the palette change re-runs the
+    #    layout - and re-asserting the geometry in that same turn writes
+    #    a rect the unfinished layout has not caught up with yet. So the
+    #    timer runs fast for a short while after every disturbance, and
+    #    idles the rest of the time.
+    #
+    # The event-driven calls stay too, since they cost nothing.
+    SYNC_FAST_MS = 16      # one frame, while something is moving
+    SYNC_IDLE_MS = 250     # a cheap heartbeat the rest of the time
+    SYNC_BURST_MS = 600    # how long a disturbance keeps us fast
 
-        Doing it synchronously is not enough. Once Qt's own tracking is
-        broken it re-applies its wrong position on every later geometry
-        change, and inside `resizeEvent` that happens AFTER us: measured
-        on a window resize, a synchronous sync alone still left the
-        render window 258 px left and 48 px up. The deferred pass runs
-        last and wins.
+    def _sync_soon(self):
+        """Now, again once Qt has had its turn, and at frame rate for a
+        moment after.
+
+        Synchronous alone is not enough: inside `resizeEvent` Qt
+        re-applies its own wrong position AFTER us, and a sync there
+        still left the window 258 px out. The deferred pass runs last,
+        and the burst covers a layout that is still settling.
         """
         self.sync_foreign_geometry()
         QTimer.singleShot(0, self.sync_foreign_geometry)
+        self._sync_burst()
+
+    def _sync_burst(self):
+        """Watch at frame rate for the next SYNC_BURST_MS."""
+        self._burst_until = time.monotonic() + self.SYNC_BURST_MS / 1000.0
+        if self._sync_timer is not None:
+            self._sync_timer.setInterval(self.SYNC_FAST_MS)
+
+    def _expected_rect(self):
+        """Where the render window should be, in the top-level's own
+        coordinates - which is the space a QWindow re-parented into that
+        top-level reports its geometry in."""
+        container = self._container
+        if container is None or container.width() < 2:
+            return None
+        top = container.window()
+        if top is None:
+            return None
+        return QRect(container.mapTo(top, QPoint(0, 0)),
+                     container.size())
 
     def sync_foreign_geometry(self):
         """Put the embedded render window back over its container.
 
-        `createWindowContainer` does NOT make the foreign window a child
-        of the container: measured with Win32 GetParent, it re-parents it
-        to the TOP-LEVEL window and then Qt keeps its geometry in step by
-        hand. After the container is hidden and shown again - which is
-        what a tab switch does - Qt stops: measured 20 px left and 42 px
-        up from the container, and it never recovers. That is the 3D
-        preview "jumping to the left".
-
-        Of the obvious remedies, only this one works. Measured on a
-        stand-in foreign window: a resize nudge, `updateGeometry()` and
-        hiding and showing the container all left it misaligned; setting
-        the QWindow's geometry explicitly is what puts it back.
+        Re-entrant by construction: `setGeometry` fires the very signals
+        that call this, so the guard stops the recursion at one level and
+        the `!= want` test makes a second pass a no-op anyway.
         """
-        fw, container = self._foreign, self._container
-        if fw is None or container is None:
+        if self._syncing:
             return
-        top = container.window()
-        if top is None or container.width() < 2:
+        fw = self._foreign
+        want = self._expected_rect()
+        if fw is None or want is None:
             return
+        self._syncing = True
         try:
-            corner = container.mapTo(top, QPoint(0, 0))
-            fw.setGeometry(QRect(corner, container.size()))
+            if fw.geometry() != want:
+                fw.setGeometry(want)
         except Exception:
             pass
+        finally:
+            self._syncing = False
+
+    def _watch_foreign_moves(self):
+        """Correct the move itself, in the frame it happens."""
+        fw = self._foreign
+        if fw is None:
+            return
+        for sig in (fw.xChanged, fw.yChanged,
+                    fw.widthChanged, fw.heightChanged):
+            try:
+                sig.connect(self._foreign_moved)
+            except Exception:
+                pass
+
+    def _foreign_moved(self, _value):
+        self.sync_foreign_geometry()
+
+    def _sync_tick(self):
+        """A mismatch means something is moving, so keep looking at frame
+        rate; quiet means fall back to the heartbeat."""
+        fw, want = self._foreign, self._expected_rect()
+        if fw is not None and want is not None and fw.geometry() != want:
+            self.sync_foreign_geometry()
+            self._sync_burst()
+            return
+        if (self._sync_timer is not None
+                and time.monotonic() > self._burst_until
+                and self._sync_timer.interval() != self.SYNC_IDLE_MS):
+            self._sync_timer.setInterval(self.SYNC_IDLE_MS)
+
+    def _start_sync_watch(self):
+        if self._sync_timer is None:
+            self._sync_timer = QTimer(self)
+            self._sync_timer.setInterval(self.SYNC_FAST_MS)
+            self._sync_timer.timeout.connect(self._sync_tick)
+        if not self._sync_timer.isActive():
+            self._sync_timer.start()
+        self._sync_burst()
+
+    def _stop_sync_watch(self):
+        if self._sync_timer is not None:
+            self._sync_timer.stop()
 
     # ── window embedding ─────────────────────────────────────────────────
     # The container is built ONCE per native window and then only moved
@@ -468,6 +569,8 @@ class View3DHost(QWidget):
             self._foreign = win
             self._container = container
             self._host_container()
+            self._watch_foreign_moves()
+            self._start_sync_watch()
             return True
         except Exception as exc:
             self._log(f'  [3D view: embedding failed ({exc}); '
@@ -569,6 +672,7 @@ class View3DHost(QWidget):
         no longer ours: the reverse order leaves Qt holding a dangling
         HWND at teardown."""
         self._has_scene = False
+        self._stop_sync_watch()
         self.cancel_feed()
         self.close_ring()
         if self._float_win is not None:
