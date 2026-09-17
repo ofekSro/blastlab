@@ -19,7 +19,8 @@ Scene layers (each toggled by an on-screen control):
 charge, gauges) for the GUI's live setup preview - no fields needed.
 """
 
-import queue as _queue
+import os
+import time
 
 import numpy as np
 
@@ -1152,41 +1153,365 @@ class GeometryScene(_CameraOps):
 
 
 # ── entry point ───────────────────────────────────────────────────────────
-def viewer_main(q):
-    """Spawn target: owns the VTK event loop for one viewer window."""
-    import pyvista as pv
+#: ('ctrl', surface, name, *args) -> BlastScene setter (host controls)
+_CTRL = {
+    'layer': lambda sc, key, on: sc.layers[key].set_visible(bool(on)),
+    'field': lambda sc, key: sc.set_field(key),
+    'clim': lambda sc, lo, hi: sc.set_clim(lo, hi),
+    'auto_scale': lambda sc, on: sc._set_auto_scale(bool(on)),
+    'log': lambda sc, on: sc.set_log_scale(bool(on)),
+    'iso_frac': lambda sc, f: sc._set_iso_frac(float(f)),
+    'plane': lambda sc, key, axis, frac: sc.set_plane(key, axis, frac),
+    'plane_opacity': lambda sc, key, op: sc.set_plane_opacity(key, op),
+    'view': lambda sc, name: sc.view_preset(name),
+    'parallel': lambda sc, on: sc.set_parallel(bool(on)),
+    'reset_view': lambda sc: sc.reset_view(),
+    'follow': lambda sc, on: sc._set_follow(bool(on)),
+    'show_frame': lambda sc, k: sc.show_frame(int(k)),
+    'play': lambda sc, on: setattr(sc, 'playing', bool(on)),
+}
 
-    try:
-        tag, init = q.get(timeout=30.0)
-    except (_queue.Empty, OSError, EOFError):
-        return
-    if tag != 'init':
-        return
+#: default window sizes: the CLI window, and a GUI surface before its
+#: host tells it the container size
+_STANDALONE_SIZE = (1400, 900)
+_EMBED_SIZE = (640, 480)
 
-    pl = pv.Plotter(title='blastlab - 3D blast viewer',
-                    window_size=(1400, 900))
-    scene = BlastScene(pl, init)
 
-    def poll(*_):
-        for _i in range(4):                    # drain a few per tick
-            try:
-                msg = q.get_nowait()
-            except _queue.Empty:
+def _window_class():
+    """The per-surface top-level window (built lazily: Qt is imported
+    only inside the viewer child)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QVBoxLayout, QWidget
+    from pyvistaqt import QtInteractor
+
+    class SurfaceWindow(QWidget):
+        """A framed top-level window. The GUI host embeds it through
+        QWindow.fromWinId + createWindowContainer, which strips the frame
+        while embedded and restores it when the host detaches - so the
+        child never touches window styles itself: it only shows, hides
+        and reports its native handle."""
+
+        def __init__(self, surface, host, standalone, title):
+            super().__init__(None)
+            self.surface = surface
+            self._host = host
+            self.standalone = standalone
+            self.setWindowFlags(Qt.Window)
+            self.setWindowTitle(title)
+            lay = QVBoxLayout(self)
+            lay.setContentsMargins(0, 0, 0, 0)
+            self.plotter = QtInteractor(self, auto_update=False)
+            lay.addWidget(self.plotter)
+            self.resize(*(_STANDALONE_SIZE if standalone else _EMBED_SIZE))
+
+        def render(self):
+            self.plotter.render()
+
+        def closeEvent(self, event):
+            # a floating window closed by the user: tell the host, and
+            # keep the scene (the GUI can re-claim it); the CLI quits
+            # once its last window is gone
+            self._host.window_closed(self.surface)
+            if self.standalone:
+                event.accept()
+            else:
+                event.ignore()
+                self.hide()
+
+    return SurfaceWindow
+
+
+class _ViewerHost:
+    """Everything the child does between two timer ticks: pull frames
+    out of the rings, step playback, apply control messages, render the
+    windows that changed, report status."""
+
+    STATUS_S = 0.1          # status replies at most this often per surface
+    PLAY_S = 0.1            # playback stepping cadence (BlastScene.tick)
+
+    def __init__(self, conn, opts, app):
+        from .protocol import SharedFrameRing
+        self._Ring = SharedFrameRing
+        self._Window = _window_class()
+        self.conn = conn
+        self.opts = opts
+        self.app = app
+        self.standalone = bool(opts.get('standalone'))
+        self.win = {}
+        self.scene = {}
+        self.ring = {}
+        self.seq = {}
+        self.dirty = set()
+        self._lost = False
+        self._status_sig = {}
+        self._status_at = {}
+        self._play_at = time.monotonic()
+        self._send(('ready', os.getpid()))
+
+    # ── plumbing ─────────────────────────────────────────────────────────
+    def _send(self, msg):
+        if self._lost:
+            return
+        try:
+            self.conn.send(msg)
+        except (BrokenPipeError, EOFError, OSError, ValueError):
+            self._connection_lost()
+
+    def _error(self, surface, exc):
+        print(f'[viewer] {surface}: {exc!r}')
+        self._send(('error', surface, repr(exc)))
+
+    def _connection_lost(self):
+        if self._lost:
+            return
+        self._lost = True
+        for s, sc in self.scene.items():
+            if isinstance(sc, BlastScene) and not sc.done:
+                try:
+                    sc.on_message(('done', 'connection to solver lost'))
+                except Exception:
+                    pass
+                self.dirty.add(s)
+        if not self.standalone:
+            self.app.quit()
+
+    def window_closed(self, surface):
+        self._send(('closed', surface))
+        if self.standalone and not any(
+                w.isVisible() and w.surface != surface
+                for w in self.win.values()):
+            self.app.quit()
+
+    def _window(self, surface, title=None):
+        w = self.win.get(surface)
+        if w is None:
+            w = self._Window(surface, self, self.standalone,
+                             title or 'blastlab - 3D blast viewer')
+            self.win[surface] = w
+            if self.standalone:
+                w.show()
+                self.app.processEvents()   # size the render window first
+            self._send(('window', surface, int(w.winId())))
+        return w
+
+    def _drop_scene(self, surface):
+        ring = self.ring.pop(surface, None)
+        if ring is not None:
+            ring.close()
+        self.scene.pop(surface, None)
+        self.seq.pop(surface, None)
+        self._status_sig.pop(surface, None)
+        w = self.win.get(surface)
+        if w is not None:
+            pl = w.plotter
+            for fn in ('clear_button_widgets', 'clear_slider_widgets',
+                       'clear_plane_widgets'):
+                try:
+                    getattr(pl, fn)()
+                except Exception:
+                    pass
+            pl.clear()
+
+    # ── the tick ─────────────────────────────────────────────────────────
+    def tick(self):
+        now = time.monotonic()
+        for s, ring in list(self.ring.items()):
+            self._pump_ring(s, ring)
+        if now - self._play_at >= self.PLAY_S:
+            self._play_at = now
+            for s, sc in self.scene.items():
+                if isinstance(sc, BlastScene):
+                    before = sc.index
+                    try:
+                        sc.tick()
+                    except Exception as exc:
+                        self._error(s, exc)
+                    if sc.index != before:
+                        self.dirty.add(s)
+        for _i in range(8):
+            if self._lost:
                 break
-            except (OSError, EOFError):        # feeding process went away
-                scene.on_message(('done', 'connection to solver lost'))
-                return
             try:
-                scene.on_message(msg)
+                if not self.conn.poll():
+                    break
+                msg = self.conn.recv()
+            except (EOFError, OSError, BrokenPipeError):
+                self._connection_lost()
+                break
+            self._handle(msg)
+        for s in list(self.dirty):
+            w = self.win.get(s)
+            if w is not None and w.isVisible():
+                try:
+                    w.render()
+                except Exception as exc:
+                    self._error(s, exc)
+        self.dirty.clear()
+        self._report(now)
+
+    def _pump_ring(self, surface, ring):
+        got = ring.read(self.seq.get(surface, 0))
+        if got is None:
+            return
+        seq, t, payload, final = got
+        self.seq[surface] = seq
+        sc = self.scene.get(surface)
+        if isinstance(sc, BlastScene):
+            try:
+                sc.on_message(('frame', t, payload, final))
             except Exception as exc:            # keep the window alive
                 print(f'[viewer] frame dropped: {exc!r}')
-        scene.tick()
+            self.dirty.add(surface)
 
-    pl.add_timer_event(max_steps=10**9, duration=100, callback=poll)
-    pl.show()
-    # window closed: unblock the parent's queue feeder thread
+    def _report(self, now):
+        for s, sc in self.scene.items():
+            if not isinstance(sc, BlastScene):
+                continue
+            have = tuple(sorted(k for k, v in sc.have.items() if v))
+            sig = (len(sc.store), sc.index, sc.t, sc.done, sc.playing,
+                   sc.follow_live, sc.field, sc.vmin, sc.cmax, have,
+                   sc.stop_reason)
+            if sig == self._status_sig.get(s):
+                continue
+            if now - self._status_at.get(s, 0.0) < self.STATUS_S:
+                continue
+            self._status_sig[s] = sig
+            self._status_at[s] = now
+            self._send(('status', s, dict(
+                n=sig[0], index=sig[1], t=sig[2], done=sig[3],
+                playing=sig[4], follow=sig[5], field=sig[6],
+                vmin=sig[7], vmax=sig[8], have=list(have),
+                stop_reason=sig[10])))
+
+    # ── control messages ─────────────────────────────────────────────────
+    def _handle(self, msg):
+        tag = msg[0]
+        if tag == 'close':
+            self.app.quit()
+            return
+        surface = msg[1] if len(msg) > 1 else ''
+        try:
+            if tag == 'scene':
+                self._build_scene(surface, msg[2])
+            elif tag == 'geo':
+                self._show_geo(surface, msg[2])
+            elif tag == 'done':
+                ring = self.ring.get(surface)
+                if ring is not None:       # the final frame lands first
+                    self._pump_ring(surface, ring)
+                sc = self.scene.get(surface)
+                if isinstance(sc, BlastScene):
+                    sc.on_message(('done', str(msg[2])))
+                    self.dirty.add(surface)
+            elif tag == 'claim':
+                self._claim(surface, msg[2] if len(msg) > 2 else None)
+            elif tag == 'release':
+                w = self.win.get(surface)
+                if w is not None:
+                    w.hide()
+            elif tag == 'detach':
+                self._detach(surface, bool(msg[2]))
+            elif tag == 'resize':
+                w = self.win.get(surface)
+                if w is not None:
+                    w.resize(max(1, int(msg[2])), max(1, int(msg[3])))
+                    self.dirty.add(surface)
+            elif tag == 'screenshot':
+                w = self.win.get(surface)
+                if w is not None:
+                    w.render()
+                    w.plotter.screenshot(msg[2])
+                    self._send(('screenshot_done', surface, msg[2]))
+            elif tag == 'hud':
+                sc = self.scene.get(surface)
+                if isinstance(sc, BlastScene):
+                    sc.loading = str(msg[2])
+                    sc._update_hud()
+                    self.dirty.add(surface)
+            elif tag == 'ctrl':
+                sc = self.scene.get(surface)
+                fn = _CTRL.get(msg[2])
+                if isinstance(sc, BlastScene) and fn is not None:
+                    fn(sc, *msg[3:])
+                    self.dirty.add(surface)
+        except Exception as exc:
+            self._error(surface, exc)
+
+    def _build_scene(self, surface, spec):
+        w = self._window(surface, spec.get('title'))
+        self._drop_scene(surface)
+        sc = BlastScene(w.plotter, spec['init'],
+                        embedded=bool(spec.get('embedded', True)),
+                        n_planes=int(spec.get('n_planes', 2)))
+        self.scene[surface] = sc
+        if spec.get('shm'):
+            self.ring[surface] = self._Ring(spec['layout'], name=spec['shm'],
+                                            create=False)
+            self.seq[surface] = 0
+        self.dirty.add(surface)
+        self._send(('scene_ready', surface))
+
+    def _show_geo(self, surface, geo):
+        w = self._window(surface, 'blastlab - model preview')
+        sc = self.scene.get(surface)
+        if not isinstance(sc, GeometryScene):
+            self._drop_scene(surface)
+            sc = GeometryScene(w.plotter)
+            self.scene[surface] = sc
+        sc.show(geo)
+        self.dirty.add(surface)
+
+    def _claim(self, surface, hwnd):
+        """Show the surface window (the host has already re-parented it
+        into its container when `hwnd` is given; a floating window just
+        appears). `hwnd` is informational."""
+        w = self._window(surface)
+        w.show()
+        w.raise_()
+        self.dirty.add(surface)
+
+    def _detach(self, surface, floating):
+        """The host un-embedded (floating=True: show as a framed window)
+        or wants the window back (False: hide until it re-embeds and
+        claims it); either way the native handle is reported again."""
+        w = self._window(surface)
+        if floating:
+            w.show()
+            w.raise_()
+            self.dirty.add(surface)
+        else:
+            w.hide()
+        self._send(('window', surface, int(w.winId())))
+
+    def shutdown(self):
+        for s in list(self.scene):
+            self._drop_scene(s)
+        for w in self.win.values():
+            try:
+                w.plotter.close()
+                w.close()
+            except Exception:
+                pass
+
+
+def viewer_main(conn, opts=None):
+    """Spawn target: a small Qt application hosting one pyvista render
+    window per surface, fed from shared-memory rings and driven by the
+    control pipe (see process.py for the message vocabulary)."""
+    # a test parent's offscreen platform must not leak into the child:
+    # VTK needs a real GL window here
+    os.environ.pop('QT_QPA_PLATFORM', None)
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance() or QApplication(['blastlab-viewer3d'])
+    app.setQuitOnLastWindowClosed(False)
+    host = _ViewerHost(conn, dict(opts or {}), app)
+    timer = QTimer()
+    timer.setInterval(33)
+    timer.timeout.connect(host.tick)
+    timer.start()
     try:
-        while True:
-            q.get_nowait()
-    except Exception:
-        pass
+        app.exec()
+    finally:
+        host.shutdown()

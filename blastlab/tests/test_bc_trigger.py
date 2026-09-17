@@ -216,7 +216,7 @@ def main():
     tmp = tempfile.mkdtemp(prefix='blastlab_trig_')
     out = os.path.join(tmp, 'remap.npz')
     from blastlab.core.profiles import load_profile_2d
-    from blastlab.gui.app import _write_trigger_remap
+    from blastlab.solvers.jobs import write_trigger_remap as _write_trigger_remap
     c2 = case2d(trigger_gauge=1, trigger_action='remap', t_end=5e-3,
                 trigger_file=out)
     with contextlib.redirect_stdout(io.StringIO()):

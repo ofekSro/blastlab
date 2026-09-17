@@ -17,6 +17,9 @@ def main():
                          'or blastFoam via WSL (default: native)')
     ap.add_argument('--case', metavar='FILE',
                     help='case JSON to open in the GUI at startup')
+    ap.add_argument('--qt', action='store_true',
+                    help='launch the PySide6 GUI (blastlab.ui, in '
+                         'development) instead of the Tk one')
     ap.add_argument('--clean-foam-runs', action='store_true',
                     help='list and delete the WSL-side blastFoam run '
                          'directories, then exit (runs still solving '
@@ -63,6 +66,9 @@ def main():
     if args.cli:
         from .cli import main as cli_main
         cli_main(args.cli, solver=args.solver)
+    elif args.qt:
+        from .ui.app import main as qt_main
+        qt_main(case_file=args.case)
     else:
         from .gui.app import main as gui_main
         gui_main(case_file=args.case)

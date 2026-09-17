@@ -233,7 +233,7 @@ def run_plan_checks():
 
     # (e) the hw_* keys survive a settings round trip
     import tempfile
-    from blastlab.gui import settings as st
+    from blastlab.core import settings as st
     fd = os.path.join(tempfile.mkdtemp(), 'settings.json')
     st.save(dict(st.load(fd), hw_cores=8, hw_ram_gb=15,
                  hw_stamp='2026-09-07T12:00:00', mpi_headroom=2), fd)
@@ -309,7 +309,7 @@ def main():
           v == ['old_dead', 'mid', 'new1', 'new2', 'new3'], str(v))
     check('policy: nothing when both limits are off',
           env.cleanup_policy(recs, now, None, None, 3) == [])
-    from blastlab.gui import settings as gs
+    from blastlab.core import settings as gs
     import tempfile
     sp = os.path.join(tempfile.mkdtemp(prefix='blastlab_set_'), 'settings.json')
     check('settings: defaults when the file is missing',

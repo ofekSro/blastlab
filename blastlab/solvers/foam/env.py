@@ -348,7 +348,7 @@ def prime_from_settings(st=None, now=None):
     """
     try:
         if st is None:
-            from ...gui import settings as _settings
+            from ...core import settings as _settings
             st = _settings.load()
         # Unconditional and FIRST: machine_fingerprint hashes the host
         # RAM out of this same cache, so the fingerprint check below is
@@ -384,7 +384,7 @@ def persist_hardware(hw):
         upd['hw_fingerprint'] = machine_fingerprint(WSL_DISTRO)
         upd['hw_stamp'] = datetime.datetime.now().isoformat(
             timespec='seconds')
-        from ...gui import settings as _settings
+        from ...core import settings as _settings
         _settings.update(**upd)
         # Verify rather than assume: `update` drops `save`'s result, so a
         # write that never landed is indistinguishable from one that did -
@@ -580,7 +580,7 @@ def mpi_headroom(default=1):
     if value is not None and now < expiry:
         return value
     try:
-        from ...gui import settings
+        from ...core import settings
         value = max(0, int(settings.load().get('mpi_headroom', default)))
     except Exception:
         return default
@@ -598,7 +598,7 @@ def mpi_max_ranks(default=0):
     if value is not None and now < expiry:
         return value
     try:
-        from ...gui import settings
+        from ...core import settings
         value = max(0, int(settings.load().get('mpi_max_ranks', default)))
     except Exception:
         return default
@@ -825,7 +825,7 @@ def auto_cleanup(settings=None, log=None, now=None):
     """Sweep the runs root per the GUI settings (opt-out
     `auto_cleanup=False`). Returns (n_deleted, bytes_deleted). One log
     line when something was removed; silent otherwise."""
-    from ...gui import settings as gui_settings
+    from ...core import settings as gui_settings
     cfg = dict(gui_settings.DEFAULTS)
     cfg.update(settings or {})
     if not cfg.get('auto_cleanup', True):

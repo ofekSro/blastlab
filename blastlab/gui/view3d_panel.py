@@ -21,13 +21,13 @@ import tkinter as tk
 import customtkinter as ctk
 
 from ..viz3d import MISSING_MSG, pyvista_available
-from ..viz3d.sampling import build_payload, build_scene_init
+# Feed3D / N_PLANES moved to viz3d/feed.py (shared with the Qt front-end)
+from ..viz3d.feed import Feed3D, N_PLANES  # noqa: F401
 from . import theme
 from .theme import GAP, c
 from .vtk_host import VtkTkHost
 from ..viz3d.viewer import FIELDS
 
-N_PLANES = 6
 #: radio-button fields, straight from the viewer's FIELDS table
 FIELD_LABELS = [(key, spec['label']) for key, spec in FIELDS.items()]
 #: wrap width for the hint texts inside the (narrow) control column
@@ -39,17 +39,6 @@ def _raise(w):
     an outer frame: raising the widget itself moves nothing, so raise
     the frame that actually carries the grid slot."""
     getattr(w, '_parent_frame', w).tkraise()
-
-
-class Feed3D:
-    """Solver-thread side: turns full-resolution fields into viewer
-    payloads. Read-only after construction, so thread-safe."""
-
-    def __init__(self, scene_info):
-        self.init, self._stride, self._specs = build_scene_init(scene_info)
-
-    def make_payload(self, fields):
-        return build_payload(fields, self._stride, self._specs)
 
 
 class View3DPanel(VtkTkHost):

@@ -1,0 +1,14 @@
+# blastlab runtime dependencies (Python 3.12 and 3.14; both machines).
+#   pip install -r requirements.txt
+numpy>=2.0
+matplotlib>=3.8
+pillow>=10
+# 3D viewer (optional at runtime: the GUI degrades to "3D viewer requires
+# pyvista" without it) - the viewer child process needs all three
+pyvista>=0.44
+pyvistaqt>=0.13
+# Qt GUI (blastlab/ui) and on-screen plots
+PySide6>=6.11,<7
+pyqtgraph>=0.14
+# Legacy Tk GUI (blastlab/gui) - removed once the PySide6 port reaches parity
+customtkinter>=5.2

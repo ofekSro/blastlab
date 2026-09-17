@@ -322,25 +322,26 @@ check("screenshot written", os.path.exists(out) and img is not None)
 check("image not blank", float(np.asarray(img).std()) > 1.0)
 pl.close()
 
-print("\nA8: control messages get through a full queue")
-import queue as _queue
-from types import SimpleNamespace
-from blastlab.viz3d.client import _send_blocking
-q = _queue.Queue(maxsize=2)
-q.put(('frame', 0.0, {}, False)); q.put(('frame', 1e-3, {}, False))
-fake = SimpleNamespace(_q=q, alive=True)
-ok = _send_blocking(fake, ('done', 'x'), timeout=2.0)
-items = []
-while not q.empty():
-    items.append(q.get_nowait()[0])
-check("'done' delivered by dropping one frame", ok and 'done' in items and items.count('frame') == 1, str(items))
-q2 = _queue.Queue(maxsize=1); q2.put(('init', {}))
-fake2 = SimpleNamespace(_q=q2, alive=True)
-ok2 = _send_blocking(fake2, ('close',), timeout=0.6)
-left = []
-while not q2.empty():
-    left.append(q2.get_nowait()[0])
-check("a non-frame message is never dropped to make room", 'init' in left, f"{ok2} {left}")
+print("\nA8: frames never block the sender (shared-memory ring)")
+# The old bounded queue needed a frame dropped to let 'done' through;
+# frames now go through a two-slot ring (latest wins) and control
+# messages through a separate pipe, so a stalled viewer can never hold
+# the solver: a burst of writes with nobody reading returns at once and
+# the newest frame is the one a late reader gets.
+import time as _time
+from blastlab.viz3d.protocol import FrameLayout, SharedFrameRing
+ring = SharedFrameRing(FrameLayout.from_init(init))
+burst = [synth_frame(k * 1e-4, 0.3 + 0.03 * k) for k in range(5)]
+t0 = _time.perf_counter()
+for k in range(50):
+    ring.write(k * 1e-4, burst[k % len(burst)])
+dt_burst = _time.perf_counter() - t0
+got = ring.read(0)
+check("50 unread frames never block the sender", dt_burst < 2.0,
+      f"{dt_burst*1e3:.0f} ms")
+check("a late reader gets the newest frame", got is not None
+      and got[0] == 50 and abs(got[1] - 49e-4) < 1e-12)
+ring.close(unlink=True)
 
 print("\nS6: geometry-only preview scene")
 pl3 = pv.Plotter(off_screen=True, window_size=(400, 300))

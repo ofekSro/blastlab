@@ -338,9 +338,10 @@ def main():
           case_from_dict(case_to_dict(Case2D(anim_mesh=True))).anim_mesh
           is True)
 
-    # the flag reaches write_animation on the GUI run path
+    # the flag reaches write_animation on the GUI run path (the stage
+    # builder moved to solvers/jobs.py, shared by both front-ends)
     import blastlab.solvers as solvers_mod
-    import blastlab.gui.app as app_mod
+    import blastlab.solvers.jobs as app_mod
 
     class _Res:
         gauges = None
@@ -354,8 +355,8 @@ def main():
         for dim, flag in ((2, True), (3, False)):
             cls = Case2D if dim == 2 else Case3D
             seen.clear()
-            app_mod._solve_stage(dim, cls(anim_file='a.gif',
-                                          anim_mesh=flag))[1](None)
+            app_mod.solve_stage(dim, cls(anim_file='a.gif',
+                                         anim_mesh=flag))[1](None)
             check(f'{dim}D run export passes show_mesh={flag}',
                   seen.get('show_mesh') is flag, str(seen))
     finally:

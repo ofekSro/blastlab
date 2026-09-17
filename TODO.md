@@ -29,10 +29,12 @@
 ## כללים קבועים לכל משימה
 
 ```
-Project: blastlab — Python blast-wave simulation desktop app (customtkinter GUI),
-native numpy 1D/2D/3D solvers in blastlab/solvers/, blastFoam backend in
+Project: blastlab — Python blast-wave simulation desktop app, native numpy
+1D/2D/3D solvers in blastlab/solvers/, blastFoam backend in
 blastlab/solvers/foam/ (writes OpenFOAM-9 cases, runs them in WSL Ubuntu, reads
 results back onto uniform numpy grids), pyvista/VTK viewer in blastlab/viz3d/.
+GUI: customtkinter in blastlab/gui/ (shipping, `python -m blastlab`) is being
+replaced by PySide6 in blastlab/ui/ (`python -m blastlab --qt`) — see Q1 below.
 Ids like B23/G7/A5/N7/W2 refer to DONE.md §5 (reference index).
 
 Hard rules:
@@ -54,12 +56,85 @@ Hard rules:
 - Do not touch files outside the task's scope without saying why.
 - GUI verification: `python blastlab/tests/_qa_gui_harness.py --resume --scenario <ids>
   --redo <ids>` opens a real window on screen (`--list` shows the matrix; output
-  under ~\blastlab_qa\<stamp>\shots).
+  under ~\blastlab_qa\<stamp>\shots). That harness drives the TK app; the Qt
+  front-end is covered by `test_ui_*.py` (offscreen) + `_e2e_ui_*.py` until its
+  own harness is written (Q1 · M7).
+- Qt work: `blastlab/ui/` must never import pyvista/VTK — the 3D scenes live in
+  the viewer child process (`blastlab/viz3d/process.py`). `test_ui_no_vtk_in_main.py`
+  pins this.
 - Windows: the test_regression baselines show as modified purely from CRLF
   conversion — do not commit them unless the task re-baselines.
 - Finish by: (1) listing exactly what changed, (2) pasting the tail of each test
   you ran, (3) ticking the item here + a one-line note of what was done.
 ```
+
+---
+
+## Q1 — מעבר ה-GUI ל-PySide6 (פתוח, בעבודה מ-2026-09-17)
+
+> התוכנית המאושרת: `~/.claude/plans/sunny-twirling-lampson.md`.
+> החלטות הבעלים: חבילה חדשה `blastlab/ui/` במקביל ל-`gui/`; אותה פריסה
+> ב-Qt נקי (Fusion + פלטה קיימת), כהה ובהיר; pyqtgraph לכל הגרפים על
+> המסך ו-matplotlib רק לייצוא לקבצים; תהליך מציג נפרד עם חלון לכל
+> משטח וזיכרון משותף לפריימים; בדיקות באותה קונבנציה (סקריפטים,
+> `QT_QPA_PLATFORM=offscreen`); ותכונות מעבר לשוויון (מדים חיים, 3D
+> בקצב הדגימה, בקרת מהירות ניגון) **אחרי** החלפת ברירת המחדל.
+
+### ~~M0~~ · תשתית — **הושלם (17.09)**
+
+`requirements.txt` + `pyproject.toml`; מודולים נייטרליים עם shims ב-`gui/`:
+`core/settings.py`, `core/mode.py`, `core/chain.py`, `solvers/worker.py`,
+`solvers/jobs.py`, `viz3d/feed.py`, `viz3d/geometry.py`. תהליך המציג נכתב
+מחדש: `viz3d/protocol.py` (טבעת זיכרון משותף דו-תאית, latest-wins),
+`viz3d/process.py` (צינור בקרה), `viewer_main(conn, opts)` כאפליקציית Qt
+קטנה עם חלון לכל משטח, ו-`client.py` כמתאם דק לשמירת מסלול ה-CLI.
+
+### ~~M1~~ · קליפה + לשונית Run + מציג מוטמע — **הושלם (17.09)**
+
+`ui/{theme,widgets,dialogs,bridge,testing,pg_plots,run_panel,run_controller,
+view3d_host,viewer_link,app}.py`; `--qt` ו-`--case`. הטמעת חלון הרינדור
+דרך `QWindow.fromWinId` עם Detach, ו-fallback לחלון צף.
+**שני לקחים שנצרבו בקוד:** (1) אסור ל-Qt לבצע re-parent לחלון זר פעמיים —
+`foreign.setParent(None)` ואחריו הזזת המכל = access violation; המכל נבנה
+פעם אחת ורק *נודד* בין הלשונית לחלון הצף. (2) תהליך המציג נפתח רק
+לקייס תלת-ממדי (VTK בזיכרון עולה ~150MB, ומכונה של 7.7GB ש-WSL לוקח 5
+ממנה לא יכולה להרשות זאת לסשן דו-ממדי).
+
+### M2 — לשונית Setup
+
+`ui/forms.py` + `ui/preview_panel.py`: הטופס לפי קלף, ולידציה ב-300 מ"ש,
+`mark_fields`, `show_report`, שורות לפי מצב הסולבר, Open/Save. תצוגה
+מקדימה: 1D/2D ב-pyqtgraph, 3D דרך `scene{kind:'geometry'}` על משטח
+`setup`. מתאם `FormVars` כדי לשמר את `get_case()/set_case()` כמעט כלשונם.
+
+### M3 — לשונית Results
+
+`ui/results_panel.py`: Fields / Gauges / Animation / 3D, ייצוא על חוט דרך
+`ThreadBridge` (בוני הדמויות של matplotlib לא נוגעים), `load_foam_run_path`,
+ניגון תלת-ממדי על משטח `results`.
+
+### M4 — Chain + דפדפן ריצות + Resume
+
+`ui/chain_panel.py`, `ui/run_browser.py` (QDialog + QTableWidget).
+`RunController.resume_foam_run` כבר כתוב ומתקן באג קיים ב-Tk
+(`gui/app.py:757-788` בנה worker ולא הפעיל אותו).
+
+### M5 — החלפת ברירת המחדל
+
+`python -m blastlab` יפתח Qt, `--tk` ישאיר את הישן. להריץ את כל המטריצה
+המהירה עם `test_ui_*` במקום `test_gui_*`.
+
+### M6 — תכונות חדשות
+
+(א) מדים חיים: hook `gauges` חדש + `reader.tail_probes` ל-blastFoam.
+(ב) 3D בקצב הדגימה: אובייקט פונקציה `liveSurf` (מישורים + isoSurfaceCell
++ patch), פענוח ב-`viz3d/vtklegacy.py`, שכבת `_SampledSurfaces` בסצנה,
+ו-canary כמו ב-`backend.py:380-406`. (ג) בקרת מהירות ניגון.
+
+### M7 — מחיקת Tk + הרנס + מסמכים
+
+מחיקת `blastlab/gui/`, העברת הבדיקות, ו-`_qa_ui_harness.py` על
+`QWidget.grab()` (זה גם פותר את P5-7 — `ImageGrab` נכשל בסשן לא-אינטראקטיבי).
 
 ---
 
@@ -894,6 +969,13 @@ python test_gui_solver_mode.py    # sidebar solver mode
 python test_foam_ingest_order.py  # ordered ingest + accumulators
 python test_foam_amr_ingest.py    # AMR per-time ingest on fake time dirs
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py / test_viz3d_panel.py
+python test_viz3d_protocol.py     # Q1: טבעת הזיכרון המשותף (בלי VTK)
+python test_ui_drain.py           # Q1: בקר הריצה של Qt
+python test_ui_run_panel.py       # Q1: לשונית Run + הפאנל ב-pyqtgraph
+python test_ui_view3d_host.py     # Q1: בקרות התלת-ממד -> הודעות למציג
+python test_ui_no_vtk_in_main.py  # Q1: אין VTK בתהליך ה-GUI
+python _e2e_ui_native_warn.py     # Q1: ריצת 2D אמיתית דרך חלון Qt
+python _e2e_ui_view3d.py          # Q1: ריצת 3D + מציג מוטמע (נפתח חלון)
 python test_blast2d.py            # 2D native physics
 python _qa_gui_harness.py --smoke # visible-window harness smoke (~1 min)
 

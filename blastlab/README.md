@@ -1,7 +1,15 @@
 # blastlab
 
 Finite-volume blast wave solvers (pure NumPy) with cross-dimension
-remapping, a prompt-based CLI and a Tkinter GUI.
+remapping, a prompt-based CLI and a desktop GUI.
+
+> **GUI port in progress.** The shipping GUI is the Tkinter one
+> (`blastlab/gui/`, `python -m blastlab`). A PySide6 rewrite lives in
+> `blastlab/ui/` and is reached with `python -m blastlab --qt`; it
+> currently covers the window shell and the **Run** tab (live slice in
+> pyqtgraph, log, progress, stepped execution, refresh policy) plus the
+> 3D viewer, and loads a case with `--case FILE`. Setup, Results and
+> Chain are still Tk-only. See "The PySide6 front-end" below.
 
 - **1D spherical** — fast free-air charges, JWL or ideal-gas EOS
 - **2D planar / axisymmetric** — ground reflection, walls, rectangular
@@ -24,9 +32,14 @@ remapping, a prompt-based CLI and a Tkinter GUI.
 
 ```
 blastlab.bat                    # GUI (or: python -m blastlab)
+python -m blastlab --qt         # the PySide6 GUI in progress (+ --case FILE)
 python -m blastlab --cli 2d     # historical prompt workflow
 python blast1d.py               # the old scripts still work (thin wrappers)
 ```
+
+Dependencies are listed in `requirements.txt` (`pip install -r
+requirements.txt`); `pyvista` + `pyvistaqt` are optional and only the
+3D viewer needs them.
 
 The GUI has four tabs: **Setup** (all parameters with live validation,
 File > Open/Save case as JSON, and a live model preview - a 2D domain
@@ -101,10 +114,34 @@ optional log contours) for a fixed range.
 
 Fields are decimated to ≤128³ float32 before display and the playback
 history is memory-capped and thins itself, so the view can't stall the
-run. In the GUI the scene renders off-screen in-process and is blitted
-into the panel; the CLI window runs in a separate process fed over a
-bounded, drop-on-full queue. Without pyvista everything else works
+run. In the Tk GUI the scene renders off-screen in-process and is
+blitted into the panel; the CLI and the PySide6 GUI both drive a
+separate viewer process (below). Without pyvista everything else works
 unchanged.
+
+## The PySide6 front-end
+
+`blastlab/ui/` is the Qt rewrite of the GUI (`python -m blastlab --qt`).
+It keeps the Tk layout - sidebar, cards, dark/light, Ctrl+O / Ctrl+S /
+F5 / Esc - and everything below the GUI is shared code, so both
+front-ends run the same solvers, hooks and exports.
+
+What is different under the hood:
+
+- **On-screen plots are pyqtgraph**, drawn on the GPU. `output/plots.py`
+  (matplotlib) is untouched and still builds every exported figure.
+- **3D runs in its own process.** `viz3d/process.py` spawns a small Qt
+  application that hosts the pyvista scenes; the GUI process never
+  imports VTK (pinned by `test_ui_no_vtk_in_main.py`). Frames reach it
+  through a two-slot shared-memory ring (`viz3d/protocol.py`) the solver
+  thread writes into: latest wins, so a slow viewer can never block the
+  run. Controls and status go over a pipe. Its render window is embedded
+  in the Run tab with `QWindow.fromWinId`, **Detach** pops it out onto a
+  second screen, and if embedding fails the window simply floats.
+- **The viewer child is started only for a 3D case**, so a 2D-only
+  session never pays for a VTK process.
+- The solver still runs on one worker thread talking to the GUI through
+  the tagged-tuple queue of `solvers/worker.py`, drained by a QTimer.
 
 ## Afterburn (blastFoam)
 
@@ -200,16 +237,23 @@ a threshold table), `tests/_e2e_foam_amr3d.py`.
 ```
 blastlab/
   core/      constants, EOS, HLL Riemann solvers, BC/obstacle fluxes,
-             grids, profile save/load/remap, Case dataclasses + validation
+             grids, profile save/load/remap, Case dataclasses +
+             validation, app settings, solver mode, chain validation
   solvers/   solve_1d/2d/3d(case, hooks) time-integration drivers;
-             hooks decouple console/GUI from the loop
+             hooks decouple console/GUI from the loop; worker.py is the
+             GUI worker thread + its message queue, jobs.py one run
+             stage with the output files it writes
   output/    gauge TSV writers, OO figure builders, animation export,
-             CLI live view
+             CLI live view (matplotlib: every FILE export)
   legacy/    backwards-compatible blast1d/2d/3d module APIs
-  gui/       Tkinter app (worker thread + queue, embedded matplotlib,
-             off-screen VTK hosts: run-time 3D view + setup preview)
-  viz3d/     interactive 3D viewer (child process; only viewer.py and
-             the gui VTK hosts import pyvista)
+  gui/       Tkinter app (embedded matplotlib, off-screen VTK hosts:
+             run-time 3D view + setup preview) - being replaced by ui/
+  ui/        PySide6 app (pyqtgraph plots, viewer process host); nothing
+             here imports VTK
+  viz3d/     interactive 3D viewer: viewer.py (the only pyvista module,
+             runs in the child process), process.py + protocol.py (the
+             pipe and the shared-memory frame ring), sampling/feed/
+             geometry (pure numpy, solver side)
   cli.py     the historical interactive prompts
   tests/     verification suites + byte-level regression harness
 ```
@@ -223,10 +267,23 @@ python test_hardware.py      # hardware model: identity, staleness, memory caps
 python test_blast2d.py       # 2D physics suite (19 checks)
 python test_blast3d.py       # 3D physics suite (T1-T10)
 python test_viz3d_sampling.py  # viewer decimation/face-load unit tests
+python test_viz3d_protocol.py  # shared-memory frame ring (no VTK needed)
 python test_viz3d_hooks.py     # solver->viewer payloads, physics unchanged
 python test_viz3d_scene.py     # off-screen scene render (needs pyvista)
 python test_viz3d_panel.py     # embedded Tk 3D panel (needs pyvista)
-python test_viz3d_e2e.py       # CLI viewer process (a window opens)
+python test_viz3d_e2e.py       # viewer process (a window opens)
+```
+
+The PySide6 front-end has its own suites, which create their
+`QApplication` on the offscreen platform themselves:
+
+```
+python test_ui_drain.py           # run controller: queue drain, refresh, errors
+python test_ui_run_panel.py       # Run tab + the pyqtgraph live pane
+python test_ui_view3d_host.py     # 3D host controls -> viewer messages
+python test_ui_no_vtk_in_main.py  # the GUI process stays VTK-free
+python _e2e_ui_native_warn.py     # real native 2D run through the window
+python _e2e_ui_view3d.py          # real 3D run + embedded viewer (a window opens)
 ```
 
 The physics is validated against 1D spherical references and across the

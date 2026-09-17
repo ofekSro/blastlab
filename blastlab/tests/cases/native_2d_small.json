@@ -1,0 +1,71 @@
+{
+  "geometry": "planar",
+  "Lx": 2.4,
+  "Ly": 1.6,
+  "cell_size_m": 0.04,
+  "init_mode": "charge",
+  "charge": 20.0,
+  "profile_file_in": null,
+  "center": [
+    0.6,
+    0.0
+  ],
+  "eos": "idealGas",
+  "bcs": {
+    "x_lo": "reflect",
+    "x_hi": "terminate",
+    "y_lo": "reflect",
+    "y_hi": "terminate"
+  },
+  "obstacles": [
+    [
+      1.2,
+      1.6,
+      0.0,
+      0.6
+    ]
+  ],
+  "refine_zones": [],
+  "charge_refine": "global",
+  "amr_levels": 0,
+  "amr_estimator": "densityGradient",
+  "amr_refine": 0.2,
+  "amr_unrefine": 0.1,
+  "amr_interval": 2,
+  "amr_buffer": 2,
+  "amr_max_cells": 0,
+  "amr_display_level": null,
+  "cfl": 0.4,
+  "t_end": 0.0,
+  "n_snapshots": 2,
+  "gauges": [
+    [
+      0.3,
+      0.8
+    ],
+    [
+      2.0,
+      0.3
+    ]
+  ],
+  "gauge_file": "gauges_2d.txt",
+  "trigger_gauge": null,
+  "trigger_action": "terminate",
+  "trigger_file": null,
+  "anim_file": null,
+  "anim_mesh": false,
+  "record_frames": 0,
+  "live": true,
+  "profile_file": null,
+  "solver": "native",
+  "material": "TNT",
+  "activation": "linear",
+  "afterburn": "none",
+  "order": 1,
+  "probe_adjust": true,
+  "n_procs": 0,
+  "det_points": null,
+  "schema": "blastlab-case",
+  "version": 11,
+  "dim": 2
+}

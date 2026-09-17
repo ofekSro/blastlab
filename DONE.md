@@ -26,6 +26,60 @@
 
 ---
 
+## 0. Q1 — מעבר ה-GUI ל-PySide6: M0 + M1 (2026-09-17)
+
+> העבודה הפתוחה והמיילסטונים הבאים (M2–M7) ב-[TODO.md](TODO.md) §Q1;
+> התוכנית המאושרת ב-`~/.claude/plans/sunny-twirling-lampson.md`.
+> ה-GUI של Tk (`blastlab/gui/`) נשאר ברירת המחדל עד M5.
+
+**M0 · תשתית.** נוצרו `requirements.txt` ו-`pyproject.toml` (לא היו כלל).
+קוד שהיה נעול ב-`gui/` עבר לבתים נייטרליים, עם shims לתאימות:
+`gui/settings.py` → `core/settings.py` (ה-backend של foam ייבא אותו מ-`gui`!),
+`gui/mode.py` → `core/mode.py`, `chain_panel.stage_errors` → `core/chain.py`,
+`gui/worker.py` → `solvers/worker.py`, `app._solve_stage` + `_write_trigger_remap`
+→ `solvers/jobs.py`, `view3d_panel.Feed3D` → `viz3d/feed.py`,
+`preview_panel.case_geometry` → `viz3d/geometry.py`.
+
+תהליך המציג התלת-ממדי נכתב מחדש: `viz3d/protocol.py` מחזיק טבעת זיכרון
+משותף דו-תאית (`SharedFrameRing`, latest-wins, חותם seq לכל תא לזיהוי
+קריאה קרועה) ו-`FrameLayout` שמחשב את מפת הבתים מה-init של הסצנה;
+`viz3d/process.py` מחזיק את הצינור; `viewer_main(conn, opts)` הוא עכשיו
+אפליקציית Qt קטנה עם חלון רינדור לכל משטח (`run`/`results`/`setup`) במקום
+לולאת VTK חוסמת אחת; `client.py` הוא מתאם דק כדי שמסלול ה-CLI ישרוד כלשונו.
+**התור החסום נעלם:** 50 פריימים שאף אחד לא קורא חוזרים מיד, והקורא המאוחר
+מקבל את החדש (`test_viz3d_scene.py` §A8 נכתב מחדש סביב זה).
+
+**M1 · קליפה + Run + מציג מוטמע.** `blastlab/ui/` עם 11 מודולים:
+`theme` (אותה פלטה, QPalette+QSS, ~30 אייקונים ב-QPainter במקום PIL),
+`widgets`, `dialogs` (מודאלים מוחלפים בבדיקות), `bridge` (חוט→GUI),
+`pg_plots` (pyqtgraph: `ScalarImage`/`MeshOverlay`/`LiveSlicePane`),
+`run_panel`, `run_controller`, `view3d_host`, `viewer_link`, `testing`, `app`.
+`python -m blastlab --qt [--case FILE]`.
+
+**שלושה דברים שנמדדו ולא נוחשו:**
+1. **re-parent כפול של חלון זר = access violation.** `foreign.setParent(None)`
+   ואחריו הזזת המכל הרג את התהליך; אותו דבר בסגירה אם Qt מפרק את המכל
+   אחרי שהילד כבר מת. הפתרון: המכל נבנה **פעם אחת** ורק *נודד* בין
+   הלשונית לחלון הצף (`_FloatWindow`), ובסגירה מפרקים אותו בעוד הילד חי
+   ומרוקנים את תור ה-DeferredDelete.
+2. **`RunController.running`** לא יכול להסתמך על `is_alive()` לבד — החוט
+   ממשיך להתפרק מיקרו-שניות אחרי `done`, ואז ריצה חדשה נדחית סתם.
+   נוסף `_done_seen`.
+3. **תהליך המציג נפתח רק לקייס תלת-ממדי.** prewarm גורף החזיק VTK
+   (~150MB) בסשן דו-ממדי, על מכונה של 7.7GB ש-WSL לוקח 5 ממנה.
+
+**מה עדיין לא ב-Qt:** Setup/Results/Chain (placeholders), ולכן ברירת
+המחדל עדיין Tk.
+
+**בדיקות שנוספו:** `test_viz3d_protocol.py` (25), `test_ui_drain.py` (36),
+`test_ui_run_panel.py` (58 — כולל אוריינטציית ה-`ImageItem`, מסכת המכשול,
+ספירת תאי AMR וקיפול לוג ה-AMR), `test_ui_view3d_host.py` (38),
+`test_ui_no_vtk_in_main.py` (9 — נועל את הכלל "אין VTK בתהליך ה-GUI"),
+`_e2e_ui_native_warn.py` ו-`_e2e_ui_view3d.py` (ריצות אמיתיות).
+`test_gui_refine_preview.py` עודכן ל-`solvers.jobs.solve_stage`.
+
+---
+
 ## 1. ציר הזמן — T0–T70
 
 **71 משימות, כולן סגורות.** T0–T24 עד 2026-09-05, T25–T48 ב-09-07 (סבב QA + סגירת

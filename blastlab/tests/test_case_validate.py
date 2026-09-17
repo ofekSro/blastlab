@@ -71,7 +71,7 @@ def chain_stage_checks():
     """B5: an auto-wired chain must be validated per stage BEFORE it
     starts - a foam stage fed by a profile used to reach the backend and
     die there with a traceback."""
-    from blastlab.gui.chain_panel import stage_errors
+    from blastlab.core.chain import stage_errors
     from blastlab.core.case import Case1D
 
     def wired(solver2):

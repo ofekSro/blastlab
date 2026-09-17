@@ -1,16 +1,17 @@
-"""Parent-side handle for the interactive 3D viewer process.
+"""Parent-side handle for the interactive 3D viewer (CLI path).
 
-Viewer3DClient spawns `viewer.viewer_main` in a child process (its own
-VTK event loop) and streams it decimated frames through a bounded
-multiprocessing queue. The queue drops frames when full, so a slow or
-stalled viewer can never block the solver. This module never imports
-pyvista - only the child does.
+Viewer3DClient spawns the viewer child (`process.ViewerProcess`) and
+streams it decimated frames through a shared-memory ring
+(`protocol.SharedFrameRing`): latest wins, so a slow or stalled viewer
+can never block the solver. This module never imports pyvista - only
+the child does.
 """
 
-import multiprocessing
-import queue as _queue
+import atexit
 import time
 
+from .process import ViewerProcess
+from .protocol import FrameLayout, SharedFrameRing
 from .sampling import build_payload, build_scene_init
 
 
@@ -18,62 +19,57 @@ class Viewer3DClient:
     """Feeds one viewer window. `scene_info` is the solver's `scene3d`
     run_started payload (also reconstructible from a Result's meta)."""
 
-    def __init__(self, scene_info, max_dim=128, min_interval=0.3):
+    def __init__(self, scene_info, max_dim=128, min_interval=0.3,
+                 daemon=False, n_planes=2, embedded=False,
+                 title='blastlab - 3D blast viewer'):
         self._min_interval = min_interval
         self._last_send = 0.0
         init, self._stride, self._face_specs = build_scene_init(
             scene_info, max_dim)
-
-        ctx = multiprocessing.get_context('spawn')
-        self._q = ctx.Queue(maxsize=2)
-        # never let an unread frame in the pipe block interpreter exit
-        self._q.cancel_join_thread()
-        from .viewer import viewer_main
-        # non-daemon: the viewer window outlives the run (and the CLI);
-        # the interpreter waits for it unless close() is called
-        self._proc = ctx.Process(target=viewer_main, args=(self._q,),
-                                 daemon=False, name='blastlab-viewer3d')
-        self._proc.start()
-        self._q.put(('init', init))
+        self._layout = FrameLayout.from_init(
+            init, with_levels=scene_info.get('refine') is not None)
+        self._ring = SharedFrameRing(self._layout)
+        # non-daemon by default: the viewer window outlives the run (and
+        # the CLI); the interpreter waits for it unless close() is called
+        self._proc = ViewerProcess(daemon=daemon).start(
+            opts=dict(standalone=True))
+        self._proc.send(('scene', 'run', dict(
+            init=init, shm=self._ring.name, layout=self._layout,
+            n_planes=n_planes, embedded=embedded, title=title)))
+        atexit.register(self._release_ring)
 
     @property
     def alive(self):
-        return self._proc.is_alive()
+        return self._proc.alive
 
     def send_frame(self, t, fields, force=False):
-        """Decimate and enqueue one frame; silently dropped when the
-        viewer is behind (bounded queue) or the throttle interval has
-        not elapsed. `fields` values are only read, never kept.
-        `force` both bypasses the throttle/drop (e.g. the final frame of
-        a run) and is carried in the message as `final`, so the viewer's
-        FrameStore keeps it regardless of thinning stride."""
+        """Decimate and publish one frame; the viewer picks up the newest
+        on its own timer (latest wins) so this never blocks. `fields`
+        values are only read, never kept. `force` bypasses the throttle
+        (e.g. the final frame of a run) and marks the frame `final`, so
+        the viewer's FrameStore keeps it regardless of thinning stride."""
         now = time.time()
         if not force and now - self._last_send < self._min_interval:
             return
         if not self.alive:
             return
         payload = build_payload(fields, self._stride, self._face_specs)
-        try:
-            if force:   # e.g. the final frame of a run - don't drop it
-                self._q.put(('frame', float(t), payload, True), timeout=2.0)
-            else:
-                self._q.put_nowait(('frame', float(t), payload, False))
-            self._last_send = now
-        except _queue.Full:
-            pass
+        self._ring.write(t, payload, final=force)
+        self._last_send = now
 
     def finish(self, stop_reason=''):
         """Run ended: switch the viewer to playback mode (stays open)."""
-        _send_blocking(self, ('done', str(stop_reason)), timeout=5.0)
+        self._proc.send(('done', 'run', str(stop_reason)))
 
     def close(self):
-        """Ask the viewer window to close; terminate if unresponsive.
-        A full queue (stalled viewer) has one frame dropped so the
-        'close' always lands (A8)."""
-        _send_blocking(self, ('close',), timeout=2.0)
-        self._proc.join(timeout=2.0)
-        if self._proc.is_alive():
-            self._proc.terminate()
+        """Ask the viewer window to close; terminate if unresponsive."""
+        self._proc.close()
+        self._release_ring()
+
+    def _release_ring(self):
+        ring = getattr(self, '_ring', None)
+        if ring is not None:
+            ring.close(unlink=True)
 
 
 def scene_from_meta(meta):
@@ -86,31 +82,6 @@ def scene_from_meta(meta):
                 refine=meta.get('refine'),
                 # P2-2: which backend produced the energy field
                 solver=meta.get('solver'))
-
-
-def _send_blocking(client, msg, timeout=30.0):
-    """Deliver a control message through the bounded queue. When the
-    queue is full (the viewer is behind or stalled) one queued FRAME is
-    dropped to make room - frames are expendable, 'done'/'close' are
-    not; a non-frame message pulled out by mistake is put back. Gives up
-    only when the viewer dies or the deadline passes (A8)."""
-    deadline = time.time() + timeout
-    while time.time() < deadline and client.alive:
-        try:
-            client._q.put(msg, timeout=0.25)
-            return True
-        except _queue.Full:
-            pass
-        try:
-            item = client._q.get_nowait()
-        except _queue.Empty:
-            continue
-        if item and item[0] != 'frame':
-            try:
-                client._q.put(item, timeout=0.25)
-            except _queue.Full:
-                pass
-    return False
 
 
 class _StartupAttach:

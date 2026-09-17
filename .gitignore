@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+*.egg-info/
+build/
 
 # Research scratch directories (measurement studies, kept out of the repo)
 blastlab/tests/_probe_study/
@@ -36,6 +38,7 @@ test_profile_3d.txt
 anim3d_test.gif
 viz3d_scene_test.png
 viz3d_embedded_render.png
+ui_e2e_*.png
 blast_1d_*.png
 blast_2d_*.png
 blast_3d_*.png

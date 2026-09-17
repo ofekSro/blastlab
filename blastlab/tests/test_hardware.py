@@ -266,7 +266,7 @@ def persistence_checks():
     Drives App's methods unbound - no window, no event loop."""
     print("\nN21: persisting and priming the hardware numbers")
     try:
-        from blastlab.gui import settings as gs
+        from blastlab.core import settings as gs
         from blastlab.gui.app import App
     except Exception as exc:                 # no customtkinter on this box
         print(f'  [SKIP] GUI not importable: {exc}')

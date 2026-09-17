@@ -108,7 +108,7 @@ print("\nH6: stepped-execution gate (GuiHooks)")
 import queue as _q
 import threading
 import time as _time
-from blastlab.gui.worker import GuiHooks
+from blastlab.solvers.worker import GuiHooks
 
 gh = GuiHooks(_q.Queue(), threading.Event())
 t0 = _time.perf_counter()
