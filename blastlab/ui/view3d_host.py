@@ -747,9 +747,13 @@ class View3DHost(QWidget):
             u32.ShowWindow(ctypes.c_void_p(hwnd), _SW_SHOWNA)
             self._start_sync_watch()
             return True
-        except Exception as exc:
-            self._log(f'  [3D view: the card could not adopt the render '
-                      f'window ({exc}); falling back to Qt]')
+        except Exception:
+            # Silent on purpose: this is an internal preference, not a
+            # failure the user can act on, and the Qt window container
+            # is tried next and speaks for itself if it fails too. The
+            # offscreen platform takes this path every time (a widget
+            # there has no real window handle to adopt), and two alarming
+            # lines per run for a working fallback is noise.
             self._native = False
             self._container = None
             if mount is not None:
