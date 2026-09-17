@@ -14,17 +14,22 @@ writes `cx` from inside the `geometry` trace, and without this the write
 either re-enters or is lost.
 """
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout,
                                QGridLayout, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QSizePolicy,
-                               QTreeWidget, QTreeWidgetItem, QVBoxLayout,
-                               QWidget)
+                               QLabel, QLineEdit, QScrollArea, QSizePolicy,
+                               QStackedWidget, QTreeWidget, QTreeWidgetItem,
+                               QVBoxLayout, QWidget)
 
 from . import dialogs, theme
 from .setup_spec import INPUT_MIN, LABEL_WRAP, cards
 from .theme import GAP
 from .widgets import Card, button, label
+
+#: what one column of cards needs: a wrapped caption, an input, and the
+#: card's own padding. Two of these plus the gap is the width at which
+#: the form stops trying to be two columns (see FieldForm._fit_columns).
+COL_MIN = LABEL_WRAP + INPUT_MIN + 4 * GAP
 
 
 # ── variables ────────────────────────────────────────────────────────────
@@ -281,7 +286,7 @@ class FieldForm(QWidget):
         outer = QHBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(GAP)
-        cols = []
+        self._cols, self._holders = [], []
         for _ in (0, 1):
             box = QVBoxLayout()
             box.setContentsMargins(0, 0, 0, 0)
@@ -293,17 +298,126 @@ class FieldForm(QWidget):
             # right column's tables will shrink to nothing; the Tk form
             # used `uniform=` to force the two the same, so give both the
             # same floor (a 6-column obstacle table needs it)
-            holder.setMinimumWidth(LABEL_WRAP + INPUT_MIN + 4 * GAP)
+            holder.setMinimumWidth(COL_MIN)
             outer.addWidget(holder, 1)
-            cols.append(box)
+            self._cols.append(box)
+            self._holders.append(holder)
+        # (card, natural column, layout stretch) in spec order, which is
+        # the reading order the single-column layout falls back to
+        self._card_order = []
         for spec in cards(self.dim):
             card = Card(spec.title, parent=self)
             self.cards[spec.title] = card
             card._blastlab_scope = spec.scope
-            cols[spec.col].addWidget(card, 1 if spec.field_rows else 0)
+            self._card_order.append(
+                (card, spec.col, 1 if spec.field_rows else 0))
+            self._cols[spec.col].addWidget(
+                card, 1 if spec.field_rows else 0)
             self._fill_card(card, spec)
-        for box in cols:
+        for box in self._cols:
             box.addStretch(1)
+        self._single = False
+        self._watched = None
+
+    # ── responsive columns ───────────────────────────────────────────────
+    def _viewport(self):
+        """The scroll viewport this form lives in, if any.
+
+        Its width is the only honest measure of the room available. The
+        form's OWN width is useless here: a scroll area with
+        `setWidgetResizable(True)` sizes its child to
+        `max(viewport, minimumSizeHint)`, so while the two columns
+        demand 628 px the form reports 628 px however narrow the window
+        gets, and its `resizeEvent` never fires."""
+        p = self.parentWidget()
+        while p is not None:
+            if isinstance(p, QScrollArea):
+                return p.viewport()
+            p = p.parentWidget()
+        return None
+
+    def _avail_width(self):
+        vp = self._viewport()
+        return vp.width() if vp is not None else self.width()
+
+    def _watch_viewport(self):
+        vp = self._viewport()
+        if vp is not None and vp is not self._watched:
+            if self._watched is not None:
+                self._watched.removeEventFilter(self)
+            vp.installEventFilter(self)
+            self._watched = vp
+
+    def eventFilter(self, obj, event):
+        if obj is self._watched and event.type() == QEvent.Resize:
+            self._fit_columns()
+        return super().eventFilter(obj, event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._watch_viewport()
+        self._fit_columns()
+
+    def _fit_columns(self):
+        """Two columns need 2 x COL_MIN, and the Setup tab shares its
+        width with the preview, so below about a 1290 px window they do
+        not fit. The scroll column has no horizontal bar, so the excess
+        was CLIPPED: measured 188 px of the right-hand cards unreachable
+        at 1100x720, which is the window's own minimum size. Stack into
+        one column instead, where everything stays reachable by the
+        vertical scroll that is already there.
+
+        The three dimension forms share a QStackedWidget, whose minimum
+        is the LARGEST of its pages whether they are visible or not - so
+        collapsing only the page on screen changed nothing, and all
+        three have to move together."""
+        single = self._avail_width() < 2 * COL_MIN + GAP
+        self._apply_single(single)
+        stack = self.parentWidget()
+        if isinstance(stack, QStackedWidget):
+            for i in range(stack.count()):
+                page = stack.widget(i)
+                if isinstance(page, FieldForm) and page is not self:
+                    page._apply_single(single)
+
+    def _apply_single(self, single):
+        if single == self._single:
+            return
+        self._single = single
+        # a card hidden by the solver scope must stay hidden: adding a
+        # widget to a layout under a visible parent shows it again
+        hidden = {id(c): c.isHidden() for c, _col, _s in self._card_order}
+        for box in self._cols:
+            while box.count():
+                item = box.takeAt(0)
+                w = item.widget()
+                if w is not None:
+                    w.setParent(self)
+        for card, col, stretch in self._card_order:
+            self._cols[0 if single else col].addWidget(card, stretch)
+            card.setVisible(not hidden[id(card)])
+        for box in self._cols:
+            box.addStretch(1)
+        # a hidden holder contributes nothing to the minimum, which is
+        # what lets the form shrink to the viewport at all
+        self._holders[1].setVisible(not single)
+        # and the scroll area has to be told: it sized us before the
+        # switch, so without this the width stays at the OLD minimum
+        # (measured: minimumSizeHint drops 628 -> 310 while width stays
+        # 628, i.e. still clipped) and only a later unrelated resize
+        # would fix it
+        self.updateGeometry()
+        vp = self._viewport()
+        if vp is not None:
+            self.resize(max(vp.width(), self.minimumSizeHint().width()),
+                        self.height())
+
+    def single_column(self):
+        return self._single
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_columns()
 
     def _fill_card(self, card, spec):
         if spec.rows and spec.rows[0].kind == 'points':
