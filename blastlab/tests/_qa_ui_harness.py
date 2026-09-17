@@ -352,12 +352,23 @@ class QA:
         from blastlab.ui.app import MainWindow
         assert dmod.show_error.__name__ == 'wrapped', \
             'the dialog patch did not take'
+        t0 = time.perf_counter()
         self.win = MainWindow()
+        self.build_ms = (time.perf_counter() - t0) * 1e3
         self.win.resize(1280, 840)
+        t1 = time.perf_counter()
         self.win.show()
+        # first paint, not "show returned": under the offscreen platform
+        # nothing is ever painted, so the pump is the honest ceiling
+        painted = self.until(lambda: self.win.isVisible(), 20)
         self.pump(1.2)
+        self.first_paint_ms = (time.perf_counter() - t1) * 1e3
+        if not painted:
+            self.note('the window never reported itself visible')
         self._watch_bridge()
-        self.log(f'window up: {self.win.width()}x{self.win.height()}')
+        self.log(f'window up: {self.win.width()}x{self.win.height()} '
+                 f'(built {self.build_ms:.0f} ms, shown '
+                 f'{self.first_paint_ms:.0f} ms)')
         return self.win
 
     def _watch_bridge(self):
@@ -451,12 +462,95 @@ class QA:
         self.pump(1.0)
         return ok
 
-    def geometry(self):
+    def geometry(self, spec=None):
+        """Read the window size, or set it from a 'WxH' spec."""
+        if spec:
+            w, h = (int(v) for v in str(spec).split('+')[0].split('x'))
+            self.action = f'resize {w}x{h}'
+            self.win.resize(w, h)
+            self.pump(0.6)
         return f'{self.win.width()}x{self.win.height()}'
 
     def reset_window(self):
+        self.win.showNormal()
         self.win.resize(1280, 840)
         self.pump(0.4)
+
+    # ── the accessors the scenarios read the UI through ─────────────────
+    def strip_text(self):
+        """The Setup tab's validation report, one string per row."""
+        try:
+            return [t for _icon, t in self.win.setup.report_rows()]
+        except Exception as exc:
+            return [f'(unavailable: {exc})']
+
+    def set_case(self, case):
+        self.action = f'set_case {type(case).__name__}'
+        self.win.setup.set_case(case)
+        self.win._schedule_validate()
+        self.pump(0.8)
+
+    def scroll_form(self, frac):
+        self.action = f'scroll {frac}'
+        try:
+            self.win.setup.scroll_form(float(frac))
+        except Exception:
+            pass
+        self.pump(0.35)
+
+    def hover(self, widget):
+        """Qt draws hover from the style, so the state has to be set the
+        way the style reads it, not by moving a real cursor."""
+        from PySide6.QtCore import QEvent, Qt
+        from PySide6.QtWidgets import QApplication
+        self.action = 'hover'
+        widget.setAttribute(Qt.WA_UnderMouse, True)
+        QApplication.sendEvent(widget, QEvent(QEvent.Enter))
+        widget.update()
+        self.pump(0.3)
+
+    def unhover(self, widget):
+        from PySide6.QtCore import QEvent, Qt
+        from PySide6.QtWidgets import QApplication
+        widget.setAttribute(Qt.WA_UnderMouse, False)
+        QApplication.sendEvent(widget, QEvent(QEvent.Leave))
+        widget.update()
+        self.pump(0.2)
+
+    def key(self, sequence, widget=None):
+        """Send a key sequence such as 'F5' or 'Ctrl+O'."""
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtTest import QTest
+        self.action = f'key {sequence}'
+        self._log_mark = len(self.run_log())
+        seq = QKeySequence(sequence)
+        if not seq.count():
+            return False
+        combo = seq[0]
+        QTest.keyClick(widget or self.win, combo.key(),
+                       combo.keyboardModifiers())
+        self.pump(0.45)
+        return True
+
+    def cpu_idle(self, seconds=5):
+        """The share of a core this process burns while nothing happens -
+        what 'that tab is spinning' means to the machine."""
+        c0, w0 = time.process_time(), time.perf_counter()
+        self.pump(seconds)
+        wall = max(time.perf_counter() - w0, 1e-9)
+        pct = 100.0 * (time.process_time() - c0) / wall
+        self._jsonl('timing.jsonl', dict(
+            label=f'idle_cpu_{self.tab}', pct=pct, seconds=seconds))
+        self.note(f'idle CPU on {self.tab}: {pct:.1f} % of a core '
+                  f'over {seconds:.0f} s')
+        if pct > self.IDLE_CPU_S2:
+            self.finding('S2', 'idle-cpu',
+                         f'the {self.tab} tab burns {pct:.1f} % of a core '
+                         f'while idle')
+        return pct
+
+    #: Tk's worst recorded idle was 20 %; past this something is spinning
+    IDLE_CPU_S2 = 25.0
 
     # ── scenario lifecycle ──────────────────────────────────────────────
     def begin(self, sid):
@@ -547,9 +641,25 @@ def install_warning_capture(qa):
                        etype, value, tb))[-2000:])
     sys.excepthook = excepthook
 
+    #: things the OFFSCREEN platform says about itself. They are true and
+    #: they are not defects: there is no window manager to raise, lower or
+    #: re-parent to, and no foreign window to wrap. Reporting them buries
+    #: the messages that do mean something ("QWidget::setMinimumSize:
+    #: negative size" and its kind), which is the whole point of the hook.
+    OFFSCREEN_NOISE = (
+        'does not support raise()',
+        'does not support lower()',
+        'does not support setParent',
+        'does not support foreign windows',
+        'does not support grabWindow',
+    )
+
     def qt_handler(mode, ctx, message):
         text = str(message)
         if not text.strip():
+            return
+        if qa.app is not None and qa.app.platformName() == 'offscreen' \
+                and any(s in text for s in OFFSCREEN_NOISE):
             return
         key = ('qt', text)
         if key in qa._warn_seen:
@@ -582,6 +692,644 @@ def s00_smoke(qa):
     qa.check(qa.win.setup.preview_kind() in ('1d', '2d', '3d', 'none'),
              f'the preview reports a kind ({qa.win.setup.preview_kind()})')
     qa.note(f'shots: {names}')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group B - the application at rest: appearance, layout, keyboard
+# ═══════════════════════════════════════════════════════════════════════
+
+@scenario('B01', 'B', est=40)
+def b01_coldstart(qa):
+    """Cold start: title, sidebar, default 2D case + validation strip."""
+    qa.note(f'App construction {qa.build_ms:.0f} ms, first paint '
+            f'{qa.first_paint_ms:.0f} ms')
+    qa.shot('coldstart')
+    qa.note(f'window title: {qa.win.windowTitle()!r}')
+    qa.note('validation strip on the default 2D case: '
+            + ' | '.join(qa.strip_text()))
+    qa.check(qa.win._mode_switch.isChecked(), 'Dark mode switch is on')
+    qa.check(bool(qa.win.windowTitle().strip()),
+             'the window has a title', 'S3')
+    qa.cpu_idle(8)
+
+
+@scenario('B02', 'B', est=60)
+def b02_tabs_empty(qa):
+    """Empty state of Run / Results / Chain + idle CPU per tab."""
+    for k in ('run', 'results', 'chain'):
+        qa.goto(k)
+        qa.shot('empty')
+        qa.cpu_idle(5)
+    rp = qa.win.run_panel
+    qa.note('Run tab empty state: Stop=%s Exec=%s 3DView=%s progress=%d'
+            % (rp.stop_btn.isEnabled(), rp._exec_btns[0].isEnabled(),
+               rp.view3d_btn.isEnabled(), rp.progress.value()))
+    qa.check(not rp.stop_btn.isEnabled(),
+             'Stop is disabled with nothing running')
+    qa.check(not any(b.isEnabled() for b in rp._exec_btns),
+             'the Exec buttons are disabled with nothing running')
+    rs = qa.win.results
+    states = {k: b.isEnabled() for k, b in rs._export_btns.items()}
+    qa.note('Results empty: export button states '
+            + ', '.join(f'{k}={v}' for k, v in states.items()))
+    # the Tk app left these live and clicking one was a silent no-op (G3);
+    # the port gates them instead, which is the behaviour to hold on to
+    qa.check(not any(states.values()),
+             'every export is disabled with no result selected - the Tk '
+             'app left them live and a click did nothing (G3)')
+    for k, b in rs._export_btns.items():
+        if not b.isEnabled() and not (b.toolTip() or '').strip():
+            qa.finding('S3', 'silent-disable',
+                       f'the {k} export is disabled with no tooltip '
+                       f'saying why')
+    qa.note(f'Chain workspace default: {qa.win.chain.ws_box.text()!r}')
+    qa.goto('setup')
+
+
+@scenario('B03', 'B', est=60)
+def b03_dimensions(qa):
+    """Every dimension's form, top and bottom of the scroll column."""
+    for d in (1, 2, 3):
+        qa.dim(d)
+        qa.scroll_form(0.0)
+        qa.shot(f'form{d}d_top')
+        qa.scroll_form(1.0)
+        qa.shot(f'form{d}d_bottom')
+        qa.note(f'{d}D strip: ' + ' | '.join(qa.strip_text()))
+    qa.scroll_form(0.0)
+    qa.check(qa.win.setup.preview_kind() == '3d',
+             'the 3D preview is the one showing for a 3D case '
+             f'(got {qa.win.setup.preview_kind()!r})')
+    qa.dim(2)
+    qa.check(qa.win.setup.preview_kind() == '2d',
+             'and the 2D preview comes back for a 2D case '
+             f'(got {qa.win.setup.preview_kind()!r})')
+
+
+@scenario('B04', 'B', est=30)
+def b04_hover_disabled(qa):
+    """Hover states and the look of disabled buttons.
+
+    A genuine rewrite rather than a port: Tk was asked to redraw a
+    colour, Qt draws hover from the style sheet, so the widget's own
+    hover state is what has to be set.
+    """
+    nav = qa.win._nav_btns['run']
+    qa.hover(nav)
+    qa.shot('hover_nav_run')
+    qa.unhover(nav)
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.hover(rp.run_btn)
+    qa.shot('hover_run_btn')
+    qa.unhover(rp.run_btn)
+    qa.check(not rp.stop_btn.isEnabled(),
+             'Stop is the disabled one to photograph')
+    qa.hover(rp.stop_btn)
+    qa.shot('hover_disabled_stop')
+    qa.unhover(rp.stop_btn)
+    qa.goto('setup')
+
+
+@scenario('B05', 'B', est=70)
+def b05_resize(qa):
+    """The window at its minimum, below it, and maximised, on every tab."""
+    for spec in ('1100x720', '900x600'):
+        qa.geometry(spec)
+        qa.note(f'requested {spec} -> actual {qa.geometry()}')
+        for k in ('setup', 'run', 'results', 'chain'):
+            qa.goto(k)
+            qa.shot(f'geom{spec}')
+    qa.win.showMaximized()
+    qa.pump(1.0)
+    qa.note(f'maximised -> {qa.geometry()}')
+    for k in ('setup', 'run', 'results', 'chain'):
+        qa.goto(k)
+        qa.shot('zoomed')
+    qa.reset_window()
+    qa.goto('setup')
+
+
+@scenario('B06', 'B', est=30)
+def b06_keyboard(qa):
+    """The accelerators, Tab order, and Return in a point list.
+
+    F5 starts a REAL solver, so the F5/Esc pair is closed inside the
+    scenario - a worker left running leaks into the next one and
+    neutral() reports it as an S1.
+    """
+    for seq in ('Ctrl+O', 'Ctrl+S'):
+        qa.key(seq)
+    n = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    qa.note(f'Ctrl+O / Ctrl+S: dialogs recorded so far = {n} '
+            f'(an Open dialog would have appeared as one)')
+
+    was_running = qa.worker_alive()
+    qa.key('F5')
+    started = qa.until(lambda: qa.worker_alive(), 8)
+    qa.check(started or was_running, 'F5 starts a run (G9 accelerator)',
+             'S3')
+    if started:
+        qa.key('Esc')
+        qa.check(qa.until(lambda: not qa.worker_alive(), 120),
+                 'Esc stops the run that F5 started', 'S2')
+
+    # Tab order: walk the focus chain and say where it goes, which is the
+    # thing that was measured and fixed on the Run tab
+    qa.goto('run')
+    rp = qa.win.run_panel
+    rp.run_btn.setFocus()
+    qa.pump(0.3)
+    qa.shot('focus_run_btn')
+    order = []
+    for _ in range(6):
+        qa.key('Tab')
+        w = qa.win.focusWidget()
+        order.append(type(w).__name__ if w is not None else 'None')
+    qa.note('Tab from Run: ' + ' -> '.join(order))
+    qa.shot('focus_after_tab')
+    qa.goto('setup')
+
+
+@scenario('B07', 'B', est=120)
+def b07_light_tour(qa):
+    """Light mode: cold-start view, every tab, every dimension, resize."""
+    qa.set_mode('light')
+    qa.shot('setup_default')
+    for k in ('run', 'results', 'chain'):
+        qa.goto(k)
+        qa.shot('empty')
+    qa.goto('setup')
+    for d in (1, 2, 3):
+        qa.dim(d)
+        qa.scroll_form(0.0)
+        qa.shot(f'form{d}d_top')
+        qa.scroll_form(1.0)
+        qa.shot(f'form{d}d_bottom')
+    qa.scroll_form(0.0)
+    qa.dim(2)
+    qa.field('Lx', 'abc')
+    qa.shot('error_strip')
+    qa.check(any('Lx' in t for t in qa.strip_text()),
+             'the bad field is named in the report', 'S2')
+    qa.field('Lx', '10')
+    qa.geometry('1100x720')
+    qa.shot('geom1100x720')
+    qa.reset_window()
+    qa.set_mode('dark')
+
+
+def _nlines(path):
+    try:
+        with open(path, encoding='utf-8') as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group C - Setup validation UX
+# ═══════════════════════════════════════════════════════════════════════
+def _fresh2d(qa):
+    from blastlab.core.case import Case2D
+    qa.set_case(Case2D())
+
+
+def _form(qa):
+    return qa.win.setup.form
+
+
+def _add_row(qa, plist, text):
+    """Type a row into a point list's entry and press its + button."""
+    qa.action = f'add row {text!r}'
+    plist.entry.setText(text)
+    ok = plist.add()
+    qa.pump(0.5)
+    return ok
+
+
+def _set_rows(qa, plist, rows, settle=0.8):
+    """`PointList.set()` does not fire on_change by design (set_case
+    drives it), so a scenario that edits rows has to revalidate the way
+    a user's +/- click would."""
+    plist.set(rows)
+    plist._on_change()
+    qa.pump(settle)
+
+
+@scenario('C01', 'C', est=30)
+def c01_parse_errors(qa):
+    """Two parse errors at once - how many are shown?"""
+    _fresh2d(qa)
+    qa.field('Lx', 'abc')
+    qa.field('cell', '')
+    qa.shot('two_parse_errors')
+    strip = qa.strip_text()
+    qa.note('strip with Lx=abc AND cell="": ' + ' | '.join(strip))
+    errs = [s for s in strip if 'not a number' in s or 'number' in s]
+    qa.check(len(errs) >= 2,
+             'both parse errors are listed - the Tk app showed only the '
+             'first (G3)', 'S2')
+    bad = _form(qa).bad
+    qa.check({'Lx', 'cell'} <= bad,
+             f'and both fields are marked in red (marked: {sorted(bad)})')
+    qa.field('Lx', '10')
+    qa.shot('one_parse_error_left')
+    qa.check('Lx' not in _form(qa).bad,
+             'fixing one field clears its mark')
+    qa.field('cell', '0.025')
+
+
+@scenario('C02', 'C', est=60)
+def c02_numeric_rules(qa):
+    """Numeric rules per dimension: zero/negative values, slice position."""
+    _fresh2d(qa)
+    for name, val in (('cell', '0'), ('charge', '0'), ('Lx', '-1')):
+        qa.field(name, val)
+        qa.shot(f'{name}_{val}')
+        strip = qa.strip_text()
+        qa.note(f'2D {name}={val}: ' + ' | '.join(strip))
+        qa.check(bool(strip), f'{name}={val} is reported at all', 'S2')
+        _fresh2d(qa)
+    from blastlab.core.case import Case1D, Case3D
+    qa.set_case(Case1D())
+    qa.field('radius_m', '0')
+    qa.shot('1d_radius_0')
+    qa.note('1D radius=0: ' + ' | '.join(qa.strip_text()))
+    qa.set_case(Case3D())
+    qa.field('t_end', '-1')
+    qa.shot('3d_tend_neg')
+    qa.note('3D t_end=-1: ' + ' | '.join(qa.strip_text()))
+    qa.field('t_end', '0')
+    qa.field('slice_pos', '99')
+    qa.shot('3d_slice_99')
+    qa.note('3D slice_pos=99: ' + ' | '.join(qa.strip_text()))
+    qa.field('slice_pos', '')
+    _fresh2d(qa)
+
+
+@scenario('C03', 'C', est=60)
+def c03_geometry_rules(qa):
+    """Charge outside / in an obstacle / near a wall, bad boxes, gauges."""
+    from blastlab.core.case import Case2D
+    qa.set_case(Case2D(geometry='planar', Lx=2.0, Ly=2.0,
+                       center=(1.0, 1.0)))
+    form = _form(qa)
+    qa.field('cx', '99')
+    qa.shot('charge_outside')
+    qa.note('charge outside: ' + ' | '.join(qa.strip_text()))
+    qa.check(bool(qa.strip_text()), 'a charge outside the domain is '
+             'reported', 'S2')
+    qa.field('cx', '1')
+    _add_row(qa, form.obstacles, '0.9 1.1 0.9 1.1')
+    qa.shot('charge_in_obstacle')
+    qa.note('charge in obstacle: ' + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.obstacles, [])
+    ok = _add_row(qa, form.obstacles, '1.5 1.0 0 1')
+    qa.shot('bad_obstacle_box')
+    qa.note(f'inverted obstacle box accepted={ok}, rows now '
+            f'{form.obstacles.get()}, strip: '
+            + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.obstacles, [])
+    _add_row(qa, form.gauges, '9 9')
+    qa.shot('gauge_outside')
+    qa.note('gauge outside: ' + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.gauges, [], settle=0.4)
+    qa.set_case(Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
+                       charge=8.0, center=(0.0, 0.05)))
+    qa.shot('charge_near_ground')
+    qa.note('axisym charge 5 cm above the ground: '
+            + ' | '.join(qa.strip_text()))
+    _fresh2d(qa)
+
+
+@scenario('C04', 'C', est=40)
+def c04_point_lists(qa):
+    """Malformed rows in the point lists - is there ANY feedback?"""
+    _fresh2d(qa)
+    form = _form(qa)
+    gauges = form.gauges
+    rest = gauges._idle_text()
+    for text in ('a b', '1 2 3', '', '1,2', '1;2'):
+        n0 = gauges.count()
+        ok = _add_row(qa, gauges, text)
+        n1 = gauges.count()
+        qa.shot(f'gauge_row_{text.replace(" ", "_") or "empty"}')
+        hint = gauges.hint.text()
+        qa.note(f'gauge entry {text!r}: accepted={ok}, rows {n0}->{n1}, '
+                f'hint {hint!r}')
+        if n1 == n0 and text:
+            # the row is still refused, which is right; the port's job is
+            # that the list SAYS why, under the entry (G3). The resting
+            # hint is a format reminder, so it has to have left that.
+            qa.check(bool(hint) and hint != rest,
+                     f'row {text!r} refused WITH a visible reason '
+                     f'({hint!r})', 'S2')
+    gauges.entry.clear()
+    gauges.tree.setCurrentItem(None)
+    gauges.remove()
+    qa.pump(0.4)
+    qa.check(gauges.hint.text() not in ('', rest),
+             'Remove with nothing selected explains itself', 'S2')
+    qa.shot('remove_nothing_selected')
+    _set_rows(qa, gauges, [])
+
+
+@scenario('C05', 'C', est=40)
+def c05_native_vs_foam(qa):
+    """blastFoam-only cards hidden for native, shown for blastFoam."""
+    _fresh2d(qa)
+    qa.solver('native')
+    form = _form(qa)
+    qa.check(not form.card_visible('Dynamic refinement (AMR)')
+             and form.row_visible('eos'),
+             'native mode: the AMR card is hidden and the EOS row shown',
+             'S2')
+    qa.shot('numerics_native')
+    qa.solver('blastfoam')
+    form = _form(qa)
+    qa.check(form.card_visible('Dynamic refinement (AMR)')
+             and not form.row_visible('eos'),
+             'blastFoam mode: the AMR card is shown and the EOS row '
+             'hidden', 'S2')
+    qa.shot('numerics_foam')
+    qa.note('foam strip: ' + ' | '.join(qa.strip_text()))
+    qa.field('material', 'C4')
+    qa.field('amr_levels', '2')
+    qa.pump(0.6)
+    qa.scroll_form(0.35)
+    qa.shot('amr_card_on')
+    qa.solver('native')
+    qa.shot('back_to_native')
+    # T34: the typed values are KEPT in the form and stripped from the
+    # case, rather than being coerced in front of the user
+    form = _form(qa)
+    got = qa.win.setup.get_case()
+    qa.check(form.v['material'].get() == 'C4'
+             and form.v['amr_levels'].get() == '2'
+             and got.material == 'TNT' and got.amr_levels == 0,
+             'native keeps the typed foam values in the form and strips '
+             'them from the case', 'S2')
+    qa.note(f'after native: material={form.v["material"].get()} '
+            f'amr_levels={form.v["amr_levels"].get()} '
+            f'(case: {got.material}, {got.amr_levels})')
+    qa.scroll_form(0.0)
+    _fresh2d(qa)
+
+
+@scenario('C06', 'C', est=70)
+def c06_zones(qa):
+    """Refinement-zone rules and their messages."""
+    from blastlab.core.case import Case2D
+    qa.set_case(Case2D(geometry='planar', Lx=2.0, Ly=2.0,
+                       cell_size_m=0.1, charge=20.0, center=(1.0, 1.0)))
+    form = _form(qa)
+    qa.scroll_form(0.5)
+    # native hides the zones card (the row still lands in its list) and
+    # strips the case, so the report shows no zone error
+    _add_row(qa, form.zones, '0.5 1.5 0.5 1.5 1')
+    qa.shot('zone_on_native')
+    qa.note('zone on native (card hidden, case stripped): '
+            + ' | '.join(qa.strip_text()))
+    qa.solver('blastfoam')
+    qa.shot('zone_on_foam')
+    qa.note('zone on foam: ' + ' | '.join(qa.strip_text()))
+    form = _form(qa)
+    for rows, tag in (([(0.5, 1.5, 0.5, 1.5, 7)], 'zone_level7'),
+                      ([(0.5, 1.5, 0.5, 1.5, 3)], 'zone_jump'),
+                      ([(0.53, 1.47, 0.53, 1.47, 1)], 'zone_snapped')):
+        _set_rows(qa, form.zones, rows)
+        qa.shot(tag)
+        qa.note(f'{tag}: ' + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.zones, [], settle=0.4)
+    qa.set_case(Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
+                       cell_size_m=0.1, charge=8.0, center=(0.0, 1.0),
+                       solver='blastfoam'))
+    form = _form(qa)
+    qa.scroll_form(0.5)
+    _set_rows(qa, form.zones, [(0.0, 0.6, 0.6, 1.4, 1),
+                               (0.0, 0.3, 0.8, 1.2, 2)])
+    qa.shot('axisym_zone_on_axis_l2')
+    qa.note('axisym level-2 zone touching the axis: '
+            + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.zones, [], settle=0.4)
+    qa.scroll_form(0.0)
+    _fresh2d(qa)
+
+
+@scenario('C07', 'C', est=70)
+def c07_amr_rules(qa):
+    """Dynamic AMR rules, the hidden charge-refine row, the report."""
+    from blastlab.core.case import Case2D
+    qa.set_case(Case2D(geometry='planar', Lx=4.0, Ly=4.0,
+                       cell_size_m=0.2, charge=100.0, center=(2.0, 2.0),
+                       gauges=[(3.2, 2.0)]))
+    qa.solver('native')
+    form = _form(qa)
+    qa.scroll_form(0.35)
+    qa.field('amr_levels', '2')
+    qa.pump(0.6)
+    qa.note(f'AMR on native: amr_levels is still '
+            f'{form.v["amr_levels"].get()!r} in the hidden card and '
+            f'stripped from the case; strip: '
+            + ' | '.join(qa.strip_text()))
+    qa.shot('amr_native')
+    qa.solver('blastfoam')
+    form = _form(qa)
+    qa.field('amr_levels', '3')
+    qa.pump(0.6)
+    qa.shot('amr_valid')
+    qa.note('valid AMR case: ' + ' | '.join(qa.strip_text()))
+    qa.check(not form.row_visible('charge_refine'),
+             'the charge-refinement row is hidden while AMR is on', 'S3')
+    _set_rows(qa, form.zones, [(1.5, 2.5, 1.5, 2.5, 1)])
+    qa.shot('amr_plus_zones')
+    qa.note('AMR + zones: ' + ' | '.join(qa.strip_text()))
+    _set_rows(qa, form.zones, [], settle=0.4)
+    for name, val, tag in (('amr_unrefine', '0.9',
+                            'amr_unrefine_gt_refine'),
+                           ('amr_display_level', '4',
+                            'amr_display_gt_levels')):
+        qa.field(name, val)
+        qa.shot(tag)
+        qa.note(f'{tag}: ' + ' | '.join(qa.strip_text()))
+    qa.field('amr_unrefine', '0.2')
+    qa.field('amr_display_level', 'auto')
+    qa.field('amr_levels', '1')
+    qa.pump(0.6)
+    qa.field('charge', '0.5')
+    qa.shot('amr_charge_unresolved')
+    qa.note('AMR 1 level with a 0.5 kg/m charge on 0.2 m cells: '
+            + ' | '.join(qa.strip_text()))
+    qa.scroll_form(0.0)
+    _fresh2d(qa)
+
+
+@scenario('C08', 'C', est=60)
+def c08_caps_and_modal(qa):
+    """Cell caps in the report, then Run -> the refusal (G3's split)."""
+    from blastlab.core.case import Case2D, Case3D
+    qa.set_case(Case2D(geometry='planar', Lx=10.0, Ly=10.0,
+                       cell_size_m=0.001, center=(5.0, 5.0)))
+    qa.shot('2d_cap')
+    strip = qa.strip_text()
+    qa.note('2D 100M cells: ' + ' | '.join(strip))
+    qa.check(bool(strip), 'a 100 M cell case is reported before Run', 'S2')
+    qa.goto('run')
+    before = qa.worker_alive()
+    qa.win._run_single()
+    qa.pump(1.2)
+    qa.shot('after_modal')
+    qa.check(not qa.worker_alive() and not before,
+             'and Run refuses it rather than starting a doomed solve',
+             'S1')
+    qa.goto('setup')
+    qa.set_case(Case3D(cell_size_m=0.06))
+    qa.shot('3d_large_warning')
+    qa.note('3D 0.06 m: ' + ' | '.join(qa.strip_text()))
+    qa.set_case(Case3D(cell_size_m=0.02, solver='blastfoam'))
+    qa.shot('3d_foam_cap')
+    qa.note('3D foam 0.02 m: ' + ' | '.join(qa.strip_text()))
+    _fresh2d(qa)
+
+
+@scenario('C09', 'C', est=50)
+def c09_report_overflow(qa):
+    """Many report lines at once; extra charges / det points in preview."""
+    from blastlab.core.case import Case3D
+    qa.set_case(Case3D(Lx=6.0, Ly=6.0, Lz=6.0, cell_size_m=0.1,
+                       charge=20.0, center=(2.0, 3.0, 1.0),
+                       solver='blastfoam',
+                       obstacles=[(3.0, 3.5, 2.5, 3.5, 0.0, 1.5),
+                                  (4.5, 5.0, 1.0, 2.0, 0.0, 2.0)],
+                       charges=[(4.0, 3.0, 1.0, 10.0),
+                                (2.0, 5.0, 1.0, 5.0)],
+                       det_points=[(2.0, 3.0, 1.0), (4.0, 3.0, 1.0)],
+                       afterburn='miller', activation='none',
+                       amr_levels=2,
+                       gauges=[(5.5, 3.0, 1.0), (3.0, 5.5, 1.0)]))
+    qa.pump(1.5)
+    qa.shot('overflow')
+    strip = qa.strip_text()
+    qa.note(f'{len(strip)} report lines: ' + ' | '.join(strip))
+    # the card is height-capped, so a long report must scroll rather than
+    # push the preview off the tab (N2-09's shape)
+    # the invariant is on the SCROLLER, not on the card: the card is
+    # legitimately taller by its own padding, and pinning the card would
+    # be fitting the test to whatever number came out
+    from blastlab.ui.setup_panel import STATUS_MAX_H
+    scroll = qa.win.setup._status_scroll
+    qa.check(scroll.height() <= STATUS_MAX_H,
+             f'a long report scrolls instead of pushing the preview off '
+             f'the tab ({scroll.height()} px of {STATUS_MAX_H})', 'S2')
+    qa.check(qa.win.setup.preview_kind() != 'none',
+             'and the preview is still on screen underneath it', 'S2')
+    qa.note('G8: the 3D preview should show 3 charges + 2 det points '
+            '(see the shot)')
+    qa.set_mode('light')
+    qa.shot('overflow_light')
+    qa.set_mode('dark')
+    _fresh2d(qa)
+
+
+@scenario('C10', 'C', est=90)
+def c10_preview_show_mesh(qa):
+    """Preview + Show mesh: 3D zones, 2D refine, AMR caption, 1D hint."""
+    from blastlab.core.case import Case1D, Case2D, Case3D
+    qa.set_case(Case3D(Lx=10.0, Ly=10.0, Lz=10.0, cell_size_m=0.5,
+                       charge=1.0, center=(5.0, 5.0, 5.0),
+                       solver='blastfoam', charge_refine='zone',
+                       refine_zones=[(4.0, 6.0, 4.0, 6.0, 4.0, 6.0, 1),
+                                     (4.5, 5.5, 4.5, 5.5, 4.5, 5.5, 2)]))
+    qa.pump(1.5)
+    qa.shot('3d_zones_preview')
+    strip = qa.strip_text()
+    qa.note('3D zones strip: ' + ' | '.join(strip))
+    # 1 kg on a 0.5 m base cell needs a level over the cap, so there is
+    # deliberately no refinement note - the error IS the right answer
+    qa.check(any('needs level' in s and 'base cell' in s for s in strip),
+             'the report explains that the charge needs a level over the '
+             'cap', 'S2')
+    qa.win.setup.show_mesh.setChecked(True)
+    qa.pump(2.0)
+    qa.shot('3d_zones_mesh')
+    qa.set_case(Case2D(geometry='planar', Lx=4.0, Ly=4.0,
+                       cell_size_m=0.05, charge=10.0, center=(2.0, 2.0),
+                       solver='blastfoam', charge_refine='zone'))
+    qa.pump(1.5)
+    qa.shot('2d_refine_mesh')
+    strip2 = qa.strip_text()
+    qa.note('2D refine strip: ' + ' | '.join(strip2))
+    qa.check(any('Local refinement' in s for s in strip2),
+             'the report says "Local refinement: N level(s)" for a '
+             'charge_refine=zone case that validates', 'S2')
+    qa.set_case(Case2D(geometry='planar', Lx=4.0, Ly=4.0,
+                       cell_size_m=0.05, charge=10.0, center=(2.0, 2.0),
+                       solver='blastfoam', amr_levels=2))
+    qa.pump(1.5)
+    qa.shot('2d_amr_mesh')
+    qa.note('2D AMR strip: ' + ' | '.join(qa.strip_text()))
+    qa.win.setup.show_mesh.setChecked(False)
+    qa.pump(1.0)
+    qa.set_case(Case1D())
+    qa.shot('1d_preview_hint')
+    _fresh2d(qa)
+
+
+@scenario('C11', 'C', est=30)
+def c11_axisym_relabel(qa):
+    """Axisymmetric relabels Lx/Ly/cx/cy and pins the burst radius."""
+    _fresh2d(qa)
+    qa.shot('axisym_labels')
+    form = _form(qa)
+    labels = {n: form.label_text(n) for n in ('Lx', 'Ly', 'cx', 'cy')
+              if form.row_visible(n)}
+    qa.note(f'axisym labels: {labels}; cx={form.v["cx"].get()!r}')
+    qa.check(any('R' in t or 'r ' in t.lower()
+                 for t in labels.values()),
+             f'axisymmetric relabels the geometry fields ({labels})', 'S2')
+    qa.field('geometry', 'planar')
+    qa.pump(0.6)
+    qa.shot('planar_labels')
+    planar = {n: form.label_text(n) for n in ('Lx', 'Ly', 'cx', 'cy')
+              if form.row_visible(n)}
+    qa.note(f'planar labels: {planar}')
+    qa.check(planar != labels, 'and planar puts them back', 'S2')
+    qa.field('geometry', 'axisymmetric')
+    qa.pump(0.6)
+
+
+@scenario('C12', 'C', est=40)
+def c12_save_open(qa):
+    """Save case -> Open case round trip, and the cancel path."""
+    from blastlab.core.case import Case2D
+    case = Case2D(geometry='planar', Lx=3.0, Ly=2.0, cell_size_m=0.05,
+                  charge=5.0, center=(1.0, 0.5), gauges=[(2.0, 1.0)],
+                  obstacles=[(1.5, 1.8, 0.0, 0.6)], n_snapshots=4)
+    qa.set_case(case)
+    p = os.path.join(qa.out, 'save1.json')
+    qa.script_paths(p)
+    qa.win._save_case()
+    qa.pump(0.6)
+    qa.check(os.path.exists(p), 'Save case wrote the JSON', 'S1')
+    _fresh2d(qa)
+    qa.win._open_case(p)
+    qa.pump(1.0)
+    back = qa.win.setup.get_case()
+    fields = ('Lx', 'Ly', 'cell_size_m', 'charge', 'center', 'gauges',
+              'obstacles', 'n_snapshots', 'geometry')
+    bad = [f for f in fields
+           if getattr(back, f, None) != getattr(case, f, None)]
+    qa.check(not bad, 'Open case round-trips the saved fields', 'S2',
+             evidence='; '.join(f'{f}: {getattr(case, f, None)!r} -> '
+                                f'{getattr(back, f, None)!r}' for f in bad))
+    qa.shot('after_open')
+    qa.script_paths('')
+    qa.win._open_case()
+    qa.pump(0.6)
+    qa.check(qa.win.setup.get_case().Lx == back.Lx,
+             'a cancelled Open leaves the form alone', 'S2')
+    qa.note('Open case cancelled -> nothing happened (expected)')
 
 
 def main():
