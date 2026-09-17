@@ -29,6 +29,17 @@ TICK_MS = 66
 NO_RESULT = ('Run a case with "Record replay frames" ticked, and the '
              'recorded frames replay here.')
 NO_1D = '1D results have no animation frames.'
+
+#: Replay speeds, as multiples of the base tick. Kept as labels rather
+#: than a slider so two sessions can be compared: "it was slow at 1x" is
+#: a statement, "it was slow with the handle about a third along" is not.
+SPEED_FACTORS = {'0.25x': 0.25, '0.5x': 0.5, '1x': 1.0,
+                 '2x': 2.0, '4x': 4.0}
+SPEED_LABELS = list(SPEED_FACTORS)
+SPEED_DEFAULT = '1x'
+#: below this the timer is asked for more than Qt will deliver, so the
+#: frames are stepped instead (see `_tick`)
+MIN_INTERVAL_MS = 16
 NO_FRAMES = ('No recorded frames for this result.\n'
              'Tick "Record replay frames" before the run; runs loaded '
              'from the foam run browser\ncarry snapshots but no replay '
@@ -87,6 +98,20 @@ class AnimView(QWidget):
         self.slider.setRange(0, 1)
         self.slider.valueChanged.connect(self._slider_moved)
         bar.addWidget(self.slider, 1)
+        # Playback speed: a recording is 60 to 150 frames, so at one
+        # fixed rate a long one crawls and a short one is over before it
+        # reads. The Tk app had no control at all.
+        bar.addWidget(label('Speed', 'muted'))
+        self.speed_sel = QComboBox()
+        self.speed_sel.addItems(SPEED_LABELS)
+        self.speed_sel.setCurrentText(SPEED_DEFAULT)
+        self.speed_sel.setFixedWidth(72)
+        self.speed_sel.setToolTip(
+            'How fast the replay advances. It changes the playback only '
+            '- the exported video keeps its own frame rate.')
+        self.speed_sel.currentIndexChanged.connect(
+            lambda *_: self._speed_changed())
+        bar.addWidget(self.speed_sel)
         root.addLayout(bar)
 
         # the colour scale, for the replay and for the export
@@ -122,6 +147,8 @@ class AnimView(QWidget):
         self.timer = QTimer(self)
         self.timer.setInterval(TICK_MS)
         self.timer.timeout.connect(self._tick)
+        self._step = 1
+        self._speed_changed()
         pg_plots.apply_theme(self.glw, [self.plot])
         theme.signals.changed.connect(self._retheme)
         self._set_manual_visible(False)
@@ -372,13 +399,36 @@ class AnimView(QWidget):
     def playing(self):
         return self._playing
 
+    # ── playback speed ───────────────────────────────────────────────────
+    def speed(self):
+        """The chosen multiple of the base rate."""
+        return SPEED_FACTORS.get(self.speed_sel.currentText(), 1.0)
+
+    def _speed_changed(self):
+        """Apply the speed, live, without interrupting a playback.
+
+        Above 1x the interval would fall under what Qt actually
+        delivers, so the tick advances by more than one frame instead of
+        being asked to fire faster than the screen refreshes.
+        """
+        factor = self.speed()
+        want = TICK_MS / factor
+        self._step = max(1, int(round(MIN_INTERVAL_MS / want))) \
+            if want < MIN_INTERVAL_MS else 1
+        self.timer.setInterval(max(MIN_INTERVAL_MS, int(round(want))))
+
+    def frame_step(self):
+        """How many frames one tick advances - 1 unless the speed asks
+        for a rate faster than the timer can deliver."""
+        return getattr(self, '_step', 1)
+
     def _tick(self):
         frames = self._frames()
         if frames is None or self.image is None:
             self.stop_play()
             return
         n = len(frames['pressures'])
-        k = (self.slider.value() + 1) % n
+        k = (self.slider.value() + self.frame_step()) % n
         # the slider is being driven, not read: its signal would call
         # show_frame a second time for the same tick
         self.slider.blockSignals(True)

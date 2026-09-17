@@ -464,6 +464,36 @@ def main():
     p.sel.setCurrentIndex(p.entries().index(fr))
     pump(40)
 
+    print('\nR5b: playback speed')
+    from blastlab.ui.results_anim import (MIN_INTERVAL_MS, SPEED_DEFAULT,
+                                          SPEED_FACTORS, TICK_MS)
+    check('it starts at 1x, the rate the Tk app had and could not change',
+          an.speed_sel.currentText() == SPEED_DEFAULT
+          and an.speed() == 1.0 and an.timer.interval() == TICK_MS,
+          f'{an.speed_sel.currentText()} {an.timer.interval()} ms')
+    rates = {}
+    for lbl in SPEED_FACTORS:
+        an.speed_sel.setCurrentText(lbl)
+        pump(10)
+        rates[lbl] = 1000.0 / an.timer.interval() * an.frame_step()
+        check(f'{lbl} never asks the timer for less than the '
+              f'{MIN_INTERVAL_MS} ms it can deliver',
+              an.timer.interval() >= MIN_INTERVAL_MS,
+              f'{an.timer.interval()} ms')
+    ordered = [rates[k] for k in SPEED_FACTORS]
+    check('and the frame rate rises monotonically with the setting',
+          all(b > a for a, b in zip(ordered, ordered[1:])),
+          str({k: round(v, 1) for k, v in rates.items()}))
+    check('a 4x replay really is about four times a 1x one',
+          abs(rates['4x'] / rates['1x'] - 4.0) < 0.3,
+          f"{rates['1x']:.1f} -> {rates['4x']:.1f} frames/s")
+    an.speed_sel.setCurrentText(SPEED_DEFAULT)
+    pump(10)
+    # the speed is a playback control and must not reach the export
+    check('and it stays out of the export options',
+          'speed' not in str(an.export_opts()).lower(),
+          str(an.export_opts()))
+
     print('\nR6: the animation colour scale, here as well as in Setup')
     check('the replay pins one range for the whole video by default',
           an.scale() == 'run' and an.scale_used() == 'run',
