@@ -49,6 +49,9 @@ class GuiHooks(RunHooks):
         self.ring = None
         self._latest3d = None
         self._frame3d_pending = False
+        self.live_gauges = False      # the Run tab's gauge view is open
+        self._latest_gauges = None
+        self._gauges_pending = False
         self._last_p = None           # newest Progress, for flush_progress
         self._revolver = None         # 2D axisym -> 3D cylinder view
         self._rev_last = 0.0
@@ -69,6 +72,8 @@ class GuiHooks(RunHooks):
         with self._lock:
             self._latest3d = None
             self._frame3d_pending = False
+            self._latest_gauges = None
+            self._gauges_pending = False
         self.feed3d = None
         self.ring = None
         self.scene3d = None
@@ -146,6 +151,27 @@ class GuiHooks(RunHooks):
         with self._lock:
             self._frame_pending = False
             return self._latest
+
+    # ── live gauge traces ────────────────────────────────────────────────
+    # Same latest-wins shape as `frame`: the payload is the whole series
+    # so far, so a coalesced post loses nothing - the newest one contains
+    # every earlier one.
+    def wants_gauges(self):
+        return self.live_gauges
+
+    def gauges(self, payload):
+        if not self.live_gauges or not payload:
+            return
+        with self._lock:
+            self._latest_gauges = payload
+            if not self._gauges_pending:
+                self._gauges_pending = True
+                self.q.put(('gauges',))
+
+    def latest_gauges(self):
+        with self._lock:
+            self._gauges_pending = False
+            return self._latest_gauges
 
     # ── embedded 3D view: decimate on the solver thread, coalesce into a
     # latest-wins slot so the GUI queue never carries big arrays twice ───

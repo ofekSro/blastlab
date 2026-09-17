@@ -193,6 +193,11 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
 
         if hooks.draw_due(step, _last_draw) or hooks.exec_will_pause():
             hooks.frame(np.array([r, p_f]), t)
+            if gauge_indices and hooks.wants_gauges():
+                from .solver2d import _gauge_payload
+                hooks.gauges(_gauge_payload(
+                    gauge_times_list, gauge_press_lists,
+                    [(float(rr),) for rr in gauge_radii]))
             _last_draw = _time.time()
 
         # Stepped execution (GUI Exec N / Interrupt): may block here.

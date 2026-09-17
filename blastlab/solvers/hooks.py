@@ -178,6 +178,21 @@ class RunHooks:
         if self.wants_frame3d():
             self.viewer3d.send_frame(t, fields, force=force)
 
+    def wants_gauges(self):
+        """True while something is watching the gauge traces live."""
+        return False
+
+    def gauges(self, payload):
+        """The gauge series SO FAR, for a live trace.
+
+        `payload` is the same shape the finished run reports -
+        dict(times, pressures, points|radii, ...) - truncated at the
+        current time rather than being a delta, because the receiver
+        redraws whole traces anyway and a delta would need it to keep
+        state the solver already has. Emitted on the live-frame cadence,
+        so a run with no gauges or no watcher costs nothing.
+        """
+
     def should_stop(self):
         """Return True to end the run after the current step."""
         return False

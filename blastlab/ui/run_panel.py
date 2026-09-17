@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
 
 from ..core import refine
 from . import theme
+from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .theme import GAP, PAD
 from .widgets import (Card, Chip, Segmented, WrapRow, button, hbox, label,
@@ -26,6 +27,9 @@ class RunPanel(QWidget):
     init_requested = Signal()
     exec_requested = Signal(object)      # 1/10/100/1000 | 'run' | 'pause'
     refresh_changed = Signal()
+    #: the live gauge view was opened or left; the solver only collects
+    #: traces while something is watching
+    gauges_wanted = Signal(bool)
 
     #: share of the Run-tab width given to the log; the live/3D pane
     #: keeps the rest (>= 60 %, the QA-17 target)
@@ -183,8 +187,8 @@ class RunPanel(QWidget):
         # glued to its field.
         self.view_row = WrapRow()
         right.add(self.view_row)
-        self._view_seg = Segmented(['Live slice', '3D view'])
-        self._view_seg.setFixedWidth(220)
+        self._view_seg = Segmented(['Live slice', 'Gauges', '3D view'])
+        self._view_seg.setFixedWidth(300)
         self._view_seg.changed.connect(self._view_selected)
         self.view_row.add(self._view_seg)
         # cell edges over the live slice (true cells of a refined run)
@@ -218,6 +222,8 @@ class RunPanel(QWidget):
         right.add(self._stack, 1)
         self.pane = LiveSlicePane()
         self._stack.addWidget(self.pane)
+        self.gauges = LiveGaugePane()
+        self._stack.addWidget(self.gauges)
         if self.view3d is None:
             self.view3d = _NoViewer()
         self._stack.addWidget(self.view3d)
@@ -291,17 +297,30 @@ class RunPanel(QWidget):
             self._body.setSizes([want, max(1, w - want)])
 
     # ── live-view sub-tab switching ──────────────────────────────────────
+    #: which widget each segment shows
+    def _view_widget(self, value):
+        return {'3D view': self.view3d,
+                'Gauges': self.gauges}.get(value, self.pane)
+
     def _view_selected(self, value):
-        self._stack.setCurrentWidget(self.view3d if value == '3D view'
-                                     else self.pane)
+        self._stack.setCurrentWidget(self._view_widget(value))
+        # the solver only does the work while someone is watching
+        self.gauges_wanted.emit(value == 'Gauges')
 
     def show_3d_tab(self):
         self._view_seg.set('3D view')
-        self._stack.setCurrentWidget(self.view3d)
+        self._view_selected('3D view')
 
     def show_slice_tab(self):
         self._view_seg.set('Live slice')
-        self._stack.setCurrentWidget(self.pane)
+        self._view_selected('Live slice')
+
+    def show_gauges_tab(self):
+        self._view_seg.set('Gauges')
+        self._view_selected('Gauges')
+
+    def watching_gauges(self):
+        return self._stack.currentWidget() is self.gauges
 
     def _set_tab_order(self):
         """Walk Tab the way the tab reads, not the way it was built.
@@ -376,10 +395,18 @@ class RunPanel(QWidget):
         self._mesh_levels = None
         self._shape = None
         self.pane.show_placeholder()
+        self.gauges.reset()
         try:
             self.view3d.reset()
         except Exception:
             pass
+
+    def set_gauge_payload(self, payload):
+        self.gauges.set_payload(payload)
+
+    def say_no_gauges(self):
+        """The case has no gauges, so the view has nothing to wait for."""
+        self.gauges.reset(NO_GAUGES)
 
     def set_validation(self, ok, n_errors=0, text=None):
         """Mirror the Setup validation strip on the Run tab and gate the

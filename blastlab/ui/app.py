@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self.run_panel.init_requested.connect(self._init_model)
         self.run_panel.exec_requested.connect(self.ctrl.exec_cmd)
         self.run_panel.refresh_changed.connect(self._apply_refresh)
+        self.run_panel.gauges_wanted.connect(self._gauges_wanted)
 
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
@@ -542,6 +543,27 @@ class MainWindow(QMainWindow):
 
     def on_frame(self, field, t, levels=None):
         self.run_panel.on_frame(field, t, levels)
+
+    def on_gauges(self, payload):
+        self.run_panel.set_gauge_payload(payload)
+
+    def _gauges_wanted(self, on):
+        """The live gauge view was opened or left."""
+        self.ctrl.set_live_gauges(on)
+        if not on:
+            return
+        # a case with no gauges would otherwise sit on "waiting for the
+        # solver" forever, which reads as a fault rather than as nothing
+        # to show
+        try:
+            case = self.current_case()
+        except Exception:
+            return
+        pts = getattr(case, 'gauges', None)
+        if pts is None:
+            pts = getattr(case, 'gauge_radii', None)
+        if not pts and not self.run_panel.gauges.has_data():
+            self.run_panel.say_no_gauges()
 
     def on_running(self, running):
         self.run_panel.set_running(running)

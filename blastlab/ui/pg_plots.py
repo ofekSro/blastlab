@@ -64,6 +64,23 @@ def inferno():
     return _CMAP, _LUT
 
 
+#: One colour per series, taken from the same tab10 the exported gauge
+#: figures use (`output/plots.py`), so a trace is the same colour on
+#: screen as in the file the user puts in a report. Ten is plenty: a
+#: case with more than ten gauges is unreadable either way.
+_SERIES = None
+
+
+def series_colours():
+    global _SERIES
+    if _SERIES is None:
+        import matplotlib as mpl
+        rgba = mpl.colormaps['tab10'](np.linspace(0, 0.9, 10))
+        _SERIES = [tuple(int(round(c * 255)) for c in row[:3])
+                   for row in rgba]
+    return _SERIES
+
+
 def apply_theme(glw, plots=()):
     """Colour a GraphicsLayoutWidget and its PlotItems for the current
     mode (card background, muted axes, text-coloured titles)."""

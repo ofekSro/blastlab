@@ -617,6 +617,31 @@ def _gauges_from_probes(spec):
                 pressures=probes['pressures'])
 
 
+#: how often the live gauge trace re-reads blastProbes' output. The file
+#: is small - a few thousand rows - so a whole re-read costs less than
+#: the bookkeeping an incremental tail would need, and it inherits
+#: `read_probes`' merging of restart chunks for free. Throttled anyway,
+#: because it is disk work on a path WSL shares with the solver.
+GAUGE_LIVE_S = 1.0
+_gauge_live = {'at': 0.0}
+
+
+def _emit_gauges(hooks, spec):
+    """Hand the live gauge traces over, if anything is watching."""
+    if not hooks.wants_gauges() or not spec.probe_pts:
+        return
+    now = _time.time()
+    if now - _gauge_live['at'] < GAUGE_LIVE_S:
+        return
+    _gauge_live['at'] = now
+    try:
+        payload = _gauges_from_probes(spec)
+    except Exception:
+        return              # a probe file mid-write is not a run failure
+    if payload and len(payload.get('times', ())):
+        hooks.gauges(payload)
+
+
 def _log_banner_1d(hooks, case, spec):
     m = MATERIALS[spec.material]
     bar = '=' * 55
@@ -2013,6 +2038,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                and t >= st['t_frame'])
         if due or will_pause:
             _emit_frame(hooks, p, t, mesh, live_sl)
+            _emit_gauges(hooks, spec)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()

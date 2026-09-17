@@ -17,6 +17,7 @@ from ..core.profiles import (remap_profile_1d_to_3d as remap_profile_1d,
                              remap_profile_2d_to_3d as remap_profile_2d)
 from .hooks import (ConsoleHooks, Progress, Result, frame_budget,
                     trigger_index)
+from .solver2d import _gauge_payload
 
 def primitives(U, phase, eos, jwl=JWL_TNT):
     """
@@ -502,6 +503,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         will_pause = hooks.exec_will_pause()
         if hooks.draw_due(step, last_draw) or will_pause:
             hooks.frame(p_f[live_sl], t)
+            if gauge_ijk and hooks.wants_gauges():
+                hooks.gauges(_gauge_payload(gauge_times_list,
+                                            gauge_press_lists,
+                                            gauge_actual))
             last_draw = time.time()
         if (hooks.draw3d_due(step, last_draw3d) or will_pause) \
                 and hooks.wants_frame3d():

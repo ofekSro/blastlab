@@ -154,6 +154,7 @@ class RunController(QObject):
         self.worker = SolverWorker(stages)
         # 3D runs attach the embedded 3D view automatically at run start
         self.worker.hooks.auto3d = pyvista_available() and self.view3d is not None
+        self.worker.hooks.live_gauges = getattr(self, '_live_gauges', False)
         self._push_refresh(self.worker.hooks)
         if paused:
             self.worker.hooks.set_exec('pause')
@@ -166,6 +167,19 @@ class RunController(QObject):
         self.worker.start()
         self._timer.start()
         return True
+
+    def set_live_gauges(self, on):
+        """Collect live gauge traces, or stop collecting them.
+
+        Off by default and off again the moment the view is left: on a
+        native run this copies the whole series on every live frame, and
+        on a foam run it re-reads blastProbes' output from the disk WSL
+        is solving on. Neither is worth paying for a pane nobody is
+        looking at.
+        """
+        self._live_gauges = bool(on)
+        if self.worker is not None:
+            self.worker.hooks.live_gauges = self._live_gauges
 
     def stop(self):
         if self.worker is not None:
@@ -290,6 +304,10 @@ class RunController(QObject):
             fr = w.hooks.latest_frame()
             if fr is not None:
                 h.on_frame(*fr)
+        elif tag == 'gauges':
+            payload = w.hooks.latest_gauges()
+            if payload is not None:
+                h.on_gauges(payload)
         elif tag == 'frame3d':
             # Tk-era token: only reached when no ring exists (e.g. the
             # viewer was refused); the slot is simply drained

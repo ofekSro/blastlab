@@ -33,6 +33,19 @@ def primitives(U, phase, eos, jwl=JWL_TNT):
     return rho, u, v, e, p, c
 
 
+def _gauge_payload(times, press_lists, points):
+    """The gauge series so far, in the shape the finished run reports.
+
+    A copy, because the solver keeps appending to these lists while the
+    GUI thread is drawing them - handing over the live objects is a race
+    that shows up as a trace that changes length mid-plot.
+    """
+    n = len(times)
+    return dict(times=list(times[:n]),
+                pressures=[list(p[:n]) for p in press_lists],
+                points=[tuple(pt) for pt in points])
+
+
 def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                   order=1,
                   charge=None, charge_center=None, profile=None,
@@ -416,6 +429,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                 frame_stride *= 2
         if hooks.draw_due(step, last_draw) or hooks.exec_will_pause():
             hooks.frame(p_f, t)
+            if gauge_ij and hooks.wants_gauges():
+                hooks.gauges(_gauge_payload(gauge_times_list,
+                                            gauge_press_lists,
+                                            gauge_actual))
             last_draw = time.time()
 
         # Stepped execution (GUI Exec N / Interrupt): may block here.
