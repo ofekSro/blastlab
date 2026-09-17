@@ -1188,6 +1188,20 @@ class View3DHost(QWidget):
         if self._has_scene:
             self.link.send(('ctrl', self.surface, name, *args))
 
+    def on_sampled_plane(self, t, field2d):
+        """The live-slice plane at the SAMPLE cadence, straight to the
+        child.
+
+        Not through the frame ring: the ring's slots are laid out for a
+        whole decimated volume, and this is one plane. It is small - a
+        few tens of kilobytes - and arrives a few times a second, which
+        is well within what the control pipe carries.
+        """
+        if not self._has_scene:
+            return
+        self._n_sampled = getattr(self, '_n_sampled', 0) + 1
+        self.link.send(('surf_plane', self.surface, float(t), field2d))
+
     def _toggle_layer(self, key):
         self._ctrl('layer', key, self._checks[key].isChecked())
 

@@ -1963,6 +1963,9 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                      Lx=case.Lx, Ly=case.Ly, Lz=case.Lz,
                      charge_center=(x0, y0, z0), r_exp=spec.r_exp,
                      bcs=bcs, refine=spec.refine_meta(),
+                     # where the live-slice plane sits, so the 3D scene
+                     # can place the sample-cadence plane it is sent
+                     slice_axis=slice_axis, slice_index=int(s0),
                      # P2-2: the live energy field is the ideal-gas
                      # stand-in this backend derives, not a solved one
                      solver='blastfoam')))

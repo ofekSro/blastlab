@@ -391,6 +391,7 @@ class BlastScene(_CameraOps):
             self.layers[f'plane{k}'] = _CutPlane(
                 self, f'plane{k}', axis, on=on,
                 use_widget=use_widget and k <= 2)
+        self.layers['sampled'] = _SampledPlane(self, on=True)
         self.layers['iso'] = _Isosurface(self, on=True)
         self.layers['loads'] = _SurfaceLoads(self, on=True)
         self.layers['volume'] = _Volume(self, on=False)
@@ -537,7 +538,10 @@ class BlastScene(_CameraOps):
 
     def _refresh_field_layers(self):
         for key, layer in self.layers.items():
-            if key.startswith('plane') or key == 'volume':
+            # 'sampled' carries pressure and nothing else, so it has to
+            # hear about a field change too - otherwise it keeps painting
+            # pressure on a plane while the scene says it is density
+            if key.startswith('plane') or key in ('volume', 'sampled'):
                 layer.refresh()
 
     def _auto_clim(self):
@@ -620,10 +624,25 @@ class BlastScene(_CameraOps):
             if abs(rep.GetValue() - frac) > 1e-6:
                 rep.SetValue(frac)
 
+    def on_sampled_plane(self, t, field2d):
+        """The live-slice plane, ahead of the written frames."""
+        layer = self.layers.get('sampled')
+        if layer is None:
+            return False
+        ok = layer.set_data(t, field2d)
+        if ok:
+            self._update_hud()
+        return ok
+
     def _display(self, t, frame):
         """Make a frame payload current and refresh all layers. Only the
         displayed fields are uploaded (ensure_field); the rest stay
         marked stale until a control needs them."""
+        # a full frame supersedes the sampled plane: keeping it would
+        # leave one plane ahead of a volume that has caught up with it
+        layer = self.layers.get('sampled')
+        if layer is not None and layer.t is not None and t >= layer.t:
+            layer.clear()
         self.t, self.frame = t, frame
         self._stale = {k for k in FIELDS if frame.get(k) is not None}
         for key in self._stale:
@@ -644,6 +663,13 @@ class BlastScene(_CameraOps):
         n = len(self.store)
         s = (f't = {self.t*1e3:8.3f} ms    peak = {peak:9.1f} kPa    '
              f'{mode}   [{self.index+1}/{n} frames]')
+        # the sampled plane runs ahead of the written volume, and saying
+        # so is the difference between a live view and a misleading one
+        sampled = self.layers.get('sampled') if self.layers else None
+        if sampled is not None and sampled.t is not None \
+                and sampled.t > self.t:
+            s += (f'\nburst plane sampled at t = {sampled.t * 1e3:.3f} ms '
+                  f'(ahead of the written frame)')
         if self.loading:
             s += f'\n{self.loading}'
         if self.done and self.stop_reason:
@@ -831,6 +857,116 @@ class _CutPlane(_Layer):
             self._actor.mapper.scalar_range = clim
             self._actor.mapper.lookup_table.log_scale = s.log_scale
             self._actor.prop.opacity = self.opacity
+
+
+class _SampledPlane(_Layer):
+    """The live-slice plane at the solver's SAMPLE cadence.
+
+    A blastFoam run can only send a full 3D frame when it writes one -
+    measured at one every 8.6 s on a real 3D run - while the plane it
+    already samples for the 2D live view was arriving about four times a
+    second from the same case. This layer paints that plane, so the part
+    of the scene a blast is actually watched on moves at the rate the
+    solver samples.
+
+    It is deliberately ONE plane and it says so: the rest of the scene
+    is still the last written frame, and a viewer that implied the whole
+    volume was this fresh would be lying about where the shock is.
+    """
+
+    def __init__(self, scene, on=True):
+        self.s = scene
+        self.name = 'sampled_plane'
+        self.visible = bool(on)
+        self.t = None
+        self._mesh = None
+        self._actor = None
+        init = scene.init
+        axis = init.get('slice_axis')
+        idx = init.get('slice_index')
+        self.axis = axis if axis in ('x', 'y', 'z') else None
+        self.index = None if idx is None else int(idx)
+        # The shape the plane MUST have, from the scene's own grid. A
+        # sample of any other size is a sample of something else - an
+        # earlier AMR display level, or another run's plane - and
+        # building a mesh to fit it would draw that quietly at the wrong
+        # scale. (The first version sized the mesh from the array and
+        # then checked the array against the mesh, which can only ever
+        # agree with itself.)
+        if self.axis is None:
+            self.want_shape = None
+        else:
+            ax = 'xyz'.index(self.axis)
+            n = [len(np.asarray(init[k])) for k in ('x_c', 'y_c', 'z_c')]
+            self.want_shape = tuple(v for a, v in enumerate(n) if a != ax)
+
+    def _ensure_mesh(self, shape):
+        """An axis-aligned single-cell-thick ImageData on the plane."""
+        if self._mesh is not None and self._shape == tuple(shape):
+            return self._mesh
+        import pyvista as pv
+        init = self.s.init
+        c = {'x': init['x_c'], 'y': init['y_c'], 'z': init['z_c']}
+        ax = 'xyz'.index(self.axis)
+        pos = float(np.asarray(c[self.axis])[self.index])
+        dims, origin = [], []
+        it = iter(shape)
+        for a, key in enumerate('xyz'):
+            if a == ax:
+                dims.append(1)
+                origin.append(pos)
+            else:
+                dims.append(int(next(it)))
+                origin.append(float(np.asarray(c[key])[0]))
+        dx = float(init['dx'])
+        self._mesh = pv.ImageData(dimensions=tuple(dims),
+                                  spacing=(dx, dx, dx),
+                                  origin=tuple(origin))
+        self._shape = tuple(shape)
+        return self._mesh
+
+    def set_data(self, t, field2d):
+        """A new sample. Pressure only - the field the plane is for."""
+        if self.axis is None or self.index is None:
+            return False
+        arr = np.asarray(field2d, dtype=np.float32)
+        if arr.ndim != 2 or arr.shape != self.want_shape:
+            return False
+        try:
+            mesh = self._ensure_mesh(arr.shape)
+        except Exception:
+            return False
+        mesh.point_data['p'] = _ovp_kpa(arr).ravel(order='F')
+        self.t = float(t)
+        self.refresh()
+        return True
+
+    def clear(self):
+        self.t = None
+        if self._actor is not None:
+            self.s.pl.remove_actor(self.name)
+            self._actor = None
+
+    def refresh(self):
+        s = self.s
+        # only while the scene is showing pressure: the sample carries p
+        # and nothing else, so painting it under any other field would
+        # put the wrong quantity on the plane
+        if (not self.visible or self.t is None or self._mesh is None
+                or s.field != 'p'):
+            if self._actor is not None:
+                self._actor.visibility = False
+            return
+        clim = s.active_clim('p')
+        if self._actor is None:
+            self._actor = s.pl.add_mesh(
+                self._mesh, scalars='p', cmap=CMAP, clim=clim,
+                log_scale=s.log_scale, name=self.name,
+                show_scalar_bar=False, reset_camera=False, render=False)
+        else:
+            self._actor.visibility = True
+            self._actor.mapper.scalar_range = clim
+            self._actor.mapper.lookup_table.log_scale = s.log_scale
 
 
 class _MeshEdges(_Layer):
@@ -1262,6 +1398,10 @@ class _ViewerHost:
         self.ring = {}
         self.seq = {}
         self.dirty = set()
+        #: screenshots that asked to render at a bad moment, retried on
+        #: the next ticks rather than reported as a scene failure
+        self._pending_shots = []
+        self._shot_retry = {}
         self._lost = False
         self._status_sig = {}
         self._status_at = {}
@@ -1367,6 +1507,11 @@ class _ViewerHost:
                 except Exception as exc:
                     self._error(s, exc)
         self.dirty.clear()
+        # retry after the render pass, when the window is current again
+        if self._pending_shots:
+            again, self._pending_shots = self._pending_shots, []
+            for shot in again:
+                self._handle(shot)
         self._report(now)
 
     def _pump_ring(self, surface, ring):
@@ -1403,6 +1548,9 @@ class _ViewerHost:
                 vmin=sig[7], vmax=sig[8], have=list(have),
                 stop_reason=sig[10])))
 
+    #: ticks a screenshot may wait for a renderable window
+    SHOT_TRIES = 30
+
     # ── control messages ─────────────────────────────────────────────────
     def _handle(self, msg):
         tag = msg[0]
@@ -1437,16 +1585,42 @@ class _ViewerHost:
                     w.resize(max(1, int(msg[2])), max(1, int(msg[3])))
                     self.dirty.add(surface)
             elif tag == 'screenshot':
+                # A screenshot is a bystander: it asks the window to
+                # render right now, and "render window is not current"
+                # is what VTK says when that lands while the window is
+                # being re-parented or is off-screen. Routing it to
+                # _error reported a scene failure for something that had
+                # nothing to do with the scene - queue a retry instead,
+                # and only complain once the window has had its chances.
                 w = self.win.get(surface)
                 if w is not None:
-                    w.render()
-                    w.plotter.screenshot(msg[2])
+                    try:
+                        w.render()
+                        w.plotter.screenshot(msg[2])
+                    except Exception as exc:
+                        n = self._shot_retry.get(msg[2], 0) + 1
+                        self._shot_retry[msg[2]] = n
+                        if n <= self.SHOT_TRIES:
+                            self._pending_shots.append(msg)
+                            return
+                        self._shot_retry.pop(msg[2], None)
+                        self._send(('screenshot_failed', surface, msg[2],
+                                    f'{type(exc).__name__}: {exc}; '
+                                    f'window visible={w.isVisible()}, '
+                                    f'size={w.width()}x{w.height()}'))
+                        return
+                    self._shot_retry.pop(msg[2], None)
                     self._send(('screenshot_done', surface, msg[2]))
             elif tag == 'hud':
                 sc = self.scene.get(surface)
                 if isinstance(sc, BlastScene):
                     sc.loading = str(msg[2])
                     sc._update_hud()
+                    self.dirty.add(surface)
+            elif tag == 'surf_plane':
+                sc = self.scene.get(surface)
+                if isinstance(sc, BlastScene):
+                    sc.on_sampled_plane(float(msg[2]), msg[3])
                     self.dirty.add(surface)
             elif tag == 'ctrl':
                 sc = self.scene.get(surface)

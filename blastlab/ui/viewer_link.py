@@ -151,5 +151,10 @@ class ViewerLink(QObject):
             host.on_closed()
         elif tag == 'screenshot_done':
             host.on_screenshot(msg[2])
+        elif tag == 'screenshot_failed':
+            # a screenshot that never found a renderable window: worth
+            # saying, but it is not a scene failure and must not be
+            # reported as one
+            host._log(f'  [3D view: screenshot failed ({msg[3]})]')
         elif tag == 'error':
             host.on_error(str(msg[2]))

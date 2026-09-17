@@ -310,10 +310,19 @@ def tail_live(spec, hooks, st, live, set_name, decode):
         if payload is None:
             continue
         if t >= st['t_frame']:
+            field = payload[0] if isinstance(payload, tuple) else payload
             if isinstance(payload, tuple):
                 hooks.frame(payload[0], t, levels=payload[1])
             else:
                 hooks.frame(payload, t)
+            # The same array, to the 3D scene's burst plane. A foam run
+            # can only emit a full frame3d when it WRITES - measured at
+            # one every 8.6 s on a real 3D run, while this sample was
+            # arriving about four times a second from the same case. No
+            # extra sampling and no extra disk read: the array is already
+            # decoded and about to be dropped.
+            if spec.dim == 3 and hooks.wants_surf3d():
+                hooks.surf3d(t, field)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()

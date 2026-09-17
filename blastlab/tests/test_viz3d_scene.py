@@ -62,8 +62,14 @@ pl = pv.Plotter(off_screen=True, window_size=(800, 600))
 scene = BlastScene(pl, init)
 check("grid dims match decimated solid",
       tuple(scene.grid.dimensions) == init['solid_dec'].shape)
-check("6 layers", set(scene.layers) == {'plane1', 'plane2', 'iso',
-                                        'loads', 'volume', 'mesh'})
+check("7 layers", set(scene.layers) == {'plane1', 'plane2', 'iso',
+                                        'loads', 'volume', 'mesh',
+                                        'sampled'})
+# the sampled plane is the one layer that draws data the frame store
+# does not have: a blastFoam run samples its burst plane far more often
+# than it writes a full field, and this layer is where that lands
+check("the sampled plane starts empty",
+      scene.layers['sampled'].t is None)
 check("hud placeholder", scene.frame is None)
 
 print("\nS2: live frames")

@@ -52,6 +52,8 @@ class GuiHooks(RunHooks):
         self.live_gauges = False      # the Run tab's gauge view is open
         self._latest_gauges = None
         self._gauges_pending = False
+        self._latest_surf3d = None
+        self._surf3d_pending = False
         self._last_p = None           # newest Progress, for flush_progress
         self._revolver = None         # 2D axisym -> 3D cylinder view
         self._rev_last = 0.0
@@ -74,6 +76,8 @@ class GuiHooks(RunHooks):
             self._frame3d_pending = False
             self._latest_gauges = None
             self._gauges_pending = False
+            self._latest_surf3d = None
+            self._surf3d_pending = False
         self.feed3d = None
         self.ring = None
         self.scene3d = None
@@ -151,6 +155,28 @@ class GuiHooks(RunHooks):
         with self._lock:
             self._frame_pending = False
             return self._latest
+
+    # ── the live-slice plane, for the 3D view ────────────────────────────
+    # Same latest-wins shape again. Gated on the 3D feed existing, so a
+    # run with no 3D view attached never copies the array.
+    def wants_surf3d(self):
+        return self.feed3d is not None
+
+    def surf3d(self, t, field2d):
+        if self.feed3d is None or field2d is None:
+            return
+        with self._lock:
+            self._latest_surf3d = (float(t),
+                                   np.asarray(field2d,
+                                              dtype=np.float32).copy())
+            if not self._surf3d_pending:
+                self._surf3d_pending = True
+                self.q.put(('surf3d',))
+
+    def latest_surf3d(self):
+        with self._lock:
+            self._surf3d_pending = False
+            return self._latest_surf3d
 
     # ── live gauge traces ────────────────────────────────────────────────
     # Same latest-wins shape as `frame`: the payload is the whole series

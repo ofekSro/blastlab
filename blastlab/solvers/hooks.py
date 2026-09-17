@@ -178,6 +178,27 @@ class RunHooks:
         if self.wants_frame3d():
             self.viewer3d.send_frame(t, fields, force=force)
 
+    def wants_surf3d(self):
+        """True while a 3D view is open AND the run can sample faster
+        than it writes."""
+        return False
+
+    def surf3d(self, t, field2d):
+        """The live-slice plane, at the SAMPLE cadence, for the 3D view.
+
+        A blastFoam run can only emit `frame3d` when a full field has
+        been written, which is every writeInterval - measured at one
+        frame every 8.6 s on a real 3D run, while the 2D live slice was
+        arriving about four times a second from the same case. The
+        sampled plane is already being read for that 2D view; this hands
+        the same array to the 3D scene so its burst plane moves at the
+        rate the solver samples instead of the rate it writes.
+
+        It is ONE plane: the rest of the scene stays at the last written
+        frame, and the viewer says so rather than implying the whole
+        volume is that fresh.
+        """
+
     def wants_gauges(self):
         """True while something is watching the gauge traces live."""
         return False

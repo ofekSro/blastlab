@@ -304,6 +304,10 @@ class RunController(QObject):
             fr = w.hooks.latest_frame()
             if fr is not None:
                 h.on_frame(*fr)
+        elif tag == 'surf3d':
+            got = w.hooks.latest_surf3d()
+            if got is not None and self.view3d is not None:
+                self.view3d.on_sampled_plane(*got)
         elif tag == 'gauges':
             payload = w.hooks.latest_gauges()
             if payload is not None:
