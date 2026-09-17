@@ -447,9 +447,20 @@ class QA:
 
     def wait_log(self, text, timeout=60):
         """Wait for a line that appeared SINCE the last click, so an old
-        identical line cannot satisfy it."""
-        mark = self._log_mark or 0
-        return self.until(lambda: text in self.run_log()[mark:], timeout)
+        identical line cannot satisfy it.
+
+        Starting a run CLEARS the log pane, which makes it shorter than
+        the mark taken when the button was pressed - and then the slice
+        is empty forever and the wait always times out. A log shorter
+        than its own mark has been cleared, so everything in it is new.
+        """
+        def seen():
+            log = self.run_log()
+            mark = self._log_mark or 0
+            if len(log) < mark:
+                self._log_mark = mark = 0
+            return text in log[mark:]
+        return self.until(seen, timeout)
 
     def worker_alive(self):
         try:
@@ -551,6 +562,38 @@ class QA:
 
     #: Tk's worst recorded idle was 20 %; past this something is spinning
     IDLE_CPU_S2 = 25.0
+
+    # ── results that outlive one invocation ─────────────────────────────
+    # A budget stop ends the process, so a scenario that needs the result
+    # of an earlier one would have to re-solve it. Pickling the Result
+    # keeps the later groups affordable, which is what makes resume work
+    # at all rather than being a way to restart from the beginning.
+    def _cache_dir(self):
+        d = os.path.join(self.out, 'cache')
+        os.makedirs(d, exist_ok=True)
+        return d
+
+    def cache(self, name, obj):
+        import pickle
+        with open(os.path.join(self._cache_dir(), name + '.pkl'),
+                  'wb') as f:
+            pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def cached(self, name):
+        import pickle
+        p = os.path.join(self._cache_dir(), name + '.pkl')
+        if not os.path.exists(p):
+            return None
+        try:
+            with open(p, 'rb') as f:
+                return pickle.load(f)
+        except Exception as exc:
+            self.log(f'cache {name} unreadable: {exc}')
+            return None
+
+    def last_result(self):
+        ents = self.win.results.entries()
+        return ents[-1].result if ents else None
 
     # ── scenario lifecycle ──────────────────────────────────────────────
     def begin(self, sid):
@@ -1330,6 +1373,880 @@ def c12_save_open(qa):
     qa.check(qa.win.setup.get_case().Lx == back.Lx,
              'a cancelled Open leaves the form alone', 'S2')
     qa.note('Open case cancelled -> nothing happened (expected)')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group D - native runs through the Run tab
+# ═══════════════════════════════════════════════════════════════════════
+def cases():
+    """The fixtures the run groups share, kept identical to the Tk
+    harness so a screenshot from either can be compared with the other."""
+    from blastlab.core.case import Case1D, Case2D, Case3D
+    C = {}
+    C['N1D'] = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.005,
+                      gauge_radii=[0.5, 1.0], n_snapshots=3)
+    C['N2D'] = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                      charge=20.0, center=(0.6, 0.0),
+                      obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                      bcs=dict(x_lo='reflect', x_hi='terminate',
+                               y_lo='reflect', y_hi='terminate'),
+                      gauges=[(0.3, 0.8), (1.4, 0.3)], n_snapshots=3,
+                      record_frames=60, anim_file='blast_2d_animation.gif')
+    C['N3D'] = Case3D(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05,
+                      charge=50.0, center=(1.0, 1.0, 0.7),
+                      obstacles=[(1.4, 1.7, 0.7, 1.3, 0.0, 0.6)],
+                      gauges=[(1.7, 1.0, 0.7), (1.0, 1.7, 0.7)],
+                      n_snapshots=3, record_frames=40, live=True,
+                      anim_file='blast_3d_animation.gif')
+    C['F1D'] = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                      gauge_radii=[0.5, 1.0], n_snapshots=2,
+                      solver='blastfoam', material='C4', activation='none')
+    C['F2D'] = Case2D(geometry='planar', Lx=2.0, Ly=2.0,
+                      cell_size_m=0.025, charge=50.0, center=(1.0, 1.0),
+                      gauges=[(0.5, 1.0)], n_snapshots=3,
+                      record_frames=50, solver='blastfoam',
+                      material='TNT')
+    C['F3D'] = Case3D(Lx=0.6, Ly=0.6, Lz=0.6, cell_size_m=0.025,
+                      charge=8.0, center=(0.3, 0.3, 0.3),
+                      gauges=[(0.45, 0.3, 0.3), (0.3, 0.45, 0.3)],
+                      n_snapshots=4, record_frames=150,
+                      solver='blastfoam', material='TNT')
+    return C
+
+
+def _cache_result(qa, name, dim=None):
+    """Cache the newest result - but only if it IS the one just run.
+
+    `last_result()` is the newest ENTRY, which is the previous run's when
+    this one timed out or was refused. Caching that quietly poisons every
+    later group: D04's 3D run once overran its timeout and its 2D
+    predecessor went into the cache as `native3d`, so group E asked a 2D
+    result for a 3D slice and got a KeyError out of a paint.
+    """
+    ents = qa.win.results.entries()
+    if not ents:
+        qa.check(False, f'no result to cache as {name}', 'S1')
+        return
+    ent = ents[-1]
+    if dim is not None and ent.dim != dim:
+        qa.check(False, f'the newest result is {ent.dim}D, not the {dim}D '
+                 f'one {name} is meant to hold - not caching it', 'S1',
+                 evidence=str([f'{e.label} ({e.dim}D)' for e in ents]))
+        return
+    try:
+        qa.cache(name, ent.result)
+    except Exception as exc:
+        qa.log(f'cache {name} failed: {exc}')
+
+
+def ensure_results(qa, names=('native1d', 'native2d', 'native3d')):
+    """Re-add the cached results under stable labels, so a group that
+    resumes in a fresh process still has something to look at."""
+    have = [e.label for e in qa.win.results.entries()]
+    dims = {'1d': 1, '2d': 2, '3d': 3}
+    for name in names:
+        label = f'QA {name}'
+        if label in have:
+            continue
+        res = qa.cached(name)
+        if res is None:
+            qa.log(f'no cache for {name}')
+            continue
+        dim = dims.get(name[-2:])
+        if dim is None:
+            meta = getattr(res, 'meta', {}) or {}
+            dim = 1 if 'radius_m' in meta else 3 if 'z_c' in meta else 2
+        qa.win.results.add_result(label, dim, res)
+        qa.pump(0.5)
+
+
+def select_result(qa, label):
+    sel = qa.win.results.sel
+    for i in range(sel.count()):
+        if sel.itemText(i) == label or label in sel.itemText(i):
+            sel.setCurrentIndex(i)
+            qa.pump(0.8)
+            return True
+    qa.check(False, f'no result labelled {label!r} to select', 'S2',
+             evidence=str([sel.itemText(i) for i in range(sel.count())]))
+    return False
+
+
+@scenario('D01', 'D', est=60)
+def d01_native_1d(qa):
+    """Native 1D run from the Run tab; chips, progress, log."""
+    C = cases()
+    qa.set_case(C['N1D'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.pump(0.6)
+    qa.shot('running')
+    qa.check(qa.run_wait(180), 'the 1D run finished', 'S1')
+    qa.shot('finished')
+    rp = qa.win.run_panel
+    qa.note(f'chips after the 1D run: {rp.chip_texts()}')
+    qa.check(rp.progress.value() >= rp.progress.maximum(),
+             f'progress reads 100 % after the run '
+             f'({rp.progress.value()} of {rp.progress.maximum()})')
+    _cache_result(qa, 'native1d', dim=1)
+
+
+@scenario('D02', 'D', est=200)
+def d02_native_2d_live(qa):
+    """Native 2D run: live slice + Show mesh, refresh policy, gauge drop."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    rp.show_mesh.setChecked(True)
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('2D Blast Solver', 40),
+             'the 2D solver announced itself', 'S1')
+    qa.pump(2.5)
+    qa.shot('live_mesh')
+    rp.refresh_val.setText('abc')
+    rp.refresh_changed.emit()
+    qa.pump(0.4)
+    qa.note(f'Refresh every = "abc": entry marked bad='
+            f'{rp.refresh_val.property("bad")!r}')
+    rp.refresh_mode.setCurrentText('steps')
+    rp.refresh_val.setText('5')
+    rp.refresh_changed.emit()
+    qa.pump(2.0)
+    qa.shot('refresh_steps5')
+    rp.show_mesh.setChecked(False)
+    qa.pump(1.5)
+    qa.shot('live_nomesh')
+    qa.check(qa.run_wait(300), 'the 2D run finished', 'S1')
+    qa.shot('finished')
+    qa.check(qa.log_has('inside an obstacle'),
+             'the dropped-gauge warning reached the run log', 'S2')
+    qa.note('that warning lives only in the Run log; the Results Gauges '
+            'table simply shows one gauge')
+    rp.refresh_val.setText('')
+    rp.refresh_mode.setCurrentText('seconds')
+    rp.refresh_changed.emit()
+    _cache_result(qa, 'native2d', dim=2)
+
+
+@scenario('D03', 'D', est=240)
+def d03_stepped(qa):
+    """Initialise Model / Exec / Interrupt / END on the 2D case."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.init_btn, 'Initialise Model')
+    qa.pump(1.5)
+    qa.shot('initialised')
+    qa.check(qa.log_has('[model initialised'),
+             'the G1 hint is there after Initialise Model', 'S3')
+    qa.note(f'after init: Run enabled={rp.run_btn.isEnabled()} '
+            f'Exec1 enabled={rp._exec_btns[0].isEnabled()} '
+            f'progress={rp.progress.value()} chips={rp.chip_texts()}')
+    qa.check(rp._exec_btns[0].isEnabled(),
+             'and the Exec buttons came alive', 'S2')
+    qa.click(rp._exec_btns[1], 'Exec 10')
+    qa.pump(1.5)
+    qa.shot('exec10')
+    qa.note(f'chips after Exec 10: {rp.chip_texts()}')
+    qa.click(rp._exec_btns[2], 'Exec 100')
+    qa.pump(1.5)
+    qa.click(rp._exec_btns[5], 'Interrupt')
+    qa.pump(1.0)
+    qa.shot('interrupted')
+    # the port says this where the run state is read, not only in the log
+    qa.note(f'paused readout: {rp.paused_text()!r}')
+    qa.check(bool(rp.paused_text().strip()),
+             'an interrupted run says so beside the run state, not only '
+             'in the log', 'S2')
+    qa.click(rp._exec_btns[4], 'END')
+    qa.check(qa.run_wait(300), 'END finished the run', 'S1')
+    qa.shot('finished')
+
+
+@scenario('D04', 'D', est=330)
+def d04_native_3d_view(qa):
+    """Native 3D run with the auto-attached embedded 3D view."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N3D'])
+    qa.shot('3d_form')
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.run_btn, 'Run')
+    ok = qa.until(lambda: rp.view3d_btn.isEnabled(), 90)
+    qa.check(ok, 'the 3D View button is enabled at run start', 'S2')
+    qa.pump(2.0)
+    qa.shot('live_slice')
+    qa.win._open_view3d()
+    qa.pump(2.5)
+    qa.shot('live_3d')
+    qa.check(rp.current_view() == '3D view',
+             'and it brings the 3D page forward', 'S2')
+    rp.show_slice_tab()
+    qa.pump(0.5)
+    # a 40-cubed native 3D solve takes minutes; a short timeout here does
+    # not just fail this scenario, it poisons the cache the E group reads
+    qa.check(qa.run_wait(1200), 'the 3D run finished', 'S1')
+    qa.shot('finished_slice')
+    rp.show_3d_tab()
+    qa.pump(1.5)
+    qa.shot('finished_3d')
+    v = rp.view3d
+    qa.note(f'after the run: frames in the host={getattr(v, "_n_frames", "?")} '
+            f'3D View enabled={rp.view3d_btn.isEnabled()}')
+    rp.show_slice_tab()
+    _cache_result(qa, 'native3d', dim=3)
+
+
+@scenario('D05', 'D', est=200)
+def d05_stop_midrun(qa):
+    """Stop during a native 3D run: bar, label, buttons."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N3D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('3D Blast Solver', 40),
+             'the 3D solver announced itself', 'S1')
+    qa.pump(4.0)
+    t0 = time.perf_counter()
+    qa.click(rp.stop_btn, 'Stop')
+    qa.shot('stop_requested')
+    qa.note(f'right after Stop: Stop enabled={rp.stop_btn.isEnabled()} '
+            f'Run enabled={rp.run_btn.isEnabled()}')
+    qa.check(qa.run_wait(180), 'the run stopped', 'S1')
+    qa.note(f'stop latency {time.perf_counter() - t0:.1f} s')
+    qa.shot('stopped')
+    labels = [e.label for e in qa.win.results.entries()]
+    qa.check(labels and labels[-1].endswith('(stopped)'),
+             'the stopped run is labelled "(stopped)"', 'S2',
+             evidence=str(labels))
+    qa.check(rp.progress.value() < rp.progress.maximum(),
+             'and the progress bar is NOT filled after a stop')
+    _cache_result(qa, 'native3d_stopped', dim=3)
+
+
+@scenario('D06', 'D', est=90)
+def d06_double_start(qa):
+    """A second start while a run is live must be refused, not queued."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('2D Blast Solver', 40),
+             'the first run started', 'S1')
+    worker = qa.win.ctrl.worker
+    qa.check(not rp.run_btn.isEnabled(),
+             'Run is disabled while a run is live - the refusal is '
+             'visible before it is needed', 'S2')
+    qa.win._run_single()            # the accelerator path, which is live
+    qa.pump(0.6)
+    qa.shot('second_start')
+    qa.check(qa.win.ctrl.worker is worker,
+             'a second start did NOT replace the running worker', 'S1')
+    qa.win.ctrl.stop()
+    qa.check(qa.run_wait(180), 'and the run still stops cleanly', 'S1')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group E - the Results tab, on the cached native runs
+# ═══════════════════════════════════════════════════════════════════════
+def _combo_items(combo):
+    return [combo.itemText(i) for i in range(combo.count())]
+
+
+@scenario('E01', 'E', est=60)
+def e01_picker_and_1d(qa):
+    """The result picker, the 1D views, and 3D asked of a 1D result."""
+    ensure_results(qa)
+    qa.goto('results')
+    rs = qa.win.results
+    qa.note('picker: ' + str(_combo_items(rs.sel)))
+    if not select_result(qa, 'QA native1d'):
+        return
+    qa.shot('1d_fields')
+    qa.check(rs.fields.page() == 'figure',
+             'a 1D result draws profiles, not a map '
+             f'(page {rs.fields.page()!r})', 'S2')
+    for view in ('Gauges', 'Animation', '3D'):
+        rs.show_view(view)
+        qa.pump(0.8)
+        qa.shot(f'1d_{view.lower()}')
+    rs.show_view('Fields')
+    qa.pump(0.5)
+    qa.click(rs._export_btns['profile'], 'Profile')
+    qa.pump(1.0)
+    # G3: asking for the 3D viewer on a 1D result has to say something
+    # where the user is looking, not only in the Run-tab log
+    rs.open_3d()
+    qa.pump(0.8)
+    qa.check(qa.log_has('select a 3D result'),
+             '3D Viewer on a 1D result explains itself', 'S3')
+    qa.shot('after_3dviewer_click')
+
+
+@scenario('E02', 'E', est=120)
+def e02_2d_fields(qa):
+    """Every 2D field for the first and last snapshot, with and without
+    the mesh."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    f = qa.win.results.fields
+    snaps = _combo_items(f.snap_sel)
+    fields = _combo_items(f.field_sel)
+    qa.note(f'2D snapshots: {snaps}; fields: {fields}')
+    qa.check(bool(snaps) and bool(fields),
+             'the 2D result offers snapshots and fields', 'S1')
+    for name in fields:
+        f.field_sel.setCurrentText(name)
+        for s in (snaps[0], snaps[-1]):
+            f.snap_sel.setCurrentText(s)
+            qa.pump(0.6)
+            tag = (name.replace(' ', '_') + '_'
+                   + s.replace(' ', '_')[:12])
+            qa.shot(tag)
+            qa.check(f.page() in ('image', 'figure'),
+                     f'{name} / {s} drew something', 'S2')
+    f.field_sel.setCurrentText(fields[0])
+    f.snap_sel.setCurrentText(snaps[-1])
+    f.show_mesh.setChecked(True)
+    qa.pump(1.0)
+    qa.shot('overpressure_mesh')
+    f.show_mesh.setChecked(False)
+    qa.pump(0.6)
+
+
+@scenario('E03', 'E', est=60)
+def e03_gauges_table(qa):
+    """Gauges figure + summary table; four exports that write files."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    rs = qa.win.results
+    rs.show_view('Gauges')
+    qa.pump(0.8)
+    qa.shot('gauges_2d')
+    rows = rs.gauges.rows()
+    qa.note(f'summary rows: {rows}')
+    qa.check(bool(rows), 'the summary table has a row per gauge', 'S2')
+    # N2-09: the table must not starve the traces it sits above
+    qa.check(rs.gauges.canvas.height() > rs.gauges.table.height(),
+             f'the traces keep more height than the table '
+             f'({rs.gauges.canvas.height()} vs '
+             f'{rs.gauges.table.height()} px)', 'S2')
+    # no scripted path: `default_path` already answers pick_dir with the
+    # exports directory and save_file with a name inside it, which is
+    # what distinguishes the two kinds. Handing a directory to a
+    # save_file export is how these were "failing" a moment ago.
+    out = qa.dirs['exports']
+    for kind in ('summary', 'tsv', 'fieldcsv', 'report'):
+        before = set(_walk(out))
+        rs.export(kind, threaded=False)
+        qa.pump(1.5)
+        written = sorted(os.path.relpath(p, out)
+                         for p in set(_walk(out)) - before)
+        qa.check(bool(written), f'the {kind} export wrote a file', 'S2',
+                 evidence=str(written))
+        qa.note(f'{kind} -> {written}')
+        qa.shot(f'after_{kind}_export')
+    if select_result(qa, 'QA native1d'):
+        qa.shot('gauges_1d')
+    rs.show_view('Fields')
+
+
+@scenario('E04', 'E', est=60)
+def e04_animation(qa):
+    """Replay: play/pause, the slider, and ONE colour range per video."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    rs = qa.win.results
+    rs.show_view('Animation')
+    qa.pump(1.0)
+    an = rs.anim
+    qa.shot('anim_frame0')
+    qa.check(an.play_btn.isEnabled(), 'Play is enabled', 'S2')
+    n = an.slider.maximum()
+    qa.note(f'recorded frames: slider 0..{n}, scale={an.scale()!r} '
+            f'used={an.scale_used()!r}')
+    qa.check(n > 0, 'the slider spans the recorded frames', 'S2')
+    first = an.image.levels
+    an.start_play()
+    qa.pump(2.0)
+    qa.shot('playing')
+    an.stop_play()
+    qa.check(not an.timer.isActive(), 'and stopping stops the timer', 'S2')
+    an.slider.setValue(n)
+    qa.pump(0.6)
+    qa.shot('last_frame')
+    qa.check(an.image.levels == first,
+             'the last frame keeps the SAME colour range as the first - '
+             'one range for the whole video', 'S2',
+             evidence=f'{first} -> {an.image.levels}')
+    an.set_show_mesh(True)
+    qa.pump(1.0)
+    an.slider.setValue(max(0, n // 2))
+    qa.pump(0.6)
+    qa.shot('mid_frame_mesh')
+    an.set_show_mesh(False)
+    rs.show_view('Fields')
+
+
+@scenario('E05', 'E', est=120)
+def e05_3d_fields(qa):
+    """Every 3D field entry, plus the mesh overlay."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native3d'):
+        return
+    f = qa.win.results.fields
+    fields = _combo_items(f.field_sel)
+    qa.note(f'3D fields: {fields}')
+    for name in fields:
+        f.field_sel.setCurrentText(name)
+        qa.pump(0.8)
+        qa.shot(name.replace(' ', '_').replace('(', '').replace(')', ''))
+        qa.check(f.page() in ('image', 'figure'),
+                 f'{name} drew something', 'S2')
+    f.field_sel.setCurrentText(fields[0])
+    f.show_mesh.setChecked(True)
+    qa.pump(1.0)
+    qa.shot('ovp_slice_mesh')
+    f.show_mesh.setChecked(False)
+    qa.win.results.show_view('Gauges')
+    qa.pump(0.8)
+    qa.shot('gauges_3d')
+    qa.win.results.show_view('Fields')
+
+
+@scenario('E06', 'E', est=200)
+def e06_3d_viewer(qa):
+    """The embedded 3D viewer: feed timing + every control.
+
+    The Tk app blocked the UI here for 1 to 10 s because pyvista was
+    imported on the click. The port pays that in the child process, so
+    the gate stays and the new number is the port's evidence.
+    """
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native3d'):
+        return
+    rs = qa.win.results
+    _, ms = qa.timeit('feed_result native3d', rs.open_3d)
+    qa.check(ms < 1000,
+             f'opening the 3D viewer blocked the UI for {ms:.0f} ms (G4)',
+             'S2')
+    qa.pump(2.0)
+    qa.shot('viewer_default')
+    v = rs.view3d
+    if not hasattr(v, '_field_btns'):
+        qa.note('no 3D host on this build (pyvista missing)')
+        return
+    qa.note('field buttons: ' + ', '.join(
+        f'{k}={b.isEnabled()}' for k, b in v._field_btns.items()))
+    for key in ('rho', 'e', 'p_peak', 'imp', 'p'):
+        btn = v._field_btns.get(key)
+        if btn is None or not btn.isEnabled():
+            qa.note(f'field {key} is not offered for this result')
+            continue
+        btn.setChecked(True)
+        qa.pump(1.2)
+        qa.shot(f'field_{key}')
+    v._checks['auto_scale'].setChecked(False)
+    v._vmin.setText('0')
+    v._vmax.setText('200')
+    v._clim_changed()
+    qa.pump(1.2)
+    qa.shot('manual_clim_0_200')
+    was_log = v._checks['log'].isChecked()
+    v._checks['log'].setChecked(not was_log)
+    qa.pump(1.2)
+    qa.shot('log_toggled')
+    v._checks['log'].setChecked(was_log)
+    v._checks['auto_scale'].setChecked(True)
+    v._checks['iso'].setChecked(False)
+    qa.pump(1.0)
+    qa.shot('iso_off')
+    v._checks['iso'].setChecked(True)
+    qa.pump(0.8)
+    rs.show_view('Fields')
+
+
+@scenario('E07', 'E', est=150)
+def e07_exports(qa):
+    """PNGs and the animation: the file is the GRID, not the screen."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    rs = qa.win.results
+    out = qa.dirs['exports']
+    before = set(_walk(out))
+    rs.export('pngs', threaded=False)
+    qa.pump(2.0)
+    pngs = [p for p in set(_walk(out)) - before if p.endswith('.png')]
+    qa.check(len(pngs) > 1,
+             'PNGs wrote the whole snapshot grid, several files - the '
+             'screen shows one field, the file does not', 'S2',
+             evidence=str(sorted(os.path.basename(p) for p in pngs)))
+    qa.check(all(os.path.getsize(p) > 5000 for p in pngs),
+             'and each one is a real image', 'S2')
+    qa.shot('after_pngs')
+    before = set(_walk(out))
+    rs.export('gif', threaded=False)
+
+    def _video():
+        return [p for p in set(_walk(out)) - before
+                if p.lower().endswith(('.gif', '.mp4', '.webm'))]
+    # the writer reports its own progress and the file lands when it is
+    # done, which for 81 frames is well past any fixed sleep
+    qa.until(lambda: bool(_video()), 120)
+    vids = _video()
+    qa.check(bool(vids), 'the animation export wrote a video', 'S2',
+             evidence=str([os.path.basename(p) for p in vids]))
+    qa.note(f'exports in {out}: '
+            f'{sorted(os.path.basename(p) for p in _walk(out))}')
+    qa.shot('after_anim')
+
+
+@scenario('E08', 'E', est=30)
+def e08_remove(qa):
+    """Remove blanks every sub-view and disables every export."""
+    ensure_results(qa)
+    qa.goto('results')
+    rs = qa.win.results
+    n0 = len(rs.entries())
+    if not n0:
+        qa.check(False, 'nothing to remove', 'S2')
+        return
+    rs.sel.setCurrentIndex(n0 - 1)
+    qa.pump(0.6)
+    rs.remove_current()
+    qa.pump(0.8)
+    qa.shot('after_remove')
+    qa.check(len(rs.entries()) == n0 - 1,
+             f'Remove took the entry out ({n0} -> {len(rs.entries())})',
+             'S2')
+    if not rs.entries():
+        qa.check(not any(b.isEnabled()
+                         for b in rs._export_btns.values()),
+                 'with nothing left, every export is disabled', 'S2')
+        qa.check(rs.fields.page() == 'empty',
+                 'and Fields shows its placeholder rather than a stale '
+                 f'picture (page {rs.fields.page()!r})', 'S2')
+
+
+@scenario('E09', 'E', est=30)
+def e09_title(qa):
+    """The title box rides into the figures and the exported names."""
+    ensure_results(qa)
+    qa.goto('results')
+    if not select_result(qa, 'QA native2d'):
+        return
+    rs = qa.win.results
+    rs.title_box.setText('QA title')
+    qa.pump(1.0)
+    qa.shot('titled')
+    qa.check('QA title' in (rs.title_extra() or ''),
+             'the panel carries the typed title', 'S3',
+             evidence=repr(rs.title_extra()))
+    qa.check('QA title' in (rs.fields.title() or ''),
+             'and it reaches the figure title', 'S3',
+             evidence=repr(rs.fields.title()))
+    rs.title_box.setText('')
+    qa.pump(0.6)
+
+
+def _walk(root):
+    out = []
+    for base, _dirs, files in os.walk(root):
+        out.extend(os.path.join(base, f) for f in files)
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group H - light mode over everything that draws
+# ═══════════════════════════════════════════════════════════════════════
+@scenario('H01', 'H', est=60)
+def h01_preview_theme(qa):
+    """The Setup preview across a theme toggle, with and without a redraw.
+
+    The interesting half is "without": a palette change has to repaint
+    what is already on screen, not wait for the next edit.
+    """
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D(geometry='planar', Lx=3.0, Ly=2.0,
+                       cell_size_m=0.05, charge=5.0, center=(1.0, 0.5),
+                       gauges=[(2.0, 1.0)],
+                       obstacles=[(1.5, 1.8, 0.0, 0.6)]))
+    qa.win.setup.show_mesh.setChecked(True)
+    qa.pump(1.0)
+    qa.shot('preview_dark')
+    qa.set_mode('light')
+    qa.shot('preview_light_no_redraw')
+    qa.field('Lx', '3.0001')
+    qa.pump(0.8)
+    qa.shot('preview_light_redrawn')
+    qa.set_mode('dark')
+    qa.shot('preview_dark_no_redraw')
+    qa.field('Lx', '3.0')
+    qa.win.setup.show_mesh.setChecked(False)
+    qa.check(qa.win.setup.preview_kind() == '2d',
+             'the preview survived four theme changes', 'S2')
+
+
+@scenario('H02', 'H', est=200)
+def h02_live_theme(qa):
+    """A theme toggle in the middle of a live native 2D run."""
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    rp.show_mesh.setChecked(True)
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('2D Blast Solver', 40), 'the run started', 'S1')
+    qa.pump(2.0)
+    qa.set_mode('light')
+    qa.pump(1.5)
+    qa.shot('live_light')
+    qa.check(qa.worker_alive() or not qa.win.ctrl.running,
+             'the run is still alive (or already done) after a repaint',
+             'S2')
+    qa.check(qa.run_wait(300), 'and it finished', 'S1')
+    qa.shot('finished_light')
+    qa.set_mode('dark')
+    qa.pump(1.0)
+    qa.shot('finished_dark_again')
+    rp.show_mesh.setChecked(False)
+
+
+@scenario('H03', 'H', est=150)
+def h03_results_light(qa):
+    """Results views, the run browser and Chain in light mode."""
+    ensure_results(qa)
+    qa.set_mode('light')
+    qa.goto('results')
+    rs = qa.win.results
+    for label in ('QA native2d', 'QA native3d'):
+        if not select_result(qa, label):
+            continue
+        for view in ('Fields', 'Gauges', 'Animation'):
+            rs.show_view(view)
+            qa.pump(0.8)
+            qa.shot(f'{label[-2:]}_{view.lower()}')
+        if label.endswith('3d'):
+            rs.open_3d()
+            qa.pump(1.5)
+            qa.shot('3d_viewer')
+    rs.show_view('Fields')
+    browser = rs.open_run_browser()
+    if browser is not None:
+        qa.until(lambda: browser.table.rowCount() > 0, 90)
+        qa.shot('browser_light', widget=browser)
+        browser.close()
+        qa.pump(0.5)
+    qa.goto('chain')
+    qa.shot('chain_light')
+    qa.goto('run')
+    qa.shot('run_light')
+    qa.set_mode('dark')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group I - robustness
+# ═══════════════════════════════════════════════════════════════════════
+@scenario('I01', 'I', est=330)
+def i01_rapid_tabs(qa):
+    """Random tab and view switching during a native 3D run."""
+    import random
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N3D'])
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.click(rp.run_btn, 'Run')
+    qa.check(qa.wait_log('3D Blast Solver', 40), 'the run started', 'S1')
+    qa.pump(3.0)
+    rnd = random.Random(7)
+    t0 = time.perf_counter()
+    qa.action = 'rapid tabs'
+    while time.perf_counter() - t0 < 12:
+        k = rnd.choice(['setup', 'run', 'results', 'chain'])
+        qa.win._show(k)
+        qa.tab = k
+        if k == 'results' and rnd.random() < 0.5:
+            qa.win.results.show_view(rnd.choice(
+                ['Fields', 'Gauges', 'Animation', '3D']))
+        if k == 'run' and rnd.random() < 0.5:
+            (rp.show_3d_tab if rnd.random() < 0.5
+             else rp.show_slice_tab)()
+        qa.pump(0.1)
+    qa.action = ''
+    qa.goto('run')
+    qa.check(qa.win.ctrl.running or not qa.win.ctrl.running,
+             'the window survived the switching', 'S1')
+    qa.check(qa.run_wait(900), 'and the run still finished', 'S1')
+    for k in ('setup', 'run', 'results', 'chain'):
+        qa.goto(k)
+        qa.shot('after_rapid')
+    rp.show_slice_tab()
+
+
+@scenario('I02', 'I', est=120, terminal=True)
+def i02_close_during_native(qa):
+    """Close the window two seconds into a native 3D run.
+
+    Terminal: the window is gone afterwards, so this ends the
+    invocation and the next one starts a fresh app.
+    """
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N3D'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.check(qa.wait_log('3D Blast Solver', 40), 'the run started', 'S1')
+    qa.pump(2.0)
+    worker = qa.win.ctrl.worker
+    t0 = time.perf_counter()
+    qa.win.close()
+    qa.pump(1.0)
+    dt = time.perf_counter() - t0
+    thread = getattr(worker, 'thread', None) or worker
+    try:
+        thread.join(60)
+        alive = thread.is_alive()
+    except Exception:
+        alive = 'unknown'
+    qa.log(f'close took {dt:.1f} s; worker alive after join: {alive}')
+    qa.check(dt < 12,
+             f'closing during a native run returned in {dt:.1f} s', 'S2')
+    qa.check(alive is not True,
+             'and the solver thread did not outlive the window', 'S2')
+    qa.win = None
+
+
+@scenario('I03', 'I', est=60)
+def i03_bad_json(qa):
+    """Open case on garbage / wrong schema / wrong dim / missing file."""
+    qa.goto('setup')
+    from blastlab.core.case import Case2D
+    qa.set_case(Case2D(Lx=3.3))
+    where = qa.dirs['cwd']
+    bad = {'garbage.json': '{not json',
+           'wrongschema.json': json.dumps({'schema': 99, 'dim': 2}),
+           'dim5.json': json.dumps({'dim': 5}),
+           'empty.json': ''}
+    for name, text in bad.items():
+        with open(os.path.join(where, name), 'w', encoding='utf-8') as f:
+            f.write(text)
+    for name in list(bad) + ['missing.json']:
+        qa.win._open_case(os.path.join(where, name))
+        qa.pump(0.5)
+        lx = _form(qa).v['Lx'].get()
+        qa.note(f'{name}: form Lx still {lx!r}')
+        qa.check(lx == '3.3',
+                 f'{name} left the form alone rather than half-loading it',
+                 'S2')
+    qa.shot('after_bad_json')
+
+
+@scenario('I04', 'I', est=120)
+def i04_huge_cells(qa):
+    """Cap errors on Run / Initialise; a warning-level case starts."""
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D(geometry='planar', Lx=10.0, Ly=10.0,
+                       cell_size_m=0.001, center=(5.0, 5.0)))
+    qa.goto('run')
+    rp = qa.win.run_panel
+    qa.win._run_single()
+    qa.pump(1.0)
+    qa.check(not qa.worker_alive(),
+             'a 100 M cell case is refused at Run', 'S1')
+    rp.init_btn.click()
+    qa.pump(1.0)
+    qa.check(not qa.worker_alive(),
+             'and refused at Initialise Model too', 'S1')
+    qa.goto('setup')
+    qa.set_case(Case2D(geometry='planar', Lx=6.0, Ly=6.0,
+                       cell_size_m=0.004, charge=50.0, center=(3.0, 3.0),
+                       record_frames=0))
+    qa.note('2.25 M-cell 2D case strip: ' + ' | '.join(qa.strip_text()))
+    qa.goto('run')
+    d0 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    qa.click(rp.run_btn, 'Run')
+    qa.pump(2.0)
+    started = qa.worker_alive() or qa.log_has('[run finished]')
+    d1 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    qa.note(f'warning-level case: started={started}, dialogs={d1 - d0} '
+            f'(no confirmation prompt for a merely large run)')
+    qa.check(started,
+             'a case that only WARNS starts without asking', 'S2')
+    qa.shot('large_run_started')
+    qa.win.ctrl.stop()
+    qa.check(qa.run_wait(300), 'and stops on request', 'S1')
+
+
+@scenario('I05', 'I', est=60)
+def i05_input_stress(qa):
+    """Odd numeric inputs: 1e400, nan, inf, whitespace, decimal comma."""
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D())
+    for val in ('1e400', 'nan', 'inf', ' 1 ', '1,5', '-0'):
+        qa.field('charge', val)
+        qa.note(f'charge={val!r}: ' + ' | '.join(qa.strip_text()))
+        qa.shot('charge_' + val.strip().replace(',', 'comma')
+                .replace(' ', '').replace('-', 'neg'))
+    qa.field('charge', '1.0')
+    qa.field('n_snapshots', '2.7')
+    # refusing 2.7 is the CORRECT answer, so get_case() raising here is a
+    # pass and not a crash - it is recorded, never propagated
+    try:
+        parsed = f'parsed as {qa.win.setup.get_case().n_snapshots}'
+    except Exception as exc:
+        parsed = (f'rejected: {type(exc).__name__}: '
+                  + ' / '.join(str(exc).splitlines()))
+    qa.note(f'n_snapshots=2.7: ' + ' | '.join(qa.strip_text())
+            + f' ({parsed})')
+    qa.field('n_snapshots', '6')
+    qa.field('cell', '1e-9')
+    qa.note('cell=1e-9: ' + ' | '.join(qa.strip_text()))
+    qa.check(bool(qa.strip_text()),
+             'a 1e-9 m cell is reported rather than accepted in silence',
+             'S2')
+    qa.field('cell', '0.025')
+
+
+@scenario('I06', 'I', est=40)
+def i06_small_window_3d(qa):
+    """A below-minimum window with the Results 3D sub-tab open."""
+    ensure_results(qa)
+    qa.goto('results')
+    if select_result(qa, 'QA native3d'):
+        qa.win.results.open_3d()
+        qa.pump(1.5)
+    for spec in ('1100x720', '900x600'):
+        qa.geometry(spec)
+        qa.shot(f'3d_{spec}')
+    qa.reset_window()
+    qa.check(qa.win.width() >= 1100,
+             f'the window refuses to go under its own minimum '
+             f'({qa.geometry()})', 'S2')
+    qa.win.results.show_view('Fields')
 
 
 def main():
