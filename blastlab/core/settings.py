@@ -71,8 +71,21 @@ def config_path():
 
 
 def load(path=None):
-    """DEFAULTS updated with whatever the file holds (missing/corrupt
-    file -> defaults)."""
+    """DEFAULTS updated with whatever the file holds.
+
+    A missing or unreadable file gives the defaults with ONE exception:
+    `auto_cleanup` comes back False. The sweep deletes run directories,
+    and a settings file we could not read means nobody has told us
+    anything about this machine - `cleanup_max_gb = 20` is then a policy
+    the user has never seen, applied to data they may care about very
+    much. Turning it on needs a file that says so.
+
+    This is not hypothetical. Every test and harness "protects" the real
+    settings by pointing BLASTLAB_SETTINGS at a throwaway path, which
+    does not exist - so each one built a GUI that swept the corpus to
+    20 GB, keeping 3 runs, which is harsher than the real app with the
+    user's own 150 GB / 10-run policy would ever have been.
+    """
     path = path or config_path()
     out = dict(DEFAULTS)
     try:
@@ -80,8 +93,10 @@ def load(path=None):
             data = json.load(f)
         if isinstance(data, dict):
             out.update(data)
+            return out
     except (OSError, ValueError):
         pass
+    out['auto_cleanup'] = False
     return out
 
 

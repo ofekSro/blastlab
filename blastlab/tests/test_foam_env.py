@@ -312,18 +312,35 @@ def main():
     from blastlab.core import settings as gs
     import tempfile
     sp = os.path.join(tempfile.mkdtemp(prefix='blastlab_set_'), 'settings.json')
-    check('settings: defaults when the file is missing',
-          gs.load(sp) == gs.DEFAULTS)
+    # A missing file gives the defaults EXCEPT auto_cleanup, which comes
+    # back False. This check used to demand plain equality with DEFAULTS,
+    # i.e. it pinned "a settings file we cannot read authorises deleting
+    # run directories down to 20 GB, keeping 3" - and every test points
+    # BLASTLAB_SETTINGS at a path that does not exist, so each one swept
+    # the corpus harder than the real app ever would. That cost real
+    # data on 2026-09-17.
+    check('settings: a missing file does not authorise the sweep',
+          gs.load(sp)['auto_cleanup'] is False, str(gs.load(sp)))
+    check('settings: every other default still comes through',
+          gs.load(sp) == dict(gs.DEFAULTS, auto_cleanup=False))
     gs.save(dict(gs.DEFAULTS, auto_cleanup=False, cleanup_max_gb=5), sp)
     got = gs.load(sp)
     check('settings: round trip keeps overrides and fills defaults',
           got['auto_cleanup'] is False and got['cleanup_max_gb'] == 5
           and got['cleanup_keep_recent'] == 3, str(got))
+    gs.save(dict(gs.DEFAULTS, auto_cleanup=True), sp)
+    check('settings: a file that SAYS yes still means yes',
+          gs.load(sp)['auto_cleanup'] is True)
     with open(sp, 'w') as f:
         f.write('{ not json')
-    check('settings: corrupt file -> defaults', gs.load(sp) == gs.DEFAULTS)
+    check('settings: a corrupt file does not authorise it either',
+          gs.load(sp) == dict(gs.DEFAULTS, auto_cleanup=False),
+          str(gs.load(sp).get('auto_cleanup')))
     check('auto_cleanup honours the opt-out without touching WSL',
           env.auto_cleanup(dict(auto_cleanup=False)) == (0, 0))
+    check('and so does an empty settings dict, which is what a test '
+          'with no file hands it',
+          env.auto_cleanup(gs.load(sp)) == (0, 0))
 
     # ── B13: run dirs are unique, not just timestamped ─────────────────
     posix, unc = env.new_case_dir(3, stamp='20260101-000000')
