@@ -48,20 +48,25 @@ def solve_stage(dim, case):
     def solve(hooks):
         from . import get_solver
         res = get_solver(dim, backend)(case, hooks)
+        # Both halves of the guard matter: gauge POINTS say there is
+        # something to write, gauge_file says the case asked for it.
+        # Without the second, `gauge_file=None` wrote a file literally
+        # named "None" into the working directory - np.savetxt stringifies
+        # its path. The profile lines two below always had it right.
         if dim == 1:
-            if case.gauge_radii:
+            if case.gauge_radii and case.gauge_file:
                 save_gauges_1d(res.gauges, case.gauge_file)
             if case.profile_file:
                 save_profile(res.meta['final_profile'], case.profile_file)
         elif dim == 2:
-            if case.gauges:
+            if case.gauges and case.gauge_file:
                 save_gauges_2d(res.gauges, case.gauge_file)
             _animate(case, res)
             if case.profile_file:
                 save_profile_2d(res.meta, case.profile_file)
             write_trigger_remap(case, res)
         else:
-            if case.gauges:
+            if case.gauges and case.gauge_file:
                 save_gauges_3d(res.gauges, case.gauge_file)
             _animate(case, res)
         return res

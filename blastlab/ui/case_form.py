@@ -231,7 +231,11 @@ class CaseForm(FieldForm):
                 n_snapshots=_I('n_snapshots', 'snapshots'),
                 t_end=_F('t_end', 'end time'),
                 gauge_radii=[g[0] for g in self.gauges.get()],
-                gauge_file=v['gauge_file'].get(),
+                # `or None` like its neighbours: without it an empty box
+                # became '' and a None round-tripped through the widget
+                # as the string 'None', which the writer then used as a
+                # FILE NAME - runs left a file called "None" behind
+                gauge_file=v['gauge_file'].get() or None,
                 profile_file=v['profile_out'].get() or None,
                 solver=self._mode,
                 material=v['material'].get() if foam else 'TNT',
@@ -258,7 +262,7 @@ class CaseForm(FieldForm):
             obstacles=self.obstacles.get(), cfl=_F('cfl', 'cfl'),
             n_snapshots=_I('n_snapshots', 'snapshots'),
             gauges=self.gauges.get(),
-            gauge_file=v['gauge_file'].get(),
+            gauge_file=v['gauge_file'].get() or None,
             t_end=_F('t_end', 'end time'),
             trigger_gauge=_trig(v['trigger_gauge']),
             trigger_action=v['trigger_action'].get(),
@@ -336,7 +340,7 @@ class CaseForm(FieldForm):
             v['n_snapshots'].set(str(case.n_snapshots))
             v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
             self.gauges.set([(g,) for g in case.gauge_radii])
-            v['gauge_file'].set(case.gauge_file)
+            v['gauge_file'].set(case.gauge_file or '')
             v['profile_out'].set(case.profile_file or '')
             return
         if self.dim == 2:
@@ -389,7 +393,7 @@ class CaseForm(FieldForm):
         if self.dim == 3:
             self.extra_charges.set(getattr(case, 'charges', None) or [])
         self.det_pts.set(getattr(case, 'det_points', None) or [])
-        v['gauge_file'].set(case.gauge_file)
+        v['gauge_file'].set(case.gauge_file or '')
         v['anim_file'].set(case.anim_file or '')
         v['anim_mesh'].set(bool(getattr(case, 'anim_mesh', False)))
         scale = anim_scale_from_label(getattr(case, 'anim_scale', 'run'))

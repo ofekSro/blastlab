@@ -95,6 +95,32 @@ def main():
             check(f"dim {d} {mode}: round trips", not diffs,
                   '; '.join(diffs[:3]))
 
+    print("\nS3b: an optional path that is None stays None")
+    # It did not. `gauge_file` alone lacked the `or None` / `or ''` its
+    # neighbours had, so None went into the widget as the string 'None'
+    # and came back as one - and the writer then used it as a FILE NAME.
+    # Every finished run left a file called "None" in the working
+    # directory. Its neighbours were always right, which is why it took
+    # a stray file in `git status` to notice.
+    import blastlab.core.case as case_mod
+    blank = {1: case_mod.Case1D(gauge_radii=[0.5], gauge_file=None,
+                                profile_file=None),
+             2: case_mod.Case2D(gauges=[(1.0, 0.4)], gauge_file=None,
+                                profile_file=None, anim_file=None),
+             3: case_mod.Case3D(gauges=[(1.0, 0.4, 0.3)],
+                                gauge_file=None, anim_file=None)}
+    for d, case in blank.items():
+        f = form(d)
+        f.set_case(case)
+        pump(5)
+        back = f.get_case()
+        bad = [(k, getattr(back, k))
+               for k in ('gauge_file', 'profile_file', 'anim_file')
+               if hasattr(case, k) and getattr(case, k) is None
+               and getattr(back, k, None) is not None]
+        check(f'dim {d}: no optional path comes back as a string',
+              not bad, str(bad))
+
     print("\nS4: every bad field is reported, and marked")
     f = form(2)
     f.v['Lx'].set('abc')
