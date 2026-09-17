@@ -7,7 +7,7 @@ the scene with `('ctrl', surface, name, ...)` messages and mirrors the
 child's `status` replies into its controls. The control column is the
 same three-tab stack the Tk panel had:
 
-  Display : displayed field, auto or manual colour range, log contours,
+  Display : displayed field, auto or manual colour range, log scale,
             isosurface / surface loads / volume / mesh layers
   Planes  : six cross-section planes - enable, axis, position, opacity
   View    : axis-aligned camera presets + parallel projection
@@ -175,6 +175,7 @@ class View3DHost(QWidget):
         self._burst_until = 0.0
         self._native = False          # the card adopted the window itself
         self._style = None            # the window's own frame, to restore
+        self._log_user = False        # the user overrode the log default
         self._build()
         self._built = True
         link.register(surface, self)
@@ -280,8 +281,8 @@ class View3DHost(QWidget):
             ent.editingFinished.connect(self._clim_changed)
             row.addWidget(ent, 1)
             disp.add_layout(row)
-        checkbox(disp, 'Log contours', 'log', False,
-                 lambda _k: self._ctrl('log', self._checks['log'].isChecked()))
+        checkbox(disp, 'Log colour scale', 'log',
+                 self._log_default_for('p'), self._log_changed)
         small_label(disp, 'LAYERS')
         checkbox(disp, 'Shock isosurface', 'iso', True, self._toggle_layer)
         disp.add(label('Iso level (frac of peak)', 'small'))
@@ -1180,9 +1181,43 @@ class View3DHost(QWidget):
     def _toggle_layer(self, key):
         self._ctrl('layer', key, self._checks[key].isChecked())
 
+    # ── the colour scale for a field whose range spans four decades ──────
+    #
+    # A blast field is not an ordinary one. Measured on a live 3D run of
+    # a 2 kg charge: the products sit at 2.8e6 kPa while the air around
+    # them is at tens of kPa, so on a linear bar the whole shocked field
+    # - everything the user is actually watching - is squeezed into the
+    # bottom fraction of a per cent and the view is one flat colour. It
+    # is updating; it just cannot show anything.
+    #
+    # Pressure therefore defaults to a logarithmic scale, where the front
+    # lands at 81-93 % of the bar (see viz3d.viewer.LOG_DECADES, which
+    # records the linear rules that were measured and rejected). The
+    # other fields have no such range and stay linear. A deliberate
+    # choice by the user outranks both, for the rest of the session.
+    def _log_default_for(self, key):
+        return bool(FIELDS.get(key, {}).get('ovp'))
+
+    def _log_changed(self, _key=None):
+        self._log_user = True
+        self._ctrl('log', self._checks['log'].isChecked())
+
+    def _sync_log_default(self, key):
+        if self._log_user:
+            return
+        cb = self._checks.get('log')
+        want = self._log_default_for(key)
+        if cb is None or cb.isChecked() == want:
+            return
+        was = cb.blockSignals(True)      # a default is not a user choice
+        cb.setChecked(want)
+        cb.blockSignals(was)
+        self._ctrl('log', want)
+
     def _field_changed(self, key):
         self._field = key
         self._ctrl('field', key)
+        self._sync_log_default(key)
 
     def _plane_changed(self, key):
         axis, pos, _op = self._planes[key]

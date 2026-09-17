@@ -37,6 +37,26 @@ OVP_TITLE = 'Overpressure [kPa]'
 RHO_TITLE = 'Density [kg/m3]'
 
 #: Selectable display fields: payload key -> scalar-bar title and
+#: How many decades a logarithmic colour scale spans below the peak.
+#:
+#: Four was not enough, measured on a real live 3D run. A 2 kg charge
+#: puts 2.8e6 kPa of overpressure in the products while the air around
+#: them is at tens of kPa - a dynamic range of 27,608 - so a four-decade
+#: floor (peak/1e4 = 278 kPa) still buried the entire shocked field at
+#: the bottom of the bar. At six the shock front lands at 81-93 % of the
+#: bar across every frame of that run, 10 kPa gets 15 % and 100 kPa 31 %.
+#:
+#: This is what a logarithmic scale is for, and it is why the live view
+#: uses one for pressure by default: every rule that tries to pick a
+#: LINEAR cap was measured and rejected. A percentile over the whole
+#: domain is ambient (99.9 % of the cells are undisturbed air); a
+#: percentile over only the disturbed cells is still products (the ratio
+#: peak/p99.5 came out 1.0-1.4, so the clip never engaged, and lower
+#: percentiles saturated the shock front itself at up to 1237 % of the
+#: bar); and splitting products from air by a multiple of the median
+#: moved the answer by 100x when that multiple went from 10 to 1000.
+LOG_DECADES = 6.0
+
 #: whether the stored display values are overpressure in kPa.
 FIELDS = {
     'p':      dict(title=OVP_TITLE,                  ovp=True,
@@ -549,7 +569,7 @@ class BlastScene(_CameraOps):
                 lo, hi = float(np.nanmin(arr)), float(np.nanmax(arr))
         hi = max(hi, lo + 1e-9)
         if self.log_scale:
-            lo = max(lo, hi * 1e-4, 1e-9)
+            lo = max(lo, hi * 10.0 ** -LOG_DECADES, 1e-9)
         return lo, hi
 
     def _scrub(self, v):
