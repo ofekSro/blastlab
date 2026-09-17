@@ -226,6 +226,7 @@ class RunPanel(QWidget):
         self._body.addWidget(right)
         self._body.setStretchFactor(0, 34)
         self._body.setStretchFactor(1, 66)
+        self._set_tab_order()
         self._sash_user = False
         self._sash_placed = False
         self._body.splitterMoved.connect(lambda *_: setattr(
@@ -289,6 +290,30 @@ class RunPanel(QWidget):
     def show_slice_tab(self):
         self._view_seg.set('Live slice')
         self._stack.setCurrentWidget(self.pane)
+
+    def _set_tab_order(self):
+        """Walk Tab the way the tab reads, not the way it was built.
+
+        Qt's default is construction order, which is right almost
+        everywhere in this app - the forms are built top to bottom. This
+        panel is the exception, because its two bars and its two body
+        columns are built in an order that has nothing to do with where
+        they end up: measured, Tab went Run (left) -> Name (middle) ->
+        Initialise (left) -> Refresh (far right) -> the log (left) ->
+        the view controls (middle), bouncing across the window six
+        times.
+
+        The log stays in the chain rather than being taken out of it: it
+        is read-only, but a keyboard user still needs to reach it to
+        scroll and copy. It just goes last, after every control.
+        """
+        chain = [self.run_btn, self.stop_btn, self.view3d_btn,
+                 self.run_name, self.init_btn, *self._exec_btns,
+                 self.refresh_val, self.refresh_mode,
+                 self._view_seg, self.show_mesh, self.auto_clim,
+                 self.clim_min, self.clim_max, self.log]
+        for first, second in zip(chain, chain[1:]):
+            QWidget.setTabOrder(first, second)
 
     def current_view(self):
         return '3D view' if self._stack.currentWidget() is self.view3d \
