@@ -93,7 +93,7 @@ def main():
     from blastlab.ui import theme
     from blastlab.ui.app import MainWindow
     from blastlab.ui.case_form import CaseForm
-    from blastlab.ui.fieldform import COL_MIN
+    from blastlab.ui.fieldform import CARD_PAD, COL_MIN
     from blastlab.ui import results_gauges as RG
 
     crashes = []
@@ -165,6 +165,13 @@ def main():
     check('and the form fills the viewport, not its minimum',
           vis[0].width() == vis[0]._avail_width(),
           f'{vis[0].width()} vs {vis[0]._avail_width()}')
+    # the DEFAULT window, and the size the owner's saved geometry uses:
+    # the Tk form showed two columns here, so the Qt one must too
+    win.resize(1280, 840)
+    pump(250)
+    check('the default 1280x840 still gets two columns',
+          not vis[0].single_column(),
+          f'avail {vis[0]._avail_width()} needs {2 * COL_MIN + 8}')
     win.resize(1100, 720)
     pump(200)
     check('narrow: one column', vis[0].single_column(),
@@ -180,7 +187,10 @@ def main():
           vis[0].width() <= vis[0]._avail_width(),
           f'{vis[0].width()} vs {vis[0]._avail_width()}')
     check('the threshold is two columns plus the gap',
-          COL_MIN == 310 and 2 * COL_MIN + 8 == 628, str(COL_MIN))
+          COL_MIN == 302 and 2 * COL_MIN + 8 == 612, str(COL_MIN))
+    check('and the form cards use the panel-wide 12 px padding - 16 cost '
+          '8 px a column, which is what pushed 1280 over the edge',
+          CARD_PAD == 12, str(CARD_PAD))
 
     print('\nP4: collapsing must not lose anything')
     win.resize(1600, 900)

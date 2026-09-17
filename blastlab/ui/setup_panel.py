@@ -92,6 +92,10 @@ class SetupPanel(QWidget):
         left.addWidget(self._status_card)
         holder = QWidget()
         holder.setLayout(left)
+        # The stretch barely matters: the preview card has its own
+        # minimum (measured 366 px at every window size), so the form
+        # gets whatever is left. Two columns fit at 1280 because
+        # fieldform.CARD_PAD is 12, not 16 - see COL_MIN there.
         body.addWidget(holder, 13)
 
         # right: the preview card

@@ -26,10 +26,17 @@ from .setup_spec import INPUT_MIN, LABEL_WRAP, cards
 from .theme import GAP
 from .widgets import Card, button, label
 
+#: the form's cards use the same 12 px padding as every other card on
+#: the Setup and Chain panels. It used to be theme.PAD (16), which cost
+#: 8 px per column - just enough to stop two columns fitting at the
+#: DEFAULT 1280 px window, where the Tk form showed two.
+CARD_PAD = 12
+
 #: what one column of cards needs: a wrapped caption, an input, and the
-#: card's own padding. Two of these plus the gap is the width at which
-#: the form stops trying to be two columns (see FieldForm._fit_columns).
-COL_MIN = LABEL_WRAP + INPUT_MIN + 4 * GAP
+#: card's padding on both sides. Two of these plus the gap is the width
+#: at which the form stops trying to be two columns (see
+#: FieldForm._fit_columns).
+COL_MIN = LABEL_WRAP + INPUT_MIN + 2 * CARD_PAD
 
 
 # ── variables ────────────────────────────────────────────────────────────
@@ -306,7 +313,7 @@ class FieldForm(QWidget):
         # the reading order the single-column layout falls back to
         self._card_order = []
         for spec in cards(self.dim):
-            card = Card(spec.title, parent=self)
+            card = Card(spec.title, pad=CARD_PAD, parent=self)
             self.cards[spec.title] = card
             card._blastlab_scope = spec.scope
             self._card_order.append(
