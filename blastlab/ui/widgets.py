@@ -2,7 +2,7 @@
 chips, scroll columns and small factories, all styled through the
 object names `theme.qss` knows about."""
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal    # noqa: F401
 from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QScrollArea, QSizePolicy,
                                QToolButton, QVBoxLayout, QWidget)
@@ -228,6 +228,128 @@ class ScrollColumn(QScrollArea):
 
     def add_stretch(self):
         self.layout_.addStretch(1)
+
+
+class WrapRow(QWidget):
+    """A row of widgets that WRAPS to a second line instead of letting
+    Qt shrink them until their labels are clipped.
+
+    Qt has no flow layout, and an ordinary QHBoxLayout compresses its
+    children when short of room - which for a push button means the text
+    is silently cut. Measured on the Results export row: four of the
+    eight buttons showed 'Animatio', 'Summary C', 'Gauges TS' and
+    'Field CSV' at EVERY window size, because they were pinned to 106 px
+    while needing 116 to 155. The Tk row had the same defect once
+    (N2-10) and was fixed by widening one button, which only moved the
+    problem.
+
+    Children keep their own sizeHint here, and the rows are filled
+    greedily, so nothing is ever narrower than its text.
+    """
+
+    def __init__(self, spacing=GAP, parent=None):
+        super().__init__(parent)
+        self._items = []
+        self._spacing = spacing
+        self._plan = None
+        self._outer = QVBoxLayout(self)
+        self._outer.setContentsMargins(0, 0, 0, 0)
+        self._outer.setSpacing(spacing)
+        self._rows = []
+
+    def add(self, widget):
+        self._items.append(widget)
+        widget.setParent(self)
+        self._relayout(force=True)
+        return widget
+
+    def widgets(self):
+        return list(self._items)
+
+    def rows(self):
+        """How many lines the row currently occupies."""
+        return max(1, len(self._rows))
+
+    def _plan_rows(self, avail):
+        rows, cur, used = [], [], 0
+        for w in self._items:
+            need = w.sizeHint().width()
+            if cur and used + self._spacing + need > avail:
+                rows.append(cur)
+                cur, used = [w], need
+            else:
+                used += (self._spacing if cur else 0) + need
+                cur.append(w)
+        if cur:
+            rows.append(cur)
+        return rows
+
+    def _relayout(self, force=False):
+        avail = max(1, self.width())
+        plan = self._plan_rows(avail)
+        key = [[id(w) for w in row] for row in plan]
+        if key == self._plan and not force:
+            return
+        self._plan = key
+        while self._outer.count():
+            item = self._outer.takeAt(0)
+            lay = item.layout()
+            if lay is not None:
+                while lay.count():
+                    sub = lay.takeAt(0)
+                    if sub.widget() is not None:
+                        sub.widget().setParent(self)
+                lay.deleteLater()
+        self._rows = []
+        for row in plan:
+            lay = QHBoxLayout()
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setSpacing(self._spacing)
+            for w in row:
+                lay.addWidget(w)
+                w.show()
+            lay.addStretch(1)
+            self._outer.addLayout(lay)
+            self._rows.append(lay)
+        # the row is taller now, and only we know it
+        self.updateGeometry()
+
+    def _row_height(self):
+        return max((w.sizeHint().height() for w in self._items),
+                   default=0)
+
+    def _height_of(self, plan):
+        n = max(1, len(plan))
+        return n * self._row_height() + (n - 1) * self._spacing
+
+    def minimumSizeHint(self):
+        """The WIDEST single child, not the sum of them.
+
+        This is the whole reason the wrap works. The nested layouts
+        report the sum as their minimum, so the parent refused to squeeze
+        the row below one line - measured: the row stayed 952 px wide
+        inside a 500 px panel and simply overflowed, which is the
+        clipping this class exists to avoid. Reporting one child's width
+        lets the parent shrink us, which fires resizeEvent, which
+        re-plans into more rows.
+        """
+        if not self._items:
+            return super().minimumSizeHint()
+        widest = max(w.sizeHint().width() for w in self._items)
+        return QSize(widest,
+                     self._height_of(self._plan_rows(max(1, self.width()))))
+
+    def sizeHint(self):
+        if not self._items:
+            return super().sizeHint()
+        total = (sum(w.sizeHint().width() for w in self._items)
+                 + self._spacing * (len(self._items) - 1))
+        return QSize(total,
+                     self._height_of(self._plan_rows(max(1, self.width()))))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._relayout()
 
 
 def hsep():

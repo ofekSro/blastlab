@@ -143,6 +143,23 @@ def main():
     check('and every button says why',
           all(p._export_btns[k].toolTip() == 'Select a result first.'
               for k in p._export_btns))
+    # four of these labels need 116-155 px and were pinned to 106, so
+    # they read 'Animatio', 'Summary C', 'Gauges TS', 'Field CSV'
+    cut = [b.text() for b in p._export_btns.values()
+           if b.fontMetrics().horizontalAdvance(b.text())
+           > b.width() - 15 - 6 - 24]
+    check('no export label is cut off by its own button', not cut,
+          str(cut))
+    p.resize(900, 600)
+    pump(60)
+    cut = [b.text() for b in p._export_btns.values()
+           if b.fontMetrics().horizontalAdvance(b.text())
+           > b.width() - 15 - 6 - 24]
+    check('nor at 900x600, where the row wraps instead of shrinking',
+          not cut and p._export_row.rows() > 1,
+          f'{cut} in {p._export_row.rows()} row(s)')
+    p.resize(1280, 840)
+    pump(60)
     a = p.add_result('run', 2, fake_2d())
     b = p.add_result('run', 2, fake_2d())
     pump(30)
@@ -352,20 +369,33 @@ def main():
     check('going back to a p-only result resets and hides it',
           g.field() == 'p' and not g.selector_visible())
     p.show_view('Gauges')
-    p.resize(900, 600)
-    pump(40)
-    check('at 900x600 every gauge row is on screen - this table is the '
-          'only place the peak, arrival and impulse numbers appear',
+    # 1100x720 is the window's declared minimum, so every row must be
+    # on screen there: this table is the only place the peak, arrival
+    # and impulse numbers appear at all
+    p.resize(1100, 720)
+    pump(200)
+    check('at the supported minimum every gauge row is on screen',
           g.table.verticalScrollBar().maximum() == 0
           and g.table.rowCount() == 3,
           f'scroll {g.table.verticalScrollBar().maximum()} '
           f'rows {g.table.rowCount()} h {g.table.height()}')
-    check('and the table does not eat the traces either',
+    check('and the table does not eat the traces',
           g.canvas.height() > g.table.height(),
           f'canvas {g.canvas.height()} vs table {g.table.height()}')
+    # below the minimum the table scrolls rather than crowding the
+    # traces out - that trade-off is the point of TABLE_MAX_SHARE
+    p.resize(900, 600)
+    pump(200)
+    check('below the minimum the traces still win',
+          g.canvas.height() > g.table.height()
+          and g.table.height() <= int(g.height() * RG.TABLE_MAX_SHARE) + 2,
+          f'canvas {g.canvas.height()} table {g.table.height()} '
+          f'share {int(g.height() * RG.TABLE_MAX_SHARE)}')
     many = with_gauges(fake_2d(), n=12)
     p.add_result('twelve gauges', 2, many)
-    pump(40)
+    # the export row may re-wrap and the table re-cap, and both change
+    # the height the canvas gets; give the layout a full pass
+    pump(200)
     check('twelve gauges scroll instead of squeezing the traces out',
           g.table.rowCount() == 12
           and g.table.maximumHeight() < 6 * g.table.rowHeight(0)
@@ -628,8 +658,15 @@ def main():
     check('Fields is blank', p.fields.page() == 'empty'
           and p.fields.image is None)
     check('the gauge table is empty', p.gauges.rows() == [])
-    check('the replay is blank', p.anim.hint.text() == ''
-          and p.anim.image is None)
+    # not blank-blank: an empty panel said nothing at all, so each
+    # sub-view now names what would put something in it
+    check('the replay says what would fill it, and holds no image',
+          'Record replay frames' in p.anim.hint.text()
+          and p.anim.image is None, repr(p.anim.hint.text()[:40]))
+    check('and so do Fields and Gauges',
+          'appear here' in p.fields.hint.text()
+          and p.gauges.canvas.figure is not None,
+          repr(p.fields.hint.text()[:40]))
     check('Remove with nothing selected says so, it does not raise',
           (p.remove_current() or True)
           and any('select a result first' in s.lower() for s in log))

@@ -15,9 +15,14 @@ from .theme import GAP, PAD
 from .widgets import Card, Segmented, label
 
 #: a long report (AMR + zones + foam notes can be eight lines) used to
-#: grow the card until the form above it had a third of its height; cap
-#: it and scroll instead
-STATUS_MAX_H = 104
+#: grow the card until the form above it had a third of its height, so
+#: the report area is a fixed height and scrolls.
+#:
+#: 104 came from the Tk widget's metrics and was too small here: it left
+#: a 54 px viewport, about two wrapped lines, while a plain blastFoam 2D
+#: case already reports six rows needing 367 px. 132 shows five or six
+#: lines, which covers the ordinary case without eating the form.
+STATUS_MAX_H = 132
 
 #: icon + palette key per report severity
 _ROW_STYLE = {'error': ('error', 'error'), 'warn': ('warning', 'warn'),
@@ -79,9 +84,17 @@ class SetupPanel(QWidget):
         self._status_scroll = QScrollArea()
         self._status_scroll.setWidgetResizable(True)
         self._status_scroll.setFrameShape(QScrollArea.NoFrame)
+        # a MAXIMUM alone was not enough. The card is vertically Fixed,
+        # so it took the scroll area's own small sizeHint instead of the
+        # cap: measured 54 px of viewport against a 367 px report, i.e.
+        # 85 % of what validation had to say was hidden behind a 175 px
+        # scrollbar. Pin the height so the space is actually reserved.
+        self._status_scroll.setMinimumHeight(STATUS_MAX_H)
         self._status_scroll.setMaximumHeight(STATUS_MAX_H)
         self._status_scroll.setHorizontalScrollBarPolicy(
             Qt.ScrollBarAlwaysOff)
+        self._status_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded)
         self._status_body = QWidget()
         self._status_lay = QVBoxLayout(self._status_body)
         self._status_lay.setContentsMargins(0, 0, 0, 0)

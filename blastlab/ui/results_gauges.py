@@ -56,6 +56,12 @@ HEADER_HELP = {
 #: 900x600 with three gauges, table 192 px against canvas 136 px.
 MAX_ROWS_SHOWN = 4
 
+#: and never more than this share of the panel. Four rows is a small
+#: table until the panel itself is small: measured at 900x600 with
+#: twelve gauges and a wrapped export row, the table took 156 px against
+#: 128 px of traces, which inverts the rule it exists to serve.
+TABLE_MAX_SHARE = 0.42
+
 
 class GaugesView(QWidget):
     def __init__(self, parent=None):
@@ -115,9 +121,13 @@ class GaugesView(QWidget):
         that is not the current one."""
         return not self._bar.isHidden()
 
+    #: said in place of a bare empty axis before any run exists
+    NO_RESULT = ('Add gauges to a case and its traces appear here, with '
+                 'the per-gauge numbers below.')
+
     def clear(self):
         self._ent = None
-        self.canvas.blank()
+        self.canvas.blank(self.NO_RESULT)
         self.table.setRowCount(0)
         self._cap_height()
         self._bar.setVisible(False)
@@ -184,17 +194,27 @@ class GaugesView(QWidget):
         return summary_rows(res)
 
     def _cap_height(self):
-        """Hold the table to header + at most MAX_ROWS_SHOWN rows, so a
-        run with twenty gauges scrolls instead of squeezing the traces
-        out of the panel."""
+        """Hold the table to header + at most MAX_ROWS_SHOWN rows AND at
+        most TABLE_MAX_SHARE of the panel, so a run with twenty gauges
+        scrolls instead of squeezing the traces out."""
         head = self.table.horizontalHeader().sizeHint().height()
         n = self.table.rowCount()
         row = (self.table.rowHeight(0) if n
                else self.table.verticalHeader().defaultSectionSize())
         frame = 2 * self.table.frameWidth() + 2
-        self.table.setMinimumHeight(head + row + frame)
-        self.table.setMaximumHeight(
-            head + max(1, min(n, MAX_ROWS_SHOWN)) * row + frame)
+        floor = head + row + frame                    # header + one row
+        want = head + max(1, min(n, MAX_ROWS_SHOWN)) * row + frame
+        h = self.height()
+        share = int(h * TABLE_MAX_SHARE) if h > 0 else want
+        cap = max(floor, min(want, share))
+        self.table.setMinimumHeight(min(floor, cap))
+        self.table.setMaximumHeight(cap)
+
+    def resizeEvent(self, event):
+        # the cap depends on the panel's height, so it is not a
+        # build-time decision
+        super().resizeEvent(event)
+        self._cap_height()
 
     def fill_summary(self, res):
         rows = gauge_summary.table_rows(self.summary_rows(res))

@@ -26,7 +26,8 @@ from .results_anim import AnimView
 from .results_fields import FieldsView
 from .results_gauges import GaugesView
 from .view3d_host import View3DHost
-from .widgets import Card, Segmented, button, hbox, label, vbox
+from .widgets import (Card, Segmented, WrapRow, button, hbox, label,
+                      vbox)
 
 #: longest label the picker shows in full; anything longer is elided
 #: there and kept whole in the item's tooltip
@@ -127,13 +128,18 @@ class ResultsPanel(QWidget):
 
         bar2 = hbox()
         bar2.addWidget(label('Export', 'muted'))
+        # no fixed widths: four of these eight labels need 116-155 px and
+        # were pinned to 106, so they read 'Animatio', 'Summary C',
+        # 'Gauges TS' and 'Field CSV' at every window size. WrapRow lets
+        # each keep its own width and breaks to a second line instead.
+        self._export_row = WrapRow()
         self._export_btns = {}
         for text, glyph, kind in EXPORT_BUTTONS:
-            b = button(text, glyph, width=118 if kind == 'summary' else 106,
-                       height=32, on_click=lambda k=kind: self.export(k))
-            bar2.addWidget(b)
+            b = self._export_row.add(
+                button(text, glyph, height=32,
+                       on_click=lambda k=kind: self.export(k)))
             self._export_btns[kind] = b
-        bar2.addStretch(1)
+        bar2.addWidget(self._export_row, 1)
         top.add_layout(bar2)
 
         # A line of the user's own ABOVE the automatic title, on every
@@ -170,6 +176,9 @@ class ResultsPanel(QWidget):
             self.stack.addWidget(w)
         self.view_seg.set('Fields')
         self.stack.setCurrentWidget(self.fields)
+        # every sub-view starts on its own "nothing yet" message rather
+        # than on empty axes, which read as a result containing nothing
+        self.clear_views()
 
         self._sync_export_buttons(None)
         if mode is not None:
@@ -246,7 +255,7 @@ class ResultsPanel(QWidget):
     def clear_views(self):
         self.fields.clear()
         self.gauges.clear()
-        self.anim.placeholder('')
+        self.anim.placeholder(self.anim.NO_RESULT)
         if isinstance(self.view3d, View3DHost):
             self.view3d.cancel_feed()
         self._sync_export_buttons(None)

@@ -29,6 +29,10 @@ from .widgets import hbox, label, vbox
 #: 'isosurface' are the two that go to the matplotlib page.
 MPL_FIELDS = ('profiles', 'isosurface')
 
+#: shown before any run has finished, in place of empty axes
+NO_RESULT = ('Run a case, or load a finished blastFoam run, and its '
+             'fields appear here.')
+
 
 def field_options(res, dim):
     """What the field selector offers for this result. The whole-run
@@ -176,19 +180,23 @@ class FieldsView(QWidget):
         self.stack.addWidget(self.hint)                 # page 2: nothing
         pg_plots.apply_theme(self.glw, [self.plot])
         theme.signals.changed.connect(self._retheme)
+        # start on the hint, not on an empty pair of axes. A blank plot
+        # with 0..1 ticks reads as "a result that contains nothing",
+        # which is exactly the wrong thing to say before a run exists.
+        self.clear()
 
     # ── state ────────────────────────────────────────────────────────────
     def set_title_extra(self, text):
         self._title_extra = text or None
 
-    def clear(self):
+    def clear(self, text=None):
         self._ent = None
         self._drop_image()
         for combo in (self.snap_sel, self.field_sel):
             combo.blockSignals(True)
             combo.clear()
             combo.blockSignals(False)
-        self.hint.setText('')
+        self.hint.setText(NO_RESULT if text is None else text)
         self.stack.setCurrentIndex(2)
 
     def set_result(self, ent):

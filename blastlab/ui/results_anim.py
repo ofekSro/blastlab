@@ -24,7 +24,10 @@ from .widgets import button, hbox, label, vbox
 #: one frame every 66 ms (~15 fps), as the Tk replay ran
 TICK_MS = 66
 
-NO_RESULT = ''
+#: an empty string here left a blank panel that said nothing at all on a
+#: fresh Results tab
+NO_RESULT = ('Run a case with "Record replay frames" ticked, and the '
+             'recorded frames replay here.')
 NO_1D = '1D results have no animation frames.'
 NO_FRAMES = ('No recorded frames for this result.\n'
              'Tick "Record replay frames" before the run; runs loaded '
@@ -57,6 +60,8 @@ def plane_geometry(meta):
 
 
 class AnimView(QWidget):
+    NO_RESULT = NO_RESULT
+
     def __init__(self, on_change=None, parent=None):
         super().__init__(parent)
         self._on_change = on_change or (lambda: None)
