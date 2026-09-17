@@ -176,6 +176,7 @@ class View3DHost(QWidget):
         self._native = False          # the card adopted the window itself
         self._style = None            # the window's own frame, to restore
         self._log_user = False        # the user overrode the log default
+        self._embed_failed = None     # the window we already complained of
         self._build()
         self._built = True
         link.register(surface, self)
@@ -826,8 +827,13 @@ class View3DHost(QWidget):
             self._start_sync_watch()
             return True
         except Exception as exc:
-            self._log(f'  [3D view: embedding failed ({exc}); '
-                      'the viewer window floats]')
+            # once per window, not once per attempt: a failed embed
+            # leaves _container None, so every later `on_window` retries
+            # and the same line used to stack up in the log
+            if self._embed_failed != self._hwnd:
+                self._embed_failed = self._hwnd
+                self._log(f'  [3D view: embedding failed ({exc}); '
+                          'the viewer window floats]')
             self._foreign = None
             self._container = None
             self._floating = True
