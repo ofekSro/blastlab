@@ -128,6 +128,34 @@ def _pid_file_cmd():
     return f'echo $$ > .run.pid && echo {os.getpid()} >> .run.pid'
 
 
+def _start_keepalive(log):
+    """A second wsl.exe session that does nothing but exist for the
+    life of the run (W3, 2026-09-16).
+
+    A 3D run died 11 minutes in with `Input/output error` on its own
+    gauge file AND on OpenMPI's static help text: the WSL distribution
+    had been terminated under the solver (`dmesg`: "Init has exited.
+    Terminating distribution" -> ext4 unmounted), and every rank got EIO
+    on its next file operation. WSL reaps a distribution it considers
+    unused; the solver's own relay is one session, this is a second,
+    independent one, so a hiccup on the relay side cannot leave the
+    distribution with no session at all. It is a cheap extra hold, not
+    a guarantee - the auto-resume in backend is what makes the failure
+    survivable when it happens anyway.
+
+    Runs WITHOUT the OpenFOAM bashrc (wsl_plain_argv): it must not care
+    whether the install is healthy. Returns the Popen, or None when it
+    could not start (logged; the run goes on without it)."""
+    try:
+        return subprocess.Popen(
+            env.wsl_plain_argv('exec sleep infinity'),
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, creationflags=env.CREATE_NO_WINDOW)
+    except OSError as exc:
+        log(f'  [blastfoam] WSL keepalive session did not start ({exc})')
+        return None
+
+
 def rewrite_entry_text(text, key, value, within=None):
     """`key   value;` rewrite of a controlDict text: the first top-level
     `key ...;` line, or - `within` a function-object block as the writer
@@ -249,6 +277,9 @@ class FoamRun:
         else:
             script = (f'cd {case_posix} && {_pid_file_cmd()} '
                       f'&& exec {app}')
+        # pinned before the solver starts, released by `release()` (the
+        # run loop's finally) or `kill()` - see _start_keepalive
+        self.keepalive = _start_keepalive(self.log)
         self.proc = subprocess.Popen(
             env.wsl_argv(script), stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -327,21 +358,37 @@ class FoamRun:
             self._signal('CONT')
 
     def kill(self):
-        """TERM then KILL the Linux-side solver, then the relay."""
-        self._signal('CONT')        # a stopped process ignores TERM
-        for sig, wait_s in (('TERM', 5.0), ('KILL', 2.0)):
-            if not self.running:
-                return
-            self._signal(sig)
-            deadline = time.time() + wait_s
-            while self.running and time.time() < deadline:
-                time.sleep(0.2)
-        if self.running:
-            try:
-                self.proc.kill()    # last resort: the wsl.exe relay
-            except OSError:
-                self.log('  [blastfoam] could not kill the wsl.exe '
-                         'relay process')
+        """TERM then KILL the Linux-side solver, then the relay; the
+        keepalive session goes with it whichever way this exits."""
+        try:
+            self._signal('CONT')    # a stopped process ignores TERM
+            for sig, wait_s in (('TERM', 5.0), ('KILL', 2.0)):
+                if not self.running:
+                    return
+                self._signal(sig)
+                deadline = time.time() + wait_s
+                while self.running and time.time() < deadline:
+                    time.sleep(0.2)
+            if self.running:
+                try:
+                    self.proc.kill()    # last resort: the wsl.exe relay
+                except OSError:
+                    self.log('  [blastfoam] could not kill the wsl.exe '
+                             'relay process')
+        finally:
+            self.release()
+
+    def release(self):
+        """End the keepalive session (idempotent). The solver is not
+        touched: this is for after it has exited or been killed."""
+        ka, self.keepalive = self.keepalive, None
+        if ka is None or ka.poll() is not None:
+            return
+        try:
+            ka.kill()
+            ka.wait(timeout=5)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
 
     def tail(self, n=40):
         return '\n'.join(list(self.log_tail)[-n:])

@@ -77,6 +77,37 @@ MIN_STABLE_STEPS = 20
 #: not in backend._NATURAL_END, so the W2 gauge-tail note still fires.
 STOP_UNSTABLE = 'numerical instability'
 
+#: W3 (2026-09-16): the WSL distribution can be torn down UNDER a running
+#: solver - measured on a 13-rank 3D run, 11 minutes in: `dmesg` said
+#: "Init has exited. Terminating distribution", ext4 was unmounted, and
+#: the solver's next write (its gauge file, whose tail is ~200 NUL bytes
+#: of never-flushed delayed allocation) failed IOstream::check. What
+#: reaches stdout is not one FOAM error but the filesystem going away for
+#: every process at once: blastFoam's own I/O error, Open MPI unable to
+#: read its STATIC help text (`help-mpi-api.txt: Input/output error`),
+#: PMIx losing its dstore files. None of these is something the solve did
+#: wrong, and the written time dirs up to the last flush are intact - so
+#: backend auto-resumes such a run instead of reporting it failed.
+#: Deliberately narrow: a genuine numerical death (SIGFPE, divergence,
+#: mesh-size mismatch) must still surface as the failure it is.
+WSL_VANISHED = ('Input/output error',
+                'PMIX ERROR: NO-PERMISSIONS',
+                'Stale file handle',
+                'Transport endpoint is not connected')
+
+
+def wsl_vanished(tail):
+    """Does this solver log tail carry the W3 filesystem-gone signature?"""
+    return any(s in (tail or '') for s in WSL_VANISHED)
+
+
+class WslVanished(RuntimeError):
+    """The solver died because WSL was torn down under it (W3). A
+    RuntimeError with the same message as any other solver failure, so
+    every caller that does not know about auto-resume sees exactly what
+    it always did; `backend` catches this one and resumes."""
+
+
 #: FOAM warnings that are inherent to the collapsed-hex sector/wedge
 #: meshes (1D sector, 2D axisym): the apex face degenerates into the
 #: default patch, and the 1-degree wedge planarity residual is ~1e-16
@@ -675,6 +706,7 @@ class FoamRunLoop:
                 _time.sleep(0.1)
             if foam.running:
                 foam.kill()
+            foam.release()          # the W3 keepalive session
             # live samples are display-only; drop the leftovers so a kept
             # case dir holds just the real record (time dirs + probes)
             if self.live_set:
@@ -683,9 +715,11 @@ class FoamRunLoop:
                               ignore_errors=True)
 
         if foam.returncode not in (0, None) and not foam.stop_requested:
-            raise RuntimeError(
+            tail = foam.tail()
+            err = WslVanished if wsl_vanished(tail) else RuntimeError
+            raise err(
                 f"blastFoam failed (exit {foam.returncode}) - case kept at "
-                f"{spec.case_unc}\n{foam.tail()}")
+                f"{spec.case_unc}\n{tail}")
         if not self.done:
             raise RuntimeError(
                 "blastFoam produced no readable time steps - case kept at "

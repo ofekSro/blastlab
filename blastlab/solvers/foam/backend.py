@@ -30,7 +30,7 @@ from ..hooks import Result, RunHooks, StoppedBeforeStart
 from . import dicts, env, reader, runner, writer
 from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, STOP_UNSTABLE, FoamRunLoop,
-                      PeakImpulse, due_sparse, new_live)
+                      PeakImpulse, WslVanished, due_sparse, new_live)
 from .runloop import amr_note, level_counts
 from ..hooks import frame_budget
 
@@ -856,6 +856,76 @@ def _n_procs_on_disk(case_unc):
     return n
 
 
+#: W3 (2026-09-16): a run whose WSL distribution was torn down under it
+#: (runloop.WslVanished) is resumed from its last written time instead of
+#: being reported failed. This many times per run: three is "a hiccup",
+#: not "WSL is broken tonight" - past that the run fails like any other,
+#: case kept, and the run browser's manual resume still works.
+WSL_RESUME_MAX = 3
+#: how long one auto-resume waits for WSL to answer again. Asking it is
+#: what brings a terminated distribution back (wsl.exe boots it), so the
+#: first probe usually succeeds; the ceiling is for a VM that is truly
+#: gone (host out of memory, `wsl --shutdown` from elsewhere).
+WSL_RESUME_WAIT_S = 300.0
+_WSL_RESUME_PROBE_S = 30
+
+
+def _wait_for_wsl(hooks, wait_s=WSL_RESUME_WAIT_S):
+    """Block until the blastFoam install answers again, the user stops,
+    or `wait_s` runs out. Returns True when WSL is back."""
+    deadline = _time.time() + wait_s
+    while True:
+        ok, detail = env.check_available(force=True,
+                                         timeout=_WSL_RESUME_PROBE_S)
+        if ok:
+            hooks.log(f'  [blastfoam] WSL is back ({detail})')
+            return True
+        if hooks.should_stop():
+            hooks.log('  [blastfoam] stopped while waiting for WSL')
+            return False
+        if _time.time() > deadline:
+            hooks.log(f'  [blastfoam] WSL did not come back within '
+                      f'{wait_s:.0f} s ({detail})')
+            return False
+        # short slices so a Stop lands within a second
+        for _ in range(10):
+            if hooks.should_stop():
+                break
+            _time.sleep(0.5)
+
+
+def _resume_after_wsl(spec, hooks, adaptive_write, exc):
+    """W3: the solver died because WSL went away (`exc`, a
+    runloop.WslVanished). Wait for WSL, then `resume_run` the case -
+    which re-enters the same `solve_*_foam` with a rebuilt spec, replays
+    every write already on disk and follows the solver from there, so
+    the caller returns its Result as the run's own. Re-raises `exc`
+    unchanged when the attempt budget is spent, WSL stays down, or the
+    user stops the wait - the failure then reads exactly as it did
+    before W3, case kept.
+
+    The attempt counter lives on `hooks`: it is the one object that
+    survives the resume (spec and case are rebuilt from disk). The type
+    guard is for test doubles whose __getattr__ answers everything."""
+    n = getattr(hooks, 'wsl_resumes', 0)
+    n = (n if isinstance(n, int) else 0) + 1
+    hooks.wsl_resumes = n
+    if n > WSL_RESUME_MAX:
+        hooks.log(f'  [blastfoam] WSL went away under the solver again - '
+                  f'{WSL_RESUME_MAX} auto-resumes already spent on this '
+                  f'run, giving up. The case is kept and can be resumed '
+                  f'from the run browser once WSL is stable.')
+        raise exc
+    hooks.log(f'  [blastfoam] WSL went away under the solver (its files '
+              f'returned I/O errors) - that is not a solver failure, and '
+              f'every write up to the last one is intact. Waiting for WSL, '
+              f'then resuming from the last written time '
+              f'(auto-resume {n} of {WSL_RESUME_MAX}).')
+    if not _wait_for_wsl(hooks, wait_s=WSL_RESUME_WAIT_S):
+        raise exc
+    return resume_run(spec.case_posix, hooks, adaptive_write=adaptive_write)
+
+
 def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     """Run a Case1D on blastFoam. Returns a Result shaped exactly like
     the native solve_1d.
@@ -944,7 +1014,10 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, store, writer.LIVE_SET,
                        decode_line, read_dir, on_frame)
-    stop_reason = loop.run()
+    try:
+        stop_reason = loop.run()
+    except WslVanished as exc:          # W3: WSL died under the solver
+        return _resume_after_wsl(spec, hooks, adaptive_write, exc)
     return finalize_1d(case, spec, store, hooks, stop_reason,
                        loop.st['step'])
 
@@ -1382,7 +1455,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
-    stop_reason = loop.run()
+    try:
+        stop_reason = loop.run()
+    except WslVanished as exc:          # W3: WSL died under the solver
+        return _resume_after_wsl(spec, hooks, adaptive_write, exc)
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
                        record_frames, acc, frame_lv=frame_lv,
@@ -2013,7 +2089,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
-    stop_reason = loop.run()
+    try:
+        stop_reason = loop.run()
+    except WslVanished as exc:          # W3: WSL died under the solver
+        return _resume_after_wsl(spec, hooks, adaptive_write, exc)
     if stop_reason == 'safety cap' and spec.cap_is_end:
         stop_reason = 'end time reached'
 
