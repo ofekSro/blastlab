@@ -663,7 +663,19 @@ class FoamRunLoop:
                   self.decode)
 
     def _ingest_ready(self, final=False):
+        # The live view is serviced BETWEEN the expensive pieces of this
+        # method, not only once per loop iteration.
+        #
+        # Measured on a real 3D foam run: the live tail was called five
+        # times a second at the start and four times in the last fifty
+        # seconds, while 104 decoded samples piled up unread on disk.
+        # The reason is here - one iteration of `run()` calls the live
+        # tail once and then does up to four `reconstructPar` runs and
+        # every pending write's full-field read, which together took
+        # about twelve seconds by the end. The live view degraded to the
+        # WRITE cadence exactly when a blast is most worth watching.
         maybe_reconstruct(self.spec, self.fields)
+        self._ingest_live()
         for name, dpath in self.order.pending(self.done, final):
             try:
                 payload = self.read_dir(name, dpath)
@@ -673,6 +685,10 @@ class FoamRunLoop:
                 break               # mid-write over 9p; retry next poll
             if self.on_frame(name, dpath, payload) is False:
                 self.order.skip(name)   # refused for good, not retried
+            # reading a written time is a full-field read plus whatever
+            # the 3D feed costs; another one may be queued right behind
+            # it, so give the live view its turn in between
+            self._ingest_live()
 
     def run(self):
         """Drive the solver to completion (or stop/kill). Returns the

@@ -1200,7 +1200,22 @@ class View3DHost(QWidget):
         if not self._has_scene:
             return
         self._n_sampled = getattr(self, '_n_sampled', 0) + 1
+        self._last_sampled_t = float(t)
         self.link.send(('surf_plane', self.surface, float(t), field2d))
+
+    def displayed_time(self):
+        """The simulated time of the frame the child is SHOWING, or None.
+
+        Reported by the child, not inferred from what was sent: how far
+        the view is behind the solver is exactly the difference between
+        the two, and guessing one of them would measure nothing.
+        """
+        t = self._status.get('t')
+        return None if t is None else float(t)
+
+    def sampled_time(self):
+        """The simulated time of the newest burst plane handed over."""
+        return getattr(self, '_last_sampled_t', None)
 
     def _toggle_layer(self, key):
         self._ctrl('layer', key, self._checks[key].isChecked())
