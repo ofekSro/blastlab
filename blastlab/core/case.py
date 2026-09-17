@@ -13,7 +13,8 @@ from dataclasses import dataclass, field, asdict
 import numpy as np
 
 from .bc import BC_KINDS, normalize_bc, normalize_bcs
-from .constants import (JWL_TNT, MIN_EXP_CELLS, FOAM_EXP_CELLS,
+from .constants import (ANIM_SCALES, JWL_TNT, MIN_EXP_CELLS,
+                        FOAM_EXP_CELLS,
                         CELLS_2D_WARN, CELLS_2D_MAX,
                         CELLS_WARN, CELLS_REFUSE,
                         FOAM_CELLS_WARN, FOAM_CELLS_REFUSE,
@@ -27,7 +28,7 @@ from . import hardware as _hardware
 TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 
 SCHEMA = 'blastlab-case'
-VERSION = 11    # v2: n_procs, activation, charges, det_points (foam)
+VERSION = 12    # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
                 # v4: afterburn (foam Miller afterburn model)
                 # v5: amr_* (foam dynamic mesh refinement, N16)
@@ -40,6 +41,9 @@ VERSION = 11    # v2: n_procs, activation, charges, det_points (foam)
                 # v10: bc_outer on Case1D (T60)
                 # v11: the 1D trigger gauge is gone (T63); the keys are
                 #      dropped from older 1D files rather than refused
+                # v12: anim_scale / anim_clim (the exported animation's
+                #      colour range: one for the whole video by default,
+                #      per frame as before, or a range you pin)
 
 
 @dataclass
@@ -149,6 +153,11 @@ class Case2D:
     anim_file: str = None
     anim_mesh: bool = False           # overlay the cell edges on the
                                       # animation written after the run
+    #: the animation's overpressure colour range: 'run' pins one range
+    #: for the whole video (default), 'frame' rescales every frame,
+    #: 'manual' uses anim_clim. See output/animation.SCALES.
+    anim_scale: str = 'run'
+    anim_clim: tuple = None           # (vmin, vmax) kPa for 'manual'
     record_frames: int = 150
     live: bool = True
     profile_file: str = None          # save .npz for 3D remap (axisym only)
@@ -242,6 +251,9 @@ class Case3D:
     anim_file: str = None
     anim_mesh: bool = False           # overlay the cell edges on the
                                       # animation written after the run
+    #: see Case2D.anim_scale
+    anim_scale: str = 'run'
+    anim_clim: tuple = None           # (vmin, vmax) kPa for 'manual'
     record_frames: int = 150
     live: bool = True
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
@@ -319,6 +331,9 @@ def case_from_dict(d):
     for fld in ('charges', 'det_points'):
         if getattr(case, fld, None):
             setattr(case, fld, [tuple(v) for v in getattr(case, fld)])
+    # JSON has no tuples: the animation colour range comes back a list
+    if getattr(case, 'anim_clim', None) is not None:
+        case.anim_clim = tuple(float(v) for v in case.anim_clim)
     return case
 
 
@@ -423,6 +438,30 @@ def _validate_solver(case, rep):
             note("Order 2 (MUSCL): sharper fronts at the same grid; "
                  "keep CFL at or below 0.4 (limiter falls back to "
                  "order 1 where a slope would go unphysical)")
+    # the exported animation's colour range (1D has no animation)
+    if hasattr(case, 'anim_scale'):
+        a_scale = getattr(case, 'anim_scale', 'run') or 'run'
+        if a_scale not in ANIM_SCALES:
+            err(f"Unknown animation colour scale '{a_scale}' "
+                f"(use {', '.join(ANIM_SCALES)})")
+        elif a_scale == 'manual':
+            a_clim = getattr(case, 'anim_clim', None)
+            try:
+                lo, hi = float(a_clim[0]), float(a_clim[1])
+            except (TypeError, ValueError, IndexError):
+                lo = hi = None
+            if lo is None:
+                err("A manual animation colour range needs a minimum "
+                    "and a maximum in kPa")
+            elif not (np.isfinite(lo) and np.isfinite(hi)):
+                err("The animation colour range must be finite")
+            elif hi <= lo:
+                err(f"The animation colour maximum ({hi:g} kPa) must be "
+                    f"above the minimum ({lo:g} kPa)")
+        elif a_scale == 'frame':
+            note("The animation rescales its colours on every frame, so "
+                 "the colour bar means something different in each one "
+                 "and the shock will not appear to decay")
     if solver == 'native':
         # N11/T46: the native solvers take their JWL set from the same
         # material table as blastFoam

@@ -15,6 +15,7 @@ import customtkinter as ctk
 from ..core.case import Case1D, Case2D, Case3D
 from ..core.bc import BC_KINDS, normalize_bc, normalize_bcs
 from ..core.case import TRIGGER_ACTIONS
+from ..core.constants import ANIM_SCALE_LABELS, anim_scale_from_label
 from ..solvers.foam.materials import MATERIAL_NAMES
 from . import mode as mode_mod
 from . import theme
@@ -265,6 +266,7 @@ class CaseForm(ctk.CTkFrame):
         self._scoped = {'native': [], 'blastfoam': []}
         self._amr_rows = []          # (label, widget): shown while AMR > 0
         self._cref_row = None        # (label, widget): hidden while AMR on
+        self._aclim_rows = []        # (label, widget): manual video range
         self._build()
 
     @property
@@ -619,6 +621,24 @@ class CaseForm(ctk.CTkFrame):
                         _entry(out, self._var(
                             'anim_file',
                             f'blast_{self.dim}d_animation{_ext}')))
+            # the video's colour range. One range for the whole video by
+            # default: the exporter used to rescale every frame, so the
+            # colour bar meant something different in each one and the
+            # shock never appeared to decay.
+            self._ascale_combo = _combo(
+                out, self._var('anim_scale', ANIM_SCALE_LABELS['run']),
+                list(ANIM_SCALE_LABELS.values()))
+            self.v['anim_scale'].trace_add(
+                'write', lambda *a: self._apply_mode())
+            orow = _row(out, orow, 'Video colours', self._ascale_combo)
+            self._aclim_rows = []
+            for key, label, default in (('anim_clim_min',
+                                         'Video min [kPa]', 0.0),
+                                        ('anim_clim_max',
+                                         'Video max [kPa]', 500.0)):
+                w = _entry(out, self._var(key, default))
+                orow, lbl, w = self._srow(out, orow, label, w)
+                self._aclim_rows.append((lbl, w))
             ctk.CTkCheckBox(out, text='Record replay frames',
                             variable=self._bool('record', True),
                             font=theme.F_BODY, corner_radius=6,
@@ -689,6 +709,16 @@ class CaseForm(ctk.CTkFrame):
                 show = foam and not amr_on
                 for x in self._cref_row:
                     (x.grid if show else x.grid_remove)()
+        # the video's min/max boxes exist only while its scale is manual
+        manual = self._anim_manual()
+        for lbl, w in self._aclim_rows:
+            for x in (lbl, w):
+                (x.grid if manual else x.grid_remove)()
+
+    def _anim_manual(self):
+        return ('anim_scale' in self.v
+                and anim_scale_from_label(self.v['anim_scale'].get())
+                == 'manual')
 
     def _sync_geometry(self):
         """2D axisymmetric relabels r/z and pins the burst to the axis;
@@ -816,6 +846,9 @@ class CaseForm(ctk.CTkFrame):
                                   'z_lo', 'z_hi'])}
         amr_levels = _I('amr_levels', 'AMR levels') if foam else 0
         amr_on = foam and amr_levels > 0
+        # the two range boxes are read only while the scale is manual, so
+        # a stale value in a hidden box cannot block a run
+        anim_scale = anim_scale_from_label(v['anim_scale'].get())
         common = dict(
             Lx=_F('Lx', 'Lx'), Ly=_F('Ly', 'Ly'),
             cell_size_m=_F('cell', 'cell size'),
@@ -835,6 +868,10 @@ class CaseForm(ctk.CTkFrame):
                           if self.dim < 3 else None),
             anim_file=v['anim_file'].get() or None,
             anim_mesh=bool(v['anim_mesh'].get()),
+            anim_scale=anim_scale,
+            anim_clim=((_F('anim_clim_min', 'video colour min'),
+                        _F('anim_clim_max', 'video colour max'))
+                       if anim_scale == 'manual' else None),
             record_frames=150 if v['record'].get() else 0,
             solver=self._mode,
             material=v['material'].get() if foam else 'TNT',
@@ -958,6 +995,12 @@ class CaseForm(ctk.CTkFrame):
         v['gauge_file'].set(case.gauge_file)
         v['anim_file'].set(case.anim_file or '')
         v['anim_mesh'].set(bool(getattr(case, 'anim_mesh', False)))
+        scale = anim_scale_from_label(getattr(case, 'anim_scale', 'run'))
+        v['anim_scale'].set(ANIM_SCALE_LABELS[scale])
+        clim = getattr(case, 'anim_clim', None)
+        if clim:
+            v['anim_clim_min'].set(f'{float(clim[0]):g}')
+            v['anim_clim_max'].set(f'{float(clim[1]):g}')
         v['record'].set(case.record_frames > 0)
         self._set_trigger(case)
         if self.dim == 2:

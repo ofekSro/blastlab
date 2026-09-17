@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from ..core.bc import BC_KINDS
 from ..core.case import TRIGGER_ACTIONS
+from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
 from ..solvers.foam.materials import MATERIAL_NAMES
 
@@ -170,6 +171,15 @@ def _outputs(dim):
     if dim > 1:
         out.append(F('anim_file', 'Animation (.gif / .mp4)', 'text',
                      f'blast_{dim}d_animation{_anim_ext()}'))
+        # the video's colour range: one for the whole video by default,
+        # so the colour bar means the same thing in every frame
+        out.append(F('anim_scale', 'Video colours', 'choice',
+                     ANIM_SCALE_LABELS['run'],
+                     values=tuple(ANIM_SCALE_LABELS.values())))
+        out.append(F('anim_clim_min', 'Video min [kPa]', 'float', 0.0,
+                     group='aclim'))
+        out.append(F('anim_clim_max', 'Video max [kPa]', 'float', 500.0,
+                     group='aclim'))
         out.append(F('record', 'Record replay frames', 'bool', True))
         out.append(F('anim_mesh', 'Mesh overlay in the animation', 'bool',
                      False))

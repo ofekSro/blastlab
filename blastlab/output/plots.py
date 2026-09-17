@@ -232,8 +232,13 @@ def set_frame(mesh, p, solid, clim=None):
     ovp = np.where(solid, np.nan, (p.astype(np.float64) - P_AIR) / 1e3)
     mesh.set_array(ovp.T)
     if clim is None:
-        hi = np.nanmax(ovp)
-        lo = np.nanmin(ovp)
+        # a plane cut entirely through an obstacle has no finite cell:
+        # nanmax would warn and hand matplotlib a NaN range (NaN fails
+        # the hi <= lo guard below, so it would get through)
+        if np.isfinite(ovp).any():
+            lo, hi = float(np.nanmin(ovp)), float(np.nanmax(ovp))
+        else:
+            lo = hi = 0.0
         if hi <= lo:
             hi = lo + 1.0
         mesh.set_clim(lo, hi)

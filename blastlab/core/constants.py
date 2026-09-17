@@ -4,6 +4,34 @@ GAMMA_AIR = 1.4
 RHO_AIR   = 1.225    # kg/m³  ambient air density
 P_AIR     = 101325.0  # Pa     ambient pressure
 
+#: How an exported animation picks its overpressure colour range.
+#: 'run' pins one range over every recorded frame (the default, so the
+#: colour bar means the same thing throughout); 'frame' rescales on
+#: every frame (what the exporter used to do unconditionally); 'manual'
+#: uses the case's own anim_clim, the only way to compare two videos.
+#: The rendering lives in output/animation.py.
+ANIM_SCALES = ('run', 'frame', 'manual')
+
+#: what each scale is called on screen. The forms store the LABEL in
+#: their combo (as the reconstruction-order row already does) and map it
+#: back when building the case, so the wording can change without
+#: touching saved case files.
+ANIM_SCALE_LABELS = {
+    'run': 'fixed (whole video)',
+    'frame': 'auto per frame',
+    'manual': 'fixed (manual)',
+}
+
+
+def anim_scale_from_label(text):
+    """The scale key behind a combo label; unknown text falls back to
+    the default so a stale case file can never break the form."""
+    text = str(text).strip()
+    for key, label in ANIM_SCALE_LABELS.items():
+        if text in (key, label):
+            return key
+    return 'run'
+
 # JWL parameters for TNT (Dobratz & Crawford, LLNL Explosives Handbook, 1985)
 JWL_TNT = dict(
     A     = 3.712e11,   # Pa

@@ -26,6 +26,19 @@ def write_trigger_remap(case, res):
                              final_state=res.meta['trigger_state']), path)
 
 
+def _animate(case, res):
+    """Write the run's own animation, and record the colour-scale choice
+    in the Result's meta so a later export from the Results tab keeps
+    it without needing the case."""
+    res.meta.setdefault('anim_scale', getattr(case, 'anim_scale', 'run'))
+    res.meta.setdefault('anim_clim', getattr(case, 'anim_clim', None))
+    if case.anim_file and res.meta.get('frames'):
+        write_animation(res.meta, case.anim_file,
+                        show_mesh=getattr(case, 'anim_mesh', False),
+                        scale=getattr(case, 'anim_scale', None),
+                        clim=getattr(case, 'anim_clim', None))
+
+
 def solve_stage(dim, case):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
     callable also writes the case's own output files (gauges, animation,
@@ -43,20 +56,14 @@ def solve_stage(dim, case):
         elif dim == 2:
             if case.gauges:
                 save_gauges_2d(res.gauges, case.gauge_file)
-            if case.anim_file and res.meta.get('frames'):
-                write_animation(res.meta, case.anim_file,
-                                show_mesh=getattr(case, 'anim_mesh',
-                                                  False))
+            _animate(case, res)
             if case.profile_file:
                 save_profile_2d(res.meta, case.profile_file)
             write_trigger_remap(case, res)
         else:
             if case.gauges:
                 save_gauges_3d(res.gauges, case.gauge_file)
-            if case.anim_file and res.meta.get('frames'):
-                write_animation(res.meta, case.anim_file,
-                                show_mesh=getattr(case, 'anim_mesh',
-                                                  False))
+            _animate(case, res)
         return res
     label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
     return (label, solve)
