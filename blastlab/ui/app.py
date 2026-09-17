@@ -22,6 +22,7 @@ from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
 from .bridge import ThreadBridge
+from .results_panel import ResultsPanel
 from .run_controller import RunController
 from .run_panel import RunPanel
 from .setup_panel import SetupPanel
@@ -112,8 +113,11 @@ class MainWindow(QMainWindow):
                                 viewer_link=self.viewer_link,
                                 log_fn=self._log_threadsafe)
         self.run_panel = RunPanel(view3d_host=self.view3d)
-        self.results = TabStub('Results', 'The Results tab arrives with the '
-                               'next milestone of the Qt port (M3).')
+        self.results = ResultsPanel(viewer_link=self.viewer_link,
+                                    log_fn=self._log_threadsafe,
+                                    mode=self.solver_mode,
+                                    on_resume=self._resume_foam_run,
+                                    bridge=self.bridge)
         self.chain = TabStub('Chain', 'The Chain tab arrives with milestone '
                              'M4 of the Qt port.')
         self._panels = {'setup': self.setup, 'run': self.run_panel,
@@ -540,13 +544,33 @@ class MainWindow(QMainWindow):
 
     def on_result(self, k, dim, label_, res):
         self._results.append((label_, dim, res))
-        self.notify(f'Result ready: {label_} (Results tab comes with M3)')
+        self.results.add_result(label_, dim, res)
+        self.notify(f'Result ready: {label_}')
 
     def on_finished(self, stopped_early, errored):
         if not (stopped_early or errored):
             # the last progress message is often throttled away, so a
             # completed run would otherwise rest below 100%
             self.run_panel.mark_complete()
+
+    def _resume_foam_run(self, path):
+        """Resume a stopped blastFoam run. The dimension comes from the
+        run's own case.json, so the run browser only has to hand over a
+        path."""
+        from ..solvers.foam import env as _env
+        try:
+            from .run_browser import dims_from_case_json
+        except ImportError:                      # lands with M4
+            from ..gui.run_browser import dims_from_case_json
+        try:
+            _p, unc = _env.case_paths(path)
+            dim = int((dims_from_case_json(unc) or '?').rstrip('D'))
+        except (ValueError, OSError, TypeError) as exc:
+            self.notify(f'cannot resume {path}: {exc}', 'error')
+            self._log_threadsafe(f'  [runs] cannot resume {path}: {exc}')
+            return False
+        return self.ctrl.resume_foam_run(
+            path, dim, run_name=self.run_panel.current_run_name())
 
     # ── status line ──────────────────────────────────────────────────────
     def notify(self, text, level='info'):
@@ -571,10 +595,11 @@ class MainWindow(QMainWindow):
         self.ctrl.shutdown()
         # release the embedded window first, then stop the child: the
         # reverse order leaves Qt holding a dangling HWND
-        try:
-            self.view3d.shutdown()
-        except Exception:
-            pass
+        for panel in (self.view3d, self.results):
+            try:
+                panel.shutdown()
+            except Exception:
+                pass
         self.viewer_link.close()
         event.accept()
 

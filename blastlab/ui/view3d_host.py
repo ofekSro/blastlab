@@ -17,7 +17,7 @@ writes into (`viz3d.protocol`); the host only hands the child the
 scene init and the ring's name.
 """
 
-from PySide6.QtCore import QEvent, Qt, Signal
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QWindow
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox,
                                QComboBox, QGridLayout, QHBoxLayout, QLabel,
@@ -119,6 +119,8 @@ class View3DHost(QWidget):
         self._ctl_user = False
         self._built = False
         self._status = {}
+        self._feed_timer = None       # results replay, one snapshot/tick
+        self._feed_state = None
         self._build()
         self._built = True
         link.register(surface, self)
@@ -471,6 +473,7 @@ class View3DHost(QWidget):
         no longer ours: the reverse order leaves Qt holding a dangling
         HWND at teardown."""
         self._has_scene = False
+        self.cancel_feed()
         self.close_ring()
         if self._float_win is not None:
             # nothing may outlive the main window
@@ -594,6 +597,7 @@ class View3DHost(QWidget):
     def reset(self):
         """Drop the current scene and go back to the placeholder, so a new
         run does not start against the previous run's picture."""
+        self.cancel_feed()
         if self._has_scene:
             self.link.send(('release', self.surface))
         self._has_scene = False
@@ -609,6 +613,80 @@ class View3DHost(QWidget):
         if self._ring is not None:
             self._ring.close(unlink=True)
             self._ring = None
+
+    # ── replay of a finished result (the Results tab's surface) ──────────
+    def feed_result(self, result):
+        """Play a finished 3D Result's snapshots into the viewer.
+
+        One snapshot per timer tick, not a loop: a 20-snapshot result
+        rebuilt every layer inside a single callback and froze the window
+        for seconds. The HUD counts them in while they stream, and
+        starting a new result cancels a feed still in flight."""
+        from ..viz3d.client import scene_from_meta
+        self.cancel_feed()
+        try:
+            feed = Feed3D(scene_from_meta(result.meta))
+            ring = make_ring(feed, None)
+        except Exception as exc:
+            self._log(f'  [3D view failed: {exc}]')
+            return False
+        if not self.adopt_feed(feed, ring):
+            ring.close(unlink=True)
+            return False
+        # the whole-run maps live in meta, not per snapshot. Without them
+        # the viewer greys out Peak overpressure / Net ovp impulse even
+        # though the Fields list offers exactly those maps for the same
+        # run; they are constant over the playback, as in Fields where
+        # they are labelled "whole run".
+        whole = {}
+        for key, mkey in (('p_peak', 'p_peak'), ('imp', 'impulse')):
+            arr = result.meta.get(mkey)
+            if arr is not None:
+                whole[key] = arr
+        self._feed_state = dict(i=0, names=list(result.snapshots.keys()),
+                                feed=feed, whole=whole, result=result)
+        if self._feed_timer is None:
+            self._feed_timer = QTimer(self)
+            self._feed_timer.setInterval(1)
+            self._feed_timer.timeout.connect(self._feed_step)
+        self._feed_timer.start()
+        return True
+
+    def cancel_feed(self):
+        if self._feed_timer is not None:
+            self._feed_timer.stop()
+        self._feed_state = None
+
+    def feeding(self):
+        return self._feed_state is not None
+
+    def _feed_step(self):
+        st = self._feed_state
+        if st is None or self._ring is None or not st['names']:
+            self.cancel_feed()
+            return
+        i, names = st['i'], st['names']
+        snap = st['result'].snapshots[names[i]]
+        payload = st['feed'].make_payload(dict(p=snap['p'], **st['whole']))
+        rho3 = snap.get('rho3')       # stored pre-decimated, same stride
+        if rho3 is not None and rho3.shape == payload['p'].shape:
+            payload['rho'] = rho3
+        last = i == len(names) - 1
+        self.link.send(('hud', self.surface,
+                        '' if last else
+                        f'loading {i + 1}/{len(names)} snapshots'))
+        try:
+            self._ring.write(float(snap.get('t', 0.0)), payload, last)
+        except Exception as exc:
+            self._log(f'  [3D replay failed: {exc}]')
+            self.cancel_feed()
+            return
+        self._n_frames = i + 1
+        self._set_time_range(self._n_frames)
+        st['i'] = i + 1
+        if last:
+            self.cancel_feed()
+            self.on_done(getattr(st['result'], 'stop_reason', ''))
 
     # ── control callbacks ────────────────────────────────────────────────
     def _ctrl(self, name, *args):

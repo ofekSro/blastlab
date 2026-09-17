@@ -25,15 +25,46 @@ pg.setConfigOptions(imageAxisOrder='col-major', antialias=False,
 MESH_MAX_LINES = 60
 GAUGE_COLOR = '#00e5ff'
 
+#: matplotlib draws `extend='max'` as an arrow on the colour bar;
+#: pyqtgraph's ColorBarItem has no such affordance, so a robust-clipped
+#: field says so in words instead. The title suffix is byte-identical to
+#: the one `plots._panel_grid_figure` puts on the exported PNG, so the
+#: screen and the file agree.
+CLIP_TITLE_SUFFIX = '  (top 0.5 % clipped)'
+CLIP_BAR_SUFFIX = '  (top clipped)'
+
+#: the robust rule itself, copied from plots._panel_grid_figure: clip to
+#: the 99.5th percentile only when the tail really is a small hot spot
+CLIP_PERCENTILE = 99.5
+CLIP_RATIO = 4.0
+
 _CMAP = None
 _LUT = None
 
 
+#: colour steps sampled out of matplotlib's table
+_LUT_N = 256
+
+
 def inferno():
+    """The same inferno the exported figures use, as a pyqtgraph map.
+
+    Sampled straight out of matplotlib's colormap registry rather than
+    through `pg.colormap.getFromMatplotlib`, which imports
+    `matplotlib.pyplot` to do it. The GUI process must not: pyplot's
+    global figure manager fights the event loop and leaks figures, which
+    is the whole reason `output/pyplot_bridge.py` exists.
+    """
     global _CMAP, _LUT
     if _CMAP is None:
-        _CMAP = pg.colormap.getFromMatplotlib('inferno')
-        _LUT = _CMAP.getLookupTable(0.0, 1.0, 256)
+        import matplotlib as mpl
+        pos = np.linspace(0.0, 1.0, _LUT_N)
+        # round, do not truncate: pyqtgraph's own conversion rounds, and
+        # truncating shifted every channel by up to 1/255
+        rgba = (np.asarray(mpl.colormaps['inferno'](pos)) * 255
+                ).round().astype(np.uint8)
+        _CMAP = pg.ColorMap(pos, rgba)
+        _LUT = _CMAP.getLookupTable(0.0, 1.0, _LUT_N)
     return _CMAP, _LUT
 
 
@@ -51,7 +82,11 @@ def apply_theme(glw, plots=()):
                 ax = plot.getAxis(name)
                 ax.setPen(pg.mkPen(p['muted']))
                 ax.setTextPen(pg.mkPen(p['muted']))
-            plot.titleLabel.setAttr('color', p['text'].lstrip('#'))
+            # the '#' must stay: LabelItem feeds this straight to
+            # mkColor, which rejects a bare 'e8e8e8' - and because the
+            # whole block is guarded, stripping it meant the titles were
+            # silently never recoloured at all
+            plot.titleLabel.setAttr('color', p['text'])
             plot.setTitle(plot.titleLabel.text)
         except Exception:
             pass
@@ -66,10 +101,19 @@ def overpressure_kpa(p, solid=None):
 
 
 class ScalarImage:
-    """An overpressure image on a PlotItem over uniform faces x_face /
-    y_face (kPa, inferno), grey where the mask says solid, with a colour
-    bar. `set_field(p, clim)` autoscales per frame unless a fixed
-    (vmin, vmax) range is given; returns the (lo, hi) applied."""
+    """A scalar field image on a PlotItem over uniform faces x_face /
+    y_face (inferno), grey where the mask says solid, with a colour bar.
+
+    Two ways in, both keeping the item and uploading only the array:
+    `set_field(p, clim)` takes a PRESSURE and converts it to
+    overpressure in kPa (the Run tab's live pane); `set_data(z, clim,
+    robust)` takes a field already in its own unit (the Results tab,
+    which also shows density, speed, peak and impulse maps). Both
+    autoscale unless given a fixed (vmin, vmax).
+
+    The faces and the mask shape are fixed at construction: a different
+    plane or a different grid needs a new ScalarImage, or at least
+    `rebuild_mask`."""
 
     def __init__(self, plot, x_face, y_face, solid=None, colorbar=True,
                  label='Overpressure [kPa]'):
@@ -89,17 +133,7 @@ class ScalarImage:
         plot.addItem(self.img)
         self.solid = None
         self.mask = None
-        if solid is not None:
-            solid = np.asarray(solid, dtype=bool)
-            if solid.shape == self.shape and solid.any():
-                self.solid = solid
-                rgba = np.zeros(self.shape + (4,), dtype=np.uint8)
-                rgba[..., :3] = 128
-                rgba[..., 3] = np.where(solid, 255, 0)
-                self.mask = pg.ImageItem(rgba)
-                self.mask.setRect(self.rect)
-                self.mask.setZValue(1)
-                plot.addItem(self.mask)
+        self.rebuild_mask(solid)
         plot.setAspectLocked(True)
         plot.setRange(xRange=(float(xf[0]), float(xf[-1])),
                       yRange=(float(yf[0]), float(yf[-1])), padding=0.02)
@@ -111,22 +145,109 @@ class ScalarImage:
             self.bar.setImageItem(self.img, insert_in=plot)
         self.levels = (0.0, 1.0)
 
-    def set_field(self, p, clim=None):
-        ovp = overpressure_kpa(p, self.solid)
-        if clim is None:
-            with np.errstate(all='ignore'):
-                hi = float(np.nanmax(ovp)) if np.isfinite(ovp).any() else 0.0
-                lo = float(np.nanmin(ovp)) if np.isfinite(ovp).any() else 0.0
-            if hi <= lo:
-                hi = lo + 1.0
+    # ── the mask ─────────────────────────────────────────────────────────
+    def rebuild_mask(self, solid):
+        """Point the grey obstacle overlay at a new mask (a 3D plane
+        change gives the same faces a different mask). An all-clear or
+        wrongly shaped mask leaves no overlay at all."""
+        solid = None if solid is None else np.asarray(solid, dtype=bool)
+        if solid is not None and (solid.shape != self.shape
+                                  or not solid.any()):
+            solid = None
+        self.solid = solid
+        if solid is None:
+            if self.mask is not None:
+                try:
+                    self.plot.removeItem(self.mask)
+                except Exception:
+                    pass
+                self.mask = None
+            return
+        rgba = np.zeros(self.shape + (4,), dtype=np.uint8)
+        rgba[..., :3] = 128
+        rgba[..., 3] = np.where(solid, 255, 0)
+        if self.mask is None:
+            self.mask = pg.ImageItem(rgba)
+            self.mask.setRect(self.rect)
+            self.mask.setZValue(1)
+            self.plot.addItem(self.mask)
         else:
-            lo, hi = float(clim[0]), float(clim[1])
-        data = np.nan_to_num(ovp, nan=lo).astype(np.float32)
+            self.mask.setImage(rgba)
+
+    # ── labels ───────────────────────────────────────────────────────────
+    def set_bar_label(self, text):
+        """Relabel the colour bar. The Results tab changes unit whenever
+        the field selector moves, so this must not rebuild the bar."""
+        if self.bar is None:
+            return
+        for axis in ('right', 'left'):
+            try:
+                self.bar.getAxis(axis).setLabel(str(text))
+            except Exception:
+                pass
+
+    def set_labels(self, xlabel=None, ylabel=None):
+        if xlabel is not None:
+            self.plot.setLabel('bottom', str(xlabel))
+        if ylabel is not None:
+            self.plot.setLabel('left', str(ylabel))
+
+    # ── the array ────────────────────────────────────────────────────────
+    def _autoscale(self, zm, robust=False):
+        """(lo, hi, clipped) for a masked field. `robust` follows
+        plots._panel_grid_figure exactly: clip to the 99.5th percentile
+        only when the top really is a small hot spot, which is what
+        makes a peak-overpressure map readable at all."""
+        if not np.isfinite(zm).any():
+            return 0.0, 1.0, False
+        clipped = False
+        with np.errstate(all='ignore'):
+            lo, hi = float(np.nanmin(zm)), float(np.nanmax(zm))
+            if robust:
+                p = float(np.nanpercentile(zm, CLIP_PERCENTILE))
+                if np.isfinite(p) and p > 0 and hi > CLIP_RATIO * p:
+                    hi, clipped = p, True
+        if hi <= lo:
+            hi = lo + 1.0
+        return lo, hi, clipped
+
+    def _push(self, zm, lo, hi):
+        # NaN (solid) reads as the bottom of the range; the grey mask
+        # item paints over those cells anyway
+        data = np.nan_to_num(zm, nan=lo).astype(np.float32)
         self.img.setImage(data, autoLevels=False, levels=(lo, hi))
         if self.bar is not None:
             self.bar.setLevels((lo, hi))
         self.levels = (lo, hi)
+
+    def _masked(self, z):
+        zm = np.asarray(z, dtype=np.float64)
+        if self.solid is not None and self.solid.shape == zm.shape:
+            zm = np.where(self.solid, np.nan, zm)
+        return zm
+
+    def set_field(self, p, clim=None):
+        """A pressure field, shown as overpressure in kPa. Returns the
+        (lo, hi) applied."""
+        ovp = overpressure_kpa(p, self.solid)
+        if clim is None:
+            lo, hi, _ = self._autoscale(ovp)
+        else:
+            lo, hi = float(clim[0]), float(clim[1])
+        self._push(ovp, lo, hi)
         return lo, hi
+
+    def set_data(self, z, clim=None, robust=False):
+        """A field already in its own unit. Returns (lo, hi, clipped),
+        where `clipped` says the robust rule cut the top off and the
+        caller should say so in the title and the bar label."""
+        zm = self._masked(z)
+        if clim is None:
+            lo, hi, clipped = self._autoscale(zm, robust=robust)
+        else:
+            lo, hi, clipped = float(clim[0]), float(clim[1]), False
+        self._push(zm, lo, hi)
+        return lo, hi, clipped
 
     def remove(self):
         for item in (self.img, self.mask, self.bar):

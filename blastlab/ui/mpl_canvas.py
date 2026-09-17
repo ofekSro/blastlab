@@ -70,6 +70,22 @@ class MplCanvas(QWidget):
         self._canvas.draw_idle()
         return fig
 
+    def blank(self, text='', figsize=(6, 5)):
+        """An empty axis, optionally carrying one muted line of text.
+
+        Results panels need this on every switch: without it the
+        PREVIOUS result's figure stays on screen under a result that has
+        none, which reads as this result's data."""
+        from matplotlib.figure import Figure
+        fig = Figure(figsize=figsize)
+        ax = fig.add_subplot()
+        ax.axis('off')
+        if text:
+            ax.text(0.5, 0.5, str(text), transform=ax.transAxes,
+                    ha='center', va='center', fontsize=10,
+                    color=theme.cur('muted'))
+        return self.set_figure(fig)
+
     def draw(self):
         if self._canvas is not None:
             self._canvas.draw_idle()
