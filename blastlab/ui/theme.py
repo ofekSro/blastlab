@@ -168,7 +168,10 @@ def qss(mode_name):
                  border: 1px solid {p['border']}; border-radius: 8px;
                  padding: 3px 6px; selection-background-color: {p['accent']}; }}
     QLineEdit:disabled {{ color: {p['muted']}; }}
-    QLineEdit[error="true"] {{ border: 1px solid {p['error']}; }}
+    /* a field the validator refused: `error` is the Run tab's refresh box,
+       `bad` is what the Setup form's mark_fields() sets */
+    QLineEdit[error="true"], QLineEdit[bad="true"],
+    QComboBox[bad="true"] {{ border: 1px solid {p['error']}; }}
     QLineEdit:focus, QComboBox:focus {{ border: 1px solid {p['accent']}; }}
     QComboBox::drop-down {{ border: none; width: 22px; }}
     QComboBox QAbstractItemView {{ background: {p['card2']}; color: {p['text']};
@@ -476,3 +479,45 @@ def icon(name, size=16, color=None):
 
 def pixmap(name, size=16, color=None):
     return _glyph(name, size, color or cur('text'))
+
+
+# ── matplotlib figure theming ────────────────────────────────────────────
+def style_figure(fig):
+    """Recolour a Figure's chrome in place to match the current mode.
+
+    Only figures shown ON SCREEN pass through here (the Results previews
+    and gauge traces); exports build their own figures and keep
+    matplotlib's default light style, so a PNG is readable on paper
+    whatever the app's appearance is."""
+    p = pal()
+    dark = _mode == 'dark'
+    face = p['card']
+    axface = p['entry'] if dark else p['card']
+    fig.patch.set_facecolor(face)
+    for txt in fig.texts:                                  # suptitles
+        txt.set_color(p['text'])
+    for ax in fig.axes:
+        try:
+            ax.set_facecolor(axface)
+        except Exception:
+            pass
+        for sp in getattr(ax, 'spines', {}).values():
+            sp.set_color(p['border'])
+        ax.tick_params(colors=p['muted'], labelcolor=p['muted'],
+                       which='both')
+        for axis_name in ('xaxis', 'yaxis', 'zaxis'):
+            axis = getattr(ax, axis_name, None)
+            if axis is None:
+                continue
+            axis.label.set_color(p['text'])
+            if hasattr(axis, 'pane'):                      # 3D axes
+                axis.pane.set_facecolor(face)
+                axis.pane.set_edgecolor(p['border'])
+        ax.title.set_color(p['text'])
+        leg = ax.get_legend()
+        if leg is not None:
+            leg.get_frame().set_facecolor(axface)
+            leg.get_frame().set_edgecolor(p['border'])
+            for t in leg.get_texts():
+                t.set_color(p['text'])
+    return fig

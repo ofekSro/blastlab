@@ -560,6 +560,28 @@ class View3DHost(QWidget):
         self.scene_changed.emit(True)
         return True
 
+    def show_geometry(self, geo):
+        """Static scenery only - the Setup tab's model preview. No ring
+        and no frames: the child builds a GeometryScene and re-renders it
+        for each edited case, keeping the camera while the domain extents
+        are unchanged."""
+        if not pyvista_available():
+            self._log(MISSING_MSG)
+            return False
+        if not self.link.ensure_started():
+            return False
+        first = not self._has_scene
+        self._has_scene = True
+        self.link.send(('geo', self.surface, geo))
+        if self.isVisible() and not self._floating:
+            self.link.send(('claim', self.surface, self._container_id()))
+        if first:
+            if self._container is None and self._hwnd is None \
+                    and not self._floating:
+                self._holder.setText('starting the 3D preview…')
+            self.scene_changed.emit(True)
+        return True
+
     def on_done(self, reason):
         if not self._has_scene:
             return

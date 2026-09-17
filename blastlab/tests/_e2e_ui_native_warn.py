@@ -42,12 +42,15 @@ def main():
     real_notify = win.notify
     win.notify = lambda text, level='info': (notes.append((level, str(text)))
                                              or real_notify(text, level))
-    win._case = case
-    win.setup.set_case(case, '(built in the test)')
+    win.setup.set_case(case)
     win._schedule_validate()
     pump(400)
-    check("validation ran on the injected case",
-          win.run_panel._valid_lbl.text() != '', win.run_panel._valid_lbl.text())
+    check("the form adopted the injected case",
+          win.setup.dim == 2 and win.current_case() is not None
+          and abs(win.current_case().Lx - 2.4) < 1e-12,
+          str(win.setup.dim))
+    check("validation ran on it", win.run_panel._valid_lbl.text() != '',
+          win.run_panel._valid_lbl.text())
 
     print("\nW1: run it through the Run button's own path")
     t0 = time.time()

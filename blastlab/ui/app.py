@@ -24,6 +24,7 @@ from . import dialogs, theme
 from .bridge import ThreadBridge
 from .run_controller import RunController
 from .run_panel import RunPanel
+from .setup_panel import SetupPanel
 from .theme import GAP, PAD
 from .view3d_host import View3DHost
 from .viewer_link import ViewerLink
@@ -33,58 +34,6 @@ _LOGO = os.path.join(os.path.dirname(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__)))), 'logo.gif')
 
 CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
-
-
-class SetupStub(QWidget):
-    """Setup tab placeholder until the form port (M2): shows the loaded
-    case and the validation report; cases come from `--case` or
-    Open case."""
-
-    def __init__(self, on_open, parent=None):
-        super().__init__(parent)
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(PAD - 4)
-        root.addWidget(label('Setup', 'h1'))
-        card = Card('Case')
-        root.addWidget(card)
-        self._path = label('No case loaded. Open a case file to run it.',
-                           'muted', wrap=True)
-        card.add(self._path)
-        card.add(button('Open case…', 'folder', width=140,
-                        on_click=on_open))
-        self._summary = QLabel('')
-        self._summary.setFont(theme.font('mono'))
-        self._summary.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        card.add(self._summary)
-        rep = Card('Validation')
-        root.addWidget(rep)
-        self._report = label('', 'body', wrap=True)
-        rep.add(self._report)
-        root.addStretch(1)
-
-    def set_case(self, case, path=None):
-        self._path.setText(path or '(unsaved case)')
-        fields = getattr(case, '__dict__', {})
-        lines = []
-        for key, val in fields.items():
-            if key.startswith('_'):
-                continue
-            text = repr(val)
-            if len(text) > 80:
-                text = text[:77] + '...'
-            lines.append(f'{key:18s} {text}')
-        self._summary.setText('\n'.join(lines))
-
-    def show_report(self, errors=(), warnings=(), notes=()):
-        parts = ([f'✖ {e}' for e in errors]
-                 + [f'⚠ {w}' for w in warnings]
-                 + [f'ℹ {n}' for n in notes])
-        if not parts:
-            parts = ['✔ Case OK']
-        self._report.setText('\n'.join(parts))
-        colour = ('error' if errors else 'warn' if warnings else 'ok')
-        self._report.setStyleSheet(f'color: {theme.cur(colour)};')
 
 
 class TabStub(QWidget):
@@ -158,7 +107,10 @@ class MainWindow(QMainWindow):
         self.viewer_link = ViewerLink(self, log_fn=self._log_threadsafe)
         self.view3d = View3DHost(self.viewer_link, 'run',
                                  log_fn=self._log_threadsafe)
-        self.setup = SetupStub(on_open=self._open_case)
+        self.setup = SetupPanel(on_change=self._schedule_validate,
+                                mode=self.solver_mode,
+                                viewer_link=self.viewer_link,
+                                log_fn=self._log_threadsafe)
         self.run_panel = RunPanel(view3d_host=self.view3d)
         self.results = TabStub('Results', 'The Results tab arrives with the '
                                'next milestone of the Qt port (M3).')
@@ -427,7 +379,12 @@ class MainWindow(QMainWindow):
 
     # ── case files ───────────────────────────────────────────────────────
     def current_case(self):
-        return self._case
+        """The case the form currently describes, or None when it does
+        not parse (the Setup report says why)."""
+        try:
+            return self.setup.get_case()
+        except ValueError:
+            return None
 
     def _open_case(self, path=None):
         path = path or dialogs.open_file('Open case', CASE_FILTER, self)
@@ -457,9 +414,8 @@ class MainWindow(QMainWindow):
             self.show_error('Open case', msg if 'case file' in msg.lower()
                             else f'Not a blastlab case file: {msg}')
             return
-        self._case = case
         self._case_path = path
-        self.setup.set_case(case, path)
+        self.setup.set_case(case)
         self._maybe_prewarm_viewer(case)
         # a run started from this case is named after the file (N9)
         self.run_panel.set_run_name(
@@ -480,9 +436,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(400, self.viewer_link.prewarm)
 
     def _save_case(self):
-        case = self.current_case()
-        if case is None:
-            self.show_error('Save case', 'No case to save.')
+        try:
+            case = self.setup.get_case()
+        except ValueError as exc:
+            self.show_error('Save case', str(exc))
             return
         path = dialogs.save_file('Save case', 'blastlab case (*.json)', self,
                                  default_suffix='json')
@@ -494,11 +451,13 @@ class MainWindow(QMainWindow):
         self._validate_timer.start()
 
     def _validate(self):
-        case = self.current_case()
-        if case is None:
-            self.setup.show_report(errors=['No case loaded.'])
-            self.run_panel.set_validation(False, 1,
-                                          text='No case loaded - see Setup')
+        try:
+            case = self.setup.get_case()
+        except ValueError as exc:
+            lines = [ln for ln in str(exc).splitlines() if ln.strip()]
+            self.setup.show_report(errors=lines)
+            self.run_panel.set_validation(False, len(lines))
+            self.setup.update_preview(None)
             return
         if getattr(case, 'solver', 'native') == 'blastfoam':
             foam_env.ensure_check_started()
@@ -518,12 +477,14 @@ class MainWindow(QMainWindow):
             extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
         self.run_panel.set_validation(not rep.errors, len(rep.errors))
+        self.setup.update_preview(case)
 
     # ── running ──────────────────────────────────────────────────────────
     def _run_single(self, paused=False):
-        case = self.current_case()
-        if case is None:
-            self.show_error('Run', 'Open a case file first.')
+        try:
+            case = self.setup.get_case()
+        except ValueError as exc:
+            self.show_error('Run', str(exc))
             return
         rep = validate_case(case)
         if not rep.ok:
