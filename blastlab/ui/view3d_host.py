@@ -17,6 +17,7 @@ writes into (`viz3d.protocol`); the host only hands the child the
 scene init and the ring's name.
 """
 
+import sys
 import time
 
 from PySide6.QtCore import QEvent, QPoint, QRect, Qt, QTimer, Signal
@@ -38,6 +39,48 @@ from .widgets import ScrollColumn, Segmented, button, label
 #: radio-button fields, straight from the viewer's FIELDS table
 FIELD_LABELS = [(key, spec['label']) for key, spec in FIELDS.items()]
 _PLANE_DEFAULTS = {1: ('y', True), 2: ('z', False)}
+
+# ── making the render window a real child of its card ────────────────────
+# Windows only; everywhere else the Qt window container is the only route.
+_GWL_STYLE, _GWL_EXSTYLE = -16, -20
+_WS_CHILD, _WS_POPUP = 0x40000000, 0x80000000
+#: caption, sizing border, system menu and the two buttons
+_WS_FRAME = 0x00C00000 | 0x00040000 | 0x00080000 | 0x00020000 | 0x00010000
+#: modal frame, window edge, client edge, app window, static edge
+_WS_EX_FRAME = 0x00000001 | 0x00000100 | 0x00000200 | 0x00040000 | 0x00020000
+_SW_HIDE, _SW_SHOWNA = 0, 8
+#: SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER
+_SWP_PIN = 0x0004 | 0x0010 | 0x0200
+_SWP_FRAMECHANGED = 0x0020
+
+
+def _user32():
+    """The user32 handle, or None off Windows."""
+    if not sys.platform.startswith('win'):
+        return None
+    try:
+        import ctypes
+        return ctypes.windll.user32
+    except Exception:
+        return None
+
+
+def _get_style(hwnd, which):
+    import ctypes
+    u32 = ctypes.windll.user32
+    fn = getattr(u32, 'GetWindowLongPtrW', None) or u32.GetWindowLongW
+    fn.restype = ctypes.c_ssize_t
+    fn.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    return int(fn(ctypes.c_void_p(int(hwnd)), which))
+
+
+def _set_style(hwnd, which, value):
+    import ctypes
+    u32 = ctypes.windll.user32
+    fn = getattr(u32, 'SetWindowLongPtrW', None) or u32.SetWindowLongW
+    fn.restype = ctypes.c_ssize_t
+    fn.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_ssize_t]
+    return int(fn(ctypes.c_void_p(int(hwnd)), which, value))
 
 
 class _FloatWindow(QWidget):
@@ -130,6 +173,8 @@ class View3DHost(QWidget):
         self._sync_timer = None       # keeps the embedded window in place
         self._syncing = False
         self._burst_until = 0.0
+        self._native = False          # the card adopted the window itself
+        self._style = None            # the window's own frame, to restore
         self._build()
         self._built = True
         link.register(surface, self)
@@ -427,39 +472,123 @@ class View3DHost(QWidget):
             self._sync_timer.setInterval(self.SYNC_FAST_MS)
 
     def _expected_rect(self):
-        """Where the render window should be, in the top-level's own
-        coordinates - which is the space a QWindow re-parented into that
-        top-level reports its geometry in."""
+        """Where the render window should be, in its Windows parent's own
+        client coordinates.
+
+        Which parent that is depends on how it was embedded, and the
+        difference is the whole point of the native path: a real child of
+        its card belongs at (0, 0) of the card, while Qt's container
+        re-parents to the top-level and so has to be told where the card
+        happens to sit inside it.
+        """
         container = self._container
         if container is None or container.width() < 2:
             return None
+        if self._native:
+            return QRect(QPoint(0, 0), container.size())
         top = container.window()
         if top is None:
             return None
         return QRect(container.mapTo(top, QPoint(0, 0)),
                      container.size())
 
+    def _real_offset(self):
+        """How far the window REALLY is from its container, asked of the
+        window manager rather than of Qt.
+
+        This distinction is the whole difference between a fix and a
+        near-miss. Comparing `fw.geometry()` with the container trusts
+        Qt's bookkeeping - which is the thing that breaks. Minimising and
+        restoring the window is the case that proves it: the window comes
+        back 915 px left and 137 px up while Qt still believes it never
+        moved, so an `!= want` test skips the correction and the window
+        stays in the corner indefinitely.
+
+        None on any platform without the call, or when the answer cannot
+        be trusted; the caller then falls back to Qt's own view.
+        """
+        rect = self._real_rect()
+        container = self._container
+        if rect is None or container is None:
+            return None
+        here = container.mapToGlobal(QPoint(0, 0))
+        return (rect[0] - here.x(), rect[1] - here.y())
+
+    def _real_rect(self):
+        """The window's screen rectangle as the window manager has it."""
+        if not sys.platform.startswith('win') or not self._hwnd:
+            return None
+        try:
+            import ctypes
+            buf = ctypes.create_string_buffer(16)    # RECT: 4 x LONG
+            if not ctypes.windll.user32.GetWindowRect(
+                    ctypes.c_void_p(int(self._hwnd)), buf):
+                return None
+            left, top, right, bottom = ctypes.cast(
+                buf, ctypes.POINTER(ctypes.c_long))[0:4]
+            return (left, top, right - left, bottom - top)
+        except Exception:
+            return None
+
+    def _real_size(self):
+        rect = self._real_rect()
+        return None if rect is None else (rect[2], rect[3])
+
     def sync_foreign_geometry(self):
         """Put the embedded render window back over its container.
 
-        Re-entrant by construction: `setGeometry` fires the very signals
-        that call this, so the guard stops the recursion at one level and
-        the `!= want` test makes a second pass a no-op anyway.
+        Qt sets the geometry, so its own bookkeeping stays in step and it
+        has nothing stale to re-apply later; Win32 then puts the window
+        there, because `setGeometry` to a rect Qt already believes in is
+        a no-op inside Qt and would leave the window where it is.
+
+        Re-entrant by construction: moving the window fires the very
+        signals that call this, hence the guard.
         """
         if self._syncing:
             return
         fw = self._foreign
         want = self._expected_rect()
-        if fw is None or want is None:
+        if want is None or (fw is None and not self._native):
+            return
+        real = self._real_offset()
+        if real is not None:
+            if max(abs(real[0]), abs(real[1])) <= 1 \
+                    and self._real_size() == (want.width(), want.height()):
+                return
+        elif fw is not None and fw.geometry() == want:
             return
         self._syncing = True
         try:
-            if fw.geometry() != want:
+            if fw is not None:
                 fw.setGeometry(want)
+            self._pin_foreign(want)
         except Exception:
             pass
         finally:
             self._syncing = False
+
+    #: SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER
+    _SWP_FLAGS = 0x0004 | 0x0010 | 0x0200
+
+    def _pin_foreign(self, want):
+        """Move the window with the window manager itself.
+
+        `want` is in the client coordinates of whichever window is the
+        render window's Windows parent, which is what SetWindowPos wants
+        for a child window - the card on the native path, the top-level
+        under Qt's container.
+        """
+        if not sys.platform.startswith('win') or not self._hwnd:
+            return
+        try:
+            import ctypes
+            ctypes.windll.user32.SetWindowPos(
+                ctypes.c_void_p(int(self._hwnd)), None,
+                want.x(), want.y(), want.width(), want.height(),
+                self._SWP_FLAGS)
+        except Exception:
+            pass
 
     def _watch_foreign_moves(self):
         """Correct the move itself, in the frame it happens."""
@@ -553,12 +682,131 @@ class View3DHost(QWidget):
         self.link.send(('claim', self.surface, target))
         self._claimed, self._claimed_ok = target, True
 
+    def _embed_native(self):
+        """Make the render window a real child window of its card.
+
+        This is the difference between correcting where the window is and
+        it never being wrong. `createWindowContainer` re-parents the
+        foreign window to the TOP-LEVEL and then tracks its position by
+        hand - and it is not the only one doing so, because over in the
+        viewer the same widget is a `Qt.Window` with no parent, so that
+        process's Qt believes it is top-level too. Either side can
+        re-apply a stale position at any moment, and the render window
+        lands in the corner of the client area, over the sidebar and the
+        form. Correcting it afterwards always costs a visible frame; the
+        owner watched it happen.
+
+        A real child window removes the failure rather than repairing
+        it. Windows clips the window to the card and carries it when the
+        card moves, and - the point - its coordinates become RELATIVE to
+        the card, so the (0, 0) that both sides fall back to is exactly
+        where it belongs.
+
+        False if the platform has no such call, and the Qt window
+        container is then used instead.
+        """
+        u32 = _user32()
+        if u32 is None or not self._hwnd:
+            return False
+        mount = None
+        try:
+            import ctypes
+            hwnd = int(self._hwnd)
+            # into the stack BEFORE it gets a native handle: re-parenting
+            # a native widget recreates its HWND, which would orphan the
+            # render window we are about to hang off it
+            mount = QWidget()
+            mount.setFocusPolicy(Qt.NoFocus)
+            mount.setMinimumSize(200, 150)
+            self._view_stack.addWidget(mount)
+            self._view_stack.setCurrentWidget(mount)
+            mount.setAttribute(Qt.WA_NativeWindow, True)
+            parent_id = int(mount.winId())
+            if not parent_id:
+                raise RuntimeError('the card has no native handle')
+
+            self._style = (_get_style(hwnd, _GWL_STYLE),
+                           _get_style(hwnd, _GWL_EXSTYLE))
+            # hidden while it is re-parented and re-framed, so none of it
+            # is ever on screen in the wrong place
+            u32.ShowWindow(ctypes.c_void_p(hwnd), _SW_HIDE)
+            _set_style(hwnd, _GWL_STYLE,
+                       (self._style[0] & ~(_WS_POPUP | _WS_FRAME))
+                       | _WS_CHILD)
+            _set_style(hwnd, _GWL_EXSTYLE, self._style[1] & ~_WS_EX_FRAME)
+            if not u32.SetParent(ctypes.c_void_p(hwnd),
+                                 ctypes.c_void_p(parent_id)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            self._container = mount
+            self._native = True
+            mount.installEventFilter(self)      # WinIdChange insurance
+            u32.SetWindowPos(ctypes.c_void_p(hwnd), None, 0, 0,
+                             max(1, mount.width()), max(1, mount.height()),
+                             _SWP_PIN | _SWP_FRAMECHANGED)
+            u32.ShowWindow(ctypes.c_void_p(hwnd), _SW_SHOWNA)
+            self._start_sync_watch()
+            return True
+        except Exception as exc:
+            self._log(f'  [3D view: the card could not adopt the render '
+                      f'window ({exc}); falling back to Qt]')
+            self._native = False
+            self._container = None
+            if mount is not None:
+                try:
+                    self._view_stack.removeWidget(mount)
+                    mount.setParent(None)
+                    mount.deleteLater()
+                except Exception:
+                    pass
+            return False
+
+    def _release_native(self):
+        """Hand the window back to the viewer as a top-level again."""
+        u32 = _user32()
+        if u32 is None or not self._native or not self._hwnd:
+            return
+        try:
+            import ctypes
+            hwnd = int(self._hwnd)
+            u32.ShowWindow(ctypes.c_void_p(hwnd), _SW_HIDE)
+            u32.SetParent(ctypes.c_void_p(hwnd), None)
+            if self._style is not None:
+                _set_style(hwnd, _GWL_STYLE, self._style[0])
+                _set_style(hwnd, _GWL_EXSTYLE, self._style[1])
+                u32.SetWindowPos(ctypes.c_void_p(hwnd), None, 0, 0, 0, 0,
+                                 _SWP_PIN | _SWP_FRAMECHANGED | 0x0001
+                                 | 0x0002)      # SWP_NOSIZE | SWP_NOMOVE
+        except Exception:
+            pass
+        self._native = False
+
+    def eventFilter(self, obj, event):
+        # Qt destroys and recreates a native widget's HWND when it is
+        # re-parented or re-created; the render window hangs off that
+        # handle, so it has to be re-adopted.
+        if (self._native and obj is self._container
+                and event.type() == QEvent.WinIdChange):
+            u32 = _user32()
+            if u32 is not None and self._hwnd:
+                try:
+                    import ctypes
+                    u32.SetParent(ctypes.c_void_p(int(self._hwnd)),
+                                  ctypes.c_void_p(int(obj.winId())))
+                    self.sync_foreign_geometry()
+                except Exception:
+                    pass
+        return super().eventFilter(obj, event)
+
     def _embed(self):
-        """Wrap the child's HWND in a window container inside the host;
-        on any failure the window is left to float on its own (the child
-        still renders into it)."""
+        """Give the child's HWND a home inside the host: a real child
+        window of its card where the platform allows it, otherwise Qt's
+        window container. On any failure the window is left to float on
+        its own (the child still renders into it)."""
         if self._hwnd is None or self._container is not None:
             return self._container is not None
+        if self._embed_native():
+            self._sync_soon()
+            return True
         try:
             win = QWindow.fromWinId(self._hwnd)
             if win is None:
@@ -586,9 +834,26 @@ class View3DHost(QWidget):
         """Move the container into the host's view stack."""
         if self._container is None:
             return
-        self._view_stack.addWidget(self._container)
+        if not self._native:
+            self._view_stack.addWidget(self._container)
+        # a native mount is never re-parented: its HWND is the render
+        # window's parent, and Qt would destroy and recreate it
         self._view_stack.setCurrentWidget(self._container)
         self._sync_soon()
+
+    def _drop_native_mount(self):
+        """Hand the window back and take the card's mount down with it."""
+        self._release_native()
+        mount, self._container = self._container, None
+        if mount is None:
+            return
+        try:
+            mount.removeEventFilter(self)
+            self._view_stack.removeWidget(mount)
+            mount.setParent(None)
+            mount.deleteLater()
+        except Exception:
+            pass
 
     def set_floating(self, floating):
         """Move the render window into its own top-level window, or bring
@@ -601,6 +866,19 @@ class View3DHost(QWidget):
             # nothing embedded (yet, or embedding failed): the child's
             # window is already on its own
             self._floating = floating
+            self._view_stack.setCurrentWidget(
+                self._float_box if floating else self._holder)
+            self.link.send(('detach', self.surface, floating))
+            self.detach_btn.setEnabled(not floating)
+            return
+        if self._native:
+            # No _FloatWindow here, and none wanted: detaching a real
+            # child window means handing it back to the viewer, which
+            # owns it as a proper framed top-level. Coming back, the
+            # child re-reports its handle and `on_window` re-adopts it.
+            self._floating = floating
+            self._drop_native_mount()
+            self._float_lbl.setText(self.FLOATING)
             self._view_stack.setCurrentWidget(
                 self._float_box if floating else self._holder)
             self.link.send(('detach', self.surface, floating))
@@ -675,6 +953,12 @@ class View3DHost(QWidget):
         self._stop_sync_watch()
         self.cancel_feed()
         self.close_ring()
+        if self._native:
+            # the window goes back to the viewer BEFORE the card's mount
+            # is destroyed: Windows destroys a parent's children with it,
+            # and that would take the child process's render window
+            self._drop_native_mount()
+            return
         if self._float_win is not None:
             # nothing may outlive the main window
             self._host_container()

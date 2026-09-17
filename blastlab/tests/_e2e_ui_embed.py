@@ -17,18 +17,29 @@ unrelated operations. Measured inside the real SetupPanel:
     switching to light mode           751 px left, 121 px up
 
 Each one leaves the render window in the corner of the client area, over
-the sidebar and the form. Enumerating the triggers failed three times,
-so `View3DHost` now asserts the geometry from STATE, in two layers: the
-QWindow's own `xChanged`/`yChanged`/`widthChanged`/`heightChanged`
-signals, which are the move itself and not a guess at its cause, and a
-timer as the backstop for a break that arrives without any signal - a
-theme change, where the CONTAINER moves and the window does not.
+the sidebar and the form.
 
-Being corrected is not the same as not being seen, so this suite
-measures both: that the window ends up over its card (E2), and that its
-longest UNBROKEN misplacement stays inside a frame or two (E3). With the
-timer alone it was right in the end and still visibly wrong for 53 to
-157 ms on the way.
+**Correcting that is not enough, and this is the lesson of the whole
+episode.** Once the position was re-asserted from state rather than from
+events, the window always ended up over its card - and the owner still
+watched it flick out and back, because a correction can only ever run
+after the wrong frame. Measured on the Qt path: 18 ms on a tab switch,
+68 ms on a theme change.
+
+So the render window is now a real Windows CHILD of its card
+(`View3DHost._embed_native`), which removes the failure instead of
+repairing it: Windows clips it to the card, carries it when the card
+moves, and makes its coordinates relative to the card - so the (0, 0)
+that both processes fall back to is exactly right. Measured across
+eleven actions with the real viewer child: never drawn out of place.
+
+Hence three questions here, not one: the window ends up over its card
+(E2), it is never DRAWN anywhere else (E3), and the backstop that
+catches whatever is left stays cheap (E4).
+
+  --qt-container   force Qt's window container: E2 passes, E3 fails,
+                   which is the state the owner reported
+  --break          also disable the geometry sync: E2 fails too
 
 Two things this suite needs, and both are deliberate:
 
@@ -65,10 +76,10 @@ os.environ['BLASTLAB_SETTINGS'] = _settings
 
 #: how far out of place counts as broken
 TOL = 2
-#: an unbroken misplacement this short is under three frames at 60 Hz -
-#: measured at 12 to 18 ms, and 157 ms before the QWindow signals and
-#: the burst were added
-VISIBLE_MS = 50
+#: one frame at 60 Hz. A real child window measures 0.0 ms here; Qt's
+#: window container measured 18 ms on a tab switch and 68 ms on a theme
+#: change, and the owner saw both
+VISIBLE_MS = 17
 
 FAIL = []
 RAN = []
@@ -96,6 +107,10 @@ def win32_rect(hwnd):
 
 def win32_parent(hwnd):
     return ctypes.windll.user32.GetParent(ctypes.c_void_p(hwnd))
+
+
+def win32_visible(hwnd):
+    return bool(ctypes.windll.user32.IsWindowVisible(ctypes.c_void_p(hwnd)))
 
 
 class FakeLink:
@@ -131,32 +146,32 @@ def main():
     from blastlab.ui import theme
     theme.apply(app, 'dark')
     from blastlab.ui.view3d_host import View3DHost
+    qt_container = broken or '--qt-container' in sys.argv
+    if qt_container:
+        View3DHost._embed_native = lambda self: False
+        print('*** the native child path is disabled: Qt window '
+              'container only ***')
     if broken:
         View3DHost.sync_foreign_geometry = lambda self: None
         print('*** sync_foreign_geometry disabled ***')
     from blastlab.core.mode import SolverMode
     from blastlab.ui.setup_panel import SetupPanel
 
-    child = subprocess.Popen(
-        [sys.executable, '-u',
-         os.path.join(HERE, '_qa_foreign_window.py')],
-        stdout=subprocess.PIPE, text=True)
-    hwnd = None
-    for _ in range(300):
-        line = child.stdout.readline()
-        if not line:
-            break
-        if line.startswith('HWND'):
-            hwnd = int(line.split()[1])
-            break
-    if hwnd is None:
-        print('FAILED: the stand-in surface never reported a window')
-        child.kill()
-        return 1
-    print(f'stand-in surface HWND: {hwnd}')
+    # The REAL viewer child by preference. The stand-in cannot reproduce
+    # the flash at all - it never repositions itself, while the child's
+    # own Qt believes its render widget is a top-level window and
+    # re-applies a stale position on every show() - so a suite built on
+    # the stand-in reports a clean bill of health for a design the owner
+    # can see failing. That is how the previous version of this file
+    # stayed green through three bug reports.
+    child = None
+    link = None
+    stand_in = '--stand-in' in sys.argv
+    if not stand_in:
+        from blastlab.ui.viewer_link import ViewerLink
+        lines = []
+        link = ViewerLink(log_fn=lines.append)
 
-    # the real hierarchy: a tab stack over the real SetupPanel, whose own
-    # preview stack holds the host
     win = QWidget()
     win.setWindowTitle('blastlab embed test')
     win.resize(1280, 840)
@@ -166,7 +181,8 @@ def main():
     root.addWidget(stack)
     setup = SetupPanel(on_change=lambda: None,
                        mode=SolverMode('blastfoam'),
-                       viewer_link=FakeLink(), log_fn=lambda _s: None)
+                       viewer_link=link or FakeLink(),
+                       log_fn=lambda _s: None)
     stack.addWidget(setup)
     run_page = QWidget()
     QVBoxLayout(run_page).addWidget(QLabel('Run tab'))
@@ -188,26 +204,77 @@ def main():
     host = setup.view3d
     if host is None:
         print('SKIP: no 3D host (pyvista missing)')
-        child.kill()
         return 0
     check('the host is the current preview page',
           setup._prev_stack.currentWidget() is host and host.isVisible())
-    host._has_scene = True
-    host.on_window(hwnd)
+
+    if link is not None:
+        for _ in range(2500):               # pyvista + VTK + a GL context
+            app.processEvents()
+            time.sleep(0.01)
+            if host._hwnd and host._container is not None:
+                break
+        if not host._hwnd:
+            print('  the real viewer child never reported a window '
+                  f'({lines[-1].strip() if lines else "no reason given"});'
+                  '\n  falling back to the stand-in, which CANNOT '
+                  'reproduce the flash')
+            link.close()
+            link = None
+        else:
+            print(f'real viewer child, render window {host._hwnd}')
+    if link is None:
+        child = subprocess.Popen(
+            [sys.executable, '-u',
+             os.path.join(HERE, '_qa_foreign_window.py')],
+            stdout=subprocess.PIPE, text=True)
+        stand_hwnd = None
+        for _ in range(300):
+            line = child.stdout.readline()
+            if not line:
+                break
+            if line.startswith('HWND'):
+                stand_hwnd = int(line.split()[1])
+                break
+        if stand_hwnd is None:
+            print('FAILED: the stand-in surface never reported a window')
+            child.kill()
+            return 1
+        print(f'stand-in surface HWND: {stand_hwnd}')
+        setup.view3d._has_scene = True
+        host.on_window(stand_hwnd)
     settle()
+    hwnd = host._hwnd
+
+    def stop_surface():
+        if child is not None:
+            child.kill()
+        if link is not None:
+            link.close()
 
     print('\nE1: the embed itself')
-    check('a container was built', host._container is not None)
-    check('and a foreign window wrapper with it',
-          host._foreign is not None)
+    check('a card was built to hold it', host._container is not None)
     if host._container is None:
-        child.kill()
+        stop_surface()
         return 1
-    check('the window is a child of the TOP-LEVEL, not of the container '
-          '- this is what makes it fragile',
-          win32_parent(hwnd) == int(win.winId()),
-          f'parent={win32_parent(hwnd)} toplevel={int(win.winId())} '
-          f'container={int(host._container.winId())}')
+    check(f'the expected path was taken (native={not qt_container})',
+          host._native is not qt_container,
+          f'native={host._native}')
+    if host._native:
+        check('the window is a child of the CARD, so Windows clips and '
+              'carries it and its coordinates are relative to it',
+              win32_parent(hwnd) == int(host._container.winId()),
+              f'parent={win32_parent(hwnd)} '
+              f'card={int(host._container.winId())} '
+              f'toplevel={int(win.winId())}')
+    else:
+        check('Qt re-parented it to the TOP-LEVEL, not to the container '
+              '- this is what makes that path fragile',
+              win32_parent(hwnd) == int(win.winId()),
+              f'parent={win32_parent(hwnd)} toplevel={int(win.winId())} '
+              f'container={int(host._container.winId())}')
+        check('and there is a foreign window wrapper',
+              host._foreign is not None)
 
     def offset():
         c = host._container
@@ -268,13 +335,12 @@ def main():
     settle()
     ok_now('and back to dark')
 
-    print('\nE3: and it is not merely corrected, it is not seen')
-    # Being back in place after settling is not enough: with the timer
-    # alone the window sat visibly out of place for 53 to 157 ms, which
-    # reads as a jump and a snap back. What the eye sees is the longest
-    # UNBROKEN stretch, so that is what is measured - a disturbance that
-    # recurs over 40 ms while never lasting more than one frame is
-    # invisible. Measured here: 12 to 18 ms, one frame at 60 Hz.
+    print('\nE3: and it is not merely corrected, it is never drawn wrong')
+    # Ending up over the card is not the bar. A correction can only run
+    # after the wrong frame, and the owner watched exactly that: the
+    # window flicking right to left and back, "just for a moment".
+    # What the eye sees is the longest UNBROKEN stretch during which a
+    # VISIBLE window is not over its card, so that is what is measured.
     def longest_off(action, watch_ms=700):
         action()
         app.processEvents()
@@ -285,7 +351,8 @@ def main():
             app.processEvents()
             now = (time.perf_counter() - t0) * 1000
             d = offset()
-            if max(abs(d[0]), abs(d[1])) > TOL:
+            if (win32_visible(hwnd)
+                    and max(abs(d[0]), abs(d[1])) > TOL):
                 run += 0.0 if prev is None else now - prev
                 best = max(best, run)
             else:
@@ -299,14 +366,30 @@ def main():
         settle(25)
         stack.setCurrentIndex(0)
 
-    for tag, action in (('a tab round trip', tab_trip),
-                        ('switching to light mode',
-                         lambda: theme.apply(app, 'light')),
-                        ('and back to dark',
-                         lambda: theme.apply(app, 'dark'))):
+    def dim_trip():
+        setup.set_dim(2)
+        setup.update_preview(setup.get_case())
+        settle(25)
+        setup.set_dim(3)
+        setup.update_preview(setup.get_case())
+
+    def minimize_trip():
+        win.showMinimized()
+        settle(40)
+        win.showNormal()
+
+    for tag, action in (
+            ('a tab round trip', tab_trip),
+            ('a dimension round trip', dim_trip),
+            ('a resize', lambda: win.resize(1180, 780)),
+            ('minimizing and restoring', minimize_trip),
+            ('switching to light mode',
+             lambda: theme.apply(app, 'light')),
+            ('and back to dark', lambda: theme.apply(app, 'dark'))):
         ms = longest_off(action)
-        check(f'{tag} never shows it out of place for more than '
+        check(f'{tag} never draws it out of place for more than '
               f'{VISIBLE_MS} ms', ms <= VISIBLE_MS, f'{ms:.1f} ms')
+        settle(20)
 
     print('\nE4: the watchdog is cheap when nothing is happening')
     check('it was running while embedded',
@@ -319,9 +402,12 @@ def main():
     settle(20)
     check('and stops with the host',
           host._sync_timer is None or not host._sync_timer.isActive())
+    check('and the card handed the render window back, so the viewer '
+          'keeps it when the card is destroyed',
+          not host._native and host._container is None)
     win.close()
     settle(20)
-    child.kill()
+    stop_surface()
 
     print('\n' + '=' * 52)
     if FAIL:
