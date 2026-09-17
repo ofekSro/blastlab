@@ -67,6 +67,8 @@ class AnimView(QWidget):
         self._levels = None
         self._clim = None
         self._scale_used = 'run'
+        self._clipped = False
+        self._clim_cache = {}       # (result, scale, clim) -> resolved
         self.image = None
         self.overlay = None
         self._show_mesh = False
@@ -159,16 +161,29 @@ class AnimView(QWidget):
         self._on_change()
 
     def _resolve_clim(self):
-        """Fix the range once per result / per scale change, not per
-        frame - that is the whole point of the 'run' scale."""
+        """Fix the range once per result and scale, not per frame - that
+        is the whole point of the 'run' scale.
+
+        The answer is memoised because the whole-video range costs a
+        pass over every recorded frame (measured: 2.6 s for 150 frames
+        of 1000x1000), and toggling the selector back and forth must not
+        pay for it twice."""
         frames = self._frames()
         if frames is None:
-            self._clim, self._scale_used = None, 'run'
+            self._clim, self._scale_used, self._clipped = None, 'run', False
             return
-        solid = self._geom['solid'] if self._geom else None
-        self._clim, self._scale_used = anim_mod.resolve_clim(
-            self._ent.result.meta, frames['pressures'], solid,
-            self.scale(), self.clim())
+        # keyed on the scale only: the cache is emptied whenever the
+        # result changes, so an id() that Python later reuses for a
+        # different entry cannot hand back a stale range
+        key = (self.scale(), self.clim())
+        hit = self._clim_cache.get(key)
+        if hit is None:
+            solid = self._geom['solid'] if self._geom else None
+            hit = anim_mod.resolve_clim(
+                self._ent.result.meta, frames['pressures'], solid,
+                self.scale(), self.clim())
+            self._clim_cache[key] = hit
+        self._clim, self._scale_used, self._clipped = hit
 
     # ── state ────────────────────────────────────────────────────────────
     def set_title_extra(self, text):
@@ -203,6 +218,8 @@ class AnimView(QWidget):
             self.image.remove()
         self.image = self.overlay = None
         self._geom = self._levels = self._clim = None
+        self._clipped = False
+        self._clim_cache = {}
         self.plot.setTitle('', color=theme.cur('text'))
         self._title = ''
         self.glw.setVisible(False)
@@ -218,6 +235,7 @@ class AnimView(QWidget):
         if show_mesh is not None:
             self._show_mesh = bool(show_mesh)
         self._ent = ent
+        self._clim_cache = {}         # a different run, a different range
         self.stop_play()
         if ent is None:
             self.placeholder(NO_RESULT)
@@ -283,6 +301,8 @@ class AnimView(QWidget):
         bar = 'Overpressure [kPa]'
         if self._clim is None:
             bar += '  (rescaled per frame)'
+        elif self._clipped:
+            bar += pg_plots.CLIP_BAR_SUFFIX
         self.image.set_bar_label(bar)
         if self._levels is not None and self._show_mesh:
             g = self._geom
@@ -311,6 +331,11 @@ class AnimView(QWidget):
         """Which scale the replay actually applied - 'manual' falls back
         to 'run' when the typed range is unusable."""
         return self._scale_used
+
+    def clipped(self):
+        """Whether the whole-video range had its top clipped, which a
+        recording that starts at t = 0 nearly always needs."""
+        return self._clipped
 
     def _slider_moved(self, value):
         if not self._playing:

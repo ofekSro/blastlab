@@ -91,6 +91,22 @@ def add_mesh_lines(ax, segments, color='0.6'):
 #: boundaries are always kept - see core.refine.mesh_segments_2d)
 MESH_MAX_LINES = 60
 
+#: The robust colour clip, defined once here because three layers need
+#: the SAME rule: the panel grid below, the animation's whole-video
+#: range (output/animation.frame_clim) and the Qt Fields panel
+#: (ui/pg_plots.ScalarImage.set_data).
+#:
+#: Blast fields are dominated by a handful of cells: a peak-overpressure
+#: map has 1e7 kPa in the charge against a field of 1e2, and a recording
+#: that starts at t = 0 has the unexpanded charge at ~2.8e6 kPa against a
+#: shock of ~4.5e4 (measured, 5 kg planar 2D: a 61x ratio, which left the
+#: last frame occupying 0.28 % of the colour bar). So the top is clipped
+#: to this percentile - but ONLY when the peak really is that far above
+#: the bulk, so an ordinary field is never touched.
+CLIP_PERCENTILE = 99.5
+CLIP_RATIO = 4.0
+CLIP_NOTE = '  (top 0.5 % clipped)'
+
 
 def gauge_points(meta, sl=None, tol=None):
     """The gauge positions to draw on one field plot, as (x, y) pairs in
@@ -414,17 +430,16 @@ def _panel_grid_figure(items, solid_sl, xf, yf, xlabel, ylabel, title,
         zm = np.where(solid_sl, np.nan, z.astype(np.float64))
         vmax = None
         if robust and np.isfinite(zm).any():
-            hi = float(np.nanpercentile(zm, 99.5))
+            hi = float(np.nanpercentile(zm, CLIP_PERCENTILE))
             top = float(np.nanmax(zm))
             # only clip when the tail really is a small hot spot
-            if np.isfinite(hi) and hi > 0 and top > 4.0 * hi:
+            if np.isfinite(hi) and hi > 0 and top > CLIP_RATIO * hi:
                 vmax = hi
         im = ax.pcolormesh(xf, yf, zm.T, cmap=cmap, shading='flat',
                            vmax=vmax)
         if mesh is not None:
             add_mesh_lines(ax, mesh)
-        ax.set_title(label + ('  (top 0.5 % clipped)' if vmax else ''),
-                     fontsize=10)
+        ax.set_title(label + (CLIP_NOTE if vmax else ''), fontsize=10)
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_aspect('equal')

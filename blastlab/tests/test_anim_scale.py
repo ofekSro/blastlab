@@ -80,19 +80,71 @@ def main():
     meta, frames, solid = synthetic()
 
     print("\nA1: one range covers every frame")
-    got = anim.frame_clim(frames, solid)
+    lo, hi, clipped = anim.frame_clim(frames, solid)
     check("the range spans the whole run",
-          got is not None and abs(got[0] - 100.0) < 1e-6
-          and abs(got[1] - 500.0) < 1e-6, str(got))
+          abs(lo - 100.0) < 1e-6 and abs(hi - 500.0) < 1e-6,
+          f'{lo} .. {hi}')
+    check("a uniform decay is no hot spot, so nothing is clipped",
+          not clipped)
     check("carved cells are excluded from the minimum",
           anim.frame_clim(frames, None)[0] == 0.0,
           str(anim.frame_clim(frames, None)))
     flat = [np.full((4, 4), P_AIR)]
     check("a dead-flat run still gets a usable range",
-          anim.frame_clim(flat) == (0.0, 1.0),
+          anim.frame_clim(flat) == (0.0, 1.0, False),
           str(anim.frame_clim(flat)))
     check("no finite data -> no range",
-          anim.frame_clim([np.full((3, 3), np.nan)]) is None)
+          anim.frame_clim([np.full((3, 3), np.nan)])
+          == (None, None, False))
+
+    print("\nA1b: the t = 0 charge must not blacken the whole video")
+    # a real recording starts with the UNEXPANDED charge: measured on a
+    # 5 kg planar 2D run, frame 0 peaks at 2.8e6 kPa while the shock
+    # after it reaches 4.5e4, so an honest range left the last frame in
+    # the bottom 0.28 % of the colour bar
+    n = 400
+    shock = []
+    for k in range(1, 6):
+        a = np.full(n, P_AIR)
+        a[:n // 2] = P_AIR + 4.5e7 / k      # a shock the eye can see
+        shock.append(a)
+    fireball = np.full(n, P_AIR)
+    fireball[0] = P_AIR + 2.8e9             # ONE cell in four hundred,
+    burst = [fireball] + shock              # i.e. inside the top 0.5 %
+    raw = anim.frame_clim(burst, robust=False)
+    cap = anim.frame_clim(burst)
+    check("the raw range is dominated by the charge",
+          abs(raw[1] - 2.8e6) < 1e3 and not raw[2], str(raw))
+    check("the robust range follows the shock instead",
+          cap[2] and cap[1] < raw[1] / 10, str(cap))
+    check("so the last frame is actually visible",
+          max(float(np.nanmax((p - P_AIR) / 1e3)) for p in shock)
+          / cap[1] > 0.1,
+          f'{max(float(np.nanmax((p - P_AIR) / 1e3)) for p in shock)}'
+          f' of {cap[1]}')
+    check("an ordinary field is left alone",
+          not anim.frame_clim(shock)[2])
+    # the percentile is sampled, because the Results replay recomputes
+    # this whenever the scale changes and must not freeze the window
+    big = [np.repeat(f, 2000) for f in burst]       # 800k cells a frame
+    sampled = anim.frame_clim(big)
+    check("sampling does not move the answer",
+          sampled[2] and abs(sampled[1] - cap[1]) / cap[1] < 0.01,
+          f'{sampled[1]} vs {cap[1]}')
+    check("and it really is a sample, not the whole frame",
+          anim._sample(big[0]).size == anim.CLIP_SAMPLE_CELLS,
+          str(anim._sample(big[0]).size))
+    check("a frame small enough is taken whole",
+          anim._sample(np.zeros(1000)).size == 1000)
+    from blastlab.output import plots as plots_mod
+    check("the rule is the ONE the exported panel grid uses",
+          plots_mod.CLIP_PERCENTILE == 99.5
+          and plots_mod.CLIP_RATIO == 4.0
+          and plots_mod.CLIP_NOTE.strip() == '(top 0.5 % clipped)')
+    from blastlab.ui import pg_plots
+    check("and the Qt panel shares it, not a copy",
+          pg_plots.CLIP_PERCENTILE is plots_mod.CLIP_PERCENTILE
+          and pg_plots.CLIP_TITLE_SUFFIX is plots_mod.CLIP_NOTE)
 
     print("\nA2: resolving the scale, and every fallback")
     cases = [
@@ -106,7 +158,8 @@ def main():
         ((None, None), 'run', (100.0, 500.0)),
     ]
     for (scale, clim), want_used, want_range in cases:
-        rng, used = anim.resolve_clim(meta, frames, solid, scale, clim)
+        rng, used, _clip = anim.resolve_clim(meta, frames, solid, scale,
+                                             clim)
         ok = used == want_used and (
             rng is None if want_range is None
             else rng is not None
@@ -114,13 +167,20 @@ def main():
             and abs(rng[1] - want_range[1]) < 1e-6)
         check(f"scale={scale!r} clim={clim!r} -> {want_used}", ok,
               f'used={used} range={rng}')
+    burst_meta = dict(meta, frames=dict(times=list(range(len(burst))),
+                                        pressures=burst))
+    _r, _u, clip = anim.resolve_clim(burst_meta, burst, None, 'run', None)
+    check("'run' on a real burst reports its clip", clip)
+    _r, _u, clip = anim.resolve_clim(burst_meta, burst, None, 'manual',
+                                     (0.0, 1e7))
+    check("a range you pinned yourself is never clipped", not clip)
 
     print("\nA3: the run's own choice travels in its meta")
     m = dict(meta, anim_scale='manual', anim_clim=(10.0, 40.0))
-    rng, used = anim.resolve_clim(m, frames, solid)
+    rng, used, _c = anim.resolve_clim(m, frames, solid)
     check("a Result exported later keeps the case's choice",
           used == 'manual' and rng == (10.0, 40.0), f'{used} {rng}')
-    rng, used = anim.resolve_clim(m, frames, solid, scale='frame')
+    rng, used, _c = anim.resolve_clim(m, frames, solid, scale='frame')
     check("an explicit argument still overrides it", used == 'frame'
           and rng is None, f'{used} {rng}')
 
@@ -192,10 +252,10 @@ def main():
               solid=solid3, Lx=1.0, Ly=1.0, Lz=1.0, charge=1.0,
               slice_axis='y', s0=3, j0=3, gauges=[], dx=1.0 / n)
     check("the full 3D mask does not match, so it is ignored",
-          anim.frame_clim(f3, solid3) == (300.0, 301.0),
+          anim.frame_clim(f3, solid3) == (300.0, 301.0, False),
           str(anim.frame_clim(f3, solid3)))
     check("its slice matches, and hides every cell -> no range",
-          anim.frame_clim(f3, solid3[:, 3, :]) is None)
+          anim.frame_clim(f3, solid3[:, 3, :]) == (None, None, False))
     p3 = os.path.join(out, 'slice3d.gif')
     import contextlib, io, warnings
     buf = io.StringIO()

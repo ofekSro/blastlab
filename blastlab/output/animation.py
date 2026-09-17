@@ -19,44 +19,90 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 
 from ..core.constants import ANIM_SCALE_LABELS, ANIM_SCALES, P_AIR
-from .plots import (add_gauge_markers, add_mesh_lines, gauge_points,
-                    mesh_for, overpressure_panel, set_frame,
-                    charge_label, titled)
+from . import plots as plots_mod
+from .plots import (CLIP_PERCENTILE, CLIP_RATIO, add_gauge_markers,
+                    add_mesh_lines, gauge_points, mesh_for,
+                    overpressure_panel, set_frame, charge_label, titled)
 
 #: how the colour range is chosen (see core.constants.ANIM_SCALES)
 SCALES = ANIM_SCALES
 SCALE_LABELS = ANIM_SCALE_LABELS
 
 
-def frame_clim(pressures, solid=None):
-    """One overpressure range [kPa] covering every recorded frame.
+#: cells per frame that feed the percentile. A percentile only has to be
+#: approximately right here - it is a bound on the bulk, not a
+#: measurement - and the Results replay recomputes the range whenever the
+#: scale changes, so it must not freeze the window.
+#:
+#: Measured over 150 frames of 1000x1000, the frame-budget cap:
+#:   whole-frame percentile   5.7 s
+#:   sampled percentile       3.4 s
+#:   min/max pass alone       2.5 s   (paid either way)
+#: so sampling cuts the robust part from 3.2 s to 0.9 s. The Results
+#: replay memoises the result on top of that.
+CLIP_SAMPLE_CELLS = 200_000
+
+
+def _sample(a):
+    """Every Nth cell of a frame, flattened - enough for a percentile."""
+    flat = np.ravel(a)
+    step = max(1, flat.size // CLIP_SAMPLE_CELLS)
+    return flat if step == 1 else flat[::step]
+
+
+def frame_clim(pressures, solid=None, robust=True):
+    """One overpressure range [kPa] covering every recorded frame, and
+    whether its top was clipped.
+
+    Returns `(lo, hi, clipped)`, or `(None, None, False)` when the frames
+    carry nothing finite.
 
     Solid cells are excluded - a carved obstacle holds ambient pressure
-    and would otherwise pin the minimum at zero. Returns None when the
-    frames carry nothing finite."""
-    lo, hi = np.inf, -np.inf
+    and would otherwise pin the minimum at zero.
+
+    `robust` applies `plots.CLIP_RATIO` / `CLIP_PERCENTILE`, and it is on
+    by default because a recording that starts at t = 0 begins with the
+    UNEXPANDED CHARGE. Measured on a 5 kg planar 2D run: the first frame
+    peaks at 2.8e6 kPa while the shock that follows reaches 4.5e4, so an
+    honest whole-run range put the last frame in the bottom 0.28 % of the
+    colour bar - black. The cap is the highest per-frame 99.5th
+    percentile, i.e. the brightest the BULK of any single frame reaches,
+    and it is applied only when the peak is far above that.
+    """
+    lo, hi, caps = np.inf, -np.inf, []
     for p in pressures:
         ovp = (np.asarray(p, dtype=np.float64) - P_AIR) / 1e3
         if solid is not None and np.shape(solid) == ovp.shape:
             ovp = np.where(solid, np.nan, ovp)
         if not np.isfinite(ovp).any():
             continue
+        # min and max come from EVERY cell: the true peak is what
+        # decides whether to clip at all
         lo = min(lo, float(np.nanmin(ovp)))
         hi = max(hi, float(np.nanmax(ovp)))
+        if robust:
+            caps.append(float(np.nanpercentile(_sample(ovp),
+                                               CLIP_PERCENTILE)))
     if not (np.isfinite(lo) and np.isfinite(hi)):
-        return None
+        return None, None, False
+    clipped = False
+    if robust and caps:
+        cap = max(caps)
+        if np.isfinite(cap) and cap > lo and hi > CLIP_RATIO * cap:
+            hi, clipped = cap, True
     if hi <= lo:
         hi = lo + 1.0
-    return lo, hi
+    return lo, hi, clipped
 
 
 def resolve_clim(meta, pressures, solid=None, scale=None, clim=None):
-    """The (vmin, vmax) to pin the video to, and the scale actually used.
+    """`((vmin, vmax) or None, scale used, clipped)`.
 
     `scale`/`clim` default to what the run recorded in its meta (the
     case's own choice), so a Result exported later keeps it; an explicit
     argument overrides. A 'manual' range that is missing or inverted
-    falls back to 'run' rather than producing an unreadable video."""
+    falls back to 'run' rather than producing an unreadable video, and a
+    range you pin is never clipped - you asked for it."""
     if scale is None:
         scale = meta.get('anim_scale') or 'run'
     scale = str(scale)
@@ -65,17 +111,18 @@ def resolve_clim(meta, pressures, solid=None, scale=None, clim=None):
     if clim is None:
         clim = meta.get('anim_clim')
     if scale == 'frame':
-        return None, 'frame'
+        return None, 'frame', False
     if scale == 'manual' and clim is not None:
         try:
             lo, hi = float(clim[0]), float(clim[1])
         except (TypeError, ValueError, IndexError):
             lo = hi = 0.0
         if np.isfinite(lo) and np.isfinite(hi) and hi > lo:
-            return (lo, hi), 'manual'
+            return (lo, hi), 'manual', False
         print('  [note] the animation colour range is unusable '
               f'({clim!r}) - using one range for the whole video')
-    return frame_clim(pressures, solid), 'run'
+    lo, hi, clipped = frame_clim(pressures, solid)
+    return (None if lo is None else (lo, hi)), 'run', clipped
 
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
@@ -160,12 +207,18 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     title_art = ax.set_title('')
     # one range for the whole video unless asked otherwise, so the
     # colour bar means the same thing in every frame
-    fixed, used = resolve_clim(meta, pressures, solid_sl, scale, clim)
+    fixed, used, clipped = resolve_clim(meta, pressures, solid_sl, scale,
+                                        clim)
     bar_label = 'Overpressure [kPa]'
     if fixed is not None:
         mesh.set_clim(*fixed)
         scale_note = (f'{SCALE_LABELS[used]} '
                       f'{fixed[0]:.3g} .. {fixed[1]:.3g} kPa')
+        if clipped:
+            # the same wording the exported panel grid uses, so the
+            # video and the PNGs describe the clip identically
+            bar_label += plots_mod.CLIP_NOTE
+            scale_note += plots_mod.CLIP_NOTE
     else:
         # the label and the log line read off the same fact, so they
         # cannot disagree: 'run' with no finite cell anywhere (a plane

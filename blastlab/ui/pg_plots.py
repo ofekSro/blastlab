@@ -16,6 +16,8 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtWidgets import QLabel, QStackedWidget, QVBoxLayout, QWidget
 
 from ..core.constants import P_AIR
+# one definition of the robust clip for every layer that draws a field
+from ..output.plots import CLIP_NOTE, CLIP_PERCENTILE, CLIP_RATIO
 from . import theme
 
 pg.setConfigOptions(imageAxisOrder='col-major', antialias=False,
@@ -27,16 +29,10 @@ GAUGE_COLOR = '#00e5ff'
 
 #: matplotlib draws `extend='max'` as an arrow on the colour bar;
 #: pyqtgraph's ColorBarItem has no such affordance, so a robust-clipped
-#: field says so in words instead. The title suffix is byte-identical to
-#: the one `plots._panel_grid_figure` puts on the exported PNG, so the
-#: screen and the file agree.
-CLIP_TITLE_SUFFIX = '  (top 0.5 % clipped)'
+#: field says so in words instead. The title suffix is the SAME string
+#: the exported PNG carries, so the screen and the file agree.
+CLIP_TITLE_SUFFIX = CLIP_NOTE
 CLIP_BAR_SUFFIX = '  (top clipped)'
-
-#: the robust rule itself, copied from plots._panel_grid_figure: clip to
-#: the 99.5th percentile only when the tail really is a small hot spot
-CLIP_PERCENTILE = 99.5
-CLIP_RATIO = 4.0
 
 _CMAP = None
 _LUT = None
