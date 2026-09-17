@@ -103,7 +103,7 @@ class MainWindow(QMainWindow):
                                 log_fn=self._log_threadsafe)
         self.run_panel = RunPanel(view3d_host=self.view3d)
         self.results = ResultsPanel(viewer_link=self.viewer_link,
-                                    log_fn=self._log_threadsafe,
+                                    log_fn=self._result_msg,
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run,
                                     bridge=self.bridge)
@@ -587,6 +587,17 @@ class MainWindow(QMainWindow):
     def _log_threadsafe(self, text):
         """Log sink for worker threads (cleanup, viewer link)."""
         self.bridge.post(self.run_panel.on_log, str(text))
+
+    def _result_msg(self, text):
+        """Results-panel messages - exports, post-mortem loads, viewer
+        hints - go to the run log AND the status bar. Only the Run tab
+        shows the log, and someone standing on Results would otherwise
+        get no sign that an export had finished or failed."""
+        text = str(text)
+        self._log_threadsafe(text)
+        low = text.lower()
+        level = 'error' if ('fail' in low or 'error' in low) else 'info'
+        self.bridge.post(self.notify, text, level)
 
     # ── shutdown ─────────────────────────────────────────────────────────
     def closeEvent(self, event):

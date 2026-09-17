@@ -1,5 +1,9 @@
 """Entry point: `python -m blastlab` starts the GUI;
-`python -m blastlab --cli 1d|2d|3d` runs the prompt-based CLI."""
+`python -m blastlab --cli 1d|2d|3d` runs the prompt-based CLI.
+
+The GUI is the PySide6 one (`blastlab.ui`). `--tk` still opens the old
+Tkinter one for a release, and `--qt` is accepted as a no-op so the
+shortcuts written during the port keep working."""
 
 import argparse
 
@@ -17,9 +21,13 @@ def main():
                          'or blastFoam via WSL (default: native)')
     ap.add_argument('--case', metavar='FILE',
                     help='case JSON to open in the GUI at startup')
+    ap.add_argument('--tk', action='store_true',
+                    help='launch the old Tkinter GUI (blastlab.gui) '
+                         'instead of the default PySide6 one; kept for '
+                         'one release')
     ap.add_argument('--qt', action='store_true',
-                    help='launch the PySide6 GUI (blastlab.ui, in '
-                         'development) instead of the Tk one')
+                    help=argparse.SUPPRESS)   # now the default; accepted
+                                              # so old shortcuts keep working
     ap.add_argument('--clean-foam-runs', action='store_true',
                     help='list and delete the WSL-side blastFoam run '
                          'directories, then exit (runs still solving '
@@ -66,12 +74,12 @@ def main():
     if args.cli:
         from .cli import main as cli_main
         cli_main(args.cli, solver=args.solver)
-    elif args.qt:
-        from .ui.app import main as qt_main
-        qt_main(case_file=args.case)
-    else:
+    elif args.tk:
         from .gui.app import main as gui_main
         gui_main(case_file=args.case)
+    else:
+        from .ui.app import main as qt_main
+        qt_main(case_file=args.case)
 
 
 if __name__ == '__main__':

@@ -70,7 +70,7 @@ Hard rules:
 
 ---
 
-## Q1 — מעבר ה-GUI ל-PySide6 (פתוח; שלב 0 ו-M0–M4 הושלמו ב-2026-09-17)
+## Q1 — מעבר ה-GUI ל-PySide6 (שלב 0 ו-M0–M5 ב-2026-09-17; נשארו M6 ו-M7)
 
 > התוכנית המאושרת: `~/.claude/plans/sunny-twirling-lampson.md`.
 > החלטות הבעלים: חבילה חדשה `blastlab/ui/` במקביל ל-`gui/`; אותה פריסה
@@ -270,10 +270,35 @@ WSL לגמרי, בלי אזהרה.**
 
 בדיקות: `test_ui_chain.py` (42) ו-`test_ui_run_browser.py` (48).
 
-### M5 — החלפת ברירת המחדל
+### M5 — החלפת ברירת המחדל · **הוחלף (17.09); נשאר המתאם ל-harness**
 
-`python -m blastlab` יפתח Qt, `--tk` ישאיר את הישן. להריץ את כל המטריצה
-המהירה עם `test_ui_*` במקום `test_gui_*`.
+**בוצע.** `python -m blastlab` פותח עכשיו את Qt; `--tk` פותח את הישן
+ונשאר לגרסה אחת; `--qt` מתקבל אבל מוסתר (`argparse.SUPPRESS`) כדי
+שקיצורי דרך מתקופת המעבר ימשיכו לעבוד. `blastlab.bat` לא נגע — הוא רק
+מעביר ארגומנטים. ה-stub האחרון (`TabStub`) נמחק, וכל ארבע הלשוניות
+אמיתיות. נוסף גם מה שה-stubs הסתירו: `_result_msg` מוליך הודעות של
+Results **גם** ללוג וגם לשורת הסטטוס (מי שעומד על Results לא היה רואה
+שייצוא נגמר או נכשל).
+
+**e2e אמיתיים:** `_e2e_ui_native.py` (35 — ריצה נייטיבית דו-ממדית אמיתית
+דרך החלון, עד לרשומה ב-Results, כל תת-התצוגות, וייצוא PNGs/GIF/TSV
+לדיסק; זו הבדיקה שמצאה את בעיית סקאלת הצבעים) ו-`_e2e_ui_chain.py`
+(16 — שרשרת 1D→2D אמיתית ב-10.5 שנ', כולל שהפרופיל עבר בדיסק ושקובצי
+ה-JSON נועצים את לוח הכתיבה).
+
+**מה נשאר ל-M5/M7:** המתאם של ה-harness. ה-harness הקיים
+(`_qa_gui_harness.py`, 3,167 שורות) הוא **59 תרחישים** + שכבת דרייבר
+(`class QA`, שורות 121–823). רק השכבה הזאת צריכה החלפה: `pump` כ-
+`mainloop` מקונן → לולאת `processEvents` (עם אותה דגימת עיכובים, `until`,
+deadline ובדיקת קובץ STOP), `patch_dialogs` על `tkinter.messagebox`/
+`filedialog` → `ui.dialogs.*` + `os.startfile`,
+`report_callback_exception` → `sys.excepthook` + `qInstallMessageHandler`
++ מקליט סביב `ThreadBridge._run`, `invoke()`/`cget('state')` →
+`click()`/`isEnabled()`, ופנימיות Tk → ה-accessors שנוספו ב-M2/M3
+(`report_rows`, `scroll_form`, `preview_kind`, `show_view`, `rows`).
+פרוטוקול ה-checkpoint/resume/budget וקודי היציאה (0/75/3/1) נשארים
+כלשונם, וגם `--smoke` כבר קיים (בוחר את `S00` לבד). ה-harness מייבא
+מ-`blastlab.gui` רק שלושה שמות, כולם lazy.
 
 ### M6 — תכונות חדשות
 
