@@ -147,6 +147,11 @@ class MainWindow(QMainWindow):
     def _build_sidebar(self):
         side = QFrame()
         side.setObjectName('sidebar')
+        # Stays 216. Widening it to 232 to fit 'blastFoam' took those
+        # 16 px straight out of the Setup form, whose two columns need
+        # 612 px of viewport and then got 604 - so the fix for a 7 px
+        # label collapsed the whole form to one column. The solver
+        # switch uses the small font instead.
         side.setFixedWidth(216)
         lay = QVBoxLayout(side)
         lay.setContentsMargins(12, PAD, 12, 12)

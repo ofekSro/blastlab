@@ -121,6 +121,10 @@ class View3DHost(QWidget):
         self._status = {}
         self._feed_timer = None       # results replay, one snapshot/tick
         self._feed_state = None
+        # the container the child was last told to use, so a claim is
+        # sent once per container and not once per edited case
+        self._claimed = None
+        self._claimed_ok = False
         self._build()
         self._built = True
         link.register(surface, self)
@@ -375,11 +379,35 @@ class View3DHost(QWidget):
     def _container_id(self):
         return int(self._container.winId()) if self._container else None
 
-    def _claim_if_visible(self):
-        if self._container is None:
+    def _claim_if_visible(self, force=False):
+        """Ask the child to show its window - but only when something
+        actually changed.
+
+        A `claim` makes the child call `show()` and `raise_()` on a
+        widget it still believes is top-level (Qt.Window, no parent);
+        only the SetParent that createWindowContainer did in this
+        process makes it a child. So a redundant claim hands the window
+        back to the child's own geometry and it reappears at the
+        top-left of the application, over the sidebar and the form.
+        `show_geometry` sent one on EVERY edited case, throttled to
+        500 ms, which is how the Setup preview jumped away while simply
+        typing in a 3D field.
+
+        Claiming once per container is enough: the first handshake
+        (before an HWND exists), again when `_embed` puts the window in
+        a container, and after a detach. `force` covers that last one,
+        where the container object is unchanged but the child has to be
+        told anyway.
+        """
+        if not self._has_scene or self._floating:
             return
-        if self._floating or (self.isVisible() and self._has_scene):
-            self.link.send(('claim', self.surface, self._container_id()))
+        if not self.isVisible():
+            return
+        target = self._container_id()
+        if not force and self._claimed_ok and target == self._claimed:
+            return
+        self.link.send(('claim', self.surface, target))
+        self._claimed, self._claimed_ok = target, True
 
     def _embed(self):
         """Wrap the child's HWND in a window container inside the host;
@@ -443,17 +471,39 @@ class View3DHost(QWidget):
             if self._float_win is not None:
                 self._float_win.release()
         self.detach_btn.setEnabled(not floating)
-        self._claim_if_visible()
+        # the container object is the same one, but the child still has
+        # to be told after a detach, so this claim is forced
+        self._claim_if_visible(force=True)
 
+    # A tab switch must NOT ask the child to hide and show its window.
+    #
+    # The child's surface window is a QWidget with Qt.Window flags and no
+    # parent, so over there Qt still believes it is top-level - the only
+    # thing that made it a child is the SetParent that
+    # createWindowContainer did in THIS process. `release` makes the
+    # child call hide(), `claim` makes it call show() + raise_(), and
+    # that pair hands the window back to the child's own top-level
+    # geometry: leaving Setup for Run and returning put the 3D view at
+    # the top-left of the application, over the sidebar and the form.
+    #
+    # An embedded window needs none of it. A window container's contents
+    # follow the container's visibility, so hiding the tab hides the
+    # render window with it. Only an UNembedded surface - the first
+    # handshake before on_window arrives, or a failed embed - still has
+    # to be told.
     def showEvent(self, event):
         super().showEvent(event)
-        if self._has_scene and not self._floating:
-            self._claim_if_visible()
+        # a no-op once embedded: the target container has not changed
+        self._claim_if_visible()
 
     def hideEvent(self, event):
         super().hideEvent(event)
-        if self._has_scene and not self._floating:
-            self.link.send(('release', self.surface))
+        if not self._has_scene or self._floating:
+            return
+        if self._container is not None:
+            return          # the container's contents hide with it
+        self.link.send(('release', self.surface))
+        self._claimed_ok = False    # so the next show claims again
 
     def on_closed(self):
         """The child says its window was closed from the outside."""
@@ -555,8 +605,7 @@ class View3DHost(QWidget):
             title=title or 'blastlab - 3D view')))
         self._apply_all_controls()
         self._set_time_range(0)
-        if self.isVisible() and not self._floating:
-            self.link.send(('claim', self.surface, self._container_id()))
+        self._claim_if_visible()
         if self._container is None and self._hwnd is None \
                 and not self._floating:
             self._holder.setText('starting the 3D view…')
@@ -576,8 +625,8 @@ class View3DHost(QWidget):
         first = not self._has_scene
         self._has_scene = True
         self.link.send(('geo', self.surface, geo))
-        if self.isVisible() and not self._floating:
-            self.link.send(('claim', self.surface, self._container_id()))
+        # once per container, NOT once per edited case
+        self._claim_if_visible()
         if first:
             if self._container is None and self._hwnd is None \
                     and not self._floating:
@@ -601,6 +650,7 @@ class View3DHost(QWidget):
         if self._has_scene:
             self.link.send(('release', self.surface))
         self._has_scene = False
+        self._claimed_ok = False
         self._done = False
         self._set_playing(False)
         self._holder.setText(self.PLACEHOLDER)

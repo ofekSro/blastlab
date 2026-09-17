@@ -106,9 +106,13 @@ def main():
     rel = [m for m in link.sent[n0:] if m[0] == 'release']
     check('leaving a surface with a scene releases the window',
           [m[1] for m in rel] == ['setup'], str(rel))
-    check('a claim needs a container to point at, so none yet',
-          not [m for m in link.sent[n0:] if m[0] == 'claim'],
-          'on_window is what closes this gap in the real app')
+    n1 = len(link.sent)
+    stack.setCurrentIndex(0)
+    pump(40)
+    back = [m for m in link.sent[n1:] if m[0] == 'claim'
+            and m[1] == 'setup']
+    check('and returning to it claims it again while unembedded',
+          len(back) == 1, str(back))
 
     # QWindow.fromWinId cannot wrap a window under the offscreen
     # platform (winId is 1 and fromWinId returns None), so the real
@@ -118,23 +122,74 @@ def main():
     for surface, host in hosts.items():
         host._container = QWidget()
         host._view_stack.addWidget(host._container)
+    # each surface claims ONCE, the first time it is shown with its new
+    # container, and never again however much the tabs are switched
     n0 = len(link.sent)
+    for i in (0, 1, 2, 0, 2, 1, 0, 1, 2):
+        stack.setCurrentIndex(i)
+        pump(40)
+    claims = [m for m in link.sent[n0:] if m[0] == 'claim']
+    per = {s: sum(1 for m in claims if m[1] == s) for s in hosts}
+    check('nine tab switches produce one claim per surface, no more',
+          per == {'setup': 1, 'run': 1, 'results': 1}, str(per))
+    check('and no release at all - a container hides with its tab',
+          not [m for m in link.sent[n0:] if m[0] == 'release'],
+          str([m for m in link.sent[n0:] if m[0] == 'release']))
+    check('every surface still believes it has a scene',
+          all(h.has_scene for h in hosts.values()))
+
+    print('\nS3a: a claim goes out once per container, not per edit')
+    # show_geometry sent a claim on EVERY call, and the Setup preview
+    # calls it for every edited case (throttled to 500 ms). Each one
+    # made the child show() and raise_() a window it still thinks is
+    # top-level, so the 3D preview jumped to the top-left of the
+    # application while the user was simply typing in a 3D field.
+    setup = hosts['setup']
     stack.setCurrentIndex(0)
     pump(40)
+    geo = dict(scene_info(), kind='geometry')
+    n0 = len(link.sent)
+    for _ in range(5):
+        setup.show_geometry(geo)
+        pump(20)
+    geos = [m for m in link.sent[n0:] if m[0] == 'geo']
     claims = [m for m in link.sent[n0:] if m[0] == 'claim']
-    check('with a container, showing the tab claims the window',
-          [m[1] for m in claims] == ['setup'], str(claims))
-    for i, surface in enumerate(('run', 'results')):
-        n0 = len(link.sent)
-        stack.setCurrentIndex(i + 1)
-        pump(40)
-        claims = [m for m in link.sent[n0:] if m[0] == 'claim']
-        rel = [m for m in link.sent[n0:] if m[0] == 'release']
-        prev = ('setup', 'run')[i]
-        check(f'{surface} claims it and only it',
-              {m[1] for m in claims} == {surface}, str(claims))
-        check(f'{prev} hands it back at the same time',
-              {m[1] for m in rel} == {prev}, str(rel))
+    check('five edited cases send five geometries',
+          len(geos) == 5, str(len(geos)))
+    check('and NOT five claims', len(claims) <= 1,
+          f'{len(claims)} claims for 5 edits')
+
+    print('\nS3b: a tab switch never hides the child\'s window')
+    # The child's surface window has Qt.Window flags and no parent, so a
+    # release/claim pair hands it back to the child's own top-level
+    # geometry: leaving Setup for Run and returning put the 3D view at
+    # the top-left of the application, over the sidebar and the form.
+    # An embedded window follows its container's visibility, so nothing
+    # needs saying.
+    host = hosts['results']
+    stack.setCurrentIndex(2)
+    pump(40)
+    n0 = len(stack_msgs := link.sent)
+    stack.setCurrentIndex(0)
+    pump(40)
+    stack.setCurrentIndex(2)
+    pump(40)
+    churn = [m for m in stack_msgs[n0:]
+             if m[0] in ('release', 'claim') and m[1] == 'results']
+    check('an embedded surface is neither released nor re-claimed',
+          not churn, str(churn))
+    # without a container the child still owns its window, so it does
+    host._container, keep = None, host._container
+    n1 = len(link.sent)
+    stack.setCurrentIndex(0)
+    pump(40)
+    stack.setCurrentIndex(2)
+    pump(40)
+    said = [m[0] for m in link.sent[n1:]
+            if m[0] in ('release', 'claim') and m[1] == 'results']
+    check('an UNembedded one is still told to hide and show',
+          'release' in said, str(said))
+    host._container = keep
 
     print('\nS4: detach and re-attach move the container, never the '
           'foreign window')
@@ -161,9 +216,9 @@ def main():
     check('the child is not told - nothing changed for it',
           not [m for m in link.sent[n0:] if m[0] == 'detach'],
           str([m[0] for m in link.sent[n0:]]))
-    check('but it is pointed at the container again',
-          any(m[0] == 'claim' and m[1] == 'results'
-              for m in link.sent[n0:]),
+    check('and not claimed either - the window never left the '
+          'container, so there is nothing to point it at',
+          not [m for m in link.sent[n0:] if m[0] == 'claim'],
           str([m[0] for m in link.sent[n0:]]))
     check('and Detach is no longer offered while it is out',
           not host.detach_btn.isEnabled())

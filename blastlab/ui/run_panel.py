@@ -15,7 +15,8 @@ from ..core import refine
 from . import theme
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .theme import GAP, PAD
-from .widgets import Card, Chip, Segmented, button, hbox, label, set_button_kind
+from .widgets import (Card, Chip, Segmented, WrapRow, button, hbox, label,
+                      set_button_kind)
 
 
 class RunPanel(QWidget):
@@ -105,32 +106,44 @@ class RunPanel(QWidget):
                                     'live plane - a 3D run counts the slice, '
                                     'not the whole mesh.')
         self._chip_cells.hide()
+        # the chips share this row with Run / Stop / 3D View / Name /
+        # validation, and at 1100 px there is not enough for all of it:
+        # 'p max [kPa]' came out 20 px short of its own caption. Let the
+        # chips wrap rather than squeeze.
+        self.chip_row = WrapRow()
         for chip in (self._chip_step, self._chip_t, self._chip_dt,
-                     self._chip_pmax, self._chip_cells):
-            bar.addWidget(chip)
+                     self._chip_pmax):
+            self.chip_row.add(chip)
+        # the AMR chip stays hidden until a frame carries a level map
+        self.chip_row.add(self._chip_cells, hidden=True)
+        bar.addWidget(self.chip_row, 1)
 
         # ── stepped execution row (VIPER-style) ──────────────────────────
         ebar = hbox()
         ctl.add_layout(ebar)
-        self.init_btn = button('Initialise Model', 'flag', width=150,
-                               height=32, on_click=self.init_requested.emit)
-        ebar.addWidget(self.init_btn)
+        # no fixed widths, and a row that wraps: 'Exec 1000' does not fit
+        # 72 px and 'Interrupt' does not fit 88 with its icon, so these
+        # read 'ec 100' and 'Interrup' on screen. Same defect as the
+        # Results export row (N2-10); same cure.
+        self.exec_row = WrapRow()
+        self.init_btn = self.exec_row.add(
+            button('Initialise Model', 'flag', height=32,
+                   on_click=self.init_requested.emit))
         self._exec_btns = []
 
         def exec_btn(text, cmd, icon=None):
-            b = button(text, icon, width=88 if icon else 72, height=32,
-                       on_click=lambda c=cmd: self.exec_requested.emit(c))
+            b = self.exec_row.add(
+                button(text, icon, height=32,
+                       on_click=lambda c=cmd: self.exec_requested.emit(c)))
             b.setEnabled(False)
-            ebar.addWidget(b)
             self._exec_btns.append(b)
             return b
 
         for n in (1, 10, 100, 1000):
             exec_btn(f'Exec {n}', n)
         exec_btn('END', 'run', icon='end')
-        ebar.addSpacing(GAP)
         exec_btn('Interrupt', 'pause', icon='pause')
-        ebar.addStretch(1)
+        ebar.addWidget(self.exec_row, 1)
         # live-view refresh rate (2D slice + 3D view); blank = automatic
         ebar.addWidget(label('Refresh every', 'muted'))
         self.refresh_val = QLineEdit()
@@ -163,36 +176,43 @@ class RunPanel(QWidget):
 
         right = Card(pad=12)
         right.setMinimumWidth(self.VIEW_MIN)
-        vbar = hbox()
-        right.add_layout(vbar)
+        # this row carries the view switch, Show mesh and the whole
+        # Min/Max colour range, which does not fit the live-view card at
+        # 1100 px: 'Show mesh' came out 5 px short of its own caption.
+        # WrapRow breaks it instead of squeezing, and each caption stays
+        # glued to its field.
+        self.view_row = WrapRow()
+        right.add(self.view_row)
         self._view_seg = Segmented(['Live slice', '3D view'])
         self._view_seg.setFixedWidth(220)
         self._view_seg.changed.connect(self._view_selected)
-        vbar.addWidget(self._view_seg)
-        vbar.addSpacing(PAD - GAP)
+        self.view_row.add(self._view_seg)
         # cell edges over the live slice (true cells of a refined run)
         self.show_mesh = QCheckBox('Show mesh')
         self.show_mesh.toggled.connect(lambda _c: self._rebuild_overlay())
-        vbar.addWidget(self.show_mesh)
-        vbar.addSpacing(PAD - GAP)
+        self.view_row.add(self.show_mesh)
         # manual colour range for the 2D live pane, mirroring the 3D
         # viewer's Min/Max: a late weak frame used to rescale the whole
         # picture, so nothing could be compared across a run (G7)
         self.auto_clim = QCheckBox('Auto')
         self.auto_clim.setChecked(True)
         self.auto_clim.toggled.connect(lambda _c: self._clim_changed())
-        vbar.addWidget(self.auto_clim)
+        self.view_row.add(self.auto_clim)
         self.clim_min = QLineEdit('0')
         self.clim_max = QLineEdit('')
         self._clim_entries = [self.clim_min, self.clim_max]
-        for lbl, ent in (('Min', self.clim_min), ('Max', self.clim_max)):
-            vbar.addWidget(label(lbl, 'small'))
+        for lbl, ent, tail in (('Min', self.clim_min, None),
+                               ('Max', self.clim_max, 'kPa')):
             ent.setFixedWidth(64)
             ent.setFont(theme.font('small'))
             ent.editingFinished.connect(self._clim_changed)
-            vbar.addWidget(ent)
-        vbar.addWidget(label('kPa', 'small'))
-        vbar.addStretch(1)
+            pair = QWidget()
+            pl = hbox(pair)
+            pl.addWidget(label(lbl, 'small'))
+            pl.addWidget(ent)
+            if tail:
+                pl.addWidget(label(tail, 'small'))
+            self.view_row.add(pair)
         self._sync_clim_state()
         self._stack = QStackedWidget()
         right.add(self._stack, 1)

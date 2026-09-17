@@ -257,10 +257,14 @@ class WrapRow(QWidget):
         self._outer.setSpacing(spacing)
         self._rows = []
 
-    def add(self, widget):
+    def add(self, widget, hidden=False):
         self._items.append(widget)
         widget.setParent(self)
+        if hidden:
+            widget.hide()
         self._relayout(force=True)
+        if hidden:
+            widget.hide()
         return widget
 
     def widgets(self):
@@ -291,6 +295,11 @@ class WrapRow(QWidget):
         if key == self._plan and not force:
             return
         self._plan = key
+        # adding a widget to a layout under a visible parent shows it,
+        # so a child the caller had hidden must be put back afterwards.
+        # The AMR cell chip is hidden until a level map arrives, and
+        # every resize was bringing it back.
+        hidden = {id(w): w.isHidden() for w in self._items}
         while self._outer.count():
             item = self._outer.takeAt(0)
             lay = item.layout()
@@ -307,7 +316,7 @@ class WrapRow(QWidget):
             lay.setSpacing(self._spacing)
             for w in row:
                 lay.addWidget(w)
-                w.show()
+                w.setVisible(not hidden[id(w)])
             lay.addStretch(1)
             self._outer.addLayout(lay)
             self._rows.append(lay)

@@ -113,7 +113,8 @@ class ResultsPanel(QWidget):
         self.sel.setMinimumWidth(250)
         self.sel.currentIndexChanged.connect(lambda *_: self.refresh())
         bar.addWidget(self.sel)
-        self._remove_btn = button('Remove', 'minus', width=104, height=32,
+        # no fixed width: 104 was 4 px short of the label plus its icon
+        self._remove_btn = button('Remove', 'minus', height=32,
                                   on_click=self.remove_current)
         bar.addWidget(self._remove_btn)
         self._view3d_btn = button('3D Viewer', 'cube', 'primary', width=124,
