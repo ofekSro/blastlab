@@ -53,7 +53,9 @@ drawing with boundary types, or a 3D render with domain, ground,
 charge, obstacles and gauges - updating as you type; 3D cases also
 choose the live-slice plane, normal + position, shown while running),
 **Run** (progress, log, live pressure view with auto or fixed Min/Max
-colour scale, Stop keeps partial results, plus
+colour scale, **live gauge traces** - overpressure against time at each
+gauge, drawn while the run is going rather than only after it - Stop
+keeps partial results, plus
 VIPER-style stepped execution: **Initialise Model** starts a run held
 at t = 0 and **Exec 1/10/100/1000/END** + **Interrupt** advance or
 pause it; a 3D case can set an end time. A **Refresh every** input
@@ -61,7 +63,8 @@ sets how often the live views redraw - in seconds or steps, blank =
 automatic - and can be changed mid-run; on blastFoam "every N steps"
 also sets how often the solver samples the live slice / profile, so
 the picture really moves every N solver steps), **Results** (snapshot
-browser, gauge histories, animation replay, exports), **Chain**
+browser, gauge histories, animation replay with a **0.25x - 4x speed**,
+exports), **Chain**
 (auto-wired 1D → 2D → 3D remap workflow into a workspace folder).
 
 ## Solver mode
@@ -90,9 +93,10 @@ the Results tab hides the blastFoam-only **Foam runs…** browser and
 3D runs get a live 3D view (VTK/OpenGL via **pyvista**, an optional
 dependency) showing the blast in space: obstacles as solid boxes, the
 domain outline, ground plane and the charge. It is **embedded in the
-GUI**: the Run tab's right pane has "Live slice" and "3D view" tabs -
-the 3D view **attaches automatically** when a 3D run starts and frames
-stream live; the Results tab has a **3D** sub-tab for snapshot playback
+GUI**: the Run tab's right pane has "Live slice", "Gauges" and
+"3D view" tabs - the 3D view **attaches automatically** when a 3D run
+starts and frames stream live; the Results tab has a **3D** sub-tab for
+snapshot playback
 of any finished 3D result (via its "3D Viewer" button). In `--cli 3d`
 (no GUI) answering `yes` to "Interactive 3D viewer" opens the same
 scene in a dedicated window instead.
@@ -102,9 +106,17 @@ double-click resets. The control column has three tabs:
 
 | Tab | Controls |
 | --- | --- |
-| Display | displayed field (pressure, density, energy, peak overpressure, impulse), auto or manual Min/Max colour range, log contours, shock isosurface (+ level slider), surface loads, volume render |
+| Display | displayed field (pressure, density, energy, peak overpressure, impulse), auto or manual Min/Max colour range, log colour scale, shock isosurface (+ level slider), surface loads, volume render |
 | Planes | six cross-section planes: enable, axis, position, opacity % |
 | View | Top/Bottom/Front/Back/Left/Right presets, parallel projection, reset |
+
+**Pressure is coloured logarithmically by default.** A blast spans four
+decades or more in one frame - the products sit at megapascals while the
+air around them is at tens of kilopascals - so on a linear bar the whole
+shocked field, which is what you are watching, collapses into the bottom
+fraction of a per cent and the view looks frozen. The other fields have
+no such range and stay linear; the Display tab's tick overrides either
+way, for the rest of the session.
 
 Peak overpressure and impulse are accumulated by the solver per cell,
 so the planes can paint running maxima like VIPER does. The displayed
