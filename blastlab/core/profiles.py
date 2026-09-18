@@ -6,6 +6,8 @@ consumed as an axisymmetric IC in 2D or a spherical IC in 3D).
 rotated around a vertical axis as a 3D IC).
 """
 
+import os
+
 import numpy as np
 
 from .constants import RHO_AIR, E_AIR
@@ -26,6 +28,7 @@ def save_profile(final_profile, filename='blast_profile.txt'):
               f"# time_s   = {fp['t']:.9e}\n"
               f"# charge_kg= {fp['charge_kg']}\n"
               f"# eos      = {fp['eos']}\n"
+              f"# solver   = {fp.get('source_solver', 'unknown')}\n"
               f"# r_exp_m  = {fp['r_exp']:.6e}\n"
               f"# radius_m = {fp['radius_m']}\n"
               f"# r[m]\trho[kg/m3]\tu[m/s]\te[J/kg]\tp[Pa]\tphase")
@@ -35,6 +38,58 @@ def save_profile(final_profile, filename='blast_profile.txt'):
                comments='', fmt='%.9e')
     print(f"  Field profile saved: {filename}  ({len(fp['r'])} cells, "
           f"t = {fp['t']*1e3:.3f} ms)")
+
+
+#: bounded memo for profile_source, keyed on (path, mtime_ns, size) so a
+#: rewritten profile is re-read but a keystroke is not
+_SRC_MEMO = {}
+_SRC_MEMO_MAX = 8
+
+
+def profile_source(filename):
+    """Which solver wrote this profile: 'native' | 'blastfoam' | 'unknown'.
+
+    Reads the HEADER ONLY - validate_case calls this on a 300 ms
+    keystroke debounce, so the cost has to be one os.stat in the common
+    case. Profiles written before N5-4 carry no stamp and come back
+    'unknown', which is never treated as an error anywhere: refusing
+    them would break every profile already on disk in exchange for a
+    guess.
+
+    Never raises. A caller on the validation path cannot afford to care
+    why a file was unreadable, only that it could not be identified.
+    """
+    try:
+        st = os.stat(filename)
+        key = (os.path.abspath(filename), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return 'unknown'
+    hit = _SRC_MEMO.get(key)
+    if hit is not None:
+        return hit
+    try:
+        if filename.lower().endswith('.npz'):
+            with np.load(filename) as z:
+                src = (str(z['source_solver'])
+                       if 'source_solver' in z.files else 'unknown')
+        else:
+            src = 'unknown'
+            with open(filename, encoding='utf-8', errors='replace') as fh:
+                for _ in range(20):          # the header is 6 lines today
+                    line = fh.readline()
+                    if not line or not line.startswith('#'):
+                        break
+                    if '=' in line:
+                        k, _, v = line[1:].partition('=')
+                        if k.strip() == 'solver':
+                            src = v.strip() or 'unknown'
+                            break
+    except Exception:            # noqa: BLE001 - see the docstring
+        src = 'unknown'
+    if len(_SRC_MEMO) >= _SRC_MEMO_MAX:
+        _SRC_MEMO.clear()
+    _SRC_MEMO[key] = src
+    return src
 
 
 def load_profile(filename):
@@ -61,6 +116,7 @@ def load_profile(filename):
         t         = float(meta.get('time_s', 0.0)),
         charge_kg = float(meta.get('charge_kg', 0.0)),
         eos       = meta.get('eos', 'unknown'),
+        source_solver = meta.get('solver', 'unknown'),
         r_exp     = float(meta.get('r_exp_m', 0.0)),
         radius_m  = float(meta.get('radius_m', 0.0)),
         r     = data[:, 0], rho = data[:, 1], u = data[:, 2],
@@ -156,7 +212,8 @@ def save_profile_2d(meta, filename='blast_profile_2d.npz'):
         t=fs['t'],
         charge_kg=meta['charge'] if meta['charge'] is not None else 0.0,
         r_exp=meta['r_exp'], y0=meta['charge_center'][1],
-        eos=meta['eos'], geometry=meta['geometry'])
+        eos=meta['eos'], geometry=meta['geometry'],
+        source_solver=str(meta.get('solver', 'unknown')))
     print(f"  2D field profile saved: {filename}  "
           f"({fs['rho'].shape[0]} x {fs['rho'].shape[1]} cells, "
           f"t = {fs['t']*1e3:.3f} ms)")
@@ -173,6 +230,8 @@ def load_profile_2d(filename):
         t         = float(z['t']),
         charge_kg = float(z['charge_kg']),
         eos       = str(z['eos']),
+        source_solver = (str(z['source_solver'])
+                         if 'source_solver' in z.files else 'unknown'),
         r_exp     = float(z['r_exp']),
         y0        = float(z['y0']),        # burst height above ground
         r_c   = z['r_c'], z_c = z['z_c'],

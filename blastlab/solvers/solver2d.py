@@ -519,7 +519,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         points   = gauge_actual,
         pressures= [np.array(lst) for lst in gauge_press_lists],
     )
-    meta = dict(x_c=x_c, y_c=y_c,
+    meta = dict(solver='native',          # N5-4: profile provenance
+                x_c=x_c, y_c=y_c,
                 x_face=geom['x_face'], y_face=geom['y_face'],
                 solid=solid, geometry=geometry, Lx=Lx, Ly=Ly, dx=dx,
                 eos=eos, bcs=bcs, obstacles=obstacles,

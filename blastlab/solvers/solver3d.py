@@ -602,7 +602,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     )
     from_profile = '2d' if profile2d is not None else (
                    '1d' if profile is not None else None)
-    meta = dict(x_c=x_c, y_c=y_c, z_c=z_c,
+    meta = dict(solver='native',          # N5-4: profile provenance
+                x_c=x_c, y_c=y_c, z_c=z_c,
                 x_face=grid['x_face'], y_face=grid['y_face'],
                 z_face=grid['z_face'], j0=j0, k0=k0,
                 slice_axis=slice_axis, s0=s0,

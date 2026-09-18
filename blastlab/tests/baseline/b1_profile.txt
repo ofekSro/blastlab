@@ -2,6 +2,7 @@
 # time_s   = 1.833327618e-03
 # charge_kg= 1.0
 # eos      = JWL
+# solver   = native
 # r_exp_m  = 5.271181e-02
 # radius_m = 2.0
 # r[m]	rho[kg/m3]	u[m/s]	e[J/kg]	p[Pa]	phase

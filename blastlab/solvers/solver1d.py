@@ -333,7 +333,12 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     final_profile = dict(t=t, r=r.copy(), rho=rho_f.copy(), u=u_f.copy(),
                          e=e_f.copy(), p=p_f.copy(), phase=phase.copy(),
                          charge_kg=charge_kg, eos=eos, r_exp=r_exp,
-                         radius_m=radius_m)
+                         radius_m=radius_m,
+                         # N5-4: stamped at the PRODUCER, not in
+                         # jobs.solve_stage - save_profile is also
+                         # reached from the Results-tab exports and the
+                         # CLI, which solve_stage never sees.
+                         source_solver='native')
 
     if stop_reason == 'safety cap' and cap_is_end:
         stop_reason = 'end time reached'
