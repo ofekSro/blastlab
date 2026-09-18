@@ -290,11 +290,17 @@ class FoamRun:
         # only writer and closes it when stdout ends, so nothing races
         # with release()/kill().
         self._logfh = None
-        try:
-            self._logfh = open(os.path.join(case_unc, LOG_NAME), 'a',
-                               encoding='utf-8', newline='\n')
-        except OSError as exc:      # a missing or read-only case dir is
-            self.log(f'  [note] no solver log file: {exc}')  # not fatal
+        # only into a case directory that really exists: a caller
+        # with a relative or empty case_unc would otherwise drop a
+        # stray log.blastFoam into the working directory (it did,
+        # once - into the repo root during a test sweep)
+        if case_unc and os.path.isdir(case_unc):
+            try:
+                self._logfh = open(os.path.join(case_unc, LOG_NAME),
+                                   'a', encoding='utf-8',
+                                   newline='\n')
+            except OSError as exc:   # a read-only dir is not fatal
+                self.log(f'  [note] no solver log file: {exc}')
         # pinned before the solver starts, released by `release()` (the
         # run loop's finally) or `kill()` - see _start_keepalive
         self.keepalive = _start_keepalive(self.log)
