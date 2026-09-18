@@ -1668,16 +1668,30 @@ def cases():
     C['F1D'] = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
                       gauge_radii=[0.5, 1.0], n_snapshots=2,
                       solver='blastfoam', material='C4', activation='none')
+    # The foam fixtures are TERMINATE-bounded, unlike the Tk harness's.
+    #
+    # Without a terminate side and without an end time a run is bounded
+    # only by the safety cap, and these are not small cases: F2D took
+    # 3,443 s to finish here and F3D had not finished after 5,448 s. A
+    # scenario that cannot complete gives no coverage at all, and the
+    # first six "findings" of this group were all one timeout wearing
+    # different hats. A real case stops when the shock reaches a
+    # boundary, so these do too.
     C['F2D'] = Case2D(geometry='planar', Lx=2.0, Ly=2.0,
                       cell_size_m=0.025, charge=50.0, center=(1.0, 1.0),
                       gauges=[(0.5, 1.0)], n_snapshots=3,
                       record_frames=50, solver='blastfoam',
-                      material='TNT')
+                      material='TNT',
+                      bcs=dict(x_lo='terminate', x_hi='terminate',
+                               y_lo='terminate', y_hi='terminate'))
     C['F3D'] = Case3D(Lx=0.6, Ly=0.6, Lz=0.6, cell_size_m=0.025,
                       charge=8.0, center=(0.3, 0.3, 0.3),
                       gauges=[(0.45, 0.3, 0.3), (0.3, 0.45, 0.3)],
                       n_snapshots=4, record_frames=150,
-                      solver='blastfoam', material='TNT')
+                      solver='blastfoam', material='TNT',
+                      bcs=dict(x_lo='terminate', x_hi='terminate',
+                               y_lo='terminate', y_hi='terminate',
+                               z_lo='terminate', z_hi='terminate'))
     C['F2D_REF'] = Case2D(geometry='planar', Lx=2.4, Ly=3.2,
                           cell_size_m=0.08, charge=20.0,
                           center=(1.2, 1.6), gauges=[(2.0, 1.6)],
@@ -1685,7 +1699,9 @@ def cases():
                           solver='blastfoam', material='TNT',
                           charge_refine='zone',
                           refine_zones=[(0.9, 2.4, 1.2, 2.0, 1),
-                                        (1.7, 2.3, 1.4, 1.8, 2)])
+                                        (1.7, 2.3, 1.4, 1.8, 2)],
+                          bcs=dict(x_lo='terminate', x_hi='terminate',
+                                   y_lo='terminate', y_hi='terminate'))
     # Both AMR fixtures were once INVALID: validate_case put "Resolving
     # the charge ... needs AMR level N" in rep.errors, the product
     # correctly disabled Run, and the only two dynamic-AMR scenarios in
@@ -1696,13 +1712,18 @@ def cases():
                           center=(2.0, 2.0), gauges=[(3.2, 2.0)],
                           n_snapshots=2, record_frames=60,
                           solver='blastfoam', material='TNT',
-                          amr_levels=3)
+                          amr_levels=3,
+                          bcs=dict(x_lo='terminate', x_hi='terminate',
+                                   y_lo='terminate', y_hi='terminate'))
     C['F3D_AMR'] = Case3D(Lx=1.5, Ly=1.5, Lz=1.5, cell_size_m=0.05,
                           charge=20.0, center=(0.75, 0.75, 0.75),
                           gauges=[(1.25, 0.75, 0.75)], amr_levels=2,
                           amr_display_level=1, amr_max_cells=150_000,
                           n_snapshots=2, record_frames=30,
-                          solver='blastfoam', material='TNT')
+                          solver='blastfoam', material='TNT',
+                          bcs=dict(x_lo='terminate', x_hi='terminate',
+                                   y_lo='terminate', y_hi='terminate',
+                                   z_lo='terminate', z_hi='terminate'))
     C['F_STOP'] = Case2D(geometry='axisymmetric', Lx=2.5, Ly=2.5,
                          cell_size_m=0.02, charge=8.0,
                          center=(0.0, 1.25), gauges=[(0.8, 1.25)],
