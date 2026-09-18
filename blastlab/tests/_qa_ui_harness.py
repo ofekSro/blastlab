@@ -1093,12 +1093,10 @@ def q03_screen_vs_file(qa):
             f'field={rs.fields.field_sel.currentText()!r} '
             f'snapshot={rs.fields.snapshot()!r}')
     out = qa.dirs['exports']
-    before = set(_walk(out))
+    t_start = time.time()
     rs.export('pngs', threaded=False)
-    qa.until(lambda: any(p.endswith('.png')
-                         for p in set(_walk(out)) - before), 120)
-    pngs = sorted(p for p in set(_walk(out)) - before
-                  if p.endswith('.png'))
+    qa.until(lambda: bool(_written_since(out, t_start, '.png')), 120)
+    pngs = _written_since(out, t_start, '.png')
     qa.note('exported: ' + str([os.path.basename(p) for p in pngs]))
     qa.check(len(pngs) > 1,
              'the file is the whole grid, several images, while the '
@@ -2034,11 +2032,11 @@ def e03_gauges_table(qa):
     # save_file export is how these were "failing" a moment ago.
     out = qa.dirs['exports']
     for kind in ('summary', 'tsv', 'fieldcsv', 'report'):
-        before = set(_walk(out))
+        t_start = time.time()
         rs.export(kind, threaded=False)
         qa.pump(1.5)
-        written = sorted(os.path.relpath(p, out)
-                         for p in set(_walk(out)) - before)
+        written = [os.path.relpath(p, out)
+                   for p in _written_since(out, t_start)]
         qa.check(bool(written), f'the {kind} export wrote a file', 'S2',
                  evidence=str(written))
         qa.note(f'{kind} -> {written}')
@@ -2176,10 +2174,10 @@ def e07_exports(qa):
         return
     rs = qa.win.results
     out = qa.dirs['exports']
-    before = set(_walk(out))
+    t_start = time.time()
     rs.export('pngs', threaded=False)
     qa.pump(2.0)
-    pngs = [p for p in set(_walk(out)) - before if p.endswith('.png')]
+    pngs = _written_since(out, t_start, '.png')
     qa.check(len(pngs) > 1,
              'PNGs wrote the whole snapshot grid, several files - the '
              'screen shows one field, the file does not', 'S2',
@@ -2187,11 +2185,11 @@ def e07_exports(qa):
     qa.check(all(os.path.getsize(p) > 5000 for p in pngs),
              'and each one is a real image', 'S2')
     qa.shot('after_pngs')
-    before = set(_walk(out))
+    t_vid = time.time()
     rs.export('gif', threaded=False)
 
     def _video():
-        return [p for p in set(_walk(out)) - before
+        return [p for p in _written_since(out, t_vid)
                 if p.lower().endswith(('.gif', '.mp4', '.webm'))]
     # the writer reports its own progress and the file lands when it is
     # done, which for 81 frames is well past any fixed sleep
@@ -2257,6 +2255,27 @@ def _walk(root):
     for base, _dirs, files in os.walk(root):
         out.extend(os.path.join(base, f) for f in files)
     return out
+
+
+def _written_since(root, t0, suffix=None):
+    """Files an export has just written, by MTIME rather than by
+    appearing.
+
+    A set difference misses a re-run: the second time a scenario runs,
+    the export overwrites the same names and the diff comes back empty -
+    so the check reports that nothing was written while the files sit
+    there, freshly stamped. That cost two false findings.
+    """
+    out = []
+    for p in _walk(root):
+        if suffix and not p.lower().endswith(suffix):
+            continue
+        try:
+            if os.path.getmtime(p) >= t0 - 1.0:
+                out.append(p)
+        except OSError:
+            continue
+    return sorted(out)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2511,11 +2530,11 @@ def f04_foam_2d_refine(qa):
     qa.shot('replay_last_mesh')
     rs.show_view('Fields')
     out = qa.dirs['exports']
-    before = set(_walk(out))
+    t_start = time.time()
     rs.export('pngs', threaded=False)
-    qa.until(lambda: any(p.endswith('.png')
-                         for p in set(_walk(out)) - before), 150)
-    files = sorted(os.path.basename(p) for p in set(_walk(out)) - before)
+    qa.until(lambda: bool(_written_since(out, t_start, '.png')), 150)
+    files = [os.path.basename(p)
+             for p in _written_since(out, t_start, '.png')]
     qa.note(f'PNG export with mesh: {files}')
     qa.check(bool(files), 'the PNG export wrote files', 'S2')
     rs.fields.show_mesh.setChecked(False)
