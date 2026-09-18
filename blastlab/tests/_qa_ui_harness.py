@@ -770,6 +770,7 @@ def install_warning_capture(qa):
         'does not support setParent',
         'does not support foreign windows',
         'does not support grabWindow',
+        'does not support propagateSizeHints',
     )
 
     def qt_handler(mode, ctx, message):

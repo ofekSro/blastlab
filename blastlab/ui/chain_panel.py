@@ -55,6 +55,7 @@ class ChainPanel(QWidget):
                  error_sink=None, parent=None):
         super().__init__(parent)
         self._on_run_chain = on_run_chain or (lambda stages, ws: None)
+        self._running = False       # a run is live somewhere in the app
         self._log = log_fn
         self.error_sink = error_sink or self._default_sink
         # every stage starts on the app-level solver and can be
@@ -204,6 +205,17 @@ class ChainPanel(QWidget):
         """Validate, wire and launch. Returns True only if the chain was
         handed on; every refusal returns False having said why."""
         self.status.setText('')
+        # Refuse here, not after the workspace has been written.
+        #
+        # The button is disabled while a run is live, but a disabled
+        # button is not a guard - anything that calls this directly (an
+        # accelerator, a script, a test) got all the way to creating the
+        # workspace and saving three case JSONs, logged "Chain: 3
+        # stage(s) into ...", returned True, and only THEN did the
+        # controller refuse with "A run is already in progress". The run
+        # never started and the evidence of one was on disk.
+        if self._running:
+            return self._refuse(['A run is already in progress.'])
         stages = self.checked()
         if not stages:
             return self._refuse(['No stages selected.'])
@@ -272,5 +284,8 @@ class ChainPanel(QWidget):
 
     def set_running(self, running):
         """Mirror the Run button: a second start while a run is live
-        would orphan the drain loop and drop the finished result."""
+        would orphan the drain loop and drop the finished result. The
+        flag is what `run()` consults, so the greyed button is the
+        visible half of the guard and not the whole of it."""
+        self._running = bool(running)
         self.run_btn.setEnabled(not running)
