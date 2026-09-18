@@ -29,6 +29,9 @@ import time
 
 from . import env
 
+#: solver stdout is teed here inside the case dir (N5-4)
+LOG_NAME = 'log.blastFoam'
+
 
 class FoamStageError(RuntimeError):
     def __init__(self, stage, log_tail):
@@ -277,6 +280,21 @@ class FoamRun:
         else:
             script = (f'cd {case_posix} && {_pid_file_cmd()} '
                       f'&& exec {app}')
+        # N5-4: tee stdout to the case dir. Until this existed the log
+        # lived only in `log_tail` (80 lines) and was gone the moment the
+        # process ended - so a run that died left almost no context,
+        # postmortem.load_run could rebuild a Result from the written
+        # times but never see what the solver SAID, and a diagnostic
+        # printed by a function object could only be caught live or not
+        # at all. Opened before the pump thread starts; the pump is the
+        # only writer and closes it when stdout ends, so nothing races
+        # with release()/kill().
+        self._logfh = None
+        try:
+            self._logfh = open(os.path.join(case_unc, LOG_NAME), 'a',
+                               encoding='utf-8', newline='\n')
+        except OSError as exc:      # a missing or read-only case dir is
+            self.log(f'  [note] no solver log file: {exc}')  # not fatal
         # pinned before the solver starts, released by `release()` (the
         # run loop's finally) or `kill()` - see _start_keepalive
         self.keepalive = _start_keepalive(self.log)
@@ -287,11 +305,24 @@ class FoamRun:
         threading.Thread(target=self._pump, daemon=True).start()
 
     def _pump(self):
-        with self.proc.stdout:
-            for raw in self.proc.stdout:
-                line = raw.decode('utf-8', 'replace').rstrip('\r\n')
-                self.log_tail.append(line)
-                self.lines.put(line)
+        try:
+            with self.proc.stdout:
+                for raw in self.proc.stdout:
+                    line = raw.decode('utf-8', 'replace').rstrip('\r\n')
+                    self.log_tail.append(line)
+                    self.lines.put(line)
+                    if self._logfh is not None:
+                        try:
+                            self._logfh.write(line + '\n')
+                        except (OSError, ValueError):
+                            self._logfh = None   # disk gone: keep going
+        finally:
+            fh, self._logfh = self._logfh, None
+            if fh is not None:
+                try:
+                    fh.close()
+                except OSError:
+                    pass
 
     @property
     def running(self):
