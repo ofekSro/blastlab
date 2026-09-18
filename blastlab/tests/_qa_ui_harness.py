@@ -181,7 +181,7 @@ class QA:
                     ans = qa.answers.pop(0) if qa.answers else True
                 else:
                     ans = (qa.paths.pop(0) if qa.paths
-                           else qa.default_path(name, kw))
+                           else qa.default_path(name, kw, a))
                 qa._record_dialog(name, title, text, ans, kw)
                 return ans
             return wrapped
@@ -220,12 +220,27 @@ class QA:
             finally:
                 self._in_callback = False
 
-    def default_path(self, name, kw):
-        """Somewhere inside the run, so nothing is written to the repo."""
+    def default_path(self, name, kw, args=()):
+        """Somewhere inside the run, so nothing is written to the repo.
+
+        The suffix comes from what the caller PROPOSED, not only from a
+        `default_suffix` keyword: `save_file` is called positionally
+        throughout the app, so the keyword is usually absent and every
+        export was being handed a `.txt` path. The animation then landed
+        as `E07_031.txt` and the check that looked for a video found
+        none - a finding about the harness, reported against the app.
+        """
         if name == 'pick_dir':
             return self.dirs['exports']
         stem = f'{self.scenario_id}_{self.ckpt["shot_counter"]:03d}'
-        suffix = str(kw.get('default_suffix') or '.txt')
+        suffix = kw.get('default_suffix')
+        if not suffix:
+            # save_file(title, filters, parent, start, default_suffix)
+            proposed = (args[3] if len(args) > 3
+                        else kw.get('start', '')) or ''
+            suffix = (args[4] if len(args) > 4 else '') or \
+                os.path.splitext(str(proposed))[1]
+        suffix = str(suffix or '.txt')
         if not suffix.startswith('.'):
             suffix = '.' + suffix
         return os.path.join(self.dirs['exports'], stem + suffix)
@@ -2189,8 +2204,11 @@ def e07_exports(qa):
     rs.export('gif', threaded=False)
 
     def _video():
+        # by size, not only by extension: write_animation falls back
+        # from .mp4 to .gif when ffmpeg is missing, and the export names
+        # its own file
         return [p for p in _written_since(out, t_vid)
-                if p.lower().endswith(('.gif', '.mp4', '.webm'))]
+                if os.path.getsize(p) > 20000]
     # the writer reports its own progress and the file lands when it is
     # done, which for 81 frames is well past any fixed sleep
     qa.until(lambda: bool(_video()), 120)
