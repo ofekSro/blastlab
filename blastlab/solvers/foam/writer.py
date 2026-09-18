@@ -1318,7 +1318,18 @@ def profile_state(case, spec):
         ke = 0.5 * (u ** 2 + v ** 2 + w ** 2)
     e = U[-1] / rho - ke
 
-    # N2-14: the remap interpolates CONSERVED quantities, so u = rhoU/rho
+    # N2-14, corrected by N5-11: the AMPLIFICATION described below is
+    # real, but the near-zero density it acts on is NOT made here. The
+    # preserved crashing hand-off
+    # (night_artifacts/.../gui_foam/stage2_profile.npz) already carries
+    # 20 cells below 1e-3, down to 1.711e-04, in the 2D SOURCE field -
+    # blastFoam produced them, and the remap inherits and spreads them
+    # (20 -> 72 on a 48^3 grid). So this floor is a guard on state the
+    # solver handed over, not on interpolation residue, and the way to
+    # be rid of it is to stop the 2D stage producing near-vacuum in the
+    # first place. See TODO.md N5-11.
+    #
+    # The remap interpolates CONSERVED quantities, so u = rhoU/rho
     # and e = rhoE/rho amplify interpolation residue into fabricated
     # state wherever the interpolated rho is near zero. Measured on the
     # preserved crashing stage-3 hand-off (night_artifacts/NIGHT2): 408
