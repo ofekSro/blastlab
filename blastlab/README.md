@@ -6,9 +6,14 @@ remapping, a prompt-based CLI and a desktop GUI.
 > **The GUI is the PySide6 one** (`blastlab/ui/`) as of 2026-09-17:
 > `python -m blastlab` opens it, and all four tabs - Setup, Run, Results
 > and Chain - are real, along with the run browser and the embedded 3D
-> viewer. The Tkinter original (`blastlab/gui/`) is kept for one release
-> behind `python -m blastlab --tk`; `--qt` is still accepted and does
-> nothing. See "The PySide6 front-end" below.
+> viewer. `--qt` is still accepted and does nothing. See "The PySide6
+> front-end" below.
+>
+> The Tkinter original (`blastlab/gui/`) stays behind `python -m
+> blastlab --tk` **indefinitely, by owner decision (2026-09-18)** - Qt
+> is the main GUI and Tk is the way back if it is ever needed. There is
+> no removal date, and `blastlab/gui/` + `customtkinter` are not to be
+> deleted without the owner asking for it.
 
 - **1D spherical** — fast free-air charges, JWL or ideal-gas EOS
 - **2D planar / axisymmetric** — ground reflection, walls, rectangular
@@ -33,7 +38,7 @@ remapping, a prompt-based CLI and a desktop GUI.
 blastlab_qt.bat                 # the GUI, double-clickable from anywhere
 blastlab.bat                    # the same thing (or: python -m blastlab)
 python -m blastlab --case a.json   # open a case at startup
-python -m blastlab --tk         # the old Tkinter GUI, kept for one release
+python -m blastlab --tk         # the Tkinter GUI, kept as the way back
 python -m blastlab --cli 2d     # historical prompt workflow
 python blast1d.py               # the old scripts still work (thin wrappers)
 ```

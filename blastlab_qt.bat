@@ -4,7 +4,8 @@ rem  blastlab - open the PySide6 (Qt) interface.
 rem
 rem  Since 2026-09-17 the Qt GUI is what "python -m blastlab" opens, so
 rem  this launcher passes no GUI flag: it stays correct even if --qt is
-rem  retired. The old Tkinter GUI is "blastlab.bat --tk".
+rem  retired. The Tkinter GUI is still there as "blastlab.bat --tk",
+rem  kept as the way back by owner decision (2026-09-18).
 rem
 rem  Safe to double-click from anywhere: it runs from its own folder, so
 rem  Python finds the blastlab package whatever the current directory is.
@@ -38,7 +39,7 @@ if not exist "blastlab\__main__.py" (
 python -c "import PySide6" >nul 2>&1 || (
     echo [blastlab] PySide6 is missing, so the Qt interface cannot start.
     echo            Install it with:  python -m pip install -r requirements.txt
-    echo            Or open the old interface with:  blastlab.bat --tk
+    echo            Or open the Tkinter interface with:  blastlab.bat --tk
     goto :fail
 )
 

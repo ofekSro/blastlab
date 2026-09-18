@@ -33,8 +33,9 @@ Project: blastlab — Python blast-wave simulation desktop app, native numpy
 1D/2D/3D solvers in blastlab/solvers/, blastFoam backend in
 blastlab/solvers/foam/ (writes OpenFOAM-9 cases, runs them in WSL Ubuntu, reads
 results back onto uniform numpy grids), pyvista/VTK viewer in blastlab/viz3d/.
-GUI: customtkinter in blastlab/gui/ (shipping, `python -m blastlab`) is being
-replaced by PySide6 in blastlab/ui/ (`python -m blastlab --qt`) — see Q1 below.
+GUI: PySide6 in blastlab/ui/ is THE GUI (`python -m blastlab`). The
+customtkinter original in blastlab/gui/ is kept as the way back
+(`python -m blastlab --tk`) and must not be deleted — see Q1 below.
 Ids like B23/G7/A5/N7/W2 refer to DONE.md §5 (reference index).
 
 Hard rules:
@@ -54,11 +55,11 @@ Hard rules:
   check for orphans the same way and kill them. 2D axisym foam cases at default
   size can take 30+ min — use tiny domains.
 - Do not touch files outside the task's scope without saying why.
-- GUI verification: `python blastlab/tests/_qa_gui_harness.py --resume --scenario <ids>
-  --redo <ids>` opens a real window on screen (`--list` shows the matrix; output
-  under ~\blastlab_qa\<stamp>\shots). That harness drives the TK app; the Qt
-  front-end is covered by `test_ui_*.py` (offscreen) + `_e2e_ui_*.py` until its
-  own harness is written (Q1 · M7).
+- GUI verification: `python blastlab/tests/_qa_ui_harness.py --resume --scenario <ids>
+  --redo <ids>` opens a real Qt window on screen — 63 scenarios (`--list` shows the
+  matrix; output under ~\blastlab_qa\<stamp>\shots), plus `test_ui_*.py` (offscreen)
+  and `_e2e_ui_*.py`. `_qa_gui_harness.py` is the same protocol against the Tk app
+  and stays as long as `--tk` does; run it only when a change touches blastlab/gui/.
 - Qt work: `blastlab/ui/` must never import pyvista/VTK — the 3D scenes live in
   the viewer child process (`blastlab/viz3d/process.py`). `test_ui_no_vtk_in_main.py`
   pins this.
@@ -273,7 +274,7 @@ WSL לגמרי, בלי אזהרה.**
 ### M5 — החלפת ברירת המחדל · **הוחלף (17.09); נשאר המתאם ל-harness**
 
 **בוצע.** `python -m blastlab` פותח עכשיו את Qt; `--tk` פותח את הישן
-ונשאר לגרסה אחת; `--qt` מתקבל אבל מוסתר (`argparse.SUPPRESS`) כדי
+ונשאר ללא תאריך הסרה (ראו ההחלטה מ-18.09 למטה); `--qt` מתקבל אבל מוסתר (`argparse.SUPPRESS`) כדי
 שקיצורי דרך מתקופת המעבר ימשיכו לעבוד. `blastlab.bat` לא נגע — הוא רק
 מעביר ארגומנטים. ה-stub האחרון (`TabStub`) נמחק, וכל ארבע הלשוניות
 אמיתיות. נוסף גם מה שה-stubs הסתירו: `_result_msg` מוליך הודעות של
@@ -300,17 +301,31 @@ deadline ובדיקת קובץ STOP), `patch_dialogs` על `tkinter.messagebox`/
 כלשונם, וגם `--smoke` כבר קיים (בוחר את `S00` לבד). ה-harness מייבא
 מ-`blastlab.gui` רק שלושה שמות, כולם lazy.
 
-### ⛔ אילוץ בעלים (17.09): **Tk לא נמחק עד ש-Qt תקין ב-100%**
+### ⛔ החלטת בעלים (18.09): **Qt הוא ה-GUI הראשי; Tk נשאר לתמיד כדרך חזרה**
 
-> **הוראת הבעלים, מילה במילה:** "יש באגים רציניים. אל תמחק את TK עד
-> שלא הכל יתוקן במאה אחוז."
+> **מילה במילה:** "אל תמחק את הTK זה פשוט תהיה אפשרות לחזור אליה בעתיד
+> אם נצטרך. מעתה והלאה הQT זה הMAIN GUI".
 >
-> כלומר `blastlab/gui/` ו-`customtkinter` **נשארים בעץ** — לא כ"גרסה
-> אחת" ולא כ"עד שה-harness ידווח שוויון", אלא עד שהבעלים יאשר.
-> `--tk` הוא רשת הביטחון בפועל, ואסור להסיר אותה.
-> הבאגים עצמם עוד לא תוארו; הבעלים ביקש **סשן QA + UI בסוף**, ושם הם
-> ייאספו ויתוקנו. מה שהופך את ה-harness (M7a) לפריט בעל הערך הגבוה
-> ביותר שנשאר: הוא הכלי שימצא אותם באופן שיטתי.
+> שתי חצאים, ושניהם מחייבים:
+>
+> 1. **Qt הוא הראשי.** `blastlab/ui/` היא ה-GUI של המוצר. כל תכונה
+>    חדשה, כל תיקון באג וכל בדיקת UI הולכים לשם. אין יותר "המעבר" —
+>    המעבר הסתיים.
+> 2. **`blastlab/gui/` ו-`customtkinter` נשארים בעץ ללא תאריך הסרה.**
+>    לא "לגרסה אחת", לא "עד שיוכח שוויון", לא "עד שהבעלים יאשר מחיקה" —
+>    אלא כדרך חזרה קבועה מאחורי `--tk`. **אל תמחק, ואל תתאר אותה
+>    כמיושנת (deprecated) או כמתוכננת להסרה** בקוד, ב-README או בהודעת
+>    שגיאה, בלי שהבעלים יבקש זאת במפורש.
+>
+> מה שנגזר מזה תפעולית: הסוויטות `test_gui_*` ו-`_qa_gui_harness.py`
+> נשארות, ומריצים אותן כשנוגעים ב-`blastlab/gui/` או במודולים הנייטרליים
+> המשותפים (`core/`, `solvers/`, `output/`) — הן מה ששומר על הדרך חזרה
+> שמישה. השינויים הלא-תואמים היחידים שמותר לעשות שם הם כאלה שנובעים
+> משינוי במודול משותף, ובאותו קומיט.
+>
+> **ההחלטה הקודמת (17.09), שההחלטה הזאת מחליפה:** "יש באגים רציניים.
+> אל תמחק את TK עד שלא הכל יתוקן במאה אחוז." זו הסיבה שה-harness של Qt
+> (M7) נבנה — הוא הכלי שאסף את הבאגים האלה באופן שיטתי, 63 תרחישים.
 
 ### M6 — סבב שוויון · **חלק א בוצע (17.09): הבאג הראשון נמצא ותוקן**
 

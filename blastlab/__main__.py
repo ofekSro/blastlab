@@ -1,9 +1,14 @@
 """Entry point: `python -m blastlab` starts the GUI;
 `python -m blastlab --cli 1d|2d|3d` runs the prompt-based CLI.
 
-The GUI is the PySide6 one (`blastlab.ui`). `--tk` still opens the old
-Tkinter one for a release, and `--qt` is accepted as a no-op so the
-shortcuts written during the port keep working."""
+The GUI is the PySide6 one (`blastlab.ui`), and `--qt` is accepted as a
+no-op so the shortcuts written during the port keep working.
+
+`--tk` opens the Tkinter original (`blastlab.gui`), which is **kept
+indefinitely by owner decision (2026-09-18)**: Qt is the main GUI, and
+Tk stays as the way back if it is ever needed. It is not deprecated and
+it has no removal date - do not delete it, and do not describe it as
+being retired, without the owner saying so."""
 
 import argparse
 
@@ -22,9 +27,9 @@ def main():
     ap.add_argument('--case', metavar='FILE',
                     help='case JSON to open in the GUI at startup')
     ap.add_argument('--tk', action='store_true',
-                    help='launch the old Tkinter GUI (blastlab.gui) '
-                         'instead of the default PySide6 one; kept for '
-                         'one release')
+                    help='launch the Tkinter GUI (blastlab.gui) instead '
+                         'of the default PySide6 one; kept as the way '
+                         'back, with no removal planned')
     ap.add_argument('--qt', action='store_true',
                     help=argparse.SUPPRESS)   # now the default; accepted
                                               # so old shortcuts keep working
