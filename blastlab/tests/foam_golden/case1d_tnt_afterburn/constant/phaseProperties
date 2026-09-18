@@ -87,7 +87,7 @@ expl
     }
     afterburnModel  Miller;
     Q0              2000000;
-    a               0.0003;
+    a               1.45e-05;
     n               1;
     m               0.5;
     pMin            150000;

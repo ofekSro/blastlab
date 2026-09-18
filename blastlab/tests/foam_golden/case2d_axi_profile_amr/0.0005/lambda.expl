@@ -1,0 +1,32 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       volScalarField;
+    object      lambda.expl;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+dimensions      [0 0 0 0 0 0 0];
+internalField   uniform 1;
+boundaryField
+{
+    x_hi
+    {
+        type            zeroGradient;
+    }
+    y_lo
+    {
+        type            zeroGradient;
+    }
+    y_hi
+    {
+        type            zeroGradient;
+    }
+    wedge
+    {
+        type            wedge;
+    }
+}
+
+// ************************************************************************* //

@@ -33,6 +33,14 @@ OptimisationSwitches
 }
 functions
 {
+    conserved
+    {
+        type            conservedQuantities;
+        libs            ("libblastFunctionObjects.so");
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields (rho rhoE);
+    }
     impulse
     {
         type            impulse;
@@ -48,6 +56,21 @@ functions
         writeControl    writeTime;
         fields (p);
         minMax          max;
+    }
+    arrival
+    {
+        type            timeOfArrival;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+    }
+    overpressure
+    {
+        type            overpressure;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pRef            101325;
+        store           yes;
     }
     cellCentres
     {

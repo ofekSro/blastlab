@@ -1044,7 +1044,8 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     except WslVanished as exc:          # W3: WSL died under the solver
         return _resume_after_wsl(spec, hooks, adaptive_write, exc)
     return finalize_1d(case, spec, store, hooks, stop_reason,
-                       loop.st['step'])
+                       loop.st['step'],
+                       conserved=conserved_meta(loop.st))
 
 
 #: W2 (P1-2): every stop except the solver reaching its own endTime goes
@@ -1084,7 +1085,30 @@ def note_gauge_tail(hooks, stop_reason):
               '         comes up short.\n')
 
 
-def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
+def conserved_meta(st):
+    """meta['conserved'] payload from the run loop's state, or None.
+
+    N5-5. What blastFoam's conservedQuantities reported at its FIRST
+    execute, beside the energy the writer put on the mesh. Only a
+    profile-initialised stage has something to compare - a charge case
+    has no hand-off, and its rhoE is not conserved anyway (E0 arrives
+    as lambda goes 0 -> 1: measured +1169 % before the open boundary
+    drains it), so `expected` is None there and only the readings are
+    kept.
+    """
+    if not st or not st.get('cons0'):
+        return None
+    return dict(rhoE0=st['cons0'].get('rhoE'),
+                rho0=st['cons0'].get('rho'),
+                rhoE_end=(st.get('cons') or {}).get('rhoE'),
+                rho_end=(st.get('cons') or {}).get('rho'),
+                expected_rhoE0=st.get('E_expect'),
+                rel=st.get('cons_rel'),
+                source='foam-fo')
+
+
+def finalize_1d(case, spec, store, hooks, stop_reason, n_steps,
+                conserved=None):
     """Build the exact native-shaped 1D Result from ingested time-dir
     entries (also used by postmortem.load_run)."""
     m = MATERIALS[spec.material]
@@ -1140,7 +1164,8 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
                          p=prof['p'].copy(),
                          phase=prof_phase, charge_kg=case.charge_kg,
                          eos='JWL', r_exp=spec.r_exp,
-                         radius_m=case.radius_m)
+                         radius_m=case.radius_m,
+                         source_solver='blastfoam')      # N5-4
 
     hooks.log(f"\n  Done. {n_steps} solver steps, t_final = "
               f"{fin['t']*1e3:.3f} ms")
@@ -1151,6 +1176,7 @@ def finalize_1d(case, spec, store, hooks, stop_reason, n_steps):
     meta = dict(final_profile=final_profile, r=r, radius_m=case.radius_m,
                 charge_kg=case.charge_kg, eos='JWL', r_exp=spec.r_exp,
                 solver='blastfoam', material=spec.material,
+                conserved=conserved,
                 case_dir=spec.case_unc)
     return Result(snapshots, _gauges_from_probes(spec), meta,
                   stop_reason, _stopped_early(stop_reason))
@@ -1249,6 +1275,14 @@ def _source_lines(case, spec, charge_lbl):
         # 6% intermittent crash stayed unexplained for two nights
         lines.append(f'  Hand-off floor  : {n_fl} near-vacuum cell(s) '
                      f'replaced with quiescent thin gas (N2-14)')
+    # N5-4: a native-sourced profile never gets this far (profile_state
+    # raises), so the only thing left to say is when we cannot tell.
+    # [warn] because both front-ends lift that prefix into the status
+    # bar - ui/app.py on_log, gui/app.py _drain.
+    if spec.init_state.get('source_solver', 'unknown') == 'unknown':
+        lines.append('  [warn] this profile carries no solver stamp; if '
+                     'it came from the native solver the hand-off '
+                     'over-prices the product cells by ~33 %')
     return lines
 
 
@@ -1487,12 +1521,13 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     return finalize_2d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
                        record_frames, acc, frame_lv=frame_lv,
-                       trig_k=trig_k, trigger=trigger)
+                       trig_k=trig_k, trigger=trigger,
+                       conserved=conserved_meta(loop.st))
 
 
 def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None, trig_k=None, trigger=None):
+                 frame_lv=None, trig_k=None, trigger=None, conserved=None):
     """Build the exact native-shaped 2D Result via a two-pass snapshot
     re-read (also used by postmortem.load_run).
 
@@ -1579,6 +1614,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0),
                 r_exp=spec.r_exp, from_profile=False,
                 solver='blastfoam', material=spec.material,
+                conserved=conserved,
                 # what the USER asked for; gauge_out['points'] is where
                 # the probes landed in the mesh (QA-33)
                 gauges=[tuple(float(v) for v in g)
@@ -2128,12 +2164,13 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     return finalize_3d(case, spec, hooks, stop_reason, loop.st['step'],
                        ingested, snap_names, frame_t, frame_p,
                        record_frames, acc, frame_lv=frame_lv,
-                       trig_k=trig_k, trigger=trigger)
+                       trig_k=trig_k, trigger=trigger,
+                       conserved=conserved_meta(loop.st))
 
 
 def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None, trig_k=None, trigger=None):
+                 frame_lv=None, trig_k=None, trigger=None, conserved=None):
     """Build the exact native-shaped 3D Result via a two-pass snapshot
     re-read - bounds run-time memory (also used by postmortem).
 
@@ -2216,6 +2253,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                 charge=case.charge, charge_center=(x0, y0, z0),
                 r_exp=spec.r_exp, r_src=spec.r_exp, from_profile=None,
                 solver='blastfoam', material=spec.material,
+                conserved=conserved,
                 # what the USER asked for; gauge_out['points'] is where
                 # the probes landed in the mesh (QA-33)
                 gauges=[tuple(float(v) for v in g)

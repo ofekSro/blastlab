@@ -81,13 +81,16 @@ def main():
     # the 2D stage really continues a state rather than replaying an
     # answer. Its dx is far finer than the 2D base cell below, which is
     # what the T70 coarsening warning is about.
+    # N5-4: blastFoam, not native - a native profile may no longer
+    # initialise a blastFoam stage (idealGas state re-priced through the
+    # JWL products EOS, +33 % on the product cells)
     c1 = Case1D(radius_m=0.2, charge_kg=0.2, cell_size_m=0.002,
-                gauge_radii=[0.15], n_snapshots=1, solver='native')
+                gauge_radii=[0.15], n_snapshots=1, solver='blastfoam')
     t0 = time.perf_counter()
-    r1 = get_solver(1, 'native')(c1)
+    r1 = get_solver(1, 'blastfoam')(c1)
     profiles.save_profile(r1.meta['final_profile'], prof)
     fp = r1.meta['final_profile']
-    print(f'  --- stage 1 (native 1D): {time.perf_counter() - t0:.0f} s, '
+    print(f'  --- stage 1 (blastFoam 1D): {time.perf_counter() - t0:.0f} s, '
           f"front at {fp['r'][-1]:.2f} m, t = {fp['t'] * 1e3:.4f} ms")
 
     # stage 2: the same hand-off the chain panel wires, plus AMR

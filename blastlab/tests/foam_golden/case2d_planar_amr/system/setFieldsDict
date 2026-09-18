@@ -22,6 +22,7 @@ regions
         centre (1 1 0);
         rho             1630;
         mass            2.5;
+        scale           1.011877357;
         LbyD            0.7155973746;
         direction (0 0 1);
         backup

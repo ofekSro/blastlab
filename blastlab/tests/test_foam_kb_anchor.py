@@ -14,11 +14,18 @@
    better-resolved TNT charge closed most of the gap, so the band is
    1.05-1.5 rather than the old 1.1-1.5.
 
-`--afterburn` adds a third run with the Miller afterburn model on and
-prints a KB comparison table (its own, upward band - the detonation-only
-gate above is untouched).
+`--afterburn` adds two more runs with the Miller afterburn model on -
+TNT against its KB band, then C4 as a sanity check that the Miller rate
+(fitted on TNT alone in N5-3, then applied to all six materials) still
+behaves for a charge nobody calibrated. The detonation-only gate above
+is untouched.
 
-Auto-SKIPs without WSL. Wall ~2 min (two 1D runs; ~3 with --afterburn).
+`--materials` sweeps the afterburn lift across all six materials and
+checks it follows oxygen balance - the shared Miller rate (N5-3, fitted
+on TNT) is the only thing they have in common.
+
+Auto-SKIPs without WSL. Wall ~2 min (two 1D runs; ~4 with --afterburn,
+~12 with --materials, which adds twelve more).
 """
 
 import os
@@ -31,6 +38,7 @@ import numpy as np                                             # noqa: E402
 
 from blastlab.core.case import Case1D                          # noqa: E402
 from blastlab.core.constants import P_AIR                      # noqa: E402
+from blastlab.solvers.foam.materials import AFTERBURN          # noqa: E402
 
 FAIL = []
 
@@ -38,10 +46,17 @@ FAIL = []
 #: Z = R/W^(1/3) [m/kg^(1/3)] (standard KB polynomial values)
 KB_FREE_AIR = {1.0: 904.0, 2.0: 186.0, 3.0: 80.0, 4.0: 47.0}
 KB_BAND = (0.65, 1.35)
+#: N5-3: a SANITY band for C4 with afterburn on - wide on purpose.
+#: Only TNT is calibrated (validate_case says so, P1-4), so this is
+#: here to catch the shared Miller rate going wrong for a non-TNT
+#: charge, not to assert a number anybody fitted.
+C4_AB_BAND = (0.85, 1.60)
 #: band for the afterburn run (`--afterburn`): the model must not
 #: overshoot KB badly and must not leave the detonation-only deficit
-#: untouched. Measured with the 8-cell charge (T39): 1.20 at Z = 1,
-#: 1.02-1.04 at Z = 2..4 (it was 0.95-1.03 across the board at 5 cells)
+#: untouched. Measured with the 8-cell charge (T39) after the N5-3
+#: refit of the Miller rate: 1.06 at Z = 1, 0.95 at Z = 2..4. It was
+#: 1.20 / 1.02-1.04 before that, on a rate still fitted at 5 cells -
+#: see the sweep table in solvers/foam/materials.py.
 KB_AB_BAND = (0.80, 1.35)
 C4_OVER_TNT = (1.05, 1.5)
 
@@ -126,6 +141,83 @@ def main():
         check('afterburn raises the peaks it should',
               all(peaks_ab[int(z)] >= peaks_tnt[int(z)] - 1e-9
                   for z in KB_FREE_AIR))
+
+        # N5-3 fitted the Miller rate `a` on TNT alone and applied it to
+        # all six materials (it is a model rate, not a material
+        # property; only Q0 is per-material, from oxygen balance). That
+        # left the other five moved by a factor of 20 with no coverage
+        # at all - this leg is the cheapest thing that would notice the
+        # shared rate going wrong for a non-TNT charge. It is a SANITY
+        # band, not an anchor: validate_case warns, correctly, that
+        # nothing but TNT is calibrated (P1-4), so asserting a KB ratio
+        # here would be asserting a number nobody has fitted.
+        print('--- C4 run, afterburn = miller ---')
+        peaks_c4ab = _peaks(_run('C4', afterburn='miller'))
+        for z in sorted(KB_FREE_AIR):
+            zi = int(z)
+            print(f'   Z = {z:g}   C4 {peaks_c4ab[zi]:7.0f} kPa   '
+                  f'TNT {peaks_ab[zi]:7.0f} kPa   '
+                  f'ratio {peaks_c4ab[zi] / peaks_ab[zi]:.2f}')
+        check('C4 afterburn still beats TNT afterburn',
+              all(peaks_c4ab[int(z)] > peaks_ab[int(z)]
+                  for z in KB_FREE_AIR),
+              str({int(z): round(peaks_c4ab[int(z)] / peaks_ab[int(z)], 3)
+                   for z in KB_FREE_AIR}))
+        # C4's Q0 is 0.57 MJ/kg against TNT's 2.0 (it is nearly
+        # oxygen-balanced), so afterburn must lift it by LESS than it
+        # lifts TNT even though its detonation energy is higher
+        lift_c4 = peaks_c4ab[1] / peaks_c4[1]
+        lift_tnt = peaks_ab[1] / peaks_tnt[1]
+        check('and afterburn lifts C4 less than TNT (oxygen balance)',
+              1.0 <= lift_c4 < lift_tnt,
+              f'C4 x{lift_c4:.3f} vs TNT x{lift_tnt:.3f}')
+        check('C4 afterburn stays inside the sanity band',
+              all(C4_AB_BAND[0] <= peaks_c4ab[int(z)] / kb <= C4_AB_BAND[1]
+                  for z, kb in KB_FREE_AIR.items()),
+              str({int(z): round(peaks_c4ab[int(z)] / kb, 2)
+                   for z, kb in KB_FREE_AIR.items()}))
+
+    if '--materials' in sys.argv:
+        # N5-3 fitted the Miller rate `a` on TNT alone and applied it to
+        # all six materials. `--afterburn` covers TNT and C4; this
+        # sweeps the remaining four so the shared rate is exercised
+        # against every Q0 in the table.
+        #
+        # What is asserted is the ONE thing that is knowable without a
+        # calibration per material: the ORDERING. Q0 comes from oxygen
+        # balance - how much oxygen the molecule lacks to burn itself -
+        # so afterburn must lift the fuel-rich explosives more than the
+        # oxygen-balanced ones, in that order. Absolute KB ratios are
+        # NOT asserted: validate_case warns, correctly, that nothing but
+        # TNT is calibrated (P1-4).
+        print('--- afterburn sweep, all six materials ---')
+        lift = {}
+        for mat in ('TNT', 'C4', 'RDX', 'HMX', 'PETN', 'ANFO'):
+            no_ab = _peaks(_run(mat, afterburn='none'))
+            with_ab = _peaks(_run(mat, afterburn='miller'))
+            lift[mat] = with_ab[1] / no_ab[1]
+            ab = AFTERBURN[mat]
+            print(f'   {mat:5} Q0={ab.Q0/1e6:4.2f} MJ/kg  '
+                  f'no-ab {no_ab[1]:7.0f} -> ab {with_ab[1]:7.0f} kPa  '
+                  f'lift x{lift[mat]:.3f}')
+            check(f'{mat}: afterburn does not lower the peak',
+                  lift[mat] >= 1.0 - 1e-9, f'x{lift[mat]:.4f}')
+            check(f'{mat}: the lift stays physical (< x2)',
+                  lift[mat] < 2.0, f'x{lift[mat]:.4f}')
+        # oxygen balance: TNT -74 %, RDX/HMX -21.6 %, C4 ~-21 %,
+        # PETN -10.1 %, ANFO ~0 % (materials.py). More missing oxygen,
+        # more left for the atmosphere to supply, bigger lift.
+        order = ['TNT', 'RDX', 'HMX', 'C4', 'PETN', 'ANFO']
+        pairs = list(zip(order, order[1:]))
+        bad = [(a, b) for a, b in pairs if lift[a] < lift[b] - 1e-6]
+        check('the lift follows oxygen balance across all six',
+              not bad,
+              ' '.join(f'{a}(x{lift[a]:.3f}) < {b}(x{lift[b]:.3f})'
+                       for a, b in bad))
+        check('TNT is lifted most, ANFO least',
+              lift['TNT'] == max(lift.values())
+              and lift['ANFO'] == min(lift.values()),
+              str({k: round(v, 3) for k, v in lift.items()}))
 
     print()
     if FAIL:

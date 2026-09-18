@@ -21,6 +21,7 @@ regions
         centre (0.5 1 1);
         rho             1630;
         mass            4;
+        scale           0.9819349766;
         backup
         {
             centre (0.5 1 1);

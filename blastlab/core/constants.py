@@ -50,11 +50,27 @@ E_AIR = P_AIR / ((GAMMA_AIR - 1.0) * RHO_AIR)   # ambient specific internal ener
 MIN_EXP_CELLS  = 5             # min cells across the charge radius
 # blastFoam charge target (N5/T39). blastFoam's sphericalMassToCell sets
 # alpha = 1 in the cells whose CENTRES fall inside r_exp, so the mass it
-# actually deposits is the staircase volume: ~0.85 of the request at 5
-# cells across the radius, and the deficit falls roughly as 1/n. 8 cells
-# brings it to ~0.94 for a 2.6x (2D) / 4.1x (3D) cell-count cost. Native
-# stays at MIN_EXP_CELLS = 5 - its outputs are byte-pinned, and T36
-# rescales the products' energy instead.
+# actually deposits is the staircase volume rather than the sphere's.
+#
+# N5-2 CORRECTION: this block used to claim that staircase was ~0.85 of
+# the request at 5 cells and ~0.94 at 8, and justified the 2.6x (2D) /
+# 4.1x (3D) cell-count cost of going to 8 with closing that gap. It was
+# measured across representative rendered cases (3D 1 kg / 5 kg, 2D
+# axisymmetric at four burst heights) and the real figures are
+# 0.98-1.05 at 5 cells and 0.98-1.01 at 8 - a couple of per cent that
+# changes SIGN with where the charge centre falls between cell centres,
+# not a systematic deficit. The writer now cancels even that with the
+# sources' `scale` keyword (refine.mass_radius_scale), so the mass is
+# no longer an argument for this constant either way.
+#
+# What 8 cells DOES buy is measured and real: the KB free-air anchor
+# moves from 0.72-0.77 to 0.85-0.89 of Kingery-Bulmash
+# (test_foam_kb_anchor). That is the EXPANSION being resolved, not the
+# mass - so the number stays at 8, with the honest reason. Whether it
+# can come back down is a WSL experiment nobody has run.
+#
+# Native stays at MIN_EXP_CELLS = 5 - its outputs are byte-pinned, and
+# T36 rescales the products' energy instead.
 FOAM_EXP_CELLS = 8
 CELLS_2D_WARN  = 2_000_000
 CELLS_2D_MAX   = 8_000_000

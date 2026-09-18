@@ -41,6 +41,21 @@ _RE_DT = re.compile(r'^deltaT = ([0-9.eE+-]+)$')
 _RE_MAXP = re.compile(r'^max\(p\):\s*([0-9.eE+-]+)'
                       r'(?:,\s*min\(p\):\s*([0-9.eE+-]+))?')
 
+#: conservedQuantities (N5-5) prints a four-line block per field, e.g.
+#:
+#:     rhoE [1 -1 -2 0 0 0 0] :
+#:         Original = 28.4068
+#:         Current = 28.4068
+#:         difference (abs/rel) = 0, 0
+#:
+#: captured verbatim from a real 6.2.0 run. `Original` is the value at
+#: the FIRST execute, not at t = 0 of the physical problem - on a resume
+#: it is the value at restart. The value itself is sum(field*V) over the
+#: mesh (conservedQuantities.C:141), i.e. a volume integral in the
+#: mesh's OWN units: a wedge reports its sector, not the full revolve.
+_RE_CONS_HEAD = re.compile(r'^(rho|rhoE) \[[-0-9 ]+\] :$')
+_RE_CONS_VAL = re.compile(r'^\s+(Original|Current) = ([0-9.eE+-]+)$')
+
 ARRIVAL_P = 1.001 * P_AIR       # native shock-arrival threshold
 STOP_GRACE_S = 60.0             # writeNow -> kill escalation window
 POLL_S = 0.25
@@ -202,6 +217,64 @@ def check_stability(st, hooks, t):
     return True
 
 
+#: N5-5. How far blastFoam's own reading of the handed-over energy may
+#: sit from the writer's before it is worth saying something.
+#:
+#: Calibrated, not guessed: on a real foam->foam chain the writer put
+#: 2.856593e4 J on the mesh and blastFoam's conservedQuantities read
+#: 2.856010e4 - a ratio of 1.000204, whose 0.02 % is the wedge's
+#: cos(1 deg) vertex geometry (blockMesh puts the outer face at
+#: x*cos(a), _init_cell_volumes integrates the ideal sector). The remap
+#: itself conserves to 0.11 % measured on the same hand-off. 2 % leaves
+#: an order of magnitude over both.
+#:
+#: The upper end is set by measurement too, and it is tighter than it
+#: looks. Reverting B0 on a small profile stage (lambda.expl stripped,
+#: so blastFoam blends the products back to the unreacted Murnaghan
+#: reactants) moved the first reading by only -4.3 %: the products are a
+#: modest share of a domain that is mostly ambient air, so the signature
+#: of a totally destroyed fireball is single-digit percent. 2 % catches
+#: that with 2.2x to spare; 5 % would have sailed straight past it.
+HANDOFF_E_TOL = 0.02
+
+
+def check_handoff_energy(st, hooks):
+    """Latch once: what blastFoam decoded against what we wrote.
+
+    Same shape as check_stability - sets a flag, logs once, and decides
+    nothing. It WARNS and never stops: the run is valid, it just began
+    from the wrong energy, and the user needs the number rather than a
+    killed solver.
+
+    This is the only check in the codebase that can see across the
+    file boundary. Python knows what it MEANT to write; blastFoam's
+    volume integral says what it actually decoded, after the EOS
+    inversion (guide 5.9) and the lambda blend (5.87). B0 and B1 both
+    broke in exactly that gap and neither was visible from either side
+    alone.
+    """
+    if st.get('cons_noted') or not st.get('cons0'):
+        return False
+    want = st.get('E_expect')
+    got = st['cons0'].get('rhoE')
+    if not want or not got:
+        return False
+    st['cons_noted'] = True
+    rel = got / want - 1.0
+    st['cons_rel'] = rel
+    if abs(rel) <= HANDOFF_E_TOL:
+        hooks.log(f'  [note] hand-off energy checks out: blastFoam reads '
+                  f'{got:.4e} J against the {want:.4e} J written '
+                  f'({rel:+.2%})')
+        return False
+    hooks.log(f'  [warn] hand-off energy mismatch: {want:.4e} J was '
+              f'written onto this mesh, blastFoam reads {got:.4e} J '
+              f'({rel:+.1%}). The state that arrived is not the state '
+              f'that was handed over - suspect the EOS the profile was '
+              f'priced with, or lambda.<phase> on the products.')
+    return True
+
+
 def progress_line(line, st, hooks, end_time):
     """Parse one solver stdout line into Progress state. st['frac'],
     when not None, overrides the t/end_time estimate (3D uses the
@@ -229,6 +302,37 @@ def progress_line(line, st, hooks, end_time):
         hooks.progress(Progress(step=st['step'], t=st['t'], dt=st['dt'],
                                 p_max=st['p_max'], frac=frac))
         return
+    # conservedQuantities' block (N5-5). Cheap prefix test first:
+    # progress_line runs on every stdout line and already spends four
+    # regexes here.
+    if line[:3] == 'rho' or (line[:1] == ' ' and st.get('cons_field')):
+        m = _RE_CONS_HEAD.match(line)
+        if m:
+            st['cons_field'] = m.group(1)
+            return
+        if st.get('cons_field'):
+            m = _RE_CONS_VAL.match(line)
+            if m:
+                fld, which = st['cons_field'], m.group(1)
+                if which == 'Original':
+                    # latched once: the first reading is the one that
+                    # says what blastFoam decoded from the fields we
+                    # wrote, which is the whole point (B0/B1 both broke
+                    # exactly there). Later blocks repeat it unchanged.
+                    # `st` seeds these to None, so setdefault on the
+                    # dict itself would hand back None, not a dict.
+                    if st.get('cons0') is None:
+                        st['cons0'] = {}
+                    st['cons0'].setdefault(fld, float(m.group(2)))
+                else:
+                    if st.get('cons') is None:
+                        st['cons'] = {}
+                    st['cons'][fld] = float(m.group(2))
+                    st['cons_field'] = None
+                    check_handoff_energy(st, hooks)
+                return
+            st['cons_field'] = None
+
     m = _RE_DT.match(line)
     if m:
         st['dt'] = float(m.group(1))
@@ -598,7 +702,18 @@ class FoamRunLoop:
         # step instead of sitting at 0 until the first ingested write
         # computes a real shock-front fraction
         self.st = dict(step=0, t=0.0, dt=0.0, p_max=float(P_AIR),
-                       frac=None, t_frame=-1.0)
+                       frac=None, t_frame=-1.0,
+                       # N5-5: conservedQuantities' readings, and
+                       # what the writer put on the mesh to compare
+                       # them against (None for a charge case - there
+                       # is no hand-off to check, and rhoE there is not
+                       # conserved anyway: E0 is injected as lambda
+                       # goes 0 -> 1, measured at +1169 % before the
+                       # open boundary drains it)
+                       cons0=None, cons=None, cons_field=None,
+                       cons_noted=False,
+                       E_expect=((spec.init_state or {}).get('E_total')
+                                 if spec.init_state else None))
         self.live = new_live()
         # live-sample cadence [solver steps] the case was written with;
         # _sync_live_steps follows the GUI's "Refresh every N steps"

@@ -203,6 +203,32 @@ class CaseSpec:
     live_steps: int = 0
 
     @property
+    def l_inf(self):
+        """Relaxation length for pressureWaveTransmissive (N5-10).
+
+        The largest domain extent: the length over which the outflow
+        patch is told to return to `fieldInf`. Anything much shorter
+        clamps the boundary towards ambient while the wave is still
+        passing through it."""
+        g = self.grid or {}
+        keys = ('x_face', 'y_face', 'z_face') if self.dim >= 2 else ('r_face',)
+        try:
+            return max(float(g[k][-1]) for k in keys if k in g)
+        except (KeyError, IndexError, TypeError, ValueError):
+            return None
+
+    @property
+    def dx_charge(self):
+        """Finest spacing the charge region will actually see - the
+        grid setFields marks whole cells on. An AMR case is refined to
+        `amr` levels around the charge by setRefinedFields before the
+        selection runs; a static case is already at its fine spacing.
+        Mirrors what validate_case reports the charge cells at."""
+        if self.amr:
+            return self.dx_base / 2 ** self.amr
+        return self.dx
+
+    @property
     def n_cells(self):
         """Cell count of the ACTUAL mesh: obstacle cells are carved out
         by topoSet/subsetMesh, so field files hold only fluid values; a
@@ -695,6 +721,32 @@ def _controldict(spec, case):
         },
     }
     functions = {}
+    # N5-5: blastFoam's own volume integral of the conserved variables,
+    # printed to the log at every write. The value here is NOT the drift
+    # it reports: the guide says the FO "does not consider the removal
+    # and injection of values into a domain", and every default case in
+    # this repo has a transmit/terminate boundary, so mass and energy
+    # legitimately leave and any drift threshold would either never fire
+    # or fire always. What earns its place is the FIRST reading - what
+    # blastFoam decoded from the fields we wrote into the start time
+    # dir. That is exactly the seam B0 (lambda reset the products to
+    # pRef) and B1 (+33 % from the wrong EOS) both broke, and neither
+    # was visible from the Python side, which only ever sees what it
+    # MEANT to write. Emitted for every dim - it costs one dict entry
+    # and a line of log per write.
+    # executeControl, NOT writeControl: conservedQuantities does its
+    # integral and its Info<< in execute(), and its write() is a bare
+    # `return true` (conservedQuantities.C:167). Left on the default
+    # timeStep cadence it prints eight lines EVERY step - measured on a
+    # 5 s 1D run: the teed log went from 0.22 MB to 7.63 MB, 35x, for
+    # 10,531 samples nobody reads.
+    functions['conserved'] = {
+        'type': 'conservedQuantities',
+        'libs': Raw('("libblastFunctionObjects.so")'),
+        'executeControl': 'writeTime',
+        'writeControl': 'writeTime',
+        'fields': ['rho', 'rhoE'],
+    }
     if spec.dim >= 2 and spec.fo_accumulators:
         # Per-step peak-pressure / impulse accumulation on the foam side
         # (matches the native solvers' per-step tracking; the backend's
@@ -713,6 +765,27 @@ def _controldict(spec, case):
             'writeControl': 'writeTime',
             'fields': ['p'],
             'minMax': 'max',
+        }
+    # N5-9: the third of the three standard blast outputs. peak (pMax)
+    # and impulse were already here; arrival time was not, and it is
+    # what the gauge summary reconstructs in Python from the traces.
+    # `overpressure` is p - pRef as a field, which is what the probes
+    # and the impulse FO are really about - guide 16.5 notes that
+    # calculateImpulse detects an overpressure file and then zeroes its
+    # own pRef, and burstingWindow_workshop samples it directly.
+    if spec.dim >= 2:
+        functions['arrival'] = {
+            'type': 'timeOfArrival',
+            'libs': Raw('("libblastFunctionObjects.so")'),
+            'writeControl': 'writeTime',
+            'pName': 'p',
+        }
+        functions['overpressure'] = {
+            'type': 'overpressure',
+            'libs': Raw('("libblastFunctionObjects.so")'),
+            'writeControl': 'writeTime',
+            'pRef': P_AIR,
+            'store': True,
         }
     if spec.dim >= 2 and spec.amr:
         # AMR (N16): the cell count and order change every write, so
@@ -858,6 +931,35 @@ def _setfieldsdict(spec, case):
     alpha = f'alpha.{PHASE}'
     m = MATERIALS[spec.material]
 
+    def radius_k(r):
+        """N5-2: multiplier that makes the marked staircase hold the
+        mass the user asked for. setFields marks WHOLE cells, so the
+        deposited mass is the staircase volume x rho0 - measured across
+        representative cases at 0.98-1.05 of the request, scattering
+        with where the charge centre happens to fall between cell
+        centres. `scale` (massToCell.C:83) multiplies the source's
+        VOLUME before it derives the radius, which cancels that while
+        leaving alpha at 1 and rho at rho0."""
+        from ...core.refine import mass_radius_scale
+        if not r:
+            return 1.0
+        g = spec.grid
+        try:
+            if spec.dim == 1:
+                dims, cen = (g['r_face'][-1],), (0.0, 0.0)
+            elif spec.dim == 2:
+                dims = (g['x_face'][-1], g['y_face'][-1])
+                cen = (0.0 if case.geometry == 'axisymmetric'
+                       else spec.center[0], spec.center[1])
+            else:
+                dims = (g['x_face'][-1], g['y_face'][-1], g['z_face'][-1])
+                cen = tuple(float(v) for v in spec.center[:3])
+            return mass_radius_scale(
+                spec.dim, getattr(case, 'geometry', ''),
+                spec.dx_charge, r, cen, dims)
+        except (ValueError, ZeroDivisionError, IndexError, KeyError):
+            return 1.0     # an odd geometry keeps the vendor behaviour
+
     def backup_radius(r):
         # the backup region catches the coarse cells around the charge
         # when none has its centre inside it. The static grid resolves
@@ -883,6 +985,7 @@ def _setfieldsdict(spec, case):
                 'centre': (x0, y0, 0.0),
                 'rho': m.rho0,
                 'mass': mass,
+                'scale': radius_k(spec.r_exp) ** 3,
                 'LbyD': spec.dx_base / (2.0 * spec.r_exp),
                 'direction': (0, 0, 1),
                 'backup': {'centre': (x0, y0, 0.0),
@@ -894,7 +997,7 @@ def _setfieldsdict(spec, case):
             regions = [('cylinderToCell', {
                 'p1': (x0, y0, -spec.dx_base),
                 'p2': (x0, y0, spec.dx_base),
-                'radius': spec.r_exp,
+                'radius': spec.r_exp * radius_k(spec.r_exp),
                 'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
             })]
     else:
@@ -902,6 +1005,7 @@ def _setfieldsdict(spec, case):
             'centre': centre,
             'rho': m.rho0,
             'mass': mass,
+            'scale': radius_k(charge_radius(mass, m)) ** 3,
             'backup': {'centre': centre,
                        'radius': backup_radius(charge_radius(mass, m))},
             'fieldValues': [Raw(f'volScalarFieldValue {alpha}    1')],
@@ -1043,7 +1147,23 @@ def _dynamicmeshdict(spec=None, case=None):
 def _decomposepardict(n_procs):
     """scotch decomposition (modeled on the building3DWorkshop
     tutorial); written only for parallel runs, so serial case trees
-    stay byte-identical."""
+    stay byte-identical.
+
+    N5-7: a planar (`hierarchical`) split was tried here and REVERTED.
+    On the 3D smoke case it looked like a clear win - against a serial
+    reference, scotch was +7.00 % on the near-field peak while either
+    planar cut was within 0.25 %, and on the reconstructed fields
+    scotch disagreed with serial in 5,360 cells by >1 % against 2,207.
+    Then the 2D parallel case contradicted it: there scotch reproduces
+    serial almost exactly (impulse 188.5 vs 188.5 Pa s) and the planar
+    split broke np1-vs-np2 impulse equivalence outright.
+
+    Two cases, opposite answers, and no mechanism that explains both -
+    the obvious "a cut through the gauges is what hurts" does not, since
+    the 3D z-cut passes through both gauges and is still the accurate
+    one. That is not enough to change what every parallel run does, so
+    scotch stays and the measurements live in TODO.md N5-7.
+    """
     body = block({
         'numberOfSubdomains': n_procs,
         'method': 'scotch',
@@ -1053,7 +1173,7 @@ def _decomposepardict(n_procs):
 
 # ── 0/ field files ──────────────────────────────────────────────────────────
 
-def _bc_entry(fld, kind, p_value='$internalField'):
+def _bc_entry(fld, kind, p_value='$internalField', l_inf=None):
     """Boundary entry dict for one field on one patch kind.
 
     `p_value` is what the open-boundary pressure patch takes as its
@@ -1072,12 +1192,26 @@ def _bc_entry(fld, kind, p_value='$internalField'):
         return {'type': 'slip'} if fld == 'U' else {'type': 'zeroGradient'}
     # transmit / terminate: both are outflow patches
     if fld == 'p':
-        return {'type': P_OPEN_BC, 'value': Raw(p_value)}
+        # N5-10: `fieldInf`/`lInf` make pressureWaveTransmissive relax
+        # back towards ambient over a length scale instead of being a
+        # pure advective outflow. Verified optional and only active
+        # when lInf > small (pressureWaveTransmissiveFvPatchField.C:134).
+        # The vendor tutorials leave them out, so this is measured
+        # against the KB anchor before it is trusted - see N5-10 in
+        # TODO. `l_inf` is None when the caller has no domain scale to
+        # give, and then nothing is emitted and the patch is exactly
+        # what it was.
+        d = {'type': P_OPEN_BC, 'value': Raw(p_value)}
+        if l_inf:
+            d['fieldInf'] = P_AIR
+            d['lInf'] = l_inf
+        return d
     return {'type': 'zeroGradient'}
 
 
 def _field_file(obj, fld, internal, spec, vector=False):
-    bfield = {name: _bc_entry(fld, kind) for name, kind in spec.patches}
+    bfield = {name: _bc_entry(fld, kind, l_inf=spec.l_inf)
+              for name, kind in spec.patches}
     body = block({
         'dimensions': Raw(_DIMS[fld]),
         'internalField': Raw(f'uniform {internal}'),
@@ -1102,6 +1236,48 @@ def _zero_fields(spec):
 
 
 # ── profile-initialised stages (N7) ─────────────────────────────────────────
+
+def _profile_energy(rho, u, v, w, e, spec, case):
+    """Total energy of a remapped state on its mesh [J], or None when
+    the cell volumes cannot be worked out."""
+    V = _init_cell_volumes(spec, case)
+    if V is None:
+        return None
+    ke = 0.5 * (u ** 2 + v ** 2 + (0.0 if w is None else w ** 2))
+    return float(np.sum(rho * (e + ke) * V))
+
+
+def _init_cell_volumes(spec, case):
+    """Per-cell volume of the mesh a profile stage's state lands on, in
+    the units blastFoam's own volume integrals use (N5-5).
+
+    The shape matches `spec.init_grid`, so it multiplies the remapped
+    state directly. The conventions are the ones the blockMesh writers
+    above build:
+      - axisymmetric: core.grid's V is PER RADIAN; the wedge spans
+        2 * HALF_ANGLE_DEG (_blockmesh_2d_axisym), so that is the
+        factor between the two.
+      - planar 2D: one cell thick, -dx_base/2 .. +dx_base/2
+        (_blockmesh_2d_planar).
+      - 3D: cubes.
+    Returns None for a geometry this cannot account for, so a caller
+    reports nothing rather than reporting a wrong number.
+    """
+    g = spec.init_grid
+    try:
+        if spec.dim == 3:
+            dx = float(g['x_face'][1] - g['x_face'][0])
+            return dx ** 3
+        dx = float(g['x_face'][1] - g['x_face'][0])
+        dy = float(g['y_face'][1] - g['y_face'][0])
+        if getattr(case, 'geometry', '') == 'axisymmetric':
+            x_c = 0.5 * (g['x_face'][:-1] + g['x_face'][1:])
+            wedge = 2.0 * math.radians(HALF_ANGLE_DEG)
+            return (x_c * dx * dy * wedge)[:, None]
+        return dx * dy * spec.dx_base
+    except (KeyError, IndexError, TypeError, ValueError):
+        return None
+
 
 def profile_state(case, spec):
     """Remap a chain stage's input profile onto this case's cell grid.
@@ -1173,7 +1349,33 @@ def profile_state(case, spec):
             w = np.where(bad, 0.0, w)
         e = np.where(bad, cv * 288.0, e)
 
+    # N5-4: the last line of defence. validate_case refuses this at the
+    # form (and chain.handoff_conflicts before that), but a hand-written
+    # case JSON or a CLI caller reaches the writer directly, and the
+    # symptom - a fireball a third too energetic - is not something a
+    # user would ever spot in the output. ValueError, not RuntimeError:
+    # run_controller.error_headline lifts the first non-indented line
+    # out of the traceback, so this shows as a sentence.
+    src_solver = str(prof.get('source_solver', 'unknown') or 'unknown')
+    if src_solver == 'native':
+        from ...core.chain import HANDOFF_MSG
+        raise ValueError(HANDOFF_MSG[0].upper() + HANDOFF_MSG[1:])
+
     return dict(rho=rho, u=u, v=v, w=w, e=e, phase=phase, t0=float(t0),
+                # the EOS the SOURCE stage ran with - _profile_fields
+                # prices the hand-off with this, never with case.eos
+                # (B1). A native stage exports 'idealGas', blastFoam
+                # exports 'JWL' (backend.py:1117).
+                eos=str(prof.get('eos', 'idealGas') or 'idealGas'),
+                source_solver=src_solver,
+                # N5-5: the total internal + kinetic energy this
+                # state carries onto THIS mesh. Compared against what
+                # blastFoam's conservedQuantities reports at the first
+                # write, it answers the one question Python cannot ask
+                # itself - "did blastFoam decode the fields I wrote as
+                # the energy I meant?" - which is the seam B0 and B1
+                # both broke.
+                E_total=_profile_energy(rho, u, v, w, e, spec, case),
                 r_exp=float(prof.get('r_exp', 0.0) or 0.0),
                 n_floored=int(np.count_nonzero(bad)),
                 dx_src=_source_dx(prof, mode))
@@ -1232,13 +1434,23 @@ def _profile_fields(spec, case):
     the reader's `e = Cv(phase) T`, and p comes from the native EOS the
     profile was produced with, so the handover is the same state the
     native solver would have continued from."""
-    from ...core.eos import pressure_soundspeed
+    from ...core.eos import pressure_soundspeed, material_jwl
     st = spec.init_state
     m = MATERIALS[spec.material]
     phase = st['phase']
     rho, e = st['rho'], st['e']
-    p, _c = pressure_soundspeed(rho, e, phase, getattr(case, 'eos',
-                                                       'idealGas'))
+    # B1/B2: the EOS is the one the profile was WRITTEN with, not the
+    # one this case runs. `case.eos` is forced to 'idealGas' for every
+    # blastFoam case (case_form.py:215, and validate_case says so), so
+    # reading it here priced the products' cells with the air formula
+    # p = (gamma_air - 1) rho e instead of JWL - a flat +33.3 % in p
+    # (the ratio 0.4 / omega_TNT) on every foam->foam hand-off, which
+    # 5.9 then inverts back into +33.3 % of internal energy. The
+    # material's own JWL set has to come with it: pressure_soundspeed
+    # defaults to TNT, which is another 20 % for C4 and 14 % for ANFO.
+    p, _c = pressure_soundspeed(rho, e, phase,
+                                st.get('eos', 'idealGas'),
+                                material_jwl(spec.material))
     Cv = np.where(phase == 1, m.Cv_products, CV_AIR)
     T = e / Cv
     comps = [st['u'], st['v']]
@@ -1262,10 +1474,28 @@ def _profile_fields(spec, case):
             np.where(phase == 1, rho, m.rho0), spec)), False),
         '0/rho.air': ('rho.air', 'rho', _nonuniform(_cell_order(
             np.where(phase == 1, RHO_AIR, rho), spec)), False),
+        # B0: the explosive arriving in a profile is ALREADY reacted -
+        # it is expanded JWL product gas the previous stage handed over.
+        # blastFoam builds lambda.<phase> READ_IF_PRESENT with a default
+        # of 0 (activationModel.C:236), and a profile stage writes an
+        # empty `points ()` on purpose, so linearActivation never raises
+        # it: lambda stays 0 for the whole run. Equation 5.87 then
+        # blends the phase back to the UNREACTED Murnaghan reactants,
+        # and Murnaghan with K0 = 0 (the vendor's pattern) returns pRef
+        # whatever the density is - the entire fireball is silently
+        # reset to ambient. Measured on blastFoam 6.2.0: 4.43 MPa in,
+        # 101,298 Pa out. `uniform 1` because a profile stage carries no
+        # unreacted material anywhere in the domain, and lambda has no
+        # meaning in the air cells (alpha.expl = 0) either way.
+        # activationModel stays `linear`: with lambda already at 1 it is
+        # a no-op, while `none` re-injects E0 and multiplies p by 8.3.
+        f'0/lambda.{PHASE}': (f'lambda.{PHASE}', 'alpha',
+                              Raw('uniform 1'), False),
     }
     out = {}
     for rel, (obj, fld, internal, vec) in fields.items():
-        bfield = {name: _bc_entry(fld, kind, f'uniform {fmt(P_AIR)}')
+        bfield = {name: _bc_entry(fld, kind, f'uniform {fmt(P_AIR)}',
+                                  l_inf=spec.l_inf)
                   for name, kind in spec.patches}
         body = block({
             'dimensions': Raw(_DIMS[fld]),
@@ -1333,6 +1563,15 @@ def render_case(case, n_procs=1, live_steps=0):
         d = spec.start_dir
         prof = {d + rel[1:]: text for rel, text
                 in _profile_fields(spec, case).items()}
+        # B0 is silent when it regresses - the run still produces a
+        # shock front (the AIR cells initialise correctly), it just
+        # loses the fireball - so the invariant is asserted here rather
+        # than left to a reviewer noticing a missing file.
+        if f'{d}/lambda.{PHASE}' not in prof:
+            raise RuntimeError(
+                'a profile-initialised stage must write '
+                f'lambda.{PHASE} - without it blastFoam treats the '
+                'products as unreacted and resets them to pRef (B0)')
         spec.files.update(prof)
         spec.deferred = tuple(prof)     # written after the mesh stages
     return spec

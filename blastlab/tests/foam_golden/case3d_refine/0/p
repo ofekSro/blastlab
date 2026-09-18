@@ -15,21 +15,29 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            1;
     }
     x_hi
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            1;
     }
     y_lo
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            1;
     }
     y_hi
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            1;
     }
     z_lo
     {
@@ -39,6 +47,8 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            1;
     }
     obstacles
     {

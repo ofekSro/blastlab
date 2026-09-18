@@ -15,6 +15,8 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            4;
     }
     y_lo
     {
@@ -24,6 +26,8 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           $internalField;
+        fieldInf        101325;
+        lInf            4;
     }
     wedge
     {

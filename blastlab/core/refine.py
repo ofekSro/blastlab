@@ -126,19 +126,17 @@ def charge_radius(mass, rho0=None, planar=False):
     return (3.0 * mass / (4.0 * math.pi * rho0)) ** (1.0 / 3.0)
 
 
-def set_mass_fraction(dim, geometry, dx, r_exp, centre, dims):
-    """What blastFoam's `sphericalMassToCell` actually deposits (N5).
+def _staircase(dim, geometry, dx, r_exp, centre, dims):
+    """(n_cells, V_staircase, V_true) for a charge of radius `r_exp`.
 
-    It sets `alpha = 1` in the cells whose CENTRES fall inside r_exp and
-    the mass that lands is therefore the staircase volume x rho0, not
-    the sphere's: ~0.85 of the request at 5 cells across the radius.
-    Returns `(n_cells, fraction)` against the charge volume clipped to
-    the domain (a wall-truncated charge is a deliberate surface burst,
-    so its outside part is not counted as missing). `centre` is
-    (x0, y0[, z0]) with x0 = 0 on the axis in axisymmetric 2D."""
+    The staircase is the set blastFoam's *MassToCell sources build: the
+    cells whose CENTRES fall inside `r_exp`. `V_true` is the charge
+    volume clipped to the domain (a wall-truncated charge is a
+    deliberate surface burst, so its outside part is not missing mass).
+    """
     from . import geometry as geom
     if not (dx > 0 and r_exp > 0):
-        return 0, 0.0
+        return 0, 0.0, 0.0
 
     def axis(c, L):
         """Global cell centres (i + 0.5) dx within r_exp of c."""
@@ -147,6 +145,21 @@ def set_mass_fraction(dim, geometry, dx, r_exp, centre, dims):
         return (np.arange(i0, max(i1, i0) + 1) + 0.5) * dx
 
     r2 = r_exp * r_exp
+    if dim == 1:
+        # radial wedge: cells are spherical shells from the origin, so
+        # the staircase is exact in angle and only steps in radius.
+        # `dims` is (R_out,) and the charge is always at r = 0.
+        i1 = min(int(math.ceil(r_exp / dx)) + 1, int(math.ceil(dims[0] / dx)))
+        faces = np.arange(0, max(i1, 1) + 1) * dx
+        centres = 0.5 * (faces[:-1] + faces[1:])
+        inside = centres <= r_exp
+        n = int(inside.sum())
+        # per steradian, so it cancels against V_true the same way the
+        # axisymmetric branch's per-radian volumes do
+        shell = (faces[1:] ** 3 - faces[:-1] ** 3) / 3.0
+        V_disc = float((inside * shell).sum())
+        V_true = r_exp ** 3 / 3.0
+        return n, V_disc, V_true
     if dim == 3:
         x0, y0, z0 = centre
         X = axis(x0, dims[0])[:, None, None]
@@ -167,7 +180,128 @@ def set_mass_fraction(dim, geometry, dx, r_exp, centre, dims):
         else:
             V_disc = n * dx * dx        # per unit depth
         V_true = geom.charge_volume_2d(geometry, r_exp, x0, y0, *dims)
+    return n, V_disc, V_true
+
+
+def set_mass_fraction(dim, geometry, dx, r_exp, centre, dims):
+    """What blastFoam's `sphericalMassToCell` actually deposits (N5).
+
+    It sets `alpha = 1` in the cells whose CENTRES fall inside r_exp and
+    the mass that lands is therefore the staircase volume x rho0, not
+    the sphere's: ~0.85 of the request at 5 cells across the radius.
+    Returns `(n_cells, fraction)` against the charge volume clipped to
+    the domain (a wall-truncated charge is a deliberate surface burst,
+    so its outside part is not counted as missing). `centre` is
+    (x0, y0[, z0]) with x0 = 0 on the axis in axisymmetric 2D.
+
+    Since N5-2 the writer cancels this deficit with the sources' `scale`
+    keyword, so a rendered case deposits ~1.00 - see `mass_radius_scale`.
+    This reports the UNCORRECTED fraction, which is what the validation
+    note is about (how badly the mesh resolves the charge).
+    """
+    n, V_disc, V_true = _staircase(dim, geometry, dx, r_exp, centre, dims)
     return n, (V_disc / V_true if V_true > 0 else 0.0)
+
+
+def _charge_cells(dim, geometry, dx, r_max, centre, dims):
+    """(distance, volume) of every cell centre within `r_max` of the
+    charge, in the same per-radian / per-steradian convention
+    `_staircase` uses so the volumes compare against `charge_volume_*`
+    directly. Clipped to the domain, exactly as the selection is."""
+    if dim == 1:
+        i1 = min(int(math.ceil(r_max / dx)) + 1,
+                 int(math.ceil(dims[0] / dx)))
+        faces = np.arange(0, max(i1, 1) + 1) * dx
+        d = 0.5 * (faces[:-1] + faces[1:])
+        v = (faces[1:] ** 3 - faces[:-1] ** 3) / 3.0
+        keep = d <= r_max
+        return d[keep], v[keep]
+
+    def axis(c, L):
+        i0 = max(int(math.floor((c - r_max) / dx)), 0)
+        i1 = min(int(math.ceil((c + r_max) / dx)), int(math.ceil(L / dx)))
+        return (np.arange(i0, max(i1, i0) + 1) + 0.5) * dx
+
+    if dim == 3:
+        x0, y0, z0 = centre
+        X, Y, Z = (axis(x0, dims[0])[:, None, None],
+                   axis(y0, dims[1])[None, :, None],
+                   axis(z0, dims[2])[None, None, :])
+        d = np.sqrt((X - x0) ** 2 + (Y - y0) ** 2 + (Z - z0) ** 2)
+        v = np.broadcast_to(np.array(dx ** 3), d.shape)
+    else:
+        x0, y0 = centre[0], centre[1]
+        xs, ys = axis(x0, dims[0]), axis(y0, dims[1])
+        d = np.sqrt((xs[:, None] - x0) ** 2 + (ys[None, :] - y0) ** 2)
+        if geometry == 'axisymmetric':
+            v = np.broadcast_to(xs[:, None] * dx * dx, d.shape)
+        else:
+            v = np.broadcast_to(np.array(dx * dx), d.shape)
+    d, v = d.ravel(), np.asarray(v).ravel()
+    keep = d <= r_max
+    return d[keep], v[keep]
+
+
+def mass_radius_scale(dim, geometry, dx, r_exp, centre, dims):
+    """Radius multiplier k that makes the staircase deposit the mass the
+    user asked for (N5-2).
+
+    blastFoam's massToCell computes `volume = mass/rho*scale` and then
+    derives the source radius from THAT volume (massToCell.C:83,
+    sphericalMassToCell.H:64), so growing the requested volume slightly
+    is the one knob that cancels the staircase scatter while leaving
+    `alpha` at exactly 1 and `rho` at exactly rho0.
+
+    The obvious alternative - `volScalarFieldMassIntegrated`, which the
+    user guide 16.1 offers - divides the requested mass by the staircase
+    mass and does NOT clamp the result (MassIntegratedFieldSetType.C:69),
+    so a 6 % deficit writes alpha.expl = 1.064 and leaves the mixture
+    with alpha.air = -0.064. `scale` has no such failure mode.
+
+    The staircase volume is a step function of the radius: it only
+    changes where the radius crosses a cell-centre distance. So the
+    candidates are the PLATEAUX between consecutive distances, and the
+    answer is the midpoint of the best one - never its edge, which is
+    where a cell is about to tip in or out and where the ten digits
+    `fmt` writes (and blastFoam's own float compare) would decide it.
+
+    Returns k = R / r_exp. The caller turns it into the entry its source
+    wants: `scale` = k**3 for the *MassToCell sources (both derive their
+    radius from the cube root of the volume), or `radius` = k * r_exp
+    for a plain geometric source. k = 1.0 whenever the geometry cannot
+    be evaluated, so an unexpected case is left exactly as it was.
+    """
+    if not (dx > 0 and r_exp > 0):
+        return 1.0
+    target = _staircase(dim, geometry, dx, r_exp, centre, dims)[2]
+    if target <= 0:
+        return 1.0
+    # wide enough for any plausible scatter in either direction; the
+    # cells beyond it are only there to bound the last plateau
+    r_max = 1.5 * r_exp
+    d, v = _charge_cells(dim, geometry, dx, r_max, centre, dims)
+    if d.size == 0:
+        return 1.0
+    order = np.argsort(d, kind='stable')
+    d, v = d[order], v[order]
+    # Cells enter in GROUPS: a charge centred on a cell corner has 48
+    # cells at one distance, and the arithmetic that produced those
+    # distances leaves them differing in the last bits. Grouping with a
+    # relative tolerance is what makes the plateaux real - comparing raw
+    # floats splits a group and lands the answer on a step edge, which
+    # the ten digits `fmt` writes then round to the wrong side.
+    step = np.empty(d.size, dtype=bool)
+    step[0] = True
+    step[1:] = d[1:] > d[:-1] * (1.0 + 1e-9)
+    ends = np.flatnonzero(step)
+    ends = np.append(ends[1:] - 1, d.size - 1)      # last index per group
+    levels = d[ends]                # radius at which the group is in
+    enclosed = np.cumsum(v)[ends]   # volume once it is
+    j = int(np.argmin(np.abs(enclosed - target)))
+    lo = float(levels[j])
+    hi = float(levels[j + 1]) if j + 1 < levels.size else lo * 1.02
+    R = 0.5 * (lo + hi)
+    return float(R / r_exp)
 
 
 # ── zones ────────────────────────────────────────────────────────────────────

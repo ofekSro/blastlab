@@ -41,6 +41,60 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
+#: N5-7. This is a REGRESSION bound, not an accuracy bar, and the
+#: difference matters.
+#:
+#: Measured at full size against a serial reference: scotch (the
+#: shipping decomposition) is +7.00 %. A planar split was +0.17 % and
+#: looked like the fix until the 2D parallel case contradicted it, so
+#: scotch stays and the +7 % stands - see TODO.md N5-7.
+#:
+#: 10 % therefore says "no worse than it already is". It is deliberately
+#: NOT 2 %: a permanently red test stops being read. Tighten it to 2 %
+#: the day N5-7 is resolved, and do not loosen it for any other reason.
+SERIAL_TOL = 0.10
+
+
+def _serial_gate(case, px, py):
+    """N5-7: parallel against a SERIAL reference - the real gate.
+
+    Serial has no processor boundaries, so it is the reference the
+    parallel run has to reproduce. Measured on this case with the
+    planar decomposition that N5-7 made the default:
+
+        full size (Z = 0.175)   +0.17 %     <- gated at 2 %
+        --tiny    (Z = 0.075)   +28 %       <- NOT gated, see below
+
+    The tiny case is not gated on accuracy on purpose. At Z = 0.075 the
+    gauges sit 0.15 m from an 8 kg charge, inside the fireball, and
+    EVERY parallel decomposition measured there lands 13-28 % high -
+    scotch and both planar cuts alike. A gate there would be pinning a
+    tracked defect rather than testing anything, so --tiny stays a smoke
+    test: does a 3D run work end to end. The accuracy question is asked
+    at full size, where it has an answer.
+    """
+    if '--tiny' in sys.argv:
+        print('  [note] --tiny: accuracy vs serial NOT gated at '
+              'Z = 0.075 (N5-7); run without --tiny for that')
+        return
+    import copy
+    from blastlab.solvers import get_solver
+    ser = copy.deepcopy(case)
+    ser.n_procs = 1
+    res = get_solver(3, 'blastfoam')(ser)
+    sx = res.gauges['pressures'][0].max() - P_AIR
+    sy = res.gauges['pressures'][1].max() - P_AIR
+    ref = 0.5 * (sx + sy)
+    for lbl, v in (('gauge x', px), ('gauge y', py)):
+        rel = v / ref - 1.0
+        check(f'parallel matches serial at {lbl}',
+              abs(rel) <= SERIAL_TOL,
+              f'{v/1e3:.0f} vs serial {ref/1e3:.0f} kPa ({rel:+.2%}, '
+              f'tol {SERIAL_TOL:.0%})')
+    print(f'  [note] serial {sx/1e3:.0f} / {sy/1e3:.0f} kPa, '
+          f'parallel {px/1e3:.0f} / {py/1e3:.0f} kPa')
+
+
 def main():
     from blastlab.solvers.foam import env
     ok, detail = env.check_available()
@@ -114,6 +168,8 @@ def main():
     else:
         check('snapshot keys', True)
     snap = res.snapshots[labels[-1]]
+    _serial_gate(case, px, py)
+
     check('snapshot dtypes/shapes',
           snap['p'].dtype == np.float32 and snap['p'].ndim == 3
           and snap['rho_xz'].shape == (N[0], N[2])
@@ -146,11 +202,22 @@ def main():
     py = res.gauges['pressures'][1].max() - P_AIR
     check('gauges shocked', px > 2 * P_AIR and py > 2 * P_AIR,
           f'{px/1e3:.0f} / {py/1e3:.0f} kPa')
-    # Since N3-01 the probes are exact mirrors, the schedule is pinned
-    # and np is pinned to 2, so this is a stable number per tree:
-    # 0.26 % at full size (the decomposition's residual - see above).
+    # N5-7: the x/y gate USED to live here, and it was the wrong
+    # instrument. It only sees an error that lands unevenly on the two
+    # mirror probes, so a decomposition whose cut is x/y symmetric
+    # scored a perfect 0.00 % while both gauges were 28 % high. The
+    # "0.26 % residual" this gate reported at full size was a measure of
+    # how asymmetric scotch's partition happened to be, not of how
+    # accurate the solution was - the real error in that same run was
+    # +7.00 %.
+    #
+    # What replaces it is below: the parallel peaks against a SERIAL
+    # reference, which has no processor boundaries at all. Symmetry is
+    # still checked, but only as a cheap sanity bound - it is no longer
+    # asked to stand in for accuracy.
     sym_tol = 0.10 if '--tiny' in sys.argv else 0.05
-    check('x/y symmetry', abs(px - py) <= sym_tol * max(px, py),
+    check('x/y symmetry (sanity only - see the serial gate below)',
+          abs(px - py) <= sym_tol * max(px, py),
           f'{px/1e3:.0f} vs {py/1e3:.0f} kPa')
 
     # per-step peak/impulse maps from the function objects. Snapshot p

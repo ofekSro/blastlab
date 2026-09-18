@@ -818,6 +818,8 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           uniform 101325;
+        fieldInf        101325;
+        lInf            2;
     }
     y_lo
     {
@@ -827,6 +829,8 @@ boundaryField
     {
         type            pressureWaveTransmissive;
         value           uniform 101325;
+        fieldInf        101325;
+        lInf            2;
     }
     wedge
     {

@@ -74,10 +74,33 @@ class Afterburn:
 
 #: Per-material Miller parameters.
 #:
-#: TNT is CALIBRATED: with Q0 = 2.0 MJ/kg and a = 3e-4 the 1 kg free-air
-#: anchor lands at 1.03 / 0.96 / 0.95 / 0.96 of Kingery-Bulmash at
-#: Z = 1 / 2 / 3 / 4 m/kg^(1/3), against 0.72 / 0.72 / 0.75 / 0.77
-#: without afterburn (tests/test_foam_kb_anchor.py --afterburn).
+#: TNT is CALIBRATED against the Kingery-Bulmash free-air anchor
+#: (tests/test_foam_kb_anchor.py --afterburn), 1 kg TNT, gauges at
+#: Z = 1 / 2 / 3 / 4 m/kg^(1/3). Current fit - Q0 = 2.0 MJ/kg,
+#: a = 1.45e-5 - lands at 1.06 / 0.95 / 0.95 / 0.95, against
+#: 0.89 / 0.85 / 0.86 / 0.87 with no afterburn at all.
+#:
+#: N5-3, why `a` and not Q0: the fit this replaced (a = 3.0e-4) was made
+#: when the charge was resolved with 5 cells across its radius. T39
+#: raised FOAM_EXP_CELLS to 8 and nobody refitted, which left the anchor
+#: at 1.20 / 1.04 / 1.02 / 1.02 - a 20 % overshoot in the NEAR FIELD
+#: only. Q0 scales all four gauges together, so pulling Z = 1 down to 1
+#: with it would have dragged Z = 2..4 to ~0.88. The rate is the knob
+#: that matches the symptom: releasing the afterburn energy more slowly
+#: costs the Z = 1 peak (which is hit early, while the burn is still
+#: going) far more than the later ones. Measured sweep, max |ratio - 1|
+#: over the four gauges:
+#:
+#:     a = 3.0e-4  0.200      a = 1.7e-5  0.082
+#:     a = 1.0e-4  0.134      a = 1.45e-5 0.055   <- fit
+#:     a = 3.0e-5  0.088      a = 1.3e-5  0.058
+#:     a = 1.0e-5  0.068      a = 3.0e-6  0.122
+#:
+#: The residual shape (Z = 1 high by 5 %, Z = 2..4 low by 5 %) is flat
+#: against BOTH knobs - a Q0 trim in either direction makes the spread
+#: worse - so 5 % is what this two-parameter Miller fit gives. Refit
+#: after any change to what the charge deposits (N5-2 `scale`) or to
+#: FOAM_EXP_CELLS, not before, or it gets calibrated twice.
 #:
 #: The others scale TNT's Q0 by OXYGEN BALANCE - how much oxygen the
 #: molecule lacks to burn itself completely is what is left for the
@@ -86,12 +109,12 @@ class Afterburn:
 #: no afterburn). Only the TNT row is anchored to data; treat the rest
 #: as physically ordered estimates and calibrate before quoting.
 AFTERBURN = {
-    'TNT':  Afterburn(Q0=2.00e6, a=3.0e-4),
-    'C4':   Afterburn(Q0=0.57e6, a=3.0e-4),
-    'RDX':  Afterburn(Q0=0.58e6, a=3.0e-4),
-    'HMX':  Afterburn(Q0=0.58e6, a=3.0e-4),
-    'PETN': Afterburn(Q0=0.27e6, a=3.0e-4),
-    'ANFO': Afterburn(Q0=0.10e6, a=3.0e-4),
+    'TNT':  Afterburn(Q0=2.00e6, a=1.45e-5),
+    'C4':   Afterburn(Q0=0.57e6, a=1.45e-5),
+    'RDX':  Afterburn(Q0=0.58e6, a=1.45e-5),
+    'HMX':  Afterburn(Q0=0.58e6, a=1.45e-5),
+    'PETN': Afterburn(Q0=0.27e6, a=1.45e-5),
+    'ANFO': Afterburn(Q0=0.10e6, a=1.45e-5),
 }
 
 

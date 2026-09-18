@@ -15,7 +15,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core.case import Case1D, Case2D, Case3D          # noqa: E402
-from blastlab.core.constants import FOAM_EXP_CELLS             # noqa: E402
+from blastlab.core.constants import (FOAM_EXP_CELLS,          # noqa: E402
+                                     GAMMA_AIR)
 from blastlab.core.grid import make_grid_1d, make_grid         # noqa: E402
 from blastlab.solvers.foam.dicts import fmt                    # noqa: E402
 from blastlab.solvers.foam.materials import (MATERIALS, E0,    # noqa: E402
@@ -48,6 +49,13 @@ def norm(text):
 #: 1D profile committed under foam_fixtures/ so the profile-initialised
 #: golden case (N7) renders from a fixed input on every machine
 PROFILE_1D = os.path.join(HERE, 'foam_fixtures', 'profile1d_chain.txt')
+#: the same, but exported by a blastFoam stage - so its products are
+#: JWL, not ideal gas. Pins B1/B2: the hand-off has to be priced with
+#: the EOS the SOURCE ran with (this header) and the case material's
+#: own JWL constants, never with case.eos (forced to 'idealGas' for
+#: every blastFoam case) or the TNT default.
+PROFILE_1D_JWL = os.path.join(HERE, 'foam_fixtures',
+                              'profile1d_chain_jwl.txt')
 
 
 def cases():
@@ -68,6 +76,13 @@ def cases():
             init_mode='profile1d', profile_file_in=PROFILE_1D,
             gauges=[(0.8, 1.0)], n_snapshots=1, eos='idealGas',
             solver='blastfoam', material='TNT', amr_levels=2),
+        # B1/B2: a foam->foam hand-off. Same geometry as
+        # case2d_axi_profile, but the profile carries JWL products.
+        'case2d_axi_profile_jwl': Case2D(
+            Lx=1.0, Ly=2.0, cell_size_m=0.05, center=(0.0, 1.0),
+            init_mode='profile1d', profile_file_in=PROFILE_1D_JWL,
+            gauges=[(0.8, 1.0)], n_snapshots=1, eos='idealGas',
+            solver='blastfoam', material='TNT'),
         'case1d_tnt': Case1D(
             radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
             gauge_radii=[1.0, 2.0, 3.0, 4.0],
@@ -117,6 +132,13 @@ def cases():
             refine_zones=[(0.5, 1.5, 0.5, 1.5, 1),
                           (0.75, 1.25, 0.75, 1.25, 2)],
             gauges=[(1.6, 1.0)], solver='blastfoam', material='TNT'),
+        # N5-8: this configuration is REFUSED by validate_case ("only
+        # level 1 is possible on the axis, so the charge needs a base
+        # cell of at most 0.0125 m"), so no user can run it. It stays a
+        # golden on purpose: what it pins is the refinement PLANNER's
+        # axis constraint (lmax 1, wedge normal never refined), which
+        # has to be right regardless of whether this particular case
+        # would also fail a later charge-resolution check.
         'case2d_axi_refine': Case2D(
             Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=1.0,
             center=(0.0, 1.0), charge_refine='zone',
@@ -521,6 +543,9 @@ def semantic_checks(specs):
     check('serial: no decomposeParDict',
           'system/decomposeParDict' not in s3.files)
     dpd = s3p.files.get('system/decomposeParDict', '')
+    # N5-7: scotch, and the measurements behind that choice (and
+    # behind the planar split that was tried and reverted) are in
+    # TODO.md N5-7 and in _decomposepardict's docstring.
     check('np4: decomposeParDict scotch',
           'numberOfSubdomains 4;' in norm(dpd)
           and 'method scotch;' in norm(dpd))
@@ -530,6 +555,208 @@ def semantic_checks(specs):
 
     two = render_case(cases()['case1d_tnt'])
     check('deterministic render', two.files == s1.files)
+
+
+def chain_eos_checks(specs):
+    """B0/B1/B2: what a profile-initialised stage hands blastFoam.
+
+    B0 - lambda.<phase> must be written, or blastFoam blends the
+    products back to the unreacted Murnaghan reactants and resets the
+    whole fireball to pRef (measured: 4.43 MPa in, 101,298 Pa out).
+    B1 - the pressure must be priced with the SOURCE profile's EOS.
+    B2 - with the case material's JWL constants, not the TNT default.
+    """
+    from blastlab.core import profiles
+    from blastlab.core.eos import material_jwl, jwl_pressure
+
+    for name in ('case2d_axi_profile', 'case2d_axi_profile_jwl',
+                 'case2d_axi_profile_amr'):
+        sp = specs[name]
+        rel = f'{sp.start_dir}/lambda.{sp.phase}'
+        txt = sp.files.get(rel, '')
+        check(f'B0: {name} writes {rel}', bool(txt), 'missing')
+        check(f'B0: {name} lambda is fully reacted',
+              'internalField uniform 1;' in norm(txt), norm(txt)[:120])
+        check(f'B0: {name} lambda is dimensionless',
+              'dimensions [0 0 0 0 0 0 0];' in norm(txt))
+        check(f'B0: {name} defers lambda past the mesh stages',
+              rel in sp.deferred)
+        # activation stays `linear`: with lambda already at 1 it is a
+        # no-op, while `none` re-injects E0 and multiplies p by 8.3
+        pp = norm(sp.files['constant/phaseProperties'])
+        check(f'B0: {name} keeps activationModel linear',
+              'activationModel linear;' in pp)
+
+    # B1/B2 as an ENERGY round trip, which is what the guide's 5.9
+    # actually does with the field: blastFoam inverts the EOS to get e
+    # back out of the p we wrote. The bug injected +33.3 % of e into
+    # every product cell (the ratio (gamma_air - 1) / omega_TNT).
+    for name, eos in (('case2d_axi_profile_jwl', 'JWL'),
+                      ('case2d_axi_profile', 'idealGas')):
+        sp = specs[name]
+        st = sp.init_state
+        check(f'B1: {name} init_state carries the source EOS',
+              st.get('eos') == eos, str(st.get('eos')))
+        _kind, p = _parse_internal(sp.files[f'{sp.start_dir}/p'])
+        phase = st['phase'].ravel(order='F')
+        rho = st['rho'].ravel(order='F')
+        e_ref = st['e'].ravel(order='F')
+        prod = phase > 0.5
+        check(f'B1: {name} has product cells to judge', bool(prod.any()))
+        if eos == 'JWL':
+            j = material_jwl(sp.material)
+            # jwl_pressure is linear in e: p = p_cold(rho) + omega rho e
+            p_cold = jwl_pressure(rho[prod], np.zeros_like(rho[prod]), j)
+            e_back = (p[prod] - p_cold) / (j['omega'] * rho[prod])
+        else:
+            e_back = p[prod] / ((GAMMA_AIR - 1.0) * rho[prod])
+        d = float(np.max(np.abs(e_back / e_ref[prod] - 1.0)))
+        check(f'B1: {name} product energy survives the hand-off',
+              d < 1e-9, f'max rel {d:.3e}')
+        # air cells were always ideal gas - a guard that the fix did
+        # not over-reach into them
+        air = ~prod
+        if air.any():
+            e_air = p[air] / ((GAMMA_AIR - 1.0) * rho[air])
+            da = float(np.max(np.abs(e_air / e_ref[air] - 1.0)))
+            check(f'B1: {name} air energy survives the hand-off',
+                  da < 1e-9, f'max rel {da:.3e}')
+
+    # N5-5: the energy the hand-off carries onto this mesh, which the
+    # conservedQuantities FO is compared against at the first write.
+    # Recomputed here through core.grid.make_geometry (a different route
+    # to the cell volumes than writer._init_cell_volumes takes) so the
+    # WEDGE CONVENTION is pinned by something independent: make_geometry
+    # returns V per radian, the blockMesh wedge spans 2 degrees.
+    from blastlab.core.grid import make_geometry
+    for name in ('case2d_axi_profile', 'case2d_axi_profile_jwl'):
+        sp = specs[name]
+        st = sp.init_state
+        g = make_geometry('axisymmetric', sp.grid['x_face'][-1],
+                          sp.grid['y_face'][-1], sp.dx)
+        V = np.broadcast_to(g['V'], (sp.nx, sp.ny)) * np.radians(2.0)
+        ke = 0.5 * (st['u'] ** 2 + st['v'] ** 2)
+        want = float(np.sum(st['rho'] * (st['e'] + ke) * V))
+        got = st.get('E_total')
+        check(f'N5-5: {name} carries its total energy',
+              got is not None and abs(got / want - 1.0) < 1e-12,
+              f'{got!r} vs {want:.6e}')
+        # and it must be a real number, not an artefact: a domain of
+        # ambient air alone is the floor it has to clear
+        from blastlab.core.constants import RHO_AIR, E_AIR
+        floor = float(np.sum(RHO_AIR * E_AIR * V))
+        check(f'N5-5: {name} exceeds an ambient-air domain',
+              got > floor, f'{got:.4e} vs ambient {floor:.4e}')
+
+    # B2: TNT and C4 must not price the same state the same way - the
+    # old call took pressure_soundspeed's TNT default for every
+    # material, a silent 20 % on C4 (omega 0.30 vs 0.25)
+    pr = profiles.load_profile(PROFILE_1D_JWL)
+    prod = pr['phase'] > 0.5
+    p_tnt = jwl_pressure(pr['rho'][prod], pr['e'][prod], material_jwl('TNT'))
+    p_c4 = jwl_pressure(pr['rho'][prod], pr['e'][prod], material_jwl('C4'))
+    spread = float(np.max(np.abs(p_c4 / p_tnt - 1.0)))
+    check('B2: the material JWL set actually changes the pressure',
+          spread > 0.1, f'max rel {spread:.3f}')
+
+
+def charge_scale_checks(specs):
+    """N5-2: setFields marks WHOLE cells, so what a charge source
+    deposits is the staircase volume x rho0 - measured across the
+    golden cases anywhere from 0.98 to 1.28 of the request, depending
+    on where the centre falls between cell centres and how many cells
+    span the radius. Every mass-based source now carries the `scale`
+    that cancels what CAN be cancelled: massToCell.C multiplies the
+    requested VOLUME by it before deriving the radius, so alpha stays 1
+    and rho stays rho0.
+
+    The staircase is a step function, so the contract is not "exact" -
+    it is "the best plateau available", and never worse than the
+    uncorrected source. A charge resolved by one cell (a refine-zone
+    case) has a single plateau and nothing to choose from; a charge
+    centred on a cell corner has coarse, highly symmetric steps.
+    """
+    import re
+    from blastlab.core.refine import _charge_cells, _staircase
+    from blastlab.solvers.foam.materials import MATERIALS
+    from blastlab.solvers.foam.writer import charge_radius
+
+    def geometry_of(sp, case, centre):
+        if sp.dim == 1:
+            return '', (0.0, 0.0), (float(sp.grid['r_face'][-1]),)
+        if sp.dim == 2:
+            geo = getattr(case, 'geometry', '')
+            dims = tuple(float(sp.grid[q][-1]) for q in ('x_face', 'y_face'))
+            cen = (0.0 if geo == 'axisymmetric' else float(centre[0]),
+                   float(centre[1]))
+            return geo, cen, dims
+        dims = tuple(float(sp.grid[q][-1])
+                     for q in ('x_face', 'y_face', 'z_face'))
+        return '', tuple(float(v) for v in centre[:3]), dims
+
+    def best_plateau(dim, geo, dx, r, cen, dims, target):
+        """Smallest achievable |V/target - 1| over every plateau."""
+        d, v = _charge_cells(dim, geo, dx, 1.5 * r, cen, dims)
+        if d.size == 0:
+            return None
+        o = np.argsort(d, kind='stable')
+        d, v = d[o], v[o]
+        st = np.empty(d.size, dtype=bool)
+        st[0] = True
+        st[1:] = d[1:] > d[:-1] * (1.0 + 1e-9)
+        ends = np.flatnonzero(st)
+        ends = np.append(ends[1:] - 1, d.size - 1)
+        return float(np.min(np.abs(np.cumsum(v)[ends] / target - 1.0)))
+
+    tried = 0
+    for name, sp in sorted(specs.items()):
+        case = cases().get(name)
+        if case is None or not sp.charges:
+            continue
+        sf = norm(sp.files['system/setFieldsDict'])
+        if 'MassToCell' not in sf:
+            continue           # plain geometric source (static planar)
+        m = re.search(r'scale\s+([0-9.eE+-]+);', sf)
+        check(f'N5-2: {name} sets scale on its charge source',
+              m is not None, sf[:200])
+        if m is None:
+            continue
+        tried += 1
+        centre, mass = sp.charges[0]
+        planar = sp.dim == 2 and getattr(case, 'geometry', '') == 'planar'
+        r = charge_radius(mass, MATERIALS[sp.material], planar=planar)
+        geo, cen, dims = geometry_of(sp, case, centre)
+        k = float(m.group(1)) ** (1.0 / 3.0)
+        target = _staircase(sp.dim, geo, sp.dx_charge, r, cen, dims)[2]
+        if target <= 0:
+            continue
+        raw = _staircase(sp.dim, geo, sp.dx_charge, r, cen, dims)[1] / target
+        got = _staircase(sp.dim, geo, sp.dx_charge,
+                         k * r, cen, dims)[1] / target
+        check(f'N5-2: {name} is never worse than the vendor default',
+              abs(got - 1.0) <= abs(raw - 1.0) + 1e-12,
+              f'corrected {got:.4f} vs raw {raw:.4f}')
+        best = best_plateau(sp.dim, geo, sp.dx_charge, r, cen, dims, target)
+        check(f'N5-2: {name} takes the best plateau on offer',
+              best is None or abs(got - 1.0) <= best + 1e-9,
+              f'got {abs(got - 1.0):.5f}, best available {best:.5f}')
+        # the scale must survive the ten digits `fmt` writes: the search
+        # returns the MIDDLE of a plateau, never its edge, so rounding
+        # cannot tip a cell in or out
+        check(f'N5-2: {name} scale is robust to the written precision',
+              _staircase(sp.dim, geo, sp.dx_charge,
+                         k * r * (1 + 1e-9), cen, dims)[1] / target == got
+              and _staircase(sp.dim, geo, sp.dx_charge,
+                             k * r * (1 - 1e-9), cen, dims)[1] / target == got,
+              f'{name} sits on a step edge')
+
+    check('N5-2: the charge cases were actually exercised', tried >= 4,
+          f'only {tried}')
+
+    # a profile stage marks no charge at all, so it carries no scale
+    sf = norm(specs['case2d_axi_profile'].files['system/setFieldsDict'])
+    check('N5-2: a profile stage still marks no charge region',
+          'MassToCell' not in sf and 'scale ' not in sf, sf[-160:])
 
 
 def golden(specs, update):
@@ -855,7 +1082,8 @@ def deferred_state_checks():
         check("carved profile case defers its state",
               set(sp.deferred) == {f'{d}/{n}' for n in
                                    ('p', 'T', 'U', 'alpha.expl',
-                                    'rho.expl', 'rho.air')},
+                                    'rho.expl', 'rho.air',
+                                    'lambda.expl')},
               str(sp.deferred))
         check("state is absent while the mesh is still being carved",
               not os.path.isdir(os.path.join(dest, d))
@@ -922,6 +1150,8 @@ def main():
     semantic_checks(specs)
     profile_checks(specs)
     profile_amr_checks(specs)
+    chain_eos_checks(specs)
+    charge_scale_checks(specs)
     burst_point_checks()
     time_name_checks()
     deferred_state_checks()

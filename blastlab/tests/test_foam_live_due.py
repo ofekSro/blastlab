@@ -277,6 +277,102 @@ def canary_checks(_st):
           not spec2.hooks.lines, str(spec2.hooks.lines))
 
 
+def handoff_energy_checks():
+    """N5-5: blastFoam's own volume integral of rhoE at the first
+    execute, against the energy the writer put on the mesh.
+
+    The one check in the codebase that sees ACROSS the file boundary.
+    Python knows what it meant to write; the FO says what blastFoam
+    decoded after the EOS inversion (guide 5.9) and the lambda blend
+    (5.87). B0 and B1 both broke in that gap and neither was visible
+    from either side on its own.
+
+    The log wording below is verbatim from blastFoam 6.2.0.
+    """
+    from blastlab.solvers.foam.runloop import progress_line, HANDOFF_E_TOL
+    print()
+    print('N5-5: the hand-off energy check')
+
+    class _H:
+        def __init__(self):
+            self.msgs = []
+
+        def log(self, m):
+            self.msgs.append(str(m))
+
+        def progress(self, *a):
+            pass
+
+    def feed(lines, E_expect):
+        st = dict(step=0, t=0.0, dt=0.0, p_max=101325.0, frac=None,
+                  t_frame=-1.0, cons0=None, cons=None, cons_field=None,
+                  cons_noted=False, E_expect=E_expect)
+        h = _H()
+        for ln in lines:
+            progress_line(ln, st, h, 1.0)
+        return st, h
+
+    BLOCK = ['rho [1 -3 0 0 0 0 0] :',
+             '    Original = 0.000124828',
+             '    Current = 0.000124828',
+             '    difference (abs/rel) = 0, 0',
+             'rhoE [1 -1 -2 0 0 0 0] :',
+             '    Original = {v!r}',
+             '    Current = {v!r}',
+             '    difference (abs/rel) = 0, 0']
+
+    def block(v):
+        return [ln.format(v=v) for ln in BLOCK]
+
+    # the real calibration pair: 2.856593e4 J written, 28560.1 read
+    st, h = feed(block(28560.1), 2.856593e4)
+    check('parses the FO block as blastFoam prints it',
+          st['cons0'] == {'rho': 0.000124828, 'rhoE': 28560.1},
+          str(st['cons0']))
+    check('the measured pair is inside tolerance',
+          abs(st['cons_rel']) < HANDOFF_E_TOL,
+          f"{st['cons_rel']:+.5f}")
+    check('and it says so without crying wolf',
+          len(h.msgs) == 1 and h.msgs[0].startswith('  [note]'),
+          str(h.msgs))
+
+    # B1's signature: products mispriced by 33 %, which is 5.6 % of the
+    # domain total on the fixture it was measured on
+    st, h = feed(block(2.856593e4 * 1.056), 2.856593e4)
+    check('a B1-sized mismatch warns',
+          any(m.startswith('  [warn]') for m in h.msgs), str(h.msgs))
+    check('and the warning carries both numbers and the ratio',
+          h.msgs and '2.8566e+04' in h.msgs[0] and '+5.6%' in h.msgs[0],
+          str(h.msgs))
+
+    # B0's signature: the fireball reset to pRef
+    _st, h = feed(block(2.856593e4 * 0.55), 2.856593e4)
+    check('a B0-sized mismatch warns',
+          any(m.startswith('  [warn]') for m in h.msgs), str(h.msgs))
+
+    # a charge case has no hand-off to check - and rhoE there is not
+    # conserved anyway (E0 arrives as lambda goes 0 -> 1: measured
+    # +1169 % before the open boundary drains it), so it must be silent
+    st, h = feed(block(28560.1), None)
+    check('a charge case says nothing', not h.msgs, str(h.msgs))
+    check('but still parses the block', st['cons0'] is not None)
+
+    # latched: only the FIRST reading is judged
+    st, h = feed(block(28560.1) + block(28560.1 * 12.7), 2.856593e4)
+    check('only the first reading is judged',
+          len(h.msgs) == 1 and st['cons0']['rhoE'] == 28560.1
+          and st['cons']['rhoE'] != 28560.1,
+          f"{len(h.msgs)} msg(s), cons0={st['cons0']['rhoE']}, "
+          f"cons={st['cons']['rhoE']}")
+
+    # the block must not disturb the lines the rest of the loop needs
+    st, h = feed(block(28560.1) + ['deltaT = 1.19781e-07',
+                                   'Time = 1.1978134e-07'], 2.856593e4)
+    check('deltaT and Time still parse around it',
+          st['dt'] == 1.19781e-07 and st['step'] == 1,
+          f"dt={st['dt']} step={st['step']}")
+
+
 def main():
     # fresh state: the very first frame is due immediately in both modes
     check('first frame due (steps)',
@@ -484,6 +580,7 @@ def main():
     canary_checks(_st)
     instability_checks(_st)
     w2_note_checks()
+    handoff_energy_checks()
 
     print()
     if FAIL:

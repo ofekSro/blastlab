@@ -20,7 +20,7 @@ regions
     {
         p1 (2 2 -0.002418379686);
         p2 (2 2 0.002418379686);
-        radius          0.01935154307;
+        radius          0.01956731176;
         fieldValues
         (
             volScalarFieldValue alpha.expl    1

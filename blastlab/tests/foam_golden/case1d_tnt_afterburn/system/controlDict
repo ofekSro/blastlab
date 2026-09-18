@@ -33,6 +33,14 @@ OptimisationSwitches
 }
 functions
 {
+    conserved
+    {
+        type            conservedQuantities;
+        libs            ("libblastFunctionObjects.so");
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields (rho rhoE);
+    }
     liveLine
     {
         type            sets;
