@@ -122,8 +122,13 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     c_amb        = np.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)        # ~340 m/s
     arrival_p    = P_AIR * 1.001                                # 0.1 % overpressure
     safety_cap   = 10.0 * radius_m / c_amb                      # absolute upper bound
-    # T52: a user end time wins whenever it comes first
-    cap_is_end   = bool(t_end) and t_end < safety_cap
+    # T52: an explicit end time wins, shorter OR longer than the cap.
+    # It used to win only when shorter (`and t_end < safety_cap`), which
+    # meant a larger number was silently discarded and the run ended at
+    # the cap - typing a bigger end time changed nothing. The cap is the
+    # automatic stop for a run that said nothing, not a ceiling on what
+    # can be said; validate_case warns about the wall clock (2026-09-18).
+    cap_is_end   = bool(t_end)
     if cap_is_end:
         safety_cap = t_end
 

@@ -290,7 +290,12 @@ def _timing(case, cap_dist, est_dist, n_snapshots):
     shock-arrival stop still has a full frame record."""
     t_end = getattr(case, 't_end', 0.0) or 0.0
     cap = 10.0 * cap_dist / C_AMB
-    cap_is_end = bool(t_end) and t_end < cap
+    # T52: an explicit end time wins, shorter OR longer than the cap.
+    # `and t_end < cap` used to discard any end time past it, so a bigger
+    # number in the field changed nothing (2026-09-18). writeInterval is
+    # unaffected: t_est below stays bounded by the transit estimate, so a
+    # long run writes at the same cadence rather than N times as often.
+    cap_is_end = bool(t_end)
     end_time = t_end if cap_is_end else cap
     # reference speed 2*c_amb: the shock front outruns ambient sound
     # (strongly so in the near field), and frames/snapshots only exist

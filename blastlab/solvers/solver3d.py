@@ -319,7 +319,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     c_amb      = np.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)
     arrival_p  = P_AIR * 1.001
     safety_cap = t0 + 10.0 * max(Lx, Ly, Lz) / c_amb
-    cap_is_end = bool(t_end) and t0 + t_end < safety_cap
+    # T52: an explicit end time wins, shorter OR longer than the cap
+    # (see solver1d.py for why the `and t0 + t_end < safety_cap` half
+    # went - it silently discarded any end time past the cap).
+    cap_is_end = bool(t_end)
     if cap_is_end:
         safety_cap = t0 + t_end
 

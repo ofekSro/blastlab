@@ -16,7 +16,8 @@ from .. import __version__
 from ..core import hardware
 from ..core import mode as mode_mod
 from ..core import settings as app_settings
-from ..core.case import load_case, save_case, validate_case
+from ..core.case import (load_case, long_run_note, save_case,
+                         validate_case)
 from ..core.mode import SolverMode
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
@@ -490,14 +491,51 @@ class MainWindow(QMainWindow):
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
             return
+        if not self._confirm_long_run([case]):
+            return
         if self.ctrl.start_stages([(case.dim, case)], paused=paused,
                                   run_name=self.run_panel.current_run_name()):
             self._show('run')
+
+    def _confirm_long_run(self, cases):
+        """An end time past the automatic stop is now honoured (T52),
+        so its cost is confirmed instead of silently discarded.
+
+        The number used to be thrown away, which is why the field felt
+        inert; honouring it means a typed 500 ms in a domain whose
+        automatic stop is 47 ms really does run ten times as long. One
+        dialog, only when that is what was asked for - a case at or
+        under the automatic stop never sees it.
+
+        Resolved through `ui.dialogs` at call time, so the QA driver and
+        every test patch it rather than meeting a modal (P2-8).
+        """
+        notes = [(c, long_run_note(c)) for c in cases]
+        notes = [(c, n) for c, n in notes if n is not None]
+        if not notes:
+            return True
+        lines = []
+        for case, (t_end, cap, ratio) in notes:
+            where = (f'Stage {case.dim}D: ' if len(cases) > 1 else '')
+            lines.append(f'{where}end time {t_end * 1e3:.4g} ms is '
+                         f'{ratio:.1f}x the automatic stop time '
+                         f'({cap * 1e3:.0f} ms).')
+        worst = max(n[2] for _c, n in notes)
+        lines.append('')
+        lines.append(f'The full span will be simulated, so expect roughly '
+                     f'{worst:.0f}x the wall clock of an automatic run. '
+                     f'The wave will have left the domain long before the '
+                     f'end.')
+        lines.append('')
+        lines.append('Start it?')
+        return dialogs.ask_yes_no('Long run', '\n'.join(lines), self)
 
     def _run_chain(self, dim_cases, workspace):
         """The Chain panel has already validated and wired the stages and
         written their case JSONs; all that is left is to launch them as
         one worker, so the Run tab, Stop and Results behave as usual."""
+        if not self._confirm_long_run([c for _d, c in dim_cases]):
+            return
         self.notify(f'Chain: {len(dim_cases)} stage(s) in {workspace}')
         if self.ctrl.start_stages(
                 dim_cases, run_name=self.run_panel.current_run_name()):

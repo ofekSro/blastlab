@@ -577,6 +577,65 @@ def _validate_solver(case, rep):
     return MATERIALS[material].rho0
 
 
+#: ambient sound speed the stop conditions are scaled by [m/s]
+C_AMB_AIR = float(np.sqrt(1.4 * 101325.0 / 1.225))
+
+
+def cap_distance(case):
+    """The domain length the automatic stop time is measured across:
+    the radius in 1D, the longest side otherwise. Mirrors
+    `solver{1,2,3}d.py` and `foam/writer._plan_*`."""
+    if getattr(case, 'dim', 0) == 1:
+        return float(getattr(case, 'radius_m', 0.0) or 0.0)
+    Ls = [getattr(case, n, 0.0) or 0.0 for n in ('Lx', 'Ly', 'Lz')]
+    return float(max(Ls))
+
+
+def safety_cap_s(case):
+    """The automatic end time [s]: ten domain crossings at ambient sound
+    speed. This is what "End time 0 = auto" resolves to, and what
+    bounds a run with no terminate boundary and no end time."""
+    return 10.0 * cap_distance(case) / C_AMB_AIR
+
+
+def long_run_note(case):
+    """`(t_end, cap, ratio)` when an explicit end time runs past the
+    automatic one, else None.
+
+    Until 2026-09-18 such an end time was silently DISCARDED: every stop
+    condition read `cap_is_end = bool(t_end) and t_end < cap`, so typing
+    a bigger number changed nothing at all. Measured on a real native 2D
+    run in a 1 m domain (cap 29.4 ms): t_end = 3 ms and 10 ms both
+    stopped with `end time reached`, while t_end = 40 ms stopped with
+    `safety cap` at 29.4 ms.
+
+    The owner's decision is that an explicit end time wins - the cap is
+    the automatic stop for when nothing was said, not a ceiling on what
+    can be said - so the number is now honoured and this reports the
+    cost instead, because ten times the simulated span is roughly ten
+    times the wall clock.
+    """
+    t_end = float(getattr(case, 't_end', 0.0) or 0.0)
+    cap = safety_cap_s(case)
+    if t_end <= 0.0 or cap <= 0.0 or t_end <= cap:
+        return None
+    return t_end, cap, t_end / cap
+
+
+def _warn_long_end_time(case, warn):
+    """Warning, not error: the case is runnable and the result sound, it
+    simply runs for longer than the automatic stop would have."""
+    info = long_run_note(case)
+    if info is None:
+        return
+    t_end, cap, ratio = info
+    warn(f"End time {t_end * 1e3:.4g} ms is {ratio:.1f}x the automatic "
+         f"stop time (~{cap * 1e3:.0f} ms = 10 domain crossings at "
+         f"{C_AMB_AIR:.0f} m/s). It will be honoured, so expect roughly "
+         f"{ratio:.0f}x the wall clock; the wave will have left the "
+         f"domain long before the end.")
+
+
 def validate_case(case, pending_inputs=False):
     """Full pre-run report for one case.
 
@@ -648,6 +707,7 @@ def validate_case(case, pending_inputs=False):
             warn(f"The outer boundary is '{kind}' and no end time is "
                  f"set: the run is bounded only by the safety cap "
                  f"(~{10.0 * case.radius_m / c_air * 1e3:.0f} ms).")
+        _warn_long_end_time(case, warn)
         if case.charge_kg <= 0:
             err("Charge must be > 0")
         if case.radius_m <= 0:
@@ -688,6 +748,7 @@ def validate_case(case, pending_inputs=False):
         warn(f"No terminate boundary and no end time: the run is bounded "
              f"only by the safety cap (~{cap_ms:.0f} ms). Set a side to "
              f"'terminate' to stop when the wave reaches it.")
+    _warn_long_end_time(case, warn)
     if case.dim == 3:
         s_ax = getattr(case, 'slice_axis', 'y')
         if s_ax not in ('x', 'y', 'z'):
