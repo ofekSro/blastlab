@@ -105,7 +105,13 @@ def main():
     # have to agree in length.
     check('final_profile contract',
           sorted(fp) == sorted(('t', 'r', 'rho', 'u', 'e', 'p', 'phase',
-                                'charge_kg', 'eos', 'r_exp', 'radius_m'))
+                                'charge_kg', 'eos', 'r_exp', 'radius_m',
+                                # N5-4: which solver wrote it, so a
+                                # blastFoam stage can refuse a native
+                                # profile (the ideal-gas state would be
+                                # re-priced through the JWL products EOS)
+                                'source_solver'))
+          and fp['source_solver'] == 'blastfoam'
           and fp['phase'].dtype.kind == 'i'
           and len({len(fp[k]) for k in ('r', 'p', 'rho', 'u', 'e',
                                         'phase')}) == 1,

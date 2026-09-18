@@ -2105,8 +2105,11 @@ def g01_chain_validation(qa):
     # button consults, so the same wiring is exercised.
     from blastlab.gui.chain_panel import stage_errors as _stage_errors
     from blastlab.core.case import Case1D, Case2D
+    # N5-4: stage 1 must be blastFoam too - a native profile feeding a
+    # blastFoam stage is refused now (idealGas state re-priced through
+    # the JWL products EOS, +33 % on the product cells)
     _c1 = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
-                 profile_file='p1.txt')
+                 solver='blastfoam', profile_file='p1.txt')
     _c2 = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
                  cell_size_m=0.02, charge=1.0, center=(0.0, 1.0),
                  solver='blastfoam', init_mode='profile1d',
@@ -2117,6 +2120,27 @@ def g01_chain_validation(qa):
              'foam 2D stage fed by 1D is accepted (N7 refusal gone)',
              'S1', evidence=str(_errs))
     qa.shot('chain_foam_stage_accepted')
+    # N5-4: the mirror image - the same wiring with a NATIVE stage 1 is
+    # refused, and the Tk panel says so on the stage being fed without
+    # waiting for Run chain
+    _c1n = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
+                  profile_file='p1.txt')          # native by default
+    _mixed = _stage_errors([1, 2], {1: _c1n, 2: _c2})
+    qa.check(len(_mixed) == 1 and _mixed[0].startswith('Stage 2 (2D):')
+             and 'JWL' in _mixed[0],
+             'native 1D -> foam 2D hand-off is refused (N5-4)',
+             'S1', evidence=str(_mixed))
+    ch.set_stage_solver(1, 'native')
+    ch.set_stage_solver(2, 'blastfoam')
+    qa.pump(0.3)
+    qa.check(bool(ch._compat[2].cget('text'))
+             and ch.run_btn.cget('state') == 'disabled',
+             'the Tk chain panel says it live and disables Run chain',
+             'S1', evidence=f'{ch._compat[2].cget("text")[:60]!r} '
+                            f'run={ch.run_btn.cget("state")}')
+    qa.shot('chain_native_to_foam_refused')
+    ch.set_stage_solver(1, 'blastfoam')
+    qa.pump(0.3)
     ch.set_stage_solver(2, 'native')
     ch.forms[2].v['Lx'].set('abc')
     qa.pump(0.3)

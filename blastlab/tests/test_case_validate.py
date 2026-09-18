@@ -74,10 +74,16 @@ def chain_stage_checks():
     from blastlab.core.chain import stage_errors
     from blastlab.core.case import Case1D
 
-    def wired(solver2):
-        """The 1D -> 2D wiring ChainPanel._run performs."""
+    def wired(solver2, solver1=None):
+        """The 1D -> 2D wiring ChainPanel._run performs.
+
+        N5-4: `solver1` defaults to `solver2` so the pair is a legal
+        same-solver chain. It used to be left at Case1D's 'native'
+        default, which made every check below a native -> blastFoam
+        hand-off - the exact combination now refused.
+        """
         c1 = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02,
-                    profile_file='p1.txt')
+                    solver=solver1 or solver2, profile_file='p1.txt')
         c2 = Case2D(geometry='axisymmetric', Lx=2.0, Ly=2.0,
                     cell_size_m=0.02, charge=1.0, center=(0.0, 1.0),
                     solver=solver2, init_mode='profile1d',
@@ -116,6 +122,28 @@ def chain_stage_checks():
     check('chain: the same wiring is fine on the native solver',
           stage_errors(*wired('native')) == [],
           str(stage_errors(*wired('native'))))
+
+    # N5-4: a blastFoam stage may not be fed a NATIVE profile. The
+    # native solvers normally run eos='idealGas'; blastFoam always runs
+    # JWL products and back-derives internal energy from the pressure
+    # field it is handed (guide 5.9), so the hand-off silently inflates
+    # the product cells by (gamma_air - 1) / omega = 33 %. Invisible
+    # until B0 was fixed, because blastFoam used to throw that pressure
+    # away and reset the products to pRef.
+    mixed = stage_errors(*wired('blastfoam', solver1='native'))
+    check('chain: native -> foam hand-off is refused',
+          len(mixed) == 1, str(mixed))
+    check('chain: the refusal names the stage that is fed',
+          mixed and mixed[0].startswith('Stage 2 (2D):'), str(mixed))
+    check('chain: the refusal says why and what to do',
+          mixed and 'JWL' in mixed[0] and '33' in mixed[0]
+          and 'Run the stage before it on blastFoam' in mixed[0],
+          str(mixed))
+    # the other direction carries `e` straight through - no EOS
+    # inversion anywhere - so it must stay allowed
+    check('chain: foam -> native hand-off is still allowed',
+          stage_errors(*wired('native', solver1='blastfoam')) == [],
+          str(stage_errors(*wired('native', solver1='blastfoam'))))
 
     # the pending-input waiver must stay narrow: outside a chain a
     # missing profile is still an error, and it waives nothing else

@@ -912,6 +912,27 @@ def validate_case(case, pending_inputs=False):
             err("A profile file is required for remap initialization")
         elif not (pending_inputs or os.path.exists(case.profile_file_in)):
             err(f"Profile file not found: {case.profile_file_in}")
+        elif foam and not pending_inputs:
+            # N5-4: the single-case path, where the user points at a
+            # profile that already exists. The CHAIN path never reaches
+            # here - its input is written by the stage before it and
+            # provably does not exist yet (pending_inputs), which is why
+            # chain.handoff_conflicts compares the two solvers directly
+            # instead. Guarded this hard because validate_case runs on
+            # every keystroke behind a 300 ms debounce: profile_source
+            # is a memoised header-only read, one os.stat unless the
+            # file actually changed.
+            from . import chain as _chain          # deferred - chain
+            from . import profiles as _profiles    # imports case
+            src = _profiles.profile_source(case.profile_file_in)
+            if src == 'native':
+                err(_chain.HANDOFF_MSG[0].upper() + _chain.HANDOFF_MSG[1:])
+            elif src == 'unknown':
+                note("This profile carries no solver stamp (it predates "
+                     "blastlab recording one). If it came from the "
+                     "native solver the hand-off over-prices the "
+                     "product cells by ~33 % - re-run the stage that "
+                     "produced it to get a stamped profile.")
         if case.dim == 2 and init == 'profile1d' \
                 and case.geometry != 'axisymmetric':
             err("1D profile remap is only valid in axisymmetric mode")
