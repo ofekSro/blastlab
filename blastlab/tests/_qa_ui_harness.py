@@ -1874,7 +1874,7 @@ def d04_native_3d_view(qa):
     qa.pump(0.5)
     # a 40-cubed native 3D solve takes minutes; a short timeout here does
     # not just fail this scenario, it poisons the cache the E group reads
-    qa.check(qa.run_wait(1200), 'the 3D run finished', 'S1')
+    qa.check(_wait_while_progressing(qa), 'the 3D run finished', 'S1')
     qa.shot('finished_slice')
     rp.show_3d_tab()
     qa.pump(1.5)
@@ -2266,6 +2266,38 @@ def _foreign_busy(qa):
     return [ln for ln in qa.wsl_pgrep() if ln and not ln.startswith('<')]
 
 
+def _wait_while_progressing(qa, stall_s=420, hard_s=5400):
+    """Wait for a run, judging it by PROGRESS rather than by a stopwatch.
+
+    A fixed timeout asks the wrong question. F02's fixture has no
+    terminate boundary, so it runs to the safety cap: it took 723 s here
+    against a 700 s limit, the harness gave up, `reap_own` killed the
+    solver as an orphan, and the app then reported a failed run - three
+    findings, none of them a defect, all from a number being too small.
+
+    So: wait while the solver's own step counter keeps moving, give up
+    only when it has genuinely stalled, and keep a hard ceiling so a
+    wedged run cannot hold the budget forever.
+    """
+    t0 = last_move = time.perf_counter()
+    last_step = None
+    while qa.worker_alive():
+        qa.pump(2.0)
+        now = time.perf_counter()
+        step = qa.win.run_panel.chip_texts().get('step')
+        if step != last_step:
+            last_step, last_move = step, now
+        if now - last_move > stall_s:
+            qa.note(f'the run stopped advancing at step {step!r} - '
+                    f'{stall_s:.0f} s without a step')
+            return False
+        if now - t0 > hard_s:
+            qa.note(f'giving up after {hard_s:.0f} s at step {step!r}')
+            return False
+    qa.pump(1.0)
+    return True
+
+
 def _foam_run(qa, case, label, timeout, show_mesh=False):
     """Set a foam case, run it from the Run tab, and photograph the
     stages the backend actually goes through.
@@ -2303,7 +2335,7 @@ def _foam_run(qa, case, label, timeout, show_mesh=False):
                  'S3')
         qa.pump(2.5)
         qa.shot(f'{label}_first_write')
-    qa.check(qa.run_wait(timeout), f'{label} finished', 'S1')
+    qa.check(_wait_while_progressing(qa), f'{label} finished', 'S1')
     qa.note(f'{label} wall {time.perf_counter() - t0:.0f} s')
     qa.shot(f'{label}_finished')
     own = qa.reap_own()
@@ -2427,7 +2459,8 @@ def f03_foam_3d_tiny(qa):
     rp.show_slice_tab()
     qa.pump(0.5)
     qa.shot('live_slice')
-    qa.check(qa.run_wait(900), 'the foam 3D run finished', 'S1')
+    qa.check(_wait_while_progressing(qa), 'the foam 3D run finished',
+             'S1')
     qa.note(f'foam3d wall {time.perf_counter() - t0:.0f} s')
     qa.shot('finished')
     qa.reap_own()
@@ -2857,7 +2890,7 @@ def g02_chain_run(qa):
     qa.pump(1.5)
     qa.shot('stage3_3d')
     qa.win.run_panel.show_slice_tab()
-    qa.check(qa.run_wait(900), 'the chain finished', 'S1')
+    qa.check(_wait_while_progressing(qa), 'the chain finished', 'S1')
     qa.note(f'chain wall {time.perf_counter() - t0:.0f} s')
     qa.shot('chain_done')
     qa.check(ch.run_btn.isEnabled(),
