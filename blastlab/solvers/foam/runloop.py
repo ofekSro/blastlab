@@ -662,6 +662,31 @@ class FoamRunLoop:
         tail_live(self.spec, self.hooks, self.st, self.live, self.live_set,
                   self.decode)
 
+    def _check_stop(self):
+        """Turn the user's Stop into `stopAt writeNow` HERE, between the
+        expensive pieces of the ingest, instead of at the top of the
+        next lap.
+
+        Same shape, and the same reason, as the live-tail servicing
+        below: one lap of `_ingest_ready` can hold four `reconstructPar`
+        runs and a full-field read per pending write. Measured on a
+        small parallel 3D case, mean 0.09 s but 3.9 s at worst (and
+        about 12 s on a big one, T61). The stop flag used to be read
+        only after all of that, so pressing Stop bought a wait of
+        anywhere between zero and one whole lap before blastFoam was
+        even told - pure latency, with no work done in exchange for it.
+
+        Nothing else moves: the ingest carries on and still drains what
+        is on disk, `run()` keeps its own check (this one merely gets
+        there first), and because `request_stop` latches
+        `foam.stop_requested`, an explicit user stop still wins over the
+        instability stop and keeps its own reason.
+        """
+        if self.foam.stop_requested or not self.foam.running:
+            return
+        if self.hooks.should_stop():
+            self.request_stop('stopped by user')
+
     def _ingest_ready(self, final=False):
         # The live view is serviced BETWEEN the expensive pieces of this
         # method, not only once per loop iteration.
@@ -676,6 +701,8 @@ class FoamRunLoop:
         # WRITE cadence exactly when a blast is most worth watching.
         maybe_reconstruct(self.spec, self.fields)
         self._ingest_live()
+        if not final:
+            self._check_stop()
         for name, dpath in self.order.pending(self.done, final):
             try:
                 payload = self.read_dir(name, dpath)
@@ -689,6 +716,11 @@ class FoamRunLoop:
             # the 3D feed costs; another one may be queued right behind
             # it, so give the live view its turn in between
             self._ingest_live()
+            # ...and let the user's Stop out at the same points; `final`
+            # is excluded because the solver has already exited by then
+            # and a writeNow request would only log that it failed
+            if not final:
+                self._check_stop()
 
     def run(self):
         """Drive the solver to completion (or stop/kill). Returns the
