@@ -269,6 +269,73 @@ def main():
     panel.set_running(False)
     check('and it comes back after', panel.run_btn.isEnabled())
 
+    print('\nC10: native -> blastFoam is refused where it is chosen')
+    # N5-4. The native solvers run eos='idealGas'; blastFoam runs JWL
+    # products and back-derives internal energy from the pressure it is
+    # handed (guide 5.9), so the hand-off inflates the product cells by
+    # (gamma_air - 1) / omega = 33 %. stage_errors refuses it, but a
+    # refusal that only lands on Run chain is one the user meets having
+    # already filled three forms - hence the live per-stage message.
+    for d in (1, 2, 3):
+        panel.use[d].setChecked(True)          # C8 left them all off
+        panel.set_stage_solver(d, 'blastfoam')
+    panel.status.setText('')
+    pump(0.05)
+    check('a foam -> foam chain says nothing',
+          not any(panel._compat[d].text() for d in (1, 2, 3))
+          and panel.run_btn.isEnabled(),
+          str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
+
+    panel.set_stage_solver(1, 'native')
+    pump(0.05)
+    check('the message lands on the stage being FED, not the source',
+          bool(panel._compat[2].text()) and not panel._compat[1].text(),
+          str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
+    check('it says why and what to do',
+          'JWL' in panel._compat[2].text()
+          and '33' in panel._compat[2].text(),
+          panel._compat[2].text()[:120])
+    check('Run chain is disabled while it stands',
+          not panel.run_btn.isEnabled())
+    check('and the status line carries it too',
+          panel.status.text().startswith('Stage 2:'),
+          panel.status.text()[:60])
+    # run() must refuse on its own account - the greyed button is the
+    # visible half of the guard, never the whole of it
+    n_log = len(log)
+    check('run() refuses it even with the button bypassed',
+          panel.run() is False
+          and any('Stage 2 (2D)' in s for s in log[n_log:]),
+          str(log[n_log:][:2]))
+
+    # switching off the stage in between must re-evaluate 1 -> 3
+    panel.use[2].setChecked(False)
+    pump(0.05)
+    check('dropping the middle stage moves it to 1 -> 3',
+          bool(panel._compat[3].text()) and not panel._compat[2].text(),
+          str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
+    panel.use[2].setChecked(True)
+
+    panel.set_stage_solver(1, 'blastfoam')
+    pump(0.05)
+    check('and it all clears when the source goes back to blastFoam',
+          not any(panel._compat[d].text() for d in (1, 2, 3))
+          and not panel.status.text()
+          and panel.run_btn.isEnabled(),
+          str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
+
+    # the two owners of the Run button must not fight (C9 + C10)
+    panel.set_stage_solver(1, 'native')
+    panel.set_running(True)
+    panel.set_running(False)
+    pump(0.05)
+    check('a finished run does not re-arm a chain that is still refused',
+          not panel.run_btn.isEnabled())
+    panel.set_stage_solver(1, 'blastfoam')
+    pump(0.05)
+    check('and clearing the conflict re-arms it once',
+          panel.run_btn.isEnabled())
+
     shutil.rmtree(ws_root, ignore_errors=True)
     print('\n' + '=' * 52)
     if FAIL:

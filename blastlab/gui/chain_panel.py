@@ -10,7 +10,7 @@ import customtkinter as ctk
 
 from ..core.case import save_case, validate_case  # noqa: F401
 # moved to core/chain.py (shared with the Qt front-end); re-exported
-from ..core.chain import stage_errors  # noqa: F401
+from ..core.chain import handoff_conflicts, stage_errors  # noqa: F401
 from . import mode as mode_mod
 from . import theme
 from .forms import CaseForm
@@ -60,6 +60,8 @@ class ChainPanel(ctk.CTkFrame):
                      text_color=c('muted')).pack(side='left',
                                                  padx=(0, GAP))
         for d in (1, 2, 3):
+            self.use[d].trace_add('write',
+                                  lambda *a: self._refresh_compat())
             ctk.CTkCheckBox(bar, text=f'{d}D', variable=self.use[d],
                             width=52, font=theme.F_BODY, corner_radius=6,
                             border_color=c('border'), fg_color=c('accent'),
@@ -90,6 +92,15 @@ class ChainPanel(ctk.CTkFrame):
                      justify='left', anchor='w').pack(
             side='left', fill='x', expand=True)
 
+        # N5-4: parity with ui/chain_panel - the refusal always lands
+        # here, whatever happens to the dialog. The Tk panel had no
+        # status line at all, so a modal that failed took the reason
+        # with it.
+        self.status = ctk.CTkLabel(self, text='', font=theme.F_SMALL,
+                                   text_color=c('error'), wraplength=860,
+                                   justify='left', anchor='w')
+        self.status.pack(fill='x', padx=PAD, pady=(0, GAP))
+
         # ── stage forms behind a segmented switcher ──────────────────────
         stages = Card(self, pad=12)
         stages.pack(fill='both', expand=True)
@@ -105,6 +116,8 @@ class ChainPanel(ctk.CTkFrame):
         stack.pack(fill='both', expand=True)
         self.forms, self._stage_wrap = {}, {}
         self._stage_solver_seg, self.stage_solver = {}, {}
+        self._compat, self._compat_bad = {}, False
+        self._running = False
         for d in (1, 2, 3):
             wrap = ctk.CTkFrame(stack, fg_color='transparent')
             row = ctk.CTkFrame(wrap, fg_color='transparent')
@@ -122,6 +135,10 @@ class ChainPanel(ctk.CTkFrame):
                                    'per stage',
                          font=theme.F_SMALL, text_color=c('muted')).pack(
                 side='left', padx=(GAP, 0))
+            # N5-4: the hand-off refusal, said where the choice is made
+            self._compat[d] = ctk.CTkLabel(
+                wrap, text='', font=theme.F_SMALL, text_color=c('error'),
+                wraplength=860, justify='left', anchor='w')
             self.forms[d] = CaseForm(wrap, d, mode=self._mode.get())
             self.forms[d].pack(fill='both', expand=True)
             self._stage_wrap[d], self._stage_solver_seg[d] = wrap, seg
@@ -132,6 +149,47 @@ class ChainPanel(ctk.CTkFrame):
         self._stage_seg.set('Stage 1D')
         self._stage_selected('Stage 1D')
         self._mode.subscribe(self._on_global_mode)
+        self._refresh_compat()
+
+    def checked(self):
+        """Stages switched on, as dims. Mirrors ui/chain_panel.checked
+        so the shared chain helpers take the same argument on both
+        front-ends."""
+        return [d for d in (1, 2, 3) if self.use[d].get()]
+
+    # ── hand-off compatibility (N5-4) ────────────────────────────────────
+    def _refresh_compat(self):
+        """Show/clear the native -> blastFoam refusal per stage.
+
+        Reads `self.stage_solver` and `checked()`, never `get_case()`:
+        a half-typed field makes get_case raise, which is exactly when
+        the user is most likely to be clicking around.
+        """
+        bad = dict(handoff_conflicts(self.checked(), self.stage_solver))
+        for d in (1, 2, 3):
+            msg = bad.get(d, '')
+            lbl = self._compat.get(d)
+            if lbl is None:
+                continue
+            lbl.configure(text=msg)
+            if msg:
+                lbl.pack(fill='x', pady=(0, GAP), before=self.forms[d])
+            else:
+                lbl.pack_forget()
+        self._compat_bad = bool(bad)
+        if bad:
+            self.status.configure(
+                text=f'Stage {min(bad)}: {bad[min(bad)]}')
+        elif str(self.status.cget('text')).startswith('Stage '):
+            self.status.configure(text='')
+        self._sync_run_btn()
+
+    def _sync_run_btn(self):
+        """The ONE owner of the Run button's state. Two owners
+        (set_running and the compat check) would fight, and whichever
+        ran last would win."""
+        ok = not self._running and not self._compat_bad
+        self.run_btn.configure(state='normal' if ok else 'disabled')
 
     # ── T34: per-stage solver ────────────────────────────────────────────
     def set_stage_solver(self, d, m):
@@ -139,6 +197,7 @@ class ChainPanel(ctk.CTkFrame):
         self.stage_solver[d] = m
         self._stage_solver_seg[d].set(mode_mod.label(m))   # no command
         self.forms[d].set_mode(m)
+        self._refresh_compat()
 
     def set_stage_case(self, d, case):
         """Fill stage `d` from a Case, adopting its solver."""
@@ -148,6 +207,8 @@ class ChainPanel(ctk.CTkFrame):
     def _on_global_mode(self, m):
         for d in (1, 2, 3):
             self.set_stage_solver(d, m)
+        self._refresh_compat()      # after the loop: mid-loop the set
+        #                             is transiently mixed
 
     def focus_stage(self, d):
         """Bring stage `d`'s form to the front (a dialog naming 'Stage 2'
@@ -245,4 +306,5 @@ class ChainPanel(ctk.CTkFrame):
     def set_running(self, running):
         """Mirror the Run button's state: a second start while a run is
         live would orphan the drain loop and drop the finished result."""
-        self.run_btn.configure(state='disabled' if running else 'normal')
+        self._running = bool(running)
+        self._sync_run_btn()

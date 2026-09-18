@@ -26,9 +26,11 @@ from PySide6.QtWidgets import (QCheckBox, QLineEdit, QStackedWidget,
 
 from ..core import mode as mode_mod
 from ..core.case import save_case
+from ..core import chain
 from ..core.chain import stage_errors
 from . import dialogs
 from .case_form import CaseForm
+from . import theme
 from .theme import PAD
 from .widgets import (Card, ScrollColumn, Segmented, button, hbox, label,
                       vbox)
@@ -82,6 +84,7 @@ class ChainPanel(QWidget):
         for d in (1, 2, 3):
             box = QCheckBox(f'{d}D')
             box.setChecked(True)
+            box.toggled.connect(lambda _c: self._refresh_compat())
             self.use[d] = box
             bar.addWidget(box)
         bar.addStretch(1)
@@ -108,7 +111,8 @@ class ChainPanel(QWidget):
         self.stack = QStackedWidget()
         stages.add(self.stack, 1)
         self.forms, self.stage_solver = {}, {}
-        self._stage_seg_solver, self._pages = {}, {}
+        self._stage_seg_solver, self._pages, self._compat = {}, {}, {}
+        self._compat_bad = False
         for d in (1, 2, 3):
             col = ScrollColumn()
             row = hbox()
@@ -124,6 +128,13 @@ class ChainPanel(QWidget):
                                 'stage', 'small'))
             row.addStretch(1)
             col.add_layout(row)
+            # N5-4: the hand-off refusal, said where the choice is made.
+            # stage_errors is still the authority (run() re-checks), but
+            # a refusal that only appears after Run chain is a refusal
+            # the user meets having already filled three forms.
+            self._compat[d] = label('', 'small', wrap=True)
+            self._compat[d].setVisible(False)
+            col.add(self._compat[d])
             self.forms[d] = CaseForm(d, mode=self._mode.get())
             col.add(self.forms[d], 1)
             self.stack.addWidget(col)
@@ -134,6 +145,7 @@ class ChainPanel(QWidget):
         self.stage_seg.set(STAGE_LABELS[1])
         self.stack.setCurrentWidget(self._pages[1])
         self._mode.subscribe(self._on_global_mode)
+        self._refresh_compat()
 
     # ── the error sink ───────────────────────────────────────────────────
     def _default_sink(self, title, lines):
@@ -153,12 +165,42 @@ class ChainPanel(QWidget):
             self._log(f'Chain: (the dialog failed: {exc})')
         return False
 
+    # ── hand-off compatibility (N5-4) ────────────────────────────────────
+    def _refresh_compat(self):
+        """Show/clear the native -> blastFoam refusal per stage.
+
+        Deliberately reads `self.stage_solver` and `checked()` and NOT
+        `get_case()`: a half-typed field makes get_case raise, which is
+        exactly when a user is most likely to be clicking around.
+        """
+        bad = dict(chain.handoff_conflicts(self.checked(), self.stage_solver))
+        for d in (1, 2, 3):
+            msg = bad.get(d, '')
+            self._compat[d].setText(msg)
+            self._compat[d].setVisible(bool(msg))
+            if msg:
+                self._compat[d].setStyleSheet(
+                    f'color: {theme.cur("error")};')
+        self._compat_bad = bool(bad)
+        if bad:
+            self.status.setText(f'Stage {min(bad)}: {bad[min(bad)]}')
+        elif self.status.text().startswith('Stage '):
+            self.status.setText('')
+        self._sync_run_btn()
+
+    def _sync_run_btn(self):
+        """The ONE owner of the Run button's enabled state. Two owners
+        (set_running and the compat check) would fight, and whichever
+        ran last would win."""
+        self.run_btn.setEnabled(not self._running and not self._compat_bad)
+
     # ── per-stage solver ─────────────────────────────────────────────────
     def set_stage_solver(self, d, m):
         m = mode_mod.normalize(m)
         self.stage_solver[d] = m
         self._stage_seg_solver[d].set(mode_mod.label(m))   # silent
         self.forms[d].set_mode(m)
+        self._refresh_compat()
 
     def set_stage_case(self, d, case):
         """Fill stage `d` from a Case, adopting its solver."""
@@ -168,6 +210,8 @@ class ChainPanel(QWidget):
     def _on_global_mode(self, m):
         for d in (1, 2, 3):
             self.set_stage_solver(d, m)
+        self._refresh_compat()      # after the loop: mid-loop the set
+        #                             is transiently mixed
 
     # ── navigation ───────────────────────────────────────────────────────
     def focus_stage(self, d):
@@ -288,4 +332,4 @@ class ChainPanel(QWidget):
         flag is what `run()` consults, so the greyed button is the
         visible half of the guard and not the whole of it."""
         self._running = bool(running)
-        self.run_btn.setEnabled(not running)
+        self._sync_run_btn()
