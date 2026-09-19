@@ -65,6 +65,27 @@
 
 ---
 
+## N5-12 · ✅ נוסף (19.09) — programmedIgnition + delays/radii
+
+שתי הרחבות מדריך 5.6.1, שתיהן opt-in (כל מקרה קיים byte-identical):
+
+- **`programmedIgnition`** (Giroux) — תא שורף בקצב `vDet/(1.5·dx)`
+  מזמן ההצתה שלו, במקום להתהפך שלם כשהחזית חוצה אותו.
+  נפלט כ-`burnModel programmedBeta`, שדורש `Pcj` פר-חומר
+  (נוסף לטבלת החומרים מ-jwl_parameters.md).
+- **`det_delays` / `det_radii`** — השהיה ורדיוס פר-נקודת הצתה,
+  ערך אחד לכל נקודה ב-`det_points`.
+
+**אומת ב-WSL:** `programmedIgnition` רץ — עובר ומייצר הלם,
+peak 1196 מול 1326 kPa ל-`linear`, נמוך כצפוי (שריפה מדורגת
+פחות חדה מהיפוך של תא שלם).
+
+**מה לא נעשה (follow-up מתועד):** טבלת GUI פר-נקודה
+ל-delays/radii. ה-dropdown של activation מחווט בשני ה-front-ends;
+ה-delays/radii נגישים דרך JSON/API ומאומתים מלא ב-`validate_case`.
+הטבלה משנה את צורת הנתון של widget ה-det_points ודורשת
+עיצוב parity משלה.
+
 ## N5-7 · ✅ נפתר (19.09) — שני מנגנונים, שניהם תוקנו
 
 **הפתרון, בקצרה.** הסטייה המקבילית בשדה הקרוב הייתה סכום של שניים:

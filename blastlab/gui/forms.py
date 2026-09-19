@@ -440,7 +440,7 @@ class CaseForm(ctk.CTkFrame):
         r = self._srow(num, r, 'Order', self._order_combo,
                        scope='native')[0]
         self._act_combo = _combo(num, self._var('activation', 'linear'),
-                                 ['linear', 'none'])
+                                 ['linear', 'programmedIgnition', 'none'])
         r = self._srow(num, r, 'Detonation', self._act_combo,
                        scope='blastfoam')[0]
         self._ab_combo = _combo(num, self._var('afterburn', 'none'),

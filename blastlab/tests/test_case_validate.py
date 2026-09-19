@@ -67,6 +67,50 @@ def _amr_cap_checks():
           any('AMR' in e for e in rep.errors), str(rep.errors))
 
 
+def programmed_ignition_checks():
+    """N5-12: programmedIgnition activation and per-point delays/radii."""
+    print()
+    print("N5-12: programmedIgnition + delays/radii")
+    base = dict(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.02,
+                charge=1.0, center=(0.0, 1.0), solver='blastfoam',
+                material='TNT', gauges=[(1.0, 1.0)])
+
+    r = validate_case(Case2D(activation='programmedIgnition', **base))
+    check('programmedIgnition validates', r.ok, str(r.errors))
+    check('and says what it does',
+          any('Giroux' in n for n in r.notes), str(r.notes))
+
+    r = validate_case(Case2D(activation='beta', **base))
+    check('an unknown model is refused',
+          any('Unknown activation' in e for e in r.errors), str(r.errors))
+
+    two = dict(base, det_points=[(0.0, 0.95), (0.0, 1.05)])
+    r = validate_case(Case2D(det_delays=[0.0, 5e-5],
+                             det_radii=[0.01, 0.02], **two))
+    check('matched delays+radii validate', r.ok, str(r.errors))
+
+    r = validate_case(Case2D(det_delays=[0.0], **two))
+    check('a length mismatch is refused',
+          any('one per point' in e for e in r.errors), str(r.errors))
+
+    r = validate_case(Case2D(det_delays=[0.0, -1e-5], **two))
+    check('a negative delay is refused',
+          any('>= 0' in e for e in r.errors), str(r.errors))
+
+    r = validate_case(Case2D(activation='none', det_delays=[1e-5], **base))
+    check('delays with activation none are refused',
+          any('needs detonation points' in e for e in r.errors),
+          str(r.errors))
+
+    # native mode never carries any of it
+    from blastlab.core.case import Case1D
+    r = validate_case(Case1D(radius_m=2.0, charge_kg=1.0,
+                             cell_size_m=0.02))
+    check('native case: silent on all of it',
+          not any('Giroux' in n for n in r.notes)
+          and not any('point' in e for e in r.errors), str(r.errors))
+
+
 def chain_stage_checks():
     """B5: an auto-wired chain must be validated per stage BEFORE it
     starts - a foam stage fed by a profile used to reach the backend and
@@ -323,6 +367,7 @@ def main():
         (hardware._host_ram_gb, hardware._host_ram_src,
          hardware._host_probed) = old_host
 
+    programmed_ignition_checks()
     chain_stage_checks()
     shared_constant_checks()
     amr_cap_checks()

@@ -75,7 +75,8 @@ def _numerics(dim):
         F('order', 'Order', 'choice', '1 (Godunov)',
           values=('1 (Godunov)', '2 (MUSCL)'), scope='native'),
         F('activation', 'Detonation', 'choice', 'linear',
-          values=('linear', 'none'), scope='blastfoam'),
+          values=('linear', 'programmedIgnition', 'none'),
+          scope='blastfoam'),
         F('afterburn', 'Afterburn', 'choice', 'none',
           values=('none', 'miller'), scope='blastfoam'),
     ]
