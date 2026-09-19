@@ -32,6 +32,20 @@ LOHNER_EPS = 0.05
 #: yes without that patch (fvMeshBalance.C:112). Flipping this flips
 #: both, so the two can never drift apart.
 AMR_LOAD_BALANCE = True
+#: `allowableImbalance` (N5-13): rebalancing is SKIPPED while the worst
+#: rank is within this fraction of the ideal cell count
+#: (fvMeshBalance.C:519, its own default 0.2). A 13-rank AMR run here
+#: was measured at a 1:64 imbalance - most of the machine idle - so the
+#: point of naming it is to make the knob visible, not to move it.
+AMR_ALLOWABLE_IMBALANCE = 0.2
+#: `balanceInterval`: refinement steps between rebalances. blastFoam
+#: defaults it to `refineInterval`, i.e. rebalance EVERY time the mesh
+#: changes, which is the expensive end - every rebalance is a full
+#: decompose plus an all-to-all field migration, and the guide warns
+#: that migration is where large cases hit the MPI buffer limit (11.2).
+#: 5 refinement steps between rebalances keeps the imbalance bounded at
+#: a fraction of the cost.
+AMR_BALANCE_INTERVAL = 5
 #: controlDict `timePrecision` - and, because `startFrom latestTime`
 #: re-derives the time NAME from the value it read, the precision any
 #: time directory this side writes must be named at. See tfmt().

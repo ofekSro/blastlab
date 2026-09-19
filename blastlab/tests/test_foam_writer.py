@@ -279,6 +279,30 @@ def amr_checks(specs):
     # addEmptyPatch stage or blastFoam refuses to start (fvMeshBalance.C:112)
     dmp = norm(specs['case2d_planar_amr_np4'].files[
         'constant/dynamicMeshDict'])
+    # N5-13: the two loadBalance knobs and the unrefinement hold
+    from blastlab.solvers.foam.writer import _unrefine_hold
+    from blastlab.solvers.foam.materials import MATERIALS
+    a3 = specs['case3d_amr']
+    dm3 = norm(a3.files['constant/dynamicMeshDict'])
+    hold = _unrefine_hold(a3)
+    check('N5-13: a charge AMR case holds unrefinement past ignition',
+          'beginUnrefine' in dm3 and hold > 0.0, f'{hold:g}')
+    check('N5-13: the hold is delay + charge crossing at vDet',
+          abs(hold - a3.r_exp / MATERIALS[a3.material].vDet) < 1e-12,
+          f'{hold:g} vs {a3.r_exp / MATERIALS[a3.material].vDet:g}')
+    pa = specs['case2d_axi_profile_amr']
+    check('N5-13: a profile AMR stage does NOT hold (nothing to ignite)',
+          'beginUnrefine' not in
+          norm(pa.files['constant/dynamicMeshDict'])
+          and _unrefine_hold(pa) == 0.0)
+    dmp = norm(specs['case2d_planar_amr_np4']
+               .files['constant/dynamicMeshDict'])
+    check('N5-13: parallel AMR names both balance knobs',
+          'balanceInterval 5;' in dmp
+          and 'allowableImbalance 0.2;' in dmp, dmp[-200:])
+    check('N5-13: serial AMR emits no loadBalance at all',
+          'loadBalance' not in dm3, dm3[-120:])
+
     check('amr 2D np4: loadBalance is on for a parallel AMR run',
           'loadBalance' in dmp and 'balance yes;' in dmp, dmp)
     from blastlab.solvers.foam import backend as _be

@@ -17,5 +17,6 @@ nBufferLayers   2;
 maxRefinement   3;
 maxCells        8000000;
 dumpLevel       yes;
+beginUnrefine   1.008249537e-05;
 
 // ************************************************************************* //

@@ -37,7 +37,8 @@ from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
 from . import env
-from .dicts import (AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
+from .dicts import (AMR_ALLOWABLE_IMBALANCE, AMR_BALANCE_INTERVAL,
+                    AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
                     TIME_PRECISION,
                     Raw, block, fmt, foam_file, tfmt)
 from .materials import AFTERBURN, MATERIALS, E0, charge_radius
@@ -1183,6 +1184,32 @@ def _afterburn_entries(spec, afterburn):
             'n': ab.n, 'm': ab.m, 'pMin': ab.pMin}
 
 
+def _unrefine_hold(spec):
+    """Time to hold unrefinement until, in seconds (N5-13).
+
+    The last detonation point has to have lit AND its burn crossed the
+    charge before the mesh is allowed to coarsen anywhere. That is the
+    largest per-point delay plus the time the detonation front needs to
+    cross the charge radius at vDet - a few microseconds for any charge
+    this code runs, so it costs a handful of refinement steps and buys
+    the refined region staying put through ignition.
+
+    0.0 (blastFoam's own default, and nothing is emitted) for a profile
+    stage: its material arrives already reacted, there is no ignition
+    to wait for, and holding unrefinement would just pin a mesh the
+    run no longer needs.
+    """
+    if spec.init_state is not None or not spec.charges:
+        return 0.0
+    m = MATERIALS[spec.material]
+    if not m.vDet:
+        return 0.0
+    burn = float(spec.r_exp) / float(m.vDet)
+    delay = max([float(v) for v in (getattr(spec, 'det_delays', None)
+                                    or [0.0])] + [0.0])
+    return delay + burn
+
+
 def _dynamicmeshdict(spec=None, case=None):
     """staticFvMesh, or the adaptiveFvMesh block of an AMR case (N16).
     Keys and defaults follow blastFoam 6.2.0's fvMeshRefiner /
@@ -1209,8 +1236,24 @@ def _dynamicmeshdict(spec=None, case=None):
                      or FOAM_CELLS_WARN),
         'dumpLevel': True,
     })
+    # N5-13: hold the refinement around the charge until it has actually
+    # detonated. `beginUnrefine` is a TIME in seconds (fvMeshRefiner.C:588
+    # - the guide's own table says "number of time steps", which is wrong;
+    # its PDF extraction shuffled the column). Before the charge lights,
+    # the error estimator sees a quiet domain and happily coarsens the
+    # cells the blast is about to need - which is exactly what the
+    # `backup_radius` inflation in _setfieldsdict works around from the
+    # Python side. Holding unrefinement past the ignition of the LAST
+    # detonation point lets the mesh keep what setRefinedFields gave it.
+    begin = _unrefine_hold(spec)
+    if begin > 0.0:
+        d['beginUnrefine'] = begin
     if spec.n_procs > 1:
-        d['loadBalance'] = {'balance': bool(AMR_LOAD_BALANCE)}
+        d['loadBalance'] = {
+            'balance': bool(AMR_LOAD_BALANCE),
+            'balanceInterval': AMR_BALANCE_INTERVAL,
+            'allowableImbalance': AMR_ALLOWABLE_IMBALANCE,
+        }
     return foam_file('dynamicMeshDict', block(d), location='constant')
 
 
