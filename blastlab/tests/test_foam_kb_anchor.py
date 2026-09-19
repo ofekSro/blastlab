@@ -25,7 +25,9 @@ checks it follows oxygen balance - the shared Miller rate (N5-3, fitted
 on TNT) is the only thing they have in common.
 
 Auto-SKIPs without WSL. Wall ~2 min (two 1D runs; ~4 with --afterburn,
-~12 with --materials, which adds twelve more).
+~12 with --materials, which adds twelve more; --impulse adds one
+20 kg free-air run, ~5 min, checked against the SwisdakData.csv
+table from blastFoam's own KingeryBulmash validation case).
 """
 
 import os
@@ -59,6 +61,29 @@ C4_AB_BAND = (0.85, 1.60)
 #: see the sweep table in solvers/foam/materials.py.
 KB_AB_BAND = (0.80, 1.35)
 C4_OVER_TNT = (1.05, 1.5)
+
+#: `--impulse` leg (N5-7 coverage gap: every anchor above measures
+#: PEAK; a 3.7 % impulse shift once sailed through this whole file
+#: green). Reference: SwisdakData.csv shipped with blastFoam's own
+#: validation case (validation/blastFoam/KingeryBulmash), Swisdak's
+#: simplified Kingery-Bulmash fits for a 10 kg TNT HEMISPHERICAL
+#: surface burst: R [m] -> (peak overpressure [kPa], positive-phase
+#: impulse [Pa s], arrival [ms]). A hemisphere on rigid ground is the
+#: image of a 20 kg sphere in free air - the same symmetry blastFoam's
+#: own wedge validation case leans on - so the leg runs 20 kg free air
+#: and reads the table directly. The mapping inherits KB's real-ground
+#: energy loss (the empirical 1.7-1.8 factor vs the ideal 2.0, worth
+#: ~5-8 % on impulse), one more reason the band is a DECADE bar, not a
+#: precision bar: it exists to catch factor-class impulse bugs (B0's
+#: pRef collapse, a lost positive phase), not few-% ignition effects -
+#: those belong to the mesh-convergence protocol in TODO N5-7.
+KB_SURF_10KG = {
+    3.0: (653.1, 403.7, 1.855),
+    5.0: (202.4, 250.6, 4.811),
+    7.0: (97.98, 185.9, 8.775),
+    10.0: (49.27, 136.3, 15.82),
+}
+KB_IMP_BAND = (0.65, 1.35)
 
 
 def check(name, ok, detail=''):
@@ -120,6 +145,43 @@ def main():
               C4_OVER_TNT[0] <= ratio <= C4_OVER_TNT[1],
               f'{ratio:.2f} (C4 {peaks_c4[z]:.0f} / '
               f'TNT {peaks_tnt[z]:.0f} kPa)')
+
+    if '--impulse' in sys.argv:
+        print('--- impulse leg: 20 kg free air vs the vendor table ---')
+        from blastlab.solvers import get_solver
+        import numpy as np
+        # open boundary + explicit t_end: with 'terminate' the run
+        # stops on arrival at the domain edge, cutting off the 10 m
+        # gauge's positive phase; 30 ms covers arrival there (15.8 ms)
+        # plus its full positive duration with margin.
+        case = Case1D(radius_m=12.0, charge_kg=20.0, cell_size_m=0.02,
+                      gauge_radii=sorted(KB_SURF_10KG), n_snapshots=2,
+                      bc_outer='open', t_end=0.030,
+                      solver='blastfoam', material='TNT')
+        res = get_solver(1, 'blastfoam')(case)
+        t = np.asarray(res.gauges['times'])
+        for r, p in zip(res.gauges['radii'], res.gauges['pressures']):
+            kb_p, kb_i, kb_ta = KB_SURF_10KG[round(float(r), 1)]
+            p = np.asarray(p)
+            above = p > P_AIR
+            if not above.any():
+                check(f'impulse at R = {r:g} m', False, 'no signal')
+                continue
+            i0 = int(np.argmax(above))
+            ipk = i0 + int(np.argmax(p[i0:]))
+            rest = np.nonzero(~above[ipk:])[0]
+            i1 = ipk + (int(rest[0]) if rest.size else len(p) - ipk)
+            imp = float(np.trapezoid(p[i0:i1] - P_AIR, t[i0:i1]))
+            ri = imp / kb_i
+            rp = (p.max() - P_AIR) / 1e3 / kb_p
+            check(f'impulse anchor at R = {r:g} m',
+                  KB_IMP_BAND[0] <= ri <= KB_IMP_BAND[1],
+                  f'foam {imp:.0f} Pa s vs KB {kb_i:.0f} '
+                  f'(ratio {ri:.2f}); peak ratio {rp:.2f}, '
+                  f'arrival KB {kb_ta:g} ms')
+            check(f'and the peak there agrees too (R = {r:g} m)',
+                  KB_BAND[0] <= rp <= KB_BAND[1],
+                  f'ratio {rp:.2f}')
 
     if '--afterburn' in sys.argv:
         # N3: the same anchor with the Miller afterburn model on. Its
