@@ -73,7 +73,12 @@ class Case1D:
     #: ever duplicated those two - in blastFoam 1D it did nothing at all.
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'        # blastFoam detonation model:
+    activation: str = 'linear'
+    #: optional, aligned with det_points (N5-12): per-point ignition
+    #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
+    #: own defaults. Guide 5.6.1: valid for any activation model.
+    det_delays: list = None
+    det_radii: list = None        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
     afterburn: str = 'none'           # blastFoam afterburn model:
@@ -173,7 +178,12 @@ class Case2D:
     profile_file: str = None          # save .npz for 3D remap (axisym only)
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'        # blastFoam detonation model:
+    activation: str = 'linear'
+    #: optional, aligned with det_points (N5-12): per-point ignition
+    #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
+    #: own defaults. Guide 5.6.1: valid for any activation model.
+    det_delays: list = None
+    det_radii: list = None        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
     afterburn: str = 'none'           # blastFoam afterburn model:
@@ -269,7 +279,12 @@ class Case3D:
     live: bool = True
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'        # blastFoam detonation model:
+    activation: str = 'linear'
+    #: optional, aligned with det_points (N5-12): per-point ignition
+    #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
+    #: own defaults. Guide 5.6.1: valid for any activation model.
+    det_delays: list = None
+    det_radii: list = None        # blastFoam detonation model:
                                       # 'linear' (burn at vDet) |
                                       # 'none' (instant)
     afterburn: str = 'none'           # blastFoam afterburn model:
@@ -532,12 +547,36 @@ def _validate_solver(case, rep):
         note("EOS setting is ignored by blastFoam (material JWL products "
              "+ ideal-gas air)")
     activation = getattr(case, 'activation', 'linear')
-    if activation not in ('linear', 'none'):
+    if activation not in ('linear', 'none', 'programmedIgnition'):
         err(f"Unknown activation model '{activation}' "
-            f"(use 'linear' or 'none')")
+            f"(use 'linear', 'programmedIgnition' or 'none')")
+    elif activation == 'programmedIgnition':
+        # N5-12, guide 5.6.1.3 (Giroux): a cell reacts at a rate set by
+        # vDet and the LOCAL grid size instead of flipping whole when
+        # the front line crosses it - the better near-field model.
+        note("programmedIgnition (Giroux): cells burn at "
+             "vDet/(1.5 dx) from their ignition time instead of "
+             "switching whole (guide 5.6.1.3)")
     elif activation == 'none':
         note("Instant detonation ('none'): the whole charge reacts "
              "at t = 0")
+    # N5-12: per-point delays/radii must line up with the points
+    # they time. `det_points or 1`: with no explicit points the charge
+    # centre is the single implicit point.
+    npts = len(getattr(case, 'det_points', None) or []) or 1
+    for name in ('det_delays', 'det_radii'):
+        vals = getattr(case, name, None)
+        if vals is None:
+            continue
+        if activation == 'none':
+            err(f"{name} needs detonation points, and activation "
+                f"'none' has none (the whole charge reacts at t = 0)")
+        elif len(vals) != npts:
+            err(f"{name} has {len(vals)} value(s) for {npts} "
+                f"detonation point(s) - one per point")
+        elif any(float(v) < 0 for v in vals):
+            err(f"{name} must be >= 0")
+
     afterburn = getattr(case, 'afterburn', 'none') or 'none'
     if afterburn not in ('none', 'miller'):
         err(f"Unknown afterburn model '{afterburn}' "

@@ -381,6 +381,8 @@ def plan_case(case):
         spec.apply_plan(plan)
         spec.charges = ([((x0, y0, 0.0), float(case.charge))]
                         if init_mode == 'charge' else [])
+        spec.det_delays = list(getattr(case, 'det_delays', None) or [])
+        spec.det_radii = list(getattr(case, 'det_radii', None) or [])
         spec.det_points = [
             ((0.0 if not planar else float(px)), float(py), 0.0)
             for px, py in (getattr(case, 'det_points', None) or [])]
@@ -446,6 +448,8 @@ def plan_case(case):
                     dx=dx, r_exp=r_exp, center=(x0, y0, z0), grid=grid)
     spec.apply_plan(plan)
     spec.charges = charges
+    spec.det_delays = list(getattr(case, 'det_delays', None) or [])
+    spec.det_radii = list(getattr(case, 'det_radii', None) or [])
     spec.det_points = [tuple(float(v) for v in p)
                        for p in (getattr(case, 'det_points', None) or [])]
     spec.patches = [(s, case.bcs[s])
@@ -1106,6 +1110,21 @@ def _phaseproperties(spec, activation='linear', afterburn='none'):
             'points': _off_faces(points, spec.dx_charge, spec.dim),
             'vDet': m.vDet,
         }
+        # N5-12: per-point timing and ignition radius (guide 5.6.1,
+        # the delayedDetonation tutorial's pattern). Emitted only when
+        # given, so every existing case stays byte-identical.
+        delays = getattr(spec, 'det_delays', None)
+        radii = getattr(spec, 'det_radii', None)
+        if delays:
+            initiation['delays'] = [float(v) for v in delays]
+        if radii:
+            initiation['radii'] = [float(v) for v in radii]
+        if activation == 'programmedIgnition':
+            # guide 5.6.1.3: Giroux. programmedBeta = the compression
+            # switch AND the programmed vDet/(1.5 dx) rate, whichever
+            # is further along - the guide's own recommended pairing.
+            initiation['Pcj'] = m.Pcj
+            initiation['burnModel'] = 'programmedBeta'
     body = block({
         'phases': [PHASE, 'air'],
         'radiationModel': 'none',
@@ -1672,7 +1691,9 @@ def render_case(case, n_procs=1, live_steps=0):
         'system/fvSolution': _fvsolution(),
         'system/setFieldsDict': _setfieldsdict(spec, case),
         'constant/phaseProperties': _phaseproperties(
-            spec, getattr(case, 'activation', 'linear'), afterburn),
+            spec,
+            ('linear' if spec.init_state is not None
+             else getattr(case, 'activation', 'linear')), afterburn),
         'constant/dynamicMeshDict': _dynamicmeshdict(spec, case),
     }
     if spec.obstacles:

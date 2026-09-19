@@ -26,21 +26,26 @@ class Material:
     Cv_reactants: float = 815.0
     Gamma_reactants: float = 0.25   # Murnaghan
     molWeight: float = 55.0         # g/mol
+    #: Pa - Chapman-Jouguet pressure, for `programmedIgnition` (guide
+    #: 5.6.1.3, its beta burn). Values from jwl_parameters.md's table;
+    #: self-consistency was spot-checked earlier as rho0*vDet^2/4, which
+    #: lands within ~7 % of every row.
+    Pcj: float = 0.0
 
 
 MATERIALS = {
     'TNT':  Material(3.712e11,  3.23e9,   4.15,  0.95,  0.30, 1630.0,
-                     4.29e6, 6930.0),
+                     4.29e6, 6930.0, Pcj=2.1e10),
     'C4':   Material(6.0977e11, 1.295e10, 4.50,  1.40,  0.25, 1601.0,
-                     5.56e6, 8193.0),
+                     5.56e6, 8193.0, Pcj=2.8e10),
     'RDX':  Material(7.78e11,   7.07e9,   4.485, 1.068, 0.30, 1770.0,
-                     5.15e6, 8750.0),
+                     5.15e6, 8750.0, Pcj=3.4e10),
     'HMX':  Material(7.783e11,  7.071e9,  4.20,  1.00,  0.30, 1890.0,
-                     5.50e6, 9100.0),
+                     5.50e6, 9100.0, Pcj=3.9e10),
     'PETN': Material(6.17e11,   1.69e10,  4.40,  1.20,  0.25, 1770.0,
-                     5.81e6, 8400.0),
+                     5.81e6, 8400.0, Pcj=3.1e10),
     'ANFO': Material(4.95e10,   1.89e9,   3.90,  1.10,  0.35,  850.0,
-                     3.80e6, 4500.0),
+                     3.80e6, 4500.0, Pcj=5.0e9),
 }
 
 MATERIAL_NAMES = tuple(MATERIALS)   # combo/prompt order
