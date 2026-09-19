@@ -419,8 +419,21 @@ def semantic_checks(specs):
     sf = s3.files['system/setFieldsDict']
     check('3d: sphericalMassToCell mass',
           'sphericalMassToCell' in sf and 'mass            8;' in sf)
-    check('3d: detonation point at centre',
-          '(0.5 0.5 0.5)' in pp)
+    # N5-7: the point is the charge centre NUDGED off the 8-cell corner
+    # by 1e-3 dx. Placed exactly on the corner, "the cell containing the
+    # point" is a tie that serial and a decomposed mesh resolve
+    # differently - measured: np=2 ignited a second cell (p 1.01e5 vs
+    # 8.41e9 Pa after one step), injecting E0 twice, which seeded the
+    # +7 % near-field parallel over-prediction. The nudge is three
+    # orders of magnitude below the cell size.
+    check('3d: detonation point just off the centre corner (N5-7)',
+          '(0.5000131579 0.5000131579 0.5000131579)' in pp
+          and '(0.5 0.5 0.5)' not in pp, pp[pp.find('points'):][:120])
+    from blastlab.solvers.foam.writer import _off_faces
+    check('N5-7: a mid-cell point is left byte-identical',
+          _off_faces([(0.507, 0.511, 0.499)], 0.0) ==
+          [(0.507, 0.511, 0.499)]
+          and _off_faces([(0.5069, 0.5, 0.25)], 1.0 / 76)[0][0] == 0.5069)
 
     # peak/impulse function objects: per-step accumulation for 2D/3D,
     # deliberately absent in 1D (no peak-map consumer there)
@@ -543,12 +556,26 @@ def semantic_checks(specs):
     check('serial: no decomposeParDict',
           'system/decomposeParDict' not in s3.files)
     dpd = s3p.files.get('system/decomposeParDict', '')
-    # N5-7: scotch, and the measurements behind that choice (and
-    # behind the planar split that was tried and reverted) are in
-    # TODO.md N5-7 and in _decomposepardict's docstring.
-    check('np4: decomposeParDict scotch',
+    # N5-7: planar. The full story - the +7 % scotch error, the double
+    # ignition it turned out to seed, the 2D counter-example that
+    # temporarily reverted this, and why the nudge resolves it - is in
+    # _decomposepardict's docstring and TODO.md N5-7.
+    check('np4: decomposeParDict is a planar split',
           'numberOfSubdomains 4;' in norm(dpd)
-          and 'method scotch;' in norm(dpd))
+          and 'method hierarchical;' in norm(dpd)
+          and 'n (1 2 2);' in norm(dpd), norm(dpd)[-160:])
+    from blastlab.solvers.foam.writer import planar_split
+    check('np4: 2D never cuts the one-cell z axis',
+          planar_split(4, 2)[2] == 1
+          and planar_split(4, 2)[0] * planar_split(4, 2)[1] == 4,
+          str(planar_split(4, 2)))
+    check('a prime rank count falls back to scotch',
+          planar_split(7, 3) is None and planar_split(5, 3) is None)
+    check('every split multiplies back to the rank count',
+          all(planar_split(n, d) is None
+              or planar_split(n, d)[0] * planar_split(n, d)[1]
+              * planar_split(n, d)[2] == n
+              for n in range(1, 33) for d in (1, 2, 3)))
     check('np4: only delta is decomposeParDict',
           {k: v for k, v in s3p.files.items()
            if k != 'system/decomposeParDict'} == s3.files)

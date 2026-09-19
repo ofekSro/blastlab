@@ -41,18 +41,17 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
-#: N5-7. This is a REGRESSION bound, not an accuracy bar, and the
-#: difference matters.
-#:
-#: Measured at full size against a serial reference: scotch (the
-#: shipping decomposition) is +7.00 %. A planar split was +0.17 % and
-#: looked like the fix until the 2D parallel case contradicted it, so
-#: scotch stays and the +7 % stands - see TODO.md N5-7.
-#:
-#: 10 % therefore says "no worse than it already is". It is deliberately
-#: NOT 2 %: a permanently red test stops being read. Tighten it to 2 %
-#: the day N5-7 is resolved, and do not loosen it for any other reason.
-SERIAL_TOL = 0.10
+#: N5-7, resolved. Two mechanisms, both fixed:
+#:   1. the detonation point sat exactly on a cell corner and parallel
+#:      runs ignited an extra cell (E0 injected twice, the systematic
+#:      +7 %) - fixed by _off_faces() nudging points off face planes;
+#:   2. scotch's ragged interface seeded ~1e-6 perturbations the near
+#:      field amplified chaotically (+9.7 % on one gauge even nudged) -
+#:      fixed by the planar decomposition, which seeds none.
+#: Measured with both fixes: z-cut+nudge tracks serial to 0.14 % with
+#: 0.02 % asymmetry. 2 % gives an order of magnitude of margin and
+#: still catches either mechanism coming back.
+SERIAL_TOL = 0.02
 
 
 def _serial_gate(case, px, py):
@@ -221,14 +220,12 @@ def main():
     # anything, so --tiny is what its name says: does a 3D run work end
     # to end. Both questions are asked at full size, where they have
     # answers.
-    if '--tiny' in sys.argv:
-        print(f'  [note] --tiny: x/y {px/1e3:.0f} vs {py/1e3:.0f} kPa '
-              f'({abs(px-py)/max(px,py):.1%}) - not gated at Z = 0.075, '
-              f'see N5-7')
-    else:
-        check('x/y symmetry (sanity only - the serial gate is the real one)',
-              abs(px - py) <= 0.05 * max(px, py),
-              f'{px/1e3:.0f} vs {py/1e3:.0f} kPa')
+    # x/y symmetry is a NOTE, not a gate: each gauge is already held
+    # to the serial reference below, which bounds asymmetry too. A
+    # second, stricter gate on the same phenomenon is how this test
+    # ended up failing configurations the real gate accepted.
+    print(f'  [note] x/y: {px/1e3:.0f} vs {py/1e3:.0f} kPa '
+          f'({abs(px-py)/max(px,py):.1%})')
 
     _serial_gate(case, px, py)
 
