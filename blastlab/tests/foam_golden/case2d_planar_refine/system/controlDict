@@ -41,6 +41,12 @@ functions
         writeControl    writeTime;
         fields (rho rhoE);
     }
+    writeTimes
+    {
+        type            writeTimeList;
+        libs            ("libblastFunctionObjects.so");
+        times (0.05877270994);
+    }
     impulse
     {
         type            impulse;

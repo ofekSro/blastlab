@@ -406,6 +406,20 @@ def semantic_checks(specs):
           'writeControl    adjustableRunTime;' in cd
           and 'runTimeModifiable true;' in cd
           and s1.end_time > 0 and s1.write_interval > 0)
+    # T62/writeTimeList: writeInterval is transit-sized, so endTime is
+    # not a write multiple - this FO is the only guarantee the run
+    # writes at the exact end time, which is the chain's hand-off
+    # surface. Its one entry must equal controlDict's own endTime.
+    from blastlab.solvers.foam.dicts import fmt as _fmt
+    check('1d: writeTimeList pins the exact end time',
+          'writeTimeList' in cd
+          and f'times ({_fmt(s1.t_start + s1.end_time)});' in cd
+          and f'endTime         {_fmt(s1.t_start + s1.end_time)};' in cd)
+    cdp = specs['case2d_axi_profile'].files['system/controlDict']
+    sp_ = specs['case2d_axi_profile']
+    check('chain stage: writeTimeList pins t_start + end_time',
+          f'times ({_fmt(sp_.t_start + sp_.end_time)});' in cdp
+          and sp_.t_start > 0)
     end_x = s1.grid['r_face'][-1] - 0.25 * s1.dx
     check('1d: live line sampling',
           'liveLine' in cd and 'lineCell' in cd

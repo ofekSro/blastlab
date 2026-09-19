@@ -752,6 +752,22 @@ def _controldict(spec, case):
         'writeControl': 'writeTime',
         'fields': ['rho', 'rhoE'],
     }
+    # T62 family: guarantee a write at the exact end time. writeInterval
+    # is transit-sized and runtime-adapted (the backend doubles it up to
+    # 8x mid-run), so endTime is NOT otherwise a write multiple - the
+    # last frame, and with it a chain's hand-off surface, could land up
+    # to one adapted interval short of the requested t_end, silently
+    # discarding computed tail. The FO clips dt to land on the listed
+    # time (timeToNextWrite) and forces the write via Time::writeNow
+    # (writeTimeList.C:92-107); the dir it writes is named by the same
+    # timeFormat/timePrecision the chain's tfmt mirrors, so the next
+    # stage reads the seam it was promised. A time the run never
+    # reaches (early shock-arrival stop) simply never fires.
+    functions['writeTimes'] = {
+        'type': 'writeTimeList',
+        'libs': Raw('("libblastFunctionObjects.so")'),
+        'times': [spec.t_start + spec.end_time],
+    }
     if spec.dim >= 2 and spec.fo_accumulators:
         # Per-step peak-pressure / impulse accumulation on the foam side
         # (matches the native solvers' per-step tracking; the backend's
@@ -1057,8 +1073,6 @@ def _phaseproperties(spec, activation='linear', afterburn='none'):
                 'phaseProperties that would never ignite')
         initiation = {
             'E0': E0(m),
-            # N5-7: nudged off cell-face planes, or serial and parallel
-            # runs disagree about which cell the point ignites
             'points': points,
             'vDet': m.vDet,
         }
