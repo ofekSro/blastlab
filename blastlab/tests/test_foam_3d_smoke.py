@@ -41,17 +41,16 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
-#: N5-7, resolved. Two mechanisms, both fixed:
-#:   1. the detonation point sat exactly on a cell corner and parallel
-#:      runs ignited an extra cell (E0 injected twice, the systematic
-#:      +7 %) - fixed by _off_faces() nudging points off face planes;
-#:   2. scotch's ragged interface seeded ~1e-6 perturbations the near
-#:      field amplified chaotically (+9.7 % on one gauge even nudged) -
-#:      fixed by the planar decomposition, which seeds none.
-#: Measured with both fixes: z-cut+nudge tracks serial to 0.14 % with
-#: 0.02 % asymmetry. 2 % gives an order of magnitude of margin and
-#: still catches either mechanism coming back.
-SERIAL_TOL = 0.02
+#: N5-7. The serial comparison STAYS - it is the right instrument, and
+#: it is what caught scotch's +7.00 % where the old x/y gate reported
+#: 0.26 %. But the fix for that error was reverted (it cost 3.7 % of
+#: serial impulse), so the error is still here and this is a REGRESSION
+#: bound, not an acceptance bar: no worse than it already is.
+#:
+#: Tighten to 2 % the day N5-7 is actually resolved - measured, a
+#: planar split brings it to 0.17 %. Do not loosen it for any other
+#: reason.
+SERIAL_TOL = 0.10
 
 
 def _serial_gate(case, px, py):

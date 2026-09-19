@@ -1031,55 +1031,6 @@ def _setfieldsdict(spec, case):
     return foam_file('setFieldsDict', block(d), location='system')
 
 
-def _off_faces(points, dx, dim=3):
-    """Detonation points nudged off cell-face planes (N5-7).
-
-    blastlab puts the charge at the domain centre and effective_dx makes
-    dx divide the domain, so a detonation point lands EXACTLY on the
-    corner shared by eight cells in almost every case. linearActivation
-    ignites "the cell containing the point", and on that corner
-    containment is a tie. Serial resolves the tie one way; a decomposed
-    mesh runs the search per rank, and when the partition passes through
-    the corner - it does, the charge is at the centre - more than one
-    rank can find a containing cell on its own side.
-
-    Measured (one fixed-dt step, same initial state, 3D smoke case):
-    serial ignites cell (37,37,37); np=2 scotch ignites (38,37,37) AS
-    WELL - p 1.01e5 vs 8.41e9 Pa in that cell, E0 injected twice. That
-    double ignition is the seed of the +7.00 % near-field parallel
-    over-prediction that N5-7 chased: every hypothesis about the flux
-    at processor boundaries died, because the boundary was never the
-    mechanism - the tie-break was.
-
-    The nudge is 1e-3 of a cell: three orders of magnitude below dx, so
-    the physics is untouched, while containment becomes unambiguous on
-    any decomposition. Only coordinates sitting on a face plane (within
-    1e-9 of dx) are moved, so points a user already placed mid-cell are
-    byte-identical.
-    """
-    if not dx or dx <= 0:
-        return [tuple(pt) for pt in points]
-    eps = 1e-3 * dx
-    out = []
-    for pt in points:
-        q = []
-        for i, x in enumerate(pt):
-            if i >= dim:
-                # a collapsed direction is NOT a face plane. The wedge
-                # (1D, 2D axisymmetric) narrows to zero width at the
-                # axis: nudging z there pushed the point OUTSIDE the
-                # mesh and blastFoam's own detonationPoint::check()
-                # aborted the run. z stays on the wedge mid-plane, and
-                # a 2D slab's mid-plane likewise.
-                q.append(x)
-                continue
-            r = x / dx
-            q.append(x + eps if abs(r - round(r)) * dx < 1e-9 * max(
-                1.0, abs(x)) else x)
-        out.append(tuple(q))
-    return out
-
-
 def _phaseproperties(spec, activation='linear', afterburn='none'):
     m = MATERIALS[spec.material]
     # 'linear' burns at vDet from the detonation points (tutorial
@@ -1108,7 +1059,7 @@ def _phaseproperties(spec, activation='linear', afterburn='none'):
             'E0': E0(m),
             # N5-7: nudged off cell-face planes, or serial and parallel
             # runs disagree about which cell the point ignites
-            'points': _off_faces(points, spec.dx_charge, spec.dim),
+            'points': points,
             'vDet': m.vDet,
         }
         # N5-12: per-point timing and ignition radius (guide 5.6.1,
@@ -1257,93 +1208,33 @@ def _dynamicmeshdict(spec=None, case=None):
     return foam_file('dynamicMeshDict', block(d), location='constant')
 
 
-def planar_split(n_procs, dim=3):
-    """(nx, ny, nz) for a planar decomposition of `n_procs` ranks, or
-    None when there is no sensible one (N5-7).
+def _decomposepardict(n_procs):
+    """scotch decomposition (modeled on the building3DWorkshop
+    tutorial); written only for parallel runs, so serial case trees
+    stay byte-identical.
 
-    Balances the prime factors so the subdomains stay as cubic as
-    possible. Returns None for a prime rank count above 3, where the
-    only split is a stack of slabs; the caller falls back to scotch.
+    N5-7 tried to replace this with a planar (`hierarchical`) split and
+    a detonation-point nudge, and BOTH were reverted. The measurements
+    are in TODO.md N5-7; the short version is that the pair fixed
+    parallel consistency (3D parallel to -0.13 % of serial, 2D np1-vs-np2
+    equivalence restored) at the cost of moving SERIAL results: the
+    uniform reference in _e2e_foam_amr2d went from 986.3 to 947.3 Pa s
+    of positive-phase impulse, a 3.7 % shift, and nothing in the suite
+    anchors impulse to say which answer is right.
 
-    `dim` is load-bearing: a 2D mesh here is ONE CELL THICK in z (a
-    planar slab, or a 1-degree wedge), so a split with nz > 1 asks for
-    subdomains that cannot exist. 2D splits x and y only; 1D is a
-    radial wedge and splits x only.
+    The nudge's size turned out to be irrelevant - 1e-6, 1e-5 and 1e-3
+    of a cell all give the same 947.3 - so it is not a gradual
+    perturbation but a discrete flip: a point exactly on a cell corner
+    has its surrounding cells equidistant and igniting together, and
+    any offset at all breaks that symmetry. Which of the two states is
+    physically right is the open question, and it needs an impulse
+    anchor (Kingery-Bulmash publishes impulse as well as peak) rather
+    than another opinion.
     """
-    n = int(n_procs)
-    if n < 1:
-        return None
-    if n == 1:
-        return (1, 1, 1)
-    if dim <= 1:
-        return (n, 1, 1)
-    rem, f, factors = n, 2, []
-    while f * f <= rem:
-        while rem % f == 0:
-            factors.append(f)
-            rem //= f
-        f += 1
-    if rem > 1:
-        factors.append(rem)
-    if len(factors) == 1 and factors[0] > 3:
-        return None                      # 5, 7, 11 ... : slabs only
-    n_axes = 3 if dim >= 3 else 2        # never cut a one-cell axis
-    dims = [1, 1, 1]
-    for q in sorted(factors, reverse=True):
-        j = min(range(n_axes), key=lambda i: dims[i])
-        dims[j] *= q
-    return tuple(sorted(dims[:n_axes], reverse=True)[::-1]) \
-        + (1,) * (3 - n_axes)
-
-
-def _decomposepardict(n_procs, dim=3):
-    """How the mesh is cut up for a parallel run: planar, scotch only
-    when the rank count leaves no planar shape (N5-7).
-
-    This went back and forth once, and both legs of the story matter.
-    Measured against a serial reference on the 3D smoke case, scotch
-    was +7 % on the near-field peak while a planar cut was within
-    0.25 % - but planar then broke the 2D parallel case's np1-vs-np2
-    impulse equivalence, so it was reverted pending a mechanism.
-
-    The mechanism turned out to be TWO effects:
-
-    1. The detonation point sat exactly on a cell corner, and "the cell
-       containing the point" is a tie that serial and a decomposed mesh
-       resolve differently - np=2 ignited an extra cell (measured:
-       p 1.01e5 vs 8.41e9 Pa after one step), injecting E0 twice. That
-       was the systematic +7 %, and it is fixed at the source:
-       _off_faces() nudges every detonation point off face planes.
-
-    2. scotch's ragged interface seeds ~1e-6 first-step perturbations
-       that the near field amplifies chaotically (measured +9.7 % on
-       one gauge even with the nudge). A planar interface does not:
-       z-cut + nudge tracks serial to 0.14 % / 0.13 % with 0.02 %
-       asymmetry.
-
-    With the nudge in place the planar split is strictly better wherever
-    it exists, and the 2D counter-example was re-tested against it -
-    the 2D detonation point sits ON the wedge-axis face, the same tie.
-
-    Written only for parallel runs, so serial case trees stay
-    byte-identical.
-    """
-    split = planar_split(n_procs, dim)
-    if split is None:
-        body = block({
-            'numberOfSubdomains': n_procs,
-            'method': 'scotch',
-        })
-    else:
-        body = block({
-            'numberOfSubdomains': n_procs,
-            'method': 'hierarchical',
-            'hierarchicalCoeffs': {
-                'n': Raw(f'({split[0]} {split[1]} {split[2]})'),
-                'delta': 0.001,
-                'order': 'xyz',
-            },
-        })
+    body = block({
+        'numberOfSubdomains': n_procs,
+        'method': 'scotch',
+    })
     return foam_file('decomposeParDict', body, location='system')
 
 
@@ -1745,7 +1636,7 @@ def render_case(case, n_procs=1, live_steps=0):
         spec.files.update(_refine_dicts(spec, case))
     if spec.n_procs > 1:
         spec.files['system/decomposeParDict'] = \
-            _decomposepardict(spec.n_procs, spec.dim)
+            _decomposepardict(spec.n_procs)
     if spec.init_state is None:
         spec.files.update(_zero_fields(spec))
     else:
