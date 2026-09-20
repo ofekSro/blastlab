@@ -113,6 +113,22 @@ class Propellant:
                  separate field is what lets the unconfined branch stand
                  on its own data instead of borrowing the confined
                  branch's. See core/unconfined.py.
+    secondary_heat
+                 [J/kg of propellant] released when the products meet
+                 ATMOSPHERIC OXYGEN. Propellant gases are fuel-rich - CO
+                 and H2 - and that energy is in no part of the internal
+                 energy balance, because inside the chamber there is no
+                 oxygen to burn them with. It is what makes the external
+                 fireball bigger than the chamber's own energy implies,
+                 and it is comparable in size to the anaerobic energy
+                 rather than a correction to it. Treated as an UPPER
+                 bound: mixing with free air is never complete.
+
+                 This is the same physics the repo already models for TNT
+                 as `afterburnModel Miller` (solvers/foam/materials.py) -
+                 products burning with atmospheric oxygen, which a pure
+                 detonation leaves out - and the same calibration
+                 discipline applies.
 
     uncalibrated names of the fields with no measurement behind them
     calibrated   derived: True only when `uncalibrated` is empty
@@ -131,6 +147,7 @@ class Propellant:
     p_valid_max: float = float('inf')
     p_extinction: float = 0.0
     r_atm: float = 0.0
+    secondary_heat: float = 0.0
     uncalibrated: tuple = ()
 
     @property
@@ -170,7 +187,7 @@ class Propellant:
 #: characterised, which is knowledge about the METHOD rather than about
 #: the material, so they are listed too until a real test defines them.
 _PLACEHOLDER = ('a', 'n', 'web', 'p_extinction', 'p_valid_min',
-                'p_valid_max', 'r_atm')
+                'p_valid_max', 'r_atm', 'secondary_heat')
 
 #: Representative classes, NOT product data. See the module docstring.
 #: force/T_flame/covolume are the usual textbook ranges for each class;
@@ -191,6 +208,7 @@ PROPELLANTS = {
                               gamma=1.25, web=1.0e-3, form='degressive',
                               p_valid_min=50.0e6, p_valid_max=300.0e6,
                               p_extinction=0.0, r_atm=0.15e-3,
+                              secondary_heat=3.0e6,
                               uncalibrated=_PLACEHOLDER),
     # NC + nitroglycerine - hotter and faster
     'double_base': Propellant(force=1.10e6, covolume=1.00e-3, rho=1650.0,
@@ -198,6 +216,7 @@ PROPELLANTS = {
                               gamma=1.24, web=1.0e-3, form='degressive',
                               p_valid_min=50.0e6, p_valid_max=300.0e6,
                               p_extinction=0.0, r_atm=0.20e-3,
+                              secondary_heat=3.5e6,
                               uncalibrated=_PLACEHOLDER),
     # AP/HTPB-like composite - lower pressure exponent, near-neutral burn
     'composite': Propellant(force=1.00e6, covolume=1.10e-3, rho=1750.0,
@@ -205,6 +224,7 @@ PROPELLANTS = {
                             gamma=1.20, web=3.0e-3, form='neutral',
                             p_valid_min=1.0e6, p_valid_max=15.0e6,
                             p_extinction=0.0, r_atm=1.0e-3,
+                            secondary_heat=2.0e6,
                             uncalibrated=_PLACEHOLDER),
 }
 

@@ -244,17 +244,24 @@ def main():
           not fitted.calibrated)
     done, _ = cal.fit_closed_vessel(t, p, deg, C, V, heat_loss='scaled',
                                     web_measured=True, refine=False)
-    # Even with the burn law fitted AND the grain measured, two fields
-    # survive - and they are exactly the right two, for one reason. A
-    # closed vessel only ever visits HIGH pressure, so it can say nothing
-    # about where the flame goes out or how fast the material burns at
-    # one atmosphere. No closed-vessel test can ever fully calibrate a
-    # row, and the per-field flags are what make that visible rather than
-    # implied.
-    check('a closed-vessel test can calibrate neither the extinction '
-          'limit nor the atmospheric burn rate, and exactly those two '
-          'survive',
-          set(done.uncalibrated) == {'p_extinction', 'r_atm'}
+    # Even with the burn law fitted AND the grain measured, three fields
+    # survive, and this assertion is deliberately exact so that adding a
+    # fourth forces someone to justify it here. Two reasons between them:
+    #
+    #   p_extinction, r_atm   a closed vessel only ever visits HIGH
+    #                         pressure, so it says nothing about where
+    #                         the flame goes out or how fast the material
+    #                         burns at one atmosphere
+    #   secondary_heat        a closed vessel contains no atmospheric
+    #                         oxygen at all, so the energy released when
+    #                         the products meet air cannot appear in it
+    #
+    # No closed-vessel test can ever fully calibrate a row, and the
+    # per-field flags are what make that visible instead of implied.
+    check('a closed-vessel test cannot reach low pressure or free oxygen, '
+          'and exactly those three fields survive a complete fit',
+          set(done.uncalibrated) == {'p_extinction', 'r_atm',
+                                     'secondary_heat'}
           and not done.calibrated,
           str(done.uncalibrated))
     check('a row with the extinction limit settled too is fully calibrated',
