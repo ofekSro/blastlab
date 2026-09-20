@@ -117,6 +117,47 @@ def sustains(prop, charge_kg, volume_m3):
     return closed_vessel_pmax(prop, charge_kg, volume_m3) > prop.p_extinction
 
 
+def free_volume_terms(prop, charge_kg, volume_m3):
+    """(A, B) such that the free gas volume at burnt fraction z is
+    `A + z*B`:
+
+        V_free(z) = (V0 - C/rho) + z * C * (1/rho - b)
+
+    The solid that has not burnt yet and the co-volume of the gas that
+    has both come out of the same chamber, and B is usually NEGATIVE -
+    the gas occupies more space than the solid it came from.
+    """
+    A = volume_m3 - charge_kg / prop.rho
+    B = charge_kg * (1.0 / prop.rho - prop.covolume)
+    return A, B
+
+
+def burnt_fraction_at(prop, charge_kg, volume_m3, p, u_lost=0.0):
+    """Burnt fraction z whose gas holds the chamber at `p` [Pa].
+
+    The exact inverse of the Noble-Abel closed-vessel pressure, from
+
+        p * (A + z B) = z C lambda - (gamma - 1) * u_lost
+    =>  z = (p A + (gamma - 1) u_lost) / (C lambda - p B)
+
+    `u_lost` [J] is internal energy the gas has already given to the
+    walls. It belongs here rather than in the caller because leaving it
+    out is a REAL bias, not a refinement: a closed vessel loses several
+    per cent of its energy by the time it peaks, and an adiabatic
+    inversion reads that as less propellant burnt than really was -
+    systematically, and more so late in the burn, which is exactly the
+    shape that tilts a fitted pressure exponent. See core/calibration.py.
+    """
+    A, B = free_volume_terms(prop, charge_kg, volume_m3)
+    den = charge_kg * prop.force - p * B
+    if den <= 0.0:
+        raise ValueError(
+            f'no burnt fraction can hold {p:g} Pa in a {volume_m3:g} m^3 '
+            f'chamber with {charge_kg:g} kg - the co-volume term has taken '
+            f'over')
+    return (p * A + (prop.gamma - 1.0) * u_lost) / den
+
+
 def ignition_fraction(prop, charge_kg, volume_m3, p_ign):
     """Burnt fraction Z0 whose product gas alone brings the chamber to
     `p_ign` [Pa]. Closed form, from the Noble-Abel EOS at T = T_flame:
@@ -143,13 +184,11 @@ def ignition_fraction(prop, charge_kg, volume_m3, p_ign):
             f'ignition pressure {p_ign:g} Pa is at or below the extinction '
             f'limit {prop.p_extinction:g} Pa - the charge would go out as '
             f'soon as it was lit')
-    solid_v = charge_kg / prop.rho
-    denom = charge_kg * (prop.force - p_ign * (1.0 / prop.rho - prop.covolume))
-    if denom <= 0.0 or volume_m3 <= solid_v:
+    if volume_m3 <= charge_kg / prop.rho:
         raise ValueError(
             f'cannot reach an ignition pressure of {p_ign:g} Pa in a '
             f'{volume_m3:g} m^3 chamber holding {charge_kg:g} kg')
-    Z0 = p_ign * (volume_m3 - solid_v) / denom
+    Z0 = burnt_fraction_at(prop, charge_kg, volume_m3, p_ign)
     if not 0.0 < Z0 <= 1.0:
         raise ValueError(
             f'an ignition pressure of {p_ign:g} Pa needs {Z0:.3g} of the '
