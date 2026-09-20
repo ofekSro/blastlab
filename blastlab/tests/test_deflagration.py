@@ -25,6 +25,7 @@ Both are pinned below. No WSL, no solver, runs in about a second.
 
 import os
 import sys
+from dataclasses import replace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
@@ -39,6 +40,16 @@ def check(name, ok, detail=''):
           + (f' - {detail}' if detail else ''))
     if not ok:
         FAIL.append(name)
+
+
+def _raises(fn, exc=ValueError):
+    try:
+        fn()
+    except exc:
+        return True
+    except Exception:
+        return False
+    return False
 
 
 def main():
@@ -159,7 +170,89 @@ def main():
     check('p_max is taken over every step, not just the samples',
           r['p_max'] >= max(r['p']) - 1e-9)
 
-    # ── 7. refusals ─────────────────────────────────────────────────────
+    # ── 7. ignition, extinction and the validity window ─────────────────
+    print('\n  ignition')
+    prop = d.PROPELLANTS['double_base']
+    # The igniter takes its gas FROM the charge, so every kilogram still
+    # ends up as product gas and the analytic limit is untouched. That is
+    # the invariant that lets ignition exist at all without costing the
+    # model its own verification.
+    ana = d.closed_vessel_pmax(prop, 5.0, 1.0)
+    lit = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0, p_ign=2.0e6)
+    check('an igniter does not change the closed-vessel limit',
+          abs(lit['p_max'] - ana) / ana < 1e-3,
+          f"{lit['p_max']/1e5:.3f} vs {ana/1e5:.3f} bar")
+    check('an igniter does not create mass',
+          abs(lit['m'][-1] - 5.0) < 1e-9 * 5.0, f"{lit['m'][-1]:.9f} kg")
+    z0 = d.ignition_fraction(prop, 5.0, 1.0, 2.0e6)
+    back = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                      p_ign=2.0e6)['p'][0]
+    check('ignition_fraction inverts the EOS: seeding Z0 really gives p_ign',
+          abs(back - 2.0e6) / 2.0e6 < 1e-6, f'Z0={z0:.6f} -> {back/1e6:.6f} MPa')
+    check('an ignition pressure at or below the extinction limit is refused',
+          _raises(lambda: d.ignition_fraction(
+              replace(prop, p_extinction=3.0e6), 5.0, 1.0, 2.0e6)))
+
+    print('\n  extinction')
+    check('every shipped row ships with extinction NOT modelled',
+          all(d.PROPELLANTS[n].p_extinction == 0.0
+              for n in d.PROPELLANT_NAMES))
+    lim = replace(prop, p_extinction=1.0e6)
+    leftover = []
+    for area in (0.05, 0.2, 1.0):
+        r = d.simulate(lim, 5.0, 1.0, vent_area=area, t_end=5.0)
+        leftover.append(r['Z'][-1])
+        check(f'vent {area:g} m^2: the burn goes out, and says so',
+              r['stop_reason'] == 'extinction' and r['extinguished'],
+              f"{r['stop_reason']}")
+    check('a bigger vent leaves MORE propellant unburnt',
+          leftover[0] > leftover[1] > leftover[2],
+          ' > '.join(f'{1 - z:.3f}' for z in leftover) + ' burnt')
+    check('extinction leaves real propellant behind, which the old '
+          'ambient-floored rate could never produce',
+          leftover[1] < 0.5, f'Z_end = {leftover[1]:.4f}')
+
+    print('\n  cannot sustain')
+    weak = replace(d.PROPELLANTS['single_base'], p_extinction=5.0e6)
+    check('a loading whose full burn cannot reach the limit does not sustain',
+          not d.sustains(weak, 5.0, 1.0),
+          f'p_cap = {d.closed_vessel_pmax(weak, 5.0, 1.0)/1e6:.3f} MPa')
+    r = d.simulate(weak, 5.0, 1.0, vent_area=0.0, t_end=5.0)
+    check('and it is an ANSWER, not an exception',
+          r['stop_reason'] == 'cannot sustain' and not r['burnt_out'],
+          f"{r['stop_reason']}")
+    check('no extinction limit means always sustains (the shipped default)',
+          d.sustains(prop, 5.0, 1.0))
+
+    print('\n  the Vieille validity window')
+    # This is the headline number of core/fuels.py, and it is the reason
+    # the window travels with the row: a gun propellant calibrated in a
+    # closed vessel at 50-300 MPa is being asked about a magazine at a
+    # few MPa, which is the whole burn spent outside the data.
+    for name in ('single_base', 'double_base'):
+        r = d.simulate(d.PROPELLANTS[name], 5.0, 1.0, vent_area=0.0,
+                       t_end=5.0)
+        check(f'{name}: the entire burn is an extrapolation',
+              r['extrapolated_fraction'] > 0.99,
+              f"{r['extrapolated_fraction']:.3f}")
+    r = d.simulate(d.PROPELLANTS['composite'], 5.0, 1.0, vent_area=0.0,
+                   t_end=120.0)
+    check('composite: characterised at motor pressures, so much of its '
+          'burn IS inside the window',
+          r['extrapolated_fraction'] < 0.9,
+          f"{r['extrapolated_fraction']:.3f}")
+
+    print('\n  per-field calibration')
+    check('calibrated is derived from uncalibrated, so they cannot disagree',
+          all(d.PROPELLANTS[n].calibrated == (not d.PROPELLANTS[n].uncalibrated)
+              for n in d.PROPELLANT_NAMES))
+    check('the measured thermochemistry is not flagged, the burn law is',
+          prop.is_calibrated('force') and prop.is_calibrated('covolume')
+          and not prop.is_calibrated('a') and not prop.is_calibrated('n'))
+    check('a row with every field sourced reports calibrated',
+          replace(prop, uncalibrated=()).calibrated)
+
+    # ── 8. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     for bad, label in (((0.0, 1.0), 'zero charge'),
                        ((5.0, 0.0), 'zero volume'),

@@ -96,6 +96,67 @@ def closed_vessel_pmax(prop, charge_kg, volume_m3):
     return prop.force * charge_kg / free
 
 
+#: Fraction of the charge an igniter converts before the burn carries
+#: itself. A starter charge is a small part of the round; it is raised
+#: only when that much gas cannot hold the deflagration limit.
+Z_IGN_DEFAULT = 0.01
+
+
+def sustains(prop, charge_kg, volume_m3):
+    """Can this loading density reach its own deflagration limit?
+
+    If the pressure the charge can generate with EVERYTHING burnt still
+    sits below `p_extinction`, the material lights and goes out. That is
+    a real and useful answer about a magazine - a small charge in a large
+    room cannot sustain combustion - so `simulate` reports it as a result
+    with `stop_reason = 'cannot sustain'` rather than raising.
+    """
+    if prop.p_extinction <= 0.0:
+        return True
+    return closed_vessel_pmax(prop, charge_kg, volume_m3) > prop.p_extinction
+
+
+def ignition_fraction(prop, charge_kg, volume_m3, p_ign):
+    """Burnt fraction Z0 whose product gas alone brings the chamber to
+    `p_ign` [Pa]. Closed form, from the Noble-Abel EOS at T = T_flame:
+
+        p (V0 - C(1-Z)/rho - b C Z) = C Z R T_flame = C Z * force
+    =>  Z = p (V0 - C/rho) / (C (force - p (1/rho - b)))
+
+    WHY IGNITION HAS TO BE MODELLED AT ALL. Once a low-pressure
+    extinction limit exists, a burn cannot start itself: seeding a
+    whisker of gas leaves the chamber at ambient, which is BELOW the
+    limit, so the burn rate is zero and nothing ever happens. That is not
+    a numerical nuisance - it is the physics. A real HD 1.3 event is
+    igniter-driven, and the model has to be too.
+
+    Taking the starter gas from the propellant itself, rather than adding
+    igniter mass, is what keeps the closed-vessel limit exact: all C
+    still ends up as gas, so p_max is untouched and the analytic check
+    stays the model's own verification.
+    """
+    if p_ign <= 0.0:
+        raise ValueError('ignition pressure must be positive')
+    if p_ign <= prop.p_extinction:
+        raise ValueError(
+            f'ignition pressure {p_ign:g} Pa is at or below the extinction '
+            f'limit {prop.p_extinction:g} Pa - the charge would go out as '
+            f'soon as it was lit')
+    solid_v = charge_kg / prop.rho
+    denom = charge_kg * (prop.force - p_ign * (1.0 / prop.rho - prop.covolume))
+    if denom <= 0.0 or volume_m3 <= solid_v:
+        raise ValueError(
+            f'cannot reach an ignition pressure of {p_ign:g} Pa in a '
+            f'{volume_m3:g} m^3 chamber holding {charge_kg:g} kg')
+    Z0 = p_ign * (volume_m3 - solid_v) / denom
+    if not 0.0 < Z0 <= 1.0:
+        raise ValueError(
+            f'an ignition pressure of {p_ign:g} Pa needs {Z0:.3g} of the '
+            f'charge burnt, which is not a fraction - lower p_ign or '
+            f'enlarge the chamber')
+    return Z0
+
+
 def _vent_mdot(p, T, prop, area, cd, p_amb):
     """Mass flow [kg/s] out of a vent of `area`, isentropic, choked-aware.
 
@@ -131,10 +192,15 @@ def _pressure(prop, charge_kg, volume_m3, Z, m, E):
 def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, state):
     Z, m, E = state
     p, T, _free = _pressure(prop, charge_kg, volume_m3, Z, m, E)
-    if Z >= 1.0:
+    # The pressure is used RAW here. It used to be max(p, p_amb), an
+    # ambient floor that silently made extinction impossible: a magazine
+    # that had vented down to atmospheric went on burning for ever at the
+    # ambient rate. Below the low-pressure deflagration limit a solid
+    # propellant does not sustain a flame, and that is now what happens.
+    if Z >= 1.0 or p < prop.p_extinction:
         dZ = 0.0
     else:
-        dZ = form_factor(prop, Z) * prop.a * (max(p, p_amb) ** prop.n) / prop.web
+        dZ = form_factor(prop, Z) * prop.a * (p ** prop.n) / prop.web
     mdot_gen = charge_kg * dZ
     mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb)
     mdot_out = min(mdot_out, m / 1e-9) if m <= 0.0 else mdot_out
@@ -144,7 +210,8 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, state):
 
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
-             t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000):
+             t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000,
+             p_ign=None):
     """Integrate the chamber to `t_end` [s]. RK4 with an adaptive step.
 
     Returns a dict with the sampled trace (`t, p, T, Z, m, mdot_out`,
@@ -156,6 +223,27 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
                          is then a partial record and `p_max` is a lower
                          bound, so callers must check this rather than
                          quietly trusting a truncated peak
+        extinguished     True if the burn went out below the propellant's
+                         low-pressure deflagration limit with propellant
+                         still unburnt
+        stop_reason      '' | 'burnt out and vented' | 'extinction'
+                         | 'step cap' | 't_end'
+        Z0               burnt fraction the igniter started from
+        extrapolated_fraction
+                         share of the BURNING time (not of `t_end`) spent
+                         with the chamber pressure outside the window the
+                         Vieille pair was measured over. A closed-vessel
+                         calibration lives at tens of MPa and a vented
+                         magazine at ~1 MPa, so this routinely comes back
+                         at 1.0 - and a peak pressure quoted without it is
+                         a two-decade extrapolation presented as a
+                         measurement. See core/fuels.py.
+
+    `p_ign` [Pa] is the pressure the igniter brings the chamber to before
+    the propellant's own burn takes over; `None` picks twice the
+    extinction limit, or the legacy whisker-of-gas seed for a propellant
+    that declares no limit. The starter gas comes from the charge itself,
+    so the closed-vessel limit is untouched - see `ignition_fraction`.
 
     The step is set by the physics, not by a fixed dt: at most 1 % of the
     burn or 5 % of the chamber mass per step, capped at `t_end / 50`.  It
@@ -171,8 +259,25 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         raise ValueError('charge and chamber volume must both be positive')
     closed_vessel_pmax(prop, charge_kg, volume_m3)   # raises if it cannot fit
 
-    # seed: a whisker of gas so T and p are defined at t = 0
-    Z = 1.0e-9
+    # seed. With an extinction limit the burn cannot light itself, so the
+    # igniter is part of the model; without one, keep the original
+    # whisker of gas so a propellant that declares no limit behaves
+    # exactly as it did before.
+    can_sustain = sustains(prop, charge_kg, volume_m3)
+    if p_ign is not None:
+        Z = ignition_fraction(prop, charge_kg, volume_m3, p_ign)
+    elif prop.p_extinction <= 0.0:
+        Z = 1.0e-9                      # legacy: no limit, no igniter
+    elif not can_sustain:
+        # lights and goes out; the loop's extinction test ends it at once
+        Z = Z_IGN_DEFAULT
+    else:
+        p_cap = closed_vessel_pmax(prop, charge_kg, volume_m3)
+        p_need = min(1.05 * prop.p_extinction,
+                     0.5 * (prop.p_extinction + p_cap))
+        Z = max(Z_IGN_DEFAULT,
+                ignition_fraction(prop, charge_kg, volume_m3, p_need))
+    Z0 = Z
     m = charge_kg * Z
     E = m * prop.cv * prop.T_flame
     t = 0.0
@@ -199,6 +304,10 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     last_sample = 0.0
     args = (prop, charge_kg, volume_m3, vent_area, cd, p_amb)
     steps = 0
+    stop_reason = 't_end'
+    extinguished = False
+    t_burning = 0.0
+    t_outside = 0.0
     while t < t_end and steps < max_steps:
         steps += 1
         s = (Z, m, E)
@@ -240,6 +349,13 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
             E += charge_kg * left * prop.cv * prop.T_flame
         m = max(m, 0.0)
         E = max(E, 0.0)
+        # Attribute the step BEFORE advancing t: k1 was evaluated at the
+        # start of it, so that is the pressure the burn law saw.
+        p_start = _pressure(prop, charge_kg, volume_m3, *s)[0]
+        if k1[0] > 0.0:
+            t_burning += h
+            if not prop.in_validity_window(p_start):
+                t_outside += h
         t += h
 
         p_now, _T = state_pT()
@@ -250,15 +366,35 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
             last_sample = t
         # burnt out and vented down: nothing left to integrate
         if Z >= 1.0 and vent_area > 0.0 and p_now <= p_amb * 1.001:
+            stop_reason = 'burnt out and vented'
+            break
+        # Went out below the deflagration limit with propellant left.
+        # Terminal: with the burn stopped nothing adds gas, so the
+        # pressure can only hold or fall further, and it can never climb
+        # back over the limit.
+        if Z < 1.0 and p_now < prop.p_extinction:
+            extinguished = True
+            stop_reason = 'extinction'
             break
 
     if out['t'][-1] < t:
         record()
+    if steps >= max_steps:
+        stop_reason = 'step cap'
+    if extinguished and t_burning <= 0.0:
+        # it never burned at all, which is a different statement about
+        # the magazine than "it burned and then went out"
+        stop_reason = 'cannot sustain'
     out['p_max'] = p_max
     out['t_p_max'] = t_p_max
     out['burnt_out'] = Z >= 1.0
     out['steps'] = steps
     out['hit_step_cap'] = steps >= max_steps
+    out['extinguished'] = extinguished
+    out['stop_reason'] = stop_reason
+    out['Z0'] = Z0
+    out['extrapolated_fraction'] = (t_outside / t_burning
+                                    if t_burning > 0.0 else 0.0)
     return out
 
 
