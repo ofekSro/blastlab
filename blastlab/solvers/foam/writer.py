@@ -1185,8 +1185,8 @@ def _dynamicmeshdict(spec=None, case=None):
         return foam_file('dynamicMeshDict',
                          block({'dynamicFvMesh': 'staticFvMesh'}),
                          location='constant')
-    est = (getattr(case, 'amr_estimator', 'densityGradient')
-           or 'densityGradient')
+    est = (getattr(case, 'amr_estimator', 'Lohner')
+           or 'Lohner')
     d = {'dynamicFvMesh': 'adaptiveFvMesh', 'errorEstimator': est}
     if est == 'Lohner':
         d['field'] = 'p'

@@ -113,7 +113,7 @@ def _amr_card():
                     rows=(
         F('amr_levels', 'AMR levels (0 = off)', 'choice', '0',
           values=levels),
-        F('amr_estimator', 'Error estimator', 'choice', 'densityGradient',
+        F('amr_estimator', 'Error estimator', 'choice', 'Lohner',
           values=tuple(AMR_ESTIMATORS), group='amr'),
         F('amr_refine', 'Refine above', 'float', 0.4, group='amr'),
         F('amr_unrefine', 'Unrefine below', 'float', 0.2, group='amr'),

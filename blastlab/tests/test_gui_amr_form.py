@@ -163,7 +163,7 @@ def main():
     root.update()
     g3 = form3.get_case()
     check('3D form round trip', g3.amr_levels == 3 and g3.amr_display_level == 1
-          and g3.amr_estimator == 'densityGradient')
+          and g3.amr_estimator == 'Lohner')
     plain = form3.get_case()
     plain.amr_levels = 0
     form3.set_case(plain)

@@ -9,7 +9,9 @@ FoamFile
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
 dynamicFvMesh   adaptiveFvMesh;
-errorEstimator  densityGradient;
+errorEstimator  Lohner;
+field           p;
+epsilon         0.05;
 refineInterval  2;
 lowerRefineLevel 0.2;
 unrefineLevel   0.1;

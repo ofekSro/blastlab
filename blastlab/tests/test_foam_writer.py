@@ -267,14 +267,26 @@ def amr_checks(specs):
     expose the display grid + per-time mesh fields."""
     s2 = specs['case2d_planar_amr']
     dm = norm(s2.files['constant/dynamicMeshDict'])
-    check('amr 2D: adaptiveFvMesh + densityGradient with the required keys',
+    # P1-6 (2026-09-20): the DEFAULT estimator is Lohner now - the golden
+    # tracks what an untouched case gets, so it carries field/epsilon.
+    check('amr 2D: adaptiveFvMesh + the Lohner default with its keys',
           all(k in dm for k in (
-              'dynamicFvMesh adaptiveFvMesh;', 'errorEstimator densityGradient;',
+              'dynamicFvMesh adaptiveFvMesh;', 'errorEstimator Lohner;',
+              'field p;', 'epsilon 0.05;',
               # re-tuned 2026-09-10, see Case2D.amr_refine
               'refineInterval 2;', 'lowerRefineLevel 0.2;', 'unrefineLevel 0.1;',
               'nBufferLayers 2;', 'maxRefinement 3;', 'maxCells 8000000;',
               'dumpLevel yes;'))
-          and 'epsilon' not in dm and 'loadBalance' not in dm, dm)
+          and 'loadBalance' not in dm, dm)
+    # the other estimator stays reachable by explicit choice, and its
+    # dict must NOT drag the Lohner-only keys along
+    import dataclasses
+    dg = render_case(dataclasses.replace(
+        cases()['case2d_planar_amr'], amr_estimator='densityGradient'))
+    dmg = norm(dg.files['constant/dynamicMeshDict'])
+    check('amr 2D: explicit densityGradient honoured, no Lohner keys',
+          'errorEstimator densityGradient;' in dmg
+          and 'epsilon' not in dmg and 'field p;' not in dmg, dmg)
     # parallel AMR: balancing on, and it MUST be paired with the
     # addEmptyPatch stage or blastFoam refuses to start (fvMeshBalance.C:112)
     dmp = norm(specs['case2d_planar_amr_np4'].files[

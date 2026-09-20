@@ -132,7 +132,14 @@ class Case2D:
     amr_levels: int = 0               # blastFoam dynamic refinement
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
-    amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
+    amr_estimator: str = 'Lohner'     # 'Lohner' | 'densityGradient'.
+                                      # Default flipped 2026-09-20 (P1-6,
+                                      # owner decision): densityGradient
+                                      # holds the near-axis charge crater
+                                      # refined until wedge cells drain to
+                                      # vacuum -> SIGFPE (axisym); Lohner
+                                      # (on p) ran the same case clean.
+                                      # An explicit choice is honoured.
     amr_refine: float = 0.2           # lowerRefineLevel (refine above);
                                       # RE-TUNED 2026-09-10. 0.4/0.2 was
                                       # chosen for ~3.6 % gauge error, but
@@ -237,7 +244,14 @@ class Case3D:
     amr_levels: int = 0               # blastFoam dynamic refinement
                                       # (adaptiveFvMesh): levels below the
                                       # base cell the mesh may reach, 0 = off
-    amr_estimator: str = 'densityGradient'   # 'densityGradient' | 'Lohner'
+    amr_estimator: str = 'Lohner'     # 'Lohner' | 'densityGradient'.
+                                      # Default flipped 2026-09-20 (P1-6,
+                                      # owner decision): densityGradient
+                                      # holds the near-axis charge crater
+                                      # refined until wedge cells drain to
+                                      # vacuum -> SIGFPE (axisym); Lohner
+                                      # (on p) ran the same case clean.
+                                      # An explicit choice is honoured.
     amr_refine: float = 0.2           # lowerRefineLevel (refine above);
                                       # RE-TUNED 2026-09-10. 0.4/0.2 was
                                       # chosen for ~3.6 % gauge error, but

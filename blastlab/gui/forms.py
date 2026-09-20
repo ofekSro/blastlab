@@ -495,7 +495,7 @@ class CaseForm(ctk.CTkFrame):
             self.v['amr_levels'].trace_add(
                 'write', lambda *a: self._apply_mode())
             self._amr_est_combo = _combo(
-                amr, self._var('amr_estimator', 'densityGradient'),
+                amr, self._var('amr_estimator', 'Lohner'),
                 list(AMR_ESTIMATORS))
             r, lbl, w = self._srow(amr, r, 'Error estimator',
                                    self._amr_est_combo)
@@ -885,7 +885,7 @@ class CaseForm(ctk.CTkFrame):
                            if foam and not amr_on else 'global'),
             amr_levels=amr_levels,
             amr_estimator=(v['amr_estimator'].get() if amr_on
-                           else 'densityGradient'),
+                           else 'Lohner'),
             amr_refine=(_F('amr_refine', 'AMR refine threshold')
                         if amr_on else 0.4),
             amr_unrefine=(_F('amr_unrefine', 'AMR unrefine threshold')
@@ -968,7 +968,7 @@ class CaseForm(ctk.CTkFrame):
         v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
         v['amr_levels'].set(str(int(getattr(case, 'amr_levels', 0) or 0)))
         v['amr_estimator'].set(getattr(case, 'amr_estimator',
-                                       'densityGradient') or 'densityGradient')
+                                       'Lohner') or 'Lohner')
         for key, default in (('amr_refine', 0.4), ('amr_unrefine', 0.2),
                              ('amr_interval', 2), ('amr_buffer', 2),
                              ('amr_max_cells', 0)):

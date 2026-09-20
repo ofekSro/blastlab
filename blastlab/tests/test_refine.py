@@ -455,7 +455,7 @@ def test_amr():
     a.amr_levels = 4
     rep = validate_case(a)
     check('valid AMR case: no errors, AMR notes, report fields',
-          not rep.errors and any('AMR (densityGradient)' in n for n in rep.notes)
+          not rep.errors and any('AMR (Lohner)' in n for n in rep.notes)
           and any('displayed at level 1' in n for n in rep.notes)
           and any('may grow to 8,000,000' in n for n in rep.notes)
           and rep.amr_levels == 4 and rep.display_level == 1
@@ -469,7 +469,7 @@ def test_amr():
     back = case_from_dict(d)
     check('v5 round trip coerces the amr ints', back.amr_levels == 3
           and isinstance(back.amr_levels, int) and back.amr_display_level == 1
-          and back.amr_estimator == 'densityGradient'
+          and back.amr_estimator == 'Lohner'   # P1-6 default
           and d['version'] == VERSION)
     n = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=25.0,
                center=(1.0, 1.0), solver='native', amr_levels=2)
@@ -502,8 +502,14 @@ def test_amr():
             setattr(c, k, v)
         rep = validate_case(c)
         check(f'{kw} -> error', any(frag in e for e in rep.errors), str(rep.errors))
+    check('P1-6: the default estimator is Lohner on both dataclasses',
+          Case2D(Lx=1.0, Ly=1.0, cell_size_m=0.1, charge=1.0,
+                 center=(0.5, 0.5)).amr_estimator == 'Lohner'
+          and Case3D(Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.1, charge=1.0,
+                     center=(0.5, 0.5, 0.5)).amr_estimator == 'Lohner')
     ax = Case2D(Lx=2.0, Ly=2.0, cell_size_m=0.1, charge=1.0, center=(0.0, 1.0),
-                solver='blastfoam', amr_levels=4)
+                solver='blastfoam', amr_levels=4,
+                amr_estimator='densityGradient')   # explicit since P1-6
     rep = validate_case(ax)
     check('axisym AMR + densityGradient -> crash warning naming Lohner',
           not rep.errors and any('Axisymmetric AMR' in w and 'Lohner' in w

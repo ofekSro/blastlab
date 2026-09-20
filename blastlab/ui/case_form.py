@@ -287,7 +287,7 @@ class CaseForm(FieldForm):
                            if foam and not amr_on else 'global'),
             amr_levels=amr_levels,
             amr_estimator=(v['amr_estimator'].get() if amr_on
-                           else 'densityGradient'),
+                           else 'Lohner'),
             amr_refine=(_F('amr_refine', 'AMR refine threshold')
                         if amr_on else 0.4),
             amr_unrefine=(_F('amr_unrefine', 'AMR unrefine threshold')
@@ -369,8 +369,8 @@ class CaseForm(FieldForm):
         v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
         v['amr_levels'].set(str(int(getattr(case, 'amr_levels', 0) or 0)))
         v['amr_estimator'].set(
-            getattr(case, 'amr_estimator', 'densityGradient')
-            or 'densityGradient')
+            getattr(case, 'amr_estimator', 'Lohner')
+            or 'Lohner')
         for key, default in (('amr_refine', 0.4), ('amr_unrefine', 0.2),
                              ('amr_interval', 2), ('amr_buffer', 2),
                              ('amr_max_cells', 0)):

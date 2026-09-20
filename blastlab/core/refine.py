@@ -1043,8 +1043,8 @@ def validate_amr(case, plan, rho0=None):
     plan came from `plan_levels` with `amr_levels > 0`."""
     errors, warnings, notes = [], [], []
     amr = int(plan.amr)
-    est = (getattr(case, 'amr_estimator', 'densityGradient')
-           or 'densityGradient')
+    est = (getattr(case, 'amr_estimator', 'Lohner')
+           or 'Lohner')
     if est not in AMR_ESTIMATORS:
         errors.append(f"Unknown AMR error estimator '{est}' (use "
                       + ' or '.join(repr(e) for e in AMR_ESTIMATORS) + ")")
