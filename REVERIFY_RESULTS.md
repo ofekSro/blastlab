@@ -471,16 +471,56 @@ The claim states: *"Parallel scotch runs deviate by a few % near-field (archived
 worst case **+7 % at Z = 0.175 for np = 2**)."* — attributing that deviation to
 this double-ignition mechanism.
 
-**At scotch np = 2 the detonation point ignites exactly one cell, the same as
-serial.** There is no over-ignition there at all. Whatever produced the archived
-+7 % at np = 2, **it is not this mechanism.** That deviation belongs to Claim 2's
-separate channel and still needs a cause.
+**In the 2D planar case measured here, scotch np = 2 ignites exactly one cell,
+the same as serial** — no over-ignition at all.
+
+> ### ⚠ Correction (later the same day, from R2.2e)
+>
+> I originally wrote the sentence above as a general claim — *"whatever produced
+> the archived +7 % at np = 2, it is not this mechanism"* — and that was
+> **over-generalising from one geometry.** The archived +7 % is the **3D** case,
+> and scotch behaves differently there. Measured directly on the 3D Claim-2 case
+> (1 m cube, 76³, det point at the centre node):
+>
+> | arm | serial | scotch np = 2 | per rank |
+> |---|---|---|---|
+> | **A** — node, `findCell` path | **1** | **2** | `p0:1 p1:1` |
+> | **B** — nudged +1e-6 dx | 1 | **1** | `p0:0 p1:1` |
+> | **C** — today's `det_radii` default | 8 | **8** | `p0:4 p1:4` |
+>
+> `sum(lambda)` goes 1.000000 → **2.000000** in arm A. **The default `scotch` at
+> np = 2 does split the node in 3D**, confirming the partition probe's 4-of-4
+> finding on the production corpus. So the Claim 1 mechanism *can* reach the
+> archived 3D +7 %, and the refutation below holds only for the 2D geometry I
+> measured it in.
+>
+> All three R2.2e predictions came out right, including that arm C gives **8** —
+> the number of cells sharing a 3D node, since 0.9·dx clears the 0.866·dx
+> diagonal.
 
 So Claim 1 splits:
 
 - **The mechanism: CONFIRMED** — reproduced independently, with a dose-response
   the original work never measured, and now explained at code level.
-- **The attribution of the np = 2 near-field deviation to it: REFUTED.**
+- **Its attribution to the archived np = 2 deviation: REFUTED in 2D, and NOT
+  refuted in 3D** — see the correction above. The 3D gauge measurement (R2.2a–d)
+  is what decides whether the split node actually produces the +7 %.
+
+### A measurement trap worth recording
+
+The first attempt at the 3D seed count returned **8 cells in serial and 8 in
+parallel** and would have read as "no effect". It was wrong, and the reason
+generalises: `linearActivation::correct()` lights cells geometrically from
+`tIgn = |C − dp| / vDet`, so by time `t` everything within `vDet·t` is already
+lit **regardless of the seed**. That case wrote first at `t = 2.5e-6`, where
+`vDet·t = 0.0173 m` — already past the nearest cell centre at
+`√3/2·dx = 0.0114 m`. The seed was invisible under the geometric front.
+
+Re-run with `endTime = 5e-7` (`vDet·t = 3.5e-3 m`, a factor 3.3 inside the
+margin) and writes every step, the same six cases gave the 1 / 2 / 1 / 1 / 8 / 8
+table above. **A seed measurement is only valid while `vDet·t` is below the
+nearest cell-centre distance**; R1.2's 2D numbers satisfied that
+(`vDet·t = 8.3e-4` against `dx = 0.025`), which is why they were sound.
 
 ### R1.3 / R1.4 — the two levers, tested against the worst case
 
