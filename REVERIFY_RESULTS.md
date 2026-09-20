@@ -758,6 +758,48 @@ more experiment, stated precisely:
 > seed at `activationModel.C:183` and ranks 2 and 3 are excluded. If B still shows
 > ≈ +7 %, the seed is excluded and the next cut is aliasing vs. the probe.
 
+### R2.2 — the discriminating run (pre-registered 20.09, before it ran)
+
+**A correction to §6 first.** §6 states "at scotch np = 2 the detonation point
+ignites exactly one cell". That was measured on the **2D planar** case, and I
+generalised it too far. The archived +7 % is the **3D** case, and scotch behaves
+differently there: a partition probe over the production corpus found **4 of 4**
+real 3D runs at scotch np = 2 with the centre node owned by two ranks. So the
+Claim 1 mechanism may well reach the 3D +7 % even though it does not reach the
+2D np = 2 case. That is what this run settles.
+
+**Case.** `test_foam_3d_smoke`'s: 1 m cube, `cell_size_m = 0.025` refined by the
+charge rule to `dx = L/76 = 0.0131578947`, 8 kg TNT at the centre,
+`adaptive_write = False` (B23, pinned write schedule), gauges snapped to exact
+mirror cell centres so probe placement is out of the comparison,
+`t_end = 4.0e-4`, 438,976 cells, `method scotch`. Verified before running:
+`0.5 / dx = 38.000000` exactly, so the detonation point **is** a mesh node
+shared by 8 cells.
+
+**Three arms x {np = 1, np = 2}.** `det_radii=[0.0]` is how an arm opts out of
+today's default — `radius_ = 0` sends `detonationPoint` back down the
+`mesh.findCell` branch.
+
+| arm | detonation point | radii written | what it tests |
+|---|---|---|---|
+| **A** | the node | `0` | the old `findCell` path |
+| **B** | node + 1e-6 dx | `0` | the N5-7 nudge mitigation |
+| **C** | the node | `0.01184210526` | the fix committed today |
+
+**Pre-registered rules.** Every arm is read against **its own** serial
+reference, never across arms — the nudge is known to move the serial answer, and
+cross-arm reading is what got N5-7 reverted.
+
+| # | Rule | Threshold fixed in advance |
+|---|---|---|
+| **R2.2a** | arm A, parallel vs serial peak at the Z = 0.175 gauges | **≥ 2 %** = the effect reproduced; below that, this case does not carry the archived deviation and the run is uninformative |
+| **R2.2b** | arm B, same comparison | **< 0.5 %** → the ignition seed is the dominant cause of the +7 % |
+| **R2.2c** | arm C, same comparison | **< 0.5 %** → today's `det_radii` default closes the Claim 2 gap as well as the Claim 1 one |
+| **R2.2d** | If B **and** C both stay **≥ 2 %** | the seed is excluded; the cause is elsewhere (temporal aliasing or probe election) and Claim 2 stays open |
+| **R2.2e** | activated cells per rank | predicted: A np=2 **> 1**; B np=2 **= 1**; C np=1 **=** C np=2 |
+
+Peak, positive-phase impulse **and** arrival are recorded for every run.
+
 ### A blastlab defect found along the way
 
 **`adjustLocations` is a no-op for any in-mesh probe.** In
