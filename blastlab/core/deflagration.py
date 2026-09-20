@@ -53,16 +53,18 @@ against the monotonicity the burn law implies.
 
 STATUS OF THE NUMBERS
 ---------------------
-`PROPELLANTS` rows are REPRESENTATIVE LITERATURE RANGES for classes of
-material, not a calibrated table for any specific product, and the burn
-coefficients in particular vary between lots. Nothing here is quotable
-without a closed-vessel test of the actual material - the same standard
-`materials.py` holds its non-TNT afterburn rows to. `calibrated=False` on
-every row is deliberate and is checked by the test suite.
+The material table lives in `core/fuels.py` and is re-exported here, so
+`deflagration.PROPELLANTS` keeps working. Every row is a REPRESENTATIVE
+LITERATURE RANGE for a class of material, not product data, and nothing
+is quotable without a closed-vessel test of the actual material. See that
+module's docstring for why the table is separate and what `calibrated`
+means.
 """
 
 import math
-from dataclasses import dataclass
+
+from .fuels import (Propellant, PROPELLANTS, PROPELLANT_NAMES,  # noqa: F401
+                    form_factor)
 
 #: Ambient back-pressure for the vent [Pa]. Matches core.constants.P_AIR.
 P_AMB = 101325.0
@@ -70,94 +72,6 @@ P_AMB = 101325.0
 #: Web fraction below which a grain counts as burnt out. See the snap in
 #: `simulate`: a degressive grain never reaches Z = 1 in finite time.
 _BURNOUT_EPS = 1.0e-9
-
-
-@dataclass(frozen=True)
-class Propellant:
-    """A deflagrating (HD 1.3) material.
-
-    force        lambda = R * T_flame [J/kg]. The "impetus" or "force
-                 constant" of interior ballistics; sets the pressure a
-                 given mass reaches in a given volume.
-    covolume     b [m^3/kg]. The Noble-Abel co-volume - roughly the volume
-                 the product molecules themselves occupy. ~1e-3 for most
-                 propellant gases, i.e. 1 litre per kg, which is NOT
-                 negligible against a chamber of a few litres.
-    rho          solid density [kg/m^3]
-    T_flame      isochoric flame temperature [K]
-    a, n         Vieille burn law r = a * p**n, r in m/s with p in Pa
-    gamma        ratio of specific heats of the product gas
-    web          w0 [m]: the burning distance from the surface to
-                 burn-out. For a slab burning on both faces this is the
-                 half-thickness; dZ/dt = sigma(Z) * r / w0.
-    form         'neutral' | 'degressive' | 'progressive'
-    theta        progressivity, used only by form='progressive'
-    calibrated   False everywhere on purpose - see the module docstring.
-    """
-    force: float
-    covolume: float
-    rho: float
-    T_flame: float
-    a: float
-    n: float
-    gamma: float = 1.25
-    web: float = 1.0e-3
-    form: str = 'degressive'
-    theta: float = 1.0
-    calibrated: bool = False
-
-    @property
-    def R(self):
-        """Specific gas constant [J/(kg K)] - force / flame temperature."""
-        return self.force / self.T_flame
-
-    @property
-    def cv(self):
-        return self.R / (self.gamma - 1.0)
-
-    @property
-    def cp(self):
-        return self.gamma * self.cv
-
-
-#: Representative classes, NOT product data. See the module docstring.
-#: force/T_flame/covolume are the usual textbook ranges for each class;
-#: the Vieille pair is where lot-to-lot variation really lives.
-PROPELLANTS = {
-    # nitrocellulose only - the lowest-energy, coolest of the three
-    'single_base': Propellant(force=0.95e6, covolume=1.05e-3, rho=1600.0,
-                              T_flame=2500.0, a=5.0e-8, n=0.85,
-                              gamma=1.25, web=1.0e-3, form='degressive'),
-    # NC + nitroglycerine - hotter and faster
-    'double_base': Propellant(force=1.10e6, covolume=1.00e-3, rho=1650.0,
-                              T_flame=3000.0, a=8.0e-8, n=0.90,
-                              gamma=1.24, web=1.0e-3, form='degressive'),
-    # AP/HTPB-like composite - lower pressure exponent, near-neutral burn
-    'composite': Propellant(force=1.00e6, covolume=1.10e-3, rho=1750.0,
-                            T_flame=3000.0, a=3.0e-6, n=0.35,
-                            gamma=1.20, web=3.0e-3, form='neutral'),
-}
-
-PROPELLANT_NAMES = tuple(PROPELLANTS)
-
-
-def form_factor(prop, Z):
-    """sigma(Z) = S(Z)/S0, the burning surface relative to its initial value.
-
-    neutral      a slab or a tube burning inward and outward at once, the
-                 area changes cancel -> 1
-    degressive   a sphere or a cord: the surface shrinks as it burns, and
-                 for a sphere S ~ r^2 while the burnt fraction goes as
-                 r^3, hence (1 - Z)^(2/3)
-    progressive  a multi-perforated grain, whose internal perforations
-                 grow faster than the outside shrinks -> 1 + theta*Z
-    """
-    Z = min(max(Z, 0.0), 1.0)
-    if prop.form == 'neutral':
-        return 1.0
-    if prop.form == 'progressive':
-        return 1.0 + prop.theta * Z
-    return (1.0 - Z) ** (2.0 / 3.0)
 
 
 def closed_vessel_pmax(prop, charge_kg, volume_m3):
