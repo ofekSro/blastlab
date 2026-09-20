@@ -70,6 +70,7 @@ makes it the first thing a sensitivity band should sweep and the last
 thing to set from a handbook without thinking.
 """
 
+import math
 from dataclasses import dataclass
 
 FORMS = ('neutral', 'degressive', 'progressive')
@@ -104,6 +105,14 @@ class Propellant:
                  burn rate is taken as zero and the charge goes out.
                  **Ships as 0.0 - not modelled - and that is a physics
                  decision, not an oversight.** See below.
+    r_atm        [m/s] the linear burn rate at ATMOSPHERIC pressure, used
+                 by the unconfined model. A measured quantity in its own
+                 right, NOT a p^n extrapolation: getting it from a closed
+                 vessel calibrated at tens of MPa would be a three-decade
+                 reach, the worst in the whole tool. Keeping it as a
+                 separate field is what lets the unconfined branch stand
+                 on its own data instead of borrowing the confined
+                 branch's. See core/unconfined.py.
 
     uncalibrated names of the fields with no measurement behind them
     calibrated   derived: True only when `uncalibrated` is empty
@@ -121,6 +130,7 @@ class Propellant:
     p_valid_min: float = 0.0
     p_valid_max: float = float('inf')
     p_extinction: float = 0.0
+    r_atm: float = 0.0
     uncalibrated: tuple = ()
 
     @property
@@ -160,7 +170,7 @@ class Propellant:
 #: characterised, which is knowledge about the METHOD rather than about
 #: the material, so they are listed too until a real test defines them.
 _PLACEHOLDER = ('a', 'n', 'web', 'p_extinction', 'p_valid_min',
-                'p_valid_max')
+                'p_valid_max', 'r_atm')
 
 #: Representative classes, NOT product data. See the module docstring.
 #: force/T_flame/covolume are the usual textbook ranges for each class;
@@ -180,21 +190,21 @@ PROPELLANTS = {
                               T_flame=2500.0, a=5.0e-8, n=0.85,
                               gamma=1.25, web=1.0e-3, form='degressive',
                               p_valid_min=50.0e6, p_valid_max=300.0e6,
-                              p_extinction=0.0,
+                              p_extinction=0.0, r_atm=0.15e-3,
                               uncalibrated=_PLACEHOLDER),
     # NC + nitroglycerine - hotter and faster
     'double_base': Propellant(force=1.10e6, covolume=1.00e-3, rho=1650.0,
                               T_flame=3000.0, a=8.0e-8, n=0.90,
                               gamma=1.24, web=1.0e-3, form='degressive',
                               p_valid_min=50.0e6, p_valid_max=300.0e6,
-                              p_extinction=0.0,
+                              p_extinction=0.0, r_atm=0.20e-3,
                               uncalibrated=_PLACEHOLDER),
     # AP/HTPB-like composite - lower pressure exponent, near-neutral burn
     'composite': Propellant(force=1.00e6, covolume=1.10e-3, rho=1750.0,
                             T_flame=3000.0, a=3.0e-6, n=0.35,
                             gamma=1.20, web=3.0e-3, form='neutral',
                             p_valid_min=1.0e6, p_valid_max=15.0e6,
-                            p_extinction=0.0,
+                            p_extinction=0.0, r_atm=1.0e-3,
                             uncalibrated=_PLACEHOLDER),
 }
 
@@ -221,3 +231,31 @@ def form_factor(prop, Z):
     if prop.form == 'progressive':
         return 1.0 + prop.theta * Z
     return (1.0 - Z) ** (2.0 / 3.0)
+
+
+def web_burn_time(prop, rate):
+    """Time [s] for one grain to burn out at a CONSTANT linear rate.
+
+    Not web/rate, except for a neutral grain. The burnt fraction follows
+    dz/dt = sigma(z) * rate / web, so the time to reach z = 1 is
+    web/rate times the integral of 1/sigma:
+
+        neutral      1
+        degressive   3          (sigma = (1-z)^(2/3): finite, but three
+                                 times longer than the web suggests)
+        progressive  ln(1+theta)/theta   (< 1 - it accelerates)
+
+    Getting this wrong is not cosmetic. It was web/rate here first, and
+    the unconfined burn was cut off at a third of its length with 0.5 %
+    of the charge still unburnt and the total energy short to match.
+    """
+    if rate <= 0.0:
+        raise ValueError('burn rate must be positive')
+    if prop.form == 'neutral':
+        factor = 1.0
+    elif prop.form == 'degressive':
+        factor = 3.0
+    else:
+        th = prop.theta
+        factor = (math.log1p(th) / th) if th > 0 else 1.0
+    return factor * prop.web / rate

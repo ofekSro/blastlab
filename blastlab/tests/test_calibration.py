@@ -244,14 +244,18 @@ def main():
           not fitted.calibrated)
     done, _ = cal.fit_closed_vessel(t, p, deg, C, V, heat_loss='scaled',
                                     web_measured=True, refine=False)
-    # Even with the burn law fitted AND the grain measured, one field
-    # survives - and it is the right one. A closed vessel only ever sees
-    # high pressure, so it cannot say anything about where the flame goes
-    # out. No closed-vessel test can ever fully calibrate a row, and the
-    # per-field flags are what make that visible instead of implied.
-    check('a closed-vessel test can never calibrate the extinction limit, '
-          'and exactly that field survives',
-          done.uncalibrated == ('p_extinction',) and not done.calibrated,
+    # Even with the burn law fitted AND the grain measured, two fields
+    # survive - and they are exactly the right two, for one reason. A
+    # closed vessel only ever visits HIGH pressure, so it can say nothing
+    # about where the flame goes out or how fast the material burns at
+    # one atmosphere. No closed-vessel test can ever fully calibrate a
+    # row, and the per-field flags are what make that visible rather than
+    # implied.
+    check('a closed-vessel test can calibrate neither the extinction '
+          'limit nor the atmospheric burn rate, and exactly those two '
+          'survive',
+          set(done.uncalibrated) == {'p_extinction', 'r_atm'}
+          and not done.calibrated,
           str(done.uncalibrated))
     check('a row with the extinction limit settled too is fully calibrated',
           replace(done, uncalibrated=()).calibrated)
