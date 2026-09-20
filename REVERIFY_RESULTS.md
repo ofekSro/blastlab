@@ -63,8 +63,13 @@ form it was written, whatever our reproducer does.
 |---|---|
 | `test_foam_writer.py` (goldens, no WSL) | **PASS** — all 16 goldens byte-identical |
 | `pgrep -a blastFoam` in WSL before every run | empty (scripted guard, aborts on a hit) |
-| `test_foam_1d_vs_native.py` | see §8 |
-| `test_foam_kb_anchor.py` | see §8 |
+| `test_foam_1d_vs_native.py` (WSL) | **PASS** — 12/12; peak ratios 1.10/1.14/1.14/1.16 and arrivals within 0.7–4.5 % at r = 1–4 m |
+| `test_foam_kb_anchor.py` (WSL) | **PASS** — KB ratios 0.89 / 0.85 / 0.86 / 0.87 at Z = 1–4, exactly the no-afterburn baseline `materials.py:83-86` documents; C4/TNT 1.17 / 1.13 / 1.11 |
+
+Both WSL gates were run **after** the measurements, not before — an ordering
+weakness worth stating. They pass, and `test_foam_1d_vs_native.py` in particular
+had been failing earlier in the session from a concurrent session's uncommitted
+work, which that session has since committed.
 
 ---
 
@@ -502,15 +507,123 @@ Both levers now have a **code-level explanation, not just a measurement**:
   rank. This converts the previously-empirical "np-invariant to ±0.1 %" into a
   guarantee that follows from the source.
 
+### R1.3 / R1.4 — what the over-ignition actually costs
+
+Six runs to `t = 1 ms`, gauge at (3.2, 2.0), `t_end` set on the Case so no
+controlDict was hand-edited. Peak, positive-phase impulse **and** arrival, per
+the standing rule.
+
+**First, an independent check on the claim's own baseline.** The claim quotes a
+serial window impulse of **983.4 Pa·s** (`t ≤ 0.369 ms`). This audit measures
+**982.14 Pa·s** — a **0.13 % match**, from a case built independently through
+blastlab's writer. The claim's serial reference number reproduces.
+
+| variant | | peak [kPa] | I⁺ [Pa·s] | I(≤0.369 ms) | arrival [ms] |
+|---|---|---|---|---|---|
+| base | serial | 19914.17 | 3754.02 | 982.14 | 0.18984 |
+| base | par4 | 19607.97 | 3739.55 | 975.25 | 0.19063 |
+| levA | serial | 17834.97 | 3829.16 | 1109.03 | 0.19922 |
+| levA | par4 | 18106.38 | 3838.97 | 1120.40 | 0.19844 |
+| levB | serial | 19606.78 | 3739.56 | 975.19 | 0.19063 |
+| levB | par4 | 19607.97 | 3739.55 | 975.25 | 0.19063 |
+
+Parallel vs serial:
+
+| variant | peak | I⁺ | I(window) | arrival | pre-registered rule |
+|---|---|---|---|---|---|
+| base | −1.538 % | −0.385 % | −0.701 % | +0.411 % | (no threshold) |
+| **levA** | **+1.522 %** | +0.256 % | **+1.025 %** | −0.393 % | **R1.3 ≤ 0.3 % — FAILS** |
+| **levB** | **+0.006 %** | **−0.000 %** | **+0.007 %** | **+0.000 %** | **R1.4 ±0.1 % — PASSES** |
+
+Three things follow, and the second was not expected.
+
+**1. The over-ignition is real but small at the gauge.** Igniting 4 cells instead
+of 1 moves peak by −1.5 % and impulse by −0.4 to −0.7 % at R = 1.19 m. It is
+**nowhere near the archived +7 %**, and the sign is negative where the archive
+reports positive. Whatever produced +7 %, this is not it — consistent with §6's
+finding that scotch np=2 does not over-ignite at all.
+
+**2. Lever A fails, and the failure is informative.** R1.2 verified that lever A
+ignites **exactly one cell in both serial and par4** (`processor3:1`, all others
+0). The ignition is identical. Yet peak still moves +1.52 % and window impulse
++1.03 %. **A parallel deviation that survives an identical ignition is, by
+construction, a second and independent channel** — i.e. Claim 2's. The N5-7
+"detonation-point nudge" mitigation therefore does **not** make a parallel run
+match its serial reference; it only removes one of two channels.
+
+**3. Lever B is essentially exact.** 0.006 % on peak, 0.000 % on impulse and
+arrival. Note also `base/par4 ≈ levB/serial ≈ levB/par4 ≈ 19607 kPa` while
+`base/serial = 19914` — the 4-cell ignition state is what sets the answer, and
+`det_radii` reaches it **deterministically in both serial and parallel**. That is
+what a correct mitigation looks like: not "parallel now agrees with serial by
+luck", but "both compute the same thing".
+
 ### What blastlab should do about it
 
-`det_radii` is already wired through `Case2D`/`Case3D` and `validate_case`
-(N5-12). Given that lever B is partition-invariant *by construction* and lever A
-depends on the user not landing on a cell boundary, **the robust fix is to default
-`det_radii` to one base cell for blastFoam cases** rather than to keep relying on
-the writer never placing a detonation point on an interior corner — which it does
-by default, since `effective_dx` divides the domain evenly and the charge centre
-is the domain centre.
+**Default `det_radii` to one base cell for blastFoam cases.** It is already wired
+through `Case2D`/`Case3D` and `validate_case` (N5-12). The evidence for
+preferring it over the nudge is now direct: lever B is partition-invariant by
+construction *and* measures 0.006 %, while lever A is a discrete coin-flip on
+cell placement *and* fails its own threshold at +1.5 %.
+
+This is not hypothetical exposure. An investigator surveyed the detonation points
+in cases blastlab has actually written: **117 of 140 (84 %) sit on at least one
+cell face**, and **40 of 58 (69 %) parallel scotch cases touch two or more cells**.
+Both shipped defaults land on a node — `Case2D` (4×4 axisym, 1 kg) gives
+`dx = 4/608` with `y0 = 2.0 = 304·dx`; `Case3D` (1.5³, 25 kg) gives `dx = 1.5/78`
+with `0.75 = 39·dx` on all three axes, an interior node shared by **8** cells.
+And on the production corpus, **4 of 4 real 3D runs** (1 m³ cube, det at the
+centre node, default `scotch`, np=2) have the point owned by two ranks.
+
+### Two corrections to this audit's own method
+
+**(a) The statistic was valid but fragile.** `count(lambda >= 0.99)` is correct at
+the first write and *only* there: the conservative re-solve at
+`activationModel.C:505-509` immediately smears lambda (serial cell 12719 decays
+1.0 → 0.957 → 0.914 → … → 0.673 with the sum conserved and support growing 1 → 21
+cells), so the count returns 0 at every later write, in serial and parallel
+alike. **`sum(lambda)` is the robust statistic** and should have been used.
+
+**(b) Measured with `sum(lambda)`, the defect is worse than I reported.**
+`sum(lambda)` is 1.000 → 1.011 serial, 2.000 → 2.018 for `simple(2 1 1)`, and
+4.000 → 4.037 for `scotch np=4` / `simple(2 2 1)` — **holding the 2.00× / 4.00×
+ratio at every written time through to endTime.** The parallel runs deposit N×
+the initiation energy and **it does not wash out**. My §4 statement that the extra
+cell is "energy released earlier and off-axis, not extra energy over the run" is
+too generous: under `linear` activation the *seeded* cells are forced to
+lambda = 1 regardless of `tIgn_`, so N seeds means N cells' worth of initiation
+energy, persistently.
+
+### Five attacks on this measurement, all of which failed
+
+An adversarial pass tried to break the R1.2 result and could not:
+
+- **Timing** — `t = 1.2e-07` is genuinely the first step, and `correct()`
+  contributes **zero for the entire run**: the nearest cell centre is 1.768e-2 m
+  from (2,2), giving `tIgn = 2.551e-6 s`, beyond the 1.98e-6 s endTime.
+- **Threshold sensitivity** — 0.99 / 0.9 / 0.5 / 0.1 / 1e-3 / 1e-9 all return
+  **identically** 1/1/1/2/4/4.
+- **Halo contamination** — processor patches *do* carry `lambda = 1.0`
+  (`procBoundary0to1` and `0to2` each hold one), so whole-file counting would
+  have yielded 12 for scotch4. The audit reported 4, which is only consistent
+  with correct internal-field-only parsing.
+- **Double counting** — `cellProcAddressing` unions to exactly 25,600 distinct
+  global ids with **0 duplicates** in every parallel case, so summing across
+  ranks is exact.
+- **Innocent explanation** — the four activated cells are globals
+  12719/12720/12879/12880, exactly the 2×2 block sharing the corner (2.0, 2.0);
+  the charge itself spans 392 cells, not 4; and `case.json` and `phaseProperties`
+  are **byte-identical** between the serial and `simple4` cases.
+
+### One fair criticism, recorded
+
+`simple (2 2 1)` is a dict **blastlab never writes** — `_decomposepardict` emits
+only `numberOfSubdomains` + `method scotch`, and all 36 decomposeParDicts on disk
+from real runs are scotch. So that specific reproduction is artificial. The
+defence is that the *exposure* is structural and already realised (the 4/4
+production np=2 hits above); the honest criticism is that the 4-way effect was
+demonstrated with a forced dict instead of the 2-way hit the default already
+produces.
 
 ---
 
@@ -556,10 +669,173 @@ See §9. The revised rules stand as written and are the right next experiments;
 the serial-solver budget on this machine went to Claim 1, which was decidable
 here and is the claim the prompt said had never been directly observed.
 
-## 8. Claims 2 and 5
+## 8. Claim 2 — **INCONCLUSIVE, but a second channel is now proven to exist and the field is narrowed to two candidates**
 
-*(pending — see §9 for what ran)*
+Claim 2 says a fixed uniform mesh shows np-dependent near-field peak movement of
+±7 % that the symmetry gate cannot see.
+
+### The audit's own direct evidence that a second channel is real
+
+This did not come from code reading. **Lever A ignites exactly one cell in both
+serial and par4 — verified per rank in R1.2 — and still moves peak by +1.52 % and
+window impulse by +1.03 %** (§6). A parallel deviation that survives a verified-
+identical ignition cannot be the Claim 1 mechanism. **Claim 2's channel exists,
+independently of Claim 1.**
+
+Combined with §6's finding that scotch np=2 does not over-ignite at all, the
+archived +7 % at np=2 has to come from here.
+
+### Candidate channels, ranked
+
+**Rank 1 — the *other* half of the `findCell` defect (survives np=2).**
+The Claim 1 mechanism is multiplicity: N ranks → N cells. There is a second
+half: **which** cell is seeded is also decomposition-dependent.
+`polyMesh::findCell` descends `cellTree()`, an octree whose root box is
+`treeBoundBox(points()).extend(1e-4)` built from the **local** sub-mesh points
+(`polyMesh.C:896`), and `indexedOctree::findInside` returns the **first** cell in
+the leaf's content list that accepts the point (`indexedOctree.C:2571-2596`),
+with list order following **local** cell labels. For a point strictly inside a
+cell exactly one cell accepts and the answer is decomposition-invariant; for a
+point on a face/edge/corner, 2/4/8 accept and the winner is decided by the local
+octree box and local numbering — **both of which `decomposePar` changes.**
+
+blastlab's 3D case is degenerate by construction: `case3d_c4` is a 1 m cube
+meshed `hex (76 76 76)` with the detonation point at `(0.5 0.5 0.5)`, and
+**0.5 = 38/76 exactly**, so the point is a mesh vertex shared by 8 cells; no
+`radius` is written, so `radius_ = 0` and the `findCell` branch is taken.
+`dynamicMeshDict` is `staticFvMesh` — this *is* Claim 2's fixed uniform mesh.
+
+This also explains the repo's own N5-7 observation that the nudge size was
+irrelevant (1e-6, 1e-5, 1e-3 of a cell all gave identically 947.3): **a discrete
+flip is the signature of a degenerate `findCell`**, not of a gradual perturbation.
+
+**Rank 2 — temporal aliasing of the peak.** Gauges are written every solver step
+(`writeControl timeStep; writeInterval 1`) under `adjustTimeStep yes`, and
+`reader.read_probes` does no resampling — the reported peak is a plain `.max()`
+over adaptive-dt samples. Any divergence in the dt sequence re-phases the
+sampling of a spike that narrows as Z falls. This is the natural explanation for
+the error **growing** from +7 % at Z = 0.175 to +13…28 % at Z = 0.075, which a
+purely spatial mechanism does not predict.
+
+**Rank 3 — the gauge probe cell. Real, quantified, and NOT the answer here.**
+The gauge in the audit case sits at (3.2, 2.0) with `3.2/0.025 = 128` and
+`2.0/0.025 = 80` — itself exactly on a cell corner. `blastProbes::findElements`
+calls the same `mesh.findCell`, and parallel adds a `reduce(proc, maxOp<label>())`
+tie-break awarding a straddling probe to the **highest** rank. But the magnitude
+was measured against a real blastlab run: the four candidate cells differ in
+radius by exactly one `dx` (ΔR/R = 2.08 %), and the local decay exponent measured
+from an existing run's `pMax` field is `n = 0.879` over R ∈ [0.9, 1.5], giving
+**1.9 % of peak — not 7 %.** Reaching 7 % would need `n ≈ 3.4`; nothing in the
+measured profile exceeds `n ≈ 1.0`. Decisively, **the archived +7 % was taken on
+the 3D smoke case whose gauges `test_foam_3d_smoke.py` deliberately snapped to
+exact mirror cell centres**, so this channel was already closed for that
+measurement. **Claim 2 is not refuted by the gauge hypothesis.**
+
+**Structurally excluded — limiters at processor patches.** blastlab writes
+`reconstruct(*) vanAlbada`, which routes through `LimitedScheme::calcLimiter`;
+that evaluates the identical `Limiter::limiter(...)` on coupled patches from
+`patchInternalField()`/`patchNeighbourField()` (only **non**-coupled patches get
+`pLim = 1.0`), and blastFoam's Kurganov boundary loop runs the same Riemann solve
+on every patch with no coupled/non-coupled branch. A processor face gets the same
+operator as an internal face, so this can only seed round-off — and the archive's
+own `simple (1 1 2) → 0.00 %` digit-identical symmetry shows round-off is not
+dominant.
+
+### Verdict and the one run that settles it
+
+**INCONCLUSIVE.** A second channel is proven to exist; attributing it requires one
+more experiment, stated precisely:
+
+> Take the Claim-2 case (1 m cube, `hex (76 76 76)`, `staticFvMesh`, gauges
+> already snapped to mirror cell centres). Arm A: det point at (0.5, 0.5, 0.5) as
+> today. Arm B: det point at `(0.5 + 1e-6·dx, …)`, **nothing else changed**. Run
+> each arm at np = 1 and np = 2 and report parallel-vs-serial peak error at the
+> Z = 0.175 gauge. **Read each arm against its own serial reference, never across
+> arms** — the nudge is known to move the serial answer, and it was cross-arm
+> reading that got N5-7 reverted.
+>
+> If A reproduces ≈ +7 % and B collapses below 0.5 %, the cause is the ignition
+> seed at `activationModel.C:183` and ranks 2 and 3 are excluded. If B still shows
+> ≈ +7 %, the seed is excluded and the next cut is aliasing vs. the probe.
+
+### A blastlab defect found along the way
+
+**`adjustLocations` is a no-op for any in-mesh probe.** In
+`blastProbes::findElements` the `movePts` flag is read only inside
+`if (nBadProbes > 0 && movePts)`, and `nBadProbes` counts probes found in **no**
+domain; an interior point is always found, so the probe position is never
+rewritten. blastlab's own comments — `core/case.py:90`, `:202`, `:310` and
+`writer.py:107-111` — state that it "snaps each gauge onto the centre of the cell
+holding it". **That is wrong for every interior gauge**, which is all of them.
+The comments should be corrected; gauges are sampled at the raw cell value of
+whichever cell `findCell` elects.
+
+---
+
+## 8a. Claim 5 — **INCONCLUSIVE, and the evidence base for removing `RHO_MIN` is confounded**
+
+**The artefact reproduces exactly.** `stage2_profile.npz` is still on disk:
+25×50, t = 2.9284e-03 s, **min(rho) = 1.710834e-04, 20 cells below 1e-3**, zero
+non-finite, all 20 in the products phase — matching N5-11's figures. The remap
+multiplier is grid-dependent rather than a fixed 3.6×: on the actual
+`stage3_case.json` grid (25×25×15) it is 20 → **3**; on 48³ it is 20 → **68**.
+
+**The post-B0 "clean" evidence does not support removal.** All 47 NIGHT2 chain
+attempts share byte-identical case JSONs, and the split between 17 runs showing
+near-vacuum and 30 clean **tracks perfectly with how far stage 2 integrated**:
+`t ≥ 2.07 ms` for the affected runs versus `t ≤ 0.75 ms` for the clean ones. The
+clean runs never entered the regime that produces the pathology. Separately, the
+post-B0 100×200 artefact TODO.md cites **is not on disk anywhere** — no 100×200
+profile `.npz` exists in the repo, and `/root` has no `.npz` files at all.
+
+**What the floor actually does, and one thing worth knowing.** `RHO_MIN` in
+`writer.profile_state` is **two guards bundled into one**: a density floor and a
+NaN/Inf guard on the divided quantities `u = rhoU/rho`, `e = rhoE/rho − ke`. It
+fires on the *remapped* state, not the source, and discards 9.37 J of 128,807 J
+(−0.0072 %) on the NIGHT2 artefact — thermodynamically negligible.
+
+But the floored cell is **not ambient**. Running the real `pressure_soundspeed`
+on `rho = 1e-3`, `e = 1400·288`, products/JWL/TNT gives **p = 120.96 Pa** beside
+neighbours at 101,324 Pa — a 1225:1 density jump and an ~838:1 pressure jump at a
+cell face, at zero velocity. That is recognisably the state §5 describes inside
+the P1-6 reproducer. **The floor does not remove the pathology; it trades it for
+a milder one.**
+
+**Verdict: INCONCLUSIVE — and do not remove the floor on the present evidence.**
+The single run that would settle it: re-run NIGHT2 stage 2 from
+`attempt_10/stage2_case.json` byte-for-byte on the current post-B0 tree, changing
+exactly one field — `t_end` from 0.0 to **5.0e-3**, so the terminate BC cannot
+stop it at 0.6 ms — serially, and report `min(rho)` and `count(rho < 1e-3)` at
+the hand-off instant and at `t_end`. That separates "B0 fixed it" from "the clean
+runs stopped too early".
+
+---
 
 ## 9. Verdict table
 
-*(filled in after the runs)*
+| Claim | Verdict | One-line reason |
+|---|---|---|
+| **1** — parallel double ignition (mechanism) | **CONFIRMED** | Directly observed for the first time: an N-way partition boundary on the det point ignites exactly N cells, one per rank (`simple(2 1 1)`→2, `simple(2 2 1)`→4, `scotch np=4`→4, serial→1); `sum(lambda)` holds the N× ratio to endTime, so the energy does not wash out |
+| **1a** — the same, attributed to the archived **+7 % at scotch np=2** | **REFUTED** | scotch np=2 puts no boundary through the point and ignites exactly one cell, same as serial; and the measured cost of even 4× over-ignition is −1.5 % peak, wrong magnitude and wrong sign |
+| **2** — a second, non-AMR parallel channel | **CONFIRMED that it exists; INCONCLUSIVE as to cause** | Lever A ignites a verified-identical single cell in serial and parallel yet still moves peak +1.52 %; leading candidate is the *other* half of `findCell` (which cell is seeded, decomposition-dependent, survives np=2); gauge-on-corner quantified at 1.9 % and excluded for the archived case |
+| **3** — axisym + AMR + `densityGradient` SIGFPE | **INCONCLUSIVE; the wedge-angle sub-claim is REFUTED** | blastFoam itself ships 1° wedges, one with a line-for-line identical AMR+`densityGradient` dict; `sin θ` cancels between face area and volume so the angle changes drain rate by 0.37 %, not 5×; vendor 5° case ran clean to 19.5 ms with FPE trapping armed, but it lacks the profile hand-off that is the mechanism's stated trigger |
+| **4** — `fluxScheme` indexing bug | **CONFIRMED (bug real, unreachable); report misnames the function** | Line 194 writes the internal field with a patch-local index where the `else` branch correctly writes the patch field; zero call sites at source *and* link level; it is `fluxScheme::snGradAlpha`, not `::AD` |
+| **5** — blastFoam's 2D stage made near-vacuum cells | **INCONCLUSIVE — do not remove `RHO_MIN`** | The artefact reproduces exactly, but the "clean" post-B0 runs stopped at ≤0.75 ms versus ≥2.07 ms for the affected ones, so they never entered the regime; the cited 100×200 artefact is not on disk |
+
+### Changes this audit implies for blastlab
+
+1. **Default `det_radii` to one base cell for blastFoam cases.** Partition-invariant
+   by construction, and measured at 0.006 % peak / 0.000 % impulse against
+   serial — versus the nudge, which fails its own 0.3 % threshold at +1.5 %.
+   Exposure is real: 117/140 written det points sit on a cell face, and 4/4
+   production 3D np=2 runs have the point owned by two ranks.
+2. **Correct the `adjustLocations` comments** in `core/case.py:90`, `:202`, `:310`
+   and `writer.py:107-111`. It does not snap interior gauges to cell centres; it
+   does nothing for them.
+3. **Correct the Claim 4 write-up** to name `fluxScheme::snGradAlpha` before it is
+   quoted anywhere — `fluxScheme::AD` sends a reader to a clean four-line function.
+4. **Prefer `sum(lambda)` over `count(lambda ≥ 0.99)`** in any future ignition
+   measurement; the count is valid only at the first write.
+5. **Do not remove `RHO_MIN`** until the pinned-`t_end` rerun in §8a is done.
+6. **Withdraw the wedge half-angle as a defect.** 1° is OpenFOAM's own documented
+   example and a value blastFoam itself ships.
