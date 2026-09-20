@@ -63,6 +63,7 @@ means.
 
 import math
 
+from . import scenario as _scenario
 from .fuels import (Propellant, PROPELLANTS, PROPELLANT_NAMES,  # noqa: F401
                     form_factor)
 
@@ -178,7 +179,8 @@ def _vent_mdot(p, T, prop, area, cd, p_amb):
 
 
 def _pressure(prop, charge_kg, volume_m3, Z, m, E):
-    """(p, T, V_free) from the Noble-Abel EOS."""
+    """(p, T, V_free) from the Noble-Abel EOS. `Z` is the OVERALL burnt
+    fraction of the charge - the mass-weighted mean over the cohorts."""
     solid = charge_kg * (1.0 - Z) / prop.rho
     free = volume_m3 - solid - prop.covolume * m
     if free <= 1e-12 or m <= 1e-15:
@@ -189,29 +191,43 @@ def _pressure(prop, charge_kg, volume_m3, Z, m, E):
     return m * prop.R * T / free, T, free
 
 
-def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, state):
-    Z, m, E = state
-    p, T, _free = _pressure(prop, charge_kg, volume_m3, Z, m, E)
+def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
+            state, t):
+    """d/dt of (Z_0 .. Z_{k-1}, m, E) at time `t`.
+
+    Non-autonomous, because cohorts light at their own times. Every
+    cohort sees the SAME chamber pressure, which is why they are
+    integrated together - see core/scenario.py on why convolution does
+    not work here.
+    """
+    k = len(fracs)
+    Zs, m, E = state[:k], state[k], state[k + 1]
+    z_total = sum(f * Z for f, Z in zip(fracs, Zs))
+    p, T, _free = _pressure(prop, charge_kg, volume_m3, z_total, m, E)
     # The pressure is used RAW here. It used to be max(p, p_amb), an
     # ambient floor that silently made extinction impossible: a magazine
     # that had vented down to atmospheric went on burning for ever at the
     # ambient rate. Below the low-pressure deflagration limit a solid
     # propellant does not sustain a flame, and that is now what happens.
-    if Z >= 1.0 or p < prop.p_extinction:
-        dZ = 0.0
-    else:
-        dZ = form_factor(prop, Z) * prop.a * (p ** prop.n) / prop.web
-    mdot_gen = charge_kg * dZ
+    burning = p >= prop.p_extinction
+    dZs = []
+    for Z, ti in zip(Zs, t_ign):
+        if Z >= 1.0 or t < ti or not burning:
+            dZs.append(0.0)
+        else:
+            dZs.append(form_factor(prop, Z) * prop.a * (p ** prop.n)
+                       / prop.web)
+    mdot_gen = charge_kg * sum(f * dZ for f, dZ in zip(fracs, dZs))
     mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb)
     mdot_out = min(mdot_out, m / 1e-9) if m <= 0.0 else mdot_out
-    return (dZ,
-            mdot_gen - mdot_out,
-            mdot_gen * prop.cv * prop.T_flame - mdot_out * prop.cp * T)
+    return tuple(dZs) + (
+        mdot_gen - mdot_out,
+        mdot_gen * prop.cv * prop.T_flame - mdot_out * prop.cp * T)
 
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
              t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000,
-             p_ign=None):
+             p_ign=None, scenario=None):
     """Integrate the chamber to `t_end` [s]. RK4 with an adaptive step.
 
     Returns a dict with the sampled trace (`t, p, T, Z, m, mdot_out`,
@@ -258,6 +274,11 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     if charge_kg <= 0.0 or volume_m3 <= 0.0:
         raise ValueError('charge and chamber volume must both be positive')
     closed_vessel_pmax(prop, charge_kg, volume_m3)   # raises if it cannot fit
+    if scenario is None:
+        scenario = _scenario.uniform()
+    coh = scenario.cohorts()
+    fracs = tuple(f for f, _ti in coh)
+    t_ign = tuple(ti for _f, ti in coh)
 
     # seed. With an extinction limit the burn cannot light itself, so the
     # igniter is part of the model; without one, keep the original
@@ -278,31 +299,43 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         Z = max(Z_IGN_DEFAULT,
                 ignition_fraction(prop, charge_kg, volume_m3, p_need))
     Z0 = Z
-    m = charge_kg * Z
+    # The igniter lights what is already exposed at t = 0, not the whole
+    # stack, so its gas is charged to the cohorts lit then. With one
+    # cohort this is exactly the old seed.
+    lit_now = sum(f for f, ti in zip(fracs, t_ign) if ti <= 0.0)
+    per = min(Z0 / lit_now, 1.0) if lit_now > 0.0 else 0.0
+    Zs = [per if ti <= 0.0 else 0.0 for ti in t_ign]
+    z_total = sum(f * Z for f, Z in zip(fracs, Zs))
+    m = charge_kg * z_total
     E = m * prop.cv * prop.T_flame
     t = 0.0
     h_max = t_end / 50.0
     sample_every = t_end / max(n_out, 2)
 
-    out = dict(t=[], p=[], T=[], Z=[], m=[], mdot_out=[])
+    out = dict(t=[], p=[], T=[], Z=[], m=[], mdot_out=[], lit=[])
     p_max, t_p_max = 0.0, 0.0
     last_sample = -1.0
 
+    def overall():
+        return sum(f * Z for f, Z in zip(fracs, Zs))
+
     def state_pT():
-        return _pressure(prop, charge_kg, volume_m3, Z, m, E)[:2]
+        return _pressure(prop, charge_kg, volume_m3, overall(), m, E)[:2]
 
     def record():
         p, T = state_pT()
         out['t'].append(t)
         out['p'].append(p)
         out['T'].append(T)
-        out['Z'].append(min(Z, 1.0))
+        out['Z'].append(min(overall(), 1.0))
         out['m'].append(m)
         out['mdot_out'].append(_vent_mdot(p, T, prop, vent_area, cd, p_amb))
+        out['lit'].append(sum(f for f, ti in zip(fracs, t_ign) if ti <= t))
 
     record()
     last_sample = 0.0
-    args = (prop, charge_kg, volume_m3, vent_area, cd, p_amb)
+    args = (prop, charge_kg, volume_m3, vent_area, cd, p_amb, fracs, t_ign)
+    nZ = len(fracs)
     steps = 0
     stop_reason = 't_end'
     extinguished = False
@@ -310,49 +343,63 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     t_outside = 0.0
     while t < t_end and steps < max_steps:
         steps += 1
-        s = (Z, m, E)
-        k1 = _derivs(*args, s)
+        s = tuple(Zs) + (m, E)
+        k1 = _derivs(*args, s, t)
+        dZ_max = max(k1[:nZ])
         h = h_max
-        if k1[0] > 0.0:
-            h = min(h, 0.005 / k1[0])          # <= 0.5 % of the burn
+        if dZ_max > 0.0:
+            h = min(h, 0.005 / dZ_max)         # <= 0.5 % of the burn
             # land ON Z = 1, never past it. Clipping an overshoot leaves
             # m and E integrated against a dZ taken beyond burn-out, which
             # showed up as m_end = 1.00066 * C - more gas than propellant.
-            h = min(h, (1.0 - Z) / k1[0])
-        if k1[1] < 0.0 and m > 0.0:
+            for Z, dZ in zip(Zs, k1[:nZ]):
+                if dZ > 0.0:
+                    h = min(h, (1.0 - Z) / dZ)
+        if k1[nZ] < 0.0 and m > 0.0:
             # 1 %, not 5 %: the vent stops at ambient (there is no inflow
             # in this model), so a step that dumps too much mass at once
             # lands the chamber BELOW ambient and strands it there. At 5 %
             # a large vent finished at 0.58 bar against an ambient of 1.01.
-            h = min(h, 0.01 * m / (-k1[1]))
+            h = min(h, 0.01 * m / (-k1[nZ]))
+        # Land ON the next ignition, never across it. A cohort lighting
+        # inside a step is a discontinuity in the right-hand side, and
+        # RK4 averaged across one would smear the entrainment the whole
+        # scenario exists to represent.
+        later = [ti for ti in t_ign if ti > t + 1.0e-15]
+        if later:
+            h = min(h, min(later) - t)
         h = max(min(h, t_end - t), 1.0e-12)
 
         def add(base, k, f):
             return tuple(b + f * kk for b, kk in zip(base, k))
 
-        k2 = _derivs(*args, add(s, k1, h / 2.0))
-        k3 = _derivs(*args, add(s, k2, h / 2.0))
-        k4 = _derivs(*args, add(s, k3, h))
-        Z, m, E = (s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
-                   for i in range(3))
-        Z = min(Z, 1.0)
+        k2 = _derivs(*args, add(s, k1, h / 2.0), t + h / 2.0)
+        k3 = _derivs(*args, add(s, k2, h / 2.0), t + h / 2.0)
+        k4 = _derivs(*args, add(s, k3, h), t + h)
+        nxt = [s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
+               for i in range(nZ + 2)]
+        Zs = [min(v, 1.0) for v in nxt[:nZ]]
+        m, E = nxt[nZ], nxt[nZ + 1]
         # A degressive grain has sigma(Z) = (1 - Z)^(2/3), so dZ/dt -> 0 and
         # Z approaches 1 asymptotically, never reaching it. Combined with
         # the land-on-Z=1 step limit that grinds the integrator to a halt -
         # one case took the full 500k step cap to cover a sliver of web.
         # Snap the last 1e-9 to burnt out, converting the remaining
         # propellant to gas so mass and energy stay exact.
-        if 0.0 < 1.0 - Z < _BURNOUT_EPS:
-            left = 1.0 - Z
-            Z = 1.0
-            m += charge_kg * left
-            E += charge_kg * left * prop.cv * prop.T_flame
+        for i, Z in enumerate(Zs):
+            if 0.0 < 1.0 - Z < _BURNOUT_EPS:
+                left = (1.0 - Z) * fracs[i]
+                Zs[i] = 1.0
+                m += charge_kg * left
+                E += charge_kg * left * prop.cv * prop.T_flame
         m = max(m, 0.0)
         E = max(E, 0.0)
         # Attribute the step BEFORE advancing t: k1 was evaluated at the
         # start of it, so that is the pressure the burn law saw.
-        p_start = _pressure(prop, charge_kg, volume_m3, *s)[0]
-        if k1[0] > 0.0:
+        z_start = sum(f * Z for f, Z in zip(fracs, s[:nZ]))
+        p_start = _pressure(prop, charge_kg, volume_m3, z_start, s[nZ],
+                            s[nZ + 1])[0]
+        if dZ_max > 0.0:
             t_burning += h
             if not prop.in_validity_window(p_start):
                 t_outside += h
@@ -364,15 +411,16 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         if t - last_sample >= sample_every:
             record()
             last_sample = t
+        all_burnt = all(Z >= 1.0 for Z in Zs)
         # burnt out and vented down: nothing left to integrate
-        if Z >= 1.0 and vent_area > 0.0 and p_now <= p_amb * 1.001:
+        if all_burnt and vent_area > 0.0 and p_now <= p_amb * 1.001:
             stop_reason = 'burnt out and vented'
             break
         # Went out below the deflagration limit with propellant left.
-        # Terminal: with the burn stopped nothing adds gas, so the
-        # pressure can only hold or fall further, and it can never climb
-        # back over the limit.
-        if Z < 1.0 and p_now < prop.p_extinction:
+        # Terminal ONLY once everything has been lit: while cohorts are
+        # still to come, a chamber below the limit is waiting, not dead.
+        if (not all_burnt and p_now < prop.p_extinction
+                and t >= max(t_ign)):
             extinguished = True
             stop_reason = 'extinction'
             break
@@ -387,12 +435,22 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         stop_reason = 'cannot sustain'
     out['p_max'] = p_max
     out['t_p_max'] = t_p_max
-    out['burnt_out'] = Z >= 1.0
+    # every cohort, not a leaked loop variable: with cohorts there is no
+    # single Z any more, and reading one was a real bug the scenario
+    # tests caught
+    out['burnt_out'] = all(Z >= 1.0 for Z in Zs)
     out['steps'] = steps
     out['hit_step_cap'] = steps >= max_steps
     out['extinguished'] = extinguished
     out['stop_reason'] = stop_reason
     out['Z0'] = Z0
+    out['scenario'] = scenario
+    # Always reported, never implied. Uniform ignition is the laboratory
+    # condition; a magazine answer computed under it is one whose
+    # entrainment was assumed away, and the report has to say so.
+    out['scenario_kind'] = scenario.kind
+    out['calibration_only_scenario'] = scenario.calibration_only
+    out['n_cohorts'] = len(fracs)
     out['extrapolated_fraction'] = (t_outside / t_burning
                                     if t_burning > 0.0 else 0.0)
     return out

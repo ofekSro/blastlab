@@ -31,6 +31,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core import deflagration as d                  # noqa: E402
+from blastlab.core import scenario as sc                     # noqa: E402
 
 FAIL = []
 
@@ -252,7 +253,87 @@ def main():
     check('a row with every field sourced reports calibrated',
           replace(prop, uncalibrated=()).calibrated)
 
-    # ── 8. refusals ─────────────────────────────────────────────────────
+    # ── 8. ignition scenarios and cohorts (HD1-6) ───────────────────────
+    print('\n  the scenario itself')
+    check('cohort masses always sum to 1',
+          all(abs(sum(f for f, _t in sc.IgnitionScenario(
+              kind=k, n_cohorts=n, spread_time=(0.0 if k == 'uniform' else 3.0)
+          ).cohorts()) - 1.0) < 1e-12
+              for k in sc.KINDS for n in ((1, 4, 9) if k == 'uniform'
+                                          else (2, 4, 9))))
+    fs = sc.IgnitionScenario(kind='flame_spread', n_cohorts=8,
+                             spread_time=4.0)
+    check('flame spread lights everything within the spread time',
+          fs.last_ignition <= 4.0 and abs(fs.mass_entrainment(4.0) - 1.0) < 1e-12)
+    line = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                               spread_time=4.0, geometry='line')
+    vol = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                              spread_time=4.0, geometry='volume')
+    check('a pile engulfed in three dimensions is back-loaded against a '
+          'line lit end to end',
+          vol.mass_entrainment(2.0) < line.mass_entrainment(2.0),
+          f'{vol.mass_entrainment(2.0):.3f} vs '
+          f'{line.mass_entrainment(2.0):.3f} lit at half time')
+    pkg = sc.IgnitionScenario(kind='progressive_package', n_cohorts=5,
+                              spread_time=8.0)
+    check('packages fail from t = 0 to the end of the window',
+          pkg.cohorts()[0][1] == 0.0 and pkg.cohorts()[-1][1] == 8.0)
+    check('uniform is flagged as the laboratory condition it is',
+          sc.uniform().calibration_only
+          and not fs.calibration_only)
+    for bad, label in (
+            (dict(kind='sideways'), 'an unknown kind'),
+            (dict(kind='uniform', spread_time=1.0), 'uniform with a spread'),
+            (dict(kind='flame_spread', n_cohorts=1, spread_time=1.0),
+             'a spread with one cohort'),
+            (dict(kind='flame_spread', n_cohorts=4, spread_time=-1.0),
+             'a negative spread'),
+            (dict(kind='flame_spread', n_cohorts=4, geometry='blob'),
+             'an unknown geometry')):
+        check(f'{label} is refused',
+              _raises(lambda b=bad: sc.IgnitionScenario(**b)))
+
+    # ── THE LIMIT CASE ──────────────────────────────────────────────────
+    # Cohorts that all light at the same instant ARE uniform ignition. A
+    # known limit catches almost any array bug - an index, a mass weight,
+    # a double count - where "it gives a different p(t)" catches almost
+    # nothing. This is the gate on the whole cohort rewrite.
+    print('\n  cohorts collapse to uniform when they light together')
+    base = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0)
+    for n in (2, 5, 17):
+        r = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                       scenario=sc.IgnitionScenario(kind='uniform',
+                                                    n_cohorts=n))
+        dp = abs(r['p_max'] - base['p_max']) / base['p_max']
+        dz = max(abs(a - b) for a, b in zip(r['Z'], base['Z']))
+        check(f'{n} simultaneous cohorts reproduce one cohort',
+              dp < 1e-10 and dz < 1e-10, f'dp {dp:.2e}, dZ {dz:.2e}')
+        check(f'{n} cohorts take the same steps as one',
+              r['steps'] == base['steps'], f"{r['steps']} vs {base['steps']}")
+
+    print('\n  entrainment changes the answer')
+    peaks = []
+    for T in (0.5, 2.0, 10.0):
+        r = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=40.0,
+                       scenario=sc.IgnitionScenario(
+                           kind='flame_spread', n_cohorts=12, spread_time=T))
+        peaks.append(r['p_max'])
+        check(f'spread {T:g} s: every cohort still reaches burn-out',
+              r['burnt_out'] and abs(r['Z'][-1] - 1.0) < 1e-9,
+              f"burnt_out={r['burnt_out']} Z={r['Z'][-1]:.9f}")
+    uni = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=40.0)
+    check('a slower spread always gives a lower peak',
+          uni['p_max'] > peaks[0] > peaks[1] > peaks[2],
+          ' > '.join(f'{v/1e6:.3f}' for v in [uni['p_max']] + peaks) + ' MPa')
+    check('and the effect is an order of magnitude, not a correction',
+          uni['p_max'] / peaks[-1] > 10.0,
+          f"x{uni['p_max'] / peaks[-1]:.1f}")
+    check('the run always reports which scenario produced it',
+          uni['scenario_kind'] == 'uniform'
+          and uni['calibration_only_scenario'] is True
+          and uni['n_cohorts'] == 1)
+
+    # ── 9. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     for bad, label in (((0.0, 1.0), 'zero charge'),
                        ((5.0, 0.0), 'zero volume'),
