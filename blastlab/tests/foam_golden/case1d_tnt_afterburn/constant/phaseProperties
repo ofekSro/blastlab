@@ -84,6 +84,7 @@ expl
             (0 0 0)
         );
         vDet            6930;
+        radii (0.005928853755);
     }
     afterburnModel  Miller;
     Q0              2000000;

@@ -87,8 +87,10 @@ class Case1D:
     #: native reconstruction order (T47/N10): 1 = the pinned Godunov
     #: path, 2 = opt-in limited MUSCL (native solvers only)
     order: int = 1
-    #: blastProbes adjustLocations: True snaps each gauge onto the
-    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    #: blastProbes `adjustLocations`. A no-op for every gauge we write:
+    #: it relocates only probes found in NO cell (blastProbes.C:218),
+    #: and ours are interior. T40 measured it - arrival moves 0.15 pp
+    #: with it off - and DONE.md records the old reading as REFUTED.
     probe_adjust: bool = True
     #: B23/N2-13: False pins writeInterval for the whole run. The
     #: adaptive controller rewrites it mid-run from what the ingest has
@@ -199,8 +201,10 @@ class Case2D:
     #: native reconstruction order (T47/N10): 1 = the pinned Godunov
     #: path, 2 = opt-in limited MUSCL (native solvers only)
     order: int = 1
-    #: blastProbes adjustLocations: True snaps each gauge onto the
-    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    #: blastProbes `adjustLocations`. A no-op for every gauge we write:
+    #: it relocates only probes found in NO cell (blastProbes.C:218),
+    #: and ours are interior. T40 measured it - arrival moves 0.15 pp
+    #: with it off - and DONE.md records the old reading as REFUTED.
     probe_adjust: bool = True
     adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
@@ -307,8 +311,10 @@ class Case3D:
     #: native reconstruction order (T47/N10): 1 = the pinned Godunov
     #: path, 2 = opt-in limited MUSCL (native solvers only)
     order: int = 1
-    #: blastProbes adjustLocations: True snaps each gauge onto the
-    #: centre of the cell holding it at t = 0 (N16-a/T40)
+    #: blastProbes `adjustLocations`. A no-op for every gauge we write:
+    #: it relocates only probes found in NO cell (blastProbes.C:218),
+    #: and ours are interior. T40 measured it - arrival moves 0.15 pp
+    #: with it off - and DONE.md records the old reading as REFUTED.
     probe_adjust: bool = True
     adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)

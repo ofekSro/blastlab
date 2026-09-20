@@ -104,10 +104,23 @@ class CaseSpec:
     det_points: list = field(default_factory=list)  # [] = charge centres
     probe_pts: list = field(default_factory=list)   # foam (x,y,z)
     gauge_ids: list = field(default_factory=list)   # native radii/points
-    #: blastProbes `adjustLocations`. 'yes' moves each probe onto the
-    #: centre of the cell that holds it at t = 0, which on a coarse base
-    #: mesh can be a long way from the requested point and, under AMR,
-    #: pins the sample to a cell that later refines under it (N16-a/T40).
+    #: blastProbes `adjustLocations`. Despite the name it does NOT move
+    #: an interior probe: `movePts` is read only inside
+    #: `if (nBadProbes > 0 && movePts)` (blastProbes.C:64/207/218), and
+    #: `nBadProbes` counts probes found in NO cell. The sample is the raw
+    #: value of whichever cell `findCell` elects; `elementLocations_`
+    #: merely REPORTS that cell's centre.
+    #:
+    #: The old comment here said 'yes' pins the sample to a coarse cell
+    #: that later refines under it. T40 tested exactly that and refuted
+    #: it - turning the flag off moves AMR-vs-static arrival by 0.15 pp,
+    #: "because blastProbes reports the containing cell's value either
+    #: way" (DONE.md T40, 2026-09-07). The real +18 % there is a
+    #: resolution difference at the gauge, not this flag. The comment was
+    #: never updated after that measurement; corrected 20.09 (reverify).
+    #:
+    #: 'yes' matches the vendor tutorials and still governs probes that
+    #: land outside the mesh, so the default stays.
     probe_adjust: str = 'yes'
     #: profile-initialised stage (N7): (rho, u, v, w, e, phase) arrays on
     #: the case grid plus the profile's start time. None = charge init.
@@ -1047,6 +1060,66 @@ def _setfieldsdict(spec, case):
     return foam_file('setFieldsDict', block(d), location='system')
 
 
+#: Seed radius for `initiation.radii`, in cells of the mesh AT THE
+#: DETONATION POINT. Must clear the corner case and stay under the
+#: centre case:
+#:   point on a cell corner - the adjacent centres sit at sqrt(2)/2 =
+#:     0.707 dx (2D) and sqrt(3)/2 = 0.866 dx (3D), all equidistant, so
+#:     a radius below that ignites NOTHING and blastFoam aborts with
+#:     "No cells will be activated"
+#:   point at a cell centre - the nearest neighbour centre is at 1.0 dx,
+#:     so a radius at or above that would drag the neighbours in too
+#: 0.9 sits between 0.866 and 1.0 with margin at both ends.
+DET_RADIUS_CELLS = 0.9
+
+
+def default_det_radius(spec):
+    """Ignition seed radius [m] written when the case sets no `det_radii`.
+
+    WHY THIS IS A DEFAULT (reverify, 20.09). With `radius_ = 0`,
+    `detonationPoint::check`/`setActivated` take the `mesh.findCell`
+    branch, and `findCell` is not decomposition-invariant for a point
+    that lies on a cell face, edge or corner: `tetrahedron::inside` is
+    inclusive on the shared plane, so every rank whose partition touches
+    the point claims a cell of its own, and the reduction guards only
+    `== 0`, never `> 1`. Measured on a uniform 160x160 planar case with
+    the point on an interior corner: serial ignites 1 cell, `simple
+    (2 1 1)` ignites 2, `simple (2 2 1)` and `scotch np=4` ignite 4 -
+    one per rank - and `sum(lambda)` holds that N-fold ratio to endTime,
+    so the extra initiation energy does not wash out.
+
+    The `radius_ > small` branch instead tests cell CENTRES
+    (`mag(mesh.C()[celli] - pt) < radius_`), and every cell centre lives
+    on exactly one rank, so it is partition-invariant BY CONSTRUCTION,
+    not merely by measurement. Measured parallel-vs-serial at the gauge:
+    +0.006 % peak and 0.000 % on impulse and arrival, against +1.5 %
+    peak for the `findCell` path.
+
+    Exposure is not hypothetical: 117 of 140 detonation points in cases
+    blastlab has actually written sit on at least one cell face, both
+    shipped defaults land on a node (Case3D gives 0.75 = 39*dx on all
+    three axes, a node shared by 8 cells), and 4 of 4 real 3D production
+    runs at the default `scotch` np=2 have the point owned by two ranks.
+
+    COST, stated plainly: this changes results. On the measured case the
+    serial peak moves 19914 -> 19607 kPa (-1.5 %), because a ball of
+    radius ~dx around a corner point seeds the 4 cells meeting there
+    rather than the one cell `findCell` happened to pick. That is a
+    deterministic physical region replacing an arbitrary choice, and it
+    is the same in serial and in parallel - but it is NOT byte-compatible
+    with results produced before 20.09.
+
+    The radius follows the mesh at the charge, not the base mesh: both
+    static refinement (`lmax`) and AMR (`amr`, realised at t = 0 by
+    `setRefinedFields`) shrink the cells there, and a base-cell radius
+    would seed 2**(dim*level) refined cells instead of a handful.
+    """
+    level = max(int(getattr(spec, 'lmax', 0) or 0),
+                int(getattr(spec, 'amr', 0) or 0))
+    dx_base = float(getattr(spec, 'dx_base', 0.0) or 0.0) or float(spec.dx)
+    return DET_RADIUS_CELLS * dx_base / (2.0 ** level)
+
+
 def _phaseproperties(spec, activation='linear', afterburn='none'):
     m = MATERIALS[spec.material]
     # 'linear' burns at vDet from the detonation points (tutorial
@@ -1077,14 +1150,17 @@ def _phaseproperties(spec, activation='linear', afterburn='none'):
             'vDet': m.vDet,
         }
         # N5-12: per-point timing and ignition radius (guide 5.6.1,
-        # the delayedDetonation tutorial's pattern). Emitted only when
-        # given, so every existing case stays byte-identical.
+        # the delayedDetonation tutorial's pattern).
         delays = getattr(spec, 'det_delays', None)
-        radii = getattr(spec, 'det_radii', None)
         if delays:
             initiation['delays'] = [float(v) for v in delays]
-        if radii:
-            initiation['radii'] = [float(v) for v in radii]
+        # reverify/20.09: `radii` is now written BY DEFAULT, not only when
+        # the case asks for it. See default_det_radius() for why.
+        radii = [float(v) for v in (getattr(spec, 'det_radii', None) or ())]
+        if points and not radii:
+            radii = [default_det_radius(spec)] * len(points)
+        if points and radii:
+            initiation['radii'] = radii
         if activation == 'programmedIgnition':
             # guide 5.6.1.3: Giroux. programmedBeta = the compression
             # switch AND the programmed vDet/(1.5 dx) rate, whichever

@@ -84,6 +84,7 @@ expl
             (0.5 0.5 0.5)
         );
         vDet            8193;
+        radii (0.01184210526);
     }
     residualRho     1e-6;
     residualAlpha   1e-10;
