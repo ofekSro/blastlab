@@ -121,6 +121,24 @@ STEPS_PER_PERIOD = 50
 #: end of the record instead of the maximum.
 FREE_PERIODS = 1.5
 
+#: Support rotation [deg] past which the element is taken as collapsed
+#: and the solve stops.
+#:
+#: This is not decoration. An elastic-perfectly-plastic element under a
+#: sustained pressure ABOVE its ultimate resistance never reaches
+#: equilibrium: the net force stays positive and the response grows
+#: without bound. That is correct mechanics and a useless number - an
+#: HD 1.3 case ran to a ductility of 1.2 million and a support rotation
+#: of 89.99 degrees, which means "it collapsed" but does not say so.
+#:
+#: The quasi-static regime is exactly where this happens, so it is the
+#: HD 1.3 answer that needs it most. Past the limit the model reports
+#: `collapsed` and stops, rather than integrating a wall through the
+#: floor. The value is in the range the blast-design literature uses for
+#: the failure of a non-reusable element; a specific element's limit
+#: belongs on the Component.
+ROTATION_LIMIT_DEG = 12.0
+
 
 class Component:
     """One structural element, reduced to its equivalent SDOF properties.
@@ -140,7 +158,8 @@ class Component:
     """
 
     def __init__(self, span, mass_per_area, Ru, kE, support='simple',
-                 damping=0.0, klm_mode='average'):
+                 damping=0.0, klm_mode='average',
+                 rotation_limit_deg=ROTATION_LIMIT_DEG):
         if span <= 0 or mass_per_area <= 0 or Ru <= 0 or kE <= 0:
             raise ValueError('span, mass_per_area, Ru and kE must all be '
                              'positive')
@@ -159,6 +178,7 @@ class Component:
         self.support = support
         self.damping = float(damping)
         self.klm_mode = klm_mode
+        self.rotation_limit_deg = float(rotation_limit_deg)
 
     @property
     def y_el(self):
@@ -210,7 +230,8 @@ class SdofResult:
     __slots__ = ('times', 'y', 'v', 'R', 'load', 'y_max', 't_ymax',
                  'ductility', 'support_rotation_deg', 'dlf', 'Tn', 'td',
                  'td_over_Tn', 'regime', 'p_peak', 'impulse', 'P_bar',
-                 'I_bar', 'yielded', 'y_residual')
+                 'I_bar', 'yielded', 'y_residual', 'collapsed',
+                 't_collapse')
 
     def __init__(self, **kw):
         for k in self.__slots__:
@@ -220,6 +241,10 @@ class SdofResult:
         return {k: getattr(self, k) for k in self.__slots__}
 
     def __repr__(self):
+        if self.collapsed:
+            return (f'SdofResult(COLLAPSED at t={self.t_collapse * 1e3:.2f} '
+                    f'ms, theta={self.support_rotation_deg:.2f} deg, '
+                    f'regime={self.regime!r})')
         return (f'SdofResult(y_max={self.y_max * 1e3:.3f} mm, '
                 f'mu={self.ductility:.3f}, '
                 f'theta={self.support_rotation_deg:.3f} deg, '
@@ -326,11 +351,28 @@ def response(times, p, comp, p_ref=P_AIR, dt=None, t_end=None,
     # UFC Sec. 3-19: y_{n+1} = 2 y_n - y_{n-1} + acc_n dt^2. Damping uses
     # the backward velocity so the step stays explicit; with the default
     # damping = 0 it contributes nothing at all.
+    # deflection at which the element is taken as collapsed
+    arm = comp.span if comp.support == 'cantilever' else 0.5 * comp.span
+    y_fail = arm * np.tan(np.radians(comp.rotation_limit_deg))
+    collapsed, t_collapse, last = False, np.nan, n - 1
+
     for i in range(1, n - 1):
         acc = (F[i] - R[i] - c * v[i]) / M
         y[i + 1] = 2.0 * y[i] - y[i - 1] + acc * dt * dt
         v[i + 1] = (y[i + 1] - y[i]) / dt
         R[i + 1], y_p = _resistance(y[i + 1], y_p, kE, Ru)
+        if y[i + 1] >= y_fail:
+            # Past the rotation limit there is nothing left to integrate:
+            # a sustained load above Ru never reaches equilibrium, so the
+            # solve would run a wall through the floor and report a
+            # ductility in the millions instead of the word "collapsed".
+            collapsed, t_collapse, last = True, float(t[i + 1]), i + 1
+            break
+
+    if collapsed:
+        t, y, v, R, F = (t[:last + 1], y[:last + 1], v[:last + 1],
+                         R[:last + 1], F[:last + 1])
+        n = last + 1
 
     y_max, t_ymax = _peak(y, t)
     y_el = comp.y_el
@@ -364,7 +406,8 @@ def response(times, p, comp, p_ref=P_AIR, dt=None, t_end=None,
         P_bar=p_peak / Ru,
         I_bar=impulse / (M * comp.omega * y_el),
         yielded=bool(mu > 1.0),
-        y_residual=float(y_p))
+        y_residual=float(y_p),
+        collapsed=collapsed, t_collapse=t_collapse)
 
 
 def _positive_duration(t, F):
@@ -472,6 +515,12 @@ def pi_curve(comp, mu_limit, shape='triangular', n=40,
     if ratios is None:
         ratios = np.logspace(-2, 2, n)
     y_target = mu_limit * comp.y_el
+    # An iso-damage curve is a pure ductility construct, so the physical
+    # rotation limit must not truncate the runs that draw it - otherwise
+    # the bisection is chasing a peak the solver has capped.
+    comp = Component(comp.span, comp.mass_per_area, comp.Ru, comp.kE,
+                     support=comp.support, damping=comp.damping,
+                     klm_mode=comp.klm_mode, rotation_limit_deg=89.0)
     I_bar, P_bar = [], []
     for r in np.asarray(ratios, float):
         td = r * comp.Tn

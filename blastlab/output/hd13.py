@@ -220,8 +220,22 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
             ('Support rotation', _fmt(s.support_rotation_deg, 3), 'deg'),
             ('Yielded', _fmt(s.yielded), ''),
         ]
+        if getattr(s, 'collapsed', False):
+            rows.append(('<b>Outcome</b>',
+                         '<b>COLLAPSE</b> <span class="warn">rotation '
+                         'limit reached</span>', ''))
+            rows.append(('Time of collapse', _fmt(s.t_collapse * 1e3, 2),
+                         'ms'))
         p.append('<h2>Structural response</h2>'
                  + _table(('Quantity', 'Value', 'Unit'), rows))
+        if getattr(s, 'collapsed', False):
+            p.append('<div class="note"><b>The element did not survive.</b> '
+                     'The deflection passed the support-rotation limit and '
+                     'the solve stopped there. A quasi-static pressure '
+                     'above the ultimate resistance never reaches '
+                     'equilibrium, so the deflection is unbounded and the '
+                     'ductility past this point has no meaning - the '
+                     'answer is the collapse, not a number.</div>')
         p.append('<div class="note"><b>Regime is the point.</b> A '
                  'detonation puts a wall in the impulsive corner, where '
                  'only the impulse matters. A confined deflagration puts '

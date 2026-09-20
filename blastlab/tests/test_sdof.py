@@ -296,6 +296,46 @@ def main():
           sdof.pi_asymptotes(1e4)[1] > 0.9999,
           f'{sdof.pi_asymptotes(1e4)[1]:.6f}')
 
+    # ── 8b. collapse, which the quasi-static regime makes reachable ─────
+    # An elastic-perfectly-plastic element under a SUSTAINED pressure
+    # above its ultimate resistance never reaches equilibrium: the net
+    # force stays positive and the deflection grows without bound. That
+    # is correct mechanics and a useless number - an HD 1.3 case reported
+    # a ductility of 1.2 million and a rotation of 89.99 degrees, which
+    # means "it collapsed" without saying so.
+    print('\n  collapse')
+    weak = yielding_component()
+    t_long = np.linspace(0.0, 400.0 * weak.Tn, 6001)
+    over = np.full_like(t_long, 5.0 * weak.Ru)
+    col = sdof.response(t_long, over, weak, p_ref=0.0)
+    check('a sustained load above Ru is reported as collapse, not as a '
+          'ductility in the millions',
+          col.collapsed and np.isfinite(col.t_collapse),
+          f'at {col.t_collapse * 1e3:.1f} ms')
+    check('the solve stops there rather than running the wall through '
+          'the floor',
+          col.times[-1] <= col.t_collapse + 1e-12
+          and col.support_rotation_deg <= weak.rotation_limit_deg * 1.05,
+          f'theta {col.support_rotation_deg:.2f} deg')
+    check('a load below Ru does not collapse, however long it is held',
+          not sdof.response(t_long, np.full_like(t_long, 0.4 * weak.Ru),
+                            weak, p_ref=0.0).collapsed)
+    check('a tighter rotation limit collapses earlier',
+          sdof.response(t_long, over,
+                        yielding_component(rotation_limit_deg=2.0),
+                        p_ref=0.0).t_collapse < col.t_collapse)
+    check('an impulsive pulse of the same PEAK does not collapse it - '
+          'the regime decides, again',
+          not sdof.response(t_imp, p_imp / p_imp.max() * 5.0 * weak.Ru,
+                            weak, p_ref=0.0).collapsed)
+    check('the P-I curve is unaffected: an iso-damage curve is a '
+          'ductility construct and must not be truncated by the physical '
+          'rotation limit',
+          abs(sdof.pi_curve(yielding_component(rotation_limit_deg=1.0),
+                            3.0, ratios=[1e-2])[0][0]
+              - sdof.pi_asymptotes(3.0)[0]) / sdof.pi_asymptotes(3.0)[0]
+          < TOL_ASYMPTOTE)
+
     # ── 9. the three feeders agree ──────────────────────────────────────
     print('\n  trace adapters')
     t_g = np.linspace(0.0, 6.0 * cc.Tn, 1201)
