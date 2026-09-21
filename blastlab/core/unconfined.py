@@ -116,9 +116,18 @@ def burn(prop, charge_kg, scenario=None, t_end=None, n_out=600,
             f'avoid.')
     if scenario is None:
         scenario = _scenario.uniform()
-    coh = scenario.cohorts()
-    fracs = [f for f, _t in coh]
-    t_ign = [ti for _f, ti in coh]
+    # The same entrainment windows the confined branch uses, so the two
+    # halves of a comparison discretise one fire the same way. See
+    # scenario.windows.
+    win = scenario.windows()
+    fracs = [f for f, _lo, _hi in win]
+    t_ign = [hi for _f, _lo, hi in win]
+    edges = [(lo, hi) for _f, lo, hi in win]
+
+    def _lit(t, lo, hi):
+        if t <= lo:
+            return 0.0
+        return 1.0 if t >= hi else (t - lo) / (hi - lo)
 
     # A single grain burns out in web_burn_time - NOT web/r_atm, which is
     # only right for a neutral grain and cut a degressive burn off at a
@@ -145,10 +154,14 @@ def burn(prop, charge_kg, scenario=None, t_end=None, n_out=600,
     for k in range(n_out):
         t = k * dt
         total_dz = 0.0
-        for i, (f, ti) in enumerate(zip(fracs, t_ign)):
-            if t < ti or zs[i] >= 1.0:
+        for i, (f, (lo, hi)) in enumerate(zip(fracs, edges)):
+            if zs[i] >= 1.0:
                 continue
-            total_dz += f * form_factor(prop, zs[i]) * prop.r_atm / prop.web
+            w = _lit(t, lo, hi)
+            if w <= 0.0:
+                continue
+            total_dz += (w * f * form_factor(prop, zs[i]) * prop.r_atm
+                         / prop.web)
         mdot = charge_kg * total_dz
         edot = mdot * e_specific
         mach = (mdot / rho_gas) / stack_area / C_AMB
@@ -157,19 +170,24 @@ def burn(prop, charge_kg, scenario=None, t_end=None, n_out=600,
         out['mdot'].append(mdot)
         out['edot'].append(edot)
         out['mach'].append(mach)
-        out['lit'].append(sum(f for f, ti in zip(fracs, t_ign) if ti <= t))
+        out['lit'].append(sum(f * _lit(t, lo, hi)
+                              for f, (lo, hi) in zip(fracs, edges)))
         mdot_max = max(mdot_max, mdot)
         mach_max = max(mach_max, mach)
         if any(z < 1.0 for z in zs):
             burn_time = t
         # advance, sub-stepped so a degressive grain does not overshoot
         sub = 4
-        for _ in range(sub):
-            for i, ti in enumerate(t_ign):
-                if t < ti or zs[i] >= 1.0:
+        for j in range(sub):
+            t_sub = t + j * dt / sub
+            for i, (lo, hi) in enumerate(edges):
+                if zs[i] >= 1.0:
                     continue
-                zs[i] = min(zs[i] + form_factor(prop, zs[i]) * prop.r_atm
-                            / prop.web * dt / sub, 1.0)
+                w = _lit(t_sub, lo, hi)
+                if w <= 0.0:
+                    continue
+                zs[i] = min(zs[i] + w * form_factor(prop, zs[i])
+                            * prop.r_atm / prop.web * dt / sub, 1.0)
                 if 1.0 - zs[i] < _BURNOUT_EPS:
                     zs[i] = 1.0
 

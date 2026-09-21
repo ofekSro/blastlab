@@ -487,43 +487,115 @@ def main():
           and uni['calibration_only_scenario'] is True
           and uni['n_cohorts'] == 1)
 
-    # ── 8b. THE COHORT COUNT IS A MESH, AND THE RUN SAYS SO ─────────────
+    # ── 8b. ENTRAINMENT IS A RAMP, NOT A STAIRCASE ──────────────────────
     #
-    # `n_cohorts` reads like a modelling choice and is a discretisation:
-    # a continuous flame spread replaced by n instantaneous ignitions of
-    # C/n. Where the chamber settles between them - a slow fire, which is
-    # the magazine case - one step IS the pressure signal and the peak
-    # reported is the size of the step.
+    # `n_cohorts` reads like a modelling choice and is a DISCRETISATION.
+    # Lighting each cohort instantaneously turns a continuous flame
+    # spread into n steps of C/n, and in a chamber that settles between
+    # them each step is a pressure spike whose height goes as the step
+    # size - first order, and tens of per cent high at any affordable n:
     #
-    # This is the third bug of this shape in this module, after the
-    # integrator and the chamber air, and all three shared one property:
-    # correct in the regime the code was verified in, wrong in the regime
-    # it is applied to. So the check is on by default and the only thing
-    # asserted here is that it CANNOT be silent.
-    print('\n  the cohort count, refined')
+    #     n = 10  2.84 x ambient      n = 40  1.19
+    #     n = 20  1.57                n = 160 1.040
+    #
+    # The fix is not a finer staircase, it is not having one. A cohort
+    # carries the mass between fractions i/n and (i+1)/n, so the times
+    # the front reaches those fractions ARE its edges and the lit
+    # fraction ramps across them (scenario.windows). With the ramp the
+    # same case reads:
+    #
+    #     n = 10  1.0223             n = 40  1.0054
+    #     n = 20  1.0101             n = 160 1.0028
+    #
+    # n = 10 is now inside 2 % of converged, where the staircase was
+    # still 1.2 % out at n = 160. The refinement check stays, because it
+    # is what proves any of this rather than what fixes it.
+    print('\n  entrainment as a ramp, and what that buys')
     slow = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
                                spread_time=60.0)
     coarse = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=120.0,
                         scenario=slow, p0_chamber=d.P_AMB)
-    check('a 60 s spread cut into 20 steps does NOT converge, and the run '
-          'reports that rather than the peak alone',
-          coarse['cohort_converged'] is False
-          and coarse['cohort_refinement_error'] > 0.2,
+    check('a 60 s spread cut into only 20 cohorts now CONVERGES, which it '
+          'did not when each of them lit in one instant',
+          coarse['cohort_converged']
+          and coarse['cohort_refinement_error'] < 0.02,
           f"{coarse['p_max']/1e6:.4f} MPa against "
           f"{coarse['p_max_refined']/1e6:.4f} at 2n, "
-          f"{coarse['cohort_refinement_error']:.0%} out")
-    check('one doubling already takes a third off it, so the coarse answer '
-          'was the staircase and not the fire',
-          coarse['p_max_refined'] < 0.8 * coarse['p_max'],
-          f"{coarse['p_max_refined']/1e6:.4f} against "
-          f"{coarse['p_max']/1e6:.4f} MPa")
-    check('a fast fire IS converged at the same cohort count - the artefact '
-          'grows with spread time, which is why it hid in the fast cases',
-          d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=10.0,
+          f"{coarse['cohort_refinement_error']:.2%} out")
+    # THE PROPERTY THAT EXPLAINS IT - and it is NOT the obvious one.
+    #
+    # Two wrong explanations were written here first and both were
+    # caught by these checks, which is why they are spelled out rather
+    # than summarised. (1) "the sum reproduces the continuous law
+    # exactly": it does not - the ramp is linear in t and the law is a
+    # power of it. (2) "the error falls as 1/n^2, second order": it does
+    # not either - measured, the sequence is 5.00e-2, 2.50e-2, 1.25e-2,
+    # 6.25e-3 at n = 5, 10, 20, 40, which is 1/n. The edges sit at
+    # T(i/n)^(1/d), so the FIRST one is at T/sqrt(n) for an area spread,
+    # and the curvature over that first wide interval leaves ~1/(4n).
+    #
+    # What the ramp actually buys is CONTINUITY. The staircase has the
+    # same order and converges far worse because its error is a sequence
+    # of JUMPS - each dumps C/n of propellant into the chamber in an
+    # instant and shock-loads it, and the peak is the height of the
+    # biggest. The ramp's error is a smooth deviation of the same size,
+    # which the chamber integrates over and never feels.
+    s_line = sc.IgnitionScenario(kind='flame_spread', n_cohorts=7,
+                                 spread_time=8.0, geometry='line')
+    check('for a line spread the law IS linear, so the ramp reproduces '
+          'it exactly everywhere',
+          max(abs(s_line.mass_entrainment(T) - T / 8.0)
+              for T in (0.0, 0.7, 2.0, 3.3, 5.0, 6.6, 8.0)) < 1e-12)
+    errs = []
+    for n_c in (5, 10, 20, 40):
+        s_c = sc.IgnitionScenario(kind='flame_spread', n_cohorts=n_c,
+                                  spread_time=8.0, geometry='area')
+        # sampled BETWEEN the knots, which is the only place it can be
+        # wrong at all
+        errs.append(max(abs(s_c.mass_entrainment(T) - (T / 8.0) ** 2)
+                        for T in [8.0 * k / 501.0 for k in range(502)]))
+    check('for an area spread it is exact at every cohort EDGE',
+          max(abs(sc.IgnitionScenario(
+              kind='flame_spread', n_cohorts=8, spread_time=8.0,
+              geometry='area').mass_entrainment(8.0 * (i / 8) ** 0.5)
+              - i / 8) for i in range(9)) < 1e-12)
+    check('the error between the edges falls only as 1/n, the SAME '
+          'order the staircase had - so order of accuracy is not what '
+          'was bought',
+          all(1.8 < a / b < 2.2 for a, b in zip(errs, errs[1:])),
+          ' -> '.join(f'{e:.2e}' for e in errs))
+    # AND HERE IS WHAT WAS. The staircase jumps by a full 1/n at every
+    # edge; the ramp is continuous, so the largest change across any
+    # instant is zero. A jump shock-loads the chamber and a slope does
+    # not, and the peak pressure is the height of the biggest shock.
+    s_j = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                              spread_time=8.0, geometry='area')
+    edge = 8.0 * (7 / 20) ** 0.5
+    eps = 1e-9
+    jump_ramp = abs(s_j.mass_entrainment(edge + eps)
+                    - s_j.mass_entrainment(edge - eps))
+    jump_stair = max(f for f, _ti in s_j.cohorts())
+    check('the staircase jumped by a full 1/n at every edge and the ramp '
+          'does not jump at all - THAT is the property, not the order',
+          jump_ramp < 1e-6 and abs(jump_stair - 1 / 20) < 1e-12,
+          f'ramp {jump_ramp:.2e} against a staircase step of '
+          f'{jump_stair:.4f}')
+    check('and it still ends at exactly the whole charge',
+          abs(slow.mass_entrainment(60.0) - 1.0) < 1e-12)
+    # THE MACHINERY STILL BITES where the physics really is discrete. A
+    # package letting go is a step and is NOT ramped - that is physics,
+    # not an exception - so a coarse one still fails to converge and
+    # still says so.
+    pkg = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=120.0,
                      p0_chamber=d.P_AMB,
                      scenario=sc.IgnitionScenario(
-                         kind='flame_spread', n_cohorts=20,
-                         spread_time=0.5))['cohort_converged'])
+                         kind='progressive_package', n_cohorts=4,
+                         spread_time=60.0))
+    check('a failing PACKAGE is still a step, so a coarse one still fails '
+          'to converge and still reports it - the refinement check was '
+          'not defeated, the flame spread stopped needing it',
+          not pkg['cohort_converged'],
+          f"{pkg['cohort_refinement_error']:.1%} out at 4 packages")
     check('the reported p_max is never silently replaced by the refined '
           'one: the caller gets the peak their own scenario produced',
           coarse['p_max'] == d.simulate(

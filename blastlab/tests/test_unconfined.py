@@ -166,12 +166,14 @@ def main():
     # more than the source can supply. A chamber whose drain outruns its
     # tap cannot fill.
     print('\n  confined vs unconfined, both computed')
-    # n = 80, not the 20 this test used to run at. The n-sequence for
-    # this case is 3.04, 1.65, 1.20, 1.06, 1.03, 1.02 at n = 10 ... 320,
-    # so 80 is the first count that supports the claim being made here -
-    # "under 1.1, it does not pressurise" - and the tail only moves
-    # further in that direction. Refining past 80 costs ~18 s a run and
-    # buys a third decimal place of an answer that is already "no".
+    # n = 80, and the number this produces has come DOWN twice as the
+    # discretisation was fixed. It read 3.75 with the old fixed-step
+    # integrator, 1.06 once that was error-controlled, and 1.017 now
+    # that entrainment is a ramp rather than a staircase
+    # (scenario.windows). Each correction moved it the same way, which
+    # is the direction a discretisation error moves when you stop
+    # making it: the room pressurises even less than the last answer
+    # said.
     s = spread(60.0, 80)
     conf, unconf, summ = u.compare(p, 5.0, 1.0, vent_area=0.02,
                                    scenario=s, t_end=120.0,
@@ -201,24 +203,15 @@ def main():
     print('\n  and the peak is refined, not quoted at whatever n was handy')
     coarse = d.simulate(p, 5.0, 1.0, vent_area=0.02, scenario=spread(60.0, 20),
                         t_end=120.0, p0_chamber=P_AIR)
-    check('a coarse ignition staircase inflates the peak, and the run says '
-          'so instead of reporting it flat',
-          not coarse['cohort_converged']
-          and coarse['cohort_refinement_error'] > 0.2,
-          f"n=20 gives {coarse['p_max']/P_AIR:.3f} x against "
-          f"{coarse['p_max_refined']/P_AIR:.3f} at 2n, "
-          f"{coarse['cohort_refinement_error']:.0%} out")
-    check('so the number this test used to report was half staircase',
-          coarse['p_max'] > 1.5 * conf['p_max'],
-          f"{coarse['p_max']/P_AIR:.3f} x at n=20 against "
-          f"{conf['p_max']/P_AIR:.3f} at n=80")
-    # A FAST FIRE IS CONVERGED AT THE SAME COHORT COUNT, which is the
-    # whole reason this hid: the artefact grows with spread time, and
-    # every case built while the module was being written was fast.
-    check('the same 20 cohorts ARE converged on a 0.5 s spread - the '
-          'artefact grows with spread time, so it hid in the fast cases',
-          d.simulate(p, 5.0, 1.0, vent_area=0.02, scenario=spread(0.5, 20),
-                     t_end=5.0, p0_chamber=P_AIR)['cohort_converged'])
+    check('even a quarter of the cohorts now lands within a per cent, '
+          'because entrainment is a ramp and not a staircase',
+          coarse['cohort_converged']
+          and abs(coarse['p_max'] / conf['p_max'] - 1.0) < 0.03,
+          f"n=20 gives {coarse['p_max']/P_AIR:.4f} x against "
+          f"{conf['p_max']/P_AIR:.4f} at n=80")
+    check('and the run still measures that rather than assuming it',
+          coarse['cohort_refinement_error'] < 0.02,
+          f"{coarse['cohort_refinement_error']:.2%} on doubling")
     check('a uniform scenario is n-independent by construction, so it is '
           'converged without paying for a second run',
           d.simulate(p, 5.0, 1.0, vent_area=0.02, t_end=5.0)['cohort_converged'])
@@ -292,8 +285,8 @@ def main():
     s_stout = u.compare(p, 5.0, 1.0, vent_area=0.002, scenario=spread(60.0, 80),
                         t_end=120.0, p0_chamber=P_AIR, refine_cohorts=False,
                         component=stout)[2]
-    check('the same 94 kPa yields a light panel, so for THAT wall pressure '
-          'governs',
+    check('the sealed room s ~82 kPa yields a light panel, so for THAT '
+          'wall pressure governs',
           s_light['governing_confined'] == 'pressure'
           and s_light['confined_yielded'],
           f"mu = {s_light['confined_ductility']:.2f}")

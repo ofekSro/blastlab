@@ -323,13 +323,17 @@ def validate(case):
     # `run` is the one that counts. This one is the cheap a-priori
     # version: the artefact grows with spread time, so a slow fire cut
     # into few steps is the shape at risk. See deflagration._COHORT_TOL.
-    if (case.scenario_kind != 'uniform' and case.spread_time > 0
-            and case.n_cohorts < 40):
-        warn(f'{case.n_cohorts} cohorts over {case.spread_time:g} s is a '
-             f'coarse ignition staircase - each step lights '
-             f'{case.charge_kg / max(case.n_cohorts, 1):.3g} kg at once. '
-             f'The run measures what refining costs and says so, but a '
-             f'slow fire usually needs 40 or more.')
+    if (case.scenario_kind == 'progressive_package'
+            and case.spread_time > 0 and case.n_cohorts < 20):
+        # Only the PACKAGE case is a staircase now - a flame spread is
+        # entrained as a ramp and converges by n = 20 (scenario.windows).
+        # A package letting go really is a step, so it keeps the warning.
+        warn(f'{case.n_cohorts} packages over {case.spread_time:g} s is a '
+             f'coarse staircase - each one releases '
+             f'{case.charge_kg / max(case.n_cohorts, 1):.3g} kg at once, '
+             f'and unlike a flame front that is a genuine step rather '
+             f'than a discretisation. The run measures what refining '
+             f'costs and says so.')
 
     # Pyrotechnics, marked rather than half-modelled. Out of scope until
     # decided otherwise (owner, 2026-09-21).
