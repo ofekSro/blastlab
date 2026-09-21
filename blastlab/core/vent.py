@@ -112,7 +112,8 @@ class ChamberState:
                  'alpha_expl', 'alpha_air', 'rho_expl', 'rho_air',
                  'rho_mix', 'e_mix', 'R_p', 'gamma_p', 'mol_weight_p',
                  't_open', 'mode', 'first_front_is_artefact',
-                 'volume_0d', 'p_0d', 'pressure_from_volume_shift')
+                 'volume_0d', 'p_0d', 'pressure_from_volume_shift',
+                 'adiabatic_source', 'wall_loss_fraction', 'warnings')
 
     def __init__(self, **kw):
         for k in self.__slots__:
@@ -214,6 +215,34 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
     _R, cv_mix, _cp, _g = mixture(prop, m_p, m_a)
     E = (m_p + m_a) * cv_mix * T
 
+    warnings = []
+    if result.get('adiabatic', True):
+        warnings.append(
+            f'the 0-D run behind this state was ADIABATIC, so its '
+            f'{T:.0f} K and {p / 1e6:.4f} MPa are upper bounds: a real '
+            f'magazine gives heat to its walls over the seconds the fire '
+            f'lasts, and both T and p come down with it. That is the '
+            f'conservative choice for a pressure check and the wrong one '
+            f'to write into a mesh without saying so. Set h_c and '
+            f'wall_area on the 0-D run.')
+    elif result.get('wall_loss_fraction', 0.0) > 0.5:
+        warnings.append(
+            f'the walls took {result["wall_loss_fraction"]:.0%} of the '
+            f'energy released before the hand-off, so this state is a '
+            f'long way below the adiabatic bound. Check that h_c is a '
+            f'measurement and not a placeholder - nothing in this repo '
+            f'calibrates it.')
+    if not result.get('cohort_converged', True):
+        warnings.append(
+            f'the 0-D peak had not converged in cohort count '
+            f'({result.get("cohort_refinement_error", 0.0):.0%} on '
+            f'doubling), so the instant this state was taken at is set by '
+            f'the ignition staircase rather than by the fire.')
+    if result.get('stop_reason') == 'conservation_violation':
+        raise ValueError(
+            'the 0-D run did not conserve, so there is nothing worth '
+            'handing to a mesh. Fix the run first.')
+
     return ChamberState(
         p=p, T=T, m_p=m_p, m_a=m_a, E=E, volume=v,
         alpha_expl=alpha_expl, alpha_air=1.0 - alpha_expl,
@@ -234,6 +263,16 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
         first_front_is_artefact=(mode == 'open'),
         volume_0d=v_0d, p_0d=p_0d,
         pressure_from_volume_shift=(p / p_0d - 1.0) if p_0d > 0 else 0.0,
+        # WHETHER THE RUN THAT PRODUCED THIS GAVE THE WALLS ANYTHING.
+        # `simulate` is adiabatic by default, which is the conservative
+        # choice for a pressure check and the WRONG one to hand to a
+        # mesh without saying so: T and therefore p are then upper
+        # bounds, and `writer` is about to write them into a golden. The
+        # state carries the answer rather than leaving it to whoever
+        # called simulate.
+        adiabatic_source=bool(result.get('adiabatic', True)),
+        wall_loss_fraction=float(result.get('wall_loss_fraction', 0.0)),
+        warnings=warnings,
     )
 
 
@@ -391,6 +430,8 @@ def summary_line(state, val):
         txt += (f' - the mesh cavity differs from the 0-D volume, so the '
                 f'pressure moved {state.pressure_from_volume_shift:+.1%} '
                 f'at constant mass, energy and temperature')
-    for w in val.get('warnings', ()):
+    if state.adiabatic_source:
+        txt += ' | ADIABATIC SOURCE: T and p are upper bounds'
+    for w in tuple(state.warnings or ()) + tuple(val.get('warnings', ())):
         txt += f' | {w}'
     return txt
