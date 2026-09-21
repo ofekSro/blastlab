@@ -253,6 +253,121 @@ def main():
     check('a row with every field sourced reports calibrated',
           replace(prop, uncalibrated=()).calibrated)
 
+    # ── 7b. the chamber's own air (HD1-3-pre) ───────────────────────────
+    # The model counted only product gas. That is right where it was
+    # VERIFIED - a closed vessel at 50-200 kg/m3, where air is under 3 %
+    # of the mass - and wrong where it is APPLIED, a magazine at 0.1-5,
+    # where the air is comparable to the products and often larger. The
+    # analytic check passed to 1e-6 throughout and could never have
+    # caught it: the regime it pins is the regime where the omission
+    # does not matter.
+    print('\n  the chamber air')
+    check('an evacuated chamber holds no air, whatever its size',
+          d.air_mass(1.0, 0.0) == 0.0 and d.air_mass(1e6, 0.0) == 0.0)
+    check('air mass follows the ideal gas law',
+          abs(d.air_mass(2.0, d.P_AMB)
+              - d.P_AMB * 2.0 / (d.AIR_R * d.AIR_T0)) < 1e-12,
+          f'{d.air_mass(2.0, d.P_AMB):.4f} kg in 2 m3')
+    check('p0_chamber defaults to 0, so the analytic limit is untouched',
+          abs(d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0)['p_max']
+              - d.closed_vessel_pmax(prop, 5.0, 1.0))
+          < 1e-3 * d.closed_vessel_pmax(prop, 5.0, 1.0))
+
+    print('\n  mixture properties')
+    for m_p, m_a, label in ((1.0, 0.0, 'no air'), (0.0, 1.0, 'no products')):
+        R, cv, cp, g = d.mixture(prop, m_p, m_a)
+        want = (prop.R, prop.cv, prop.cp, prop.gamma) if m_a == 0 else \
+               (d.AIR_R, d.AIR_CV, d.AIR_CV + d.AIR_R, d.AIR_GAMMA)
+        check(f'{label}: the mixture is that one species',
+              all(abs(a - b) < 1e-9 * max(abs(b), 1.0)
+                  for a, b in zip((R, cv, cp, g), want)))
+    Rm, _cvm, _cpm, gm = d.mixture(prop, 1.0, 1.0)
+    # NOT assuming which way round they are: the products have the LOWER
+    # molecular weight (~23 against 29), so their R is the HIGHER one
+    # while their gamma is the lower. Asserting an order here was wrong
+    # the first time.
+    check('a half-and-half mixture sits between the two',
+          min(prop.R, d.AIR_R) < Rm < max(prop.R, d.AIR_R)
+          and min(prop.gamma, d.AIR_GAMMA) < gm
+          < max(prop.gamma, d.AIR_GAMMA),
+          f'R {Rm:.1f} between {min(prop.R, d.AIR_R):.1f} and '
+          f'{max(prop.R, d.AIR_R):.1f}; gamma {gm:.4f}')
+    check('cp - cv = R holds for the mixture too',
+          abs((d.mixture(prop, 1.0, 1.0)[2] - d.mixture(prop, 1.0, 1.0)[1])
+              - Rm) < 1e-9 * Rm)
+
+    print('\n  the vent takes the mixture, not the products')
+    args = (5.0e6, 2500.0, prop, 0.01, 0.8, d.P_AMB)
+    check('with no air it is exactly the old choked flow',
+          abs(d._vent_mdot(*args, m_p=1.0, m_a=0.0)
+              - d._vent_mdot(*args)) < 1e-12)
+    pure_air = d._vent_mdot(*args, m_p=0.0, m_a=1.0)
+    pure_prod = d._vent_mdot(*args, m_p=1.0, m_a=0.0)
+    check('air and products really do give different flows, by enough to '
+          'matter', abs(pure_air - pure_prod) / pure_prod > 0.10,
+          f'{100 * (pure_air / pure_prod - 1):+.1f} % if air were assumed')
+    half = d._vent_mdot(*args, m_p=1.0, m_a=1.0)
+    check('a mixture lies between them', pure_prod < half < pure_air
+          or pure_air < half < pure_prod, f'{half:.5f} kg/s')
+
+    print('\n  where the air matters and where it does not')
+    rows = []
+    for C, V in ((5.0, 0.1), (5.0, 1.0), (5.0, 5.0), (5.0, 25.0)):
+        dry = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0)
+        wet = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0,
+                         p0_chamber=d.P_AMB)
+        rows.append((C / V, wet['p_max'] / dry['p_max'],
+                     wet['air_to_product_ratio']))
+    check('at closed-vessel loading density the air is a rounding error',
+          rows[0][1] < 1.02, f'C/V = {rows[0][0]:g}: x{rows[0][1]:.3f}')
+    check('at magazine loading density it is not - THE NUMBER THAT MAKES '
+          'THIS NECESSARY',
+          rows[-1][1] > 1.5,
+          f'C/V = {rows[-1][0]:g}: x{rows[-1][1]:.2f}, air/products '
+          f'{rows[-1][2]:.1f}')
+    check('and the effect grows monotonically as the room gets bigger',
+          all(a[1] < b[1] for a, b in zip(rows, rows[1:])),
+          ' < '.join(f'{r[1]:.3f}' for r in rows))
+    check('every run reports how much air it had, so a default-evacuated '
+          'answer cannot be mistaken for a magazine one',
+          'm_air0' in dry and dry['m_air0'] == 0.0
+          and wet['m_air0'] > 0.0)
+
+    print('\n  conservation, now over two species')
+    r = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=5.0,
+                   p0_chamber=d.P_AMB)
+    check('air can only leave, never appear',
+          all(b <= a + 1e-12 for a, b in zip(r['m_air'], r['m_air'][1:]))
+          and r['m_air'][0] == r['m_air0'])
+    check('and it never goes negative', min(r['m_air']) >= 0.0)
+    closed = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                        p0_chamber=d.P_AMB)
+    check('a closed chamber keeps every gram of its air',
+          abs(closed['m_air'][-1] - closed['m_air0'])
+          < 1e-12 * closed['m_air0'])
+    check('and every gram of propellant still becomes gas',
+          abs(closed['m'][-1] - 5.0) < 1e-9 * 5.0)
+
+    # ── 7c. the integrator's verified range ─────────────────────────────
+    # Found while measuring the air, reproduced on the commit before it,
+    # and NOT fixed here - see _MAX_VERIFIED_LOADING. Pinned so it cannot
+    # be walked into silently, and so that whoever fixes it has the
+    # failing numbers.
+    print('\n  the verified loading-density range')
+    check('a magazine loading is inside it',
+          d.simulate(prop, 5.0, 1.0, vent_area=0.0,
+                     t_end=5.0)['loading_verified'])
+    hot = d.simulate(prop, 10.0, 0.05, vent_area=0.0, t_end=5.0)
+    check('a closed-vessel loading is flagged as outside it',
+          not hot['loading_verified'],
+          f"C/V = {hot['loading_density']:g}")
+    check('and it is flagged because the answer really is wrong there - '
+          'the integrator blows up in the ignition transient',
+          abs(hot['p_max'] - d.closed_vessel_pmax(prop, 10.0, 0.05))
+          / d.closed_vessel_pmax(prop, 10.0, 0.05) > 0.5,
+          f"{hot['p_max']/1e6:.3f} MPa against an analytic "
+          f"{d.closed_vessel_pmax(prop, 10.0, 0.05)/1e6:.0f}")
+
     # ── 8. ignition scenarios and cohorts (HD1-6) ───────────────────────
     print('\n  the scenario itself')
     check('cohort masses always sum to 1',

@@ -74,6 +74,80 @@ P_AMB = 101325.0
 #: `simulate`: a degressive grain never reaches Z = 1 in finite time.
 _BURNOUT_EPS = 1.0e-9
 
+#: KNOWN LIMIT OF THIS INTEGRATOR, measured 2026-09-21 and not fixed
+#: here. Above roughly C/V = 50 kg/m^3 - which is CLOSED-VESSEL loading
+#: density, the regime a calibration lives in - the fixed-step RK4 below
+#: blows up in the ignition transient and reports a silently wrong peak:
+#:
+#:     C/V = 200    reported 0.101 MPa against an analytic 275
+#:     C/V = 100    reported 263 MPa against an analytic 122
+#:
+#: with stop_reason 't_end', 51 steps and no warning. It survived because
+#: the suite only ever covered C/V of 0.5 to 5, and the analytic check
+#: that pins this model is written at a loading density where the
+#: omission cannot show.
+#:
+#: The cause is the seed: a whisker of gas at ~0.25 Pa makes dZ/dt
+#: minuscule, the step limiters below are all keyed on rates, and they
+#: hand the transient the largest step there is - inside which the RK4
+#: stages extrapolate along dZ ~ Z^n and diverge. A relative bound on Z
+#: fixes those cases exactly (4e-16) but moves the vent-decay tail, and
+#: four different step heuristics were tried and each traded one failure
+#: for another. What this needs is the error-controlled integrator the
+#: HD1-2 design called for, not another heuristic.
+#:
+#: Until then: `simulate` is verified for C/V up to ~5 and must not be
+#: used to generate or check a closed-vessel case.
+_MAX_VERIFIED_LOADING = 5.0
+
+#: Air, for the chamber's own atmosphere (HD1-3-pre).
+AIR_R = 287.05          # J/(kg K)
+AIR_GAMMA = 1.4
+AIR_CV = AIR_R / (AIR_GAMMA - 1.0)
+AIR_T0 = 288.15         # K, the temperature the chamber air starts at
+
+
+def air_mass(volume_m3, p0, T0=AIR_T0):
+    """Mass of air [kg] initially filling the chamber.
+
+    THE NUMBER THAT MAKES THIS NECESSARY. The model used to count only
+    product gas, which is right where it was verified and wrong where it
+    is applied:
+
+        closed vessel   C/V = 50-200 kg/m3   air is under 3 % of the mass
+        magazine        C/V = 0.1-5 kg/m3    air is comparable to the
+                                             products, and often larger
+
+    So the analytic closed-vessel check passed to 1e-6 and could never
+    have caught this: the regime it pins is exactly the regime where the
+    omission does not matter.
+
+    `p0 = 0` means an evacuated vessel and returns 0, which is what keeps
+    that analytic limit exactly as it was.
+    """
+    if p0 <= 0.0 or volume_m3 <= 0.0:
+        return 0.0
+    return p0 * volume_m3 / (AIR_R * T0)
+
+
+def mixture(prop, m_p, m_a):
+    """(R, cv, cp, gamma) of the product/air mixture, mass-weighted.
+
+    Used for the chamber state AND for the vent. Leaving the products'
+    own properties in `_vent_mdot` once air is present is a ~15 % error
+    on the choked flow - the same size as the tolerance the CFD
+    cross-check is run at, so it would be absorbed into the discharge
+    coefficient and disappear.
+    """
+    m = m_p + m_a
+    if m <= 0.0:
+        return prop.R, prop.cv, prop.cp, prop.gamma
+    yp, ya = m_p / m, m_a / m
+    R = yp * prop.R + ya * AIR_R
+    cv = yp * prop.cv + ya * AIR_CV
+    cp = cv + R
+    return R, cv, cp, (cp / cv if cv > 0 else prop.gamma)
+
 
 def closed_vessel_pmax(prop, charge_kg, volume_m3):
     """Analytic peak pressure [Pa] of a CLOSED vessel, all propellant burnt.
@@ -197,18 +271,27 @@ def ignition_fraction(prop, charge_kg, volume_m3, p_ign):
     return Z0
 
 
-def _vent_mdot(p, T, prop, area, cd, p_amb):
+def _vent_mdot(p, T, prop, area, cd, p_amb, m_p=None, m_a=0.0):
     """Mass flow [kg/s] out of a vent of `area`, isentropic, choked-aware.
 
     Returns 0 while the chamber is below ambient - this model has no
     inflow, and a magazine that has vented down to ambient has nothing
     left to drive.
+
+    `m_p`/`m_a` give the MIXTURE its properties. What leaves the vent is
+    whatever is in the chamber, so the choked flux has to use the
+    mixture's gamma and R - see `mixture`. Omitting `m_p` keeps the
+    products' own properties, which is the pre-HD1-3-pre behaviour and
+    what an evacuated chamber reduces to anyway.
     """
     if area <= 0.0 or p <= p_amb or T <= 0.0:
         return 0.0
-    g = prop.gamma
+    if m_p is None:
+        R, g = prop.R, prop.gamma
+    else:
+        R, _cv, _cp, g = mixture(prop, m_p, m_a)
     crit = ((g + 1.0) / 2.0) ** (g / (g - 1.0))
-    coef = cd * area * p / math.sqrt(prop.R * T)
+    coef = cd * area * p / math.sqrt(R * T)
     if p / p_amb >= crit:                      # choked
         return coef * math.sqrt(g) * (2.0 / (g + 1.0)) ** ((g + 1.0)
                                                            / (2.0 * (g - 1.0)))
@@ -217,17 +300,29 @@ def _vent_mdot(p, T, prop, area, cd, p_amb):
         2.0 * g / (g - 1.0) * (pr ** (2.0 / g) - pr ** ((g + 1.0) / g)))
 
 
-def _pressure(prop, charge_kg, volume_m3, Z, m, E):
+def _pressure(prop, charge_kg, volume_m3, Z, m, E, m_a=0.0):
     """(p, T, V_free) from the Noble-Abel EOS. `Z` is the OVERALL burnt
-    fraction of the charge - the mass-weighted mean over the cohorts."""
+    fraction of the charge - the mass-weighted mean over the cohorts.
+
+    `m` is product gas, `m_a` the chamber's own air. The two share one
+    temperature and their partial pressures add (Dalton):
+
+        p = (m R_p + m_a R_a) T / (V_free - b m)
+
+    The co-volume correction stays on the products alone; air at these
+    densities is close enough to ideal that giving it one would be
+    inventing a number. With `m_a = 0` every line below is what it was
+    before HD1-3-pre, which is what keeps the analytic limit exact.
+    """
     solid = charge_kg * (1.0 - Z) / prop.rho
     free = volume_m3 - solid - prop.covolume * m
-    if free <= 1e-12 or m <= 1e-15:
+    if free <= 1e-12 or (m + m_a) <= 1e-15:
         return P_AMB, 0.0, max(free, 1e-12)
-    T = E / (m * prop.cv)
+    _R, cv_mix, _cp, _g = mixture(prop, m, m_a)
+    T = E / ((m + m_a) * cv_mix)
     if T <= 0.0:
         return P_AMB, 0.0, free
-    return m * prop.R * T / free, T, free
+    return (m * prop.R + m_a * AIR_R) * T / free, T, free
 
 
 def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
@@ -240,9 +335,9 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     not work here.
     """
     k = len(fracs)
-    Zs, m, E = state[:k], state[k], state[k + 1]
+    Zs, m, E, m_a = state[:k], state[k], state[k + 1], state[k + 2]
     z_total = sum(f * Z for f, Z in zip(fracs, Zs))
-    p, T, _free = _pressure(prop, charge_kg, volume_m3, z_total, m, E)
+    p, T, _free = _pressure(prop, charge_kg, volume_m3, z_total, m, E, m_a)
     # The pressure is used RAW here. It used to be max(p, p_amb), an
     # ambient floor that silently made extinction impossible: a magazine
     # that had vented down to atmospheric went on burning for ever at the
@@ -257,16 +352,23 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
             dZs.append(form_factor(prop, Z) * prop.a * (p ** prop.n)
                        / prop.web)
     mdot_gen = charge_kg * sum(f * dZ for f, dZ in zip(fracs, dZs))
-    mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb)
+    mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb, m_p=m, m_a=m_a)
     mdot_out = min(mdot_out, m / 1e-9) if m <= 0.0 else mdot_out
+    # The vent takes the MIXTURE, so each species leaves in proportion to
+    # its share of the mass. Air that has left cannot come back - there
+    # is no inflow in this model.
+    tot = m + m_a
+    yp = m / tot if tot > 0.0 else 1.0
+    _R, _cv, cp_mix, _g = mixture(prop, m, m_a)
     return tuple(dZs) + (
-        mdot_gen - mdot_out,
-        mdot_gen * prop.cv * prop.T_flame - mdot_out * prop.cp * T)
+        mdot_gen - mdot_out * yp,
+        mdot_gen * prop.cv * prop.T_flame - mdot_out * cp_mix * T,
+        -mdot_out * (1.0 - yp))
 
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
              t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000,
-             p_ign=None, scenario=None):
+             p_ign=None, scenario=None, p0_chamber=0.0):
     """Integrate the chamber to `t_end` [s]. RK4 with an adaptive step.
 
     Returns a dict with the sampled trace (`t, p, T, Z, m, mdot_out`,
@@ -309,6 +411,14 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     `vent_area = 0` is the closed vessel, whose peak must match
     `closed_vessel_pmax` - that is the model's own verification and the
     first thing to re-run after any change here.
+
+    `p0_chamber` [Pa] is the air already in the chamber when the charge
+    lights. **It defaults to 0 - an evacuated vessel - on purpose**, so
+    the analytic closed-vessel limit and the test that pins it stay
+    exactly what they were, and the new physics enters only when it is
+    asked for. A magazine passes `P_AMB`; at a magazine's loading density
+    that air is comparable to the product gas and changes the answer.
+    See `air_mass` for why the omission survived a 1e-6 verification.
     """
     if charge_kg <= 0.0 or volume_m3 <= 0.0:
         raise ValueError('charge and chamber volume must both be positive')
@@ -346,12 +456,17 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     Zs = [per if ti <= 0.0 else 0.0 for ti in t_ign]
     z_total = sum(f * Z for f, Z in zip(fracs, Zs))
     m = charge_kg * z_total
-    E = m * prop.cv * prop.T_flame
+    # The chamber's own air, and the energy it already holds. m_a0 = 0
+    # for the default evacuated vessel, and then every line below is
+    # arithmetically what it was before HD1-3-pre.
+    m_a0 = air_mass(volume_m3, p0_chamber)
+    m_a = m_a0
+    E = m * prop.cv * prop.T_flame + m_a * AIR_CV * AIR_T0
     t = 0.0
     h_max = t_end / 50.0
     sample_every = t_end / max(n_out, 2)
 
-    out = dict(t=[], p=[], T=[], Z=[], m=[], mdot_out=[], lit=[])
+    out = dict(t=[], p=[], T=[], Z=[], m=[], m_air=[], mdot_out=[], lit=[])
     p_max, t_p_max = 0.0, 0.0
     last_sample = -1.0
 
@@ -359,7 +474,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         return sum(f * Z for f, Z in zip(fracs, Zs))
 
     def state_pT():
-        return _pressure(prop, charge_kg, volume_m3, overall(), m, E)[:2]
+        return _pressure(prop, charge_kg, volume_m3, overall(), m, E, m_a)[:2]
 
     def record():
         p, T = state_pT()
@@ -368,7 +483,9 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         out['T'].append(T)
         out['Z'].append(min(overall(), 1.0))
         out['m'].append(m)
-        out['mdot_out'].append(_vent_mdot(p, T, prop, vent_area, cd, p_amb))
+        out['m_air'].append(m_a)
+        out['mdot_out'].append(_vent_mdot(p, T, prop, vent_area, cd, p_amb,
+                                          m_p=m, m_a=m_a))
         out['lit'].append(sum(f for f, ti in zip(fracs, t_ign) if ti <= t))
 
     record()
@@ -382,7 +499,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     t_outside = 0.0
     while t < t_end and steps < max_steps:
         steps += 1
-        s = tuple(Zs) + (m, E)
+        s = tuple(Zs) + (m, E, m_a)
         k1 = _derivs(*args, s, t)
         dZ_max = max(k1[:nZ])
         h = h_max
@@ -416,9 +533,9 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         k3 = _derivs(*args, add(s, k2, h / 2.0), t + h / 2.0)
         k4 = _derivs(*args, add(s, k3, h), t + h)
         nxt = [s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
-               for i in range(nZ + 2)]
+               for i in range(nZ + 3)]
         Zs = [min(v, 1.0) for v in nxt[:nZ]]
-        m, E = nxt[nZ], nxt[nZ + 1]
+        m, E, m_a = nxt[nZ], nxt[nZ + 1], max(nxt[nZ + 2], 0.0)
         # A degressive grain has sigma(Z) = (1 - Z)^(2/3), so dZ/dt -> 0 and
         # Z approaches 1 asymptotically, never reaching it. Combined with
         # the land-on-Z=1 step limit that grinds the integrator to a halt -
@@ -437,7 +554,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         # start of it, so that is the pressure the burn law saw.
         z_start = sum(f * Z for f, Z in zip(fracs, s[:nZ]))
         p_start = _pressure(prop, charge_kg, volume_m3, z_start, s[nZ],
-                            s[nZ + 1])[0]
+                            s[nZ + 1], s[nZ + 2])[0]
         if dZ_max > 0.0:
             t_burning += h
             if not prop.in_validity_window(p_start):
@@ -451,7 +568,14 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
             record()
             last_sample = t
         all_burnt = all(Z >= 1.0 for Z in Zs)
-        # burnt out and vented down: nothing left to integrate
+        # burnt out and vented down: nothing left to integrate. Two ways
+        # to be finished, and the second is the one that matters. The
+        # chamber approaches ambient asymptotically and the step limiter
+        # above shrinks with it, so waiting for a pressure threshold can
+        # take tens of thousands of steps (22,613 for a 0.1 m^2 vent, and
+        # the cap for 0.5 m^2). A converged step IS the answer: h this
+        # small means the remaining excess over ambient is too, so stop
+        # and report the chamber at ambient rather than chase it.
         if all_burnt and vent_area > 0.0 and p_now <= p_amb * 1.001:
             stop_reason = 'burnt out and vented'
             break
@@ -484,6 +608,18 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     out['stop_reason'] = stop_reason
     out['Z0'] = Z0
     out['scenario'] = scenario
+    #: See _MAX_VERIFIED_LOADING. Reported rather than raised, because a
+    #: high-loading run is still wanted for comparison - but nothing
+    #: downstream may quote a peak from one without saying this.
+    out['loading_density'] = charge_kg / volume_m3
+    out['loading_verified'] = (charge_kg / volume_m3) <= _MAX_VERIFIED_LOADING
+    out['m_air0'] = m_a0
+    out['p0_chamber'] = p0_chamber
+    #: mass of chamber air relative to the product gas made. Above ~0.1
+    #: the air is not a correction, and a run made with the default
+    #: evacuated chamber is answering a different question.
+    out['air_to_product_ratio'] = (m_a0 / (charge_kg * out['Z'][-1])
+                                   if out['Z'][-1] > 0 else float('inf'))
     # Always reported, never implied. Uniform ignition is the laboratory
     # condition; a magazine answer computed under it is one whose
     # entrainment was assumed away, and the report has to say so.
