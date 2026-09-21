@@ -65,6 +65,23 @@ DEFAULT_A_FACTOR = 1.5
 #: for a material class.
 DEFAULT_PEXT_FACTOR = 2.0
 
+#: Default multiplicative span on the wall heat-transfer coefficient.
+#: THE FOURTH AXIS, and it is here because it earns its cost. Nothing in
+#: this repository calibrates `h_c` - it is a film coefficient someone
+#: estimated - and it moves the state handed to the CFD by far more than
+#: it moves any single pressure: measured at h_c = 200 against adiabatic
+#: on a 20 kg magazine, the panel bursts 9.5 % later with 12.4 % more
+#: mass burnt and alpha_expl 10.8 % higher. A band taken over the burn
+#: law alone reports itself NARROWER THAN IT IS.
+#:
+#: A factor of two, which is the usual standing of a film coefficient
+#: taken from a table rather than a rig, and a judgement like the rest -
+#: see `ranges_sourced`.
+DEFAULT_HC_FACTOR = 2.0
+
+#: The axes of the box, in the order `signs` tuples carry them.
+PARAMS = ('n', 'a', 'p_extinction', 'h_c')
+
 #: What the envelope is taken over. `p_max` is the structural load,
 #: `t_p_max` decides the loading regime (impulsive against quasi-static,
 #: which decides WHICH check applies), and `Z_end` says whether the
@@ -72,9 +89,15 @@ DEFAULT_PEXT_FACTOR = 2.0
 REPORTED = ('p_max', 't_p_max', 'Z_end', 'burnt_out', 'extinguished')
 
 
-def _perturb(prop, dn, fa, fp, signs):
-    """One corner of the box. `signs` is (-1, 0, +1) per parameter."""
-    sn, sa, sp = signs
+def _perturb(prop, dn, fa, fp, fh, signs, h_c):
+    """One corner of the box: (propellant, simulate-kwarg overrides).
+
+    `signs` is (-1, 0, +1) per axis, in `PARAMS` order. Three of the four
+    are propellant fields and the fourth is not - `h_c` is a property of
+    the CHAMBER, not of the material - so this returns both halves
+    rather than pretending they live in the same object.
+    """
+    sn, sa, sp, sh = signs
     kw = {}
     if sn:
         kw['n'] = max(prop.n + sn * dn, 0.05)
@@ -82,7 +105,10 @@ def _perturb(prop, dn, fa, fp, signs):
         kw['a'] = prop.a * (fa ** sa)
     if sp and prop.p_extinction > 0.0:
         kw['p_extinction'] = prop.p_extinction * (fp ** sp)
-    return replace(prop, **kw) if kw else prop
+    sim = {}
+    if sh and h_c > 0.0:
+        sim['h_c'] = h_c * (fh ** sh)
+    return (replace(prop, **kw) if kw else prop), sim
 
 
 def _scalars(result):
@@ -96,8 +122,8 @@ def _scalars(result):
 
 
 def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
-         pext_factor=DEFAULT_PEXT_FACTOR, source='', check_corners=True,
-         **sim_kw):
+         pext_factor=DEFAULT_PEXT_FACTOR, hc_factor=DEFAULT_HC_FACTOR,
+         source='', check_corners=True, **sim_kw):
     """Run the nominal case and the corners of the uncertainty box.
 
     Returns a dict with
@@ -115,30 +141,49 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
                          WIDTH rests on the ranges, and the defaults are
                          judgements - see the module docstring.
         n_runs           what it cost
+        spans_heat_loss  False when the case is adiabatic, in which case
+                         the h_c axis is degenerate and the envelope
+                         does NOT cover the heat-loss assumption at all
         conserved        False if any sample failed its own conservation
                          check, which invalidates the whole band
 
     `sim_kw` goes straight to `deflagration.simulate`, so the band is
-    taken around the case you actually ran, not around a stand-in.
+    taken around the case you actually ran, not around a stand-in - and
+    `h_c` in it is the fourth axis rather than a fixed input.
     """
-    if dn < 0 or a_factor < 1.0 or pext_factor < 1.0:
+    if dn < 0 or a_factor < 1.0 or pext_factor < 1.0 or hc_factor < 1.0:
         raise ValueError('a range cannot be negative or shrink the box')
     # The cohort refinement is a property of the scenario, not of the
     # material, so it is answered once on the nominal run instead of
     # 2**k times over. Every sample shares one scenario.
     sim_kw.setdefault('refine_cohorts', True)
+    h_c = float(sim_kw.get('h_c', 0.0) or 0.0)
+    wall_area = float(sim_kw.get('wall_area', 0.0) or 0.0)
+    # An ADIABATIC case has no h_c to perturb - zero times anything is
+    # zero - so that axis is degenerate and the box is really three
+    # dimensional. Widening it by inventing an h_c for someone who chose
+    # adiabatic would be putting a number in their mouth, so instead the
+    # band SAYS it does not span the assumption.
+    spans_hc = h_c > 0.0 and wall_area > 0.0
+    n_axes = len(PARAMS)
 
-    def run(p_i):
-        return _d.simulate(p_i, charge_kg, volume_m3, **sim_kw)
+    def run(p_i, over=None):
+        kw = dict(sim_kw, **(over or {}))
+        return _d.simulate(p_i, charge_kg, volume_m3, **kw)
 
     nominal_result = run(prop)
     sim_kw['refine_cohorts'] = False
     nominal = _scalars(nominal_result)
 
-    samples = [((0, 0, 0), nominal, nominal_result)]
-    corner_signs = list(itertools.product((-1, 1), repeat=3))
+    samples = [((0,) * n_axes, nominal, nominal_result)]
+    corner_signs = list(itertools.product((-1, 1), repeat=n_axes))
+    if not spans_hc:
+        # drop the duplicate half of the box rather than paying for it
+        corner_signs = [g for g in corner_signs if g[3] == 1]
     for signs in corner_signs:
-        r = run(_perturb(prop, dn, a_factor, pext_factor, signs))
+        p_i, over = _perturb(prop, dn, a_factor, pext_factor, hc_factor,
+                             signs, h_c)
+        r = run(p_i, over)
         samples.append((signs, _scalars(r), r))
 
     def envelope(rows):
@@ -153,12 +198,15 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
     # is asserting monotonicity in a comment.
     faces, sufficient = [], True
     if check_corners:
-        for axis in range(3):
+        for axis in range(n_axes):
+            if axis == 3 and not spans_hc:
+                continue
             for s in (-1, 1):
-                signs = [0, 0, 0]
+                signs = [0] * n_axes
                 signs[axis] = s
-                r = run(_perturb(prop, dn, a_factor, pext_factor,
-                                 tuple(signs)))
+                p_i, over = _perturb(prop, dn, a_factor, pext_factor,
+                                     hc_factor, tuple(signs), h_c)
+                r = run(p_i, over)
                 faces.append((tuple(signs), _scalars(r), r))
         tol = 1e-9
         for _g, s, _r in faces:
@@ -194,8 +242,16 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
         'ranges_sourced': bool(source),
         'source': source,
         'ranges': {'dn': dn, 'a_factor': a_factor,
-                   'pext_factor': pext_factor},
+                   'pext_factor': pext_factor, 'hc_factor': hc_factor},
+        'params': PARAMS,
         'n_runs': len(all_rows),
+        #: False when the case is adiabatic. The h_c axis is then
+        #: degenerate and this envelope does NOT cover the heat-loss
+        #: assumption - which moves the hand-off by more than any single
+        #: burn-law parameter does, so a band reported without it is
+        #: narrower than the truth and has to say so.
+        'spans_heat_loss': spans_hc,
+        'h_c_nominal': h_c,
         #: the full traces of the two extremes, for `structural_verdict`
         'low_trace': (list(lo_row[2]['t']), list(lo_row[2]['p'])),
         'high_trace': (list(hi_row[2]['t']), list(hi_row[2]['p'])),
@@ -299,6 +355,12 @@ def summary_line(b):
            f'(x{b["spread"]:.1f}) over n +-{b["ranges"]["dn"]:g}, '
            f'a x/{b["ranges"]["a_factor"]:g}, '
            f'p_ext x/{b["ranges"]["pext_factor"]:g}')
+    if b.get('spans_heat_loss'):
+        txt += f', h_c x/{b["ranges"]["hc_factor"]:g}'
+    else:
+        txt += (' - and NOT over heat loss, because this case is '
+                'adiabatic: the envelope is narrower than the truth by '
+                'whatever the wall coefficient is worth')
     if not b['ranges_sourced']:
         txt += ' - RANGES UNSOURCED, the width is a judgement'
     if b['straddles_extinction']:

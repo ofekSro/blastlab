@@ -187,6 +187,17 @@ when it is not, with the ratio and the overpressure handed back. The same 94 kPa
 yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
 (μ = 0.118): one pressure, two answers, which is the point.
 
+> **The sensitivity band has four axes, not three** (owner, 2026-09-21): `a`, `n`,
+> `p_extinction` and **`h_c`**. Nothing here calibrates the wall coefficient, and
+> it moves the answer by more than any burn-law parameter does. Measured on a
+> closed vessel, where the peak is a thermodynamic limit the burn law does not
+> enter: the band over `a`, `n`, `p_extinction` is **×1.000000** — a number that
+> looks exact — and **×4.4** once `h_c` is an axis. On a sealed magazine, ×1.02
+> against ×1.37. Which parameter dominates is a property of the *case*, which is
+> why an axis may not be dropped for being usually small. An adiabatic case cannot
+> perturb `h_c` at all, so the band reports `spans_heat_loss=False` rather than
+> inventing one.
+
 **One finding that is a scope decision, not a deviation:**
 
 - **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`

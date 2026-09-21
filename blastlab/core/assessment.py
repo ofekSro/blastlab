@@ -91,6 +91,12 @@ class DeflagrationCase:
     sens_dn: float = 0.15
     sens_a_factor: float = 1.5
     sens_pext_factor: float = 2.0
+    #: The fourth axis. `h_c` is a film coefficient nobody here has
+    #: measured, and it moves the state handed to a CFD run by more than
+    #: any single burn-law parameter: 12.4 % on the mass burnt at burst
+    #: against 1.4 % on T. A band that leaves it out reports itself
+    #: narrower than it is.
+    sens_hc_factor: float = 2.0
 
     # heat (0 = that part is not asked for)
     h_c: float = 0.0
@@ -355,6 +361,7 @@ def run(case):
             prop, case.charge_kg, case.volume_m3,
             dn=case.sens_dn, a_factor=case.sens_a_factor,
             pext_factor=case.sens_pext_factor,
+            hc_factor=case.sens_hc_factor,
             source=case.sensitivity_source,
             vent_area=case.vent_area_m2, cd=case.discharge_coeff,
             t_end=case.t_end, n_out=case.n_out, scenario=sc,
@@ -375,6 +382,15 @@ def run(case):
                 '' if b['ranges_sourced'] else
                 'And the ranges themselves are judgements, not a record, '
                 'so the WIDTH is not citable either.'))
+        if not b['spans_heat_loss']:
+            rep.warnings.append(
+                'The band does NOT span the heat-loss assumption: this '
+                'case is adiabatic, so h_c has nothing to perturb. That '
+                'matters more than it sounds - h_c is not calibrated by '
+                'anything here, and switching it on moves the state at '
+                'burst by 12 % on the mass burnt where it moves T by 1 %. '
+                'The envelope above is narrower than the truth by '
+                'whatever the wall coefficient is worth.')
         if b['straddles_extinction']:
             rep.warnings.append(
                 'The band straddles the extinction limit: part of it is a '
