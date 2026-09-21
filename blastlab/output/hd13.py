@@ -72,7 +72,7 @@ solid #e0a800;padding:8px 12px;margin:10px 0;font-size:0.92em}"""
 def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                      sdof=None, component=None, calibration=None,
                      thermal=None, radiation=(), sensitivity=None,
-                     sensitivity_note='', verdict=None, oat=(),
+                     sensitivity_note='', verdict=None, qd=None, oat=(),
                      figures=(), title=None):
     """Write the whole HD 1.3 analysis as one self-contained .html.
 
@@ -318,6 +318,44 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                      + _table(('Input', 'Swing'),
                               [(html.escape(a), _fmt(b, 4)) for a, b in oat]))
         sections.append('sensitivity')
+
+    # QUANTITY-DISTANCE. The section renders whether or not anything was
+    # entered, and that is the point: a siting report that simply omits
+    # the comparison reads as though it was not needed, while one that
+    # prints the sentence says it was not DONE. The two are different
+    # and only the second is true.
+    if qd is not None:
+        p.append('<h2>Quantity-distance</h2>')
+        if not qd.get('have_criteria'):
+            p.append(f'<div class="note"><b>No comparison.</b> '
+                     f'{html.escape(qd.get("note", ""))}</div>')
+        else:
+            p.append(_table(
+                ('Criterion', 'Protects', 'Basis', 'K', 'Required [m]',
+                 'Source'),
+                [(html.escape(str(r['name'])),
+                  html.escape(str(r['protects'])),
+                  html.escape(str(r['basis'])),
+                  _fmt(r['k_factor'], 3),
+                  f"<b>{_fmt(r['distance_m'], 1)}</b>",
+                  html.escape(str(r['source']))) for r in qd['rows']]))
+            if qd.get('standoffs'):
+                p.append(_table(
+                    ('Criterion',) + tuple(f'{s:g} m'
+                                           for s in qd['standoffs']),
+                    [(html.escape(str(r['name'])),)
+                     + tuple(('<span class="ok">meets</span>' if ok else
+                              f'<span class="warn">short by '
+                              f'{_fmt(sh, 1)} m</span>')
+                             for ok, sh in zip(r['meets'],
+                                               r['shortfall_m']))
+                     for r in qd['rows']]))
+            p.append(f'<p class="meta">Every factor above is one the user '
+                     f'entered, with the source it came from printed '
+                     f'beside it - this tool ships none. Governing: '
+                     f'<b>{html.escape(str(qd["governing"]))}</b> at '
+                     f'{_fmt(qd["governing_distance_m"], 1)} m.</p>')
+        sections.append('qd')
 
     for caption, fig in figures:
         p.append(f'<h2>{html.escape(str(caption))}</h2>'

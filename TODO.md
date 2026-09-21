@@ -107,7 +107,7 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 | `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
 | `HD1-3b` · `init_mode='chamber'` in the writer | ✅ done — inert `type basic` phase with the propellant's `gamma`/`molWeight`; per-phase mass exact to 9 digits; **no `lambda.expl`**, so bug B0 cannot occur |
 | `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** — see the pre-registered condition below |
-| `HD1-3e` · `core/qd.py` — ships with an empty table | open |
+| `HD1-3e` · `core/qd.py` — ships with an empty table | ✅ done — `CRITERIA = {}`, and a row without a `source` is an **error**, not a blank column |
 | `HD1-3f` · validation, GUI card, report section | open |
 
 > **The number `HD1-3a` was built to produce.** `refine.snap_obstacles` moves
@@ -680,6 +680,7 @@ python test_sensitivity.py        # HD1: the band around an uncalibrated peak
 python test_room.py               # HD1-3a: a room as boxes, and what snapping does
 python test_vent.py               # HD1-3c: the 0D -> CFD hand-off, phase by phase
 python test_foam_chamber.py       # HD1-3b: the room as a blastFoam case
+python test_qd.py                 # HD1-3e: siting, as a mechanism with no numbers
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py
 python test_viz3d_panel.py / test_viz3d_protocol.py

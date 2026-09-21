@@ -296,6 +296,63 @@ def main():
           'than one computed at a single point and called robust',
           asm.run(replace(with_wall, sensitivity=False))['verdict'] is None)
 
+    # ── QUANTITY-DISTANCE, wired and EMPTY ──────────────────────────────
+    #
+    # The comparison is evaluated whenever standoffs were given, even
+    # with nothing entered - a siting report that simply OMITS it reads
+    # as though it was not needed, while one that prints the sentence
+    # says it was not done. Only the second is true.
+    print('\n  quantity-distance: present, and empty')
+    sited = asm.run(replace(good, sensitivity=False, standoffs_m=[25.0]))
+    check('standoffs alone produce the comparison, not silence',
+          sited['qd'] is not None and not sited['qd']['have_criteria'])
+    check('and the report says no coefficients were entered rather than '
+          'leaving the section out',
+          any('no coefficients' in n for n in sited['report'].notes))
+    entered = replace(good, sensitivity=False, standoffs_m=[25.0],
+                      qd_criteria=[dict(name='inhabited building',
+                                        k_factor=22.2, basis='mass',
+                                        source='<owner standard>',
+                                        protects='inhabited building')])
+    out5 = asm.run(entered)
+    check('a criterion the USER entered is computed, and carries its '
+          'source with it',
+          out5['qd']['have_criteria']
+          and out5['qd']['rows'][0]['source'] == '<owner standard>',
+          f"{out5['qd']['governing']} at "
+          f"{out5['qd']['governing_distance_m']:.1f} m")
+    bad_qd = replace(entered,
+                     qd_criteria=[dict(name='x', k_factor=1.0)])
+    vrep = asm.validate(bad_qd)
+    check('a criterion entered WITHOUT a source is refused up front, '
+          'rather than printing a distance with no provenance',
+          not vrep.ok and any('QD criterion' in e for e in vrep.errors),
+          str(vrep.errors[:1]))
+    check('and the case will not run at all in that state - a siting '
+          'number from a remembered factor is worse than none',
+          _raises(lambda: asm.run(bad_qd)))
+    qpath = os.path.join(os.path.dirname(path), 'qd.html')
+    qs = hd13.save_hd13_report(qpath, prop=out5['prop'],
+                               confined=out5['confined'], qd=out5['qd'])
+    check('the report renders the QD section', 'qd' in qs, str(qs))
+    with open(qpath, encoding='utf-8') as fh:
+        qpage = fh.read()
+    check('and prints the source beside the distance it produced, so a '
+          'number can never appear without its provenance',
+          '&lt;owner standard&gt;' in qpage
+          and f"{out5['qd']['governing_distance_m']:.1f}" in qpage,
+          f"{out5['qd']['governing_distance_m']:.1f} m with its source")
+    epath = os.path.join(os.path.dirname(path), 'qd_empty.html')
+    hd13.save_hd13_report(epath, prop=sited['prop'],
+                          confined=sited['confined'], qd=sited['qd'])
+    with open(epath, encoding='utf-8') as fh:
+        epage = fh.read()
+    check('an empty table renders the SECTION and a sentence - not a '
+          'zero a reader could take for a clearance, and not silence, '
+          'which would read as though the comparison was not needed',
+          'Quantity-distance' in epage and 'No QD comparison' in epage
+          and 'this tool ships none' in epage)
+
     print('\nASSESSMENT: ' + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
     return 1 if FAIL else 0
 

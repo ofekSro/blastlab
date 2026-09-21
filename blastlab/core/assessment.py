@@ -104,6 +104,12 @@ class DeflagrationCase:
     T_wall: float = 300.0
     standoffs_m: list = field(default_factory=list)
 
+    #: HD1-3e. Quantity-distance rows, each a dict with name, k_factor,
+    #: basis and SOURCE. Empty by default and empty on purpose: these
+    #: are safety-siting factors out of a standard, a wrong one is
+    #: invisible, and this tool ships none. See core/qd.py.
+    qd_criteria: list = field(default_factory=list)
+
     # the structural component, or None to skip the response
     span_m: float = 0.0
     mass_per_area: float = 0.0
@@ -305,6 +311,20 @@ def validate(case):
         warn('Fireball radiation uses correlations fitted to hydrocarbon '
              'and BLEVE data; nothing equivalent is published for '
              'propellant stacks.')
+
+    # HD1-3e. Checked HERE rather than at run time, so a row with no
+    # provenance stops the case instead of producing a plausible
+    # distance in metres with no symptom. See core/qd.py.
+    for row in (case.qd_criteria or ()):
+        try:
+            from . import qd as _qd
+            _qd.QDCriterion(**row)
+        except (TypeError, ValueError) as exc:
+            err(f'QD criterion {row!r}: {exc}')
+    if case.qd_criteria:
+        note(f'{len(case.qd_criteria)} quantity-distance criteria, all '
+             f'entered by the user - this tool ships none, and each '
+             f'distance is printed with the source it came from.')
     return rep
 
 
@@ -319,7 +339,7 @@ def run(case):
     out = dict(case=case, prop=prop, report=rep, confined=None,
                unconfined=None, thermal=None, radiation=(), sdof=None,
                component=None, band=None, sensitivity=None,
-               sensitivity_note='', verdict=None)
+               sensitivity_note='', verdict=None, qd=None)
 
     if case.confinement in ('confined', 'both'):
         out['confined'] = deflagration.simulate(
@@ -425,6 +445,27 @@ def run(case):
             out['fireball'] = fb
             out['radiation'] = [thermal.radiation_at(fb, float(r))
                                 for r in case.standoffs_m]
+
+    # HD1-3e. Always evaluated when standoffs were given, even with no
+    # criteria - because a siting report that OMITS the comparison reads
+    # as though it was not needed, while one that prints the sentence
+    # says it was not done. Only the second is true.
+    if case.standoffs_m or case.qd_criteria:
+        from . import qd as _qd
+        # Already validated - a bad row refuses the case before it runs,
+        # because a siting distance from a remembered factor is worse
+        # than no siting distance.
+        crits = [_qd.QDCriterion(**row) for row in case.qd_criteria]
+        fb = out.get('fireball')
+        out['qd'] = _qd.compare(
+            crits, case.standoffs_m, charge_kg=case.charge_kg,
+            # `fireball` reports a DIAMETER; a criterion written against
+            # the radius must be given a radius. Halving it here rather
+            # than hoping the person entering K knew which one this
+            # returns.
+            fireball_radius=(0.5 * fb['diameter'] if fb else None))
+        if not out['qd']['have_criteria']:
+            rep.notes.append(_qd.NO_CRITERIA)
 
     if case.has_component and conf is not None:
         from . import sdof as _sdof

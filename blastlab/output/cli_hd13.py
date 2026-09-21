@@ -94,7 +94,7 @@ def run_and_report(case_path, out_path=None, quiet=False):
         radiation=out['radiation'], figures=figures,
         sensitivity=out['sensitivity'],
         sensitivity_note=out['sensitivity_note'],
-        verdict=out['verdict'],
+        verdict=out['verdict'], qd=out['qd'],
         title=case.name or None)
 
     if not quiet:
@@ -122,5 +122,8 @@ def run_and_report(case_path, out_path=None, quiet=False):
             print(f"  verdict    {v['verdict'].replace('_', ' ').upper()}"
                   f"   (mu {v['low']['ductility']:.2f} at the low end of "
                   f"the band, {v['high']['ductility']:.2f} at the high)")
+        if out['qd'] is not None:
+            from ..core import qd as _qd
+            print(f"  siting     {_qd.summary_line(out['qd'])}")
         print(f'\n  report: {out_path}\n')
     return out_path
