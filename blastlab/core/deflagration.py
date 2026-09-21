@@ -74,31 +74,66 @@ P_AMB = 101325.0
 #: `simulate`: a degressive grain never reaches Z = 1 in finite time.
 _BURNOUT_EPS = 1.0e-9
 
-#: KNOWN LIMIT OF THIS INTEGRATOR, measured 2026-09-21 and not fixed
-#: here. Above roughly C/V = 50 kg/m^3 - which is CLOSED-VESSEL loading
-#: density, the regime a calibration lives in - the fixed-step RK4 below
-#: blows up in the ignition transient and reports a silently wrong peak:
+#: Cash-Karp RK4(5). Six stages, two answers: a fifth-order solution to
+#: advance with and a fourth-order one to measure it against. Their
+#: difference IS the local error estimate, which is what lets the step
+#: be chosen from what the equations are doing rather than from a
+#: heuristic about what they might do.
+#:
+#: This replaces a fixed-form RK4 whose step came from rate-based rules.
+#: Those rules are blind in two ways that cost real answers here: they
+#: cannot see a transient that is slow at the step start and violent
+#: inside it, and a limiter on a NET rate sees nothing at all when two
+#: large fluxes cancel - measured at one failing step, a burn feeding
+#: 3.4 MW against a vent removing 3.35 MW left a net mass rate of
+#: 5e-3 kg/s and a permitted step of 0.217 s, while the chamber held
+#: 0.11 kg against an outflow of 0.73 kg/s.
+_CK_NODES = (0.0, 1.0 / 5.0, 3.0 / 10.0, 3.0 / 5.0, 1.0, 7.0 / 8.0)
+_CK_A = (
+    (),
+    (1.0 / 5.0,),
+    (3.0 / 40.0, 9.0 / 40.0),
+    (3.0 / 10.0, -9.0 / 10.0, 6.0 / 5.0),
+    (-11.0 / 54.0, 5.0 / 2.0, -70.0 / 27.0, 35.0 / 27.0),
+    (1631.0 / 55296.0, 175.0 / 512.0, 575.0 / 13824.0,
+     44275.0 / 110592.0, 253.0 / 4096.0),
+)
+#: fifth-order weights (the solution that is kept)
+_CK_B5 = (37.0 / 378.0, 0.0, 250.0 / 621.0, 125.0 / 594.0, 0.0,
+          512.0 / 1771.0)
+#: fourth-order weights (the yardstick)
+_CK_B4 = (2825.0 / 27648.0, 0.0, 18575.0 / 48384.0, 13525.0 / 55296.0,
+          277.0 / 14336.0, 1.0 / 4.0)
+
+#: step-control tolerances and the factors that keep it from thrashing
+_RTOL = 1.0e-8
+_SAFETY = 0.9
+_H_SHRINK_MIN = 0.1
+_H_GROW_MAX = 5.0
+_MAX_REJECTS = 60
+
+#: Conservation residual, relative, above which a run is declared
+#: broken. Cash-Karp holds this near machine precision on every case
+#: measured; 1e-6 is loose enough that only a real failure trips it.
+_CONSERVATION_TOL = 1.0e-6
+
+#: THE BUG THIS INTEGRATOR WAS BROUGHT IN TO FIX, kept because it is the
+#: reason the design says what it says. With the previous fixed-step RK4
+#: and its rate-based limiters, a loading density above roughly
+#: 50 kg/m^3 blew up in the ignition transient:
 #:
 #:     C/V = 200    reported 0.101 MPa against an analytic 275
 #:     C/V = 100    reported 263 MPa against an analytic 122
 #:
-#: with stop_reason 't_end', 51 steps and no warning. It survived because
-#: the suite only ever covered C/V of 0.5 to 5, and the analytic check
-#: that pins this model is written at a loading density where the
-#: omission cannot show.
+#: with stop_reason 't_end', 51 steps and no warning of any kind. It
+#: survived because the suite only covered C/V of 0.5 to 5 - and C/V of
+#: tens to hundreds is CLOSED-VESSEL density, the regime a calibration
+#: lives in, so the one place the model had to be right was the one
+#: place nothing looked.
 #:
-#: The cause is the seed: a whisker of gas at ~0.25 Pa makes dZ/dt
-#: minuscule, the step limiters below are all keyed on rates, and they
-#: hand the transient the largest step there is - inside which the RK4
-#: stages extrapolate along dZ ~ Z^n and diverge. A relative bound on Z
-#: fixes those cases exactly (4e-16) but moves the vent-decay tail, and
-#: four different step heuristics were tried and each traded one failure
-#: for another. What this needs is the error-controlled integrator the
-#: HD1-2 design called for, not another heuristic.
-#:
-#: Until then: `simulate` is verified for C/V up to ~5 and must not be
-#: used to generate or check a closed-vessel case.
-_MAX_VERIFIED_LOADING = 5.0
+#: Cash-Karp returns 275.000 and 122.222 exactly, in fewer steps than the
+#: old scheme took to get them wrong. The suite now spans 0.2 to 200.
+_VERIFIED_LOADING_RANGE = (0.2, 200.0)
 
 #: Air, for the chamber's own atmosphere (HD1-3-pre).
 AIR_R = 287.05          # J/(kg K)
@@ -334,6 +369,20 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     integrated together - see core/scenario.py on why convolution does
     not work here.
     """
+    """State is (Z_0..Z_{k-1}, m, E, m_a, m_out_p, m_out_a, E_out).
+
+    The last three are ACCUMULATORS - everything that has left through
+    the vent, integrated alongside everything that stayed. They cost one
+    addition each and they turn conservation into an identity the run can
+    check on itself:
+
+        m     + m_out_p == charge * z          products
+        m_a   + m_out_a == m_a0                air
+        E     + E_out   == E_in                energy
+
+    That is what `_conservation_residual` reads, and it is the difference
+    between an integrator that fails and one that fails SILENTLY.
+    """
     k = len(fracs)
     Zs, m, E, m_a = state[:k], state[k], state[k + 1], state[k + 2]
     z_total = sum(f * Z for f, Z in zip(fracs, Zs))
@@ -360,10 +409,66 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     tot = m + m_a
     yp = m / tot if tot > 0.0 else 1.0
     _R, _cv, cp_mix, _g = mixture(prop, m, m_a)
+    e_out = mdot_out * cp_mix * T
     return tuple(dZs) + (
         mdot_gen - mdot_out * yp,
-        mdot_gen * prop.cv * prop.T_flame - mdot_out * cp_mix * T,
-        -mdot_out * (1.0 - yp))
+        mdot_gen * prop.cv * prop.T_flame - e_out,
+        -mdot_out * (1.0 - yp),
+        mdot_out * yp,                 # m_out_p
+        mdot_out * (1.0 - yp),         # m_out_a
+        e_out)                         # E_out
+
+
+def _ck_step(derivs, s, t, h, n, k1=None):
+    """One Cash-Karp step. Returns (y5, err_scaled_numerator, k1).
+
+    `k1` does not depend on h, so a rejected step can hand it back and
+    save one right-hand side evaluation per retry.
+    """
+    ks = []
+    for stage in range(6):
+        if stage == 0:
+            if k1 is not None:
+                ks.append(k1)
+                continue
+            y = s
+        else:
+            a = _CK_A[stage]
+            y = tuple(s[i] + h * sum(a[j] * ks[j][i] for j in range(len(a)))
+                      for i in range(n))
+        ks.append(derivs(y, t + _CK_NODES[stage] * h))
+    y5 = tuple(s[i] + h * sum(_CK_B5[j] * ks[j][i] for j in range(6))
+               for i in range(n))
+    err = tuple(h * sum((_CK_B5[j] - _CK_B4[j]) * ks[j][i] for j in range(6))
+                for i in range(n))
+    return y5, err, ks[0]
+
+
+def _conservation_residual(prop, charge_kg, fracs, state, nZ, m_a0):
+    """Largest relative violation of the three conservation identities.
+
+    THE POINT OF THIS FUNCTION. The integrator bug this model shipped
+    with did not crash, did not warn, and did not stop early - it
+    reported 0.101 MPa where 275 was right and called it a normal
+    finish. Nothing downstream could tell. Conservation is the one
+    property that is true of the physics regardless of the answer, so
+    checking it at the end of every run turns a silent failure into a
+    loud one. It is only possible because the vented mass and energy are
+    carried as accumulators - see `_derivs`.
+    """
+    Zs = state[:nZ]
+    m, E, m_a = state[nZ], state[nZ + 1], state[nZ + 2]
+    m_out_p, m_out_a, E_out = state[nZ + 3], state[nZ + 4], state[nZ + 5]
+    z = sum(f * Z for f, Z in zip(fracs, Zs))
+    made = charge_kg * z
+    e_in = made * prop.cv * prop.T_flame + m_a0 * AIR_CV * AIR_T0
+    worst = 0.0
+    for got, want in (((m + m_out_p), made),
+                      ((m_a + m_out_a), m_a0),
+                      ((E + E_out), e_in)):
+        scale = max(abs(want), 1e-30)
+        worst = max(worst, abs(got - want) / scale)
+    return worst
 
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
@@ -451,6 +556,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     # The igniter lights what is already exposed at t = 0, not the whole
     # stack, so its gas is charged to the cohorts lit then. With one
     # cohort this is exactly the old seed.
+    nZ_seed = len(fracs)
     lit_now = sum(f for f, ti in zip(fracs, t_ign) if ti <= 0.0)
     per = min(Z0 / lit_now, 1.0) if lit_now > 0.0 else 0.0
     Zs = [per if ti <= 0.0 else 0.0 for ti in t_ign]
@@ -462,9 +568,24 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     m_a0 = air_mass(volume_m3, p0_chamber)
     m_a = m_a0
     E = m * prop.cv * prop.T_flame + m_a * AIR_CV * AIR_T0
+    # what has left, integrated alongside what stayed - see `_derivs`
+    m_out_p = m_out_a = E_out = 0.0
     t = 0.0
     h_max = t_end / 50.0
     sample_every = t_end / max(n_out, 2)
+
+    # Absolute error floors, one per state component, so the error test
+    # is meaningful for quantities that legitimately pass through zero:
+    # the accumulators all start at 0, and a purely relative test would
+    # divide by nothing on the first step.
+    _e_scale = max(charge_kg * prop.cv * prop.T_flame, 1.0)
+    _atol = ([1.0e-12] * nZ_seed
+             + [1.0e-12 * max(charge_kg, 1.0),      # m
+                1.0e-9 * _e_scale,                  # E
+                1.0e-12 * max(m_a0, 1.0e-6),        # m_a
+                1.0e-12 * max(charge_kg, 1.0),      # m_out_p
+                1.0e-12 * max(m_a0, 1.0e-6),        # m_out_a
+                1.0e-9 * _e_scale])                 # E_out
 
     out = dict(t=[], p=[], T=[], Z=[], m=[], m_air=[], mdot_out=[], lit=[])
     p_max, t_p_max = 0.0, 0.0
@@ -497,45 +618,75 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     extinguished = False
     t_burning = 0.0
     t_outside = 0.0
+    def rhs(y, tt):
+        return _derivs(*args, y, tt)
+
+    nstate = nZ + 6
+    h = h_max
+    rejected = 0
     while t < t_end and steps < max_steps:
         steps += 1
-        s = tuple(Zs) + (m, E, m_a)
-        k1 = _derivs(*args, s, t)
-        dZ_max = max(k1[:nZ])
-        h = h_max
-        if dZ_max > 0.0:
-            h = min(h, 0.005 / dZ_max)         # <= 0.5 % of the burn
-            # land ON Z = 1, never past it. Clipping an overshoot leaves
-            # m and E integrated against a dZ taken beyond burn-out, which
-            # showed up as m_end = 1.00066 * C - more gas than propellant.
-            for Z, dZ in zip(Zs, k1[:nZ]):
-                if dZ > 0.0:
-                    h = min(h, (1.0 - Z) / dZ)
-        if k1[nZ] < 0.0 and m > 0.0:
-            # 1 %, not 5 %: the vent stops at ambient (there is no inflow
-            # in this model), so a step that dumps too much mass at once
-            # lands the chamber BELOW ambient and strands it there. At 5 %
-            # a large vent finished at 0.58 bar against an ambient of 1.01.
-            h = min(h, 0.01 * m / (-k1[nZ]))
+        s = tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out)
         # Land ON the next ignition, never across it. A cohort lighting
         # inside a step is a discontinuity in the right-hand side, and
-        # RK4 averaged across one would smear the entrainment the whole
-        # scenario exists to represent.
+        # no error estimate can repair an average taken across one - it
+        # would just keep shrinking h at a point where the equations are
+        # not differentiable. This one stays a hard constraint.
         later = [ti for ti in t_ign if ti > t + 1.0e-15]
         if later:
             h = min(h, min(later) - t)
-        h = max(min(h, t_end - t), 1.0e-12)
+        # ...and land ON Z = 1 for the same reason. Burn-out is an event,
+        # not a smooth feature: past it the burn rate is identically
+        # zero, so an error estimate taken across it is measuring a
+        # discontinuity and would only shrink h for ever. Error control
+        # replaced the RATE heuristics, not the event constraints.
+        k1 = rhs(s, t)
+        for Z, dZ in zip(Zs, k1[:nZ]):
+            if dZ > 0.0 and Z < 1.0:
+                h = min(h, (1.0 - Z) / dZ)
+        h = max(min(h, t_end - t, h_max), 1.0e-14)
 
-        def add(base, k, f):
-            return tuple(b + f * kk for b, kk in zip(base, k))
+        # Cash-Karp with rejection: take the step, measure it against the
+        # embedded fourth-order solution, and only keep it if the error
+        # is inside tolerance. This is what a rate-based limiter cannot
+        # do - it judges the step AFTER seeing what happened inside it.
+        tries = 0
+        while True:
+            y5, err, _k1 = _ck_step(rhs, s, t, h, nstate, k1=k1)
+            scale = max(
+                abs(err[i]) / (_atol[i] + _RTOL * max(abs(s[i]),
+                                                      abs(y5[i])))
+                for i in range(nstate))
+            if scale <= 1.0 or tries >= _MAX_REJECTS or h <= 1.0e-13:
+                break
+            tries += 1
+            rejected += 1
+            h = max(h * max(_SAFETY * scale ** -0.25, _H_SHRINK_MIN),
+                    1.0e-14)
+        dZ_max = max(k1[:nZ])
+        h_used = h
+        # grow for next time, from the same estimate
+        h = min(h * min(_SAFETY * (scale ** -0.2 if scale > 0 else
+                                   _H_GROW_MAX), _H_GROW_MAX), h_max)
 
-        k2 = _derivs(*args, add(s, k1, h / 2.0), t + h / 2.0)
-        k3 = _derivs(*args, add(s, k2, h / 2.0), t + h / 2.0)
-        k4 = _derivs(*args, add(s, k3, h), t + h)
-        nxt = [s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
-               for i in range(nZ + 3)]
-        Zs = [min(v, 1.0) for v in nxt[:nZ]]
+        nxt = list(y5)
         m, E, m_a = nxt[nZ], nxt[nZ + 1], max(nxt[nZ + 2], 0.0)
+        m_out_p, m_out_a, E_out = nxt[nZ + 3], nxt[nZ + 4], nxt[nZ + 5]
+        # Clipping an overshoot past Z = 1 has to take back the mass and
+        # energy that were integrated along with it, or the chamber ends
+        # up holding more gas than there was propellant. The old fixed
+        # step hid this behind an exact landing; an error-controlled step
+        # lands near Z = 1 rather than on it, so the correction has to be
+        # explicit. Without it m_end came out at 1.00000002 * C - small,
+        # but conservation is either exact or it is a tolerance argument.
+        Zs = []
+        for i, v in enumerate(nxt[:nZ]):
+            if v > 1.0:
+                over = (v - 1.0) * fracs[i]
+                m -= charge_kg * over
+                E -= charge_kg * over * prop.cv * prop.T_flame
+                v = 1.0
+            Zs.append(v)
         # A degressive grain has sigma(Z) = (1 - Z)^(2/3), so dZ/dt -> 0 and
         # Z approaches 1 asymptotically, never reaching it. Combined with
         # the land-on-Z=1 step limit that grinds the integrator to a halt -
@@ -556,10 +707,10 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         p_start = _pressure(prop, charge_kg, volume_m3, z_start, s[nZ],
                             s[nZ + 1], s[nZ + 2])[0]
         if dZ_max > 0.0:
-            t_burning += h
+            t_burning += h_used
             if not prop.in_validity_window(p_start):
-                t_outside += h
-        t += h
+                t_outside += h_used
+        t += h_used
 
         p_now, _T = state_pT()
         if p_now > p_max:
@@ -592,7 +743,17 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         record()
     if steps >= max_steps:
         stop_reason = 'step cap'
-    if extinguished and t_burning <= 0.0:
+    # The run checks itself. Conservation is true of the physics whatever
+    # the answer is, so a residual here means the integration is wrong -
+    # and saying so is the whole point. The bug this replaced reported a
+    # peak 2700x too low with stop_reason 't_end' and no other sign.
+    resid = _conservation_residual(
+        prop, charge_kg, fracs,
+        tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out), nZ, m_a0)
+    out['conservation_residual'] = resid
+    if resid > _CONSERVATION_TOL:
+        stop_reason = 'conservation_violation'
+    elif extinguished and t_burning <= 0.0:
         # it never burned at all, which is a different statement about
         # the magazine than "it burned and then went out"
         stop_reason = 'cannot sustain'
@@ -608,11 +769,12 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     out['stop_reason'] = stop_reason
     out['Z0'] = Z0
     out['scenario'] = scenario
-    #: See _MAX_VERIFIED_LOADING. Reported rather than raised, because a
-    #: high-loading run is still wanted for comparison - but nothing
-    #: downstream may quote a peak from one without saying this.
+    #: Reported so a run outside the range the suite actually spans is
+    #: visible. See _VERIFIED_LOADING_RANGE for why that range is three
+    #: decades wide and not the half-decade it used to be.
+    lo, hi = _VERIFIED_LOADING_RANGE
     out['loading_density'] = charge_kg / volume_m3
-    out['loading_verified'] = (charge_kg / volume_m3) <= _MAX_VERIFIED_LOADING
+    out['loading_verified'] = lo <= charge_kg / volume_m3 <= hi
     out['m_air0'] = m_a0
     out['p0_chamber'] = p0_chamber
     #: mass of chamber air relative to the product gas made. Above ~0.1

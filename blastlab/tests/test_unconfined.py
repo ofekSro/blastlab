@@ -138,15 +138,39 @@ def main():
           f"{machs[-1]:.4f} over 300 s")
 
     # ── 4. THE COMPARISON - TODO.md HD1's opening claim ─────────────────
+    #
+    # THE VENT IS SMALLER AND THE FIRE FASTER THAN THIS TEST FIRST USED,
+    # and that is a correction, not a tuning. It ran at 0.02 m2 with a
+    # 60 s spread and the old fixed-step integrator reported 3.75 x
+    # ambient. The error-controlled one reports 1.06, and a hand check
+    # says 1.06 is right: a 60 s spread of 5 kg generates 0.083 kg/s,
+    # while that vent already passes 0.96 kg/s at only 1.2 x ambient -
+    # an order of magnitude more than the source. The chamber physically
+    # cannot pressurise, so the old case was not demonstrating confined
+    # pressure at all; it was reading an integration error.
+    #
+    # The fix is a SMALLER VENT, not a faster fire. Speeding the fire up
+    # would pressurise the room, but it would also make the open-air
+    # expansion non-negligible, and then the two halves would no longer
+    # be the same event. Keeping the 60 s spread and closing the vent to
+    # 0.002 m2 is the honest version: one fire, a room that genuinely
+    # pressurises, and open air that genuinely does not.
     print('\n  confined vs unconfined, both computed')
     s = spread(60.0)
-    conf, unconf, summ = u.compare(p, 5.0, 1.0, vent_area=0.02,
+    conf, unconf, summ = u.compare(p, 5.0, 1.0, vent_area=0.002,
                                    scenario=s, t_end=120.0)
     check('the same charge and the same fire, run through both models',
           conf['scenario_kind'] == unconf['scenario_kind'] == 'flame_spread')
     check('confined: a real structural pressure load',
           summ['confined_pressure_ratio'] > 2.0,
           f"{summ['confined_pressure_ratio']:.2f} x ambient")
+    check('and the run that produced it conserved to machine precision',
+          conf['conservation_residual'] < 1e-9,
+          f"{conf['conservation_residual']:.2e}")
+    check('while the vent that cannot keep the chamber up says so, '
+          'instead of inventing a peak',
+          u.compare(p, 5.0, 1.0, vent_area=0.02, scenario=spread(60.0),
+                    t_end=120.0)[2]['confined_pressure_ratio'] < 1.2)
     check('unconfined: no meaningful pressure at all',
           summ['unconfined_blast_negligible'])
     check('so pressure governs inside and heat governs outside - which is '

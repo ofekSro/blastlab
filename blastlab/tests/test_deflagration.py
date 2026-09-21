@@ -348,25 +348,64 @@ def main():
     check('and every gram of propellant still becomes gas',
           abs(closed['m'][-1] - 5.0) < 1e-9 * 5.0)
 
-    # ── 7c. the integrator's verified range ─────────────────────────────
-    # Found while measuring the air, reproduced on the commit before it,
-    # and NOT fixed here - see _MAX_VERIFIED_LOADING. Pinned so it cannot
-    # be walked into silently, and so that whoever fixes it has the
-    # failing numbers.
-    print('\n  the verified loading-density range')
-    check('a magazine loading is inside it',
-          d.simulate(prop, 5.0, 1.0, vent_area=0.0,
-                     t_end=5.0)['loading_verified'])
-    hot = d.simulate(prop, 10.0, 0.05, vent_area=0.0, t_end=5.0)
-    check('a closed-vessel loading is flagged as outside it',
-          not hot['loading_verified'],
-          f"C/V = {hot['loading_density']:g}")
-    check('and it is flagged because the answer really is wrong there - '
-          'the integrator blows up in the ignition transient',
-          abs(hot['p_max'] - d.closed_vessel_pmax(prop, 10.0, 0.05))
-          / d.closed_vessel_pmax(prop, 10.0, 0.05) > 0.5,
-          f"{hot['p_max']/1e6:.3f} MPa against an analytic "
-          f"{d.closed_vessel_pmax(prop, 10.0, 0.05)/1e6:.0f}")
+    # ── 7c. LOADING DENSITY, ACROSS BOTH REGIMES THE TOOL LIVES IN ──────
+    # The suite used to cover C/V of 0.5 to 5 only, and that gap hid a
+    # real bug: with the old fixed-step RK4 the ignition transient blew
+    # up above roughly C/V = 50 and reported 0.101 MPa against an
+    # analytic 275, silently, with stop_reason 't_end'. C/V of tens to
+    # hundreds is CLOSED-VESSEL density - the regime a calibration lives
+    # in - so the one place the model had to be right was the one place
+    # nothing checked it.
+    #
+    # 0.2 to 200 now, three decades, both regimes.
+    print('\n  loading density, 0.2 to 200 kg/m3')
+    for C, V in ((5.0, 25.0), (5.0, 5.0), (5.0, 1.0), (10.0, 0.5),
+                 (10.0, 0.2), (10.0, 0.1), (10.0, 0.05)):
+        r = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0)
+        ana = d.closed_vessel_pmax(prop, C, V)
+        rel = abs(r['p_max'] - ana) / ana
+        check(f'C/V = {C / V:g}: peak within 1e-6 of analytic',
+              rel < 1e-6, f'{r["p_max"] / 1e6:.3f} vs {ana / 1e6:.3f} MPa '
+                          f'({rel:.2e})')
+        check(f'C/V = {C / V:g}: conserved',
+              r['conservation_residual'] < 1e-9,
+              f"{r['conservation_residual']:.2e}")
+
+    # ── 7d. the run checks itself ───────────────────────────────────────
+    # The bug above did not crash, did not warn and did not stop early.
+    # It reported a peak 2700x too low and called it a normal finish, and
+    # nothing downstream could have known. That - not the arithmetic - is
+    # what made it dangerous. Conservation is true of the physics
+    # whatever the answer is, so every run now measures its own and says
+    # so, which is only possible because what left through the vent is
+    # carried as an accumulator rather than discarded.
+    print('\n  conservation, checked at run time')
+    for C, V, area in ((5.0, 1.0, 0.0), (5.0, 1.0, 0.02), (10.0, 0.05, 0.0),
+                       (5.0, 25.0, 0.1)):
+        r = d.simulate(prop, C, V, vent_area=area, t_end=5.0,
+                       p0_chamber=d.P_AMB)
+        check(f'C={C:g} V={V:g} vent={area:g}: residual under 1e-9',
+              r['conservation_residual'] < 1e-9,
+              f"{r['conservation_residual']:.2e}")
+        check(f'C={C:g} V={V:g} vent={area:g}: and so not flagged',
+              r['stop_reason'] != 'conservation_violation')
+
+    # ...and that the check is not decorative: break conservation on
+    # purpose and it must be caught. A tolerance nothing can trip is not
+    # a check.
+    import blastlab.core.deflagration as _d
+    real_tol = _d._CONSERVATION_TOL
+    try:
+        _d._CONSERVATION_TOL = 0.0      # nothing can satisfy this
+        broken = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=2.0)
+        check('an impossible tolerance really does trip the check',
+              broken['stop_reason'] == 'conservation_violation',
+              broken['stop_reason'])
+    finally:
+        _d._CONSERVATION_TOL = real_tol
+    check('and the real tolerance is restored',
+          d.simulate(prop, 5.0, 1.0, vent_area=0.02,
+                     t_end=2.0)['stop_reason'] != 'conservation_violation')
 
     # ── 8. ignition scenarios and cohorts (HD1-6) ───────────────────────
     print('\n  the scenario itself')

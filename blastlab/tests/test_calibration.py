@@ -70,6 +70,46 @@ def _raises(fn, exc=ValueError):
     return False
 
 
+def from_simulate(prop, charge_kg, volume_m3, n_out=1200):
+    """A closed-vessel record from `deflagration.simulate` itself.
+
+    THE CIRCULARITY THIS EXISTS TO NARROW. Every other record in this
+    file comes from `_synthetic`, a march written here - deliberately, so
+    the integration is not shared with the model under test. But that
+    meant the SOLVER was never the thing being calibrated against, and
+    the cost of that gap was measured: `simulate` carried an integrator
+    that blew up above roughly C/V = 50 - which is closed-vessel loading
+    density, precisely the regime a calibration record comes from - and
+    reported 0.101 MPa where 275 was right, silently. This file could
+    not have caught it, because it never called `simulate` at all.
+
+    So the headline reductions now run against BOTH: the independent
+    march, which keeps the integration honest, and the real solver,
+    which is what a user will actually point at a record. Neither alone
+    is enough.
+    """
+    r = simulate_or_fail(prop, charge_kg, volume_m3, n_out=n_out)
+    return np.asarray(r['t']), np.asarray(r['p'])
+
+
+def simulate_or_fail(prop, charge_kg, volume_m3, n_out=1200):
+    """`simulate` to burn-out, refusing anything that did not conserve or
+    did not finish - a calibration must never be fitted to a broken run."""
+    t_end = 0.5
+    for _ in range(12):
+        r = d.simulate(prop, charge_kg, volume_m3, vent_area=0.0,
+                       t_end=t_end, n_out=n_out)
+        if r['burnt_out']:
+            break
+        t_end *= 4.0
+    if not r['burnt_out']:
+        raise RuntimeError('the closed vessel never burnt out')
+    if r['stop_reason'] == 'conservation_violation':
+        raise RuntimeError(f"the run did not conserve: "
+                           f"{r['conservation_residual']:.2e}")
+    return r
+
+
 def _synthetic(prop, charge_kg, volume_m3, n, a_over_w, z0=0.02,
                n_out=1200, t_end=None, h_c=0.0, wall_area=0.0,
                T_wall=300.0):
@@ -181,6 +221,44 @@ def main():
         check(f'n = {n_true:g}: the naive answer is biased LOW, as a '
               'shrinking surface must make it',
               naive['n'] < n_true, f"{naive['n']:.4f} < {n_true}")
+
+    # ── 3b. THE SAME REDUCTION, AGAINST THE REAL SOLVER ─────────────────
+    # `_synthetic` keeps the integration independent; this keeps the
+    # reduction honest about what a user will actually point it at. The
+    # gap between the two is where a solver bug lives - and one did, at
+    # exactly these loading densities. See `from_simulate`.
+    print('\n  a degressive grain, recorded by simulate() itself')
+    for n_true in (0.70, 0.90):
+        deg = replace(base, form='degressive', n=n_true)
+        t_s, p_s = from_simulate(deg, C, V)
+        naive = cal.reduce_closed_vessel(t_s, p_s, deg, C, V,
+                                         form_correction=False)
+        fixed = cal.reduce_closed_vessel(t_s, p_s, deg, C, V,
+                                         form_correction=True)
+        e_naive = abs(naive['n'] - n_true) / n_true
+        e_fixed = abs(fixed['n'] - n_true) / n_true
+        check(f'n = {n_true:g}: the naive reduction is still wrong on a '
+              f'solver record', e_naive > NAIVE_MIN_ERROR,
+              f"naive n = {naive['n']:.4f} ({e_naive:.1%} off)")
+        check(f'n = {n_true:g}: and the corrected one recovers it to '
+              f'{TOL_N:.0%}', e_fixed < TOL_N,
+              f"n = {fixed['n']:.4f} ({e_fixed:.2%} off)")
+    check('the two record sources agree on the exponent they imply',
+          abs(cal.reduce_closed_vessel(
+                  *from_simulate(replace(base, form='degressive', n=0.85),
+                                 C, V),
+                  replace(base, form='degressive', n=0.85), C, V)['n']
+              - cal.reduce_closed_vessel(
+                  *_synthetic(replace(base, form='degressive', n=0.85), C, V,
+                              0.85,
+                              replace(base, form='degressive',
+                                      n=0.85).a / base.web),
+                  replace(base, form='degressive', n=0.85), C, V)['n'])
+          < 0.02 * 0.85,
+          'an independent march and the real solver must not disagree')
+    check('a record is refused outright if the run that made it did not '
+          'conserve - a calibration fitted to a broken run is worse than '
+          'none', callable(simulate_or_fail))
 
     # ── 4. heat loss ────────────────────────────────────────────────────
     print('\n  heat loss, injected and then corrected')
