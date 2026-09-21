@@ -746,6 +746,12 @@ class MainWindow(QMainWindow):
 
 
 def main(case_file=None):
+    # Before the window, so a failure while BUILDING it is reported too.
+    # An unhandled exception in a Qt slot used to abort the process with
+    # no traceback anywhere - see ui/crashlog.py for the run that found
+    # that out the hard way.
+    from . import crashlog
+    crashlog.install()
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName('blastlab')
     st = app_settings.load()

@@ -710,6 +710,7 @@ python test_room.py               # HD1-3a: a room as boxes, and what snapping d
 python test_vent.py               # HD1-3c: the 0D -> CFD hand-off, phase by phase
 python test_foam_chamber.py       # HD1-3b: the room as a blastFoam case
 python test_qd.py                 # HD1-3e: siting, as a mechanism with no numbers
+python test_ui_crashlog.py        # a raising Qt slot must not kill the process
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py
 python test_viz3d_panel.py / test_viz3d_protocol.py
