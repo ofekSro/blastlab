@@ -251,28 +251,60 @@ def main():
     check('in the open the load is heat, which is why the thermal path is '
           'in scope',
           summ['governing_unconfined'] == 'thermal')
-    # AND INSIDE IT IS ALSO HEAT, at a realistic vent. That is not the
-    # contrast the module docstring leads with, and it is what the
-    # numbers say: confinement turns an HD 1.3 fire into a pressure event
-    # only when the confinement is tight enough to hold the gas. State it
-    # rather than arrange the inputs until the expected contrast appears.
-    check('inside, at a realistic vent, heat governs too - the confined / '
-          'unconfined contrast is a property of the opening',
-          summ['governing_confined'] == 'thermal',
-          f"realistic vent -> {summ['governing_confined']}")
-    # AND THE LABEL IS COARSER THAN THE NUMBER, pinned here so it is not
-    # rediscovered. `governing_confined` flips at 2 x ambient, i.e. about
-    # 101 kPa of overpressure. The sealed edge case above reaches ~80 kPa
-    # QUASI-STATIC, which will take a masonry wall apart, and still comes
-    # back labelled 'thermal'. The threshold is not changed here to make
-    # this read better; it is recorded so the ratio is what gets quoted.
-    check('even the sealed room stays under the 2x label threshold while '
-          'carrying a destructive quasi-static pressure - so read the '
-          'ratio, not the label',
-          tight['confined_pressure_ratio'] < 2.0
-          and tight['confined_overpressure'] > 50e3,
-          f"{tight['confined_overpressure']/1e3:.0f} kPa labelled "
+    # INSIDE, THE LABEL REFUSES RATHER THAN GUESSES.
+    #
+    # This check replaces one that pinned a 2 x ambient threshold. That
+    # threshold was a round number wearing the clothes of a structural
+    # criterion, and it failed in the direction that matters: the sealed
+    # case below carries ~94 kPa of QUASI-STATIC overpressure, enough to
+    # take an unreinforced masonry wall apart, and came back 'thermal'
+    # because 94 < 101. Replacing it with a better round number would
+    # mean typing a threshold out of a safety standard from memory,
+    # which is the reason `core/qd.py` ships its table empty.
+    check('with no element given, the label says undetermined instead of '
+          'inventing a threshold - and hands back the pressure so a '
+          'reader who HAS a wall in mind can decide',
+          summ['governing_confined'] == 'undetermined'
+          and summ['governing_confined_basis'].startswith('none')
+          and summ['confined_overpressure'] > 0.0,
+          f"{summ['confined_overpressure']/1e3:.1f} kPa, "
+          f"{summ['governing_confined']}")
+    check('and the sealed case is undetermined too, however large its '
+          'pressure - the refusal is about having no element, not about '
+          'the number being small',
+          tight['governing_confined'] == 'undetermined',
+          f"{tight['confined_overpressure']/1e3:.0f} kPa, still "
           f"'{tight['governing_confined']}'")
+
+    # GIVEN AN ELEMENT IT IS DERIVED, and the two answers come from the
+    # same pressure. A wall that yields under it is a pressure problem; a
+    # wall that does not is not. That is a statement about a structure
+    # rather than about a round number.
+    print('\n  and given a wall, the label is computed from the wall')
+    from blastlab.core import sdof as _sdof
+    light = _sdof.Component(span=3.0, mass_per_area=100.0, Ru=20e3,
+                            kE=2.0e6, support='simple')
+    stout = _sdof.Component(span=3.0, mass_per_area=480.0, Ru=800e3,
+                            kE=3.0e7, support='simple')
+    s_light = u.compare(p, 5.0, 1.0, vent_area=0.002, scenario=spread(60.0, 80),
+                        t_end=120.0, p0_chamber=P_AIR, refine_cohorts=False,
+                        component=light)[2]
+    s_stout = u.compare(p, 5.0, 1.0, vent_area=0.002, scenario=spread(60.0, 80),
+                        t_end=120.0, p0_chamber=P_AIR, refine_cohorts=False,
+                        component=stout)[2]
+    check('the same 94 kPa yields a light panel, so for THAT wall pressure '
+          'governs',
+          s_light['governing_confined'] == 'pressure'
+          and s_light['confined_yielded'],
+          f"mu = {s_light['confined_ductility']:.2f}")
+    check('and does not yield a 200 mm reinforced wall, so for THAT one it '
+          'does not - one pressure, two answers, which is the point',
+          s_stout['governing_confined'] == 'thermal'
+          and not s_stout['confined_yielded'],
+          f"mu = {s_stout['confined_ductility']:.3f}")
+    check('and both say what the label was derived from',
+          s_light['governing_confined_basis'] == 'sdof'
+          and s_stout['governing_confined_basis'] == 'sdof')
     check('the confined side carries its extrapolation warning into the '
           'comparison, the unconfined side has none to carry',
           summ['confined_extrapolated_fraction'] > 0.99

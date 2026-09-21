@@ -84,16 +84,52 @@ its propagation, what it does to structures **outside**, and the flow field in t
 3D viewer. **The pressure *inside* the room does not need CFD:** slow burning mixes
 well, the pressure is uniform, and 0D is the correct physics there, not a shortcut.
 
-**The route (the default unless something proves otherwise):** take `p(t)` from the
-0D model as a **boundary condition at the opening** of a real blastFoam case, using
-the whole existing write/run/viewer machinery.
+**The route — changed 2026-09-21, and the change deletes most of the work.** The
+original plan put the chamber **outside** the mesh and drove `p(t)` in at the
+opening as a time-varying boundary condition. Investigation found the repo has
+**nothing** time-varying — no `Function1`, no `uniformFixedValue`, no `tableFile`
+— and the guide documents exactly one such condition (`codedFixedValue`, §20.1)
+while warning (§5.9) that the boundary *builds* the conserved quantities, so `p`,
+`T` **and** `rho` would all have to be driven together or the face state is wrong.
+
+**Putting the room INSIDE the mesh removes the need for any of it.** blastFoam
+computes the blowdown itself; the 0D model's only job becomes the state at the
+instant the vent opens. Deleted from the plan: the time-varying BC, a separate
+patch for the opening, `createPatch`, `createBaffles`, a new mesh stage, a new BC
+kind, a reacting phase, and `fvModels`. **The opening is a hole between wall
+boxes — fluid** — and the walls are ordinary obstacles on the existing
+`topoSet` + `subsetMesh -patch obstacles` path.
+
+| Step | State |
+|---|---|
+| `HD1-3-pre` · the chamber's own air in the 0D model | ✅ done |
+| `HD1-3a` · `core/room.py`, the geometry | ✅ done — measured: an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
+| `HD1-3b` · `init_mode='chamber'` in the writer | open |
+| `HD1-3c` · the hand-off and its validity metrics | open |
+| `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** |
+| `HD1-3e` · `core/qd.py` — ships with an empty table | open |
+| `HD1-3f` · validation, GUI card, report section | open |
+
+> **The number `HD1-3a` was built to produce.** `refine.snap_obstacles` moves
+> every obstacle edge outward onto a base-cell face, so a room's walls grow and
+> its cavity and opening shrink. At `dx=0.1` on a 5 m room that is **−10.5 %**
+> volume and **−27.6 %** vent area. The volume shift is five times the 2 %
+> `check_handoff_energy` runs at; the vent shift is nearly twice the 15 % the 2D
+> verification is pre-registered at, so it would have been absorbed into `Cd` and
+> disappeared. Both are now measured off the **snapped** boxes and reported.
+> This is why the hand-off must conserve **mass and energy** and let pressure
+> follow from the EOS — a cavity 10 % smaller simply arrives at a higher
+> pressure, and a golden that pinned `p == p_0D` would pin the bug.
 
 **The alternative, only if the above proves inadequate:** `phaseProperties` with
 `AbelNobel` instead of JWL and `Arrhenius`/`pressureBased` instead of `linear`. The
 guide documents both, and lists `AbelNobel` explicitly under **solid propellants**.
 **But** neither is Vieille with a form function, so it would require calibration
 against a closed-vessel test, exactly like the afterburn model against
-Kingery-Bulmash.
+Kingery-Bulmash. **Not needed while the room is inside the mesh:** the gas in the
+chamber is combustion products that have finished reacting, so the phase is
+inert — `type basic` with `idealGas`, `gamma` and `molWeight` from the
+`Propellant`, and **not** air (γ 1.25 against 1.40, M ≈ 23 against 29).
 
 ### `HD1-4` · Removing the blockers
 
@@ -123,14 +159,19 @@ that "the plan said X" is never quietly read as "the code does X".
 | Grain geometries | Five forms | Three: `degressive`, `neutral`, `progressive` (θ) | The missing two are multi-perforated grains, which need a web-regression law rather than another `theta` |
 | `hooks.Result` | The HD 1.3 assessment reaches the Results panel as a `Result` like a blast run | Its own bundle, rendered by `output/hd13.py` | Nothing downstream consumes it as a `Result` yet; `HD1-3` is what will |
 
-**Two findings that are open questions, not deviations:**
+**Closed 2026-09-21 — `governing_confined` no longer guesses.** It used to flip
+at 2× ambient, so a sealed magazine at ~94 kPa **quasi-static** came back
+labelled `'thermal'` because 94 < 101. Replacing it with a better round number
+would mean typing a threshold out of a safety standard from memory, which is why
+`core/qd.py` ships its table empty. The label is now **derived** from the element
+when `compare(..., component=...)` is given one — the pressure is run through
+`core/sdof.py` and `'pressure'` means it actually yielded — and **`'undetermined'`**
+when it is not, with the ratio and the overpressure handed back. The same 94 kPa
+yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
+(μ = 0.118): one pressure, two answers, which is the point.
 
-- **`governing_confined` flips at 2× ambient**, i.e. ~101 kPa of overpressure.
-  A sealed magazine reaching ~80 kPa **quasi-static** — enough to take a masonry
-  wall apart — is still labelled `'thermal'`. The threshold was not changed to
-  make anything pass; it is pinned by a test in `test_unconfined.py` so the
-  **ratio** is what gets quoted, not the label. **Owner decision:** whether the
-  label should key off a structural check instead of a round number.
+**One finding that is a scope decision, not a deviation:**
+
 - **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`
   and `Cp_condensed` are not modelled: every kilogram burnt is treated as gas,
   so pressure is over-predicted and the heat retained in solid residue ignored.
@@ -608,6 +649,7 @@ python test_deflagration.py       # HD1: the 0D burn model
 python test_sdof.py               # HD1: the SDOF structural response
 python test_unconfined.py         # HD1: the unconfined branch
 python test_sensitivity.py        # HD1: the band around an uncalibrated peak
+python test_room.py               # HD1-3a: a room as boxes, and what snapping does
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py
 python test_viz3d_panel.py / test_viz3d_protocol.py
