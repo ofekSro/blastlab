@@ -561,6 +561,103 @@ def thin_obstacle_warn_checks():
     check('0.1 m base cell (3-cell wall): silent', not thin_warns(rep),
           str(rep.warnings))
 
+    _fixed_dt_checks()
+
+
+def _fixed_dt_checks():
+    """A PRESCRIBED STEP HAS NO CFL GUARD, which is the point and the
+    risk both. `adjustTimeStep no` means blastFoam takes that step
+    whatever the flow does, so a case that is not quiescent can sail
+    past the stability limit without a word - the run does not stop, it
+    produces a wrong answer.
+
+    It exists for verification cases that are deliberately at rest:
+    blastFoam takes its Courant number from the face fluxes, so an
+    exactly uniform field at exactly zero velocity has Co = 0 and
+    `Time::adjustDeltaT` divides by it (a SIGFPE, measured, in
+    `_e2e_gamma_interface.py`). Anything that actually moves should
+    leave it at 0.
+    """
+    from blastlab.core.case import Case3D, validate_case
+
+    def rep_dt(dt, dx=0.05, cfl=0.3):
+        return validate_case(Case3D(
+            solver='blastfoam', Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=dx,
+            charge=0.5, center=(0.5, 0.5, 0.5), charge_refine='zone',
+            cfl=cfl, t_end=0.01, fixed_dt=dt))
+
+    # The guard's OWN messages, not `rep.ok`: this throwaway geometry
+    # has charge-resolution complaints of its own, and a check that
+    # reads the whole report would be measuring those instead.
+    def warned(rep):
+        return [m for m in rep.warnings if 'Courant limiter' in m]
+
+    def refused(rep):
+        return [m for m in rep.errors if 'Courant number' in m]
+
+    print('\n  a fixed time step turns the Courant limiter off')
+    check('an adaptive case says nothing about it',
+          not warned(rep_dt(0.0)) and not refused(rep_dt(0.0)))
+    # 2e-6 s on a 0.05 m cell is Co = 0.014 at the ambient sound speed:
+    # the step the gamma-interface case runs at, and comfortably inside
+    # the limit. It still warns, because the limiter is off either way.
+    ok = rep_dt(2.0e-6)
+    check('a safe fixed step is allowed and STILL warns that the '
+          'limiter is off - being inside the limit today is not the '
+          'same as being protected',
+          warned(ok) and not refused(ok), str(warned(ok))[:80])
+    check('and the warning says this is for quiescent verification '
+          'cases, so nobody reaches for it to speed a real run up',
+          any('QUIESCENT' in m for m in warned(ok)))
+    # 1e-4 s on the same cell is Co = 0.68 at AMBIENT sound speed alone,
+    # and a chamber holds gas far hotter and faster than ambient.
+    bad = rep_dt(1.0e-4)
+    check('a step past the CFL limit is an ERROR, not a warning - '
+          'nothing downstream will catch it, because the limiter that '
+          'would have is the thing being switched off',
+          refused(bad) and not warned(bad), str(refused(bad))[:100])
+    check('and it scales with the CELL, not just the step: the same '
+          'step on a ten-times coarser mesh is a warning again',
+          warned(rep_dt(1.0e-4, dx=0.5))
+          and not refused(rep_dt(1.0e-4, dx=0.5)))
+
+    # THE SPEED COMES FROM THE GAS IN THE CASE, and that correction
+    # matters in the direction that hurts: ambient air is a LOWER bound
+    # on the wave speed in a chamber, and checking a stability limit
+    # against a lower bound makes an unsafe step look safe. A chamber
+    # case carries its own T and gamma, and the wave that matters is
+    # |u| + c rather than c, so the estimate is doubled for the jet.
+    print('\n  and the speed it checks against comes from the gas')
+    hot = validate_case(Case3D(
+        solver='blastfoam', Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.05,
+        charge=0.5, center=(0.5, 0.5, 0.5), charge_refine='zone',
+        cfl=0.3, t_end=0.01, fixed_dt=2.0e-6,
+        chamber_state=dict(T=2400.0, gamma_p=1.24, R_p=366.67)))
+    check('a case that declares a hot gas is judged against THAT, not '
+          'against ambient air',
+          warned(hot) and any('chamber gas' in m for m in warned(hot)),
+          str(warned(hot))[:100])
+    check('and a case that declares none says its bound is a LOWER one, '
+          'rather than presenting it as the answer',
+          any('LOWER bound' in m for m in warned(rep_dt(2.0e-6))))
+    # 2e-6 s is safe at 288 K and NOT safe at 2400 K, on the same mesh:
+    # c goes as sqrt(T), so the hot gas is nearly three times faster.
+    scald = validate_case(Case3D(
+        solver='blastfoam', Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.01,
+        charge=0.5, center=(0.5, 0.5, 0.5), charge_refine='zone',
+        cfl=0.3, t_end=0.01, fixed_dt=2.0e-6,
+        chamber_state=dict(T=2400.0, gamma_p=1.24, R_p=366.67)))
+    cool = validate_case(Case3D(
+        solver='blastfoam', Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.01,
+        charge=0.5, center=(0.5, 0.5, 0.5), charge_refine='zone',
+        cfl=0.3, t_end=0.01, fixed_dt=2.0e-6,
+        chamber_state=dict(T=288.0, gamma_p=1.24, R_p=366.67)))
+    check('so a step that passes at 288 K is REFUSED at 2400 K on the '
+          'same mesh - which is the whole reason not to use ambient',
+          refused(scald) and not refused(cool),
+          f'hot: {len(refused(scald))} error(s), '
+          f'cool: {len(refused(cool))}')
+
 
 if __name__ == '__main__':
     sys.exit(main())
