@@ -141,6 +141,12 @@ class MainWindow(QMainWindow):
         # the first validation.
         self.solver_mode.subscribe(self._on_solver_mode)
         self._on_solver_mode(self.solver_mode.get())
+        # HD1-11c: the solver switch is meaningless for a 0-D
+        # deflagration case, and leaving 'blastFoam' lit beside one would
+        # be a lie about what is running. The signal was declared when
+        # SetupPanel was written and never connected to anything.
+        self.setup.dim_changed.connect(self._dim_changed)
+        self._dim_changed(self.setup.dim)
 
         if case_file:
             self._open_case(case_file)
@@ -189,7 +195,8 @@ class MainWindow(QMainWindow):
                                  on_click=lambda f=cmd: f()))
         lay.addSpacing(10)
         # T34: the solver is chosen here, once, for the whole app
-        lay.addWidget(label('Solver', 'small'))
+        self._solver_label = label('Solver', 'small')
+        lay.addWidget(self._solver_label)
         self._solver_seg = Segmented([mode_mod.label(m) for m in mode_mod.MODES],
                                      height=30, small=True)
         self._solver_seg.set(mode_mod.label(self.solver_mode.get()))
@@ -460,6 +467,16 @@ class MainWindow(QMainWindow):
             self.run_panel.set_validation(False, len(lines))
             self.setup.update_preview(None)
             return
+        if getattr(case, 'dim', None) == 0:
+            # HD 1.3: a different validator, the SAME ValidationReport, so
+            # everything below this point is unchanged - which is why
+            # core/assessment returns that type rather than its own.
+            from ..core.assessment import validate as validate_hd13
+            rep = validate_hd13(case)
+            self.setup.show_report(rep.errors, rep.warnings, rep.notes)
+            self.run_panel.set_validation(not rep.errors, len(rep.errors))
+            self.setup.update_preview(case)
+            return
         if getattr(case, 'solver', 'native') == 'blastfoam':
             foam_env.ensure_check_started()
         rep = validate_case(case)
@@ -487,6 +504,9 @@ class MainWindow(QMainWindow):
         except ValueError as exc:
             self.show_error('Run', str(exc))
             return
+        if getattr(case, 'dim', None) == 0:
+            self._run_hd13(case)
+            return
         rep = validate_case(case)
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
@@ -496,6 +516,49 @@ class MainWindow(QMainWindow):
         if self.ctrl.start_stages([(case.dim, case)], paused=paused,
                                   run_name=self.run_panel.current_run_name()):
             self._show('run')
+
+    def _dim_changed(self, dim):
+        """Hide, never grey, the controls a dimension does not have - the
+        app-wide rule (CLAUDE.md Sec. 4). A 0-D case has no solver
+        backend, so the whole solver block goes."""
+        blast = int(dim) != 0
+        for w in (self._solver_label, self._solver_seg, self._solver_hint,
+                  self._wsl_hint, self._wsl_redetect):
+            w.setVisible(blast and not (w is self._wsl_hint
+                                        and not w.text()))
+        if blast:
+            self._on_solver_mode(self.solver_mode.get())
+
+    def _run_hd13(self, case):
+        """Run an HD 1.3 assessment and write its report.
+
+        Solved INLINE, not through RunController. That machinery exists
+        for a solve that takes minutes in a worker thread with progress,
+        a live viewer, cancellation and resume; a 0-D deflagration case
+        finishes in well under a second, and routing it through all of
+        that would add every one of those failure modes to buy nothing.
+        """
+        from ..core.assessment import run as run_hd13, validate as val_hd13
+        from ..output.cli_hd13 import run_and_report
+        rep = val_hd13(case)
+        if not rep.ok:
+            self.show_error('Run', '\n'.join(rep.errors))
+            return
+        path = self.setup.form.v['report_file'].get().strip() \
+            or 'hd13_report.html'
+        try:
+            run_hd13(case)                     # fail before touching disk
+            import tempfile, os as _os
+            case_path = _os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_'),
+                                      'case.json')
+            from ..core.assessment import save_case
+            save_case(case, case_path)
+            out = run_and_report(case_path, path, quiet=True)
+        except Exception as exc:               # noqa: BLE001 - shown to the user
+            self.show_error('HD 1.3 assessment', str(exc))
+            return
+        self._status.setText(f'HD 1.3 report written: {out}')
+        self._status_timer.start()
 
     def _confirm_long_run(self, cases):
         """An end time past the automatic stop is now honoured (T52),

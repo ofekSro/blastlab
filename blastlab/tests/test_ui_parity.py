@@ -129,6 +129,24 @@ def main():
                     worst.append((tab, bad[0]))
             check(f'{mode} {size[0]}x{size[1]}', not worst, str(worst[:2]))
 
+    # Every dimension's form, on screen, at the window's own minimum. The
+    # forms share a QStackedWidget whose minimum is the LARGEST of its
+    # pages, so a new page can clip the others without ever being looked
+    # at - which is exactly how the 0-D HD 1.3 form arrived.
+    print('\nP1b: every dimension form, at the minimum window size')
+    theme.apply(QApplication.instance(), 'dark')
+    win.resize(1100, 720)
+    win._show('setup')
+    for d in sorted(win.setup.forms):
+        win.setup.set_dim(d)
+        pump(180)
+        bad = clipped(win)
+        bad.sort(key=lambda t: -t[2])
+        check(f'{d}D form is not cut off at 1100x720', not bad,
+              str(bad[:2]))
+    win.setup.set_dim(2)
+    pump(120)
+
     print('\nP2: light mode really changes the palette')
     theme.apply(QApplication.instance(), 'dark')
     pump(120)
@@ -158,8 +176,14 @@ def main():
     pump(250)
     forms = [f for f in win.setup.findChildren(CaseForm)]
     vis = [f for f in forms if f.isVisible()]
-    check('three dimension forms, one on screen',
-          len(forms) == 3 and len(vis) == 1, f'{len(forms)}/{len(vis)}')
+    # One form per dimension the panel offers, exactly one on screen.
+    # Tied to the panel's own dict rather than a literal, because the
+    # count changed once already when the 0-D HD 1.3 form was added and a
+    # hard-coded 3 says nothing about what the check is for.
+    check('one form per dimension, exactly one on screen',
+          len(forms) == len(win.setup.forms) and len(vis) == 1,
+          f'{len(forms)} forms / {len(vis)} visible, '
+          f'dims {sorted(win.setup.forms)}')
     check('wide: two columns', not vis[0].single_column(),
           f'avail {vis[0]._avail_width()}')
     check('and the form fills the viewport, not its minimum',
