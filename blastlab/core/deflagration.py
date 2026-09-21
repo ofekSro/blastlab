@@ -898,6 +898,15 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     #: Reported so a run outside the range the suite actually spans is
     #: visible. See _VERIFIED_LOADING_RANGE for why that range is three
     #: decades wide and not the half-decade it used to be.
+    #: The inputs a consumer needs and was previously expected to carry
+    #: alongside the result. `core/vent.py` has to know what volume the
+    #: chamber ran at in order to hand it to a mesh with a different one,
+    #: and reconstructing it from p, m and T is only exact for the
+    #: ideal-gas part - the covolume makes it a guess. Report it.
+    out['volume_m3'] = volume_m3
+    out['charge_kg'] = charge_kg
+    out['vent_area'] = vent_area
+    out['cd'] = cd
     lo, hi = _VERIFIED_LOADING_RANGE
     out['loading_density'] = charge_kg / volume_m3
     out['loading_verified'] = lo <= charge_kg / volume_m3 <= hi

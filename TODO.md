@@ -104,8 +104,8 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 |---|---|
 | `HD1-3-pre` · the chamber's own air in the 0D model | ✅ done |
 | `HD1-3a` · `core/room.py`, the geometry | ✅ done — measured: an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
-| `HD1-3b` · `init_mode='chamber'` in the writer | open |
-| `HD1-3c` · the hand-off and its validity metrics | open |
+| `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
+| `HD1-3b` · `init_mode='chamber'` in the writer | open — consumes `ChamberState` |
 | `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** |
 | `HD1-3e` · `core/qd.py` — ships with an empty table | open |
 | `HD1-3f` · validation, GUI card, report section | open |
@@ -650,6 +650,7 @@ python test_sdof.py               # HD1: the SDOF structural response
 python test_unconfined.py         # HD1: the unconfined branch
 python test_sensitivity.py        # HD1: the band around an uncalibrated peak
 python test_room.py               # HD1-3a: a room as boxes, and what snapping does
+python test_vent.py               # HD1-3c: the 0D -> CFD hand-off, phase by phase
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py
 python test_viz3d_panel.py / test_viz3d_protocol.py
