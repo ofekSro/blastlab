@@ -240,6 +240,18 @@ class Case3D:
     #: boxes actually leave.
     room: dict = field(default_factory=dict)
     chamber_state: dict = field(default_factory=dict)
+    #: Run at a PRESCRIBED time step instead of a Courant-controlled
+    #: one. 0 = adaptive, which is what every real case wants and what
+    #: every golden is written against.
+    #:
+    #: It exists for verification cases that are deliberately QUIESCENT.
+    #: blastFoam takes its Courant number from the face fluxes, so a
+    #: field that is exactly uniform and exactly at rest has Co = 0 and
+    #: `Time::adjustDeltaT` divides by it - measured, a SIGFPE on the
+    #: first step of `_e2e_gamma_interface.py`. A real chamber case is
+    #: pressurised and gets a flux immediately, so this is not a
+    #: limitation anyone else meets.
+    fixed_dt: float = 0.0
     charge: float = 25.0
     charge_resolution: str = 'resolve'  # 'resolve' (refine grid to charge)
                                         # | 'smear' (keep cell size,

@@ -712,6 +712,7 @@ def _controldict(spec, case):
         'stopAt': 'endTime',
         'endTime': spec.t_start + spec.end_time,
         'deltaT': Raw('1e-7'),
+        # overwritten below when the case asks for a fixed step
         'writeControl': 'adjustableRunTime',
         'writeInterval': spec.write_interval,
         'cycleWrite': 0,
@@ -738,6 +739,17 @@ def _controldict(spec, case):
             'fileModificationSkew': 1,
         },
     }
+    # A QUIESCENT VERIFICATION CASE CANNOT USE A COURANT-CONTROLLED
+    # STEP. blastFoam takes Co from the face fluxes, so a field that is
+    # exactly uniform and exactly at rest has Co = 0 and
+    # `Time::adjustDeltaT` divides by it - a SIGFPE on the first step,
+    # measured. Falsy by default, so every golden is untouched.
+    _dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
+    if _dt > 0.0:
+        d['deltaT'] = Raw(fmt(_dt))
+        d['adjustTimeStep'] = 'no'
+        d['writeControl'] = 'runTime'
+
     functions = {}
     # N5-5: blastFoam's own volume integral of the conserved variables,
     # printed to the log at every write. The value here is NOT the drift
