@@ -106,7 +106,7 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 | `HD1-3a` · `core/room.py`, the geometry | ✅ done — measured: an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
 | `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
 | `HD1-3b` · `init_mode='chamber'` in the writer | open — consumes `ChamberState` |
-| `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** |
+| `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** — see the pre-registered condition below |
 | `HD1-3e` · `core/qd.py` — ships with an empty table | open |
 | `HD1-3f` · validation, GUI card, report section | open |
 
@@ -120,6 +120,23 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 > This is why the hand-off must conserve **mass and energy** and let pressure
 > follow from the EOS — a cavity 10 % smaller simply arrives at a higher
 > pressure, and a golden that pinned `p == p_0D` would pin the bug.
+
+> **And measuring it is not the same as not having it** (owner, 2026-09-21). A
+> 27.6 % error in the vent area means the CFD solves a *different hole* from the
+> one that was asked for. So `room.align` now puts every edge — outer faces, wall
+> thickness, vent — onto a base-cell face **before** the boxes are built. Snapping
+> then has nothing left to move, the area that gets solved **is** the area
+> reported, and the rounding is stated once against what was typed. Default on.
+
+> **Pre-registered condition on `HD1-3d`, before the run that will be judged by
+> it.** `_e2e_vent_2d.py` compares the CFD's mass flow through the opening against
+> `deflagration._vent_mdot`. **That 0D comparison must be run at the
+> post-alignment vent area and cavity volume, not at the numbers typed into the
+> case.** The threshold is 15 % and the geometry error it would otherwise carry is
+> 27.6 %, so running it against the entered numbers would fail the check for a
+> reason that has nothing to do with the physics being tested — or, if alignment
+> is on and the comparison is not updated, pass it while measuring the wrong
+> thing. `measure()` returns both numbers; use them.
 
 **The alternative, only if the above proves inadequate:** `phaseProperties` with
 `AbelNobel` instead of JWL and `Arrhenius`/`pressureBased` instead of `linear`. The
