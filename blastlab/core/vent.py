@@ -113,6 +113,7 @@ class ChamberState:
                  'rho_mix', 'e_mix', 'R_p', 'gamma_p', 'mol_weight_p',
                  't_open', 'mode', 'first_front_is_artefact',
                  'volume_0d', 'p_0d', 'pressure_from_volume_shift',
+                 'pressure_from_eos_shift',
                  'adiabatic_source', 'wall_loss_fraction', 'warnings')
 
     def __init__(self, **kw):
@@ -262,7 +263,19 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
         # first front is something this initialisation invented.
         first_front_is_artefact=(mode == 'open'),
         volume_0d=v_0d, p_0d=p_0d,
-        pressure_from_volume_shift=(p / p_0d - 1.0) if p_0d > 0 else 0.0,
+        # TWO SHIFTS, AND THEY ARE NOT THE SAME THING. Reporting one
+        # number for both hid a real effect behind a rounding-sized one:
+        #   volume - the mesh cavity differs from the 0-D volume, and
+        #            pressure scales with the ratio at constant m and E.
+        #   eos    - the 0-D model is Noble-Abel and carries a covolume;
+        #            blastFoam's phases are ideal gases and do not. At
+        #            magazine density that is ~0.1 %, and at closed-
+        #            vessel density it is not small at all, so it has to
+        #            be visible rather than folded into the other one.
+        pressure_from_volume_shift=(v_0d / v - 1.0) if v > 0 else 0.0,
+        pressure_from_eos_shift=(
+            ((m_p * prop.R + m_a * AIR_R) * T / v_0d) / p_0d - 1.0
+            if p_0d > 0 and v_0d > 0 else 0.0),
         # WHETHER THE RUN THAT PRODUCED THIS GAVE THE WALLS ANYTHING.
         # `simulate` is adiabatic by default, which is the conservative
         # choice for a pressure check and the WRONG one to hand to a
@@ -430,6 +443,10 @@ def summary_line(state, val):
         txt += (f' - the mesh cavity differs from the 0-D volume, so the '
                 f'pressure moved {state.pressure_from_volume_shift:+.1%} '
                 f'at constant mass, energy and temperature')
+    if abs(state.pressure_from_eos_shift) > 1e-3:
+        txt += (f' | and {state.pressure_from_eos_shift:+.1%} again from '
+                f'dropping the co-volume: the 0-D model is Noble-Abel and '
+                f'the mesh phases are ideal gases')
     if state.adiabatic_source:
         txt += ' | ADIABATIC SOURCE: T and p are upper bounds'
     for w in tuple(state.warnings or ()) + tuple(val.get('warnings', ())):

@@ -1120,7 +1120,73 @@ def default_det_radius(spec):
     return DET_RADIUS_CELLS * dx_base / (2.0 ** level)
 
 
+def _chamber_phaseproperties(spec, cs):
+    """HD1-3b: both phases INERT ideal gases.
+
+    The gas in a vented magazine is combustion products that have
+    finished reacting on any timescale the CFD resolves, so there is
+    nothing to detonate and nothing to burn. The guide (5.5, p. 68)
+    gives `type basic` for exactly that, and it costs nothing here: the
+    phase keeps its name, so none of the twelve places that hard-code
+    `alpha.expl` / `rho.expl` change.
+
+    AND IT IS NOT AIR, which is the mistake this dictionary exists to
+    prevent. `gamma` and `molWeight` come from the propellant - measured
+    on the shipped double-base row, 1.24 and 22.7 g/mol against air's
+    1.40 and 28.97. Writing air instead would be wrong twice: 1.67x on
+    the internal energy at the same p and V, and +17.9 % on the choked
+    mass flow through the opening. The 2-D verification is
+    pre-registered at 15 %, so the second one would have passed it and
+    been absorbed into the discharge coefficient.
+
+    BUG B0 CANNOT HAPPEN HERE, structurally rather than by care. The
+    comment at the profile branch explains that `lambda.expl` must be
+    written or blastFoam blends already-reacted products back to
+    unreacted Murnaghan reactants. A `basic` phase has no reactant side
+    and no `lambda` at all, so the trap does not exist - which is why
+    the caller's lambda assertion is skipped for a chamber case rather
+    than satisfied by writing a field the solver would ignore.
+    """
+    gamma = float(cs['gamma_p'])
+    molw = float(cs['mol_weight_p'])
+    # Cv from the two the state already carries, so the dictionary
+    # cannot disagree with the EOS the hand-off priced itself with:
+    # R = 8314.46/M and Cv = R/(gamma - 1).
+    R = 8314.46261815324 / molw
+    body = block({
+        'phases': [PHASE, 'air'],
+        'radiationModel': 'none',
+        PHASE: {
+            'type': 'basic',
+            'thermoType': {'transport': 'const', 'thermo': 'eConst',
+                           'equationOfState': 'idealGas'},
+            'equationOfState': {'gamma': gamma},
+            'specie': {'molWeight': molw},
+            'transport': {'mu': 0, 'Pr': 1},
+            'thermodynamics': {'type': 'eConst', 'Cv': R / (gamma - 1.0),
+                               'Hf': 0},
+            'residualRho': Raw('1e-6'),
+            'residualAlpha': Raw('1e-10'),
+        },
+        'air': {
+            'type': 'basic',
+            'thermoType': {'transport': 'const', 'thermo': 'eConst',
+                           'equationOfState': 'idealGas'},
+            'equationOfState': {'gamma': GAMMA_AIR},
+            'specie': {'molWeight': MOLW_AIR},
+            'transport': {'mu': 0, 'Pr': 1},
+            'thermodynamics': {'type': 'eConst', 'Cv': CV_AIR, 'Hf': 0},
+            'residualRho': Raw('1e-6'),
+            'residualAlpha': Raw('1e-10'),
+        },
+    })
+    return foam_file('phaseProperties', body, location='constant')
+
+
 def _phaseproperties(spec, activation='linear', afterburn='none'):
+    st = spec.init_state or {}
+    if st.get('chamber'):
+        return _chamber_phaseproperties(spec, st['chamber'])
     m = MATERIALS[spec.material]
     # 'linear' burns at vDet from the detonation points (tutorial
     # default); 'none' = fully reacted at t0 - the vendor's
@@ -1448,6 +1514,8 @@ def profile_state(case, spec):
     from ...core import profiles
     mode = getattr(case, 'init_mode', 'charge')
     path = getattr(case, 'profile_file_in', None)
+    if mode == 'chamber':
+        return _chamber_state(case, spec)
     if mode == 'charge' or not path:
         return None
     g = spec.init_grid
@@ -1549,6 +1617,75 @@ def profile_state(case, spec):
                 dx_src=_source_dx(prof, mode))
 
 
+def _chamber_state(case, spec):
+    """HD1-3b: the room as an initial condition, uniform inside the
+    cavity and ambient outside it.
+
+    Same contract as the profile branch above - a dict shaped like
+    `spec.init_grid` - and deliberately so, because everything
+    downstream of `profile_state` is written against that contract and
+    none of it needs to know a chamber from a chain stage. There is no
+    interpolation at all here: the state is one number per field inside
+    the cavity mask and ambient outside, so no remap kernel is involved
+    and none was written.
+
+    WHAT IS NOT DONE HERE, and it is the point of the design. The 0-D
+    model has already decided the pressure, temperature and mixture (see
+    `core/vent.py`), and `core/room.py` has already decided where the
+    walls are. This function only puts the one on the other.
+    """
+    import numpy as _np
+    cs = dict(getattr(case, 'chamber_state', None) or {})
+    room = dict(getattr(case, 'room', None) or {})
+    if not cs or not room:
+        raise ValueError(
+            "init_mode 'chamber' needs both `room` (from "
+            "core.room.measure) and `chamber_state` (from "
+            "core.vent.handoff) - neither is derivable from the other")
+    g = spec.init_grid
+    lo, hi = room['cavity_lo'], room['cavity_hi']
+    # cell CENTRE inside, inclusive - the same criterion the obstacle
+    # carve and foam's boxToCell use, so the cavity the state fills is
+    # exactly the cavity the walls leave
+    ax = [_np.asarray(g[k], dtype=float) for k in ('x_c', 'y_c', 'z_c')]
+    inside = _np.ones((ax[0].size, ax[1].size, ax[2].size), dtype=bool)
+    for i, a in enumerate(ax):
+        shape = [1, 1, 1]
+        shape[i] = a.size
+        inside &= ((a >= lo[i] - 1e-12) & (a <= hi[i] + 1e-12)
+                   ).reshape(shape)
+
+    rho = _np.where(inside, float(cs['rho_mix']), RHO_AIR)
+    e = _np.where(inside, float(cs['e_mix']), CV_AIR * 288.0)
+    # alpha.expl is the products' VOLUME FRACTION, which in a magazine is
+    # nothing like 1: the air that was already in the room carries most
+    # of the partial pressure. See core/vent.py on Dalton against volume
+    # fractions, and on why m_p/V is the wrong density to pair with it.
+    alpha = _np.where(inside, float(cs['alpha_expl']), 0.0)
+    zero = _np.zeros_like(rho)
+    return dict(
+        rho=rho, u=zero, v=zero.copy(), w=zero.copy(), e=e,
+        phase=alpha, t0=0.0,
+        # Both phases are ideal gases here: the chamber holds combustion
+        # products that have finished reacting, so there is no JWL and
+        # no reactant side. See `_phaseproperties`.
+        eos='idealGas',
+        # NOT 'native' - that raises HANDOFF_MSG, and rightly, for a
+        # native blast profile. This state came from the 0-D
+        # deflagration model, which is a different provenance with a
+        # different meaning.
+        source_solver='deflagration0d',
+        # From the 0-D RESULT, carried through core/vent.py, never
+        # recomputed from the numbers written below: computing it from
+        # the hand-off would compare the hand-off with itself.
+        E_total=float(cs['E']),
+        r_exp=0.0, n_floored=0, dx_src=0.0,
+        # carried for the report and the goldens, not used by the writer
+        chamber=cs, room_volume=float(room['volume']),
+        cavity_cells=int(_np.count_nonzero(inside)),
+    )
+
+
 def _source_dx(prof, mode):
     """Cell size of the profile the stage starts from, or 0.0 when it
     cannot be told. The mesh the state lands on should not be much
@@ -1590,6 +1727,57 @@ def _nonuniform(vals, vector=False):
         kind = 'scalar'
     head = 'nonuniform List<' + kind + '>' + sep + str(len(rows))
     return Raw(head + sep + '(' + sep + sep.join(rows) + sep + ')')
+
+
+def _chamber_fields(spec, case):
+    """HD1-3b: 0/ files for a room at pressure with a hole in it.
+
+    A SEPARATE FUNCTION FROM `_profile_fields`, on purpose. That one is
+    written for a SHARP two-phase split - the native profile carries one
+    mixture density and an integer phase flag, so `alpha` is 0 or 1 and
+    every `np.where(phase == 1, ...)` in it is exact. A chamber's alpha
+    is a genuine fraction (0.115 on the measured magazine), and every
+    one of those comparisons would quietly send every cell down the air
+    branch. Generalising them would also put the existing goldens at
+    risk for no gain, since the two cases share no EOS: this one is two
+    ideal gases, that one is JWL products against air.
+
+    `rho.expl` and `rho.air` are each phase's own density AT THE FULL
+    PRESSURE, not the chamber average - see core/vent.py. Outside the
+    room both are their ambient values, so the absent phase still has a
+    physical density everywhere, which blastFoam requires.
+    """
+    st = spec.init_state
+    cs = st['chamber']
+    alpha = st['phase']
+    inside = alpha > 0.0
+    T_amb = 288.0
+    T = np.where(inside, float(cs['T']), T_amb)
+    p = np.where(inside, float(cs['p']), P_AIR)
+    rho_expl = np.where(inside, float(cs['rho_expl']),
+                        P_AIR / (float(cs['R_p']) * T_amb))
+    rho_air = np.where(inside, float(cs['rho_air']), RHO_AIR)
+    U = np.zeros((spec.n_cells, 3))
+    if len(_cell_order(T, spec)) != spec.n_cells:
+        raise RuntimeError(
+            f'chamber state has {len(_cell_order(T, spec)):,} values for '
+            f'a {spec.n_cells:,}-cell mesh - the room grid and the mesh '
+            f'disagree')
+    fields = {
+        '0/p': ('p', 'p', _nonuniform(_cell_order(p, spec)), False),
+        '0/T': ('T', 'T', _nonuniform(_cell_order(T, spec)), False),
+        '0/U': ('U', 'U', _nonuniform(U, vector=True), True),
+        f'0/alpha.{PHASE}': (f'alpha.{PHASE}', 'alpha',
+                             _nonuniform(_cell_order(alpha, spec)), False),
+        f'0/rho.{PHASE}': (f'rho.{PHASE}', 'rho',
+                           _nonuniform(_cell_order(rho_expl, spec)), False),
+        '0/rho.air': ('rho.air', 'rho',
+                      _nonuniform(_cell_order(rho_air, spec)), False),
+        # NO lambda.expl. A `basic` phase has no reactant side to blend
+        # back to, so B0 - the bug that makes a profile stage lose its
+        # fireball - cannot occur here. See `_chamber_phaseproperties`.
+    }
+    return _render_fields(fields, spec)
 
 
 def _profile_fields(spec, case):
@@ -1660,6 +1848,15 @@ def _profile_fields(spec, case):
         f'0/lambda.{PHASE}': (f'lambda.{PHASE}', 'alpha',
                               Raw('uniform 1'), False),
     }
+    return _render_fields(fields, spec)
+
+
+def _render_fields(fields, spec):
+    """(object, field, internalField, is_vector) -> the 0/ file text.
+
+    Shared by the profile and the chamber branches, so the two cannot
+    drift in how a field file is FRAMED - only in what goes inside it.
+    """
     out = {}
     for rel, (obj, fld, internal, vec) in fields.items():
         bfield = {name: _bc_entry(fld, kind, f'uniform {fmt(P_AIR)}',
@@ -1731,13 +1928,21 @@ def render_case(case, n_procs=1, live_steps=0):
         spec.files.update(_zero_fields(spec))
     else:
         d = spec.start_dir
+        chamber = bool(spec.init_state.get('chamber'))
         prof = {d + rel[1:]: text for rel, text
-                in _profile_fields(spec, case).items()}
+                in (_chamber_fields(spec, case) if chamber
+                    else _profile_fields(spec, case)).items()}
         # B0 is silent when it regresses - the run still produces a
         # shock front (the AIR cells initialise correctly), it just
         # loses the fireball - so the invariant is asserted here rather
         # than left to a reviewer noticing a missing file.
-        if f'{d}/lambda.{PHASE}' not in prof:
+        #
+        # A CHAMBER CASE IS EXEMPT, and structurally rather than by
+        # exception: its phase is `basic`, which has no reactant side
+        # and no lambda at all, so there is nothing for blastFoam to
+        # blend back to. Writing a lambda there would be writing a field
+        # the solver does not read, which is worse than not writing one.
+        if not chamber and f'{d}/lambda.{PHASE}' not in prof:
             raise RuntimeError(
                 'a profile-initialised stage must write '
                 f'lambda.{PHASE} - without it blastFoam treats the '
