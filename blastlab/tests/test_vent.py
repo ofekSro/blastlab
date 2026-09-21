@@ -258,7 +258,54 @@ def main():
     check('the one-line summary carries the caveat with the number',
           'ARTEFACT' in line and 'MPa' in line)
 
-    # ── 8. refusals ─────────────────────────────────────────────────────
+    # ── 8. WHERE THE STATE CAME FROM, not just what it is ───────────────
+    #
+    # `simulate` is ADIABATIC by default, which is the conservative
+    # choice for a pressure check and the wrong one to write into a mesh
+    # without saying so: T and therefore p are then upper bounds, and
+    # HD1-3b is about to put them in a golden. The state answers this
+    # itself rather than leaving it to whoever called simulate.
+    print('\n  the provenance of the state, carried with it')
+    check('a state from an adiabatic run says so',
+          st.adiabatic_source and st.wall_loss_fraction == 0.0)
+    check('and warns that its T and p are upper bounds, in words',
+          any('ADIABATIC' in w for w in st.warnings),
+          str([w[:50] for w in st.warnings]))
+    cooled = d.simulate(p, 5.0, V, vent_area=0.0, t_end=40.0, scenario=s,
+                        p0_chamber=P_AIR, refine_cohorts=False,
+                        h_c=200.0, wall_area=6.0)
+    st_c = vent.handoff(cooled, p, mode='burst', p_burst=p_burst,
+                        volume_cfd=V)
+    check('a state from a run that gave its walls heat does NOT claim to '
+          'be adiabatic, and reports how much went',
+          not st_c.adiabatic_source and st_c.wall_loss_fraction > 0.0,
+          f'{st_c.wall_loss_fraction:.1%} of the energy released')
+    # WHAT THE WALLS ACTUALLY COST THE HAND-OFF. The reason this matters
+    # is that HD1-3b writes T into a golden: if the two differ, the
+    # golden records which of them was run.
+    check('and its T is lower than the adiabatic one, which is the whole '
+          'reason the provenance has to travel with the state',
+          st_c.T < st.T,
+          f'{st_c.T:.1f} K against {st.T:.1f} K adiabatic '
+          f'({st_c.T/st.T - 1.0:+.1%})')
+    check('a run that did not conserve is refused outright rather than '
+          'handed to a mesh',
+          _raises(lambda: vent.handoff(
+              dict(shut, stop_reason='conservation_violation'), p,
+              mode='burst', p_burst=p_burst, volume_cfd=V)))
+    coarse = d.simulate(p, 5.0, V, vent_area=0.0, t_end=40.0,
+                        p0_chamber=P_AIR,
+                        scenario=sc.IgnitionScenario(kind='flame_spread',
+                                                     n_cohorts=6,
+                                                     spread_time=20.0))
+    if not coarse['cohort_converged']:
+        check('a state taken off an unconverged 0-D peak says the instant '
+              'was set by the ignition staircase, not by the fire',
+              any('staircase' in w for w in vent.handoff(
+                  coarse, p, mode='burst', p_burst=p_burst,
+                  volume_cfd=V).warnings))
+
+    # ── 9. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     check('a zero CFD window is refused',
           _raises(lambda: vent.validity(shut, st, 0.0)))
