@@ -230,6 +230,16 @@ class Case3D:
     Lz: float = 1.5
     cell_size_m: float = 0.025
     init_mode: str = 'charge'         # 'charge' | 'profile1d' | 'profile2d'
+                                      # | 'chamber' (HD1-3b)
+    #: HD1-3b, both falsy by default so every existing golden is
+    #: byte-identical. `room` is what `core/room.py:measure` returned -
+    #: the ALIGNED geometry, not the numbers someone typed - and
+    #: `chamber_state` is `core/vent.py:ChamberState.as_dict()`. The two
+    #: must describe the same room: the state's volume is what the 0-D
+    #: model ran at, and validation compares it with the cavity the
+    #: boxes actually leave.
+    room: dict = field(default_factory=dict)
+    chamber_state: dict = field(default_factory=dict)
     charge: float = 25.0
     charge_resolution: str = 'resolve'  # 'resolve' (refine grid to charge)
                                         # | 'smear' (keep cell size,
@@ -553,11 +563,61 @@ def _validate_solver(case, rep):
             err("blastFoam 1D stages cannot start from a profile "
                 "(a 1D profile IS the 1D state - run the next stage "
                 "in 2D or 3D)")
+        # Applies to a chamber case for the same reason it applies to a
+        # profile one: the state is written into 0/ in the mesh's cell
+        # order, and refineMesh renumbers.
         if (getattr(case, 'refine_zones', None)
                 or getattr(case, 'charge_refine', 'global') == 'zone'):
             err("A profile-initialised blastFoam stage cannot use "
                 "refinement zones yet - the remapped state is written "
                 "on the uniform base mesh")
+    if getattr(case, 'init_mode', 'charge') == 'chamber':
+        # HD1-3b. A chamber case carries its own state rather than
+        # loading one from a file, and the two halves have to agree
+        # about which room they describe.
+        room = getattr(case, 'room', None) or {}
+        cs = getattr(case, 'chamber_state', None) or {}
+        if not room:
+            err("init_mode 'chamber' needs the room geometry - pass what "
+                "core.room.measure() returned, which is the ALIGNED "
+                "room and not the numbers that were typed")
+        if not cs:
+            err("init_mode 'chamber' needs a chamber_state - see "
+                "core.vent.handoff()")
+        if room and not room.get('ok', True):
+            for e in room.get('errors', ()):
+                err(f'Room: {e}')
+        if room and cs:
+            v_mesh = float(room.get('volume') or 0.0)
+            v_state = float(cs.get('volume') or 0.0)
+            if v_mesh > 0 and v_state > 0 and \
+                    abs(v_state / v_mesh - 1.0) > 0.02:
+                # NOT a rounding complaint - room.align makes snapping a
+                # no-op, so a gap here means the hand-off was computed
+                # for a different room than the one about to be meshed,
+                # and the pressure written into the cells is wrong by
+                # that ratio.
+                err(f"The chamber state was computed at "
+                    f"{v_state:.4f} m3 but the meshed cavity is "
+                    f"{v_mesh:.4f} m3 ({v_state / v_mesh - 1.0:+.1%}). "
+                    f"Re-run core.vent.handoff with volume_cfd set to "
+                    f"the meshed cavity - it conserves mass and energy, "
+                    f"so the pressure follows, but only if it is told "
+                    f"the right volume.")
+            if cs.get('adiabatic_source'):
+                warn("The chamber state came from an ADIABATIC 0-D run, "
+                     "so the T and p about to be written into the mesh "
+                     "are upper bounds. Set h_c and wall_area on the 0-D "
+                     "run, or accept them as a bound and say so.")
+            if cs.get('first_front_is_artefact'):
+                warn("Opened-from-the-start: the first front out of the "
+                     "opening is an artefact of initialising a "
+                     "pressurised room against ambient. No peak or "
+                     "impulse may be read from it - only steady-jet "
+                     "quantities after it has passed.")
+        if getattr(case, 'charge', None):
+            note("Charge is ignored for a chamber case: the gas is "
+                 "already made, and the 0-D model is what made it")
     if getattr(case, 'charge_resolution', 'resolve') == 'smear':
         note("Charge resolution 'smear' is ignored by the blastFoam "
              "backend (the grid is refined to resolve the charge)")
@@ -966,6 +1026,14 @@ def validate_case(case, pending_inputs=False):
             if not inside:
                 err(f"Detonation point {tuple(dp)} lies outside every "
                     f"charge")
+    elif init == 'chamber':
+        # HD1-3b: nothing to load and nothing to resolve. The gas is
+        # already made and the room is a set of obstacle boxes, so the
+        # charge-sphere geometry checks above have nothing to say and
+        # the profile-file checks below are about a file that does not
+        # exist for this mode. Its own checks ran earlier, next to the
+        # other blastFoam-specific ones.
+        rep.r_exp = 0.0
     else:
         if not case.profile_file_in:
             err("A profile file is required for remap initialization")
