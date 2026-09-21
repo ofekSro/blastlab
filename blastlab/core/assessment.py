@@ -84,6 +84,7 @@ class DeflagrationCase:
     Ru_pa: float = 0.0
     kE_pa_m: float = 0.0
     support: str = 'simple'
+    rotation_limit_deg: float = 12.0
 
     @property
     def has_component(self):
@@ -293,7 +294,8 @@ def run(case):
         comp = _sdof.Component(span=case.span_m,
                                mass_per_area=case.mass_per_area,
                                Ru=case.Ru_pa, kE=case.kE_pa_m,
-                               support=case.support)
+                               support=case.support,
+                               rotation_limit_deg=case.rotation_limit_deg)
         out['component'] = comp
         out['sdof'] = _sdof.response(conf['t'], conf['p'], comp,
                                      p_ref=P_AIR)
