@@ -297,6 +297,33 @@ def main():
           'than one computed at a single point and called robust',
           asm.run(replace(with_wall, sensitivity=False))['verdict'] is None)
 
+    # THE BAND MUST RUN ON THE CASE'S OWN SCENARIO. Every band test in
+    # test_sensitivity.py lights uniformly because that is fast, so the
+    # SPREAD path - the one the ramped entrainment changed - is only
+    # exercised through here. A band that quietly reverted to uniform
+    # would be qualifying a different fire from the one being reported.
+    print('\n  and the band runs on the case s own fire')
+    sp = replace(banded, scenario_kind='flame_spread', n_cohorts=20,
+                 spread_time=8.0, spread_geometry='area', t_end=20.0)
+    out_sp = asm.run(sp)
+    check('a spread case gets a band taken on a spread fire',
+          out_sp['band'] is not None
+          and out_sp['band']['nominal']['p_max'] > 0.0,
+          f"x{out_sp['band']['spread']:.2f}")
+    check('and the band brackets the SAME peak the report quotes - '
+          'which it could not if it had reverted to uniform ignition',
+          out_sp['band']['low']['p_max'] <= out_sp['confined']['p_max']
+          <= out_sp['band']['high']['p_max'],
+          f"{out_sp['band']['low']['p_max']/1e6:.4f} <= "
+          f"{out_sp['confined']['p_max']/1e6:.4f} <= "
+          f"{out_sp['band']['high']['p_max']/1e6:.4f} MPa")
+    check('a uniform case would have given a different peak entirely, '
+          'which is how we know the scenario really travelled',
+          abs(asm.run(replace(sp, scenario_kind='uniform', n_cohorts=1,
+                              spread_time=0.0, sensitivity=False)
+                      )['confined']['p_max']
+              / out_sp['confined']['p_max'] - 1.0) > 0.5)
+
     # ── QUANTITY-DISTANCE, wired and EMPTY ──────────────────────────────
     #
     # The comparison is evaluated whenever standoffs were given, even

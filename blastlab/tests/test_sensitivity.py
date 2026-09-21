@@ -90,6 +90,36 @@ def main():
           f"{vented['at_high']['p_max']}")
 
     # ── 3. THE CORNERS ARE CHECKED, NOT ASSERTED ────────────────────────
+    # ── 3a. THE BAND ON A SPREAD FIRE ───────────────────────────────────
+    #
+    # Every other case in this file lights uniformly, because that is
+    # fast and n-independent. But uniform ignition has zero-width
+    # entrainment windows, so the whole ramped path - the thing that
+    # moved every headline number in this track - never runs through the
+    # band at all. A magazine is a SPREAD fire, and the band is what
+    # qualifies its peak, so one case has to exercise that.
+    print('\n  a band on a spread fire, not just on a uniform one')
+    from blastlab.core import scenario as sc
+    spread = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                                 spread_time=8.0, geometry='area')
+    sb = sens.band(p, 5.0, 1.0, vent_area=0.02, t_end=20.0,
+                   p0_chamber=d.P_AMB, scenario=spread,
+                   check_corners=False)
+    check('the band runs on the case s own scenario, and the samples '
+          'carry it rather than quietly reverting to uniform',
+          sb['nominal']['p_max'] > 0.0 and sb['n_runs'] == 9,
+          f"x{sb['spread']:.2f} over {sb['n_runs']} spread runs")
+    check('and each sample converged in cohort count, so the band is '
+          'around a fire rather than around an ignition staircase',
+          sb['cohort_converged'])
+    check('every sample conserved',
+          sb['conserved'])
+    check('the band is still a band - the burn law moves a spread fire '
+          'as it moves a uniform one',
+          sb['high']['p_max'] > sb['low']['p_max'],
+          f"{sb['low']['p_max']/1e6:.4f} to {sb['high']['p_max']/1e6:.4f} "
+          f"MPa")
+
     # ── 3b. THE FOURTH AXIS ─────────────────────────────────────────────
     #
     # `h_c` is a film coefficient nobody here has measured, and it moves

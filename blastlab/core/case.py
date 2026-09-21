@@ -7,6 +7,7 @@ surface while editing a form instead of at launch.
 """
 
 import json
+import math
 import os
 from dataclasses import dataclass, field, asdict
 
@@ -640,6 +641,49 @@ def _validate_solver(case, rep):
         if getattr(case, 'charge', None):
             note("Charge is ignored for a chamber case: the gas is "
                  "already made, and the 0-D model is what made it")
+    # A PRESCRIBED STEP HAS NO CFL GUARD, which is the whole point and
+    # also the whole risk. `adjustTimeStep no` means blastFoam will take
+    # this step whatever the flow does, so a case that is not quiescent
+    # can sail past the stability limit without a word - the run does
+    # not stop, it produces a wrong answer. Estimated here against the
+    # acoustic speed of ambient air, which is a LOWER bound on the wave
+    # speed in a chamber case: hot products are faster, so a step that
+    # is already marginal on this estimate is worse in reality.
+    _dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
+    _dx = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
+    if _dt > 0.0 and _dx > 0.0:
+        # THE SPEED HAS TO COME FROM THE GAS IN THE CASE, not from
+        # ambient air. Ambient is a LOWER bound and a lower bound is the
+        # wrong end to check a stability limit against: it makes a step
+        # look safe that is not. A chamber case carries its own T and
+        # gamma, so use them - and the wave that matters is |u| + c, not
+        # c, so the estimate is doubled for the jet the opening makes.
+        cs = getattr(case, 'chamber_state', None) or {}
+        if cs.get('T') and cs.get('gamma_p') and cs.get('R_p'):
+            c_gas = math.sqrt(float(cs['gamma_p']) * float(cs['R_p'])
+                              * float(cs['T']))
+            speed = 2.0 * c_gas
+            basis = (f'|u| + c in the chamber gas, ~{speed:.0f} m/s at '
+                     f'{float(cs["T"]):.0f} K')
+        else:
+            speed = 2.0 * 340.3
+            basis = ('|u| + c in ambient air, ~680 m/s - a LOWER bound, '
+                     'since this case declares no gas state to read')
+        co = _dt * speed / _dx
+        if co > case.cfl:
+            err(f"A fixed time step of {_dt:g} s implies a Courant "
+                f"number of {co:.2f} on a {_dx:g} m cell, against "
+                f"{basis} - past the {case.cfl:g} this case asks for. "
+                f"`adjustTimeStep` is off with a fixed step, so nothing "
+                f"will catch this at run time: the run will not stop, it "
+                f"will produce a wrong answer.")
+        else:
+            warn(f"Fixed time step {_dt:g} s: the Courant limiter is OFF, "
+                 f"so this run will take that step whatever the flow "
+                 f"does. It sits at Co = {co:.3f} against {basis}. This "
+                 f"exists for QUIESCENT verification cases, where a "
+                 f"Courant-controlled step divides by a zero flux - "
+                 f"anything that actually moves should leave it at 0.")
     if getattr(case, 'charge_resolution', 'resolve') == 'smear':
         note("Charge resolution 'smear' is ignored by the blastFoam "
              "backend (the grid is refined to resolve the charge)")
