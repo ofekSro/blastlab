@@ -71,7 +71,14 @@ class CaseForm(FieldForm):
         self._mode = mode_mod.normalize(mode)
         super().__init__(dim, on_change=on_change, mode=self._mode,
                          parent=parent)
-        # the reactive rules, registered once the widgets exist
+        # the reactive rules, registered once the widgets exist. A 0-D
+        # deflagration case has no solver mode and no geometry, so it has
+        # none of them; the one rule it does have is that a uniform
+        # ignition has nothing to spread.
+        if self.dim == 0:
+            self.on_field('scenario_kind', self._sync_scenario)
+            self._sync_scenario()
+            return
         if self.dim == 2:
             self.on_field('geometry', self._sync_geometry)
         if 'amr_levels' in self.v:
@@ -164,6 +171,143 @@ class CaseForm(FieldForm):
         self.set_enabled('cx', not axisym)
 
     # ── Case conversion ──────────────────────────────────────────────────
+    # ── HD 1.3, dim 0 (HD1-11c) ──────────────────────────────────────────
+    # A deflagration case shares no field with the blast ones, so it gets
+    # its own pair rather than branches threaded through theirs. The unit
+    # conversions live here and only here: the form speaks kPa, MPa, mm
+    # and mm/s because that is what an engineer writes down, and the case
+    # is SI throughout.
+    _HD13_UNITS = (
+        # (form key, case/override key, factor form -> SI)
+        ('ov_n', 'n', 1.0),
+        ('ov_a', 'a', 1.0),
+        ('ov_r_atm', 'r_atm', 1e-3),           # mm/s
+        ('ov_web', 'web', 1e-3),               # mm
+        ('ov_p_ext', 'p_extinction', 1e6),     # MPa
+        ('ov_secondary', 'secondary_heat', 1e6),   # MJ/kg
+    )
+
+    def _sync_scenario(self):
+        """Uniform ignition lights everything at t = 0, so the spread
+        rows have nothing to say. They are disabled rather than hidden:
+        the point of the form is that the user SEES the entrainment
+        exists and is choosing not to model it."""
+        if self.dim != 0 or 'scenario_kind' not in self.v:
+            return
+        spread = self.v['scenario_kind'].get() != 'uniform'
+        for key in ('n_cohorts', 'spread_time', 'spread_geometry'):
+            self.set_enabled(key, spread)
+
+    def _get_case_hd13(self):
+        from ..core.assessment import DeflagrationCase
+        v = self.v
+        errs, bad = [], []
+
+        def num(name, label, factor=1.0, blank=None):
+            raw = v[name].get().strip()
+            if not raw:
+                return blank
+            try:
+                return _f(v[name], label) * factor
+            except ValueError as exc:
+                errs.append(str(exc))
+                bad.append(name)
+                return blank if blank is not None else 0.0
+
+        overrides, measured = {}, []
+        for key, field_name, factor in self._HD13_UNITS:
+            got = num(key, field_name, factor)
+            if got is not None:
+                overrides[field_name] = got
+                measured.append(field_name)
+        if not v['measured'].get():
+            measured = []
+
+        try:
+            cohorts = _i(v['n_cohorts'], 'Cohorts') or 1
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append('n_cohorts')
+            cohorts = 1
+        try:
+            n_out = _i(v['n_out'], 'Samples') or 1000
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append('n_out')
+            n_out = 1000
+
+        span = num('span_m', 'Span', blank=0.0) or 0.0
+        case = DeflagrationCase(
+            name=v['name'].get().strip(),
+            propellant=v['propellant'].get(),
+            overrides=overrides, measured=measured,
+            charge_kg=num('charge_kg', 'Charge', blank=0.0) or 0.0,
+            volume_m3=num('volume_m3', 'Chamber volume', blank=0.0) or 0.0,
+            vent_area_m2=num('vent_area', 'Vent area', blank=0.0) or 0.0,
+            discharge_coeff=num('cd', 'Discharge coefficient',
+                                blank=0.8) or 0.8,
+            p_ign=(num('p_ign', 'Igniter pressure', 1e6, blank=0.0) or 0.0),
+            confinement=v['confinement'].get(),
+            scenario_kind=v['scenario_kind'].get(),
+            n_cohorts=cohorts,
+            spread_time=num('spread_time', 'Spread time', blank=0.0) or 0.0,
+            spread_geometry=v['spread_geometry'].get(),
+            t_end=num('t_end', 'End time', blank=0.0) or 0.0,
+            n_out=n_out,
+            h_c=num('h_c', 'Wall heat transfer', blank=0.0) or 0.0,
+            wall_area_m2=num('wall_area', 'Wall area', blank=0.0) or 0.0,
+            T_wall=num('t_wall', 'Wall temperature', blank=300.0) or 300.0,
+            standoffs_m=[float(r[0]) for r in self.points['standoffs'].get()],
+            span_m=span,
+            mass_per_area=num('mass_per_area', 'Mass', blank=0.0) or 0.0,
+            Ru_pa=num('ru_kpa', 'Ultimate resistance', 1e3, blank=0.0) or 0.0,
+            kE_pa_m=num('ke_mpa_m', 'Elastic stiffness', 1e6,
+                        blank=0.0) or 0.0,
+            support=v['support'].get(),
+            rotation_limit_deg=num('rot_limit', 'Collapse rotation',
+                                   blank=12.0) or 12.0,
+        )
+        # a uniform scenario has no spread; saying so here keeps the form
+        # from building a case its own validator would reject
+        if case.scenario_kind == 'uniform':
+            case.spread_time = 0.0
+            case.n_cohorts = 1
+        return case, errs, bad
+
+    def _set_case_hd13(self, case):
+        v = self.v
+        v['name'].set(case.name)
+        v['propellant'].set(case.propellant)
+        for key, field_name, factor in self._HD13_UNITS:
+            got = case.overrides.get(field_name)
+            v[key].set('' if got is None else f'{got / factor:g}')
+        v['measured'].set(bool(case.measured))
+        for key, value in (
+                ('charge_kg', case.charge_kg),
+                ('volume_m3', case.volume_m3),
+                ('vent_area', case.vent_area_m2),
+                ('cd', case.discharge_coeff),
+                ('p_ign', case.p_ign / 1e6),
+                ('n_cohorts', case.n_cohorts),
+                ('spread_time', case.spread_time),
+                ('t_end', case.t_end),
+                ('n_out', case.n_out),
+                ('h_c', case.h_c),
+                ('wall_area', case.wall_area_m2),
+                ('t_wall', case.T_wall),
+                ('span_m', case.span_m),
+                ('mass_per_area', case.mass_per_area),
+                ('ru_kpa', case.Ru_pa / 1e3),
+                ('ke_mpa_m', case.kE_pa_m / 1e6),
+                ('rot_limit', case.rotation_limit_deg)):
+            v[key].set(f'{value:g}')
+        for key, value in (('confinement', case.confinement),
+                           ('scenario_kind', case.scenario_kind),
+                           ('spread_geometry', case.spread_geometry),
+                           ('support', case.support)):
+            v[key].set(value)
+        self.points['standoffs'].set([(r,) for r in case.standoffs_m])
+
     def get_case(self):
         """Build the Case. EVERY bad numeric field is reported, not just
         the first one: the strip used to show a single message and the
@@ -173,6 +317,12 @@ class CaseForm(FieldForm):
         carries that solver's defaults for them, and a stale bad value in
         a hidden box can never block a run. The form keeps the values for
         a later switch back."""
+        if self.dim == 0:
+            case, errs, bad = self._get_case_hd13()
+            self.mark_fields(bad)
+            if errs:
+                raise ValueError('\n'.join(errs))
+            return case
         v = self.v
         errs, bad = [], []
         foam = self._mode == 'blastfoam'
@@ -325,6 +475,9 @@ class CaseForm(FieldForm):
 
     def set_case(self, case):
         v = self.v
+        if self.dim == 0:
+            self._set_case_hd13(case)
+            return
         if self.dim == 1:
             v['radius_m'].set(f'{case.radius_m:g}')
             v['charge'].set(f'{case.charge_kg:g}')

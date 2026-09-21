@@ -781,22 +781,72 @@ operator as an internal face, so this can only seed round-off — and the archiv
 own `simple (1 1 2) → 0.00 %` digit-identical symmetry shows round-off is not
 dominant.
 
-### Verdict and the one run that settles it
+### R2.2 result — Claim 2 splits cleanly into two channels
 
-**INCONCLUSIVE.** A second channel is proven to exist; attributing it requires one
-more experiment, stated precisely:
+All three arms ran. Peak, positive-phase impulse and arrival at both mirror
+gauges, each arm read against **its own** serial reference.
 
-> Take the Claim-2 case (1 m cube, `hex (76 76 76)`, `staticFvMesh`, gauges
-> already snapped to mirror cell centres). Arm A: det point at (0.5, 0.5, 0.5) as
-> today. Arm B: det point at `(0.5 + 1e-6·dx, …)`, **nothing else changed**. Run
-> each arm at np = 1 and np = 2 and report parallel-vs-serial peak error at the
-> Z = 0.175 gauge. **Read each arm against its own serial reference, never across
-> arms** — the nudge is known to move the serial answer, and it was cross-arm
-> reading that got N5-7 reverted.
->
-> If A reproduces ≈ +7 % and B collapses below 0.5 %, the cause is the ignition
-> seed at `activationModel.C:183` and ranks 2 and 3 are excluded. If B still shows
-> ≈ +7 %, the seed is excluded and the next cut is aliasing vs. the probe.
+| arm | serial x/y sym | np=2 x/y sym | per-gauge Δpeak | character |
+|---|---|---|---|---|
+| **A** — node, `findCell` | 0.327 % | **4.384 %** | x **−3.309 %**, y **+1.355 %** | **antisymmetric** |
+| **B** — nudged +1e-6 dx | 0.077 % | **0.093 %** | x +2.187 %, y +2.170 % | symmetric |
+| **C** — `det_radii` default | **0.000 %** | **0.105 %** | x −1.890 %, y −1.786 % | symmetric |
+
+**1. The antisymmetric channel is the ignition seed. Confirmed.**
+Arm A's parallel run breaks x/y symmetry by 4.384 %, with one gauge falling
+3.3 % while its mirror rises 1.4 %. **Both mitigations close it by a factor of
+42** — the nudge to 0.093 %, `det_radii` to 0.105 %. That is the archived
+symmetry-degradation signature (0.10 → 0.26 → 4.85 % across np = 1/2/8), and it
+is now attributed.
+
+**2. `det_radii` gives the best serial symmetry of the three — exactly 0.000 %.**
+This is worth more than the parallel number. `findCell` picks *one arbitrary cell
+of the eight* meeting the node, which cannot respect the x↔y mirror, so even
+**serial** arm A is 0.327 % asymmetric on a perfectly symmetric problem. A ball of
+radius 0.9·dx seeds all eight symmetrically and the mirror is exact. The fix does
+not merely make parallel agree with serial — it makes the **serial** answer
+correct.
+
+**3. A symmetric ≈2 % parallel-vs-serial offset survives both mitigations, and it
+is NOT the seed.** Arm B +2.187 %, arm C −1.890 %, with both gauges moving the
+same way and **the sign differing between arms**. A systematic physical bias would
+not flip sign; a sampling artefact would. This is the signature the temporal-
+aliasing candidate predicts: gauges are written every solver step under
+`adjustTimeStep yes`, `read_probes` does no resampling, and the reported peak is a
+plain `.max()` over adaptive-dt samples — so a serial and a parallel run that
+diverge in their dt sequence sample a sharp peak at different phases, shifting
+both gauges together by whatever that phase error is worth.
+
+### Verdict
+
+- **The x/y symmetry degradation: CONFIRMED and ATTRIBUTED** to the `findCell`
+  ignition seed. Closed by `det_radii` (shipped today) or by the nudge.
+- **A residual ≈2 % symmetric parallel-vs-serial peak offset: still OPEN**, and
+  now known *not* to be the seed. Leading candidate: temporal aliasing of the
+  peak.
+
+### The one run that settles what is left
+
+> Take arm C exactly as it is and pin the timestep: `adjustTimeStep no` with a
+> fixed `deltaT` below the smallest adaptive step either run took, everything else
+> byte-identical, np = 1 vs np = 2. If the ≈2 % offset collapses, it is temporal
+> aliasing and the fix belongs in how blastlab *samples* the gauge, not in the
+> solver. If it survives at a fixed timestep, aliasing is excluded and the next
+> cut is the probe-cell election under decomposition.
+
+A note on the pre-registered threshold, since it was written down in advance and
+should be judged as written: **R2.2 gated on the MEAN of the two mirror gauges,
+and that was a poor choice.** The dominant mechanism is antisymmetric, so the mean
+cancels precisely what it was meant to detect — arm A moves −3.31 % / +1.36 % per
+gauge and only −0.98 % on the mean, which would have read as "not reproduced".
+Both numbers are reported above. The lesson is the mirror of the standing rule
+about peak-only anchors: **a symmetric average is blind to an antisymmetric
+defect**, and gauge pairs placed to test symmetry must be read individually.
+
+Finally, the magnitude: this reproduces **3.3 % on the worst gauge and 4.4 % of
+symmetry**, against the archive's **+7.00 %**. Same order, same signature, not the
+same number — the archive's configuration differs in rank count and decomposition,
+and neither was pinned in what it recorded.
 
 ### R2.2 — the discriminating run (pre-registered 20.09, before it ran)
 
@@ -899,7 +949,7 @@ runs stopped too early".
 |---|---|---|
 | **1** — parallel double ignition (mechanism) | **CONFIRMED** | Directly observed for the first time: an N-way partition boundary on the det point ignites exactly N cells, one per rank (`simple(2 1 1)`→2, `simple(2 2 1)`→4, `scotch np=4`→4, serial→1); `sum(lambda)` holds the N× ratio to endTime, so the energy does not wash out |
 | **1a** — the same, attributed to the archived **+7 % at scotch np=2** | **REFUTED** | scotch np=2 puts no boundary through the point and ignites exactly one cell, same as serial; and the measured cost of even 4× over-ignition is −1.5 % peak, wrong magnitude and wrong sign |
-| **2** — a second, non-AMR parallel channel | **CONFIRMED that it exists; INCONCLUSIVE as to cause** | Lever A ignites a verified-identical single cell in serial and parallel yet still moves peak +1.52 %; leading candidate is the *other* half of `findCell` (which cell is seeded, decomposition-dependent, survives np=2); gauge-on-corner quantified at 1.9 % and excluded for the archived case |
+| **2** — a second, non-AMR parallel channel | **SPLIT: the symmetry break is CONFIRMED and ATTRIBUTED; a ≈2 % symmetric offset stays OPEN** | The x/y degradation (0.327 → 4.384 % at np=2) is the `findCell` ignition seed — both the nudge and `det_radii` close it 42×, and `det_radii` also makes the *serial* answer exactly symmetric (0.000 %). A ≈2 % offset survives both, moves both gauges the same way, and **flips sign between arms**, which fits temporal aliasing of the peak, not a physical bias |
 | **3** — axisym + AMR + `densityGradient` SIGFPE | **INCONCLUSIVE; the wedge-angle sub-claim is REFUTED** | blastFoam itself ships 1° wedges, one with a line-for-line identical AMR+`densityGradient` dict; `sin θ` cancels between face area and volume so the angle changes drain rate by 0.37 %, not 5×; vendor 5° case ran clean to 19.5 ms with FPE trapping armed, but it lacks the profile hand-off that is the mechanism's stated trigger |
 | **4** — `fluxScheme` indexing bug | **CONFIRMED (bug real, unreachable); report misnames the function** | Line 194 writes the internal field with a patch-local index where the `else` branch correctly writes the patch field; zero call sites at source *and* link level; it is `fluxScheme::snGradAlpha`, not `::AD` |
 | **5** — blastFoam's 2D stage made near-vacuum cells | **INCONCLUSIVE — do not remove `RHO_MIN`** | The artefact reproduces exactly, but the "clean" post-B0 runs stopped at ≤0.75 ms versus ≥2.07 ms for the affected ones, so they never entered the regime; the cited 100×200 artefact is not on disk |

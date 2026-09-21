@@ -54,7 +54,27 @@ def main():
                     help='load a finished blastFoam run directory '
                          '(name under /root/blastlab_runs, or a full '
                          'path) and report its contents, then exit')
+    ap.add_argument('--hd13', metavar='CASE',
+                    help='run an HD 1.3 deflagration assessment from a '
+                         'case file and write its HTML report, then exit. '
+                         'No WSL and no GUI: the whole HD1.3 track is 0-D '
+                         'plus closed-form models')
+    ap.add_argument('--hd13-new', metavar='CASE',
+                    help='write a starter HD 1.3 case file and exit')
+    ap.add_argument('--report', metavar='FILE',
+                    help='where --hd13 writes its report '
+                         '(default: alongside the case file)')
     args = ap.parse_args()
+
+    # These two need neither the WSL probe below nor any Qt import.
+    if args.hd13_new:
+        from .output.cli_hd13 import write_starter_case
+        print(write_starter_case(args.hd13_new))
+        return
+    if args.hd13:
+        from .output.cli_hd13 import run_and_report
+        run_and_report(args.hd13, args.report)
+        return
 
     # N21 follow-up: the hardware probe is process-local, and until this
     # call existed only the GUI restored it. Every other entry point

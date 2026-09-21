@@ -53,16 +53,19 @@ against the monotonicity the burn law implies.
 
 STATUS OF THE NUMBERS
 ---------------------
-`PROPELLANTS` rows are REPRESENTATIVE LITERATURE RANGES for classes of
-material, not a calibrated table for any specific product, and the burn
-coefficients in particular vary between lots. Nothing here is quotable
-without a closed-vessel test of the actual material - the same standard
-`materials.py` holds its non-TNT afterburn rows to. `calibrated=False` on
-every row is deliberate and is checked by the test suite.
+The material table lives in `core/fuels.py` and is re-exported here, so
+`deflagration.PROPELLANTS` keeps working. Every row is a REPRESENTATIVE
+LITERATURE RANGE for a class of material, not product data, and nothing
+is quotable without a closed-vessel test of the actual material. See that
+module's docstring for why the table is separate and what `calibrated`
+means.
 """
 
 import math
-from dataclasses import dataclass
+
+from . import scenario as _scenario
+from .fuels import (Propellant, PROPELLANTS, PROPELLANT_NAMES,  # noqa: F401
+                    form_factor)
 
 #: Ambient back-pressure for the vent [Pa]. Matches core.constants.P_AIR.
 P_AMB = 101325.0
@@ -70,94 +73,6 @@ P_AMB = 101325.0
 #: Web fraction below which a grain counts as burnt out. See the snap in
 #: `simulate`: a degressive grain never reaches Z = 1 in finite time.
 _BURNOUT_EPS = 1.0e-9
-
-
-@dataclass(frozen=True)
-class Propellant:
-    """A deflagrating (HD 1.3) material.
-
-    force        lambda = R * T_flame [J/kg]. The "impetus" or "force
-                 constant" of interior ballistics; sets the pressure a
-                 given mass reaches in a given volume.
-    covolume     b [m^3/kg]. The Noble-Abel co-volume - roughly the volume
-                 the product molecules themselves occupy. ~1e-3 for most
-                 propellant gases, i.e. 1 litre per kg, which is NOT
-                 negligible against a chamber of a few litres.
-    rho          solid density [kg/m^3]
-    T_flame      isochoric flame temperature [K]
-    a, n         Vieille burn law r = a * p**n, r in m/s with p in Pa
-    gamma        ratio of specific heats of the product gas
-    web          w0 [m]: the burning distance from the surface to
-                 burn-out. For a slab burning on both faces this is the
-                 half-thickness; dZ/dt = sigma(Z) * r / w0.
-    form         'neutral' | 'degressive' | 'progressive'
-    theta        progressivity, used only by form='progressive'
-    calibrated   False everywhere on purpose - see the module docstring.
-    """
-    force: float
-    covolume: float
-    rho: float
-    T_flame: float
-    a: float
-    n: float
-    gamma: float = 1.25
-    web: float = 1.0e-3
-    form: str = 'degressive'
-    theta: float = 1.0
-    calibrated: bool = False
-
-    @property
-    def R(self):
-        """Specific gas constant [J/(kg K)] - force / flame temperature."""
-        return self.force / self.T_flame
-
-    @property
-    def cv(self):
-        return self.R / (self.gamma - 1.0)
-
-    @property
-    def cp(self):
-        return self.gamma * self.cv
-
-
-#: Representative classes, NOT product data. See the module docstring.
-#: force/T_flame/covolume are the usual textbook ranges for each class;
-#: the Vieille pair is where lot-to-lot variation really lives.
-PROPELLANTS = {
-    # nitrocellulose only - the lowest-energy, coolest of the three
-    'single_base': Propellant(force=0.95e6, covolume=1.05e-3, rho=1600.0,
-                              T_flame=2500.0, a=5.0e-8, n=0.85,
-                              gamma=1.25, web=1.0e-3, form='degressive'),
-    # NC + nitroglycerine - hotter and faster
-    'double_base': Propellant(force=1.10e6, covolume=1.00e-3, rho=1650.0,
-                              T_flame=3000.0, a=8.0e-8, n=0.90,
-                              gamma=1.24, web=1.0e-3, form='degressive'),
-    # AP/HTPB-like composite - lower pressure exponent, near-neutral burn
-    'composite': Propellant(force=1.00e6, covolume=1.10e-3, rho=1750.0,
-                            T_flame=3000.0, a=3.0e-6, n=0.35,
-                            gamma=1.20, web=3.0e-3, form='neutral'),
-}
-
-PROPELLANT_NAMES = tuple(PROPELLANTS)
-
-
-def form_factor(prop, Z):
-    """sigma(Z) = S(Z)/S0, the burning surface relative to its initial value.
-
-    neutral      a slab or a tube burning inward and outward at once, the
-                 area changes cancel -> 1
-    degressive   a sphere or a cord: the surface shrinks as it burns, and
-                 for a sphere S ~ r^2 while the burnt fraction goes as
-                 r^3, hence (1 - Z)^(2/3)
-    progressive  a multi-perforated grain, whose internal perforations
-                 grow faster than the outside shrinks -> 1 + theta*Z
-    """
-    Z = min(max(Z, 0.0), 1.0)
-    if prop.form == 'neutral':
-        return 1.0
-    if prop.form == 'progressive':
-        return 1.0 + prop.theta * Z
-    return (1.0 - Z) ** (2.0 / 3.0)
 
 
 def closed_vessel_pmax(prop, charge_kg, volume_m3):
@@ -182,6 +97,106 @@ def closed_vessel_pmax(prop, charge_kg, volume_m3):
     return prop.force * charge_kg / free
 
 
+#: Fraction of the charge an igniter converts before the burn carries
+#: itself. A starter charge is a small part of the round; it is raised
+#: only when that much gas cannot hold the deflagration limit.
+Z_IGN_DEFAULT = 0.01
+
+
+def sustains(prop, charge_kg, volume_m3):
+    """Can this loading density reach its own deflagration limit?
+
+    If the pressure the charge can generate with EVERYTHING burnt still
+    sits below `p_extinction`, the material lights and goes out. That is
+    a real and useful answer about a magazine - a small charge in a large
+    room cannot sustain combustion - so `simulate` reports it as a result
+    with `stop_reason = 'cannot sustain'` rather than raising.
+    """
+    if prop.p_extinction <= 0.0:
+        return True
+    return closed_vessel_pmax(prop, charge_kg, volume_m3) > prop.p_extinction
+
+
+def free_volume_terms(prop, charge_kg, volume_m3):
+    """(A, B) such that the free gas volume at burnt fraction z is
+    `A + z*B`:
+
+        V_free(z) = (V0 - C/rho) + z * C * (1/rho - b)
+
+    The solid that has not burnt yet and the co-volume of the gas that
+    has both come out of the same chamber, and B is usually NEGATIVE -
+    the gas occupies more space than the solid it came from.
+    """
+    A = volume_m3 - charge_kg / prop.rho
+    B = charge_kg * (1.0 / prop.rho - prop.covolume)
+    return A, B
+
+
+def burnt_fraction_at(prop, charge_kg, volume_m3, p, u_lost=0.0):
+    """Burnt fraction z whose gas holds the chamber at `p` [Pa].
+
+    The exact inverse of the Noble-Abel closed-vessel pressure, from
+
+        p * (A + z B) = z C lambda - (gamma - 1) * u_lost
+    =>  z = (p A + (gamma - 1) u_lost) / (C lambda - p B)
+
+    `u_lost` [J] is internal energy the gas has already given to the
+    walls. It belongs here rather than in the caller because leaving it
+    out is a REAL bias, not a refinement: a closed vessel loses several
+    per cent of its energy by the time it peaks, and an adiabatic
+    inversion reads that as less propellant burnt than really was -
+    systematically, and more so late in the burn, which is exactly the
+    shape that tilts a fitted pressure exponent. See core/calibration.py.
+    """
+    A, B = free_volume_terms(prop, charge_kg, volume_m3)
+    den = charge_kg * prop.force - p * B
+    if den <= 0.0:
+        raise ValueError(
+            f'no burnt fraction can hold {p:g} Pa in a {volume_m3:g} m^3 '
+            f'chamber with {charge_kg:g} kg - the co-volume term has taken '
+            f'over')
+    return (p * A + (prop.gamma - 1.0) * u_lost) / den
+
+
+def ignition_fraction(prop, charge_kg, volume_m3, p_ign):
+    """Burnt fraction Z0 whose product gas alone brings the chamber to
+    `p_ign` [Pa]. Closed form, from the Noble-Abel EOS at T = T_flame:
+
+        p (V0 - C(1-Z)/rho - b C Z) = C Z R T_flame = C Z * force
+    =>  Z = p (V0 - C/rho) / (C (force - p (1/rho - b)))
+
+    WHY IGNITION HAS TO BE MODELLED AT ALL. Once a low-pressure
+    extinction limit exists, a burn cannot start itself: seeding a
+    whisker of gas leaves the chamber at ambient, which is BELOW the
+    limit, so the burn rate is zero and nothing ever happens. That is not
+    a numerical nuisance - it is the physics. A real HD 1.3 event is
+    igniter-driven, and the model has to be too.
+
+    Taking the starter gas from the propellant itself, rather than adding
+    igniter mass, is what keeps the closed-vessel limit exact: all C
+    still ends up as gas, so p_max is untouched and the analytic check
+    stays the model's own verification.
+    """
+    if p_ign <= 0.0:
+        raise ValueError('ignition pressure must be positive')
+    if p_ign <= prop.p_extinction:
+        raise ValueError(
+            f'ignition pressure {p_ign:g} Pa is at or below the extinction '
+            f'limit {prop.p_extinction:g} Pa - the charge would go out as '
+            f'soon as it was lit')
+    if volume_m3 <= charge_kg / prop.rho:
+        raise ValueError(
+            f'cannot reach an ignition pressure of {p_ign:g} Pa in a '
+            f'{volume_m3:g} m^3 chamber holding {charge_kg:g} kg')
+    Z0 = burnt_fraction_at(prop, charge_kg, volume_m3, p_ign)
+    if not 0.0 < Z0 <= 1.0:
+        raise ValueError(
+            f'an ignition pressure of {p_ign:g} Pa needs {Z0:.3g} of the '
+            f'charge burnt, which is not a fraction - lower p_ign or '
+            f'enlarge the chamber')
+    return Z0
+
+
 def _vent_mdot(p, T, prop, area, cd, p_amb):
     """Mass flow [kg/s] out of a vent of `area`, isentropic, choked-aware.
 
@@ -203,7 +218,8 @@ def _vent_mdot(p, T, prop, area, cd, p_amb):
 
 
 def _pressure(prop, charge_kg, volume_m3, Z, m, E):
-    """(p, T, V_free) from the Noble-Abel EOS."""
+    """(p, T, V_free) from the Noble-Abel EOS. `Z` is the OVERALL burnt
+    fraction of the charge - the mass-weighted mean over the cohorts."""
     solid = charge_kg * (1.0 - Z) / prop.rho
     free = volume_m3 - solid - prop.covolume * m
     if free <= 1e-12 or m <= 1e-15:
@@ -214,23 +230,43 @@ def _pressure(prop, charge_kg, volume_m3, Z, m, E):
     return m * prop.R * T / free, T, free
 
 
-def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, state):
-    Z, m, E = state
-    p, T, _free = _pressure(prop, charge_kg, volume_m3, Z, m, E)
-    if Z >= 1.0:
-        dZ = 0.0
-    else:
-        dZ = form_factor(prop, Z) * prop.a * (max(p, p_amb) ** prop.n) / prop.web
-    mdot_gen = charge_kg * dZ
+def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
+            state, t):
+    """d/dt of (Z_0 .. Z_{k-1}, m, E) at time `t`.
+
+    Non-autonomous, because cohorts light at their own times. Every
+    cohort sees the SAME chamber pressure, which is why they are
+    integrated together - see core/scenario.py on why convolution does
+    not work here.
+    """
+    k = len(fracs)
+    Zs, m, E = state[:k], state[k], state[k + 1]
+    z_total = sum(f * Z for f, Z in zip(fracs, Zs))
+    p, T, _free = _pressure(prop, charge_kg, volume_m3, z_total, m, E)
+    # The pressure is used RAW here. It used to be max(p, p_amb), an
+    # ambient floor that silently made extinction impossible: a magazine
+    # that had vented down to atmospheric went on burning for ever at the
+    # ambient rate. Below the low-pressure deflagration limit a solid
+    # propellant does not sustain a flame, and that is now what happens.
+    burning = p >= prop.p_extinction
+    dZs = []
+    for Z, ti in zip(Zs, t_ign):
+        if Z >= 1.0 or t < ti or not burning:
+            dZs.append(0.0)
+        else:
+            dZs.append(form_factor(prop, Z) * prop.a * (p ** prop.n)
+                       / prop.web)
+    mdot_gen = charge_kg * sum(f * dZ for f, dZ in zip(fracs, dZs))
     mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb)
     mdot_out = min(mdot_out, m / 1e-9) if m <= 0.0 else mdot_out
-    return (dZ,
-            mdot_gen - mdot_out,
-            mdot_gen * prop.cv * prop.T_flame - mdot_out * prop.cp * T)
+    return tuple(dZs) + (
+        mdot_gen - mdot_out,
+        mdot_gen * prop.cv * prop.T_flame - mdot_out * prop.cp * T)
 
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
-             t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000):
+             t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000,
+             p_ign=None, scenario=None):
     """Integrate the chamber to `t_end` [s]. RK4 with an adaptive step.
 
     Returns a dict with the sampled trace (`t, p, T, Z, m, mdot_out`,
@@ -242,6 +278,27 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
                          is then a partial record and `p_max` is a lower
                          bound, so callers must check this rather than
                          quietly trusting a truncated peak
+        extinguished     True if the burn went out below the propellant's
+                         low-pressure deflagration limit with propellant
+                         still unburnt
+        stop_reason      '' | 'burnt out and vented' | 'extinction'
+                         | 'step cap' | 't_end'
+        Z0               burnt fraction the igniter started from
+        extrapolated_fraction
+                         share of the BURNING time (not of `t_end`) spent
+                         with the chamber pressure outside the window the
+                         Vieille pair was measured over. A closed-vessel
+                         calibration lives at tens of MPa and a vented
+                         magazine at ~1 MPa, so this routinely comes back
+                         at 1.0 - and a peak pressure quoted without it is
+                         a two-decade extrapolation presented as a
+                         measurement. See core/fuels.py.
+
+    `p_ign` [Pa] is the pressure the igniter brings the chamber to before
+    the propellant's own burn takes over; `None` picks twice the
+    extinction limit, or the legacy whisker-of-gas seed for a propellant
+    that declares no limit. The starter gas comes from the charge itself,
+    so the closed-vessel limit is untouched - see `ignition_fraction`.
 
     The step is set by the physics, not by a fixed dt: at most 1 % of the
     burn or 5 % of the chamber mass per step, capped at `t_end / 50`.  It
@@ -256,76 +313,135 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     if charge_kg <= 0.0 or volume_m3 <= 0.0:
         raise ValueError('charge and chamber volume must both be positive')
     closed_vessel_pmax(prop, charge_kg, volume_m3)   # raises if it cannot fit
+    if scenario is None:
+        scenario = _scenario.uniform()
+    coh = scenario.cohorts()
+    fracs = tuple(f for f, _ti in coh)
+    t_ign = tuple(ti for _f, ti in coh)
 
-    # seed: a whisker of gas so T and p are defined at t = 0
-    Z = 1.0e-9
-    m = charge_kg * Z
+    # seed. With an extinction limit the burn cannot light itself, so the
+    # igniter is part of the model; without one, keep the original
+    # whisker of gas so a propellant that declares no limit behaves
+    # exactly as it did before.
+    can_sustain = sustains(prop, charge_kg, volume_m3)
+    if p_ign is not None:
+        Z = ignition_fraction(prop, charge_kg, volume_m3, p_ign)
+    elif prop.p_extinction <= 0.0:
+        Z = 1.0e-9                      # legacy: no limit, no igniter
+    elif not can_sustain:
+        # lights and goes out; the loop's extinction test ends it at once
+        Z = Z_IGN_DEFAULT
+    else:
+        p_cap = closed_vessel_pmax(prop, charge_kg, volume_m3)
+        p_need = min(1.05 * prop.p_extinction,
+                     0.5 * (prop.p_extinction + p_cap))
+        Z = max(Z_IGN_DEFAULT,
+                ignition_fraction(prop, charge_kg, volume_m3, p_need))
+    Z0 = Z
+    # The igniter lights what is already exposed at t = 0, not the whole
+    # stack, so its gas is charged to the cohorts lit then. With one
+    # cohort this is exactly the old seed.
+    lit_now = sum(f for f, ti in zip(fracs, t_ign) if ti <= 0.0)
+    per = min(Z0 / lit_now, 1.0) if lit_now > 0.0 else 0.0
+    Zs = [per if ti <= 0.0 else 0.0 for ti in t_ign]
+    z_total = sum(f * Z for f, Z in zip(fracs, Zs))
+    m = charge_kg * z_total
     E = m * prop.cv * prop.T_flame
     t = 0.0
     h_max = t_end / 50.0
     sample_every = t_end / max(n_out, 2)
 
-    out = dict(t=[], p=[], T=[], Z=[], m=[], mdot_out=[])
+    out = dict(t=[], p=[], T=[], Z=[], m=[], mdot_out=[], lit=[])
     p_max, t_p_max = 0.0, 0.0
     last_sample = -1.0
 
+    def overall():
+        return sum(f * Z for f, Z in zip(fracs, Zs))
+
     def state_pT():
-        return _pressure(prop, charge_kg, volume_m3, Z, m, E)[:2]
+        return _pressure(prop, charge_kg, volume_m3, overall(), m, E)[:2]
 
     def record():
         p, T = state_pT()
         out['t'].append(t)
         out['p'].append(p)
         out['T'].append(T)
-        out['Z'].append(min(Z, 1.0))
+        out['Z'].append(min(overall(), 1.0))
         out['m'].append(m)
         out['mdot_out'].append(_vent_mdot(p, T, prop, vent_area, cd, p_amb))
+        out['lit'].append(sum(f for f, ti in zip(fracs, t_ign) if ti <= t))
 
     record()
     last_sample = 0.0
-    args = (prop, charge_kg, volume_m3, vent_area, cd, p_amb)
+    args = (prop, charge_kg, volume_m3, vent_area, cd, p_amb, fracs, t_ign)
+    nZ = len(fracs)
     steps = 0
+    stop_reason = 't_end'
+    extinguished = False
+    t_burning = 0.0
+    t_outside = 0.0
     while t < t_end and steps < max_steps:
         steps += 1
-        s = (Z, m, E)
-        k1 = _derivs(*args, s)
+        s = tuple(Zs) + (m, E)
+        k1 = _derivs(*args, s, t)
+        dZ_max = max(k1[:nZ])
         h = h_max
-        if k1[0] > 0.0:
-            h = min(h, 0.005 / k1[0])          # <= 0.5 % of the burn
+        if dZ_max > 0.0:
+            h = min(h, 0.005 / dZ_max)         # <= 0.5 % of the burn
             # land ON Z = 1, never past it. Clipping an overshoot leaves
             # m and E integrated against a dZ taken beyond burn-out, which
             # showed up as m_end = 1.00066 * C - more gas than propellant.
-            h = min(h, (1.0 - Z) / k1[0])
-        if k1[1] < 0.0 and m > 0.0:
+            for Z, dZ in zip(Zs, k1[:nZ]):
+                if dZ > 0.0:
+                    h = min(h, (1.0 - Z) / dZ)
+        if k1[nZ] < 0.0 and m > 0.0:
             # 1 %, not 5 %: the vent stops at ambient (there is no inflow
             # in this model), so a step that dumps too much mass at once
             # lands the chamber BELOW ambient and strands it there. At 5 %
             # a large vent finished at 0.58 bar against an ambient of 1.01.
-            h = min(h, 0.01 * m / (-k1[1]))
+            h = min(h, 0.01 * m / (-k1[nZ]))
+        # Land ON the next ignition, never across it. A cohort lighting
+        # inside a step is a discontinuity in the right-hand side, and
+        # RK4 averaged across one would smear the entrainment the whole
+        # scenario exists to represent.
+        later = [ti for ti in t_ign if ti > t + 1.0e-15]
+        if later:
+            h = min(h, min(later) - t)
         h = max(min(h, t_end - t), 1.0e-12)
 
         def add(base, k, f):
             return tuple(b + f * kk for b, kk in zip(base, k))
 
-        k2 = _derivs(*args, add(s, k1, h / 2.0))
-        k3 = _derivs(*args, add(s, k2, h / 2.0))
-        k4 = _derivs(*args, add(s, k3, h))
-        Z, m, E = (s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
-                   for i in range(3))
-        Z = min(Z, 1.0)
+        k2 = _derivs(*args, add(s, k1, h / 2.0), t + h / 2.0)
+        k3 = _derivs(*args, add(s, k2, h / 2.0), t + h / 2.0)
+        k4 = _derivs(*args, add(s, k3, h), t + h)
+        nxt = [s[i] + h / 6.0 * (k1[i] + 2 * k2[i] + 2 * k3[i] + k4[i])
+               for i in range(nZ + 2)]
+        Zs = [min(v, 1.0) for v in nxt[:nZ]]
+        m, E = nxt[nZ], nxt[nZ + 1]
         # A degressive grain has sigma(Z) = (1 - Z)^(2/3), so dZ/dt -> 0 and
         # Z approaches 1 asymptotically, never reaching it. Combined with
         # the land-on-Z=1 step limit that grinds the integrator to a halt -
         # one case took the full 500k step cap to cover a sliver of web.
         # Snap the last 1e-9 to burnt out, converting the remaining
         # propellant to gas so mass and energy stay exact.
-        if 0.0 < 1.0 - Z < _BURNOUT_EPS:
-            left = 1.0 - Z
-            Z = 1.0
-            m += charge_kg * left
-            E += charge_kg * left * prop.cv * prop.T_flame
+        for i, Z in enumerate(Zs):
+            if 0.0 < 1.0 - Z < _BURNOUT_EPS:
+                left = (1.0 - Z) * fracs[i]
+                Zs[i] = 1.0
+                m += charge_kg * left
+                E += charge_kg * left * prop.cv * prop.T_flame
         m = max(m, 0.0)
         E = max(E, 0.0)
+        # Attribute the step BEFORE advancing t: k1 was evaluated at the
+        # start of it, so that is the pressure the burn law saw.
+        z_start = sum(f * Z for f, Z in zip(fracs, s[:nZ]))
+        p_start = _pressure(prop, charge_kg, volume_m3, z_start, s[nZ],
+                            s[nZ + 1])[0]
+        if dZ_max > 0.0:
+            t_burning += h
+            if not prop.in_validity_window(p_start):
+                t_outside += h
         t += h
 
         p_now, _T = state_pT()
@@ -334,17 +450,48 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         if t - last_sample >= sample_every:
             record()
             last_sample = t
+        all_burnt = all(Z >= 1.0 for Z in Zs)
         # burnt out and vented down: nothing left to integrate
-        if Z >= 1.0 and vent_area > 0.0 and p_now <= p_amb * 1.001:
+        if all_burnt and vent_area > 0.0 and p_now <= p_amb * 1.001:
+            stop_reason = 'burnt out and vented'
+            break
+        # Went out below the deflagration limit with propellant left.
+        # Terminal ONLY once everything has been lit: while cohorts are
+        # still to come, a chamber below the limit is waiting, not dead.
+        if (not all_burnt and p_now < prop.p_extinction
+                and t >= max(t_ign)):
+            extinguished = True
+            stop_reason = 'extinction'
             break
 
     if out['t'][-1] < t:
         record()
+    if steps >= max_steps:
+        stop_reason = 'step cap'
+    if extinguished and t_burning <= 0.0:
+        # it never burned at all, which is a different statement about
+        # the magazine than "it burned and then went out"
+        stop_reason = 'cannot sustain'
     out['p_max'] = p_max
     out['t_p_max'] = t_p_max
-    out['burnt_out'] = Z >= 1.0
+    # every cohort, not a leaked loop variable: with cohorts there is no
+    # single Z any more, and reading one was a real bug the scenario
+    # tests caught
+    out['burnt_out'] = all(Z >= 1.0 for Z in Zs)
     out['steps'] = steps
     out['hit_step_cap'] = steps >= max_steps
+    out['extinguished'] = extinguished
+    out['stop_reason'] = stop_reason
+    out['Z0'] = Z0
+    out['scenario'] = scenario
+    # Always reported, never implied. Uniform ignition is the laboratory
+    # condition; a magazine answer computed under it is one whose
+    # entrainment was assumed away, and the report has to say so.
+    out['scenario_kind'] = scenario.kind
+    out['calibration_only_scenario'] = scenario.calibration_only
+    out['n_cohorts'] = len(fracs)
+    out['extrapolated_fraction'] = (t_outside / t_burning
+                                    if t_burning > 0.0 else 0.0)
     return out
 
 

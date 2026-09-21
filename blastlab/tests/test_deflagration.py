@@ -25,11 +25,13 @@ Both are pinned below. No WSL, no solver, runs in about a second.
 
 import os
 import sys
+from dataclasses import replace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core import deflagration as d                  # noqa: E402
+from blastlab.core import scenario as sc                     # noqa: E402
 
 FAIL = []
 
@@ -39,6 +41,16 @@ def check(name, ok, detail=''):
           + (f' - {detail}' if detail else ''))
     if not ok:
         FAIL.append(name)
+
+
+def _raises(fn, exc=ValueError):
+    try:
+        fn()
+    except exc:
+        return True
+    except Exception:
+        return False
+    return False
 
 
 def main():
@@ -159,7 +171,169 @@ def main():
     check('p_max is taken over every step, not just the samples',
           r['p_max'] >= max(r['p']) - 1e-9)
 
-    # ── 7. refusals ─────────────────────────────────────────────────────
+    # ── 7. ignition, extinction and the validity window ─────────────────
+    print('\n  ignition')
+    prop = d.PROPELLANTS['double_base']
+    # The igniter takes its gas FROM the charge, so every kilogram still
+    # ends up as product gas and the analytic limit is untouched. That is
+    # the invariant that lets ignition exist at all without costing the
+    # model its own verification.
+    ana = d.closed_vessel_pmax(prop, 5.0, 1.0)
+    lit = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0, p_ign=2.0e6)
+    check('an igniter does not change the closed-vessel limit',
+          abs(lit['p_max'] - ana) / ana < 1e-3,
+          f"{lit['p_max']/1e5:.3f} vs {ana/1e5:.3f} bar")
+    check('an igniter does not create mass',
+          abs(lit['m'][-1] - 5.0) < 1e-9 * 5.0, f"{lit['m'][-1]:.9f} kg")
+    z0 = d.ignition_fraction(prop, 5.0, 1.0, 2.0e6)
+    back = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                      p_ign=2.0e6)['p'][0]
+    check('ignition_fraction inverts the EOS: seeding Z0 really gives p_ign',
+          abs(back - 2.0e6) / 2.0e6 < 1e-6, f'Z0={z0:.6f} -> {back/1e6:.6f} MPa')
+    check('an ignition pressure at or below the extinction limit is refused',
+          _raises(lambda: d.ignition_fraction(
+              replace(prop, p_extinction=3.0e6), 5.0, 1.0, 2.0e6)))
+
+    print('\n  extinction')
+    check('every shipped row ships with extinction NOT modelled',
+          all(d.PROPELLANTS[n].p_extinction == 0.0
+              for n in d.PROPELLANT_NAMES))
+    lim = replace(prop, p_extinction=1.0e6)
+    leftover = []
+    for area in (0.05, 0.2, 1.0):
+        r = d.simulate(lim, 5.0, 1.0, vent_area=area, t_end=5.0)
+        leftover.append(r['Z'][-1])
+        check(f'vent {area:g} m^2: the burn goes out, and says so',
+              r['stop_reason'] == 'extinction' and r['extinguished'],
+              f"{r['stop_reason']}")
+    check('a bigger vent leaves MORE propellant unburnt',
+          leftover[0] > leftover[1] > leftover[2],
+          ' > '.join(f'{1 - z:.3f}' for z in leftover) + ' burnt')
+    check('extinction leaves real propellant behind, which the old '
+          'ambient-floored rate could never produce',
+          leftover[1] < 0.5, f'Z_end = {leftover[1]:.4f}')
+
+    print('\n  cannot sustain')
+    weak = replace(d.PROPELLANTS['single_base'], p_extinction=5.0e6)
+    check('a loading whose full burn cannot reach the limit does not sustain',
+          not d.sustains(weak, 5.0, 1.0),
+          f'p_cap = {d.closed_vessel_pmax(weak, 5.0, 1.0)/1e6:.3f} MPa')
+    r = d.simulate(weak, 5.0, 1.0, vent_area=0.0, t_end=5.0)
+    check('and it is an ANSWER, not an exception',
+          r['stop_reason'] == 'cannot sustain' and not r['burnt_out'],
+          f"{r['stop_reason']}")
+    check('no extinction limit means always sustains (the shipped default)',
+          d.sustains(prop, 5.0, 1.0))
+
+    print('\n  the Vieille validity window')
+    # This is the headline number of core/fuels.py, and it is the reason
+    # the window travels with the row: a gun propellant calibrated in a
+    # closed vessel at 50-300 MPa is being asked about a magazine at a
+    # few MPa, which is the whole burn spent outside the data.
+    for name in ('single_base', 'double_base'):
+        r = d.simulate(d.PROPELLANTS[name], 5.0, 1.0, vent_area=0.0,
+                       t_end=5.0)
+        check(f'{name}: the entire burn is an extrapolation',
+              r['extrapolated_fraction'] > 0.99,
+              f"{r['extrapolated_fraction']:.3f}")
+    r = d.simulate(d.PROPELLANTS['composite'], 5.0, 1.0, vent_area=0.0,
+                   t_end=120.0)
+    check('composite: characterised at motor pressures, so much of its '
+          'burn IS inside the window',
+          r['extrapolated_fraction'] < 0.9,
+          f"{r['extrapolated_fraction']:.3f}")
+
+    print('\n  per-field calibration')
+    check('calibrated is derived from uncalibrated, so they cannot disagree',
+          all(d.PROPELLANTS[n].calibrated == (not d.PROPELLANTS[n].uncalibrated)
+              for n in d.PROPELLANT_NAMES))
+    check('the measured thermochemistry is not flagged, the burn law is',
+          prop.is_calibrated('force') and prop.is_calibrated('covolume')
+          and not prop.is_calibrated('a') and not prop.is_calibrated('n'))
+    check('a row with every field sourced reports calibrated',
+          replace(prop, uncalibrated=()).calibrated)
+
+    # ── 8. ignition scenarios and cohorts (HD1-6) ───────────────────────
+    print('\n  the scenario itself')
+    check('cohort masses always sum to 1',
+          all(abs(sum(f for f, _t in sc.IgnitionScenario(
+              kind=k, n_cohorts=n, spread_time=(0.0 if k == 'uniform' else 3.0)
+          ).cohorts()) - 1.0) < 1e-12
+              for k in sc.KINDS for n in ((1, 4, 9) if k == 'uniform'
+                                          else (2, 4, 9))))
+    fs = sc.IgnitionScenario(kind='flame_spread', n_cohorts=8,
+                             spread_time=4.0)
+    check('flame spread lights everything within the spread time',
+          fs.last_ignition <= 4.0 and abs(fs.mass_entrainment(4.0) - 1.0) < 1e-12)
+    line = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                               spread_time=4.0, geometry='line')
+    vol = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                              spread_time=4.0, geometry='volume')
+    check('a pile engulfed in three dimensions is back-loaded against a '
+          'line lit end to end',
+          vol.mass_entrainment(2.0) < line.mass_entrainment(2.0),
+          f'{vol.mass_entrainment(2.0):.3f} vs '
+          f'{line.mass_entrainment(2.0):.3f} lit at half time')
+    pkg = sc.IgnitionScenario(kind='progressive_package', n_cohorts=5,
+                              spread_time=8.0)
+    check('packages fail from t = 0 to the end of the window',
+          pkg.cohorts()[0][1] == 0.0 and pkg.cohorts()[-1][1] == 8.0)
+    check('uniform is flagged as the laboratory condition it is',
+          sc.uniform().calibration_only
+          and not fs.calibration_only)
+    for bad, label in (
+            (dict(kind='sideways'), 'an unknown kind'),
+            (dict(kind='uniform', spread_time=1.0), 'uniform with a spread'),
+            (dict(kind='flame_spread', n_cohorts=1, spread_time=1.0),
+             'a spread with one cohort'),
+            (dict(kind='flame_spread', n_cohorts=4, spread_time=-1.0),
+             'a negative spread'),
+            (dict(kind='flame_spread', n_cohorts=4, geometry='blob'),
+             'an unknown geometry')):
+        check(f'{label} is refused',
+              _raises(lambda b=bad: sc.IgnitionScenario(**b)))
+
+    # ── THE LIMIT CASE ──────────────────────────────────────────────────
+    # Cohorts that all light at the same instant ARE uniform ignition. A
+    # known limit catches almost any array bug - an index, a mass weight,
+    # a double count - where "it gives a different p(t)" catches almost
+    # nothing. This is the gate on the whole cohort rewrite.
+    print('\n  cohorts collapse to uniform when they light together')
+    base = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0)
+    for n in (2, 5, 17):
+        r = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                       scenario=sc.IgnitionScenario(kind='uniform',
+                                                    n_cohorts=n))
+        dp = abs(r['p_max'] - base['p_max']) / base['p_max']
+        dz = max(abs(a - b) for a, b in zip(r['Z'], base['Z']))
+        check(f'{n} simultaneous cohorts reproduce one cohort',
+              dp < 1e-10 and dz < 1e-10, f'dp {dp:.2e}, dZ {dz:.2e}')
+        check(f'{n} cohorts take the same steps as one',
+              r['steps'] == base['steps'], f"{r['steps']} vs {base['steps']}")
+
+    print('\n  entrainment changes the answer')
+    peaks = []
+    for T in (0.5, 2.0, 10.0):
+        r = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=40.0,
+                       scenario=sc.IgnitionScenario(
+                           kind='flame_spread', n_cohorts=12, spread_time=T))
+        peaks.append(r['p_max'])
+        check(f'spread {T:g} s: every cohort still reaches burn-out',
+              r['burnt_out'] and abs(r['Z'][-1] - 1.0) < 1e-9,
+              f"burnt_out={r['burnt_out']} Z={r['Z'][-1]:.9f}")
+    uni = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=40.0)
+    check('a slower spread always gives a lower peak',
+          uni['p_max'] > peaks[0] > peaks[1] > peaks[2],
+          ' > '.join(f'{v/1e6:.3f}' for v in [uni['p_max']] + peaks) + ' MPa')
+    check('and the effect is an order of magnitude, not a correction',
+          uni['p_max'] / peaks[-1] > 10.0,
+          f"x{uni['p_max'] / peaks[-1]:.1f}")
+    check('the run always reports which scenario produced it',
+          uni['scenario_kind'] == 'uniform'
+          and uni['calibration_only_scenario'] is True
+          and uni['n_cohorts'] == 1)
+
+    # ── 9. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     for bad, label in (((0.0, 1.0), 'zero charge'),
                        ((5.0, 0.0), 'zero volume'),

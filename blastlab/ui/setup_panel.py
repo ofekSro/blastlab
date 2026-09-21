@@ -55,8 +55,11 @@ class SetupPanel(QWidget):
         head = QHBoxLayout()
         head.addWidget(label('Case Setup', 'h1'))
         head.addStretch(1)
-        self.dim_seg = Segmented(['1D', '2D', '3D'], height=34)
-        self.dim_seg.setFixedWidth(180)
+        # '0D' rather than 'HD1.3' so `_dim_selected` keeps parsing the
+        # leading digit, and so the four sit in one series: a deflagration
+        # chamber really is the zero-dimensional member of the family.
+        self.dim_seg = Segmented(['0D', '1D', '2D', '3D'], height=34)
+        self.dim_seg.setFixedWidth(240)
         self.dim_seg.changed.connect(self._dim_selected)
         head.addWidget(self.dim_seg)
         root.addLayout(head)
@@ -139,7 +142,7 @@ class SetupPanel(QWidget):
 
         self._forms = {d: CaseForm(d, on_change=self._changed,
                                    mode=self._mode.get())
-                       for d in (1, 2, 3)}
+                       for d in (0, 1, 2, 3)}
         for f in self._forms.values():
             self._stack.addWidget(f)
         self._dim = 2
@@ -154,8 +157,9 @@ class SetupPanel(QWidget):
         return self._mode.get()
 
     def _mode_changed(self, m):
-        for f in self._forms.values():
-            f.set_mode(m)
+        for d, f in self._forms.items():
+            if d:                       # a 0-D case has no solver backend
+                f.set_mode(m)
         # cards vanished: a viewport left past the new end would show
         # nothing, so go back to the top
         self._scroll.verticalScrollBar().setValue(0)
@@ -196,8 +200,10 @@ class SetupPanel(QWidget):
     def set_case(self, case):
         # the case's solver becomes the app mode (sidebar, Chain presets,
         # Results) BEFORE the form is filled, so the amr_levels trace and
-        # the hide/show logic see the right mode
-        self._mode.set(getattr(case, 'solver', 'native'))
+        # the hide/show logic see the right mode. A 0-D case has no
+        # solver and must not drag the app mode back to native.
+        if case.dim:
+            self._mode.set(getattr(case, 'solver', 'native'))
         self.set_dim(case.dim)
         self.form.set_case(case)
 

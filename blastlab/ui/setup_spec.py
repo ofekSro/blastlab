@@ -209,11 +209,93 @@ def _trigger(dim):
     return CardSpec('Trigger gauge', col=1, rows=tuple(rows))
 
 
+# ── HD 1.3: the 0-D chamber (HD1-11c) ────────────────────────────────────
+# A deflagration assessment has no mesh, no boundaries and no solver
+# choice, so it shares no card with the blast forms. It is `dim = 0`
+# because that is how core/assessment.DeflagrationCase labels itself and
+# how a host already branches.
+#
+# Units here are the ones an engineer writes on paper - kPa, MPa, mm,
+# mm/s - and case_form converts. The blast forms get away with SI because
+# a charge really is in kilograms; a web thickness in metres reads as a
+# typo.
+#
+# The override rows are blank by default and mean "use the table value".
+# They exist because the shipped propellant rows are class-typical
+# literature and a real assessment is expected to replace some of them -
+# that was the owner's "generic-parametric" decision. Per-field control
+# of which overrides are MEASURED lives in the case file; the form offers
+# the one checkbox, because in practice a user either has data behind
+# their numbers or does not.
+def _hd13_cards():
+    from ..core.fuels import PROPELLANT_NAMES
+    from ..core.scenario import GEOMETRIES, KINDS
+    from ..core.assessment import CONFINEMENTS
+    from ..core.sdof import SUPPORTS
+
+    return [
+        CardSpec('Material', col=0, rows=(
+            F('propellant', 'Propellant', 'choice', 'double_base',
+              values=tuple(PROPELLANT_NAMES)),
+            F('ov_n', 'Vieille n\n(blank = table)', 'float'),
+            F('ov_a', 'Vieille a\n(blank = table)', 'float'),
+            F('ov_r_atm', 'Burn rate at 1 atm\n[mm/s]', 'float'),
+            F('ov_web', 'Web [mm]', 'float'),
+            F('ov_p_ext', 'Extinction limit [MPa]\n(blank = not modelled)',
+              'float'),
+            F('ov_secondary', 'Secondary heat\nin air [MJ/kg]', 'float'),
+            F('measured', 'The overrides above are measured', 'bool',
+              False))),
+        CardSpec('Charge and chamber', col=0, rows=(
+            F('charge_kg', 'Charge [kg]', 'float', 5.0),
+            F('volume_m3', 'Chamber volume [m3]', 'float', 1.0),
+            F('vent_area', 'Vent area [m2]\n(0 = closed)', 'float', 0.02),
+            F('cd', 'Discharge coefficient', 'float', 0.8),
+            F('p_ign', 'Igniter pressure [MPa]\n(0 = automatic)', 'float',
+              0.0),
+            F('confinement', 'Assess', 'choice', 'both',
+              values=tuple(CONFINEMENTS)))),
+        CardSpec('Ignition', col=0, rows=(
+            F('scenario_kind', 'How it catches', 'choice', 'flame_spread',
+              values=tuple(KINDS)),
+            F('n_cohorts', 'Cohorts', 'int', 10),
+            F('spread_time', 'Time to light it all [s]', 'float', 30.0),
+            F('spread_geometry', 'Spread through a', 'choice', 'area',
+              values=tuple(GEOMETRIES)))),
+        CardSpec('Run', col=1, rows=(
+            F('t_end', 'End time [s]', 'float', 60.0),
+            F('n_out', 'Samples', 'int', 1000))),
+        CardSpec('Heat', col=1, rows=(
+            F('h_c', 'Wall heat transfer\n[W/m2K] (0 = skip)', 'float',
+              200.0),
+            F('wall_area', 'Wall area [m2]', 'float', 6.0),
+            F('t_wall', 'Wall temperature [K]', 'float', 300.0))),
+        CardSpec('Radiation standoffs [m]', col=1, field_rows=1, rows=(
+            F('standoffs', 'Radiation standoffs [m]', 'points',
+              cols=('R',), rows=3),)),
+        CardSpec('Structure', col=1, rows=(
+            F('span_m', 'Span [m]\n(0 = skip)', 'float', 3.0),
+            F('mass_per_area', 'Mass [kg/m2]', 'float', 480.0),
+            F('ru_kpa', 'Ultimate resistance [kPa]', 'float', 400.0),
+            F('ke_mpa_m', 'Elastic stiffness [MPa/m]', 'float', 30.0),
+            F('support', 'Supports', 'choice', 'simple',
+              values=tuple(SUPPORTS)),
+            F('rot_limit', 'Collapse rotation [deg]', 'float', 12.0))),
+        CardSpec('Outputs', col=1, rows=(
+            F('name', 'Run name', 'text', ''),
+            F('report_file', 'Report file', 'file', 'hd13_report.html',
+              file=dict(title='Write the HD 1.3 report',
+                        filter='HTML (*.html);;All files (*.*)')))),
+    ]
+
+
 # ── the cards of one dimension, in build order ───────────────────────────
 def cards(dim):
     dim = int(dim)
-    if dim not in (1, 2, 3):
-        raise ValueError(f'dim must be 1, 2 or 3, not {dim!r}')
+    if dim not in (0, 1, 2, 3):
+        raise ValueError(f'dim must be 0, 1, 2 or 3, not {dim!r}')
+    if dim == 0:
+        return _hd13_cards()
     out = []
 
     # Domain -------------------------------------------------------------

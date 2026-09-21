@@ -657,3 +657,153 @@ def figure_isosurfaces_3d(snapshots, meta, title_extra=None):
 
     fig.tight_layout()
     return fig
+
+
+# ── HD 1.3: deflagration, structural response and heat (HD1-10) ─────────────
+# Same OO convention as everything above: build and return a Figure, never
+# touch pyplot. These are the exported figures for the HD1.3 track, whose
+# models live in core/deflagration, core/unconfined, core/sdof and
+# core/thermal.
+
+def figure_deflagration(res, title=None):
+    """The confined chamber: pressure, temperature, burnt fraction and
+    vent flow against time, plus how much of the charge is even lit."""
+    fig = Figure(figsize=(9, 6))
+    t = np.asarray(res['t'])
+    ax = fig.add_subplot(2, 2, 1)
+    ax.plot(t, np.asarray(res['p']) / 1e6, color='#c1121f')
+    ax.set_ylabel('p [MPa]')
+    ax.set_title(title or 'Chamber pressure', fontsize=10)
+    ax = fig.add_subplot(2, 2, 2)
+    ax.plot(t, res['T'], color='#e07a5f')
+    ax.set_ylabel('T [K]')
+    ax.set_title('Gas temperature', fontsize=10)
+    ax = fig.add_subplot(2, 2, 3)
+    ax.plot(t, res['Z'], label='burnt')
+    if 'lit' in res:
+        ax.plot(t, res['lit'], '--', color='0.5', label='lit')
+    ax.set_ylabel('fraction of charge')
+    ax.set_xlabel('t [s]')
+    ax.set_ylim(0, 1.02)
+    ax.legend(fontsize=8)
+    ax.set_title('Entrainment and burn', fontsize=10)
+    ax = fig.add_subplot(2, 2, 4)
+    ax.plot(t, res['mdot_out'], color='#3d5a80')
+    ax.set_ylabel('vent flow [kg/s]')
+    ax.set_xlabel('t [s]')
+    ax.set_title('Venting', fontsize=10)
+    for a in fig.axes:
+        a.grid(alpha=0.3)
+    fig.suptitle(f"stop: {res.get('stop_reason', '-')}"
+                 f"   |   extrapolated {res.get('extrapolated_fraction', 0):.0%}"
+                 f" of the burn", fontsize=9, color='#666')
+    fig.tight_layout()
+    return fig
+
+
+def figure_unconfined(res, title=None):
+    """The open-air burn: gas rate, burnt fraction, and the expansion
+    Mach number that is the whole no-blast argument."""
+    fig = Figure(figsize=(9, 3.2))
+    t = np.asarray(res['t'])
+    ax = fig.add_subplot(1, 3, 1)
+    ax.plot(t, res['mdot'], color='#3d5a80')
+    ax.set_ylabel('gas rate [kg/s]'); ax.set_xlabel('t [s]')
+    ax.set_title(title or 'Gas generation', fontsize=10)
+    ax = fig.add_subplot(1, 3, 2)
+    ax.plot(t, res['z'], label='burnt')
+    ax.plot(t, res['lit'], '--', color='0.5', label='lit')
+    ax.set_xlabel('t [s]'); ax.set_ylim(0, 1.02); ax.legend(fontsize=8)
+    ax.set_title('Entrainment and burn', fontsize=10)
+    ax = fig.add_subplot(1, 3, 3)
+    ax.plot(t, res['mach'], color='#c1121f')
+    ax.axhline(0.05, ls=':', color='0.4')
+    ax.text(t[-1], 0.05, ' quasi-static limit', fontsize=7, va='bottom',
+            ha='right', color='0.4')
+    ax.set_ylabel('expansion Mach'); ax.set_xlabel('t [s]')
+    ax.set_title('Why there is no blast', fontsize=10)
+    for a in fig.axes:
+        a.grid(alpha=0.3)
+    fig.tight_layout()
+    return fig
+
+
+def figure_sdof_response(sres, comp, title=None):
+    """Displacement and resistance against time, with the yield
+    deflection marked - the picture of whether the element went plastic."""
+    fig = Figure(figsize=(9, 3.4))
+    t = np.asarray(sres.times) * 1e3
+    ax = fig.add_subplot(1, 2, 1)
+    ax.plot(t, np.asarray(sres.y) * 1e3, color='#3d5a80')
+    ax.axhline(comp.y_el * 1e3, ls='--', color='#c1121f', lw=1)
+    ax.text(t[-1], comp.y_el * 1e3, ' yield', fontsize=7, ha='right',
+            va='bottom', color='#c1121f')
+    ax.set_xlabel('t [ms]'); ax.set_ylabel('deflection [mm]')
+    ax.set_title(title or f'Response ({sres.regime})', fontsize=10)
+    ax = fig.add_subplot(1, 2, 2)
+    ax.plot(t, np.asarray(sres.load) / 1e3, color='0.5', label='load')
+    ax.plot(t, np.asarray(sres.R) / 1e3, color='#c1121f', label='resistance')
+    ax.set_xlabel('t [ms]'); ax.set_ylabel('[kPa]')
+    ax.legend(fontsize=8)
+    ax.set_title('Load against resistance', fontsize=10)
+    for a in fig.axes:
+        a.grid(alpha=0.3)
+    fig.suptitle(f'mu = {sres.ductility:.2f}   theta = '
+                 f'{sres.support_rotation_deg:.2f} deg   '
+                 f'td/Tn = {sres.td_over_Tn:.3g}', fontsize=9, color='#666')
+    fig.tight_layout()
+    return fig
+
+
+def figure_pi_diagram(curves, points=(), title=None):
+    """Pressure-impulse diagram: iso-damage curves and where the loads
+    actually landed.
+
+    `curves` is [(label, I_bar, P_bar)] and `points` is
+    [(label, I_bar, P_bar)]. Log-log, because the two asymptotes are the
+    entire content and they are decades apart - which is exactly the
+    HD1.1 / HD1.3 distinction.
+    """
+    fig = Figure(figsize=(5.6, 4.6))
+    ax = fig.add_subplot(1, 1, 1)
+    for label, ib, pb in curves:
+        ax.loglog(ib, pb, label=label)
+    for label, ib, pb in points:
+        ax.loglog([ib], [pb], 'o', ms=7, label=label)
+    ax.set_xlabel(r'$\bar{I}$  (impulsive)')
+    ax.set_ylabel(r'$\bar{P}$  (quasi-static)')
+    ax.set_title(title or 'Pressure-impulse diagram', fontsize=10)
+    ax.grid(alpha=0.3, which='both')
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def figure_thermal(t, q, T_surface=None, radiation=(), title=None):
+    """Wall flux and surface temperature for the confined case, and
+    received flux against standoff for the fireball."""
+    n = 2 if T_surface is not None else 1
+    n += 1 if radiation else 0
+    fig = Figure(figsize=(4.4 * n, 3.2))
+    k = 1
+    ax = fig.add_subplot(1, n, k); k += 1
+    ax.plot(np.asarray(t), np.asarray(q) / 1e3, color='#e07a5f')
+    ax.set_xlabel('t [s]'); ax.set_ylabel('wall flux [kW/m2]')
+    ax.set_title(title or 'Flux to the wall', fontsize=10)
+    if T_surface is not None:
+        ax = fig.add_subplot(1, n, k); k += 1
+        ax.plot(np.asarray(t), np.asarray(T_surface) - 273.15,
+                color='#c1121f')
+        ax.set_xlabel('t [s]'); ax.set_ylabel('surface [C]')
+        ax.set_title('Inner face temperature', fontsize=10)
+    if radiation:
+        ax = fig.add_subplot(1, n, k)
+        d = [r['distance'] for r in radiation]
+        ax.loglog(d, [r['flux'] / 1e3 for r in radiation], 'o-',
+                  color='#3d5a80')
+        ax.set_xlabel('standoff [m]'); ax.set_ylabel('incident [kW/m2]')
+        ax.set_title('Fireball radiation', fontsize=10)
+    for a in fig.axes:
+        a.grid(alpha=0.3)
+    fig.tight_layout()
+    return fig
