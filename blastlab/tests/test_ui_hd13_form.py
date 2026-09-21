@@ -138,10 +138,57 @@ def main():
     check('the round-tripped case still validates',
           asm.validate(back).ok, str(asm.validate(back).errors))
 
+    # ── HD1-3f · THE VENT STAGE CARD ────────────────────────────────────
+    #
+    # Every row of it is optional, and BLANK IS THE ANSWER rather than a
+    # failure: a 0-D assessment is complete without a venting stage, and
+    # `wants_vent` is what decides whether a CFD case gets built. So the
+    # round trip has to preserve both states - filled in, and empty.
+    print('\n  the vent stage card, filled in and empty')
+    vent = asm.DeflagrationCase(
+        charge_kg=20.0, volume_m3=12.168, t_end=40.0,
+        scenario_kind='flame_spread', n_cohorts=40, spread_time=20.0,
+        h_c=200.0, wall_area_m2=6.0,
+        room_origin=(0.0, 0.0, 0.0), room_size=(3.0, 3.0, 2.0),
+        room_wall_m=0.2, vent_face='x_lo', vent_rect=(1.0, 2.0, 0.6, 1.4),
+        open_mode='burst', p_burst=3.0 * 101325.0,
+        domain_size=(8.0, 6.0, 5.0), cfd_dx_m=0.1, cfd_window_s=0.02,
+        n_snapshots_vent=20, vent_gauges=[(6.0, 3.0, 1.0)])
+    form.set_case(vent)
+    bv = form.get_case()
+    check('the room, the opening and the domain survive as geometry '
+          'rather than as text',
+          bv.room_size == vent.room_size and bv.vent_rect == vent.vent_rect
+          and bv.domain_size == vent.domain_size,
+          f'{bv.room_size} / {bv.vent_rect} / {bv.domain_size}')
+    for f, tol in (('room_wall_m', 1e-9), ('cfd_dx_m', 1e-9),
+                   ('cfd_window_s', 1e-9), ('p_burst', 1.0)):
+        check(f'{f} survives', abs(getattr(bv, f) - getattr(vent, f)) <= tol,
+              f'{getattr(bv, f)!r} vs {getattr(vent, f)!r}')
+    check('the face and the opening mode survive',
+          bv.vent_face == 'x_lo' and bv.open_mode == 'burst')
+    check('and the gauges do',
+          [tuple(round(c, 6) for c in g) for g in bv.vent_gauges]
+          == vent.vent_gauges, str(bv.vent_gauges))
+    check('so the round-tripped case still wants a venting stage, and '
+          'still validates', bv.wants_vent and asm.validate(bv).ok,
+          str(asm.validate(bv).errors[:1]))
+
     print('\n  blank overrides mean "use the table", not zero')
     blank = asm.DeflagrationCase()
     form.set_case(blank)
     b2 = form.get_case()
+    # BLANK IS AN ANSWER. A case with no venting stage must come back
+    # with no venting stage - writing zeros into the boxes would turn it
+    # into one with a degenerate room the validator then has to reject.
+    check('a case with no venting stage round-trips as having none, not '
+          'as a room of zero size',
+          not b2.wants_vent and b2.room_size == () and b2.vent_rect == ()
+          and b2.domain_size == (),
+          f'{b2.room_size!r} / {b2.vent_rect!r} / {b2.domain_size!r}')
+    check('and it validates, because a 0-D assessment is complete '
+          'without one', asm.validate(b2).ok,
+          str(asm.validate(b2).errors[:1]))
     check('no overrides in, no overrides out', b2.overrides == {},
           str(b2.overrides))
     check('and the material is untouched',

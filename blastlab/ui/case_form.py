@@ -188,6 +188,27 @@ class CaseForm(FieldForm):
         ('ov_secondary', 'secondary_heat', 1e6),   # MJ/kg
     )
 
+    @staticmethod
+    def _csv(text, n):
+        """`n` comma-separated numbers, or () when the field is blank.
+
+        Blank is an ANSWER here, not a failure: every venting-stage row
+        is optional and `DeflagrationCase.wants_vent` is what decides
+        whether a CFD case gets built at all. A field with the WRONG
+        COUNT also comes back as () rather than half a geometry -
+        validation then refuses the case as half filled in, which is the
+        message that helps, instead of the form silently keeping two of
+        three coordinates.
+        """
+        parts = [p for p in str(text or '').replace(';', ',').split(',')
+                 if p.strip()]
+        if len(parts) != n:
+            return ()
+        try:
+            return tuple(float(p) for p in parts)
+        except ValueError:
+            return ()
+
     def _sync_scenario(self):
         """Uniform ignition lights everything at t = 0, so the spread
         rows have nothing to say. They are disabled rather than hidden:
@@ -236,6 +257,14 @@ class CaseForm(FieldForm):
             errs.append(str(exc))
             bad.append('n_out')
             n_out = 1000
+        # 0 means "the builder's default", so a blank box is not an error
+        try:
+            snap_vent = (_i(v['n_snap_vent'], 'Vent snapshots')
+                         if v['n_snap_vent'].get().strip() else 0)
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append('n_snap_vent')
+            snap_vent = 0
 
         span = num('span_m', 'Span', blank=0.0) or 0.0
         case = DeflagrationCase(
@@ -272,6 +301,23 @@ class CaseForm(FieldForm):
             support=v['support'].get(),
             rotation_limit_deg=num('rot_limit', 'Collapse rotation',
                                    blank=12.0) or 12.0,
+            # HD1-3f. Blank means NO venting stage, which is the common
+            # case: a 0-D assessment is complete without one.
+            room_origin=(self._csv(v['room_origin'].get(), 3)
+                         or (0.0, 0.0, 0.0)),
+            room_size=self._csv(v['room_size'].get(), 3),
+            room_wall_m=num('room_wall', 'Wall thickness', blank=0.0) or 0.0,
+            vent_face=v['vent_face'].get(),
+            vent_rect=self._csv(v['vent_rect'].get(), 4),
+            open_mode=v['open_mode'].get(),
+            p_burst=(num('p_burst', 'Burst pressure', 1e6, blank=0.0)
+                     or 0.0),
+            domain_size=self._csv(v['domain_size'].get(), 3),
+            cfd_dx_m=num('cfd_dx', 'Base cell', blank=0.0) or 0.0,
+            cfd_window_s=num('cfd_window', 'CFD window', blank=0.0) or 0.0,
+            n_snapshots_vent=snap_vent,
+            vent_gauges=[tuple(float(c) for c in r)
+                         for r in self.points['vent_gauges'].get()],
         )
         # a uniform scenario has no spread; saying so here keeps the form
         # from building a case its own validator would reject
@@ -314,6 +360,30 @@ class CaseForm(FieldForm):
                            ('support', case.support)):
             v[key].set(value)
         self.points['standoffs'].set([(r,) for r in case.standoffs_m])
+
+        # HD1-3f. An empty tuple round-trips as an EMPTY BOX, not as
+        # '0,0,0': blank is what "no venting stage" looks like, and
+        # writing zeros back would turn a case that had none into one
+        # with a degenerate room the validator then has to reject.
+        def _csv_out(t):
+            return ','.join(f'{x:g}' for x in t) if t else ''
+
+        for key, value in (('room_size', case.room_size),
+                           ('vent_rect', case.vent_rect),
+                           ('domain_size', case.domain_size)):
+            v[key].set(_csv_out(value))
+        v['room_origin'].set(_csv_out(case.room_origin) or '0,0,0')
+        for key, value in (('vent_face', case.vent_face),
+                           ('open_mode', case.open_mode)):
+            v[key].set(value)
+        for key, value in (('room_wall', case.room_wall_m),
+                           ('p_burst', case.p_burst / 1e6),
+                           ('cfd_dx', case.cfd_dx_m),
+                           ('cfd_window', case.cfd_window_s)):
+            v[key].set(f'{value:g}')
+        v['n_snap_vent'].set(f'{case.n_snapshots_vent:g}'
+                             if case.n_snapshots_vent else '')
+        self.points['vent_gauges'].set([tuple(g) for g in case.vent_gauges])
 
     def get_case(self):
         """Build the Case. EVERY bad numeric field is reported, not just

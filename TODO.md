@@ -198,6 +198,33 @@ yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
 > perturb `h_c` at all, so the band reports `spans_heat_loss=False` rather than
 > inventing one.
 
+### `HD1-12` · The 0-D model is too slow at the cohort count it needs · **open**
+
+Found 2026-09-21 while wiring the GUI Vent card. `deflagration.simulate`
+integrates the cohorts in a **Python loop inside every Cash-Karp stage**, so the
+cost grows faster than the cohort count — and the cohort count is a
+discretisation that has to be refined until the peak stops moving. On the dim-0
+form's own defaults (5 kg, 1 m³, 0.02 m², 30 s spread):
+
+| `n` | peak / ambient | cost |
+|---|---|---|
+| 10 | 2.84 | 2.4 s |
+| 20 | 1.57 | 7.5 s |
+| 40 | 1.19 | 27.0 s |
+| 80 | 1.064 | 84.4 s |
+| 160 | 1.040 | 151.7 s |
+
+**The converged answer needs ~160 and costs two and a half minutes — five with
+the refinement check, which runs at 2n.** That is not a Run button. The default
+is therefore 40, the knee, and the run reports that it is ~20 % high.
+
+**The fix is to vectorise the cohort loop**, not to lower the default further:
+`_derivs` and `_ck_step` work element-by-element over a tuple of `nZ + 7` states,
+which is exactly what NumPy is for. The maths does not change; only the
+summation order does, and every tolerance in `test_deflagration.py` is 1e-9 or
+looser. **Not started** — it is a rewrite of the most delicate module in the
+track and wants its own branch and its own verification pass.
+
 **One finding that is a scope decision, not a deviation:**
 
 - **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`
