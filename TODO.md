@@ -106,6 +106,7 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 | `HD1-3a` · `core/room.py`, the geometry | ✅ done — measured: an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
 | `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
 | `HD1-3b` · `init_mode='chamber'` in the writer | ✅ done — inert `type basic` phase with the propellant's `gamma`/`molWeight`; per-phase mass exact to 9 digits; **no `lambda.expl`**, so bug B0 cannot occur |
+| `HD1-3d` · the γ-interface stopping point | ✅ **passed 2026-09-21 on WSL** — 0.024 % across a γ step and 0.000 % on uniform mixed cells, against a pre-registered 0.5 % |
 | `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** — see the pre-registered condition below |
 | `HD1-3e` · `core/qd.py` — ships with an empty table | ✅ done — `CRITERIA = {}`, and a row without a `source` is an **error**, not a blank column |
 | `HD1-3f` · validation, GUI card, report section | open |
