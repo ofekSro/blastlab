@@ -253,12 +253,22 @@ def _hd13_cards():
             F('cd', 'Discharge coefficient', 'float', 0.8),
             F('p_ign', 'Igniter pressure [MPa]\n(0 = automatic)', 'float',
               0.0),
+            # A room, not a test vessel: the air already in it carries a
+            # large share of the pressure at magazine loading density.
+            # `simulate` defaults this to 0 to protect its own analytic
+            # limit; a case is never evacuated unless someone says so.
+            F('p0_chamber', 'Air in the room [MPa]\n(0 = evacuated)',
+              'float', 0.101325),
             F('confinement', 'Assess', 'choice', 'both',
               values=tuple(CONFINEMENTS)))),
         CardSpec('Ignition', col=0, rows=(
             F('scenario_kind', 'How it catches', 'choice', 'flame_spread',
               values=tuple(KINDS)),
-            F('n_cohorts', 'Cohorts', 'int', 10),
+            # 80, not 10: the cohort count is a discretisation of the
+            # flame spread, and a slow fire cut into ten steps reports
+            # the size of one step as its peak. See
+            # deflagration._COHORT_TOL.
+            F('n_cohorts', 'Cohorts', 'int', 80),
             F('spread_time', 'Time to light it all [s]', 'float', 30.0),
             F('spread_geometry', 'Spread through a', 'choice', 'area',
               values=tuple(GEOMETRIES)))),

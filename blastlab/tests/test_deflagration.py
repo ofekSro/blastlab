@@ -253,6 +253,160 @@ def main():
     check('a row with every field sourced reports calibrated',
           replace(prop, uncalibrated=()).calibrated)
 
+    # ── 7b. the chamber's own air (HD1-3-pre) ───────────────────────────
+    # The model counted only product gas. That is right where it was
+    # VERIFIED - a closed vessel at 50-200 kg/m3, where air is under 3 %
+    # of the mass - and wrong where it is APPLIED, a magazine at 0.1-5,
+    # where the air is comparable to the products and often larger. The
+    # analytic check passed to 1e-6 throughout and could never have
+    # caught it: the regime it pins is the regime where the omission
+    # does not matter.
+    print('\n  the chamber air')
+    check('an evacuated chamber holds no air, whatever its size',
+          d.air_mass(1.0, 0.0) == 0.0 and d.air_mass(1e6, 0.0) == 0.0)
+    check('air mass follows the ideal gas law',
+          abs(d.air_mass(2.0, d.P_AMB)
+              - d.P_AMB * 2.0 / (d.AIR_R * d.AIR_T0)) < 1e-12,
+          f'{d.air_mass(2.0, d.P_AMB):.4f} kg in 2 m3')
+    check('p0_chamber defaults to 0, so the analytic limit is untouched',
+          abs(d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0)['p_max']
+              - d.closed_vessel_pmax(prop, 5.0, 1.0))
+          < 1e-3 * d.closed_vessel_pmax(prop, 5.0, 1.0))
+
+    print('\n  mixture properties')
+    for m_p, m_a, label in ((1.0, 0.0, 'no air'), (0.0, 1.0, 'no products')):
+        R, cv, cp, g = d.mixture(prop, m_p, m_a)
+        want = (prop.R, prop.cv, prop.cp, prop.gamma) if m_a == 0 else \
+               (d.AIR_R, d.AIR_CV, d.AIR_CV + d.AIR_R, d.AIR_GAMMA)
+        check(f'{label}: the mixture is that one species',
+              all(abs(a - b) < 1e-9 * max(abs(b), 1.0)
+                  for a, b in zip((R, cv, cp, g), want)))
+    Rm, _cvm, _cpm, gm = d.mixture(prop, 1.0, 1.0)
+    # NOT assuming which way round they are: the products have the LOWER
+    # molecular weight (~23 against 29), so their R is the HIGHER one
+    # while their gamma is the lower. Asserting an order here was wrong
+    # the first time.
+    check('a half-and-half mixture sits between the two',
+          min(prop.R, d.AIR_R) < Rm < max(prop.R, d.AIR_R)
+          and min(prop.gamma, d.AIR_GAMMA) < gm
+          < max(prop.gamma, d.AIR_GAMMA),
+          f'R {Rm:.1f} between {min(prop.R, d.AIR_R):.1f} and '
+          f'{max(prop.R, d.AIR_R):.1f}; gamma {gm:.4f}')
+    check('cp - cv = R holds for the mixture too',
+          abs((d.mixture(prop, 1.0, 1.0)[2] - d.mixture(prop, 1.0, 1.0)[1])
+              - Rm) < 1e-9 * Rm)
+
+    print('\n  the vent takes the mixture, not the products')
+    args = (5.0e6, 2500.0, prop, 0.01, 0.8, d.P_AMB)
+    check('with no air it is exactly the old choked flow',
+          abs(d._vent_mdot(*args, m_p=1.0, m_a=0.0)
+              - d._vent_mdot(*args)) < 1e-12)
+    pure_air = d._vent_mdot(*args, m_p=0.0, m_a=1.0)
+    pure_prod = d._vent_mdot(*args, m_p=1.0, m_a=0.0)
+    check('air and products really do give different flows, by enough to '
+          'matter', abs(pure_air - pure_prod) / pure_prod > 0.10,
+          f'{100 * (pure_air / pure_prod - 1):+.1f} % if air were assumed')
+    half = d._vent_mdot(*args, m_p=1.0, m_a=1.0)
+    check('a mixture lies between them', pure_prod < half < pure_air
+          or pure_air < half < pure_prod, f'{half:.5f} kg/s')
+
+    print('\n  where the air matters and where it does not')
+    rows = []
+    for C, V in ((5.0, 0.1), (5.0, 1.0), (5.0, 5.0), (5.0, 25.0)):
+        dry = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0)
+        wet = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0,
+                         p0_chamber=d.P_AMB)
+        rows.append((C / V, wet['p_max'] / dry['p_max'],
+                     wet['air_to_product_ratio']))
+    check('at closed-vessel loading density the air is a rounding error',
+          rows[0][1] < 1.02, f'C/V = {rows[0][0]:g}: x{rows[0][1]:.3f}')
+    check('at magazine loading density it is not - THE NUMBER THAT MAKES '
+          'THIS NECESSARY',
+          rows[-1][1] > 1.5,
+          f'C/V = {rows[-1][0]:g}: x{rows[-1][1]:.2f}, air/products '
+          f'{rows[-1][2]:.1f}')
+    check('and the effect grows monotonically as the room gets bigger',
+          all(a[1] < b[1] for a, b in zip(rows, rows[1:])),
+          ' < '.join(f'{r[1]:.3f}' for r in rows))
+    check('every run reports how much air it had, so a default-evacuated '
+          'answer cannot be mistaken for a magazine one',
+          'm_air0' in dry and dry['m_air0'] == 0.0
+          and wet['m_air0'] > 0.0)
+
+    print('\n  conservation, now over two species')
+    r = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=5.0,
+                   p0_chamber=d.P_AMB)
+    check('air can only leave, never appear',
+          all(b <= a + 1e-12 for a, b in zip(r['m_air'], r['m_air'][1:]))
+          and r['m_air'][0] == r['m_air0'])
+    check('and it never goes negative', min(r['m_air']) >= 0.0)
+    closed = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=5.0,
+                        p0_chamber=d.P_AMB)
+    check('a closed chamber keeps every gram of its air',
+          abs(closed['m_air'][-1] - closed['m_air0'])
+          < 1e-12 * closed['m_air0'])
+    check('and every gram of propellant still becomes gas',
+          abs(closed['m'][-1] - 5.0) < 1e-9 * 5.0)
+
+    # ── 7c. LOADING DENSITY, ACROSS BOTH REGIMES THE TOOL LIVES IN ──────
+    # The suite used to cover C/V of 0.5 to 5 only, and that gap hid a
+    # real bug: with the old fixed-step RK4 the ignition transient blew
+    # up above roughly C/V = 50 and reported 0.101 MPa against an
+    # analytic 275, silently, with stop_reason 't_end'. C/V of tens to
+    # hundreds is CLOSED-VESSEL density - the regime a calibration lives
+    # in - so the one place the model had to be right was the one place
+    # nothing checked it.
+    #
+    # 0.2 to 200 now, three decades, both regimes.
+    print('\n  loading density, 0.2 to 200 kg/m3')
+    for C, V in ((5.0, 25.0), (5.0, 5.0), (5.0, 1.0), (10.0, 0.5),
+                 (10.0, 0.2), (10.0, 0.1), (10.0, 0.05)):
+        r = d.simulate(prop, C, V, vent_area=0.0, t_end=5.0)
+        ana = d.closed_vessel_pmax(prop, C, V)
+        rel = abs(r['p_max'] - ana) / ana
+        check(f'C/V = {C / V:g}: peak within 1e-6 of analytic',
+              rel < 1e-6, f'{r["p_max"] / 1e6:.3f} vs {ana / 1e6:.3f} MPa '
+                          f'({rel:.2e})')
+        check(f'C/V = {C / V:g}: conserved',
+              r['conservation_residual'] < 1e-9,
+              f"{r['conservation_residual']:.2e}")
+
+    # ── 7d. the run checks itself ───────────────────────────────────────
+    # The bug above did not crash, did not warn and did not stop early.
+    # It reported a peak 2700x too low and called it a normal finish, and
+    # nothing downstream could have known. That - not the arithmetic - is
+    # what made it dangerous. Conservation is true of the physics
+    # whatever the answer is, so every run now measures its own and says
+    # so, which is only possible because what left through the vent is
+    # carried as an accumulator rather than discarded.
+    print('\n  conservation, checked at run time')
+    for C, V, area in ((5.0, 1.0, 0.0), (5.0, 1.0, 0.02), (10.0, 0.05, 0.0),
+                       (5.0, 25.0, 0.1)):
+        r = d.simulate(prop, C, V, vent_area=area, t_end=5.0,
+                       p0_chamber=d.P_AMB)
+        check(f'C={C:g} V={V:g} vent={area:g}: residual under 1e-9',
+              r['conservation_residual'] < 1e-9,
+              f"{r['conservation_residual']:.2e}")
+        check(f'C={C:g} V={V:g} vent={area:g}: and so not flagged',
+              r['stop_reason'] != 'conservation_violation')
+
+    # ...and that the check is not decorative: break conservation on
+    # purpose and it must be caught. A tolerance nothing can trip is not
+    # a check.
+    import blastlab.core.deflagration as _d
+    real_tol = _d._CONSERVATION_TOL
+    try:
+        _d._CONSERVATION_TOL = 0.0      # nothing can satisfy this
+        broken = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=2.0)
+        check('an impossible tolerance really does trip the check',
+              broken['stop_reason'] == 'conservation_violation',
+              broken['stop_reason'])
+    finally:
+        _d._CONSERVATION_TOL = real_tol
+    check('and the real tolerance is restored',
+          d.simulate(prop, 5.0, 1.0, vent_area=0.02,
+                     t_end=2.0)['stop_reason'] != 'conservation_violation')
+
     # ── 8. ignition scenarios and cohorts (HD1-6) ───────────────────────
     print('\n  the scenario itself')
     check('cohort masses always sum to 1',
@@ -332,6 +486,130 @@ def main():
           uni['scenario_kind'] == 'uniform'
           and uni['calibration_only_scenario'] is True
           and uni['n_cohorts'] == 1)
+
+    # ── 8b. THE COHORT COUNT IS A MESH, AND THE RUN SAYS SO ─────────────
+    #
+    # `n_cohorts` reads like a modelling choice and is a discretisation:
+    # a continuous flame spread replaced by n instantaneous ignitions of
+    # C/n. Where the chamber settles between them - a slow fire, which is
+    # the magazine case - one step IS the pressure signal and the peak
+    # reported is the size of the step.
+    #
+    # This is the third bug of this shape in this module, after the
+    # integrator and the chamber air, and all three shared one property:
+    # correct in the regime the code was verified in, wrong in the regime
+    # it is applied to. So the check is on by default and the only thing
+    # asserted here is that it CANNOT be silent.
+    print('\n  the cohort count, refined')
+    slow = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                               spread_time=60.0)
+    coarse = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=120.0,
+                        scenario=slow, p0_chamber=d.P_AMB)
+    check('a 60 s spread cut into 20 steps does NOT converge, and the run '
+          'reports that rather than the peak alone',
+          coarse['cohort_converged'] is False
+          and coarse['cohort_refinement_error'] > 0.2,
+          f"{coarse['p_max']/1e6:.4f} MPa against "
+          f"{coarse['p_max_refined']/1e6:.4f} at 2n, "
+          f"{coarse['cohort_refinement_error']:.0%} out")
+    check('one doubling already takes a third off it, so the coarse answer '
+          'was the staircase and not the fire',
+          coarse['p_max_refined'] < 0.8 * coarse['p_max'],
+          f"{coarse['p_max_refined']/1e6:.4f} against "
+          f"{coarse['p_max']/1e6:.4f} MPa")
+    check('a fast fire IS converged at the same cohort count - the artefact '
+          'grows with spread time, which is why it hid in the fast cases',
+          d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=10.0,
+                     p0_chamber=d.P_AMB,
+                     scenario=sc.IgnitionScenario(
+                         kind='flame_spread', n_cohorts=20,
+                         spread_time=0.5))['cohort_converged'])
+    check('the reported p_max is never silently replaced by the refined '
+          'one: the caller gets the peak their own scenario produced',
+          coarse['p_max'] == d.simulate(
+              prop, 5.0, 1.0, vent_area=0.02, t_end=120.0, scenario=slow,
+              p0_chamber=d.P_AMB, refine_cohorts=False)['p_max'])
+    check('uniform ignition is n-independent by construction, so it is '
+          'converged without a second run being paid for',
+          uni['cohort_converged'] and uni['cohort_refinement_error'] == 0.0)
+
+    # ── 8c. HEAT LOSS TO THE WALLS ──────────────────────────────────────
+    #
+    # The gap this closes: `core/calibration.py` has inverted FOR a
+    # convective wall loss since it was written, and the forward model
+    # had none. So the calibration corrected a record for heat that
+    # `simulate` then never removed, and the wall flux `core/thermal.py`
+    # reported was energy the gas had not given up. Both halves now use
+    # the same law.
+    #
+    # It is OFF by default and that is the conservative choice, not the
+    # convenient one: taking heat out lowers T and therefore p, so a run
+    # with heat loss reports a SMALLER load than the adiabatic bound.
+    print('\n  heat loss')
+    cold = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=2.0)
+    hot = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=2.0,
+                     h_c=2000.0, wall_area=6.0)
+    check('h_c = 0 is adiabatic and says so, and the default is h_c = 0',
+          cold['adiabatic'] and cold['Q_wall'] == 0.0
+          and cold['wall_loss_fraction'] == 0.0)
+    check('wall_area = 0 is adiabatic too - one number alone cannot switch '
+          'it on by accident',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=2000.0)['adiabatic'])
+    check('the adiabatic run still lands exactly on the analytic limit, so '
+          'nothing was disturbed by adding the term',
+          abs(cold['p_max'] - d.closed_vessel_pmax(prop, 5.0, 1.0))
+          < 1e-9 * cold['p_max'],
+          f"{cold['p_max']/1e6:.6f} vs "
+          f"{d.closed_vessel_pmax(prop, 5.0, 1.0)/1e6:.6f} MPa")
+    check('with a wall, energy leaves and the run reports how much',
+          hot['Q_wall'] > 0.0 and not hot['adiabatic']
+          and 0.0 < hot['wall_loss_fraction'] < 1.0,
+          f"{hot['Q_wall']/1e6:.2f} MJ, "
+          f"{hot['wall_loss_fraction']:.1%} of what was released")
+    check('and the peak falls, which is the direction that matters: heat '
+          'loss is NOT conservative for a pressure check',
+          hot['p_max'] < cold['p_max'],
+          f"{hot['p_max']/1e6:.3f} against {cold['p_max']/1e6:.3f} MPa")
+    check('a hotter wall takes less, monotonically',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=2000.0, wall_area=6.0,
+                     T_wall=1500.0)['Q_wall'] < hot['Q_wall'])
+    check('twice the coefficient takes more',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=4000.0,
+                     wall_area=6.0)['Q_wall'] > hot['Q_wall'])
+    # THE BUG THIS TERM SHIPPED WITH FOR ONE AFTERNOON. Written as one
+    # more derivative it was stiff against the ignition seed - a whisker
+    # of gas against a 32 MW sink, time constant ~1e-8 s - and every run
+    # with h_c > 0 came back with a zero peak at the step cap. The
+    # exponential form in `_wall_relax` is bounded by construction, so
+    # the gas is driven towards the wall and never past it however hard
+    # the wall pulls.
+    fierce = d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=1.0e6,
+                        wall_area=100.0)
+    check('an absurd wall does NOT collapse the run - the relaxation is '
+          'bounded, not a stiff derivative that can sail past the wall',
+          fierce['stop_reason'] != 'step cap' and fierce['p_max'] > 0.0
+          and fierce['T'][-1] >= 300.0 - 1e-6
+          and fierce['conservation_residual'] < 1e-9,
+          f"{fierce['p_max']/1e6:.3f} MPa, T_end {fierce['T'][-1]:.1f} K, "
+          f"{fierce['steps']} steps, {fierce['stop_reason']}")
+    check('and over a long enough window every coefficient converges on '
+          'the same total - all the energy above the wall, eventually',
+          abs(d.simulate(prop, 5.0, 1.0, t_end=20.0, h_c=2000.0,
+                         wall_area=6.0)['Q_wall']
+              - d.simulate(prop, 5.0, 1.0, t_end=20.0, h_c=8000.0,
+                           wall_area=6.0)['Q_wall']) < 1e-3 * 20.6e6)
+    check('THE WALL TERM IS IN THE CONSERVATION IDENTITY, not excused '
+          'from it - energy that left through the wall is accounted for '
+          'exactly like energy that left through the vent',
+          hot['conservation_residual'] < 1e-9
+          and hot['stop_reason'] != 'conservation_violation',
+          f"{hot['conservation_residual']:.2e}")
+    vented_hot = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=20.0,
+                            h_c=2000.0, wall_area=6.0, p0_chamber=d.P_AMB)
+    check('and it holds with a vent and chamber air as well, where three '
+          'sinks are running at once',
+          vented_hot['conservation_residual'] < 1e-9,
+          f"{vented_hot['conservation_residual']:.2e}")
 
     # ── 9. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')

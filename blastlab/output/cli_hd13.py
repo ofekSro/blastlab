@@ -33,7 +33,12 @@ def write_starter_case(path):
         name='magazine, 5 kg double-base, vented',
         propellant='double_base', charge_kg=5.0, volume_m3=1.0,
         vent_area_m2=0.02, confinement='both',
-        scenario_kind='flame_spread', n_cohorts=10, spread_time=30.0,
+        # 80 cohorts, not the 10 this started with, for the same reason
+        # the ignition is spread rather than uniform: a starter file
+        # teaches whatever it does. Ten steps over 30 s is a coarse
+        # ignition staircase, and the peak it reports is largely the size
+        # of one step - see deflagration._COHORT_TOL.
+        scenario_kind='flame_spread', n_cohorts=80, spread_time=30.0,
         spread_geometry='area', t_end=60.0,
         h_c=200.0, wall_area_m2=6.0, standoffs_m=[10.0, 25.0, 50.0],
         # a 200 mm reinforced-concrete magazine wall rather than a light

@@ -62,6 +62,13 @@ class DeflagrationCase:
     vent_area_m2: float = 0.0
     discharge_coeff: float = 0.8
     p_ign: float = 0.0                 # 0 = let the model choose
+    #: Air already in the room when the charge lights [Pa]. `simulate`
+    #: defaults this to 0 so its analytic closed-vessel limit is
+    #: untouched; a CASE is a room, never an evacuated vessel, so the
+    #: default here is atmospheric. It matters: the case path ran
+    #: evacuated until 2026-09-21, and at magazine loading density the
+    #: resident air is comparable to the product gas.
+    p0_chamber: float = P_AIR
 
     confinement: str = 'confined'
     scenario_kind: str = 'uniform'
@@ -231,6 +238,37 @@ def validate(case):
              'impossible: a grain cannot burn before the flame reaches '
              'it. Treat the result as a limit.')
 
+    if case.p0_chamber < 0:
+        err('chamber air pressure cannot be negative')
+    elif case.p0_chamber == 0 and case.confinement != 'unconfined':
+        warn('The chamber is being run EVACUATED. That is the closed-vessel '
+             'condition, not a room: at magazine loading density the air '
+             'already in the room is comparable to the product gas and '
+             'carries much of the pressure. Set p0_chamber to atmospheric '
+             'unless this really is a sealed test vessel.')
+
+    # Said before the run, because afterwards the measured version in
+    # `run` is the one that counts. This one is the cheap a-priori
+    # version: the artefact grows with spread time, so a slow fire cut
+    # into few steps is the shape at risk. See deflagration._COHORT_TOL.
+    if (case.scenario_kind != 'uniform' and case.spread_time > 0
+            and case.n_cohorts < 40):
+        warn(f'{case.n_cohorts} cohorts over {case.spread_time:g} s is a '
+             f'coarse ignition staircase - each step lights '
+             f'{case.charge_kg / max(case.n_cohorts, 1):.3g} kg at once. '
+             f'The run measures what refining costs and says so, but a '
+             f'slow fire usually needs 40 or more.')
+
+    # Pyrotechnics, marked rather than half-modelled. Out of scope until
+    # decided otherwise (owner, 2026-09-21).
+    if getattr(prop, 'gas_yield', 1.0) < 1.0 or getattr(
+            prop, 'Cp_condensed', 0.0) > 0.0:
+        warn('This row carries a condensed-residue fraction, which is the '
+             'pyrotechnic case. It is NOT modelled: every kilogram burnt is '
+             'treated as gas, so the pressure is over-predicted and the '
+             'heat retained by solid residue is ignored. Out of scope by '
+             'decision, not by oversight.')
+
     if prop.uncalibrated:
         warn('Not calibrated for this material: '
              + ', '.join(prop.uncalibrated)
@@ -268,15 +306,43 @@ def run(case):
             prop, case.charge_kg, case.volume_m3,
             vent_area=case.vent_area_m2, cd=case.discharge_coeff,
             t_end=case.t_end, n_out=case.n_out, scenario=sc,
-            p_ign=(case.p_ign or None))
+            p_ign=(case.p_ign or None), p0_chamber=case.p0_chamber,
+            # The same h_c the thermal path uses, now also taken OUT of
+            # the gas. Until 2026-09-21 the wall flux was computed from a
+            # gas that never gave the energy up, so T and p at the end of
+            # the burn were the adiabatic ones while the wall was being
+            # heated for free. Off unless both numbers are given.
+            h_c=case.h_c, wall_area=case.wall_area_m2, T_wall=case.T_wall)
     if case.confinement in ('unconfined', 'both'):
         out['unconfined'] = unconfined.burn(prop, case.charge_kg,
                                             scenario=sc)
 
     conf = out['confined']
+    # The cohort count is a mesh, and a peak that moves when it is halved
+    # is not an answer. This has to be raised AFTER the run because it is
+    # measured, not predicted - `validate` can only say the case looks
+    # like one at risk. See deflagration._COHORT_TOL.
+    if conf is not None and not conf['cohort_converged']:
+        rep.warnings.append(
+            f'The peak moved {conf["cohort_refinement_error"]:.0%} when the '
+            f'cohort count was doubled from {conf["n_cohorts"]} to '
+            f'{2 * conf["n_cohorts"]} ({conf["p_max"] / 1e6:.3f} MPa against '
+            f'{conf["p_max_refined"] / 1e6:.3f}). The ignition staircase, '
+            f'not the fire, is setting this peak. Raise n_cohorts until it '
+            f'stops moving before quoting the number.')
+
     if conf is not None and case.h_c > 0 and case.wall_area_m2 > 0:
         out['thermal'] = thermal.wall_exposure(
             conf['t'], conf['T'], h_c=case.h_c, T_wall=case.T_wall)
+        # The gas paid for this, which it did not before. Said out loud
+        # because it cuts the peak pressure, i.e. it moves the structural
+        # answer in the UN-conservative direction.
+        rep.notes.append(
+            f'Heat loss to the walls is taken OUT of the gas: '
+            f'{conf["Q_wall"]/1e6:.2f} MJ, '
+            f'{conf["wall_loss_fraction"]:.1%} of the energy released. '
+            f'That lowers the peak pressure, so this run is NOT the '
+            f'adiabatic upper bound - set h_c to 0 for that.')
 
     if case.standoffs_m:
         burnt = (out['unconfined']['z'][-1] if out['unconfined']

@@ -16,7 +16,8 @@ import math
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.case import Case1D, Case2D, Case3D
-from ..core.constants import ANIM_SCALE_LABELS, anim_scale_from_label
+from ..core.constants import (ANIM_SCALE_LABELS, P_AIR,
+                              anim_scale_from_label)
 from ..core import mode as mode_mod
 from . import setup_spec
 from .fieldform import FieldForm
@@ -247,6 +248,11 @@ class CaseForm(FieldForm):
             discharge_coeff=num('cd', 'Discharge coefficient',
                                 blank=0.8) or 0.8,
             p_ign=(num('p_ign', 'Igniter pressure', 1e6, blank=0.0) or 0.0),
+            # blank means "the room has air in it", not "evacuate it" -
+            # a blank field must never silently pick the rarer physics.
+            # An explicit 0 still means an evacuated vessel.
+            p0_chamber=num('p0_chamber', 'Air in the room', 1e6,
+                           blank=P_AIR),
             confinement=v['confinement'].get(),
             scenario_kind=v['scenario_kind'].get(),
             n_cohorts=cohorts,
@@ -288,6 +294,7 @@ class CaseForm(FieldForm):
                 ('vent_area', case.vent_area_m2),
                 ('cd', case.discharge_coeff),
                 ('p_ign', case.p_ign / 1e6),
+                ('p0_chamber', case.p0_chamber / 1e6),
                 ('n_cohorts', case.n_cohorts),
                 ('spread_time', case.spread_time),
                 ('t_end', case.t_end),
