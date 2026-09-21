@@ -106,37 +106,76 @@ def main():
           {'x_lo:below', 'x_lo:above', 'x_lo:side_lo', 'x_lo:side_hi'}
           <= set(parts), str(sorted(parts)))
 
-    # ── 3. WHAT THE MESH DOES TO IT ─────────────────────────────────────
-    print('\n  and then the mesh moves every edge outward')
-    # deliberately off-grid, which is what a real number typed by a
-    # person looks like
-    m = room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.22, 0.1,
-                     vent=('x_lo', 1.53, 2.47, 0.44, 1.38))
+    # ── 3. WHAT THE MESH WOULD DO TO IT, AND WHY THAT IS NOT ENOUGH ─────
+    #
+    # `align_first=False` is the old behaviour: build the room from the
+    # numbers as typed and let `snap_obstacles` move every edge outward.
+    # This half of the test exists to show what alignment prevents.
+    print('\n  unaligned: the mesh moves every edge outward')
+    off = ((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.22)   # off-grid on purpose
+    off_vent = ('x_lo', 1.53, 2.47, 0.44, 1.38)
+    m = room.measure(*off, 0.1, vent=off_vent, align_first=False)
     check('the cavity is measured AFTER snapping, not from the numbers '
           'that were typed',
           m['volume'] < m['volume_entered'],
           f"{m['volume']:.4f} vs {m['volume_entered']:.4f} m3 "
           f"({m['volume_shift']:+.2%})")
     check('and it loses several per cent - past the 2 % the hand-off '
-          'energy check runs at, which is the whole reason the hand-off '
-          'conserves mass and energy rather than pressure',
-          abs(m['volume_shift']) > 0.02,
-          f"{m['volume_shift']:+.2%}")
-    check('so the run says so rather than absorbing it',
-          any('hand-off' in t for t in m['warnings']), str(m['warnings']))
-    check('the opening shrinks too, and by the same mechanism',
-          m['vent_area'] < m['vent_area_entered'],
+          'energy check runs at',
+          abs(m['volume_shift']) > 0.02, f"{m['volume_shift']:+.2%}")
+    check('the opening loses far more, and THAT is the one that matters: '
+          'the 2-D verification is pre-registered at 15 %, so an error '
+          'this size would be argued into Cd and never seen again',
+          abs(m['vent_area_shift']) > 0.15,
           f"{m['vent_area']:.4f} vs {m['vent_area_entered']:.4f} m2 "
           f"({m['vent_area_shift']:+.2%})")
-    check('the snapped opening is a whole number of base cells across, '
-          'because every edge of it is now on a cell face',
-          all(abs(m['vent_area'] / 0.1 ** 2 - round(m['vent_area'] / 0.01))
-              < 1e-6 for _ in (0,)),
-          f"{m['vent_cells']} cells")
-    check('and the cavity corners are on cell faces as well',
+
+    # ── 3b. SO THE ROOM IS PUT ON THE MESH BEFORE IT IS BUILT ───────────
+    #
+    # Measuring a problem is not the same as not having it. Every edge
+    # goes onto a base-cell face first, the rounding is reported once
+    # against what was typed, and nothing moves afterwards.
+    print('\n  aligned first: the area solved IS the area reported')
+    a = room.measure(*off, 0.1, vent=off_vent)
+    check('alignment is the default, because reporting a 27.6 % error in '
+          'the vent area is not the same as not having one',
+          a['aligned'] and a['align'] is not None)
+    check('after it, snapping has nothing left to move',
+          not a['moved'] and abs(a['volume_shift']) < 1e-12
+          and abs(a['vent_area_shift']) < 1e-12,
+          f"volume {a['volume_shift']:+.2e}, "
+          f"vent {a['vent_area_shift']:+.2e}")
+    check('so the CFD solves the hole that was reported, not another one',
+          abs(a['vent_area'] - a['vent_area_entered']) < 1e-12,
+          f"{a['vent_area']:.4f} m2 both ways")
+    check('and what the rounding cost is reported ONCE, against what was '
+          'typed, rather than appearing later as a shift',
+          abs(a['align']['vent_area_shift']) > 0.0
+          and any('area that gets solved IS the area above' in t
+                  for t in a['warnings']),
+          f"opening rounded {a['align']['vent_area_shift']:+.1%}, "
+          f"walls by at most "
+          f"{max(abs(v) for v in a['align']['size_shift']) * 1e3:.0f} mm")
+    check('the aligned room is the one the 0-D model should be run at, '
+          'and it says so',
+          any('Run the 0-D model at this volume' in t
+              for t in a['warnings']))
+    check('every edge is on a cell face, which is what makes snapping a '
+          'no-op',
           all(abs(v / 0.1 - round(v / 0.1)) < 1e-9
-              for v in m['cavity_lo'] + m['cavity_hi']),
-          f"{m['cavity_lo']} to {m['cavity_hi']}")
+              for b in a['boxes'] for v in b))
+    check('and the cavity corners are too',
+          all(abs(v / 0.1 - round(v / 0.1)) < 1e-9
+              for v in a['cavity_lo'] + a['cavity_hi']),
+          f"{a['cavity_lo']} to {a['cavity_hi']}")
+    check('the opening is a whole number of base cells across',
+          all(c * 0.1 > 0 for c in a['vent_cells']),
+          f"{a['vent_cells']} cells")
+    check('alignment never makes the opening too small to carry a jet - '
+          'it grows it about its own centre rather than rounding it away',
+          room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.2, 0.1,
+                       vent=('x_lo', 1.5, 1.53, 0.5, 1.5))['vent_cells'][0]
+          >= room.MIN_VENT_CELLS)
 
     # A room already on the grid must not move at all - otherwise the
     # measurement above is measuring the measurer.
@@ -158,17 +197,34 @@ def main():
     # a four-million-cell mesh has been generated and queued.
     print('\n  what is refused, and refused early')
     thin = room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.05, 0.1,
-                        vent=('x_lo', 1.5, 2.5, 0.5, 1.5))
+                        vent=('x_lo', 1.5, 2.5, 0.5, 1.5),
+                        align_first=False)
     check('a wall thinner than one base cell cannot be carved, and the '
           'measurement says so instead of producing a room with no walls',
           not thin['ok'] and any('base cell' in e for e in thin['errors']),
-          str(thin['errors']))
+          str(thin['errors'][:1]))
+    # Alignment REPAIRS this one rather than refusing it, because a wall
+    # is a thickness someone estimated and the mesh is the constraint.
+    # The repair is reported, which is the part that matters.
+    fixed = room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.05, 0.1,
+                         vent=('x_lo', 1.5, 2.5, 0.5, 1.5))
+    check('with alignment on it is REPAIRED to one cell rather than '
+          'refused - and the repair is reported, not silent',
+          fixed['ok'] and fixed['wall_cells'] >= room.MIN_WALL_CELLS
+          and abs(fixed['align']['wall_shift'] - 0.05) < 1e-9,
+          f"wall {0.05:g} -> {0.05 + fixed['align']['wall_shift']:g} m")
     narrow = room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 3.0), 0.2, 0.1,
-                          vent=('x_lo', 1.5, 1.7, 0.5, 1.5))
+                          vent=('x_lo', 1.5, 1.7, 0.5, 1.5),
+                          align_first=False)
     check('an opening under six cells across cannot carry a jet, and is '
           'refused rather than quietly under-resolved',
           not narrow['ok'] and any('at least' in e for e in narrow['errors']),
           f"{narrow['vent_cells']} cells")
+    cramped = room.measure((0.0, 0.0, 0.0), (5.0, 4.0, 0.5), 0.1, 0.1,
+                           vent=('x_lo', 1.5, 2.5, 0.1, 0.2))
+    check('and a face too small to hold six cells plus a wall either '
+          'side is refused by ALIGNMENT, before any mesh is built',
+          not cramped['ok'], str(cramped['errors'][:1]))
     check('a room whose walls meet in the middle is refused',
           _raises(lambda: room.room_boxes((0, 0, 0), (1.0, 4.0, 3.0), 0.6)))
     check('a vent that reaches the edge of its face cuts the wall through '
