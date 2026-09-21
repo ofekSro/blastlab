@@ -72,7 +72,8 @@ solid #e0a800;padding:8px 12px;margin:10px 0;font-size:0.92em}"""
 def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                      sdof=None, component=None, calibration=None,
                      thermal=None, radiation=(), sensitivity=None,
-                     sensitivity_note='', oat=(), figures=(), title=None):
+                     sensitivity_note='', verdict=None, oat=(),
+                     figures=(), title=None):
     """Write the whole HD 1.3 analysis as one self-contained .html.
 
     Every argument is optional: the report prints the sections it was
@@ -286,6 +287,31 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
         # that straddles extinction is not an interval at all.
         if sensitivity_note:
             p.append(f'<p class="warn">{html.escape(sensitivity_note)}</p>')
+        # THE VERDICT AT BOTH ENDS, because one at the nominal point says
+        # nothing about whether it holds across a band this wide. The
+        # third answer - the verdict flips inside the band - is printed
+        # as prominently as the other two, because "we cannot tell, and
+        # here is what would settle it" is the result in that case.
+        if verdict:
+            p.append(
+                '<h3>Does that verdict survive the band?</h3>'
+                + _table(
+                    ('End of band', 'Peak [MPa]', 'Ductility mu',
+                     'Rotation [deg]', 'Regime', 'Yields'),
+                    [(end,
+                      _fmt(verdict[end]['p_max'] / 1e6, 3),
+                      _fmt(verdict[end]['ductility'], 3),
+                      _fmt(verdict[end]['support_rotation_deg'], 2),
+                      html.escape(str(verdict[end]['regime'])),
+                      ('<span class="warn">yes</span>'
+                       if verdict[end]['yielded'] else
+                       '<span class="ok">no</span>'))
+                     for end in ('low', 'high')]))
+            css = ('note' if verdict['verdict']
+                   == 'undetermined_within_band' else 'meta')
+            p.append(f'<div class="{css}"><b>'
+                     f'{html.escape(verdict["verdict"].replace("_", " "))}'
+                     f'.</b> {html.escape(verdict["note"])}</div>')
         if oat:
             p.append('<p class="meta">Which knob dominates, one at a '
                      'time:</p>'

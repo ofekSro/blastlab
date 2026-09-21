@@ -139,7 +139,73 @@ def main():
         check('and the summary line carries that too',
               'STRADDLES EXTINCTION' in sens.summary_line(wide))
 
-    # ── 6. refusals ─────────────────────────────────────────────────────
+    # ── 6. THE VERDICT AT BOTH ENDS, NOT AT THE MIDDLE ──────────────────
+    #
+    # A band spanning a factor of 12 is more than an order of magnitude,
+    # and a wall's response is not linear in the load. A verdict computed
+    # at the nominal point says nothing about whether it holds at the
+    # ends - and "the wall survives" reads the same whether it is robust
+    # or whether it flips one step either side of the number that
+    # produced it.
+    print('\n  does the structural verdict survive its own band')
+    from blastlab.core import sdof as _sdof
+    check('the band keeps the two extreme runs WHOLE, not just their '
+          'peaks - the same peak reached slowly or quickly puts a wall '
+          'in opposite corners of the pressure-impulse diagram',
+          len(vented['low_trace'][0]) > 10
+          and len(vented['high_trace'][0]) > 10
+          and abs(max(vented['low_trace'][1]) - vented['low']['p_max'])
+          < 1e-6 * vented['low']['p_max'])
+
+    # A wall far too light for the low end: yields at both.
+    flimsy = _sdof.Component(span=3.0, mass_per_area=60.0, Ru=8e3,
+                             kE=8e5, support='simple')
+    # A wall far too strong for the high end: yields at neither.
+    bunker = _sdof.Component(span=3.0, mass_per_area=1200.0, Ru=40e6,
+                             kE=2e9, support='fixed')
+    v_f = sens.structural_verdict(vented, flimsy)
+    v_b = sens.structural_verdict(vented, bunker)
+    check('a wall that yields at BOTH ends gets a verdict that does not '
+          'rest on the calibration, and says so',
+          v_f['verdict'] == 'fails_across_band'
+          and 'does not rest on the calibration' in v_f['note'],
+          f"mu {v_f['low']['ductility']:.2f} to "
+          f"{v_f['high']['ductility']:.2f}")
+    check('and one that yields at NEITHER gets the same standing, the '
+          'other way up',
+          v_b['verdict'] == 'survives_across_band'
+          and not v_b['low']['yielded'] and not v_b['high']['yielded'],
+          f"mu {v_b['low']['ductility']:.4f} to "
+          f"{v_b['high']['ductility']:.4f}")
+    check('all three names are the ones the report prints',
+          v_f['verdict'] in sens.VERDICTS and v_b['verdict'] in sens.VERDICTS)
+
+    # THE THIRD ANSWER. Tuned so the element sits between the ends -
+    # which is the point: for a band this wide there IS a wall for which
+    # the answer is "it depends on the calibration", and that is a
+    # result rather than a gap.
+    lo_p = vented['low']['p_max'] - 101325.0
+    hi_p = vented['high']['p_max'] - 101325.0
+    mid = _sdof.Component(span=3.0, mass_per_area=300.0,
+                          Ru=0.5 * (lo_p + hi_p), kE=3.0e7,
+                          support='simple')
+    v_m = sens.structural_verdict(vented, mid)
+    check('a wall whose resistance sits between the two ends gets '
+          'UNDETERMINED - and that is an answer, not a failure to '
+          'produce one',
+          v_m['verdict'] == 'undetermined_within_band'
+          and not v_m['low']['yielded'] and v_m['high']['yielded'],
+          f"survives {v_m['low']['p_max']/1e6:.3f} MPa, "
+          f"yields {v_m['high']['p_max']/1e6:.3f} MPa")
+    check('and the note names what would settle it, rather than leaving '
+          'the reader with a shrug',
+          'closed-vessel record' in v_m['note']
+          and 'nothing else will' in v_m['note'])
+    check('a verdict taken across a band whose width is a judgement says '
+          'so, because "it survives" is where that matters most',
+          v_b['ranges_sourced'] is False)
+
+    # ── 7. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     check('a negative exponent range is refused',
           _raises(lambda: sens.band(p, 5.0, 1.0, dn=-0.1)))
