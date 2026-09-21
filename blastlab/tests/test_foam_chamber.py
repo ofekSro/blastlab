@@ -127,6 +127,21 @@ def main():
                         'chamber_state': {**st.as_dict(),
                                           'adiabatic_source': True}})
           ).warnings))
+    # The absence of the field is NOT the quiet way past that warning:
+    # `simulate` is adiabatic by DEFAULT, so a hand-written case that
+    # simply omits it is an adiabatic case until it says otherwise.
+    bare = {k: v for k, v in st.as_dict().items()
+            if k != 'adiabatic_source'}
+    check('a state dict that just omits the field is treated as '
+          'adiabatic rather than as unknown - absence of evidence is '
+          'the default, which is what simulate does',
+          any('ADIABATIC' in w for w in validate_case(
+              Case3D(**{**case.__dict__, 'chamber_state': bare})).warnings))
+    check('and the warning says where the effect actually IS - the burst '
+          'timing and the mass burnt, not T, which is nearly fixed by '
+          'the trigger pressure',
+          any('burnt' in w and 'later' in w for w in validate_case(
+              Case3D(**{**case.__dict__, 'chamber_state': bare})).warnings))
 
     # ── 2. the fields ───────────────────────────────────────────────────
     print('\n  what lands in 0/')

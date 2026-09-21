@@ -604,11 +604,21 @@ def _validate_solver(case, rep):
                     f"the meshed cavity - it conserves mass and energy, "
                     f"so the pressure follows, but only if it is told "
                     f"the right volume.")
-            if cs.get('adiabatic_source'):
-                warn("The chamber state came from an ADIABATIC 0-D run, "
-                     "so the T and p about to be written into the mesh "
-                     "are upper bounds. Set h_c and wall_area on the 0-D "
-                     "run, or accept them as a bound and say so.")
+            # Defaults to True when the key is absent, because
+            # `simulate` is adiabatic by default: a hand-written case
+            # that simply omits the field must not be the quiet way past
+            # this warning. Absence of evidence is the adiabatic case.
+            if cs.get('adiabatic_source', True):
+                warn("The chamber state came from an ADIABATIC 0-D run. "
+                     "At a burst pressure the effect of that is NOT in T "
+                     "- the pressure is fixed by the trigger, so T is "
+                     "nearly set by the composition. It is in WHEN the "
+                     "panel bursts and HOW MUCH has burnt by then: "
+                     "measured at h_c = 200 on a 20 kg magazine, the "
+                     "burst comes 9.5 % later with 12.4 % more mass "
+                     "burnt and alpha_expl 10.8 % higher, while T moves "
+                     "1.4 %. Set h_c and wall_area on the 0-D run, or "
+                     "state that this is the adiabatic bound.")
             if cs.get('first_front_is_artefact'):
                 warn("Opened-from-the-start: the first front out of the "
                      "opening is an artefact of initialising a "

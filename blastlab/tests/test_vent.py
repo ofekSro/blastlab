@@ -53,6 +53,14 @@ def _raises(fn, exc=ValueError):
     return False
 
 
+def _room_case():
+    """The meshed cavity of the magazine HD1-3b writes, so the heat-loss
+    comparison below is taken on the same room the golden uses."""
+    from blastlab.core import room as _room
+    return _room.measure((0.0, 0.0, 0.0), (3.0, 3.0, 2.0), 0.2, 0.1,
+                         vent=('x_lo', 1.0, 2.0, 0.6, 1.4))['volume']
+
+
 def main():
     print('VENT (HD1-3c)')
     p = d.PROPELLANTS['double_base']
@@ -280,14 +288,76 @@ def main():
           'be adiabatic, and reports how much went',
           not st_c.adiabatic_source and st_c.wall_loss_fraction > 0.0,
           f'{st_c.wall_loss_fraction:.1%} of the energy released')
-    # WHAT THE WALLS ACTUALLY COST THE HAND-OFF. The reason this matters
-    # is that HD1-3b writes T into a golden: if the two differ, the
-    # golden records which of them was run.
-    check('and its T is lower than the adiabatic one, which is the whole '
-          'reason the provenance has to travel with the state',
-          st_c.T < st.T,
-          f'{st_c.T:.1f} K against {st.T:.1f} K adiabatic '
-          f'({st_c.T/st.T - 1.0:+.1%})')
+
+    # ── 8b. WHERE THE HEAT LOSS ACTUALLY SHOWS, and where it does not ───
+    #
+    # An earlier version of this file compared T between the two runs and
+    # reported 2.2 %, which is the LEAST informative number in the set.
+    # At a burst pressure the pressure is fixed BY THE TRIGGER, so T is
+    # nearly determined by the composition and has almost nowhere to go.
+    # The effect is in WHEN the panel bursts and HOW MUCH has burnt by
+    # then: a cooled chamber climbs to p_burst more slowly, so it gets
+    # there later and with more propellant consumed.
+    #
+    # Measured on a 20 kg magazine in 12.17 m3, adiabatic -> h_c = 200:
+    #
+    #     t_burst      +9.45 %
+    #     mass burnt  +12.35 %
+    #     alpha_expl  +10.79 %
+    #     E           +3.58 %
+    #     T           +1.38 %     <- the one that was being quoted
+    #
+    # AND T DOES NOT EVEN MOVE IN A FIXED DIRECTION. On that case it goes
+    # UP with mild cooling, because the extra burnt propellant outweighs
+    # the heat lost; at h_c = 500 it turns over and comes down. So the
+    # old check was pinning an accident of one geometry as if it were a
+    # law. These four are the quantities that carry the effect.
+    print('\n  and where the heat loss shows: not in T')
+    big = _room_case()
+    ad = d.simulate(p, 20.0, big, vent_area=0.0, t_end=60.0, scenario=s,
+                    p0_chamber=P_AIR, refine_cohorts=False)
+    co = d.simulate(p, 20.0, big, vent_area=0.0, t_end=60.0, scenario=s,
+                    p0_chamber=P_AIR, refine_cohorts=False,
+                    h_c=200.0, wall_area=6.0)
+    pb = 3.0 * P_AIR
+    s_ad = vent.handoff(ad, p, mode='burst', p_burst=pb, volume_cfd=big)
+    s_co = vent.handoff(co, p, mode='burst', p_burst=pb, volume_cfd=big)
+    check('a cooled chamber reaches the burst pressure LATER',
+          s_co.t_open > s_ad.t_open * 1.02,
+          f'{s_ad.t_open:.4f} -> {s_co.t_open:.4f} s '
+          f'({s_co.t_open/s_ad.t_open - 1.0:+.2%})')
+    check('with MORE propellant burnt by then - the effect T cannot show',
+          s_co.m_p > s_ad.m_p * 1.05,
+          f'{s_ad.m_p:.5f} -> {s_co.m_p:.5f} kg '
+          f'({s_co.m_p/s_ad.m_p - 1.0:+.2%})')
+    check('so the mixture handed over is RICHER in products',
+          s_co.alpha_expl > s_ad.alpha_expl * 1.05,
+          f'{s_ad.alpha_expl:.5f} -> {s_co.alpha_expl:.5f} '
+          f'({s_co.alpha_expl/s_ad.alpha_expl - 1.0:+.2%})')
+    check('and it carries more energy, not less, despite having given '
+          'the walls most of what was released',
+          s_co.E > s_ad.E,
+          f'{s_ad.E/1e6:.4f} -> {s_co.E/1e6:.4f} MJ '
+          f'({s_co.E/s_ad.E - 1.0:+.2%}), with '
+          f'{co["wall_loss_fraction"]:.0%} gone to the walls')
+    check('while T moves by far the least of the four - which is why '
+          'comparing T was the wrong comparison',
+          abs(s_co.T/s_ad.T - 1.0) < 0.5 * abs(s_co.m_p/s_ad.m_p - 1.0),
+          f'T {s_co.T/s_ad.T - 1.0:+.2%} against mass '
+          f'{s_co.m_p/s_ad.m_p - 1.0:+.2%}')
+    # AND ITS DIRECTION IS NOT FIXED, pinned so nobody re-derives a law
+    # from one case. More cooling eventually turns it over.
+    hot = vent.handoff(
+        d.simulate(p, 20.0, big, vent_area=0.0, t_end=60.0, scenario=s,
+                   p0_chamber=P_AIR, refine_cohorts=False,
+                   h_c=500.0, wall_area=6.0),
+        p, mode='burst', p_burst=pb, volume_cfd=big)
+    check('T is not even MONOTONE in the wall coefficient: mild cooling '
+          'raises it (more burnt) and harder cooling turns it over - so '
+          'no direction may be asserted from one case',
+          s_co.T > s_ad.T and hot.T < s_co.T,
+          f'{s_ad.T:.2f} (adiabatic) -> {s_co.T:.2f} (h_c 200) -> '
+          f'{hot.T:.2f} (h_c 500) K')
     check('a run that did not conserve is refused outright rather than '
           'handed to a mesh',
           _raises(lambda: vent.handoff(
