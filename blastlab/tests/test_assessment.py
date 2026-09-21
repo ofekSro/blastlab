@@ -28,7 +28,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.core import assessment as asm                   # noqa: E402
-from blastlab.core.case import ValidationReport               # noqa: E402
+from blastlab.core.case import (ValidationReport,             # noqa: E402
+                                validate_case)
 
 FAIL = []
 
@@ -352,6 +353,94 @@ def main():
           'which would read as though the comparison was not needed',
           'Quantity-distance' in epage and 'No QD comparison' in epage
           and 'this tool ships none' in epage)
+
+    # ── HD1-3f · THE VENTING STAGE, BUILT FROM THE 0-D CASE ─────────────
+    #
+    # The order here is the part worth pinning and it is not the obvious
+    # one: the room is ALIGNED TO THE MESH FIRST, and only then is the
+    # 0-D model run - at the aligned cavity, not at the volume typed
+    # into the case. The other way round hands the mesh a state computed
+    # for a room up to 10 % larger than the one about to be built, and
+    # `validate_case` would rightly refuse it.
+    print('\n  the venting stage, built from the 0-D case')
+    vcase = replace(good, sensitivity=False, standoffs_m=[], span_m=0.0,
+                    charge_kg=20.0, volume_m3=12.168, t_end=40.0,
+                    scenario_kind='flame_spread', n_cohorts=40,
+                    spread_time=20.0, h_c=200.0, wall_area_m2=6.0,
+                    room_origin=(0.0, 0.0, 0.0), room_size=(3.0, 3.0, 2.0),
+                    room_wall_m=0.2, vent_face='x_lo',
+                    vent_rect=(1.0, 2.0, 0.6, 1.4),
+                    open_mode='burst', p_burst=3.0 * 101325.0,
+                    domain_size=(8.0, 6.0, 5.0), cfd_dx_m=0.1,
+                    cfd_window_s=0.02,
+                    vent_gauges=[(6.0, 3.0, 1.0)])
+    vrep2 = asm.validate(vcase)
+    check('a complete venting stage validates', vrep2.ok,
+          str(vrep2.errors[:2]))
+    check('and the cell budget is stated BEFORE anything is built',
+          any('base cells' in n for n in vrep2.notes),
+          str([n for n in vrep2.notes if 'base cells' in n][:1]))
+    cfd, info = asm.build_vent_case(vcase)
+    check('the CFD case is a chamber case carrying the room as ordinary '
+          'obstacles', cfd.init_mode == 'chamber' and cfd.obstacles
+          and cfd.solver == 'blastfoam')
+    check('THE 0-D MODEL WAS RE-RUN AT THE ALIGNED CAVITY, not at the '
+          'volume typed into the case - so the mesh and the state '
+          'describe the same room',
+          abs(info['state'].volume / info['room']['volume'] - 1.0) < 1e-12,
+          f"state {info['state'].volume:.4f} m3, "
+          f"mesh {info['room']['volume']:.4f} m3")
+    check('and the case it produced validates against the writer s own '
+          'rules', validate_case(cfd).ok,
+          str(validate_case(cfd).errors[:2]))
+    check('the caveats travel WITH it rather than being consumed here - '
+          'the hand-off s, the window s and the room s',
+          info['warnings'] and any('window' in w or 'artefact' in w
+                                   or 'ADIABATIC' in w
+                                   for w in info['warnings']),
+          f"{len(info['warnings'])} warnings carried")
+    check('the ground reflects and every other side lets the wave out, '
+          'because a reflection arriving back inside the window is '
+          'indistinguishable from the jet',
+          cfd.bcs['z_lo'] == 'reflect'
+          and all(cfd.bcs[s] == 'transmit' for s in
+                  ('x_lo', 'x_hi', 'y_lo', 'y_hi', 'z_hi')))
+    check('a burst panel with no burst pressure is refused - taking the '
+          'peak instead would silently become the other case, whose '
+          'first front is an artefact',
+          not asm.validate(replace(vcase, p_burst=0.0)).ok)
+    # TWO BRANCHES, AND THE SPLIT IS THE BUG THIS CAUGHT. Intent comes
+    # from the GEOMETRY, not from any-field-set: the form pre-fills a
+    # wall thickness, a base cell and a window, so keying on those made
+    # a BRAND NEW dim-0 case refuse itself as half filled in - which
+    # `_e2e_hd13_gui.py` found by pressing Run on a real window and
+    # losing the process.
+    half_geom = asm.validate(replace(vcase, vent_rect=()))
+    check('half a GEOMETRY is refused - a room and a domain with no '
+          'opening is not a smaller case',
+          not half_geom.ok
+          and any('half filled' in e for e in half_geom.errors),
+          str(half_geom.errors[:1]))
+    no_nums = asm.validate(replace(vcase, cfd_dx_m=0.0))
+    check('and a complete geometry missing its numbers is refused too, '
+          'with a different message that says which',
+          not no_nums.ok
+          and any('not its numbers' in e for e in no_nums.errors),
+          str(no_nums.errors[:1]))
+    check('while an UNTOUCHED case - geometry blank, scalars pre-filled '
+          'by the form - is not a venting stage at all and validates',
+          asm.validate(replace(good, room_wall_m=0.2, cfd_dx_m=0.1,
+                               cfd_window_s=0.02, p_burst=3e5)).ok)
+    check('a room that sticks out of the domain is refused',
+          not asm.validate(replace(vcase, domain_size=(2.0, 2.0, 1.0))).ok)
+    check('and a 0-D case with no venting fields does not try to build '
+          'one', not good.wants_vent
+          and _raises(lambda: asm.build_vent_case(good)))
+    check('opened-from-the-start warns about its artefact at VALIDATION, '
+          'before a run, not only afterwards',
+          any('ARTEFACT' in w for w in
+              asm.validate(replace(vcase, open_mode='open',
+                                   p_burst=0.0)).warnings))
 
     print('\nASSESSMENT: ' + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
     return 1 if FAIL else 0

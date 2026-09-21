@@ -110,6 +110,40 @@ class DeflagrationCase:
     #: invisible, and this tool ships none. See core/qd.py.
     qd_criteria: list = field(default_factory=list)
 
+    # ── HD1-3f · the venting stage ──────────────────────────────────────
+    #
+    # All falsy by default: a 0-D assessment does not need any of it, and
+    # `wants_vent` is what decides whether a CFD case gets built at all.
+    # The room here is what the user TYPED; `build_vent_case` runs it
+    # through `core.room.measure`, which aligns it to the mesh, and the
+    # aligned volume is what the 0-D model is then re-run at.
+    room_origin: tuple = (0.0, 0.0, 0.0)
+    room_size: tuple = ()             # (Lx, Ly, Lz) outer, m
+    room_wall_m: float = 0.0
+    #: 'x_lo' | 'x_hi' | 'y_lo' | ... - which wall the opening is in
+    vent_face: str = 'x_lo'
+    #: (a0, a1, b0, b1) in that face's two in-plane axes
+    vent_rect: tuple = ()
+    #: 'burst' = a panel that lets go at `p_burst`; 'open' = an opening
+    #: that was never closed. Same CFD case, different standing - see
+    #: core/vent.py on why only one of them has a meaningful first front.
+    open_mode: str = 'burst'
+    p_burst: float = 0.0              # Pa; 0 with open_mode='burst' is
+                                      # an error, not a default
+    domain_size: tuple = ()           # (Lx, Ly, Lz) of the CFD domain
+    cfd_dx_m: float = 0.0             # base cell
+    cfd_window_s: float = 0.0         # how long the CFD runs
+    n_snapshots_vent: int = 0         # 0 = 20
+    #: (x, y, z) pressure gauges in the CFD domain - typically on the
+    #: face of whatever structure the jet is aimed at
+    vent_gauges: list = field(default_factory=list)
+
+    @property
+    def wants_vent(self):
+        return bool(self.room_size and self.vent_rect and self.room_wall_m
+                    and self.domain_size and self.cfd_dx_m
+                    and self.cfd_window_s)
+
     # the structural component, or None to skip the response
     span_m: float = 0.0
     mass_per_area: float = 0.0
@@ -158,12 +192,25 @@ def case_to_dict(case):
     return d
 
 
+#: Fields that are fixed-length coordinates rather than open lists. JSON
+#: has no tuple, so they come back as lists and a saved case would not
+#: compare equal to the one that was saved - which is the whole point of
+#: the round trip being tested.
+_TUPLE_FIELDS = ('room_origin', 'room_size', 'vent_rect', 'domain_size')
+
+
 def case_from_dict(d):
     if d.get('schema') != SCHEMA:
         raise ValueError(f'not an HD 1.3 case file (schema '
                          f'{d.get("schema")!r})')
     known = {f for f in DeflagrationCase.__dataclass_fields__}
-    return DeflagrationCase(**{k: v for k, v in d.items() if k in known})
+    kw = {k: v for k, v in d.items() if k in known}
+    for k in _TUPLE_FIELDS:
+        if k in kw and kw[k] is not None:
+            kw[k] = tuple(kw[k])
+    if kw.get('vent_gauges'):
+        kw['vent_gauges'] = [tuple(g) for g in kw['vent_gauges']]
+    return DeflagrationCase(**kw)
 
 
 def save_case(case, path):
@@ -325,7 +372,155 @@ def validate(case):
         note(f'{len(case.qd_criteria)} quantity-distance criteria, all '
              f'entered by the user - this tool ships none, and each '
              f'distance is printed with the source it came from.')
+
+    # ── HD1-3f · the venting stage, checked before a mesh is planned ────
+    #
+    # INTENT COMES FROM THE GEOMETRY, not from the scalars. The form
+    # pre-fills a wall thickness, a base cell and a window because those
+    # are useful once someone starts, and keying "is a venting stage
+    # wanted" off any-field-set made a BRAND NEW form refuse itself as
+    # half filled in. Caught by _e2e_hd13_gui.py on a real window, which
+    # is what that file is for: pressing Run on an untouched dim-0 case
+    # raised out of the slot and took the process with it.
+    _geom = (case.room_size, case.vent_rect, case.domain_size)
+    if any(_geom) and not all(_geom):
+        err('The venting stage is half filled in: it needs a room size, '
+            'a vent rectangle AND a domain size. A partial geometry is '
+            'not a smaller case, it is no case.')
+    elif all(_geom) and not case.wants_vent:
+        err('The venting stage has its geometry but not its numbers - it '
+            'also needs a wall thickness, a base cell and a CFD window.')
+    elif case.wants_vent:
+        from . import room as _room
+        if case.open_mode not in ('burst', 'open'):
+            err("Opening mode must be 'burst' or 'open'")
+        if case.open_mode == 'burst' and case.p_burst <= 0:
+            err('A burst panel needs the pressure it lets go at. Without '
+                'one there is no instant to hand over at, and taking the '
+                'peak instead would silently turn this into the '
+                'opened-from-the-start case, whose first front is an '
+                'initialisation artefact.')
+        if case.open_mode == 'open':
+            warn('Opened from the start: the first front out of the '
+                 'opening will be an ARTEFACT of initialising a '
+                 'pressurised room against ambient. No peak or impulse '
+                 'may be read from it - only steady-jet quantities after '
+                 'it has passed.')
+        try:
+            m = _room.measure(case.room_origin, case.room_size,
+                              case.room_wall_m, case.cfd_dx_m,
+                              vent=(case.vent_face,)
+                              + tuple(float(v) for v in case.vent_rect))
+        except (TypeError, ValueError) as exc:
+            err(f'Room: {exc}')
+            m = None
+        if m is not None:
+            for e in m['errors']:
+                err(f'Room: {e}')
+            for w in m['warnings']:
+                warn(f'Room: {w}')
+            # The 0-D half of this case and the room have to describe the
+            # same building. `build_vent_case` re-runs the 0-D model at
+            # the aligned cavity, so this is a note rather than an error -
+            # but a big gap usually means two different rooms.
+            if m['volume'] > 0 and case.volume_m3 > 0 and \
+                    abs(case.volume_m3 / m['volume'] - 1.0) > 0.1:
+                warn(f'The 0-D chamber volume ({case.volume_m3:.3f} m3) '
+                     f'and the meshed room ({m["volume"]:.3f} m3) differ '
+                     f'by {case.volume_m3 / m["volume"] - 1.0:+.0%}. The '
+                     f'venting stage re-runs the 0-D model at the meshed '
+                     f'cavity, so the two answers in this report will not '
+                     f'be for the same room.')
+            dom = [float(v) for v in case.domain_size]
+            cells = 1
+            for L in dom:
+                cells *= max(1, int(round(L / case.cfd_dx_m)))
+            note(f'Venting stage: {cells:,} base cells over a '
+                 f'{dom[0]:g} x {dom[1]:g} x {dom[2]:g} m domain at '
+                 f'dx = {case.cfd_dx_m:g} m.')
+            hi = [float(o) + float(s) for o, s
+                  in zip(case.room_origin, case.room_size)]
+            if any(h > L + 1e-9 for h, L in zip(hi, dom)):
+                err(f'The room sticks out of the CFD domain: it reaches '
+                    f'{tuple(round(h, 3) for h in hi)} m in a '
+                    f'{tuple(dom)} m box.')
     return rep
+
+
+def build_vent_case(case, dim=3):
+    """HD1-3f: turn a 0-D assessment into the blastFoam case that
+    resolves the jet leaving its opening.
+
+    Returns `(Case3D, info)`. `info` carries the aligned room, the
+    chamber state, the validity metrics and the warnings, because every
+    one of those is a caveat that has to reach the report rather than
+    being consumed here.
+
+    THE ORDER MATTERS AND IS NOT THE OBVIOUS ONE. The room is aligned to
+    the mesh FIRST, and only then is the 0-D model run - at the ALIGNED
+    cavity volume, not at the volume the user typed. Doing it the other
+    way round hands the mesh a state computed for a room that is up to
+    10 % larger than the one about to be built (see core/room.py), and
+    `validate_case` would rightly refuse it.
+    """
+    from . import room as _room, vent as _vent
+    from .case import Case3D
+    if not case.wants_vent:
+        raise ValueError(
+            'this case has no venting stage: it needs a room size, a wall '
+            'thickness, a vent rectangle, a domain, a base cell and a CFD '
+            'window. See DeflagrationCase.wants_vent.')
+    if dim != 3:
+        raise ValueError('only the 3D venting stage is implemented')
+
+    dx = float(case.cfd_dx_m)
+    vent_spec = (case.vent_face,) + tuple(float(v) for v in case.vent_rect)
+    m = _room.measure(case.room_origin, case.room_size, case.room_wall_m,
+                      dx, vent=vent_spec)
+    if not m['ok']:
+        raise ValueError('the room cannot be meshed: '
+                         + '; '.join(m['errors']))
+
+    # THE 0-D MODEL RUNS AT THE ALIGNED CAVITY. Not at `case.volume_m3`,
+    # which is whatever the 0-D half of the assessment was set up with -
+    # the two have to describe the same room or the pressure written
+    # into the cells is wrong by their ratio.
+    prop = case.build_propellant()
+    sc = case.build_scenario()
+    r = deflagration.simulate(
+        prop, case.charge_kg, m['volume'],
+        # the panel holds until it bursts, so the 0-D run that CHOOSES
+        # the instant is sealed; an opening that was never closed is run
+        # with its real area
+        vent_area=(0.0 if case.open_mode == 'burst' else m['vent_area']),
+        cd=case.discharge_coeff, t_end=case.t_end, n_out=case.n_out,
+        scenario=sc, p_ign=(case.p_ign or None),
+        p0_chamber=case.p0_chamber, h_c=case.h_c,
+        wall_area=case.wall_area_m2, T_wall=case.T_wall)
+    st = _vent.handoff(r, prop, mode=case.open_mode,
+                       p_burst=(case.p_burst or None),
+                       volume_cfd=m['volume'])
+    val = _vent.validity(r, st, case.cfd_window_s, prop=prop,
+                         vent_area=m['vent_area'])
+
+    Lx, Ly, Lz = (float(v) for v in case.domain_size)
+    cfd = Case3D(
+        solver='blastfoam', Lx=Lx, Ly=Ly, Lz=Lz, cell_size_m=dx,
+        init_mode='chamber', charge=0.0,
+        room=m, chamber_state=st.as_dict(), obstacles=m['boxes'],
+        # The ground reflects and everything else lets the wave out.
+        # A reflection arriving back at the target inside the window
+        # would be indistinguishable from the jet - see TODO.md HD1-3.
+        bcs=dict(x_lo='transmit', x_hi='transmit', y_lo='transmit',
+                 y_hi='transmit', z_lo='reflect', z_hi='transmit'),
+        t_end=float(case.cfd_window_s),
+        n_snapshots=case.n_snapshots_vent or 20,
+        gauges=[tuple(g) for g in (case.vent_gauges or ())])
+    return cfd, {
+        'room': m, 'state': st, 'validity': val, 'zero_d': r,
+        'warnings': list(st.warnings or ()) + list(val['warnings'])
+        + list(m['warnings']),
+    }
 
 
 def run(case):
