@@ -79,6 +79,19 @@ class DeflagrationCase:
     t_end: float = 5.0
     n_out: int = 1000
 
+    #: Run the uncertainty band around the confined peak. It costs 15
+    #: extra solves, which is why it is not forced on - but nothing in
+    #: `PROPELLANTS` is calibrated, so a peak quoted without it is a
+    #: point estimate from a model applied two decades from where its
+    #: burn law was fitted. See `core/sensitivity.py`.
+    sensitivity: bool = False
+    #: Where the ranges below came from. Empty means "a judgement", and
+    #: the band says so on every line it produces.
+    sensitivity_source: str = ''
+    sens_dn: float = 0.15
+    sens_a_factor: float = 1.5
+    sens_pext_factor: float = 2.0
+
     # heat (0 = that part is not asked for)
     h_c: float = 0.0
     wall_area_m2: float = 0.0
@@ -299,7 +312,8 @@ def run(case):
     sc = case.build_scenario()
     out = dict(case=case, prop=prop, report=rep, confined=None,
                unconfined=None, thermal=None, radiation=(), sdof=None,
-               component=None)
+               component=None, band=None, sensitivity=None,
+               sensitivity_note='')
 
     if case.confinement in ('confined', 'both'):
         out['confined'] = deflagration.simulate(
@@ -330,6 +344,47 @@ def run(case):
             f'{conf["p_max_refined"] / 1e6:.3f}). The ignition staircase, '
             f'not the fire, is setting this peak. Raise n_cohorts until it '
             f'stops moving before quoting the number.')
+
+    # THE BAND, and it is deliberately reported in the same units and
+    # next to the same number it qualifies. `PROPELLANTS` ships
+    # uncalibrated on every row, so the point estimate above is a point
+    # estimate from a burn law fitted two decades away.
+    if case.sensitivity and conf is not None:
+        from . import sensitivity as _sens
+        b = _sens.band(
+            prop, case.charge_kg, case.volume_m3,
+            dn=case.sens_dn, a_factor=case.sens_a_factor,
+            pext_factor=case.sens_pext_factor,
+            source=case.sensitivity_source,
+            vent_area=case.vent_area_m2, cd=case.discharge_coeff,
+            t_end=case.t_end, n_out=case.n_out, scenario=sc,
+            p_ign=(case.p_ign or None), p0_chamber=case.p0_chamber,
+            h_c=case.h_c, wall_area=case.wall_area_m2, T_wall=case.T_wall)
+        out['band'] = b
+        out['sensitivity'] = {
+            'peak pressure [MPa]': (b['low']['p_max'] / 1e6,
+                                    b['high']['p_max'] / 1e6),
+            'time to peak [s]': (b['low']['t_p_max'], b['high']['t_p_max']),
+            'fraction burnt [-]': (b['low']['Z_end'], b['high']['Z_end']),
+        }
+        out['sensitivity_note'] = _sens.summary_line(b)
+        rep.warnings.append(
+            f'The peak is uncertain by a factor of {b["spread"]:.1f} over '
+            f'the burn-law ranges alone ({b["low"]["p_max"]/1e6:.3f} to '
+            f'{b["high"]["p_max"]/1e6:.3f} MPa). ' + (
+                '' if b['ranges_sourced'] else
+                'And the ranges themselves are judgements, not a record, '
+                'so the WIDTH is not citable either.'))
+        if b['straddles_extinction']:
+            rep.warnings.append(
+                'The band straddles the extinction limit: part of it is a '
+                'fire that goes out and part is one that does not. Those '
+                'are two different events and a range across them is not '
+                'a pressure interval.')
+        if not b['conserved']:
+            rep.errors.append('A sample inside the sensitivity band failed '
+                              'its own conservation check, so the band is '
+                              'void.')
 
     if conf is not None and case.h_c > 0 and case.wall_area_m2 > 0:
         out['thermal'] = thermal.wall_exposure(

@@ -92,6 +92,8 @@ def run_and_report(case_path, out_path=None, quiet=False):
         unconfined=out['unconfined'], sdof=out['sdof'],
         component=out['component'], thermal=out['thermal'],
         radiation=out['radiation'], figures=figures,
+        sensitivity=out['sensitivity'],
+        sensitivity_note=out['sensitivity_note'],
         title=case.name or None)
 
     if not quiet:
@@ -99,6 +101,8 @@ def run_and_report(case_path, out_path=None, quiet=False):
         if c is not None:
             print(f"\n  confined   peak {c['p_max'] / 1e6:.3f} MPa"
                   f"   ({c['stop_reason']})")
+            if out['sensitivity_note']:
+                print(f"             {out['sensitivity_note']}")
         if u is not None:
             print(f"  unconfined expansion Mach {u['mach_max']:.4f}"
                   f"   blast negligible: {u['blast_negligible']}")
