@@ -301,17 +301,25 @@ def main():
     #
     # Measured on a 20 kg magazine in 12.17 m3, adiabatic -> h_c = 200:
     #
-    #     t_burst      +9.45 %
-    #     mass burnt  +12.35 %
-    #     alpha_expl  +10.79 %
-    #     E           +3.58 %
-    #     T           +1.38 %     <- the one that was being quoted
+    #     t_burst      +8.25 %
+    #     mass burnt   +8.17 %
+    #     alpha_expl   +7.17 %
+    #     E            +1.08 %
+    #     T            -0.35 %     <- the one that was being quoted
     #
-    # AND T DOES NOT EVEN MOVE IN A FIXED DIRECTION. On that case it goes
-    # UP with mild cooling, because the extra burnt propellant outweighs
-    # the heat lost; at h_c = 500 it turns over and comes down. So the
-    # old check was pinning an accident of one geometry as if it were a
-    # law. These four are the quantities that carry the effect.
+    # AND A CORRECTION TO THIS FILE'S OWN PREVIOUS CLAIM. It used to
+    # assert that T is NOT MONOTONE in the wall coefficient - rising
+    # with mild cooling and turning over at h_c = 500 - and that was an
+    # artefact of the ignition STAIRCASE, not physics. With entrainment
+    # ramped (scenario.windows) T falls monotonically:
+    #
+    #     766.60 -> 763.91 -> 757.89 -> 727.49 K   at h_c 0, 200, 500, 1000
+    #
+    # The lesson survives the correction and the claim does not: T is
+    # still the wrong quantity to compare, by a factor of twenty against
+    # the mass burnt. Pinning the non-monotonicity was pinning a
+    # discretisation artefact as a law - the same mistake this module
+    # documents elsewhere, made one commit earlier.
     print('\n  and where the heat loss shows: not in T')
     big = _room_case()
     ad = d.simulate(p, 20.0, big, vent_area=0.0, t_end=60.0, scenario=s,
@@ -335,29 +343,35 @@ def main():
           f'{s_ad.alpha_expl:.5f} -> {s_co.alpha_expl:.5f} '
           f'({s_co.alpha_expl/s_ad.alpha_expl - 1.0:+.2%})')
     check('and it carries more energy, not less, despite having given '
-          'the walls most of what was released',
+          'the walls a large share of what was released',
           s_co.E > s_ad.E,
           f'{s_ad.E/1e6:.4f} -> {s_co.E/1e6:.4f} MJ '
           f'({s_co.E/s_ad.E - 1.0:+.2%}), with '
           f'{co["wall_loss_fraction"]:.0%} gone to the walls')
-    check('while T moves by far the least of the four - which is why '
-          'comparing T was the wrong comparison',
-          abs(s_co.T/s_ad.T - 1.0) < 0.5 * abs(s_co.m_p/s_ad.m_p - 1.0),
+    check('while T moves by a twentieth of what the mass does - which is '
+          'why comparing T was the wrong comparison',
+          abs(s_co.T/s_ad.T - 1.0) < 0.2 * abs(s_co.m_p/s_ad.m_p - 1.0),
           f'T {s_co.T/s_ad.T - 1.0:+.2%} against mass '
           f'{s_co.m_p/s_ad.m_p - 1.0:+.2%}')
-    # AND ITS DIRECTION IS NOT FIXED, pinned so nobody re-derives a law
-    # from one case. More cooling eventually turns it over.
+    # THE CORRECTION. This used to assert T is NOT monotone in h_c. It
+    # is - that was the ignition staircase, and it went away with the
+    # ramp. Pinned the right way round now, so the retraction is on the
+    # record rather than the claim quietly disappearing.
     hot = vent.handoff(
         d.simulate(p, 20.0, big, vent_area=0.0, t_end=60.0, scenario=s,
                    p0_chamber=P_AIR, refine_cohorts=False,
                    h_c=500.0, wall_area=6.0),
         p, mode='burst', p_burst=pb, volume_cfd=big)
-    check('T is not even MONOTONE in the wall coefficient: mild cooling '
-          'raises it (more burnt) and harder cooling turns it over - so '
-          'no direction may be asserted from one case',
-          s_co.T > s_ad.T and hot.T < s_co.T,
+    check('T falls monotonically with the wall coefficient once the '
+          'entrainment is ramped - the non-monotonicity this file used '
+          'to pin was a discretisation artefact, not physics',
+          s_ad.T > s_co.T > hot.T,
           f'{s_ad.T:.2f} (adiabatic) -> {s_co.T:.2f} (h_c 200) -> '
           f'{hot.T:.2f} (h_c 500) K')
+    check('and the mass burnt keeps rising across the same sweep, which '
+          'is the quantity that actually carries the effect',
+          hot.m_p > s_co.m_p > s_ad.m_p,
+          f'{s_ad.m_p:.4f} -> {s_co.m_p:.4f} -> {hot.m_p:.4f} kg')
     check('a run that did not conserve is refused outright rather than '
           'handed to a mesh',
           _raises(lambda: vent.handoff(

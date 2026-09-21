@@ -198,32 +198,34 @@ yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
 > perturb `h_c` at all, so the band reports `spans_heat_loss=False` rather than
 > inventing one.
 
-### `HD1-12` · The 0-D model is too slow at the cohort count it needs · **open**
+### `HD1-12` · ✅ closed 2026-09-21 — it was the discretisation, not the speed
 
-Found 2026-09-21 while wiring the GUI Vent card. `deflagration.simulate`
-integrates the cohorts in a **Python loop inside every Cash-Karp stage**, so the
-cost grows faster than the cohort count — and the cohort count is a
-discretisation that has to be refined until the peak stops moving. On the dim-0
-form's own defaults (5 kg, 1 m³, 0.02 m², 30 s spread):
+Opened as "the 0-D model is too slow at the cohort count it needs", with
+vectorising the Cash-Karp loop as the proposed fix. **The owner proposed the
+better one: ramp the ignition across each cohort's interval instead of lighting
+it in an instant.** That was right, and it removed the need for the speed work
+entirely.
 
-| `n` | peak / ambient | cost |
+| `n` | staircase | ramp |
 |---|---|---|
-| 10 | 2.84 | 2.4 s |
-| 20 | 1.57 | 7.5 s |
-| 40 | 1.19 | 27.0 s |
-| 80 | 1.064 | 84.4 s |
-| 160 | 1.040 | 151.7 s |
+| 10 | 2.84 | **1.0223** |
+| 20 | 1.57 | 1.0101 |
+| 40 | 1.19 | 1.0054 |
+| 160 | 1.040 | 1.0028 |
 
-**The converged answer needs ~160 and costs two and a half minutes — five with
-the refinement check, which runs at 2n.** That is not a Run button. The default
-is therefore 40, the knee, and the run reports that it is ~20 % high.
+`n = 10` now lands within 2 % of converged, where the staircase was **still 1.2 %
+out at n = 160**. So the converged answer was never 1.04 either — a realistic
+magazine reaches **1.003× ambient**.
 
-**The fix is to vectorise the cohort loop**, not to lower the default further:
-`_derivs` and `_ck_step` work element-by-element over a tuple of `nZ + 7` states,
-which is exactly what NumPy is for. The maths does not change; only the
-summation order does, and every tolerance in `test_deflagration.py` is 1e-9 or
-looser. **Not started** — it is a rewrite of the most delicate module in the
-track and wants its own branch and its own verification pass.
+**And the mechanism is not the one that sounds right.** The ramp is *not* higher
+order: measured, its entrainment error still falls as 1/n, the same as the
+staircase, because the cohort edges sit at `T(i/n)^(1/d)` and the first interval
+is `T/√n` wide. What it buys is **continuity** — the staircase jumps by a full
+`1/n` at every edge and each jump shock-loads the chamber, while a slope does
+not. Two wrong explanations were written into the code before that one, and
+`test_deflagration.py` caught both; the measured sequences are pinned there.
+
+Vectorising is no longer needed for correctness. Left undone.
 
 **One finding that is a scope decision, not a deviation:**
 

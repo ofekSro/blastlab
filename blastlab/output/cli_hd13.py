@@ -33,14 +33,12 @@ def write_starter_case(path):
         name='magazine, 5 kg double-base, vented',
         propellant='double_base', charge_kg=5.0, volume_m3=1.0,
         vent_area_m2=0.02, confinement='both',
-        # 40 cohorts, not the 10 this started with, for the same reason
-        # the ignition is spread rather than uniform: a starter file
-        # teaches whatever it does. Ten steps over 30 s is a coarse
-        # ignition staircase and reports 2.84 x ambient where the
-        # converged answer is 1.04. 40 is the knee of the cost curve and
-        # still reports itself ~20 % high - see the measured table in
-        # ui/setup_spec.py and deflagration._COHORT_TOL.
-        scenario_kind='flame_spread', n_cohorts=40, spread_time=30.0,
+        # 20 cohorts, for the same reason the ignition is spread rather
+        # than uniform: a starter file teaches whatever it does. With
+        # entrainment ramped (scenario.windows) 20 is inside 1 % of
+        # converged; with the old staircase even 160 was 1.2 % out. See
+        # the measured table in ui/setup_spec.py.
+        scenario_kind='flame_spread', n_cohorts=20, spread_time=30.0,
         spread_geometry='area', t_end=60.0,
         h_c=200.0, wall_area_m2=6.0, standoffs_m=[10.0, 25.0, 50.0],
         # a 200 mm reinforced-concrete magazine wall rather than a light

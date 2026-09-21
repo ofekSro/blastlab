@@ -264,27 +264,23 @@ def _hd13_cards():
         CardSpec('Ignition', col=0, rows=(
             F('scenario_kind', 'How it catches', 'choice', 'flame_spread',
               values=tuple(KINDS)),
-            # 40, and the number is a measurement rather than a taste.
-            # The cohort count is a DISCRETISATION of the flame spread
-            # (see deflagration._COHORT_TOL), and on this form's own
-            # defaults - 5 kg, 1 m3, 0.02 m2, 30 s spread - the peak
-            # converges like this:
+            # 20, and the number is a measurement. The cohort count is a
+            # DISCRETISATION of the flame spread, and once entrainment
+            # is a RAMP rather than a staircase (scenario.windows) it
+            # converges almost at once. On this form's own defaults -
+            # 5 kg, 1 m3, 0.02 m2, 30 s spread:
             #
-            #     n = 10   2.84 x ambient      2.4 s
-            #     n = 20   1.57               7.5 s
-            #     n = 40   1.19              27.0 s
-            #     n = 80   1.064             84.4 s
-            #     n = 160  1.040            151.7 s
+            #                staircase   ramp
+            #     n = 10        2.84     1.0223
+            #     n = 20        1.57     1.0101
+            #     n = 40        1.19     1.0054
+            #     n = 160       1.040    1.0028
             #
-            # So 10 was wrong by a factor of nearly three, and the
-            # CONVERGED answer needs about 160 - which currently costs
-            # two and a half minutes, and twice that with the refinement
-            # check. 40 is the knee: fast enough to press Run on, and
-            # the run itself reports that it is ~20 % high and says to
-            # raise it. A default that is slow AND still wrong teaches
-            # nothing; one that is quick and says so teaches the thing
-            # that matters.
-            F('n_cohorts', 'Cohorts', 'int', 40),
+            # 20 is inside 1 % of converged and costs ~14 s. The old
+            # staircase needed 160 for a worse answer at ten times the
+            # cost. The run still measures its own refinement and says
+            # so, which is what makes the default safe to be small.
+            F('n_cohorts', 'Cohorts', 'int', 20),
             F('spread_time', 'Time to light it all [s]', 'float', 30.0),
             F('spread_geometry', 'Spread through a', 'choice', 'area',
               values=tuple(GEOMETRIES)))),

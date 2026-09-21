@@ -439,13 +439,20 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     # ambient rate. Below the low-pressure deflagration limit a solid
     # propellant does not sustain a flame, and that is now what happens.
     burning = p >= prop.p_extinction
+    # THE LIT FRACTION, not a step. `t_ign` carries (t_lo, t_hi) per
+    # cohort - the interval over which the front crosses that cohort's
+    # share of the mass - and `w` ramps 0 to 1 across it. With zero-width
+    # windows this is exactly the old `t < ti` test, which is what a
+    # package failing still gets. See scenario.windows for why the edges
+    # are the mass-fraction boundaries and not a smoothing choice.
     dZs = []
-    for Z, ti in zip(Zs, t_ign):
-        if Z >= 1.0 or t < ti or not burning:
+    for Z, (lo, hi) in zip(Zs, t_ign):
+        if Z >= 1.0 or not burning or t < lo:
             dZs.append(0.0)
-        else:
-            dZs.append(form_factor(prop, Z) * prop.a * (p ** prop.n)
-                       / prop.web)
+            continue
+        w = 1.0 if t >= hi else (t - lo) / (hi - lo)
+        dZs.append(w * form_factor(prop, Z) * prop.a * (p ** prop.n)
+                   / prop.web)
     mdot_gen = charge_kg * sum(f * dZ for f, dZ in zip(fracs, dZs))
     mdot_out = _vent_mdot(p, T, prop, area, cd, p_amb, m_p=m, m_a=m_a)
     mdot_out = min(mdot_out, m / 1e-9) if m <= 0.0 else mdot_out
@@ -646,9 +653,17 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     closed_vessel_pmax(prop, charge_kg, volume_m3)   # raises if it cannot fit
     if scenario is None:
         scenario = _scenario.uniform()
-    coh = scenario.cohorts()
-    fracs = tuple(f for f, _ti in coh)
-    t_ign = tuple(ti for _f, ti in coh)
+    # ENTRAINMENT WINDOWS, not ignition instants. A cohort is the mass
+    # between two fractions of the charge, so the times the front reaches
+    # those fractions are its edges and the lit fraction ramps across
+    # them - see scenario.windows for why that converges where a
+    # staircase does not. A zero-width window IS the old instant, which
+    # is what uniform ignition and a failing package still get.
+    win = scenario.windows()
+    fracs = tuple(f for f, _lo, _hi in win)
+    t_ign = tuple((lo, hi) for _f, lo, hi in win)
+    #: every edge, for the land-on-the-kink step constraint below
+    t_edges = tuple(sorted({v for _f, lo, hi in win for v in (lo, hi)}))
 
     # seed. With an extinction limit the burn cannot light itself, so the
     # igniter is part of the model; without one, keep the original
@@ -673,9 +688,9 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     # stack, so its gas is charged to the cohorts lit then. With one
     # cohort this is exactly the old seed.
     nZ_seed = len(fracs)
-    lit_now = sum(f for f, ti in zip(fracs, t_ign) if ti <= 0.0)
+    lit_now = sum(f for f, (lo, _hi) in zip(fracs, t_ign) if lo <= 0.0)
     per = min(Z0 / lit_now, 1.0) if lit_now > 0.0 else 0.0
-    Zs = [per if ti <= 0.0 else 0.0 for ti in t_ign]
+    Zs = [per if lo <= 0.0 else 0.0 for lo, _hi in t_ign]
     z_total = sum(f * Z for f, Z in zip(fracs, Zs))
     m = charge_kg * z_total
     # The chamber's own air, and the energy it already holds. m_a0 = 0
@@ -724,7 +739,11 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         out['m_air'].append(m_a)
         out['mdot_out'].append(_vent_mdot(p, T, prop, vent_area, cd, p_amb,
                                           m_p=m, m_a=m_a))
-        out['lit'].append(sum(f for f, ti in zip(fracs, t_ign) if ti <= t))
+        # the CONTINUOUS entrainment law, which the ramped windows
+        # reproduce exactly for any cohort count
+        out['lit'].append(sum(
+            f if t >= hi else (0.0 if t <= lo else f * (t - lo) / (hi - lo))
+            for f, (lo, hi) in zip(fracs, t_ign)))
 
     record()
     last_sample = 0.0
@@ -745,14 +764,16 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     while t < t_end and steps < max_steps:
         steps += 1
         s = tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out, Q_wall)
-        # Land ON the next ignition, never across it. A cohort lighting
-        # inside a step is a discontinuity in the right-hand side, and
-        # no error estimate can repair an average taken across one - it
-        # would just keep shrinking h at a point where the equations are
-        # not differentiable. This one stays a hard constraint.
-        later = [ti for ti in t_ign if ti > t + 1.0e-15]
+        # Land ON the next window EDGE, never across it. With instant
+        # ignition that edge is a jump in the right-hand side; with a
+        # ramp it is a kink. Either way no error estimate can repair an
+        # average taken across a point where the equations are not
+        # differentiable - it would just keep shrinking h there. This
+        # stays a hard constraint, and the ramp makes it cheaper rather
+        # than dearer: a kink costs far less than a jump.
+        later = [te for te in t_edges if te > t + 1.0e-15]
         if later:
-            h = min(h, min(later) - t)
+            h = min(h, later[0] - t)
         # ...and land ON Z = 1 for the same reason. Burn-out is an event,
         # not a smooth feature: past it the burn rate is identically
         # zero, so an error estimate taken across it is measuring a
@@ -860,7 +881,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         # Terminal ONLY once everything has been lit: while cohorts are
         # still to come, a chamber below the limit is waiting, not dead.
         if (not all_burnt and p_now < prop.p_extinction
-                and t >= max(t_ign)):
+                and t >= t_edges[-1]):
             extinguished = True
             stop_reason = 'extinction'
             break

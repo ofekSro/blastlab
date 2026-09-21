@@ -146,9 +146,92 @@ class IgnitionScenario:
         span = max(n - 1, 1)
         return [(frac, self.spread_time * i / span) for i in range(n)]
 
+    def windows(self):
+        """[(mass_fraction, t_lo, t_hi)] - the interval each cohort is
+        ENTRAINED OVER, rather than the instant it is lit at.
+
+        WHY THIS EXISTS AND WHAT IT FIXES. `cohorts()` lights each group
+        instantaneously, which turns a continuous flame spread into n
+        steps of C/n. In a chamber that has settled between them, each
+        step is a pressure spike whose height goes as the step size, so
+        the peak converges only as 1/n - first order, and at the counts
+        anyone can afford it is tens of per cent high.
+
+        The interval is not a smoothing parameter. Cohort i carries the
+        mass between fractions i/n and (i+1)/n, so the times at which
+        the front reaches those two fractions ARE its edges:
+
+            t_lo = T (i/n)**(1/d)      t_hi = T ((i+1)/n)**(1/d)
+
+        They tile the spread with no gap and no overlap, and the lit
+        fraction summed over the cohorts,
+
+            sum_i f_i w_i(t),   w_i = clamp((t - t_lo)/(t_hi - t_lo))
+
+        is a PIECEWISE-LINEAR INTERPOLATION of the continuous
+        entrainment law (t/T)**d: exact at every cohort edge, and
+        straight in between. For `line` (d = 1) the law is itself linear
+        so the two agree everywhere.
+
+        WHAT MAKES THIS WORK IS CONTINUITY, NOT ORDER OF ACCURACY, and
+        the difference matters because the obvious explanation is wrong.
+        In max-norm this is still only first order: the edges are at
+        T (i/n)**(1/d), so the FIRST one sits at T/n**(1/d) rather than
+        T/n, and for d = 2 the curvature over that first wide interval
+        leaves an error of about 1/(4n) - measured, and exactly 1/n in
+        the sequence.
+
+        The staircase has the same order and converges far worse,
+        because its error is a sequence of JUMPS. Each one dumps C/n of
+        propellant into the chamber in an instant and shock-loads it,
+        and the peak pressure is the height of the biggest of those.
+        The ramp's error is a smooth deviation of the same size, which
+        the chamber integrates over and never feels. Continuity is the
+        property being bought; the order is unchanged.
+
+        (Two earlier versions of this docstring got this wrong - first
+        claiming the sum was EXACT for every geometry, then claiming
+        second-order convergence. `test_deflagration.py` caught both.
+        The measured sequence is in that file.)
+
+        A PACKAGE FAILING IS NOT RAMPED, and that is physics rather than
+        an exception: a flame front is continuous, and a package letting
+        go is not. `progressive_package` returns zero-width windows, so
+        it behaves exactly as it did.
+        """
+        n = self.n_cohorts
+        frac = 1.0 / n
+        if self.kind == 'uniform':
+            return [(frac, 0.0, 0.0)] * n
+        if self.kind == 'flame_spread':
+            d = GEOMETRIES[self.geometry]
+            T = self.spread_time
+            return [(frac, T * (i / n) ** (1.0 / d),
+                     T * ((i + 1) / n) ** (1.0 / d)) for i in range(n)]
+        span = max(n - 1, 1)
+        return [(frac, self.spread_time * i / span,
+                 self.spread_time * i / span) for i in range(n)]
+
+    @property
+    def ramped(self):
+        """True when entrainment is continuous, i.e. the windows have
+        width. Only a flame spread does - see `windows`."""
+        return self.kind == 'flame_spread' and self.spread_time > 0.0
+
     def mass_entrainment(self, t):
-        """Fraction of the charge LIT by time t (not burnt by time t)."""
-        return sum(f for f, ti in self.cohorts() if ti <= t)
+        """Fraction of the charge LIT by time t (not burnt by time t).
+
+        Taken from `windows`, so it is the CONTINUOUS law and not the
+        staircase: for a flame spread this returns (t/T)**d exactly,
+        whatever the cohort count.
+        """
+        out = 0.0
+        for f, lo, hi in self.windows():
+            if t >= hi:
+                out += f
+            elif t > lo:
+                out += f * (t - lo) / (hi - lo)
+        return out
 
     @property
     def last_ignition(self):
