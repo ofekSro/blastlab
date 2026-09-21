@@ -174,6 +174,14 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
               for k in REPORTED}
     at_high = {k: max(all_rows, key=lambda row, k=k: row[1][k])[0]
                for k in REPORTED}
+    # THE TWO EXTREME RUNS ARE KEPT WHOLE, not just their peaks. A
+    # structural verdict needs a pressure HISTORY, not a maximum: the
+    # same peak reached slowly or quickly puts a wall in opposite corners
+    # of the pressure-impulse diagram. Two traces is the whole cost of
+    # being able to ask "does the answer survive its own uncertainty" -
+    # see `structural_verdict`.
+    lo_row = min(all_rows, key=lambda row: row[1]['p_max'])
+    hi_row = max(all_rows, key=lambda row: row[1]['p_max'])
     return {
         'nominal': nominal,
         'low': low,
@@ -188,6 +196,11 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
         'ranges': {'dn': dn, 'a_factor': a_factor,
                    'pext_factor': pext_factor},
         'n_runs': len(all_rows),
+        #: the full traces of the two extremes, for `structural_verdict`
+        'low_trace': (list(lo_row[2]['t']), list(lo_row[2]['p'])),
+        'high_trace': (list(hi_row[2]['t']), list(hi_row[2]['p'])),
+        'low_signs': lo_row[0],
+        'high_signs': hi_row[0],
         'conserved': all(r['stop_reason'] != 'conservation_violation'
                          for _g, _s, r in all_rows),
         'cohort_converged': nominal_result['cohort_converged'],
@@ -197,6 +210,84 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
         'straddles_extinction': (low['extinguished']
                                  != high['extinguished']),
     }
+
+
+#: The three answers a structural question can have once the band is
+#: taken seriously. The third is an ANSWER and not a failure to produce
+#: one - see `structural_verdict`.
+VERDICTS = ('fails_across_band', 'survives_across_band',
+            'undetermined_within_band')
+
+
+def structural_verdict(b, component, p_ref=None):
+    """Run the element at BOTH ends of the band, and say which of the
+    three answers that gives.
+
+    WHY A VERDICT AT THE NOMINAL POINT IS WORTH LITTLE. The band on a
+    vented magazine spans a factor of 12.7 - more than an order of
+    magnitude - and a wall's response is not linear in the load. A
+    verdict computed at the middle of that says nothing about whether it
+    holds at the ends, and "the wall survives" from an uncalibrated model
+    is a sentence that reads the same whether it is robust or whether it
+    flips one step either side of the number that produced it.
+
+    So the element is run at the low end and at the high end:
+
+        fails_across_band       it yields at both ends. The conclusion
+                                does not depend on the calibration, and
+                                that is worth saying.
+        survives_across_band    it yields at neither. Same.
+        undetermined_within_band
+                                it yields at one. This is an ANSWER, not
+                                a failure to produce one: the verdict
+                                depends on a calibration that does not
+                                exist, and the only honest report is to
+                                say so and name what would settle it.
+
+    The full traces are used rather than the two peaks, because the same
+    peak reached slowly or quickly puts a wall in opposite corners of the
+    pressure-impulse diagram.
+    """
+    from . import sdof as _sdof
+    from .constants import P_AIR
+    p_ref = P_AIR if p_ref is None else p_ref
+    out = {}
+    for end in ('low', 'high'):
+        t, p = b[f'{end}_trace']
+        r = _sdof.response(t, p, component, p_ref=p_ref)
+        out[end] = {
+            'p_max': b[end]['p_max'],
+            'ductility': r.ductility,
+            'support_rotation_deg': r.support_rotation_deg,
+            'yielded': bool(r.yielded),
+            'collapsed': bool(r.collapsed),
+            'regime': r.regime,
+            'signs': b[f'{end}_signs'],
+        }
+    lo_fails, hi_fails = out['low']['yielded'], out['high']['yielded']
+    if lo_fails and hi_fails:
+        verdict = 'fails_across_band'
+        note = ('The element yields at BOTH ends of the band, so this '
+                'conclusion does not rest on the calibration.')
+    elif not lo_fails and not hi_fails:
+        verdict = 'survives_across_band'
+        note = ('The element yields at NEITHER end of the band, so this '
+                'conclusion does not rest on the calibration.')
+    else:
+        verdict = 'undetermined_within_band'
+        note = ('THE VERDICT FLIPS INSIDE THE BAND: the element survives '
+                'the low end and yields at the high one. That is not a '
+                'missing calculation, it is the answer - whether this '
+                'wall holds depends on a burn law nobody has measured '
+                'for this material. A closed-vessel record on the real '
+                'propellant is what settles it, and nothing else will.')
+    out['verdict'] = verdict
+    out['note'] = note
+    out['collapses_at_high_end'] = out['high']['collapsed']
+    # A conclusion drawn from a band whose own width is a judgement is
+    # weaker again, and saying "it survives" is where that matters most.
+    out['ranges_sourced'] = b.get('ranges_sourced', False)
+    return out
 
 
 def summary_line(b):

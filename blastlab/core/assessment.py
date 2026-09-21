@@ -313,7 +313,7 @@ def run(case):
     out = dict(case=case, prop=prop, report=rep, confined=None,
                unconfined=None, thermal=None, radiation=(), sdof=None,
                component=None, band=None, sensitivity=None,
-               sensitivity_note='')
+               sensitivity_note='', verdict=None)
 
     if case.confinement in ('confined', 'both'):
         out['confined'] = deflagration.simulate(
@@ -423,4 +423,36 @@ def run(case):
         if out['thermal'] is not None:
             out['residual'] = thermal.residual_capacity(
                 case.Ru_pa, out['thermal']['T_surface_max'])
+
+        # THE VERDICT AT BOTH ENDS OF THE BAND, not just at the nominal
+        # point. The band on a vented magazine spans more than an order
+        # of magnitude and a wall's response is not linear in the load,
+        # so a verdict at the middle says nothing about whether it holds
+        # at the ends. Three answers, and the third is an answer.
+        if out['band'] is not None:
+            from . import sensitivity as _sens
+            v = _sens.structural_verdict(out['band'], comp)
+            out['verdict'] = v
+            if v['verdict'] == 'undetermined_within_band':
+                rep.warnings.append(
+                    f'STRUCTURAL VERDICT UNDETERMINED. The element '
+                    f'survives the low end of the band '
+                    f'({v["low"]["p_max"]/1e6:.3f} MPa, mu '
+                    f'{v["low"]["ductility"]:.2f}) and yields at the high '
+                    f'end ({v["high"]["p_max"]/1e6:.3f} MPa, mu '
+                    f'{v["high"]["ductility"]:.2f}). Whether this wall '
+                    f'holds depends on a burn law nobody has measured for '
+                    f'this material; a closed-vessel record on the real '
+                    f'propellant is what settles it, and nothing else '
+                    f'will.')
+            else:
+                rep.notes.append(
+                    f'Structural verdict: {v["verdict"].replace("_", " ")} '
+                    f'(mu {v["low"]["ductility"]:.2f} at the low end, '
+                    f'{v["high"]["ductility"]:.2f} at the high). '
+                    + v['note']
+                    + ('' if v['ranges_sourced'] else
+                       ' The band it is taken across rests on ranges that '
+                       'are a judgement, so this robustness is only as '
+                       'wide as that judgement.'))
     return out

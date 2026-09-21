@@ -257,6 +257,45 @@ def main():
     check('and the caveat is IN the page, not left to the reader',
           'UNSOURCED' in page)
 
+    # THE VERDICT ACROSS THE BAND, wired through. A verdict at the
+    # nominal point of a band spanning an order of magnitude is not a
+    # verdict about the structure, it is a verdict about the middle of a
+    # guess.
+    print('\n  and the structural verdict across both ends of it')
+    with_wall = replace(banded, span_m=3.0, mass_per_area=300.0,
+                        Ru_pa=250e3, kE_pa_m=3.0e7, support='simple')
+    out4 = asm.run(with_wall)
+    v = out4['verdict']
+    check('a case with both a band and an element gets a verdict at each '
+          'end of the band, not one at the middle',
+          v is not None and 'low' in v and 'high' in v
+          and v['verdict'] in ('fails_across_band', 'survives_across_band',
+                               'undetermined_within_band'),
+          f"{v['verdict']}: mu {v['low']['ductility']:.2f} to "
+          f"{v['high']['ductility']:.2f}")
+    check('the two ends really are the ends of the band it was taken '
+          'across', abs(v['low']['p_max'] - out4['band']['low']['p_max']) < 1
+          and abs(v['high']['p_max'] - out4['band']['high']['p_max']) < 1)
+    check('and the report carries it, either as a warning when it flips '
+          'or as a note when it does not',
+          any('VERDICT UNDETERMINED' in m for m in out4['report'].warnings)
+          or any('Structural verdict' in m for m in out4['report'].notes),
+          str(out4['report'].notes[-1:] + out4['report'].warnings[-1:]))
+    vpath = os.path.join(os.path.dirname(path), 'verdict.html')
+    vs = hd13.save_hd13_report(vpath, prop=out4['prop'],
+                               confined=out4['confined'],
+                               sensitivity=out4['sensitivity'],
+                               sensitivity_note=out4['sensitivity_note'],
+                               verdict=v)
+    with open(vpath, encoding='utf-8') as fh:
+        vpage = fh.read()
+    check('the page shows both ends side by side and names the verdict',
+          'survive the band' in vpage
+          and v['verdict'].replace('_', ' ') in vpage, str(vs))
+    check('a case with an element but NO band gets no verdict, rather '
+          'than one computed at a single point and called robust',
+          asm.run(replace(with_wall, sensitivity=False))['verdict'] is None)
+
     print('\nASSESSMENT: ' + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
     return 1 if FAIL else 0
 

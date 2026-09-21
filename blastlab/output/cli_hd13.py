@@ -94,6 +94,7 @@ def run_and_report(case_path, out_path=None, quiet=False):
         radiation=out['radiation'], figures=figures,
         sensitivity=out['sensitivity'],
         sensitivity_note=out['sensitivity_note'],
+        verdict=out['verdict'],
         title=case.name or None)
 
     if not quiet:
@@ -116,5 +117,10 @@ def run_and_report(case_path, out_path=None, quiet=False):
             else:
                 print(f"  structure  mu {s.ductility:.3f}   {s.regime}"
                       f"   theta {s.support_rotation_deg:.2f} deg")
+        if out['verdict'] is not None:
+            v = out['verdict']
+            print(f"  verdict    {v['verdict'].replace('_', ' ').upper()}"
+                  f"   (mu {v['low']['ductility']:.2f} at the low end of "
+                  f"the band, {v['high']['ductility']:.2f} at the high)")
         print(f'\n  report: {out_path}\n')
     return out_path
