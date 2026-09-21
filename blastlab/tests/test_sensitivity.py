@@ -90,6 +90,67 @@ def main():
           f"{vented['at_high']['p_max']}")
 
     # ── 3. THE CORNERS ARE CHECKED, NOT ASSERTED ────────────────────────
+    # ── 3b. THE FOURTH AXIS ─────────────────────────────────────────────
+    #
+    # `h_c` is a film coefficient nobody here has measured, and it moves
+    # the state handed to the CFD by far more than it moves any single
+    # pressure: at burst, 12.4 % on the mass burnt against 1.4 % on T. A
+    # band taken over the burn law alone reports itself NARROWER THAN IT
+    # IS, so h_c is an axis of the box and not an input to it.
+    print('\n  heat loss as the fourth axis, not as a fixed input')
+    warm = sens.band(p, 5.0, 1.0, vent_area=0.02, t_end=10.0,
+                     p0_chamber=d.P_AMB, h_c=200.0, wall_area=6.0)
+    check('a case with heat loss gets a FOUR-dimensional box, and says '
+          'the envelope covers the assumption',
+          warm['spans_heat_loss'] and len(warm['params']) == 4
+          and 'h_c' in warm['params'],
+          f"{warm['n_runs']} runs over {warm['params']}")
+    check('and the extremes carry a sign on that axis, so it is really '
+          'being varied rather than carried along',
+          len(warm['low_signs']) == 4 and len(warm['high_signs']) == 4,
+          f"low {warm['low_signs']}, high {warm['high_signs']}")
+    check('an ADIABATIC case cannot perturb it - zero times anything is '
+          'zero - so the band says it does NOT span the assumption '
+          'rather than inventing an h_c for someone who chose adiabatic',
+          not vented['spans_heat_loss'] and vented['h_c_nominal'] == 0.0)
+    check('and the summary line says so where the number is read, not in '
+          'a footnote',
+          'NOT over heat loss' in sens.summary_line(vented)
+          and 'h_c x/' in sens.summary_line(warm))
+    check('the adiabatic box costs less because half of it would be '
+          'duplicates, and that is a saving rather than a silent gap',
+          vented['n_runs'] < warm['n_runs'],
+          f"{vented['n_runs']} against {warm['n_runs']} runs")
+
+    # AND ON SOME CASES h_c IS NOT A CONTRIBUTOR TO THE BAND, IT IS THE
+    # BAND. The sharpest demonstration is the cheapest: in a CLOSED
+    # vessel the peak is the thermodynamic limit and the burn law does
+    # not appear in it at all, so a band over a, n and p_extinction has
+    # ZERO width - it would report "this number is tight". Heat loss
+    # moves it, and nothing else does.
+    #
+    # Measured on a sealed 20 kg magazine the same effect is less
+    # absolute and just as decisive: over the burn law alone the
+    # envelope is x1.02, and with h_c at a factor of two it is x1.37.
+    # Which parameter dominates is a property of the CASE, which is
+    # exactly why an axis may not be left out for being usually small.
+    cold_band = sens.band(p, 5.0, 1.0, vent_area=0.0, t_end=30.0,
+                          check_corners=False)
+    warm_band = sens.band(p, 5.0, 1.0, vent_area=0.0, t_end=30.0,
+                          check_corners=False, h_c=2000.0, wall_area=6.0)
+    check('in a closed vessel the burn law cannot move the peak at all, '
+          'so a band without h_c reports ZERO width - a number that '
+          'looks certain and is not',
+          cold_band['spread'] < 1.0 + 1e-9,
+          f"x{cold_band['spread']:.6f} over a, n and p_ext")
+    check('while the SAME band with h_c as an axis is not zero - so on '
+          'this case h_c is not a contributor to the width, it is the '
+          'whole of it',
+          warm_band['spread'] > 1.05,
+          f"x{warm_band['spread']:.3f} once heat loss is an axis "
+          f"({warm_band['low']['p_max']/1e6:.3f} to "
+          f"{warm_band['high']['p_max']/1e6:.3f} MPa)")
+
     print('\n  corners, and whether they are the hull')
     check('the face centres are sampled as well, so "corners are enough" '
           'is a measurement',
