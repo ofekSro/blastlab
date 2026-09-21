@@ -197,7 +197,7 @@ def burn(prop, charge_kg, scenario=None, t_end=None, n_out=600,
 
 
 def compare(prop, charge_kg, volume_m3, vent_area=0.0, scenario=None,
-            t_end=1.0, **kw):
+            t_end=1.0, component=None, **kw):
     """Run both branches on one charge and one fire, and say which load
     governs.
 
@@ -205,12 +205,46 @@ def compare(prop, charge_kg, volume_m3, vent_area=0.0, scenario=None,
     docstring - and the point of putting them side by side is exactly
     that the same material is negligible in the open and dangerous in a
     room. Returns (confined_result, unconfined_result, summary).
+
+    WHAT "GOVERNS" MEANS, AND WHY IT NEEDS A STRUCTURE
+    --------------------------------------------------
+    `governing_confined` used to flip at 2 x ambient. That is a round
+    number wearing the clothes of a structural criterion, and it was
+    wrong in the direction that matters: a sealed magazine reaching
+    ~94 kPa of QUASI-STATIC overpressure - which will take an
+    unreinforced masonry wall apart - came back labelled 'thermal',
+    because 94 is less than 101.
+
+    The fix is not a better round number. Picking one (5 psi, say) would
+    mean typing a threshold out of a safety standard from memory, which
+    is exactly why `core/qd.py` ships its table empty. So the label is
+    now DERIVED when it can be and REFUSED when it cannot:
+
+        component given     the pressure is run through `core/sdof.py`
+                            against that element's own resistance, and
+                            'pressure' means it actually yielded
+        no component        'undetermined' - with the ratio and the
+                            overpressure in the summary, for a reader
+                            who has a wall in mind and this code does not
+
+    A label that says 'undetermined' is more use than one that says
+    'thermal' because 94 < 101.
     """
     from . import deflagration
     conf = deflagration.simulate(prop, charge_kg, volume_m3,
                                  vent_area=vent_area, scenario=scenario,
                                  t_end=t_end, **kw)
     unconf = burn(prop, charge_kg, scenario=scenario)
+
+    # Derived, or refused. See the docstring.
+    sdof_res, governing = None, 'undetermined'
+    if component is not None:
+        from . import sdof as _sdof
+        sdof_res = _sdof.response(conf['t'], conf['p'], component,
+                                  p_ref=kw.get('p_amb', P_AIR))
+        governing = ('pressure' if (sdof_res.yielded or sdof_res.collapsed)
+                     else 'thermal')
+
     summary = dict(
         confined_p_max=conf['p_max'],
         confined_overpressure=conf['p_max'] - P_AIR,
@@ -221,11 +255,23 @@ def compare(prop, charge_kg, volume_m3, vent_area=0.0, scenario=None,
         unconfined_energy_total=unconf['energy_total'],
         simultaneous_limit=unconf['simultaneous_limit'],
         scenario_kind=unconf['scenario_kind'],
-        governing_confined=('pressure' if conf['p_max'] > 2.0 * P_AIR
-                            else 'thermal'),
+        # 'pressure' | 'thermal' | 'undetermined' - see the docstring.
+        # NOT a pressure threshold: that was a round number pretending to
+        # be a structural criterion, and it called 94 kPa quasi-static
+        # 'thermal' because 94 < 101.
+        governing_confined=governing,
+        governing_confined_basis=('sdof' if component is not None
+                                  else 'none - no component given'),
+        confined_yielded=(None if sdof_res is None else sdof_res.yielded),
+        confined_collapsed=(None if sdof_res is None
+                            else sdof_res.collapsed),
+        confined_ductility=(None if sdof_res is None
+                            else sdof_res.ductility),
         # In the open there is no structural pressure load to govern
         # anything - which is the entire reason the thermal path is in
-        # scope rather than out of it.
+        # scope rather than out of it. This one needs no element: the
+        # claim is that there is no wave to resist, not that some wall
+        # survives it.
         governing_unconfined=('thermal' if unconf['blast_negligible']
                               else 'pressure'),
     )
