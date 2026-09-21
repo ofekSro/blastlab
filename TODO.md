@@ -450,6 +450,41 @@ Automatic cleanup runs on GUI start; disable with `auto_cleanup: false` in
 
 ---
 
+## Closed items that code comments still cite
+
+These are **done**. They stay named here because comments in the source point at
+this file by id, and a reference that resolves to nothing is worse than a long file.
+
+### `N5-7` · ✅ closed 2026-09-20 — `det_radii` is now the default
+
+Cited by `solvers/foam/writer.py:1308` and `tests/test_foam_writer.py:599`.
+
+`writer.default_det_radius` now **always** writes `initiation.radii`, at a radius of
+0.9 cells of the mesh *at the detonation point* (it follows `lmax` and AMR, otherwise
+a base-cell radius would ignite dozens of refined cells).
+
+**Why it works:** the `radius_ > small` branch tests **cell centres**, and every cell
+centre belongs to exactly one rank — so it is partition-invariant **by construction**,
+not by measurement.
+
+**Acceptance measurements:** the seed goes from 1-vs-4 to `sum(lambda) = 4.000000` in
+both serial and the worst-case parallel; at an engineering-range gauge **+0.006 %** on
+peak and **0.000 %** on impulse and arrival, against +1.5 % for the `findCell` path;
+the Kingery-Bulmash anchor **did not move at all** (0.89/0.85/0.86/0.87), so the
+afterburn calibration needs no refit; `test_regression.py` stayed byte-green.
+
+> **The cost, stated explicitly:** foam results from before 2026-09-20 are not
+> byte-comparable. The serial peak in the measured case went 19914 → 19607 kPa
+> (−1.5 %), because a ball of radius ~dx around a corner point ignites the 4 cells
+> meeting there instead of the one cell `findCell` chose arbitrarily. 15 goldens were
+> updated — one `radii` line in each, zero deletions.
+
+**What is still open from it** is the residual ≈2 % parallel offset in P1 above — the
++7 % at `scotch np=2` is **not** this mechanism. Full history:
+[docs/verification/blastfoam-claims.md](docs/verification/blastfoam-claims.md).
+
+---
+
 ## Standing rules for every task
 
 ```

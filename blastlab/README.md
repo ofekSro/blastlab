@@ -1,3 +1,8 @@
+> **Academic CFD — blast-wave gas dynamics, Technion.** This project computes a
+> pressure field in air and the structural load it produces, for blast-resistant
+> design and explosive-safety siting (UFC 3-340-02, Kingery-Bulmash).
+> Energetic materials enter only as a published equation of state. Scope: [../docs/SCOPE.md](../docs/SCOPE.md)
+
 # blastlab
 
 Finite-volume blast wave solvers (pure NumPy) with cross-dimension

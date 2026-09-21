@@ -1,3 +1,8 @@
+> **Academic CFD — blast-wave gas dynamics, Technion.** Learning material for
+> blastFoam, the public open-source airblast solver. This project computes a pressure
+> field in air and the structural load it produces, for blast-resistant design and
+> explosive-safety siting. Scope: [../../../docs/SCOPE.md](../../../docs/SCOPE.md)
+
 # BlastFOAM Quick Reference / דף עזר מהיר
 ═══════════════════════════════════════════════════════════════
 

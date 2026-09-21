@@ -1,3 +1,10 @@
+> **Academic CFD — blast-wave gas dynamics, Technion.** Published equation-of-state
+> data (LLNL Explosives Handbook, Dobratz & Crawford, UCRL-52997) used to simulate a
+> pressure field in air for blast-resistant design and explosive-safety siting.
+> These are pressure-volume-energy constants for gas that has already reacted; they
+> say nothing about how a material is made, mixed, initiated or handled.
+> Scope: [../../../docs/SCOPE.md](../../../docs/SCOPE.md)
+
 # פרמטרי JWL לחומרי נפץ נפוצים
 # JWL Parameters for Common Explosives
 # =====================================
