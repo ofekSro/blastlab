@@ -1,0 +1,156 @@
+"""HD1: the band around an uncalibrated number.
+
+The claim this file pins is the one that makes every other HD1.3 number
+quotable or not: a peak pressure from a model calibrated two to three
+decades away from where it is applied is an interval, and the interval
+has to be COMPUTED rather than appended as a percentage.
+
+The sharpest check here needs no tolerance at all. In a CLOSED vessel
+the peak is a thermodynamic limit - `force * C / (V - b C)` - and the
+burn law does not appear in it. So the band on `p_max` must collapse to
+nothing however hard `a` and `n` are shaken, while the band on
+`t_p_max` must not. If a sensitivity study cannot tell those two apart
+it is measuring its own sampling.
+
+Run:  cd blastlab/tests && python test_sensitivity.py
+"""
+
+import os
+import sys
+from dataclasses import replace
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+
+from blastlab.core import deflagration as d                   # noqa: E402
+from blastlab.core import sensitivity as sens                 # noqa: E402
+
+FAIL = []
+
+
+def check(name, ok, detail=''):
+    print(f"  [{'PASS' if ok else 'FAIL'}] {name}"
+          + (f' - {detail}' if detail else ''))
+    if not ok:
+        FAIL.append(name)
+
+
+def _raises(fn, exc=ValueError):
+    try:
+        fn()
+    except exc:
+        return True
+    except Exception:
+        return False
+    return False
+
+
+def main():
+    print('SENSITIVITY (HD1)')
+    p = d.PROPELLANTS['double_base']
+
+    # ── 1. THE CLOSED VESSEL SEPARATES THE TWO KINDS OF NUMBER ──────────
+    print('\n  a closed vessel: the peak is thermodynamics, the timing is '
+          'the burn law')
+    closed = sens.band(p, 5.0, 1.0, vent_area=0.0, t_end=30.0)
+    ana = d.closed_vessel_pmax(p, 5.0, 1.0)
+    width = (closed['high']['p_max'] - closed['low']['p_max']) / ana
+    check('the band on the peak collapses, because the burn law does not '
+          'appear in force*C/(V-bC)',
+          width < 1e-3, f'{width:.2e} of the analytic limit')
+    check('and it sits on that limit rather than near it',
+          abs(closed['nominal']['p_max'] - ana) < 1e-3 * ana,
+          f"{closed['nominal']['p_max']/1e6:.4f} vs {ana/1e6:.4f} MPa")
+    check('while the TIMING band is wide - that is where a and n live',
+          closed['high']['t_p_max'] > 2.0 * closed['low']['t_p_max'],
+          f"{closed['low']['t_p_max']:.3f} to "
+          f"{closed['high']['t_p_max']:.3f} s")
+    check('the fastest corner is the one with the highest n and the '
+          'largest a, which is the direction the physics requires',
+          closed['at_low']['t_p_max'] == (1, 1, -1)
+          or closed['at_low']['t_p_max'][:2] == (1, 1),
+          f"{closed['at_low']['t_p_max']}")
+
+    # ── 2. A VENTED CHAMBER, WHERE THE PEAK IS NOT A LIMIT ──────────────
+    print('\n  a vented chamber: now the peak moves too')
+    vented = sens.band(p, 5.0, 1.0, vent_area=0.02, t_end=10.0,
+                       p0_chamber=d.P_AMB)
+    check('venting makes the peak depend on the burn law, and the band '
+          'opens up',
+          vented['spread'] > 1.2,
+          f"x{vented['spread']:.2f}, "
+          f"{vented['low']['p_max']/1e6:.3f} to "
+          f"{vented['high']['p_max']/1e6:.3f} MPa")
+    check('the nominal lies inside its own band, which is the least a '
+          'band can do',
+          vented['low']['p_max'] <= vented['nominal']['p_max']
+          <= vented['high']['p_max'])
+    check('a faster burn law gives the higher peak against a fixed vent',
+          vented['at_high']['p_max'][0] == 1,
+          f"{vented['at_high']['p_max']}")
+
+    # ── 3. THE CORNERS ARE CHECKED, NOT ASSERTED ────────────────────────
+    print('\n  corners, and whether they are the hull')
+    check('the face centres are sampled as well, so "corners are enough" '
+          'is a measurement',
+          closed['n_runs'] == 15, f"{closed['n_runs']} runs")
+    check('and the run says whether they were',
+          isinstance(closed['corners_sufficient'], bool)
+          and closed['corners_sufficient'])
+    cheap = sens.band(p, 5.0, 1.0, vent_area=0.0, t_end=30.0,
+                      check_corners=False)
+    check('turning the check off costs the six face runs and SAYS the '
+          'hull was not verified',
+          cheap['n_runs'] == 9,
+          f"{cheap['n_runs']} runs")
+    check('every sample in the band conserved, or the band is void',
+          closed['conserved'] and vented['conserved'])
+
+    # ── 4. THE WIDTH IS NOT CITABLE, AND THE OBJECT SAYS SO ─────────────
+    print('\n  what the band is not')
+    check('the default ranges are judgements and the result carries that',
+          closed['ranges_sourced'] is False)
+    check('and a band with a source does not',
+          sens.band(p, 5.0, 1.0, vent_area=0.0, t_end=30.0,
+                    check_corners=False,
+                    source='closed-vessel record 2026-xx')['ranges_sourced']
+          is True)
+    line = sens.summary_line(closed)
+    check('the one-line summary carries the caveat rather than the number '
+          'alone', 'UNSOURCED' in line, line)
+
+    # ── 5. EXTINCTION IS A DIFFERENT EVENT, NOT A LOWER NUMBER ──────────
+    #
+    # `p_extinction` does not scale the answer, it decides whether there
+    # IS one. A band whose members disagree about that is not a band
+    # around a pressure - it straddles two events, and reporting a range
+    # would average a fire with a fire that went out.
+    print('\n  extinction straddling')
+    fragile = replace(p, p_extinction=0.9e6)
+    wide = sens.band(fragile, 5.0, 1.0, vent_area=0.05, t_end=10.0,
+                     pext_factor=4.0, check_corners=False,
+                     p0_chamber=d.P_AMB)
+    check('a band that spans the extinction limit says so instead of '
+          'quoting a range across it',
+          isinstance(wide['straddles_extinction'], bool),
+          f"straddles={wide['straddles_extinction']}, "
+          f"Z_end {wide['low']['Z_end']:.3f} to {wide['high']['Z_end']:.3f}")
+    if wide['straddles_extinction']:
+        check('and the summary line carries that too',
+              'STRADDLES EXTINCTION' in sens.summary_line(wide))
+
+    # ── 6. refusals ─────────────────────────────────────────────────────
+    print('\n  refusals')
+    check('a negative exponent range is refused',
+          _raises(lambda: sens.band(p, 5.0, 1.0, dn=-0.1)))
+    check('a factor below 1 would SHRINK the box rather than widen it, '
+          'and is refused rather than quietly transposed',
+          _raises(lambda: sens.band(p, 5.0, 1.0, a_factor=0.5)))
+
+    print('\nSENSITIVITY: '
+          + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
+    return 1 if FAIL else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

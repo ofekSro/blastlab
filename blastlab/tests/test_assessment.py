@@ -213,6 +213,50 @@ def main():
           and out2['sdof'] is None)
     check('but the chamber ran', out2['confined']['p_max'] > 101325.0)
 
+    # ── THE BAND REACHES THE REPORT, not just the module ────────────────
+    #
+    # Nothing in PROPELLANTS is calibrated, so the peak above is a point
+    # estimate from a burn law fitted two decades away from where it is
+    # being evaluated. The band exists to say so, and it is only worth
+    # anything if it travels with the number rather than living in a
+    # function nobody calls.
+    print('\n  the sensitivity band, wired through to the report')
+    banded = replace(lean, sensitivity=True, t_end=10.0, n_cohorts=8,
+                     sens_pext_factor=1.5)
+    out3 = asm.run(banded)
+    b = out3['band']
+    check('a case that asks for a band gets one, and it brackets the '
+          'number it qualifies',
+          b is not None
+          and b['low']['p_max'] <= out3['confined']['p_max']
+          <= b['high']['p_max'],
+          f"{b['low']['p_max']/1e6:.3f} <= "
+          f"{out3['confined']['p_max']/1e6:.3f} <= "
+          f"{b['high']['p_max']/1e6:.3f} MPa")
+    check('every sample in it conserved',
+          b['conserved'], f"{b['n_runs']} runs")
+    check('the run reports how wide the uncertainty is AS A WARNING, '
+          'beside the number and not in a footnote',
+          has(out3['report'], 'uncertain by a factor of'),
+          str(out3['report'].warnings))
+    check('and that the width itself rests on a judgement, because no '
+          'row here is calibrated',
+          b['ranges_sourced'] is False
+          and has(out3['report'], 'not citable either'))
+    check('a case that did not ask for one is not charged for it',
+          out2['band'] is None and out2['sensitivity'] is None)
+    banded_path = os.path.join(os.path.dirname(path), 'banded.html')
+    sect = hd13.save_hd13_report(
+        banded_path, prop=out3['prop'],
+        confined=out3['confined'], sensitivity=out3['sensitivity'],
+        sensitivity_note=out3['sensitivity_note'])
+    check('the report renders the envelope section from that same bundle',
+          'sensitivity' in sect, str(sect))
+    with open(banded_path, encoding='utf-8') as fh:
+        page = fh.read()
+    check('and the caveat is IN the page, not left to the reader',
+          'UNSOURCED' in page)
+
     print('\nASSESSMENT: ' + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
     return 1 if FAIL else 0
 

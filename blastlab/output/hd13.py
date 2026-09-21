@@ -72,7 +72,7 @@ solid #e0a800;padding:8px 12px;margin:10px 0;font-size:0.92em}"""
 def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                      sdof=None, component=None, calibration=None,
                      thermal=None, radiation=(), sensitivity=None,
-                     oat=(), figures=(), title=None):
+                     sensitivity_note='', oat=(), figures=(), title=None):
     """Write the whole HD 1.3 analysis as one self-contained .html.
 
     Every argument is optional: the report prints the sections it was
@@ -281,6 +281,11 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                  '<p class="meta">One envelope over the corners of the '
                  'uncertain inputs - not a set of runs to choose from.</p>'
                  + _table(('Quantity', 'Low', 'High'), rows))
+        # The caveats travel with the band and not in a footnote: the
+        # width rests on ranges that are usually a judgement, and a band
+        # that straddles extinction is not an interval at all.
+        if sensitivity_note:
+            p.append(f'<p class="warn">{html.escape(sensitivity_note)}</p>')
         if oat:
             p.append('<p class="meta">Which knob dominates, one at a '
                      'time:</p>'

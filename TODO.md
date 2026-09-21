@@ -607,6 +607,7 @@ python test_foam_amr_ingest.py    # AMR per-time ingest on fake time dirs
 python test_deflagration.py       # HD1: the 0D burn model
 python test_sdof.py               # HD1: the SDOF structural response
 python test_unconfined.py         # HD1: the unconfined branch
+python test_sensitivity.py        # HD1: the band around an uncalibrated peak
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py
 python test_viz3d_panel.py / test_viz3d_protocol.py
