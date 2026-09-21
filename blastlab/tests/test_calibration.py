@@ -92,13 +92,13 @@ def from_simulate(prop, charge_kg, volume_m3, n_out=1200):
     return np.asarray(r['t']), np.asarray(r['p'])
 
 
-def simulate_or_fail(prop, charge_kg, volume_m3, n_out=1200):
+def simulate_or_fail(prop, charge_kg, volume_m3, n_out=1200, **kw):
     """`simulate` to burn-out, refusing anything that did not conserve or
     did not finish - a calibration must never be fitted to a broken run."""
     t_end = 0.5
     for _ in range(12):
         r = d.simulate(prop, charge_kg, volume_m3, vent_area=0.0,
-                       t_end=t_end, n_out=n_out)
+                       t_end=t_end, n_out=n_out, **kw)
         if r['burnt_out']:
             break
         t_end *= 4.0
@@ -288,6 +288,53 @@ def main():
           e_cv < TOL_N, f"n = {conv['n']:.4f} ({e_cv:.2%} off)")
     check('the cheap scaled correction helps too, without needing h_c',
           e_sc < e_ad, f"scaled {scaled['n']:.4f} ({e_sc:.2%})")
+
+    # ── 4b. THE ROUND TRIP THAT WAS NOT CLOSEABLE BEFORE ────────────────
+    #
+    # Until 2026-09-21 this section could only inject heat loss into
+    # `_synthetic`, because `simulate` had none: the inversion corrected
+    # for a loss the forward model did not apply. So the correction was
+    # only ever tested against a march written in this same file, and
+    # "the heat correction works" meant "it undoes what the test put in".
+    #
+    # Now the loss is in the solver, and the loop closes on the solver:
+    # burn with h_c, reduce with the same h_c, get n back. That is a
+    # statement about the model rather than about this file.
+    print('\n  and the same round trip through simulate() itself')
+    r_hot = simulate_or_fail(deg, C, V, h_c=hc, wall_area=wall)
+    t_s, p_s = np.asarray(r_hot['t']), np.asarray(r_hot['p'])
+    check('the solver gives the wall a real share of the energy, and '
+          'reports how much',
+          0.01 < r_hot['wall_loss_fraction'] < 0.5
+          and not r_hot['adiabatic'],
+          f"{r_hot['Q_wall']/1e6:.2f} MJ, "
+          f"{r_hot['wall_loss_fraction']:.1%} of what was released")
+    check('and it still conserves, with the wall term carried in the '
+          'identity rather than excused from it',
+          r_hot['conservation_residual'] < 1e-9,
+          f"{r_hot['conservation_residual']:.2e}")
+    r_cold = simulate_or_fail(deg, C, V)
+    check('losing heat lowers the peak, which is why adiabatic is the '
+          'conservative default and not the lazy one',
+          r_hot['p_max'] < r_cold['p_max'],
+          f"{r_hot['p_max']/1e6:.2f} against {r_cold['p_max']/1e6:.2f} MPa "
+          f"adiabatic")
+    conv_s = cal.reduce_closed_vessel(t_s, p_s, deg, C, V,
+                                      form_correction=True,
+                                      heat_loss='convective', h_c=hc,
+                                      wall_area=wall)
+    adia_s = cal.reduce_closed_vessel(t_s, p_s, deg, C, V,
+                                      form_correction=True, heat_loss='none')
+    e_cv_s = abs(conv_s['n'] - n_true) / n_true
+    e_ad_s = abs(adia_s['n'] - n_true) / n_true
+    check('reducing a SOLVER record with the same h_c recovers the '
+          f'exponent to {TOL_N:.0%} - the correction now inverts the '
+          'model, not this file',
+          e_cv_s < TOL_N, f"n = {conv_s['n']:.4f} ({e_cv_s:.2%} off)")
+    check('and ignoring the loss still biases it, on the solver record too',
+          e_ad_s > e_cv_s,
+          f"adiabatic {adia_s['n']:.4f} ({e_ad_s:.2%}) vs "
+          f"corrected {conv_s['n']:.4f} ({e_cv_s:.2%})")
 
     # ── 5. the full fit and its report ──────────────────────────────────
     print('\n  fit_closed_vessel')

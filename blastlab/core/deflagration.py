@@ -62,6 +62,7 @@ means.
 """
 
 import math
+from dataclasses import replace as _dc_replace
 
 from . import scenario as _scenario
 from .fuels import (Propellant, PROPELLANTS, PROPELLANT_NAMES,  # noqa: F401
@@ -134,6 +135,35 @@ _CONSERVATION_TOL = 1.0e-6
 #: Cash-Karp returns 275.000 and 122.222 exactly, in fewer steps than the
 #: old scheme took to get them wrong. The suite now spans 0.2 to 200.
 _VERIFIED_LOADING_RANGE = (0.2, 200.0)
+
+#: THE SAME FAILURE AGAIN, ONE LAYER UP - and this is why the check below
+#: is on by default rather than offered.
+#:
+#: `n_cohorts` looks like a modelling choice and is a DISCRETISATION
+#: parameter. A flame spread is continuous; cohorts replace it with n
+#: instantaneous ignitions of C/n each. In a chamber that is already
+#: quasi-steady - which is what a slow magazine fire produces - one such
+#: step IS the entire pressure signal, so `p_max` is the size of the step
+#: rather than a property of the fire. Measured on 5 kg in 1 m^3 vented
+#: through 0.02 m^2 with chamber air, against the n-refined answer:
+#:
+#:     spread  0.5 s    n=20 is  +0.7 %      (converged)
+#:     spread    2 s    n=20 is  +2.6 %
+#:     spread   10 s    n=20 is   +37 %
+#:     spread   60 s    n=20 is   +62 %      1.65 x ambient against 1.02
+#:
+#: The error grows with spread time because the slower the fire, the more
+#: completely the chamber has settled between ignitions. So the model was
+#: right where a fire is fast and wrong where it is slow - and a magazine
+#: is the slow end. That is the third time this shape of bug has appeared
+#: here (the integrator above, the chamber air in `air_mass`), and every
+#: time the common factor is the same: verified in the regime it was
+#: written for, applied in the one it was meant for.
+#:
+#: `scenario.cohorts()` claimed refining n "does not change the answer".
+#: Splitting by mass makes it CONVERGE, first order - which is a weaker
+#: statement, and the difference between them is a factor of 1.6.
+_COHORT_TOL = 0.02
 
 #: Air, for the chamber's own atmosphere (HD1-3-pre).
 AIR_R = 287.05          # J/(kg K)
@@ -361,7 +391,7 @@ def _pressure(prop, charge_kg, volume_m3, Z, m, E, m_a=0.0):
 
 
 def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
-            state, t):
+            state, t, h_c=0.0, wall_area=0.0, T_wall=300.0):
     """d/dt of (Z_0 .. Z_{k-1}, m, E) at time `t`.
 
     Non-autonomous, because cohorts light at their own times. Every
@@ -369,19 +399,35 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     integrated together - see core/scenario.py on why convolution does
     not work here.
     """
-    """State is (Z_0..Z_{k-1}, m, E, m_a, m_out_p, m_out_a, E_out).
+    """State is (Z_0..Z_{k-1}, m, E, m_a, m_out_p, m_out_a, E_out, Q_wall).
 
-    The last three are ACCUMULATORS - everything that has left through
-    the vent, integrated alongside everything that stayed. They cost one
-    addition each and they turn conservation into an identity the run can
-    check on itself:
+    The last four are ACCUMULATORS - everything that has left, whether
+    through the vent or into the walls, integrated alongside everything
+    that stayed. They cost one addition each and they turn conservation
+    into an identity the run can check on itself:
 
-        m     + m_out_p == charge * z          products
-        m_a   + m_out_a == m_a0                air
-        E     + E_out   == E_in                energy
+        m   + m_out_p           == charge * z    products
+        m_a + m_out_a           == m_a0          air
+        E   + E_out  + Q_wall   == E_in          energy
 
     That is what `_conservation_residual` reads, and it is the difference
     between an integrator that fails and one that fails SILENTLY.
+
+    HEAT LOSS is `Q_wall = h_c * A_w * (T - T_wall)`, the lumped
+    convective law, and it is OFF by default (`h_c = 0`) for a reason
+    that is not convenience: adiabatic is the CONSERVATIVE case for a
+    pressure check. Removing heat lowers T and therefore p, so switching
+    this on makes the structural load smaller. It exists because
+    `core/calibration.py` already inverts FOR heat loss - a closed-vessel
+    record reduced with `heat_loss='convective'` was being matched
+    against a forward model that had none - and because the wall
+    temperature the thermal path reports is only meaningful if the gas it
+    came from actually gave that energy up.
+
+    `T_wall` is held fixed, which over-states the loss late in a long
+    burn as a real wall heats up. That errs towards a lower pressure,
+    i.e. NOT conservatively, which is the second reason the default is
+    off rather than a plausible-looking number.
     """
     k = len(fracs)
     Zs, m, E, m_a = state[:k], state[k], state[k + 1], state[k + 2]
@@ -410,13 +456,65 @@ def _derivs(prop, charge_kg, volume_m3, area, cd, p_amb, fracs, t_ign,
     yp = m / tot if tot > 0.0 else 1.0
     _R, _cv, cp_mix, _g = mixture(prop, m, m_a)
     e_out = mdot_out * cp_mix * T
+    # The wall term is NOT here. It is linear in T and its time constant
+    # m*cv/(h_c*A) collapses to ~1e-8 s while the chamber holds only the
+    # igniter seed, so an explicit stage cannot carry it: the first
+    # attempt drove E negative inside one step and every run with h_c > 0
+    # died at the step cap with a zero peak. It is applied exactly
+    # instead, in `_wall_relax`, split out of the Cash-Karp step.
     return tuple(dZs) + (
         mdot_gen - mdot_out * yp,
         mdot_gen * prop.cv * prop.T_flame - e_out,
         -mdot_out * (1.0 - yp),
         mdot_out * yp,                 # m_out_p
         mdot_out * (1.0 - yp),         # m_out_a
-        e_out)                         # E_out
+        e_out,                         # E_out
+        0.0)                           # Q_wall - see _wall_relax
+
+
+def _wall_relax(prop, m, m_a, E, h, h_c, wall_area, T_wall):
+    """Energy the walls take over a step of `h`, applied EXACTLY.
+
+    WHY THIS IS SPLIT OUT rather than being one more term in `_derivs`.
+    Convective loss is linear in T, so over a step with m frozen the gas
+    relaxes towards the wall on a time constant
+
+        tau = m * cv / (h_c * A)
+
+    and the solution is an exponential, not a polynomial. Two things
+    follow, and the first is what forced this:
+
+    STIFFNESS. At t = 0 the chamber holds only the igniter seed, so m is
+    a whisker and tau collapses - measured at ~1e-8 s for a 5 kg charge
+    in 1 m^3 against 6 m^2 of wall at h_c = 2000. An explicit stage sees
+    a 32 MW sink against a few kJ of gas and drives E negative inside one
+    step. That is not a bug in the integrator: Cash-Karp responded
+    correctly, by shrinking h until it hit the step cap, and every run
+    with h_c > 0 came back with a zero peak. The exponential form is
+    unconditionally stable and needs no step control at all.
+
+    AND IT CANNOT OVERSHOOT. `(1 - exp(-h/tau))` is bounded by 1, so the
+    gas is driven towards the wall temperature and never past it,
+    whatever the step. A polynomial term can and did sail through it.
+
+    Conservation stays exact because the same number is subtracted from
+    E and added to the Q_wall accumulator - see `_conservation_residual`.
+    """
+    if h_c <= 0.0 or wall_area <= 0.0 or h <= 0.0:
+        return 0.0
+    tot = m + m_a
+    if tot <= 0.0:
+        return 0.0
+    _R, cv_mix, _cp, _g = mixture(prop, m, m_a)
+    C_th = tot * cv_mix                      # J/K of the gas in there
+    if C_th <= 0.0:
+        return 0.0
+    T = E / C_th
+    x = h * h_c * wall_area / C_th           # = h / tau
+    # math.expm1 keeps the small-x end accurate, where the loss is a tiny
+    # fraction of a large energy and the difference of exponentials would
+    # cancel to noise.
+    return -C_th * (T - T_wall) * math.expm1(-x)
 
 
 def _ck_step(derivs, s, t, h, n, k1=None):
@@ -459,13 +557,14 @@ def _conservation_residual(prop, charge_kg, fracs, state, nZ, m_a0):
     Zs = state[:nZ]
     m, E, m_a = state[nZ], state[nZ + 1], state[nZ + 2]
     m_out_p, m_out_a, E_out = state[nZ + 3], state[nZ + 4], state[nZ + 5]
+    q_wall = state[nZ + 6]
     z = sum(f * Z for f, Z in zip(fracs, Zs))
     made = charge_kg * z
     e_in = made * prop.cv * prop.T_flame + m_a0 * AIR_CV * AIR_T0
     worst = 0.0
     for got, want in (((m + m_out_p), made),
                       ((m_a + m_out_a), m_a0),
-                      ((E + E_out), e_in)):
+                      ((E + E_out + q_wall), e_in)):
         scale = max(abs(want), 1e-30)
         worst = max(worst, abs(got - want) / scale)
     return worst
@@ -473,7 +572,8 @@ def _conservation_residual(prop, charge_kg, fracs, state, nZ, m_a0):
 
 def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
              t_end=1.0, p_amb=P_AMB, max_steps=500_000, n_out=1000,
-             p_ign=None, scenario=None, p0_chamber=0.0):
+             p_ign=None, scenario=None, p0_chamber=0.0,
+             refine_cohorts=True, h_c=0.0, wall_area=0.0, T_wall=300.0):
     """Integrate the chamber to `t_end` [s]. RK4 with an adaptive step.
 
     Returns a dict with the sampled trace (`t, p, T, Z, m, mdot_out`,
@@ -524,6 +624,22 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     asked for. A magazine passes `P_AMB`; at a magazine's loading density
     that air is comparable to the product gas and changes the answer.
     See `air_mass` for why the omission survived a 1e-6 verification.
+
+    `refine_cohorts` runs the case a second time at twice the cohort
+    count and reports how far `p_max` moved, as `cohort_refinement_error`
+    and `cohort_converged`. It is ON by default, it never changes
+    `p_max`, and it costs nothing on a uniform scenario, which is
+    n-independent by construction. See `_COHORT_TOL` for the measurement
+    that put it there: at a 60 s spread the usual n = 20 reports a peak
+    62 % high with nothing in the result saying so.
+
+    `h_c` [W/m2K], `wall_area` [m2] and `T_wall` [K] are the lumped
+    convective heat loss to the chamber walls. **It is off by default
+    (`h_c = 0`), and that default is the conservative one**: taking heat
+    out lowers T and therefore p, so a run with heat loss reports a
+    SMALLER structural load than the adiabatic bound. The energy removed
+    is reported as `Q_wall` [J] and is carried in the conservation
+    identity, so it cannot quietly go missing. See `_derivs`.
     """
     if charge_kg <= 0.0 or volume_m3 <= 0.0:
         raise ValueError('charge and chamber volume must both be positive')
@@ -569,7 +685,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     m_a = m_a0
     E = m * prop.cv * prop.T_flame + m_a * AIR_CV * AIR_T0
     # what has left, integrated alongside what stayed - see `_derivs`
-    m_out_p = m_out_a = E_out = 0.0
+    m_out_p = m_out_a = E_out = Q_wall = 0.0
     t = 0.0
     h_max = t_end / 50.0
     sample_every = t_end / max(n_out, 2)
@@ -585,7 +701,8 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
                 1.0e-12 * max(m_a0, 1.0e-6),        # m_a
                 1.0e-12 * max(charge_kg, 1.0),      # m_out_p
                 1.0e-12 * max(m_a0, 1.0e-6),        # m_out_a
-                1.0e-9 * _e_scale])                 # E_out
+                1.0e-9 * _e_scale,                  # E_out
+                1.0e-9 * _e_scale])                 # Q_wall
 
     out = dict(t=[], p=[], T=[], Z=[], m=[], m_air=[], mdot_out=[], lit=[])
     p_max, t_p_max = 0.0, 0.0
@@ -619,14 +736,15 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     t_burning = 0.0
     t_outside = 0.0
     def rhs(y, tt):
-        return _derivs(*args, y, tt)
+        return _derivs(*args, y, tt, h_c=h_c, wall_area=wall_area,
+                       T_wall=T_wall)
 
-    nstate = nZ + 6
+    nstate = nZ + 7
     h = h_max
     rejected = 0
     while t < t_end and steps < max_steps:
         steps += 1
-        s = tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out)
+        s = tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out, Q_wall)
         # Land ON the next ignition, never across it. A cohort lighting
         # inside a step is a discontinuity in the right-hand side, and
         # no error estimate can repair an average taken across one - it
@@ -672,6 +790,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
         nxt = list(y5)
         m, E, m_a = nxt[nZ], nxt[nZ + 1], max(nxt[nZ + 2], 0.0)
         m_out_p, m_out_a, E_out = nxt[nZ + 3], nxt[nZ + 4], nxt[nZ + 5]
+        Q_wall = nxt[nZ + 6]
         # Clipping an overshoot past Z = 1 has to take back the mass and
         # energy that were integrated along with it, or the chamber ends
         # up holding more gas than there was propellant. The old fixed
@@ -701,6 +820,13 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
                 E += charge_kg * left * prop.cv * prop.T_flame
         m = max(m, 0.0)
         E = max(E, 0.0)
+        # The walls, applied exactly over the step just taken rather than
+        # as a stage of it. See `_wall_relax` for why it cannot be a
+        # stage: at the seed its time constant is ~1e-8 s and it made
+        # every run with h_c > 0 die at the step cap.
+        _q = _wall_relax(prop, m, m_a, E, h_used, h_c, wall_area, T_wall)
+        E -= _q
+        Q_wall += _q
         # Attribute the step BEFORE advancing t: k1 was evaluated at the
         # start of it, so that is the pressure the burn law saw.
         z_start = sum(f * Z for f, Z in zip(fracs, s[:nZ]))
@@ -749,7 +875,7 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     # peak 2700x too low with stop_reason 't_end' and no other sign.
     resid = _conservation_residual(
         prop, charge_kg, fracs,
-        tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out), nZ, m_a0)
+        tuple(Zs) + (m, E, m_a, m_out_p, m_out_a, E_out, Q_wall), nZ, m_a0)
     out['conservation_residual'] = resid
     if resid > _CONSERVATION_TOL:
         stop_reason = 'conservation_violation'
@@ -777,6 +903,15 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     out['loading_verified'] = lo <= charge_kg / volume_m3 <= hi
     out['m_air0'] = m_a0
     out['p0_chamber'] = p0_chamber
+    #: energy given up to the walls over the whole run [J], and its share
+    #: of the energy released. Zero unless heat loss was asked for.
+    out['Q_wall'] = Q_wall
+    out['h_c'] = h_c
+    out['wall_area'] = wall_area
+    _e_released = charge_kg * out['Z'][-1] * prop.cv * prop.T_flame
+    out['wall_loss_fraction'] = (Q_wall / _e_released
+                                 if _e_released > 0.0 else 0.0)
+    out['adiabatic'] = (h_c <= 0.0 or wall_area <= 0.0)
     #: mass of chamber air relative to the product gas made. Above ~0.1
     #: the air is not a correction, and a run made with the default
     #: evacuated chamber is answering a different question.
@@ -790,6 +925,32 @@ def simulate(prop, charge_kg, volume_m3, vent_area=0.0, cd=0.8,
     out['n_cohorts'] = len(fracs)
     out['extrapolated_fraction'] = (t_outside / t_burning
                                     if t_burning > 0.0 else 0.0)
+
+    # THE COHORT COUNT IS A MESH, SO THE RUN REFINES IT AND SAYS WHAT
+    # HAPPENED. Nothing here touches `p_max`: the reported peak stays the
+    # one the caller's own scenario produced, and what gets added is
+    # whether that peak survives halving the ignition step. A uniform
+    # scenario is skipped because every cohort lights at t = 0 whatever n
+    # is, so there is nothing to refine and no reason to pay for it.
+    # See _COHORT_TOL.
+    out['cohort_refinement_error'] = 0.0
+    out['cohort_converged'] = True
+    out['p_max_refined'] = p_max
+    if (refine_cohorts and len(fracs) >= 2
+            and scenario.kind != 'uniform'
+            and stop_reason != 'conservation_violation'):
+        fine = simulate(prop, charge_kg, volume_m3, vent_area=vent_area,
+                        cd=cd, t_end=t_end, p_amb=p_amb,
+                        max_steps=max_steps, n_out=2, p_ign=p_ign,
+                        scenario=_dc_replace(scenario,
+                                             n_cohorts=2 * len(fracs)),
+                        p0_chamber=p0_chamber, refine_cohorts=False,
+                        h_c=h_c, wall_area=wall_area, T_wall=T_wall)
+        out['p_max_refined'] = fine['p_max']
+        if p_max > 0.0:
+            out['cohort_refinement_error'] = abs(fine['p_max'] - p_max) / p_max
+        out['cohort_converged'] = (
+            out['cohort_refinement_error'] <= _COHORT_TOL)
     return out
 
 

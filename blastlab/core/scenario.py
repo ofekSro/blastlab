@@ -11,14 +11,16 @@ that is usually far longer than any one item takes to burn.
 
 It changes the answer by more than anything else in the model. Measured
 here on 5 kg of double-base in a 1 m^3 chamber vented through 0.02 m^2,
-with everything else held fixed:
+with everything else held fixed, and REFINED in the cohort count until
+the numbers stopped moving (see `cohorts` for why that qualifier is not
+decoration - the earlier version of this table was not refined):
 
-    uniform                       3.99 MPa
-    flame spread over 0.5 s       1.43 MPa
-    flame spread over 2 s         0.31 MPa
-    flame spread over 10 s        0.12 MPa
+    uniform                       3.87 MPa
+    flame spread over 0.5 s       2.20 MPa
+    flame spread over 2 s         0.67 MPa
+    flame spread over 10 s        0.14 MPa
 
-a factor of 32 across a range of spread times that a real magazine could
+a factor of 28 across a range of spread times that a real magazine could
 easily span.
 
 Note WHICH WAY it errs, because it is not the simple way. Uniform
@@ -112,10 +114,22 @@ class IgnitionScenario:
     def cohorts(self):
         """[(mass_fraction, t_ignite)] - equal masses, unequal times.
 
-        Splitting by MASS rather than by time is what keeps the cohort
-        count from changing the answer: each group carries 1/n of the
-        charge whatever the spread law, so refining n refines the timing
-        only and converges instead of drifting.
+        Splitting by MASS rather than by time is what makes refining `n`
+        CONVERGE rather than drift: each group carries 1/n of the charge
+        whatever the spread law, so refining n refines the timing only.
+
+        THAT IS NOT THE SAME AS "n DOES NOT CHANGE THE ANSWER", which is
+        what this docstring used to say, and the gap between the two is
+        large enough to matter. `n` is a discretisation of a continuous
+        flame spread into n instantaneous ignitions of C/n each, and the
+        convergence is first order. In a chamber that has settled between
+        ignitions - a slow magazine fire - a single such step is the
+        whole pressure signal, and the peak reported is the size of the
+        step. Measured at a 60 s spread, n = 20 comes out 62 % high.
+
+        So `n` has to be refined until the answer stops moving, exactly
+        like a mesh. `deflagration.simulate` does that by default and
+        reports `cohort_converged`; see `deflagration._COHORT_TOL`.
         """
         n = self.n_cohorts
         frac = 1.0 / n

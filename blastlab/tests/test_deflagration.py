@@ -487,6 +487,130 @@ def main():
           and uni['calibration_only_scenario'] is True
           and uni['n_cohorts'] == 1)
 
+    # ── 8b. THE COHORT COUNT IS A MESH, AND THE RUN SAYS SO ─────────────
+    #
+    # `n_cohorts` reads like a modelling choice and is a discretisation:
+    # a continuous flame spread replaced by n instantaneous ignitions of
+    # C/n. Where the chamber settles between them - a slow fire, which is
+    # the magazine case - one step IS the pressure signal and the peak
+    # reported is the size of the step.
+    #
+    # This is the third bug of this shape in this module, after the
+    # integrator and the chamber air, and all three shared one property:
+    # correct in the regime the code was verified in, wrong in the regime
+    # it is applied to. So the check is on by default and the only thing
+    # asserted here is that it CANNOT be silent.
+    print('\n  the cohort count, refined')
+    slow = sc.IgnitionScenario(kind='flame_spread', n_cohorts=20,
+                               spread_time=60.0)
+    coarse = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=120.0,
+                        scenario=slow, p0_chamber=d.P_AMB)
+    check('a 60 s spread cut into 20 steps does NOT converge, and the run '
+          'reports that rather than the peak alone',
+          coarse['cohort_converged'] is False
+          and coarse['cohort_refinement_error'] > 0.2,
+          f"{coarse['p_max']/1e6:.4f} MPa against "
+          f"{coarse['p_max_refined']/1e6:.4f} at 2n, "
+          f"{coarse['cohort_refinement_error']:.0%} out")
+    check('one doubling already takes a third off it, so the coarse answer '
+          'was the staircase and not the fire',
+          coarse['p_max_refined'] < 0.8 * coarse['p_max'],
+          f"{coarse['p_max_refined']/1e6:.4f} against "
+          f"{coarse['p_max']/1e6:.4f} MPa")
+    check('a fast fire IS converged at the same cohort count - the artefact '
+          'grows with spread time, which is why it hid in the fast cases',
+          d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=10.0,
+                     p0_chamber=d.P_AMB,
+                     scenario=sc.IgnitionScenario(
+                         kind='flame_spread', n_cohorts=20,
+                         spread_time=0.5))['cohort_converged'])
+    check('the reported p_max is never silently replaced by the refined '
+          'one: the caller gets the peak their own scenario produced',
+          coarse['p_max'] == d.simulate(
+              prop, 5.0, 1.0, vent_area=0.02, t_end=120.0, scenario=slow,
+              p0_chamber=d.P_AMB, refine_cohorts=False)['p_max'])
+    check('uniform ignition is n-independent by construction, so it is '
+          'converged without a second run being paid for',
+          uni['cohort_converged'] and uni['cohort_refinement_error'] == 0.0)
+
+    # ── 8c. HEAT LOSS TO THE WALLS ──────────────────────────────────────
+    #
+    # The gap this closes: `core/calibration.py` has inverted FOR a
+    # convective wall loss since it was written, and the forward model
+    # had none. So the calibration corrected a record for heat that
+    # `simulate` then never removed, and the wall flux `core/thermal.py`
+    # reported was energy the gas had not given up. Both halves now use
+    # the same law.
+    #
+    # It is OFF by default and that is the conservative choice, not the
+    # convenient one: taking heat out lowers T and therefore p, so a run
+    # with heat loss reports a SMALLER load than the adiabatic bound.
+    print('\n  heat loss')
+    cold = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=2.0)
+    hot = d.simulate(prop, 5.0, 1.0, vent_area=0.0, t_end=2.0,
+                     h_c=2000.0, wall_area=6.0)
+    check('h_c = 0 is adiabatic and says so, and the default is h_c = 0',
+          cold['adiabatic'] and cold['Q_wall'] == 0.0
+          and cold['wall_loss_fraction'] == 0.0)
+    check('wall_area = 0 is adiabatic too - one number alone cannot switch '
+          'it on by accident',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=2000.0)['adiabatic'])
+    check('the adiabatic run still lands exactly on the analytic limit, so '
+          'nothing was disturbed by adding the term',
+          abs(cold['p_max'] - d.closed_vessel_pmax(prop, 5.0, 1.0))
+          < 1e-9 * cold['p_max'],
+          f"{cold['p_max']/1e6:.6f} vs "
+          f"{d.closed_vessel_pmax(prop, 5.0, 1.0)/1e6:.6f} MPa")
+    check('with a wall, energy leaves and the run reports how much',
+          hot['Q_wall'] > 0.0 and not hot['adiabatic']
+          and 0.0 < hot['wall_loss_fraction'] < 1.0,
+          f"{hot['Q_wall']/1e6:.2f} MJ, "
+          f"{hot['wall_loss_fraction']:.1%} of what was released")
+    check('and the peak falls, which is the direction that matters: heat '
+          'loss is NOT conservative for a pressure check',
+          hot['p_max'] < cold['p_max'],
+          f"{hot['p_max']/1e6:.3f} against {cold['p_max']/1e6:.3f} MPa")
+    check('a hotter wall takes less, monotonically',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=2000.0, wall_area=6.0,
+                     T_wall=1500.0)['Q_wall'] < hot['Q_wall'])
+    check('twice the coefficient takes more',
+          d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=4000.0,
+                     wall_area=6.0)['Q_wall'] > hot['Q_wall'])
+    # THE BUG THIS TERM SHIPPED WITH FOR ONE AFTERNOON. Written as one
+    # more derivative it was stiff against the ignition seed - a whisker
+    # of gas against a 32 MW sink, time constant ~1e-8 s - and every run
+    # with h_c > 0 came back with a zero peak at the step cap. The
+    # exponential form in `_wall_relax` is bounded by construction, so
+    # the gas is driven towards the wall and never past it however hard
+    # the wall pulls.
+    fierce = d.simulate(prop, 5.0, 1.0, t_end=2.0, h_c=1.0e6,
+                        wall_area=100.0)
+    check('an absurd wall does NOT collapse the run - the relaxation is '
+          'bounded, not a stiff derivative that can sail past the wall',
+          fierce['stop_reason'] != 'step cap' and fierce['p_max'] > 0.0
+          and fierce['T'][-1] >= 300.0 - 1e-6
+          and fierce['conservation_residual'] < 1e-9,
+          f"{fierce['p_max']/1e6:.3f} MPa, T_end {fierce['T'][-1]:.1f} K, "
+          f"{fierce['steps']} steps, {fierce['stop_reason']}")
+    check('and over a long enough window every coefficient converges on '
+          'the same total - all the energy above the wall, eventually',
+          abs(d.simulate(prop, 5.0, 1.0, t_end=20.0, h_c=2000.0,
+                         wall_area=6.0)['Q_wall']
+              - d.simulate(prop, 5.0, 1.0, t_end=20.0, h_c=8000.0,
+                           wall_area=6.0)['Q_wall']) < 1e-3 * 20.6e6)
+    check('THE WALL TERM IS IN THE CONSERVATION IDENTITY, not excused '
+          'from it - energy that left through the wall is accounted for '
+          'exactly like energy that left through the vent',
+          hot['conservation_residual'] < 1e-9
+          and hot['stop_reason'] != 'conservation_violation',
+          f"{hot['conservation_residual']:.2e}")
+    vented_hot = d.simulate(prop, 5.0, 1.0, vent_area=0.02, t_end=20.0,
+                            h_c=2000.0, wall_area=6.0, p0_chamber=d.P_AMB)
+    check('and it holds with a vent and chamber air as well, where three '
+          'sinks are running at once',
+          vented_hot['conservation_residual'] < 1e-9,
+          f"{vented_hot['conservation_residual']:.2e}")
+
     # ── 9. refusals ─────────────────────────────────────────────────────
     print('\n  refusals')
     for bad, label in (((0.0, 1.0), 'zero charge'),

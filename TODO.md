@@ -57,6 +57,23 @@ unconfined case, structural response, heat and a report — with no WSL and no Q
 `HD1-11c` landed on 2026-09-21 and the track is complete end to end, from the GUI
 form to the report. Details in [DONE.md](DONE.md).
 
+**Three silent-failure bugs were found and fixed on 2026-09-21, and they share a
+shape worth naming.** Each was correct in the regime the code was *verified* in
+and wrong in the regime it is *applied* to, and none of them announced itself:
+
+| | Verified where | Applied where | Cost |
+|---|---|---|---|
+| Fixed-step RK4 | `C/V` 0.5–5 | closed vessel, `C/V` 50–200 | peak 2700× low, `stop_reason='t_end'` |
+| No chamber air | closed vessel, air <3 % of products | magazine, air ≈ products | pressure under-stated |
+| Cohort staircase | fast fires (spread ≲ 2 s) | magazine fires (spread ≳ 10 s) | peak 62 % high at the usual `n = 20` |
+
+The answer in all three cases was the same: **make the run check itself.** A
+conservation residual, an air-to-product ratio, and a cohort refinement pass now
+come back with every result, and `assessment.validate` turns each into a warning
+next to the number rather than a footnote. Heat loss to the walls (`h_c`,
+`Q_wall`) is also in the forward model as of the same day — `core/calibration.py`
+had been inverting for a loss that `simulate` never applied.
+
 ### `HD1-3` · The venting, in blastFoam — **THE ONE REMAINING TASK**
 
 Requires WSL. The three owner decisions that blocked it **have all been answered**
@@ -92,6 +109,33 @@ Only what `HD1-3` actually needs, from this list:
 *(The end-time safety cap is **no longer** a blocker: an explicit end time overrides
 it in both directions since `e05ab22`, with a validator warning and a Run
 confirmation. That is the fix that opened the way to this task.)*
+
+### Deviations from the HD1 plan — recorded, not scheduled
+
+The plan and the code diverged in places. Three of those divergences were bugs
+and are fixed (see DONE.md); the rest are below. **Nothing here is scheduled.**
+They are written down so that the next person does not rediscover them, and so
+that "the plan said X" is never quietly read as "the code does X".
+
+| Deviation | What the plan asked | What the code does | Why it is not urgent |
+|---|---|---|---|
+| `psi` / `G'(z)` | Carry the form function as an array `psi` and invert with the corrected `G'(z)` | `form_factor()` returns a scalar per call; the correction is folded into `reduce_closed_vessel` | Same answer for the three analytic forms shipped; only a tabulated grain would need the array |
+| Grain geometries | Five forms | Three: `degressive`, `neutral`, `progressive` (θ) | The missing two are multi-perforated grains, which need a web-regression law rather than another `theta` |
+| `hooks.Result` | The HD 1.3 assessment reaches the Results panel as a `Result` like a blast run | Its own bundle, rendered by `output/hd13.py` | Nothing downstream consumes it as a `Result` yet; `HD1-3` is what will |
+
+**Two findings that are open questions, not deviations:**
+
+- **`governing_confined` flips at 2× ambient**, i.e. ~101 kPa of overpressure.
+  A sealed magazine reaching ~80 kPa **quasi-static** — enough to take a masonry
+  wall apart — is still labelled `'thermal'`. The threshold was not changed to
+  make anything pass; it is pinned by a test in `test_unconfined.py` so the
+  **ratio** is what gets quoted, not the label. **Owner decision:** whether the
+  label should key off a structural check instead of a round number.
+- **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`
+  and `Cp_condensed` are not modelled: every kilogram burnt is treated as gas,
+  so pressure is over-predicted and the heat retained in solid residue ignored.
+  `assessment.validate` now says so on any row that declares residue, rather than
+  computing quietly.
 
 ### The highest-value next step needs no code at all
 
