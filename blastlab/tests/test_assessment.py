@@ -396,7 +396,11 @@ def main():
                     spread_time=20.0, h_c=200.0, wall_area_m2=6.0,
                     room_origin=(0.0, 0.0, 0.0), room_size=(3.0, 3.0, 2.0),
                     room_wall_m=0.2, vent_face='x_lo',
-                    vent_rect=(1.0, 2.0, 0.6, 1.4),
+                    # 1.2 x 1.2 m at dx = 0.1 is 12 cells across, which
+                    # is the floor a run that reports a LOAD has to
+                    # meet: Cd_eff was measured moving 12.1 % between
+                    # six cells and twelve. See room.MIN_VENT_CELLS_LOAD.
+                    vent_rect=(0.8, 2.0, 0.3, 1.5),
                     open_mode='burst', p_burst=3.0 * 101325.0,
                     domain_size=(8.0, 6.0, 5.0), cfd_dx_m=0.1,
                     cfd_window_s=0.02,
@@ -460,6 +464,22 @@ def main():
                                cfd_window_s=0.02, p_burst=3e5)).ok)
     check('a room that sticks out of the domain is refused',
           not asm.validate(replace(vcase, domain_size=(2.0, 2.0, 1.0))).ok)
+    # SIX CELLS ACROSS THE OPENING IS ENOUGH FOR THE MASS FLOW AND NOT
+    # FOR A LOAD, and that is a measurement rather than a judgement:
+    # Cd_eff moved 12.1 % between six cells and twelve, with the coarse
+    # mesh passing LESS. Blocking, because the symptom is a quietly weak
+    # jet and not a run that fails.
+    coarse_vent = asm.validate(replace(vcase, cfd_dx_m=0.2))
+    check('an opening under twelve cells across is REFUSED for a run '
+          'that reports a load - six buys the flow rate, not the '
+          'discharge coefficient',
+          not coarse_vent.ok
+          and any('discharge coefficient' in e for e in coarse_vent.errors),
+          str(coarse_vent.errors[:1])[:120])
+    check('and at twelve the run is allowed but told the flow may still '
+          'be ~10 % low, with the direction named',
+          any('slightly weak' in n for n in vrep2.notes),
+          str([n for n in vrep2.notes if 'weak' in n])[:100])
     check('and a 0-D case with no venting fields does not try to build '
           'one', not good.wants_vent
           and _raises(lambda: asm.build_vent_case(good)))

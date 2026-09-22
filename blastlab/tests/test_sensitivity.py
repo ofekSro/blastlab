@@ -105,9 +105,11 @@ def main():
     sb = sens.band(p, 5.0, 1.0, vent_area=0.02, t_end=20.0,
                    p0_chamber=d.P_AMB, scenario=spread,
                    check_corners=False)
+    # 1 nominal + 2**4 corners: vented, so the Cd axis spans, and
+    # adiabatic, so the h_c axis does not.
     check('the band runs on the case s own scenario, and the samples '
           'carry it rather than quietly reverting to uniform',
-          sb['nominal']['p_max'] > 0.0 and sb['n_runs'] == 9,
+          sb['nominal']['p_max'] > 0.0 and sb['n_runs'] == 17,
           f"x{sb['spread']:.2f} over {sb['n_runs']} spread runs")
     check('and each sample converged in cohort count, so the band is '
           'around a fire rather than around an ignition staircase',
@@ -130,15 +132,37 @@ def main():
     print('\n  heat loss as the fourth axis, not as a fixed input')
     warm = sens.band(p, 5.0, 1.0, vent_area=0.02, t_end=10.0,
                      p0_chamber=d.P_AMB, h_c=200.0, wall_area=6.0)
-    check('a case with heat loss gets a FOUR-dimensional box, and says '
-          'the envelope covers the assumption',
-          warm['spans_heat_loss'] and len(warm['params']) == 4
-          and 'h_c' in warm['params'],
+    check('a case with heat loss AND an opening gets the full '
+          'five-dimensional box, and says the envelope covers both '
+          'assumptions',
+          warm['spans_heat_loss'] and warm['spans_cd']
+          and len(warm['params']) == 5 and 'h_c' in warm['params']
+          and 'cd' in warm['params'],
           f"{warm['n_runs']} runs over {warm['params']}")
-    check('and the extremes carry a sign on that axis, so it is really '
-          'being varied rather than carried along',
-          len(warm['low_signs']) == 4 and len(warm['high_signs']) == 4,
+    check('and the extremes carry a sign on every axis, so each is '
+          'really being varied rather than carried along',
+          len(warm['low_signs']) == 5 and len(warm['high_signs']) == 5,
           f"low {warm['low_signs']}, high {warm['high_signs']}")
+
+    # THE FIFTH AXIS IS THERE BECAUSE A VERIFICATION MEASURED IT MOVING.
+    # `_e2e_vent_verify.py` reported Cd_eff = 0.7227 at six cells across
+    # the opening and 0.8102 at twelve - 12.1 % apart, past the 10 %
+    # registered before the run. Cd was NOT calibrated to either; it
+    # became a range instead.
+    check('a CLOSED vessel has no opening to be uncertain about, so the '
+          'Cd axis is degenerate and the band says so rather than '
+          'pretending to cover it',
+          not closed['spans_cd'] and vented['spans_cd'])
+    lo_cd, hi_cd = warm['ranges']['cd_range']
+    check('the range is the two measurements and an extrapolation, not '
+          'a judgement: the floor is the coarse measurement and the '
+          'ceiling the first-order Richardson value',
+          abs(lo_cd - 0.72) < 1e-9 and abs(hi_cd - 0.90) < 1e-9,
+          f'Cd {lo_cd:g} to {hi_cd:g}')
+    check('and the summary line says the ceiling is a TWO-POINT '
+          'extrapolation rather than a converged number',
+          'two-point' in sens.summary_line(warm)
+          and 'MEASURED moving' in sens.summary_line(warm))
     check('an ADIABATIC case cannot perturb it - zero times anything is '
           'zero - so the band says it does NOT span the assumption '
           'rather than inventing an h_c for someone who chose adiabatic',

@@ -79,8 +79,36 @@ DEFAULT_PEXT_FACTOR = 2.0
 #: see `ranges_sourced`.
 DEFAULT_HC_FACTOR = 2.0
 
+#: THE FIFTH AXIS, and it is here because a verification MEASURED it
+#: moving rather than because anyone suspected it.
+#:
+#: `_e2e_vent_verify.py` compares the 0-D orifice law against blastFoam
+#: on one opening and reports `Cd_eff = mdot_CFD / mdot_isentropic`. On
+#: two meshes it gave
+#:
+#:     dx = 0.05 m   (6 cells across the opening)   Cd_eff = 0.7227
+#:     dx = 0.025 m  (12 cells)                     Cd_eff = 0.8102
+#:
+#: - 12.1 % apart, past the 10 % that was registered before the run. So
+#: Cd_eff is NOT mesh-independent and `Cd` was NOT calibrated to either
+#: number (owner, 2026-09-22). The coarse mesh passes less, which is the
+#: signature of numerical dissipation in the opening.
+#:
+#: THE RANGE IS THE TWO MEASUREMENTS PLUS AN EXTRAPOLATION. The low end
+#: is the coarse measurement, which is a floor. The high end is a
+#: Richardson extrapolation from the two meshes:
+#:
+#:     first order   Cd + (Cd_f - Cd_c)/(2-1) = 0.898
+#:     second order  Cd + (Cd_f - Cd_c)/(4-1) = 0.839
+#:
+#: 0.90 takes the first-order figure, which is the pessimistic one.
+#: **This is an extrapolation from TWO POINTS, not a converged value** -
+#: two points cannot establish an order, so the two rows above are
+#: assumptions about it rather than measurements of it.
+DEFAULT_CD_RANGE = (0.72, 0.90)
+
 #: The axes of the box, in the order `signs` tuples carry them.
-PARAMS = ('n', 'a', 'p_extinction', 'h_c')
+PARAMS = ('n', 'a', 'p_extinction', 'h_c', 'cd')
 
 #: What the envelope is taken over. `p_max` is the structural load,
 #: `t_p_max` decides the loading regime (impulsive against quasi-static,
@@ -89,15 +117,19 @@ PARAMS = ('n', 'a', 'p_extinction', 'h_c')
 REPORTED = ('p_max', 't_p_max', 'Z_end', 'burnt_out', 'extinguished')
 
 
-def _perturb(prop, dn, fa, fp, fh, signs, h_c):
+def _perturb(prop, dn, fa, fp, fh, cd_range, signs, h_c):
     """One corner of the box: (propellant, simulate-kwarg overrides).
 
-    `signs` is (-1, 0, +1) per axis, in `PARAMS` order. Three of the four
-    are propellant fields and the fourth is not - `h_c` is a property of
-    the CHAMBER, not of the material - so this returns both halves
-    rather than pretending they live in the same object.
+    `signs` is (-1, 0, +1) per axis, in `PARAMS` order. Three of the
+    five are propellant fields and two are not - `h_c` and `Cd` are
+    properties of the CHAMBER and of its opening - so this returns both
+    halves rather than pretending they live in the same object.
+
+    `Cd` takes an explicit (low, high) rather than a factor, because its
+    range is two measurements and an extrapolation rather than a
+    judgement about a nominal - see DEFAULT_CD_RANGE.
     """
-    sn, sa, sp, sh = signs
+    sn, sa, sp, sh, sc = signs
     kw = {}
     if sn:
         kw['n'] = max(prop.n + sn * dn, 0.05)
@@ -108,6 +140,8 @@ def _perturb(prop, dn, fa, fp, fh, signs, h_c):
     sim = {}
     if sh and h_c > 0.0:
         sim['h_c'] = h_c * (fh ** sh)
+    if sc and cd_range:
+        sim['cd'] = cd_range[0] if sc < 0 else cd_range[1]
     return (replace(prop, **kw) if kw else prop), sim
 
 
@@ -123,7 +157,8 @@ def _scalars(result):
 
 def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
          pext_factor=DEFAULT_PEXT_FACTOR, hc_factor=DEFAULT_HC_FACTOR,
-         source='', check_corners=True, **sim_kw):
+         cd_range=DEFAULT_CD_RANGE, source='', check_corners=True,
+         **sim_kw):
     """Run the nominal case and the corners of the uncertainty box.
 
     Returns a dict with
@@ -165,6 +200,10 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
     # adiabatic would be putting a number in their mouth, so instead the
     # band SAYS it does not span the assumption.
     spans_hc = h_c > 0.0 and wall_area > 0.0
+    # A CLOSED vessel has no opening, so there is no discharge
+    # coefficient to be uncertain about and that axis is degenerate too.
+    spans_cd = bool(cd_range) and float(sim_kw.get('vent_area', 0.0) or
+                                        0.0) > 0.0
     n_axes = len(PARAMS)
 
     def run(p_i, over=None):
@@ -177,12 +216,15 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
 
     samples = [((0,) * n_axes, nominal, nominal_result)]
     corner_signs = list(itertools.product((-1, 1), repeat=n_axes))
+    # drop the duplicate halves of a degenerate axis rather than paying
+    # for them twice
     if not spans_hc:
-        # drop the duplicate half of the box rather than paying for it
         corner_signs = [g for g in corner_signs if g[3] == 1]
+    if not spans_cd:
+        corner_signs = [g for g in corner_signs if g[4] == 1]
     for signs in corner_signs:
         p_i, over = _perturb(prop, dn, a_factor, pext_factor, hc_factor,
-                             signs, h_c)
+                             cd_range, signs, h_c)
         r = run(p_i, over)
         samples.append((signs, _scalars(r), r))
 
@@ -199,13 +241,14 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
     faces, sufficient = [], True
     if check_corners:
         for axis in range(n_axes):
-            if axis == 3 and not spans_hc:
+            if (axis == 3 and not spans_hc) or (axis == 4 and not spans_cd):
                 continue
             for s in (-1, 1):
                 signs = [0] * n_axes
                 signs[axis] = s
                 p_i, over = _perturb(prop, dn, a_factor, pext_factor,
-                                     hc_factor, tuple(signs), h_c)
+                                     hc_factor, cd_range, tuple(signs),
+                                     h_c)
                 r = run(p_i, over)
                 faces.append((tuple(signs), _scalars(r), r))
         tol = 1e-9
@@ -242,8 +285,14 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
         'ranges_sourced': bool(source),
         'source': source,
         'ranges': {'dn': dn, 'a_factor': a_factor,
-                   'pext_factor': pext_factor, 'hc_factor': hc_factor},
+                   'pext_factor': pext_factor, 'hc_factor': hc_factor,
+                   'cd_range': cd_range},
         'params': PARAMS,
+        #: False for a closed vessel, which has no opening to be
+        #: uncertain about. When True the envelope covers a discharge
+        #: coefficient that a verification MEASURED moving 12.1 % with
+        #: the mesh - see DEFAULT_CD_RANGE.
+        'spans_cd': spans_cd,
         'n_runs': len(all_rows),
         #: False when the case is adiabatic. The h_c axis is then
         #: degenerate and this envelope does NOT cover the heat-loss
@@ -355,6 +404,11 @@ def summary_line(b):
            f'(x{b["spread"]:.1f}) over n +-{b["ranges"]["dn"]:g}, '
            f'a x/{b["ranges"]["a_factor"]:g}, '
            f'p_ext x/{b["ranges"]["pext_factor"]:g}')
+    if b.get('spans_cd'):
+        lo_c, hi_c = b['ranges']['cd_range']
+        txt += (f', Cd {lo_c:g}-{hi_c:g} (MEASURED moving 12 % with the '
+                f'mesh, and the top of that range is a two-point '
+                f'extrapolation rather than a converged value)')
     if b.get('spans_heat_loss'):
         txt += f', h_c x/{b["ranges"]["hc_factor"]:g}'
     else:

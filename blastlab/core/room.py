@@ -83,6 +83,22 @@ AXIS_NAME = ('x', 'y', 'z')
 #: has been built is discovering it too late.
 MIN_VENT_CELLS = 6
 
+#: AND SIX IS NOT ENOUGH FOR A DISCHARGE COEFFICIENT, which is a
+#: stronger requirement than the flow rate above and was MEASURED rather
+#: than argued. `_e2e_vent_verify.py` compared the 0-D orifice law
+#: against blastFoam on one opening at two meshes:
+#:
+#:     6 cells across    Cd_eff = 0.7227
+#:     12 cells across   Cd_eff = 0.8102
+#:
+#: 12.1 % apart, past the 10 % registered before the run. The coarse
+#: mesh passes LESS, which is numerical dissipation in the opening. So a
+#: run that reports a load on a structure needs twelve, and
+#: `assessment.validate` refuses fewer. Even at twelve the CFD's flow
+#: may still be up to ~10 % below the converged value, and the direction
+#: is known: less out, so a slightly weak jet.
+MIN_VENT_CELLS_LOAD = 12
+
 #: A wall thinner than one base cell cannot be carved at all - it would
 #: snap to a single cell layer or vanish. Also enforced here.
 MIN_WALL_CELLS = 1
