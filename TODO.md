@@ -107,7 +107,8 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 | `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
 | `HD1-3b` · `init_mode='chamber'` in the writer | ✅ done — inert `type basic` phase with the propellant's `gamma`/`molWeight`; per-phase mass exact to 9 digits; **no `lambda.expl`**, so bug B0 cannot occur |
 | `HD1-3d` · the γ-interface stopping point | ✅ **passed 2026-09-21 on WSL** — 0.024 % across a γ step and 0.000 % on uniform mixed cells, against a pre-registered 0.5 % |
-| `HD1-3d` · the 2D verification and the 3D answer | open, **needs WSL** — see the pre-registered condition below |
+| `HD1-3d` · the vent verification | ✅ **run 2026-09-22**, and it found something — see below |
+| `HD1-3d` · the 3D answer | open, **needs WSL**; ≥12 cells across the opening, enforced |
 | `HD1-3e` · `core/qd.py` — ships with an empty table | ✅ done — `CRITERIA = {}`, and a row without a `source` is an **error**, not a blank column |
 | `HD1-3f` · validation, GUI card, report section | open |
 
@@ -227,6 +228,50 @@ not. Two wrong explanations were written into the code before that one, and
 `test_deflagration.py` caught both; the measured sequences are pinned there.
 
 Vectorising is no longer needed for correctness. Left undone.
+
+### The vent verification, and the one thing it refused to confirm
+
+`_e2e_vent_verify.py` puts two independent models on one opening: the 0D
+isentropic orifice law, and blastFoam solving the same hole from the equations.
+Run on WSL, 2026-09-22, with every threshold registered **before** the run.
+
+> **THE MAIN RESULT, and it is the good one.** With the discharge coefficient
+> divided out, the two blowdown curves agree to **2.27 % RMS** of the initial
+> overpressure against a pre-registered 5 %. **The lumped model is right about
+> the *shape* of a blowdown; the only disagreement is the coefficient.**
+
+**And the coefficient did not converge.** `Cd_eff = ṁ_CFD / ṁ_isentropic`:
+
+| mesh | cells across the opening | `Cd_eff` |
+|---|---|---|
+| `dx = 0.05` | 6 | 0.7227 |
+| `dx = 0.025` | 12 | 0.8102 |
+
+**12.1 % apart, past the 10 % registered before the run.** The coarse mesh
+passes *less*, which is the signature of numerical dissipation in the opening.
+The threshold that caught it has **not** been redefined and the run is still
+recorded as a failure of that check.
+
+**Three consequences, all owner decisions of 2026-09-22:**
+
+1. **`Cd` is not calibrated** — not to 0.724, not to 0.810. It stays a declared
+   estimate of 0.8.
+2. **`Cd` is the fifth axis of the sensitivity band**, range **0.72–0.90**: the
+   coarse measurement as a floor and the first-order Richardson extrapolation as
+   a ceiling (second order gives 0.84). **That ceiling is an extrapolation from
+   two points — two points cannot establish an order**, so the choice of order is
+   an assumption and not a measurement.
+3. **≥12 cells across the opening** for any run that reports a load, enforced by
+   `assessment.validate` as an error. Six remains the geometry floor in
+   `room.MIN_VENT_CELLS` — it buys the mass flow, not the coefficient. Even at
+   twelve the CFD flow may be ~10 % below the converged value, and the direction
+   is known: less out, so a slightly weak jet.
+
+**Optional, not done:** a third convergence point at 24 cells across, on a
+geometrically shrunken room — `Cd` depends on the opening's local geometry
+(wall-thickness to width, pressure ratio) rather than on the room's size, so a
+small room with a minimal domain would give it affordably. That is what would
+turn the two-point extrapolation into a measurement.
 
 **One finding that is a scope decision, not a deviation:**
 

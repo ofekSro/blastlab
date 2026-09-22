@@ -423,6 +423,30 @@ def validate(case):
                 err(f'Room: {e}')
             for w in m['warnings']:
                 warn(f'Room: {w}')
+            # TWELVE CELLS ACROSS THE OPENING, and the number is a
+            # measurement. `room.MIN_VENT_CELLS` is six, which buys the
+            # mass flow; a run that reports a LOAD needs the discharge
+            # coefficient too, and that was measured moving 12.1 %
+            # between six cells and twelve. Blocking, because the
+            # symptom is a jet that is quietly weak rather than a run
+            # that fails. See room.MIN_VENT_CELLS_LOAD.
+            cells = m.get('vent_cells') or ()
+            if cells and min(cells) < _room.MIN_VENT_CELLS_LOAD:
+                err(f'The opening is {cells[0]} x {cells[1]} base cells. '
+                    f'Six is enough for the mass flow, but this run '
+                    f'reports a load on a structure and that needs the '
+                    f'discharge coefficient as well - measured moving '
+                    f'12.1 % between six cells and twelve, with the '
+                    f'coarse mesh passing LESS. Refine to at least '
+                    f'{_room.MIN_VENT_CELLS_LOAD} across, i.e. '
+                    f'dx <= {m["vent_area"] ** 0.5 / _room.MIN_VENT_CELLS_LOAD:.4f} m.')
+            elif cells:
+                note(f'The opening is {cells[0]} x {cells[1]} base '
+                     f'cells. At twelve the CFD flow may still be up to '
+                     f'~10 % below the converged value, and the '
+                     f'direction is known: less out, so a slightly weak '
+                     f'jet. Cd is an axis of the sensitivity band for '
+                     f'exactly this reason.')
             # The 0-D half of this case and the room have to describe the
             # same building. `build_vent_case` re-runs the 0-D model at
             # the aligned cavity, so this is a note rather than an error -
