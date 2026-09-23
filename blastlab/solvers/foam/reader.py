@@ -41,17 +41,50 @@ def _retry(fn, tries=3, delay=0.5):
             _time.sleep(delay)
 
 
+#: Read the 9p share in pieces this size. A ONE-SHOT `f.read()` of a
+#: large file over `\\wsl.localhost\...` fails with OSError EINVAL
+#: (errno 22) rather than short-reading - measured on the 864,000-cell
+#: HD1-3d case, where a binary scalar field is ~7 MB and the first
+#: written time threw on the first field it touched. `_retry` above did
+#: not help, because the failure is deterministic in the SIZE rather
+#: than transient, so every attempt failed identically.
+#:
+#: 4 MiB is comfortably under whatever the limit is and costs nothing:
+#: the reads are sequential and the OS buffers them anyway.
+_CHUNK = 4 << 20
+
+
 def _read_text(path):
+    # Same chunking as _read_bytes, for the same reason: an ascii field
+    # file from a large case is just as big as a binary one.
     def go():
+        parts = []
         with open(path, encoding='ascii', errors='replace') as f:
-            return f.read()
+            while True:
+                s = f.read(_CHUNK)
+                if not s:
+                    break
+                parts.append(s)
+        return ''.join(parts)
     return _retry(go)
 
 
 def _read_bytes(path):
+    """The whole file, read in chunks rather than in one call.
+
+    See `_CHUNK` for why the obvious `f.read()` is not safe here. This
+    also degrades gracefully if a future path short-reads: the loop
+    ends on the first empty chunk either way.
+    """
     def go():
+        parts = []
         with open(path, 'rb') as f:
-            return f.read()
+            while True:
+                b = f.read(_CHUNK)
+                if not b:
+                    break
+                parts.append(b)
+        return b''.join(parts)
     return _retry(go)
 
 

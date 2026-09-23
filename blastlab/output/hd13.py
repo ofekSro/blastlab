@@ -312,6 +312,17 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
             p.append(f'<div class="{css}"><b>'
                      f'{html.escape(verdict["verdict"].replace("_", " "))}'
                      f'.</b> {html.escape(verdict["note"])}</div>')
+            # WHERE A CFD RUN SITS IN ALL THIS, when there was one. The
+            # CFD does not take Cd as an input - it produces one, set by
+            # how well the opening is resolved - so its load is a sample
+            # at one corner of that axis and not the envelope. Printed
+            # beside the verdict because that is where it would
+            # otherwise be misread as the answer.
+            if verdict.get('cfd_point'):
+                cp = verdict['cfd_point']
+                p.append(f'<div class="note"><b>The CFD is one point in '
+                         f'this envelope, not the envelope.</b> '
+                         f'{html.escape(cp["note"])}</div>')
         if oat:
             p.append('<p class="meta">Which knob dominates, one at a '
                      'time:</p>'

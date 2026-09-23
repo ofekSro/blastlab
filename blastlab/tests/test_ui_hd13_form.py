@@ -150,7 +150,13 @@ def main():
         scenario_kind='flame_spread', n_cohorts=40, spread_time=20.0,
         h_c=200.0, wall_area_m2=6.0,
         room_origin=(0.0, 0.0, 0.0), room_size=(3.0, 3.0, 2.0),
-        room_wall_m=0.2, vent_face='x_lo', vent_rect=(1.0, 2.0, 0.6, 1.4),
+        room_wall_m=0.2, vent_face='x_lo',
+        # 1.2 x 1.2 m at dx = 0.1 is 12 cells across, the floor a run
+        # that reports a LOAD has to meet - Cd_eff was measured moving
+        # 12.1 % between six cells and twelve. See
+        # room.MIN_VENT_CELLS_LOAD. This fixture said 10 x 8 until the
+        # rule landed, and the rule caught it.
+        vent_rect=(0.8, 2.0, 0.3, 1.5),
         open_mode='burst', p_burst=3.0 * 101325.0,
         domain_size=(8.0, 6.0, 5.0), cfd_dx_m=0.1, cfd_window_s=0.02,
         n_snapshots_vent=20, vent_gauges=[(6.0, 3.0, 1.0)])

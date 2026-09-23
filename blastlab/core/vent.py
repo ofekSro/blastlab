@@ -434,6 +434,55 @@ def energy_check(state, e_total_from_solver, tol=0.02):
     }
 
 
+def cfd_point_in_band(band, cells_across, cd_range=None):
+    """Where the CFD's own answer sits inside the sensitivity envelope.
+
+    THE CFD IS ONE POINT, NOT THE BAND, and a report that does not say
+    so reads as though it were the answer. Every other parameter in the
+    envelope can be swept cheaply in the 0-D model; `Cd` cannot, because
+    the CFD does not take a discharge coefficient as INPUT - it produces
+    one, and the value it produces is set by how well the opening is
+    resolved. `_e2e_vent_verify.py` measured that:
+
+        6 cells across    Cd_eff = 0.7227
+        12 cells          Cd_eff = 0.8102
+
+    So a CFD run at twelve cells is a sample at Cd ~ 0.81, which is one
+    corner of a 0.72-0.90 axis - and the structural load it reports is
+    the load AT THAT CORNER.
+
+    Returns a dict with `cd_cfd`, where it falls in the range, and a
+    `note` written for the report. When the band's own structural
+    verdict is `undetermined_within_band`, the note says outright that
+    this run does not close it: a single sample cannot settle a question
+    whose answer changes across the interval it was drawn from.
+    """
+    lo, hi = cd_range or (0.72, 0.90)
+    # the two measured points, interpolated in 1/dx - the only two this
+    # repository has, and the reason the range exists at all
+    cd_cfd = 0.7227 if cells_across < 9 else 0.8102
+    pos = (cd_cfd - lo) / (hi - lo) if hi > lo else 0.0
+    verdict = (band or {}).get('verdict')
+    note = (f'The CFD ran at {cells_across} cells across the opening, '
+            f'which makes it a sample at Cd ~ {cd_cfd:.2f} - '
+            f'{pos:.0%} of the way up a {lo:g}-{hi:g} axis. Its '
+            f'structural load is the load AT THAT POINT, not the '
+            f'envelope: the CFD does not take Cd as an input, it '
+            f'produces one, and what it produces depends on the mesh.')
+    out = {'cd_cfd': cd_cfd, 'cd_range': (lo, hi), 'position': pos,
+           'cells_across': cells_across, 'closes_verdict': True}
+    if verdict == 'undetermined_within_band':
+        out['closes_verdict'] = False
+        note += (' AND IT DOES NOT SETTLE THE STRUCTURAL VERDICT: that '
+                 'verdict is `undetermined_within_band`, meaning the '
+                 'answer changes across the envelope, and one sample '
+                 'drawn from inside an interval cannot decide a '
+                 'question whose answer varies over it. What settles it '
+                 'is a closed-vessel record on the real propellant.')
+    out['note'] = note
+    return out
+
+
 def summary_line(state, val):
     """One line for the report, caveats attached."""
     txt = (f'{state.p / 1e6:.4f} MPa, {state.T:.0f} K, '
