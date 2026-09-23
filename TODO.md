@@ -110,7 +110,7 @@ boxes — fluid** — and the walls are ordinary obstacles on the existing
 | `HD1-3d` · the vent verification | ✅ **run 2026-09-22**, and it found something — see below |
 | `HD1-3d` · the 3D answer | open, **needs WSL**; ≥12 cells across the opening, enforced |
 | `HD1-3e` · `core/qd.py` — ships with an empty table | ✅ done — `CRITERIA = {}`, and a row without a `source` is an **error**, not a blank column |
-| `HD1-3f` · validation, GUI card, report section | open |
+| `HD1-3f` · validation, GUI card, report section | ✅ done (`b33947f`) — `build_vent_case` aligns the room first and re-runs the 0D at the **aligned** cavity; the Vent stage card is in the dim-0 form. This row read "open" until 2026-09-23 and that was a bookkeeping slip, not a gap |
 
 > **The number `HD1-3a` was built to produce.** `refine.snap_obstacles` moves
 > every obstacle edge outward onto a base-cell face, so a room's walls grow and

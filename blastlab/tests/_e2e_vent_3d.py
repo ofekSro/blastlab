@@ -188,6 +188,38 @@ def main():
           'panel at 4 m should', not r.collapsed,
           f'mu {r.ductility:.4f}')
 
+    # ── THE CFD IS ONE POINT IN THE ENVELOPE, NOT THE ENVELOPE ──────────
+    #
+    # Every other uncertain parameter can be swept cheaply in the 0-D
+    # model. `Cd` cannot, because the CFD does not TAKE a discharge
+    # coefficient - it produces one, and the value depends on how well
+    # the opening is resolved. So this run is a sample at Cd ~ 0.81, and
+    # the load it reports is the load at that corner.
+    print('\n  where this run sits in the envelope')
+    across = min(m['vent_cells'])
+    pt = _vent.cfd_point_in_band(None, across)
+    print(f"  {pt['note']}")
+    check('the run states where its own Cd sits in the band rather than '
+          'presenting its load as the answer',
+          0.0 <= pt['position'] <= 1.0
+          and 'not the envelope' in pt['note'],
+          f"Cd ~ {pt['cd_cfd']:.2f}, {pt['position']:.0%} up the axis")
+    # AND A SINGLE SAMPLE CANNOT CLOSE AN UNDETERMINED VERDICT. Checked
+    # against a verdict rather than by running a 43-solve band here: the
+    # logic is what matters and the band is expensive.
+    und = _vent.cfd_point_in_band(
+        {'verdict': 'undetermined_within_band'}, across)
+    check('and if the structural verdict is undetermined across the '
+          'band, this run does NOT close it - one sample drawn from '
+          'inside an interval cannot decide a question whose answer '
+          'varies over it',
+          und['closes_verdict'] is False
+          and 'DOES NOT SETTLE' in und['note'])
+    check('while a verdict that does not depend on the calibration is '
+          'not undermined by the same argument',
+          _vent.cfd_point_in_band(
+              {'verdict': 'fails_across_band'}, across)['closes_verdict'])
+
     print('\nVENT 3D: ' + ('FAIL - ' + ', '.join(FAIL) if FAIL
                            else 'PASS'))
     return 1 if FAIL else 0
