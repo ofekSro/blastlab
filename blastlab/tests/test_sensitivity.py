@@ -254,6 +254,51 @@ def main():
         check('and the summary line carries that too',
               'STRADDLES EXTINCTION' in sens.summary_line(wide))
 
+    # ── 5b. WHAT IT WILL COST, SAID BEFORE IT IS PAID ───────────────────
+    #
+    # Five axes is up to 43 solves, and on the dim-0 form's own defaults
+    # that measured 933.8 s - 15.6 minutes. No axis is cut for it: each
+    # is in the envelope because it moves the answer, and trimming the
+    # envelope for speed is what the envelope exists to prevent. But
+    # nobody should find out about the wait by waiting.
+    print('\n  the cost, estimated before it is paid')
+    check('the solve count is known without running anything',
+          sens.n_samples(True, True) == 43
+          and sens.n_samples(False, True) == 25
+          and sens.n_samples(False, False) == 15
+          and sens.n_samples(False, False, check_corners=False) == 9,
+          f'{sens.n_samples(True, True)} / {sens.n_samples(False, True)} '
+          f'/ {sens.n_samples(False, False)} / '
+          f'{sens.n_samples(False, False, check_corners=False)}')
+    from blastlab.core import assessment as _asm
+    ref = _asm.DeflagrationCase(
+        vent_area_m2=0.02, h_c=200.0, wall_area_m2=6.0,
+        scenario_kind='flame_spread', n_cohorts=20, spread_time=30.0,
+        t_end=20.0, sensitivity=True)
+    secs, n, how = sens.estimate_seconds(ref)
+    check('and the estimate lands near the case it was measured on - '
+          '43 solves in 933.8 s',
+          n == 43 and 600.0 < secs < 1400.0,
+          f'{n} solves, {secs:.0f} s estimated against 934 measured')
+    check('the estimate carries how it was made, because an estimate '
+          'without its provenance is the thing this repo keeps finding',
+          'not a promise' in how and 'measured case' in how)
+    check('a heavier case is estimated dearer, so the number tracks the '
+          'case rather than being a constant',
+          sens.estimate_seconds(
+              _asm.replace(ref, n_cohorts=80, t_end=60.0))[0] > 4 * secs)
+    check('and the validator says it as a WARNING on the case, before '
+          'anything is run',
+          any('sensitivity band will run' in w
+              for w in _asm.validate(ref).warnings),
+          str([w[:70] for w in _asm.validate(ref).warnings
+               if 'band will run' in w]))
+    check('a case without the band is not warned about a cost it will '
+          'not pay',
+          not any('sensitivity band will run' in w for w in
+                  _asm.validate(_asm.replace(ref,
+                                             sensitivity=False)).warnings))
+
     # ── 6. THE VERDICT AT BOTH ENDS, NOT AT THE MIDDLE ──────────────────
     #
     # A band spanning a factor of 12 is more than an order of magnitude,

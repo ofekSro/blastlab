@@ -80,7 +80,12 @@ def build():
         vent_rect=(5.4, 6.6, 0.8, 2.0),
         open_mode='burst', p_burst=3.0 * P_AIR,
         domain_size=(12.0, 12.0, 6.0), cfd_dx_m=DX,
-        cfd_window_s=WINDOW, n_snapshots_vent=30,
+        # SIX, not thirty. The first attempt asked for thirty on an
+        # 864,000-cell mesh and wrote 193 GB, which filled the disk and
+        # tripped the corpus sweep. A snapshot of this mesh costs ~6 GB
+        # once the decomposed and reconstructed copies are counted, and
+        # six is plenty to see the jet leave and load the wall.
+        cfd_window_s=WINDOW, n_snapshots_vent=6,
         # gauges on the face of a wall 4 m beyond the opening, at the
         # height of the jet and one either side of it
         vent_gauges=[(10.0, 6.0, 1.4), (10.0, 5.0, 1.4),

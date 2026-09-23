@@ -110,6 +110,45 @@ DEFAULT_CD_RANGE = (0.72, 0.90)
 #: The axes of the box, in the order `signs` tuples carry them.
 PARAMS = ('n', 'a', 'p_extinction', 'h_c', 'cd')
 
+#: Seconds per solve, for telling someone what a band will cost BEFORE
+#: they wait for it. Measured on the dim-0 form's own defaults - 5 kg in
+#: 1 m3 vented through 0.02 m2, 20 cohorts over 30 s, t_end 20 s - where
+#: the whole five-axis band took 933.8 s over 43 solves.
+#:
+#: A rough guide and nothing more: the cost per solve goes with the
+#: cohort count and the end time, so a heavier case is dearer. It exists
+#: so the estimate is in the right order of magnitude rather than
+#: absent, and `estimate_seconds` says which it is.
+SECONDS_PER_SOLVE = 21.7
+
+
+def n_samples(spans_hc, spans_cd, check_corners=True):
+    """How many solves a band will take, before running any of them."""
+    axes = len(PARAMS) - (0 if spans_hc else 1) - (0 if spans_cd else 1)
+    faces = 2 * axes if check_corners else 0
+    return 1 + 2 ** axes + faces
+
+
+def estimate_seconds(case_like, check_corners=True):
+    """Rough wall-clock for the band on a case, and what it rests on.
+
+    Returns (seconds, n_solves, note). The note says plainly that this
+    is scaled from one measured case, because an estimate presented
+    without its provenance is the thing this repository keeps finding.
+    """
+    h_c = float(getattr(case_like, 'h_c', 0.0) or 0.0)
+    wall = float(getattr(case_like, 'wall_area_m2', 0.0) or 0.0)
+    vent = float(getattr(case_like, 'vent_area_m2', 0.0) or 0.0)
+    n = n_samples(h_c > 0 and wall > 0, vent > 0, check_corners)
+    # scale off the measured case: cohorts x end time is the bulk of it
+    ref = 20 * 20.0
+    here = max(int(getattr(case_like, 'n_cohorts', 1) or 1), 1) \
+        * max(float(getattr(case_like, 't_end', 1.0) or 1.0), 1e-6)
+    secs = n * SECONDS_PER_SOLVE * (here / ref)
+    return secs, n, ('scaled from one measured case (43 solves in '
+                     '933.8 s), by cohorts x end time - an order of '
+                     'magnitude, not a promise')
+
 #: What the envelope is taken over. `p_max` is the structural load,
 #: `t_p_max` decides the loading regime (impulsive against quasi-static,
 #: which decides WHICH check applies), and `Z_end` says whether the

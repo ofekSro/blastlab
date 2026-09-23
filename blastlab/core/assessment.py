@@ -377,6 +377,23 @@ def validate(case):
              f'entered by the user - this tool ships none, and each '
              f'distance is printed with the source it came from.')
 
+    # WHAT THE BAND WILL COST, BEFORE IT IS PAID. Five axes means up to
+    # 43 solves, and on the form's own defaults that measured 15.6
+    # minutes. No axis is cut for it: each one is there because it moves
+    # the answer, and trimming the envelope for speed is the thing the
+    # envelope exists to prevent. But nobody should discover the wait by
+    # waiting.
+    if case.sensitivity:
+        from . import sensitivity as _sens
+        secs, n_solves, how = _sens.estimate_seconds(case)
+        warn(f'The sensitivity band will run about {n_solves} solves, '
+             f'roughly {secs / 60.0:.0f} minutes ({how}). No axis is '
+             f'dropped to make that shorter - each is in the envelope '
+             f'because it moves the answer, and a band trimmed for speed '
+             f'is the thing a band exists to prevent. Turn it off if you '
+             f'only want the point estimate, and read that estimate as a '
+             f'point.')
+
     # ── HD1-3f · the venting stage, checked before a mesh is planned ────
     #
     # INTENT COMES FROM THE GEOMETRY, not from the scalars. The form
