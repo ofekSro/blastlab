@@ -33,7 +33,21 @@ wave reaching a boundary 5 m away can return inside the window and
 would be indistinguishable from the jet. The target trace is examined
 for a second arrival.
 
-Run:  cd blastlab/tests && python _e2e_vent_3d.py [--dry]
+JUDGING A RUN THAT ALREADY EXISTS (HD1-3d, H2). `--load RUN` - a run
+directory name under /root/blastlab_runs, a WSL path or a UNC path -
+runs C1-C5 exactly as above, then reads the finished run's gauges and
+puts the same C6-C13 to them. It is READ-ONLY on the run directory: it
+opens the run's case.json (refusing a run that is not this script's
+CFD case) and the blastProbes output under postProcessing/gauges, and
+nothing else. No field is read, nothing is reconstructed, no solver and
+no OpenFOAM utility is started. The gauges come from the same reader
+call, packed into the same dict, as the live path's own
+(`backend.finalize_3d`: `reader.read_probes(spec.case_unc)`), so C6-C13
+see what the live run returned. `postmortem.load_run` is NOT used: it
+reads every written time and may run reconstructPar INTO the run, and
+the checks need neither.
+
+Run:  cd blastlab/tests && python _e2e_vent_3d.py [--dry | --load RUN]
       (WSL; confirm `wsl -d Ubuntu -- pgrep -a blastFoam` is empty)
 """
 
@@ -95,8 +109,66 @@ def build():
         support='simple')
 
 
+def load_gauges(run, cfd):
+    """The gauges of a FINISHED run, read back without touching it (H2).
+
+    Opens only the run's case.json and its blastProbes output - see the
+    module docstring for why this and not `postmortem.load_run`. Returns
+    a Result with the live run's gauge dict, or None when the run cannot
+    be read or is not this script's CFD case (every case.json field must
+    match - a different run would be judged on the wrong gauges)."""
+    import json
+
+    from blastlab.core.case import case_to_dict
+    from blastlab.solvers.foam import env, reader
+    from blastlab.solvers.hooks import Result
+
+    posix, unc = env.case_paths(run)
+    print(f'\n  loading  {posix}')
+    print('           read-only: case.json + postProcessing/gauges; no '
+          'field, no reconstruct, no solver')
+    try:
+        with open(os.path.join(unc, 'case.json'), encoding='utf-8') as f:
+            saved = json.load(f)
+        probes = reader.read_probes(unc)
+    except (OSError, ValueError) as exc:
+        print(f'  [ERROR] cannot read the run: {exc}')
+        return None
+    want = json.loads(json.dumps(case_to_dict(cfd)))    # as save_case
+    differ = sorted(k for k in set(saved) | set(want)
+                    if saved.get(k) != want.get(k))
+    if differ:
+        print(f"  [ERROR] not this script's case: {', '.join(differ)} "
+              f'differ')
+        return None
+    print(f'  case     case.json matches this CFD case, all {len(want)} '
+          f'fields')
+    # backend.finalize_3d's own gauge dict, from the same reader call
+    if probes:
+        gauges = dict(times=probes['times'],
+                      points=[tuple(pt) for pt in probes['points']],
+                      pressures=probes['pressures'],
+                      **{k: probes[k] for k in ('speeds', 'rhos')
+                         if k in probes})
+    else:
+        gauges = dict(times=np.array([]), points=[], pressures=[])
+    n = len(gauges['times'])
+    print(f"  gauges   {len(gauges['points'])} probes, {n} samples"
+          + (f", t = {gauges['times'][0] * 1e3:.4f} to "
+             f"{gauges['times'][-1] * 1e3:.4f} ms" if n else ''))
+    return Result({}, gauges, dict(case_dir=unc, solver='blastfoam'),
+                  'loaded post-mortem (gauges only)')
+
+
 def main():
     dry = '--dry' in sys.argv
+    load = None
+    if '--load' in sys.argv:
+        i = sys.argv.index('--load')
+        load = sys.argv[i + 1] if i + 1 < len(sys.argv) else ''
+        if not load:
+            print('usage: _e2e_vent_3d.py [--dry | --load RUN]')
+            return 2
     case = build()
 
     print('VENT 3D (HD1-3d): the answer')
@@ -141,6 +213,15 @@ def main():
         print('\nVENT 3D: DRY - validated and sized, nothing run')
         return 1 if FAIL else 0
 
+    if load:
+        # a finished run, judged post-mortem - no WSL solve, no write
+        res = load_gauges(load, cfd)
+        if res is None:
+            print('\nVENT 3D: NOT JUDGED - the run could not be read as '
+                  'this case')
+            return 1
+        return evaluate(case, m, res)
+
     from blastlab.solvers.foam import env
     ok, detail = env.check_available()
     if not ok:
@@ -150,7 +231,12 @@ def main():
     from blastlab.solvers import get_solver
 
     print('\n  running')
-    res = get_solver(3, 'blastfoam')(cfd)
+    return evaluate(case, m, get_solver(3, 'blastfoam')(cfd))
+
+
+def evaluate(case, m, res):
+    """C6-C13 on a run's gauges - the live run's, or a finished run's
+    read back by `load_gauges`. Only `res.gauges` is read."""
     t = np.asarray(res.gauges['times'], dtype=float)
     traces = [np.asarray(p, dtype=float) for p in res.gauges['pressures']]
     check('the target gauges recorded something',
@@ -177,6 +263,39 @@ def main():
           f'later maximum '
           f'{(float(np.max(later)) - P_AIR) / 1e3 if len(later) else 0:.2f}'
           f' kPa against a peak of {peak / 1e3:.2f}')
+
+    # EVERY GAUGE, REPORTED - NOT JUDGED (H2). The checks read gauge 1's
+    # peak alone, and CLAUDE.md 6 says never measure peak alone: so
+    # peak, arrival and positive-phase impulse are printed for all
+    # three. No threshold on impulse or arrival was registered before
+    # the run, so none is asserted - that would be judging after the
+    # numbers. An impulse whose positive phase is still open when the
+    # record ends is a LOWER BOUND and is printed as one.
+    from blastlab.output.gauge_summary import gauge_labels, summarize_trace
+    t_later = t_after[t_after > tf[i_pk] + 0.004]
+    if len(later):
+        j = int(np.argmax(later))
+        print(f'  gauge 1 after t_peak + 4 ms: largest '
+              f'{(later[j] - P_AIR) / 1e3:.2f} kPa at '
+              f'{t_later[j] * 1e3:.3f} ms')
+    print('\n  every gauge - reported, not judged (no threshold on impulse '
+          'or arrival was set before the run)')
+    for label, p in zip(gauge_labels(res.gauges, case.vent_gauges),
+                        traces):
+        ok = np.isfinite(p)
+        s = summarize_trace(t[ok], p[ok])
+        print(f'  {label}')
+        print(f"     peak {s['peak_kpa']:.2f} kPa at "
+              f"{s['t_peak_ms']:.3f} ms, arrival {s['arrival_ms']:.3f} ms, "
+              f"net impulse {s['net_impulse']:.2f} Pa s")
+        if np.isnan(s['arrival_ms']):
+            print('     no arrival: never above 1.1 x ambient in the record')
+            continue
+        print(f"     positive phase {s['pos_duration_ms']:.3f} ms, impulse "
+              f"{s['pos_impulse']:.2f} Pa s"
+              + ('' if s['complete'] else
+                 ' - a LOWER BOUND: still positive when the record ends')
+              + f"; positive_phase_complete {s['complete']}")
 
     comp = _sdof.Component(span=case.span_m,
                            mass_per_area=case.mass_per_area,
