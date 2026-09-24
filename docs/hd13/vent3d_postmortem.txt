@@ -1,0 +1,255 @@
+HD1-3d - the 3D answer: post-mortem record
+==========================================
+Judged 2026-09-24 (batch hd1-3d-close, H1-H3), with no new solve.
+
+VERDICT: VENT 3D: PASS - 13/13 committed checks C1-C13 of
+blastlab/tests/_e2e_vent_3d.py, thresholds as committed at 1c9b238.
+9b5212f moved C6-C13 into evaluate() without changing one of them
+(git diff -w). Impulse and arrival are REPORTED WITH NO VERDICT: no
+threshold was registered for either before the run.
+
+
+THE RUN
+  /root/blastlab_runs/20260923-195308_3d_p31468-00 (WSL distro Ubuntu).
+  blastFoam 6.2.0 on OpenFOAM-9 (Build 9-c96968adf6d8), `blastFoam
+  -parallel`, 13 ranks (decomposeParDict: scotch).
+  Timeline, 2026-09-23: solver start 19:53:27; solver End 21:07:29
+  (4439.74 s execution time); final reconstruct to 21:18:45; the run's
+  own final ingest and cleanup at 21:22:50.
+  COMPLETE:
+  - log.blastFoam ends `End` / `Finalising parallel run` at Time = 0.03,
+    which is startTime 0 plus the 0.030 s window.
+  - No `Input/output error` and one solver banner, so W3 did not resume.
+    The probes are one chunk (postProcessing/gauges/0).
+  WRITTEN TIMES: 748 after t = 0 (749 time dirs), NOT 6.
+  - n_snapshots = 6 only picks which frames become Result snapshots.
+  - The writes follow the adaptive-writeInterval controller
+    (runloop.maybe_adapt, clamped to [interval0/4, 8*interval0]), with
+    rendered interval0 = 1.033114042e-05 s: 340 writes at interval0/4,
+    337 at the x8 ceiling (8.264912335e-05 s), and 71 in between.
+  SIZE: 185,713,059,688 B (172.96 GiB), made up of:
+    749 time dirs at the root          97,538,070,861 B  (reconstructed;
+                                        a write ~130.4 MB, 14 fields)
+    13 processor* dirs                 88,073,570,425 B  (every write
+                                        again, decomposed, ~141.7 MB each,
+                                        incl. 117,631,863 B of constant)
+    constant/ (polyMesh)                   99,146,872 B
+    log.blastFoam                           1,338,038 B
+    postProcessing/                           885,570 B
+    system/, case.json, .run.pid, root dir entry  47,922 B
+  What dominates is the number of writes, each kept twice. It is not
+  n_snapshots. The 30-snapshot attempt, 20260922-132259_3d_p3756-00, has
+  the same case.json in every field but n_snapshots (30). It also ended
+  `End`, with 774 time dirs and 191.63 GiB.
+
+
+IDENTITY (H1): SAME CASE
+  case.json
+  - Compared against case_to_dict(asm.build_vent_case(build())[0]) on
+    the current tree: all 56 fields identical, exact float equality
+    (chamber_state max relative difference 0). Field diff: EMPTY.
+  Rendered dicts
+  - writer.render_case(cfd, n_procs=13, live_steps=1), in memory, against
+    the run: blockMeshDict, fvSchemes, fvSolution, setFieldsDict,
+    topoSetDict, decomposeParDict (13), phaseProperties and
+    dynamicMeshDict are byte-identical.
+  - The initial state 0/{T,U,alpha.expl,p,rho.air,rho.expl} (841,704
+    fluid cells) is sha256-identical.
+  - Dict diff: system/controlDict, ONE line - the top-level
+    writeInterval, rendered 1.033114042e-05, 8.264912335e-05 in the run.
+  - That line is the runner's own run-time rewrite
+    (runner.rewrite_control_entry), called by the adaptive controller the
+    case asks for (adaptive_write = true). The file's mtime, 20:16:56.000,
+    is that rewrite's whole-second bump.
+  - Applying that single rewrite to the rendered controlDict reproduces
+    the run's byte for byte. It is not a difference in the case.
+  Source commit
+  - Built from HEAD 4975705 (master, merged 19:52:32), plus the
+    n_snapshots_vent 30 -> 6 edit, which was still uncommitted at launch
+    and was committed at 20:04:44 in 1c9b238.
+  - Evidence: the committed 4975705 script builds a case that differs
+    from case.json in n_snapshots alone.
+  - Commits since then that touch core/assessment.py, vent.py, room.py,
+    deflagration.py or solvers/foam/writer.py: 1c9b238 only. Its
+    assessment.py change is a band-cost warning in validate() when
+    case.sensitivity is on. It leaves build_vent_case untouched, as the
+    exact match above shows.
+
+
+EVIDENCE AND THE READ-ONLY PROOF
+  Evidence copy, lightweight set
+  - C:\Users\rotem.ofek\blastlab_evidence\20260923-195308_3d_p31468-00\
+    holds case.json, .run.pid, log.blastFoam, system/, constant/ and
+    postProcessing/: 24 files, 101,361,058 B.
+  - Plus SHA256SUMS.source, taken from the run and verified against the
+    copy.
+  - The time dirs stay in WSL, far over 5 GB. 0/ (35,193,461 B) was
+    hashed, not copied.
+  Corpus sweep
+  - env.auto_cleanup was NOT called: it deletes.
+  - Its policy was dry-run at 2026-09-24 10:45:33 with the settings the
+    app loads (auto_cleanup true, 150 GB, 14 days, keep 10). It would
+    delete one run, 20260921-123600_2d_p41784-01 (~0 GiB), and not this
+    one, the newest of 11.
+  Run dir before / after this evaluation (10:45:45 / 10:45:53)
+    du -sb             185,713,059,688 / 185,713,059,688
+    newest mtime       2026-09-23 21:22:50.398 postProcessing (the live
+                       run's own end-of-run removal of its live-slice
+                       samples, runloop.py) / the same
+    entries            157,318 files, 21,018 dirs / the same
+    sha256 over every path + size + mtime
+                       2101932063f3f2c2a9865f00a54ad28d9926d1950e31565bd027a74af567586e
+                       / the same
+    sha256 case.json, gauges/0/p, U, rho   / all the same
+  Process check
+  - `pgrep -a blastFoam` plus a scan for blastFoam, reconstructPar,
+    decomposePar, mpirun, orted, setRefinedFields, blockMesh, foamToVTK
+    and postProcess.
+  - Clean before, at each of 16 samples during the 3.3 s run, and after.
+
+
+HOW THE GAUGES WERE READ
+  `--load` (9b5212f) reads case.json and postProcessing/gauges/0/{p,U,rho}
+  and nothing else. It goes through reader.read_probes(case_unc) - the
+  call the live path's backend.finalize_3d makes - and packs the result
+  into finalize_3d's gauge dict. No field, no reconstructPar, no solver.
+  postmortem.load_run was not used: it reads all 748 written times and
+  may reconstruct into the run.
+  The probes are blastProbes, sampled every solver step, with
+  adjustLocations yes and the default `cell` interpolation. Each sample
+  is therefore the raw value of the cell findCell elects (blastFoam User
+  Guide v6.0, sec. 15.1, pp. 122-123). 3395 samples, 0 to 30 ms.
+
+==============================================================================
+CONSOLE OUTPUT, VERBATIM: cd blastlab/tests && python -u _e2e_vent_3d.py --load 20260923-195308_3d_p31468-00
+==============================================================================
+VENT 3D (HD1-3d): the answer
+  [PASS] the case validates - 0 errors
+  [PASS] and the CFD case it builds validates too
+  [PASS] the opening is at least twelve base cells across, which is what a run reporting a LOAD now has to be - (12, 12) cells
+  [PASS] the state and the mesh describe the same room - 52.272 m3
+
+  room    cavity 52.272 m3, opening 1.440 m2
+  state   0.3063 MPa, 647 K, alpha_expl 0.2573, burst at t = 13.115 s
+  mesh    864,000 cells, 30 ms
+  window  tau_drain 0.1516 s, window/drain 0.198
+  [caveat] the walls took 90% of the energy released before the hand-off, so this state is a long way below the adiabatic bound. Check that h_c is a measurement 
+  [PASS] this is a BURST panel, so a peak may be read from the first front - an opening that was never closed would not get that
+
+  loading  /root/blastlab_runs/20260923-195308_3d_p31468-00
+           read-only: case.json + postProcessing/gauges; no field, no reconstruct, no solver
+  case     case.json matches this CFD case, all 56 fields
+  gauges   3 probes, 3395 samples, t = 0.0000 to 30.0000 ms
+  [PASS] the target gauges recorded something
+
+  target face  peak 41.47 kPa at t = 19.08 ms
+  [PASS] the jet reached the wall and loaded it - 41.47 kPa over ambient
+  [PASS] no boundary reflection returns to the wall inside the window - a second arrival would be indistinguishable from the jet - later maximum -21.35 kPa against a peak of 41.47
+  gauge 1 after t_peak + 4 ms: largest -21.35 kPa at 23.083 ms
+
+  every gauge - reported, not judged (no threshold on impulse or arrival was set before the run)
+  G1 (10.000, 6.000, 1.400) m
+     peak 41.47 kPa at 19.080 ms, arrival 10.319 ms, net impulse 82.61 Pa s
+     positive phase 11.610 ms, impulse 322.78 Pa s; positive_phase_complete True
+  G2 (10.000, 5.000, 1.400) m
+     peak 26.75 kPa at 12.905 ms, arrival 10.709 ms, net impulse -84.48 Pa s
+     positive phase 10.139 ms, impulse 200.52 Pa s; positive_phase_complete True
+  G3 (10.000, 6.000, 2.600) m
+     peak 24.78 kPa at 14.109 ms, arrival 10.792 ms, net impulse -59.01 Pa s
+     positive phase 9.722 ms, impulse 172.55 Pa s; positive_phase_complete True
+  response     mu 0.3027, theta 0.154 deg, dynamic
+  [PASS] the wall response is computed from the CFD trace, not from the 0-D chamber pressure - which is the whole point of running this
+  [PASS] and the wall survives this one, which a 200 mm reinforced panel at 4 m should - mu 0.3027
+
+  where this run sits in the envelope
+  The CFD ran at 12 cells across the opening, which makes it a sample at Cd ~ 0.81 - 50% of the way up a 0.72-0.9 axis. Its structural load is the load AT THAT POINT, not the envelope: the CFD does not take Cd as an input, it produces one, and what it produces depends on the mesh.
+  [PASS] the run states where its own Cd sits in the band rather than presenting its load as the answer - Cd ~ 0.81, 50% up the axis
+  [PASS] and if the structural verdict is undetermined across the band, this run does NOT close it - one sample drawn from inside an interval cannot decide a question whose answer varies over it
+  [PASS] while a verdict that does not depend on the calibration is not undermined by the same argument
+
+VENT 3D: PASS
+==============================================================================
+END OF CONSOLE OUTPUT
+==============================================================================
+
+THE THREE FULL TRACES
+  docs/hd13/vent3d_gauges_3d.txt holds every sample, p [Pa], 3395 rows.
+  output.gauges.save_gauges_3d wrote it from the probe file
+  (p sha256 86513971e4cecc43eb7d2e556eb30b937b51043da1cc2be75f6653a6ba28392a,
+  the same in the run and in the evidence copy).
+
+  Overpressure per 1-ms bin, kPa: max / min
+  (G1 = (10, 6, 1.4), G2 = (10, 5, 1.4), G3 = (10, 6, 2.6))
+    bin ms  |     G1 max    min |     G2 max    min |     G3 max    min
+     0- 8   |       0.00   0.00 |       0.00   0.00 |       0.00   0.00
+     8- 9   |       0.06   0.00 |       0.01   0.00 |       0.01   0.00
+     9-10   |       4.39   0.06 |       0.88   0.01 |       0.62   0.01
+    10-11   |      16.14   4.58 |      13.30   0.92 |      12.82   0.66
+    11-12   |      25.93  16.19 |      20.34  13.39 |      16.23  12.94
+    12-13   |      29.10  26.05 |      26.75  20.50 |      16.23  15.81
+    13-14   |      28.69  26.18 |      26.70  24.18 |      24.67  16.22
+    14-15   |      26.16  25.60 |      24.13  21.44 |      24.78  22.85
+    15-16   |      28.31  25.74 |      21.41  20.42 |      22.82  21.18
+    16-17   |      33.89  28.37 |      21.68  20.42 |      21.16  20.76
+    17-18   |      38.41  33.96 |      22.33  21.70 |      20.80  19.95
+    18-19   |      41.39  38.47 |      22.23  19.59 |      19.92  15.22
+    19-20   |      41.47  35.38 |      19.55  12.99 |      15.15   6.40
+    20-21   |      35.26  20.27 |      12.85  -2.32 |       6.26  -5.30
+    21-22   |      20.03  -1.79 |      -2.52 -20.94 |      -5.43 -15.79
+    22-23   |      -2.11 -20.44 |     -21.13 -34.55 |     -15.89 -22.67
+    23-24   |     -20.56 -27.04 |     -34.66 -41.11 |     -22.73 -27.09
+    24-25   |     -27.12 -33.53 |     -41.16 -42.77 |     -27.13 -30.02
+    25-26   |     -33.60 -37.41 |     -40.45 -42.77 |     -30.04 -31.34
+    26-27   |     -37.43 -38.53 |     -36.25 -40.41 |     -31.35 -31.57
+    27-28   |     -37.31 -38.50 |     -31.42 -36.20 |     -30.72 -31.59
+    28-29   |     -32.84 -37.28 |     -26.69 -31.37 |     -28.20 -30.70
+    29-30   |     -25.29 -32.76 |     -22.44 -26.63 |     -24.45 -28.16
+
+  What the traces show (a description, not a verdict):
+  - G1, on the jet axis. Arrival 10.319 ms. A first rise to 29.1 kPa at
+    12-13 ms, then a second, higher one to the 41.47 kPa peak at
+    19.080 ms. The positive phase closes at ~21.9 ms. After that the
+    negative phase reaches -38.5 kPa and is still -25.3 kPa at 30 ms, so
+    it is open at the end of the record.
+  - G2, 1 m to the side. 26.75 kPa at 12.905 ms, then ~21-22 kPa until
+    about 19 ms. Negative from ~20.8 ms, down to -42.8 kPa.
+  - G3, 1.2 m above. 24.78 kPa at 14.109 ms. Negative from ~20.5 ms,
+    down to -31.6 kPa.
+  - C8 is narrow by construction (batch plan, Risks). It reads only G1,
+    only after t_peak + 4 ms (23.08 ms), and only for a maximum above
+    half the peak. There the largest value is -21.35 kPa at 23.083 ms.
+    A return that was the peak itself, or that arrived before it, would
+    pass.
+  - Geometry for a reader to weigh that: the x_hi boundary is 2 m behind
+    G1 and z_hi is 4.6 m above it. Both are `transmit`; the ground,
+    z_lo, is `reflect`.
+
+THE WALL, AND WHAT LOADS IT
+  mu 0.3027, theta 0.154 deg, dynamic, not collapsed (C9, C10). The load
+  is G1's trace as recorded: the static pressure at a point in free air.
+  No wall is meshed at x = 10 m - the CFD's obstacles are the eight room
+  boxes (assessment.build_vent_case: obstacles = m['boxes']) - so the
+  trace carries no reflection off the face it is applied to. Compare UFC
+  3-340-02 (2008), para. 2-15.3.2 (printed p. 64): a front wall struck
+  by the wave goes to the normal reflected pressure Pr, a function of
+  the incident pressure (Figure 2-15). Recorded here, not acted on: C10
+  passes as committed.
+
+THE BAND
+  Cd ~ 0.81, 50% up the 0.72-0.9 axis, "not the envelope" (C11). One
+  sample does not close an undetermined verdict (C12), and it does not
+  undermine a calibration-independent one (C13).
+
+THE RENDER docs/hd13/hd13_vent_jet_3d.mp4 (60 frames, 12 fps, 1280x720)
+  Tied to THIS run by content, not by metadata: the file carries none,
+  and no code in the repo writes it.
+  - Frame 0 reads "t = 0.01 ms, max 205.0 kPa". That is this run's first
+    write (1.033114e-05 s) and its chamber state (306,325.087 - 101,325
+    Pa).
+  - Frame 59 reads "t = 28.93 ms, max 151.2 kPa". That is this run's
+    write at 0.028927193 s, where the solver logged max(p) 252,558 Pa.
+  - The only other run in the corpus with a 0.028927193 s write is a
+    different case (3 x 1.5 x 1.5 m, a 659 kPa chamber). There its
+    solver logged max(p) 103,989 Pa.
+  - The frames are not a uniform stride over the 748 writes, and the
+    renderer is not recorded.
