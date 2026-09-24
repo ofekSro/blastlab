@@ -423,6 +423,12 @@ def test_fake_run():
               str(purge.reconstructed))
         check('and are purged once ingested',
               purge.run({t1: 0, t2: 0, t3: 0}) == [t1, t2])
+        n = len(calls)
+        again = runloop.DecomposedPurge(budget_spec(root), FIELDS, hooks,
+                                        delete=local_delete(root, calls))
+        check('a later session does not re-delete what is already gone',
+              again.run({t1: 0, t2: 0, t3: 0}) == [] and len(calls) == n,
+              str(calls))
 
     with tempfile.TemporaryDirectory() as root:
         fake_run(root, [t1, t2, t3], reconstructed=[t1, t2, t3])

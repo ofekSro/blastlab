@@ -323,6 +323,12 @@ class DecomposedPurge:
         if names:
             self.reconstructed.update(names)
 
+    def _present(self, name):
+        """Is `name` still in some processor*/ dir?"""
+        return any(os.path.isdir(os.path.join(self.spec.case_unc,
+                                              f'processor{i}', name))
+                   for i in range(self.spec.n_procs))
+
     def run(self, done):
         """Purge what the plan allows now; returns the times removed."""
         if not self.active:
@@ -330,9 +336,11 @@ class DecomposedPurge:
         common = common_ready_times(self.spec, self.fields)
         if not common:
             return []
+        # ...and still on disk: a resumed run's earlier session already
+        # removed its own older copies, which need no second rm
         plan = [t for t in decomposed_purge_plan(
             done, self.reconstructed, common, self.spec.start_dir)
-            if t not in self.purged]
+            if t not in self.purged and self._present(t)]
         if not plan:
             return []
         try:
