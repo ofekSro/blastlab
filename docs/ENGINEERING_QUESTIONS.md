@@ -213,3 +213,30 @@ is part of the migration plan, and none affects the byte-pinned baselines.
    beams under uniform load an elasto-plastic range (K_L 0.64, K_M 0.50, K_LM 0.78) in
    between. The text sidecar doesn't carry the table values, so confirm them on the
    printed PDF page, and document how `average` is formed.
+
+---
+
+## 2026-09-24 · `/refactor` phase 0 (characterisation tests, `389247d`)
+
+Source: the arch-refactorer's phase 0 report. Noticed while pinning outputs; nothing
+changed.
+
+1. **The HD 1.3 sensitivity band does not contain the nominal result.** On the starter
+   case with `sensitivity=True`, the nominal SDOF ductility is 0.1164, but the band's
+   ends are 0.0509 (low) and 0.1049 (high). The verdict "survives_across_band" is
+   therefore taken between two ends that bracket everything except the nominal point.
+   Worth checking `core/sensitivity.band` and `structural_verdict`; the heat-loss (h_c)
+   axis is a suspect.
+2. **`validate_case` reports a different grid from the one the native solver builds.**
+   For the native 2D case, validation reports dx 0.010542 and 17,063 cells (113 × 151,
+   rounded down). The solver builds 114 × 152 = 17,328 cells at dx 0.010526. So the
+   cell-cap check undercounts by ~1.5 % in 2D, and probably more in 3D. Worth deciding
+   before phases 3-4 split `validate_case`, because the split pins the current numbers.
+3. **The HD 1.3 starter case is a weak check.** Its confined peak is 102.35 kPa absolute
+   (~1 kPa over ambient), with ductility 0.12 (quasi-static). The `cli_hd13.py` docstring
+   says the assessment finishes "in under a second". The starter case took ~42 s here,
+   and ~20 min with the band on.
+4. **Two existing tests are weaker under pytest than they look.** `test_vent_wall.py`'s
+   `test_evidence/test_tails/test_step2_driver` take arguments, so pytest reports 3
+   "fixture not found" errors. `test_refine.py`'s `check()` only appends to a list, so
+   its 10 pytest functions cannot fail. Fixing either edits a committed test (§9).
