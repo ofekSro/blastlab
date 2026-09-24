@@ -1323,8 +1323,7 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
                else 'safety cap (no terminate boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + ('(initial, adaptive)' if spec.adaptive_write
-               else '(pinned schedule)'),
+            + _interval_label(spec),
             f'  Live slice      : p sampled every '
             f'{spec.live_steps or writer.live_sample_steps(2)} steps'
             + (' + every written time (AMR)' if spec.amr else ''),
@@ -1346,9 +1345,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     if spec is None:
         spec = _preflight(case, hooks)
     # either side saying False pins the write schedule (N2-13; see the
-    # solve_1d_foam docstring)
+    # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True)))
+                           and bool(getattr(case, 'adaptive_write', True))
+                           and not getattr(spec, 'write_budget', 0))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
@@ -1881,6 +1881,15 @@ def slice_geom_3d(case, spec):
             live_title)
 
 
+def _interval_label(spec):
+    """The banner's word on the write schedule. The two pre-HD1-15
+    phrasings are unchanged - the GUI and tests read this line - and a
+    write budget gets its own."""
+    if getattr(spec, 'write_budget', 0):
+        return f'(pinned: write budget {spec.write_budget})'
+    return '(initial, adaptive)' if spec.adaptive_write else '(pinned schedule)'
+
+
 def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
     m = MATERIALS[spec.material]
     bar = '=' * 62
@@ -1917,8 +1926,7 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
             f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + ('(initial, adaptive)' if spec.adaptive_write
-               else '(pinned schedule)'),
+            + _interval_label(spec),
             ('  Live slice      : p of every written time (AMR)'
              if spec.amr else '  Live slice      : p sampled every step'),
             bar, ''):
@@ -1936,9 +1944,10 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     if spec is None:
         spec = _preflight(case, hooks)
     # either side saying False pins the write schedule (N2-13; see the
-    # solve_1d_foam docstring)
+    # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True)))
+                           and bool(getattr(case, 'adaptive_write', True))
+                           and not getattr(spec, 'write_budget', 0))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)

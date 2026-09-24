@@ -373,6 +373,7 @@ def main():
     amr_cap_checks()
     axisym_pin_note_checks()
     thin_obstacle_warn_checks()
+    write_budget_checks()
 
     if FAIL:
         print(f"\nCASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
@@ -657,6 +658,71 @@ def _fixed_dt_checks():
           refused(scald) and not refused(cool),
           f'hot: {len(refused(scald))} error(s), '
           f'cool: {len(refused(cool))}')
+
+
+def write_budget_checks():
+    """HD1-15: the write budget's rules, one case each. The messages are
+    matched by their own words - the throwaway geometry has complaints of
+    its own, which a check on `rep.ok` would be measuring instead."""
+    print('\n  HD1-15: the write budget')
+
+    def rep_for(dim=3, **kw):
+        base = dict(solver='blastfoam', t_end=0.01, n_snapshots=6)
+        if dim == 3:
+            base.update(Lx=1.0, Ly=1.0, Lz=1.0, cell_size_m=0.05,
+                        charge=0.5, center=(0.5, 0.5, 0.5),
+                        charge_refine='zone')
+            base.update(kw)
+            return validate_case(Case3D(**base))
+        base.update(geometry='axisymmetric', Lx=2.0, Ly=2.0,
+                    cell_size_m=0.02, charge=1.0, center=(0.0, 1.0))
+        base.update(kw)
+        return validate_case(Case2D(**base))
+
+    def said(rep, words, where=('errors', 'warnings', 'notes')):
+        return [m for w in where for m in getattr(rep, w) if words in m]
+
+    off = rep_for(write_budget=0)
+    check('budget 0: not one word about it',
+          not said(off, 'rite budget') and not said(off, 'budget'),
+          str(said(off, 'budget')))
+    for bad in (-1, 2.5, True, '60'):
+        check(f'budget {bad!r} is refused: a whole number, 0 or more',
+              said(rep_for(write_budget=bad), 'whole number of writes',
+                   ('errors',)))
+    check('a budget without an explicit end time is an error (the '
+          'automatic end is a 10x cap)',
+          said(rep_for(write_budget=60, t_end=0.0), 'explicit end time',
+               ('errors',)))
+    check('a budget of 1 is an error: at least 2 writes',
+          said(rep_for(write_budget=1), 'at least 2 writes', ('errors',)))
+    ok = rep_for(write_budget=60)
+    check('a budget of 60 with t_end raises no budget error',
+          not said(ok, 'budget', ('errors',)), str(ok.errors))
+    check('the native solver notes that it ignores the budget',
+          said(rep_for(write_budget=60, solver='native'),
+               'native solver ignores it', ('notes',)))
+    check('below 4 x n_snapshots is a warning, not an error',
+          said(rep_for(write_budget=10), 'below 4 x n_snapshots',
+               ('warnings',))
+          and not said(rep_for(write_budget=10), 'budget', ('errors',)))
+    check('and at 4 x n_snapshots it is silent',
+          not said(rep_for(write_budget=24), 'below 4 x n_snapshots'))
+    term = dict(x_lo='transmit', x_hi='transmit', y_lo='terminate',
+                y_hi='transmit', z_lo='reflect', z_hi='transmit')
+    check('a terminate side normal to the live slice gets a note: '
+          'arrival there is seen at writes only',
+          said(rep_for(write_budget=60, bcs=term, slice_axis='y'),
+               'normal to the live slice', ('notes',))
+          and not said(rep_for(write_budget=60, bcs=term, slice_axis='z'),
+                       'normal to the live slice'))
+    check('a parallel AMR case gets a note: no purge',
+          said(rep_for(write_budget=60, amr_levels=1,
+                       charge_refine='global'), 'no purge', ('notes',)))
+    check('and every budget case is told the disk it will take',
+          said(ok, 'on the WSL disk', ('notes',))
+          and said(rep_for(dim=2, write_budget=20), 'on the WSL disk',
+                   ('notes',)))
 
 
 if __name__ == '__main__':

@@ -99,6 +99,11 @@ class CaseSpec:
     #: controller never rewrites the controlDict, so two identical runs
     #: write at exactly the same times and stay bit-identical (B23)
     adaptive_write: bool = True
+    #: HD1-15: N > 0 while the case's write budget is in effect (2D/3D,
+    #: explicit end time): writeInterval is t_end / N for the whole run,
+    #: the adaptive controller is off, and the run loop keeps the
+    #: decomposed copy of the latest write only (runloop.DecomposedPurge).
+    write_budget: int = 0
     grid: dict = None                    # core.grid product (per dim)
     charges: list = field(default_factory=list)   # [((x,y,z), mass_kg)]
     det_points: list = field(default_factory=list)  # [] = charge centres
@@ -347,7 +352,35 @@ def _timing(case, cap_dist, est_dist, n_snapshots):
     # the backend's adaptive controller doubles it back within bounds
     # [i0/4, i0*8] once frames accumulate.
     t_est = min(end_time, 1.5 * est_dist / (2.0 * C_AMB))
+    budget = write_budget_of(case)
+    if budget and cap_is_end:
+        # HD1-15: a number of writes asked for, spread evenly over the
+        # window asked for - not a transit estimate the controller then
+        # has to chase. The end-time write (writeTimeList) coincides with
+        # the last one, so it is neither lost nor doubled.
+        return end_time, end_time / budget, cap_is_end
     return end_time, t_est / _n_writes(n_snapshots) / 4.0, cap_is_end
+
+
+def write_budget_of(case):
+    """HD1-15: the case's write budget N (> 0) when it can take effect -
+    a 2D/3D case with an explicit end time - else 0. Validation refuses a
+    budget without an end time; this just never pins one to the cap."""
+    try:
+        b = int(getattr(case, 'write_budget', 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    if b <= 0 or not (getattr(case, 't_end', 0.0) or 0.0) > 0.0:
+        return 0
+    return b
+
+
+def _apply_budget(spec, case):
+    """Carry an effective write budget onto the spec: the interval
+    `_timing` pinned stays pinned (no adaptive controller)."""
+    spec.write_budget = write_budget_of(case) if spec.cap_is_end else 0
+    if spec.write_budget:
+        spec.adaptive_write = False
 
 
 def plan_case(case):
@@ -440,6 +473,7 @@ def plan_case(case):
         est = min(opens) if opens else far
         spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
             case, max(Lx_eff, Ly_eff), est, case.n_snapshots)
+        _apply_budget(spec, case)
         return spec
 
     # 3D - the primary charge plus any extras; the grid resolves the
@@ -504,6 +538,7 @@ def plan_case(case):
     est = min(opens) if opens else far
     spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
         case, max(Ls), est, case.n_snapshots)
+    _apply_budget(spec, case)
     return spec
 
 

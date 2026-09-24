@@ -208,6 +208,11 @@ class Case2D:
     #: with it off - and DONE.md records the old reading as REFUTED.
     probe_adjust: bool = True
     adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
+    #: HD1-15: N > 0 pins blastFoam's writeInterval to t_end / N (an
+    #: explicit t_end is required) and keeps the decomposed copy of the
+    #: latest write only. 0 = off, and then the key is not even written
+    #: (case_to_dict), so every case without one is byte for byte as before.
+    write_budget: int = 0
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y), ...] (axisym: x = 0);
@@ -340,6 +345,7 @@ class Case3D:
     #: with it off - and DONE.md records the old reading as REFUTED.
     probe_adjust: bool = True
     adaptive_write: bool = True       # see Case1D.adaptive_write (B23)
+    write_budget: int = 0             # see Case2D.write_budget (HD1-15)
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto)
     charges: list = None              # blastFoam: ADDITIONAL charges
                                       # [(x, y, z, mass_kg), ...] on top
@@ -354,6 +360,13 @@ _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
 
 def case_to_dict(case):
     d = asdict(case)
+    # HD1-15: an unset write budget is not written at all. A case without
+    # one then serialises byte for byte as it always has and VERSION stays
+    # 13 - which keeps every saved case.json, and the HD1-3d evidence
+    # identity check that compares one key for key, as they were. (An
+    # older blastlab refuses a file that HAS a budget: "Unknown case keys".)
+    if not d.get('write_budget'):
+        d.pop('write_budget', None)
     d['schema'] = SCHEMA
     d['version'] = VERSION
     d['dim'] = case.dim
@@ -819,6 +832,68 @@ def _warn_long_end_time(case, warn):
          f"{C_AMB_AIR:.0f} m/s). It will be honoured, so expect roughly "
          f"{ratio:.0f}x the wall clock; the wave will have left the "
          f"domain long before the end.")
+
+
+#: HD1-15: disk one written time costs per cell on a blastFoam 3D run -
+#: measured on HD1-3d, 130,677,089 B over 841,704 cells (14 fields)
+BYTES_PER_CELL_WRITE = 155
+
+
+def _validate_write_budget(case, rep, n_cells, foam, amr):
+    """HD1-15: the rules of the per-case write budget. `n_cells` is
+    validate_case's own cell estimate."""
+    err, warn, note = rep.errors.append, rep.warnings.append, rep.notes.append
+    b = getattr(case, 'write_budget', 0)
+    b = 0 if b is None else b
+    if isinstance(b, bool) or not isinstance(b, (int, np.integer)) or b < 0:
+        err("Write budget must be a whole number of writes, 0 or more "
+            "(0 = off)")
+        return
+    b = int(b)
+    if not b:
+        return
+    if not foam:
+        note(f"Write budget {b} is a blastFoam setting - the native solver "
+             f"ignores it")
+        return
+    t_end = float(getattr(case, 't_end', 0.0) or 0.0)
+    if t_end <= 0.0:
+        err(f"A write budget needs an explicit end time: the automatic end "
+            f"is a 10x safety cap (~{safety_cap_s(case) * 1e3:.0f} ms), so "
+            f"t_end / {b} would space the writes for a run far longer than "
+            f"the one that happens")
+    if b < 2:
+        err("A write budget needs at least 2 writes")
+    n_snap = int(getattr(case, 'n_snapshots', 0) or 0)
+    if b < 4 * n_snap:
+        warn(f"Write budget {b} is below 4 x n_snapshots = {4 * n_snap}, "
+             f"the writer's own rule for how many writes the {n_snap} "
+             f"snapshots are picked from - they will be picked from fewer, "
+             f"coarser writes")
+    if case.dim == 3 and t_end > 0.0:
+        # the live-slice rim sees the four in-plane sides every step
+        # (N3-01); a side NORMAL to the slice is only seen in a write
+        ax = getattr(case, 'slice_axis', 'y') or 'y'
+        bcs = normalize_bcs(dict(case.bcs or {}))
+        sides = [s for s in (f'{ax}_lo', f'{ax}_hi')
+                 if bcs.get(s) == 'terminate']
+        if sides:
+            note(f"{' and '.join(sides)} is a terminate side normal to the "
+                 f"live slice: shock arrival there is checked at written "
+                 f"times only, so with the budget the stop can come up to "
+                 f"t_end / {b} = {t_end / b * 1e3:.4g} ms late")
+    if amr and int(getattr(case, 'n_procs', 0) or 0) != 1:
+        note("A parallel AMR run is read from its per-rank copies, so the "
+             "write budget keeps every one of them (no purge); it still "
+             "pins the write times")
+    if t_end > 0.0 and b >= 2:
+        per = BYTES_PER_CELL_WRITE * n_cells
+        note(f"Write budget: {b} writes, one every {t_end / b * 1e3:.4g} ms, "
+             f"pinned (no adaptive interval). Expect ~{b * per / 1e9:.1f} GB "
+             f"of written times on the WSL disk (~{BYTES_PER_CELL_WRITE} B "
+             f"per cell per write, measured on HD1-3d), plus one "
+             f"decomposed write (~{per / 1e9:.2f} GB) kept for a resume "
+             f"when the run is parallel")
 
 
 def validate_case(case, pending_inputs=False):
@@ -1371,6 +1446,7 @@ def validate_case(case, pending_inputs=False):
             warn(f"Large grid: ~{n:,} cells - expect a long run and "
                  f"~{_nat.est_bytes(n) / 2 ** 30:.1f} GB of RAM")
     rep.n_cells = n
+    _validate_write_budget(case, rep, n, foam, amr)
     if foam:
         # N17/T48: resolve the rank count with the real cell count and
         # say what was decided, for auto (0) as well as an explicit ask
