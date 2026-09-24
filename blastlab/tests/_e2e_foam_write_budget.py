@@ -173,10 +173,11 @@ def run_a(case):
             bad.append(f'{n}: {exc}')
     check(f'the root copy of every purged time reads back '
           f'({len(purged)} purged)', purged and not bad, str(bad))
-    frames = (res.meta.get('frames') or {}).get('times') or []
+    frames = (res.meta.get('frames') or {}).get('times')
+    n_frames = 0 if frames is None else len(frames)
     check('the Result has snapshots and at least 2 frames',
-          len(res.snapshots) >= 1 and len(frames) >= 2,
-          f'{len(res.snapshots)} snapshots, {len(frames)} frames')
+          len(res.snapshots) >= 1 and n_frames >= 2,
+          f'{len(res.snapshots)} snapshots, {n_frames} frames')
     pt = probe_times(unc)
     gaps = np.diff(pt)
     check('the probe rows run contiguously to t_end',
