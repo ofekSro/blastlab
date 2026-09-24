@@ -476,10 +476,24 @@ def field_text(name, vals, vector=False):
             'boundaryField { }\n')
 
 
+def writer_start_files(values):
+    """The start time's files exactly as blastlab's writer frames them
+    (`writer._render_fields` over `writer._nonuniform`) - the list closed
+    by ');' on one line. `values`: {name: (field kind, list, is_vector)}."""
+    from types import SimpleNamespace
+    from blastlab.solvers.foam import writer
+    spec = SimpleNamespace(patches=[('x_lo', 'transmit')], l_inf=1.0)
+    fields = {f'0/{name}': (name, kind,
+                            writer._nonuniform(vals, vector=vec), vec)
+              for name, (kind, vals, vec) in values.items()}
+    return {rel[2:]: text for rel, text in
+            writer._render_fields(fields, spec).items()}
+
+
 def make_run(root, spec, times, field):
-    """Time dirs holding p, U and rho in F order (x fastest); the start
-    time holds alpha.expl, rho.expl and rho.air instead of rho, as
-    blastFoam's own 0/ does."""
+    """Time dirs holding p, U and rho in F order (x fastest), as the
+    solver writes them; the start time holds p, U, alpha.expl, rho.expl
+    and rho.air in the WRITER's framing and no rho, as the run's 0/ does."""
     nx, ny, nz = spec.nx, spec.ny, spec.nz
     order = [(i, j, k) for k in range(nz) for j in range(ny)
              for i in range(nx)]
@@ -487,18 +501,73 @@ def make_run(root, spec, times, field):
         d = os.path.join(root, name)
         os.makedirs(d)
         p, rho, U = field(tv)
-        files = {'p': field_text('p', [p[c] for c in order]),
-                 'U': field_text('U', [U[c] for c in order], vector=True)}
         if tv == 0.0:
-            files['alpha.expl'] = field_text('alpha.expl', [0.25] * len(order))
-            files['rho.expl'] = field_text('rho.expl', [2.0] * len(order))
-            files['rho.air'] = field_text('rho.air', [1.2] * len(order))
+            n = len(order)
+            files = writer_start_files({
+                'p': ('p', [p[c] for c in order], False),
+                'U': ('U', [U[c] for c in order], True),
+                'alpha.expl': ('alpha', [0.25] * n, False),
+                'rho.expl': ('rho', [2.0] * n, False),
+                'rho.air': ('rho', [1.2] * n, False)})
         else:
-            files['rho'] = field_text('rho', [rho[c] for c in order])
+            files = {'p': field_text('p', [p[c] for c in order]),
+                     'U': field_text('U', [U[c] for c in order],
+                                     vector=True),
+                     'rho': field_text('rho', [rho[c] for c in order])}
         for fname, text in files.items():
             with open(os.path.join(d, fname), 'w', encoding='ascii',
                       newline='\n') as f:
                 f.write(text)
+
+
+def test_start_reader():
+    print("\nthe start time, as blastlab's writer frames it")
+    files = writer_start_files({
+        'p': ('p', [101325.0, 2.0e5, 3.5e5], False),
+        'U': ('U', [(1.0, 2.0, 3.0), (0.0, 0.0, 0.0), (-4.0, 5.0, 6.5)],
+              True)})
+    check('the writer closes the list with ");" on one line',
+          '\n);\n' in files['p'] and '\n);\n' in files['U'])
+    with tempfile.TemporaryDirectory() as d:
+        paths = {}
+        for name, text in files.items():
+            paths[name] = os.path.join(d, name)
+            with open(paths[name], 'w', encoding='ascii', newline='\n') as f:
+                f.write(text)
+        try:
+            reader.read_scalar(paths['p'], 3)
+            check('reader alone refuses it - the mismatch Step 2 works '
+                  'around', False)
+        except ValueError as exc:
+            check('reader alone refuses it - the mismatch Step 2 works '
+                  'around', 'unterminated' in str(exc), str(exc))
+        check('read_start reads the scalars',
+              np.array_equal(ew.read_start(paths['p'], 3),
+                             [101325.0, 2.0e5, 3.5e5]))
+        check('and the vectors',
+              np.array_equal(ew.read_start(paths['U'], 3, vector=True),
+                             [[1.0, 2.0, 3.0], [0.0, 0.0, 0.0],
+                              [-4.0, 5.0, 6.5]]))
+        for what, n, mangle in (
+                ('a count that is not the mesh\'s', 4, None),
+                ('a torn file (no closing line)', 3,
+                 lambda s: s[:s.index('\n);\n')])):
+            path = paths['p']
+            if mangle:
+                path = os.path.join(d, 'torn')
+                with open(path, 'w', encoding='ascii', newline='\n') as f:
+                    f.write(mangle(files['p']))
+            try:
+                ew.read_start(path, n)
+                check(f'{what} is still refused', False)
+            except ValueError:
+                check(f'{what} is still refused', True)
+        of = os.path.join(d, 'of')
+        with open(of, 'w', encoding='ascii', newline='\n') as f:
+            f.write(field_text('p', [1.0, 2.0, 3.0]))
+        check('an OpenFOAM-framed file goes through reader itself',
+              np.array_equal(ew.read_start(of, 3),
+                             reader.read_scalar(of, 3)))
 
 
 def test_step2_driver(case):
@@ -643,6 +712,22 @@ def test_step2_driver(case):
             check('a fingerprint that cannot be taken means not read-only',
                   res['completed'] and not res['read_only']
                   and 'FAILED' in text, text)
+            # a write that cannot be read aborts Step 2 - and the run is
+            # still fingerprinted after it, so the record shows it intact
+            with open(os.path.join(run, '0.009', 'p'), 'w',
+                      encoding='ascii', newline='\n') as f:
+                f.write('FoamFile { format ascii; }\ninternalField   '
+                        'nonuniform List<scalar>\n48\n(\n1\n2\n')
+            taken = []
+            res, text = quietly(ew.step2, None, probes, run, comp, P_AIR,
+                                spec=spec, scan=lambda: [],
+                                fp=lambda _p: taken.append(1) or {'x': '1'},
+                                expected_n=2)
+            check('an unreadable write aborts Step 2 (not completed, not '
+                  'read-only), and the after-fingerprint is still taken',
+                  not res['completed'] and not res['read_only']
+                  and 'ABORTED' in text and len(taken) == 2
+                  and 'after    x 1' in text, text)
     finally:
         env.case_paths = real_paths
 
@@ -657,6 +742,7 @@ def main():
     test_refusals()
     test_plane_parts()
     test_mapping()
+    test_start_reader()
     test_step2_driver(case)
 
 

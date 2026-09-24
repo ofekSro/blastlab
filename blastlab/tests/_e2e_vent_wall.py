@@ -792,33 +792,73 @@ def mapping_check(write_t, cells, probe_t, probe_p, probe_rho, probe_U,
     return res
 
 
-def start_density(tdir, spec):
-    """The mixture density at a time blastFoam wrote no `rho` for (its
-    start time): rho = alpha1 rho1 + (1 - alpha1) rho2 - blastFoam User
-    Guide v6.0, sec. 2, Eqs. 2.9-2.10 (p. 15)."""
+def read_start(path, n, vector=False):
+    """One field of the START time, which blastlab's own writer wrote
+    (`writer._nonuniform`), not the solver. `reader` is tried first; the
+    writer closes its ascii list with ');' on one line, which reader's
+    ascii path (written for OpenFOAM's own ')' line) refuses as
+    "unterminated", and only that refusal falls through to a parse that
+    also accepts ');', with reader's own float parser. The count must
+    still be exactly `n`."""
+    try:
+        return (reader.read_vector if vector else reader.read_scalar)(path, n)
+    except ValueError as exc:
+        if 'unterminated internalField list' not in str(exc):
+            raise
+    lines = reader._read_text(path).splitlines()
+    i = next((k for k, ln in enumerate(lines)
+              if ln.startswith('internalField')), None)
+    j = (None if i is None else
+         next((k for k in range(i + 1, min(i + 4, len(lines)))
+               if lines[k].strip() == '('), None))
+    end = (None if j is None else
+           next((k for k in range(j + 1, len(lines))
+                 if lines[k].strip() in (')', ');')), None))
+    if end is None:
+        raise ValueError(f'unterminated internalField list in {path}')
+    body = '\n'.join(lines[j + 1:end])
+    vals = reader._floats(body.replace('(', ' ').replace(')', ' ')
+                          if vector else body)
+    ncomp = 3 if vector else 1
+    if len(vals) != n * ncomp:
+        raise ValueError(f'{path}: {len(vals)} values, expected {n * ncomp}')
+    return vals.reshape(-1, 3) if vector else vals
+
+
+def start_state(tdir, spec):
+    """(p, rho, U) on the grid at the START time, where blastFoam wrote no
+    mixture `rho`: rho = alpha1 rho1 + (1 - alpha1) rho2 - blastFoam
+    User Guide v6.0, sec. 2, Eqs. 2.9-2.10 (p. 15). Carved cells take
+    the ambient fills `backend.read_3d` uses."""
     from blastlab.core.constants import RHO_AIR
     from blastlab.solvers.foam import writer
     n = spec.n_cells
-    a = reader.to_grid(reader.read_scalar(
+    p = reader.to_grid(read_start(os.path.join(tdir, 'p'), n), spec,
+                       fill=P_AIR)
+    flat = read_start(os.path.join(tdir, 'U'), n, vector=True)
+    U = np.stack([reader.to_grid(flat[:, i], spec) for i in range(3)],
+                 axis=-1)
+    a = reader.to_grid(read_start(
         os.path.join(tdir, f'alpha.{writer.PHASE}'), n), spec, fill=0.0)
-    r1 = reader.to_grid(reader.read_scalar(
+    r1 = reader.to_grid(read_start(
         os.path.join(tdir, f'rho.{writer.PHASE}'), n), spec, fill=RHO_AIR)
-    r2 = reader.to_grid(reader.read_scalar(
+    r2 = reader.to_grid(read_start(
         os.path.join(tdir, 'rho.air'), n), spec, fill=RHO_AIR)
-    return a * r1 + (1.0 - a) * r2
+    return p, a * r1 + (1.0 - a) * r2, U
 
 
 def read_slab(tdir, spec, i_lo, i_hi):
     """(p, rho, U) on the layers i_lo..i_hi of one written time, through
     the live ingest's own reader (`backend.read_3d`), so the grid mapping
-    is the one the foam tests pin. Reads files; writes nothing."""
+    is the one the foam tests pin; the start time, which has no `rho`,
+    through `start_state`. Reads files; writes nothing."""
     from blastlab.solvers.foam import backend
     sl = slice(i_lo, i_hi + 1)
     if os.path.isfile(os.path.join(tdir, 'rho')):
         f = backend.read_3d(tdir, spec, what=('p', 'rho', 'U'))
         return f['p'][sl], f['rho'][sl], f['U'][sl]
-    f = backend.read_3d(tdir, spec, what=('p', 'U'))
-    return f['p'][sl], start_density(tdir, spec)[sl], f['U'][sl]
+    p, rho, U = start_state(tdir, spec)
+    return p[sl], rho[sl], U[sl]
 
 
 def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
@@ -877,6 +917,8 @@ def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
              ['momentum'] + [('E', gm) for gm in GAMMAS]
              + [('strip', gm) for gm in GAMMAS]}
     nbytes = 0
+    completed = False
+    tv = float('nan')
     t0 = time.time()
     stamps = [t0]                           # the scan before
     scanner = _Scanner(scan, SCAN_EVERY_S).start()
@@ -901,15 +943,18 @@ def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
                 say('  [ABORTED] while reading, the process scan '
                     + (f'saw {", ".join(scanner.hits)}' if scanner.hits
                        else f'failed: {scanner.error}'))
-                return out
+                break
             if (w + 1) % 50 == 0 or w + 1 == n:
                 say(f'  read     {w + 1}/{n} writes, t = {tv * 1e3:.3f} ms, '
                     f'{time.time() - t0:.0f} s')
+        else:
+            completed = True
     except (OSError, ValueError) as exc:
-        say(f'  [ABORTED] reading failed: {exc}')
-        return out
+        say(f'  [ABORTED] reading failed at t = {tv:g}: {exc}')
     finally:
         scanner.stop()
+    # the after-scan and the after-fingerprint are taken on every path:
+    # an aborted read still has to show that it left the run as it was
     wall = time.time() - t0
     hits = _checked(scan, say)
     stamps += scanner.stamps + [time.time()]
@@ -923,11 +968,15 @@ def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
     for k, v in after.items():
         say(f'  after    {k} {v}')
     same = bool(before) and before == after
-    say(f'  read     {n} writes, {nbytes:,} B of p/U/rho in {wall:.0f} s; '
-        f'fingerprint before == after: {same}; scans clean and at most '
-        f'30 s apart: {scanned_ok}')
-    out['completed'] = True
-    out['read_only'] = same and scanned_ok
+    say(f"  read     {n if completed else 'NOT all'} writes, {nbytes:,} B "
+        f"of p/U/rho in {wall:.0f} s; fingerprint before == after: {same}; "
+        f"scans clean and at most 30 s apart: {scanned_ok}")
+    out['completed'] = completed
+    out['read_only'] = completed and same and scanned_ok
+    if not completed:
+        say('  Step 2 did not complete, so it was not run read-only as the '
+            'rule requires')
+        return out
 
     # the mapping check - P1 replaced by a measurement
     m = mapping_check(t, cells, probes['times'], probes['pressures'][0],
