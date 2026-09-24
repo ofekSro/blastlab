@@ -21,7 +21,11 @@ Phase 4 split `validate_case` by concern into `_validate_common`,
 `_validate_profile_init`, `_validate_refinement`, `_validate_caps` and
 `_validate_closing`, which append to one `ValidationReport` in the order
 the single function did and share a per-call `_Ctx`. The bodies moved
-unchanged.
+unchanged; a later readability pass pulled pure helpers out of them
+(`_validate_trigger`, `_validate_extra_charges`, `_validate_det_points`,
+`_plan_static_zones`, `_note_charge_cells`, `_check_amr_growth`,
+`_check_display_grid`, `_warn_thin_obstacle`), each called at the point
+its code used to run, so messages and side effects keep their order.
 """
 
 import math
@@ -473,11 +477,9 @@ def _validate_common(case, rep):
     and the trigger gauge (T51). Returns the shared `_Ctx`, or None when
     validation stops here - a bad cell size, or a fatal backend error,
     which ends validation before any geometry check."""
-    err, note = rep.errors.append, rep.notes.append
-
     dx = case.cell_size_m
     if dx <= 0:
-        err("Cell size must be > 0")
+        rep.errors.append("Cell size must be > 0")
         return None
 
     rho0 = _validate_solver(case, rep)
@@ -492,40 +494,49 @@ def _validate_common(case, rep):
     zones = list(getattr(case, 'refine_zones', None) or [])
     amr = int(getattr(case, 'amr_levels', 0) or 0) if foam else 0
 
-    # ── Trigger gauge (T51) ────────────────────────────────────────────
+    _validate_trigger(case, rep)
+    return _Ctx(rho0, foam, n_exp, cref, zones, amr, dx)
+
+
+def _validate_trigger(case, rep):
+    """Trigger gauge (T51), 2D/3D only: the gauge number, the action, and
+    what a remap action needs (an axisymmetric 2D case and a filename)."""
+    err, note = rep.errors.append, rep.notes.append
     trig = getattr(case, 'trigger_gauge', None)
     action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
-    if case.dim >= 2 and trig not in (None, 0, ''):
-        n_g = len(case.gauges)
-        try:
-            trig_i = int(trig)
-        except (TypeError, ValueError):
-            trig_i = 0
-            err("Trigger gauge must be a gauge number")
-        if trig_i and not 1 <= trig_i <= n_g:
-            err(f"Trigger gauge {trig_i}: the case has {n_g} gauge(s)")
-        if action not in TRIGGER_ACTIONS:
-            err(f"Trigger action '{action}': expected one of "
-                f"{', '.join(TRIGGER_ACTIONS)}")
-        elif 'remap' in action:
-            if case.dim == 3:
-                err("Trigger action 'remap' is not available in 3D - "
-                    "there is no 3D remap format; use 'terminate'")
-            elif case.dim == 2 and case.geometry != 'axisymmetric':
-                err("Trigger action 'remap' needs an axisymmetric 2D "
-                    "case (only those can be remapped into 3D)")
-            elif not (getattr(case, 'trigger_file', None)
-                      or case.profile_file):
-                err("Trigger action 'remap' needs a remap filename "
-                    "(trigger file, or the case's profile output)")
-            else:
-                note(f"Gauge {trig_i} will write the remap file when the "
-                     f"wave reaches it"
-                     + ("" if 'terminate' in action
-                        else " (the run then continues)"))
+    if case.dim < 2 or trig in (None, 0, ''):
+        return
+    n_g = len(case.gauges)
+    try:
+        trig_i = int(trig)
+    except (TypeError, ValueError):
+        trig_i = 0
+        err("Trigger gauge must be a gauge number")
+    if trig_i and not 1 <= trig_i <= n_g:
+        err(f"Trigger gauge {trig_i}: the case has {n_g} gauge(s)")
+    if action not in TRIGGER_ACTIONS:
+        err(f"Trigger action '{action}': expected one of "
+            f"{', '.join(TRIGGER_ACTIONS)}")
+    elif 'remap' in action:
+        if case.dim == 3:
+            err("Trigger action 'remap' is not available in 3D - "
+                "there is no 3D remap format; use 'terminate'")
+        elif case.dim == 2 and case.geometry != 'axisymmetric':
+            err("Trigger action 'remap' needs an axisymmetric 2D "
+                "case (only those can be remapped into 3D)")
+        elif not (getattr(case, 'trigger_file', None)
+                  or case.profile_file):
+            err("Trigger action 'remap' needs a remap filename "
+                "(trigger file, or the case's profile output)")
         else:
-            note(f"The run ends when the wave reaches gauge {trig_i}")
-    return _Ctx(rho0, foam, n_exp, cref, zones, amr, dx)
+            if 'terminate' in action:
+                then = ""
+            else:
+                then = " (the run then continues)"
+            note(f"Gauge {trig_i} will write the remap file when the "
+                 f"wave reaches it{then}")
+    else:
+        note(f"The run ends when the wave reaches gauge {trig_i}")
 
 
 def _validate_1d(case, rep, ctx):
@@ -635,12 +646,13 @@ def _validate_charge(case, rep, ctx):
                and getattr(case, 'charge_resolution',
                            'resolve') == 'smear'
                and dx > r_exp / MIN_EXP_CELLS)
-    r_exp = max(r_exp, 2.0 * dx) if smeared else r_exp
+    if smeared:
+        r_exp = max(r_exp, 2.0 * dx)
     center = case.center
     # containment vs open boundaries; walls allow surface bursts
     if case.dim == 2:
-        x0, y0 = (0.0 if case.geometry == 'axisymmetric'
-                  else center[0]), center[1]
+        x0 = 0.0 if case.geometry == 'axisymmetric' else center[0]
+        y0 = center[1]
         # UX-04: this pin used to be silent - a case file carrying
         # x != 0 was quietly recentred without a word
         if case.geometry == 'axisymmetric' and center[0]:
@@ -700,7 +712,21 @@ def _validate_charge(case, rep, ctx):
         err("Additional charges are only supported for 3D "
             "blastFoam cases")
         extras = []
+    # every charge as (x, y, z, r); the main one first, z = 0 in 2D
     spheres = [(x0, y0, (z0 if case.dim == 3 else 0.0), r_exp)]
+    dx, refined = _validate_extra_charges(case, rep, ctx, extras, spheres,
+                                          dx, refined)
+    _validate_det_points(case, rep, spheres)
+    ctx.dx, ctx.refined = dx, refined
+    return True
+
+
+def _validate_extra_charges(case, rep, ctx, extras, spheres, dx, refined):
+    """The additional blastFoam charges (3D): shape, mass, containment,
+    overlap with the charges before them, and the cell size each forces.
+    Appends each checked charge to `spheres`; returns `(dx, refined)`."""
+    err, note = rep.errors.append, rep.notes.append
+    rho0, n_exp, amr, bcs = ctx.rho0, ctx.n_exp, ctx.amr, ctx.bcs
     for ch in extras:
         if len(ch) != 4:
             err(f"Extra charge {tuple(ch)}: need (x, y, z, mass)")
@@ -744,16 +770,28 @@ def _validate_charge(case, rep, ctx):
             note(f"Cell size will be refined to {dx:.5f} m "
                  f"({n_exp} cells across the smallest "
                  f"charge radius)")
+    return dx, refined
+
+
+def _validate_det_points(case, rep, spheres):
+    """Every detonation point must lie inside one of the charges in
+    `spheres`. In 2D a point is (x, y), and on the axisymmetric axis its
+    x is pinned to 0 as the charge's is."""
+    err = rep.errors.append
     for dp in getattr(case, 'det_points', None) or []:
         pt = tuple(dp) + ((0.0,) if case.dim == 2 else ())
         if len(pt) != 3:
-            err(f"Detonation point {tuple(dp)}: need "
-                + ("(x, y)" if case.dim == 2 else "(x, y, z)"))
+            if case.dim == 2:
+                need = "(x, y)"
+            else:
+                need = "(x, y, z)"
+            err(f"Detonation point {tuple(dp)}: need " + need)
             continue
         px, py, pz = pt
         if case.dim == 2:
-            px, py, pz = ((0.0 if case.geometry == 'axisymmetric'
-                           else px), py, 0.0)
+            if case.geometry == 'axisymmetric':
+                px = 0.0
+            pz = 0.0
             inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2)
                          <= sr for sx, sy, _sz, sr in spheres)
         else:
@@ -763,8 +801,6 @@ def _validate_charge(case, rep, ctx):
         if not inside:
             err(f"Detonation point {tuple(dp)} lies outside every "
                 f"charge")
-    ctx.dx, ctx.refined = dx, refined
-    return True
 
 
 def _validate_profile_init(case, rep, ctx, pending_inputs):
@@ -782,44 +818,47 @@ def _validate_profile_init(case, rep, ctx, pending_inputs):
         # exist for this mode. Its own checks ran earlier, next to the
         # other blastFoam-specific ones.
         rep.r_exp = 0.0
-    elif init != 'charge':
-        if not case.profile_file_in:
-            err("A profile file is required for remap initialization")
-        elif not (pending_inputs or os.path.exists(case.profile_file_in)):
-            err(f"Profile file not found: {case.profile_file_in}")
-        elif foam and not pending_inputs:
-            # N5-4: the single-case path, where the user points at a
-            # profile that already exists. The CHAIN path never reaches
-            # here - its input is written by the stage before it and
-            # provably does not exist yet (pending_inputs), which is why
-            # chain.handoff_conflicts compares the two solvers directly
-            # instead. Guarded this hard because validate_case runs on
-            # every keystroke behind a 300 ms debounce: profile_source
-            # is a memoised header-only read, one os.stat unless the
-            # file actually changed.
-            # deferred: services.chain imports this module
-            from . import chain as _chain
-            from ..core import profiles as _profiles
-            src = _profiles.profile_source(case.profile_file_in)
-            if src == 'native':
-                err(_chain.HANDOFF_MSG[0].upper() + _chain.HANDOFF_MSG[1:])
-            elif src == 'unknown':
-                note("This profile carries no solver stamp (it predates "
-                     "blastlab recording one). If it came from the "
-                     "native solver the hand-off over-prices the "
-                     "product cells by ~33 % - re-run the stage that "
-                     "produced it to get a stamped profile.")
-        if case.dim == 2 and init == 'profile1d' \
-                and case.geometry != 'axisymmetric':
-            err("1D profile remap is only valid in axisymmetric mode")
-        # the remapped charge is still placed at `center`, so an out-of-
-        # domain centre is just as invalid as for a fresh charge (a chain
-        # stage fed a bad burst point used to reach the backend and die)
-        cc = ((0.0, case.center[1])
-              if case.dim == 2 and case.geometry == 'axisymmetric'
-              else tuple(case.center)[:case.dim])
-        if any(not (0 <= float(v) <= float(L)) for v, L in zip(cc, dims)):
-            err("Charge centre is outside the domain")
+        return
+    if init == 'charge':
+        return
+    if not case.profile_file_in:
+        err("A profile file is required for remap initialization")
+    elif not (pending_inputs or os.path.exists(case.profile_file_in)):
+        err(f"Profile file not found: {case.profile_file_in}")
+    elif foam and not pending_inputs:
+        # N5-4: the single-case path, where the user points at a
+        # profile that already exists. The CHAIN path never reaches
+        # here - its input is written by the stage before it and
+        # provably does not exist yet (pending_inputs), which is why
+        # chain.handoff_conflicts compares the two solvers directly
+        # instead. Guarded this hard because validate_case runs on
+        # every keystroke behind a 300 ms debounce: profile_source
+        # is a memoised header-only read, one os.stat unless the
+        # file actually changed.
+        # deferred: services.chain imports this module
+        from . import chain as _chain
+        from ..core import profiles as _profiles
+        src = _profiles.profile_source(case.profile_file_in)
+        if src == 'native':
+            err(_chain.HANDOFF_MSG[0].upper() + _chain.HANDOFF_MSG[1:])
+        elif src == 'unknown':
+            note("This profile carries no solver stamp (it predates "
+                 "blastlab recording one). If it came from the "
+                 "native solver the hand-off over-prices the "
+                 "product cells by ~33 % - re-run the stage that "
+                 "produced it to get a stamped profile.")
+    if case.dim == 2 and init == 'profile1d' \
+            and case.geometry != 'axisymmetric':
+        err("1D profile remap is only valid in axisymmetric mode")
+    # the remapped charge is still placed at `center`, so an out-of-
+    # domain centre is just as invalid as for a fresh charge (a chain
+    # stage fed a bad burst point used to reach the backend and die)
+    if case.dim == 2 and case.geometry == 'axisymmetric':
+        cc = (0.0, case.center[1])
+    else:
+        cc = tuple(case.center)[:case.dim]
+    if any(not (0 <= float(v) <= float(L)) for v, L in zip(cc, dims)):
+        err("Charge centre is outside the domain")
 
 
 def _validate_refinement(case, rep, ctx):
@@ -878,33 +917,7 @@ def _validate_refinement(case, rep, ctx):
             err(f"Unknown charge refinement mode '{cref}' (use 'global' "
                 f"or 'zone')")
         elif init == 'charge' and not rep.errors:
-            from ..core.refine import plan_levels, validate_zones
-            try:
-                plan = plan_levels(case, rho0)
-            except ValueError as exc:
-                err(str(exc))
-            else:
-                zerr, zwarn = validate_zones(case, plan)
-                rep.errors.extend(zerr)
-                rep.warnings.extend(zwarn)
-                if zerr:
-                    plan = None
-                else:
-                    if plan.refined:
-                        note(f"Local refinement: {plan.lmax} level(s), "
-                             f"finest cell {plan.dx_fine:.5g} m, "
-                             f"~{plan.n_pred:,} mesh cells; results are "
-                             f"resampled to a {plan.n_fine:,}-cell display "
-                             f"grid")
-                        rep.lmax = plan.lmax
-                        rep.dx_fine = plan.dx_fine
-                        rep.n_fine = plan.n_fine
-                    if cref == 'zone':
-                        note(f"Charge resolved by automatic level-"
-                             f"{plan.auto_level} zones (base cell kept at "
-                             f"{plan.dx_base:.5g} m)" if plan.auto_level
-                             else "The base cell already resolves the "
-                                  "charge - no automatic zone needed")
+            plan = _plan_static_zones(case, rep, rho0, cref)
     ctx.plan = plan
 
     # What blastFoam will actually deposit (N5/T39): setFields marks
@@ -914,26 +927,74 @@ def _validate_refinement(case, rep, ctx):
     if foam and init == 'charge' and rep.r_exp and not rep.errors:
         dx_charge = dx
         if plan is not None:
-            dx_charge = (plan.dx_base / 2 ** plan.amr if plan.amr
-                         else plan.dx_fine)
-        try:
-            from ..core.refine import set_mass_fraction
-            cen = ((0.0 if case.geometry == 'axisymmetric' else case.center[0],
-                    case.center[1]) if case.dim == 2
-                   else tuple(float(v) for v in case.center[:3]))
-            n_set, frac = set_mass_fraction(
-                case.dim, getattr(case, 'geometry', ''), dx_charge,
-                rep.r_exp, cen, dims)
-        except (ValueError, ZeroDivisionError, IndexError):
-            n_set = 0
-        if case.dim >= 2 and n_set:
-            rep.charge_cells = n_set
-            rep.charge_mass_frac = frac
-            note(f"Charge cells: {n_set:,} at {dx_charge:.5g} m -> "
-                 f"~{frac:.2f} of the {case.charge:g} kg set by "
-                 f"blastFoam (whole cells are marked; "
-                 f"{n_exp} cells across the radius)")
+            if plan.amr:
+                dx_charge = plan.dx_base / 2 ** plan.amr
+            else:
+                dx_charge = plan.dx_fine
+        _note_charge_cells(case, rep, dx_charge, dims, n_exp)
     return True
+
+
+def _plan_static_zones(case, rep, rho0, cref):
+    """Plan blastFoam's static refinement zones (`plan_levels` +
+    `validate_zones`) and say what they give. Returns the plan, or None
+    when it cannot be made or does not validate."""
+    err, note = rep.errors.append, rep.notes.append
+    from ..core.refine import plan_levels, validate_zones
+    try:
+        plan = plan_levels(case, rho0)
+    except ValueError as exc:
+        err(str(exc))
+        return None
+    zerr, zwarn = validate_zones(case, plan)
+    rep.errors.extend(zerr)
+    rep.warnings.extend(zwarn)
+    if zerr:
+        return None
+    if plan.refined:
+        note(f"Local refinement: {plan.lmax} level(s), "
+             f"finest cell {plan.dx_fine:.5g} m, "
+             f"~{plan.n_pred:,} mesh cells; results are "
+             f"resampled to a {plan.n_fine:,}-cell display "
+             f"grid")
+        rep.lmax = plan.lmax
+        rep.dx_fine = plan.dx_fine
+        rep.n_fine = plan.n_fine
+    if cref == 'zone':
+        if plan.auto_level:
+            note(f"Charge resolved by automatic level-"
+                 f"{plan.auto_level} zones (base cell kept at "
+                 f"{plan.dx_base:.5g} m)")
+        else:
+            note("The base cell already resolves the "
+                 "charge - no automatic zone needed")
+    return plan
+
+
+def _note_charge_cells(case, rep, dx_charge, dims, n_exp):
+    """How many whole cells blastFoam's setFields marks as charge at
+    `dx_charge` [m], and the fraction of the requested mass they hold."""
+    try:
+        from ..core.refine import set_mass_fraction
+        if case.dim == 2:
+            if case.geometry == 'axisymmetric':
+                cen = (0.0, case.center[1])
+            else:
+                cen = (case.center[0], case.center[1])
+        else:
+            cen = tuple(float(v) for v in case.center[:3])
+        n_set, frac = set_mass_fraction(
+            case.dim, getattr(case, 'geometry', ''), dx_charge,
+            rep.r_exp, cen, dims)
+    except (ValueError, ZeroDivisionError, IndexError):
+        n_set = 0
+    if case.dim >= 2 and n_set:
+        rep.charge_cells = n_set
+        rep.charge_mass_frac = frac
+        rep.notes.append(f"Charge cells: {n_set:,} at {dx_charge:.5g} m -> "
+                         f"~{frac:.2f} of the {case.charge:g} kg set by "
+                         f"blastFoam (whole cells are marked; "
+                         f"{n_exp} cells across the radius)")
 
 
 def _validate_caps(case, rep, ctx, hw=None):
@@ -1019,31 +1080,13 @@ def _validate_caps(case, rep, ctx, hw=None):
 
     rep.effective_dx = dx
     if plan is not None and plan.amr:
-        # AMR: the mesh grows during the run up to maxCells, so that is
-        # the number the blastFoam caps apply to (t = 0 is the base grid)
-        n_max = (int(getattr(case, 'amr_max_cells', 0) or 0)
-                 or cap_warn)
-        if n_max > cap_refuse:
-            err(f"AMR max cells {n_max:,} exceeds the blastFoam cap of "
-                f"{cap_refuse:,}" + ram_hint())
-        elif n_max > cap_warn:
-            warn(f"AMR may grow the mesh to {n_max:,} cells - expect a "
-                 f"long run and GBs of case files on the WSL disk")
-        # every written time keeps its own mesh (cell centres + levels), so
-        # an AMR run's disk cost is much larger than a static one's
-        n_w = max(int(getattr(case, 'n_snapshots', 6) or 6), 1)
-        mb = plan.n_pred * 60 / 1e6            # ~60 B per cell per write
-        if mb * n_w > 200:
-            note(f"AMR keeps a mesh per written time: roughly "
-                 f"{mb:.0f} MB per write, about {mb * n_w / 1000:.1f} GB "
-                 f"for this run on the WSL disk - clean old runs with "
-                 f"'Foam runs...' or --clean-foam-runs")
+        _check_amr_growth(case, rep, plan, cap_warn, cap_refuse, ram_hint)
     if case.dim == 2:
         n = int(case.Lx / dx) * int(case.Ly / dx)
         if plan is not None and (plan.refined or plan.amr):
             n = plan.n_pred
         if plan is not None and plan.amr:
-            pass
+            pass    # AMR: no static cap - maxCells was checked above
         elif foam:
             # blastFoam solves in WSL; Python only ingests written
             # frames, so the cap reflects wall time/disk, not RAM
@@ -1064,7 +1107,7 @@ def _validate_caps(case, rep, ctx, hw=None):
         if plan is not None and (plan.refined or plan.amr):
             n = plan.n_pred
         if plan is not None and plan.amr:
-            pass
+            pass    # AMR: no static cap - maxCells was checked above
         elif foam:
             if n > cap_refuse:
                 err(f"~{fmt_cells(n)} cells exceeds the blastFoam cap of "
@@ -1082,11 +1125,11 @@ def _validate_caps(case, rep, ctx, hw=None):
     _validate_write_budget(case, rep, n, foam, amr)
     if foam:
         # N17/T48: resolve the rank count with the real cell count and
-        # say what was decided, for auto (0) as well as an explicit ask
-        # every argument the RUN will use, so what validation reports is
-        # what actually launches (N21: sources and the settings rank
-        # limit included - without max_ranks the note would promise more
-        # ranks than resolve_nprocs goes on to ask for)
+        # say what was decided, for auto (0) as well as an explicit ask.
+        # Every argument the RUN will use is passed, so what validation
+        # reports is what actually launches (N21: sources and the settings
+        # rank limit included - without max_ranks the note would promise
+        # more ranks than resolve_nprocs goes on to ask for)
         rep.run_plan = _env.plan_run(
             int(getattr(case, 'n_procs', 0) or 0), n,
             cores=_hw.get('cores'), ram_gb=_hw.get('ram_gb'),
@@ -1097,20 +1140,55 @@ def _validate_caps(case, rep, ctx, hw=None):
         if case.dim > 1:
             note("Parallel run: " + rep.run_plan.reason)
     if plan is not None and plan.refined:
-        # Python holds the resampled fine grid per ingested write, so the
-        # display grid is capped like a native run's grid
-        cap = CELLS_2D_MAX if case.dim == 2 else CELLS_REFUSE
-        cap_warn = CELLS_2D_WARN if case.dim == 2 else CELLS_WARN
-        if plan.n_fine > cap:
-            err(f"Refined results are resampled to a {plan.n_fine:,}-cell "
-                f"display grid (finest cell {plan.dx_fine:.5g} m), above "
-                f"the {cap:,} cap - "
-                + ("lower the AMR display level or use a coarser base"
-                   if plan.amr else "use fewer levels or a coarser base"))
-        elif plan.n_fine > cap_warn:
-            warn(f"Refined results are resampled to a {plan.n_fine:,}-cell "
-                 f"display grid - expect GBs of RAM for frames and "
-                 f"snapshots")
+        _check_display_grid(case, rep, plan)
+
+
+def _check_amr_growth(case, rep, plan, cap_warn, cap_refuse, ram_hint):
+    """AMR: the blastFoam cell caps against maxCells, and the disk a mesh
+    per written time costs. `ram_hint` builds the tail of the refusal."""
+    # the mesh grows during the run up to maxCells, so that is the number
+    # the blastFoam caps apply to (t = 0 is the base grid)
+    n_max = (int(getattr(case, 'amr_max_cells', 0) or 0)
+             or cap_warn)
+    if n_max > cap_refuse:
+        rep.errors.append(f"AMR max cells {n_max:,} exceeds the blastFoam "
+                          f"cap of {cap_refuse:,}" + ram_hint())
+    elif n_max > cap_warn:
+        rep.warnings.append(f"AMR may grow the mesh to {n_max:,} cells - "
+                            f"expect a long run and GBs of case files on "
+                            f"the WSL disk")
+    # every written time keeps its own mesh (cell centres + levels), so
+    # an AMR run's disk cost is much larger than a static one's
+    n_w = max(int(getattr(case, 'n_snapshots', 6) or 6), 1)
+    mb = plan.n_pred * 60 / 1e6            # ~60 B per cell per write
+    if mb * n_w > 200:
+        rep.notes.append(f"AMR keeps a mesh per written time: roughly "
+                         f"{mb:.0f} MB per write, about "
+                         f"{mb * n_w / 1000:.1f} GB for this run on the "
+                         f"WSL disk - clean old runs with 'Foam runs...' "
+                         f"or --clean-foam-runs")
+
+
+def _check_display_grid(case, rep, plan):
+    """Refined results: Python holds the resampled fine grid per ingested
+    write, so the display grid is capped like a native run's grid."""
+    if case.dim == 2:
+        cap_refuse, cap_warn = CELLS_2D_MAX, CELLS_2D_WARN
+    else:
+        cap_refuse, cap_warn = CELLS_REFUSE, CELLS_WARN
+    if plan.n_fine > cap_refuse:
+        if plan.amr:
+            fix = "lower the AMR display level or use a coarser base"
+        else:
+            fix = "use fewer levels or a coarser base"
+        rep.errors.append(f"Refined results are resampled to a "
+                          f"{plan.n_fine:,}-cell display grid (finest cell "
+                          f"{plan.dx_fine:.5g} m), above the "
+                          f"{cap_refuse:,} cap - " + fix)
+    elif plan.n_fine > cap_warn:
+        rep.warnings.append(f"Refined results are resampled to a "
+                            f"{plan.n_fine:,}-cell display grid - expect "
+                            f"GBs of RAM for frames and snapshots")
 
 
 def _validate_closing(case, rep, ctx):
@@ -1123,8 +1201,7 @@ def _validate_closing(case, rep, ctx):
     # gauges / obstacles sanity
     for g in getattr(case, 'gauges', []):
         pt = g if isinstance(g, (list, tuple)) else (g,)
-        limits = dims
-        if any(not (0 <= v <= L) for v, L in zip(pt, limits)):
+        if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             warn(f"Gauge {tuple(pt)} outside domain - will be dropped")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
@@ -1132,34 +1209,45 @@ def _validate_closing(case, rep, ctx):
            any(b > L or a < 0 for a, b, L in zip(lo, hi, dims)):
             err(f"Obstacle {box} is not a valid in-domain box")
             continue
-        # A wall carved a single cell thick is a numerical hazard: shock
-        # diffraction over a one-cell blade collapses deltaT and can end
-        # in SIGFPE (measured: 0.3 m wall on a 0.5 m base mesh). The
-        # carve uses base-cell FACES (refine.snap_obstacles outward for
-        # foam), so the count below is the snapped width, not len/dx.
         dxb = plan.dx_base if plan is not None else dx
         if dxb and dxb > 0:
-            for ax, (a, b) in enumerate(zip(lo, hi)):
-                n_side = (int(np.ceil(b / dxb - 1e-6))
-                          - int(np.floor(a / dxb + 1e-6)))
-                if n_side <= 1:
-                    warn(f"Obstacle {box} is only one cell thick along "
-                         f"{'xyz'[ax]} ({b - a:g} m wall, {dxb:g} m base "
-                         f"cell) - shock reflection off a single-cell "
-                         f"wall tends to go numerically unstable. Use a "
-                         f"base cell <= {(b - a) / 2:g} m so the wall is "
-                         f"at least 2 cells thick"
-                         # the obvious "just add AMR" does not work, and
-                         # the crashing run (20260915-090553) proved it:
-                         # it ran amr_levels = 2 and still hit SIGFPE
-                         + (" (AMR levels do not help: obstacles are "
-                            "carved on the base mesh, so the wall stays "
-                            "one base cell at every level)"
-                            if foam else ""))
-                    break
+            _warn_thin_obstacle(rep, box, lo, hi, dxb, foam)
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
+
+
+def _warn_thin_obstacle(rep, box, lo, hi, dxb, foam):
+    """Warn once, on the first axis along which obstacle `box` is a
+    single base cell `dxb` [m] thick.
+
+    A wall carved a single cell thick is a numerical hazard: shock
+    diffraction over a one-cell blade collapses deltaT and can end in
+    SIGFPE (measured: 0.3 m wall on a 0.5 m base mesh). The carve uses
+    base-cell FACES (refine.snap_obstacles outward for foam), so the count
+    below is the snapped width, not len/dx."""
+    for ax, (a, b) in enumerate(zip(lo, hi)):
+        n_side = (int(np.ceil(b / dxb - 1e-6))
+                  - int(np.floor(a / dxb + 1e-6)))
+        if n_side > 1:
+            continue
+        # the obvious "just add AMR" does not work, and the crashing run
+        # (20260915-090553) proved it: it ran amr_levels = 2 and still
+        # hit SIGFPE
+        if foam:
+            amr_note = (" (AMR levels do not help: obstacles are carved on "
+                        "the base mesh, so the wall stays one base cell at "
+                        "every level)")
+        else:
+            amr_note = ""
+        rep.warnings.append(
+            f"Obstacle {box} is only one cell thick along "
+            f"{'xyz'[ax]} ({b - a:g} m wall, {dxb:g} m base "
+            f"cell) - shock reflection off a single-cell "
+            f"wall tends to go numerically unstable. Use a "
+            f"base cell <= {(b - a) / 2:g} m so the wall is "
+            f"at least 2 cells thick" + amr_note)
+        return
 
 
 def validate_case(case, pending_inputs=False):
