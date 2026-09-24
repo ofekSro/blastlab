@@ -12,14 +12,31 @@ only (B2). Default 0: nothing changes. Pinned here:
         controller makes zero controlDict rewrites, and the banner's
         own label; save_case / load_case keep N;
       * the solvers' adaptive expression honours the budget.
+  B2  * the purge planner never lists the newest complete common time,
+        the start dir, a time not ingested or not reconstructed, or one
+        newer than the newest complete time (a torn write), and lists
+        nothing without a budget, in serial or on a decomposed AMR run;
+      * the deleter builds <case>/processor<N>/<time> and nothing else;
+      * a fake 2-rank run - 0 plus four times, three reconstructed and
+        ingested, the fourth partial on rank 1 - keeps {constant, 0, t3,
+        t4} per rank and an untouched root; _n_procs_on_disk still says 2,
+        _resume_start_time still picks the latest root time, and a second
+        purge is a no-op;
+      * through a whole fake ingest a spy deleter is called zero times
+        without a budget and exactly for the older times with one; a
+        failing delete is logged once, retried, and never raises; a
+        resumed run's earlier root writes count as reconstructed.
 
 Run:  cd blastlab/tests && python test_write_budget.py
 """
 import json
 import os
+import random
 import re
+import shutil
 import sys
 import tempfile
+from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
@@ -194,10 +211,296 @@ def test_solver_expression():
                   spec.adaptive_write is want)
 
 
+# ── B2: the decomposed copy of the latest write only ───────────────────
+
+FIELDS = ('p', 'rho', 'U', 'alpha.expl')
+N = 8                                      # cells per rank / at the root
+
+
+def field(name, vector=False):
+    rows = (['(1 2 3)'] * N) if vector else ['101325'] * N
+    kind = 'vector' if vector else 'scalar'
+    return ('FoamFile { format ascii; object ' + name + '; }\n'
+            f'internalField   nonuniform List<{kind}>\n{N}\n(\n'
+            + '\n'.join(rows) + '\n)\n;\nboundaryField { }\n')
+
+
+def write_time(d, t, fields=FIELDS):
+    os.makedirs(os.path.join(d, 'uniform'), exist_ok=True)
+    with open(os.path.join(d, 'uniform', 'time'), 'w') as f:
+        f.write(f'value {t};\ndeltaT 1e-07;\n')
+    for name in fields:
+        with open(os.path.join(d, name), 'w') as f:
+            f.write(field(name, vector=(name == 'U')))
+
+
+def fake_run(root, times, partial=None, reconstructed=()):
+    """2 ranks: processorN/{constant, 0, times...}; `partial` is a time
+    that is complete on rank 0 only. The root holds the writer's 0 and
+    `reconstructed`."""
+    for r in range(2):
+        pr = os.path.join(root, f'processor{r}')
+        os.makedirs(os.path.join(pr, 'constant', 'polyMesh'))
+        write_time(os.path.join(pr, '0'), 0, fields=('p',))  # not "ready"
+        for t in times:
+            write_time(os.path.join(pr, t), t)
+        if partial:
+            write_time(os.path.join(pr, partial), partial,
+                       fields=FIELDS if r == 0 else ('p', 'rho'))
+    write_time(os.path.join(root, '0'), 0, fields=('p', 'U'))
+    for t in reconstructed:
+        write_time(os.path.join(root, t), t)
+
+
+def local_delete(root, calls):
+    """A deleter for a local fake run: the same path guard as the WSL
+    one (purge_paths), then shutil on the local mirror of each path."""
+    def delete(spec, names):
+        calls.append(list(names))
+        for p in runloop.purge_paths(spec.case_posix, spec.n_procs, names):
+            rel = p[len(spec.case_posix) + 1:]
+            shutil.rmtree(os.path.join(root, *rel.split('/')),
+                          ignore_errors=True)
+        return True
+    return delete
+
+
+def listing(root):
+    return {d: sorted(os.listdir(os.path.join(root, d)))
+            for d in sorted(os.listdir(root)) if d.startswith('processor')}
+
+
+def tree(root):
+    out = {}
+    for dp, dn, fn in os.walk(root):
+        for name in dn + fn:
+            p = os.path.join(dp, name)
+            st = os.stat(p)
+            out[os.path.relpath(p, root)] = (os.path.isdir(p), st.st_size,
+                                             st.st_mtime_ns)
+    return out
+
+
+def budget_spec(root, budget=10, n_procs=2, amr=0):
+    spec = writer.CaseSpec(dim=3, material='TNT', n_procs=n_procs,
+                           write_budget=budget)
+    spec.amr = amr
+    spec.case_unc = root
+    spec.case_posix = '/root/blastlab_runs/20260924-000000_3d_p1-00'
+    return spec
+
+
+class Hooks:
+    def __init__(self):
+        self.lines = []
+
+    def log(self, s):
+        self.lines.append(s)
+
+    def should_stop(self):
+        return False
+
+
+def test_planner():
+    print('\nB2: the purge planner')
+    rng = random.Random(15)
+    bad = []
+    for _ in range(3000):
+        pool = [f'{v:g}' for v in sorted(rng.sample(range(1, 40), 12))]
+        pool = ['0'] + [f'0.{p}' for p in pool]
+        done = set(rng.sample(pool, rng.randint(0, len(pool))))
+        rec = set(rng.sample(pool, rng.randint(0, len(pool))))
+        common = set(rng.sample(pool, rng.randint(0, len(pool))))
+        start = rng.choice(['0', pool[3]])
+        plan = runloop.decomposed_purge_plan(done, rec, common, start)
+        newest = max((float(t) for t in common), default=None)
+        if newest is None and plan:
+            bad.append(('no common time', plan))
+        for t in plan:
+            if (t not in done or t not in rec or t == start
+                    or float(t) >= newest):
+                bad.append((t, done, rec, common, start))
+        if plan != sorted(plan, key=float):
+            bad.append(('unsorted', plan))
+    check('3000 random cases: never the newest complete common time, the '
+          'start dir, a time not ingested or not reconstructed, or a newer '
+          '(torn) one; sorted', not bad, str(bad[:3]))
+    check('nothing complete on every rank -> nothing to purge',
+          runloop.decomposed_purge_plan({'0.1'}, {'0.1'}, set(), '0') == [])
+    check('the one-line case: t1, t2 go, t3 (newest) stays',
+          runloop.decomposed_purge_plan(
+              {'0.1', '0.2', '0.3'}, {'0.1', '0.2', '0.3'},
+              {'0.1', '0.2', '0.3'}, '0') == ['0.1', '0.2'])
+    with tempfile.TemporaryDirectory() as d:
+        for kw, want in ((dict(budget=10), True), (dict(budget=0), False),
+                         (dict(n_procs=1), False),
+                         (dict(amr=1), False)):
+            check(f'purge_active with {kw}: {want}',
+                  runloop.purge_active(budget_spec(d, **kw)) is want)
+
+
+def test_paths():
+    print('\nB2: the deleter builds nothing but processor<N>/<time>')
+    case = '/root/blastlab_runs/20260924-000000_3d_p1-00'
+    got = runloop.purge_paths(case, 2, ['0.0005', '1e-05'])
+    check('two ranks x two times, exactly',
+          got == [f'{case}/processor0/0.0005', f'{case}/processor1/0.0005',
+                  f'{case}/processor0/1e-05', f'{case}/processor1/1e-05'],
+          str(got))
+    for what, args in (
+            ('a relative case', ('root/blastlab_runs/x', 2, ['0.1'])),
+            ('a case outside the runs root', ('/root/other/x', 2, ['0.1'])),
+            ('the runs root itself', ('/root/blastlab_runs', 2, ['0.1'])),
+            ('a nested path', (case + '/processor0', 2, ['0.1'])),
+            ('a ..', ('/root/blastlab_runs/../x', 2, ['0.1'])),
+            ('a quote in the case', ("/root/blastlab_runs/x'y", 2, ['0.1'])),
+            ('a serial case', (case, 1, ['0.1'])),
+            ('constant', (case, 2, ['constant'])),
+            ('a path in the name', (case, 2, ['0.1/../x'])),
+            ('a space in the name', (case, 2, ['0.1 0.2'])),
+            ('a quote in the name', (case, 2, ["0.1'"])),
+            ('a negative time', (case, 2, ['-0.1'])),
+            ('a processor dir as a name', (case, 2, ['processor0']))):
+        try:
+            runloop.purge_paths(*args)
+            check(f'refuses {what}', False)
+        except ValueError:
+            check(f'refuses {what}', True)
+
+
+def test_fake_run():
+    print('\nB2: a fake 2-rank run (no WSL)')
+    t1, t2, t3, t4 = '0.001', '0.002', '0.003', '0.004'
+    with tempfile.TemporaryDirectory() as root:
+        fake_run(root, [t1, t2, t3], partial=t4,
+                 reconstructed=[t1, t2, t3])
+        spec = budget_spec(root)
+        hooks, calls = Hooks(), []
+        purge = runloop.DecomposedPurge(spec, FIELDS, hooks,
+                                        delete=local_delete(root, calls))
+        purge.reconstructed.clear()           # this session's own record
+        purge.covered([t1, t2, t3])
+        root_before = {k: v for k, v in tree(root).items()
+                       if not k.startswith('processor')}
+        gone = purge.run({t1: 0.001, t2: 0.002, t3: 0.003})
+        check('t1 and t2 are purged', gone == [t1, t2], str(gone))
+        want = ['0', t3, t4, 'constant']
+        check('each processorN holds {constant, 0, t3, t4 (partial)}',
+              listing(root) == {'processor0': want, 'processor1': want},
+              str(listing(root)))
+        check('the root is untouched',
+              {k: v for k, v in tree(root).items()
+               if not k.startswith('processor')} == root_before)
+        check('backend._n_procs_on_disk still reports 2',
+              backend._n_procs_on_disk(root) == 2)
+        times = [n for _t, n in backend.reader.list_times(root)
+                 if float(_t) > 0 or n == '0']
+        name, skipped = backend._resume_start_time(spec, times, hooks)
+        check('backend._resume_start_time picks the latest root time',
+              name == t3 and not skipped, f'{name}, {skipped}')
+        n = len(calls)
+        again = purge.run({t1: 0.001, t2: 0.002, t3: 0.003})
+        check('a second purge is a no-op', again == [] and len(calls) == n)
+        # t4 completes: now t3 may go and t4 is the newest
+        write_time(os.path.join(root, 'processor1', t4), t4)
+        write_time(os.path.join(root, t4), t4)
+        purge.covered([t4])
+        gone = purge.run({t1: 0, t2: 0, t3: 0, t4: 0})
+        check('once t4 is complete everywhere, t3 goes and t4 stays',
+              gone == [t3] and listing(root)['processor1']
+              == ['0', t4, 'constant'], f'{gone}, {listing(root)}')
+        check('one log line for the purge, not one per time',
+              sum('write budget' in s for s in hooks.lines) == 1,
+              str(hooks.lines))
+
+    with tempfile.TemporaryDirectory() as root:
+        fake_run(root, [t1, t2, t3], reconstructed=[t1, t2, t3])
+        hooks, calls = Hooks(), []
+        purge = runloop.DecomposedPurge(budget_spec(root), FIELDS, hooks,
+                                        delete=local_delete(root, calls))
+        check('a resumed run: the root writes already whole count as '
+              'reconstructed', purge.reconstructed == {t1, t2, t3},
+              str(purge.reconstructed))
+        check('and are purged once ingested',
+              purge.run({t1: 0, t2: 0, t3: 0}) == [t1, t2])
+
+    with tempfile.TemporaryDirectory() as root:
+        fake_run(root, [t1, t2, t3], reconstructed=[t1, t2, t3])
+        hooks, attempts = Hooks(), []
+
+        def failing(spec, names):
+            attempts.append(list(names))
+            raise OSError('wsl.exe went away')
+
+        purge = runloop.DecomposedPurge(budget_spec(root), FIELDS, hooks,
+                                        delete=failing)
+        first = purge.run({t1: 0, t2: 0, t3: 0})
+        second = purge.run({t1: 0, t2: 0, t3: 0})
+        check('a failing delete never raises, is retried at the next pass '
+              'and logged once',
+              first == [] and second == [] and len(attempts) == 2
+              and sum('could not remove' in s for s in hooks.lines) == 1,
+              str(hooks.lines))
+        check('and leaves every processor time in place',
+              listing(root)['processor0'] == ['0', t1, t2, t3, 'constant'])
+
+
+def test_whole_ingest():
+    print('\nB2: through a whole fake ingest (FoamRunLoop._ingest_ready)')
+    t1, t2, t3, t4 = '0.001', '0.002', '0.003', '0.004'
+    for budget in (0, 10):
+        with tempfile.TemporaryDirectory() as root:
+            fake_run(root, [t1, t2, t3], partial=t4)
+            spec = budget_spec(root, budget=budget)
+            hooks, calls = Hooks(), []
+            loop = runloop.FoamRunLoop.__new__(runloop.FoamRunLoop)
+            loop.spec, loop.hooks, loop.fields, loop.done = (
+                spec, hooks, FIELDS, {})
+            loop.live_set = None
+            loop.read_dir = lambda name, dpath: name
+            loop.on_frame = (lambda name, dpath, payload:
+                             loop.done.__setitem__(name, float(name)))
+            loop.order = runloop.OrderedIngest(spec, FIELDS, hooks)
+            loop.foam = SimpleNamespace(stop_requested=False, running=False)
+            loop.purge = runloop.DecomposedPurge(
+                spec, FIELDS, hooks, delete=local_delete(root, calls))
+
+            def fake_reconstruct(case_posix, cmds, timeout=0):
+                (want,) = re.findall(r'-time (\S+)', cmds[0])
+                for t in want.split(','):
+                    shutil.copytree(os.path.join(root, 'processor0', t),
+                                    os.path.join(root, t))
+                return ''
+
+            real = runloop.runner.run_stage
+            runloop.runner.run_stage = fake_reconstruct
+            try:
+                loop._ingest_ready(final=True)
+            finally:
+                runloop.runner.run_stage = real
+            ingested = sorted(loop.done, key=float)
+            if budget == 0:
+                check('budget 0: the ingest read t1..t3 and the spy deleter '
+                      'was called zero times',
+                      ingested == [t1, t2, t3] and calls == [],
+                      f'{ingested}, {calls}')
+                check('   and every processor time is still there',
+                      listing(root)['processor0']
+                      == ['0', t1, t2, t3, t4, 'constant'])
+            else:
+                check('budget 10: one purge, of t1 and t2, after the ingest',
+                      ingested == [t1, t2, t3] and calls == [[t1, t2]],
+                      f'{ingested}, {calls}')
+
+
 def main():
     test_defaults()
     test_pinned()
     test_solver_expression()
+    test_planner()
+    test_paths()
+    test_fake_run()
+    test_whole_ingest()
 
 
 if __name__ == '__main__':

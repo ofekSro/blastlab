@@ -138,43 +138,223 @@ def stop_grace(spec):
     return max(STOP_GRACE_S, spec.n_cells / 2e5)
 
 
-def maybe_reconstruct(spec, fields, done=False):
-    """Parallel runs: reconstruct processor time dirs that are complete
-    on every rank and absent top-level, so the ingest loops read
-    reconstructed dirs indistinguishable from serial output. Quietly
-    retries next poll on failure. `done` lifts the per-poll batch cap
-    (final sweep after the solver exits)."""
-    if spec.n_procs <= 1 or spec.decomposed:
-        # `decomposed` (parallel AMR, N16-b/T42): reconstructPar cannot
-        # follow a mesh that changes between writes, so those runs are
-        # ingested straight from processor*/ instead.
-        return
-    proc_uncs = [os.path.join(spec.case_unc, f'processor{i}')
-                 for i in range(spec.n_procs)]
+def common_ready_times(spec, fields):
+    """Names of the processor*/ times complete on EVERY rank (an empty
+    set when there are none), or None when a rank dir cannot be listed."""
     common = None
-    for pu in proc_uncs:
+    for i in range(spec.n_procs):
+        pu = os.path.join(spec.case_unc, f'processor{i}')
         try:
             times = {name for _t, name in reader.list_times(pu)
                      if reader.time_ready(os.path.join(pu, name),
                                           fields)}
         except OSError:
-            return
+            return None
         common = times if common is None else (common & times)
+    return common or set()
+
+
+def maybe_reconstruct(spec, fields, done=False):
+    """Parallel runs: reconstruct processor time dirs that are complete
+    on every rank and absent top-level, so the ingest loops read
+    reconstructed dirs indistinguishable from serial output. Quietly
+    retries next poll on failure. `done` lifts the per-poll batch cap
+    (final sweep after the solver exits).
+
+    Returns the times a SUCCESSFUL reconstructPar call covered ([]
+    otherwise) - what the HD1-15 purge needs to know is safely at the
+    root; every other caller ignores it."""
+    if spec.n_procs <= 1 or spec.decomposed:
+        # `decomposed` (parallel AMR, N16-b/T42): reconstructPar cannot
+        # follow a mesh that changes between writes, so those runs are
+        # ingested straight from processor*/ instead.
+        return []
+    common = common_ready_times(spec, fields)
     if not common:
-        return
+        return []
     have = {name for _t, name in reader.list_times(spec.case_unc)}
     todo = sorted(common - have, key=float)
     if not done:
         todo = todo[:4]             # bound per-poll reconstruct work
     if not todo:
-        return
+        return []
     try:
         runner.run_stage(
             spec.case_posix,
             [f'reconstructPar -newTimes -time {",".join(todo)}'],
             timeout=1800)
     except runner.FoamStageError:
-        pass                        # transient (mid-write): next poll
+        return []                   # transient (mid-write): next poll
+    return todo
+
+
+# ── HD1-15: the decomposed copy of the latest write only ───────────────
+
+_TIME_NAME = re.compile(r'[0-9][0-9.eE+-]*')
+_CASE_POSIX = re.compile(r'/[A-Za-z0-9_.+/-]+')
+
+
+def _is_time(name):
+    try:
+        v = float(name)
+    except (TypeError, ValueError):
+        return False
+    return bool(_TIME_NAME.fullmatch(str(name))) and np.isfinite(v)
+
+
+def purge_active(spec):
+    """Does this run purge? Only with a write budget, in parallel, and
+    never on a decomposed (parallel AMR) run - that one is READ from its
+    per-rank copies (guide sec. 11.2-11.3, p. 112: a balanced parallel
+    AMR run keeps its times per rank)."""
+    return (int(getattr(spec, 'write_budget', 0) or 0) > 0
+            and int(getattr(spec, 'n_procs', 1) or 1) > 1
+            and not getattr(spec, 'decomposed', False))
+
+
+def decomposed_purge_plan(done, reconstructed_ok, common_ready, start_dir):
+    """Pure. The processor*/<t> times that may be deleted: every t the
+    ingest has read (`done`), that a successful reconstructPar covered
+    (`reconstructed_ok`), that is OLDER than the newest time complete on
+    every rank (`common_ready`), and that is not `start_dir`. So never
+    the newest complete time (a restart reads it), a write still in
+    progress or torn (newer than that), the start dir, or anything not
+    yet safely at the root. Sorted by time."""
+    common = [t for t in (common_ready or ()) if _is_time(t)]
+    if not common:
+        return []
+    newest = max(float(t) for t in common)
+    ok = set(reconstructed_ok or ())
+    keep = str(start_dir)
+    return sorted({t for t in (done or ()) if t in ok and t != keep
+                   and _is_time(t) and float(t) < newest}, key=float)
+
+
+def purge_paths(case_posix, n_procs, names):
+    """The paths one purge deletes: <case>/processor<N>/<time> for every
+    rank and name. Refuses (ValueError) a case that is not a plain
+    absolute path under the runs root, a name that is not a written
+    time, and a case with fewer than two ranks - the deleter never
+    builds anything else."""
+    from .env import RUNS_ROOT
+    case = str(case_posix or '').rstrip('/')
+    parts = case.split('/')
+    if (not _CASE_POSIX.fullmatch(case) or '..' in parts or '.' in parts
+            or not case.startswith(RUNS_ROOT + '/')
+            or len(parts) != len(RUNS_ROOT.split('/')) + 1):
+        raise ValueError(f'not a run directory under {RUNS_ROOT}: {case!r}')
+    n = int(n_procs)
+    if n < 2:
+        raise ValueError('only a decomposed (parallel) case has '
+                         'processor dirs to purge')
+    out = []
+    for name in names:
+        s = str(name)
+        if not _is_time(s) or float(s) < 0.0:
+            raise ValueError(f'not a written time: {s!r}')
+        out.extend(f'{case}/processor{i}/{s}' for i in range(n))
+    return out
+
+
+def delete_decomposed(spec, names):
+    """rm -rf the processor*/<t> dirs of `names` in ONE WSL stage (no
+    OpenFOAM env needed). True when it went through."""
+    import subprocess
+    from . import env
+    paths = purge_paths(spec.case_posix, spec.n_procs, names)
+    if not paths:
+        return True
+    script = 'rm -rf -- ' + ' '.join(f"'{p}'" for p in paths)
+    try:
+        res = subprocess.run(env.wsl_plain_argv(script), capture_output=True,
+                             timeout=300, stdin=subprocess.DEVNULL,
+                             creationflags=env.CREATE_NO_WINDOW)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return res.returncode == 0
+
+
+def _root_whole(spec, fields):
+    """Root times that are complete when the loop starts: on a RESUMED
+    run, the writes the session before it reconstructed. Their root
+    copies are what the record is read from, which is exactly what a
+    successful reconstructPar in this session would have established."""
+    try:
+        return {name for _t, name in reader.list_times(spec.case_unc)
+                if name != str(spec.start_dir)
+                and reader.time_ready(os.path.join(spec.case_unc, name),
+                                      fields)}
+    except OSError:
+        return set()
+
+
+class DecomposedPurge:
+    """HD1-15: with a write budget, keep the decomposed copy of the
+    LATEST complete write only.
+
+    A parallel run keeps every write twice - reconstructed at the root,
+    which is the record, and decomposed in processor*/, which only a
+    restart ever reads again, and a restart reads the newest complete
+    one. On HD1-3d that second copy was 88 GB of 173 GiB. The purge
+    deletes a processor*/<t> once the ingest has read t, a reconstructPar
+    covering it has succeeded, and a NEWER time is complete on every
+    rank; never the start dir, never processor*/constant, never the root
+    or postProcessing (see decomposed_purge_plan and purge_paths).
+
+    Rejected: OpenFOAM's `purgeWrite`, which deletes on the solver's own
+    clock and so races the per-poll reconstruct (capped at 4 per poll) -
+    a write purged before it was reconstructed would be lost from the
+    record. A failed delete is logged once and retried; it never raises.
+    Inactive (no listing, no deleter call) without a budget, in serial
+    and on a decomposed AMR run."""
+
+    def __init__(self, spec, fields, hooks, delete=None):
+        self.spec, self.fields, self.hooks = spec, fields, hooks
+        self.delete = delete or delete_decomposed
+        self.active = purge_active(spec)
+        self.reconstructed = set()
+        self.purged = set()
+        self._warned = self._said = False
+        if self.active:
+            self.reconstructed |= _root_whole(spec, fields)
+
+    def covered(self, names):
+        """Times a successful reconstructPar just covered."""
+        if names:
+            self.reconstructed.update(names)
+
+    def run(self, done):
+        """Purge what the plan allows now; returns the times removed."""
+        if not self.active:
+            return []
+        common = common_ready_times(self.spec, self.fields)
+        if not common:
+            return []
+        plan = [t for t in decomposed_purge_plan(
+            done, self.reconstructed, common, self.spec.start_dir)
+            if t not in self.purged]
+        if not plan:
+            return []
+        try:
+            ok, why = bool(self.delete(self.spec, plan)), ''
+        except Exception as exc:            # noqa: BLE001 - never raises
+            ok, why = False, f' ({exc})'
+        if ok:
+            self.purged.update(plan)
+            if not self._said:
+                self._said = True
+                self.hooks.log(
+                    f'  [blastfoam] write budget: keeping the decomposed '
+                    f'copy of the latest write only ({len(plan)} older '
+                    f'removed; every write stays reconstructed)')
+            return plan
+        if not self._warned:
+            self._warned = True
+            self.hooks.log(
+                f'  [blastfoam] could not remove the decomposed copies of '
+                f'{len(plan)} written time(s){why} - retrying at the next '
+                f'poll; the reconstructed copies are untouched')
+        return []
 
 
 def check_stability(st, hooks, t):
@@ -690,6 +870,10 @@ class FoamRunLoop:
     `note_pause(will_pause)`, `gated_step()`. Constructing the loop
     starts the solver, exactly where the inline loops created FoamRun."""
 
+    #: HD1-15 (DecomposedPurge). A class default so a loop assembled
+    #: with __new__ (the stop-latency test does) simply has none.
+    purge = None
+
     def __init__(self, spec, hooks, fields, done, live_set, decode,
                  read_dir, on_frame):
         self.spec, self.hooks, self.fields, self.done = (spec, hooks,
@@ -723,6 +907,9 @@ class FoamRunLoop:
         self.adapt = dict(interval=spec.write_interval, since=0)
         self.stop_reason = 'safety cap'
         self.stop_deadline = None
+        # HD1-15: with a write budget, the decomposed copy of the latest
+        # write only - inactive (no listing, no deletes) otherwise
+        self.purge = DecomposedPurge(spec, fields, hooks)
         self.foam = runner.FoamRun(spec.case_posix, spec.case_unc,
                                    n_procs=spec.n_procs, log=hooks.log)
 
@@ -814,7 +1001,7 @@ class FoamRunLoop:
         # every pending write's full-field read, which together took
         # about twelve seconds by the end. The live view degraded to the
         # WRITE cadence exactly when a blast is most worth watching.
-        maybe_reconstruct(self.spec, self.fields)
+        self._covered(maybe_reconstruct(self.spec, self.fields))
         self._ingest_live()
         if not final:
             self._check_stop()
@@ -836,6 +1023,19 @@ class FoamRunLoop:
             # and a writeNow request would only log that it failed
             if not final:
                 self._check_stop()
+        self._purge_decomposed()
+
+    def _covered(self, names):
+        """Tell the HD1-15 purge what a reconstructPar just covered."""
+        if self.purge is not None:
+            self.purge.covered(names)
+
+    def _purge_decomposed(self):
+        """HD1-15: drop the decomposed copies the root now holds for good
+        (DecomposedPurge; a no-op without a write budget). Runs after
+        every ingest pass, the final sweep's included."""
+        if self.purge is not None:
+            self.purge.run(self.done)
 
     def run(self):
         """Drive the solver to completion (or stop/kill). Returns the
@@ -862,7 +1062,8 @@ class FoamRunLoop:
                 if not foam.running:
                     for line in foam.drain(0.05):
                         progress_line(line, self.st, hooks, spec.end_time)
-                    maybe_reconstruct(spec, self.fields, done=True)
+                    self._covered(maybe_reconstruct(spec, self.fields,
+                                                    done=True))
                     self._ingest_ready(final=True)  # final sweep - files complete
                     break
         finally:
