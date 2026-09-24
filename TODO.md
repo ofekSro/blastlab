@@ -57,6 +57,12 @@ unconfined case, structural response, heat and a report — with no WSL and no Q
 `HD1-11c` landed on 2026-09-21 and the track is complete end to end, from the GUI
 form to the report. Details in [DONE.md](DONE.md).
 
+**2026-09-24: `HD1-3`, the venting in blastFoam, is closed** and its record moved to
+[DONE.md](DONE.md) §0 — the 3-D answer passed all thirteen checks committed before
+its run. What stays open on HD1: `HD1-13` (that answer's wall load has no reflection
+and no drag in it — an owner decision), `HD1-14` (the optional third `Cd` point),
+`HD1-4`, and closed-vessel data, which needs no code.
+
 **Three silent-failure bugs were found and fixed on 2026-09-21, and they share a
 shape worth naming.** Each was correct in the regime the code was *verified* in
 and wrong in the regime it is *applied* to, and none of them announced itself:
@@ -74,83 +80,36 @@ next to the number rather than a footnote. Heat loss to the walls (`h_c`,
 `Q_wall`) is also in the forward model as of the same day — `core/calibration.py`
 had been inverting for a loss that `simulate` never applied.
 
-### `HD1-3` · The venting, in blastFoam — **THE ONE REMAINING TASK**
+### `HD1-13` · The wall load in the 3-D answer — owner decision
 
-Requires WSL. The three owner decisions that blocked it **have all been answered**
-(2026-09-20), so it is open.
+`HD1-3d`'s 3-D answer (closed 2026-09-24, [DONE.md](DONE.md) §0) judged a 200 mm RC
+panel 4 m from the opening on the **side-on** trace of a gauge in free air: only the
+room is meshed (`build_vent_case`: `obstacles = m['boxes']`), so nothing at x = 10 m
+reflects. UFC 3-340-02 para. 2-15.3.2 (printed p. 65) loads a front wall with the
+**reflected** pressure and, after clearing, `Ps + C_D·q` (Eq. 2-9). The probes already
+record `U` and `rho`: on the jet axis ½ρ|U|² peaks at **114.6 kPa at 24.71 ms**, when
+the static trace reads −31.5 kPa (static + q peaks at 99.6 kPa, 2.4× the 41.47 kPa
+static peak — an incompressible estimate). So μ = 0.3027 and "survives" (C10, which
+passed as committed) may be **unconservative**. *Decide:* mesh the wall and read its
+face, or apply `Pr` and `C_D·q` to the trace — before "survives" is relied on. Either
+means a new solve; see the disk note under `HD1-14`.
 
-**What it will give that does not exist today:** the **jet leaving the opening** —
-its propagation, what it does to structures **outside**, and the flow field in the
-3D viewer. **The pressure *inside* the room does not need CFD:** slow burning mixes
-well, the pressure is uniform, and 0D is the correct physics there, not a shortcut.
+### `HD1-14` · A third `Cd` convergence point — optional, not done
 
-**The route — changed 2026-09-21, and the change deletes most of the work.** The
-original plan put the chamber **outside** the mesh and drove `p(t)` in at the
-opening as a time-varying boundary condition. Investigation found the repo has
-**nothing** time-varying — no `Function1`, no `uniformFixedValue`, no `tableFile`
-— and the guide documents exactly one such condition (`codedFixedValue`, §20.1)
-while warning (§5.9) that the boundary *builds* the conserved quantities, so `p`,
-`T` **and** `rho` would all have to be driven together or the face state is wrong.
-
-**Putting the room INSIDE the mesh removes the need for any of it.** blastFoam
-computes the blowdown itself; the 0D model's only job becomes the state at the
-instant the vent opens. Deleted from the plan: the time-varying BC, a separate
-patch for the opening, `createPatch`, `createBaffles`, a new mesh stage, a new BC
-kind, a reacting phase, and `fvModels`. **The opening is a hole between wall
-boxes — fluid** — and the walls are ordinary obstacles on the existing
-`topoSet` + `subsetMesh -patch obstacles` path.
-
-| Step | State |
-|---|---|
-| `HD1-3-pre` · the chamber's own air in the 0D model | ✅ done |
-| `HD1-3a` · `core/room.py`, the geometry | ✅ done — measured: an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
-| `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | ✅ done — measured: at burst the room is **`alpha_expl` = 0.115**, i.e. nine times more air than product gas, and air-vs-products is **+17.9 %** on the choked flow |
-| `HD1-3b` · `init_mode='chamber'` in the writer | ✅ done — inert `type basic` phase with the propellant's `gamma`/`molWeight`; per-phase mass exact to 9 digits; **no `lambda.expl`**, so bug B0 cannot occur |
-| `HD1-3d` · the γ-interface stopping point | ✅ **passed 2026-09-21 on WSL** — 0.024 % across a γ step and 0.000 % on uniform mixed cells, against a pre-registered 0.5 % |
-| `HD1-3d` · the vent verification | ✅ **run 2026-09-22**, and it found something — see below |
-| `HD1-3d` · the 3D answer | open, **needs WSL**; ≥12 cells across the opening, enforced |
-| `HD1-3e` · `core/qd.py` — ships with an empty table | ✅ done — `CRITERIA = {}`, and a row without a `source` is an **error**, not a blank column |
-| `HD1-3f` · validation, GUI card, report section | ✅ done (`b33947f`) — `build_vent_case` aligns the room first and re-runs the 0D at the **aligned** cavity; the Vent stage card is in the dim-0 form. This row read "open" until 2026-09-23 and that was a bookkeeping slip, not a gap |
-
-> **The number `HD1-3a` was built to produce.** `refine.snap_obstacles` moves
-> every obstacle edge outward onto a base-cell face, so a room's walls grow and
-> its cavity and opening shrink. At `dx=0.1` on a 5 m room that is **−10.5 %**
-> volume and **−27.6 %** vent area. The volume shift is five times the 2 %
-> `check_handoff_energy` runs at; the vent shift is nearly twice the 15 % the 2D
-> verification is pre-registered at, so it would have been absorbed into `Cd` and
-> disappeared. Both are now measured off the **snapped** boxes and reported.
-> This is why the hand-off must conserve **mass and energy** and let pressure
-> follow from the EOS — a cavity 10 % smaller simply arrives at a higher
-> pressure, and a golden that pinned `p == p_0D` would pin the bug.
-
-> **And measuring it is not the same as not having it** (owner, 2026-09-21). A
-> 27.6 % error in the vent area means the CFD solves a *different hole* from the
-> one that was asked for. So `room.align` now puts every edge — outer faces, wall
-> thickness, vent — onto a base-cell face **before** the boxes are built. Snapping
-> then has nothing left to move, the area that gets solved **is** the area
-> reported, and the rounding is stated once against what was typed. Default on.
-
-> **Pre-registered condition on `HD1-3d`, before the run that will be judged by
-> it.** `_e2e_vent_2d.py` compares the CFD's mass flow through the opening against
-> `deflagration._vent_mdot`. **That 0D comparison must be run at the
-> post-alignment vent area and cavity volume, not at the numbers typed into the
-> case.** The threshold is 15 % and the geometry error it would otherwise carry is
-> 27.6 %, so running it against the entered numbers would fail the check for a
-> reason that has nothing to do with the physics being tested — or, if alignment
-> is on and the comparison is not updated, pass it while measuring the wrong
-> thing. `measure()` returns both numbers; use them.
-
-**The alternative, only if the above proves inadequate:** `phaseProperties` with
-`AbelNobel` instead of JWL and `Arrhenius`/`pressureBased` instead of `linear`. The
-guide documents both, and lists `AbelNobel` explicitly under **solid propellants**.
-**But** neither is Vieille with a form function, so it would require calibration
-against a closed-vessel test, exactly like the afterburn model against
-Kingery-Bulmash. **Not needed while the room is inside the mesh:** the gas in the
-chamber is combustion products that have finished reacting, so the phase is
-inert — `type basic` with `idealGas`, `gamma` and `molWeight` from the
-`Propellant`, and **not** air (γ 1.25 against 1.40, M ≈ 23 against 29).
+24 cells across the opening, on a geometrically shrunken room: `Cd` depends on the
+opening's local geometry (wall thickness to width, pressure ratio) rather than on the
+room's size, so a small room with a minimal domain would give it affordably. It would
+turn `DEFAULT_CD_RANGE = (0.72, 0.90)` (`core/sensitivity.py`) from a two-point
+extrapolation into a measurement. Register the convergence threshold before the run.
+**Disk, measured 2026-09-24:** `n_snapshots` does not bound it — the adaptive write
+interval made 748 writes in the 3-D answer's 30 ms, each kept reconstructed and again
+decomposed, **172.96 GiB**. Size the writes before any such run.
 
 ### `HD1-4` · Removing the blockers
+
+*(2026-09-24: `HD1-3` closed on the chamber route, which needed none of these. Close
+`HD1-4`, or keep it for the `AbelNobel` fallback recorded with `HD1-3` in
+[DONE.md](DONE.md) §0 — an owner decision.)*
 
 Only what `HD1-3` actually needs, from this list:
 
@@ -229,51 +188,10 @@ not. Two wrong explanations were written into the code before that one, and
 
 Vectorising is no longer needed for correctness. Left undone.
 
-### The vent verification, and the one thing it refused to confirm
+### Scope decision — pyrotechnics are out
 
-`_e2e_vent_verify.py` puts two independent models on one opening: the 0D
-isentropic orifice law, and blastFoam solving the same hole from the equations.
-Run on WSL, 2026-09-22, with every threshold registered **before** the run.
-
-> **THE MAIN RESULT, and it is the good one.** With the discharge coefficient
-> divided out, the two blowdown curves agree to **2.27 % RMS** of the initial
-> overpressure against a pre-registered 5 %. **The lumped model is right about
-> the *shape* of a blowdown; the only disagreement is the coefficient.**
-
-**And the coefficient did not converge.** `Cd_eff = ṁ_CFD / ṁ_isentropic`:
-
-| mesh | cells across the opening | `Cd_eff` |
-|---|---|---|
-| `dx = 0.05` | 6 | 0.7227 |
-| `dx = 0.025` | 12 | 0.8102 |
-
-**12.1 % apart, past the 10 % registered before the run.** The coarse mesh
-passes *less*, which is the signature of numerical dissipation in the opening.
-The threshold that caught it has **not** been redefined and the run is still
-recorded as a failure of that check.
-
-**Three consequences, all owner decisions of 2026-09-22:**
-
-1. **`Cd` is not calibrated** — not to 0.724, not to 0.810. It stays a declared
-   estimate of 0.8.
-2. **`Cd` is the fifth axis of the sensitivity band**, range **0.72–0.90**: the
-   coarse measurement as a floor and the first-order Richardson extrapolation as
-   a ceiling (second order gives 0.84). **That ceiling is an extrapolation from
-   two points — two points cannot establish an order**, so the choice of order is
-   an assumption and not a measurement.
-3. **≥12 cells across the opening** for any run that reports a load, enforced by
-   `assessment.validate` as an error. Six remains the geometry floor in
-   `room.MIN_VENT_CELLS` — it buys the mass flow, not the coefficient. Even at
-   twelve the CFD flow may be ~10 % below the converged value, and the direction
-   is known: less out, so a slightly weak jet.
-
-**Optional, not done:** a third convergence point at 24 cells across, on a
-geometrically shrunken room — `Cd` depends on the opening's local geometry
-(wall-thickness to width, pressure ratio) rather than on the room's size, so a
-small room with a minimal domain would give it affordably. That is what would
-turn the two-point extrapolation into a measurement.
-
-**One finding that is a scope decision, not a deviation:**
+*(The vent verification that used to sit here closed with `HD1-3`; its record,
+`Cd` as the fifth band axis and the ≥ 12-cell rule are in [DONE.md](DONE.md) §0.)*
 
 - **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`
   and `Cp_condensed` are not modelled: every kilogram burnt is treated as gas,
@@ -756,6 +674,7 @@ python test_room.py               # HD1-3a: a room as boxes, and what snapping d
 python test_vent.py               # HD1-3c: the 0D -> CFD hand-off, phase by phase
 python test_foam_chamber.py       # HD1-3b: the room as a blastFoam case
 python test_qd.py                 # HD1-3e: siting, as a mechanism with no numbers
+python test_vent3d_load.py        # HD1-3d: judging a finished 3-D vent run from its probes
 python test_ui_crashlog.py        # a raising Qt slot must not kill the process
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py

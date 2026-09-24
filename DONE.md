@@ -24,12 +24,12 @@ Open work is in [TODO.md](TODO.md).
 
 ---
 
-## 0. 2026-09-20/21 — the HD1.3 track
+## 0. 2026-09-20/24 — the HD1.3 track
 
 An owner directive of 2026-09-20: compute the effects of an **HD1.3
 (non-detonating, deflagrating)** material on a structure. The computational track
-was built and tested in two days. **Only `HD1-3`, the venting in blastFoam,
-remains open** — see [TODO.md](TODO.md).
+was built and tested in two days; **`HD1-3`, the venting in blastFoam, closed on
+2026-09-24** (below). What is still open on HD1 is in [TODO.md](TODO.md).
 
 A full assessment runs today via `python -m blastlab --hd13 case.json` — quasi-static
 pressure, comparison with the unconfined case, structural response, heat and a
@@ -252,6 +252,109 @@ exists to catch **layout clipping**, and its docstring records that the forms sh
 `QStackedWidget` whose minimum is the **widest page**. A new page can clip the others
 without anyone looking at it — which is exactly how this form arrived. The parity check
 now runs over all four dimensions at 1100×720. All clean.
+
+**`HD1-3` · the venting, in blastFoam — closed 2026-09-24** (moved from TODO.md). What
+it gives that nothing else does: the jet leaving the opening, what it does to a
+structure outside, and the flow field in the 3D viewer. The pressure *inside* the room
+needs no CFD — slow burning mixes well, and 0D is the correct physics there.
+
+**The route changed on 2026-09-21, and the change deleted most of the work.** The plan
+put the chamber outside the mesh and drove `p(t)` in at the opening as a time-varying
+boundary. The repo has nothing time-varying (no `Function1`, `uniformFixedValue`,
+`tableFile`); the guide documents one such condition (`codedFixedValue`, §20.1) and
+warns (§5.9) that the boundary builds the conserved quantities, so `p`, `T` and `rho`
+would all have to be driven together. **With the room inside the mesh none of it is
+needed:** blastFoam computes the blowdown, the 0D model supplies only the state at the
+instant the vent opens, and the opening is a hole between wall boxes on the existing
+`topoSet` + `subsetMesh -patch obstacles` path. The chamber gas is an inert `type basic`
+phase with the `Propellant`'s `gamma`/`molWeight` — not air (γ 1.25 against 1.40, M ≈ 23
+against 29). *The fallback, never needed:* `AbelNobel` with `Arrhenius`/`pressureBased`
+in `phaseProperties` (the guide lists `AbelNobel` under solid propellants) — neither is
+Vieille with a form function, so it would need closed-vessel calibration (`HD1-4`).
+
+| Step | Result |
+|---|---|
+| `HD1-3-pre` · the chamber's own air in the 0D model | done |
+| `HD1-3a` · `core/room.py`, the geometry | an off-grid 5 m room at `dx=0.1` loses **10.5 %** of its cavity and **27.6 %** of its opening to snapping |
+| `HD1-3c` · `core/vent.py`, the hand-off and its validity metrics | at burst the room is **`alpha_expl` = 0.115** — nine times more air than product gas; air-vs-products **+17.9 %** on the choked flow |
+| `HD1-3b` · `init_mode='chamber'` in the writer | per-phase mass exact to 9 digits; **no `lambda.expl`**, so bug B0 cannot occur |
+| `HD1-3d` · the γ-interface stopping point | WSL, 2026-09-21: 0.024 % across a γ step, 0.000 % on uniform mixed cells, against a pre-registered 0.5 % |
+| `HD1-3d` · the vent verification | WSL, 2026-09-22 — below |
+| `HD1-3d` · the 3D answer | **13/13 PASS**, run 2026-09-23, judged 2026-09-24 — below |
+| `HD1-3e` · `core/qd.py` | ships with an empty table: `CRITERIA = {}`, and a row without a `source` is an **error** |
+| `HD1-3f` · validation, GUI card, report section | `b33947f` — `build_vent_case` aligns the room and re-runs the 0D at the aligned cavity; the Vent card is in the dim-0 form |
+
+> **Measuring the snapping is not the same as not having it** (owner, 2026-09-21). A
+> 27.6 % error in the vent area means the CFD solves a *different hole*, and it would
+> have vanished into `Cd`. `room.align` (default on) puts every edge — outer faces, wall
+> thickness, vent — onto a base-cell face **before** the boxes are built, so the area
+> solved **is** the area reported. The hand-off conserves **mass and energy** and lets
+> pressure follow from the EOS; a golden pinning `p == p_0D` would have pinned the bug.
+
+**The vent verification** (`_e2e_vent_verify.py`, WSL, 2026-09-22, every threshold
+registered before the run, the 0D comparison at the post-alignment area and volume):
+the 0D isentropic orifice law and blastFoam on one opening. **The main result is the
+good one** — with the discharge coefficient divided out, the blowdown curves agree to
+**2.27 % RMS** of the initial overpressure against a registered 5 %: the lumped model is
+right about the *shape*. **The coefficient did not converge:** `Cd_eff` 0.7227 at 6 cells
+across the opening (`dx = 0.05`), 0.8102 at 12 (`dx = 0.025`) — **12.1 % apart against a
+registered 10 %**, numerical dissipation in the opening; still recorded as a failure of
+that check. Owner decisions of 2026-09-22: `Cd` is **not calibrated** (a declared 0.8);
+`Cd` is the **fifth band axis, 0.72–0.90** (the coarse floor and a first-order Richardson
+ceiling — two points cannot establish an order, so the order is an assumption); and
+**≥ 12 cells across the opening** for any run that reports a load, an error in
+`assessment.validate` (`room.MIN_VENT_CELLS` = 6 stays the geometry floor).
+
+**`HD1-3d` · the 3D answer — run 2026-09-23, judged post-mortem 2026-09-24: 13/13 PASS.**
+`tests/_e2e_vent_3d.py`, run `20260923-195308_3d_p31468-00`: 864,000 cells (841,704
+fluid), dx 0.10 m, 12 × 12 × 6 m, 13 ranks; commit `4975705` plus the `n_snapshots`
+30 → 6 edit committed in `1c9b238`. A 40 kg double-base magazine behind a burst panel at
+3·P_AIR, a wall 4 m out. Hand-off at t_open = 13.115 s: 0.3063 MPa, 647 K, alpha_expl
+0.2573; the opening 12 × 12 cells. Target face, from the probes:
+
+| Gauge | Peak kPa | t_peak ms | Arrival ms | +impulse Pa·s | Net impulse Pa·s |
+|---|---|---|---|---|---|
+| (10, 6, 1.4) | 41.47 | 19.080 | 10.319 | 322.78 | 82.61 |
+| (10, 5, 1.4) | 26.75 | 12.905 | 10.709 | 200.52 | −84.48 |
+| (10, 6, 2.6) | 24.78 | 14.109 | 10.792 | 172.55 | −59.01 |
+
+All three positive phases close inside the 30 ms window; impulse and arrival carry no
+verdict (no threshold was registered for them). From the first trace, not the 0-D
+pressure: μ = 0.3027, θ = 0.154°, dynamic — C10, "the 200 mm panel survives", passes. C8
+(no boundary return after t_peak + 4 ms): later maximum −21.35 kPa against 41.47. The
+run is **one sample** in the band, at Cd ≈ 0.81 (50 % up the axis), and does not close
+an undetermined verdict.
+
+> **What the PASS does not establish — `HD1-13` in TODO.** Only the room is meshed, so
+> the gauges at x = 10 m are in free air and the SDOF saw **side-on** pressure. UFC
+> 3-340-02 para. 2-15.3.2 (printed p. 65) loads a front wall with the reflected pressure
+> and, after clearing, `Ps + C_D·q` (Eq. 2-9). On the jet axis ½ρ|U|² peaks at **114.6 kPa
+> at 24.71 ms**, when the static trace reads −31.5 kPa. "Survives" is a statement about an
+> unreflected, drag-free load and may be unconservative.
+
+> **Disk: `n_snapshots` does not bound it.** The adaptive write interval made **748
+> writes**, each kept reconstructed (~130 MB) and again decomposed: **172.96 GiB**. The
+> 30-snapshot attempt: 774 writes, 191.63 GiB. Budget ~190 GB per run of this case until
+> the write sizing changes.
+
+Judged with **no new solve and nothing written into the run** — size, file count and a
+path+size+mtime hash identical before and after — by a new `--load` path that reads only
+case.json and the probe files, through the live `reader.read_probes` → `finalize_3d`
+gauge packing (`postmortem.load_run` would reconstruct into the run). The thirteen
+`check(` calls are unchanged (AST-compared), and an independent numpy pass over the raw
+probes reproduced G1 to every printed digit.
+- Files: `blastlab/tests/_e2e_vent_3d.py`, `blastlab/tests/test_vent3d_load.py`,
+  `docs/hd13/vent3d_postmortem.txt`, `docs/hd13/vent3d_gauges_3d.txt`
+- Tests: `python test_vent3d_load.py` 15/15; `python _e2e_vent_3d.py --load
+  20260923-195308_3d_p31468-00` → `VENT 3D: PASS`; final gate run, 17 of 17 green
+  (`test_regression.py` byte-for-byte; the Qt/Tk suites not run — no GUI change)
+- Commits: `9b5212f`, `94a56e4`, `3798cec`, `119b59e`
+- QA: n/a — no GUI change
+- Evidence: `docs/hd13/` — the record, the traces, and `hd13_vent_jet_3d.mp4` (tied to
+  this run by its frame labels; `hd13_report.html` and `hd13_vent_jet.mp4` there are owner
+  trials, not evidence). A sha256-checked copy of the run's dicts, logs and probes
+  (101 MB) is in `%USERPROFILE%\blastlab_evidence\`; the fields stay in WSL. Batch
+  records: `docs/batches/2026-09-24-hd1-3d-close*.md`.
 
 **The decisions that closed on 2026-09-20:**
 
