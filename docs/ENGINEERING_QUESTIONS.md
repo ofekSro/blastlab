@@ -274,3 +274,29 @@ Source: the eng-code-simplifier's phase 2 report. Nothing changed.
 2. **`material_rho0` returns None on `KeyError`, `ImportError` or `AttributeError`.** A
    broken import of `core.materials` would quietly fall back to TNT density in the
    preview instead of failing. Low risk, but it hides a real fault.
+
+---
+
+## 2026-09-24 · `/refactor` phase 3 (`services/validation.py`, `7a89030`)
+
+Source: the arch-refactorer's phase 3 report. Moved verbatim; nothing changed.
+
+1. **The ambient sound speed is defined three times.** `validate_case` recomputes
+   `c_air = sqrt(1.4*101325/1.225)` in the 1D and in the 2D/3D safety-cap warnings, next
+   to the module constant `C_AMB_AIR`. The values agree today, but a change to one would
+   not reach the others.
+2. **`_charge_radius` return type.** The 2D planar branch returns `np.float64`, and the
+   other branches return a Python float. Harmless in arithmetic, but visible in JSON or
+   repr. It still defaults to TNT's 1630 kg/m³ (see the architecture-review item 3).
+3. **A fourth sound speed.** The fixed-time-step Courant check hard-codes
+   `2.0 * 340.3` and says "~680 m/s" in its message, while every other stop condition
+   uses `C_AMB_AIR` (340.294 m/s). The difference is negligible, but it is one more
+   source for the same quantity (see item 1).
+4. **AMR disk note: 60 against 155 bytes per cell per write.** The AMR note assumes
+   "~60 B per cell per write", but `BYTES_PER_CELL_WRITE = 155` was measured on HD1-3d
+   for static runs. Either they are meant to differ (AMR writes fewer fields?) or one
+   is stale. It matters for the disk estimate, given the ~190 GB runs in `hd1-3d-close`
+   item 2.
+5. **The "Charge cells" note can vanish silently.** A `ValueError`, `ZeroDivisionError`
+   or `IndexError` in `set_mass_fraction` sets n_set = 0, and the note that reports what
+   fraction of the charge blastFoam marks disappears with no message.
