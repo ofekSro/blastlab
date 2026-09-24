@@ -63,14 +63,14 @@ class Case1D:
     #: ever duplicated those two - in blastFoam 1D it did nothing at all.
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
     #: optional, aligned with det_points (N5-12): per-point ignition
     #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
     #: own defaults. Guide 5.6.1: valid for any activation model.
     det_delays: list = None
-    det_radii: list = None        # blastFoam detonation model:
-                                      # 'linear' (burn at vDet) |
-                                      # 'none' (instant)
+    det_radii: list = None
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
@@ -177,14 +177,14 @@ class Case2D:
     profile_file: str = None          # save .npz for 3D remap (axisym only)
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
     #: optional, aligned with det_points (N5-12): per-point ignition
     #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
     #: own defaults. Guide 5.6.1: valid for any activation model.
     det_delays: list = None
-    det_radii: list = None        # blastFoam detonation model:
-                                      # 'linear' (burn at vDet) |
-                                      # 'none' (instant)
+    det_radii: list = None
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
@@ -314,14 +314,14 @@ class Case3D:
     live: bool = True
     solver: str = 'native'            # 'native' | 'blastfoam' (WSL)
     material: str = 'TNT'             # blastFoam charge material
-    activation: str = 'linear'
+    activation: str = 'linear'        # blastFoam detonation model:
+                                      # 'linear' (burn at vDet) |
+                                      # 'none' (instant)
     #: optional, aligned with det_points (N5-12): per-point ignition
     #: delay [s] and initiation radius [m]. None = all zero, blastFoam's
     #: own defaults. Guide 5.6.1: valid for any activation model.
     det_delays: list = None
-    det_radii: list = None        # blastFoam detonation model:
-                                      # 'linear' (burn at vDet) |
-                                      # 'none' (instant)
+    det_radii: list = None
     afterburn: str = 'none'           # blastFoam afterburn model:
                                       # 'none' | 'miller' (products
                                       # burning with atmospheric oxygen)
@@ -348,6 +348,7 @@ _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
 
 
 def case_to_dict(case):
+    """The case as a JSON-ready dict, stamped with schema, version and dim."""
     d = asdict(case)
     # HD1-15: an unset write budget is not written at all. A case without
     # one then serialises byte for byte as it always has and VERSION stays
@@ -363,6 +364,10 @@ def case_to_dict(case):
 
 
 def case_from_dict(d):
+    """Case1D/2D/3D from a `case_to_dict` dict (or its JSON round trip).
+
+    Refuses another schema, a newer version and unknown keys; restores
+    the tuples JSON turned into lists and normalises boundary kinds."""
     d = dict(d)
     if d.pop('schema', SCHEMA) != SCHEMA:
         raise ValueError("Not a blastlab case file")
@@ -410,11 +415,14 @@ def case_from_dict(d):
 
 
 def save_case(case, path):
+    """Write the case to `path` as indented JSON."""
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(case_to_dict(case), f, indent=2)
 
 
 def load_case(path):
+    """Read a case file; a relative `profile_file_in` is taken relative
+    to the case file's own folder."""
     with open(path, encoding='utf-8') as f:
         case = case_from_dict(json.load(f))
     # profile paths are stored as given; resolve relative to the case file

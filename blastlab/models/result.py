@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Progress:
+    """One solver step, as reported to `RunHooks.progress`."""
     step: int
     t: float            # simulation time [s]
     dt: float           # current time step [s]
@@ -49,6 +50,9 @@ class StoppedBeforeStart(RuntimeError):
 
 @dataclass
 class ValidationReport:
+    """A pre-flight check's findings (`validate_case`, and
+    `assessment.validate` for HD 1.3). Errors block the run; warnings
+    and notes do not."""
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     notes: list = field(default_factory=list)

@@ -1,15 +1,20 @@
-"""Case definitions: everything needed to run a simulation, serializable
-to JSON case files (used by the GUI, the chain workflow, and scripting).
+"""Pre-flight validation of blast cases, and the old import path of the
+case model.
 
-`validate_case` is the GUI's pre-flight check: it mirrors the guard rails
-the solvers enforce at run start (which remain authoritative) so problems
-surface while editing a form instead of at launch.
+The case dataclasses (`Case1D`, `Case2D`, `Case3D`) and their versioned
+JSON form live in `models/case.py`, and `ValidationReport` in
+`models/result.py` (Phase 2 of docs/ARCHITECTURE_REVIEW.md). This module
+re-exports them, underscore names included, so every existing import
+keeps returning the same objects.
+
+What this module itself holds is validation. `validate_case` is the GUI's
+pre-flight check: it mirrors the guard rails the solvers enforce at run
+start (which remain authoritative) so problems surface while editing a
+form instead of at launch.
 """
 
-import json
 import math
 import os
-from dataclasses import dataclass, field, asdict
 
 import numpy as np
 

@@ -1,4 +1,4 @@
-"""The Phase 2 re-export shims hand out the SAME objects (Phase 2).
+"""The Phase 2 re-export shims hand out the SAME objects.
 
 docs/ARCHITECTURE_REVIEW.md section 5, Phase 2. The case dataclasses and
 their JSON moved to `models/case.py`, `DeflagrationCase` and its JSON to
@@ -32,23 +32,27 @@ HD13_NAMES = ('SCHEMA', 'VERSION', 'DeflagrationCase', '_TUPLE_FIELDS',
 HOOKS_NAMES = ('Progress', 'Result', 'StoppedBeforeStart')
 
 
-def _same(old, new, names):
+def _not_same(old, new, names):
+    """The names whose object at the old path is not the one in models/."""
     return [n for n in names if getattr(old, n) is not getattr(new, n)]
 
 
 def test_core_case_reexports_models_case():
-    assert not _same(core_case, m_case, CASE_NAMES)
+    bad = _not_same(core_case, m_case, CASE_NAMES)
+    assert not bad, f'core.case copies, not re-exports: {bad}'
     assert core_case.ValidationReport is m_result.ValidationReport
     assert core_case.VERSION == 13
 
 
 def test_assessment_reexports_models_hd13_case():
-    assert not _same(assessment, m_hd13, HD13_NAMES)
+    bad = _not_same(assessment, m_hd13, HD13_NAMES)
+    assert not bad, f'core.assessment copies, not re-exports: {bad}'
     assert assessment.ValidationReport is m_result.ValidationReport
 
 
 def test_hooks_reexports_models_result():
-    assert not _same(hooks, m_result, HOOKS_NAMES)
+    bad = _not_same(hooks, m_result, HOOKS_NAMES)
+    assert not bad, f'solvers.hooks copies, not re-exports: {bad}'
 
 
 def test_objects_built_on_either_path_are_one_class():

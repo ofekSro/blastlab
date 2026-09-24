@@ -7,9 +7,6 @@ a Tk-safe queue.
 """
 
 import time
-from dataclasses import dataclass, field
-
-import numpy as np
 
 
 #: memory budget for the recorded replay frames [bytes]. The record

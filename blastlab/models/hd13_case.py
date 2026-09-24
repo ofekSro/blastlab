@@ -166,6 +166,7 @@ class DeflagrationCase:
 
 
 def case_to_dict(case):
+    """The case as a JSON-ready dict, stamped with schema and version."""
     d = asdict(case)
     d['schema'] = SCHEMA
     d['version'] = VERSION
@@ -180,6 +181,8 @@ _TUPLE_FIELDS = ('room_origin', 'room_size', 'vent_rect', 'domain_size')
 
 
 def case_from_dict(d):
+    """DeflagrationCase from a `case_to_dict` dict. Refuses another
+    schema; keys that are not case fields are dropped, not refused."""
     if d.get('schema') != SCHEMA:
         raise ValueError(f'not an HD 1.3 case file (schema '
                          f'{d.get("schema")!r})')
@@ -194,11 +197,13 @@ def case_from_dict(d):
 
 
 def save_case(case, path):
+    """Write the case to `path` as indented JSON; returns `path`."""
     with open(path, 'w', encoding='utf-8') as fh:
         json.dump(case_to_dict(case), fh, indent=2)
     return path
 
 
 def load_case(path):
+    """Read an HD 1.3 case file."""
     with open(path, encoding='utf-8') as fh:
         return case_from_dict(json.load(fh))

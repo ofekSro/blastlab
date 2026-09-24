@@ -23,13 +23,11 @@ comes back without those statements is not a safer answer, it is the same
 answer with the uncertainty hidden.
 """
 
-import json
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import replace    # noqa: F401 - tests call assessment.replace
 
 from . import deflagration, scenario as _scenario, thermal, unconfined
 from .case import ValidationReport
 from .constants import P_AIR
-from .fuels import PROPELLANTS
 
 # Phase 2 (docs/ARCHITECTURE_REVIEW.md section 5): the case and its JSON
 # live in models/hd13_case.py. Re-exported here, underscore names
