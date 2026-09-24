@@ -8,11 +8,14 @@ this is instant and needs no Qt, Tk or WSL - and asserts:
     toolkit (tkinter, customtkinter, PySide6); viz3d/viewer.py is the one
     exception - it IS the viewer child process's Qt window;
   * core/ imports nothing outside core/ (it is the bottom layer);
+  * models/ imports nothing outside core/ and models/ (Phase 2);
   * ui/ (Qt) imports nothing from gui/ (Tk), and gui/ nothing from ui/.
 
 `ALLOWED_UPWARD` records the edges that break those rules TODAY, so the
 test is green on day 0; the later phases of the plan delete entries as
 they remove the edges (Phase 1 removed the three `materials` entries).
+Phase 2 added the core -> models edges: they are the re-export shims at
+the old paths, not dependencies of the code that stays in core/.
 An entry whose edge no longer exists fails the test, so the list cannot
 go stale.
 Imports inside functions count the same as top-level ones: a deferred
@@ -28,13 +31,17 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.abspath(os.path.join(HERE, '..'))       # .../blastlab
 
 TOOLKITS = {'tkinter', 'customtkinter', 'PySide6'}
-NO_TOOLKIT = ('core', 'solvers', 'output', 'viz3d')
+NO_TOOLKIT = ('core', 'models', 'solvers', 'output', 'viz3d')
 TOOLKIT_EXEMPT = {'viz3d.viewer'}
 
 #: (importing module, imported module), both relative to `blastlab.`
 ALLOWED_UPWARD = {
     ('core.case', 'solvers.foam.backend'),
     ('core.case', 'solvers.foam.env'),
+    # Phase 2 re-export shims: the old paths keep the moved names
+    ('core.case', 'models.case'),
+    ('core.case', 'models.result'),
+    ('core.assessment', 'models.hd13_case'),
     ('ui.app', 'gui.run_browser'),
 }
 
@@ -130,6 +137,8 @@ def violations():
             dl = _layer(dep)
             if layer == 'core' and dl != 'core':
                 bad.append(('core imports upward', name, dep))
+            elif layer == 'models' and dl not in ('core', 'models'):
+                bad.append(('models imports upward', name, dep))
             elif (layer, dl) in (('ui', 'gui'), ('gui', 'ui')):
                 bad.append(('ui/gui cross-import', name, dep))
     return bad, seen
@@ -145,6 +154,12 @@ def test_core_imports_only_core():
     bad, _ = violations()
     bad = [v for v in bad if v[0] == 'core imports upward']
     assert not bad, f'core/ imports outside core/: {bad}'
+
+
+def test_models_imports_only_core():
+    bad, _ = violations()
+    bad = [v for v in bad if v[0] == 'models imports upward']
+    assert not bad, f'models/ imports outside core/ and models/: {bad}'
 
 
 def test_ui_and_gui_do_not_import_each_other():
@@ -164,7 +179,8 @@ def test_scan_sees_the_package():
     """Guard against a scan that silently finds nothing."""
     known = modules()
     for mod in ('core.case', 'solvers.foam.env', 'ui.app', 'gui.app',
-                'viz3d.viewer', 'output.gauge_summary'):
+                'viz3d.viewer', 'output.gauge_summary', 'models.case',
+                'models.result', 'models.hd13_case'):
         assert mod in known, f'{mod} not found under {PKG}'
 
 
@@ -172,6 +188,7 @@ def main():
     fails = []
     for fn in (test_scan_sees_the_package, test_no_toolkit_below_the_gui,
                test_core_imports_only_core,
+               test_models_imports_only_core,
                test_ui_and_gui_do_not_import_each_other,
                test_allowed_upward_is_current):
         try:

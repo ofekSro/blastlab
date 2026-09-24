@@ -72,40 +72,10 @@ def trigger_index(trigger_gauge, n_gauges, hooks):
     return k
 
 
-@dataclass
-class Progress:
-    step: int
-    t: float            # simulation time [s]
-    dt: float           # current time step [s]
-    p_max: float        # max pressure this step [Pa]
-    frac: float = 0.0   # 0..1 progress estimate (front/stop-distance or t/cap)
-
-
-@dataclass
-class Result:
-    """What a solver run produces (also on early stop - finalization
-    always runs, so snapshots/gauges/meta are complete for the time
-    actually simulated)."""
-    snapshots: dict
-    gauges: dict
-    meta: dict
-    stop_reason: str = ''
-    stopped_early: bool = False
-
-    @property
-    def legacy_tuple(self):
-        return self.snapshots, self.gauges, self.meta
-
-
-class StoppedBeforeStart(RuntimeError):
-    """The user stopped a run before it produced anything at all.
-
-    Raised only from the setup phase a solver goes through before its
-    first step - for blastFoam the WSL availability probe and the
-    mesh/charge-init stages, which can take minutes on a cold start. No
-    partial Result exists at that point (there is no field to finalize),
-    so this is *not* a failure and hosts must not report it as one: end
-    the run quietly and post no result."""
+# Phase 2 (docs/ARCHITECTURE_REVIEW.md section 5): Progress, Result and
+# StoppedBeforeStart live in models/result.py. Re-exported here, so
+# `isinstance(x, Result)` holds whichever path Result came from.
+from ..models.result import Progress, Result, StoppedBeforeStart  # noqa: F401
 
 
 class RunHooks:
