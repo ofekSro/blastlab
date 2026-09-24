@@ -8,7 +8,8 @@ the two committed case files in `tests/cases/` become after a load and a
 re-save. Phase 2 moves these functions; the bytes must not move with them.
 
 Each golden is also pushed back through `case_from_dict` to pin whether
-the round trip reproduces it.
+the round trip reproduces it. Phase 5a adds the form round trip through
+`models.fields` (no QApplication), which needs no golden.
 
 Run:  cd blastlab/tests && python test_char_case_json.py [--update]
 """
@@ -60,10 +61,51 @@ def test_committed_case_files():
             f'{fname}: the loaded case does not round-trip'
 
 
+#: Phase 5a: what one form round trip changes in a DEFAULT case, pinned as
+#: found. The Case2D/3D dataclass AMR thresholds are 0.2/0.1 (re-tuned
+#: 2026-09-10, models/case.py), but the form mapping substitutes 0.4/0.2
+#: whenever AMR is off and falls back to them in fields_from_case, so a
+#: default case read back through the form carries 0.4/0.2. Reported, not
+#: fixed (a characterisation test documents behaviour, correct or not).
+FORM_ROUNDTRIP_CHANGES = {
+    1: {},
+    2: {'amr_refine': ('0.2', '0.4'), 'amr_unrefine': ('0.1', '0.2')},
+    3: {'amr_refine': ('0.2', '0.4'), 'amr_unrefine': ('0.1', '0.2')},
+    0: {},
+}
+
+
+def test_fields_roundtrip_default_cases():
+    """fields_from_case(case_from_fields(...)) on the three default blast
+    cases and the default HD 1.3 case, both solver modes, no QApplication
+    (Phase 5a): no errors, no bad fields, only the pinned changes, and a
+    second round trip is a fixed point."""
+    from blastlab.models import fields
+    for case in (Case1D(), Case2D(), Case3D(),
+                 assessment.DeflagrationCase()):
+        dim = case.dim
+        values = fields.fields_from_case(case)
+        for mode in ('native', 'blastfoam'):
+            got, errs, bad = fields.case_from_fields(dim, values, mode)
+            assert (errs, bad) == ([], []), f'dim {dim} {mode}: {errs} {bad}'
+            if dim:
+                assert got.solver == mode, f'dim {dim} {mode}: {got.solver}'
+            back = fields.fields_from_case(got)
+            assert list(back) == list(values), \
+                f'dim {dim} {mode}: field order changed'
+            changed = {k: (values[k], back[k]) for k in values
+                       if values[k] != back[k]}
+            assert changed == FORM_ROUNDTRIP_CHANGES[dim], \
+                f'dim {dim} {mode}: round trip changed {changed}'
+            again, errs2, _ = fields.case_from_fields(dim, back, mode)
+            assert not errs2 and fields.fields_from_case(again) == back, \
+                f'dim {dim} {mode}: the second round trip is not a fixed point'
+
+
 def main():
     return cc.run_main('CHAR CASE JSON', [
         test_default_cases, test_hd13_starter_case,
-        test_committed_case_files])
+        test_committed_case_files, test_fields_roundtrip_default_cases])
 
 
 if __name__ == '__main__':
