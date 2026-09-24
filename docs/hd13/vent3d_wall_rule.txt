@@ -1,0 +1,93 @@
+HD1-13, ROUTE (b) - DECISION RULE
+Registered 2026-09-24 by the owner, before any wall-load number was computed.
+
+EVIDENCE. Run 20260923-195308_3d_p31468-00 (HD1-3d), judged from files only,
+with no solve. The evidence copy's postProcessing/gauges/0/{p,U,rho} and
+case.json each match SHA256SUMS.source, and case.json equals the script's CFD
+case in every key. Step 2 reads the run's reconstructed time directories,
+read-only. C10 and _e2e_vent_3d.py are not edited.
+
+LOAD AT A POINT, in Pa over P_AIR = 101325, computed for gamma g = 1.24 (the
+double_base products, as written into the run's constant/phaseProperties) and
+for g = 1.40 (air):
+  ps = p - P_AIR
+  R  = ps [2 + (g+1) ps / ((g-1) ps + 2 g P_AIR)]   where ps > 0; R = ps otherwise
+       (normal reflection of the front, Rankine-Hugoniot; no clearing - the
+        wall is taken as unbounded)
+  un = max(Ux, 0), the velocity into the wall (the wall at x = 10 m faces -x)
+  M  = un / sqrt(g p / rho)
+  p0 = p (1 + (g-1) M^2 / 2)^(g/(g-1))                                  if M < 1
+  p0 = p [(g+1)^2 M^2 / (4g M^2 - 2(g-1))]^(g/(g-1)) (1 - g + 2g M^2)/(g+1)
+                                                                         if M >= 1
+       (Rayleigh pitot: a normal shock stands ahead of the wall)
+  S  = p0 - P_AIR
+  E  = max(R, S)
+
+RESPONSE. core/sdof.response(t, E, comp, p_ref=0) with C10's component
+unchanged: span 3.0 m, 480 kg/m2, Ru 400 kPa, kE 3.0e7 Pa/m, simple support,
+damping 0, K_LM average, 12 deg collapse limit (Tn 21.33 ms, y_el 13.33 mm).
+Two tails after the record ends at 30 ms:
+  T0, as recorded: E = 0 afterwards (what C10 did).
+  T1, the bound: E held at E_tail = max(p_open - P_AIR, max E over the record)
+      for 1.5 Tn, then the solver's own free vibration. p_open is the chamber
+      hand-off pressure in case.json (0.30633 MPa, so E_tail >= 205.0 kPa):
+      the jet cannot deliver more than the chamber's own pressure (P3).
+
+TRACES.
+  Step 1: E at G1 = (10, 6, 1.4), every probe sample.
+  Step 2: at every written time, the maximum of E over the two cell layers
+      either side of x = 10 m (centres 9.95 and 10.05 m), all y and z.
+      Trusted only if one of the eight cells around (10, 6, 1.4) reproduces
+      G1's probe p, rho and U to 1e-5 relative (U: relative to |U| + 1 m/s)
+      at all 267 writes after 8 ms.
+
+PREMISES.
+  P2, quasi-steady stagnation: at G1, t90 - t10 >= D / a, where
+      t90 = first time un >= 0.9 max(un);
+      t10 = last time before t90 with un <= 0.1 max(un);
+      D = sqrt(vent area) = 1.2 m; a = sqrt(1.24 p / rho) at t90.
+  P3, the tail is a ceiling: the sealed 0-D run's pressure rise rate at
+      t_open < (p_open - P_AIR) / tau_drain.
+
+NO SURVIVAL CRITERION (owner, 2026-09-24). Every wall has its own criterion.
+What this rule produces is the LOAD: E(t), with R(t) and S(t), exported for
+the owner's SDOF on any wall. Nothing below says whether any wall survives.
+
+OUTCOME - about the load only; first match wins:
+  NOT ESTABLISHED  P2 or P3 fails, or Step 2 is untrusted (mapping check), or
+                   Step 2 cannot be run read-only. The exported E(t) is still
+                   what the formulas above give, but it is NOT claimed as an
+                   upper bound on the wall load. HD1-13 stays open. The next
+                   step is route (a): mesh the wall at x = 10 m and read its
+                   face in a new solve, after HD1-15, with a rule of its own.
+  BOUND            otherwise: P2 and P3 hold and Step 2 is trusted. The
+                   exported E(t) is the reflected front plus the compressible
+                   stagnation load, at the worst point of the wall plane
+                   (Step 2) and at G1 (Step 1), at both gammas. It is an upper
+                   bound on the load a wall at x = 10 m takes during the
+                   record, unrelieved by clearing and taken as uniform over
+                   the wall. Beyond the record, the T1 rule applies. HD1-13
+                   closes on route (b).
+
+DELIVERED (text files, units in a header line):
+  docs/hd13/vent3d_wall_load_G1.txt  every probe sample at G1: t [s]; and
+                                     for g = 1.24 and 1.40: R, S, E
+                                     [Pa over P_AIR]; un [m/s]; M
+  docs/hd13/vent3d_wall_plane.txt    every write: t [s]; the plane maximum of
+                                     E per gamma and where it sits; G1's cell;
+                                     the panel means
+  The T1 tail is not baked into the files, because its length (1.5 Tn) belongs
+  to the wall being checked. The files state it as a rule: after the record,
+  hold E_tail = max(p_open - P_AIR, max E) for 1.5 Tn of that wall.
+
+REPORTED, NO VERDICT:
+  - the example panel (C10's component above) through core/sdof under T0 and
+    T1, for G1, G2, G3 and the plane maximum, at both gammas: mu, theta,
+    regime, collapsed. UFC 3-340-02's support-rotation limits (2, 6, 12 deg)
+    are listed beside them as reference only;
+  - peak, positive-phase impulse and arrival of E for every trace
+    (gauge_summary.summarize_trace on P_AIR + E);
+  - |U| against un;
+  - the C10 control: G1's static trace through the same call must give
+    mu 0.3027 and theta 0.154 deg;
+  - the Step 2 panel means (estimates, not bounds).
