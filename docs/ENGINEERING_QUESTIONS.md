@@ -240,3 +240,21 @@ changed.
    `test_evidence/test_tails/test_step2_driver` take arguments, so pytest reports 3
    "fixture not found" errors. `test_refine.py`'s `check()` only appends to a list, so
    its 10 pytest functions cannot fail. Fixing either edits a committed test (§9).
+
+---
+
+## 2026-09-24 · `/refactor` phase 1 (the material table moves to `core/materials.py`, `880516e`)
+
+Source: the arch-refactorer's phase 1 report. The table was moved byte for byte; nothing
+here was changed.
+
+1. **The `Pcj` comment overstates the fit.** It says `rho0*vDet^2/4` "lands within ~7 %
+   of every row". That holds for five rows (ratios 0.93-1.007), but for ANFO the ratio
+   is 0.861 (4.30e9 against the table's 5.0e9, a 14 % gap). Check ANFO's `Pcj` against
+   `blastfoam_toolkit/docs/jwl_parameters.md`.
+2. **The `Afterburn` docstring disagrees with CLAUDE.md §7.** The docstring puts the
+   pure-JWL gap at "~25 %". The TNT comment's own no-afterburn ratios (0.85-0.89) put it
+   at 11-15 %, and CLAUDE.md §7 says ~13 %. It also cites "ROADMAP N3", which may not
+   exist after the 2026-09-21 documentation consolidation.
+3. *(Checked, agrees:)* the TNT row matches `constants.JWL_TNT` field for field on the
+   seven JWL keys.
