@@ -258,3 +258,19 @@ here was changed.
    exist after the 2026-09-21 documentation consolidation.
 3. *(Checked, agrees:)* the TNT row matches `constants.JWL_TNT` field for field on the
    seven JWL keys.
+
+---
+
+## 2026-09-24 · `/refactor` phase 2 (`models/` package, `6d7a13d`)
+
+Source: the eng-code-simplifier's phase 2 report. Nothing changed.
+
+1. **An HD 1.3 case file with a misspelled field loads silently at the default.**
+   `models/case.py` (blast cases) refuses unknown keys, but
+   `models/hd13_case.case_from_dict` drops them silently and never checks `version`. A
+   typo in a DeflagrationCase JSON (for example a wall or vent parameter) gives an
+   assessment of a different case with no warning. Should the HD 1.3 reader refuse
+   unknown keys, as the blast reader does? That is a behaviour change, so it needs a test.
+2. **`material_rho0` returns None on `KeyError`, `ImportError` or `AttributeError`.** A
+   broken import of `core.materials` would quietly fall back to TNT density in the
+   preview instead of failing. Low risk, but it hides a real fault.
