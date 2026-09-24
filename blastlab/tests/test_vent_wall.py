@@ -116,6 +116,17 @@ def synthetic_signals():
     return t, ps, Us, rhos
 
 
+def write_sums(root):
+    """A SHA256SUMS.source vouching for the evidence files as they are."""
+    lines = []
+    for rel in ew.EVIDENCE_FILES:
+        with open(os.path.join(root, *rel.split('/')), 'rb') as f:
+            lines.append(f'{hashlib.sha256(f.read()).hexdigest()}  {rel}')
+    with open(os.path.join(root, 'SHA256SUMS.source'), 'w',
+              encoding='ascii', newline='\n') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
 def make_evidence(root, cfd):
     save_case(cfd, os.path.join(root, 'case.json'))
     gdir = os.path.join(root, 'postProcessing', 'gauges', '0')
@@ -128,13 +139,7 @@ def make_evidence(root, cfd):
         with open(os.path.join(gdir, name), 'w', encoding='ascii',
                   newline='\n') as f:
             f.write(text)
-    lines = []
-    for rel in ew.EVIDENCE_FILES:
-        with open(os.path.join(root, *rel.split('/')), 'rb') as f:
-            lines.append(f'{hashlib.sha256(f.read()).hexdigest()}  {rel}')
-    with open(os.path.join(root, 'SHA256SUMS.source'), 'w',
-              encoding='ascii', newline='\n') as f:
-        f.write('\n'.join(lines) + '\n')
+    write_sums(root)
 
 
 # ── the checks ─────────────────────────────────────────────────────────
@@ -222,14 +227,7 @@ def test_evidence(case, cfd, info):
         other['t_end'] = 0.031
         with open(cpath, 'w', encoding='utf-8') as f:
             json.dump(other, f, indent=2)
-        lines = []
-        for rel in ew.EVIDENCE_FILES:
-            with open(os.path.join(ev, *rel.split('/')), 'rb') as f:
-                lines.append(f'{hashlib.sha256(f.read()).hexdigest()}  '
-                             f'{rel}')
-        with open(os.path.join(ev, 'SHA256SUMS.source'), 'w',
-                  encoding='ascii', newline='\n') as f:
-            f.write('\n'.join(lines) + '\n')
+        write_sums(ev)
         res, text = quietly(ew.load_evidence, ev, cfd)
         check('a changed case field is refused, naming the field',
               res is None and 't_end' in text and 'not this script' in text,
@@ -689,10 +687,10 @@ def test_step2_driver(case):
                   not res['read_only'] and '9 mpirun' in text
                   and len(seen) >= 2, text)
 
-            def broken():
-                seen.append(1)
-                if len(seen) > 3:
-                    raise RuntimeError('wsl.exe went away')
+            def broken():                         # clean before the read, then
+                seen.append(1)                    # fails at the timer's first scan
+                if len(seen) > 1:                 # or the after-scan, whichever
+                    raise RuntimeError('wsl.exe went away')   # comes first
                 return []
 
             seen.clear()

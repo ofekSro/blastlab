@@ -301,16 +301,30 @@ class Hooks:
         return False
 
 
+def random_sets(rng):
+    """One random case for the planner's property checks: (pool, done,
+    reconstructed, common ready), drawn from '0' and twelve times."""
+    pool = ['0'] + [f'0.{v:g}' for v in sorted(rng.sample(range(1, 40), 12))]
+    done = set(rng.sample(pool, rng.randint(0, len(pool))))
+    rec = set(rng.sample(pool, rng.randint(0, len(pool))))
+    common = set(rng.sample(pool, rng.randint(0, len(pool))))
+    return pool, done, rec, common
+
+
+def resume_start(spec, root, hooks):
+    """backend._resume_start_time over the root's time dirs, filtered as
+    backend.resume_run filters them (t > 0, or the dir '0')."""
+    times = [n for t, n in backend.reader.list_times(root)
+             if float(t) > 0 or n == '0']
+    return backend._resume_start_time(spec, times, hooks)
+
+
 def test_planner():
     print('\nB2: the purge planner')
     rng = random.Random(15)
     bad = []
     for _ in range(3000):
-        pool = [f'{v:g}' for v in sorted(rng.sample(range(1, 40), 12))]
-        pool = ['0'] + [f'0.{p}' for p in pool]
-        done = set(rng.sample(pool, rng.randint(0, len(pool))))
-        rec = set(rng.sample(pool, rng.randint(0, len(pool))))
-        common = set(rng.sample(pool, rng.randint(0, len(pool))))
+        pool, done, rec, common = random_sets(rng)
         start = rng.choice(['0', pool[3]])
         plan = runloop.decomposed_purge_plan(done, rec, common, start)
         newest = max((float(t) for t in common), default=None)
@@ -393,9 +407,7 @@ def test_fake_run():
                if not k.startswith('processor')} == root_before)
         check('backend._n_procs_on_disk still reports 2',
               backend._n_procs_on_disk(root) == 2)
-        times = [n for _t, n in backend.reader.list_times(root)
-                 if float(_t) > 0 or n == '0']
-        name, skipped = backend._resume_start_time(spec, times, hooks)
+        name, skipped = resume_start(spec, root, hooks)
         check('backend._resume_start_time picks the latest root time',
               name == t3 and not skipped, f'{name}, {skipped}')
         n = len(calls)
@@ -513,11 +525,7 @@ def test_purge_anchor():
     rng = random.Random(1135)
     bad = []
     for _ in range(3000):
-        pool = [f'{v:g}' for v in sorted(rng.sample(range(1, 40), 12))]
-        pool = ['0'] + [f'0.{p}' for p in pool]
-        done = set(rng.sample(pool, rng.randint(0, len(pool))))
-        rec = set(rng.sample(pool, rng.randint(0, len(pool))))
-        common = set(rng.sample(pool, rng.randint(0, len(pool))))
+        _pool, done, rec, common = random_sets(rng)
         plan = runloop.decomposed_purge_plan(done, rec, common, '0')
         anchor = max((float(t) for t in common if t in rec), default=None)
         if anchor is None:
@@ -544,9 +552,7 @@ def test_purge_anchor():
         purge.reconstructed.clear()
         purge.covered([t1, t2])                 # not t3: it failed
         gone = purge.run({t1: 0.001, t2: 0.002})
-        times = [n for _t, n in backend.reader.list_times(root)
-                 if float(_t) > 0 or n == '0']
-        name, skipped = backend._resume_start_time(spec, times, hooks)
+        name, skipped = resume_start(spec, root, hooks)
         check('a torn newest root copy: the resume walks back to t2, and '
               't2 is still in every processor dir',
               gone == [t1] and name == t2

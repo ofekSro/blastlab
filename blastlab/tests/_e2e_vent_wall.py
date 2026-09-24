@@ -239,7 +239,8 @@ def responses(t, E, comp, p_open):
     zero after it (`sdof.response`'s own convention - what C10 did). T1:
     E_tail held for TAIL_TN natural periods after the record, then the
     solver's free vibration. Non-finite samples are dropped (and counted)
-    as C10 dropped them. Returns dict(T0, T1, level, t1, E1, dropped)."""
+    as C10 dropped them. Returns dict(T0, T1, level, t1, E1, dropped,
+    t_end)."""
     t, E = np.asarray(t, float), np.asarray(E, float)
     ok = np.isfinite(E) & np.isfinite(t)
     t, E = t[ok], E[ok]
@@ -450,26 +451,22 @@ def _kpa(v):
     return f'{v / 1e3:.2f}'
 
 
-def report_trace(t, E, parts, comp, p_open, say=print):
-    """Peak, positive phase, arrival (summarize_trace on P_AIR + E) and
-    the example panel under T0 and T1, for one E trace. Returns the two
-    responses. Nothing here is judged."""
-    s = summarize_trace(t, P_AIR + np.asarray(E, float))
-    i_pk = int(np.nanargmax(E))
-    which = ('R' if parts['R'][i_pk] >= parts['S'][i_pk] else 'S')
-    say(f"      E peak {s['peak_kpa']:.2f} kPa at {s['t_peak_ms']:.3f} ms "
-        f"(governed by {which}: R {_kpa(parts['R'][i_pk])}, "
-        f"S {_kpa(parts['S'][i_pk])} kPa)")
-    if np.isnan(s['arrival_ms']):
-        say('      no arrival: E never above 0.1 x P_AIR in the record')
-    else:
-        say(f"      arrival {s['arrival_ms']:.3f} ms, positive phase "
+def _phase_summary(s):
+    """Arrival, positive phase and impulses of one `summarize_trace`
+    result, worded as the record words them for every trace. A positive
+    phase still open when the record ends makes its impulse a lower
+    bound, and the text says so."""
+    return (f"arrival {s['arrival_ms']:.3f} ms, positive phase "
             f"{s['pos_duration_ms']:.3f} ms, positive-phase impulse "
             f"{s['pos_impulse']:.2f} Pa s"
             + ('' if s['complete'] else
                ' - a LOWER BOUND: still positive when the record ends')
             + f"; net impulse {s['net_impulse']:.2f} Pa s")
-    rs = responses(t, E, comp, p_open)
+
+
+def _say_tails(rs, comp, say):
+    """The example panel under T0 and T1 (`responses`), one line each,
+    noting a peak response that falls after the record ends."""
     for tail in ('T0', 'T1'):
         r = rs[tail]
         extra = ''
@@ -483,6 +480,24 @@ def report_trace(t, E, parts, comp, p_open, say=print):
             f'{r.support_rotation_deg:.3f} deg, {r.regime}, collapsed '
             f'{r.collapsed}; peak response at {r.t_ymax * 1e3:.2f} ms'
             + (f' - after the record ends, {why}' if late else ''))
+
+
+def report_trace(t, E, parts, comp, p_open, say=print):
+    """Peak, positive phase, arrival (summarize_trace on P_AIR + E) and
+    the example panel under T0 and T1, for one E trace. Returns the
+    `responses` dict. Nothing here is judged."""
+    s = summarize_trace(t, P_AIR + np.asarray(E, float))
+    i_pk = int(np.nanargmax(E))
+    which = ('R' if parts['R'][i_pk] >= parts['S'][i_pk] else 'S')
+    say(f"      E peak {s['peak_kpa']:.2f} kPa at {s['t_peak_ms']:.3f} ms "
+        f"(governed by {which}: R {_kpa(parts['R'][i_pk])}, "
+        f"S {_kpa(parts['S'][i_pk])} kPa)")
+    if np.isnan(s['arrival_ms']):
+        say('      no arrival: E never above 0.1 x P_AIR in the record')
+    else:
+        say('      ' + _phase_summary(s))
+    rs = responses(t, E, comp, p_open)
+    _say_tails(rs, comp, say)
     dt0 = rs['T0'].times[1] - rs['T0'].times[0]
     dt1 = rs['T1'].times[1] - rs['T1'].times[0]
     say(f'      sdof dt {dt0:.4e} s (T0) / {dt1:.4e} s (T1)'
@@ -986,10 +1001,8 @@ def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
         f"at the {m['n']} writes after {t_min * 1e3:g} ms (the rule says "
         f"{expected_n}); nearest probe row, time mismatch at most "
         f"{m['t_mismatch']:.2e} relative")
-    for c, (i, j, k) in enumerate(cand):
-        d = m['cells'][c] if m['cells'] else None
-        if d is None:
-            continue
+    # one entry per candidate cell; none when no write came after t_min
+    for (i, j, k), d in zip(cand, m['cells']):
         say(f"    ({xs[i]:.2f}, {ys[j]:.2f}, {zs[k]:.2f}): max error p "
             f"{d['p']:.2e}, rho {d['rho']:.2e}, U {d['U']:.2e} -> "
             + ('MATCHES' if d['ok'] else 'no'))
@@ -1007,35 +1020,20 @@ def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
             f'{where[gm][i_pk][2]:.2f}) m')
         s = summarize_trace(t, P_AIR + Emax[gm])
         say(f"      E peak {s['peak_kpa']:.2f} kPa at {s['t_peak_ms']:.3f} "
-            f"ms; arrival {s['arrival_ms']:.3f} ms, positive phase "
-            f"{s['pos_duration_ms']:.3f} ms, positive-phase impulse "
-            f"{s['pos_impulse']:.2f} Pa s"
-            + ('' if s['complete'] else
-               ' - a LOWER BOUND: still positive when the record ends')
-            + f"; net impulse {s['net_impulse']:.2f} Pa s")
+            f"ms; " + _phase_summary(s))
         rs = responses(t, Emax[gm], comp, p_open)
-        for tail in ('T0', 'T1'):
-            r = rs[tail]
-            late = r.t_ymax > rs['t_end']
-            why = ('in free vibration once the load drops to zero'
-                   if tail == 'T0' else 'set by the T1 hold')
-            extra = (f" (E_tail {_kpa(rs['level'])} kPa held "
-                     f"{TAIL_TN * comp.Tn * 1e3:.2f} ms)" if tail == 'T1'
-                     else '')
-            say(f'      {tail}{extra}: mu {r.ductility:.4f}, theta '
-                f'{r.support_rotation_deg:.3f} deg, {r.regime}, collapsed '
-                f'{r.collapsed}; peak response at {r.t_ymax * 1e3:.2f} ms'
-                + (f' - after the record ends, {why}' if late else ''))
+        _say_tails(rs, comp, say)
         out.setdefault('levels', {})[gm] = rs['level']
     say('\n  PANEL MEANS over the footprint - estimates, NOT bounds: a wall '
         'spreads the stagnation region wider than the free jet')
-    for key in panel:
-        v = panel[key]
+    for key, v in panel.items():
+        if key == 'momentum':
+            lab = 'momentum flux max(0, p - P_AIR + rho un^2)'
+        elif key[0] == 'E':
+            lab = f'area mean of E, gamma {key[1]:.2f}'
+        else:
+            lab = f'strip mean of E at y = 6, gamma {key[1]:.2f}'
         i_pk = int(np.nanargmax(v))
-        lab = ('momentum flux max(0, p - P_AIR + rho un^2)'
-               if key == 'momentum' else
-               f"{'area mean of E' if key[0] == 'E' else 'strip mean of E at y = 6'}"
-               f', gamma {key[1]:.2f}')
         say(f'    {lab}: peak {_kpa(v[i_pk])} kPa at {t[i_pk] * 1e3:.3f} ms')
     out.update(t=t, Emax=Emax, where=where, cells=cells, cand=cand,
                xs=xs, ys=ys, zs=zs, layers=layers, panel=panel, mapping=m,
