@@ -94,11 +94,17 @@ def build():
         vent_rect=(5.4, 6.6, 0.8, 2.0),
         open_mode='burst', p_burst=3.0 * P_AIR,
         domain_size=(12.0, 12.0, 6.0), cfd_dx_m=DX,
-        # SIX, not thirty. The first attempt asked for thirty on an
-        # 864,000-cell mesh and wrote 193 GB, which filled the disk and
-        # tripped the corpus sweep. A snapshot of this mesh costs ~6 GB
-        # once the decomposed and reconstructed copies are counted, and
-        # six is plenty to see the jet leave and load the wall.
+        # SIX, not thirty - but n_snapshots does NOT bound the disk: it
+        # only picks which writes become Result snapshots. The number of
+        # writes is set by the adaptive writeInterval, and every write is
+        # kept twice, reconstructed (~130 MB on this 864,000-cell mesh)
+        # and again decomposed over the ranks. Measured, in
+        # docs/hd13/vent3d_postmortem.txt: the thirty-snapshot attempt
+        # left 774 time dirs, 191.63 GiB, which filled the disk and
+        # tripped the corpus sweep; the six-snapshot run that followed,
+        # 20260923-195308_3d_p31468-00, still left 749, 172.96 GiB. A
+        # rerun needs room for ~750 writes, not for six snapshots. Six
+        # is still plenty to see the jet leave and load the wall.
         cfd_window_s=WINDOW, n_snapshots_vent=6,
         # gauges on the face of a wall 4 m beyond the opening, at the
         # height of the jet and one either side of it

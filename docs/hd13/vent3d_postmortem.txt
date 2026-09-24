@@ -230,7 +230,7 @@ THE WALL, AND WHAT LOADS IT
   No wall is meshed at x = 10 m - the CFD's obstacles are the eight room
   boxes (assessment.build_vent_case: obstacles = m['boxes']) - so the
   trace carries no reflection off the face it is applied to. Compare UFC
-  3-340-02 (2008), para. 2-15.3.2 (printed p. 64): a front wall struck
+  3-340-02 (2008), para. 2-15.3.2 (printed p. 65): a front wall struck
   by the wave goes to the normal reflected pressure Pr, a function of
   the incident pressure (Figure 2-15). Recorded here, not acted on: C10
   passes as committed.
