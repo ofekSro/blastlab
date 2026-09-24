@@ -452,7 +452,7 @@ def material_rho0(case):
     lookup serves either."""
     material = getattr(case, 'material', 'TNT') or 'TNT'
     try:
-        from ..solvers.foam.materials import MATERIALS
+        from .materials import MATERIALS
         return float(MATERIALS[material].rho0)
     except (KeyError, ImportError, AttributeError):
         return None
@@ -548,7 +548,7 @@ def _validate_solver(case, rep):
     if solver == 'native':
         # N11/T46: the native solvers take their JWL set from the same
         # material table as blastFoam
-        from ..solvers.foam.materials import MATERIALS as _MATS
+        from .materials import MATERIALS as _MATS
         if material not in _MATS:
             err(f"Unknown charge material '{material}'")
             return None
@@ -567,7 +567,7 @@ def _validate_solver(case, rep):
     if solver != 'blastfoam':
         err(f"Unknown solver backend '{solver}'")
         return None
-    from ..solvers.foam.materials import MATERIALS
+    from .materials import MATERIALS
     if material not in MATERIALS:
         err(f"Unknown charge material '{material}'")
         return None
@@ -741,7 +741,7 @@ def _validate_solver(case, rep):
         err(f"Unknown afterburn model '{afterburn}' "
             f"(use 'none' or 'miller')")
     elif afterburn == 'miller':
-        from ..solvers.foam.materials import AFTERBURN
+        from .materials import AFTERBURN
         ab = AFTERBURN.get(material)
         if ab is None:
             err(f"No afterburn parameters for '{material}'")

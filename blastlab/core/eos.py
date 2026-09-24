@@ -40,7 +40,7 @@ def material_jwl(name):
     solvers/foam/materials table (pure data, no foam dependency)."""
     if not name or name == 'TNT':
         return JWL_TNT
-    from ..solvers.foam.materials import MATERIALS
+    from .materials import MATERIALS
     m = MATERIALS[name]
     return dict(A=m.A, B=m.B, R1=m.R1, R2=m.R2, omega=m.omega,
                 rho0=m.rho0, e0=m.e0)
