@@ -215,16 +215,23 @@ def purge_active(spec):
 def decomposed_purge_plan(done, reconstructed_ok, common_ready, start_dir):
     """Pure. The processor*/<t> times that may be deleted: every t the
     ingest has read (`done`), that a successful reconstructPar covered
-    (`reconstructed_ok`), that is OLDER than the newest time complete on
-    every rank (`common_ready`), and that is not `start_dir`. So never
-    the newest complete time (a restart reads it), a write still in
-    progress or torn (newer than that), the start dir, or anything not
-    yet safely at the root. Sorted by time."""
-    common = [t for t in (common_ready or ()) if _is_time(t)]
+    (`reconstructed_ok`), that is not `start_dir`, and that is OLDER than
+    the anchor - the newest time complete on every rank (`common_ready`)
+    whose own reconstructPar succeeded too. So never the newest complete
+    time (a restart reads it), a write still in progress or torn (newer
+    than that), the start dir, or anything not yet safely at the root.
+
+    Why the anchor must be reconstructed as well: a failed reconstructPar
+    can leave that time's ROOT copy torn, and a resume then walks back
+    past it to the newest whole root time (backend._resume_start_time,
+    P1-5 - it checks every run, not only AMR) and restarts from that
+    time's processor*/ copy, which therefore has to still be there.
+    Sorted by time."""
+    ok = set(reconstructed_ok or ())
+    common = [t for t in (common_ready or ()) if _is_time(t) and t in ok]
     if not common:
         return []
     newest = max(float(t) for t in common)
-    ok = set(reconstructed_ok or ())
     keep = str(start_dir)
     return sorted({t for t in (done or ()) if t in ok and t != keep
                    and _is_time(t) and float(t) < newest}, key=float)
@@ -256,22 +263,50 @@ def purge_paths(case_posix, n_procs, names):
     return out
 
 
+#: Windows refuses a command line longer than 32,767 characters
+#: (CreateProcess, WinError 206), and the whole rm rides on wsl.exe's. One
+#: purge of 60 writes on 13 ranks is about 54,000, so the paths go out in
+#: chunks of at most this many characters - one WSL stage per chunk, and
+#: a normal purge (a few writes) is still exactly one.
+RM_CHUNK_CHARS = 16000
+
+
+def rm_scripts(paths, limit=RM_CHUNK_CHARS):
+    """`rm -rf -- '<path>' ...` lines covering `paths` once each, in
+    order, none longer than `limit` characters (a single path always
+    gets a line of its own)."""
+    head = 'rm -rf --'
+    out, cur = [], head
+    for p in paths:
+        arg = f" '{p}'"
+        if cur != head and len(cur) + len(arg) > limit:
+            out.append(cur)
+            cur = head
+        cur += arg
+    if cur != head:
+        out.append(cur)
+    return out
+
+
 def delete_decomposed(spec, names):
-    """rm -rf the processor*/<t> dirs of `names` in ONE WSL stage (no
-    OpenFOAM env needed). True when it went through."""
+    """rm -rf the processor*/<t> dirs of `names` in WSL (no OpenFOAM env
+    needed), one stage per `rm_scripts` chunk so that no purge, however
+    many writes it removes, meets Windows' command-line cap. True when
+    every stage went through."""
     import subprocess
     from . import env
     paths = purge_paths(spec.case_posix, spec.n_procs, names)
-    if not paths:
-        return True
-    script = 'rm -rf -- ' + ' '.join(f"'{p}'" for p in paths)
-    try:
-        res = subprocess.run(env.wsl_plain_argv(script), capture_output=True,
-                             timeout=300, stdin=subprocess.DEVNULL,
-                             creationflags=env.CREATE_NO_WINDOW)
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return res.returncode == 0
+    for script in rm_scripts(paths):
+        try:
+            res = subprocess.run(env.wsl_plain_argv(script),
+                                 capture_output=True, timeout=300,
+                                 stdin=subprocess.DEVNULL,
+                                 creationflags=env.CREATE_NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if res.returncode != 0:
+            return False
+    return True
 
 
 def _root_whole(spec, fields):
@@ -298,8 +333,9 @@ class DecomposedPurge:
     one. On HD1-3d that second copy was 88 GB of 173 GiB. The purge
     deletes a processor*/<t> once the ingest has read t, a reconstructPar
     covering it has succeeded, and a NEWER time is complete on every
-    rank; never the start dir, never processor*/constant, never the root
-    or postProcessing (see decomposed_purge_plan and purge_paths).
+    rank and reconstructed too; never the start dir, never
+    processor*/constant, never the root or postProcessing (see
+    decomposed_purge_plan and purge_paths).
 
     Rejected: OpenFOAM's `purgeWrite`, which deletes on the solver's own
     clock and so races the per-poll reconstruct (capped at 4 per poll) -

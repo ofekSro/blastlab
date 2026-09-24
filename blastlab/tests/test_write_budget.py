@@ -499,6 +499,119 @@ def test_whole_ingest():
                       f'{ingested}, {calls}')
 
 
+def test_purge_anchor():
+    print('\nB2 (verify): the purge anchors on the newest time that is '
+          'complete on every rank AND reconstructed')
+    t1, t2, t3 = '0.001', '0.002', '0.003'
+    check('a newest common time whose reconstructPar failed does not '
+          'anchor the plan: t2 stays',
+          runloop.decomposed_purge_plan({t1, t2}, {t1, t2}, {t1, t2, t3},
+                                        '0') == [t1])
+    check('   and once that time is reconstructed, it does',
+          runloop.decomposed_purge_plan({t1, t2, t3}, {t1, t2, t3},
+                                        {t1, t2, t3}, '0') == [t1, t2])
+    rng = random.Random(1135)
+    bad = []
+    for _ in range(3000):
+        pool = [f'{v:g}' for v in sorted(rng.sample(range(1, 40), 12))]
+        pool = ['0'] + [f'0.{p}' for p in pool]
+        done = set(rng.sample(pool, rng.randint(0, len(pool))))
+        rec = set(rng.sample(pool, rng.randint(0, len(pool))))
+        common = set(rng.sample(pool, rng.randint(0, len(pool))))
+        plan = runloop.decomposed_purge_plan(done, rec, common, '0')
+        anchor = max((float(t) for t in common if t in rec), default=None)
+        if anchor is None:
+            if plan:
+                bad.append(('no reconstructed common time', plan))
+            continue
+        bad += [(t, anchor) for t in plan if float(t) >= anchor]
+    check('3000 random cases: never the newest time that is both complete '
+          'on every rank and reconstructed, nor anything newer',
+          not bad, str(bad[:3]))
+
+    # the P1-5 walk-back: t3's reconstructPar failed and left a root copy
+    # without p, so a resume restarts from t2 - whose processor copy the
+    # purge must therefore have kept
+    with tempfile.TemporaryDirectory() as root:
+        fake_run(root, [t1, t2, t3], reconstructed=[t1, t2])
+        os.makedirs(os.path.join(root, t3, 'uniform'))
+        with open(os.path.join(root, t3, 'uniform', 'time'), 'w') as f:
+            f.write(f'value {t3};\n')
+        spec = budget_spec(root)
+        hooks, calls = Hooks(), []
+        purge = runloop.DecomposedPurge(spec, FIELDS, hooks,
+                                        delete=local_delete(root, calls))
+        purge.reconstructed.clear()
+        purge.covered([t1, t2])                 # not t3: it failed
+        gone = purge.run({t1: 0.001, t2: 0.002})
+        times = [n for _t, n in backend.reader.list_times(root)
+                 if float(_t) > 0 or n == '0']
+        name, skipped = backend._resume_start_time(spec, times, hooks)
+        check('a torn newest root copy: the resume walks back to t2, and '
+              't2 is still in every processor dir',
+              gone == [t1] and name == t2
+              and [s[0] for s in skipped] == [t3]
+              and all(os.path.isdir(os.path.join(root, f'processor{i}', t2))
+                      for i in range(2)),
+              f'purged {gone}, restart {name}, {listing(root)}')
+
+
+def test_rm_chunks():
+    print("\nB2 (verify): the rm never meets Windows' command-line cap")
+    import subprocess
+    from blastlab.solvers.foam import env
+    # a run name of real length that does not exist - strings only here
+    case = '/root/blastlab_runs/20260924-999999_3d_p99999-99'
+    names = [f'{0.0005 * k:.8g}' for k in range(1, 61)]
+    paths = runloop.purge_paths(case, 13, names)            # 780 paths
+    one_line = subprocess.list2cmdline(env.wsl_plain_argv(
+        'rm -rf -- ' + ' '.join(f"'{p}'" for p in paths)))
+    scripts = runloop.rm_scripts(paths)
+    longest = max(len(subprocess.list2cmdline(env.wsl_plain_argv(s)))
+                  for s in scripts)
+    check('60 writes on 13 ranks would be one line over 32,767 characters; '
+          'the chunks are each well under it',
+          len(one_line) > 32767 and len(scripts) > 1 and longest < 32767
+          and all(len(s) <= runloop.RM_CHUNK_CHARS for s in scripts),
+          f'one line {len(one_line)}, {len(scripts)} stages, longest '
+          f'{longest}')
+    named = [a[1:-1] for s in scripts
+             for a in s[len('rm -rf -- '):].split(' ')]
+    check('   and they name every path exactly once, in order',
+          named == paths)
+    few = paths[:26]
+    check('a normal purge is still one stage, the same line as before',
+          runloop.rm_scripts(few)
+          == ['rm -rf -- ' + ' '.join(f"'{p}'" for p in few)])
+    check('an empty plan is no stage at all', runloop.rm_scripts([]) == [])
+
+    # delete_decomposed through a stub (budget_spec's run does not exist
+    # either): one stage per chunk, and False as soon as one fails
+    spec = budget_spec(tempfile.gettempdir(), n_procs=13)
+    want = len(runloop.rm_scripts(runloop.purge_paths(spec.case_posix, 13,
+                                                      names)))
+    calls, codes = [], []
+    real = subprocess.run
+
+    def stub(argv, **_kw):
+        calls.append(argv)
+        return SimpleNamespace(returncode=codes.pop(0) if codes else 0)
+
+    subprocess.run = stub
+    try:
+        ok = runloop.delete_decomposed(spec, names)
+        n_ok = len(calls)
+        calls.clear()
+        codes[:] = [0, 1]
+        failed = runloop.delete_decomposed(spec, names)
+    finally:
+        subprocess.run = real
+    check('delete_decomposed runs one WSL stage per chunk and says True',
+          ok is True and want > 1 and n_ok == want, f'{n_ok} vs {want}')
+    check('   and says False when a stage fails, stopping there',
+          failed is False and len(calls) == 2, f'{len(calls)} stages')
+
+
 def main():
     test_defaults()
     test_pinned()
@@ -507,6 +620,8 @@ def main():
     test_paths()
     test_fake_run()
     test_whole_ingest()
+    test_purge_anchor()
+    test_rm_chunks()
 
 
 if __name__ == '__main__':
