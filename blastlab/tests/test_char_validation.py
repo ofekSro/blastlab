@@ -27,6 +27,9 @@ import char_common as cc
 from blastlab.core import assessment, hardware            # noqa: E402
 from blastlab.core.case import (Case1D, Case2D, Case3D,   # noqa: E402
                                 validate_case)
+from blastlab.core.constants import MIN_EXP_CELLS        # noqa: E402
+from blastlab.models.result import ValidationReport      # noqa: E402
+from blastlab.services import validation as sv           # noqa: E402
 from blastlab.solvers.foam import env                    # noqa: E402
 
 _ENV_ATTRS = ('_cores', '_slots', '_ram_gb',
@@ -122,9 +125,126 @@ def test_hd13_starter_case():
     cc.check_json('validation_hd13_starter.json', report_dict(rep))
 
 
+# ── Phase 4: the blocks validate_case is split into ─────────────────────
+# One case per extracted function. Each runs the blocks in
+# validate_case's order and checks against the golden above or against
+# literal messages - no new golden.
+GOLDEN_BLAST = 'validation_blast_cases.json'
+
+
+def _upto(case, last, pending=False, hw=None):
+    """Run the blocks of validate_case in order through `last` (a
+    function name); returns (report, ctx, what `last` returned)."""
+    rep = ValidationReport()
+    ctx = sv._validate_common(case, rep)
+    if last == '_validate_common' or ctx is None:
+        return rep, ctx, ctx
+    if case.dim == 1:
+        return rep, ctx, sv._validate_1d(case, rep, ctx)
+    steps = (('_validate_domain_and_charge',
+              lambda: sv._validate_domain_and_charge(case, rep, ctx)),
+             ('_validate_profile_init',
+              lambda: sv._validate_profile_init(case, rep, ctx, pending)),
+             ('_validate_refinement',
+              lambda: sv._validate_refinement(case, rep, ctx)),
+             ('_validate_caps',
+              lambda: sv._validate_caps(case, rep, ctx, hw)),
+             ('_validate_closing',
+              lambda: sv._validate_closing(case, rep, ctx)))
+    for name, step in steps:
+        out = step()
+        if name == last or out is False:
+            return rep, ctx, out
+    raise AssertionError(f'no block named {last}')
+
+
+def _golden(name):
+    return cc.load_json(GOLDEN_BLAST)[name]
+
+
+def _same_as_golden(rep, name):
+    return cc.dumps(report_dict(rep)) == cc.dumps(_golden(name))
+
+
+def test_block_common():
+    rep, ctx, _ = _upto(Case2D(cell_size_m=0.0), '_validate_common')
+    assert ctx is None and rep.errors == ['Cell size must be > 0']
+    assert not rep.warnings and not rep.notes
+    # a fatal backend error stops before any geometry check
+    rep, ctx, _ = _upto(Case2D(solver='nope', Lx=0.0), '_validate_common')
+    assert ctx is None and rep.errors == ["Unknown solver backend 'nope'"]
+    rep = validate_case(Case2D(solver='nope', Lx=0.0))
+    assert rep.errors == ["Unknown solver backend 'nope'"]
+    rep, ctx, _ = _upto(BLAST_CASES['native_2d'][0], '_validate_common')
+    assert (ctx.foam, ctx.amr, ctx.n_exp) == (False, 0, MIN_EXP_CELLS)
+
+
+def test_block_1d():
+    with pinned_hardware():
+        rep, _ctx, _ = _upto(BLAST_CASES['native_1d'][0], '_validate_1d')
+    assert _same_as_golden(rep, 'native_1d')
+
+
+def test_block_domain_and_charge():
+    rep, _ctx, ok = _upto(Case3D(Lx=0.0), '_validate_domain_and_charge')
+    assert ok is False and rep.errors == ['Domain extents must be > 0']
+    rep, ctx, ok = _upto(BLAST_CASES['native_3d'][0],
+                         '_validate_domain_and_charge')
+    assert ok is True and ctx.init == 'charge'
+    assert ctx.dims == (1.0, 1.0, 1.0)
+    assert rep.r_exp == _golden('native_3d')['r_exp']
+
+
+def test_block_profile_init():
+    case = BLAST_CASES['native_2d_profile_pending'][0]
+    rep, _ctx, _ = _upto(case, '_validate_profile_init', pending=True)
+    assert not rep.errors
+    rep, _ctx, _ = _upto(case, '_validate_profile_init', pending=False)
+    assert rep.errors == [f'Profile file not found: {case.profile_file_in}']
+
+
+def test_block_refinement():
+    with pinned_hardware():
+        rep, ctx, ok = _upto(BLAST_CASES['foam_3d_amr'][0],
+                             '_validate_refinement')
+    g = _golden('foam_3d_amr')
+    assert ok is True and ctx.plan is not None and ctx.plan.amr == 4
+    assert (rep.amr_levels, rep.lmax, rep.n_fine) == (
+        g['amr_levels'], g['lmax'], g['n_fine'])
+
+
+def test_block_caps_hardware_argument():
+    """`hw=None` reads env.hardware() at call time (the golden); an
+    explicit dict is used instead of it."""
+    case = BLAST_CASES['foam_3d'][0]
+    with pinned_hardware():
+        rep, _ctx, _ = _upto(case, '_validate_closing')
+        assert _same_as_golden(rep, 'foam_3d')
+        rep, _ctx, _ = _upto(case, '_validate_closing', hw=env.hardware())
+        assert _same_as_golden(rep, 'foam_3d')
+        rep, _ctx, _ = _upto(case, '_validate_caps', hw={})
+    assert any(w.startswith('WSL hardware not detected')
+               for w in rep.warnings)
+
+
+def test_block_closing():
+    case = Case2D(geometry='axisymmetric', Lx=1.2, Ly=1.6, cell_size_m=0.02,
+                  charge=1.0, center=(0.0, 0.7), bcs=dict(_BCS_2D),
+                  gauges=[(5.0, 5.0)])
+    with pinned_hardware():
+        rep, ctx, _ = _upto(case, '_validate_caps')
+        before = list(rep.warnings)
+        sv._validate_closing(case, rep, ctx)
+    assert rep.warnings == before + [
+        'Gauge (5.0, 5.0) outside domain - will be dropped']
+
+
 def main():
     return cc.run_main('CHAR VALIDATION', [
-        test_blast_cases, test_hd13_starter_case])
+        test_blast_cases, test_hd13_starter_case,
+        test_block_common, test_block_1d, test_block_domain_and_charge,
+        test_block_profile_init, test_block_refinement,
+        test_block_caps_hardware_argument, test_block_closing])
 
 
 if __name__ == '__main__':

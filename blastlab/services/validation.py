@@ -15,6 +15,13 @@ refinement planner, the chain and the profile reader stay deferred
 inside the functions, exactly where they were. `solvers.foam.env` and
 `core.hardware` are held as module references on purpose: the tests
 patch attributes on those modules.
+
+Phase 4 split `validate_case` by concern into `_validate_common`,
+`_validate_1d`, `_validate_domain_and_charge` (+ `_validate_charge`),
+`_validate_profile_init`, `_validate_refinement`, `_validate_caps` and
+`_validate_closing`, which append to one `ValidationReport` in the order
+the single function did and share a per-call `_Ctx`. The bodies moved
+unchanged.
 """
 
 import math
@@ -443,24 +450,39 @@ def _validate_write_budget(case, rep, n_cells, foam, amr):
              f"when the run is parallel")
 
 
-def validate_case(case, pending_inputs=False):
-    """Full pre-run report for one case.
+class _Ctx:
+    """What the blocks of `validate_case` share, one per call (Phase 4 of
+    docs/ARCHITECTURE_REVIEW.md). `_validate_common` fills the first
+    seven; `_validate_domain_and_charge` sets `dims`, `bcs` and `init`;
+    `_validate_charge` updates `dx` and `refined`; `_validate_refinement`
+    sets `plan`."""
 
-    `pending_inputs=True` means the case's profile input is produced by
-    an earlier stage of the same chain run, so its absence on disk right
-    now is expected rather than an error (everything else is still
-    checked). Only the chain panel passes it."""
-    rep = ValidationReport()
-    err, warn, note = rep.errors.append, rep.warnings.append, rep.notes.append
+    def __init__(self, rho0, foam, n_exp, cref, zones, amr, dx):
+        self.rho0, self.foam, self.n_exp = rho0, foam, n_exp
+        self.cref, self.zones, self.amr = cref, zones, amr
+        self.dx = dx
+        self.dims = None
+        self.bcs = None
+        self.init = None
+        self.refined = False
+        self.plan = None
+
+
+def _validate_common(case, rep):
+    """Every case: the cell size, the solver backend (`_validate_solver`)
+    and the trigger gauge (T51). Returns the shared `_Ctx`, or None when
+    validation stops here - a bad cell size, or a fatal backend error,
+    which ends validation before any geometry check."""
+    err, note = rep.errors.append, rep.notes.append
 
     dx = case.cell_size_m
     if dx <= 0:
         err("Cell size must be > 0")
-        return rep
+        return None
 
     rho0 = _validate_solver(case, rep)
     if rho0 is None:
-        return rep
+        return None
     foam = getattr(case, 'solver', 'native') == 'blastfoam'
     # blastFoam wants more cells across the charge than the native
     # solvers: sphericalMassToCell deposits only the staircase mass
@@ -503,43 +525,56 @@ def validate_case(case, pending_inputs=False):
                         else " (the run then continues)"))
         else:
             note(f"The run ends when the wave reaches gauge {trig_i}")
+    return _Ctx(rho0, foam, n_exp, cref, zones, amr, dx)
 
-    if case.dim == 1:
-        kind = normalize_bc(getattr(case, 'bc_outer', 'terminate'))
-        if kind not in BC_KINDS:
-            err(f"Outer boundary: unknown kind '{kind}' "
-                f"(expected one of {', '.join(BC_KINDS)})")
-        elif kind != 'terminate' and not getattr(case, 't_end', 0.0):
-            c_air = float(np.sqrt(1.4 * 101325.0 / 1.225))
-            warn(f"The outer boundary is '{kind}' and no end time is "
-                 f"set: the run is bounded only by the safety cap "
-                 f"(~{10.0 * case.radius_m / c_air * 1e3:.0f} ms).")
-        _warn_long_end_time(case, warn)
-        if case.charge_kg <= 0:
-            err("Charge must be > 0")
-        if case.radius_m <= 0:
-            err("Domain radius must be > 0")
-        if rep.errors:
-            return rep
-        r_exp = (3.0 * case.charge_kg
-                 / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
-        rep.r_exp = r_exp
-        if r_exp >= case.radius_m:
-            err(f"Explosive radius {r_exp:.3f} m exceeds domain radius")
-        if dx > r_exp / n_exp:
-            dx = r_exp / n_exp
-            note(f"Cell size will be refined to {dx:.5f} m "
-                 f"({n_exp} cells inside the charge)")
-        rep.effective_dx = dx
-        rep.n_cells = int(case.radius_m / dx)
-        return rep
+
+def _validate_1d(case, rep, ctx):
+    """1D spherical: the outer boundary, the end time, charge and radius,
+    the cell size the charge forces and the cell count. No later block
+    runs for a 1D case."""
+    err, warn, note = rep.errors.append, rep.warnings.append, rep.notes.append
+    rho0, n_exp, dx = ctx.rho0, ctx.n_exp, ctx.dx
+    kind = normalize_bc(getattr(case, 'bc_outer', 'terminate'))
+    if kind not in BC_KINDS:
+        err(f"Outer boundary: unknown kind '{kind}' "
+            f"(expected one of {', '.join(BC_KINDS)})")
+    elif kind != 'terminate' and not getattr(case, 't_end', 0.0):
+        c_air = float(np.sqrt(1.4 * 101325.0 / 1.225))
+        warn(f"The outer boundary is '{kind}' and no end time is "
+             f"set: the run is bounded only by the safety cap "
+             f"(~{10.0 * case.radius_m / c_air * 1e3:.0f} ms).")
+    _warn_long_end_time(case, warn)
+    if case.charge_kg <= 0:
+        err("Charge must be > 0")
+    if case.radius_m <= 0:
+        err("Domain radius must be > 0")
+    if rep.errors:
+        return
+    r_exp = (3.0 * case.charge_kg
+             / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
+    rep.r_exp = r_exp
+    if r_exp >= case.radius_m:
+        err(f"Explosive radius {r_exp:.3f} m exceeds domain radius")
+    if dx > r_exp / n_exp:
+        dx = r_exp / n_exp
+        note(f"Cell size will be refined to {dx:.5f} m "
+             f"({n_exp} cells inside the charge)")
+    rep.effective_dx = dx
+    rep.n_cells = int(case.radius_m / dx)
+
+
+def _validate_domain_and_charge(case, rep, ctx):
+    """2D/3D: domain extents, end time, boundary kinds (T50) and the live
+    slice, then - for a charge-initialised case - the charge itself
+    (`_validate_charge`). False when validation stops here."""
+    err, warn = rep.errors.append, rep.warnings.append
 
     # 2D / 3D shared pieces
     dims = ((case.Lx, case.Ly) if case.dim == 2
             else (case.Lx, case.Ly, case.Lz))
     if any(L <= 0 for L in dims):
         err("Domain extents must be > 0")
-        return rep
+        return False
     if getattr(case, 't_end', 0.0) < 0:
         err("End time must be >= 0 (0 = automatic stop condition)")
     # ── Boundary kinds (T50) ───────────────────────────────────────────
@@ -566,155 +601,180 @@ def validate_case(case, pending_inputs=False):
             if s_pos is not None and not 0 <= s_pos <= L_ax:
                 warn(f"Live slice position {s_pos:g} m is outside the "
                      f"domain (0..{L_ax:g} m) - the nearest cell is used")
+    ctx.dims, ctx.bcs = dims, bcs
 
     init = getattr(case, 'init_mode', 'charge')
-    refined = False
+    ctx.init = init
     if init == 'charge':
-        if case.charge is None or case.charge <= 0:
-            err("Charge must be > 0")
-            return rep
-        if getattr(case, 'charge_resolution', 'resolve') \
-                not in ('resolve', 'smear'):
-            err("Charge resolution must be 'resolve' or 'smear'")
-            return rep
-        r_exp = _charge_radius(case, rho0)
-        rep.r_exp = r_exp
-        # 3D 'smear' keeps dx and enlarges the source ball instead of
-        # refining; use the ball radius for the geometry checks below.
-        # (blastfoam always resolves - smear is native-only.)
-        smeared = (case.dim == 3 and not foam
-                   and getattr(case, 'charge_resolution',
-                               'resolve') == 'smear'
-                   and dx > r_exp / MIN_EXP_CELLS)
-        r_exp = max(r_exp, 2.0 * dx) if smeared else r_exp
-        center = case.center
-        # containment vs open boundaries; walls allow surface bursts
-        if case.dim == 2:
-            x0, y0 = (0.0 if case.geometry == 'axisymmetric'
-                      else center[0]), center[1]
-            # UX-04: this pin used to be silent - a case file carrying
-            # x != 0 was quietly recentred without a word
-            if case.geometry == 'axisymmetric' and center[0]:
-                note(f"Axisymmetric: the charge sits on the axis - "
-                     f"burst x = {center[0]:g} is ignored (r = 0)")
-            overhangs = [(r_exp - (case.Lx - x0), 'x_hi'),
-                         (r_exp - y0, 'y_lo'),
-                         (r_exp - (case.Ly - y0), 'y_hi')]
-            if case.geometry == 'planar':
-                overhangs.append((r_exp - x0, 'x_lo'))
-            inside = 0 <= x0 <= case.Lx and 0 <= y0 <= case.Ly
+        return _validate_charge(case, rep, ctx)
+    return True
+
+
+def _validate_charge(case, rep, ctx):
+    """A charge-initialised 2D/3D case: charge mass and resolution,
+    containment against the boundaries, obstacle overlap, the cell size
+    the charge forces, extra charges and detonation points. Updates
+    `ctx.dx` and `ctx.refined`; False when validation stops here."""
+    err, note = rep.errors.append, rep.notes.append
+    rho0, foam, n_exp = ctx.rho0, ctx.foam, ctx.n_exp
+    cref, amr, bcs = ctx.cref, ctx.amr, ctx.bcs
+    dx, refined = ctx.dx, ctx.refined
+    if case.charge is None or case.charge <= 0:
+        err("Charge must be > 0")
+        return False
+    if getattr(case, 'charge_resolution', 'resolve') \
+            not in ('resolve', 'smear'):
+        err("Charge resolution must be 'resolve' or 'smear'")
+        return False
+    r_exp = _charge_radius(case, rho0)
+    rep.r_exp = r_exp
+    # 3D 'smear' keeps dx and enlarges the source ball instead of
+    # refining; use the ball radius for the geometry checks below.
+    # (blastfoam always resolves - smear is native-only.)
+    smeared = (case.dim == 3 and not foam
+               and getattr(case, 'charge_resolution',
+                           'resolve') == 'smear'
+               and dx > r_exp / MIN_EXP_CELLS)
+    r_exp = max(r_exp, 2.0 * dx) if smeared else r_exp
+    center = case.center
+    # containment vs open boundaries; walls allow surface bursts
+    if case.dim == 2:
+        x0, y0 = (0.0 if case.geometry == 'axisymmetric'
+                  else center[0]), center[1]
+        # UX-04: this pin used to be silent - a case file carrying
+        # x != 0 was quietly recentred without a word
+        if case.geometry == 'axisymmetric' and center[0]:
+            note(f"Axisymmetric: the charge sits on the axis - "
+                 f"burst x = {center[0]:g} is ignored (r = 0)")
+        overhangs = [(r_exp - (case.Lx - x0), 'x_hi'),
+                     (r_exp - y0, 'y_lo'),
+                     (r_exp - (case.Ly - y0), 'y_hi')]
+        if case.geometry == 'planar':
+            overhangs.append((r_exp - x0, 'x_lo'))
+        inside = 0 <= x0 <= case.Lx and 0 <= y0 <= case.Ly
+    else:
+        x0, y0, z0 = center
+        overhangs = [(r_exp - x0, 'x_lo'), (r_exp - (case.Lx - x0), 'x_hi'),
+                     (r_exp - y0, 'y_lo'), (r_exp - (case.Ly - y0), 'y_hi'),
+                     (r_exp - z0, 'z_lo'), (r_exp - (case.Lz - z0), 'z_hi')]
+        inside = (0 <= x0 <= case.Lx and 0 <= y0 <= case.Ly
+                  and 0 <= z0 <= case.Lz)
+    if not inside:
+        err("Charge centre is outside the domain")
+    for over, side in overhangs:
+        if over <= 0:
+            continue
+        if bcs.get(side) == 'reflect':
+            note(f"Charge is truncated by the {side} wall (surface burst)")
         else:
-            x0, y0, z0 = center
-            overhangs = [(r_exp - x0, 'x_lo'), (r_exp - (case.Lx - x0), 'x_hi'),
-                         (r_exp - y0, 'y_lo'), (r_exp - (case.Ly - y0), 'y_hi'),
-                         (r_exp - z0, 'z_lo'), (r_exp - (case.Lz - z0), 'z_hi')]
-            inside = (0 <= x0 <= case.Lx and 0 <= y0 <= case.Ly
-                      and 0 <= z0 <= case.Lz)
-        if not inside:
-            err("Charge centre is outside the domain")
-        for over, side in overhangs:
+            err(f"Charge (r_exp = {r_exp:.4f} m) pokes through the "
+                f"open '{side}' boundary")
+    # obstacle overlap
+    for box in case.obstacles:
+        if case.dim == 2:
+            ox0, ox1, oy0, oy1 = box
+            cx = min(max(x0, ox0), ox1)
+            cy = min(max(y0, oy0), oy1)
+            d2 = (cx - x0)**2 + (cy - y0)**2
+        else:
+            ox0, ox1, oy0, oy1, oz0, oz1 = box
+            cx = min(max(x0, ox0), ox1)
+            cy = min(max(y0, oy0), oy1)
+            cz = min(max(z0, oz0), oz1)
+            d2 = (cx - x0)**2 + (cy - y0)**2 + (cz - z0)**2
+        if d2 < r_exp**2:
+            err(f"Charge overlaps obstacle {box}")
+    if smeared:
+        note(f"Charge under-resolved at dx = {dx:g} m - its mass & "
+             f"energy will be smeared into a {r_exp:.3f} m source ball")
+    elif dx > r_exp / n_exp and not (foam and cref == 'zone') \
+            and not amr:
+        dx = r_exp / n_exp
+        refined = True
+        note(f"Cell size will be refined to {dx:.5f} m "
+             f"({n_exp} cells across the charge radius)")
+
+    # blastFoam extra charges (3D only) + detonation points
+    extras = getattr(case, 'charges', None) or []
+    if extras and case.dim != 3:
+        err("Additional charges are only supported for 3D "
+            "blastFoam cases")
+        extras = []
+    spheres = [(x0, y0, (z0 if case.dim == 3 else 0.0), r_exp)]
+    for ch in extras:
+        if len(ch) != 4:
+            err(f"Extra charge {tuple(ch)}: need (x, y, z, mass)")
+            continue
+        ex, ey, ez, mass = ch
+        if mass is None or mass <= 0:
+            err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}): "
+                f"mass must be > 0")
+            continue
+        r_i = (3.0 * mass / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
+        if not (0 <= ex <= case.Lx and 0 <= ey <= case.Ly
+                and 0 <= ez <= case.Lz):
+            err(f"Extra charge centre ({ex:g}, {ey:g}, {ez:g}) is "
+                f"outside the domain")
+            continue
+        for over, side in ((r_i - ex, 'x_lo'),
+                           (r_i - (case.Lx - ex), 'x_hi'),
+                           (r_i - ey, 'y_lo'),
+                           (r_i - (case.Ly - ey), 'y_hi'),
+                           (r_i - ez, 'z_lo'),
+                           (r_i - (case.Lz - ez), 'z_hi')):
             if over <= 0:
                 continue
             if bcs.get(side) == 'reflect':
-                note(f"Charge is truncated by the {side} wall (surface burst)")
+                note(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) is "
+                     f"truncated by the {side} wall")
             else:
-                err(f"Charge (r_exp = {r_exp:.4f} m) pokes through the "
+                err(f"Extra charge (r_exp = {r_i:.4f} m) at "
+                    f"({ex:g}, {ey:g}, {ez:g}) pokes through the "
                     f"open '{side}' boundary")
-        # obstacle overlap
-        for box in case.obstacles:
-            if case.dim == 2:
-                ox0, ox1, oy0, oy1 = box
-                cx = min(max(x0, ox0), ox1)
-                cy = min(max(y0, oy0), oy1)
-                d2 = (cx - x0)**2 + (cy - y0)**2
-            else:
-                ox0, ox1, oy0, oy1, oz0, oz1 = box
-                cx = min(max(x0, ox0), ox1)
-                cy = min(max(y0, oy0), oy1)
-                cz = min(max(z0, oz0), oz1)
-                d2 = (cx - x0)**2 + (cy - y0)**2 + (cz - z0)**2
-            if d2 < r_exp**2:
-                err(f"Charge overlaps obstacle {box}")
-        if smeared:
-            note(f"Charge under-resolved at dx = {dx:g} m - its mass & "
-                 f"energy will be smeared into a {r_exp:.3f} m source ball")
-        elif dx > r_exp / n_exp and not (foam and cref == 'zone') \
-                and not amr:
-            dx = r_exp / n_exp
+        for (px, py, pz, pr) in spheres:
+            d = np.sqrt((ex - px) ** 2 + (ey - py) ** 2
+                        + (ez - pz) ** 2)
+            if d < r_i + pr:
+                err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) "
+                    f"overlaps another charge")
+        spheres.append((ex, ey, ez, r_i))
+        if dx > r_i / n_exp and not amr:
+            dx = r_i / n_exp
             refined = True
             note(f"Cell size will be refined to {dx:.5f} m "
-                 f"({n_exp} cells across the charge radius)")
+                 f"({n_exp} cells across the smallest "
+                 f"charge radius)")
+    for dp in getattr(case, 'det_points', None) or []:
+        pt = tuple(dp) + ((0.0,) if case.dim == 2 else ())
+        if len(pt) != 3:
+            err(f"Detonation point {tuple(dp)}: need "
+                + ("(x, y)" if case.dim == 2 else "(x, y, z)"))
+            continue
+        px, py, pz = pt
+        if case.dim == 2:
+            px, py, pz = ((0.0 if case.geometry == 'axisymmetric'
+                           else px), py, 0.0)
+            inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2)
+                         <= sr for sx, sy, _sz, sr in spheres)
+        else:
+            inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2
+                                 + (pz - sz) ** 2) <= sr
+                         for sx, sy, sz, sr in spheres)
+        if not inside:
+            err(f"Detonation point {tuple(dp)} lies outside every "
+                f"charge")
+    ctx.dx, ctx.refined = dx, refined
+    return True
 
-        # blastFoam extra charges (3D only) + detonation points
-        extras = getattr(case, 'charges', None) or []
-        if extras and case.dim != 3:
-            err("Additional charges are only supported for 3D "
-                "blastFoam cases")
-            extras = []
-        spheres = [(x0, y0, (z0 if case.dim == 3 else 0.0), r_exp)]
-        for ch in extras:
-            if len(ch) != 4:
-                err(f"Extra charge {tuple(ch)}: need (x, y, z, mass)")
-                continue
-            ex, ey, ez, mass = ch
-            if mass is None or mass <= 0:
-                err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}): "
-                    f"mass must be > 0")
-                continue
-            r_i = (3.0 * mass / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
-            if not (0 <= ex <= case.Lx and 0 <= ey <= case.Ly
-                    and 0 <= ez <= case.Lz):
-                err(f"Extra charge centre ({ex:g}, {ey:g}, {ez:g}) is "
-                    f"outside the domain")
-                continue
-            for over, side in ((r_i - ex, 'x_lo'),
-                               (r_i - (case.Lx - ex), 'x_hi'),
-                               (r_i - ey, 'y_lo'),
-                               (r_i - (case.Ly - ey), 'y_hi'),
-                               (r_i - ez, 'z_lo'),
-                               (r_i - (case.Lz - ez), 'z_hi')):
-                if over <= 0:
-                    continue
-                if bcs.get(side) == 'reflect':
-                    note(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) is "
-                         f"truncated by the {side} wall")
-                else:
-                    err(f"Extra charge (r_exp = {r_i:.4f} m) at "
-                        f"({ex:g}, {ey:g}, {ez:g}) pokes through the "
-                        f"open '{side}' boundary")
-            for (px, py, pz, pr) in spheres:
-                d = np.sqrt((ex - px) ** 2 + (ey - py) ** 2
-                            + (ez - pz) ** 2)
-                if d < r_i + pr:
-                    err(f"Extra charge at ({ex:g}, {ey:g}, {ez:g}) "
-                        f"overlaps another charge")
-            spheres.append((ex, ey, ez, r_i))
-            if dx > r_i / n_exp and not amr:
-                dx = r_i / n_exp
-                refined = True
-                note(f"Cell size will be refined to {dx:.5f} m "
-                     f"({n_exp} cells across the smallest "
-                     f"charge radius)")
-        for dp in getattr(case, 'det_points', None) or []:
-            pt = tuple(dp) + ((0.0,) if case.dim == 2 else ())
-            if len(pt) != 3:
-                err(f"Detonation point {tuple(dp)}: need "
-                    + ("(x, y)" if case.dim == 2 else "(x, y, z)"))
-                continue
-            px, py, pz = pt
-            if case.dim == 2:
-                px, py, pz = ((0.0 if case.geometry == 'axisymmetric'
-                               else px), py, 0.0)
-                inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2)
-                             <= sr for sx, sy, _sz, sr in spheres)
-            else:
-                inside = any(np.sqrt((px - sx) ** 2 + (py - sy) ** 2
-                                     + (pz - sz) ** 2) <= sr
-                             for sx, sy, sz, sr in spheres)
-            if not inside:
-                err(f"Detonation point {tuple(dp)} lies outside every "
-                    f"charge")
-    elif init == 'chamber':
+
+def _validate_profile_init(case, rep, ctx, pending_inputs):
+    """The starts that are not a charge: a chamber case (HD1-3b) has
+    nothing to check here; a profile-initialised stage needs its input
+    file (or `pending_inputs`), a solver stamp that fits (N5-4) and a
+    centre inside the domain."""
+    err, note = rep.errors.append, rep.notes.append
+    foam, dims, init = ctx.foam, ctx.dims, ctx.init
+    if init == 'chamber':
         # HD1-3b: nothing to load and nothing to resolve. The gas is
         # already made and the room is a set of obstacle boxes, so the
         # charge-sphere geometry checks above have nothing to say and
@@ -722,7 +782,7 @@ def validate_case(case, pending_inputs=False):
         # exist for this mode. Its own checks ran earlier, next to the
         # other blastFoam-specific ones.
         rep.r_exp = 0.0
-    else:
+    elif init != 'charge':
         if not case.profile_file_in:
             err("A profile file is required for remap initialization")
         elif not (pending_inputs or os.path.exists(case.profile_file_in)):
@@ -761,6 +821,18 @@ def validate_case(case, pending_inputs=False):
         if any(not (0 <= float(v) <= float(L)) for v, L in zip(cc, dims)):
             err("Charge centre is outside the domain")
 
+
+def _validate_refinement(case, rep, ctx):
+    """blastFoam mesh refinement - dynamic AMR (`plan_levels` +
+    `validate_amr`) or static zones (`plan_levels` + `validate_zones`) -
+    then the charge cells blastFoam will actually deposit at the finest
+    spacing the charge sees. Sets `ctx.plan`; False when no AMR plan can
+    be made, which ends validation."""
+    err, note = rep.errors.append, rep.notes.append
+    rho0, foam, n_exp = ctx.rho0, ctx.foam, ctx.n_exp
+    cref, zones, amr = ctx.cref, ctx.zones, ctx.amr
+    init, dims, dx = ctx.init, ctx.dims, ctx.dx
+
     # blastFoam local refinement: zones and/or an automatic charge zone
     plan = None
     if amr and (zones or cref == 'zone'):
@@ -777,7 +849,7 @@ def validate_case(case, pending_inputs=False):
                 plan = plan_levels(case, rho0)
             except ValueError as exc:
                 err(str(exc))
-                return rep
+                return False
             aerr, awarn, anote = validate_amr(case, plan, rho0)
             rep.errors.extend(aerr)
             rep.warnings.extend(awarn)
@@ -833,21 +905,7 @@ def validate_case(case, pending_inputs=False):
                              f"{plan.dx_base:.5g} m)" if plan.auto_level
                              else "The base cell already resolves the "
                                   "charge - no automatic zone needed")
-
-    def scale_hint():
-        """Why a modest cell size turned into a huge grid: the charge, not
-        the cell-size field, sets the spacing, and it applies to the WHOLE
-        uniform domain. Without this the user only saw 'cell size will be
-        refined' and a cell count two orders of magnitude off what they
-        asked for."""
-        if not refined or not rep.r_exp:
-            return ""
-        return (f" - resolving the {2 * rep.r_exp:.3g} m charge forces a "
-                f"{dx:.4g} m cell across the whole {max(dims):g} m domain; "
-                f"use a smaller domain, a larger charge"
-                + (", or charge resolution 'smear'"
-                   if case.dim == 3 and not foam else "")
-                + (", or blastFoam charge refinement 'zone'" if foam else ""))
+    ctx.plan = plan
 
     # What blastFoam will actually deposit (N5/T39): setFields marks
     # whole cells, so the charge is a staircase whose mass is only
@@ -875,6 +933,33 @@ def validate_case(case, pending_inputs=False):
                  f"~{frac:.2f} of the {case.charge:g} kg set by "
                  f"blastFoam (whole cells are marked; "
                  f"{n_exp} cells across the radius)")
+    return True
+
+
+def _validate_caps(case, rep, ctx, hw=None):
+    """The cell caps - blastFoam's from the WSL VM, the native solvers'
+    from this host - the cell count, the write budget, the blastFoam run
+    plan and the refined display grid. `hw` is the WSL hardware dict;
+    None, the default, reads `solvers.foam.env.hardware()` at call time,
+    exactly where validation always read it."""
+    err, warn, note = rep.errors.append, rep.warnings.append, rep.notes.append
+    foam, amr, dims, dx = ctx.foam, ctx.amr, ctx.dims, ctx.dx
+    refined, plan = ctx.refined, ctx.plan
+
+    def scale_hint():
+        """Why a modest cell size turned into a huge grid: the charge, not
+        the cell-size field, sets the spacing, and it applies to the WHOLE
+        uniform domain. Without this the user only saw 'cell size will be
+        refined' and a cell count two orders of magnitude off what they
+        asked for."""
+        if not refined or not rep.r_exp:
+            return ""
+        return (f" - resolving the {2 * rep.r_exp:.3g} m charge forces a "
+                f"{dx:.4g} m cell across the whole {max(dims):g} m domain; "
+                f"use a smaller domain, a larger charge"
+                + (", or charge resolution 'smear'"
+                   if case.dim == 3 and not foam else "")
+                + (", or blastFoam charge refinement 'zone'" if foam else ""))
 
     # N17/T48: the caps come from the WSL VM's measured RAM when a probe
     # has run (BYTES_PER_CELL). N21: when it has NOT, they come from a
@@ -882,7 +967,7 @@ def validate_case(case, pending_inputs=False):
     # constants - an unknown machine must not be treated as a large one.
     # `hardware()` never touches WSL, so validation stays instant.
     from ..solvers.foam import env as _env
-    _hw = _env.hardware() or {}
+    _hw = (_env.hardware() or {}) if hw is None else hw
     _caps = _env.plan_run(0, 0, cores=_hw.get('cores'),
                           ram_gb=_hw.get('ram_gb'), dim=case.dim,
                           ram_source=_hw.get('ram_source'),
@@ -1027,6 +1112,14 @@ def validate_case(case, pending_inputs=False):
                  f"display grid - expect GBs of RAM for frames and "
                  f"snapshots")
 
+
+def _validate_closing(case, rep, ctx):
+    """The closing checks: gauges and obstacles inside the domain,
+    obstacle walls at least two base cells thick, and the 2D profile
+    export."""
+    err, warn = rep.errors.append, rep.warnings.append
+    foam, dims, dx, plan = ctx.foam, ctx.dims, ctx.dx, ctx.plan
+
     # gauges / obstacles sanity
     for g in getattr(case, 'gauges', []):
         pt = g if isinstance(g, (list, tuple)) else (g,)
@@ -1067,4 +1160,31 @@ def validate_case(case, pending_inputs=False):
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
+
+
+def validate_case(case, pending_inputs=False):
+    """Full pre-run report for one case.
+
+    `pending_inputs=True` means the case's profile input is produced by
+    an earlier stage of the same chain run, so its absence on disk right
+    now is expected rather than an error (everything else is still
+    checked). Only the chain panel passes it.
+
+    The checks run in blocks, each appending to one report, in the order
+    they always ran; a block that returns False (or None) ends validation
+    there, as the early `return rep`s of the single function did."""
+    rep = ValidationReport()
+    ctx = _validate_common(case, rep)
+    if ctx is None:
+        return rep
+    if case.dim == 1:
+        _validate_1d(case, rep, ctx)
+        return rep
+    if not _validate_domain_and_charge(case, rep, ctx):
+        return rep
+    _validate_profile_init(case, rep, ctx, pending_inputs)
+    if not _validate_refinement(case, rep, ctx):
+        return rep
+    _validate_caps(case, rep, ctx)
+    _validate_closing(case, rep, ctx)
     return rep
