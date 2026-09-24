@@ -1,0 +1,25 @@
+{
+  "amr_levels": 0,
+  "charge_cells": null,
+  "charge_mass_frac": null,
+  "display_level": null,
+  "dx_fine": null,
+  "effective_dx": null,
+  "errors": [],
+  "lmax": 0,
+  "n_cells": null,
+  "n_fine": null,
+  "notes": [
+    "Closed-vessel limit p_max = lambda C / (V - b C) = 5.53 MPa",
+    "Loading density C/V = 5.000 kg/m3",
+    "Vent parameter A/V^(2/3) = 0.0200",
+    "A structural response will be computed at the AMBIENT resistance. Thermal weakening is reported separately, for a later load case - steel does not heat in the time the pressure pulse lasts."
+  ],
+  "r_exp": null,
+  "run_plan": null,
+  "warnings": [
+    "The burn law was measured between 50 and 300 MPa, and this chamber cannot exceed 5.53 MPa. The whole run will be an extrapolation BELOW the data, where the dominant error is in the exponent n rather than in a.",
+    "Not calibrated for this material: a, n, web, p_extinction, p_valid_min, p_valid_max, r_atm, secondary_heat. These are class-typical literature values. A closed-vessel record fixes the burn law, but can never fix the extinction limit, the atmospheric rate or the secondary heat.",
+    "Fireball radiation uses correlations fitted to hydrocarbon and BLEVE data; nothing equivalent is published for propellant stacks."
+  ]
+}

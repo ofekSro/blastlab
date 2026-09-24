@@ -1,0 +1,305 @@
+{
+  "gauge_keys": [
+    "points",
+    "pressures",
+    "times"
+  ],
+  "meta": {
+    "Lx": {
+      "float": "1.2"
+    },
+    "Ly": {
+      "float": "1.6"
+    },
+    "bcs": {
+      "dict": {
+        "x_hi": {
+          "str": "'terminate'"
+        },
+        "x_lo": {
+          "str": "'reflect'"
+        },
+        "y_hi": {
+          "str": "'terminate'"
+        },
+        "y_lo": {
+          "str": "'reflect'"
+        }
+      }
+    },
+    "charge": {
+      "float": "1.0"
+    },
+    "charge_center": {
+      "tuple": [
+        {
+          "float": "0.0"
+        },
+        {
+          "float": "0.7"
+        }
+      ]
+    },
+    "dx": {
+      "float": "0.010526315789473684"
+    },
+    "eos": {
+      "str": "'idealGas'"
+    },
+    "final_state": {
+      "dict": {
+        "e": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "phase": {
+          "ndarray": "int64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "t": {
+          "float64": "0.0003751525842707252"
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "v": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        }
+      }
+    },
+    "frames": {
+      "dict": {
+        "pressures": {
+          "arrays": 97,
+          "dtypes": [
+            "float32"
+          ],
+          "shapes": [
+            "(114, 152)"
+          ]
+        },
+        "times": {
+          "ndarray": "float64",
+          "shape": [
+            97
+          ]
+        }
+      }
+    },
+    "from_profile": {
+      "bool": "False"
+    },
+    "gauges": {
+      "list": [
+        {
+          "tuple": [
+            {
+              "float": "0.5"
+            },
+            {
+              "float": "0.7"
+            }
+          ]
+        },
+        {
+          "tuple": [
+            {
+              "float": "0.4"
+            },
+            {
+              "float": "0.2"
+            }
+          ]
+        }
+      ]
+    },
+    "geometry": {
+      "str": "'axisymmetric'"
+    },
+    "impulse": {
+      "ndarray": "float64",
+      "shape": [
+        114,
+        152
+      ]
+    },
+    "obstacles": {
+      "list": [
+        {
+          "tuple": [
+            {
+              "float": "0.7"
+            },
+            {
+              "float": "0.9"
+            },
+            {
+              "float": "0.2"
+            },
+            {
+              "float": "0.5"
+            }
+          ]
+        }
+      ]
+    },
+    "p_peak": {
+      "ndarray": "float64",
+      "shape": [
+        114,
+        152
+      ]
+    },
+    "r_exp": {
+      "float": "0.052711809956185275"
+    },
+    "solid": {
+      "ndarray": "bool",
+      "shape": [
+        114,
+        152
+      ]
+    },
+    "solver": {
+      "str": "'native'"
+    },
+    "trigger_gauge": {
+      "NoneType": "None"
+    },
+    "x_c": {
+      "ndarray": "float64",
+      "shape": [
+        114
+      ]
+    },
+    "x_face": {
+      "ndarray": "float64",
+      "shape": [
+        115
+      ]
+    },
+    "y_c": {
+      "ndarray": "float64",
+      "shape": [
+        152
+      ]
+    },
+    "y_face": {
+      "ndarray": "float64",
+      "shape": [
+        153
+      ]
+    }
+  },
+  "meta_keys": [
+    "Lx",
+    "Ly",
+    "bcs",
+    "charge",
+    "charge_center",
+    "dx",
+    "eos",
+    "final_state",
+    "frames",
+    "from_profile",
+    "gauges",
+    "geometry",
+    "impulse",
+    "obstacles",
+    "p_peak",
+    "r_exp",
+    "solid",
+    "solver",
+    "trigger_gauge",
+    "x_c",
+    "x_face",
+    "y_c",
+    "y_face"
+  ],
+  "snapshot_fields": {
+    "t = 0.116 ms": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "speed": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        }
+      }
+    },
+    "t = 0.375 ms (final)": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        },
+        "speed": {
+          "ndarray": "float64",
+          "shape": [
+            114,
+            152
+          ]
+        }
+      }
+    }
+  },
+  "snapshot_labels": [
+    "t = 0.116 ms",
+    "t = 0.375 ms (final)"
+  ],
+  "stop_reason": "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)",
+  "stopped_early": false
+}

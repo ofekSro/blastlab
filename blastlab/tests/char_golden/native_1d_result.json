@@ -1,0 +1,244 @@
+{
+  "gauge_keys": [
+    "pressures",
+    "radii",
+    "times"
+  ],
+  "meta": {
+    "charge_kg": {
+      "float": "1.0"
+    },
+    "eos": {
+      "str": "'JWL'"
+    },
+    "final_profile": {
+      "dict": {
+        "charge_kg": {
+          "float": "1.0"
+        },
+        "e": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "eos": {
+          "str": "'JWL'"
+        },
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "phase": {
+          "ndarray": "int64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r_exp": {
+          "float": "0.052711809956185275"
+        },
+        "radius_m": {
+          "float": "2.0"
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "source_solver": {
+          "str": "'native'"
+        },
+        "t": {
+          "float64": "0.001833327617565155"
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    },
+    "r": {
+      "ndarray": "float64",
+      "shape": [
+        190
+      ]
+    },
+    "r_exp": {
+      "float": "0.052711809956185275"
+    },
+    "radius_m": {
+      "float": "2.0"
+    }
+  },
+  "meta_keys": [
+    "charge_kg",
+    "eos",
+    "final_profile",
+    "r",
+    "r_exp",
+    "radius_m"
+  ],
+  "snapshot_fields": {
+    "t = 0.107 ms": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    },
+    "t = 0.327 ms": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    },
+    "t = 0.699 ms": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    },
+    "t = 1.195 ms": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    },
+    "t = 1.833 ms (final)": {
+      "dict": {
+        "p": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "r": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "rho": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        },
+        "u": {
+          "ndarray": "float64",
+          "shape": [
+            190
+          ]
+        }
+      }
+    }
+  },
+  "snapshot_labels": [
+    "t = 0.107 ms",
+    "t = 0.327 ms",
+    "t = 0.699 ms",
+    "t = 1.195 ms",
+    "t = 1.833 ms (final)"
+  ],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.015e+05 Pa)",
+  "stopped_early": false
+}

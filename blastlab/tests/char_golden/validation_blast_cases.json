@@ -1,0 +1,220 @@
+{
+  "foam_1d": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.005,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 1000,
+    "n_fine": null,
+    "notes": [
+      "Afterburn (Miller): up to 2 MJ/kg released as the products burn with atmospheric oxygen - calibrated against Kingery-Bulmash (DONE.md N3: the anchor reads 1.02-1.20 of KB with this model on)",
+      "WSL blastFoam availability will be verified at run start"
+    ],
+    "r_exp": 0.052711809956185275,
+    "run_plan": null,
+    "warnings": []
+  },
+  "foam_2d": {
+    "amr_levels": 0,
+    "charge_cells": 99,
+    "charge_mass_frac": 0.9829101562499999,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.006588976244523159,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 368449,
+    "n_fine": null,
+    "notes": [
+      "programmedIgnition (Giroux): cells burn at vDet/(1.5 dx) from their ignition time instead of switching whole (guide 5.6.1.3)",
+      "WSL blastFoam availability will be verified at run start",
+      "Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+      "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+      "Parallel run: auto: 7 MPI ranks (8 physical cores - 1 headroom)"
+    ],
+    "r_exp": 0.052711809956185275,
+    "run_plan": {
+      "cell_cap_refuse": 120000000,
+      "cell_cap_warn": 8000000,
+      "clamped_from": null,
+      "cores": 8,
+      "cores_source": "measured",
+      "ram_gb": 512,
+      "ram_source": "measured",
+      "ranks": 7,
+      "reason": "auto: 7 MPI ranks (8 physical cores - 1 headroom)",
+      "requested": 0
+    },
+    "warnings": [
+      "No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it."
+    ]
+  },
+  "foam_3d": {
+    "amr_levels": 0,
+    "charge_cells": 2139,
+    "charge_mass_frac": 0.99736061505927,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.019381915782421925,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 456533,
+    "n_fine": null,
+    "notes": [
+      "WSL blastFoam availability will be verified at run start",
+      "Cell size will be refined to 0.01938 m (8 cells across the charge radius)",
+      "Charge cells: 2,139 at 0.019382 m -> ~1.00 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+      "Write budget: 8 writes, one every 0.25 ms, pinned (no adaptive interval). Expect ~0.6 GB of written times on the WSL disk (~155 B per cell per write, measured on HD1-3d), plus one decomposed write (~0.07 GB) kept for a resume when the run is parallel",
+      "Parallel run: requested: 4 MPI ranks"
+    ],
+    "r_exp": 0.1550553262593754,
+    "run_plan": {
+      "cell_cap_refuse": 120000000,
+      "cell_cap_warn": 8000000,
+      "clamped_from": null,
+      "cores": 8,
+      "cores_source": "measured",
+      "ram_gb": 512,
+      "ram_source": "measured",
+      "ranks": 4,
+      "reason": "requested: 4 MPI ranks",
+      "requested": 4
+    },
+    "warnings": [
+      "Write budget 8 is below 4 x n_snapshots = 24, the writer's own rule for how many writes the 6 snapshots are picked from - they will be picked from fewer, coarser writes"
+    ]
+  },
+  "foam_3d_amr": {
+    "amr_levels": 4,
+    "charge_cells": 19952,
+    "charge_mass_frac": 0.9924853515624998,
+    "display_level": 2,
+    "dx_fine": 0.00625,
+    "effective_dx": 0.1,
+    "errors": [],
+    "lmax": 2,
+    "n_cells": 64000,
+    "n_fine": 4096000,
+    "notes": [
+      "WSL blastFoam availability will be verified at run start",
+      "AMR (Lohner): up to 4 level(s) below the 0.1 m base cell (finest 0.00625 m), refining every 2 step(s) with 2 buffer layer(s)",
+      "Results are displayed at level 2 (0.025 m, 4,096,000 cells); cells finer than that are box-averaged",
+      "The mesh starts at ~64,000 cells and may grow to 8,000,000 (maxCells)",
+      "Charge cells: 19,952 at 0.00625 m -> ~0.99 of the 8 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+      "Parallel run: 1 rank: 64,000 cells is below the 200,000-cell parallel floor"
+    ],
+    "r_exp": 0.10542361991237055,
+    "run_plan": {
+      "cell_cap_refuse": 120000000,
+      "cell_cap_warn": 8000000,
+      "clamped_from": null,
+      "cores": 8,
+      "cores_source": "measured",
+      "ram_gb": 512,
+      "ram_source": "measured",
+      "ranks": 1,
+      "reason": "1 rank: 64,000 cells is below the 200,000-cell parallel floor",
+      "requested": 0
+    },
+    "warnings": [
+      "No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+      "Refined results are resampled to a 4,096,000-cell display grid - expect GBs of RAM for frames and snapshots"
+    ]
+  },
+  "native_1d": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.010542361991237054,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 189,
+    "n_fine": null,
+    "notes": [
+      "Cell size will be refined to 0.01054 m (5 cells inside the charge)"
+    ],
+    "r_exp": 0.052711809956185275,
+    "run_plan": null,
+    "warnings": []
+  },
+  "native_2d": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.010542361991237054,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 17063,
+    "n_fine": null,
+    "notes": [
+      "Cell size will be refined to 0.01054 m (5 cells across the charge radius)"
+    ],
+    "r_exp": 0.052711809956185275,
+    "run_plan": null,
+    "warnings": []
+  },
+  "native_2d_profile_pending": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.02,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 45000,
+    "n_fine": null,
+    "notes": [],
+    "r_exp": null,
+    "run_plan": null,
+    "warnings": [
+      "No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it."
+    ]
+  },
+  "native_3d": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.02108472398247411,
+    "errors": [],
+    "lmax": 0,
+    "n_cells": 103823,
+    "n_fine": null,
+    "notes": [
+      "Cell size will be refined to 0.02108 m (5 cells across the charge radius)"
+    ],
+    "r_exp": 0.10542361991237055,
+    "run_plan": null,
+    "warnings": []
+  },
+  "native_3d_over_cap": {
+    "amr_levels": 0,
+    "charge_cells": null,
+    "charge_mass_frac": null,
+    "display_level": null,
+    "dx_fine": null,
+    "effective_dx": 0.01,
+    "errors": [
+      "~1e+09 cells exceeds the 3D cap of 15,000,000"
+    ],
+    "lmax": 0,
+    "n_cells": 1000000000,
+    "n_fine": null,
+    "notes": [],
+    "r_exp": 0.1541302673251913,
+    "run_plan": null,
+    "warnings": [
+      "No terminate boundary and no end time: the run is bounded only by the safety cap (~294 ms). Set a side to 'terminate' to stop when the wave reaches it."
+    ]
+  }
+}
