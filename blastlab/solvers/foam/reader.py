@@ -448,9 +448,10 @@ def read_probes(case_unc, name='gauges', field='p'):
     """blastProbes output -> dict(points, times, pressures) or None.
 
     When the run also recorded U and rho (T44/N12) and their rows align
-    row-for-row with p's, the dict gains `speeds` (|U| per probe) and
-    `rhos`; consumers that only know `pressures` see exactly the shape
-    they always did."""
+    row-for-row with p's, the dict gains `speeds` (|U| per probe),
+    `velocities` (the (n, 3) U vectors per probe, HD1-13: a wall load
+    needs the component INTO the wall, not |U|) and `rhos`; consumers
+    that only know `pressures` see exactly the shape they always did."""
     base = os.path.join(case_unc, 'postProcessing', name)
     tdirs = list_sample_times(case_unc, name)
     if not tdirs:
@@ -485,6 +486,8 @@ def read_probes(case_unc, name='gauges', field='p'):
         out['speeds'] = [np.sqrt((ua[:, 1 + 3 * i:4 + 3 * i] ** 2)
                                  .sum(axis=1))
                          for i in range(n_probes)]
+        out['velocities'] = [ua[:, 1 + 3 * i:4 + 3 * i].copy()
+                             for i in range(n_probes)]
     return out
 
 

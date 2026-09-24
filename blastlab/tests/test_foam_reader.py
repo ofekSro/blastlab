@@ -139,6 +139,21 @@ def main():
         check('pressures unchanged by the extras',
               np.allclose(pr2['pressures'][0],
                           [101325, 201325, 301325]))
+        # HD1-13: the vectors themselves ride along too - a wall load
+        # needs the component INTO the wall, which |U| has thrown away
+        vel = pr2.get('velocities')
+        check('U vectors per probe, aligned with p row for row',
+              vel is not None and len(vel) == 2
+              and all(v.shape == (3, 3) for v in vel)
+              and np.array_equal(vel[0], [[0, 0, 0], [3, 4, 0], [6, 8, 0]])
+              and np.array_equal(vel[1], [[0, 0, 0], [0, 0, 0], [1, 2, 2]]),
+              str(vel))
+        check('speeds == |velocities|, bit for bit',
+              vel is not None
+              and all(np.array_equal(s, np.sqrt((v ** 2).sum(axis=1)))
+                      for s, v in zip(pr2['speeds'], vel)))
+        check('p-only run: no velocities key either',
+              'velocities' not in pr)
         # a torn U file (fewer rows) must NOT misalign - drop it
         with open(os.path.join(pdir, 'U'), 'w') as f:
             f.write('# Probe 0 (0.5 0 0)\n'
@@ -147,6 +162,8 @@ def main():
         pr3 = reader.read_probes(td)
         check('torn U file degrades to p-only, never misaligns',
               'speeds' not in pr3 and 'rhos' in pr3)
+        check('and drops the vectors with it',
+              'velocities' not in pr3)
 
     # ── binary format (fixtures from a writeFormat-binary sector run) ──
     NB = 190                    # cells in the binary fixture run
