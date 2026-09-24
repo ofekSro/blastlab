@@ -24,6 +24,8 @@ if not os.environ.get('BLASTLAB_SETTINGS'):
         tempfile.mkdtemp(prefix='blastlab_status_cells_'), 'settings.json')
 
 CASE = os.path.join(HERE, 'cases', 'native_2d_small.json')
+#: the same two lines as test_ui_status_cells.py: both GUIs show what
+#: validate_case reports
 LINE_LOADED = '~24,576 cells at dx = 0.012499 m'
 LINE_TYPED = '~38,400 cells at dx = 0.01 m'
 

@@ -19,6 +19,7 @@ The values are literals rather than a golden file.
 
 Run:  cd blastlab/tests && python test_char_services.py   (or under pytest)
 """
+import subprocess
 import sys
 
 import pytest
@@ -46,7 +47,8 @@ HANDOFF_CASES = (
     ([1, 3], {1: 'native'}, []),
 )
 
-#: (dim, geometry, charge kg) -> (radius at default rho0, at rho0 = 850)
+#: (dim, geometry, charge kg) -> charge radius [m] at the default rho0
+#: (TNT) and at rho0 = 850 kg/m3
 RADIUS_CASES = (
     (2, 'planar', 1.0, 0.013974338580521863, 0.0193515430661163),
     (2, 'planar', 25.0, 0.0698716929026093, 0.09675771533058149),
@@ -125,8 +127,7 @@ def test_shims_reexport_services():
 def test_core_case_import_pulls_no_solvers():
     """Importing the old path must not drag in the WSL backend: its
     imports of solvers.foam stay deferred inside the functions."""
-    import subprocess
-    code = ('import sys, blastlab.core.case, blastlab.core.chain; '
+    code =('import sys, blastlab.core.case, blastlab.core.chain; '
             'print(sorted(m for m in sys.modules '
             "if m.startswith(('blastlab.solvers', 'blastlab.output'))))")
     out = subprocess.run([sys.executable, '-c', code], cwd=cc.REPO,

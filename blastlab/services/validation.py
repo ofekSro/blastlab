@@ -8,10 +8,13 @@ afterburn checks follow the blastFoam User Guide v6.0, sec. 5.6.1 and
 
 Moved verbatim from `core/case.py` (Phase 3 of
 docs/ARCHITECTURE_REVIEW.md), so that `core/` no longer imports
-`solvers.foam.backend` or `solvers.foam.env`; the old path re-exports
-every name here, underscore names included. The imports of the WSL
-backend, the refinement planner, the chain and the profile reader stay
-deferred inside the functions, exactly where they were.
+`solvers.foam.backend` or `solvers.foam.env`; only the relative imports
+were retargeted. The old path re-exports every name here, underscore
+names included. The imports of the WSL backend, the materials table, the
+refinement planner, the chain and the profile reader stay deferred
+inside the functions, exactly where they were. `solvers.foam.env` and
+`core.hardware` are held as module references on purpose: the tests
+patch attributes on those modules.
 """
 
 import math
@@ -734,8 +737,9 @@ def validate_case(case, pending_inputs=False):
             # every keystroke behind a 300 ms debounce: profile_source
             # is a memoised header-only read, one os.stat unless the
             # file actually changed.
-            from . import chain as _chain          # deferred - chain
-            from ..core import profiles as _profiles   # imports validation
+            # deferred: services.chain imports this module
+            from . import chain as _chain
+            from ..core import profiles as _profiles
             src = _profiles.profile_source(case.profile_file_in)
             if src == 'native':
                 err(_chain.HANDOFF_MSG[0].upper() + _chain.HANDOFF_MSG[1:])

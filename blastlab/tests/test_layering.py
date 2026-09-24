@@ -52,6 +52,8 @@ ALLOWED_UPWARD = {
     # services/; core.case and core.chain are now nothing but these lines
     ('core.case', 'services.validation'),
     ('core.chain', 'services.chain'),
+    # ui/app.py's dead `ImportError` fallback to the Tk run browser;
+    # Phase 9 drops it
     ('ui.app', 'gui.run_browser'),
 }
 

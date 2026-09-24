@@ -9,6 +9,8 @@ existing import keeps returning the same objects - and `core/` no
 longer imports `solvers.foam` for it.
 """
 
+# `import *` skips underscore names, so each one the old module held is
+# listed by hand
 from ..models.case import *                     # noqa: F401,F403
 from ..models.case import _CASE_TYPES           # noqa: F401
 from ..models.result import ValidationReport    # noqa: F401
