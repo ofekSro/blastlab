@@ -59,9 +59,11 @@ form to the report. Details in [DONE.md](DONE.md).
 
 **2026-09-24: `HD1-3`, the venting in blastFoam, is closed** and its record moved to
 [DONE.md](DONE.md) §0 — the 3-D answer passed all thirteen checks committed before
-its run. What stays open on HD1: `HD1-13` (that answer's wall load has no reflection
-and no drag in it — an owner decision), `HD1-14` (the optional third `Cd` point),
-`HD1-4`, and closed-vessel data, which needs no code.
+its run. The same day `HD1-13` closed too: the wall load, with reflection and
+stagnation, is delivered as a trace in `docs/hd13/`, and it is an upper bound on the
+load. Each wall is judged by its own criterion. `HD1-15` added a disk-saving write
+budget. What stays open on HD1: `HD1-14` (the optional third `Cd` point), `HD1-4`, and
+closed-vessel data, which needs no code.
 
 **Three silent-failure bugs were found and fixed on 2026-09-21, and they share a
 shape worth naming.** Each was correct in the regime the code was *verified* in
@@ -80,20 +82,6 @@ next to the number rather than a footnote. Heat loss to the walls (`h_c`,
 `Q_wall`) is also in the forward model as of the same day — `core/calibration.py`
 had been inverting for a loss that `simulate` never applied.
 
-### `HD1-13` · The wall load in the 3-D answer — owner decision
-
-`HD1-3d`'s 3-D answer (closed 2026-09-24, [DONE.md](DONE.md) §0) judged a 200 mm RC
-panel 4 m from the opening on the **side-on** trace of a gauge in free air: only the
-room is meshed (`build_vent_case`: `obstacles = m['boxes']`), so nothing at x = 10 m
-reflects. UFC 3-340-02 para. 2-15.3.2 (printed p. 65) loads a front wall with the
-**reflected** pressure and, after clearing, `Ps + C_D·q` (Eq. 2-9). The probes already
-record `U` and `rho`: on the jet axis ½ρ|U|² peaks at **114.6 kPa at 24.71 ms**, when
-the static trace reads −31.5 kPa (static + q peaks at 99.6 kPa, 2.4× the 41.47 kPa
-static peak — an incompressible estimate). So μ = 0.3027 and "survives" (C10, which
-passed as committed) may be **unconservative**. *Decide:* mesh the wall and read its
-face, or apply `Pr` and `C_D·q` to the trace — before "survives" is relied on. Either
-means a new solve; see the disk note under `HD1-14`.
-
 ### `HD1-14` · A third `Cd` convergence point — optional, not done
 
 24 cells across the opening, on a geometrically shrunken room: `Cd` depends on the
@@ -103,7 +91,9 @@ turn `DEFAULT_CD_RANGE = (0.72, 0.90)` (`core/sensitivity.py`) from a two-point
 extrapolation into a measurement. Register the convergence threshold before the run.
 **Disk, measured 2026-09-24:** `n_snapshots` does not bound it — the adaptive write
 interval made 748 writes in the 3-D answer's 30 ms, each kept reconstructed and again
-decomposed, **172.96 GiB**. Size the writes before any such run.
+decomposed, **172.96 GiB**. Run it with `HD1-15`'s `write_budget` (e.g. 60, about
+8 GB). If a run with a meshed wall is ever wanted (HD1-13's route (a)), it needs the
+same budget and a window longer than 30 ms: every T1 peak fell after the record ended.
 
 ### `HD1-4` · Removing the blockers
 
@@ -325,6 +315,17 @@ blocker.)*
 - **Prefer `sum(lambda)` over `count(lambda >= 0.99)`** in any future ignition
   measurement; the count is valid only at the first write.
 
+### P1-7 · blastlab cannot read the `0/` fields it writes itself · **found 2026-09-24**
+
+`writer._nonuniform` / `_render_fields` close a nonuniform list with `);`, but
+`reader._nonuniform_body` requires a bare `)`. **Consequences:**
+`backend._initial_frame` / `_initial_frame3d` silently skip the t = 0 frame for chamber
+and profile stages, and `_time_is_whole` fails on such a start dir. Found by
+hd1-wall-load A3 (see `docs/batches/2026-09-24-hd1-wall-load.*.md`), which worked
+around it locally in `_e2e_vent_wall.read_start`. *Decide which side to fix:*
+- the reader: visible in the GUI, so it needs QA;
+- the writer: moves goldens.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
@@ -424,6 +425,25 @@ both. **That is not enough to change what every parallel run does.**
 and the activation dropdown is wired in both front ends. **What is missing is the
 GUI table**: it changes the data shape of the `det_points` widget and needs a parity
 design of its own.
+
+### P2-10 · `test_foam_wsl_resume.py` has not run since 2026-09-19 · **found 2026-09-24**
+
+It fails with `AttributeError: 'types.SimpleNamespace' object has no attribute
+'init_state'` in `FoamRunLoop.__init__`, identically at `7dd2446` and at HEAD: its stub
+spec predates `9b9a039`. **The W3 regression suite has been dark for five days.** That
+suite checks the auto-resume after WSL is torn down under a run (CLAUDE.md §8.3).
+Fixing it means editing a committed test, so it is the owner's call (§9).
+
+### P2-11 · `test_foam_postmortem.py`: the peak-map check fails deterministically · **found 2026-09-24**
+
+"final peak map within 0.5 %" fails with rel 2.90e-01 (620 against 632 samples),
+identically at `7dd2446` and at HEAD. The hd1-wall-load batch is a no-op on that path.
+Cause undetermined; two candidates:
+- the FO pMax restart loses the state stored at the restart dir;
+- the scripted stop has drifted to 0.64 µs, firing after three live-slice frames and
+  before the first regular write.
+
+If a resumed run's peak map is really wrong, this is P1.
 
 ---
 
@@ -533,7 +553,10 @@ if Hibernate is unused.
 
 `python -m blastlab --clean-foam-runs` (also `--older-than N` / `--keep-gb N`).
 Automatic cleanup runs on GUI start; disable with `auto_cleanup: false` in
-`%APPDATA%\blastlab\settings.json`.
+`%APPDATA%\blastlab\settings.json`. **But under the Microsoft Store Python the app
+reads a virtualised copy of that file, not this one**, and the P0 check above
+deletes rather than checks. See `docs/ENGINEERING_QUESTIONS.md` (2026-09-24,
+hd1-3d-close #3).
 
 **The `ext4.vhdx` does not shrink by itself.** Reclaim with `wsl --shutdown` then
 `wsl --manage Ubuntu --set-sparse true`.
@@ -675,6 +698,9 @@ python test_vent.py               # HD1-3c: the 0D -> CFD hand-off, phase by pha
 python test_foam_chamber.py       # HD1-3b: the room as a blastFoam case
 python test_qd.py                 # HD1-3e: siting, as a mechanism with no numbers
 python test_vent3d_load.py        # HD1-3d: judging a finished 3-D vent run from its probes
+python test_wallload.py           # HD1-13: reflected front + compressible stagnation at a point
+python test_vent_wall.py          # HD1-13: the wall-load rule, Step 1 and Step 2's pure parts
+python test_write_budget.py       # HD1-15: the write budget and the decomposed-copy purge
 python test_ui_crashlog.py        # a raising Qt slot must not kill the process
 python test_revolve3d.py          # (belongs in this matrix - fast, native, green)
 python test_viz3d_sampling.py / test_viz3d_hooks.py / test_viz3d_scene.py

@@ -325,36 +325,60 @@ pressure: μ = 0.3027, θ = 0.154°, dynamic — C10, "the 200 mm panel survives
 run is **one sample** in the band, at Cd ≈ 0.81 (50 % up the axis), and does not close
 an undetermined verdict.
 
-> **What the PASS does not establish — `HD1-13` in TODO.** Only the room is meshed, so
-> the gauges at x = 10 m are in free air and the SDOF saw **side-on** pressure. UFC
-> 3-340-02 para. 2-15.3.2 (printed p. 65) loads a front wall with the reflected pressure
-> and, after clearing, `Ps + C_D·q` (Eq. 2-9). On the jet axis ½ρ|U|² peaks at **114.6 kPa
-> at 24.71 ms**, when the static trace reads −31.5 kPa. "Survives" is a statement about an
-> unreflected, drag-free load and may be unconservative.
+> **What the PASS does not establish.** Only the room is meshed, so C10's "survives" was
+> judged on the **side-on** pressure at a free-air gauge. It carries no reflection and no
+> drag (UFC 3-340-02 para. 2-15.3.2, printed p. 65). The wall load is `HD1-13`, below.
 
-> **Disk: `n_snapshots` does not bound it.** The adaptive write interval made **748
-> writes**, each kept reconstructed (~130 MB) and again decomposed: **172.96 GiB**. The
-> 30-snapshot attempt: 774 writes, 191.63 GiB. Budget ~190 GB per run of this case until
-> the write sizing changes.
+> **Disk: `n_snapshots` does not bound it.** 748 writes, each kept reconstructed
+> (~130 MB) and again decomposed: **172.96 GiB** (the 30-snapshot attempt: 191.63 GiB).
+> Fixed by `HD1-15`, below.
 
-Judged with **no new solve and nothing written into the run** — size, file count and a
-path+size+mtime hash identical before and after — by a new `--load` path that reads only
-case.json and the probe files, through the live `reader.read_probes` → `finalize_3d`
-gauge packing (`postmortem.load_run` would reconstruct into the run). The thirteen
-`check(` calls are unchanged (AST-compared), and an independent numpy pass over the raw
-probes reproduced G1 to every printed digit.
-- Files: `blastlab/tests/_e2e_vent_3d.py`, `blastlab/tests/test_vent3d_load.py`,
-  `docs/hd13/vent3d_postmortem.txt`, `docs/hd13/vent3d_gauges_3d.txt`
-- Tests: `python test_vent3d_load.py` 15/15; `python _e2e_vent_3d.py --load
-  20260923-195308_3d_p31468-00` → `VENT 3D: PASS`; final gate run, 17 of 17 green
-  (`test_regression.py` byte-for-byte; the Qt/Tk suites not run — no GUI change)
-- Commits: `9b5212f`, `94a56e4`, `3798cec`, `119b59e`
+Judged with **no new solve and nothing written into the run** (size, file count and a
+path+size+mtime hash identical before and after), by a `--load` path that reads only
+case.json and the probes through the live `read_probes` → `finalize_3d` packing. The
+thirteen `check(` calls are unchanged (AST-compared); an independent numpy pass
+reproduced G1 to every printed digit.
+- Files: `tests/_e2e_vent_3d.py`, `tests/test_vent3d_load.py`, `docs/hd13/vent3d_postmortem.txt`, `vent3d_gauges_3d.txt`
+- Tests: `test_vent3d_load.py` 15/15; `_e2e_vent_3d.py --load 20260923-195308_3d_p31468-00` → `VENT 3D: PASS`; 17/17 gates
+- Commits: `9b5212f`, `94a56e4`, `3798cec`, `119b59e` · QA: n/a — no GUI change
+- Evidence: `docs/hd13/` (`hd13_vent_jet_3d.mp4` is tied to this run by its frame labels; the
+  `.html` and the other `.mp4` are owner trials); a sha256-checked 101 MB copy of the dicts,
+  logs and probes in `%USERPROFILE%\blastlab_evidence\`; batch `docs/batches/2026-09-24-hd1-3d-close*.md`
+
+**`HD1-13` · the wall load, route (b) — closed 2026-09-24: BOUND.**
+- What: from the HD1-3d run's own files, with no new solve, the wall load E(t) = max(the
+  front's normal reflection, the compressible stagnation of the flow into the wall) is
+  delivered with units, for γ 1.24 and 1.40, in `docs/hd13/vent3d_wall_load_G1.txt` and
+  `vent3d_wall_plane.txt`. It is **the load, not a verdict** (owner: each wall has its own
+  criterion). At γ 1.24, G1 peaks at **153.67 kPa** (23.815 ms) with ≥ 2030.6 Pa·s positive
+  impulse, against the side-on 41.47 kPa and 322.8 Pa·s that C10 used; the plane maximum
+  is 155.27 kPa. The rule was registered before any number (`vent3d_wall_rule.txt`,
+  `bf8d89d`) and printed `BOUND - P2 and P3 hold and Step 2 is trusted`. E bounds the
+  **load** during the 30 ms record, **not an SDOF response**, so run the SDOF on each
+  delivered trace and take the worst: the plane-max trace gave the 200 mm example panel
+  μ 0.450, against G1's 0.467 (UFC 2° = μ 3.93).
+- Files: `core/wallload.py`, `solvers/foam/reader.py`, `tests/test_wallload.py`,
+  `tests/_e2e_vent_wall.py`, `tests/test_vent_wall.py`; record `docs/hd13/vent3d_wall_load.txt`
+- Tests: `test_wallload.py`, `test_vent_wall.py`, `test_foam_reader.py` PASS; the
+  verifier reproduced E with its own parses of the probes and of three plane writes
+- Commits: `0e8583a`, `bf8d89d`, `46ca1fe`, `fb017ad`, `53f87ad`, `0703d75`, `9889c54`, `92a52ac`
 - QA: n/a — no GUI change
-- Evidence: `docs/hd13/` — the record, the traces, and `hd13_vent_jet_3d.mp4` (tied to
-  this run by its frame labels; `hd13_report.html` and `hd13_vent_jet.mp4` there are owner
-  trials, not evidence). A sha256-checked copy of the run's dicts, logs and probes
-  (101 MB) is in `%USERPROFILE%\blastlab_evidence\`; the fields stay in WSL. Batch
-  records: `docs/batches/2026-09-24-hd1-3d-close*.md`.
+
+**`HD1-15` · a per-case write budget — done 2026-09-24.**
+- What: `write_budget = N` pins `writeInterval` to t_end/N. In parallel, it keeps a
+  decomposed copy only of the newest time that is complete on every rank and
+  reconstructed. The default 0 changes nothing: no JSON key, `VERSION` 13, goldens
+  byte-identical. A real tiny run and a stop-and-resume kept the schedule. The verifier
+  caught and fixed two purge defects (`b87f76f`): it could delete a resume's walk-back
+  target, and its `rm` could exceed Windows' command-line limit. A run like HD1-3d at
+  N = 60 costs ~8 GB instead of ~190 GB. The Qt form does not expose the field yet, and
+  drops it on save.
+- Files: `core/case.py`, `solvers/foam/writer.py`, `backend.py`, `runloop.py`,
+  `tests/test_write_budget.py`, `tests/_e2e_foam_write_budget.py`
+- Tests: `test_write_budget.py` and `_e2e_foam_write_budget.py` (WSL) PASS; goldens and
+  regression unchanged
+- Commits: `6960902`, `5507069`, `a038c16`, `919870e`, `0ac8217`, `b87f76f`, `59d9de8`
+- QA: n/a — no GUI screen; final gate 45/45 rc=0
 
 **The decisions that closed on 2026-09-20:**
 

@@ -75,3 +75,85 @@ Sources: [implement report](batches/2026-09-24-hd1-3d-close.implement.md),
    copies is not the per-write mean (~117.6 MB). In `_e2e_vent_3d.evaluate`,
    `traces[0]` raises IndexError on a run with no probes - pre-existing, inside the
    frozen C6-C13 block, and it fails loudly rather than silently.
+
+---
+
+## 2026-09-24 · batch `hd1-wall-load` (HD1-13 route (b), HD1-15)
+
+Sources: [implement report](batches/2026-09-24-hd1-wall-load.implement.md),
+[verify report](batches/2026-09-24-hd1-wall-load.verify.md).
+
+1. **BOUND bounds the load, not the SDOF response.** The envelope max(G1, plane
+   maximum) is at least G1's E at every sample and carries more impulse (2095.6 against
+   2033.1 Pa s). Yet it gives the 200 mm example panel a lower response than G1's trace
+   alone: T0 mu 0.4500 against 0.4672, and T1 0.6426 against 0.6513, at gamma 1.24.
+   The plane-max trace, sampled only at writes, behaves the same way. A dynamic SDOF
+   can respond less to a load that is larger at every instant. **Any wall check should
+   therefore run the SDOF on each delivered trace (G1 and plane maximum, both gammas,
+   T0 and T1) and take the worst response.** The rule's wording ("upper bound on the
+   load") holds. The plan's rationale for P1 ("a uniform load ... loads the SDOF more")
+   does not.
+
+2. **blastlab cannot read the `0/` fields it writes itself.** The writer closes lists
+   with `);` and the reader wants a bare `)`. Chamber and profile stages therefore lose
+   their t = 0 frame silently. Tracked as `P1-7` in TODO.md. Which side to fix is the
+   owner's decision: the reader is GUI-visible and needs QA; the writer moves goldens.
+   The same defect made Step 2's first attempt print `NOT ESTABLISHED - Step 2 cannot be
+   run read-only`. That attempt aborted at t = 0, before any plane number existed, and
+   the re-run after fix `53f87ad` changed no rule or threshold. The verifier judged the
+   re-run legitimate. The committed record does not mention attempt 1; the commits do.
+   Should the record say so?
+
+3. **Two committed WSL suites fail, identically at `7dd2446`.**
+   `test_foam_wsl_resume.py` has not run since `9b9a039` (2026-09-19), because its stub
+   spec lacks `init_state`; this is `P2-10`. `test_foam_postmortem.py`'s peak-map check
+   fails deterministically at 2.90e-01, 620 against 632 samples; this is `P2-11`, cause
+   undetermined. Fixing either means editing a committed test (§9).
+
+4. **The T1 hold drives every T1 response.** Every T1 peak falls after the 30 ms record,
+   which covers only 0.198 of the drain time. Any meshed-wall run (route (a)) wants a
+   longer window, and with `HD1-15` its disk cost is ~8 GB.
+
+5. **Artefacts at G2 and G3.** Their T0 peaks come after the record, because sdof
+   releases a suction E (-17.9 / -7.5 kPa at 30 ms, gamma 1.24) to zero there. Their T1
+   applies 205 kPa where the local E is negative, which gives mu 1.57 at G2. This is
+   conservative by design.
+
+6. **Observations.** The mapping check tells G1's cell from its y-mirror only through
+   U, because the case is symmetric about y = 6. At the peak, the jet core sits at
+   z = 1.25 m, 0.15 m below the opening's axis.
+
+7. **The plan's safety table was wrong about P1-5.** `_resume_start_time` walks back on
+   every resume, not only on AMR. The purge interaction this caused is fixed in
+   `b87f76f`.
+
+8. **Low defects, not fixed.**
+   - `DecomposedPurge.run` logs "retrying at the next poll" after a failed final sweep,
+     but no poll follows. It fails safe.
+   - `read_probes` aligns U and rho with p by row count, not by time. This guard
+     predates the batch, and the evidence's times are identical.
+   - The guide citation in `purge_active` pointed at 11.2-11.3, p. 112, which covers
+     load balancing. The orchestrator corrected it to sec. 16.9, p. 136 (a balanced case
+     makes the standard reconstructPar fail fatally). It is a comment only.
+   - **The validation and the writer read `write_budget` differently.**
+     `_validate_write_budget` refuses a bool, a non-integer and anything below 2.
+     `writer.write_budget_of` passes the value through `int()`, so `True` becomes 1,
+     `12.7` becomes 12 and `'60'` becomes 60. It is safe only on paths that run
+     `validate_case` first; a headless call that skips validation gets the coerced
+     value. Should `write_budget_of` return 0 for anything that is not a positive whole
+     number? That is a behaviour change, so it needs one new test.
+   - The validation warning "below 4 x n_snapshots ... the writer's own rule" ignores
+     the writer's clamp `min(60, max(40, 4n))`. At n_snapshots = 20 it warns for any
+     budget below 80, while the default writer uses 60. It is a note only; the
+     threshold is frozen.
+   - `_e2e_foam_write_budget.du_sb` hard-codes `'Ubuntu'` instead of `env.WSL_DISTRO`,
+     omits `stdin=DEVNULL` / `CREATE_NO_WINDOW`, and does not check `returncode`
+     before parsing. Behaviour is the same on this machine, but a fix needs a WSL
+     rerun.
+   - The Qt form rebuilds `Case3D` and drops `write_budget` on save. Exposing the
+     field in the GUI is backlog.
+   - **Fixed by the orchestrator:** `test_vent_wall.py`'s "a scan that fails means not
+     read-only" was flaky, failing about 1 in 10 runs. Its fake scanner raised only on
+     its 4th call, which needs the 1 ms timer to fire twice during a tiny read. It now
+     raises from the 2nd call, i.e. the timer's first scan or the after-scan: 30 of 30
+     runs pass. The check's condition is unchanged. The test is new in this batch.
