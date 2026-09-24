@@ -32,20 +32,43 @@ theta 0.154 deg, or the script stops), E at G1/G2/G3 for gamma 1.24 and
 premises P2 (quasi-steady stagnation at G1) and P3 (the chamber
 pressure is a ceiling on the tail).
 
-READ-ONLY. Nothing is written under the evidence dir or any run dir.
-The record is stdout; the delivered G1 trace goes to --deliver (default
-docs/hd13/), and --out DIR adds the G2/G3 traces, both refused if they
-point into the evidence copy or into WSL.
+STEP 2 (--plane): the plane x = 10 m. Every written time of the run -
+the reconstructed ROOT time dirs, never processor* - is read over the
+9p share with the live ingest's own reader (`backend.read_3d` on the
+spec `writer.render_case` builds in memory), and E is taken over the
+two cell layers either side of x = 10 m. Its maximum per write replaces
+premise P1 (that G1 sits where the wall load is largest) with a
+measurement. The mapping check decides whether that plane can be
+trusted: one of the eight cells around (10, 6, 1.4) must reproduce G1's
+probe p, rho and U to 1e-5 at all 267 writes after 8 ms. The run is
+fingerprinted inside WSL before and after (sizes, counts, newest mtime,
+a sha256 over every path + size + mtime), foam/MPI processes are scanned
+for at least every 20 s while it is read, and any difference or hit
+means Step 2 was not run read-only. No OpenFOAM utility is started,
+`postmortem.load_run` is not used (it can reconstruct INTO the run), and
+nothing is installed or written inside WSL. Then the rule's outcome
+line, last.
 
-Run:  cd blastlab/tests && python -u _e2e_vent_wall.py
-          [--evidence DIR] [--deliver DIR] [--out DIR] [--record FILE]
+READ-ONLY. Nothing is written under the evidence dir or any run dir.
+The record is stdout (--record FILE keeps a copy); the delivered G1
+trace and, with --plane, the plane file go to --deliver (default
+docs/hd13/), and --out DIR adds the G2/G3 traces and the plane's raw
+arrays. Each is refused if it points into the evidence copy or into
+WSL.
+
+Run:  cd blastlab/tests && python -u _e2e_vent_wall.py [--plane]
+          [--evidence DIR] [--run NAME] [--deliver DIR] [--out DIR]
+          [--record FILE]
+      (--plane: WSL; ~26 GB read over 9p, 5-10 min)
 """
 
 import argparse
 import hashlib
 import json
 import os
+import subprocess
 import sys
+import time
 
 import numpy as np
 
@@ -454,11 +477,12 @@ def report_trace(t, E, parts, comp, p_open, say=print):
             extra = (f" (E_tail {_kpa(rs['level'])} kPa held "
                      f"{TAIL_TN * comp.Tn * 1e3:.2f} ms)")
         late = r.t_ymax > rs['t_end']
+        why = ('in free vibration once the load drops to zero'
+               if tail == 'T0' else 'set by the T1 hold')
         say(f'      {tail}{extra}: mu {r.ductility:.4f}, theta '
             f'{r.support_rotation_deg:.3f} deg, {r.regime}, collapsed '
             f'{r.collapsed}; peak response at {r.t_ymax * 1e3:.2f} ms'
-            + (' - after the record ends: set by the tail' if late
-               else ''))
+            + (f' - after the record ends, {why}' if late else ''))
     dt0 = rs['T0'].times[1] - rs['T0'].times[0]
     dt1 = rs['T1'].times[1] - rs['T1'].times[0]
     say(f'      sdof dt {dt0:.4e} s (T0) / {dt1:.4e} s (T1)'
@@ -548,12 +572,513 @@ def deliver_traces(res1, probes, rule_sha, status, deliver, out, say=print):
     return paths
 
 
+# ── Step 2: the plane x = 10 m, read-only from the run ─────────────────
+
+WALL_X = 10.0
+G1_POINT = (10.0, 6.0, 1.4)
+#: the rule names the two layers either side of the wall by their centres
+LAYER_CENTRES = (9.95, 10.05)
+#: report-only panel footprint (owner default, 2026-09-24): a 3 m span
+#: from the ground, centred on the opening's axis
+FOOT_Y = (4.5, 7.5)
+FOOT_Z = (0.0, 3.0)
+STRIP_Y = 6.0
+#: the mapping check, as the rule states it
+MAP_T_MIN = 0.008
+MAP_N = 267
+MAP_REL = 1e-5
+MAP_U_FLOOR = 1.0
+#: the process scan runs at least this often while the fields are read
+SCAN_EVERY_S = 20.0
+FOAM_PROCS = ('blastFoam', 'mpirun', 'orted', 'reconstructPar',
+              'decomposePar', 'postProcess', 'foamToVTK')
+PLANE_FILE = 'vent3d_wall_plane.txt'
+#: READ-ONLY fingerprint of a run dir: sizes, newest mtime, counts, a
+#: sha256 over every path + size + mtime, and the sha256 of the files
+#: the evidence copy vouches for. Fed to `bash -s` on stdin as bytes
+#: (LF endings, no quoting through any shell); prints to stdout only.
+FINGERPRINT_SH = b'''R="$1"
+echo "FP|du_sb|$(du -sb "$R" | cut -f1)"
+echo "FP|newest_mtime|$(find "$R" -printf '%T@\\n' | sort -n | tail -1)"
+echo "FP|n_files|$(find "$R" -type f | wc -l)"
+echo "FP|n_dirs|$(find "$R" -type d | wc -l)"
+echo "FP|tree_sha256|$(find "$R" -printf '%P %s %T@\\n' | LC_ALL=C sort | sha256sum | cut -d' ' -f1)"
+for f in case.json postProcessing/gauges/0/p postProcessing/gauges/0/U postProcessing/gauges/0/rho; do
+  echo "FP|sha256 $f|$(sha256sum "$R/$f" | cut -d' ' -f1)"
+done
+'''
+
+
+def parse_ps(text):
+    """`ps -eo pid=,comm=` output -> the foam/MPI lines. Matched on the
+    exact command name, so the scan can never match itself."""
+    hits = []
+    for ln in (text or '').splitlines():
+        parts = ln.split(None, 1)
+        if len(parts) == 2 and parts[1].strip() in FOAM_PROCS:
+            hits.append(ln.strip())
+    return hits
+
+
+def process_scan():
+    """Foam/MPI processes running in WSL ([] = none)."""
+    from blastlab.solvers.foam import env
+    res = subprocess.run(['wsl', '-d', env.WSL_DISTRO, '-e', 'ps', '-eo',
+                          'pid=,comm='], capture_output=True, timeout=120,
+                         stdin=subprocess.DEVNULL,
+                         creationflags=env.CREATE_NO_WINDOW)
+    if res.returncode != 0:
+        raise RuntimeError(f'the process scan failed (rc {res.returncode})')
+    return parse_ps(res.stdout.decode('utf-8', 'replace'))
+
+
+def parse_fp(text):
+    """Fingerprint output -> {key: value}."""
+    out = {}
+    for ln in (text or '').splitlines():
+        parts = ln.strip().split('|', 2)
+        if len(parts) == 3 and parts[0] == 'FP':
+            out[parts[1]] = parts[2]
+    return out
+
+
+def fingerprint(posix_run):
+    """The READ-ONLY fingerprint of a run dir inside WSL (FINGERPRINT_SH)."""
+    from blastlab.solvers.foam import env
+    res = subprocess.run(['wsl', '-d', env.WSL_DISTRO, '-e', 'bash', '-s',
+                          '--', posix_run], input=FINGERPRINT_SH,
+                         capture_output=True, timeout=1800,
+                         creationflags=env.CREATE_NO_WINDOW)
+    return parse_fp(res.stdout.decode('utf-8', 'replace'))
+
+
+def _checked(fn, say, *a, failed=('(the scan failed)',)):
+    """fn(*a), or `failed` - printed - when it raises: a scan or a
+    fingerprint that cannot be taken proves nothing, so it counts as a
+    hit / as no fingerprint, never as a clean result."""
+    try:
+        return fn(*a)
+    except Exception as exc:                # noqa: BLE001 - reported
+        say(f'  [FAILED] {getattr(fn, "__name__", "check")}: {exc}')
+        return list(failed) if isinstance(failed, tuple) else failed
+
+
+class _Scanner:
+    """Runs `scan` every `every` seconds on a daemon thread while the
+    fields are read - so a stalled 9p read cannot stretch the cadence -
+    and keeps the times of the scans and anything they saw."""
+
+    def __init__(self, scan, every):
+        import threading
+        self.scan, self.every = scan, float(every)
+        self.stamps, self.hits, self.error = [], [], None
+        self._stop = threading.Event()
+        self._th = threading.Thread(target=self._run, daemon=True,
+                                    name='hd13-foam-scan')
+
+    def _run(self):
+        while not self._stop.wait(self.every):
+            try:
+                h = self.scan()
+            except Exception as exc:        # noqa: BLE001 - reported below
+                self.error = exc
+                return
+            self.stamps.append(time.time())
+            if h:
+                self.hits.extend(h)
+
+    def start(self):
+        self._th.start()
+        return self
+
+    def stop(self):
+        self._stop.set()
+        self._th.join()
+
+    @property
+    def bad(self):
+        return bool(self.hits) or self.error is not None
+
+
+def bracket(centres, x):
+    """(i_lo, i_hi): the cell centres either side of `x`,
+    c[i_lo] <= x < c[i_hi]. Raises when `x` is not inside the centres."""
+    c = np.asarray(centres, dtype=float)
+    i_hi = int(np.searchsorted(c, float(x), side='right'))
+    if i_hi <= 0 or i_hi >= len(c):
+        raise ValueError(f'{x} is not between two cell centres')
+    return i_hi - 1, i_hi
+
+
+def plane_max(E, xs, ys, zs):
+    """(max E, (x, y, z) of its cell, (i, j, k)) over a slab E[i, j, k]
+    whose cells sit at xs[i], ys[j], zs[k]. NaN cells are skipped."""
+    k = int(np.nanargmax(E))
+    i, j, l = (int(v) for v in np.unravel_index(k, E.shape))
+    return (float(E[i, j, l]), (float(xs[i]), float(ys[j]), float(zs[l])),
+            (i, j, l))
+
+
+def footprint_masks(ys, zs, foot_y=FOOT_Y, foot_z=FOOT_Z):
+    """(y mask, z mask) of the cells whose centres lie on the panel."""
+    ys, zs = np.asarray(ys, float), np.asarray(zs, float)
+    return ((ys >= foot_y[0]) & (ys <= foot_y[1]),
+            (zs >= foot_z[0]) & (zs <= foot_z[1]))
+
+
+def panel_numbers(p, rho, U, E, ys, zs, strip_j):
+    """Report-only means over the panel footprint, both layers: the area
+    mean of E (per gamma, E maps gamma -> slab), the area mean of the
+    momentum flux max(0, p - P_AIR + rho un^2), and the mean of E over
+    the strip of z at the two y columns `strip_j`. Every cell of a
+    uniform mesh has the same face area, so an area mean is a plain
+    mean. Estimates, not bounds (see the module docstring)."""
+    my, mz = footprint_masks(ys, zs)
+    un = np.maximum(np.asarray(U, float)[..., 0], 0.0)
+    mf = np.maximum(0.0, np.asarray(p, float) - P_AIR
+                    + np.asarray(rho, float) * un * un)
+    foot = np.ix_(np.arange(mf.shape[0]), np.flatnonzero(my),
+                  np.flatnonzero(mz))
+    strip = np.ix_(np.arange(mf.shape[0]), np.asarray(strip_j),
+                   np.flatnonzero(mz))
+    out = dict(momentum=float(np.mean(mf[foot])))
+    for g, Eg in E.items():
+        out[('E', g)] = float(np.mean(Eg[foot]))
+        out[('strip', g)] = float(np.mean(Eg[strip]))
+    return out
+
+
+def mapping_check(write_t, cells, probe_t, probe_p, probe_rho, probe_U,
+                  t_min=MAP_T_MIN, expected_n=MAP_N, rel=MAP_REL,
+                  u_floor=MAP_U_FLOOR):
+    """The rule's mapping check. `cells[w, c]` is [p, rho, Ux, Uy, Uz] of
+    candidate cell c at write w. At every write after `t_min`, the probe
+    row nearest in time is compared with each cell: p and rho to `rel`
+    relative, U to `rel` of |U| + `u_floor` (the vector difference).
+    Trusted when exactly `expected_n` writes were compared and one cell
+    matched at all of them."""
+    wt = np.asarray(write_t, float)
+    cells = np.asarray(cells, float)
+    pt = np.asarray(probe_t, float)
+    sel = np.flatnonzero(wt > t_min)
+    n = len(sel)
+    res = dict(n=n, expected_n=expected_n, cells=[], matched=None,
+               trusted=False, t_mismatch=np.nan)
+    if not n:
+        return res
+    j = np.clip(np.searchsorted(pt, wt[sel]), 1, len(pt) - 1)
+    j = np.where(np.abs(pt[j - 1] - wt[sel]) <= np.abs(pt[j] - wt[sel]),
+                 j - 1, j)
+    res['t_mismatch'] = float(np.max(np.abs(pt[j] - wt[sel])
+                                     / np.abs(wt[sel])))
+    P = np.asarray(probe_p, float)[j]
+    R = np.asarray(probe_rho, float)[j]
+    V = np.asarray(probe_U, float)[j]
+    Vmag = np.sqrt((V * V).sum(axis=1))
+    for c in range(cells.shape[1]):
+        x = cells[sel, c]
+        ep = np.abs(x[:, 0] - P) / np.abs(P)
+        er = np.abs(x[:, 1] - R) / np.abs(R)
+        eu = (np.sqrt(((x[:, 2:5] - V) ** 2).sum(axis=1))
+              / (Vmag + u_floor))
+        ok = bool((ep <= rel).all() and (er <= rel).all()
+                  and (eu <= rel).all())
+        res['cells'].append(dict(ok=ok, p=float(ep.max()),
+                                 rho=float(er.max()), U=float(eu.max())))
+    oks = [c for c, d in enumerate(res['cells']) if d['ok']]
+    if oks:
+        res['matched'] = oks[0]
+    res['trusted'] = bool(oks) and n == expected_n
+    return res
+
+
+def start_density(tdir, spec):
+    """The mixture density at a time blastFoam wrote no `rho` for (its
+    start time): rho = alpha1 rho1 + (1 - alpha1) rho2 - blastFoam User
+    Guide v6.0, sec. 2, Eqs. 2.9-2.10 (p. 15)."""
+    from blastlab.core.constants import RHO_AIR
+    from blastlab.solvers.foam import writer
+    n = spec.n_cells
+    a = reader.to_grid(reader.read_scalar(
+        os.path.join(tdir, f'alpha.{writer.PHASE}'), n), spec, fill=0.0)
+    r1 = reader.to_grid(reader.read_scalar(
+        os.path.join(tdir, f'rho.{writer.PHASE}'), n), spec, fill=RHO_AIR)
+    r2 = reader.to_grid(reader.read_scalar(
+        os.path.join(tdir, 'rho.air'), n), spec, fill=RHO_AIR)
+    return a * r1 + (1.0 - a) * r2
+
+
+def read_slab(tdir, spec, i_lo, i_hi):
+    """(p, rho, U) on the layers i_lo..i_hi of one written time, through
+    the live ingest's own reader (`backend.read_3d`), so the grid mapping
+    is the one the foam tests pin. Reads files; writes nothing."""
+    from blastlab.solvers.foam import backend
+    sl = slice(i_lo, i_hi + 1)
+    if os.path.isfile(os.path.join(tdir, 'rho')):
+        f = backend.read_3d(tdir, spec, what=('p', 'rho', 'U'))
+        return f['p'][sl], f['rho'][sl], f['U'][sl]
+    f = backend.read_3d(tdir, spec, what=('p', 'U'))
+    return f['p'][sl], start_density(tdir, spec)[sl], f['U'][sl]
+
+
+def step2(cfd, probes, run, comp, p_open, say=print, spec=None,
+          scan=process_scan, fp=fingerprint, t_min=MAP_T_MIN,
+          expected_n=MAP_N):
+    """Step 2: E over the plane x = 10 m at every written time, read-only
+    from the run's reconstructed root time dirs. Returns a dict whose
+    `read_only` and `trusted` are the rule's two Step 2 conditions."""
+    from blastlab.solvers.foam import env, writer
+    posix, unc = env.case_paths(run)
+    out = dict(read_only=False, trusted=False, completed=False)
+    say('\nSTEP 2 - the plane x = 10 m, every written time, read-only from '
+        'the run')
+    say(f'  run      {posix}')
+    hits = _checked(scan, say)
+    say('  scan     before: ' + (', '.join(hits) if hits else
+                                 'no foam/MPI process'))
+    if hits:
+        say('  [REFUSED] a foam/MPI process is running, or the scan failed '
+            '- Step 2 cannot be run read-only')
+        return out
+    before = _checked(fp, say, posix, failed={})
+    for k, v in before.items():
+        say(f'  before   {k} {v}')
+    if spec is None:
+        spec = writer.render_case(cfd, n_procs=13)
+    g = spec.grid
+    xs, ys, zs = (np.asarray(g[k], float) for k in ('x_c', 'y_c', 'z_c'))
+    i_lo, i_hi = bracket(xs, WALL_X)
+    js, ks = bracket(ys, G1_POINT[1]), bracket(zs, G1_POINT[2])
+    layers = (float(xs[i_lo]), float(xs[i_hi]))
+    say(f'  layers   x = {layers[0]:.4f} and {layers[1]:.4f} m (cells '
+        f'{i_lo}, {i_hi} of {len(xs)}), from spec.grid x_c; all '
+        f'{len(ys)} x {len(zs)} y, z')
+    as_stated = all(abs(a - b) < 1e-9 for a, b in zip(layers, LAYER_CENTRES))
+    if not as_stated:
+        say(f'  [REFUSED] the rule names the layers {LAYER_CENTRES}; this '
+            f'grid does not have them')
+        return out
+    cand = [(i, j, k) for i in (i_lo, i_hi) for j in js for k in ks]
+    say('  G1 cells ' + ', '.join(
+        f'({xs[i]:.2f}, {ys[j]:.2f}, {zs[k]:.2f})' for i, j, k in cand))
+    my, mz = footprint_masks(ys, zs)
+    say(f'  panel    y {FOOT_Y[0]:g}-{FOOT_Y[1]:g} m, z {FOOT_Z[0]:g}-'
+        f'{FOOT_Z[1]:g} m: {int(my.sum())} x {int(mz.sum())} cells per '
+        f'layer (report only)')
+    times = reader.list_times(unc)
+    n = len(times)
+    say(f'  times    {n} written times at the root, t = {times[0][0]:g} to '
+        f'{times[-1][0]:g} s (processor* dirs are not read)')
+    t = np.array([tv for tv, _name in times])
+    Emax = {gm: np.full(n, np.nan) for gm in GAMMAS}
+    where = {gm: np.full((n, 3), np.nan) for gm in GAMMAS}
+    cells = np.full((n, len(cand), 5), np.nan)
+    panel = {key: np.full(n, np.nan) for key in
+             ['momentum'] + [('E', gm) for gm in GAMMAS]
+             + [('strip', gm) for gm in GAMMAS]}
+    nbytes = 0
+    t0 = time.time()
+    stamps = [t0]                           # the scan before
+    scanner = _Scanner(scan, SCAN_EVERY_S).start()
+    try:
+        for w, (tv, name) in enumerate(times):
+            tdir = os.path.join(unc, name)
+            p, rho, U = read_slab(tdir, spec, i_lo, i_hi)
+            nbytes += sum(os.path.getsize(os.path.join(tdir, f))
+                          for f in ('p', 'U', 'rho')
+                          if os.path.isfile(os.path.join(tdir, f)))
+            E = {}
+            for gm in GAMMAS:
+                E[gm] = wl.wall_load(tv, p, U, rho, gm, normal=NORMAL)['E']
+                Emax[gm][w], where[gm][w], _ijk = plane_max(
+                    E[gm], xs[i_lo:i_hi + 1], ys, zs)
+            for c, (i, j, k) in enumerate(cand):
+                ii = i - i_lo
+                cells[w, c] = (p[ii, j, k], rho[ii, j, k], *U[ii, j, k])
+            for key, v in panel_numbers(p, rho, U, E, ys, zs, js).items():
+                panel[key][w] = v
+            if scanner.bad:
+                say('  [ABORTED] while reading, the process scan '
+                    + (f'saw {", ".join(scanner.hits)}' if scanner.hits
+                       else f'failed: {scanner.error}'))
+                return out
+            if (w + 1) % 50 == 0 or w + 1 == n:
+                say(f'  read     {w + 1}/{n} writes, t = {tv * 1e3:.3f} ms, '
+                    f'{time.time() - t0:.0f} s')
+    except (OSError, ValueError) as exc:
+        say(f'  [ABORTED] reading failed: {exc}')
+        return out
+    finally:
+        scanner.stop()
+    wall = time.time() - t0
+    hits = _checked(scan, say)
+    stamps += scanner.stamps + [time.time()]
+    gap = float(np.max(np.diff(sorted(stamps))))
+    scanned_ok = not hits and not scanner.bad and gap <= 30.0
+    say('  scan     after: ' + (', '.join(hits) if hits else
+                                'no foam/MPI process')
+        + f' ({len(stamps)} scans in all, every {SCAN_EVERY_S:g} s on a '
+          f'timer while reading; the largest gap {gap:.1f} s)')
+    after = _checked(fp, say, posix, failed={})
+    for k, v in after.items():
+        say(f'  after    {k} {v}')
+    same = bool(before) and before == after
+    say(f'  read     {n} writes, {nbytes:,} B of p/U/rho in {wall:.0f} s; '
+        f'fingerprint before == after: {same}; scans clean and at most '
+        f'30 s apart: {scanned_ok}')
+    out['completed'] = True
+    out['read_only'] = same and scanned_ok
+
+    # the mapping check - P1 replaced by a measurement
+    m = mapping_check(t, cells, probes['times'], probes['pressures'][0],
+                      probes['rhos'][0], probes['velocities'][0],
+                      t_min=t_min, expected_n=expected_n)
+    say(f"\n  MAPPING CHECK - the eight cells around G1 against G1's probe, "
+        f"at the {m['n']} writes after {t_min * 1e3:g} ms (the rule says "
+        f"{expected_n}); nearest probe row, time mismatch at most "
+        f"{m['t_mismatch']:.2e} relative")
+    for c, (i, j, k) in enumerate(cand):
+        d = m['cells'][c] if m['cells'] else None
+        if d is None:
+            continue
+        say(f"    ({xs[i]:.2f}, {ys[j]:.2f}, {zs[k]:.2f}): max error p "
+            f"{d['p']:.2e}, rho {d['rho']:.2e}, U {d['U']:.2e} -> "
+            + ('MATCHES' if d['ok'] else 'no'))
+    out['trusted'] = m['trusted']
+    say('  Step 2 is ' + ('TRUSTED' if m['trusted'] else 'UNTRUSTED')
+        + (f" - cell {cand[m['matched']]} is G1's" if m['matched'] is not None
+           else ' - no cell matched at every write'))
+
+    # the plane maximum through the example panel - reported only
+    say('\n  THE PLANE MAXIMUM - E over both layers, every write')
+    for gm in GAMMAS:
+        i_pk = int(np.nanargmax(Emax[gm]))
+        say(f'    gamma {gm:.2f}: at its peak the maximum sits at '
+            f'({where[gm][i_pk][0]:.2f}, {where[gm][i_pk][1]:.2f}, '
+            f'{where[gm][i_pk][2]:.2f}) m')
+        s = summarize_trace(t, P_AIR + Emax[gm])
+        say(f"      E peak {s['peak_kpa']:.2f} kPa at {s['t_peak_ms']:.3f} "
+            f"ms; arrival {s['arrival_ms']:.3f} ms, positive phase "
+            f"{s['pos_duration_ms']:.3f} ms, positive-phase impulse "
+            f"{s['pos_impulse']:.2f} Pa s"
+            + ('' if s['complete'] else
+               ' - a LOWER BOUND: still positive when the record ends')
+            + f"; net impulse {s['net_impulse']:.2f} Pa s")
+        rs = responses(t, Emax[gm], comp, p_open)
+        for tail in ('T0', 'T1'):
+            r = rs[tail]
+            late = r.t_ymax > rs['t_end']
+            why = ('in free vibration once the load drops to zero'
+                   if tail == 'T0' else 'set by the T1 hold')
+            extra = (f" (E_tail {_kpa(rs['level'])} kPa held "
+                     f"{TAIL_TN * comp.Tn * 1e3:.2f} ms)" if tail == 'T1'
+                     else '')
+            say(f'      {tail}{extra}: mu {r.ductility:.4f}, theta '
+                f'{r.support_rotation_deg:.3f} deg, {r.regime}, collapsed '
+                f'{r.collapsed}; peak response at {r.t_ymax * 1e3:.2f} ms'
+                + (f' - after the record ends, {why}' if late else ''))
+        out.setdefault('levels', {})[gm] = rs['level']
+    say('\n  PANEL MEANS over the footprint - estimates, NOT bounds: a wall '
+        'spreads the stagnation region wider than the free jet')
+    for key in panel:
+        v = panel[key]
+        i_pk = int(np.nanargmax(v))
+        lab = ('momentum flux max(0, p - P_AIR + rho un^2)'
+               if key == 'momentum' else
+               f"{'area mean of E' if key[0] == 'E' else 'strip mean of E at y = 6'}"
+               f', gamma {key[1]:.2f}')
+        say(f'    {lab}: peak {_kpa(v[i_pk])} kPa at {t[i_pk] * 1e3:.3f} ms')
+    out.update(t=t, Emax=Emax, where=where, cells=cells, cand=cand,
+               xs=xs, ys=ys, zs=zs, layers=layers, panel=panel, mapping=m,
+               before=before, after=after, wall=wall, nbytes=nbytes)
+    return out
+
+
+def deliver_plane(res2, rule_sha, status, deliver, out=None, say=print):
+    """The delivered plane file (and, with --out, the raw arrays)."""
+    t, m, cand = res2['t'], res2['mapping'], res2['cand']
+    xs, ys, zs = res2['xs'], res2['ys'], res2['zs']
+    if m['matched'] is not None:
+        best = m['matched']
+        c_note = ("the cell that matches G1's probe at every write after "
+                  "8 ms")
+    else:
+        errs = [max(d['p'], d['rho'], d['U']) for d in m['cells']]
+        best = int(np.argmin(errs)) if errs else 0
+        c_note = ("NO cell matched G1's probe at every write; these "
+                  "columns hold the closest candidate")
+    i, j, k = cand[best]
+    cols, units, arrs = ['t'], ['s'], [t]
+    for g in GAMMAS:
+        cols += [f'Emax_{g:.2f}', f'x_{g:.2f}', f'y_{g:.2f}', f'z_{g:.2f}']
+        units += ['Pa over P_AIR', 'm', 'm', 'm']
+        arrs += [res2['Emax'][g], res2['where'][g][:, 0],
+                 res2['where'][g][:, 1], res2['where'][g][:, 2]]
+    cell = res2['cells'][:, best]
+    cols += ['G1cell_p', 'G1cell_rho', 'G1cell_Ux', 'G1cell_Uy', 'G1cell_Uz']
+    units += ['Pa', 'kg/m3', 'm/s', 'm/s', 'm/s']
+    arrs += [cell[:, q] for q in range(5)]
+    for g in GAMMAS:
+        cols.append(f'G1cell_E_{g:.2f}')
+        units.append('Pa over P_AIR')
+        arrs.append(wl.wall_load(t, cell[:, 0], cell[:, 2:5], cell[:, 1], g,
+                                 normal=NORMAL)['E'])
+    cols.append('panel_momentum')
+    units.append('Pa')
+    arrs.append(res2['panel']['momentum'])
+    for g in GAMMAS:
+        cols += [f'panel_E_{g:.2f}', f'strip_E_{g:.2f}']
+        units += ['Pa over P_AIR', 'Pa over P_AIR']
+        arrs += [res2['panel'][('E', g)], res2['panel'][('strip', g)]]
+    head = [
+        f'HD1-13 route (b): the wall plane x = 10 m, every written time '
+        f'({len(t)} rows, t = 0 included)',
+        f'run {RUN_NAME} (HD1-3d), its reconstructed root time dirs, read '
+        f'read-only (processor* not read); no solve',
+        f'rule docs/hd13/vent3d_wall_rule.txt, sha256 {rule_sha}',
+        f'Emax_g: the maximum of E = max(R, S) over the two cell layers '
+        f'either side of x = 10 m (centres {res2["layers"][0]:.2f} and '
+        f'{res2["layers"][1]:.2f} m), all y and z; x_g, y_g, z_g: the '
+        f'centre of the cell it sits in. E is in Pa over P_AIR = 101325 Pa, '
+        f'gamma 1.24 and 1.40, as in the G1 trace.',
+        f'G1cell_*: cell ({xs[i]:.2f}, {ys[j]:.2f}, {zs[k]:.2f}) m - '
+        + c_note + '.',
+        'panel_*: report-only means over y 4.5-7.5 m, z 0-3 m, both '
+        'layers (estimates, NOT bounds): panel_E_g the area mean of E, '
+        'panel_momentum the area mean of max(0, p - P_AIR + rho un^2), '
+        'strip_E_g the mean of E over z at the two y columns either side '
+        'of y = 6 m.',
+        't = 0: blastFoam writes no mixture rho at its start time; it is '
+        'alpha.expl rho.expl + (1 - alpha.expl) rho.air (blastFoam User '
+        'Guide v6.0, Eq. 2.10).',
+        f'T1 (a rule, not baked in - its length belongs to the wall): '
+        f'after the record ends at t = {t[-1]:.6g} s, hold E_tail = '
+        f'max(p_open - P_AIR, max E) for 1.5 Tn of the wall being checked; '
+        f'E_tail for Emax: '
+        + ', '.join(f'gamma {g:.2f} {res2["levels"][g]:.1f} Pa'
+                    for g in GAMMAS) + '.',
+        f'status: {status}',
+    ]
+    path = write_table(os.path.join(deliver, PLANE_FILE), head, cols, units,
+                       arrs)
+    say(f'  delivered {path} ({len(t)} rows)')
+    if out:
+        raw = os.path.join(out, 'vent3d_wall_plane_raw.npz')
+        np.savez(raw, t=t, cells=res2['cells'], cand=np.array(cand),
+                 **{f'Emax_{g:.2f}': res2['Emax'][g] for g in GAMMAS})
+        say(f'  delivered {raw}')
+    return path
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--evidence', default=DEFAULT_EVIDENCE)
     ap.add_argument('--deliver', default=DELIVER)
     ap.add_argument('--out', default=None)
     ap.add_argument('--record', default=None)
+    ap.add_argument('--plane', action='store_true',
+                    help='also run Step 2 (reads the run, WSL)')
+    ap.add_argument('--run', default=RUN_NAME)
     args = ap.parse_args(argv)
     for d in (args.deliver, args.out, args.record):
         if d and not _outside(d, args.evidence):
@@ -608,11 +1133,40 @@ def main(argv=None):
           f'for {TAIL_TN:g} Tn = {TAIL_TN * comp.Tn * 1e3:.2f} ms')
 
     res1 = step1(info, probes, comp)
-    status = ('Step 1 only - Step 2 (the plane) not run, so no bound is '
-              'claimed yet: ' + step1_status(res1['p2']['ok'],
-                                             res1['p3']['ok']))
-    print()
+    p2, p3 = res1['p2']['ok'], res1['p3']['ok']
+    if not args.plane:
+        status = ('Step 1 only - Step 2 (the plane) not run, so no bound is '
+                  'claimed yet: ' + step1_status(p2, p3))
+        print()
+        deliver_traces(res1, probes, rule_sha, status, args.deliver,
+                       args.out)
+        return 0
+
+    try:
+        res2 = step2(cfd, probes, args.run, comp, st.p)
+    except Exception as exc:                # noqa: BLE001 - it is the outcome
+        print(f'  [ABORTED] Step 2 raised {type(exc).__name__}: {exc}')
+        res2 = dict(read_only=False, trusted=False, completed=False)
+    read_only, trusted = res2['read_only'], res2['trusted']
+    label, why = outcome(p2, p3, trusted, read_only)
+    if label == BOUND:
+        status = ('BOUND - an upper bound on the load a wall at x = 10 m '
+                  'takes during the record, unrelieved by clearing and '
+                  'taken as uniform over the wall; beyond the record the '
+                  'T1 rule applies (docs/hd13/vent3d_wall_rule.txt)')
+    else:
+        status = ('NOT ESTABLISHED - NOT a bound on the wall load: '
+                  + '; '.join(why))
+    print('\nTHE RULE\'S CONDITIONS')
+    print(f"  P2 {'holds' if p2 else 'FAILS'}; P3 {'holds' if p3 else 'FAILS'}"
+          f"; Step 2 run read-only: {'yes' if read_only else 'NO'}; Step 2 "
+          f"trusted (mapping check): {'yes' if trusted else 'NO'}")
+    print('\nDELIVERED')
     deliver_traces(res1, probes, rule_sha, status, args.deliver, args.out)
+    if res2['completed']:
+        deliver_plane(res2, rule_sha, status, args.deliver, args.out)
+    print()
+    print(outcome_line(p2, p3, trusted, read_only))
     return 0
 
 
