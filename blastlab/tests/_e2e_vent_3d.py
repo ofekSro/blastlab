@@ -140,7 +140,9 @@ def load_gauges(run, cfd):
     except (OSError, ValueError) as exc:
         print(f'  [ERROR] cannot read the run: {exc}')
         return None
-    want = json.loads(json.dumps(case_to_dict(cfd)))    # as save_case
+    # as save_case writes it, read back: JSON has no tuples, so without
+    # the round trip center, gauges, obstacles and room would all "differ"
+    want = json.loads(json.dumps(case_to_dict(cfd)))
     differ = sorted(k for k in set(saved) | set(want)
                     if saved.get(k) != want.get(k))
     if differ:
@@ -242,7 +244,9 @@ def main():
 
 def evaluate(case, m, res):
     """C6-C13 on a run's gauges - the live run's, or a finished run's
-    read back by `load_gauges`. Only `res.gauges` is read."""
+    read back by `load_gauges`. Only `res.gauges` is read; `m` is
+    build_vent_case's info['room']. Returns the script's exit code: 1 if
+    any check has failed, C1-C5 included (FAIL is module-wide), else 0."""
     t = np.asarray(res.gauges['times'], dtype=float)
     traces = [np.asarray(p, dtype=float) for p in res.gauges['pressures']]
     check('the target gauges recorded something',

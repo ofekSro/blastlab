@@ -82,6 +82,17 @@ def quietly(fn, *a):
     return out, buf.getvalue()
 
 
+def evaluate_quietly(case, m, res):
+    """`quietly(ev.evaluate, ...)` with the script's FAIL list emptied
+    before and after: evaluate() records failed checks in that module-wide
+    list, and this test reads the report it prints, not its verdict."""
+    del ev.FAIL[:]
+    try:
+        return quietly(ev.evaluate, case, m, res)
+    finally:
+        del ev.FAIL[:]
+
+
 def main():
     case = ev.build()
     cfd, info = asm.build_vent_case(case)
@@ -128,11 +139,7 @@ def main():
               'read-only' in text and 'no reconstruct' in text, text)
 
         print('\nevaluate() on them reports every gauge')
-        del ev.FAIL[:]
-        try:
-            rc, report = quietly(ev.evaluate, case, info['room'], res)
-        finally:
-            del ev.FAIL[:]
+        rc, report = evaluate_quietly(case, info['room'], res)
         check('evaluate runs on loaded gauges', rc in (0, 1), rc)
         check('all three gauges are reported',
               all(f'G{k}' in report for k in (1, 2, 3))
@@ -147,11 +154,7 @@ def main():
         weak = Result({}, dict(g, pressures=[
             g['pressures'][0], g['pressures'][1],
             np.full_like(g['times'], P_AIR + 5e3)]), {})
-        del ev.FAIL[:]
-        try:
-            _rc, report2 = quietly(ev.evaluate, case, info['room'], weak)
-        finally:
-            del ev.FAIL[:]
+        _rc, report2 = evaluate_quietly(case, info['room'], weak)
         check('a gauge below the arrival rule says "no arrival"',
               'no arrival' in report2
               and report2.count('positive_phase_complete') == 2, report2)
