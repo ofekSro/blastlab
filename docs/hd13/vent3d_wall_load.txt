@@ -1,0 +1,153 @@
+HD1-13 ROUTE (b) - the load a wall at x = 10 m takes, from the HD1-3d run's files (no solve)
+  evidence C:\Users\rotem.ofek\blastlab_evidence\20260923-195308_3d_p31468-00
+  sha256 ac6369daf5182c51783639baa8dd20d1e20558d3c3d3b43168b922974b5b9822  case.json  matches SHA256SUMS.source
+  sha256 86513971e4cecc43eb7d2e556eb30b937b51043da1cc2be75f6653a6ba28392a  postProcessing/gauges/0/p  matches SHA256SUMS.source
+  sha256 4973fe13bfc642bdc20d9979eb294ea33f300f7b8759880cb4658dbdc50ce9c6  postProcessing/gauges/0/U  matches SHA256SUMS.source
+  sha256 071b860d9d37da27ab13a6941360981a0f08a716533615791a771ee124fd1489  postProcessing/gauges/0/rho  matches SHA256SUMS.source
+  case     case.json equals this CFD case, all 56 keys
+  rule     docs/hd13/vent3d_wall_rule.txt  sha256 9a7c2678f412344460b92ac55fcd43a0200775a0da32402f29850011d20f842f
+  probes   3 probes, 3395 samples, t = 0.0000 to 30.0000 ms; U vectors and rho aligned with p
+
+C10 CONTROL - G1's static trace through the same call (sdof.response, p_ref = P_AIR)
+  mu 0.3027, theta 0.154 deg, dynamic - reproduces C10 (0.3027, 0.154 deg, dynamic)
+
+  example panel (C10's component, unchanged): span 3 m, 480 kg/m2, Ru 400 kPa, kE 3e+07 Pa/m, simple, damping 0, K_LM 0.72 (average), Tn 21.33 ms, y_el 13.33 mm, collapse at 12 deg
+  UFC 3-340-02 support rotations, REFERENCE ONLY (no criterion is applied): 2 deg = mu 3.93, 6 deg = mu 11.82, 12 deg = mu 23.91
+  chamber  p_open 0.30633 MPa, so p_open - P_AIR = 205.00 kPa; T1 holds E_tail = max(that, max E) for 1.5 Tn = 31.99 ms
+
+STEP 1 - E at the three probes, every sample (G1 is the rule's Step 1 trace; G2, G3 are reported)
+
+  G1 (10, 6, 1.4) m
+    |U| against un: max |U| 690.4 m/s at 26.259 ms (Ux/|U| there 0.9960); max un 687.6 m/s at 26.259 ms
+    gamma 1.24
+      E peak 153.67 kPa at 23.815 ms (governed by S: R -25.96, S 153.67 kPa)
+      arrival 10.024 ms, positive phase 19.976 ms, positive-phase impulse 2030.62 Pa s - a LOWER BOUND: still positive when the record ends; net impulse 2033.12 Pa s
+      T0: mu 0.4672, theta 0.238 deg, dynamic, collapsed False; peak response at 27.02 ms
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 0.6513, theta 0.332 deg, dynamic, collapsed False; peak response at 43.50 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+    gamma 1.40
+      E peak 146.73 kPa at 23.201 ms (governed by S: R -22.29, S 146.73 kPa)
+      arrival 10.024 ms, positive phase 19.976 ms, positive-phase impulse 1965.49 Pa s - a LOWER BOUND: still positive when the record ends; net impulse 1967.99 Pa s
+      T0: mu 0.4475, theta 0.228 deg, dynamic, collapsed False; peak response at 26.62 ms
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 0.6762, theta 0.344 deg, dynamic, collapsed False; peak response at 43.12 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+
+  G2 (10, 5, 1.4) m
+    |U| against un: max |U| 210.0 m/s at 21.264 ms (Ux/|U| there 0.1340); max un 129.1 m/s at 26.554 ms
+    gamma 1.24
+      E peak 59.72 kPa at 12.905 ms (governed by R: R 59.72, S 29.50 kPa)
+      arrival 10.414 ms, positive phase 10.471 ms, positive-phase impulse 442.88 Pa s; net impulse 184.55 Pa s
+      T0: mu 0.3882, theta 0.198 deg, dynamic, collapsed False; peak response at 41.81 ms - after the record ends, in free vibration once the load drops to zero
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 1.5656, theta 0.797 deg, dynamic, collapsed False; peak response at 42.97 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+    gamma 1.40
+      E peak 59.34 kPa at 12.905 ms (governed by R: R 59.34, S 29.50 kPa)
+      arrival 10.414 ms, positive phase 10.471 ms, positive-phase impulse 440.64 Pa s; net impulse 182.24 Pa s
+      T0: mu 0.3870, theta 0.197 deg, dynamic, collapsed False; peak response at 41.81 ms - after the record ends, in free vibration once the load drops to zero
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 1.5635, theta 0.796 deg, dynamic, collapsed False; peak response at 42.96 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+
+  G3 (10, 6, 2.6) m
+    |U| against un: max |U| 232.7 m/s at 29.034 ms (Ux/|U| there 0.9929); max un 231.2 m/s at 28.904 ms
+    gamma 1.24
+      E peak 54.90 kPa at 14.109 ms (governed by R: R 54.90, S 27.46 kPa)
+      arrival 10.496 ms, positive phase 10.089 ms, positive-phase impulse 379.10 Pa s; net impulse 227.99 Pa s
+      T0: mu 0.3002, theta 0.153 deg, dynamic, collapsed False; peak response at 41.75 ms - after the record ends, in free vibration once the load drops to zero
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 1.4178, theta 0.722 deg, dynamic, collapsed False; peak response at 42.39 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+    gamma 1.40
+      E peak 54.58 kPa at 14.109 ms (governed by R: R 54.58, S 27.46 kPa)
+      arrival 10.496 ms, positive phase 10.089 ms, positive-phase impulse 377.36 Pa s; net impulse 225.59 Pa s
+      T0: mu 0.2996, theta 0.153 deg, dynamic, collapsed False; peak response at 41.75 ms - after the record ends, in free vibration once the load drops to zero
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 1.4166, theta 0.721 deg, dynamic, collapsed False; peak response at 42.39 ms - after the record ends, set by the T1 hold
+      sdof dt 1.1875e-07 s (T0) / 1.1875e-07 s (T1), the same
+
+PREMISES
+  P2 (quasi-steady stagnation, G1): un max 687.6 m/s; t10 12.480 ms, t90 22.799 ms, rise 10.319 ms; D = sqrt(vent area) = 1.200 m, a = sqrt(1.24 p/rho) at t90 = 422.1 m/s, D/a = 2.843 ms -> P2 HOLDS (rise/(D/a) = 3.630)
+  P3 (the tail is a ceiling): the sealed 0-D run at t_open = 13.1145 s (sample 13.1145 s) rises 65380.4 Pa/s (the larger one-sided difference: back 65380.4, forward 49156.6); (p_open - P_AIR)/tau_drain = 205.00 kPa / 0.1516 s = 1351849.6 Pa/s; ratio 0.0484 -> P3 HOLDS
+
+STEP 1's OUTCOME: P2 and P3 hold - the outcome needs Step 2 (the plane)
+
+STEP 2 - the plane x = 10 m, every written time, read-only from the run
+  run      /root/blastlab_runs/20260923-195308_3d_p31468-00
+  scan     before: no foam/MPI process
+  before   du_sb 185713059688
+  before   newest_mtime 1790187770.3976782600
+  before   n_files 157318
+  before   n_dirs 21018
+  before   tree_sha256 40d3a9d50cc95ae325e5178ef0002d217723e0e6402a089ae55d6f59f30d6367
+  before   sha256 case.json ac6369daf5182c51783639baa8dd20d1e20558d3c3d3b43168b922974b5b9822
+  before   sha256 postProcessing/gauges/0/p 86513971e4cecc43eb7d2e556eb30b937b51043da1cc2be75f6653a6ba28392a
+  before   sha256 postProcessing/gauges/0/U 4973fe13bfc642bdc20d9979eb294ea33f300f7b8759880cb4658dbdc50ce9c6
+  before   sha256 postProcessing/gauges/0/rho 071b860d9d37da27ab13a6941360981a0f08a716533615791a771ee124fd1489
+  layers   x = 9.9500 and 10.0500 m (cells 99, 100 of 120), from spec.grid x_c; all 120 x 60 y, z
+  G1 cells (9.95, 5.95, 1.35), (9.95, 5.95, 1.45), (9.95, 6.05, 1.35), (9.95, 6.05, 1.45), (10.05, 5.95, 1.35), (10.05, 5.95, 1.45), (10.05, 6.05, 1.35), (10.05, 6.05, 1.45)
+  panel    y 4.5-7.5 m, z 0-3 m: 30 x 30 cells per layer (report only)
+  times    749 written times at the root, t = 0 to 0.03 s (processor* dirs are not read)
+  read     50/749 writes, t = 0.178 ms, 27 s
+  read     100/749 writes, t = 0.307 ms, 49 s
+  read     150/749 writes, t = 0.436 ms, 70 s
+  read     200/749 writes, t = 0.566 ms, 90 s
+  read     250/749 writes, t = 0.695 ms, 110 s
+  read     300/749 writes, t = 0.824 ms, 130 s
+  read     350/749 writes, t = 0.953 ms, 150 s
+  read     400/749 writes, t = 1.612 ms, 171 s
+  read     450/749 writes, t = 5.290 ms, 195 s
+  read     500/749 writes, t = 9.422 ms, 222 s
+  read     550/749 writes, t = 13.554 ms, 248 s
+  read     600/749 writes, t = 17.687 ms, 269 s
+  read     650/749 writes, t = 21.819 ms, 289 s
+  read     700/749 writes, t = 25.952 ms, 311 s
+  read     749/749 writes, t = 30.000 ms, 331 s
+  scan     after: no foam/MPI process (18 scans in all, every 20 s on a timer while reading; the largest gap 20.2 s)
+  after    du_sb 185713059688
+  after    newest_mtime 1790187770.3976782600
+  after    n_files 157318
+  after    n_dirs 21018
+  after    tree_sha256 40d3a9d50cc95ae325e5178ef0002d217723e0e6402a089ae55d6f59f30d6367
+  after    sha256 case.json ac6369daf5182c51783639baa8dd20d1e20558d3c3d3b43168b922974b5b9822
+  after    sha256 postProcessing/gauges/0/p 86513971e4cecc43eb7d2e556eb30b937b51043da1cc2be75f6653a6ba28392a
+  after    sha256 postProcessing/gauges/0/U 4973fe13bfc642bdc20d9979eb294ea33f300f7b8759880cb4658dbdc50ce9c6
+  after    sha256 postProcessing/gauges/0/rho 071b860d9d37da27ab13a6941360981a0f08a716533615791a771ee124fd1489
+  read     749 writes, 25,752,728,010 B of p/U/rho in 331 s; fingerprint before == after: True; scans clean and at most 30 s apart: True
+
+  MAPPING CHECK - the eight cells around G1 against G1's probe, at the 267 writes after 8 ms (the rule says 267); nearest probe row, time mismatch at most 4.40e-06 relative
+    (9.95, 5.95, 1.35): max error p 4.81e-06, rho 4.18e-06, U 4.28e-06 -> MATCHES
+    (9.95, 5.95, 1.45): max error p 1.62e-02, rho 1.44e-02, U 7.89e-02 -> no
+    (9.95, 6.05, 1.35): max error p 4.81e-06, rho 4.18e-06, U 8.69e-02 -> no
+    (9.95, 6.05, 1.45): max error p 1.62e-02, rho 1.44e-02, U 1.17e-01 -> no
+    (10.05, 5.95, 1.35): max error p 1.21e-01, rho 2.26e-01, U 6.08e-01 -> no
+    (10.05, 5.95, 1.45): max error p 1.05e-01, rho 2.19e-01, U 6.09e-01 -> no
+    (10.05, 6.05, 1.35): max error p 1.21e-01, rho 2.26e-01, U 6.08e-01 -> no
+    (10.05, 6.05, 1.45): max error p 1.05e-01, rho 2.19e-01, U 6.09e-01 -> no
+  Step 2 is TRUSTED - cell (99, 59, 13) is G1's
+
+  THE PLANE MAXIMUM - E over both layers, every write
+    gamma 1.24: at its peak the maximum sits at (9.95, 5.95, 1.25) m
+      E peak 155.27 kPa at 23.803 ms; arrival 10.083 ms, positive phase 19.917 ms, positive-phase impulse 2092.45 Pa s - a LOWER BOUND: still positive when the record ends; net impulse 2095.63 Pa s
+      T0: mu 0.4500, theta 0.229 deg, dynamic, collapsed False; peak response at 26.96 ms
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 0.6436, theta 0.328 deg, dynamic, collapsed False; peak response at 42.98 ms - after the record ends, set by the T1 hold
+    gamma 1.40: at its peak the maximum sits at (9.95, 5.95, 1.25) m
+      E peak 148.26 kPa at 23.803 ms; arrival 10.083 ms, positive phase 19.917 ms, positive-phase impulse 2026.10 Pa s - a LOWER BOUND: still positive when the record ends; net impulse 2029.28 Pa s
+      T0: mu 0.4309, theta 0.219 deg, dynamic, collapsed False; peak response at 26.44 ms
+      T1 (E_tail 205.00 kPa held 31.99 ms): mu 0.6711, theta 0.342 deg, dynamic, collapsed False; peak response at 42.68 ms - after the record ends, set by the T1 hold
+
+  PANEL MEANS over the footprint - estimates, NOT bounds: a wall spreads the stagnation region wider than the free jet
+    momentum flux max(0, p - P_AIR + rho un^2): peak 34.89 kPa at 18.844 ms
+    area mean of E, gamma 1.24: peak 51.05 kPa at 13.554 ms
+    area mean of E, gamma 1.40: peak 50.75 kPa at 13.554 ms
+    strip mean of E at y = 6, gamma 1.24: peak 66.39 kPa at 18.596 ms
+    strip mean of E at y = 6, gamma 1.40: peak 65.88 kPa at 18.596 ms
+
+THE RULE'S CONDITIONS
+  P2 holds; P3 holds; Step 2 run read-only: yes; Step 2 trusted (mapping check): yes
+
+DELIVERED
+  delivered C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\hd13\vent3d_wall_load_G1.txt (3395 rows)
+  delivered C:\Users\rotem.ofek\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\2519858a-e9bd-4f14-b4dd-41cab222be1b\scratchpad\wall\a3\out\vent3d_wall_load_G1.txt (3395 rows)
+  delivered C:\Users\rotem.ofek\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\2519858a-e9bd-4f14-b4dd-41cab222be1b\scratchpad\wall\a3\out\vent3d_wall_load_G2.txt (3395 rows)
+  delivered C:\Users\rotem.ofek\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\2519858a-e9bd-4f14-b4dd-41cab222be1b\scratchpad\wall\a3\out\vent3d_wall_load_G3.txt (3395 rows)
+  delivered C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\hd13\vent3d_wall_plane.txt (749 rows)
+  delivered C:\Users\rotem.ofek\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\2519858a-e9bd-4f14-b4dd-41cab222be1b\scratchpad\wall\a3\out\vent3d_wall_plane_raw.npz
+
+HD1-13 ROUTE (b): BOUND - P2 and P3 hold and Step 2 is trusted
