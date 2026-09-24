@@ -37,7 +37,7 @@ def material_jwl(name):
     """JWL parameter dict for a charge material (N11/T46). 'TNT' returns
     the byte-pinned constants.JWL_TNT OBJECT itself, so every default
     run stays bit-identical; other names come from the shared
-    solvers/foam/materials table (pure data, no foam dependency)."""
+    core/materials table (pure data, no foam dependency)."""
     if not name or name == 'TNT':
         return JWL_TNT
     from .materials import MATERIALS

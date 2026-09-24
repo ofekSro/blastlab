@@ -127,13 +127,13 @@ AFTERBURN = {
 }
 
 
-def E0(m):
+def E0(m: Material) -> float:
     """blastFoam initiation energy [J/m^3] (verified convention:
     freeField C4 uses E0 = 9.0e9 = 1601 * 5.56e6)."""
     return m.rho0 * m.e0
 
 
-def charge_radius(mass, m, planar=False):
+def charge_radius(mass: float, m: Material, planar: bool = False) -> float:
     """Initial charge radius [m]: sphere from a mass in kg, or (2D
     planar) a cylinder per unit depth from kg/m."""
     if planar:

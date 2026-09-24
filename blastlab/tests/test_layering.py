@@ -12,8 +12,9 @@ this is instant and needs no Qt, Tk or WSL - and asserts:
 
 `ALLOWED_UPWARD` records the edges that break those rules TODAY, so the
 test is green on day 0; the later phases of the plan delete entries as
-they remove the edges (Phase 1 removed the three `materials` entries). An entry
-whose edge no longer exists fails the test, so the list cannot go stale.
+they remove the edges (Phase 1 removed the three `materials` entries).
+An entry whose edge no longer exists fails the test, so the list cannot
+go stale.
 Imports inside functions count the same as top-level ones: a deferred
 import is still a dependency.
 
