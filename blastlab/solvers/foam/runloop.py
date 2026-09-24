@@ -205,8 +205,9 @@ def _is_time(name):
 def purge_active(spec):
     """Does this run purge? Only with a write budget, in parallel, and
     never on a decomposed (parallel AMR) run - that one is READ from its
-    per-rank copies (guide sec. 11.2-11.3, p. 112: a balanced parallel
-    AMR run keeps its times per rank)."""
+    per-rank copies (N16-b, T42), because a balanced case makes the
+    standard reconstructPar fail fatally (blastFoam User Guide v6.0,
+    sec. 16.9, p. 136), so those copies are the run's record."""
     return (int(getattr(spec, 'write_budget', 0) or 0) > 0
             and int(getattr(spec, 'n_procs', 1) or 1) > 1
             and not getattr(spec, 'decomposed', False))
