@@ -300,3 +300,24 @@ Source: the arch-refactorer's phase 3 report. Moved verbatim; nothing changed.
 5. **The "Charge cells" note can vanish silently.** A `ValueError`, `ZeroDivisionError`
    or `IndexError` in `set_mass_fraction` sets n_set = 0, and the note that reports what
    fraction of the charge blastFoam marks disappears with no message.
+
+---
+
+## 2026-09-25 · `/refactor` phase 4 (`validate_case` split, `12e5435`)
+
+Source: the eng-code-simplifier's phase 4 report. A byte-identical dump over ~100 cases
+proves no behaviour changed; these were noticed on the way.
+
+1. **Are AMR runs serial or parallel?** A comment in the AMR branch of
+   `_validate_refinement` says "T42/N16-b: AMR runs in parallel; the ingest reads
+   processor*/ directly", and `_validate_write_budget` speaks of "a parallel AMR run".
+   CLAUDE.md §7 says AMR runs are serial (`reconstructPar` cannot follow a changing mesh).
+   One of them is out of date.
+2. **Extra charges refine the grid when the main charge would not.** The main charge
+   skips dx refinement under `foam and charge_refine == 'zone'`, but extra charges
+   refine dx whenever AMR is off, even in 'zone' mode. Intended, or should extra charges
+   follow the same rule?
+3. **A second copy of the sphere-radius formula.** `_validate_1d` computes the charge
+   radius itself instead of calling `_charge_radius`. It is correct (1D uses `charge_kg`,
+   not `case.charge`), but it is another place where the formula could drift (see the
+   architecture-review item 3).
