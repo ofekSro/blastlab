@@ -1,0 +1,6671 @@
+
+=== page 1 ===
+blastFoam Theory and User Guide
+Version 6.0
+Jeﬀ Heylmun, Peter Vonk,
+Benjamin Shields, and Timothy Brewer
+Synthetik Applied Technologies
+info@synthetik-technologies.com
+https://github.com/synthetik-technologies/blastFoam
+August 30, 2022
+Abstract
+blastFoam is an open-source toolbox for simulating detonations
+based on the OpenFOAM ®1 framework (OpenCFD Ltd., 2018a).
+blastFoam provides solutions to highly compressible systems includ-
+ing single- and multi-phase compressible ﬂow, including single- and
+multi-velocity systems, based on the work of Zheng et al. (2011),
+Shyue (2001), and Houim and Oran (2016). blastFoam provides im-
+plementations of the essential numerical methods (e.g. 2nd and 3rd
+order schemes), equations of state (e.g. ideal gas, stiﬀened gas, Jones-
+Wilkins-Lee, etc.), run-time selectable ﬂux schemes (e.g. HLL, HLLC,
+AUSM+, Kurganov/Tadmor), and high-order explicit time integra-
+tion (e.g. 2nd, 3rd, and 4th order). blastFoam provides activation
+and explosive burn models to simulate the initiation and expansion
+of energetic materials, as well as afterburn models to simulate under-
+oxygenated explosives that exhibit delayed energy release.
+1DISCLAIMER: This oﬀering is not approved or endorsed by OpenCFD Limited, pro-
+ducer and distributor of the OpenFOAM software via www.openfoam.org, and owner of the
+OpenFOAM and OpenCFD trade marks.
+1
+
+=== page 2 ===
+Contents
+1 Introduction 10
+1.1 System Requirements . . . . . . . . . . . . . . . . . . . . . . . 10
+1.2 Downloading . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.3 Compilation . . . . . . . . . . . . . . . . . . . . . . . . . . . . 11
+1.4 Executable . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+1.5 Getting Help . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+2 Governing equations 13
+2.1 Single-ﬂuid model . . . . . . . . . . . . . . . . . . . . . . . . . 13
+2.2 Multi-ﬂuid . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 15
+2.2.1 Granular phases . . . . . . . . . . . . . . . . . . . . . . 17
+3 Interfacial models 22
+3.1 Drag models . . . . . . . . . . . . . . . . . . . . . . . . . . . . 22
+3.1.1 SchillerNaumann . . . . . . . . . . . . . . . . . . . . . 23
+3.1.2 WenYu . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+3.1.3 Ergun . . . . . . . . . . . . . . . . . . . . . . . . . . . 23
+3.1.4 Gibilaro . . . . . . . . . . . . . . . . . . . . . . . . . . 24
+3.1.5 SyamlalOBrien . . . . . . . . . . . . . . . . . . . . . . 24
+3.1.6 GidaspowErgunWenYu . . . . . . . . . . . . . . . . . . 24
+3.1.7 GidaspowSchillerNaumann . . . . . . . . . . . . . . . . 25
+3.2 Lift models . . . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+3.2.1 constant . . . . . . . . . . . . . . . . . . . . . . . . . . 25
+3.3 Heat transfer models . . . . . . . . . . . . . . . . . . . . . . . 26
+3.3.1 RanzMarshall . . . . . . . . . . . . . . . . . . . . . . . 26
+3.3.2 noneNu . . . . . . . . . . . . . . . . . . . . . . . . . . 26
+3.4 Nusselt number models . . . . . . . . . . . . . . . . . . . . . . 26
+3.4.1 constant . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+3.4.2 duct . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+3.4.3 GelperinEinstein . . . . . . . . . . . . . . . . . . . . . 27
+3.4.4 Gunn . . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+3.4.5 RanzMarschall . . . . . . . . . . . . . . . . . . . . . . 27
+3.4.6 sphere . . . . . . . . . . . . . . . . . . . . . . . . . . . 27
+3.5 Mass transfer models . . . . . . . . . . . . . . . . . . . . . . . 28
+3.5.1 none . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+2
+
+=== page 3 ===
+3.5.2 reactingParticle . . . . . . . . . . . . . . . . . . . . . . 28
+3.6 Interfacial pressure models . . . . . . . . . . . . . . . . . . . . 28
+3.6.1 single . . . . . . . . . . . . . . . . . . . . . . . . . . . . 28
+3.6.2 volumeAveraged . . . . . . . . . . . . . . . . . . . . . . 28
+3.6.3 totalPressure . . . . . . . . . . . . . . . . . . . . . . . 28
+3.7 Interfacial velocity models . . . . . . . . . . . . . . . . . . . . 29
+3.7.1 single . . . . . . . . . . . . . . . . . . . . . . . . . . . . 29
+3.7.2 massAveraged . . . . . . . . . . . . . . . . . . . . . . . 29
+4 Granular models 30
+4.1 Radial distribution models . . . . . . . . . . . . . . . . . . . . 30
+4.1.1 CarnahanStarling . . . . . . . . . . . . . . . . . . . . . 30
+4.1.2 SinclairJackson . . . . . . . . . . . . . . . . . . . . . . 31
+4.1.3 LunSavage . . . . . . . . . . . . . . . . . . . . . . . . . 31
+4.1.4 Gao . . . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+4.1.5 Lebowitz . . . . . . . . . . . . . . . . . . . . . . . . . . 31
+4.2 Granular viscosity models . . . . . . . . . . . . . . . . . . . . 32
+4.2.1 Gidaspow . . . . . . . . . . . . . . . . . . . . . . . . . 32
+4.2.2 HrenyaSinclair . . . . . . . . . . . . . . . . . . . . . . . 32
+4.2.3 Princeton . . . . . . . . . . . . . . . . . . . . . . . . . 33
+4.2.4 Syamlal . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+4.2.5 none . . . . . . . . . . . . . . . . . . . . . . . . . . . . 33
+4.3 Granular conductivity models . . . . . . . . . . . . . . . . . . 34
+4.3.1 Chao . . . . . . . . . . . . . . . . . . . . . . . . . . . . 34
+4.3.2 Gidaspow . . . . . . . . . . . . . . . . . . . . . . . . . 34
+4.3.3 HrenyaSinclair . . . . . . . . . . . . . . . . . . . . . . . 34
+4.3.4 Princeton . . . . . . . . . . . . . . . . . . . . . . . . . 35
+4.3.5 Syamlal . . . . . . . . . . . . . . . . . . . . . . . . . . 35
+4.4 Granular pressure models . . . . . . . . . . . . . . . . . . . . 36
+4.4.1 Huilin . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+4.4.2 Lun . . . . . . . . . . . . . . . . . . . . . . . . . . . . 36
+4.5 Frictional stress models . . . . . . . . . . . . . . . . . . . . . . 36
+4.5.1 JohnsonJackson . . . . . . . . . . . . . . . . . . . . . . 37
+4.5.2 Schaeﬀer . . . . . . . . . . . . . . . . . . . . . . . . . . 37
+4.5.3 JohnsonJacksonSchaeﬀer . . . . . . . . . . . . . . . . . 38
+4.5.4 Princeton . . . . . . . . . . . . . . . . . . . . . . . . . 38
+4.6 Packing limit models . . . . . . . . . . . . . . . . . . . . . . . 39
+4.6.1 constant . . . . . . . . . . . . . . . . . . . . . . . . . . 40
+3
+
+=== page 4 ===
+4.6.2 YuStandish . . . . . . . . . . . . . . . . . . . . . . . . 40
+4.6.3 FedorsLandel . . . . . . . . . . . . . . . . . . . . . . . 41
+4.7 Granular drag models . . . . . . . . . . . . . . . . . . . . . . . 41
+4.7.1 Chao . . . . . . . . . . . . . . . . . . . . . . . . . . . . 41
+4.7.2 Syamlal . . . . . . . . . . . . . . . . . . . . . . . . . . 42
+5 Fluid and solid thermodynamic models 43
+5.1 Thermodynamic models . . . . . . . . . . . . . . . . . . . . . 44
+5.1.1 eConst . . . . . . . . . . . . . . . . . . . . . . . . . . . 45
+5.1.2 ePolynomial . . . . . . . . . . . . . . . . . . . . . . . . 46
+5.1.3 ePower . . . . . . . . . . . . . . . . . . . . . . . . . . . 46
+5.1.4 eIcoTabulated . . . . . . . . . . . . . . . . . . . . . . . 47
+5.1.5 eTabulated . . . . . . . . . . . . . . . . . . . . . . . . 47
+5.1.6 hConst . . . . . . . . . . . . . . . . . . . . . . . . . . . 47
+5.1.7 hPolynomial . . . . . . . . . . . . . . . . . . . . . . . . 48
+5.1.8 hPower . . . . . . . . . . . . . . . . . . . . . . . . . . . 48
+5.1.9 hIcoTabulated . . . . . . . . . . . . . . . . . . . . . . . 48
+5.1.10 hTabulated . . . . . . . . . . . . . . . . . . . . . . . . 49
+5.1.11 JANAF . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+5.2 Equation of states . . . . . . . . . . . . . . . . . . . . . . . . . 49
+5.2.1 rhoConst . . . . . . . . . . . . . . . . . . . . . . . . . . 49
+5.2.2 Internal energy based (Mie-Grüneisen form) . . . . . . 50
+5.2.2.1 idealGas . . . . . . . . . . . . . . . . . . . . . 50
+5.2.2.2 stiﬀenedGas . . . . . . . . . . . . . . . . . . . 51
+5.2.2.3 (linearTillotson . . . . . . . . . . . . . . . . . 51
+5.2.2.4 Tillotson . . . . . . . . . . . . . . . . . . . . 52
+5.2.2.5 Tait . . . . . . . . . . . . . . . . . . . . . . . 53
+5.2.2.6 vanderWaals . . . . . . . . . . . . . . . . . . 54
+5.2.2.7 LSZK . . . . . . . . . . . . . . . . . . . . . . 54
+5.2.2.8 JWL . . . . . . . . . . . . . . . . . . . . . . . 55
+5.2.2.9 CochranChan . . . . . . . . . . . . . . . . . . 56
+5.2.2.10 DoanNickel . . . . . . . . . . . . . . . . . . . 57
+5.2.3 Temperature-based . . . . . . . . . . . . . . . . . . . . 58
+5.2.3.1 perfectGas . . . . . . . . . . . . . . . . . . . 59
+5.2.3.2 JWLC . . . . . . . . . . . . . . . . . . . . . . 59
+5.2.3.3 AbelNobel . . . . . . . . . . . . . . . . . . . . 59
+5.2.3.4 BKW . . . . . . . . . . . . . . . . . . . . . . 60
+5.2.3.5 BWR . . . . . . . . . . . . . . . . . . . . . . 60
+4
+
+=== page 5 ===
+5.2.3.6 Murnaghan . . . . . . . . . . . . . . . . . . . 61
+5.2.4 tabulatedEOS . . . . . . . . . . . . . . . . . . . . . . . 61
+5.2.4.1 BirchMurnaghan2 . . . . . . . . . . . . . . . 61
+5.2.4.2 BirchMurnaghan3 . . . . . . . . . . . . . . . 62
+5.2.5 eTabulated/tabulatedMG . . . . . . . . . . . . . . . . 62
+5.3 Fluid Transport . . . . . . . . . . . . . . . . . . . . . . . . . . 64
+5.3.1 const . . . . . . . . . . . . . . . . . . . . . . . . . . . . 64
+5.3.2 sutherland . . . . . . . . . . . . . . . . . . . . . . . . . 65
+5.3.3 logPolynomial . . . . . . . . . . . . . . . . . . . . . . . 65
+5.3.4 polynomial . . . . . . . . . . . . . . . . . . . . . . . . 66
+5.3.5 WLF . . . . . . . . . . . . . . . . . . . . . . . . . . . . 66
+5.3.6 icoTabulated . . . . . . . . . . . . . . . . . . . . . . . 66
+5.3.7 tabulated . . . . . . . . . . . . . . . . . . . . . . . . . 67
+5.4 Solid Transport . . . . . . . . . . . . . . . . . . . . . . . . . . 67
+5.4.1 constIso . . . . . . . . . . . . . . . . . . . . . . . . . . 67
+5.4.2 constAnIso . . . . . . . . . . . . . . . . . . . . . . . . 67
+5.4.3 exponential . . . . . . . . . . . . . . . . . . . . . . . . 67
+5.4.4 polynomial . . . . . . . . . . . . . . . . . . . . . . . . 68
+5.4.5 tabulatedIso . . . . . . . . . . . . . . . . . . . . . . . . 68
+5.4.6 tabulatedAnIso . . . . . . . . . . . . . . . . . . . . . . 68
+5.5 Basic thermodynamic model . . . . . . . . . . . . . . . . . . . 68
+5.6 Detonating thermodynamic model . . . . . . . . . . . . . . . . 69
+5.6.1 Activation Models . . . . . . . . . . . . . . . . . . . . . 70
+5.6.1.1 none . . . . . . . . . . . . . . . . . . . . . . . 71
+5.6.1.2 linear . . . . . . . . . . . . . . . . . . . . . . 72
+5.6.1.3 programmedIgnition . . . . . . . . . . . . . . 72
+5.6.1.4 pressureBased . . . . . . . . . . . . . . . . . . 73
+5.6.1.5 ArrheniusRate . . . . . . . . . . . . . . . . . 74
+5.6.2 Afterburn Models . . . . . . . . . . . . . . . . . . . . . 75
+5.6.2.1 none [default] . . . . . . . . . . . . . . . . . . 75
+5.6.2.2 constant . . . . . . . . . . . . . . . . . . . . . 75
+5.6.2.3 linear . . . . . . . . . . . . . . . . . . . . . . 75
+5.6.2.4 Miller . . . . . . . . . . . . . . . . . . . . . . 76
+5.7 Multicomponent thermodynamic model . . . . . . . . . . . . . 76
+5.8 Two/multiphase models . . . . . . . . . . . . . . . . . . . . . 78
+5.9 Initialization . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+5.10 Example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 79
+5
+
+=== page 6 ===
+6 Turbulence 82
+7 Burst patches 84
+7.1 Burst models . . . . . . . . . . . . . . . . . . . . . . . . . . . 84
+7.1.1 pressure . . . . . . . . . . . . . . . . . . . . . . . . . . 84
+7.1.2 impulse . . . . . . . . . . . . . . . . . . . . . . . . . . 84
+7.1.3 pressureAndImpulse . . . . . . . . . . . . . . . . . . . 85
+7.1.4 ﬁeld . . . . . . . . . . . . . . . . . . . . . . . . . . . . 85
+8 Region models 87
+8.1 Boundary conditions . . . . . . . . . . . . . . . . . . . . . . . 88
+8.1.1 globalMapped . . . . . . . . . . . . . . . . . . . . . . . 88
+8.1.2 globalInterpolated . . . . . . . . . . . . . . . . . . . . . 88
+8.1.3 globalTemperatureCoupled . . . . . . . . . . . . . . . . 88
+9 Diameter models 89
+9.1 constant . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 89
+9.2 constantMass . . . . . . . . . . . . . . . . . . . . . . . . . . . 89
+9.3 reacting . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 89
+9.4 Reaction Rates . . . . . . . . . . . . . . . . . . . . . . . . . . 90
+9.4.1 pressureBased . . . . . . . . . . . . . . . . . . . . . . . 90
+9.4.2 Arrhenius . . . . . . . . . . . . . . . . . . . . . . . . . 90
+10 Flux Evaluation 92
+10.1 Riemann Solvers . . . . . . . . . . . . . . . . . . . . . . . . . 93
+10.1.1 HLL . . . . . . . . . . . . . . . . . . . . . . . . . . . . 94
+10.1.2 HLLC . . . . . . . . . . . . . . . . . . . . . . . . . . . 94
+10.1.3 HLLCP . . . . . . . . . . . . . . . . . . . . . . . . . . 95
+10.1.4 AUSM+ . . . . . . . . . . . . . . . . . . . . . . . . . . 96
+10.1.5 AUSM+up . . . . . . . . . . . . . . . . . . . . . . . . 97
+10.1.6 AUSM+up (granular) . . . . . . . . . . . . . . . . . . 98
+10.1.7 Tadmor/Kurganov . . . . . . . . . . . . . . . . . . . . 99
+10.2 Riemann advection scheme . . . . . . . . . . . . . . . . . . . . 100
+10.3 Time integration . . . . . . . . . . . . . . . . . . . . . . . . . 101
+10.3.1 Euler . . . . . . . . . . . . . . . . . . . . . . . . . . . . 102
+10.3.2 RK1SSP . . . . . . . . . . . . . . . . . . . . . . . . . . 102
+10.3.3 RK2 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 103
+10.3.4 RK2SSP . . . . . . . . . . . . . . . . . . . . . . . . . . 103
+6
+
+=== page 7 ===
+10.3.5 RK3SSP . . . . . . . . . . . . . . . . . . . . . . . . . . 104
+10.3.6 RK4 . . . . . . . . . . . . . . . . . . . . . . . . . . . . 105
+10.3.7 RK4SSP . . . . . . . . . . . . . . . . . . . . . . . . . . 105
+11 Adaptive Mesh Reﬁnement (AMR) 106
+11.1 Error estimators . . . . . . . . . . . . . . . . . . . . . . . . . . 107
+11.1.1 cellSize . . . . . . . . . . . . . . . . . . . . . . . . . . . 108
+11.1.2 ﬁeldValue . . . . . . . . . . . . . . . . . . . . . . . . . 108
+11.1.3 delta . . . . . . . . . . . . . . . . . . . . . . . . . . . . 109
+11.1.4 scaledDelta . . . . . . . . . . . . . . . . . . . . . . . . 109
+11.1.5 Density gradient (densityGradient) . . . . . . . . . . . 109
+11.1.6 Lohner . . . . . . . . . . . . . . . . . . . . . . . . . . . 110
+11.1.7 multiComponent . . . . . . . . . . . . . . . . . . . . . 110
+11.2 Dynamic Load Balancing . . . . . . . . . . . . . . . . . . . . . 112
+11.3 Example . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 112
+12 Numerics 114
+12.1 Lookup tables . . . . . . . . . . . . . . . . . . . . . . . . . . . 114
+12.1.1 Modiﬁers . . . . . . . . . . . . . . . . . . . . . . . . . 114
+12.1.2 Interpolation schemes . . . . . . . . . . . . . . . . . . . 115
+12.1.3 1D lookup tables . . . . . . . . . . . . . . . . . . . . . 115
+12.1.4 2D lookup table . . . . . . . . . . . . . . . . . . . . . . 115
+12.1.5 3D lookup tables . . . . . . . . . . . . . . . . . . . . . 116
+12.2 Equations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 116
+12.3 Root solvers . . . . . . . . . . . . . . . . . . . . . . . . . . . . 116
+12.4 Minimization . . . . . . . . . . . . . . . . . . . . . . . . . . . 117
+12.5 Integrators . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 118
+13 Solid models 120
+14 Coupling to preCICE’s OpenFOAM adapter 121
+15 Function objects 122
+15.1 blastProbes . . . . . . . . . . . . . . . . . . . . . . . . . . . . 122
+15.2 ﬁeldMinMax (ﬁeldMax) . . . . . . . . . . . . . . . . . . . . . 123
+15.3 writeTimeList . . . . . . . . . . . . . . . . . . . . . . . . . . . 124
+15.4 conservedQuantities . . . . . . . . . . . . . . . . . . . . . . . . 124
+15.5 vtkTimeSeries surface writer . . . . . . . . . . . . . . . . . . . 124
+7
+
+=== page 8 ===
+15.6 Schlieren (grad) . . . . . . . . . . . . . . . . . . . . . . . . . . 124
+15.7 shadowgrap (laplacian) . . . . . . . . . . . . . . . . . . . . . . 125
+15.8 blastMachNo . . . . . . . . . . . . . . . . . . . . . . . . . . . 125
+15.9 dynamicPressure . . . . . . . . . . . . . . . . . . . . . . . . . 125
+15.10overpressure . . . . . . . . . . . . . . . . . . . . . . . . . . . . 126
+15.11impulse . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 126
+15.12timeOfArrival . . . . . . . . . . . . . . . . . . . . . . . . . . . 126
+16 Utilities 127
+16.1 setReﬁnedFields . . . . . . . . . . . . . . . . . . . . . . . . 127
+16.2 blastToVTK . . . . . . . . . . . . . . . . . . . . . . . . . . . 132
+16.3 createTimeSeries . . . . . . . . . . . . . . . . . . . . . . . . 133
+16.4 mergeProbes . . . . . . . . . . . . . . . . . . . . . . . . . . 133
+16.5 calculateImpulse . . . . . . . . . . . . . . . . . . . . . . . . 133
+16.6 initializeAtmosphere . . . . . . . . . . . . . . . . . . . . . . 134
+16.7 rotateFields . . . . . . . . . . . . . . . . . . . . . . . . . . . 135
+16.8 convertLagrangianPositions . . . . . . . . . . . . . . . . . 136
+16.9 reconstructParAll . . . . . . . . . . . . . . . . . . . . . . . 136
+17 fvModels and fvConstraints 137
+18 Optional libraries 138
+19 Solvers 139
+19.1 blastFoam . . . . . . . . . . . . . . . . . . . . . . . . . . . . 139
+19.2 blastEulerFoam . . . . . . . . . . . . . . . . . . . . . . . . . 139
+19.3 blastFSIFoam . . . . . . . . . . . . . . . . . . . . . . . . . . 140
+19.4 blastXiFoam(Experimental) . . . . . . . . . . . . . . . . . . 140
+19.5 blastReactingFoam(Experimental) . . . . . . . . . . . . . . 140
+19.6 blastMultiRegionFoam(Experimental) . . . . . . . . . . . 141
+19.7 blastParcelFoam(Experimental) . . . . . . . . . . . . . . . 141
+19.8 blastEquation . . . . . . . . . . . . . . . . . . . . . . . . . . 141
+20 Examples 143
+20.1 Double Mach reﬂection . . . . . . . . . . . . . . . . . . . . . . 143
+20.2 Shock Tube - Two Fluid . . . . . . . . . . . . . . . . . . . . . 148
+20.3 Two charge detonation . . . . . . . . . . . . . . . . . . . . . . 152
+20.4 Mine (buried charge) . . . . . . . . . . . . . . . . . . . . . . . 165
+8
+
+=== page 9 ===
+20.5 Bursting windows . . . . . . . . . . . . . . . . . . . . . . . . . 176
+References 183
+9
+
+=== page 10 ===
+1 Introduction
+blastFoam is an opensource computational ﬂuid dynamics (CFD) code based
+ontheOpenFOAMC++library(OpenCFDLtd.,2018a)tosimulatestrongly
+compressible systems of equations with detonations. Along with the main
+solvers for simulating ﬂuid ﬂow, additional utilities have been added to sim-
+plify case setup, allow adaptive mesh reﬁnement with load balancing based
+on the work of Rettenmaier et al. (2019), and facilitate blastFoam speciﬁc
+case post-processing.
+The purpose of this guide is to serve as a reference for the governing
+equations and the models that have been implemented in blastFoam. The
+guide also provides a brief description of the capabilities of the solver and
+the new utilities that have been introduced on top of those available in the
+standard OpenFOAM. Many of the available models include options that the
+user can tune to best suit their simulations, and are given in a table at the
+end of each model description.
+1.1 System Requirements
+blastFoam currently builds against OpenFOAM-92. The following depen-
+dencies are required to successfully compile and run blastFoam:
+1. A working installation of OpenFOAM-9 complete with libraries and
+headers produced by OpenFOAM-9, no other packages are required to
+run blastFoam applications. If OpenFOAM-9 is compiled from source,
+the ThirdParty-9 repository source is also required. If a pre-compiled
+version of OpenFOAM-9 is used, this is automatically installed.
+2. In order to create and view the postscript plots (e.g.*.eps ﬁles),gnu-
+plot is available on all platforms.EPS Viewercan be used on Win-
+dows and ghostview can be used on linux. On macOS, Preview
+opens eps ﬁles natively.
+2https://github.com/OpenFOAM/OpenFOAM-9\protect\let\futurelet\@let@
+token\let\let\@xspace@maybespace\relax
+10
+
+=== page 11 ===
+1.2 Downloading
+The un-compiled source code can be obtained at: https://github.com/
+synthetik-technologies/blastfoam. Download or clone the source in the
+following location: $HOME/OpenFOAM/blastfoam
+mkdir -p $HOME/OpenFOAM # create the OpenFOAM directory
+cd $HOME/OpenFOAM # go to the directory
+git clone https://github.com/synthetik-technologies/blastfoam
+1.3 Compilation
+After cloning the the blastFoam source code from https://github.com/
+synthetik-technologies/blastfoam (see previous section) and installing
+any optional libraries, similar to OpenFOAM, add the following line to
+$HOME/.bashrc ﬁle:
+source ~/OpenFOAM/blastfoam/etc/bashrc
+and run:
+source ~/.bashrc
+in any open terminals to update the BASH environment. This is used to
+specify the local directories included during blastFoam compilation, as well
+as make future developments easier and less intrusive.
+Next run the./Allwmake command from the top blastFoam directory
+to compile the libraries and applications. Finally, ensure that OpenFOAM-
+9 and blastFoam have been installed and that the environment has been
+correctly setup by running one of the tutorial or validation cases.
+Summary of steps to download, conﬁgure and compile blastFoam:
+# 1. create the OpenFOAM directory if if does not exist
+mkdir -p $HOME/OpenFOAM
+# 2. go to the $HOME/OpenFOAM directory
+cd $HOME/OpenFOAM
+# 3. # clone the blastFoam repository
+11
+
+=== page 12 ===
+git clone https://github.com/synthetik-technologies/blastfoam
+# go to the blastfoam directory
+cd $HOME/OpenFOAM/blastfoam
+# Source the etc/bashrc to your .bashrc file
+# by runngin the following command in terminal
+echo "source $HOME/OpenFOAM/blastfoam/etc/bashrc" >> $HOME/.bashrc
+# Re-load and set the bash environment to compile blastFoam
+source $HOME/.bashrc
+# Compile blastFoam (for parallel use "-j")
+./Allwmake
+1.4 Executable
+The applications to solve these equations are executed by running the ex-
+ecutable name (i.e. blastFoam). The executables are stored within the
+$BLAST_APPBIN ($FOAM_USER_APPBIN by default but this can be
+overridden) directory and can be run from any directory.
+1.5 Getting Help
+This guide is intended to cover the major points of the library. For more
+speciﬁc questions regarding the equations or models, the references listed in
+the class header ﬁles (*.H) should be consulted.
+Please report bugs using the issues tab on the GitHub page:
+https://github.com/synthetik-technologies/blastfoam/issues
+12
+
+=== page 13 ===
+2 Governing equations
+Here the governing conservation equations used within blastFoam will be
+described. We will describe two cases: (1) the single-ﬂuid case where a
+single shared velocity and energy is used and (2) the multi-ﬂuid case where
+each ﬂuid has a unique velocity and energy. The phrase "multi-phase" will
+be used to denote a ﬂuid that uses multiple equations of states to describe
+the density-energy-pressure relation. For both variations U is the vector
+of conservative variables, F are the ﬂuxes corresponding to the respective
+conservative variables, andS is a vector of source terms,
+∂tU + ∇· F = S (2.1)
+The exact form each of these take will depend on whether the single-ﬂuid
+or multi-ﬂuid is used. Each of these are presented in the following sections.
+2.1 Single-ﬂuid model
+For a single phase with multiple species, the conservative variables and ﬂuxes
+are deﬁned as
+U =
+
+
+ρ
+ρYs
+ρu
+ρE
+
+ (2.2)
+F =
+
+
+ρu
+ρYsu
+ρu⊗ u +pI
+(ρE +p)u
+
+ (2.3)
+S =
+
+
+0
+˙Rs + ∇· Js
+˙M + ˙Mv
+˙E + ˙Ev
+
+ (2.4)
+whereYs is the mass fraction of species, andJs is the diﬀusion ﬂux of species
+s. For multiple phases
+13
+
+=== page 14 ===
+U =
+
+
+α1
+...
+αn
+α1ρ1
+...
+αnρn
+ρu
+ρE
+
+
+(2.5)
+F =
+
+
+α1u
+...
+αnu
+α1ρ1u
+...
+αnρnu
+ρu⊗ u +pI
+(ρE +p)u
+
+
+(2.6)
+S =
+
+
+α1∇· u
+...
+αn∇· u
+0
+...
+0
+˙M + ˙Mv
+˙E + ˙Ev
+
+
+(2.7)
+whereρ is the mixture density,u is the mixture velocity,E is the total energy
+(thermal and kinetic),p is the pressure, andρi and αi are the density and
+volume fraction of each phase. The source terms, ˙Rs, ˙M, and ˙E are the
+specie production from reactions, momentum, and energy sources (including
+gravitational acceleration), and ˙Mv and ˙Ev are viscous terms.
+The sum of all volume fractions is deﬁned to be one, i.e.
+∑
+i
+αi = 1 (2.8)
+14
+
+=== page 15 ===
+When only two phases are used, the second volume fraction is deﬁned
+α2 = 1−α1 (2.9)
+Additionally, the mixture density is deﬁned by
+ρ =
+∑
+i
+αiρi (2.10)
+When all phases are considered inviscid,˙Mv = ˙Ev = 0. However, when
+viscosity is included,
+˙Mv = ∇·
+(
+ρν
+[
+∇u + (∇u)⊺− 2
+3(∇· u)I
+])
+(2.11)
+and
+˙Ev = ∇·
+(
+ρν
+[
+∇u + (∇u)⊺− 2
+3(∇· u)I
+]
+· u
+)
++ ∇· (αT ∇e) (2.12)
+where ν is the viscosity,αT is the thermal diﬀusivity, andI is the identity
+matrix.
+The ﬁve equation model is used for multiphase systems in which a sin-
+gle shared velocity, a shared internal energy and temperature is used, and
+individual phase masses are conserved. Pressure is deﬁned using a speciﬁed
+EOS, where the mixture’s internal energy, densities, and volume fraction are
+used to calculate the total pressure.
+2.2 Multi-ﬂuid
+Similar to ﬂows that use a single shared velocity and energy, the mass, mo-
+mentum, and energy are all conserved. In contrast, however, each phase has
+its own set of mass, momentum, and energy, which is transferred between
+phases using interfacial transfer models (such as drag, heat transfer, etc.).
+15
+
+=== page 16 ===
+The conservation equations for thei th ﬂuid phase are
+Ui =
+
+
+αi
+αiρi
+αiρiui
+αiρiEi
+
+ (2.13)
+F =
+
+
+αiui
+αiρiui
+αiρiui⊗ ui +αipiI
+αi(ρiEi +pi)ui
+
+ (2.14)
+S =
+
+
+αi∇· ui +∑
+i⁄=j
+˙ωij
+I(ρi,ρj)∑
+i⁄=j ˙ωij
+αiρig +∑
+i⁄=j
+˙Mij + ˙Mv,i
+αiρig· ui +∑
+i⁄=j( ˙Eij + ˙Mij· uint,ij) + ˙Edet,i + ˙Ev,i
+
+ (2.15)
+whereαi is the phase volume fraction,ρi is the phase density,ui is the phase
+velocity,Ei is the total phase energy, andpi is the phase pressure. The source
+terms, ˙Mij and ˙Eij, are the momentum and energy sources that account for
+interactions between other phases, ˙Mv,i and ˙Ev,i are viscous terms,g is the
+gravitational acceleration vector,˙Edet,i is the energy added due to reactions,
+and uint,ij is the interfacial velocity between two phases. When mass transfer
+is used ˙ωi,j is the mass transfer rate from theith phase to thejth phase, and
+I is a switching function used to select the transferring quantity (Xue et al.,
+2011) and is deﬁned as
+I(xi,xj) =ξi,jxj + (1−ξi,j)xi (2.16)
+and
+ξi,j =
+{
+1 if ˙ωi,j > 0
+0 else (2.17)
+The viscous stress uses a Newtonian stress tensor deﬁned as
+˙Mv,i = ∇·
+(
+αiρiνi
+[
+∇ui + (∇ui)⊺− 2
+3(∇· ui)I
+])
+(2.18)
+16
+
+=== page 17 ===
+and
+˙Ev,i = ∇·
+(
+αiρiνi
+[
+∇ui + (∇ui)⊺− 2
+3(∇· ui)I
+]
+· ui
+)
++ ∇· (αiαT,i ∇ei) (2.19)
+where νi is the viscosity,αT,i is the thermal diﬀusivity, andI is the identity
+matrix.
+The momentum transfer term, ˙Mij, is deﬁned as
+˙Mij = ˙MD,ij + ˙ML,ij + ˙MVM,ij + ˙MWL,ij + ˙MTD,ij + ˙ωi,jI(ui, uj) (2.20)
+where the summed terms, in order, represent drag, lift, virtual mass, wall
+lubrication, and turbulent dispersion, respectively.
+The energy transfer term,˙Eij, is deﬁned as
+˙Eij = ˙EHT,ij + ˙ωi,jI(Ei,Ej +hfi−hfj) (2.21)
+where ˙EHT,ij is the energy transfer rate due to convective heat transfer, and
+hf is the heat of formation.
+2.2.1 Granular phases
+Incontrasttoastandardﬂuid(gasorliquid), agranularﬂuidtracksthephase
+mass, momentum, thermal energy, and granular energy. The last quantity,
+granular energy, is the energy that is present due to ﬂuctuation in the phase
+velocity within a cell. This is the kinetic energy due to the local velocity
+variance. The more common quantity is the granular temperature,Θi, which
+is related to the granular energy by⟨E⟩i = 3
+2Θi. The governing equations
+17
+
+=== page 18 ===
+are
+Ui =
+
+
+αiρi
+αiρiui
+αiρiei
+αiρi⟨E⟩i
+
+ (2.22)
+F =
+
+
+αiρiui
+αiρiui⊗ ui + (Ps,i +Pfric,i)I
+αiρieiui
+αiρiui⟨E⟩i
+
+ (2.23)
+S =
+
+
+∑
+i⁄=j ˙ωij
+αiρig−αi
+∑
+𝓁 ∇pint,i𝓁 +∑
+j
+˙Mij + ˙Mv,i∑
+j ˙ eij +∑
+k ˙γik + ˙edet,i
+−
+∑
+k
+˙γik−
+∑
+𝓁
+φprod,i𝓁
+−Ps,i∇· ui +αiτi : ∇ui
++ ∇· (κs,i∇Θi) +
+∑
+i⁄=j
+˙ωijI(⟨E⟩i, 0)
+
+
+(2.24)
+where, again, αi is the phase volume fraction,ρi is the phase density, ui
+is the phase velocity, andei is the phase thermal energy. The summations∑
+j, ∑
+k, and∑
+𝓁 denote summations over all phases, all solid phases, and
+all ﬂuid phases, respectively. The new quantities,Ps,i, Pfric,i,⟨E⟩, andpint
+are the granular pressure, frictional pressure, granular energy, and interfa-
+cial pressure (generally taken as the gas phase pressure), respectively. The
+density is assumed to be constant, so the volume fraction is found by simply
+dividing the total phase mass by the known density. The source terms,˙Mij,
+˙ eij, ˙γij, andφprod,il are the momentum transfer, energy transfer, granular en-
+ergy dissipation, and production terms. The momentum and energy transfer
+terms are the same as for a ﬂuid phase (˙ eij = ˙Eij and ˙ edet,i = ˙Edet,i). The
+production and dissipation terms are described below.
+The production and dissipation of granular energy introduce a new term
+into the continuous phase total energy equation so that the continuous phase
+18
+
+=== page 19 ===
+source terms become
+S =
+
+
+αi∇· ui +∑
+i⁄=j
+˙ωij
+I(ρi,ρj)∑
+i⁄=j ˙ωij
+αiρig +∑
+i⁄=j
+˙Mij + ˙Mv,i
+αiρig· ui +∑
+i⁄=j
+˙Eij + ˙Edet,i + ˙Ev,i +∑
+kφprod,k∑
+k ˙ωikI(0,⟨E⟩k)
+
+
+(2.25)
+You can also see in Eq. (2.22) that the dissipation of granular energy is
+converted into thermal energy within the solid phase. For those familiar with
+incompressible ﬂows, this term is typically neglected due to the fact that the
+amount of heat produced from collisions is typically very small. In highly
+compressible ﬂows, this is not the case, and signiﬁcant heat can be generated
+due to the loss of energy from inelastic collisions.
+We deﬁne the change in momentum due to granular phase stress as
+˙Mij = ∇· τs,i + ˙ωi,jI(ui, uj) (2.26)
+and the granular stress is deﬁned as
+τs,i =ρiνs,i [∇ui + (∇ui)⊺] +
+(
+λs,i− 2
+3ρiνs,i
+)
+(∇· ui)I (2.27)
+with λs,i being the bulk viscosity of the granular phase deﬁned by (Huilin
+and Gidaspow, 2003)
+λs,i =
+∑
+k
+Ps,ik
+dik
+3
+√
+2(miΘi +mkΘk)2
+πΘiΘk(m2
+i Θi +m2
+kΘk) (2.28)
+where Ps,ij is the granular pressure between solid phasesi and k, and is
+related toPs,i by
+Ps,i =αiρiΘi +
+∑
+k
+Ps,ik (2.29)
+The production of granular energy is given by
+φprod,i𝓁 = 81αiµ2
+𝓁
+g0,iid3
+iρi
+√π
+|u𝓁− ui|2
+√Θi
+− 3KD,i𝓁Θi (2.30)
+19
+
+=== page 20 ===
+where KD,i𝓁 is the drag coeﬃcient for thei-𝓁 solid-ﬂuid pair andg0,ij is the
+radial distribution function.
+The dissipation of granular energy between granular phasesi andk is deﬁned
+by (Huilin and Gidaspow, 2003)
+˙γik =
+[ 3
+dik
+( 2m2
+0ΘiΘk
+π(m2
+i Θi +m2
+kΘk)
+)1/2
+− 3m0(miΘi +mkΘk)
+4(m2
+i Θi +m2
+kΘk) ∇· ui
+]
+(1−eik)Ps,ik (2.31)
+where
+mi = ρiπd3
+i
+6 (2.32)
+dik = (di +dk)/2, m0 =mi +mk, eik is the coeﬃcient of restitution between
+granular phasesi and j, and Ps,ik is the granular pressure between phases
+i and k. The drag, radial distribution function, and granular pressure are
+determined by models and will be discussed in Sec. 3.1 and Sec. 4. The
+speciﬁc manner as to how these source terms are solved can be found in
+Appendix B.7 of Houim and Oran (2016).
+The energy transfer term,˙ eij, is deﬁned as
+˙ eij = ˙ eHT,ij + ˙ωi,jI(ei,ej +hfi−hfj) (2.33)
+Lastly, the speed of sound for a granular material is given by
+c2
+i = 1
+ρi
+
+∂Ptot,i
+∂αi
++ 2
+3
+Θi
+(
+∂Ptot,i
+∂Θi
+)2
+ρiα2
+i
+
+ (2.34)
+wherePtot,i =Ps,i +Pfr,i. Because diﬀerent models can be used for the gran-
+ular pressure, frictional pressure, and additional models used within radial
+distribution functions, the speciﬁc form this takes is not discussed here.
+The topic of granular ﬂows, or kinetic theory, is quite extensive and thus
+it would be impractical to attempt to provide complete descriptions and
+derivationsoftheequationsandmodelsdiscussedhere. Formoremoredetails
+on this topic, the reader should consult the following resources:
+20
+
+=== page 21 ===
+• For derivations relating to molecular gasses, see Chapman et al. (1990)
+• For more practical derivations, see Gidaspow (1994)
+• For applications to compressible ﬂows, see Fox (2019)
+• For derivations of the polydisperse formulations, see Huilin and Gi-
+daspow (2003) and Chao et al. (2011)
+21
+
+=== page 22 ===
+3 Interfacial models
+The exchange of momentum and energy is determined by the use of inter-
+facial models. These models are described below and include the equations
+used to calculate the transfer rates. In general, these models are solved us-
+ing an explicit Euler integration method. Drag and heat transfer, however,
+are solved using an analytical solution; the reference used for these solution
+methods will be provided in the relevant sections.
+NOTE: There are more models currently implemented that do not apply
+to gas-particle ﬂows and, therefore, are not presented at this time. Their
+descriptions and equations will be added as they become relevant.
+3.1 Drag models
+Thedragisresponsibleforrelaxingthevelocitydiﬀerencebetweentwophases
+to an equilibrium velocity at a rate determined by the drag coeﬃcient,KD,ij:
+KD,ij = 0.75αdCDReijρcνc
+d2
+d
+(3.1)
+where the Reynolds number between phasesi and j is deﬁned asReij =
+dd|uc−ud|
+νc
+. The subscriptsc and d are used to denote the continuous and dis-
+persed phases, respectively. The termCDReij will be deﬁned by the models
+discussed in the following sections.
+The momentum transfer term is deﬁned as˙MD,ij =KD,ij(uj− ui). The
+solution to the drag relaxation can be found in Appendix B.7 of Houim and
+Oran (2016). Additionally, an ODE solver can be used to solve the drag
+relaxation, though this approach is much more computationally expensive.
+Variable Description
+swarmCorrelation Swarm model
+22
+
+=== page 23 ===
+3.1.1 SchillerNaumann
+The drag model of Schiller and Naumann (1933) calculates the drag coeﬃ-
+cient for ﬂow over a single sphere:
+CDReij =
+{
+24(1 + 0.15Re0.687
+ij ) if Reij < 1000
+0.44Reij else (3.2)
+Variable Description
+residualRe Minimum Reynolds number [ ]
+3.1.2 WenYu
+The Wen and Yu drag model (Enwald et al., 1996) is used for dispersed
+particulate ﬂow and the drag coeﬃcient is deﬁned as
+CDReij =CDResSN,ijα−2.65
+c (3.3)
+where CDReSN,ij is the Schiller Naumann drag coeﬃcient multiplied by the
+Reynolds number, and the Reynolds number used in the drag coeﬃcient is
+weighted by the dispersed phase volume fraction, i.e.,
+Resij = Reijαc (3.4)
+Variable Description
+residualRe Minimum Reynolds number [ ]
+3.1.3 Ergun
+The Ergun drag model (Enwald et al., 1996) is used for dispersed particulate
+ﬂow and the drag coeﬃcient is deﬁned as
+CDReij = 4
+3
+150(1−αc)
+αc
++ 1.75Reij (3.5)
+23
+
+=== page 24 ===
+3.1.4 Gibilaro
+The Gibilaro drag model (Enwald et al., 1996) is used for dispersed particu-
+late ﬂow and the drag coeﬃcient is deﬁned as
+CDReij = 4
+3
+(17.3
+α2
++ 0.336Reij
+)
+αcα−2.8
+2 (3.6)
+where α2 = 1−αd.
+3.1.5 SyamlalOBrien
+The Syamlal O’Brien drag model (Syamlal et al., 1993) is used for dispersed
+particulate ﬂow and the drag coeﬃcient is deﬁned as
+CDReij = CDsReijαc
+V 2
+r
+(3.7)
+where
+CDsReij =
+(
+0.63
+√
+Reij + 4.8
+√
+Vr
+)2
+(3.8)
+Vr = 0.5
+(
+A− 0.06Reij +
+√
+(0.06Reij)2 + 0.12Reij(2B−A) +A2
+)
+(3.9)
+A =α4.14
+2 (3.10)
+B =
+{
+0.8α1.28
+2 if α2 < 0.85
+α2.65
+2 else (3.11)
+and α2 = 1−αd.
+3.1.6 GidaspowErgunWenYu
+The drag model of Gidaspow (1994) is used for dispersed particulate ﬂow and
+the drag coeﬃcient is a combination of the Wen and Yu drag model (dilute)
+and Ergun drag model (dense):
+CDReij =
+{
+CDReWenYu,ij if αc > 0.80
+CDReErgun,ij else (3.12)
+24
+
+=== page 25 ===
+where CDReWenYu,ij is the Wen Yu drag coeﬃcient andCDReErgun,ij is the
+Ergun drag coeﬃcient, both multiplied by the Reynolds number.
+Variable Description
+residualRe Minimum Reynolds number [ ]
+3.1.7 GidaspowSchillerNaumann
+The Gidaspow-Schiller Naumann drag model (Enwald et al., 1996) is used
+for dispersed particulate ﬂow and the drag coeﬃcient is deﬁned as
+CDReij =CDsReijα−1.65
+c (3.13)
+CDsReij =
+{ 24(1+0.15Res0.687
+ij )
+αc
+if Resij < 1000
+0.44Resij else
+(3.14)
+where the Reynolds number used in the drag coeﬃcient is weighted by the
+dispersed phase volume fraction, i.e.,
+Resij = Reijαc (3.15)
+Variable Description
+residualRe Minimum Reynolds number [ ]
+3.2 Lift models
+The lift interfacial momentum transfer model is used to account for acceler-
+ation due to rotation in the continuous phase and is deﬁned as
+˙ML,ij =CL,ijαdρc [(uc− ui)× (∇× uc)] (3.16)
+whereCL,ij is the lift coeﬃcient between phasesi andj and is deﬁned by the
+model of choice.
+3.2.1 constant
+The lift coeﬃcient is a constant value.
+Variable Description
+Cl Lift coeﬃcient [ ]
+25
+
+=== page 26 ===
+3.3 Heat transfer models
+The heat transfer model is responsible for relaxing the temperature between
+two phases at a rate determined by the model of choice. The Prandtl number
+will be used and is deﬁned as
+Prij = νcCvcρc
+κc
+(3.17)
+Again, the subscriptsc andd represent the continuous and dispersed phases,
+respectively. Cvc is the continuous phase speciﬁc heat at constant volume
+and κc is the continuous phase thermal conductivity. The solution to the
+temperature relaxation can be found in Appendix B.7 of Houim and Oran
+(2016).
+3.3.1 RanzMarshall
+The Ranz Marshall heat transfer model (Houim and Oran, 2016) deﬁnes the
+heat transfer rate as
+˙EHT,ij = 6αdκcNuij
+d2
+d
+(3.18)
+where the Nusselt number is a run-time selectable model, and all other prop-
+erties are taken from the thermodynamic model.
+Variable Description
+NuModel Nusselt number model
+residualAlpha Stabilization value of volume fraction
+(defaults to that of the phaseModel)
+3.3.2 noneNu
+This should only be used is a Nusselt number is needed by some other model,
+but heat transfer is neglected.
+3.4 Nusselt number models
+26
+
+=== page 27 ===
+3.4.1 constant
+For the constant Nusselt number heat transfer model, Eq. (3.18) is again
+used, but the Nusselt number is a constant value provided by the user.
+Variable Description
+Nu Nusselt number [ ]
+3.4.2 duct
+For hollow particles the Nusselt number of Dittus and Boelter (1930) is de-
+ﬁned as
+Nuij = 0.023Re0.8
+ij Pr0.4
+ij (3.19)
+3.4.3 GelperinEinstein
+The Nusselt number of Gelperin and Einstein (1971) is deﬁned as
+Nuij = 0.023Re2/3
+ij Pr1/3
+ij (3.20)
+3.4.4 Gunn
+The Nusselt number of Gunn (1978) is deﬁned as
+Nuij =(7− 10αc + 5.0α2
+c)(1 + 0.7Re0.2
+ij Pr1/3
+ij )
++(1.33− 2.4αc + 1.2α2
+c)Re0.7
+ij Pr1/3
+ij (3.21)
+3.4.5 RanzMarschall
+The Ranz-Marschall Nusselt number for spheres is deﬁned as
+Nuij = 2 + 0.6Re1/2
+ij Pr1/3
+ij (3.22)
+3.4.6 sphere
+The Nusselt number for spheres is deﬁned as
+Nuij = 2 + 0.4Re1/2
+ij Pr1/3
+ij (3.23)
+27
+
+=== page 28 ===
+3.5 Mass transfer models
+Currently on particle to ﬂuid mass transfer has been implemented. Fluid-
+ﬂuid mass transfer is not currently supported.
+3.5.1 none
+No mass transfer.
+3.5.2 reactingParticle
+The mass transfer rate is explicitly calculated using the change in mass of
+a particle where the regression rate is determined by a reaction rate. the
+reactingParticle diameter model must be used.
+3.6 Interfacial pressure models
+The interfacial pressure model is used to determine the pressure at the in-
+terface between two phases.
+3.6.1 single
+The pressure of the given phase is used.
+Variable Description
+phase Name of the phase
+NOTE:For gas-particle ﬂows this option should be used, using the gas phase
+pressure.
+3.6.2 volumeAveraged
+The volume fraction averaged pressure of the two phases is used.
+3.6.3 totalPressure
+The volume fraction averaged thermodynamic pressure and the mass aver-
+aged dynamic pressure is used.
+28
+
+=== page 29 ===
+3.7 Interfacial velocity models
+The interfacial velocity model is used to determine the velocity at the inter-
+face between two phases.
+3.7.1 single
+The velocity of the given phase is used.
+Variable Description
+phase Name of the phase
+NOTE: For gas-particle ﬂows this option should be used, using the particle
+phase velocity.
+3.7.2 massAveraged
+The mass averaged velocity of the two phases is used.
+29
+
+=== page 30 ===
+4 Granular models
+For granular phases, additional models are required to account for particle-
+particle collisions in both the kinetic and frictional regimes. These models
+include radial distribution, viscosity, conductivity, granular pressure, fric-
+tional pressure, solid-solid drag, and packing models.
+Some common variables used in the granular models will now be deﬁned.
+Here,∑
+k is the summation over all granular phase indices andαs is the sum
+of all granular phase volume fractions. The strain is deﬁned as
+S = 1
+2 [(∇u)⊺ + ∇u]− 1
+3(∇· u)I (4.1)
+The symmetric strain is deﬁned as
+D = 1
+2 [(∇u)⊺ + ∇u] (4.2)
+Finally, the total granular drag on a phase is deﬁned as
+KD,i =
+∑
+k
+KD,ik (4.3)
+4.1 Radial distribution models
+The radial distribution gives the likelihood of a collision between two parti-
+cles. This is deﬁned between like and unlike particle phases.
+4.1.1 CarnahanStarling
+The Carnahan Starling radial distribution function is only valid for monodis-
+perse ﬂows and is deﬁned as
+g0,ii = 1
+1−αi
++ 3αi
+2(1−αi)2 + α2
+i
+2(1−αi)3 (4.4)
+30
+
+=== page 31 ===
+4.1.2 SinclairJackson
+The radial distribution of Sinclair and Jackson (1989) function is only valid
+for monodisperse ﬂows and is deﬁned as
+g0,ii = 1
+1−
+(
+αi
+αi,max
+)1/3 (4.5)
+4.1.3 LunSavage
+The radial distribution function of Lun et al. (1984) is only valid for monodis-
+perse ﬂows and is deﬁned as
+g0,ii =
+(
+1− αi
+αmax,i
+)−2.5αmax,i
+(4.6)
+4.1.4 Gao
+The radial distribution function of Gao et al. (2008) is a modiﬁed version of
+the Sinclair Jackson radial distribution function and is valid for polydisperse
+ﬂows. It is deﬁned as
+g0,ij = dig0,i +djg0,j
+di +dj
+(4.7)
+g0,i = 1
+1−
+(
+αi
+αi,max
+)1/3 (4.8)
+4.1.5 Lebowitz
+The Lebowitz radial distribution function (Benyahia et al., 2012) is valid for
+polydisperse ﬂows and is deﬁned as
+g0,ij = 1
+1−αs
++ 3didj
+(1−αs)2(di +dj)
+∑
+k
+αk
+dk
+(4.9)
+31
+
+=== page 32 ===
+4.2 Granular viscosity models
+The modeling of granular viscosity is used to determine the stress seen in
+a granular phase. These models only account for single collisions (frictional
+models will have additional contributions for multiple collisions).
+4.2.1 Gidaspow
+The Gidaspow viscosity model (Gidaspow, 1994) is for monodisperse ﬂows
+and is deﬁned as
+νs,i = 4
+5α2
+ig0,ii
+(1 +ei,j)
+π + 1
+15
+√πg0,ii(1 +eii)α2
+i
++ 1
+6
+√παi + 10
+96
+√π
+(1 +eii)g0,ii
+(4.10)
+4.2.2 HrenyaSinclair
+TheHrenyaSinclairviscositymodel(HrenyaandSinclair,1997)isformonodis-
+perse ﬂows and is deﬁned as
+νs,i = 4
+5α2
+ig0,ii
+(1 +ei,j)
+π
++ 1
+15
+√πg0,ii(3eii− 1) α2
+i
+3−eii
++ 1
+6
+√παi(0.5λ + 0.25(3eii− 1))
+0.5(3−eii)λ
++ 10
+96
+√π
+(1 +eii)0.5(3−eii)g0,iiλ (4.11)
+where
+λ = 1 + diL
+6
+√
+2αi
+(4.12)
+Variable Description
+L characteristic length [m]
+32
+
+=== page 33 ===
+4.2.3 Princeton
+The Princeton viscosity model (Agrawal et al., 2001) is for polydisperse ﬂows
+and is deﬁned as
+νs,i =ρi
+3.6
+3
+[ µ∗
+i
+g0,iiη(2−η)
+(
+1 + 8
+5η
+∑
+k
+(αkg0,ik)
+)
+×
+(
+1 + 8
+5η(3η− 2)
+∑
+k
+(αkg0i,k)
+)
++ 3
+5ηµb
+]
+(4.13)
+where
+µ∗
+i = ρiαig0,iiΘiµ
+ρi
+∑
+k(αkg0,ik)Θi + 2Kd,iµ
+ρiαi
+(4.14)
+µ = 5
+96ρidi
+√
+πΘi (4.15)
+and
+µb = 256
+5π µαi
+∑
+k
+(αkg0,ik) (4.16)
+4.2.4 Syamlal
+The Syamlal viscosity model (Syamlal et al., 1993) is for monodisperse ﬂows
+and is deﬁned as
+νs,i = 4
+5α2
+ig0,ii
+(1 +eii)
+π + 1
+15
+√πg0,ii(3eii− 1) α2
+i
+3−eii
++ 1
+6
+√παi
+(3−eii) (4.17)
+4.2.5 none
+Nogranularviscosityisused. Thisalsoremovestheconductivitycontribution
+to the granular energy equation.
+33
+
+=== page 34 ===
+4.3 Granular conductivity models
+4.3.1 Chao
+The Chao granular conductivity model Chao et al. (2011) is deﬁned as
+κs,i = 2κdilute,i
+1
+N
+∑
+k(1 +eik)g0,ik
+[
+1 + 6
+5
+∑
+k
+αk(1 +eik)g0,ik
+]2
+(4.18)
+where N is the number of granular phases and
+κdilute,i = 15ρiΘi
+∑
+k
+[
+π
+√
+2πnkd2
+ij(√Θi +
+√
+Θj− 0.56 4
+√
+ΘiΘj)
+] (4.19)
+4.3.2 Gidaspow
+The Gidaspow conductivity model (Gidaspow, 1994) is for monodisperse
+ﬂows and is deﬁned as
+κs,i = 2α2
+ig0,ii
+(1 +eii)√π + 9
+8
+√πg0,ii0.5(1 +eii)α2
+i
++ 15
+16
+√παi + 25
+64
+√π
+g0,ii(1 +eii) (4.20)
+4.3.3 HrenyaSinclair
+The Hrenya Sinclair conductivity model (Hrenya and Sinclair, 1997) is for
+monodisperse ﬂows and is deﬁned as
+κs,i = 2α2
+ig0,ii
+(1 +eii)√π
++ 9
+8
+√πg0,ii0.25(1 +eii)2(2eii− 1)α2
+i
+49
+16− 33
+16eii
++ 15
+16
+√παi(0.5e2
+ii + 0.25eii− 0.75 +λ)( 49
+16− 33
+16eii
+)
+λ
++ 25
+64
+√π
+g0,iiλ(1 +eii)
+( 49
+16− 33
+16eii
+) (4.21)
+34
+
+=== page 35 ===
+where
+λ = 1 + diL
+6
+√
+2αi
+(4.22)
+Variable Description
+L characteristic length [m]
+4.3.4 Princeton
+The Princeton conductivity model (Agrawal et al., 2001) is for polydisperse
+ﬂows and is deﬁned as
+κs,i = κ∗
+i
+g0,ii
+[(
+1 + 12
+5 η
+∑
+k
+(αkg0,ik)
+)(
+1 + 12
+5 η2(4η− 3)
+∑
+k
+(αkg0,ik)
+)
++ 64
+25π (41− 33η)η2
+(∑
+k
+(αkg0,ik)
+)2]
+(4.23)
+where
+κ∗
+i = ρiαig0,iiΘiκi
+ρi
+∑
+k(αkg0,ik)Θi + 6Kd,iκi
+5ρiαi
+(4.24)
+and
+κi = 75ρidi
+√πΘi
+48η(41− 33η) (4.25)
+4.3.5 Syamlal
+The Syamlal conductivity model (Syamlal et al., 1993) is for monodisperse
+ﬂows and is deﬁned as
+κs,i = 2α2
+ig0,ii
+(1 +eii)√π
++ 9
+8
+√πg0,ii0.25(1 +eii)(2eii− 1)α2
+i
+49
+16− 3316eii
++ 15
+16
+√παi
+49
+16− 33
+16eii
+(4.26)
+35
+
+=== page 36 ===
+4.4 Granular pressure models
+The granular pressure model is used to calculate the pressure due to single
+collisions between particles. Pressures that occur due to multiple collisions
+will be added using the frictional models.
+4.4.1 Huilin
+The Huilin granular pressure model (Huilin and Gidaspow, 2003) is for poly-
+disperse ﬂows and is deﬁned as
+Ps,ij = π(1 +eij)d3
+ijg0,ijninjmimjm0ΘiΘj
+3(m2
+i Θi +m2
+jΘj)
+×
+[ m2
+0ΘiΘj
+(m2
+i Θi +m2
+jΘj)(Θi + Θj)
+]3/2
+× (1− 3ω + 6ω2− 10ω3)
+(4.27)
+with
+ω = miΘi−mjΘj)
+[(m2
+i Θ2
+i +m2
+jΘ2
+j) + ΘiΘj(m2
+i +m2
+j)]1/2 (4.28)
+4.4.2 Lun
+The Lun granular pressure model (Lun et al., 1984) is for monodisperse ﬂows
+and is deﬁned as
+Ps,ij =αiαjρiΘi2(1 +eij)g0,ij (4.29)
+4.5 Frictional stress models
+The frictional stress model acts as a simple way to account for non-singular
+collisions between particles and results in very large stress when the gran-
+ular phases approach their packing limit. This results in both a modeled
+pressure and viscosity to calculate a stress, and limits the ability of particles
+to move between computational cells. The frictional pressure and viscosity
+denotedPfr andνfr act on all granular phases since the packing of particles
+is dependent on the total volume fraction of particles.
+36
+
+=== page 37 ===
+4.5.1 JohnsonJackson
+The Johnson-Jackson frictional stress model (OpenCFD Ltd., 2018b) uses a
+smooth function to calculate the pressure
+Pfr =
+{
+Fr (αs−αcrit,s)η
+(αmax,s−αs)p if αs >α crit,s
+0 else
+(4.30)
+and the frictional viscosity is
+νfr = 0.5Pfrsin(φ) (4.31)
+where φ is the angle of internal friction, andFr, η, andp are model coef-
+ﬁcients generally taking values of 0.05, 2, and 5 respectively.αcrit,s is the
+granular particle fraction that the frictional pressure "turns on", andαmax,s
+is the maximum packing limit of all granular phases. Generallyαcrit,s is taken
+to be around 0.5.
+Variable Description
+Fr Model coeﬃcient [ ]
+eta Model coeﬃcient [ ]
+p Model coeﬃcient [ ]
+phi Model coeﬃcient [ ]
+alphaDeltaMin Minimum value ofαs−αmax,s [ ]
+alphaMinFriction Volume fraction friction is “turned on” [ ]
+4.5.2 Schaeﬀer
+The Scheﬀer frictional stress model (Syamlal et al., 1993) uses a power law
+and the local stress is used to calculate the frictional viscosity. The critical
+volume fraction,αcrit,s should be a value close to that of the packing limit.
+Because the local packing limit can vary in space when polydispersity is
+present, the ratio of the local volume fraction by the critical volume fraction
+is used, i.e. αcrit,s =
+(
+αcrit,s
+αmax,s
+)
+crit
+αmax,s where
+(
+αcrit,s
+αmax,s
+)
+crit
+is speciﬁed by the
+user andαmax,s is the calculated local packing limit. The pressure is deﬁned
+as
+Pfr =
+{
+1024(αs−αcrit,s)10 if αs >α crit,s
+0 else (4.32)
+37
+
+=== page 38 ===
+and the viscosity is
+νfr =
+{
+0.5 Pfrsin(φ)√ 1
+3 (I1(D)2−I2(D))
+if αs >α crit,s
+0 else
+(4.33)
+whereI1(D) is the ﬁrst in variant (or trace) andI2(D) is the second invariant.
+Variable Description
+phi Model coeﬃcient [ ]
+alphaMinFrictionByAlphap Volume fraction ratio friction is “turned on” [ ]
+4.5.3 JohnsonJacksonSchaeﬀer
+For the Johnson Jackson-Scheﬀer frictional stress model (OpenCFD Ltd.,
+2018b), the frictional pressure of Johnson Jackson is used while the viscosity
+of the Schaeﬀer model is used.
+Pfr =
+{
+Fr (αs−αcrit,s)η
+(αmax,s−αs)p if αs >α crit,s
+0 else
+(4.34)
+νfr =
+{
+0.5 Pfrsin(φ)√ 1
+3 (I1(D)2−I2(D))
+if αs >α crit,s
+0 else
+(4.35)
+Variable Description
+Fr Model coeﬃcient [ ]
+eta Model coeﬃcient [ ]
+p Model coeﬃcient [ ]
+phi Model coeﬃcient [ ]
+alphaDeltaMin Minimum value ofαs−αmax,s [ ]
+alphaMinFriction Volume fraction friction is “turned on” [ ]
+4.5.4 Princeton
+The Princeton model Agrawal et al. (2001) uses a blending of the Johnson
+Jackson model when the local volume fraction is greater thanαcrit,JJ,s but less
+38
+
+=== page 39 ===
+than αcrit,Sc,s. As with the Schaeﬀer model, the critical ratio of
+(
+αcrit,Sc,s
+αmax,s
+)
+crit
+is used as an input rather thanαcrit,Sc,s.
+Pfr =
+
+
+
+1024(αs−αcrit,Sc,s)10 if αs >α crit,Sc,s
+Fr (αs−αcrit,JJ,s)η
+(αmax,s−αs)p if αcrit,Sc,s≤αs >α crit,JJ,s
+0 else
+(4.36)
+The frictional viscosity is deﬁned using
+Pc,k
+Pfr
+=
+(
+1− ∇· us
+n
+√
+2sin(φ)
+√
+S : S + Θk/d2
+k
+)n−1
+(4.37)
+νfr,k =
+√
+2Pc,ksin(φ)√
+S : S + Θk/d2
+k
+[
+n− (n− 1)
+(Pc,k
+Pfr
+) 1
+1−n
+]
+αk
+αs
+(4.38)
+and
+n =
+{ √
+3
+2sin(φ) if ∇· us≥ 0
+1.03 else
+(4.39)
+Variable Description
+Fr Model coeﬃcient [ ]
+eta Model coeﬃcient [ ]
+p Model coeﬃcient [ ]
+phi Model coeﬃcient [ ]
+alphaDeltaMin Minimum value ofαs−αmax,s [ ]
+alphaMinFriction Volume fraction friction is “turned on” [ ]
+alphaMinFrictionByAlphap Volume fraction ratio friction is “turned on” [ ]
+4.6 Packing limit models
+The modeling of the packing limit is important in polydisperse ﬂows due to
+the fact that, when large variations in particle diameters exist locally, the
+packing limit can vary widely. This is due to the fact that smaller particles
+can be found in between larger particles, increasing the maximum allowable
+volume fraction. For monodisperse ﬂows, this is not the case and a constant
+value packing limit should be used.
+39
+
+=== page 40 ===
+4.6.1 constant
+A constant value for the packing limit is used.
+Variable Description
+alphaMax Packing limit [ ]
+4.6.2 YuStandish
+The Yu Standish packing model (Yu and Standish, 1987) assumes that the
+particle phases are ordered from smallest diameter to largest for the calcula-
+tion of the packing limit. The packing limit is deﬁned as
+αmax,s = min
+i∈1:N
+
+ αmax,i
+1−∑i−1
+k=1
+(
+1− αmax,i
+pik
+)
+cxi
+Xik
+−∑N
+k=i+1
+(
+1− αmax,i
+pik
+)
+cxi
+Xik
+
+
+(4.40)
+where
+cxi = αi
+αs
+(4.41)
+Xik =
+{ 1−r2
+ik
+2−αmax,i
+if k <i
+1−
+1−r2
+ik
+2−αmax,i
+if k≥i
+(4.42)
+pik =
+
+
+
+αmax,i +αmax,i(1−αmax,i)
+×(1− 2.35rik + 1.35r2
+ik) if rik≤ 0.741
+αmax,i if rik > 0.741
+(4.43)
+and
+rik =
+{
+di
+dk
+if i≥k
+dk
+di
+if i<k (4.44)
+Variable Description
+residualAlpha Minimum volume fraction to divide by [ ]
+40
+
+=== page 41 ===
+4.6.3 FedorsLandel
+The Fedors-Landel packing model (Fedors and Landel, 1979) is only valid of
+for a binary mixture and is deﬁned as
+αmax,s =
+
+
+[(αmax,1−αmax,2)
++(1−√r21(1−αmax,1)αmax,2]
+×[αmax,1 + (1−αmax,1)αmax,2] cxi
+αmax,1
++αmax,2 if cx1≤ αmax,1
+αmax,1+(1−αmax,1)αmax,2
+(1−√r21)[αmax,1
++(1−αmax,1)αmax,2]cx2 +αmax,1 else
+(4.45)
+Where the deﬁnitions ofr21 and cxi are used from the previous section.
+Variable Description
+residualAlpha Minimum volume fraction to divide by [ ]
+4.7 Granular drag models
+The drag force between granular phases is diﬀerent than standard drags
+models due to the fact the the collisions which are a function of the granular
+energy strongly eﬀect the rate at which the velocities relax. These granular
+drag models are only necessary when multiple granular phases are used.
+4.7.1 Chao
+The Chao granular drag model (Chao et al., 2011) deﬁnes the drag coeﬃcient
+between phases as
+KD,ij = αiαjρiρj
+m0
+dij(1 +eij)g0,ij
+×
+[√
+2π(
+√
+Θi +
+√
+Θj)−
+√
+2(ΘiΘj)1/4 + 0.5π|ui− uj|
+− 1.135
+√
+|ui− uj|
+(√
+4Θi + 4
+√
+Θj− 0.8 8
+√
+ΘiΘj
+)]
+(4.46)
+41
+
+=== page 42 ===
+4.7.2 Syamlal
+The Syamlal granular drag model (Benyahia et al., 2012) deﬁnes the drag
+coeﬃcient between phases as
+KD,ij = 3(1 +eij)(π
+2 + Cf,ijπ2
+8 )αiαjρiρj(di +dj)2g0,ij|ui− uj|
+2π(ρid2
+i +ρjd3
+j) +C1Pfr
+(4.47)
+where Cf,ij is the coeﬃcient of friction between granular phases i and j, and
+C1 is the coeﬃcient of frictional pressure.
+Variable Description
+C1 Coeﬃcient of frictional pressure (default is 0) [s/m2]
+42
+
+=== page 43 ===
+5 Fluid and solid thermodynamic models
+WithinblastFoamsolvers, twodiﬀerenttypesofbasicthermodynamicmodels
+are used. The primary is that of a ﬂuid where internal energy and density, or
+temperature and density, are used to ﬁnd the resulting pressure and speed of
+sound. The other, is the solid thermodynamic model, which is only used for
+solid phases within multi-ﬂuid solvers and multi-region solvers. These two
+models will share the basic thermodynamic classes (eConst, hConst, etc),
+as well as the choice in the type (basic, detonating, or multicomponent),
+however the solid phase only can use a constant density equation of state,
+and the transport model describes the of heat conduction, rather than ﬂow
+coeﬃcients (like viscosity). These speciﬁc choices will be described below.
+To calculate the pressure and temperature given the conservative quan-
+tities (mass, momentum, and energy) three components are required: an
+equation of state, a thermodynamic model, and a transport model. These
+models are deﬁned in thephaseProperties ﬁle located in theconstant di-
+rectory of each blastFoam case. Each phase within thephaseProperties ﬁle
+has several dictionary entries, and these models are speciﬁed in the ”ther-
+moType” sub-dictionary; the molecular weight must also be deﬁned in the
+”specie” sub-dictionary.
+phase_name
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+specie
+{
+molWeight 28.97;
+}
+transport
+{
+...
+}
+43
+
+=== page 44 ===
+thermodynamics
+{
+...
+}
+equationOfState
+{
+gamma 1.4;
+...
+}
+}
+NOTE: Not all combinations of thermodynamic model, equation of state,
+transport, and mixture type are compiled, however using the dynamic com-
+pilation available in OpenFOAM, if a valid option is requested it will be com-
+piled at run time and the library will be stored in thedynamicCode folder
+in the case. If any changes are made to the source code (updating/pulling)
+will not aﬀect these libraries, and thedynamicCode folder will need to be
+removed for re-compilation.
+NOTE: By default, any thermodynamic combination that has not previ-
+ously been compiled will be compiled using the ﬁles inblastfoam/etc/code-
+Templates. These ﬁles include support for the standard model, however using
+the ”templateDir” entry a diﬀerent folder can be used, so that user modiﬁed
+ﬁles can be used. This allows for use of user implemented equations of state,
+thermodynamic, or transport models.
+5.1 Thermodynamic models
+The thermodynamic model is used to calculate the internal energy based
+solely on the thermal contribution:
+eT =
+∫
+Cv(T )dT (5.1)
+An additional contribution from the equation of state is given by:
+eeos(ρ,T ) =
+∫ (
+T∂p(ρ,T )
+∂T −p(ρ,T )
+)
+dv (5.2)
+44
+
+=== page 45 ===
+where vi = 1/ρi is the speciﬁc volume. The total internal energy is
+e =eT (T ) +eeos(ρ,T ) (5.3)
+Because the internal energy is the tracked quantity, the temperature is solved
+using a Newton-Raphson root ﬁnding method given the local internal energy
+and density.
+Either internal energy or enthalpy-based coeﬃcients can be used, but
+only internal energy is used to deﬁne the total energy. The conversion from
+an enthalpy base to an internal energy base is calculated using the speciﬁed
+equation of state. All transport models, with the exception of the tabulated
+methods were ported from OpenCFD Ltd. (2018b).
+Cv =Cp−CpMCv (5.4)
+where CpMCv is determined from the equation of state using
+CpMCv = ∂(p(ρ,e )v)
+∂T (5.5)
+For an ideal gas,CpMCv = ¯R/W where ¯R is the ideal gas constant (8314
+[J/mol/K]) andW is the molecular weight in [kg/kmol]. Equations of state
+that have a pressure with a non-linear dependence on temperature will devi-
+ate from this.
+When enthalpy is used, the internal energy is calculated using
+e =h− p
+ρ (5.6)
+NOTE: By default the internal energy is limited so that the temperature is
+greater than 0. If ”limitT” is set to ”no” the temperature and energy will not
+be limited. Caution should be used with this option.
+5.1.1 eConst
+Internalenergyiscalculatedusingaconstantvalueofspeciﬁcheatatconstant
+volume.
+eT (T ) =Cv(T−Tref ) +Es,ref (5.7)
+45
+
+=== page 46 ===
+Variable Description
+Cv Speciﬁc at constant volume [J/kg/K]
+Tref Reference temperature [K] (293.15 K default)
+Esref Reference sensible internal energy [J/kg/] (Tref Cv default)
+Hf Heat of formation [J/kg]
+5.1.2 ePolynomial
+Internal energy is calculated using polynomial with powers of T.
+eT (T ) =
+7∑
+i=0
+Cv,iTi (5.8)
+Variable Description
+CvCoeﬀs<8> Speciﬁc heat at constant volume polynomial coeﬃcients
+Hf Heat of formation [J/kg]
+Sf Standard entropy [J/kg/K]
+5.1.3 ePower
+Internal energy using a power function of temperature.
+eT (T ) =Cv(T )T (5.9)
+Cv(T ) =C0
+( T
+Tref
+)n0
+(5.10)
+Variable Description
+C0 Reference heat capacity at constant volume [J/kg/K]
+n0 Exponent of the power function
+Tref Reference temperature [K]
+Hf Heat of formation [J/kg]
+46
+
+=== page 47 ===
+5.1.4 eIcoTabulated
+The incompressible tabulated thermodynamic model can be used to calculate
+the temperature using temperature to lookup the internal energy. The data
+is read from a one dimensional table. The speciﬁc heat are calculated using
+ﬁnite diﬀerence derivatives to the tables. See Sec. 12.1 for more information
+on the available options for modiﬁers and interpolation schemes. The ”x”
+and ”f” names are ”T” and ”e” respectively. A heat of formation, ”Hf”, must
+also be provided.
+5.1.5 eTabulated
+The tabulated thermodynamic model can be used to calculate the tempera-
+ture using density and temperature to ﬁnd internal energy. The data is read
+from a two dimensional table. The speciﬁc heat are calculated using ﬁnite
+diﬀerence derivatives to the tables. See Sec. 12.1 for more information on
+the available options for modiﬁers and interpolation schemes. The ”x”, ”y”,
+and ”f” names are ”rho”, ”T”, and ”e” respectively. A heat of formation, ”Hf”,
+must also be provided.
+NOTE: The equation of state contribution of internal energy is not included
+so this must be included in the tables provided.
+5.1.6 hConst
+Enthalpy is calculated using a constant value of speciﬁc heat at constant
+pressure.
+hT (T ) =Cp(T−Tref) +Hs,ref (5.11)
+Variable Description
+Cp Speciﬁc at constant pressure [J/kg/K]
+Tref Reference temperature [K] (293.15 K default)
+Hsref Reference sensible enthalpy [J/kg/] (Tref Cp default)
+Hf Heat of formation [J/kg]
+47
+
+=== page 48 ===
+5.1.7 hPolynomial
+Enthalpy is calculated using polynomial with powers of T.
+hT (T ) =
+7∑
+i=0
+Cp,iTi (5.12)
+Variable Description
+CpCoeﬀs<8> Speciﬁc heat at constant pressure polynomial coeﬃcients
+Hf Heat of formation [J/kg]
+Sf Standard entropy [J/kg/K]
+5.1.8 hPower
+Internal energy using a power function of temperature.
+hT (T ) =Cp(T )T (5.13)
+Cv(T ) =C0
+( T
+Tref
+)n0
+(5.14)
+Variable Description
+C0 Reference heat capacity at constant volume [J/kg/K]
+n0 Exponent of the power function
+Tref Reference temperature [K]
+Hf Heat of formation [J/kg]
+5.1.9 hIcoTabulated
+The incompressible tabulated thermodynamic model can be used to calculate
+the temperature using temperature to lookup the enthalpy. The data is read
+from a one dimensional table. The speciﬁc heat are calculated using ﬁnite
+diﬀerence derivatives to the tables. See Sec. 12.1 for more information on
+the available options for modiﬁers and interpolation schemes. The ”x” and
+”f” names are ”T” and ”h” respectively. A heat of formation, ”Hf”, must also
+be provided.
+48
+
+=== page 49 ===
+5.1.10 hTabulated
+The tabulated thermodynamic model can be used to calculate the tempera-
+ture using density and temperature to ﬁnd enthalpy. The data is read from a
+two dimensional table. The speciﬁc heat are calculated using ﬁnite diﬀerence
+derivatives to the tables. See Sec. 12.1 for more information on the available
+options for modiﬁers and interpolation schemes. The ”x”, ”y”, and ”f” names
+are ”rho”, ”T”, and ”h” respectively. A heat of formation, ”Hf”, must also be
+provided.
+NOTE: The equation of state contribution of internal energy is not included
+so this must be included in the tables provided.
+5.1.11 JANAF
+The JANAF thermodynamic model can be used in which the enthalpy is
+represented by a temperature based polynomial (OpenCFD Ltd., 2018b).
+Seven coeﬃcients must be speciﬁed for both the low temperature and high
+temperature states, as well as the high, low, and switching temperatures.
+Currently, this model is only available for ideal gases.
+Variable Description
+highCpCoeﬀs High enthalpy coeﬃcients
+lowCpCoeﬀs Low enthalpy coeﬃcients
+Tlow Minimum temperature [K]
+Tcommon Switching temperature [K]
+Thigh Maximum temperature [K]
+5.2 Equation of states
+Inordertomoreeasilyhandleavarietyofequationsofstate, bothtemperature-
+based equations of state and internal energy based equations of state (e.g. in
+Mie-Grüneisen form) can be used.
+5.2.1 rhoConst
+For a solid phase, it is assumed to have a constant density,ρ0, and maintains
+a reference pressurepref. Because a solid thermodynamic model is never used
+49
+
+=== page 50 ===
+to transport mass, the reference pressure is arbitrary and therefore set to 0
+[Pa] by default.
+Variable Description
+ρ0 reference density [ kg/m3 ]
+pref Reference pressure [Pa ] (default 101235 Pa)
+5.2.2 Internal energy based (Mie-Grüneisen form)
+The Mie-Grüneisen form uses two contributions to calculate the pressure,
+and ideal gas term contribution, and a deviation term.
+p = (Γi− 1)ρie− Πi (5.15)
+Γi, also called the Grüneisen coeﬃcient, andΠi is the pressure deviation from
+an ideal gas and is speciﬁc to the equation of state. Using these quantities,
+the speed of sound is written as
+c2
+i = Γip + Πi
+ρi
+−δi(Γi− 1) (5.16)
+where δi is deﬁned
+δi =−[p + Πi]Γ′
+i
+[Γi− 1]2 + Π′
+i
+Γi− 1 (5.17)
+and where Γ′
+i and Π′
+i are the derivatives with respect to the phase density.
+5.2.2.1 idealGas
+For an ideal gas, the pressure is deﬁned as
+pi = (γi− 1)ρiei (5.18)
+The functions as deﬁned to represent an ideal gas in Mie-Grüneisen form
+are:
+Γi =γi (5.19)
+Πi = 0 (5.20)
+50
+
+=== page 51 ===
+δi = 0 (5.21)
+Variable Description
+gamma Speciﬁc heat ratio [ ]
+5.2.2.2 stiﬀenedGas
+For a material obeying the stiﬀened EOS, the pressure is deﬁned as
+pi = (γi− 1)ρiei−γiai (5.22)
+where ai and γi are material properties (Zheng et al., 2011). In the Mie-
+Grüneisen form
+Γi =γi (5.23)
+Πi =γiai (5.24)
+and
+δi = 0 (5.25)
+Variable Description
+a Reference pressure [Pa]
+gamma Speciﬁc heat ratio [ ]
+5.2.2.3 (linearTillotson
+The linear Tillotson equation of state was presented by (Wardlaw et al.,
+1998), and the pressure is deﬁned as
+pi =p0,i +ωiρi(eT−e0,i) +Aiµ +Biµ2 +Ciµ3 (5.26)
+where Ai, Bi, Ci, andωi are material coeﬃcients, andp0,i and e0,i are the
+reference pressure and internal energy. µ is deﬁned asρi/ρ0,i− 1. The
+cavitation pressure,pcav is used as the minimum pressure which occurs when
+the density is suﬃciently below the reference density.
+51
+
+=== page 52 ===
+In the Mie-Grüneisen form
+Γi =ωi + 1 (5.27)
+and
+Πi =ωiρie0,i−p0,i−Aiµ−Biµ2−Ciµ3 (5.28)
+and
+δi =e0,i− A + 2Bµ + 3.0Cµ2
+ρ0,iωi
+(5.29)
+Variable Description
+p0 Reference pressure [Pa]
+rho0 Reference density [kg/m3]
+e0 Reference internal energy [kJ/kg]
+omega Model coeﬃcient [ ]
+A Model coeﬃcient [Pa]
+B Model coeﬃcient [Pa]
+C Model coeﬃcient [Pa]
+pCav Cavitation pressure [Pa]
+5.2.2.4 Tillotson
+The Tillotson equation of state was originally developed for metals by
+Tillotson (1962), and the pressure is deﬁned as
+pi = max
+(
+ρie
+(
+a + b
+e
+e0,iη2 + 1
+)
++Aiµ +Biµ2,pcav
+)
+(5.30)
+where Ai, Bi, Ci, andωi are material coeﬃcients, andp0,i and e0,i are the
+reference pressure and internal energy (Wardlaw et al., 1998).µ is deﬁned
+asρi/ρ0,i− 1. The cavitation pressure,pcav is used as the minimum pressure
+which occurs when the density is suﬃciently below the reference density.
+In the Mie-Grüneisen form
+Γi = aix +bie0,iρ2
+i
+x − bee0,i(ρiρ0,i)2
+x2 + 1 (5.31)
+52
+
+=== page 53 ===
+where
+xi =eρ2
+0,i +e0,iρ2
+i (5.32)
+and
+Πi =−Aiµ−Biµ2−bi
+(eρiρ0,i)2e0,iρi
+(
+eρ2
+0,i +e0,iρ2
+i
+)2 (5.33)
+and δi is calculated using (5.17)
+Variable Description
+rho0 Reference density [kg/m3]
+e0 Reference internal energy [kJ/kg]
+a Model coeﬃcient [ ]
+b Model coeﬃcient [ ]
+A Model coeﬃcient [Pa]
+B Model coeﬃcient [Pa]
+pCav Cavitation pressure [Pa]
+5.2.2.5 Tait
+For a material obeying the stiﬀened EOS, the pressure is deﬁned as
+pi = (γi− 1)ρiei−γi(bi−ai) (5.34)
+where ai, bi, and γi are material properties (Zheng et al., 2011). In the
+Mie-Grüneisen form
+Γi =γi (5.35)
+Πi =γi(bi−ai) (5.36)
+and
+δi = 0 (5.37)
+Variable Description
+a Material parameter [Pa]
+b Material parameter [Pa]
+gamma Speciﬁc heat ratio [ ]
+53
+
+=== page 54 ===
+5.2.2.6 vanderWaals
+For a gas described by the generalized van der Waals equation of state
+(Zheng et al., 2011), the pressure is deﬁned as
+pi = γi− 1
+1−biρi
+(ρiei +aiρ2
+i )− (aiρ2
+i +ci) (5.38)
+Putting the pressure in the Mie-Grüneisen form, we obtain
+Γi = γi− 1
+1−biρi
++ 1 (5.39)
+Πi =
+[
+1− γi− 1
+1−biρi
+]
+aiρ2
+i +
+[ γi− 1
+1−biρi
++ 1
+]
+ci (5.40)
+and
+δi =−bi
+pi +aiρ2
+i
+γi− 1 +
+(1−biρi
+γ− 1 − 1
+)
+2aiρi (5.41)
+Variable Description
+a Attraction between particles [kg−1 m5 s−2]
+b Speciﬁc volume excluded due to particle volume [kg−1 m3]
+c Reference pressure [Pa]
+gamma Speciﬁc heat ratio [ ]
+5.2.2.7 LSZK
+The Landau, Stanyukovich, Zeldovich, and Kompaneets equation of state
+is a simple model for describing an ideal explosive (Lutzky, 1964; Needham,
+2018). It takes a form similar to a stiﬀened gas or Tait EOS, with
+Γi =γi (5.42)
+Πi =aiρbi
+i (5.43)
+and
+δi = 0 (5.44)
+54
+
+=== page 55 ===
+Variable Description
+a Model constant [kg1−bs−2m3b−1]
+b Pressure exponent [ ]
+gamma Speciﬁc heat ratio [ ]
+5.2.2.8 JWL
+The more complicated Jones Wilkins Lee EOS is often used to deﬁne
+energetic materials (Zheng et al., 2011), and has a pressure deviation given
+by
+Πi =Aie−R1,iV
+( ωi
+R1,iV − 1
+)
++Bie−R2,iV
+( ωi
+R2,iV − 1
+)
+−ρiωie0,i (5.45)
+where V =ρ0,i/ρi.
+Γr,i =ωi + 1 (5.46)
+and
+δr,i =Aie−
+R1,iρ0,i
+ρi
+[
+ωi
+( 1
+R1,iρ0,i
++ 1
+ρi
+)
+− R1,iρ0,i
+ρ2
+i
+] 1
+ωi
++Bie−
+R2,iρ0,i
+ρi
+[
+ωi
+( 1
+R2,iρ0,i
++ 1
+ρi
+)
+− R2,iρ0,i
+ρ2
+i
+] 1
+ωi
+−e0,i (5.47)
+NOTE: The JWL model can also be used to describe the unreacted state if
+a detonating model is used with thesolidJWL type. For the solid case,e0,i is
+calculated so that there is zero pressure at the reference density, and uses an
+oﬀset pressure, ”pRef”. Thermal energy is also not considered for the solid
+case
+55
+
+=== page 56 ===
+Variable Description
+A Model coeﬃcient [Pa]
+B Model coeﬃcient [Pa]
+R1 Model coeﬃcient [ ]
+R2 Model coeﬃcient [ ]
+rho0 Unreacted or reference density [kg m−3]
+omega Grüneisen coeﬃcient [ ]
+e0 Oﬀset energy (0 by default for gas) [J/Kg]
+pRef Oﬀset pressure (only for solid, 0 by default) [Pa]
+5.2.2.9 CochranChan
+The Cochran Chan EOS can be used to describe a solid material (Zheng
+et al., 2011), and has a reference pressure given by
+pref,i =AiV
+1−E1,i
+i −BiV
+1−E2,i
+i (5.48)
+The functions used to deﬁned the Mie-Grüneisen equations are
+Γi = Γ0,i + 1, (5.49)
+Πi = Γ0,iρi
+(
+− Ai
+(E1,i− 1)ρ0,i
+V
+1−E1,i
+i
++ Bi
+(E2,i− 1)ρ0,i
+V
+1−E2,i
+i −e0,i
+)
+−pref,i (5.50)
+and
+δi = Ai
+E1,i
+[
+E1,iV
+−E1,i
+i
+E1,i− Γ0,i− 1
+ρi
++ Γ0,i
+ρ0,i
+] 1
+Γ0,i
++ Bi
+E2,i
+[
+E2,iV
+−E2,i
+i
+E2,i− Γ0,i− 1
+ρi
++ Γ0,i
+ρ0,i
+] 1
+Γ0,i
+−e0,i (5.51)
+56
+
+=== page 57 ===
+Variable Description
+A Model coeﬃcient [Pa]
+B Model coeﬃcient [Pa]
+E1 Model coeﬃcient [ ]
+E2 Model coeﬃcient [ ]
+rho0 Reference density [kg/m3]
+Gamma0 Grüneisen coeﬃcient [ ]
+e0 Reference energy (0 by default) [J/Kg ]
+5.2.2.10 DoanNickel
+The Doan-Nickel EOS includes changes in the composition of air at high tem-
+peratures and the changing speciﬁc heat ratio due to dissociation of molecules
+DoanandNickel(1963). Duetothewaythismodelisdeﬁned, itcancurrently
+only be used with inviscid ﬂuids and a constant speciﬁc heat at constant vol-
+ume (eConst). The speciﬁc heat is a function of the density and internal
+energy and is deﬁned as
+Γi = 1 +
+[
+0.161 + 0.255e˜e/e1f1 + 0.280e˜e/e2(1−f1)
++ 0.137e˜e/e3f2 + 0.050f3
+]( ρi
+ρ0,i
+)α(ρi,˜e)
+(5.52)
+where ˜e = e· 10−6. e1 = 4.46, e2 = 6.63, and e3 = 25.5 are the internal
+energies at which oxygen dissociates, everything is dissociated, and electrons
+contribute, respectively.ρ0,i is the density of air at sea-level (1.293 [kg/m3],
+and
+α(ρi, ˜e) = [0.048f1 + 0.032(1−f1)(1−f2)] log10(˜e) + 0.045f3 (5.53)
+with
+f1 = 1
+exp
+(
+˜e−eO2−>2O
+∆eO2−>2O
+)
++ 1
+(5.54)
+eO2−>2O = 8.5 + 0.357log10
+( ρi
+ρ0,i
+)
+(5.55)
+∆eO2−>2O = 0.975
+( ρi
+ρ0,i
+)0.05
+(5.56)
+57
+
+=== page 58 ===
+f2 = 1
+exp(
+eN2−>2N−˜e
+∆eN2−>2N
+) + 1
+(5.57)
+eN2−>2N = 45.0
+( ρi
+ρ0,i
+)0.0157
+(5.58)
+∆eN2−>2N = 4.0
+( ρi
+ρ0,i
+)0.085
+(5.59)
+f3 = 1
+exp(ee−˜e
+∆ee
+) + 1 (5.60)
+ee = 160.0 (5.61)
+and
+∆ee = 6.0 (5.62)
+Due to the complexity of the model, and the fact that it wasspeciﬁcally
+developed as a model for air, all coeﬃcients are hard-coded and cannot be
+changed. This equation of state should only be used to represent standard
+air.
+5.2.3 Temperature-based
+While it is preferable to use an internal energy based equation of state for
+compressible ﬂows, some equations of state cannot be converted, and there-
+fore use the local temperature to deﬁne the thermodynamic pressure. Gener-
+ally the Grüneisen coeﬃcient used to calculate the shared pressure is deﬁned
+as
+Γi = vi
+Cv
+∂p
+∂T (5.63)
+where Cv is the speciﬁc heat at constant volume, and the speed of sound is
+deﬁned
+c2
+i =v2
+i
+[(∂pi
+∂T
+)2 T
+Cv
+− ∂p
+∂vi
+]
+(5.64)
+Unless otherwise speciﬁed, these relations are used to calculate the relevant
+quantities.
+58
+
+=== page 59 ===
+5.2.3.1 perfectGas
+Theperfectgasequationofstateusesthestandardidealgaspressurerelation,
+however the speciﬁc heat ratio is not held constant, allowing for the use of
+non-constant heat capacity models.
+pi =RTρi (5.65)
+5.2.3.2 JWLC
+The C-form of the Jones Wilkins Lee equation of state (Souers et al.,
+2000) does not have a dependence on the temperature or internal energy and
+has a pressure deﬁned as
+pi =Aie−R1,iV +Bie−R2,iV + Ci
+V 1+ωi
+(5.66)
+the speed of sound if deﬁned
+c2
+i = V 2
+ρ0,i
+(
+Aie−R1,iV +Bie−R2,iV + Ci(1 +ωi)
+V 2+ωi
+)
+(5.67)
+The Grüneisen coeﬃcient is the same as the standard JWL equation of state.
+Variable Description
+A Model coeﬃcient [Pa]
+B Model coeﬃcient [Pa]
+C Model coeﬃcient [Pa]
+R1 Model coeﬃcient [ ]
+R2 Model coeﬃcient [ ]
+rho0 Unreacted or reference density [kg m−3]
+omega Grüneisen coeﬃcient [ ]
+5.2.3.3 AbelNobel
+The equation of state of Abel-Nobel is commonly used for modeling simulate
+explosive materials, speciﬁcally for propellants (Johnston, 2005). Unlike the
+JWL equation of state, the BKW models uses the temperature, rather than
+the internal energy, to deﬁne the pressure.
+pi = RTρi
+1−biρi
+(5.68)
+59
+
+=== page 60 ===
+where b is the co-volume of the ﬂuid.
+Variable Description
+b Co-volume [m3/kg ]
+5.2.3.4 BKW
+The Becker-Kistiakowsky-Wilson equation of state is another equation of
+state that is commonly used to simulate explosive materials (Mader, 1963).
+Unlike the JWL equation of state, the BKW models uses the temperature,
+rather than the internal energy, to deﬁne the pressure.
+pi =RTρi
+(
+1 +xeβx)
+(5.69)
+where
+x = κkρi
+Wi(T +θ)a (5.70)
+and Wi is the molecular weight in [kg/kmol].
+Variable Description
+beta Model coeﬃcient [ ]
+a Temperature exponent [ ]
+Theta Model coeﬃcient [K]
+kappa Model coeﬃcient [Ka]
+k Specie co-volume [m3/kmol]
+5.2.3.5 BWR
+The Benedict-Webb-Rubin equation of state was developed by (Benedict
+et al., 1942) to describe real gases using a set of eight coeﬃcients that must
+be experimentally determined. The pressure is deﬁned as
+pi =RTρi +
+(
+B0RT−A0− C0
+T 2
+)
+ρ2
+i
++ (bRT−a)ρ3
+i +aαρ6
+i +cρ3
+i
+T 2 (1 +γρ2
+i )e−γρ2
+i (5.71)
+60
+
+=== page 61 ===
+Variable Description
+A0 Model coeﬃcient
+B0 Temperature exponent
+C0 Model coeﬃcient
+a Model coeﬃcient
+b Model coeﬃcient
+c Model coeﬃcient
+alpha Model coeﬃcient
+gamma Speciﬁc heat ratio [ ]
+5.2.3.6 Murnaghan
+The Murnaghan (or Munahan) equation of state is used for solid material
+and has no temperature dependence (Souers et al., 2000). The pressure is a
+function of only the density and is deﬁned as
+pi =pref + 1
+κn
+( ρi
+ρ0,i
+− 1
+)n
+(5.72)
+Variable Description
+pRef Reference pressure [Pa]
+rho0 Reference density [kg/m3]
+kappa Model coeﬃcient (1/K0) [Pa−1]
+K0 Bulk modulus (can be used in place ofκ) [Pa]
+n (or K0) Model coeﬃcient (default 1) [ ]
+Gamma Grüneisen coeﬃcient [ ]
+5.2.4 tabulatedEOS
+The tabulated equation of state can be used to calculate the pressure using
+the density and temperature. The data is read from a two dimensional tables.
+See Sec. 12.1 for more information on the available options for modiﬁers and
+interpolation schemes. The ”x”, ”y”, and ”f” names are ”rho”, ”T”, and ”p”
+respectively.
+5.2.4.1 BirchMurnaghan2
+61
+
+=== page 62 ===
+The second order Birch-Murnaghan equation of state is the second order
+expansion of the Birch-Murnaghan model. The pressure is deﬁned as
+pi =pref + 3K0
+2K′
+0
+[( ρi
+ρ0,i
+)7/3
+−
+( ρi
+ρ0,i
+)5/3]
+(5.73)
+Many coeﬃcients can be found for this in Zheng and Zhao (2016).
+Variable Description
+pRef Reference pressure [Pa]
+rho0 Reference density [kg/m3]
+K0 Bulk modulus [Pa]
+Gamma Grüneisen coeﬃcient [ ]
+5.2.4.2 BirchMurnaghan3
+The Third order Birch-Murnaghan equation of state is the third order ex-
+pansion of the Birch-Murnaghan (see Zheng and Zhao (2016)). The pressure
+is deﬁned as
+pi =pref + 3K0
+2K′
+0
+[( ρi
+ρ0,i
+)7/3
+−
+( ρi
+ρ0,i
+)5/3]
+×
+{
+1 + 0.75(K′
+0− 4)
+[( ρi
+ρ0,i
+)2/3
+− 1
+]}
+(5.74)
+Variable Description
+pRef Reference pressure [Pa]
+rho0 Reference density [kg/m3]
+K0 Bulk modulus [Pa]
+K0Prime Change in bulk modulus w.r.t. pressure [ ]
+Gamma Grüneisen coeﬃcient [ ]
+5.2.5 eTabulated/tabulatedMG
+In addition to the previously mentioned equations of state and thermody-
+namic models, tabulated models may also be used. This is useful when
+62
+
+=== page 63 ===
+simulating real gasses, and high temperatures and pressures when standard
+models are no longer suﬃcient. Any combination of pressure and tempera-
+ture tables can be used, as long as they are a function of density and internal
+energy (x and y, respectively). The internal energy is initialized using a re-
+verse look up given a pressure and a density. See 12.1 for more information
+on usage.
+NOTE: Because of the way the selection of models is handled, this option
+will not show up as an available option if other models are used. Currently
+only const, icoTabulated, and tabulated transport models are available.
+An example is shown below:
+phase
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eTabulated;
+equationOfState tabulatedMG;
+}
+specie
+{
+molWeight 28.97;
+}
+tranpsport
+{
+mu 0;
+Pr 0;
+}
+thermodynamics
+{
+file "T.csv";
+mod ln; // log(p_i)=p_table
+rhoMod log10; // log_10(rho_i)=minRho+i*deltaRho
+nRho 7; // Number of columns
+minRho -3.0; // 0.001 kg/m^3
+63
+
+=== page 64 ===
+deltaRho 1.0;
+eMod ln; // log(e)=mine+j*deltaE
+nE 40; // Number of rows
+minE 11.8748;
+deltaE 1.0;
+}
+equationOfState
+{
+file "p.csv";
+mod ln; // log(p_i)=p_table
+rhoMod log10; // log_10(rho_i)=minRho+i*deltaRho
+nRho 7; // Number of columns
+minRho -3.0; // 0.001 kg/m^3
+deltaRho 1.0;
+rhoIsReal false;
+eMod ln; // log(e)=mine+j*deltaE
+nE 40; // Number of rows
+minE 11.8748;
+deltaE 1.0;
+eIsReal false;
+}
+}
+5.3 Fluid Transport
+The transport models are used to deﬁne quantities such as viscosity and
+thermal diﬀusion. Only Newtonian viscosity models are currently available.
+All transport models, with the exception of the tabulated methods ported
+from OpenCFD Ltd. (2018b).
+5.3.1 const
+Constant values for viscosity (µ) and Prandtl number are used.
+κ =µCp/Pr (5.75)
+64
+
+=== page 65 ===
+Variable Description
+mu Dynamic viscosity [Kg/m/s]
+Pr Prandtl number [ ]
+5.3.2 sutherland
+Viscosity is calculated using Sutherland’s formula for viscosity
+µ(T ) =As
+√
+T
+1 +Ts/T (5.76)
+κ =µCv
+(
+1.32 + 1.77R
+Cv
+)
+(5.77)
+Variable Description
+Ts Sutherland temperature [K]
+As Sutherland coeﬃcient [kg/m/s/K1/2]
+5.3.3 logPolynomial
+Transport package using polynomial functions of the natural logarithm of
+temperature for the natural logarithm of dynamic viscosity and thermal con-
+ductivity:
+log(µ(T )) =
+7∑
+i=0
+µi(log(T ))i (5.78)
+log(κ(T )) =
+7∑
+i=0
+κi(log(T ))i (5.79)
+Variable Description
+muCoeﬀs<8> Dynamic viscosity coeﬃcients
+kappaCoeﬀs<8> Conductivity coeﬃcients
+65
+
+=== page 66 ===
+5.3.4 polynomial
+Transport package using polynomial functions of temperature for the dy-
+namic viscosity and thermal conductivity:
+µ(T ) =
+7∑
+i=0
+µiTi (5.80)
+κ(T ) =
+7∑
+i=0
+κiTi (5.81)
+Variable Description
+muCoeﬀs<8> Dynamic viscosity coeﬃcients
+kappaCoeﬀs<8> Conductivity coeﬃcients
+5.3.5 WLF
+Transport package using the Williams-Landel-Ferry model for viscosity of
+polymer melts (Williams et al., 1955):
+µ(T ) =µ0exp
+(
+− C1(T−Tr)
+C2 +T−Tr
+)
+(5.82)
+κ(T ) =Cp(T )µ(T )
+Pr (5.83)
+Variable Description
+mu0 Reference dynamic viscosity [Pa s]
+TRef Referece temperature [K]
+C1 WLF constant [ ]
+C2 WLF constant [K]
+Pr Prandtl number [ ]
+5.3.6 icoTabulated
+The tabulated, incompressible transport model can be used to calculate the
+viscosity and conductivity using only the temperature. The data is read
+from two one dimensional tables. See Sec. 12.1 for more information on the
+66
+
+=== page 67 ===
+available options for modiﬁers and interpolation schemes. The ”x” and ”f”
+names are ”T” and ”mu”/”kappa” respectively.
+5.3.7 tabulated
+The tabulated transport model can be used to calculate the viscosity and
+conductivity using the density and temperature. The data is read from two,
+two dimensional tables. See Sec. 12.1 for more information on the available
+options for modiﬁers and interpolation schemes. The ”x”, ”y”, and ”f” names
+are ”rho”, ”T”, and ”mu”/”kappa” respectively.
+5.4 Solid Transport
+The transport models are used to deﬁne the thermal conductivity of the
+material. All transport models, with the exception of the tabulated methods
+are ported from OpenCFD Ltd. (2018b).
+5.4.1 constIso
+A constant, scalar value (isotropic), is used for for thermal conductivity.
+Variable Description
+kappa Thermal conductivity [W/m/K]
+5.4.2 constAnIso
+A constant, vector value (anistropic), is used for thermal conductivity.
+Variable Description
+kappa Thermal conductivity (vector) [W/m/K]
+5.4.3 exponential
+Thermal conductivity is calculated using an exponential function
+κ(T ) =κ0
+( T
+Tref
+)n0
+(5.84)
+67
+
+=== page 68 ===
+Variable Description
+kappa0 Reference thermal conductivity [W/m/K]
+n0 Exponential coeﬃcient [ ]
+Tref Reference temperature [K]
+5.4.4 polynomial
+Thermal conductivity is calculated using polynomial functions of tempera-
+ture.
+κ(T ) =
+7∑
+i=0
+κiTi (5.85)
+Variable Description
+kappaCoeﬀs<8> Conductivity coeﬃcients
+5.4.5 tabulatedIso
+The tabulated, isotroptic solid transport model can be used to calculate the
+conductivity using the temperature. The data is read from a one dimensional
+table. See Sec. 12.1 for more information on the available options for modi-
+ﬁers and interpolation schemes. The ”x” and ”f” names are ”T” and ”kappa”
+respectively.
+5.4.6 tabulatedAnIso
+The tabulated, anisotroptic solid transport model can be used to calculate
+the conductivity using the temperature. The data is read from a one di-
+mensional table. See Sec. 12.1 for more information on the available options
+for modiﬁers and interpolation schemes. The ”x” and ”f” names are ”T” and
+”kappa” respectively.
+5.5 Basic thermodynamic model
+The basicFluid and basicSolid models (”type” basic) uses a transport
+model, thermodynamic model, and equation of state to describe a phase.
+The basic model should be used for non-reacting phases.
+68
+
+=== page 69 ===
+5.6 Detonating thermodynamic model
+In order to better describe a detonating material, a ’detonating’ thermo-
+dynamic model can be used. This model transitions between an unreacted
+state and a reacted state using an activation model. Each state (unreacted
+and reacted) is described by its own basic thermodynamic model, allowing
+for diﬀerent models and coeﬃcients to be used for values such as viscosity or
+speciﬁc heats. In addition to the activation model, afterburn models can also
+be used to add additional energy into the system after the initial detonation
+reaction has taken place.
+This same methodology is applied to solid phases where energy is released
+locally to increase the thermal energy (internal energy). Only activation
+models are currenltly available.
+Some standard combinations of unreacted and reacted equations of states
+include theJWL++ (Murnaghn and JWLC), and theblendedJWL (solidJWL and
+JWL).
+NOTE: Whilst it will not give the correct temperature, using an ideal gas
+is a simple option if the solid properties of the unreacted material are not
+known.
+phase1
+{
+type detonating;
+reactants
+{
+thermoType
+{
+...
+}
+...
+}
+products
+{
+thermoType
+{
+...
+}
+69
+
+=== page 70 ===
+...
+}
+activationModel linear;
+initiation
+{
+E0 9.0e9;
+points ((0 0 0) (0.1 0.1 0.1));
+delays (0 1e-5);
+radii (0.001 0.005);
+vDet 5000;
+}
+afterburnModel Miller;
+MillerCoeffs
+{
+Q0 1e7;
+m 0.1667;
+n 0.5;
+a 0.0195e6;
+pMin 1.1e5;
+}
+}
+5.6.1 Activation Models
+In order to accurately model the release of energy, diﬀerent models can be
+used to approximate the speed at which the solid reactants become the prod-
+uct gases. The currently available models include the linear model, a pressure
+based model, and ﬁnally an Arrhenius rate reaction. Theses models all use
+a reaction progress variable,λi, to describe the state of individual cell acti-
+vation. Additionally, in order to add numerical stability, the initial energy is
+deﬁned using the unreacted equation of state, and the reaction energy,E0,
+is added based on the time rate of change of the reaction progress variable,
+i.e.
+˙E = E0ρi
+ρ0,i
+dλ
+dt (5.86)
+70
+
+=== page 71 ===
+The phase properties are calculated using
+xi =λ𝓁
+ixr,i + (1−λ𝓁
+i)xu,i) (5.87)
+wherexr,i is the reacted phase quantity,xu,i is the unreacted phase quantity,
+and 𝓁 is the exponent used to blend the unreacted and reacted states (lam-
+daPow). By default𝓁 is one. The advection scheme and limiters forλi need
+to be speciﬁed in thefvSchemes in the same manner as the other transported
+quantities.
+The setting of detonation points can be done for any activation model. By
+setting detonation points, the cells within the charge with the radii speciﬁed
+are set to full activated when run time reaches the given delays. If no radii are
+provided, only the cell containing the point will be activated. Additionally,
+delays can be used to specify the time at which the given point and cells
+within the radius are activated. For a single detonation point, the ”useCOM”
+option can be used to calculate the center of mass of an individual charge.
+Transport of the reaction progress variable is described by the transport
+equation
+∂αiρiλi
+∂t + ∇· (αiρiuλi) =αiρi ˙Ri (5.88)
+where ˙Ri is the reaction rate determined by the model of choice.
+Variable Description
+E0 Detonation energy [Pa]
+points Detonation points [m]
+radii (radius) Initiation radii around
+detonation points (default is 0) [m]
+delays Delay time of detonation points (default is 0) [s]
+lambdaPow Exponent used for blending [ ] (default is 1)
+useCOM Is the center of mass used
+as the detation point (default is no)
+5.6.1.1 none
+The none activation model assumes that all cells are activated when the
+simulation begins. This is the equivalent to an inﬁnitely fast detonation
+velocity. The use of delays and detonation points are not valid here because
+the detonation is assumed to be instantaneous. There is no transport of the
+reaction progress variable.
+71
+
+=== page 72 ===
+5.6.1.2 linear
+The simplest activation model uses a list of detonation points and a constant
+detonation velocity to determine which cells have been activated. This gives
+λi,j =
+{
+1 if|x− xdet,i,j|<v det,it
+0 else (5.89)
+where x is the cell center, xdet,i,j is the jth detonation point, vdet,i is the
+detonation velocity, and t is the time. In order to account for multi-point
+detonation, the actualλ is deﬁned as
+λi = max(λi,j) (5.90)
+Variable Description
+vDet Speed of propagation within the material [m/s]
+5.6.1.3 programmedIgnition
+The programmedIgnition activation model is slightly more complex than
+the linear activation model and includes the option to use activation due to
+compression of material, and is based on the work of Giroux (1973). The
+reaction progress variable is deﬁned using a combination of two models, the
+compression
+λβ,i =
+1− ρ0,i
+ρi
+1−VCJ,i
+(5.91)
+where VCJ,i is the Chapman-Jougnuet speciﬁc volume which is computed
+using the Chapman-Jouguet pressure. The reference density,ρ0,i is read from
+the product equation of state. The programmed deﬁnition of the reaction
+progress variable is a modiﬁed version of the linear activation, where a cell
+reacts at a time-rate determined by the detonation velocity and the local grid
+size
+λprogrammed,i = max(t−tign,j, 0) vdet
+1.5dx (5.92)
+wheretign is the time of ignition determined by the physical location and the
+detonation velocity, anddx is the local grid size.
+72
+
+=== page 73 ===
+If the beta burn option is used,λi = λβ,i; if the programmed burn option
+is used, λi = λprogrammed,i; and if the programmedBeta burn option is used
+λi = max(λi,β,λ programmed,i).
+Variable Description
+vDet Speed of propagation within the material [m/s]
+Pcj Chapman-Jouguet pressure [Pa]
+burnModel Burn model used (beta, programmed, or programmedBeta)
+5.6.1.4 pressureBased
+A more advanced activation model uses the local cell pressure, determined
+by the equation of state, and follows the evolution equation
+˙Ri = I
+( ρi
+ρ0,i
+− 1−a
+)x
+(1−λ)b + G1(1−λ)cλdpy + G2(1−λ)eλfpz (5.93)
+The ﬁrst term is responsible for the initial detonation based on the com-
+pression of the material. The following two terms account for the subsequent
+reaction based on the local pressure. All terms can be turned on or oﬀ by
+specifying the minimum and maximum values of lambda at which the stages
+occur.
+73
+
+=== page 74 ===
+Variable Description
+I Ignition rate [s−1]
+a Compression ratio oﬀset [ ]
+b Ignition (1−λ) exponent [ ]
+x Compression ratio exponent [ ]
+maxLambdaI Maximum value ofλ that the ignition term is used [ ]
+G1 First activation rate [Pa−ys−1]
+c First (1−λ) exponent [ ]
+d First λ exponent [ ]
+y First pressure exponent [ ]
+minLambda1 Minimum value ofλ that the ﬁrst step is used [ ] (default 0)
+maxLambda1 Maximum value ofλ that the ﬁrst step is used [ ] (default 1)
+G2 Second activation rate [Pa−zs−1]
+e Second (1−λ) exponent [ ]
+f Second λ exponent [ ]
+z Second pressure exponent [ ]
+minLambda2 Minimum value ofλ that the second step is used [ ] (default 0)
+maxLambda2 Maximum value ofλ that the second step is used [ ] (default 1)
+pScale Coeﬃcient used to scale pressure [ ] (default is 1)
+5.6.1.5 ArrheniusRate
+A more physical representation of the activation rate uses the local temper-
+ature, deﬁned by the internal energy and the speciﬁc heat of the mixture.
+The evolution equation for the reaction progress variable is
+˙Ri = (1−λ)
+
+
+
+0 T <Tign
+d2
+pAlowexp(Ea,low
+RT ) Tign≤T <Ts
+Ahighexp(Ea,high
+RT ) T≥Ts
+(5.94)
+Where the particle diameter is determined by the chosen diameter model (see
+Sec. 9), andR is the ideal gas constant.
+74
+
+=== page 75 ===
+Variable Description
+diameterModel Diameter model used to determine the particle diameter
+ALow Low activation rate [m−2 s−1]
+EaLow Low activation energy [m2/s2]
+AHigh High activation rate [s−1]
+EaHigh High activation energy [m2/s2]
+Ts Switch temperature [K]
+Tign Minimum temperature of reaction
+NOTE: This model is still in development and has not been validated
+5.6.2 Afterburn Models
+When reactions occur over a period of time after the initial charge has been
+activated, additional energy can be added that results in higher pressure
+and temperature, and is refered toafterburn. Afterburn is typical in under-
+oxygenated and/or non-ideal explosives, which may release energy at a later
+time. The advection scheme and limiters forci need to be speciﬁed in the
+fvSchemes in the same manner as the other transported quantities.
+5.6.2.1 none [default]
+No additional energy is added. If the keyword ”afterburnModel” is not found
+in the phase dictionary, this is the model that is used.
+5.6.2.2 constant
+A constant amount of afterburn energy is added where˙Q is speciﬁed by the
+user.
+Variable Description
+Qdot Afterburn energy addition rate[J/kg/s]
+5.6.2.3 linear
+Afterburn energy is added linearly from a start time to an end time where
+˙Q =
+{
+Q0
+∆t if tstart <t<t end
+0 else (5.95)
+75
+
+=== page 76 ===
+Variable Description
+Q0 Afterburn energy [J/kg]
+tStart Time energy begins being added [s]
+tEnd Time energy stops being added [s]
+5.6.2.4 Miller
+The model of Miller (1995) uses an evolution equation to determine the
+fraction of the total amount of afterburn energy added to the system due
+to unburnt material. ci is the reaction progress variable that has a value
+between 0 and 1, with an evolution equation deﬁned as
+∂αiρici
+∂t + ∇· (αiρiuci) =αiρia(1−ci)m(p×pscale)n (5.96)
+and the total afterburn energy is found using
+˙Q = dci
+dtQ0 (5.97)
+Variable Description
+a Model constant [Pa−n]
+m Reaction progress variable exponent [ ]
+n Pressure exponent [ ]
+Q0 Afterburn energy [J/kg]
+pMin Minimum pressure that afterburn occurs [Pa]
+pScale Scale factor for pressure (default is 1) [ ]
+5.7 Multicomponent thermodynamic model
+The multicomponent ﬂuid thermodynamic model allows for the use of mul-
+tiple species that use the same equation of state by mass averaging equation
+of state coeﬃcients of the species. The mass fractions of the species are re-
+quired as initial conditions (Ydefault can be used to give initial conditions
+for multiple species). Additionally, a ”defaultSpecie” must be provided in the
+thermodynamic dictionary to specify aslave specie
+Below is an example of a multicomponent ﬂuid
+type multicomponent;
+species (ignitor air);
+76
+
+=== page 77 ===
+defaultSpecie air;
+calculateDensity yes;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState AbelNobel;
+}
+ignitor
+{
+equationOfState
+{
+b 0.99e-3;
+}
+specie
+{
+molWeight 22.935;
+}
+transport
+{
+mu 1.81e-5;
+Pr 0.7;
+}
+thermodynamics
+{
+Cv 1450;
+Hf 1;
+}
+}
+air
+{
+equationOfState
+{
+b 1.02e-3;
+}
+specie
+{
+77
+
+=== page 78 ===
+molWeight 28.6689;
+}
+transport
+{
+mu 1.81e-5;
+Pr 0.7;
+}
+thermodynamics
+{
+Cv 1450;
+Hf 0;
+}
+}
+5.8 Two/multiphase models
+To simulate a two-phase or multiphase system, the keyword ”phases” must
+be deﬁned in thephaseProperties dictionary and deﬁnes the list of phases
+used in a simulation. The selection of a two-phase or multiphase system is
+determined by the number of deﬁned phases. The mixture pressure is deﬁned
+by
+p =
+∑
+iαiξipi∑
+iαiξi
+(5.98)
+where
+ξi(ρi) = 1
+Γi− 1 (5.99)
+and pi is the pressure from a single equation of state (Zheng et al., 2011).
+The speed of sound within a given phase is given by
+ci =
+√∑
+iyiξic2
+i∑
+iξi
+(5.100)
+with
+yi = αiρi
+ρ (5.101)
+78
+
+=== page 79 ===
+Boththeinitialenergyandtemperaturearecalculatedusingarootﬁnding
+method (Newton-Raphson by default) that include the contributions of all
+phases so the calculated values obey the mixture equations. See 12.3 for
+additional options.
+5.9 Initialization
+The initialization of ﬁelds can be handled in several ways, butρi, p, andT
+must be given as initial conditions. Some of these ﬁelds may be overwritten,
+but the boundary conditions are used to construct the conserved quantities.
+For equations of state in the Mie-Grüneisen form, by default the pressure and
+density are used to initialize the internal energy. Temperature based equa-
+tions of state initialize the internal energy using the density and temperature.
+If the ”calculateDensity” keyword is deﬁned, and is set to ”yes” in the given
+equation of state dictionary, then the density is calculated from the pressure
+and temperature prior to the initialization of the internal energy. Each of
+the initialization methods use a Newton-Raphson root ﬁnding method to ﬁnd
+the necessary quantities. If the internal energy ﬁeld is provided in the initial
+conditions folder, the pressure and temperature ﬁelds are calculated directly
+from the density and internal energy.
+5.10 Example
+An example of a single phasephaseProperties ﬁle can be seen below
+mixture
+{
+type basic;
+calculateDensity yes;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+transport
+{
+mu 0.0;
+79
+
+=== page 80 ===
+Pr 1.0;
+}
+thermodynamic
+{
+Cv 718;
+Hf 0.0;
+}
+idealGas
+{
+gamma 1.4;
+}
+}
+For a two or multiphase simulation, thephaseProperies ﬁle is deﬁned as
+phases (air water);
+air
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+transport
+{
+mu 0.0;
+Pr 1.0;
+}
+thermodynamic
+{
+Cv 718;
+Hf 0.0;
+}
+equationOfState
+{
+gamma 1.4;
+80
+
+=== page 81 ===
+}
+}
+water
+{
+type basic;
+thermoType
+{
+transport const;
+thermo hConst;
+equationOfState stiffenedGas;
+}
+specie
+{
+molWeight 18.0;
+}
+transport
+{
+mu 0.0;
+Pr 1.0;
+}
+thermodynamic
+{
+Cp 4186;
+Hf 0.0;
+}
+equationOfState
+{
+gamma 4.4;
+a 7e8;
+}
+}
+81
+
+=== page 82 ===
+6 Turbulence
+In addition to the hyperbolic ﬂux terms, viscous eﬀects can be included in
+simulations. This includes the use of turbulence models such as Reynolds av-
+eraged Navier-Stokes (RANS) or Large Eddy simulations (LES) models. All
+single phase turbulence models standard to OpenFOAM including k-epsilon,
+k-omega, Smagorinsky, as well as many others are available. The speciﬁed
+model introduces additional transport equations, as well as modiﬁcations
+to transport coeﬃcients like viscosity (ν) and thermal diﬀusivity (α) which
+modify the viscous terms in the conservation equations. When the maximum
+viscosity is zero, theconstant/momentumTransport(or constant/turbulence-
+Properties) does not need to be included, however if any phase has viscous
+terms, this dictionary needs to be included along with the appropriate tur-
+bulence model (laminar is the same as no turbulence model). The available
+turbulence models are listed below, and these can also be found using the
+’-listMomentumTransportModels’ option when runningblastFoam.
+Turbulence models: LES, RAS, laminar (e.g. no model)
+laminar models:
+• Giesekus
+• Maxwell
+• Stokes (default)
+• generalizedNewtonian
+RAS models:
+• LRR
+• LaunderSharmaKE
+• RNGkEpsilon
+• SSG
+• SpalartAllmaras
+• buoyantKEpsilon
+• kEpsilon
+• kOmega
+• kOmega2006
+• kOmegaSST
+• kOmegaSSTLM
+• kOmegaSSTSAS
+• realizableKE
+• v2f
+LES models:
+82
+
+=== page 83 ===
+• DeardorffDiffStress
+• Smagorinsky
+• SpalartAllmarasDDES
+• SpalartAllmarasDES
+• SpalartAllmarasIDDES
+• WALE
+• dynamicKEqn
+• dynamicLagrangian
+• kEqn
+• kOmegaSSTDES
+NOTE: Many of the turbulence models require additional ﬁeld (k, epsilon,
+omega, etc.) to be speciﬁed in the initial conditions folder.
+83
+
+=== page 84 ===
+7 Burst patches
+The ability to have a "bursting" patch can be used with the burst (external
+patch), burstCyclic (internal with no AMR), orburstCyclicAMI (general
+internal). All ﬁelds require an additional entry in their dictionaries name ”in-
+tactField” which is used to specify the boundary condition of the ﬁeld before
+bursting. The basic burst patch can be created using any mesh generation
+technique, however the cyclic variations require using thecreateBaﬄesutil-
+ity, standard to OpenFOAM. See Sec. 20.5 for an example of how to create
+and use the patches.
+7.1 Burst models
+The method to calculate where burst occurs is runtime-selectable and the
+inputs are placed in theconstant/polyMesh/boundary ﬁle under the corre-
+sponding boundary. This can also be added in either the patch entry within
+blockMeshDict of snappyHexMeshDict.
+Variable Description
+partialBurst Can individual face burst (no by default)
+useDelta Us the diﬀerence across coupled patches rather
+than the maximum value (yes by default)
+7.1.1 pressure
+Only pressure is used to determine if burst occurs.
+Variable Description
+pName Name of the pressure ﬁeld (p by default)
+pRef Reference pressure (0 by default)
+pBurst Pressure at which burst occurs [Pa]
+7.1.2 impulse
+Only impulse is used to determine if burst occurs. Because an impulse ﬁeld
+must be available while running the simulation, it is recommended to use the
+impulse functionObject (Sec. 15), otherwise some other method of calculat-
+ing impulse needs to be used.
+84
+
+=== page 85 ===
+Variable Description
+impulseName Name of the impulse ﬁeld (impulse by default)
+impulseBurst Impulse at which burst occurs
+7.1.3 pressureAndImpulse
+A combination of the pressure and impulse models are used. If either model
+results in a burst, then burst occurs. Both sets of inputs are required.
+7.1.4 ﬁeld
+A list of ﬁelds and bust values are used to determine if the patch has burst.
+The inputs can either be given as a single entry (”burstValue”), multiple
+burst conditions (”burstValues”), or as a list of names and values (”ﬁelds” and
+”values”). The latter is used when writing to remove errors inParaView.
+See below for an example.
+// Model
+burstModel field;
+// Single Entry
+burstValue p 4e7;
+// Multiple Entries
+burstValues
+(
+p 4e7
+impulse 10000
+);
+// Multiple Entries, split
+fields (p impulse);
+values (4e7 10000);
+85
+
+=== page 86 ===
+Variable Description
+burstValue Used for single ﬁeld burst condition [name value]
+burstValues Used for multiple ﬁeld burst condition
+[(name1 value1 name2 value2 ... nameN valueN)]
+ﬁelds Name of the ﬁelds
+values Values at which burst occurs
+86
+
+=== page 87 ===
+8 Region models
+When multiple regions are used, blastFoam solvers use global poly patches
+which do not require any special mesh patches to transfer data between ﬁeld.
+Instead, the information is transferred using ﬁeld speciﬁc boundary condi-
+tions. The interpolation method, sampled patch, and optional displacement
+ﬁeld is speciﬁed in theconstant/regionPropertiesﬁle. An example ofregion-
+Properties can be seen below
+regions
+(
+fluid (air)
+solid (building)
+);
+interfaces
+(
+air
+{
+air_to_building
+{
+sampleRegion building;
+samplePatch building_to_air;
+mappingType AMI;
+interpolationMethod faceAreaWeight;
+}
+}
+building
+{
+building_to_air
+{
+sampleRegion air;
+samplePatch air_to_building;
+displacementField pointD;
+}
+}
+);
+87
+
+=== page 88 ===
+8.1 Boundary conditions
+Several boundary conditions have been implemented that make use of the
+global patches and are described below.
+8.1.1 globalMapped
+Both vol and point ﬁeld can use theglobalMapped boundary condition which
+directly maps values from one patch to another where the neighbour patch
+is speciﬁed inregionProperties.
+Variable Description
+nbrName Name of ﬁeld to map from
+8.1.2 globalInterpolated
+Point ﬁeld can use theglobalInterpolated boundary condition which maps
+a volume ﬁeld to a point ﬁeld where the neighbour patch is speciﬁed in
+regionProperties.
+Variable Description
+nbrName Name of ﬁeld to map from
+8.1.3 globalTemperatureCoupled
+Using the same methodology as theglobalMapped boundary condition, the
+globalTemperatureCoupled boundary condition computes the temperature
+of a patch using the neighbour temperature, heat transfer coeﬃcient, and
+radiation heat ﬂux. Optionally when the entire boundary does not overlap
+the neighbour patch and unmapped temperature can be speciﬁed.
+Variable Description
+TNbr Name of neighbour temperature (T by default)
+hNbr Name of neighbour convective heat transfer coeﬃcient (none by default)
+h Name of convective heat transfer coeﬃcient (none by default)
+qrNbr Name of neighbour radiation heat ﬂux (none by default)
+qr Name of radiation heat ﬂux (T by default)
+limitGrad Is the temperature gradient limited (no by default)
+unmappedT Unmapped temperature (293.15 by default)
+88
+
+=== page 89 ===
+9 Diameter models
+The diameter of a dispersed phase is used to calculate surface reaction rates
+in the Arrhenius activation model as well as interfacial transfer sources in
+the blastEulerFoamsolver. Below are is a short description of the models
+currently available.
+9.1 constant
+A constant diameter is used.
+NOTE: The diameter ﬁeld is not written
+Entry Description
+d Diameter of the phase [m]
+9.2 constantMass
+The diameter is determined using a reference diameter at a reference density.
+The mass is deﬁned as
+M = πd3
+0ρ0
+6 (9.1)
+and the true diameter is calculated using
+d =
+(6M
+ρπ
+)1/3
+(9.2)
+Entry Description
+rho0 Reference density [kg/m3]
+d0 Reference diameter [m]
+9.3 reacting
+The reacting diameter model adds an additional source term in the trans-
+port equation for the diameter to increase/decrease the local diameter based
+89
+
+=== page 90 ===
+on the given reaction rate
+∂di
+∂t + ui· ∇di =k (9.3)
+where k is the speciﬁed reaction rate (see Sec. 9.4)
+Entry Description
+d Initial diameter [m]
+reactionRate Reaction rate model
+9.4 Reaction Rates
+Reaction rates are used to give rates based on temperature and/or pressure
+currently there are two options, pressure based, and Arrhenius rate
+9.4.1 pressureBased
+The pressureBased reaction rate uses a coeﬃcient, pressure scale, pressure
+oﬀset (in scaled units) and pressure exponent to compute the rate
+k =β (¯p)α (9.4)
+and ¯p = p×pscale. For example, if the pressure relation is in MPa,pscale =
+1e− 6.
+Entry Description
+alpha Pressure exponent [ ]
+beta Coeﬃcient [Pa−α]
+pScale Pressure scale [ ]
+oﬀset Pressure oﬀset [Pa/pScale]
+9.4.2 Arrhenius
+The rate given by the Arrhenius reaction rate is
+k =ATβexp
+(−Ta
+T
+)
+(9.5)
+90
+
+=== page 91 ===
+Entry Description
+A Rate constant [1/s]
+beta Temperature exponent [ ]
+Ta Activation temperature [K]
+91
+
+=== page 92 ===
+10 Flux Evaluation
+blastFoam relies on explicit solutions for the evolution of conservative vari-
+ables. This has several beneﬁts in terms of order of accuracy and com-
+putational cost. First, higher-order, explicit Runge-Kutta time integration
+schemes can be used which allow for higher order time-integration accuracy.
+Secondly, because of the required time steps of the problems of interest, it-
+erative matrix solutions are not necessary to ensure accuracy or stability.
+Instead, stability can be improved through use of SSP time integraion meth-
+ods or more restrictive limiters.
+All of the methods currently available to calculate the conservative, hy-
+perbolic ﬂuxes rely on the owner (own) and neighbour (nei) interpolated
+values on a face (also called left and right states). These interpolated values
+are found using a combination of a base interpolation scheme and ﬂux lim-
+iters. OpenFOAM currently has a wide selection of available limiters such as
+upwind, Minmod, vanLeer, SuperBee, etc. for scalars, andupwind, MinmodV,
+vanLeerV, SuperBeeV, etc. for vectors; all are run-time selectable.
+In addition to the standard OpenFOAM interpolation schemes, MUSCL
+reconstruction has also been implemented. There are two main options which
+include upwindMUSCL and quadraticMUSCL. The upwind version uses stan-
+dard upwinding for owner and neighbour interpolations. The quadratic ver-
+sion uses limiters in combination with the gradients and the gradient of the
+gradients (Hessians) to reconstruct face values. All of the standard limiters
+are available for MUSCL reconstruction. The vector limiters (MinmodV for
+example) are not used with the MUSCL schemes since the limiting is done
+for each component of the variables.
+An example of thefvSchemes dictionary is shown below
+fluxScheme HLLC;
+ddtSchemes
+{
+default Euler;
+timeIntegrator RK2SSP;
+}
+gradSchemes
+{
+92
+
+=== page 93 ===
+default cellMDLimited leastSquares 1.0;
+}
+divSchemes
+{
+default none;
+}
+laplacianSchemes
+{
+default Gauss linear corrected;
+}
+interpolationSchemes
+{
+default linear; //Base interpolation scheme
+// Limiters
+reconstruct(alpha) vanLeer; // Volume fraction
+reconstruct(rho) upwindMUSCL; // Density
+reconstruct(p) linearMUSCL vanLeer; // Pressure
+reconstruct(U) quadraticMUSCL vanLeer; // Velocity
+reconstruct(e) quadraticMUSCL vanLeer; // Internal energy
+reconstruct(speedOfSound) vanLeer; // Speed of sound
+}
+NOTE: By default, if the OpenFOAM standard reconstruction is used, lin-
+ear interpolation will be used. ThelimitWith method can instead be used to
+specify a diﬀerent interpolation scheme such ascubic, but these have proven
+to be unstable in the past. Please use with caution.
+10.1 Riemann Solvers
+ThecurrentlyavailableRiemannsolversaredescribedbelow. Forallschemes,
+n denotes the surface normal vector, andu = u· n. There is the inclusion
+of volume fraction in the solution of multi-ﬂuid problems, however with the
+93
+
+=== page 94 ===
+exception of the AUSM+up ﬂux scheme for granular phases these changes
+will not be included in the descriptions below.
+10.1.1 HLL
+The HLL scheme is based on Toro et al. (1994) in which the contact wave is
+neglected. The ﬂuxes take the form:
+FHLL =
+
+
+
+Fown if 0≤Sown
+SneiFown−SownFnei+SownSnei(Unei−Uown)
+Snei−Sown
+if Sown≤ 0≤Snei
+Fnei if 0≥Snei
+(10.1)
+The owner and neighbor states to approximate the wave propagation speeds
+are deﬁned as
+Sown = min(uown−cown, ˜u− ˜c) (10.2)
+Snei = max(unei +cnei, ˜u + ˜c) (10.3)
+whereuK is the normal ﬂux of the respective state,cK is the speed of sound,
+and ˜u and ˜c are the Roe averages velocities and speed of sounds, respectively.
+10.1.2 HLLC
+The approximate HLLC Riemann was developed by Toro et al. (1994), and
+improves upon the HLL method by providing an estimation of the contact
+wave between the owner and neighbour waves. The speciﬁc implementation
+used is taken from Zheng et al. (2011, 2008) This means that the state be-
+tween the owner and neighbour waves now has two states rather than one.
+The following ﬂuxes are thus used, using the fact that both pressure and
+velocity are constant across the contact wave,
+FHLLC =
+
+
+
+Fown if 0≤Sown
+F∗own if Sown≤ 0≤S∗
+F∗nei if S∗≤ 0≤Snei
+Fnei if 0≥Snei
+(10.4)
+94
+
+=== page 95 ===
+The contact wave speed is given by
+S∗ = ρownuown(Sown−Uown) +ρneiunei(Snei−Unei) +pnei−pown
+ρown(Sown−uown)−ρnei(Snei−unei) (10.5)
+and the pressure in the
+p∗K =ρK(SK−UK)(S∗−uK) +pK (10.6)
+The ﬁnal ﬂuxes are determined by
+FHLLC
+∗K = S∗(SKUK− FK) +SKp∗KD∗
+SK−S∗
+(10.7)
+D∗ =
+
+
+0
+...
+0
+n
+S∗
+
+
+(10.8)
+10.1.3 HLLCP
+Following the work of Xie et al. (2019), a low-speed correction of the standard
+HLLC ﬂux scheme has been added. Currently it is only available for single
+phase simulations.
+FHLLC−P = FHLLC + ΦP (10.9)
+Φp = (f− 1) SownSnei
+Snei−Sown
+1
+1 +| ˜M|
+pnei−pown
+˜c2
+
+
+1
+˜u
+1
+2 ˜u2
+
+ (10.10)
+f = min
+(pown
+pnei
+, pnei
+pown
+)3
+(10.11)
+where the minimum of all cell faces is used for each cell.
+p∗∗ =θp∗ + (1−θ)pown +pnei
+2 (10.12)
+θ = min(M∗, 1) (10.13)
+95
+
+=== page 96 ===
+p∗∗∗ =fp∗∗ + (1−f)p∗ (10.14)
+where p∗∗∗ replaces p∗K in Eq. (10.7)
+10.1.4 AUSM+
+The AUSM+ scheme was developed by Luo et al. (2004) and constructs the
+ﬂuxes based on the mass ﬂux across the face.
+FAUSM + = 0.5 [M∗c∗(Uown + Unei)]− 0.5 [|M∗|c∗(Uown + Unei)] + Fp
+(10.15)
+Fp =
+
+
+0
+...
+0
+p∗n
+p∗
+
+
+(10.16)
+The star state variables are written as
+c∗ = 0.5(cown +cnei) (10.17)
+M∗ =M+
+4,own +M−
+4,nei (10.18)
+and
+P∗ =P+
+5,ownpown +P−
+5,neipnei (10.19)
+where
+M±
+1 (M) = 0.5(M±|M|) (10.20)
+M±
+2 (M) =
+{
+M±
+1 (M) if|M|≥ 1
+±0.25(M± 1)2 else (10.21)
+M±
+4 (M) =
+{
+M±
+1 (M) if|M|≥ 1
+M±
+2 (M)
+[
+1∓ 16βM∓
+2 (M)
+]
+else (10.22)
+96
+
+=== page 97 ===
+P±
+5 (M) =
+{
+1
+MM±
+1 (M) if|M|≥ 1
+±M±
+2 (M)
+[
+(2∓M)− 16αMM∓
+2 (M)
+]
+else (10.23)
+with α = 3/16 and β = 1/8.
+10.1.5 AUSM+up
+The AUSM+ scheme extended to include a low speed correction by Liou
+(2006). The previous section is used to describe the high speed portion,
+however additional diﬀusion terms are added resulting in the following deﬁ-
+nitions of the mass and pressure ﬂuxes
+M∗ =M+
+4,own +M−
+4,nei +Mp (10.24)
+and
+P∗ =P+
+5,ownpown +P−
+5,neipnei +Pu (10.25)
+where
+Mp =−Kp
+fa
+max(1−σ ¯Ma
+2
+, 0)pnei−pown
+ρ∗c2
+∗
+(10.26)
+Pu =−KuP+
+5,ownP−
+5,nei(ρown +ρnei)fac∗(unei−uown) (10.27)
+and fa = 1, σ = 1, Kp = 0.25, Ku = 0.75, andα is redeﬁned as3
+16(5fa−
+4). The interface density,ρ∗, is deﬁned asρown+ρnei
+2 , and the average Mach
+number is deﬁned as.
+¯Ma
+2
+=
+√
+u2
+own +u2
+nei
+2c2
+∗
+(10.28)
+This correction is very important when considering blasts because the
+Mach numbers can become much less than unity, resulting in numerical
+checker-boarding.
+97
+
+=== page 98 ===
+10.1.6 AUSM+up (granular)
+A modiﬁed version of the AUSM+up ﬂux scheme has been developed by
+Houim and Oran (2016) and includes ﬂux limiters in the event of packing.
+The ﬂux of conservative variables, (mass, momentum, thermal energy, and
+granular energy) across a face is given by
+FAUSM +up
+s = Fp + ˙m
+{
+Uown if ˙m> 0
+Unei if ˙m≤ 0 (10.29)
+where
+˙m =Fc1/2M1/2
+{
+αownρown if M1/2 > 0
+αneiρnei if M1/2≤ 0 (10.30)
+F = (c1/2−ϵ)[1 +|M1/2|(1−G/2)]
+2
+max(αs,own,αs,nei)
+αs,max
+[αownρown−αneiρnei]
+(10.31)
+and Fp =
+⟨
+0,Ptot,1/2I, 0, 0
+⟩
+, withαs being the total granular volume fraction
+(sum of all granular phases),αs,max being the maximum volume fraction at
+which packing occurs, andϵ being a small number (1e-10).
+G is deﬁned as
+G = max(2(1−Dζ2) (10.32)
+and ζ is deﬁned as
+ζ =
+{ αM
+s −αs,crit
+αs,max−αs,crit
+if αM
+s >α s,crit
+0 if αM
+s <α s,crit
+(10.33)
+whereαM
+s isthemaximumgranularvolumefractionoftheown/neivalue, and
+αs,crit being the minimum granular volume fraction that frictional stresses
+occur.
+c1/2 is deﬁned as
+c1/2 =
+√
+αownρownc2
+own +αneiρneic2
+nei
+αownρown +αneiρnei
++ϵ (10.34)
+The split Mach number is deﬁned as
+98
+
+=== page 99 ===
+M1/2 =M+
+4,own +M−
+4,nei
+−2Kp
+fa
+max(1−σ ¯M 2, 0) Ptot,nei−,Ptot,own
+(αownρown +αneiρnei +ϵ)c2
+1/2
+(10.35)
+where M±
+4 is calculate the same way as in the AUSM+ scheme andfa = 1.
+Kp, andσ are deﬁned as
+Kp = 0.25 + 0.75(1−G/2) (10.36)
+σ = 0.75σ/2 (10.37)
+The pressure is deﬁned as
+Ptot,1/2 =
+−Kufa(c1/2−ϵ)P+
+5,ownP−
+5,nei(αownρown +αneiρnei)(unei−uown)
++P+
+5,ownptot,own +P−
+5,neiptot,nei
+(10.38)
+withP±
+5 being the same as in the AUSM+ scheme and
+Ku = 0.75 + 0.25(1−G/2) (10.39)
+10.1.7 Tadmor/Kurganov
+The Tadmor/Kurganov ﬂuxes were developed by Kurganov and Tadmor
+(2000). The rhoCentalFoam solver (OpenCFD Ltd., 2018a; Greenshields
+et al., 2010) utilizes this scheme, which has been ported to the current frame-
+work. Two run-time selectable options (e.g.Kurganov or Tadmor) are avail-
+able; both follow the same general procedure with a slight diﬀerence in the
+calculation of coeﬃcients.
+The Kurganov scheme deﬁnes
+a+ = max(max(uown +cown,unei +cnei), 0) (10.40)
+a− = min(min(uown−cown,unei−cnei), 0) (10.41)
+99
+
+=== page 100 ===
+aown = a+
+a+ +a− (10.42)
+anei = a−
+a+ +a− (10.43)
+and
+a = a−a+
+a+ +a− (10.44)
+The Tadmor scheme deﬁnesaown =anei = 0.5 and a =max(|a−|,|a+|).
+The volumetric ﬂuxes are written
+φown =uownaown−a (10.45)
+and
+φnei =uneianei +a (10.46)
+The resulting ﬂuxes are
+FKT = (φownUown +φneiUnei) + Fp (10.47)
+with
+Fp =
+
+
+0
+...
+0
+(aownpown +aneipnei)n
+a(pown−pnei)
+
+
+(10.48)
+10.2 Riemann advection scheme
+In order to allow for consistency between the conserved quantities (mass, mo-
+mentum, and energy), and additional transport quantities such as turbulence
+ﬁelds or species mass fractions, an additional advection scheme using the Rie-
+mann ﬂuxes has been added. This makes use of the quantities calculated in
+transport of the conserved variable which then allows for the use of higher
+order interpolation schemes to be used for additional scalar transport. This
+is a major advantage over traditional methods which are generally limited to
+upwinding for additional transport due to presence of strong gradients.
+100
+
+=== page 101 ===
+divSchemes
+{
+default none;
+div(alphaRhoPhi.tnt,lambda.tnt) Riemann;
+div(alphaRhoPhi.tnt,c.tnt) Riemann;
+}
+interpolationSchemes
+{
+default linear;
+...
+reconstruct(lambda.tnt) linearMUSCL vanLeer;
+reconstruct(c.tnt) linearMUSCL vanLeer;
+}
+In the interpolation schemes sub-dictionary, the limiters should be speci-
+ﬁed for each ﬁeld using the Riemann ﬂuxes, but by default the limiter spec-
+iﬁed by ”reconstruct(rho)” will be used.
+NOTE: One limitation of using the Riemann ﬂuxes is that, because an
+explicit advection term for the transported quantities is used, when very stiﬀ
+implicit terms are present (such as production term in turbulence models),
+the advection term can become negligible leading to no advection occurring.
+For this reason, implicit divergence schemes are still recommended for the
+advection of turbulence quantities and other equations with large implicit
+source terms.
+10.3 Time integration
+Higher order time integration has been added allowing for fully third order
+accurate solutions to the evolution equations. This is a major beneﬁt in com-
+parison to standard OpenFOAM time integration which is at most second
+order due to the limitation on the implicit time evolution. This function-
+ality applies to both conservative quantities such as mass, momentum, and
+energy, as well as the activation and afterburn models. The transport of tur-
+bulent quantities are still limited by the standard time integration schemes
+in OpenFOAM. Below are the currently available time integration schemes
+101
+
+=== page 102 ===
+and the mathematical steps associated with them. The superscriptn denotes
+the state at the beginning of the current time step,(i) denotes the i-th step,
+andn + 1denotes ﬁnal state. The time integration scheme is speciﬁed in the
+fvSchemes dictionary using
+ddtSchemes
+{
+default Euler;
+timeIntegrator RK2SSP 3; // Three stages, second order accurate
+}
+NOTE: The strong stability preserving (SSP) methods oﬀer several diﬀerent
+variation that allow for a greater number of steps to be used to add additional
+stability to the solution. This is speciﬁed by adding the number of requested
+steps after the SSP scheme. If a number is provided that is higher or lower
+than the available number of steps, the scheme will used the closest number
+of steps.
+10.3.1 Euler
+Standard ﬁrst order time integration
+Un+1 = Un− ∆t∇· Fn (10.49)
+10.3.2 RK1SSP
+First-order, strong-stability-preservingRunge-Kuttamethod(SpiteriandRu-
+uth, 2002):
+One stage:
+Un+1 = Un− ∆t∇· Fn (10.50)
+Two stages:
+U(1) = Un− 1
+2∆t∇· Fn (10.51)
+Un+1 = 1
+2U(1)− 1
+2∆t∇· F(1) (10.52)
+102
+
+=== page 103 ===
+Three stages:
+U(1) = Un− 1
+3∆t∇· Fn (10.53)
+U(2) = U(1)− 1
+3∆t∇· F(1) (10.54)
+Un+1 = U(2)− 1
+3∆t∇· F(2) (10.55)
+10.3.3 RK2
+Standard second-order Runge-Kutta method (mid point):
+U(1) = Un− 1
+2∆t∇· Fn (10.56)
+Un+1 = Un− ∆t∇· F(1) (10.57)
+10.3.4 RK2SSP
+Second-order, strong-stability-preserving Runge-Kutta method (Spiteri and
+Ruuth, 2002):
+Two stages:
+U(1) = Un− ∆t∇· Fn (10.58)
+Un+1 = 1
+2
+(
+Un + U(1)− ∆t∇· F(1))
+(10.59)
+Three stages:
+U(1) = Un− 1
+2∆t∇· Fn (10.60)
+U(2) = U(1)− 1
+2∆t∇· F(1) (10.61)
+Un+1 = 1
+3Un + 2
+3U(1)− 1
+3∆t∇· F(2) (10.62)
+103
+
+=== page 104 ===
+Four stages:
+U(1) = Un− 1
+3∆t∇· Fn (10.63)
+U(2) = U(1)− 1
+3∆t∇· F(1) (10.64)
+U(3) = U(2)− 1
+3∆t∇· F(2) (10.65)
+Un+1 = 1
+4Un + 3
+4U(3)− 1
+4∆t∇· F(3) (10.66)
+10.3.5 RK3SSP
+Third-order, strong-stability-preserving Runge-Kutta method (Spiteri and
+Ruuth, 2002):
+Three stages:
+U(1) = Un− ∆t∇· Fn (10.67)
+U(2) = 1
+4
+(
+3Un + U(1)− ∆t∇· F(1))
+(10.68)
+Un+1 = 1
+3
+(
+Un + 2U(2)− 2∆t∇· F(1))
+(10.69)
+Four stages:
+U(1) = Un− 1
+2∆t∇· Fn (10.70)
+U(2) = U(1)− 1
+2∆t∇· F(1) (10.71)
+U(3) = 2
+3Un + 1
+3U(2)− 1
+6∆t∇· F(2) (10.72)
+Un+1 = U(3)− 1
+2∆t∇· F(3) (10.73)
+104
+
+=== page 105 ===
+10.3.6 RK4
+Standard fourth-order Runge-Kutta method:
+U(1) = Un− 1
+2∆t∇· Fn (10.74)
+U(2) = U(1)− 1
+2∆t∇· F(1) (10.75)
+U(3) = Un− ∆t∇· F(2) (10.76)
+Un+1 = Un− 1
+6∆t∇·
+(
+Fn + 2F(1) + 2F(2) + F(3))
+(10.77)
+10.3.7 RK4SSP
+Fourth-order, strong-stability-preserving Runge-Kutta method (Spiteri and
+Ruuth, 2002):
+U(i) =
+i−1∑
+k=0
+(
+aikU(k) + ∆tβik∇· F(k))
+(10.78)
+Table 1:aik
+0 1
+1 649
+1600
+951
+1600
+2 53989
+2500000
+4806213
+20000000
+23619
+32000
+3 1
+5
+6127
+30000
+7873
+30000
+1
+3
+0 1 2 3
+Table 2:βik
+0 1
+1 −10890423
+25193600
+5000
+7873
+2 −102261
+5000000
+−5121
+20000
+7873
+10000
+3 1
+10
+1
+6 0 1
+6
+0 1 2 3
+105
+
+=== page 106 ===
+11 Adaptive Mesh Reﬁnement (AMR)
+The dynamic mesh classes have been incorporated from the github repos-
+itory SOFTX_2018_143 and is based on the work of Rettenmaier et al.
+(2019). This library introduces 2-D, 2-D axisymmetic, and 3-D (present in
+OpenFOAM-9) all with the option to include dynamic load balancing. The
+original work (dynamicRefineBalanceFvMesh and dynamicRefineFvMesh)
+has been used as the base for theadaptiveFvMesh class. This mesh type has
+been further developed, speciﬁcally for compressible ﬂows, and includes mod-
+iﬁcationsforimprovedstabilitywithmeshescreatedwith snappyHexMesh.
+Additional polyhedral reﬁnement has been ported from foam-extend’s and al-
+lows for general polygon reﬁnement.
+Because the detonation of explosives may not occur when the simulation
+starts, the option to begin unreﬁnement at a designated time (”beginUnre-
+ﬁne”) has been added. This allows the mesh to remain reﬁned in speciﬁc
+regions even though the error is initially small.
+Additionally, themovingAdaptiveFvMeshclassisbasedon adaptiveFvMesh,
+and has all of the same features, but includes the ability to use mesh motion.
+It is recommended to use thevelocityLaplacian motion solver.
+NOTE: Whilst AMR may be used with meshes created using snappy-
+HexMesh, regions can only be cut at level 0 when using either 2-D or
+axisymmetric reﬁnement. This is due to the fact thatsnappyHexMesh
+uses a 3-D reﬁnement, regardless of the number of solution directions. If re-
+ﬁnement is used, the simulation will crash when the mesh is reﬁned in these
+areas.
+NOTE: Meshes that have been "snapped" with snappyHexMesh may
+work, however crashes may occur. Use at your own risk.
+106
+
+=== page 107 ===
+Entry Description
+balance Is dynamic load balancing used (default is yes)
+protectedPatches List of patch names that will not be
+reﬁned or unreﬁned (default is none)
+nReﬁnementBuﬀerLayers Number of layers added to reﬁnement (default is 0)
+nUnreﬁnementBuﬀerLayers number oy layers added to unreﬁnement (default is 0)
+reﬁne Use reﬁnement (default is yes)
+unreﬁne Use unreﬁnement (default is yes)
+reﬁneInterval Number of time steps between reﬁnement (default is 1)
+unreﬁneInterval Number of time steps between unreﬁnement (default is 1)
+balanceInterval Number of time steps between balancing (default is 1)
+beginReﬁne Time when reﬁnement can begin (default is 0 s)
+endReﬁne Time when reﬁnement stops (default is great s)
+beginUnreﬁne Time when unreﬁnement can begin (default is 0 s)
+endUnreﬁne Time when unreﬁnement stops (default is great s)
+beginBalance Time when balancing can begin (default is 0 s)
+endBalance Time when balancing stops (default is great s)
+dumpLevel Write the cell and point level as viewable ﬁelds (false by default)
+11.1 Error estimators
+In order to determine the cells that can be reﬁned or unreﬁned, error estima-
+torshavebeenadded. Generally, thisisachievedbylookingforaderivativeor
+diﬀerence of a speciﬁed ﬁelds across all the faces a cell and it neighbours. The
+maximum value of all face errors of a given cell is taken as the cell center-
+based value, and is used to deﬁne the cells that should be reﬁned. Probe
+locations are automatically reﬁned up to the maximum level of reﬁnement
+to remove discontinuities in probe sampling.
+107
+
+=== page 108 ===
+Entry Description
+lowerReﬁneLevel Error that mesh is reﬁned at
+unreﬁneLevel Error that mesh is unreﬁned
+upperReﬁneLevel Error that reﬁnement is stopped
+(default is great)
+upperUnreﬁneLevel Error that unreﬁnement begins to occur again
+(default is great)
+maxReﬁnement Maximum number of reﬁnement levels
+minDx Minimum cell size
+reﬁneProbes Are probes reﬁned (yes by default)
+11.1.1 cellSize
+Reﬁnement is determined based on the cell size. Either the volume, magni-
+tude of relevant directions (mag), components (cmpt), or the characteristic
+length (characteristic) can be used. Only the options listed below are used.
+Because the reﬁnment is based on the cell size the maximumReﬁnment can
+be a large number.
+Entry Description
+type size type (volume, mag, cmpt, or characteristic)
+minVolume Minimum volume (for volume)
+maxVolume Maximum volume (for volume)
+cmpts Components (x, y, or z for cmpts)
+minDX Minimum size as a vector (for cmpts)
+maxDX Maximum size as a vector (for cmpts)
+minDx Minimum size (for mag or characteristic)
+maxDx Maximum size (for mag or characteristic)
+maxReﬁnement Maximum number of reﬁnement levels (default is 10)
+11.1.2 ﬁeldValue
+The error is set to the value of the given ﬁeld
+ϵx =x (11.1)
+wherex is a ﬁeld chosen by the user, and can be any scalar ﬁeld stored within
+the simulation.
+108
+
+=== page 109 ===
+Entry Description
+ﬁeld Error ﬁeld
+11.1.3 delta
+A basic method to detect sharp changes across faces uses a diﬀerence ap-
+proach, where the error is deﬁned by
+ϵδ =|xown−xnei| (11.2)
+wherex is a ﬁeld chosen by the user, and can be any scalar ﬁeld stored within
+the simulation. The subscript own denotes values at the current face, while
+nei denotes the value at the neighboring face.
+Entry Description
+ﬁeld Field used to compute error
+11.1.4 scaledDelta
+A basic method to detect sharp changes across faces uses a scaled diﬀerence
+approach, where the error is deﬁned by
+ϵ¯δ = |xown−xnei|
+max(min(|xown−xc|,|xnei−xc|),xmin) (11.3)
+where x is a ﬁeld chosen by the user, and can be any ﬁeld stored within the
+simulation. The minimum value (xmin) can be speciﬁed by the user and is
+the minimum value that the error will be scaled by.
+Entry Description
+ﬁeld Field used to compute error
+minValue (xmin) Minimum value to scale diﬀerence by (default is small)
+oﬀset (xc) Oﬀset value to centre error around (default is 0)
+11.1.5 Density gradient (densityGradient)
+A modiﬁed density gradient was deﬁned by Zheng et al. (2008), and uses an
+error deﬁned by
+ϵ∇ρ = max
+(|(∇lnρ)C− (∇lnρ)own|
+αfρC/dl +|∇lnρ)own| ,|(∇lnρ)C− (∇lnρ)nei|
+αfρC/dl +|∇lnρ)nei|
+)
+f
+(11.4)
+109
+
+=== page 110 ===
+with
+(∇lnρ)C = ρnei−ρown
+|rnei− rown| (11.5)
+(∇lnρ)nei,own = (∇ρ)nei,own
+rnei− rown
+|rnei− rown| (11.6)
+rown,nei is the surface normal vector, anddl =|rnei− rown|, is the distance
+between cell centers. This error estimator uses the total density.
+11.1.6 Lohner
+A ﬁnal error estimation method based on Löhner (1987) is also available. It
+uses a scaled Laplacian to ensure an error bounded between 0 and 1, and in-
+dicates the smoothness of the solution. Due to the fact that the method was
+initially developed for a Cartesian grid, some modiﬁcations were required.
+Namely, the face value of the tracked ﬁeld is interpolated using a cubic in-
+terpolation method. This allows non-zero smoothness across the faces while
+still allowing for the method to be used on a non-Cartesian grid.
+ϵLohner = |xown− 2xf +xnei|
+|xown−xf| +|xnei−xf| +ε(|xown| + 2|xf| +|xnei|) (11.7)
+whereε is a coeﬃcient which is problem dependent, andx is any scalar ﬁeld
+saved within the simulation.
+Entry Description
+ﬁeld Field name used to compute error
+epsilon Scaling coeﬃcient
+11.1.7 multiComponent
+The multicomponent error estimator allows for multiple errors to be used to
+deﬁne which cells should be reﬁned. Any of the previous methods can be
+used. A list of names for the error estimators need to be provided, which
+must correspond to a dictionary with the necessary entries included. The
+maximum of error at each cell is used for reﬁnement. Each error estimator
+can use diﬀerent levels of maximum reﬁnement that are speciﬁed in their
+respective dictionaries.
+110
+
+=== page 111 ===
+// BlastFoam specific AMR mesh type
+dynamicFvMesh adaptiveFvMesh;
+// Error is calculated using the density gradient
+errorEstimator multicomponent;
+errorEstimators
+(
+density
+{
+errorEstimator densityGradient;
+lowerRefineLevel 0.01;
+unrefineLevel 0.01;
+maxRefinement 2;
+}
+pressure
+{
+errorEstimator scaledDelta;
+deltaField p;
+minValue 1e3;
+lowerRefineLevel 0.1;
+unrefineLevel 0.01;
+maxRefinement 2;
+}
+volumeFraction
+{
+errorEstimate fieldValue;
+fieldName alpha.tnt;
+//- Only refine when 0.1 < alpha.tnt < 0.6
+lowerRefineLevel 0.1;
+unrefineLevel 0.05;
+upperRefineLevel 0.6;
+upperUnrefineLevel 0.7;
+maxRefinement 1;
+}
+);
+111
+
+=== page 112 ===
+Entry Description
+errorEstimators List of error estimators to be used
+11.2 Dynamic Load Balancing
+The ability to use dynamic load balancing is available for 2-D, 2-D axisym-
+metic, and 3-D meshes. Dynamic load balancing can greatly reduce the com-
+putational time required by balancing the cells equally across all processors.
+However, there are known limitations: due to the way OpenFOAM trans-
+fers data between processors, the MPI buﬀer limit can be exceeded for large
+cases, leading to the simulation crashing. There are also known problems
+in the transferring of data for calculated non-scalar ﬁelds and movingWall
+boundary conditions. The ﬁelds used within the standardblastFoamsolver
+have addressed this, but ifadaptiveFvMesh is used with a diﬀerent solver,
+its stability with balancing is not guaranteed.
+11.3 Example
+An example of the optionaldynamicMeshDict for use withadaptiveFvMesh
+class
+// BlastFoam specific AMR mesh type
+dynamicFvMesh adaptiveFvMesh;
+// Error is calculated using the density gradient
+errorEstimator densityGradient;
+loadBalance
+{
+// Is the mesh dynamically balanced
+balance yes;
+// How many refinement steps between rebalancing
+balanceInterval 20;
+// Allowable difference between average load
+// and max load
+allowableImbalance 0.2;
+112
+
+=== page 113 ===
+// Decomposition method
+method scotch;
+}
+// How often to refine
+refineInterval 1;
+// When to begin unrefinement
+beginUnrefine 1e-5;
+// Refine field in between lower..upper
+lowerRefineLevel 1e-2;
+// If value < unrefineLevel unrefine
+unrefineLevel 1e-2;
+// Number of cells between level
+nBufferLayers 1;
+// Refine cells only up to maxRefinement levels
+maxRefinement 4;
+// Write the refinement level as a volScalarField
+dumpLevel true;
+113
+
+=== page 114 ===
+12 Numerics
+A collection of numerical methods is provided that are used within the mod-
+els describe prior, and can also be used for new application and solvers. Many
+of the methods are only listed and the reader should view the provided ref-
+erences for a more complete description.
+12.1 Lookup tables
+1D, 2D, and 3D lookup tables are provided, all including support for modiﬁed
+data types, runtime selectable interpolation schemes, and the ability to read
+or construct the necessary data. The name of the given dictionaries and
+inputs are dictated by the speciﬁc models using the tables, "x" and "f" will
+be used as place holders for these names. If the dictionary named ”xCoeﬀs”
+is provided ”x” is not used to read the given input (i.e. ”xMod” is ”mod”).
+When 1D data is read the ﬁeld can be constructed with 3 methods: di-
+rectly read, read from a ﬁle given a column, or constructed with a spacing.
+Variable Description
+ﬁle Name of a ﬁle to read from
+delim Delimiter used to seperate data (’,’ by default)
+xCol Column of the data (ﬁrst column by default)
+x Data
+xMod Modiﬁer (none by default)
+nX Number of values
+minX Minimum value
+maxX Maximum value
+deltaX Spacing
+12.1.1 Modiﬁers
+Diﬀerent modiﬁers can be used to interpolate scalar data in diﬀerentspaces,
+and include
+• none
+• log10
+• pow10 (10x)
+• ln
+• exp
+114
+
+=== page 115 ===
+Variable Description
+xMod Modiﬁer for the data
+12.1.2 Interpolation schemes
+Several interpolation schemes are provided to give the user control over the
+method which is used to interpolate data including
+• ﬂoor
+• ceil
+• linearClamp
+• linearExtrapolated
+• quadraticClamp
+• quadraticExtrapolted
+• cubicClamp
+• cubicExtrapolated
+Clamp methods limit the interpolation to the minimum and maximum
+values of the provided table, and extrapolated methods will use the closest
+values to extrapolate the given data out of bounds. Diﬀerent methods can
+be used for all directions, and ”interpolationScheme” is used to deﬁne the
+default method.
+Variable Description
+xInterpolationScheme Interpolation scheme (linearClamp by default)
+(interpolationScheme)
+12.1.3 1D lookup tables
+Data is looked up given an x value. First and second derivatives have been
+implemented and a reverse lookup can be used for scalar data (ﬁnd f given
+x).
+12.1.4 2D lookup table
+Data is looked up given x and y values. The data can be read from a table
+or from a list. The default delimiter is ",". The table can also be ﬂipped
+when reading if the input is reversed (y by x) and a check is done on the
+size when reading. First and second derivatives (pure and mixed) have been
+implemented and a reverse lookup can be used for scalar data (ﬁnd x or y
+given f and y or x).
+115
+
+=== page 116 ===
+12.1.5 3D lookup tables
+Data is looked up given x, y, and z values. The data can be read from a table
+or a list. The default delimiters are "," for columns and ";" for rows. The
+table can also be ﬂipped when reading if the input is reversed (z by y by x)
+and a check is done on the size when reading. First and second derivatives
+(pure and mixed) have been implemented.
+12.2 Equations
+A simple equation class has been implemented to support many of the nu-
+merical methods. The equations take and input and return a result.
+Equation: A single scalar input is used to return a single value. This
+can be used as a univariate or multivariate equation.
+Univariate equation: A List of scalar inputs are used to return a single
+value. This can be used as a multivariate equation.
+Multivariate equation: A list of scalar inputs are used to return a list
+of values.
+12.3 Root solvers
+A collection of root solvers are provided for ﬁnding the roots of univariate,
+scalar equations. Both the x (absolute and relative) and y (absolute only)
+values are checked for convergence. The available methods are:
+Univariate root solvers:
+• bisection
+• Brent
+• falsePoint
+• Halley
+• NewtonRaphson
+• secant
+• Steffensen
+• step
+Multivariate root solvers:
+• goodBroyden (Broyden, 1965)
+• badBroyden (Kvaalen, 1991)
+• NewtonRaphson
+116
+
+=== page 117 ===
+Variable Description
+xTolerance(s) Relative tolerance for the diﬀerence in x (1e-6 by default)
+xAbsTolerance(s) Absolute tolerance for the diﬀerence in x (1e-6 by default)
+yTolerance(s) Absolute tolerance for the y value (1e-6 by default)
+maxSteps Maximum number of iteration (100 by default)
+12.4 Minimization
+A collection of minimization methods are providing for ﬁnding the minimums
+of scalar equations. All methods were implemented using Kochenderfer and
+Wheeler (2019). The available models are
+Univariate minimization:
+• bisection
+• Fibonacci
+• goldenRatio
+• NewtonRaphson
+• quadraticFit
+• ShubertPiyavskii
+• step
+Multivariate minimization:
+• gradientDescent
+• NelderMead
+• particleSwarm
+Nelder-Mead options:
+Variable Description
+reﬂectionCoeﬀ Scale for reﬂection (1 by default)
+expansionCoeﬀ Scale for expansion (2 by default)
+contractionCoeﬀ Scale for contraction (0.5 by default)
+Particle Swarm options:
+Variable Description
+narticles Number of particles used (100 by default)
+cLocal Velocity weight toward the best local point
+cGlobal Velocity weight toward the best global point
+vWeight Weight of previous velocity
+117
+
+=== page 118 ===
+General options:
+Variable Description
+xTolerance(s) Absolute convergence tolerance for
+the independent variables (1e-6 by default)
+xRelTolerance(s) Relative convergence tolerance
+for the independent variables (1e-6 by default)
+yTolerance(s) Absolute convergence tolerance for
+the evaluated function (1e-6 by default)
+yRelTolerance(s) Relative convergence tolerance
+for the evaluated function (1e-6 by default)
+maxSteps Maximum number of iteration (100 by default)
+nSamples Number of pre-sample intervals (0 by default)
+normaliseError Is the relative error checked for convergence (true by default)
+tau Line search (and step) reduction coeﬃcient (0.5 by default)
+12.5 Integrators
+Numerical integrators have been implemented for arbitrary data types (not
+only scalars).
+Univariate integrators (single input) have the ability to use either adap-
+tive integration or a ﬁxed number of intervals. These methods have also
+been optimised to reduce the number of function evaluations. The available
+methods are:
+Univariate integrators:
+• Boole
+• Gaussian
+• midPoint
+• Simpson13
+• Simpson38
+• trapezoidal
+Variable Description
+tolerance Convergence tolerance (1e-6 by default)
+adaptive Is the integration adaptive (true by default)
+maxSplits Maximum number splits (10 by default)
+nIntervals Number of intervals (10 by default)
+118
+
+=== page 119 ===
+Because of the complexity of integrating an arbitrary number of dimen-
+sions, only a small subset of the univariate integrators a have been imple-
+mented for multiple inputs. These methods also do not have the same opti-
+misation as seen in the univariate case. The available options are:
+Multivariate integrators:
+• Gaussian
+• midPoint
+• trapezoidal
+Variable Description
+tolerances Convergence tolerance (1e-6 by default)
+adaptive Is the integration adaptive (true by default)
+maxSplits Maximum number splits (5 by default)
+119
+
+=== page 120 ===
+13 Solid models
+A port of solids4foam has been incorporated into theblastFSI solver. These
+models allow for linear and non-linear deformation using the ﬁnite-volume
+methodolgy described in Cardiﬀ et al. (2018); Cardiﬀ and Demirdzic (2021)
+and Simo and Hughes (2000) for plasticity.
+In addition, if solids4foam is available locally, the blastSolids4Foam
+library can also be compiled to allow use of the models available in the
+blastFoam solver to be used withsolids4Foam solver by specifying the
+blast ﬂuid.
+NOTE: These models are still under development and have not been exten-
+sively validatedspeciﬁcallyfor blast.
+120
+
+=== page 121 ===
+14 CouplingtopreCICE’sOpenFOAMadapter
+With the addition of moving meshes, the ability to couple blastFoam to an
+external solver through preCICE is possible. There is no special setup re-
+quired, and it is ready to be used upon install. There are no limitations
+for the standard blastFoam moving mesh classes. However, when using the
+movingAdaptiveFvMesh, the coupled boundary cannot change within the
+simulation. For this reason, balancing is not allowed and the optional ”pro-
+tectedPatches” keyword must be used to specify boundaries which cannot be
+reﬁned. Checkpointing can also not be used with reﬁnement due to limita-
+tions on the mesh.
+121
+
+=== page 122 ===
+15 Function objects
+In addition to the standard OpenFOAM functionObjects, additional blast
+speciﬁc function objects have been added. The standard function objects
+from the sampling library are automatically included, but additional libraries
+can also be included. A list of these libraries can be seen in 18. These can
+be included using the followingcontrolDict entry
+functions
+{
+impulse
+{
+// Additional libraries to include
+libs ("libblastFunctionObject.so");
+// Function object type
+type impulse;
+// writeTime - Writes every output time
+// timeStep - Number of time steps
+// adjustableRunTime - Specified output interval
+writeControl writeTime;
+// Interval between writes
+writeInterval 1;
+// Reference pressure
+pRef 101325;
+...
+}
+}
+15.1 blastProbes
+A modiﬁed version of the standard OpenFOAM probe utility is also available,
+where the basic functionality remains the same, with several key additions.
+First, the ability to append to exiting probe ﬁles is now possible, allowing
+122
+
+=== page 123 ===
+for a single probe ﬁle to be used even if a simulation is restarted from a later
+time. Second, probes that are not found within the mesh can be moved to
+the nearest face so they can produce valid results. This can be very useful
+if a probe is needed on a curved face. Lastly, the warning of probes existing
+on multiple processors has been removed by selecting a single processor on
+which to probe.
+NOTE: When reﬁnement and unreﬁnement occurs, the probe locations will
+"jump" to the nearest cell resulting in ﬂuctuations when plotted. This can
+be eliminated by allowing reﬁnement of probes indynamicMeshDict (”re-
+ﬁneProbes”) (this is the default option).
+Entry Description
+probeLocations List of locations to probe
+ﬁelds Fields to probe at the given points
+append Are probes appended to and existing ﬁle (default no)
+ﬁxLocation Probes follow cell motion (not stationary)
+adjustLocations Can probes be moved into the mesh (default no)
+writeVTK Probed points are written to a VTK ﬁle (default no)
+interpolationScheme Method to interpolate probe.
+Options are cell, cellPoint, cellPointFace,
+cellPatchConstrained, cellPointWallModiﬁed,
+and pointMVC (default is cell)
+15.2 ﬁeldMinMax (ﬁeldMax)
+The minimum or maximum value at every cell in a domain is output, allowing
+for quantities such as maximum impulse and peak pressure to be visualized.
+This can be done for any ﬁeld currently stored within the simulation. These
+ﬁelds are automatically saved within the calculation.
+Entry Description
+ﬁelds Name of the ﬁelds (i.e (rho U p impulse))
+restartOnRestart Reset the min/max on simulation restart (default is no)
+mode Type of min/max (component, magnitude, componentMag)
+minMax Minimum or maximum (default is max)
+123
+
+=== page 124 ===
+15.3 writeTimeList
+Additional write times are added using a list of user speciﬁed times. This is
+useful when ﬁelds are needed at time that do not correspond to a standard
+write interval. Seevalidation/blastFoam/woodwardColellafor an example.
+Entry Description
+times List of times to write
+15.4 conservedQuantities
+The volume integrated value of ﬁelds can be computed and printed in the
+output of the solver. The initial, current, total diﬀerence, and relative dif-
+ference is printed. Any ﬁelds can be tracked by specifying the names of the
+ﬁelds in the dictionary.
+Entry Description
+ﬁelds Fields to track
+NOTE: Currently, the removal and injection of values into a domain is not
+considered.
+15.5 vtkTimeSeries surface writer
+An extension of the vtk surface writer for writing sampled surfaces can be
+used so that an additional*.vtk.series ﬁle is written in thepostProcessing/-
+surfacesName folder with the relative paths to all write times of the given
+surfaces. This ﬁle can then be opened inParaView to visualize all ﬁles in
+the correct time sequence.
+15.6 Schlieren (grad)
+The gradient of the given ﬁeld is calculated and written. Only scalar and
+vector ﬁelds can be used.
+Entry Description
+ﬁeld Fields to take the gradient of
+result Name of the result ﬁeld (Schlieren/grad(ﬁeld) by default)
+124
+
+=== page 125 ===
+15.7 shadowgrap (laplacian)
+The Laplacian of the given ﬁeld is calculated and written
+Entry Description
+ﬁeld Fields to take the laplacian of
+result Name of the result ﬁeld (shadowgraph/laplacian(ﬁeld) by default)
+15.8 blastMachNo
+The blastMachNo replaces the standardmachNo available in OpenFOAM by
+using the speed of sound calculated from the blastFoam speciﬁc thermody-
+namic models.
+Entry Description
+phaseName Name of the phase (default is none)
+UName Name of the velocity ﬁeld (default is U or U.phaseName)
+result Name of the Mach number ﬁeld (default is Ma or Ma.phaseName)
+15.9 dynamicPressure
+It can be useful in blast simulations to track the dynamic pressure (kinetic
+energy) of a phase deﬁned as
+pdyn = 1
+2ρiU|U|. (15.1)
+The dynamicPressurefunctionobjectreturnsthevectorofdynamicpres-
+sure, where the magnitude of this output is the standard dynamic pressure.
+Additionally the pressure function object (standard OpenFOAM) can be
+used to calculate static (if using incompressible) or total pressure and their
+respective coeﬃcients.
+Entry Description
+rhoName Name of the density ﬁeld (default is rho)
+UName Name of the velocity ﬁeld (default is U)
+125
+
+=== page 126 ===
+15.10 overpressure
+This function object calculates and writes the overpressure (e.g. the pressure
+relative to a given reference pressure, usually ambient) given a pressure ﬁeld
+and reference pressure. The ﬁeld can also be saved to allow for additional
+sampling.
+Entry Description
+pName Name of the pressure ﬁeld (default is p)
+pRef Reference pressure [Pa]
+store Is the ﬁeld saved (default is no)
+15.11 impulse
+This function object calculates the impulse in every cell by integrating the
+overpressure over time using the speciﬁed pressure ﬁeld and reference pres-
+sure. The impulse ﬁeld is automatically saved to allow additional sampling
+by default.
+Entry Description
+pName Name of the pressure ﬁeld (default is p)
+pRef Reference pressure value [Pa]
+15.12 timeOfArrival
+This function object tracks the maximum pressure and records the time when
+the maximum pressure is reached.
+Entry Description
+pName Name of the pressure ﬁeld (default is p)
+126
+
+=== page 127 ===
+16 Utilities
+Listed below are the utilities that have been developed for blastFoam to
+simplify case setup and post-processing.
+16.1 setReﬁnedFields
+This is a modiﬁed version of thesetFields utility in the standard Open-
+FOAM that includes the ability to reﬁne the mesh based on the ﬁelds that
+are set. This is extremely beneﬁcial when a small volume needs to be set
+within a set of very large computational cells. The same functionality pre-
+sented in Sec. 11 is present, allowing for 2D and 3D geometries to be set and
+reﬁned, and the reﬁnement options are speciﬁed insetFieldsDict, notdynam-
+icMeshDict. The utility works by setting the default ﬁeld values provided,
+settingtherequestedﬁelds, thencheckingforlocalvariationsinspeciﬁcﬁelds.
+Region may have a level deﬁned where the mesh is reﬁned up to this level.
+The default ﬁeld values for any ﬁelds being set must also be deﬁned so that
+the region is updated at each iteration. The utility will iterate until the
+mesh is no longer changing, or the maximum number of iterations is reached.
+A comparison using the standardsetFields and setReﬁnedFieldscan be
+seen in Fig. 1.
+(a) Unreﬁned initial ﬁeld
+ (b) Reﬁned initial ﬁeld
+Figure1: Comparisonofinitialﬁeldsusing setFieldsandsetReﬁnedFields
+By default, no error estimator will be used so any local change in a tracked
+127
+
+=== page 128 ===
+ﬁeldwillbereﬁned. However, byspecifyinganerrorestimator, thereﬁnement
+will be determined by the method requested.
+By default only ﬁelds that are speciﬁed withinsetFieldsDict will be modiﬁed,
+meaning that all other ﬁelds must use uniform ﬁeld values to be read. The
+’-updateAll’ command line option will read in all ﬁelds present in the current
+time step and update the sizes of the ﬁelds which is necessary if non-uniform
+ﬁelds will be used. If balancing is used this will automatically be enabled to
+ensure that all ﬁelds are correct.
+In addition to the standard shapes that can be set withsetFields, several
+additional options have been added and are listed below with their required
+entries. All *MassToCell options require ”rho” and ”mass” to be speciﬁed.
+Usage: setReﬁnedFields [OPTIONS]
+New cell sets:
+• sphereListToCell: centres, radii, or radius
+• cylinderCellToList: p1s, p2s, radii, or radius
+• boxMassToCell: centre and aspectRatio (span for backup)
+• cylindericalMassToCell: centre, LbyD and direction (radius and L for
+backup)
+• sphericalMassToCell: centre (radius for backup)
+• hemisphericalMassToCell: centre (radius for backup)
+• searchableSurfaceToCell: surface (searchable surface type)
+• searchableSurfaceToPoint: surface (searchable surface type)
+The option to specify non-uniform values for the ﬁelds has also been included
+and are speciﬁed by using the ﬁeld type (i.e. volScalarField, pointVector-
+Field, etc.) followed by the type (i.e. Value, Density, etc.), for example
+pointScalarFieldValue, volVectorFieldDensity, etc.
+Field set types:
+• Density: A density is calculated using the given volume integrated
+quantity, and dividing by the volume of the selected cells
+128
+
+=== page 129 ===
+• Function: Values are set based on the speciﬁed function.
+• InitialValue: The current ﬁeld is read and saved to ensure the true
+values are used after reﬁnement.
+• MassIntegrated: The mass integrated quantity read and is divided by
+the mass (density times volume) of the given cell set to determine the
+ﬁeld value.
+• Sum: The ﬁeld value is calculated given a summed value and the list
+of ﬁelds to use in the sum
+• Value: A uniform value is set
+Command line options:
+Entry Description
+-forceHex8 Force 3D reﬁnement for compatibility with standard OpenFOAM solvers
+-debug Write intermediate step with error and max cell level
+-updateAll Resize all ﬁelds from the current time
+-overwrite Write the mesh to previous location
+-noFields Do not write ﬁelds
+-noReﬁne Do not reﬁne the mesh
+-noHistory Do not write the reﬁnement history (ﬁx the mesh)
+Dictionary options:
+Entry Description
+ﬁelds Field names that are used to compute error and reﬁne mesh
+level Level of each cell set
+reﬁneInternal Are the cells inside each region reﬁned
+reﬁneFaces Are the owner and neighbor cells of faces reﬁne (requires selectionMode)
+reﬁnePoints Cells containing the points reﬁned (requires selectionMode)
+nBuﬀerLayer Number of cells between level boundaries (default is 0)
+maxIter Maximum number of iterations (default is 2*max(level)
+errorEstimator Type of error estimator used (default none)
+Field options:
+129
+
+=== page 130 ===
+Entry Description
+-setBoundaries ("patches") Set the boundaries provided
+-setAllBoundaries Set all boundary values
+-noInternal Do not set cell values
+-evaluateBoundaries Correct boundary conditions after setting
+Selection modes:
+Entry Description
+-all Select all entries
+-internal Select all entries not on boundaries
+-interface Selected entries between selected and not
+-boundary Select entries on boundaries in the ’patches’ entry
+-interfaceAndBoundary Select entries using ’interface’ and ’boundary’
+Set and zone creation:The functionality of thetopoSet utility is avail-
+able in setReﬁnedFieldsallowing for creation of sets and zones using the
+reﬁnement shapes. cell/face/point sets/zones are speciﬁed in separate lists,
+and multipleactions can be performed on the given sets. The usage is iden-
+tical to that oftopoSet and thetutorials/setReﬁnedFieldscase will oﬀer an
+extensive list of usage options.
+An examplesetFieldsDict is shown below
+fields (alpha.air);
+nBufferLayers 1;
+defaultFieldValues
+(
+volVectorFieldInitialValue U ( 0 0 0 )
+volScalarFieldFunction p
+{
+// Function3 (i.e. uses x, y, and z)
+type coded;
+code
+#{
+return -x + 2.0*y*z
+#};
+}
+130
+
+=== page 131 ===
+volScalarFieldValue alpha.air 0
+// alpha.water = 1 - (alpha.air + alpha.gas)
+volScalarFieldSum alpha.water 1 (alpha.air alpha.gas)
+volScalarFieldValue rho.air 1.225
+);
+regions
+(
+cylinderToCell
+{
+p1 (0 0 -1);
+p2 (0 0 1);
+radius 0.1;
+level 3;
+refineInternal yes;
+backup
+{
+p1 (0 0 -1);
+p2 (0 0 1);
+radius 0.2;
+}
+fieldValues
+(
+volScalarFieldValue p 9.12e8
+// alpha.air = 10 [kg] / sum(V * rho.air) [kg]
+volScalarFieldMassIntegrated alpha.air 10
+// rho.water = 500 [kg]/ Volume
+volScalarFieldDensity rho.water 500.0
+);
+}
+// Refine the faces in the "walls" patch
+patchToFace
+131
+
+=== page 132 ===
+{
+name walls;
+level 2;
+refineFaces yes;
+selectionMode boundary;
+}
+);
+The tutorial intutorials/setReﬁnedFielddetails how this an be used as
+well as the outputs of the ’-debug’ option.
+NOTE: Because OpenFOAM does not decompose both the time-based mesh
+(e.g. 0, 0.001, ... ) and the base mesh (located inconstant), where both
+are required to use the mesh modiﬁed bysetReﬁnedFields. Thus, if it is
+run in parallel,setReﬁnedFieldsmust be run in parallel after the case has
+been decomposed.
+16.2 blastToVTK
+In order to create smaller ﬁles for post-processing,blastToVTKcan be used
+to create VTK ﬁles of a given patch with a set of ﬁelds. By Default the write
+interval will be the write interval of the VTK ﬁles, but optionally the ’-dt’ ﬂag
+can be used to write interpolated, intermediate steps at the given interval.
+A *.vtk.series ﬁle will automatically be written for simpliﬁed viewing. By
+default the VTK ﬁles will be written in binary.
+Usage: blastToVTK <patchName> [OPTIONS]
+Command line options:
+Entry Description
+-ascii Write ascii VTK ﬁles
+-dt Optional write interval
+-interpolationScheme Scheme used to interpolate between time steps
+(linearClamp by default)
+-ﬁelds List of ﬁelds to be written in the VTK ﬁles
+-outputDir Directory to write ﬁles to (VTK by default)
+132
+
+=== page 133 ===
+16.3 createTimeSeries
+This utility simpliﬁes the previous utility by simply creating a*.*.series ﬁle
+which provides the path to each time step of a VTK or STL ﬁle and allows
+viewing of the time series with the time inParaView. Only one additional
+ﬁle is created for each sampled ﬁeld in the directory provided. The given
+path must include ﬁles within time step folders. By default the relative path
+to the ﬁles will be used
+Usage: createTimeSeries <path/to/timeFolders> [OPTIONS]
+Command line options:
+Entry Description
+-absolute Use absolute ﬁle paths
+-outputDir Directory to write the *.series ﬁle to
+16.4 mergeProbes
+This is a simple utility that can be used to calculate combine probes started
+at diﬀerent times. By default, all ﬁles found in the start time folder will be
+merged.
+Usage: mergeProbes <path/to/probes> [OPTIONS]
+Command line options:
+Entry Description
+-force Overwrite existing merged probes
+-probeNames Probed ﬁelds to merge (default is all)
+16.5 calculateImpulse
+This is a simple utility that can be used to calculate the impulse using a
+pressure probe ﬁle. If an overpressure ﬁle is found, that will be the default
+ﬁeld to integrate, but this can be overridden with the ’-p’ option. If an
+overpressure ﬁle is provided the reference pressure will be 0 by default, other
+with ’-pRef’ should be provided.
+133
+
+=== page 134 ===
+Usage: calculateImpulse <path/to/probes> [OPTIONS]
+Command line options:
+Entry Description
+-p Name of pressure ﬁeld
+-pRef Reference pressure [Pa]
+-impulse Name of ﬁle to write
+-force Overwrite existing impulse ﬁle
+16.6 initializeAtmosphere
+The initializeAtmosphere utility is used to initialize stable pressure and
+density ﬁelds such that the hydrostatic pressure gradient and gravitational
+acceleration force are balanced. The hydrostatic initialization procedure is a
+modiﬁed version of that available in OpenFOAM (OpenCFD Ltd., 2018a).
+Currently, there are two available models: hydrostatic and tabulated. The
+hydrostatic model dynamically solves for the hydrostatic pressure gradient
+and adjusts the density accordingly. The tabulated model reads a list of
+pressures and temperatures versus height to determine the density ﬁelds. An
+optional hydrostatic correction can be used once the table values have been
+set. See tutorials/initializeAtmosphere for an example.
+Inputs can either be read from a dictionary or through the command line.
+If the tabulated option is requested,system/atmosphereProperies must be
+available.
+Usage: initializeAtmosphere [OPTIONS]
+Command line options:
+Entry Description
+-pRef Reference pressure [Pa]
+-hRef Reference height, or the height at the lowest point of the mesh [m]
+-phase Name of the phase to set (only for multiphase)
+-zone Optional cellZone to set (all cells by default)
+-type Optional override of the model. (hydrostatic by default,
+no default if read from dictionary)
+134
+
+=== page 135 ===
+16.7 rotateFields
+The rotateFields utility is can be used to map the ﬁelds of a 1-D or 2-D
+solution to that of a 2-D or 3-D solution, where the source and target meshes
+are used to determine the rotation. The rotation of vector and tensor ﬁelds
+are mapped using the local rotation tensor to ensure that the correct radial
+components are used. Only ﬁeld present in the target case are mapped,
+however additional ﬁelds can be mapped. Because there are no values for
+these ﬁelds, the closest value on the source mesh is used for cells outside of
+the mapped cells. Iterative reﬁnement can be used to iteratively rotate ﬁelds
+and reﬁne the mesh using the reﬁnement criteria found indynamicMeshDict
+allowing for easier initialization when using AMR.
+NOTE: The mapping is not conservative currently so only the nearest cell
+value will be used which can result in certain ﬂow features either being over
+or under emphasised.
+Usage: rotateFields <sourceCase> [OPTIONS]
+Command line options:
+Entry Description
+-sourceTime Time in the source case to map
+(default is startFrom time in source case)
+-sourceRegion Region of the source case to map
+(only used for multi-region)
+-targetRegion Region of the target case to map to
+(only used for multi-region)
+-extend If a cell is outside of the source range,
+map to the closest cell (default is no)
+-maxR Cutoﬀ radius to map (default is a big number)
+-centre Center of rotation on the source mesh
+(default is the center of the source mesh)
+-uniform Copy uniform ﬁelds to the target case (default is no)
+-additionalFields List of additional ﬁelds to map
+-reﬁne Iteratively map, rotate and reﬁne the mesh
+-parallelSource Map from a parallel source
+-tets Use cell tet decomposition (no by default)
+135
+
+=== page 136 ===
+16.8 convertLagrangianPositions
+Because OpenFOAM has changed the write format of Lagrangian particles
+to barycentric coordinated in place of a point in physical space,ParaView
+is no longer able to read the positions of particles any more. To alleviate
+this problem, and allowParaView to read Lagrangian ﬁelds (in serial and
+parallel), theconvertLagrangianPositionswillreadinthestandardOpen-
+FOAM positions ﬁle, convert it to a format thatParaView can read and
+rewrite the positions ﬁle. If the positions need to be reverted to continue
+a simulation, the ’-revert’ optional will rewrite the original positions of the
+particles.
+Usage: convertLagrangianPositions [OPTIONS]
+Command line options:
+Entry Description
+-revert Convert point positions back to original positions
+16.9 reconstructParAll
+A modiﬁed version of the standard OpenFOAMreconstructPar and re-
+constructParMesh has been added to allow for reconstruction of cases
+that have been balanced, something that will cause a fatal error withrecon-
+structPar. Reconstruction of the mesh is automaically handled, meaning
+that reconstructParMesh does not need to be run prior. This also al-
+lows for reconstruction of blastFoam AMR reﬁnement histories which is not
+typically supported.
+NOTE:Ifthemeshinthedecomposed processor*/constantfolderisdiﬀerent
+that that in theconstant folder, the ’-constant’ must be used.
+NOTE: If the mesh in the 0 folder diﬀers from that inconstant the ’-
+withZero’ ﬂag must be used.
+136
+
+=== page 137 ===
+17 fvModels and fvConstraints
+In addition to the physics present in the standard solver, additional source
+terms and models can be included by adding the optionalconstant/fvModels
+and system/fvConstraints. All of these models must have their associated
+libraries included within the given entries in the ﬁles. A list of the libraries
+and a brief description can be found in Sec. 18
+137
+
+=== page 138 ===
+18 Optional libraries
+Below is a list of optional libraries to include for functionObject, fvMod-
+els, and fvConstraints. When libraries are included additional options will
+become available in the list of runtime-selectable models.
+• "libutilityFunctionObjects.so": General utitilies
+• "libﬁeldFunctionObjects.so": Function objects used for ﬁeld quantities
+• "liblagrangianFunctionObjects.so": Simple lagrangian particles
+• "libforces.so": Calculate viscous and pressure forces activing on bound-
+aries
+• "libfvConstraints.so": General fvConstraints
+• "libfvModels.so": General fvModels
+• "liblagrangianParcel.so": Coupled lagrangian particles (one way cou-
+pling)
+138
+
+=== page 139 ===
+19 Solvers
+blastFoam oﬀers a wide variety of solvers for simulating transient, highly
+compressible ﬂows. A short description of each is given below.
+19.1 blastFoam
+The blastFoam solver is the standard solver and has a variety of uses, in-
+cluding single phase, two phase and multiphase ﬂows, where the phases and
+thermodynamic models are speciﬁed in theconstant/phaseProperties. When
+a list of phases is provided (and the list has more than one entry), the two
+phase or multiphase solver is selected. If the key word phases is not speciﬁed,
+then the single phase solver is selected. All phases use the blastFoam speciﬁc
+equations of states (see Section 5).
+19.2 blastEulerFoam
+The blastEulerFoam solver is the Euler-Euler (two/multiﬂuid) variant of
+blastFoam. Currently only ﬂuid-solid simulations are supported; however,
+the addition of ﬂuid-ﬂuid simulations is under development. This solver is
+based on the work of Houim and Oran (2016) and Lai et al. (2018). One
+major advantage over the standardmultiphaseEulerFoam solver is that
+any number of particle phases can be used. Currently there are three phase
+models that can be used: ﬂuid, multiphase, and granular. The ﬂuid phase
+model is used to describe a single component ﬂuid (such as air). The mul-
+tiphase phase model is used to describe a ﬂuid phase consisting of multiple
+phases, each described by a unique equation of state. This allows simula-
+tions of standard detonation problems with the addition of particles. The
+granular phase model is used to describe a solid phase. Both the ﬂuid and
+multiphase models can use any of the ﬂuid thermodynamic models, while the
+granular model can use any of the solid thermodynamic models. The models
+describing interactions between ﬂuids are described in Sec. 3 and Sec. 4
+NOTE: While multiple ﬂuid phases will not cause the solver to fail, theses
+types of simulations are not currently supported.
+139
+
+=== page 140 ===
+19.3 blastFSIFoam
+The blastFSIFoamsolver uses the standardblastFoamsolver to solve the
+ﬂuid phase, and the models mentioned in Sec. 13 to handle the solid defor-
+mation. The ﬂuid phase uses a moving mesh, while the solid phase can be
+solved using a total lagrangian or linear (stationary), or updated Lagrangian
+(moving) method. In order to correctly transfer the information between
+the patches, thecoupledGlobalPolyPatch Cardiﬀ et al. (2018) is used and
+does not require any changed to the mesh patch types. Fields that require
+coupling information (temperature, displacment, etc.) should used a global
+patch type (see Sec. 8.1). If meshes are made for each individual region, the
+patch types can be speciﬁed as usual. However, if thesplitMeshRegions
+utility is used to separate a single region mesh into multiple region meshes,
+the patch names and types may need to be modiﬁed
+NOTE: This solver is still in development. Please use with caution.
+19.4 blastXiFoam (Experimental)
+In addition to the standardblastFoamsolver, an additional solver has been
+added to solve combustion as an extension of the standard OpenFOAMXi-
+Foam solver. The only diﬀerence is that the ﬂux schemes presented earlier
+are used to transport the conserved quantities. This allows for a more accu-
+rate description of combusting, highly compressible ﬂows (i.e. deﬂagration
+to detonation transition). It is recommended to use theadibaticFlameT
+utility to calculate the model coeﬃcients used in the requiredconstant/ther-
+mophysicalProperties dictionary.
+19.5 blastReactingFoam (Experimental)
+blastReactingFoamusesthestandardOpenFOAMthermodynamicclasses,
+and can be used to solve multi-specie systems that include reactions. The
+use of combustion models are also available. Theconstant/thermophysical-
+Properties dictionary must be included under the constant dictionary along
+with the relevant dictionaries (constant/combustionProperties and constan-
+t/chemistyProperties) and initial value ﬁles (mass fractions). The conserved
+quantities (mass, momentum, and energy) as well as the mass fractions are
+all transported using the ﬂux schemes presented herein.
+140
+
+=== page 141 ===
+19.6 blastMultiRegionFoam (Experimental)
+The blastMultiRegionFoamsolver is derived from thechtMultiRegion-
+Foamavailable in OpenFOAM. The major diﬀerences are in the use of ODE
+time integration and Riemann ﬂuxes. The thermal transport in solids is still
+treated implicitly through a matrix solution.
+19.7 blastParcelFoam (Experimental)
+blastParcelFoammakesuseofthestandardOpenFOAMLagrangianclasses
+to solve a coupled Eulerian ﬂuid and collection of Lagragian parcels. This in-
+cludes interaction terms like drag, heat transfer, and particle collisions. Not
+all of the OpenFOAM standard Lagrangian options are available due to the
+use of a diﬀerent thermodynamic model. While AMR can be used, dynamic
+load balancing cannot.
+19.8 blastEquation
+blastEquation makes use of the numerics library and can be used to inter-
+rogate simple equations, or more complicated, coded function evaluations.
+This utility can either be used strictly though the command line, or using
+dictionaries to deﬁne equations and the operations they are used with. More
+control is available when using dictionaries, speciﬁcally with respect to root
+solving, minimization, and integration schemes. Please seetutorials/blastE-
+quation for more complete examples on how to use this utility.
+141
+
+=== page 142 ===
+Entry Description
+-func Dictionary used to deﬁne the equation
+-dict Dictionary used to deﬁne operations on the equation
+-clean Remove dynamicCode library
+-noClean Do not remove dynamicCode library
+-name Name of the equation
+-fx "pow(x, 3)" Function
+"x[0]*x[1]"
+-dfdx "3*sqr(x)" First derivative of function
+"x[1]; x[0]" (entries seperated by ";" for multiple inputs)
+-d2fdx2 "6*x" Second derivative of function (only for single inputs)
+-d3fdx3 "6" Third derivative of function (only for single inputs)
+-P "(c b a)" Polynomial coeﬃcient (a + bx + cx2)
+-eval "x0" or "(x0 ... xn)" Evaluate at a list of points
+-ﬁndRoots "(x0 x1 x)" Find roots between x0 and x1, optionally starting at x
+-ﬁndAllRoots "(x0 x1)" Find all roots between x0 and x1
+-rootSolver Root solver
+-ﬁndPolyRoots Find roots of a polynomial (only valid with "P")
+-minimize "(x0 x1 x)" Minimize function with bounds x0 and x1,
+optionally starting at x
+-minimizer Method of minimization
+-integrate "(x0 x1)" Integate between x0 and x1
+-integrator Integration method
+-time Use time (only for cases using meshes)
+NOTE: When using command line options, all function deﬁnitions and list
+entries should be in quotes.
+NOTE: When multiple inputs are used, "x0" becomes "(x00 ... x0m)", and
+applies to all entries that take points/positions.
+142
+
+=== page 143 ===
+20 Examples
+Several validation and tutorial cases are presented to demonstrate the ap-
+proach for setting up typical problems. Other validation and tutorial cases
+are available in thevalidation and tutorials directories, which can be found
+in the top level directory where blastFoam is installed. The cases presented
+here are
+1. A single-phase, double Mach reﬂection. Located in
+validation/blastFoam/doubleMachReﬂection
+2. A 1-D shock tube consisting of air and water. Located in
+validation/blastFoam/shockTube_twoFluid
+3. A 2-D, three-phase case with two diﬀerent detonating phases where the
+ﬁrst explosive material is used to detonate the second charge using the
+pressure based activation model. Located in
+tutorials/blastFoam/twoChargeDetonation
+4. An explosive charge of C-4 buried in sand. Located in
+tutorials/blastEulerFoam/mine
+5. A charge causing the breakage of windows using burst patches.
+Located intutorials/blastFoam/burstingWindow_workshop
+Only modiﬁed, relevant input ﬁles are shown here, as all additional ﬁles
+(such asblockMeshDict and initial conditions) are contained in the respective
+directory for each case.
+20.1 Double Mach reﬂection
+The double Mach reﬂection problem is a complex case based on Woodward
+and Colella (1984), which is meant to demonstrate the capabilities of the sin-
+gle phase solver withinblastFoam. Coded boundary conditions for velocity,
+pressure, and density are used to correctly describe the shock behavior at
+the top boundary. The case uses the a single phase with the RK2-SSP ODE
+time integrator and HLLC ﬂux scheme.
+143
+
+=== page 144 ===
+For the double Mach reﬂection, the boundary conditions must be set so
+that the ﬁelds on the top boundary follow the correct upstream and down-
+stream shock conditions, which are
+ρR = 1.4 kg/m3, pL = 1 Pa, TR = 1 [K], UR = (0, 0, 0) m/s
+ρL = 8 kg/m3 pL = 116.5 Pa, TR = 20.3887 [K] UL = (7.1447,−4.125, 0) m/s
+These conditions change based on the shock location, leading to a modiﬁed
+boundary condition for density, pressure, temperature, and velocity, which
+uses a codedFixedValue. The initial density ﬁeld is deﬁned using
+dimensions [1 -3 0 0 0 0 0];
+internalField uniform 1.4;
+boundaryField
+{
+inlet1
+{
+type fixedValue;
+value $internalField;
+}
+inlet2
+{
+type fixedValue;
+value $internalField;
+}
+outlet
+{
+type codedFixedValue;
+value $internalField;
+name shockRho;
+code
+#{
+// Shock location (x)
+scalar xS =
+db().time().value()*11.2799
+144
+
+=== page 145 ===
++ 0.74402;
+scalarField x =
+this->patch().Cf().component(0);
+operator==
+(
+pos(x - xS)*1.4
++ neg0(x-xS)*8.0
+);
+#};
+}
+walls
+{
+type zeroGradient;
+}
+defaultFaces
+{
+type empty;
+}
+}
+The velocity and temperature ﬁelds are initialized using the upstream
+and downstream values with the same evolution equations. The pressure
+ﬁeld useszeroGradient boundary conditions. The internal and boundaries
+are set usingsetFields with thesetFieldsDict deﬁned as
+defaultFieldValues
+(
+volVectorFieldValue U (7.1447 -4.125 0)
+volScalarFieldValue T 20.3887
+volScalarFieldValue p 116.5
+volScalarFieldValue rho 8.0
+);
+regions
+(
+rotatedBoxToCell
+145
+
+=== page 146 ===
+{
+origin (0.16667 0 -1);
+i (8.66025 -5.0 0);
+j (5.0 8.66025 0 );
+k (0 0 2);
+fieldValues
+(
+volScalarFieldValue p 1
+volScalarFieldValue T 1
+volVectorFieldValue U (0 0 0)
+volScalarFieldValue rho 1.4
+);
+}
+boxToFace
+{
+box (0.74402 0.999 -1) (5 1.001 1);
+fieldValues
+(
+volScalarFieldValue p 1
+volScalarFieldValue T 1
+volVectorFieldValue U (0 0 0)
+volScalarFieldValue rho 1.4
+);
+}
+);
+The phaseProperties ﬁle is
+mixture
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+specie
+146
+
+=== page 147 ===
+{
+molWeight 11640.3; // normalizes pressure
+}
+transport
+{
+mu 0;
+Pr 1.0;
+}
+equationOfState
+{
+gamma 1.4;
+}
+thermo
+{
+Cv 1.785714286;
+Hf 0.0;
+}
+}
+The case can be initialized and run using the following commands:
+blockMesh
+setFields
+blastFoam
+The ﬁnal results are shown in the following ﬁgure.
+Figure 2: Density contours at t = 200 ms
+147
+
+=== page 148 ===
+20.2 Shock Tube - Two Fluid
+This 1-D shock tube problem is taken from Zheng et al. (2011) and consists
+of gas and water initially separated at the center of the domain. The gas
+uses the van der Waals EOS and the water uses the Stiﬀened gas EOS. The
+shock tube is 1 m long, and is discretized into 300 computational cells.
+The left state is deﬁned as:
+ρ = 1000 kg/m3 α = 1 p = 1e9 Pa
+The right state is deﬁned as:
+ρ = 50 kg/m3 α = 0 p = 1e5 Pa
+The phaseProperties dictionary is:
+phases (fluid gas);
+fluid
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState stiffenedGas;
+}
+specie
+{
+molWeight 18.0;
+}
+transport
+{
+mu 0;
+Pr 1.0;
+}
+equationOfState
+{
+gamma 4.4;
+148
+
+=== page 149 ===
+a 6.0e8;
+}
+thermo
+{
+Cv 4186;
+Hf 0.0;
+}
+residualRho 1e-6;
+residualAlpha 1e-10;
+}
+gas
+{
+type basic;
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState vanderWaals;
+}
+specie
+{
+molWeight 28.97;
+}
+transport
+{
+mu 0;
+Pr 1.0;
+}
+equationOfState
+{
+gamma 1.4;
+a 5.0;
+b 1e-3;
+}
+thermo
+{
+149
+
+=== page 150 ===
+Cv 718;
+Hf 0.0;
+}
+residualRho 1e-6;
+residualAlpha 1e-10;
+}
+and thefvSchemes dictionary is:
+fluxScheme HLLC;
+ddtSchemes
+{
+default Euler;
+timeIntegrator RK2SSP;
+}
+gradSchemes
+{
+default leastSquares;
+}
+divSchemes
+{
+default none;
+}
+laplacianSchemes
+{
+default Gauss linear corrected;
+}
+interpolationSchemes
+{
+default linear;
+reconstruct(alpha) vanLeer;
+reconstruct(rho) vanLeer;
+150
+
+=== page 151 ===
+reconstruct(U) vanLeerV;
+reconstruct(e) vanLeer;
+reconstruct(p) vanLeer;
+reconstruct(speedOfSound) vanLeer;
+}
+snGradSchemes
+{
+default corrected;
+}
+As seen above, the HLLC ﬂux scheme is used with vanLeer limiters,
+and 2nd-order strong-stability-preserving time integration. The following
+commands were used to initialize and run the case in serial:
+blockMesh
+setFields
+blastFoam
+The results are shown in Fig. 3.
+151
+
+=== page 152 ===
+ 0
+ 1x108
+ 2x108
+ 3x108
+ 4x108
+ 5x108
+ 6x108
+ 7x108
+ 8x108
+ 9x108
+ 1x109
+ 0  0.2  0.4  0.6  0.8  1
+Pressure [Pa]
+X-Position (m)
+Zheng 2011
+blastFOAM
+(a) Pressure
+-50
+ 0
+ 50
+ 100
+ 150
+ 200
+ 250
+ 300
+ 350
+ 400
+ 450
+ 500
+ 0  0.2  0.4  0.6  0.8  1
+Velocity [m/s]
+X-Position (m)
+Zheng 2011
+blastFOAM
+(b) X-velocity
+Figure 3: Pressure and velocity ﬁelds at t = 73 ms
+20.3 Two charge detonation
+This case demonstrates the ability ofblastFoamto solve complex problems
+involving multiple phases and detonation dynamics. Two charges, one com-
+posed of RDX and the other of TNT, are detonated in air. The RDX has a
+single detonation point at the center of its circular domain, and the TNT is
+detonated using the pressure based activation model. Fig. 4 shows the initial
+conﬁguration, where the red line is the outline of the RDX charge, the red
+dot is the initiation point of the RDX charge, and the blue line is the outline
+of the TNT charge.
+152
+
+=== page 153 ===
+Figure 4: Initial charge conﬁguration
+The phaseProperties dictionary is deﬁned as
+phases (RDX tnt gas);
+RDX
+{
+type detonating;
+reactants
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState Murnaghan;
+}
+equationOfState
+{
+rho0 1160;
+n 7.4;
+kappa 3.9e11;
+Gamma 0.35;
+pRef 101298;
+}
+specie
+{
+153
+
+=== page 154 ===
+molWeight 222.12;
+}
+transport
+{
+mu 0;
+Pr 1;
+}
+thermodynamics
+{
+Cv 1130.78;
+Hf 0.0;
+}
+}
+products
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState JWL;
+}
+equationOfState
+{
+A 2.9867e11;
+B 4.11706e9;
+R1 4.95;
+R2 1.15;
+C 7.206147e8;
+omega 0.35;
+rho0 1160;
+}
+specie
+{
+molWeight 55.0;
+}
+transport
+{
+mu 0;
+154
+
+=== page 155 ===
+Pr 1;
+}
+thermodynamics
+{
+Cv 1000;
+Hf 0.0;
+}
+}
+activationModel none;
+initiation
+{
+E0 4.0e9;
+}
+residualRho 1e-6;
+residualAlpha 1e-10;
+}
+tnt
+{
+type detonating;
+reactants
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState BirchMurnaghan3;
+}
+equationOfState
+{
+rho0 1601; // Reference density [kg/m^3]
+K0 9.6e9; // Bulk modulus [Pa]
+K0Prime 6.6; // dK0/dp []
+Gamma 0.35; // Gruneisen coefficient
+pRef 101298; // Reference pressure [Pa]
+}
+155
+
+=== page 156 ===
+specie
+{
+molWeight 227.13;
+}
+transport
+{
+mu 0;
+Pr 1;
+}
+thermodynamics
+{
+Cv 1095;
+Hf 0.0;
+}
+}
+products
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState JWL;
+}
+equationOfState
+{
+rho0 1601;
+A 371.21e9;
+B 3.23e9;
+R1 4.15;
+R2 0.95;
+omega 0.3;
+}
+specie
+{
+molWeight 55.0;
+}
+transport
+{
+156
+
+=== page 157 ===
+mu 0;
+Pr 1;
+}
+thermodynamics
+{
+Cv 1000;
+Hf 0.0;
+}
+}
+activationModel pressureBased;
+initiation
+{
+E0 7.0e9; // Detonation energy [Pa]
+// Ignition coefficients
+I 0; // Ignition rate [1/s]
+// First stage coefficients
+G1 3.5083e-7; // Activation rate [Pa/s]
+c 1.0; // (1-lambda) exponent
+d 0.0; // lambda exponent
+y 1.3; // pressure exponent
+minLambda1 0.0; // 1st stage start value
+// Second stage coefficients
+G2 0.0; // Activation rate [Pa/s]
+pMin 1.1e5; // Cutoff pressure
+}
+residualRho 1e-6;
+residualAlpha 1e-6;
+}
+gas
+{
+type basic;
+157
+
+=== page 158 ===
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+equationOfState
+{
+gamma 1.4;
+}
+specie
+{
+molWeight 28.97;
+}
+transport
+{
+mu 0;
+Pr 1;
+}
+thermodynamics
+{
+Cv 718;
+Hf 0;
+}
+residualRho 1e-6;
+residualAlpha 1e-6;
+}
+The HLLC ﬂux scheme is used with vanLeer limiters, and 2nd-order
+strong-stability-preserving time integration. ThefvSchemes dictionary is de-
+ﬁned as
+fluxScheme HLLC;
+ddtSchemes
+{
+default Euler;
+158
+
+=== page 159 ===
+timeIntegrator RK2SSP;
+}
+gradSchemes
+{
+default cellMDLimited leastSquares 1;
+}
+divSchemes
+{
+default none;
+div(alphaRhoPhi.tnt,lambda.tnt) Riemann;
+}
+laplacianSchemes
+{
+default Gauss linear corrected;
+}
+interpolationSchemes
+{
+default linear;
+reconstruct(alpha) vanLeer;
+reconstruct(rho) vanLeer;
+reconstruct(U) vanLeerV;
+reconstruct(e) vanLeer;
+reconstruct(p) vanLeer;
+reconstruct(speedOfSound) vanLeer;
+reconstruct(lambda.tnt) vanLeer;
+}
+snGradSchemes
+{
+default corrected;
+}
+Because the circular charge domain is not well represented by the hexahe-
+dral mesh generated byblockMesh, reﬁnement around this region is used.
+159
+
+=== page 160 ===
+A maximum of four levels of reﬁnement are used, with two cells between each
+level. This allows for a more accurate initial mass of the charges, and pro-
+vides better initial resolution of the solution. ThesetReﬁnedFieldsutility
+is used where thesetFieldsDict is deﬁned as
+fields (alpha.RDX alpha.tnt);
+nBufferLayers 1;
+defaultFieldValues
+(
+volScalarFieldValue alpha.gas 1
+volScalarFieldValue alpha.RDX 0
+volScalarFieldValue alpha.tnt 0
+);
+regions
+(
+cylinderToCell
+{
+refineInternal yes;
+level 6;
+p1 (0 0.55 -1);
+p2 (0 0.55 1);
+radius 0.05;
+fieldValues
+(
+volScalarFieldValue alpha.RDX 1
+volScalarFieldValue alpha.gas 0
+);
+}
+boxToCell
+{
+level 5;
+refineInternal no;
+160
+
+=== page 161 ===
+box (-0.05 0.01 -1) (0.05 0.5 1);
+fieldValues
+(
+volScalarFieldValue alpha.tnt 1
+volScalarFieldValue alpha.gas 0
+);
+}
+);
+The following commands were used to run the case in parallel:
+blockMesh
+decomposePar
+mpirun -np $nProcs setRefineFields -parallel
+mpirun -np $nProcs blastFoam -parallel
+The overpressure, density, and updated mesh are shown in Fig. 5, Fig. 6,
+and Fig. 7 for time states at 0.005 ms, 0.05 ms, and 0.15 ms, respectively.
+161
+
+=== page 162 ===
+(a) Overpressure
+(b) Density
+(c) Mesh
+Figure 5: Instantaneous ﬁelds at t = 0.005 ms
+162
+
+=== page 163 ===
+(a) Overpressure
+(b) Density
+(c) Mesh
+Figure 6: Instantaneous ﬁelds at t = 0.05 ms
+163
+
+=== page 164 ===
+(a) Overpressure
+(b) Density
+(c) Mesh
+Figure 7: Instantaneous ﬁelds at t = 0.15 ms
+164
+
+=== page 165 ===
+20.4 Mine (buried charge)
+This case demonstrates the simulation of an underground detonation using
+blastEulerFoam, i.e., amine. AC-4chargeisburiedinavolumeofparticles
+(sand) and detonated, leading to the ejection of explosive gases and particles
+into the air above. The multiphase phase model is used to represent the air
+and C-4 gases. The particle phase is represented by the granular phase model
+with a density of 1470 kg/m3 and a diameter of 50µm. ThephaseProperties
+ﬁle is shown below:
+phases (particles gas);
+particles
+{
+phaseType granular;
+diameterModel constant;
+d 50e-6;
+alphaMax 0.65;
+alphaMinFriction 0.5;
+type basic;
+thermoType
+{
+transport constIso;
+thermo eConst;
+equationOfState rhoConst;
+}
+specie
+{
+molWeight 100.0;
+}
+equationOfState
+{
+rho0 1470;
+}
+transport
+165
+
+=== page 166 ===
+{
+kappa 237;
+}
+thermodynamics
+{
+Cv 987; // Heat capacity
+Hf 0.0;
+}
+residualAlpha 1e-10;
+residualRho 1e-6;
+kineticTheoryCoeffs
+{
+e 0.9;
+}
+}
+gas
+{
+phaseType multiphase;
+diameterModel constant;
+d 0;
+phases (c4 air);
+c4
+{
+type detonating;
+reactants
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState idealGas;
+}
+166
+
+=== page 167 ===
+equationOfState
+{
+rho0 1601;
+n 7.4;
+kappa 3.9e11;
+Gamma 0.35;
+gamma 1.35;
+pRef 101298;
+}
+specie
+{
+molWeight 55.0;
+}
+transport
+{
+mu 1.81e-5; // Viscosity
+Pr 1; // Prandtl number
+}
+thermodynamics
+{
+Cv 1400; // Heat capacity
+Hf 0.0;
+}
+}
+products
+{
+thermoType
+{
+transport const;
+thermo eConst;
+equationOfState JWL;
+}
+equationOfState
+{
+rho0 1601;
+A 609.77e9;
+B 12.95e9;
+167
+
+=== page 168 ===
+R1 4.50;
+R2 1.4;
+omega 0.25;
+}
+specie
+{
+molWeight 55.0;
+}
+transport
+{
+mu 1.81e-5; // Viscosity
+Pr 1; // Prandtl number
+}
+thermodynamics
+{
+Cv 1400; // Heat capacity
+Hf 0.0;
+}
+}
+residualRho 1e-6; // Minimum density of the phase
+residualAlpha 1e-10; // Minimum volume fraction used for division
+activationModel linear;
+initiation
+{
+E0 9.0e9;
+points ((0 -1 0));
+vDet 7850; // Detonation velocity [m/s]
+}
+}
+air
+{
+type basic;
+thermoType
+{
+transport const;
+equationOfState idealGas;
+168
+
+=== page 169 ===
+thermo eConst;
+}
+specie
+{
+molWeight 28.97;
+}
+equationOfState
+{
+gamma 1.4;
+}
+transport
+{
+mu 1.81e-5; // Viscosity
+Pr 1; // Prandtl number
+}
+thermodynamics
+{
+Cv 718; // Heat capacity
+Hf 0.0;
+}
+residualRho 1e-6;
+residualAlpha 1e-10;
+}
+}
+blending
+{
+default
+{
+type none;
+continuousPhase gas;
+}
+}
+interfacialPressure
+(
+(gas and particles)
+{
+169
+
+=== page 170 ===
+type single;
+phase gas;
+}
+);
+interfacialVelocity
+(
+(gas and particles)
+{
+type single;
+phase particles;
+}
+);
+aspectRatio
+();
+drag
+(
+(particles in gas)
+{
+type GidaspowErgunWenYu;
+residualRe 1e-3;
+swarmCorrection
+{
+type none;
+}
+}
+);
+virtualMass
+();
+heatTransfer
+(
+(particles in gas)
+{
+type RanzMarshall;
+170
+
+=== page 171 ===
+}
+);
+lift
+();
+wallLubrication
+();
+turbulentDispersion
+();
+kineticTheory
+{
+residualAlpha 1e-6;
+radialModel SinclairJackson;
+viscosityModel Gidaspow;
+conductivityModel Gidaspow;
+granularPressureModel Lun;
+frictionalStressModel JohnsonJackson;
+JohnsonJacksonCoeffs
+{
+alphaMinFriction 0.5;
+Fr 0.05;
+eta 2;
+p 5;
+phi 28.5;
+alphaDeltaMin 1e-6;
+}
+}
+and thefvSchemes dictionary is:
+fluxSchemes
+{
+gas
+171
+
+=== page 172 ===
+{
+fluxScheme HLLC;
+}
+particles
+{
+fluxScheme AUSM+Up;
+alphaMinFriction 0.5;
+}
+}
+ddtSchemes
+{
+default Euler;
+timeIntegrator RK2SSP 3;
+}
+gradSchemes
+{
+default cellMDLimited leastSquares 1;
+}
+divSchemes
+{
+default none;
+div(alphaRhoPhi.c4,lambda.c4) Gauss Riemann;
+div((((alpha.gas*rho.gas)*nuEff.gas)*dev2(T(grad(U.gas))))) Gauss linear;
+div(sigma.particles) Gauss linear;
+}
+laplacianSchemes
+{
+default Gauss linear corrected;
+}
+interpolationSchemes
+{
+default linear;
+reconstruct(alpha) vanAlbada;
+172
+
+=== page 173 ===
+reconstruct(rho) vanAlbada;
+reconstruct(U) vanAlbadaV;
+reconstruct(e) vanAlbada;
+reconstruct(p) vanAlbada;
+reconstruct(speedOfSound) vanAlbada;
+reconstruct(Theta) vanAlbada;
+reconstruct(lambda) vanAlbada;
+}
+snGradSchemes
+{
+default corrected;
+}
+Because the spherical charge is not well represented by the hexahedral
+mesh generated byblockMesh, reﬁnement around this region is used. A
+maximum of four levels of reﬁnement are used, with two cells between each
+level. Thisallowsforamoreaccurateinitialmassof thecharges, andprovides
+better initial resolution of the solution. The setReﬁnedFieldsutility is
+used, and thesetFieldsDict is
+fields (alpha.particles);
+nBufferLayers 1;
+defaultFieldValues
+(
+volScalarFieldValue alpha.particles 0
+volScalarFieldValue alpha.c4 0
+volScalarFieldValue alpha.air 1
+);
+regions
+(
+boxToCell
+{
+level 1;
+box (-25 -25 -0.1) (25 0 0.1);
+173
+
+=== page 174 ===
+fieldValues
+(
+volScalarFieldValue alpha.particles 0.55
+);
+}
+sphereToCell
+{
+centre (0 -1 0);
+radius 0.5;
+level 2;
+refineInternal yes;
+backup
+{
+centre (0 -1 0);
+radius 1;
+}
+fieldValues
+(
+volScalarFieldValue alpha.particles 0
+volScalarFieldValue alpha.c4 1
+volScalarFieldValue alpha.air 0
+);
+}
+);
+The following commands were used to run the case in parallel:
+blockMesh
+decomposePar
+mpirun -np $nProcs setRefineFields -parallel
+mpirun -np $nProcs blastEulerFoam -parallel
+Contour plots of the pressure and particle volume fraction are shown in
+Fig. 8, Fig. 9, and Fig. 10 at time states of 0.0002 s, 0.002 s, and 0.005 s,
+respectively. Note that the results shown here were mirrored during post-
+processing; the simulation used an axisymmetric domain.
+174
+
+=== page 175 ===
+(a) Pressure
+ (b) Particle volume fraction
+Figure 8: Instantaneous ﬁelds at t = 0.0002 s
+(a) Pressure
+ (b) Particle volume fraction
+Figure 9: Instantaneous ﬁelds at t = 0.002 s
+175
+
+=== page 176 ===
+(a) Pressure
+ (b) Particle volume fraction
+Figure 10: Instantaneous ﬁelds at t = 0.005 s
+20.5 Bursting windows
+This case will demonstrate how to set up ablastFoam case to use burst
+patches. Only the mesh generation and initial conditions will be described
+since the other parts of the case setup remain the same.
+After constructing the initial mesh using block mesh with bounds (-5,
+0, 0) to (10, 10, 10) with a symmetry condition for the x-z plane,snap-
+pyHexMesh is used to cut cells from inside the building and reﬁne the
+faces on the boundary of the ”windows” searchableBox. The ”geometry” and
+”castellatedMeshControls” sections are shown below
+castellatedMesh on;
+snap on;
+addLayers off;
+geometry
+{
+building
+{
+type triSurfaceMesh;
+file "building.stl";
+scale 0.001;
+}
+176
+
+=== page 177 ===
+windows
+{
+type searchableBox;
+min (1.125 -2.375 -1);
+max (5.875 2.375 3.875);
+}
+};
+castellatedMeshControls
+{
+// Refinement parameters
+// ~~~~~~~~~~~~~~~~~~~~~
+// If local number of cells is >= maxLocalCells on any processor
+// switches from from refinement followed by balancing
+// (current method) to (weighted) balancing before refinement.
+maxLocalCells 10000000;
+// Overall cell limit (approximately). Refinement will stop immediately
+// upon reaching this number so a refinement level might not complete.
+// Note that this is the number of cells before removing the part which
+// is not 'visible' from the keepPoint. The final number of cells might
+// actually be a lot less.
+maxGlobalCells 200000000;
+// The surface refinement loop might spend lots of iterations refining just a
+// few cells. This setting will cause refinement to stop if <= minimumRefine
+// are selected for refinement. Note: it will at least do one iteration
+// (unless the number of cells to refine is 0)
+minRefinementCells 2;
+maxLoadUnBalance 0.1;
+// Number of buffer layers between different levels.
+// 1 means normal 2:1 refinement restriction, larger means slower
+// refinement.
+nCellsBetweenLevels 2;
+177
+
+=== page 178 ===
+resolveFeatureAngle 30;
+allowFreeStandingZoneFaces false;
+features
+(
+{
+file "building.extendedFeatureEdgeMesh";
+level 0;
+}
+);
+refinementSurfaces
+{
+building
+{
+level (2 2);
+patchInfo
+{
+type wall;
+}
+}
+}
+refinementRegions
+{
+windows
+{
+mode distance;
+levels ((0.25 2));
+}
+}
+locationInMesh (0 1 1.5);
+}
+Once the mesh has been created with the new building patch, the faces
+belonging to the widows are selected usingtopoSet. The topoSetDict is
+shown below.
+178
+
+=== page 179 ===
+actions
+(
+{
+name windows;
+type faceZoneSet;
+action new;
+source searchableSurfaceToFaceZone;
+sourceInfo
+{
+surface searchableBox;
+min (1.125 -2.375 -1);
+max (5.875 2.375 3.875);
+}
+}
+);
+After the necessary faces are selected, thecreateBaﬄesutility is used
+to change the faces to boundary patches named windows_master and win-
+dows_slave patches with the burstCyclicAMI patch type. ThecreatBaﬄes-
+Dict can be seen below.
+// Whether to convert internal faces only
+// (so leave boundary faces intact).
+// This is only relevant if your face selection type can pick
+// up boundary faces.
+internalFacesOnly true;
+// Baffles to create.
+baffles
+{
+windows
+{
+//- Use surface to select faces and orientation.
+type faceZone;
+zoneName windows;
+// Generate patchGroup windows with two patches:
+// - windows_master
+179
+
+=== page 180 ===
+// - windows_slave
+patchPairs
+{
+type burstCyclicAMI;
+partialBurst yes;
+pBurst 5e6;
+}
+}
+}
+The initial conditions forU can be seen below. The same format will be
+used will all other initial ﬁelds.
+dimensions [0 0 0 0 0 0 0];
+internalField uniform 0;
+boundaryField
+{
+//- Set patchGroups for constraint patches
+#include Etc "caseDicts/setConstraintTypes"
+building
+{
+type zeroGradient;
+}
+windows_master
+{
+type burstCyclicAMI;
+intactPatch
+{
+type zeroGradient;
+}
+}
+windows_slave
+{
+type burstCyclicAMI;
+180
+
+=== page 181 ===
+intactPatch
+{
+type zeroGradient;
+}
+}
+outlet
+{
+type zeroGradient;
+}
+ground
+{
+type zeroGradient;
+}
+symmetry
+{
+type symmetry;
+}
+}
+The following commands were used to run the case in parallel:
+surfaceFeatures
+blockMesh
+decomposePar -copyZero
+mpirun -np 4 snappyHexMesh -overwrite -parallel
+mpirun -np 4 topoSet -parallel
+mpirun -np 4 createBaffles -overwrite -parallel
+mpirun -np 4 setRefinedFields -parallel
+mpirun -np 4 blastFoam -parallel
+Contour plots of the overpressureare on the building shown in Fig. 11 and
+Fig. 12 at time states of 0.0003 and 0.001 s respectively, and the threshold
+ﬁlter is used to remove burst faces. Note that the results shown here were
+mirrored during post-processing.
+181
+
+=== page 182 ===
+Figure 11: Overpressure ﬁeld at t = 0.0003 s
+Figure 12: Overpressure ﬁeld at t = 0.0010 s
+182
+
+=== page 183 ===
+References
+Agrawal, K., Loezos, P. N., Syamlal, M., and Sundaresan, S. (2001). The
+role of meso-scale structures in rapid gas–solid ﬂows.Journal of Fluid
+Mechanics, 445:151 – 185.
+Benedict, M., Webb, G. B., and Rubin, L. C. (1942). An Empirical Equation
+for Thermodynamic Properties of Light Hydrocarbons and Their Mixtures
+II. Mixtures of Methane, Ethane, Propane, and n-Butane. The Journal
+of Chemical Physics, 10(12):747–758. Publisher: American Institute of
+Physics.
+Benyahia, S., Syamlal, M., and O’Brien, T. (2012). Summary of MFIX
+Equations 2012-1. Technical report.
+Broyden, C. G. (1965). A class of methods for solving nonlinear simultaneous
+equations. Mathematics of Computation, 19(92):577–593.
+Cardiﬀ, P. and Demirdzic, I. (2021). Thirty years of the ﬁnite volume method
+for solid mechanics. Archives of Computational Methods in Engineering,
+28(5):3721–3780. Publisher: Springer.
+Cardiﬀ, P., Karac, A., De Jaeger, P., Jasak, H., Nagy, J., Ivankovic,
+A., and Tukovic, Z. (2018). An open-source ﬁnite volume toolbox for
+solid mechanics and ﬂuid-solid interaction simulations. arXiv preprint
+arXiv:1808.10736.
+Chao, Z., Wang, Y., Jakobsen, J. P., Fernandino, M., and Jakobsen, H. A.
+(2011). Derivation and validation of a binary multi-ﬂuid Eulerian model
+for ﬂuidized beds.Chemical Engineering Science, 66(16):3605–3616.
+Chapman, S., Cowling, T. G., and Burnett, D. (1990).The Mathematical
+Theory of Non-uniform Gases: An Account of the Kinetic Theory of Vis-
+cosity, Thermal Conduction and Diﬀusion in Gases. Cambridge University
+Press. Google-Books-ID: Cbp5JP2OTrwC.
+Dittus, F. W. and Boelter, L. M. K. (1930). Heat transfer in automobile
+radiators of the tubular type. Numberv.2, no.13inUniversityofCalifornia
+publications in engineering. University of California press, Berkeley, Calif.
+183
+
+=== page 184 ===
+Doan, L. R. and Nickel, G. H. (1963). A subroutine for the equation of
+state of air. Technical Report RTD (WLR) TN63-2, Air Force Weapons
+Labratory.
+Enwald, H., Peirano, E., and Almstedt, A.-E. (1996). Eulerian two-phase
+ﬂow theory applied to ﬂuidization.International Journal of Multiphase
+Flow, 22:21–66.
+Fedors, R. F. and Landel, R. F. (1979). An Empirical method of estimating
+the void fraction in mixtures of uniform particles of diﬀerent size.Powder
+Technology, 23(2):225–231.
+Fox, R. O. (2019). A kinetic-based hyperbolic two-ﬂuid model for binary
+hard-spheremixtures. Journal of Fluid Mechanics, 877:282–329. Publisher:
+Cambridge University Press.
+Gao, J., Chang, J., Lu, C., and Xu, C. (2008). Experimental and computa-
+tional studies on ﬂow behavior of gas–solid ﬂuidized bed with disparately
+sized binary particles.Particuology, 6(2):59–71.
+Gelperin, N. I. and Einstein, V. G. (1971). "Heat Transfer in Fluidized Beds.
+In Fluidization. Academic Press, New York.
+Gidaspow, D. (1994). Multiphase Flow and Fluidization: Continuum and
+Kinetic Theory Descriptions. Elsevier. Google-Books-ID: fHecceQyaYkC.
+Giroux, E. D. (1973).HEMP User’s Manual. Lawrence Livermore National
+Laboratory, University of California. Google-Books-ID: 3XgpHQAA-
+CAAJ.
+Greenshields, C. J., Weller, H. G., Gasparini, L., and Reese, J. M. (2010).
+Implementation of semi-discrete, non-staggered central schemes in a colo-
+cated, polyhedral, ﬁnite volume framework, for high-speed viscous ﬂows.
+International journal for numerical methods in ﬂuids, 63(1):1–21.
+Gunn, D. J. (1978). Transfer of heat or mass to particles in ﬁxed and ﬂuidised
+beds. International Journal of Heat and Mass Transfer, 21:467–476.
+Houim, R. W. and Oran, E. S. (2016). A multiphase model for compressible
+granular–gaseous ﬂows: formulation and initial tests.Journal of Fluid
+Mechanics, 789:166–220.
+184
+
+=== page 185 ===
+Hrenya, C. M. and Sinclair, J. L. (1997). Eﬀects of particle-phase tur-
+bulence in gas-solid ﬂows. AIChE Journal, 43(4):853–869. _eprint:
+https://aiche.onlinelibrary.wiley.com/doi/pdf/10.1002/aic.690430402.
+Huilin, L. and Gidaspow, D. (2003). Hydrodynamics of binary ﬂuidization
+in a riser: CFD simulation using two granular temperatures. Chemical
+Engineering Science, 58(16):3777–3792.
+Johnston, I. A. (2005). The Noble-Abel Equation of State: Thermodynamic
+Derivations for Ballistics Modeling. Technical Report DSTO-TN-0670,
+Defense Science and Technology Organisation.
+Kochenderfer, M. J. and Wheeler, T. A. (2019).Algorithms for Optimization.
+MIT Press, Cambridge, MA, USA.
+Kurganov, A. and Tadmor, E. (2000). New high-resolution central schemes
+for nonlinear conservation laws and convection–diﬀusion equations.Jour-
+nal of Computational Physics, 160(1):241–282.
+Kvaalen, E. (1991). A faster Broyden method.BIT Numerical Mathematics,
+31(2):369–372.
+Lai, S., Houim, R. W., and Oran, E. S. (2018). Eﬀects of particle size and
+density on dust dispersion behind a moving shock.Physical Review Fluids,
+3(6):064306.
+Liou, M.-S. (2006). A sequel to AUSM, Part II: AUSM+-up for all speeds.
+Journal of Computational Physics, 214(1):137–170.
+Lun, C. K. K., Savage, S. B., Jeﬀrey, D. J., and Chepurniy, N. (1984). Ki-
+netic theories for granular ﬂow: inelastic particles in Couette ﬂow and
+slightly inelastic particles in a general ﬂowﬁeld.Journal of Fluid Mechan-
+ics, 140:223–256.
+Luo, H., Baum, J. D., and Löhner, R. (2004). On the computation of multi-
+material ﬂows using ALE formulation.Journal of Computational Physics,
+194(1):304–328.
+Lutzky, M. (1964). The ﬂow ﬁeld behind a spherical detonation in TNT
+using the landau-stanyukovich equation of state for detonation products.
+Technical report, NAVAL ORDNANCE LAB WHITE OAK MD.
+185
+
+=== page 186 ===
+Löhner, R. (1987). An adaptive ﬁnite element scheme for transient prob-
+lems in CFD.Computer Methods in Applied Mechanics and Engineering,
+61(3):323–338.
+Mader, C. (1963). Detonation properties of condensed explosives computed
+using the becker-kistiakowsky-wilson equation of state.
+Miller, P. J. (1995). A Reactive Flow Model with Coupled Reaction Kinetics
+for Detonation and Combustion in Non-Ideal Explosives. MRS Online
+Proceedings Library Archive, 418.
+Needham, C. E. (2018).Blast Waves. Shock Wave and High Pressure Phe-
+nomena. Springer International Publishing, Cham.
+OpenCFD Ltd. (2018a). OpenFOAM - The Open Source CFD Toolbox -
+Programer’s Guide. United Kingdom, 2 edition.
+OpenCFD Ltd. (2018b). OpenFOAM - The Open Source CFD Toolbox -
+User’s Guide. United Kingdom, 2 edition.
+Rettenmaier, D., Deising, D., Ouedraogo, Y., Gjonaj, E., De Gersem, H.,
+Bothe, D., Tropea, C., and Marschall, H. (2019). Load balanced 2D and
+3D adaptive mesh reﬁnement in OpenFOAM.SoftwareX, 10:100317.
+Schiller, L. and Naumann, A. (1933). Über die grundlegenden Berechnungen
+bei der Schwerkraftaufbereitung.Ver. Deut. Ing., 77:318–320.
+Shyue, K.-M. (2001). A Fluid-Mixture Type Algorithm for Compressible
+Multicomponent Flow with Mie–Grüneisen Equation of State.Journal of
+Computational Physics, 171(2):678–707.
+Simo, J. C. and Hughes, T. J. R. (2000).Computational Inelasticity. Springer
+New York. Google-Books-ID: ftL2AJL8OPYC.
+Sinclair, J. L. and Jackson, R. (1989). Gas-particle ﬂow in a vertical pipe
+with particle-particle interactions.AIChE Journal, 35(9):1473–1486.
+Souers, P. C., Anderson, S., Mercer, J., McGuire, E., and Vitello, P. (2000).
+JWL++: A Simple Reactive Flow Code Package for Detonation. page 5.
+186
+
+=== page 187 ===
+Spiteri, R. J. and Ruuth, S. J. (2002). A New Class of Optimal High-Order
+Strong-Stability-Preserving Time Discretization Methods.SIAM Journal
+on Numerical Analysis, 40(2):469–491.
+Syamlal, M., Rogers, W., and O‘Brien, T. (1993). MFIX documentation
+theory guide. Technical Report DOE/METC–94/1004, 10145548.
+Tillotson, J.H.(1962). MetallicEquationsofStateForHypervelocityImpact.
+General Atomic Report GA-3216. 1962. Technical Report.
+Toro, E. F., Spruce, M., and Speares, W. (1994). Restoration of the contact
+surface in the HLL-Riemann solver.Shock waves, 4(1):25–34.
+Wardlaw, A., Mckeown, R., andLuton, A.(1998). Coupledhydrocodepredic-
+tionofunderwaterexplosiondamage. Technicalreport, NAVALSURFACE
+WARFARE CENTER INDIAN HEAD DIV MD.
+Williams, M. L., Landel, R. F., and Ferry, J. D. (1955). The Tempera-
+ture Dependence of Relaxation Mechanisms in Amorphous Polymers and
+Other Glass-forming Liquids.Journal of the American Chemical Society,
+77(14):3701–3707. Publisher: American Chemical Society.
+Woodward, P. and Colella, P. (1984). The numerical simulation of two-
+dimensional ﬂuid ﬂow with strong shocks. Journal of Computational
+Physics, 54(1):115–173.
+Xie, W., Zhang, R., Lai, J., and Li, H. (2019). An accurate and robust
+HLLC-type Riemann solver for the compressible Euler system at various
+Mach numbers. International Journal for Numerical Methods in Fluids,
+89(10):430–463.
+Xue, Q., Heindel, T. J., and Fox, R. O. (2011). A CFD model for biomass
+fast pyrolysis in ﬂuidized-bed reactors. Chemical Engineering Science,
+66(11):2440–2452.
+Yu, A. B. and Standish, N. (1987). Porosity calculations of multi-component
+mixtures of spherical particles.Powder Technology, 52(3):233–241.
+Zheng, H., Shu, C., and Chew, Y. (2008). An object-oriented and
+quadrilateral-mesh based solution adaptive algorithm for compressible
+multi-ﬂuid ﬂows.Journal of Computational Physics, 227(14):6895–6921.
+187
+
+=== page 188 ===
+Zheng, H. W., Shu, C., Chew, Y. T., and Qin, N. (2011). A solution adaptive
+simulation of compressible multi-ﬂuid ﬂows with general equation of state.
+International Journal for Numerical Methods in Fluids, 67(5):616–637.
+Zheng, Z. and Zhao, J. (2016). Unreacted equation of states of typical en-
+ergetic materials under static compression: A review.Chinese Physics B,
+25(7):076202.
+188

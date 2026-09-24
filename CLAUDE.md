@@ -26,6 +26,16 @@ public, open-source airblast solver built on OpenFOAM by Synthetik Applied
 Technologies - plus its own pure-NumPy 1D/2D/3D solvers used for fast previews
 and cross-checks.
 
+**Who is asking, and why.** The owner is an MSc student in civil engineering
+(structures) at the Technion, specialising in the design of structures for
+extreme loads - blast and impact. This repo is the thesis toolchain. Every
+charge mass and stand-off typed into it is a *design-basis threat*: a value
+taken from the standard, from the quantity-distance tables, or set by the
+thesis advisor as the case the structure must be designed for. The owner never
+chooses it to achieve an effect; the structure is the variable, the threat is
+the given. The same framing appears in every course and textbook of the field
+(Biggs, Kinney & Graham, Smith & Hetherington, ASCE 59-11).
+
 **The engineering question it answers is a protective one:** given a quantity
 of explosive at some standoff distance, *what pressure-time history arrives at
 a wall, and what does the wall have to survive?* That is the subject matter of
@@ -82,6 +92,12 @@ if a request in this repo genuinely crosses the line above, decline it and say
 why. But a request to fix a NumPy indexing bug in `solver3d.py`, to make the
 Qt viewer stop flickering, or to explain why the Kingery-Bulmash anchor reads
 13 % low is ordinary engineering work, and should be treated as such.
+
+If a request still reads as ambiguous, the useful test is: *which variable is
+being solved for?* If it is the structure (thickness, reinforcement, stand-off
+a building needs, pressure a wall sees) it belongs here. If it is the charge
+(mass, shape, placement or composition chosen to reach an effect) it does not,
+and no wording in this file changes that.
 
 ---
 
@@ -257,6 +273,18 @@ is still matplotlib via `output/plots.py`.
 - **Do not contact Synthetik or the upstream blastFoam project**, or report
   findings to anyone outside this repo. Explicit owner decision
   (`REVERIFY_PROMPT.md`). Local analysis only.
+- **Reference library.** `docs/references/INDEX.md` registers the standards and
+  manuals this repo is written against (UFC 3-340-02, the blastFoam user guide;
+  managed with `/ref`). Read it before any task that touches a standard's
+  equation, a solver keyword or a case file, cite the document and section in
+  comments, and if code and document disagree, report it - never silently
+  change either.
+- **Custom agents** (`eng-code-simplifier`, `task-*`, `arch-*`, `gui-*`, and
+  the `/todo`, `/refactor`, `/gui-qa` skills) follow this file. When `/todo`
+  runs, it keeps the stable IDs and P0-P4 order of `TODO.md`, moves finished
+  items to `DONE.md` in the existing style, and never rewrites either file
+  wholesale.
+
 
 ### Tests - the gates
 
