@@ -14,26 +14,19 @@ every phase, so the verdict itself is not characterised here.
 
 Run:  cd blastlab/tests && python test_char_hd13.py [--update]
 """
-import os
 import sys
-import tempfile
 
 import char_common as cc
 from blastlab.core import assessment                      # noqa: E402
-from blastlab.output.cli_hd13 import write_starter_case   # noqa: E402
 
 REL = 1e-9
 
 
-def starter_case():
-    with tempfile.TemporaryDirectory(prefix='blastlab_char_') as tmp:
-        return assessment.load_case(
-            write_starter_case(os.path.join(tmp, 'starter.json')))
-
-
 def headline(out):
-    c, u, s, v = (out['confined'], out['unconfined'], out['sdof'],
-                  out['verdict'])
+    c = out['confined']
+    u = out['unconfined']
+    s = out['sdof']
+    v = out['verdict']
     return dict(
         confined_p_max=c['p_max'],
         confined_stop_reason=c['stop_reason'],
@@ -60,7 +53,7 @@ def check(name, got):
 
 
 def test_starter_case():
-    check('hd13_starter.json', headline(assessment.run(starter_case())))
+    check('hd13_starter.json', headline(assessment.run(cc.hd13_starter_case())))
 
 
 def main():

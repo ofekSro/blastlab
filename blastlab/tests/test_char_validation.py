@@ -21,16 +21,13 @@ Run:  cd blastlab/tests && python test_char_validation.py [--update]
 """
 import contextlib
 import dataclasses
-import os
 import sys
-import tempfile
 
 import char_common as cc
 from blastlab.core import assessment, hardware            # noqa: E402
 from blastlab.core.case import (Case1D, Case2D, Case3D,   # noqa: E402
                                 validate_case)
-from blastlab.output.cli_hd13 import write_starter_case   # noqa: E402
-from blastlab.solvers.foam import env                     # noqa: E402
+from blastlab.solvers.foam import env                    # noqa: E402
 
 _ENV_ATTRS = ('_cores', '_slots', '_ram_gb',
               '_cores_src', '_slots_src', '_ram_src',
@@ -119,9 +116,7 @@ def test_blast_cases():
 
 
 def test_hd13_starter_case():
-    with tempfile.TemporaryDirectory(prefix='blastlab_char_') as tmp:
-        case = assessment.load_case(
-            write_starter_case(os.path.join(tmp, 'starter.json')))
+    case = cc.hd13_starter_case()
     with pinned_hardware():
         rep = assessment.validate(case)
     cc.check_json('validation_hd13_starter.json', report_dict(rep))

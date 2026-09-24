@@ -15,13 +15,11 @@ Run:  cd blastlab/tests && python test_char_case_json.py [--update]
 import json
 import os
 import sys
-import tempfile
 
 import char_common as cc
 from blastlab.core import assessment                      # noqa: E402
 from blastlab.core.case import (Case1D, Case2D, Case3D,   # noqa: E402
                                 case_from_dict, case_to_dict, load_case)
-from blastlab.output.cli_hd13 import write_starter_case   # noqa: E402
 
 CASES_DIR = os.path.join(cc.HERE, 'cases')
 
@@ -35,12 +33,6 @@ def blast_roundtrip(text):
     return canonical(case_to_dict(case_from_dict(json.loads(text))))
 
 
-def starter_case():
-    with tempfile.TemporaryDirectory(prefix='blastlab_char_') as tmp:
-        path = write_starter_case(os.path.join(tmp, 'starter.json'))
-        return assessment.load_case(path)
-
-
 def test_default_cases():
     for name, cls in (('case1d', Case1D), ('case2d', Case2D),
                       ('case3d', Case3D)):
@@ -51,7 +43,7 @@ def test_default_cases():
 
 
 def test_hd13_starter_case():
-    case = starter_case()
+    case = cc.hd13_starter_case()
     text = canonical(assessment.case_to_dict(case))
     cc.check_text('json_hd13_starter.json', text)
     again = canonical(assessment.case_to_dict(

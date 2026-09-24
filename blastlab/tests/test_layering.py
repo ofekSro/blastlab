@@ -92,9 +92,11 @@ def imports(name, path, known):
                 continue
             base = mod.split('.')[1:]
         else:
+            # relative import: level 1 is this package, each extra dot one up
             up = node.level - 1
-            base = (pkg[:len(pkg) - up] if up else list(pkg)) \
-                + (node.module.split('.') if node.module else [])
+            base = pkg[:len(pkg) - up]
+            if node.module:
+                base = base + node.module.split('.')
         for a in node.names:
             # `from .foam import env` imports the module foam.env
             sub = '.'.join(base + [a.name])

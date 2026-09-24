@@ -25,6 +25,7 @@ import json
 import math
 import os
 import sys
+import tempfile
 
 import numpy as np
 
@@ -73,12 +74,18 @@ def _path(name):
     return os.path.join(GOLDEN, name)
 
 
-def _read_text(name):
+def _require(name):
+    """The golden's path; AssertionError if it has not been written yet."""
     path = _path(name)
     if not os.path.exists(path):
         raise AssertionError(
             f'golden {name} is missing - write it from the current code '
             f'with `python <this test>.py --update`')
+    return path
+
+
+def _read_text(name):
+    path = _require(name)
     with open(path, 'rb') as f:
         return f.read().replace(b'\r\n', b'\n').decode('utf-8')
 
@@ -115,16 +122,11 @@ def load_json(name):
 def check_npz(name, arrays):
     """Every array in `arrays` equal (values, dtype, shape) to the golden
     `name`, and the same set of keys."""
-    path = _path(name)
     if UPDATE:
         os.makedirs(GOLDEN, exist_ok=True)
-        np.savez(path, **arrays)
+        np.savez(_path(name), **arrays)
         return
-    if not os.path.exists(path):
-        raise AssertionError(
-            f'golden {name} is missing - write it from the current code '
-            f'with `python <this test>.py --update`')
-    with np.load(path) as z:
+    with np.load(_require(name)) as z:
         want = {k: z[k] for k in z.files}
     assert sorted(want) == sorted(arrays), \
         f'{name}: keys {sorted(arrays)} != golden {sorted(want)}'
@@ -172,6 +174,17 @@ def approx_equal(got, want, rel):
     return walk(plain(got), plain(want), '$')
 
 
+def hd13_starter_case():
+    """The HD 1.3 starter case exactly as `output/cli_hd13` writes it,
+    loaded back through `core.assessment.load_case`."""
+    # deferred, so the tests that do not need the HD 1.3 chain never import it
+    from blastlab.core import assessment
+    from blastlab.output.cli_hd13 import write_starter_case
+    with tempfile.TemporaryDirectory(prefix='blastlab_char_') as tmp:
+        return assessment.load_case(
+            write_starter_case(os.path.join(tmp, 'starter.json')))
+
+
 def run_main(title, tests):
     """The script half of the dual pytest/script pattern (`test_refine.py`
     style): run every test function, print PASS/FAIL per test and a final
@@ -190,10 +203,12 @@ def run_main(title, tests):
             print(f'  [{"WROTE" if UPDATE else "PASS"}] {fn.__name__}')
     print()
     if UPDATE:
-        print(f'{title}: goldens written to {GOLDEN}'
-              + (f' ({len(fails)} test(s) failed while writing)'
-                 if fails else ''))
+        note = ''
+        if fails:
+            note = f' ({len(fails)} test(s) failed while writing)'
+        print(f'{title}: goldens written to {GOLDEN}{note}')
+    elif fails:
+        print(f'{title}: FAIL ({len(fails)}): ' + ', '.join(fails))
     else:
-        print(f'{title}: ' + ('PASS' if not fails else
-                              f'FAIL ({len(fails)}): ' + ', '.join(fails)))
+        print(f'{title}: PASS')
     return 1 if fails else 0
