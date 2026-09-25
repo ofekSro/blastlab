@@ -22,6 +22,11 @@ import char_common as cc
 from blastlab.core.case import Case1D, Case2D, Case3D   # noqa: E402
 from blastlab.solvers import get_solver                   # noqa: E402
 from blastlab.solvers.hooks import RunHooks               # noqa: E402
+from blastlab.models.meta import (META_KEYS_1D, META_KEYS_2D,  # noqa: E402
+                                  META_KEYS_3D)
+
+#: Phase 8 (docs/ARCHITECTURE_REVIEW.md): the documented Result.meta keys
+META_KEYS = {'1d': META_KEYS_1D, '2d': META_KEYS_2D, '3d': META_KEYS_3D}
 
 CASES = {
     '1d': Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.02, eos='JWL',
@@ -83,6 +88,10 @@ def run(key):
 
 def characterise(key):
     res = run(key)
+    # Phase 8: the documented contract is exactly what the run returns
+    want = META_KEYS[key]
+    assert set(res.meta) == want, \
+        f'{key}: meta keys differ from models.meta: {sorted(set(res.meta) ^ want)}'
     cc.check_npz(f'native_{key}_gauges.npz', gauge_arrays(res.gauges))
     cc.check_json(f'native_{key}_result.json', dict(
         stop_reason=res.stop_reason,
