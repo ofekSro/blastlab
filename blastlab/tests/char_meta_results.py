@@ -22,7 +22,7 @@ import json
 
 import numpy as np
 
-import char_common as cc                                   # noqa: F401
+import char_common as cc
 from blastlab.solvers.hooks import Result                   # noqa: E402
 
 _RUNS = {}

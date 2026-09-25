@@ -105,11 +105,10 @@ def png_figures(res, dim, show_mesh=False, title_extra=None):
     that output/plots.py builds, not the single panel on screen."""
     if dim == 1:
         c = charge_label(res.meta)
-        results = plots.figure_results_1d(
-            res.snapshots, c.eos, c.charge_kg, c.radius_m,
-            title_extra=title_extra)
-        c = charge_label(res.meta, radius=False)
-        return [('blast_1d_results.png', results),
+        return [('blast_1d_results.png',
+                 plots.figure_results_1d(
+                     res.snapshots, c.eos, c.charge_kg, c.radius_m,
+                     title_extra=title_extra)),
                 ('blast_1d_gauges.png',
                  plots.figure_gauges_1d(
                      res.gauges, c.charge_kg, c.eos,
@@ -131,11 +130,9 @@ def report_figures(res, dim, show_mesh=False, title_extra=None):
     """(caption, Figure) for the HTML report."""
     if dim == 1:
         c = charge_label(res.meta)
-        results = plots.figure_results_1d(
-            res.snapshots, c.eos, c.charge_kg, c.radius_m,
-            title_extra=title_extra)
-        c = charge_label(res.meta, radius=False)
-        return [('Results', results),
+        return [('Results', plots.figure_results_1d(
+                    res.snapshots, c.eos, c.charge_kg, c.radius_m,
+                    title_extra=title_extra)),
                 ('Gauge time histories', plots.figure_gauges_1d(
                     res.gauges, c.charge_kg, c.eos,
                     title_extra=title_extra))]

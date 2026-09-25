@@ -128,11 +128,21 @@ class SliceGeometry(NamedTuple):
 
 
 def _plane_sl(axis, index):
+    """The 3D index tuple fixing `axis` at `index`, e.g. ('y', 4) ->
+    (slice(None), 4, slice(None))."""
     return tuple(index if a == 'xyz'.index(axis) else slice(None)
                  for a in range(3))
 
 
-def slice_geometry(meta, plane='recorded'):
+def _on_plane(meta, xf, yf, axis, index):
+    """The 3D plane across `axis` at `index`; reads `solid`, then
+    `<axis>_c`, in the order the panels did."""
+    sl = _plane_sl(axis, index)
+    return SliceGeometry(xf, yf, meta['solid'][sl], axis, index, sl,
+                         meta[f'{axis}_c'][index])
+
+
+def slice_geometry(meta: dict, plane: str = 'recorded') -> SliceGeometry:
     """The faces, mask and position of one plane of a result.
 
     `plane`:
@@ -155,9 +165,7 @@ def slice_geometry(meta, plane='recorded'):
         else:
             axis, index = 'z', k0
             xf, yf = meta['x_face'], meta['y_face']
-        sl = _plane_sl(axis, index)
-        return SliceGeometry(xf, yf, meta['solid'][sl], axis, index, sl,
-                             meta[f'{axis}_c'][index])
+        return _on_plane(meta, xf, yf, axis, index)
     if plane == 'recorded':
         if 'z_face' not in meta:
             return slice_geometry(meta, 'grid')
@@ -166,13 +174,11 @@ def slice_geometry(meta, plane='recorded'):
         xf, yf = {'x': (meta['y_face'], meta['z_face']),
                   'y': (meta['x_face'], meta['z_face']),
                   'z': (meta['x_face'], meta['y_face'])}[axis]
-        sl = _plane_sl(axis, index)
-        return SliceGeometry(xf, yf, meta['solid'][sl], axis, index, sl,
-                             meta[f'{axis}_c'][index])
+        return _on_plane(meta, xf, yf, axis, index)
     raise ValueError(f'unknown plane {plane!r}')
 
 
-def frames_of(meta):
+def frames_of(meta: dict) -> dict | None:
     """The recorded replay frames (`{'times', 'pressures'[, 'levels']}`),
     or None when the run recorded none or an empty set."""
     frames = meta.get('frames')
@@ -186,7 +192,7 @@ class AnimScale(NamedTuple):
     clim: object        # the recorded manual range [kPa], or None
 
 
-def anim_scale_of(meta):
+def anim_scale_of(meta: dict) -> AnimScale:
     """The colour scale the run recorded for its animation
     (`solvers/jobs._animate`), 'run' when it recorded none."""
     return AnimScale(anim_scale_from_label(meta.get('anim_scale') or 'run'),
@@ -199,7 +205,7 @@ class ChargeLabel(NamedTuple):
     radius_m: object    # None when asked for without it
 
 
-def charge_label(meta, radius=True):
+def charge_label(meta: dict, radius: bool = True) -> ChargeLabel:
     """The EOS, charge [kg] and domain radius [m] a 1D figure is titled
     with. `radius=False` is the gauges figure, which never read the radius
     (so a meta without it still draws; `radius_m` is then None).
@@ -207,5 +213,6 @@ def charge_label(meta, radius=True):
     Not `output.plots.charge_label`, which formats the 2D/3D title text."""
     if radius:
         return ChargeLabel(meta['eos'], meta['charge_kg'], meta['radius_m'])
+    # charge_kg before eos: the order figure_gauges_1d's arguments were read
     charge_kg = meta['charge_kg']
     return ChargeLabel(meta['eos'], charge_kg, None)
