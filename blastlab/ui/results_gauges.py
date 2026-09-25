@@ -21,6 +21,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QHeaderView, QSizePolicy,
                                QTableWidget, QTableWidgetItem, QWidget)
 
+from ..models.meta import charge_label
 from ..output import gauge_summary, plots
 from . import theme
 from .mpl_canvas import MplCanvas
@@ -174,8 +175,9 @@ class GaugesView(QWidget):
         res = ent.result
         try:
             if ent.dim == 1:
+                c = charge_label(res.meta, radius=False)
                 fig = plots.figure_gauges_1d(
-                    res.gauges, res.meta['charge_kg'], res.meta['eos'],
+                    res.gauges, c.charge_kg, c.eos,
                     title_extra=self._title_extra)
             else:
                 fig = plots.figure_gauges_nd(
