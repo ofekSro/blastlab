@@ -38,6 +38,15 @@ _LOGO = os.path.join(os.path.dirname(os.path.dirname(
 
 CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
 
+#: The GIL switch interval while an HD 1.3 assessment runs on its thread
+#: (Python's default is 5 ms). The assessment is pure-Python loops, and at
+#: 5 ms every GIL hand-back to the GUI thread cost up to 5 ms, so one
+#: live validation took ~250 ms instead of ~8 ms and its repaint stalled
+#: the window for ~600 ms. At 0.5 ms: ~20 ms and a longest gap of ~60 ms,
+#: for ~3 % on the assessment's wall clock (measured, UX_REVIEW finding 1).
+#: Scheduling only - no number the assessment returns can depend on it.
+_HD13_SWITCH_INTERVAL = 0.0005
+
 
 class MainWindow(QMainWindow):
     #: How a failed run is reported (see RunController.show_error).
@@ -52,6 +61,8 @@ class MainWindow(QMainWindow):
             self.setWindowIcon(QIcon(QPixmap(_LOGO)))
 
         self.bridge = ThreadBridge(self)
+        self._hd13_busy = False     # an HD 1.3 assessment is on its thread
+        self._switch_interval = sys.getswitchinterval()
         self._case = None
         self._case_path = None
         self._results = []
@@ -499,6 +510,9 @@ class MainWindow(QMainWindow):
 
     # ── running ──────────────────────────────────────────────────────────
     def _run_single(self, paused=False):
+        if self._hd13_busy:
+            # F5 and Initialise Model reach here with Run greyed
+            return
         try:
             case = self.setup.get_case()
         except ValueError as exc:
@@ -532,16 +546,24 @@ class MainWindow(QMainWindow):
     def _run_hd13(self, case):
         """Run an HD 1.3 assessment and write its report.
 
-        Solved INLINE, on the GUI thread, not through RunController. That
-        machinery exists for a solve in a worker thread with progress, a
-        live viewer, cancellation and resume. A 0-D deflagration case is
-        closed form, but it is not instant: the starter case takes about
-        40 s per assessment (sensitivity band off), and this method runs
-        the assessment twice (see below) - known UX debt, pinned by
-        `tests/test_ui_char_hd13_run.py`.
+        Not through RunController: that machinery is for a solve with
+        frames, gauges, stepping and resume. A 0-D deflagration case is
+        closed form but not instant - the starter case takes about 40 s
+        (sensitivity band off) - so the assessment runs ONCE, on a worker
+        thread, and the outcome comes back through `self.bridge`; the
+        worker touches no widget (UX_REVIEW finding 1). Meanwhile Run,
+        F5 and Initialise Model are off, the Run tab's bar is
+        indeterminate and the status line says what is running.
+
+        There is no Cancel: `assessment.run` has no cooperative stop
+        hook, and the physics does not grow one for a button.
+
+        Validation and the report path are read here, on the GUI thread.
+        Pinned by `tests/test_ui_char_hd13_run.py`.
         """
         # Imported here, and called through the module, so a test that
         # patches `assessment.run` or `tempfile.mkdtemp` is honoured.
+        import shutil
         import tempfile
         from ..core import assessment
         from ..services import hd13 as hd13_service
@@ -551,20 +573,55 @@ class MainWindow(QMainWindow):
             return
         path = self.setup.form.v['report_file'].get().strip() \
             or 'hd13_report.html'
-        try:
-            # Run 1: fail before touching disk. `assess` below is run 2.
-            assessment.run(case)
-            # The temp case file is kept, and the report is made from the
-            # case read back from it, exactly as before Phase 7 of
-            # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
-            # open question Q4 there.
-            case_dir = tempfile.mkdtemp(prefix='blastlab_hd13_')
-            case_path = os.path.join(case_dir, 'case.json')
-            assessment.save_case(case, case_path)
-            bundle = hd13_service.assess(assessment.load_case(case_path))
-            out = hd13_service.write_report(bundle, path)
-        except Exception as exc:               # noqa: BLE001 - shown to the user
-            self.show_error('HD 1.3 assessment', str(exc))
+
+        def work():
+            out = err = case_dir = None
+            try:
+                # The temp case file is kept, and the report is made from
+                # the case read back from it, exactly as before Phase 7 of
+                # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
+                # open question Q4 there. It is now written BEFORE the one
+                # assessment, so a failure removes it again - a run that
+                # raises still leaves nothing on disk.
+                case_dir = tempfile.mkdtemp(prefix='blastlab_hd13_')
+                case_path = os.path.join(case_dir, 'case.json')
+                assessment.save_case(case, case_path)
+                bundle = hd13_service.assess(assessment.load_case(case_path))
+            except Exception as exc:           # noqa: BLE001 - shown to the user
+                err = exc
+                if case_dir:
+                    shutil.rmtree(case_dir, ignore_errors=True)
+            else:
+                try:
+                    out = hd13_service.write_report(bundle, path)
+                except Exception as exc:       # noqa: BLE001 - shown to the user
+                    err = exc
+            finally:
+                self.bridge.post(self._hd13_done, out, err)
+
+        self._set_hd13_busy(True)
+        threading.Thread(target=work, name='hd13-assessment',
+                         daemon=True).start()
+
+    def _set_hd13_busy(self, busy):
+        self._hd13_busy = bool(busy)
+        self.run_panel.set_busy(busy)
+        if busy:
+            self._switch_interval = sys.getswitchinterval()
+            sys.setswitchinterval(min(self._switch_interval,
+                                      _HD13_SWITCH_INTERVAL))
+            self._status.setText('HD 1.3 assessment running…')
+            self._status.setStyleSheet(f'color: {theme.cur("muted")};')
+            self._status_timer.stop()
+        else:
+            sys.setswitchinterval(self._switch_interval)
+
+    def _hd13_done(self, out, err):
+        """GUI thread: the worker of `_run_hd13` has finished."""
+        self._set_hd13_busy(False)
+        if err is not None:
+            self._status.setText('')
+            self.show_error('HD 1.3 assessment', str(err))
             return
         self._status.setText(f'HD 1.3 report written: {out}')
         self._status_timer.start()

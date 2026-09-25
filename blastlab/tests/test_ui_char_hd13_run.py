@@ -1,10 +1,10 @@
-"""Characterisation: Run on the Qt HD 1.3 (0-D) tab (Phase 7).
+"""Characterisation: Run on the Qt HD 1.3 (0-D) tab (Phase 7, UX 1).
 
-docs/ARCHITECTURE_REVIEW.md section 5, Phase 7. Drives the REAL
-`ui.app.MainWindow` offscreen, switched to the 0-D dimension with the
-starter case in its form, through `_run_single` -> `_run_hd13`, and pins
-in one golden (`char_golden/ui_hd13_run.json`) plus the report
-(`char_golden/ui_hd13_run_report.html`):
+docs/ARCHITECTURE_REVIEW.md section 5, Phase 7, and docs/UX_REVIEW.md
+finding 1. Drives the REAL `ui.app.MainWindow` offscreen, switched to the
+0-D dimension with the starter case in its form, through `_run_single` ->
+`_run_hd13`, and pins in one golden (`char_golden/ui_hd13_run.json`) plus
+the report (`char_golden/ui_hd13_run_report.html`):
 
   * with a report file typed in: which temp directories are made (their
     `tempfile.mkdtemp` arguments), the temp case JSON written into each,
@@ -12,18 +12,27 @@ in one golden (`char_golden/ui_hd13_run.json`) plus the report
     whether it is provenance, so it is pinned as it is), the report written
     where it was asked for (byte for byte after the timestamp and PNG
     masking of `test_char_hd13_cli.py`), the status line and its timer,
-    no dialog, and HOW MANY TIMES `assessment.run` is called - two today
-    (UX finding: `_run_hd13` runs the assessment once to fail before
-    touching disk, then `services/hd13.assess` runs it again - before
-    Phase 7 it was `run_and_report`);
+    no dialog, and HOW MANY TIMES `assessment.run` is called - once since
+    UX 1 (it was twice: once "to fail before touching disk", then again
+    in `services/hd13.assess`);
+  * the Run controls right after the press (`during`: Run and Initialise
+    Model off, the bar indeterminate, the status line) and after it
+    finishes (`after`), and that a second press while it works starts
+    nothing;
   * with the report field blank: the `hd13_report.html` fallback, written
     relative to the working directory;
   * a case `assessment.validate` refuses: the dialog title and text, no
     temp directory, no run, no report;
-  * a run that raises: the dialog title and text, and nothing on disk.
+  * a run that raises: the dialog title and text, and nothing on disk -
+    the temp directory, made before the assessment since UX 1, is removed
+    again (`temp_dirs_left`).
 
-Only the first scenario runs the real assessment (twice, about 40 s each
-- the starter case has the sensitivity band off). The blank-field one
+The assessment runs on a worker thread, so each press is waited out with
+the event loop running, and the longest gap between ticks of a 10 ms
+timer during the real assessment must stay under `MAX_GAP_S`.
+
+Only the first scenario runs the real assessment (once, about 40-90 s -
+the starter case has the sensitivity band off). The blank-field one
 reuses that result through a patched `assessment.run`, so the figures and
 the report are still built for real; the failing one patches it to raise.
 
@@ -38,6 +47,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 
 import char_common as cc
 from blastlab.ui.testing import ensure_qapp, pump             # noqa: E402
@@ -85,9 +95,12 @@ class Recorder:
         assessment.run = _REAL_RUN
 
     def temp_files(self):
-        """{dir index: {file name: text}} for every temp dir made."""
+        """{dir index: {file name: text}} for every temp dir made and
+        still there (a failed run removes its own)."""
         out = {}
         for i, d in enumerate(self.dirs):
+            if not os.path.isdir(d):
+                continue
             files = {}
             for n in sorted(os.listdir(d)):
                 with open(os.path.join(d, n), 'rb') as f:
@@ -108,16 +121,65 @@ def scrub(obj, root):
     return obj
 
 
-def press_run(win, root, run=None):
-    """One Run press, recorded."""
+#: UX finding 1, pre-registered before the first run of the worker
+#: version: while the real assessment runs, the event loop may not stall
+#: for longer than this. The inline version stalled for the whole
+#: assessment, twice (91 s in one piece on the starter case, measured).
+MAX_GAP_S = 1.0
+
+
+def ui_state(win):
+    """What the Run controls say right now."""
+    bar = win.run_panel.progress
+    return dict(busy=win._hd13_busy,
+                run_enabled=win.run_panel.run_btn.isEnabled(),
+                init_enabled=win.run_panel.init_btn.isEnabled(),
+                bar_range=[bar.minimum(), bar.maximum()],
+                switch_interval_s=sys.getswitchinterval(),
+                status=win._status.text())
+
+
+def press_run(win, root, run=None, gaps=None):
+    """One Run press, recorded, waited out with the event loop running.
+
+    The assessment is on a worker thread, so the recorders stay in place
+    until the window says it is done. A 10 ms QTimer ticks throughout;
+    the longest gap between its ticks goes into `gaps` when given - that
+    is how long the window was unresponsive."""
+    from PySide6.QtCore import QTimer
     win._status.setText('')
     win._status_timer.stop()
+    ticks = []
+    timer = QTimer()
+    timer.setInterval(10)
+    timer.timeout.connect(lambda: ticks.append(time.perf_counter()))
     with Recorder(win, root, run) as rec:
+        timer.start()
+        ticks.append(time.perf_counter())
         win._run_single()
+        during = ui_state(win)
+        if win._hd13_busy:
+            # F5 (or Initialise Model) while it works must not start a
+            # second one: assessment_runs and mkdtemp would show it
+            win._run_single()
+        end = time.monotonic() + 900
+        while win._hd13_busy:
+            assert time.monotonic() < end, 'the HD 1.3 worker never finished'
+            app.processEvents()
+            time.sleep(0.002)
+        ticks.append(time.perf_counter())
+        timer.stop()
+        app.processEvents()
+    if gaps is not None:
+        gaps.append(max(b - a for a, b in zip(ticks, ticks[1:])))
+    after = ui_state(win)
+    del after['status']
     return dict(errors=rec.errors, mkdtemp=rec.mkdtemp,
                 temp_files=rec.temp_files(), assessment_runs=rec.runs,
+                temp_dirs_left=sum(os.path.isdir(d) for d in rec.dirs),
                 status=win._status.text(),
-                status_timer_active=win._status_timer.isActive())
+                status_timer_active=win._status_timer.isActive(),
+                during=during, after=after)
 
 
 def main_window():
@@ -131,7 +193,7 @@ def main_window():
     return win
 
 
-def collect():
+def collect(gaps):
     root = _REAL_MKDTEMP(prefix='blastlab_char_hd13run_')
     here = os.getcwd()
     win = main_window()
@@ -145,13 +207,13 @@ def collect():
         out_dir = os.path.join(root, 'out')
         os.makedirs(out_dir)
         form.v['report_file'].set(os.path.join(out_dir, 'report.html'))
-        pump(50)
+        pump(400)                       # past the 300 ms validation timer
         results = []
 
         def real(case):
             results.append(_REAL_RUN(case))
             return results[-1]
-        g = press_run(win, root, real)
+        g = press_run(win, root, real, gaps)
         g['out_files'] = sorted(os.listdir(out_dir))
         with open(os.path.join(out_dir, 'report.html'), 'rb') as f:
             data = f.read()
@@ -164,7 +226,7 @@ def collect():
         os.makedirs(cwd)
         os.chdir(cwd)
         form.v['report_file'].set('')
-        pump(50)
+        pump(400)
         g = press_run(win, root, lambda case: results[-1])
         g['cwd_files'] = sorted(os.listdir(cwd))
         with open(os.path.join(cwd, 'hd13_report.html'), 'rb') as f:
@@ -179,7 +241,7 @@ def collect():
         form.v['report_file'].set(os.path.join(out_dir, 'refused.html'))
         form.v['charge_kg'].set('0')
         form.v['t_end'].set('0')
-        pump(50)
+        pump(400)
         g = press_run(win, root)
         g['out_files'] = sorted(os.listdir(out_dir))
         got['refused'] = g
@@ -187,7 +249,7 @@ def collect():
         # 4. a run that raises
         form.set_case(starter)
         form.v['report_file'].set(os.path.join(out_dir, 'raised.html'))
-        pump(50)
+        pump(400)
 
         def boom(case):
             raise ValueError('char: the assessment failed')
@@ -203,9 +265,14 @@ def collect():
 
 
 def test_hd13_run():
-    got, report = collect()
+    gaps = []
+    got, report = collect(gaps)
+    print(f'  longest event-loop gap during the real assessment: '
+          f'{gaps[0] * 1e3:.1f} ms (limit {MAX_GAP_S * 1e3:.0f} ms)')
     cc.check_json('ui_hd13_run.json', got)
     cc.check_text('ui_hd13_run_report.html', report)
+    assert gaps[0] < MAX_GAP_S, \
+        f'the window stalled for {gaps[0]:.2f} s during the assessment'
 
 
 def main():

@@ -249,6 +249,8 @@ class RunPanel(QWidget):
         self._last_dt = 0.0         # newest solver time step [s]
         self._last_field = None     # newest 2D frame, for a clim redraw
         self._running = False
+        self._busy = False          # a non-solve job (HD 1.3) is working
+        self._bar_value = 0         # the bar's value before it went busy
         self._case_ok = True        # latest validation verdict (Setup tab)
         self._shape = None
 
@@ -360,7 +362,7 @@ class RunPanel(QWidget):
             self._cadence_steps = 0
             self._last_dt = 0.0
             self._last_field = None
-        start_ok = (not running) and self._case_ok
+        start_ok = (not running) and (not self._busy) and self._case_ok
         self.run_btn.setEnabled(start_ok)
         self.init_btn.setEnabled(start_ok)
         # a disabled Stop used to stay danger-red, reading as armed
@@ -421,9 +423,27 @@ class RunPanel(QWidget):
             self._valid_lbl.setText(
                 text or f'{n} error{"s" if n != 1 else ""} - see Setup')
             self._valid_lbl.setStyleSheet(f'color: {theme.cur("error")};')
-        if not self._running:
+        if not (self._running or self._busy):
             self.run_btn.setEnabled(bool(ok))
             self.init_btn.setEnabled(bool(ok))
+
+    def set_busy(self, busy):
+        """A job that is not a solve - the HD 1.3 assessment - is working
+        on a thread: Run and Initialise Model off, the bar indeterminate.
+        Nothing else changes; the log, chips and live view still describe
+        the last solve, and the bar gets its old value back afterwards."""
+        busy = bool(busy)
+        if busy and not self._busy:
+            self._bar_value = self.progress.value()
+        self._busy = busy
+        if busy:
+            self.progress.setRange(0, 0)
+        else:
+            self.progress.setRange(0, 1000)
+            self.progress.setValue(self._bar_value)
+        start_ok = not (self._running or busy) and self._case_ok
+        self.run_btn.setEnabled(start_ok)
+        self.init_btn.setEnabled(start_ok)
 
     def mark_refresh(self, ok):
         """Red-border the 'Refresh every' box when its value is unusable
