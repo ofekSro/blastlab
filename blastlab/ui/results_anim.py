@@ -16,6 +16,7 @@ from PySide6.QtWidgets import QComboBox, QLineEdit, QSlider, QWidget
 import pyqtgraph as pg
 
 from ..core.constants import ANIM_SCALE_LABELS, anim_scale_from_label
+from ..models.meta import anim_scale_of, frames_of, slice_geometry
 from ..output import animation as anim_mod
 from ..output import plots
 from . import pg_plots, theme
@@ -50,24 +51,18 @@ def plane_geometry(meta):
     """Faces, labels, mask and plane caption for the recorded frames.
     Mirrors `output/animation.py` so the replay and the exported video
     show the same plane."""
-    if 'z_face' in meta:                       # 3D: the recorded slice
-        s_ax = meta.get('slice_axis', 'y')
-        s0 = meta.get('s0', meta['j0'])
-        xf, yf = {'x': (meta['y_face'], meta['z_face']),
-                  'y': (meta['x_face'], meta['z_face']),
-                  'z': (meta['x_face'], meta['y_face'])}[s_ax]
+    g = slice_geometry(meta, 'recorded')
+    if g.axis is not None:                     # 3D: the recorded slice
         xlabel, ylabel = {'x': ('y [m]', 'z [m]'),
                           'y': ('x [m]', 'z [m]'),
-                          'z': ('x [m]', 'y [m]')}[s_ax]
-        sl = tuple(s0 if a == 'xyz'.index(s_ax) else slice(None)
-                   for a in range(3))
-        return dict(xf=xf, yf=yf, xlabel=xlabel, ylabel=ylabel, sl=sl,
-                    solid=meta['solid'][sl],
-                    plane=f"{s_ax} = {meta[f'{s_ax}_c'][s0]:.2f} m  ")
-    return dict(xf=meta['x_face'], yf=meta['y_face'], xlabel='x [m]',
+                          'z': ('x [m]', 'y [m]')}[g.axis]
+        return dict(xf=g.xf, yf=g.yf, xlabel=xlabel, ylabel=ylabel,
+                    sl=g.sl, solid=g.solid,
+                    plane=f"{g.axis} = {g.coord:.2f} m  ")
+    return dict(xf=g.xf, yf=g.yf, xlabel='x [m]',
                 ylabel=('z [m]' if meta.get('geometry') == 'axisymmetric'
                         else 'y [m]'),
-                sl=None, solid=meta['solid'], plane='')
+                sl=None, solid=g.solid, plane='')
 
 
 class AnimView(QWidget):
@@ -235,10 +230,7 @@ class AnimView(QWidget):
     def _frames(self):
         if self._ent is None:
             return None
-        frames = self._ent.result.meta.get('frames')
-        if not frames or not len(frames['pressures']):
-            return None
-        return frames
+        return frames_of(self._ent.result.meta)
 
     def placeholder(self, text):
         """Blank the replay. Without this the previous result's frame
@@ -283,11 +275,10 @@ class AnimView(QWidget):
         self._geom = plane_geometry(meta)
         # the run's own choice is the starting point, so a video
         # exported here matches the one the run wrote
-        recorded = anim_scale_from_label(meta.get('anim_scale') or 'run')
+        recorded, rec_clim = anim_scale_of(meta)
         self.scale_sel.blockSignals(True)
         self.scale_sel.setCurrentText(ANIM_SCALE_LABELS[recorded])
         self.scale_sel.blockSignals(False)
-        rec_clim = meta.get('anim_clim')
         if rec_clim:
             self.min_box.setText(f'{float(rec_clim[0]):g}')
             self.max_box.setText(f'{float(rec_clim[1]):g}')
