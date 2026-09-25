@@ -21,6 +21,7 @@ import os
 import re
 
 from ..core.profiles import save_profile, save_profile_2d
+from ..models.meta import charge_label
 from ..output import gauge_summary, plots
 from ..output.animation import write_animation
 from ..output.gauges import save_gauges_1d, save_gauges_2d, save_gauges_3d
@@ -103,13 +104,15 @@ def png_figures(res, dim, show_mesh=False, title_extra=None):
     """(filename, Figure) for the `pngs` export: the FULL snapshot grid
     that output/plots.py builds, not the single panel on screen."""
     if dim == 1:
-        return [('blast_1d_results.png',
-                 plots.figure_results_1d(
-                     res.snapshots, res.meta['eos'], res.meta['charge_kg'],
-                     res.meta['radius_m'], title_extra=title_extra)),
+        c = charge_label(res.meta)
+        results = plots.figure_results_1d(
+            res.snapshots, c.eos, c.charge_kg, c.radius_m,
+            title_extra=title_extra)
+        c = charge_label(res.meta, radius=False)
+        return [('blast_1d_results.png', results),
                 ('blast_1d_gauges.png',
                  plots.figure_gauges_1d(
-                     res.gauges, res.meta['charge_kg'], res.meta['eos'],
+                     res.gauges, c.charge_kg, c.eos,
                      title_extra=title_extra))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = builder(res.snapshots, res.meta, include_peak=True,
@@ -127,11 +130,14 @@ def png_figures(res, dim, show_mesh=False, title_extra=None):
 def report_figures(res, dim, show_mesh=False, title_extra=None):
     """(caption, Figure) for the HTML report."""
     if dim == 1:
-        return [('Results', plots.figure_results_1d(
-                    res.snapshots, res.meta['eos'], res.meta['charge_kg'],
-                    res.meta['radius_m'], title_extra=title_extra)),
+        c = charge_label(res.meta)
+        results = plots.figure_results_1d(
+            res.snapshots, c.eos, c.charge_kg, c.radius_m,
+            title_extra=title_extra)
+        c = charge_label(res.meta, radius=False)
+        return [('Results', results),
                 ('Gauge time histories', plots.figure_gauges_1d(
-                    res.gauges, res.meta['charge_kg'], res.meta['eos'],
+                    res.gauges, c.charge_kg, c.eos,
                     title_extra=title_extra))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = [(_report_caption(n, dim), f)
