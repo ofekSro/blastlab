@@ -1,0 +1,303 @@
+{
+  "1d": {
+    "fieldcsv": {
+      "can": true,
+      "why_not": ""
+    },
+    "gif": {
+      "can": false,
+      "why_not": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "name_prefix": "char_1d_run_",
+    "pngs": {
+      "can": true,
+      "why_not": "This result has no field snapshots."
+    },
+    "profile": {
+      "can": true,
+      "why_not": "Only axisymmetric 2D fields can be remapped into 3D."
+    },
+    "report": {
+      "can": true,
+      "why_not": ""
+    },
+    "summary": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "tsv": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "vtk": {
+      "can": false,
+      "why_not": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "2d": {
+    "fieldcsv": {
+      "can": true,
+      "why_not": ""
+    },
+    "gif": {
+      "can": true,
+      "why_not": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "name_prefix": "char_2d_axisym_",
+    "pngs": {
+      "can": true,
+      "why_not": "This result has no field snapshots."
+    },
+    "profile": {
+      "can": true,
+      "why_not": "Only axisymmetric 2D fields can be remapped into 3D."
+    },
+    "report": {
+      "can": true,
+      "why_not": ""
+    },
+    "summary": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "tsv": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "vtk": {
+      "can": false,
+      "why_not": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "3d": {
+    "fieldcsv": {
+      "can": true,
+      "why_not": ""
+    },
+    "gif": {
+      "can": true,
+      "why_not": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "name_prefix": "",
+    "pngs": {
+      "can": true,
+      "why_not": "This result has no field snapshots."
+    },
+    "profile": {
+      "can": false,
+      "why_not": "3D results have no profile export."
+    },
+    "report": {
+      "can": true,
+      "why_not": ""
+    },
+    "summary": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "tsv": {
+      "can": true,
+      "why_not": "This result has no gauges."
+    },
+    "vtk": {
+      "can": false,
+      "why_not": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "DIR_KINDS": [
+    "pngs",
+    "fieldcsv"
+  ],
+  "KINDS": [
+    "profile",
+    "gif",
+    "vtk",
+    "summary",
+    "tsv",
+    "fieldcsv",
+    "report",
+    "pngs"
+  ],
+  "foam": {
+    "fieldcsv": {
+      "can": true,
+      "why_not": ""
+    },
+    "gif": {
+      "can": false,
+      "why_not": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "name_prefix": "",
+    "pngs": {
+      "can": false,
+      "why_not": "This result has no field snapshots."
+    },
+    "profile": {
+      "can": false,
+      "why_not": "3D results have no profile export."
+    },
+    "report": {
+      "can": true,
+      "why_not": ""
+    },
+    "summary": {
+      "can": false,
+      "why_not": "This result has no gauges."
+    },
+    "tsv": {
+      "can": false,
+      "why_not": "This result has no gauges."
+    },
+    "vtk": {
+      "can": true,
+      "why_not": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "missing": {
+    "fieldcsv": {
+      "can": true,
+      "why_not": ""
+    },
+    "gif": {
+      "can": false,
+      "why_not": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "name_prefix": "",
+    "pngs": {
+      "can": false,
+      "why_not": "This result has no field snapshots."
+    },
+    "profile": {
+      "can": false,
+      "why_not": "Only axisymmetric 2D fields can be remapped into 3D."
+    },
+    "report": {
+      "can": true,
+      "why_not": ""
+    },
+    "summary": {
+      "can": false,
+      "why_not": "This result has no gauges."
+    },
+    "tsv": {
+      "can": false,
+      "why_not": "This result has no gauges."
+    },
+    "vtk": {
+      "can": false,
+      "why_not": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "none": {
+    "fieldcsv": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "gif": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "pngs": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "profile": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "report": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "summary": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "tsv": {
+      "can": false,
+      "why_not": "Select a result first."
+    },
+    "vtk": {
+      "can": false,
+      "why_not": "Select a result first."
+    }
+  },
+  "summary_rows": {
+    "1d": [
+      {
+        "arrival_ms": 0.13456082860797855,
+        "complete": true,
+        "gauge": "G1  r = 0.500 m",
+        "net_impulse": 37.257117053886894,
+        "peak_kpa": 2940.4736777190656,
+        "pos_duration_ms": 0.10378508460040449,
+        "pos_impulse": 140.2516425332352,
+        "t_peak_ms": 0.15682643019650877
+      },
+      {
+        "arrival_ms": 0.4753093358267422,
+        "complete": true,
+        "gauge": "G2  r = 0.995 m",
+        "net_impulse": 115.398122998354,
+        "peak_kpa": 732.5305862646812,
+        "pos_duration_ms": 0.7097110184530533,
+        "pos_impulse": 129.12355471852538,
+        "t_peak_ms": 0.5251888378005994
+      },
+      {
+        "arrival_ms": 1.077109342084015,
+        "complete": false,
+        "gauge": "G3  r = 1.500 m",
+        "net_impulse": 88.02953176562785,
+        "peak_kpa": 262.2156124789169,
+        "pos_duration_ms": 0.7562182754811402,
+        "pos_impulse": 87.91227775547995,
+        "t_peak_ms": 1.1780080227116334
+      }
+    ],
+    "2d": [
+      {
+        "arrival_ms": 0.13521451598412457,
+        "complete": true,
+        "gauge": "G1 (0.500, 0.700) m",
+        "net_impulse": 121.7654765614308,
+        "peak_kpa": 2707.4255071578214,
+        "pos_duration_ms": 0.10425322092176274,
+        "pos_impulse": 130.7286414847704,
+        "t_peak_ms": 0.16266175152367188
+      },
+      {
+        "arrival_ms": 0.2299081011140944,
+        "complete": false,
+        "gauge": "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+        "net_impulse": 143.0217983830893,
+        "peak_kpa": 1894.435312229219,
+        "pos_duration_ms": 0.14524448315663077,
+        "pos_impulse": 143.00161578158202,
+        "t_peak_ms": 0.25769539362963845
+      }
+    ],
+    "3d": [
+      {
+        "arrival_ms": NaN,
+        "complete": false,
+        "gauge": "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+        "net_impulse": 1.941437482606538e-08,
+        "peak_kpa": 9.367612859932706e-06,
+        "pos_duration_ms": NaN,
+        "pos_impulse": NaN,
+        "t_peak_ms": 0.06318724570021704
+      },
+      {
+        "arrival_ms": 0.03246585047243059,
+        "complete": false,
+        "gauge": "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+        "net_impulse": 130.20277655772134,
+        "peak_kpa": 7494.8072086006505,
+        "pos_duration_ms": 0.030721395227786445,
+        "pos_impulse": 130.18841351393692,
+        "t_peak_ms": 0.06318724570021704
+      }
+    ]
+  }
+}

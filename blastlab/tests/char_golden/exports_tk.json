@@ -1,0 +1,903 @@
+{
+  "1d/fieldcsv/plain": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save field CSVs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_t0p107ms_p.csv": {
+        "bytes": 5142,
+        "head": [
+          "r[m],p[Pa]",
+          "5.263158e-03,5.328016e+05"
+        ],
+        "sha256": "c13c469843f88b0d88f24321292de8db302273fd276b78a3cd25924ed08e84e3"
+      },
+      "char_1d_run_t0p107ms_rho.csv": {
+        "bytes": 5147,
+        "head": [
+          "r[m],rho[kg/m3]",
+          "5.263158e-03,4.112862e+00"
+        ],
+        "sha256": "4cd6b626778bc7ff77d67bdb63a5d9a85719b3549ffd566ab5d7c91aca0e995b"
+      },
+      "char_1d_run_t0p327ms_p.csv": {
+        "bytes": 5142,
+        "head": [
+          "r[m],p[Pa]",
+          "5.263158e-03,2.842706e+04"
+        ],
+        "sha256": "8e9781e3d01dc876e85779c5ee5585a345ce5e9fffe3e866efb7c0c922542287"
+      },
+      "char_1d_run_t0p327ms_rho.csv": {
+        "bytes": 5147,
+        "head": [
+          "r[m],rho[kg/m3]",
+          "5.263158e-03,4.327626e-01"
+        ],
+        "sha256": "f9463326a348c9727dd869dd8bd726b88e9a2bd232eac7ea9fea53a96fe2edf1"
+      },
+      "char_1d_run_t0p699ms_p.csv": {
+        "bytes": 5142,
+        "head": [
+          "r[m],p[Pa]",
+          "5.263158e-03,4.240716e+02"
+        ],
+        "sha256": "355ac1245888d5b9a8d53050c91224c8ffae1c78f64b423b87c00688ee72ce8a"
+      },
+      "char_1d_run_t0p699ms_rho.csv": {
+        "bytes": 5147,
+        "head": [
+          "r[m],rho[kg/m3]",
+          "5.263158e-03,1.726337e-02"
+        ],
+        "sha256": "1d9367f1da0ab4be41b5239c03f5d7bc49d2892f387ad1b299b5ccbc440de4be"
+      },
+      "char_1d_run_t1p195ms_p.csv": {
+        "bytes": 5142,
+        "head": [
+          "r[m],p[Pa]",
+          "5.263158e-03,6.599066e+05"
+        ],
+        "sha256": "ed8a4f5a6f320a39f889e17cbdd735fabd9d98e986cd71c2a836622176a4da62"
+      },
+      "char_1d_run_t1p195ms_rho.csv": {
+        "bytes": 5147,
+        "head": [
+          "r[m],rho[kg/m3]",
+          "5.263158e-03,5.313439e-01"
+        ],
+        "sha256": "f13f69986eab637da191d98b7db85764214ce603dd176b6b2fae3da74ada79ac"
+      },
+      "char_1d_run_t1p833ms_final_p.csv": {
+        "bytes": 5142,
+        "head": [
+          "r[m],p[Pa]",
+          "5.263158e-03,1.424200e+05"
+        ],
+        "sha256": "2da1ee81b046146ff28586bae463fd6ae557abc55b3b256102cefa830ca8b806"
+      },
+      "char_1d_run_t1p833ms_final_rho.csv": {
+        "bytes": 5147,
+        "head": [
+          "r[m],rho[kg/m3]",
+          "5.263158e-03,2.889382e-01"
+        ],
+        "sha256": "8def15be5774b36945c504a12728eacfd6f66218d99b0918fd87b3634b889682"
+      }
+    },
+    "log": [
+      "Saved 10 field CSV(s) into <out>"
+    ],
+    "opened": []
+  },
+  "1d/gif/plain": {
+    "dialogs": [],
+    "errors": [],
+    "files": {},
+    "log": [
+      "No recorded frames in this result."
+    ],
+    "opened": []
+  },
+  "1d/gif/titled": {
+    "dialogs": [],
+    "errors": [],
+    "files": {},
+    "log": [
+      "No recorded frames in this result."
+    ],
+    "opened": []
+  },
+  "1d/pngs/plain": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save PNGs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_blast_1d_gauges.png": {
+        "png": [
+          2117,
+          1217
+        ]
+      },
+      "char_1d_run_blast_1d_results.png": {
+        "png": [
+          1484,
+          1480
+        ]
+      }
+    },
+    "log": [
+      "Saved char_1d_run_blast_1d_results.png",
+      "Saved char_1d_run_blast_1d_gauges.png"
+    ],
+    "opened": []
+  },
+  "1d/pngs/titled": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save PNGs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_blast_1d_gauges.png": {
+        "png": [
+          2117,
+          1217
+        ]
+      },
+      "char_1d_run_blast_1d_results.png": {
+        "png": [
+          1484,
+          1477
+        ]
+      }
+    },
+    "log": [
+      "Saved char_1d_run_blast_1d_results.png",
+      "Saved char_1d_run_blast_1d_gauges.png"
+    ],
+    "opened": []
+  },
+  "1d/profile/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".txt",
+          "initialfile": "char_1d_run_blast_profile.txt",
+          "title": "Save profile"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_blast_profile.txt": {
+        "bytes": 18714,
+        "head": [
+          "# blast1d radial field profile",
+          "# time_s   = 1.833327618e-03"
+        ],
+        "sha256": "9ea550dd6b0695ee83c7e16c5491f29abb060ae24bd19f8454aa5e744b775ea3"
+      }
+    },
+    "log": [
+      "Saved <out>/char_1d_run_blast_profile.txt"
+    ],
+    "opened": []
+  },
+  "1d/report/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".html",
+          "initialfile": "char_1d_run_blast_1d_report.html",
+          "title": "Save HTML report"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_blast_1d_report.html": {
+        "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>Run 1 - 1D</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px auto;\nmax-width:1100px;color:#222}h1{margin-bottom:0}h2{margin-top:28px;\nborder-bottom:1px solid #ccc;padding-bottom:4px}table{border-collapse:\ncollapse;margin:8px 0}th,td{border:1px solid #bbb;padding:4px 10px;\ntext-align:right}th{background:#eee}td:first-child,th:first-child{\ntext-align:left}img{max-width:100%;border:1px solid #ddd;margin:6px 0}\n.meta{color:#666;font-size:0.9em}pre{background:#f6f6f6;padding:10px;\noverflow-x:auto;font-size:0.85em}</style></head><body>\n<h1>Run 1 - 1D</h1><p class=\"meta\">1D &middot; solver: native &middot; <now> &middot; stop: shock arrived at outer boundary (p_last = 1.015e+05 Pa)</p>\n<h2>Gauges</h2><table><tr><th>Gauge</th><th>Peak ovp [kPa]</th><th>Arrival [ms]</th><th>t peak [ms]</th><th>Pos. phase [ms]</th><th>Pos. imp [Pa&middot;s]</th><th>Net imp [Pa&middot;s]</th><th>Phase ended</th></tr>\n<tr><td>G1  r = 0.500 m</td><td>2940.5</td><td>0.135</td><td>0.157</td><td>0.104</td><td>140.25</td><td>37.26</td><td>yes</td></tr>\n<tr><td>G2  r = 0.995 m</td><td>732.5</td><td>0.475</td><td>0.525</td><td>0.710</td><td>129.12</td><td>115.40</td><td>yes</td></tr>\n<tr><td>G3  r = 1.500 m</td><td>262.2</td><td>1.077</td><td>1.178</td><td>0.756</td><td>87.91</td><td>88.03</td><td>no</td></tr>\n</table>\n<h2>Kingery-Bulmash free-air comparison</h2><table><tr><th>Gauge</th><th>R [m]</th><th>Z [m/kg<sup>1/3</sup>]</th><th>Peak [kPa]</th><th>KB [kPa]</th><th>ratio</th></tr>\n<tr><td>G1  r = 0.500 m</td><td>0.50</td><td>0.50</td><td>2940</td><td>5070</td><td>0.58</td></tr>\n<tr><td>G2  r = 0.995 m</td><td>0.99</td><td>0.99</td><td>733</td><td>916</td><td>0.80</td></tr>\n<tr><td>G3  r = 1.500 m</td><td>1.50</td><td>1.50</td><td>262</td><td>350</td><td>0.75</td></tr>\n</table><p class=\"meta\">KB values: standard free-air incident polynomial table; detonation-only runs land below 1.0 (see ROADMAP N3).</p>\n<h2>Results</h2><img alt=\"Results\" src=\"data:image/png;<png 1088x1086>\">\n<h2>Gauge time histories</h2><img alt=\"Gauge time histories\" src=\"data:image/png;<png 1552x892>\">\n</body></html>"
+      }
+    },
+    "log": [
+      "Saved <out>/char_1d_run_blast_1d_report.html"
+    ],
+    "opened": [
+      "<out>/char_1d_run_blast_1d_report.html"
+    ]
+  },
+  "1d/report/titled": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".html",
+          "initialfile": "char_1d_run_blast_1d_report.html",
+          "title": "Save HTML report"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_blast_1d_report.html": {
+        "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>Char title</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px auto;\nmax-width:1100px;color:#222}h1{margin-bottom:0}h2{margin-top:28px;\nborder-bottom:1px solid #ccc;padding-bottom:4px}table{border-collapse:\ncollapse;margin:8px 0}th,td{border:1px solid #bbb;padding:4px 10px;\ntext-align:right}th{background:#eee}td:first-child,th:first-child{\ntext-align:left}img{max-width:100%;border:1px solid #ddd;margin:6px 0}\n.meta{color:#666;font-size:0.9em}pre{background:#f6f6f6;padding:10px;\noverflow-x:auto;font-size:0.85em}</style></head><body>\n<h1>Char title</h1><p class=\"meta\">1D &middot; solver: native &middot; <now> &middot; stop: shock arrived at outer boundary (p_last = 1.015e+05 Pa)</p>\n<h2>Gauges</h2><table><tr><th>Gauge</th><th>Peak ovp [kPa]</th><th>Arrival [ms]</th><th>t peak [ms]</th><th>Pos. phase [ms]</th><th>Pos. imp [Pa&middot;s]</th><th>Net imp [Pa&middot;s]</th><th>Phase ended</th></tr>\n<tr><td>G1  r = 0.500 m</td><td>2940.5</td><td>0.135</td><td>0.157</td><td>0.104</td><td>140.25</td><td>37.26</td><td>yes</td></tr>\n<tr><td>G2  r = 0.995 m</td><td>732.5</td><td>0.475</td><td>0.525</td><td>0.710</td><td>129.12</td><td>115.40</td><td>yes</td></tr>\n<tr><td>G3  r = 1.500 m</td><td>262.2</td><td>1.077</td><td>1.178</td><td>0.756</td><td>87.91</td><td>88.03</td><td>no</td></tr>\n</table>\n<h2>Kingery-Bulmash free-air comparison</h2><table><tr><th>Gauge</th><th>R [m]</th><th>Z [m/kg<sup>1/3</sup>]</th><th>Peak [kPa]</th><th>KB [kPa]</th><th>ratio</th></tr>\n<tr><td>G1  r = 0.500 m</td><td>0.50</td><td>0.50</td><td>2940</td><td>5070</td><td>0.58</td></tr>\n<tr><td>G2  r = 0.995 m</td><td>0.99</td><td>0.99</td><td>733</td><td>916</td><td>0.80</td></tr>\n<tr><td>G3  r = 1.500 m</td><td>1.50</td><td>1.50</td><td>262</td><td>350</td><td>0.75</td></tr>\n</table><p class=\"meta\">KB values: standard free-air incident polynomial table; detonation-only runs land below 1.0 (see ROADMAP N3).</p>\n<h2>Results</h2><img alt=\"Results\" src=\"data:image/png;<png 1088x1084>\">\n<h2>Gauge time histories</h2><img alt=\"Gauge time histories\" src=\"data:image/png;<png 1552x892>\">\n</body></html>"
+      }
+    },
+    "log": [
+      "Saved <out>/char_1d_run_blast_1d_report.html"
+    ],
+    "opened": [
+      "<out>/char_1d_run_blast_1d_report.html"
+    ]
+  },
+  "1d/summary/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".csv",
+          "initialfile": "char_1d_run_gauges_1d_summary.csv",
+          "title": "Save gauge summary CSV"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_gauges_1d_summary.csv": {
+        "bytes": 326,
+        "head": [
+          "gauge,peak_overpressure_kPa,arrival_ms,time_of_peak_ms,positive_phase_duration_ms,positive_phase_impulse_Pa_s,net_impulse_Pa_s,positive_phase_complete",
+          "G1  r = 0.500 m,2940.5,0.135,0.157,0.104,140.25,37.26,yes"
+        ],
+        "sha256": "767f46d8048e974f288608cb617571bd22ccda9d9fa19d94601675a11a05c908"
+      }
+    },
+    "log": [
+      "Saved <out>/char_1d_run_gauges_1d_summary.csv"
+    ],
+    "opened": []
+  },
+  "1d/tsv/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".txt",
+          "initialfile": "char_1d_run_gauges_1d.txt",
+          "title": "Save gauges TSV"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_1d_run_gauges_1d.txt": {
+        "bytes": 30744,
+        "head": [
+          "time[s]\tp_r=0.5000m[Pa]\tp_r=0.9947m[Pa]\tp_r=1.5000m[Pa]",
+          "0.000000e+00\t1.013250e+05\t1.013250e+05\t1.013250e+05"
+        ],
+        "sha256": "b0c88d9e577f23bed16325eb9200a25390233da1bea9de746b992d2cc13c2861"
+      }
+    },
+    "log": [
+      "Saved <out>/char_1d_run_gauges_1d.txt"
+    ],
+    "opened": []
+  },
+  "1d/vtk/plain": {
+    "dialogs": [],
+    "errors": [],
+    "files": {},
+    "log": [
+      "VTK export needs a blastFoam run whose case directory still exists."
+    ],
+    "opened": []
+  },
+  "2d/fieldcsv/plain": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save field CSVs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_impulse.csv": {
+        "bytes": 693145,
+        "head": [
+          "x[m],y[m],impulse[Pa.s]",
+          "5.263158e-03,5.263158e-03,4.651139e+02"
+        ],
+        "sha256": "8920fdb9da5512d4a200b9a3c14bb659d09e4631794d19cc1d0af6e76b4c9b84"
+      },
+      "char_2d_axisym_p_peak.csv": {
+        "bytes": 693142,
+        "head": [
+          "x[m],y[m],p_peak[Pa]",
+          "5.263158e-03,5.263158e-03,5.705680e+06"
+        ],
+        "sha256": "77bd28af3ef66543bdd89de3344836f145fba4b881b84c6e8462670bb45ee07c"
+      },
+      "char_2d_axisym_t0p116ms_p.csv": {
+        "bytes": 693137,
+        "head": [
+          "x[m],y[m],p[Pa]",
+          "5.263158e-03,5.263158e-03,1.013250e+05"
+        ],
+        "sha256": "7de1241cf3ecc55939263fa187cf5c38632f2783b499df3dc20b85d69286d71a"
+      },
+      "char_2d_axisym_t0p116ms_rho.csv": {
+        "bytes": 693142,
+        "head": [
+          "x[m],y[m],rho[kg/m3]",
+          "5.263158e-03,5.263158e-03,1.225000e+00"
+        ],
+        "sha256": "b9e54e75aa6f3af2d6d61a675aff9e20cfaa1cec6e6b5c7875fd0cc15f8ec7fd"
+      },
+      "char_2d_axisym_t0p116ms_speed.csv": {
+        "bytes": 693142,
+        "head": [
+          "x[m],y[m],speed[m/s]",
+          "5.263158e-03,5.263158e-03,3.770227e-14"
+        ],
+        "sha256": "a5f9985cfbc1117070c256d4f2cfbe190071c03a4ba5ffe631b4195c6f39a776"
+      },
+      "char_2d_axisym_t0p375ms_final_p.csv": {
+        "bytes": 693137,
+        "head": [
+          "x[m],y[m],p[Pa]",
+          "5.263158e-03,5.263158e-03,2.416125e+06"
+        ],
+        "sha256": "cfb506711815dedf158d3b04b52687292d29aa9f89eda2c603e6600349cedb38"
+      },
+      "char_2d_axisym_t0p375ms_final_rho.csv": {
+        "bytes": 693142,
+        "head": [
+          "x[m],y[m],rho[kg/m3]",
+          "5.263158e-03,5.263158e-03,4.269021e+00"
+        ],
+        "sha256": "87b141525ea385971724b9c34bcc66dca1e668e58260e967d0d0b2b45f88cfa1"
+      },
+      "char_2d_axisym_t0p375ms_final_speed.csv": {
+        "bytes": 693142,
+        "head": [
+          "x[m],y[m],speed[m/s]",
+          "5.263158e-03,5.263158e-03,3.227613e+01"
+        ],
+        "sha256": "aea46f5f79ba0a20c8514f63e6ec7228a0157b94d433cfbf071f5bc3d959c32e"
+      }
+    },
+    "log": [
+      "Saved 8 field CSV(s) into <out>"
+    ],
+    "opened": []
+  },
+  "2d/gif/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".mp4",
+          "filetypes": [
+            [
+              "MP4 video",
+              "*.mp4"
+            ],
+            [
+              "Animated GIF",
+              "*.gif"
+            ]
+          ],
+          "initialfile": "char_2d_axisym_blast_2d_animation.mp4",
+          "title": "Save animation"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_animation.gif": {
+        "frames": 13,
+        "gif": [
+          700,
+          1033
+        ]
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_blast_2d_animation.gif"
+    ],
+    "opened": []
+  },
+  "2d/gif/titled": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".mp4",
+          "filetypes": [
+            [
+              "MP4 video",
+              "*.mp4"
+            ],
+            [
+              "Animated GIF",
+              "*.gif"
+            ]
+          ],
+          "initialfile": "char_2d_axisym_blast_2d_animation.mp4",
+          "title": "Save animation"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_animation.gif": {
+        "frames": 13,
+        "gif": [
+          700,
+          1033
+        ]
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_blast_2d_animation.gif"
+    ],
+    "opened": []
+  },
+  "2d/pngs/plain": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save PNGs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_density.png": {
+        "png": [
+          1515,
+          1084
+        ]
+      },
+      "char_2d_axisym_blast_2d_gauges.png": {
+        "png": [
+          2117,
+          617
+        ]
+      },
+      "char_2d_axisym_blast_2d_impulse.png": {
+        "png": [
+          1018,
+          1096
+        ]
+      },
+      "char_2d_axisym_blast_2d_peak_overpressure.png": {
+        "png": [
+          927,
+          1096
+        ]
+      },
+      "char_2d_axisym_blast_2d_pressure.png": {
+        "png": [
+          1515,
+          1096
+        ]
+      }
+    },
+    "log": [
+      "Saved char_2d_axisym_blast_2d_pressure.png",
+      "Saved char_2d_axisym_blast_2d_density.png",
+      "Saved char_2d_axisym_blast_2d_peak_overpressure.png",
+      "Saved char_2d_axisym_blast_2d_impulse.png",
+      "Saved char_2d_axisym_blast_2d_gauges.png"
+    ],
+    "opened": []
+  },
+  "2d/pngs/titled": {
+    "dialogs": [
+      [
+        "askdirectory",
+        {
+          "title": "Save PNGs into"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_density.png": {
+        "png": [
+          1515,
+          1087
+        ]
+      },
+      "char_2d_axisym_blast_2d_gauges.png": {
+        "png": [
+          2117,
+          617
+        ]
+      },
+      "char_2d_axisym_blast_2d_impulse.png": {
+        "png": [
+          1018,
+          1099
+        ]
+      },
+      "char_2d_axisym_blast_2d_peak_overpressure.png": {
+        "png": [
+          927,
+          1099
+        ]
+      },
+      "char_2d_axisym_blast_2d_pressure.png": {
+        "png": [
+          1515,
+          1099
+        ]
+      }
+    },
+    "log": [
+      "Saved char_2d_axisym_blast_2d_pressure.png",
+      "Saved char_2d_axisym_blast_2d_density.png",
+      "Saved char_2d_axisym_blast_2d_peak_overpressure.png",
+      "Saved char_2d_axisym_blast_2d_impulse.png",
+      "Saved char_2d_axisym_blast_2d_gauges.png"
+    ],
+    "opened": []
+  },
+  "2d/profile/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".npz",
+          "initialfile": "char_2d_axisym_blast_profile_2d.npz",
+          "title": "Save profile"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_profile_2d.npz": {
+        "npz": {
+          "charge_kg": {
+            "dtype": "float64",
+            "sha256": "6c3c396ed6b5c36dcae172271f462051b1266b851e92df3deea8ac65478fd712",
+            "shape": []
+          },
+          "e": {
+            "dtype": "float64",
+            "sha256": "bf74583b76094d47ecf9552ba5ecce8aeba0fed5684dce34d7dba370b88f53ba",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "eos": {
+            "dtype": "<U8",
+            "sha256": "bcad92c70b911814a8529c2043c9c735d9dd7d08622152880a3c186a45cec991",
+            "shape": []
+          },
+          "geometry": {
+            "dtype": "<U12",
+            "sha256": "3554ffa152a6c9205fd3bcd69e38a393b497ccff32c6f35dea69f55938e070ad",
+            "shape": []
+          },
+          "p": {
+            "dtype": "float64",
+            "sha256": "062e1128b3328600fb0b86d440e86758df7216b99d65c72f6c52125c7452d823",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "phase": {
+            "dtype": "int64",
+            "sha256": "23a80e1d3a9a3c3ab0a18e69157c71b082fb216407c91f60228bee90277accea",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "r_c": {
+            "dtype": "float64",
+            "sha256": "54b48aefb547751815aadb3ab4df703ddd14c8fa87fb7b218e0d46863bc75407",
+            "shape": [
+              114
+            ]
+          },
+          "r_exp": {
+            "dtype": "float64",
+            "sha256": "cabfe0a034cf721af5af61700b262685ec58adcbe87257dc5d104c475e0fed58",
+            "shape": []
+          },
+          "rho": {
+            "dtype": "float64",
+            "sha256": "685b359f70d74a632a04814aad07648a93e74f85d0b4bcfe421001872c4c9853",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "source_solver": {
+            "dtype": "<U6",
+            "sha256": "9d5d332231de2cbbf175ff540664667cf338ff411574e86a5fe4c70652756924",
+            "shape": []
+          },
+          "t": {
+            "dtype": "float64",
+            "sha256": "54c9a966c4ccaa09ee5e9e7f3181789864df6869ef25f8472af36068835e2990",
+            "shape": []
+          },
+          "u": {
+            "dtype": "float64",
+            "sha256": "c440dc490773bd603d17574b19f10795aed1cd0f9a1c1ea668734e677f98945a",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "v": {
+            "dtype": "float64",
+            "sha256": "640219c732a229bc5b1120eceb1ee76557f566932819b30e30188ef07bd2e7f0",
+            "shape": [
+              114,
+              152
+            ]
+          },
+          "y0": {
+            "dtype": "float64",
+            "sha256": "633938f09cacdbde4f646abc325ccf65e800705d587f09b4b5531321820893f8",
+            "shape": []
+          },
+          "z_c": {
+            "dtype": "float64",
+            "sha256": "9ee7d3fc78fe11761c4883e91450dbbb247ce71554a8c05e31bcf2500be0de49",
+            "shape": [
+              152
+            ]
+          }
+        }
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_blast_profile_2d.npz"
+    ],
+    "opened": []
+  },
+  "2d/report/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".html",
+          "initialfile": "char_2d_axisym_blast_2d_report.html",
+          "title": "Save HTML report"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_report.html": {
+        "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>Run 2 - 2D</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px auto;\nmax-width:1100px;color:#222}h1{margin-bottom:0}h2{margin-top:28px;\nborder-bottom:1px solid #ccc;padding-bottom:4px}table{border-collapse:\ncollapse;margin:8px 0}th,td{border:1px solid #bbb;padding:4px 10px;\ntext-align:right}th{background:#eee}td:first-child,th:first-child{\ntext-align:left}img{max-width:100%;border:1px solid #ddd;margin:6px 0}\n.meta{color:#666;font-size:0.9em}pre{background:#f6f6f6;padding:10px;\noverflow-x:auto;font-size:0.85em}</style></head><body>\n<h1>Run 2 - 2D</h1><p class=\"meta\">2D &middot; solver: native &middot; <now> &middot; stop: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)</p>\n<h2>Gauges</h2><table><tr><th>Gauge</th><th>Peak ovp [kPa]</th><th>Arrival [ms]</th><th>t peak [ms]</th><th>Pos. phase [ms]</th><th>Pos. imp [Pa&middot;s]</th><th>Net imp [Pa&middot;s]</th><th>Phase ended</th></tr>\n<tr><td>G1 (0.500, 0.700) m</td><td>2707.4</td><td>0.135</td><td>0.163</td><td>0.104</td><td>130.73</td><td>121.77</td><td>yes</td></tr>\n<tr><td>G2 (0.400, 0.200) -&gt; cell (0.405, 0.205) m</td><td>1894.4</td><td>0.230</td><td>0.258</td><td>0.145</td><td>143.00</td><td>143.02</td><td>no</td></tr>\n</table>\n<h2>Pressure</h2><img alt=\"Pressure\" src=\"data:image/png;<png 1111x804>\">\n<h2>Density</h2><img alt=\"Density\" src=\"data:image/png;<png 1111x795>\">\n<h2>Peak overpressure</h2><img alt=\"Peak overpressure\" src=\"data:image/png;<png 679x804>\">\n<h2>Impulse</h2><img alt=\"Impulse\" src=\"data:image/png;<png 746x804>\">\n<h2>Gauge time histories</h2><img alt=\"Gauge time histories\" src=\"data:image/png;<png 1552x452>\">\n</body></html>"
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_blast_2d_report.html"
+    ],
+    "opened": [
+      "<out>/char_2d_axisym_blast_2d_report.html"
+    ]
+  },
+  "2d/report/titled": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".html",
+          "initialfile": "char_2d_axisym_blast_2d_report.html",
+          "title": "Save HTML report"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_blast_2d_report.html": {
+        "html": "<!doctype html><html><head><meta charset=\"utf-8\"><title>Char title</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:24px auto;\nmax-width:1100px;color:#222}h1{margin-bottom:0}h2{margin-top:28px;\nborder-bottom:1px solid #ccc;padding-bottom:4px}table{border-collapse:\ncollapse;margin:8px 0}th,td{border:1px solid #bbb;padding:4px 10px;\ntext-align:right}th{background:#eee}td:first-child,th:first-child{\ntext-align:left}img{max-width:100%;border:1px solid #ddd;margin:6px 0}\n.meta{color:#666;font-size:0.9em}pre{background:#f6f6f6;padding:10px;\noverflow-x:auto;font-size:0.85em}</style></head><body>\n<h1>Char title</h1><p class=\"meta\">2D &middot; solver: native &middot; <now> &middot; stop: shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)</p>\n<h2>Gauges</h2><table><tr><th>Gauge</th><th>Peak ovp [kPa]</th><th>Arrival [ms]</th><th>t peak [ms]</th><th>Pos. phase [ms]</th><th>Pos. imp [Pa&middot;s]</th><th>Net imp [Pa&middot;s]</th><th>Phase ended</th></tr>\n<tr><td>G1 (0.500, 0.700) m</td><td>2707.4</td><td>0.135</td><td>0.163</td><td>0.104</td><td>130.73</td><td>121.77</td><td>yes</td></tr>\n<tr><td>G2 (0.400, 0.200) -&gt; cell (0.405, 0.205) m</td><td>1894.4</td><td>0.230</td><td>0.258</td><td>0.145</td><td>143.00</td><td>143.02</td><td>no</td></tr>\n</table>\n<h2>Pressure</h2><img alt=\"Pressure\" src=\"data:image/png;<png 1111x806>\">\n<h2>Density</h2><img alt=\"Density\" src=\"data:image/png;<png 1111x797>\">\n<h2>Peak overpressure</h2><img alt=\"Peak overpressure\" src=\"data:image/png;<png 679x806>\">\n<h2>Impulse</h2><img alt=\"Impulse\" src=\"data:image/png;<png 746x806>\">\n<h2>Gauge time histories</h2><img alt=\"Gauge time histories\" src=\"data:image/png;<png 1552x452>\">\n</body></html>"
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_blast_2d_report.html"
+    ],
+    "opened": [
+      "<out>/char_2d_axisym_blast_2d_report.html"
+    ]
+  },
+  "2d/summary/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".csv",
+          "initialfile": "char_2d_axisym_gauges_2d_summary.csv",
+          "title": "Save gauge summary CSV"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_gauges_2d_summary.csv": {
+        "bytes": 306,
+        "head": [
+          "gauge,peak_overpressure_kPa,arrival_ms,time_of_peak_ms,positive_phase_duration_ms,positive_phase_impulse_Pa_s,net_impulse_Pa_s,positive_phase_complete",
+          "\"G1 (0.500, 0.700) m\",2707.4,0.135,0.163,0.104,130.73,121.77,yes"
+        ],
+        "sha256": "9d34e908a9fb3c894969ac1859478ff0d9f852828d4647049b3a941dce87c1ee"
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_gauges_2d_summary.csv"
+    ],
+    "opened": []
+  },
+  "2d/tsv/plain": {
+    "dialogs": [
+      [
+        "asksaveasfilename",
+        {
+          "defaultextension": ".txt",
+          "initialfile": "char_2d_axisym_gauges_2d.txt",
+          "title": "Save gauges TSV"
+        }
+      ]
+    ],
+    "errors": [],
+    "files": {
+      "char_2d_axisym_gauges_2d.txt": {
+        "bytes": 15371,
+        "head": [
+          "time[s]\tp_(0.500,0.700)m[Pa]\tp_(0.405,0.205)m[Pa]",
+          "0.000000e+00\t1.013250e+05\t1.013250e+05"
+        ],
+        "sha256": "75e2509ad77fefc574eb83446c2e8e664129f3fcea628618312b950468acbd15"
+      }
+    },
+    "log": [
+      "Saved <out>/char_2d_axisym_gauges_2d.txt"
+    ],
+    "opened": []
+  },
+  "2d/vtk/plain": {
+    "dialogs": [],
+    "errors": [],
+    "files": {},
+    "log": [
+      "VTK export needs a blastFoam run whose case directory still exists."
+    ],
+    "opened": []
+  },
+  "buttons/1d": {
+    "fieldcsv": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "gif": {
+      "state": "disabled",
+      "tooltip": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+    },
+    "pngs": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "profile": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "report": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "summary": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "tsv": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "vtk": {
+      "state": "disabled",
+      "tooltip": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "buttons/2d": {
+    "fieldcsv": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "gif": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "pngs": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "profile": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "report": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "summary": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "tsv": {
+      "state": "normal",
+      "tooltip": ""
+    },
+    "vtk": {
+      "state": "disabled",
+      "tooltip": "Only a blastFoam run whose case directory still exists can be written as VTK."
+    }
+  },
+  "buttons/none": {
+    "fieldcsv": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "gif": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "pngs": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "profile": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "report": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "summary": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "tsv": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    },
+    "vtk": {
+      "state": "disabled",
+      "tooltip": "Select a result first."
+    }
+  }
+}
