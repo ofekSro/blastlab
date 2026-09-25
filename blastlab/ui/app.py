@@ -604,6 +604,13 @@ class MainWindow(QMainWindow):
                          daemon=True).start()
 
     def _set_hd13_busy(self, busy):
+        """GUI thread: enter or leave the HD 1.3 busy state.
+
+        Entering greys the Run controls, shows the running status and
+        lowers the GIL switch interval for the worker's lifetime (see
+        `_HD13_SWITCH_INTERVAL`); leaving restores the interval saved on
+        entry. The status line after a run is `_hd13_done`'s business.
+        """
         self._hd13_busy = bool(busy)
         self.run_panel.set_busy(busy)
         if busy:

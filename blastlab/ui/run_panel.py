@@ -428,20 +428,23 @@ class RunPanel(QWidget):
             self.init_btn.setEnabled(bool(ok))
 
     def set_busy(self, busy):
-        """A job that is not a solve - the HD 1.3 assessment - is working
-        on a thread: Run and Initialise Model off, the bar indeterminate.
-        Nothing else changes; the log, chips and live view still describe
-        the last solve, and the bar gets its old value back afterwards."""
+        """Mark a non-solve job (the HD 1.3 assessment) as working or done.
+
+        Busy: Run and Initialise Model off, the bar indeterminate. Nothing
+        else changes - the log, chips and live view still describe the
+        last solve - and the bar gets its old value back afterwards.
+        """
         busy = bool(busy)
         if busy and not self._busy:
             self._bar_value = self.progress.value()
         self._busy = busy
         if busy:
-            self.progress.setRange(0, 0)
+            self.progress.setRange(0, 0)        # (0, 0) = indeterminate
         else:
             self.progress.setRange(0, 1000)
             self.progress.setValue(self._bar_value)
-        start_ok = not (self._running or busy) and self._case_ok
+        # same gate as set_running / set_validation
+        start_ok = (not self._running) and (not busy) and self._case_ok
         self.run_btn.setEnabled(start_ok)
         self.init_btn.setEnabled(start_ok)
 
