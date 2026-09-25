@@ -3,7 +3,7 @@
 docs/ARCHITECTURE_REVIEW.md section 5, Phase 10 splits
 `solvers/foam/writer._controldict` into one function per section it
 renders. `tests/foam_golden/` (test_foam_writer.py) pins the controlDict
-of 21 reference cases, but none of them takes these branches:
+of 19 reference cases, but none of them takes these branches:
 
 - a fixed time step (`Case3D.fixed_dt` > 0: deltaT, adjustTimeStep no,
   writeControl runTime);

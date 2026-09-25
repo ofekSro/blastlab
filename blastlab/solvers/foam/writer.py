@@ -784,9 +784,9 @@ def _controldict_time(spec, case):
     # exactly uniform and exactly at rest has Co = 0 and
     # `Time::adjustDeltaT` divides by it - a SIGFPE on the first step,
     # measured. Falsy by default, so every golden is untouched.
-    _dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
-    if _dt > 0.0:
-        d['deltaT'] = Raw(fmt(_dt))
+    fixed_dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
+    if fixed_dt > 0.0:
+        d['deltaT'] = Raw(fmt(fixed_dt))
         d['adjustTimeStep'] = 'no'
         d['writeControl'] = 'runTime'
     return d
@@ -800,14 +800,15 @@ def _controldict_function_objects(spec):
     (sec. 15.2, p. 123), timeOfArrival (sec. 15.12, p. 126), overpressure
     (sec. 15.10, p. 126). blastProbes (sec. 15.1) is rendered last, by
     `_controldict_probes`."""
+    blast_libs = Raw('("libblastFunctionObjects.so")')
     functions = {}
     # N5-5: blastFoam's own volume integral of the conserved variables,
     # printed to the log at every write. The value here is NOT the drift
-    # it reports: the guide says the FO "does not consider the removal
-    # and injection of values into a domain", and every default case in
-    # this repo has a transmit/terminate boundary, so mass and energy
-    # legitimately leave and any drift threshold would either never fire
-    # or fire always. What earns its place is the FIRST reading - what
+    # it reports: the guide notes that "the removal and injection of
+    # values into a domain is not considered" (sec. 15.4, p. 124), and
+    # every default case in this repo has a transmit/terminate boundary,
+    # so mass and energy legitimately leave and any drift threshold would
+    # either never fire or fire always. What earns its place is the FIRST reading - what
     # blastFoam decoded from the fields we wrote into the start time
     # dir. That is exactly the seam B0 (lambda reset the products to
     # pRef) and B1 (+33 % from the wrong EOS) both broke, and neither
@@ -822,7 +823,7 @@ def _controldict_function_objects(spec):
     # 10,531 samples nobody reads.
     functions['conserved'] = {
         'type': 'conservedQuantities',
-        'libs': Raw('("libblastFunctionObjects.so")'),
+        'libs': blast_libs,
         'executeControl': 'writeTime',
         'writeControl': 'writeTime',
         'fields': ['rho', 'rhoE'],
@@ -840,7 +841,7 @@ def _controldict_function_objects(spec):
     # reaches (early shock-arrival stop) simply never fires.
     functions['writeTimes'] = {
         'type': 'writeTimeList',
-        'libs': Raw('("libblastFunctionObjects.so")'),
+        'libs': blast_libs,
         'times': [spec.t_start + spec.end_time],
     }
     if spec.dim >= 2 and spec.fo_accumulators:
@@ -850,14 +851,14 @@ def _controldict_function_objects(spec):
         # names written per time dir: 'pMax' and 'impulse'.
         functions['impulse'] = {
             'type': 'impulse',
-            'libs': Raw('("libblastFunctionObjects.so")'),
+            'libs': blast_libs,
             'writeControl': 'writeTime',
             'pName': 'p',
             'pRef': P_AIR,
         }
         functions['pMax'] = {
             'type': 'fieldMinMax',
-            'libs': Raw('("libblastFunctionObjects.so")'),
+            'libs': blast_libs,
             'writeControl': 'writeTime',
             'fields': ['p'],
             'minMax': 'max',
@@ -872,13 +873,13 @@ def _controldict_function_objects(spec):
     if spec.dim >= 2:
         functions['arrival'] = {
             'type': 'timeOfArrival',
-            'libs': Raw('("libblastFunctionObjects.so")'),
+            'libs': blast_libs,
             'writeControl': 'writeTime',
             'pName': 'p',
         }
         functions['overpressure'] = {
             'type': 'overpressure',
-            'libs': Raw('("libblastFunctionObjects.so")'),
+            'libs': blast_libs,
             'writeControl': 'writeTime',
             'pRef': P_AIR,
             'store': True,
@@ -912,6 +913,7 @@ def _controldict_live_sampling(spec, case):
     p(r) line (`LIVE_SET`, 1D), every few solver steps. OpenFOAM's own
     sampling-library function objects, which blastFoam loads by default
     (blastFoam User Guide v6.0, sec. 15, p. 122)."""
+    steps = spec.live_steps or live_sample_steps(spec.dim)
     functions = {}
     if spec.dim >= 2:
         # live p slice every few steps (same role as the 1D liveLine):
@@ -929,11 +931,11 @@ def _controldict_live_sampling(spec, case):
             axis = getattr(case, 'slice_axis', 'y') or 'y'
             ax_i = 'xyz'.index(axis)
             c = spec.grid[('x_c', 'y_c', 'z_c')[ax_i]]
-            pos = (spec.center[ax_i]
-                   if getattr(case, 'slice_pos', None) is None
-                   else float(case.slice_pos))
-            s0 = min(range(len(c)), key=lambda i: abs(float(c[i]) - pos))
-            pos = float(c[s0])
+            target = (spec.center[ax_i]
+                      if getattr(case, 'slice_pos', None) is None
+                      else float(case.slice_pos))
+            # snap to the nearest cell-centre layer (first one on a tie)
+            pos = float(min(c, key=lambda c_i: abs(float(c_i) - target)))
             if spec.amr and spec.display_level < spec.amr:
                 # cells finer than the display grid have faces at the
                 # display-layer centre: cut through the centre of the
@@ -947,7 +949,7 @@ def _controldict_live_sampling(spec, case):
             'type': 'surfaces',
             'libs': Raw('("libsampling.so")'),
             'writeControl': 'timeStep',
-            'writeInterval': spec.live_steps or live_sample_steps(spec.dim),
+            'writeInterval': steps,
             'surfaceFormat': 'raw',
             'interpolationScheme': 'cell',
             'fields': ['p'],
@@ -969,7 +971,7 @@ def _controldict_live_sampling(spec, case):
             'type': 'sets',
             'libs': Raw('("libsampling.so")'),
             'writeControl': 'timeStep',
-            'writeInterval': spec.live_steps or live_sample_steps(spec.dim),
+            'writeInterval': steps,
             'setFormat': 'raw',
             'interpolationScheme': 'cell',
             'fields': ['p'],
