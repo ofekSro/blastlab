@@ -12,6 +12,7 @@ import numpy as np
 from matplotlib.figure import Figure
 
 from ..core.constants import P_AIR
+from ..models.meta import charge_label, frames_of, slice_geometry
 from ..output import gauge_summary, plots
 from ..services.exports import run_export
 from ..viz3d import MISSING_MSG, pyvista_available
@@ -517,9 +518,10 @@ class ResultsPanel(ctk.CTkFrame):
         field = self.field_sel.get()
 
         if dim == 1:
+            c = charge_label(res.meta)
             fig = plots.figure_results_1d(
-                res.snapshots, res.meta['eos'], res.meta['charge_kg'],
-                res.meta['radius_m'], title_extra=self.title_extra())
+                res.snapshots, c.eos, c.charge_kg, c.radius_m,
+                title_extra=self.title_extra())
             self.field_canvas.set_figure(fig)
             return
 
@@ -548,29 +550,25 @@ class ResultsPanel(ctk.CTkFrame):
                 unit = {'overpressure': 'Overpressure [kPa]',
                         'density': 'Density [kg/m³]',
                         'speed': 'Speed [m/s]'}[field]
-            solid_sl, xf, yf = meta['solid'], meta['x_face'], meta['y_face']
+            g = slice_geometry(meta, 'grid')
+            solid_sl, xf, yf = g.solid, g.xf, g.yf
             xl = 'r [m]' if meta['geometry'] == 'axisymmetric' else 'x [m]'
             yl = 'z [m]' if meta['geometry'] == 'axisymmetric' else 'y [m]'
             aspect = meta['Lx'] / meta['Ly']
         else:
-            j0, k0 = meta['j0'], meta['k0']
             is_ovp = field.startswith('overpressure')
-            if '(x-z)' in field:
-                sl = np.s_[:, j0, :]
-                solid_sl = meta['solid'][sl]
-                xf, yf = meta['x_face'], meta['z_face']
+            plane = 'x-z' if '(x-z)' in field else 'x-y'
+            g = slice_geometry(meta, plane)
+            sl, solid_sl, xf, yf = g.sl, g.solid, g.xf, g.yf
+            pos = f"{g.axis} = {g.coord:.2f} m"
+            if plane == 'x-z':
                 xl, yl = 'x [m]', 'z [m]'
                 aspect = meta['Lx'] / meta['Lz']
-                plane, pos = 'x-z', f"y = {meta['y_c'][j0]:.2f} m"
                 raw = (snap['p'][sl] - np.float32(P_AIR)
                       if is_ovp else snap['rho_xz'])
             else:
-                sl = np.s_[:, :, k0]
-                solid_sl = meta['solid'][sl]
-                xf, yf = meta['x_face'], meta['y_face']
                 xl, yl = 'x [m]', 'y [m]'
                 aspect = meta['Lx'] / meta['Ly']
-                plane, pos = 'x-y', f"z = {meta['z_c'][k0]:.2f} m"
                 raw = (snap['p'][sl] - np.float32(P_AIR)
                       if is_ovp else snap['rho_xy'])
             if is_peak or is_imp:
@@ -645,8 +643,9 @@ class ResultsPanel(ctk.CTkFrame):
             if self._gauge_bar.winfo_manager():
                 self._gauge_bar.pack_forget()
         if ent.dim == 1:
+            c = charge_label(res.meta, radius=False)
             fig = plots.figure_gauges_1d(
-                res.gauges, res.meta['charge_kg'], res.meta['eos'],
+                res.gauges, c.charge_kg, c.eos,
                 title_extra=self.title_extra())
         else:
             fig = plots.figure_gauges_nd(
@@ -714,8 +713,8 @@ class ResultsPanel(ctk.CTkFrame):
                 '1D results have no animation frames.' if ent is not None
                 else '')
             return
-        frames = ent.result.meta.get('frames')
-        if not frames or not len(frames['pressures']):
+        frames = frames_of(ent.result.meta)
+        if frames is None:
             self._anim_placeholder(
                 'No recorded frames for this result.\n'
                 'Tick "Record frames" before the run; runs loaded from the\n'
@@ -729,24 +728,15 @@ class ResultsPanel(ctk.CTkFrame):
 
         fig = Figure(figsize=(6, 5))
         ax = fig.add_subplot()
-        if 'z_face' in meta:      # 3D slice: mirror output/animation.py
-            s_ax = meta.get('slice_axis', 'y')
-            s0 = meta.get('s0', meta['j0'])
-            faces = {'x': (meta['y_face'], meta['z_face']),
-                     'y': (meta['x_face'], meta['z_face']),
-                     'z': (meta['x_face'], meta['y_face'])}[s_ax]
-            labels = {'x': ('y [m]', 'z [m]'), 'y': ('x [m]', 'z [m]'),
-                      'z': ('x [m]', 'y [m]')}[s_ax]
-            sl = tuple(s0 if a == 'xyz'.index(s_ax) else slice(None)
-                      for a in range(3))
-            xf, yf = faces
-            xlabel, ylabel = labels
-            self._anim_solid = meta['solid'][sl]
-            self._anim_plane = f"{s_ax} = {meta[f'{s_ax}_c'][s0]:.2f} m  "
+        g = slice_geometry(meta, 'recorded')
+        xf, yf, sl = g.xf, g.yf, g.sl
+        self._anim_solid = g.solid
+        if g.axis is not None:    # 3D slice: mirror output/animation.py
+            xlabel, ylabel = {'x': ('y [m]', 'z [m]'),
+                              'y': ('x [m]', 'z [m]'),
+                              'z': ('x [m]', 'y [m]')}[g.axis]
+            self._anim_plane = f"{g.axis} = {g.coord:.2f} m  "
         else:
-            xf, yf = meta['x_face'], meta['y_face']
-            self._anim_solid = meta['solid']
-            sl = None
             xlabel = 'x [m]'
             ylabel = ('z [m]' if meta.get('geometry') == 'axisymmetric'
                      else 'y [m]')
