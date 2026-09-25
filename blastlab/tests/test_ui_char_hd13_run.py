@@ -14,7 +14,8 @@ in one golden (`char_golden/ui_hd13_run.json`) plus the report
     masking of `test_char_hd13_cli.py`), the status line and its timer,
     no dialog, and HOW MANY TIMES `assessment.run` is called - two today
     (UX finding: `_run_hd13` runs the assessment once to fail before
-    touching disk, then `run_and_report` runs it again);
+    touching disk, then `services/hd13.assess` runs it again - before
+    Phase 7 it was `run_and_report`);
   * with the report field blank: the `hd13_report.html` fallback, written
     relative to the working directory;
   * a case `assessment.validate` refuses: the dialog title and text, no
@@ -113,11 +114,10 @@ def press_run(win, root, run=None):
     win._status_timer.stop()
     with Recorder(win, root, run) as rec:
         win._run_single()
-    got = dict(errors=rec.errors, mkdtemp=rec.mkdtemp,
-               temp_files=rec.temp_files(), assessment_runs=rec.runs,
-               status=win._status.text(),
-               status_timer_active=win._status_timer.isActive())
-    return got
+    return dict(errors=rec.errors, mkdtemp=rec.mkdtemp,
+                temp_files=rec.temp_files(), assessment_runs=rec.runs,
+                status=win._status.text(),
+                status_timer_active=win._status_timer.isActive())
 
 
 def main_window():

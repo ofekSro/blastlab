@@ -112,7 +112,7 @@ def test_starter_and_report():
 def test_refused_case():
     tmp = tempfile.mkdtemp(prefix='blastlab_char_hd13cli_')
     try:
-        code, out, err = blastlab(tmp, '--hd13-new', 'bad.json')
+        blastlab(tmp, '--hd13-new', 'bad.json')
         path = os.path.join(tmp, 'bad.json')
         with open(path, encoding='utf-8') as f:
             case = json.load(f)

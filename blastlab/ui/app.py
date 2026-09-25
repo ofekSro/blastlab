@@ -532,33 +532,37 @@ class MainWindow(QMainWindow):
     def _run_hd13(self, case):
         """Run an HD 1.3 assessment and write its report.
 
-        Solved INLINE, not through RunController. That machinery exists
-        for a solve that takes minutes in a worker thread with progress,
-        a live viewer, cancellation and resume; a 0-D deflagration case
-        finishes in well under a second, and routing it through all of
-        that would add every one of those failure modes to buy nothing.
+        Solved INLINE, on the GUI thread, not through RunController. That
+        machinery exists for a solve in a worker thread with progress, a
+        live viewer, cancellation and resume. A 0-D deflagration case is
+        closed form, but it is not instant: the starter case takes about
+        40 s per assessment (sensitivity band off), and this method runs
+        the assessment twice (see below) - known UX debt, pinned by
+        `tests/test_ui_char_hd13_run.py`.
         """
-        from ..core.assessment import run as run_hd13, validate as val_hd13
+        # Imported here, and called through the module, so a test that
+        # patches `assessment.run` or `tempfile.mkdtemp` is honoured.
+        import tempfile
+        from ..core import assessment
         from ..services import hd13 as hd13_service
-        rep = val_hd13(case)
+        rep = assessment.validate(case)
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
             return
         path = self.setup.form.v['report_file'].get().strip() \
             or 'hd13_report.html'
         try:
-            run_hd13(case)                     # fail before touching disk
+            # Run 1: fail before touching disk. `assess` below is run 2.
+            assessment.run(case)
             # The temp case file is kept, and the report is made from the
             # case read back from it, exactly as before Phase 7 of
             # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
             # open question Q4 there.
-            import tempfile, os as _os
-            case_path = _os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_'),
-                                      'case.json')
-            from ..core.assessment import load_case, save_case
-            save_case(case, case_path)
-            out = hd13_service.write_report(
-                hd13_service.assess(load_case(case_path)), path)
+            case_dir = tempfile.mkdtemp(prefix='blastlab_hd13_')
+            case_path = os.path.join(case_dir, 'case.json')
+            assessment.save_case(case, case_path)
+            bundle = hd13_service.assess(assessment.load_case(case_path))
+            out = hd13_service.write_report(bundle, path)
         except Exception as exc:               # noqa: BLE001 - shown to the user
             self.show_error('HD 1.3 assessment', str(exc))
             return

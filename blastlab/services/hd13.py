@@ -20,14 +20,14 @@ from ..core import assessment
 from ..output import hd13, plots
 
 
-def default_report_path(case_path):
+def default_report_path(case_path: str) -> str:
     """Where `--hd13` writes the report when not told: beside the case
     file, `<case>_hd13.html`."""
     base = os.path.splitext(case_path)[0]
     return base + '_hd13.html'
 
 
-def assess(case, report=None):
+def assess(case, report=None) -> dict:
     """Validate `case`, run it and build the report's figures.
 
     `report` is the `ValidationReport` of `case` when the caller has
@@ -39,14 +39,16 @@ def assess(case, report=None):
     `assessment.run` output under `out`, and the (caption, Figure) list
     under `figures`.
     """
-    rep = assessment.validate(case) if report is None else report
-    if not rep.ok:
-        raise ValueError('refusing to run: ' + '; '.join(rep.errors))
+    if report is None:
+        report = assessment.validate(case)
+    if not report.ok:
+        raise ValueError('refusing to run: ' + '; '.join(report.errors))
 
     out = assessment.run(case)
+    confined, thermal = out['confined'], out['thermal']
     figures = []
-    if out['confined'] is not None:
-        figures.append(('Chamber', plots.figure_deflagration(out['confined'])))
+    if confined is not None:
+        figures.append(('Chamber', plots.figure_deflagration(confined)))
     if out['unconfined'] is not None:
         figures.append(('In the open',
                         plots.figure_unconfined(out['unconfined'])))
@@ -54,17 +56,19 @@ def assess(case, report=None):
         figures.append(('Structural response',
                         plots.figure_sdof_response(out['sdof'],
                                                    out['component'])))
-    if out['thermal'] is not None or out['radiation']:
-        t = out['confined']['t'] if out['confined'] else []
-        q = out['thermal']['q'] if out['thermal'] else []
-        Ts = out['thermal']['T_surface'] if out['thermal'] else None
+    # The heat figure is drawn on the chamber's time axis: with no
+    # confined result there is no axis, so no heat figure.
+    if thermal is not None or out['radiation']:
+        t = confined['t'] if confined else []
+        q = thermal['q'] if thermal else []
+        T_surface = thermal['T_surface'] if thermal else None
         if len(t):
             figures.append(('Heat', plots.figure_thermal(
-                t, q, Ts, out['radiation'])))
+                t, q, T_surface, out['radiation'])))
     return dict(case=case, out=out, figures=figures)
 
 
-def write_report(bundle, out_path):
+def write_report(bundle: dict, out_path: str) -> str:
     """Write the HD 1.3 HTML report of an `assess` bundle to `out_path`;
     returns `out_path`."""
     case, out = bundle['case'], bundle['out']
