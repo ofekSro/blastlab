@@ -1,0 +1,72 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     blastFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.1469317748;
+deltaT          1e-7;
+writeControl    adjustableRunTime;
+writeInterval   6.887426946e-05;
+cycleWrite      0;
+writeFormat     ascii;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  yes;
+maxCo           0.5;
+maxDeltaT       1;
+OptimisationSwitches
+{
+    fileModificationChecking timeStampMaster;
+    fileModificationSkew 1;
+}
+functions
+{
+    conserved
+    {
+        type            conservedQuantities;
+        libs            ("libblastFunctionObjects.so");
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields (rho rhoE);
+    }
+    writeTimes
+    {
+        type            writeTimeList;
+        libs            ("libblastFunctionObjects.so");
+        times (0.1469317748);
+    }
+    liveLine
+    {
+        type            sets;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   10;
+        setFormat       raw;
+        interpolationScheme cell;
+        fields (p);
+        sets
+        (
+            line
+            {
+                type            lineCell;
+                axis            x;
+                start (0.001646903821 0 0);
+                end (4.998353096 0 0);
+            }
+        );
+    }
+}
+
+// ************************************************************************* //

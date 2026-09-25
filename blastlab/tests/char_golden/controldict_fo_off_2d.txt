@@ -1,0 +1,105 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     blastFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.1175454199;
+deltaT          1e-7;
+writeControl    adjustableRunTime;
+writeInterval   4.132456168e-05;
+cycleWrite      0;
+writeFormat     binary;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  yes;
+maxCo           0.4;
+maxDeltaT       1;
+OptimisationSwitches
+{
+    fileModificationChecking timeStampMaster;
+    fileModificationSkew 1;
+}
+functions
+{
+    conserved
+    {
+        type            conservedQuantities;
+        libs            ("libblastFunctionObjects.so");
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields (rho rhoE);
+    }
+    writeTimes
+    {
+        type            writeTimeList;
+        libs            ("libblastFunctionObjects.so");
+        times (0.1175454199);
+    }
+    arrival
+    {
+        type            timeOfArrival;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+    }
+    overpressure
+    {
+        type            overpressure;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pRef            101325;
+        store           yes;
+    }
+    liveSlice
+    {
+        type            surfaces;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   5;
+        surfaceFormat   raw;
+        interpolationScheme cell;
+        fields (p);
+        surfaces
+        (
+            slice
+            {
+                type            plane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point (0 0 0);
+                    normal (0 0 1);
+                }
+                interpolate     no;
+                triangulate     no;
+            }
+        );
+    }
+    gauges
+    {
+        type            blastProbes;
+        writeControl    timeStep;
+        writeInterval   1;
+        adjustLocations yes;
+        append          yes;
+        probeLocations
+        (
+            (1 1 0)
+        );
+        fields (p U rho);
+    }
+}
+
+// ************************************************************************* //

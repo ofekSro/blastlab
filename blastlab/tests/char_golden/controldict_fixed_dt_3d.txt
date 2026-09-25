@@ -1,0 +1,121 @@
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    location    "system";
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+application     blastFoam;
+startFrom       startTime;
+startTime       0;
+stopAt          endTime;
+endTime         0.05877270994;
+deltaT          2e-06;
+writeControl    runTime;
+writeInterval   1.377485389e-05;
+cycleWrite      0;
+writeFormat     binary;
+writePrecision  6;
+writeCompression off;
+timeFormat      general;
+timePrecision   8;
+runTimeModifiable true;
+adjustTimeStep  no;
+maxCo           0.3;
+maxDeltaT       1;
+OptimisationSwitches
+{
+    fileModificationChecking timeStampMaster;
+    fileModificationSkew 1;
+}
+functions
+{
+    conserved
+    {
+        type            conservedQuantities;
+        libs            ("libblastFunctionObjects.so");
+        executeControl  writeTime;
+        writeControl    writeTime;
+        fields (rho rhoE);
+    }
+    writeTimes
+    {
+        type            writeTimeList;
+        libs            ("libblastFunctionObjects.so");
+        times (0.05877270994);
+    }
+    impulse
+    {
+        type            impulse;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+        pRef            101325;
+    }
+    pMax
+    {
+        type            fieldMinMax;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        fields (p);
+        minMax          max;
+    }
+    arrival
+    {
+        type            timeOfArrival;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+    }
+    overpressure
+    {
+        type            overpressure;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pRef            101325;
+        store           yes;
+    }
+    liveSlice
+    {
+        type            surfaces;
+        libs            ("libsampling.so");
+        writeControl    timeStep;
+        writeInterval   1;
+        surfaceFormat   raw;
+        interpolationScheme cell;
+        fields (p);
+        surfaces
+        (
+            slice
+            {
+                type            plane;
+                planeType       pointAndNormal;
+                pointAndNormalDict
+                {
+                    point (0 0.9934210526 0);
+                    normal (0 1 0);
+                }
+                interpolate     no;
+                triangulate     no;
+            }
+        );
+    }
+    gauges
+    {
+        type            blastProbes;
+        writeControl    timeStep;
+        writeInterval   1;
+        adjustLocations yes;
+        append          yes;
+        probeLocations
+        (
+            (1.8 1 1)
+        );
+        fields (p U rho);
+    }
+}
+
+// ************************************************************************* //
