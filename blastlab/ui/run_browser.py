@@ -25,8 +25,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QTableWidget,
                                QTableWidgetItem)
 
-# dims_from_case_json is re-exported: the main window reads a run's
-# dimension from its case.json before handing a resume to the controller
+# dims_from_case_json stays importable here; the main window now reads a
+# run's dimension through services/foam_runs (Phase 9)
 from ..solvers.foam.runs import (COLS, HEADS, WIDTHS,     # noqa: F401
                                  apply_sizes, build_rows, default_deleter,
                                  default_lister, default_sizer,

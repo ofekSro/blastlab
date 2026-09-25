@@ -696,11 +696,8 @@ class MainWindow(QMainWindow):
         """Resume a stopped blastFoam run. The dimension comes from the
         run's own case.json, so the run browser only has to hand over a
         path."""
+        from ..services.foam_runs import dims_from_case_json
         from ..solvers.foam import env as _env
-        try:
-            from .run_browser import dims_from_case_json
-        except ImportError:                      # lands with M4
-            from ..gui.run_browser import dims_from_case_json
         try:
             _p, unc = _env.case_paths(path)
             dim = int((dims_from_case_json(unc) or '?').rstrip('D'))

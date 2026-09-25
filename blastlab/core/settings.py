@@ -8,7 +8,8 @@ writes are best-effort.
 Lives in `core` (not the GUI package) because the foam backend reads it
 too - `solvers/foam/env.py` primes the hardware cache and the cleanup
 policy from here. `blastlab.gui.settings` re-exports this module for
-the Tk GUI until that package is removed.
+the Tk GUI, which stays as the permanent way back behind `--tk`
+(CLAUDE.md section 9).
 """
 
 import json

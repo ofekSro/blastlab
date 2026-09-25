@@ -31,6 +31,7 @@ import numpy as np
 from ...core.constants import P_AIR
 from ..hooks import Progress
 from . import reader, runner, writer
+from .common import rd_scalar
 
 _RE_TIME = re.compile(r'^Time = ([0-9.eE+-]+)s?$')
 _RE_DT = re.compile(r'^deltaT = ([0-9.eE+-]+)$')
@@ -689,12 +690,11 @@ def read_fo_fields(dpath, spec, mesh=None):
     missing/unreadable - the caller falls back to the Python per-write
     accumulators, so an FO failure degrades instead of stalling.
     `mesh` is the time dir's own structure on a dynamic-AMR run."""
-    from . import backend
     n = spec.n_cells if mesh is None else mesh.n_cells
     try:
-        peak = reader.to_grid(backend.rd_scalar(spec, dpath, 'pMax', n),
+        peak = reader.to_grid(rd_scalar(spec, dpath, 'pMax', n),
                               spec, fill=P_AIR, mesh=mesh)
-        imp = reader.to_grid(backend.rd_scalar(spec, dpath, 'impulse', n),
+        imp = reader.to_grid(rd_scalar(spec, dpath, 'impulse', n),
                              spec, fill=0.0, mesh=mesh)
     except (ValueError, OSError):
         return None, None

@@ -26,8 +26,10 @@ answer with the uncertainty hidden.
 from dataclasses import replace    # noqa: F401 - tests call assessment.replace
 
 from . import deflagration, scenario as _scenario, thermal, unconfined
-from .case import ValidationReport
 from .constants import P_AIR
+# Named at its real home, not through the core.case shim, so the layering
+# test sees this core -> models edge (Phase 9; tests/test_layering.py)
+from ..models.result import ValidationReport
 
 # Phase 2 (docs/ARCHITECTURE_REVIEW.md section 5): the case and its JSON
 # live in models/hd13_case.py. Re-exported here, underscore names
@@ -326,7 +328,7 @@ def build_vent_case(case, dim=3):
     `validate_case` would rightly refuse it.
     """
     from . import room as _room, vent as _vent
-    from .case import Case3D
+    from ..models.case import Case3D
     if not case.wants_vent:
         raise ValueError(
             'this case has no venting stage: it needs a room size, a wall '

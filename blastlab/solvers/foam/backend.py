@@ -28,6 +28,9 @@ from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
 from ..hooks import Result, RunHooks, StoppedBeforeStart
 from . import dicts, env, reader, runner, writer
+# part_counts/rd_scalar live in common.py since Phase 9 (runloop needs
+# them without importing this module); re-exported, same objects
+from .common import part_counts, rd_scalar
 from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, STOP_UNSTABLE, FoamRunLoop,
                       PeakImpulse, WslVanished, due_sparse, new_live)
@@ -179,32 +182,6 @@ def build_remap(spec, hooks):
               f'predicted structure ({spec.lmax} level(s), finest '
               f'{spec.dx:.5g} m, displayed on a '
               f'{" x ".join(str(n) for n in spec.levels.shape)} grid)')
-
-
-def part_counts(spec, dpath):
-    """Cells per part of a decomposed time, learned from each part's own
-    `C` (memoised per time: every field read needs the same numbers, and
-    a rank whose field happens to be `uniform` cannot report its own
-    count). None for an ordinary single-directory time."""
-    if not isinstance(dpath, (list, tuple)):
-        return None
-    key = tuple(dpath)
-    memo = getattr(spec, '_part_n', None)
-    if memo is None:
-        memo = spec._part_n = {}
-    if key not in memo:
-        memo[key] = [len(reader.read_vector(os.path.join(d, 'C'), None))
-                     for d in dpath]
-    return memo[key]
-
-
-def rd_scalar(spec, dpath, field, n_cells):
-    """One scalar field of a time, whole or concatenated across ranks."""
-    if isinstance(dpath, (list, tuple)):
-        return np.concatenate([
-            reader.read_scalar(os.path.join(d, field), k)
-            for d, k in zip(dpath, part_counts(spec, dpath))])
-    return reader.read_scalar(os.path.join(dpath, field), n_cells)
 
 
 def rd_vector(spec, dpath, field, n_cells):

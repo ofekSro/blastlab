@@ -1,5 +1,6 @@
 """Compatibility shim: the solver worker moved to `blastlab.solvers.worker`
-(PySide6 migration, M0) so both GUI front-ends share it. Remove with the
-Tk package."""
+(PySide6 migration, M0) so both GUI front-ends share it. The Tk GUI keeps
+importing it here; that GUI is the permanent way back behind `--tk`
+(CLAUDE.md section 9)."""
 
 from ..solvers.worker import GuiHooks, SolverWorker  # noqa: F401
