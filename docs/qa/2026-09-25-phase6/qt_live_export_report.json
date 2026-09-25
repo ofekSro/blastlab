@@ -1,0 +1,345 @@
+{
+  "shots": [
+    "01_start.png",
+    "02_setup_1d_filled.png",
+    "03_run_1d_midway.png",
+    "04_run_1d_done.png",
+    "05_setup_2d_filled.png",
+    "06_run_2d_midway.png",
+    "07_run_2d_done.png",
+    "08_results_1d_gauges.png",
+    "09_results_1d_after_exports.png",
+    "10_results_2d_gauges.png",
+    "11_results_2d_after_exports.png",
+    "12_results_no_selection.png"
+  ],
+  "runs": {
+    "1d": {
+      "wall_s": 1.3,
+      "label": "Run 1 - 1D",
+      "dim": 1,
+      "n_gauges": 2
+    },
+    "2d": {
+      "wall_s": 24.1,
+      "label": "Run 2 - 2D",
+      "dim": 2,
+      "n_gauges": 1
+    }
+  },
+  "exports": {
+    "1d": {
+      "displayed_summary_table": [
+        [
+          "G1  r = 0.502 m",
+          "3412.8",
+          "0.152",
+          "0.165",
+          "0.078",
+          "138.12",
+          "31.19",
+          "yes"
+        ],
+        [
+          "G2  r = 0.998 m",
+          "934.0",
+          "0.485",
+          "0.511",
+          "0.692",
+          "137.36",
+          "123.43",
+          "yes"
+        ]
+      ],
+      "buttons": {
+        "profile": {
+          "enabled": true,
+          "tooltip": "Save the final state for a later stage to start from.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save profile",
+              "filters": "All files (*.*)",
+              "start": "blast_profile.txt",
+              "default_suffix": ".txt"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\profile\\blast_profile.txt",
+          "files_written": [
+            "blast_profile.txt"
+          ]
+        },
+        "gif": {
+          "enabled": false,
+          "tooltip": "This result has no recorded frames - tick \"Record replay frames\" before the run."
+        },
+        "vtk": {
+          "enabled": false,
+          "tooltip": "Only a blastFoam run whose case directory still exists can be written as VTK."
+        },
+        "summary": {
+          "enabled": true,
+          "tooltip": "Per-gauge peak, arrival, phase and impulse as CSV.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save gauge summary CSV",
+              "filters": "CSV (*.csv)",
+              "start": "gauges_1d_summary.csv",
+              "default_suffix": ".csv"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\summary\\gauges_1d_summary.csv",
+          "files_written": [
+            "gauges_1d_summary.csv"
+          ]
+        },
+        "tsv": {
+          "enabled": true,
+          "tooltip": "The raw gauge time histories.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save gauges TSV",
+              "filters": "Text (*.txt)",
+              "start": "gauges_1d.txt",
+              "default_suffix": ".txt"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\tsv\\gauges_1d.txt",
+          "files_written": [
+            "gauges_1d.txt"
+          ]
+        },
+        "fieldcsv": {
+          "enabled": true,
+          "tooltip": "Every field map as a long-format CSV, one file per field.",
+          "dialog_calls": [
+            {
+              "kind": "pick_dir",
+              "title": "Save field CSVs into",
+              "start": ""
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\fieldcsv",
+          "files_written": [
+            "t0p257ms_p.csv",
+            "t0p257ms_rho.csv",
+            "t0p856ms_p.csv",
+            "t0p856ms_rho.csv",
+            "t1p828ms_final_p.csv",
+            "t1p828ms_final_rho.csv"
+          ]
+        },
+        "report": {
+          "enabled": true,
+          "tooltip": "One self-contained HTML file: the FULL snapshot grid, the gauge table and the case, not just the panel on screen.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save HTML report",
+              "filters": "HTML (*.html)",
+              "start": "blast_1d_report.html",
+              "default_suffix": ".html"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\report\\blast_1d_report.html",
+          "files_written": [
+            "blast_1d_report.html"
+          ]
+        },
+        "pngs": {
+          "enabled": true,
+          "tooltip": "The FULL multi-panel snapshot grid as PNGs, not just the single panel on screen.",
+          "dialog_calls": [
+            {
+              "kind": "pick_dir",
+              "title": "Save PNGs into",
+              "start": ""
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\pngs",
+          "files_written": [
+            "blast_1d_gauges.png",
+            "blast_1d_results.png"
+          ]
+        }
+      }
+    },
+    "2d": {
+      "displayed_summary_table": [
+        [
+          "G1 (0.300, 0.800) -> cell (0.305, 0.802) m",
+          "7759.4",
+          "0.211",
+          "0.237",
+          "0.255",
+          "619.31",
+          "619.32",
+          "no"
+        ]
+      ],
+      "buttons": {
+        "profile": {
+          "enabled": false,
+          "tooltip": "Only axisymmetric 2D fields can be remapped into 3D."
+        },
+        "gif": {
+          "enabled": true,
+          "tooltip": "Write the recorded frames as a video, using the colour scale set in the Animation view.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save animation",
+              "filters": "MP4 video (*.mp4);;Animated GIF (*.gif)",
+              "start": "blast_2d_animation.mp4",
+              "default_suffix": ".mp4"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\gif\\blast_2d_animation.mp4",
+          "files_written": [
+            "blast_2d_animation.mp4"
+          ]
+        },
+        "vtk": {
+          "enabled": false,
+          "tooltip": "Only a blastFoam run whose case directory still exists can be written as VTK."
+        },
+        "summary": {
+          "enabled": true,
+          "tooltip": "Per-gauge peak, arrival, phase and impulse as CSV.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save gauge summary CSV",
+              "filters": "CSV (*.csv)",
+              "start": "gauges_2d_summary.csv",
+              "default_suffix": ".csv"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\summary\\gauges_2d_summary.csv",
+          "files_written": [
+            "gauges_2d_summary.csv"
+          ]
+        },
+        "tsv": {
+          "enabled": true,
+          "tooltip": "The raw gauge time histories.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save gauges TSV",
+              "filters": "Text (*.txt)",
+              "start": "gauges_2d.txt",
+              "default_suffix": ".txt"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\tsv\\gauges_2d.txt",
+          "files_written": [
+            "gauges_2d.txt"
+          ]
+        },
+        "fieldcsv": {
+          "enabled": true,
+          "tooltip": "Every field map as a long-format CSV, one file per field.",
+          "dialog_calls": [
+            {
+              "kind": "pick_dir",
+              "title": "Save field CSVs into",
+              "start": ""
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\fieldcsv",
+          "files_written": [
+            "impulse.csv",
+            "p_peak.csv",
+            "t0p110ms_p.csv",
+            "t0p110ms_rho.csv",
+            "t0p110ms_speed.csv",
+            "t0p276ms_p.csv",
+            "t0p276ms_rho.csv",
+            "t0p276ms_speed.csv",
+            "t0p466ms_final_p.csv",
+            "t0p466ms_final_rho.csv",
+            "t0p466ms_final_speed.csv"
+          ]
+        },
+        "report": {
+          "enabled": true,
+          "tooltip": "One self-contained HTML file: the FULL snapshot grid, the gauge table and the case, not just the panel on screen.",
+          "dialog_calls": [
+            {
+              "kind": "save_file",
+              "title": "Save HTML report",
+              "filters": "HTML (*.html)",
+              "start": "blast_2d_report.html",
+              "default_suffix": ".html"
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\report\\blast_2d_report.html",
+          "files_written": [
+            "blast_2d_report.html"
+          ]
+        },
+        "pngs": {
+          "enabled": true,
+          "tooltip": "The FULL multi-panel snapshot grid as PNGs, not just the single panel on screen.",
+          "dialog_calls": [
+            {
+              "kind": "pick_dir",
+              "title": "Save PNGs into",
+              "start": ""
+            }
+          ],
+          "returned": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\pngs",
+          "files_written": [
+            "blast_2d_density.png",
+            "blast_2d_gauges.png",
+            "blast_2d_impulse.png",
+            "blast_2d_peak_overpressure.png",
+            "blast_2d_pressure.png"
+          ]
+        }
+      }
+    },
+    "opened_by_os_startfile": [
+      "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\1d\\report\\blast_1d_report.html",
+      "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-25-phase6\\exports\\qt\\2d\\report\\blast_2d_report.html"
+    ],
+    "no_selection_buttons": {
+      "profile": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "gif": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "vtk": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "summary": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "tsv": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "fieldcsv": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "report": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      },
+      "pngs": {
+        "enabled": false,
+        "tooltip": "Select a result first."
+      }
+    }
+  },
+  "_log": []
+}
