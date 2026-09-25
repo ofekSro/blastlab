@@ -377,3 +377,20 @@ Source: the arch-refactorer's phase 6 report. Nothing changed.
    curve (hemispherical, 2W) when the charge sits on the ground?
 2. **The report footnote says "see ROADMAP N3", and no ROADMAP file exists.** It is the
    same dead reference as in the `Afterburn` docstring (phase 1, item 2).
+
+---
+
+## 2026-09-25 · `/refactor` phase 7 (`services/hd13.py`, `61ab709`)
+
+Source: the arch-refactorer's phase 7 report. Nothing changed.
+
+1. **"Blast negligible: False" at Mach 0.0917.** On the starter case the CLI prints
+   "unconfined expansion Mach 0.0917, blast negligible: False", and the report says
+   "Blast negligible: no". A Mach number that low looks like it should count as
+   negligible. Check the threshold and the flag logic in the unconfined model.
+2. **The whole burn is flagged outside the calibration window.** The confined peak is
+   0.102 MPa (~1 kPa overpressure) against the 5.53 MPa closed-vessel limit that
+   validation quotes. That is plausible for a well-vented case, but the report marks
+   "the whole burn" as outside the calibration window. Is the window defined in
+   pressure terms that a vented case can never reach? (This connects to phase 0 item 3:
+   the starter case is a weak check.)
