@@ -14,12 +14,15 @@ The validation report is printed before anything is computed, errors and
 warnings first, because for this model the warnings are the product. A
 peak pressure from a burn law measured two decades away is not a result
 until the reader knows that is what it is.
+
+The assessment itself (validate, run, figures, report) is
+`services/hd13.py` (docs/ARCHITECTURE_REVIEW.md section 5, Phase 7);
+this module is the command-line wrapper around it: it prints, and it
+turns a refused case into `SystemExit`.
 """
 
-import os
-
 from ..core import assessment
-from . import hd13, plots
+from ..services import hd13 as hd13_service
 
 
 def write_starter_case(path):
@@ -65,37 +68,11 @@ def run_and_report(case_path, out_path=None, quiet=False):
     if not rep.ok:
         raise SystemExit('refusing to run: ' + '; '.join(rep.errors))
 
-    out = assessment.run(case)
-    figures = []
-    if out['confined'] is not None:
-        figures.append(('Chamber', plots.figure_deflagration(out['confined'])))
-    if out['unconfined'] is not None:
-        figures.append(('In the open',
-                        plots.figure_unconfined(out['unconfined'])))
-    if out['sdof'] is not None:
-        figures.append(('Structural response',
-                        plots.figure_sdof_response(out['sdof'],
-                                                   out['component'])))
-    if out['thermal'] is not None or out['radiation']:
-        t = out['confined']['t'] if out['confined'] else []
-        q = out['thermal']['q'] if out['thermal'] else []
-        Ts = out['thermal']['T_surface'] if out['thermal'] else None
-        if len(t):
-            figures.append(('Heat', plots.figure_thermal(
-                t, q, Ts, out['radiation'])))
-
+    bundle = hd13_service.assess(case, rep)
+    out = bundle['out']
     if out_path is None:
-        base = os.path.splitext(case_path)[0]
-        out_path = base + '_hd13.html'
-    hd13.save_hd13_report(
-        out_path, prop=out['prop'], confined=out['confined'],
-        unconfined=out['unconfined'], sdof=out['sdof'],
-        component=out['component'], thermal=out['thermal'],
-        radiation=out['radiation'], figures=figures,
-        sensitivity=out['sensitivity'],
-        sensitivity_note=out['sensitivity_note'],
-        verdict=out['verdict'], qd=out['qd'],
-        title=case.name or None)
+        out_path = hd13_service.default_report_path(case_path)
+    hd13_service.write_report(bundle, out_path)
 
     if not quiet:
         c, u = out['confined'], out['unconfined']

@@ -539,7 +539,7 @@ class MainWindow(QMainWindow):
         that would add every one of those failure modes to buy nothing.
         """
         from ..core.assessment import run as run_hd13, validate as val_hd13
-        from ..output.cli_hd13 import run_and_report
+        from ..services import hd13 as hd13_service
         rep = val_hd13(case)
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
@@ -548,12 +548,17 @@ class MainWindow(QMainWindow):
             or 'hd13_report.html'
         try:
             run_hd13(case)                     # fail before touching disk
+            # The temp case file is kept, and the report is made from the
+            # case read back from it, exactly as before Phase 7 of
+            # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
+            # open question Q4 there.
             import tempfile, os as _os
             case_path = _os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_'),
                                       'case.json')
-            from ..core.assessment import save_case
+            from ..core.assessment import load_case, save_case
             save_case(case, case_path)
-            out = run_and_report(case_path, path, quiet=True)
+            out = hd13_service.write_report(
+                hd13_service.assess(load_case(case_path)), path)
         except Exception as exc:               # noqa: BLE001 - shown to the user
             self.show_error('HD 1.3 assessment', str(exc))
             return
