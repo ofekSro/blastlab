@@ -1,0 +1,8 @@
+{
+  "code": 1,
+  "files": [
+    "bad.json"
+  ],
+  "stderr": "refusing to run: Charge mass must be positive; End time must be positive\n",
+  "stdout": "\nHD 1.3 assessment: magazine, 5 kg double-base, vented\n  [ERROR] Charge mass must be positive\n  [ERROR] End time must be positive\n  [WARNING] Not calibrated for this material: a, n, web, p_extinction, p_valid_min, p_valid_max, r_atm, secondary_heat. These are class-typical literature values. A closed-vessel record fixes the burn law, but can never fix the extinction limit, the atmospheric rate or the secondary heat.\n  [WARNING] Fireball radiation uses correlations fitted to hydrocarbon and BLEVE data; nothing equivalent is published for propellant stacks.\n  [note] A structural response will be computed at the AMBIENT resistance. Thermal weakening is reported separately, for a later load case - steel does not heat in the time the pressure pulse lasts.\n"
+}
