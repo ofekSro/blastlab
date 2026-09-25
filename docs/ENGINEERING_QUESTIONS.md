@@ -351,3 +351,12 @@ Source: the arch-refactorer's phase 5a report. The Qt form's behaviour is pinned
 4. **HD1.3 form: a blank Samples or Cohorts box is an error** (`'Samples' is not an
    integer: ''`), while the code's `or 1000` / `or 1` suggests a blank was meant to fall
    back to the default.
+5. **A negative charge in 2D breaks the live preview** (found by the post-5a QA,
+   `docs/qa/2026-09-25-phase5a/QA_REPORT.md` section 4). `charge_radius()` of a negative
+   mass is complex, and `core/refine.py:115` `effective_dx()` then raises
+   `TypeError: '>' not supported between 'float' and 'complex'` from
+   `ui/setup_panel.py:264` `update_preview()`. The event loop swallows it: no crash, just
+   a stale preview. Validation still refuses the run. This is pre-existing code, not
+   phase 5a; the baseline tested a negative charge in 1D only. It is a bug rather than an
+   engineering question: a guard for mass <= 0 in the preview path (or in
+   `charge_radius`) is a behaviour change, for TODO.md.
