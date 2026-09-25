@@ -33,7 +33,8 @@ import char_common as cc
 
 import customtkinter as ctk                                  # noqa: E402
 
-from blastlab.core.case import Case1D, Case2D, Case3D, case_to_dict  # noqa
+from blastlab.core.case import (Case1D, Case2D, Case3D,     # noqa: E402
+                                case_to_dict)
 from blastlab.gui.forms import CaseForm                      # noqa: E402
 
 MODES = ('native', 'blastfoam')
