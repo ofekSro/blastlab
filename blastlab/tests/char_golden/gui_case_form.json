@@ -13,7 +13,7 @@
       "det_radii": null,
       "dim": 1,
       "eos": "JWL",
-      "gauge_file": "",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.0,
@@ -33,14 +33,24 @@
     }
   },
   "dim1_blastfoam/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'garbage'",
+    "bad": [
+      "cell",
+      "cfl",
+      "charge",
+      "n_snapshots",
+      "radius_m",
+      "t_end"
+    ],
+    "error": "'radius' is not a number: ''\n'charge' is not a number: 'abc'\n'cell size' must be a finite number: 'nan'\n'cfl' is not a number: '1,5'\n'snapshots' must be a whole number: '2.7'\n'end time' must be a finite number: 'inf'",
     "exception": "ValueError"
   },
   "dim1_blastfoam/bad2": {
-    "bad": [],
-    "error": "list index out of range",
-    "exception": "IndexError"
+    "bad": [
+      "n_snapshots",
+      "radius_m"
+    ],
+    "error": "'radius' must be a finite number: '1e400'\n'snapshots' is not an integer: 'x'",
+    "exception": "ValueError"
   },
   "dim1_blastfoam/fresh": {
     "bad": [],
@@ -116,7 +126,7 @@
       "material": "TNT",
       "n_procs": 0,
       "n_snapshots": 5,
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "blast_profile.txt",
       "radius_m": 10.0,
@@ -150,7 +160,7 @@
       "cfl": "0.4",
       "charge": "0.5",
       "eos": "JWL",
-      "gauge_file": "None",
+      "gauge_file": "",
       "material": "PETN",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
@@ -172,8 +182,8 @@
       "det_delays": null,
       "det_radii": null,
       "dim": 1,
-      "eos": "JWL",
-      "gauge_file": "None",
+      "eos": "idealGas",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.5
@@ -181,7 +191,7 @@
       "material": "PETN",
       "n_procs": 0,
       "n_snapshots": 3,
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "prof.txt",
       "radius_m": 3.0,
@@ -221,8 +231,8 @@
       "det_delays": null,
       "det_radii": null,
       "dim": 1,
-      "eos": "JWL",
-      "gauge_file": "",
+      "eos": "idealGas",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.0,
@@ -231,7 +241,7 @@
       "material": "PETN",
       "n_procs": 0,
       "n_snapshots": 7,
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "p.txt",
       "radius_m": 12.5,
@@ -242,14 +252,26 @@
     }
   },
   "dim1_native/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'garbage'",
+    "bad": [
+      "cell",
+      "cfl",
+      "charge",
+      "n_snapshots",
+      "order",
+      "radius_m",
+      "t_end"
+    ],
+    "error": "'radius' is not a number: ''\n'charge' is not a number: 'abc'\n'cell size' must be a finite number: 'nan'\n'cfl' is not a number: '1,5'\n'order' is not a reconstruction order: 'garbage'\n'snapshots' must be a whole number: '2.7'\n'end time' must be a finite number: 'inf'",
     "exception": "ValueError"
   },
   "dim1_native/bad2": {
-    "bad": [],
-    "error": "list index out of range",
-    "exception": "IndexError"
+    "bad": [
+      "n_snapshots",
+      "order",
+      "radius_m"
+    ],
+    "error": "'radius' must be a finite number: '1e400'\n'order' is not a reconstruction order: ''\n'snapshots' is not an integer: 'x'",
+    "exception": "ValueError"
   },
   "dim1_native/fresh": {
     "bad": [],
@@ -359,7 +381,7 @@
       "cfl": "0.4",
       "charge": "0.5",
       "eos": "JWL",
-      "gauge_file": "None",
+      "gauge_file": "",
       "material": "PETN",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
@@ -382,7 +404,7 @@
       "det_radii": null,
       "dim": 1,
       "eos": "JWL",
-      "gauge_file": "None",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.5
@@ -431,7 +453,7 @@
       "det_radii": null,
       "dim": 1,
       "eos": "JWL",
-      "gauge_file": "",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.0,
@@ -499,8 +521,8 @@
       "det_delays": null,
       "det_radii": null,
       "dim": 1,
-      "eos": "JWL",
-      "gauge_file": "",
+      "eos": "idealGas",
+      "gauge_file": null,
       "gauge_radii": [
         0.5,
         1.0,
@@ -509,7 +531,7 @@
       "material": "PETN",
       "n_procs": 0,
       "n_snapshots": 7,
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "p.txt",
       "radius_m": 12.5,
@@ -561,7 +583,7 @@
       "det_radii": null,
       "dim": 2,
       "eos": "JWL",
-      "gauge_file": "",
+      "gauge_file": null,
       "gauges": [
         [
           1.0,
@@ -674,8 +696,21 @@
     "exception": "ValueError"
   },
   "dim2_blastfoam/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'zz'",
+    "bad": [
+      "Lx",
+      "Ly",
+      "anim_clim_max",
+      "anim_clim_min",
+      "cell",
+      "cfl",
+      "charge",
+      "cx",
+      "cy",
+      "n_procs",
+      "n_snapshots",
+      "t_end"
+    ],
+    "error": "'Lx' is not a number: 'x'\n'Ly' is not a number: ''\n'cell size' is not a number: '0,025'\n'charge' must be a finite number: 'nan'\n'cfl' must be a finite number: 'inf'\n'snapshots' must be a whole number: '1.5'\n'end time' is not a number: ''\n'video colour min' is not a number: 'lo'\n'video colour max' is not a number: ''\n'MPI ranks' is not an integer: 'bad'\n'burst x' is not a number: 'a'\n'burst y' is not a number: 'b'",
     "exception": "ValueError"
   },
   "dim2_blastfoam/fresh": {
@@ -942,7 +977,7 @@
       ],
       "det_radii": null,
       "dim": 2,
-      "eos": "JWL",
+      "eos": "idealGas",
       "gauge_file": "g.txt",
       "gauges": [
         [
@@ -964,7 +999,7 @@
           1.0
         ]
       ],
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "o.npz",
       "profile_file_in": null,
@@ -1090,7 +1125,7 @@
       "cx": "0",
       "cy": "2",
       "eos": "idealGas",
-      "gauge_file": "None",
+      "gauge_file": "",
       "geometry": "axisymmetric",
       "init_mode": "charge",
       "material": "TNT",
@@ -1145,7 +1180,7 @@
       "det_radii": null,
       "dim": 2,
       "eos": "idealGas",
-      "gauge_file": "None",
+      "gauge_file": null,
       "gauges": [],
       "geometry": "axisymmetric",
       "init_mode": "charge",
@@ -1445,8 +1480,8 @@
       ],
       "det_radii": null,
       "dim": 2,
-      "eos": "JWL",
-      "gauge_file": "",
+      "eos": "idealGas",
+      "gauge_file": null,
       "gauges": [
         [
           1.0,
@@ -1471,7 +1506,7 @@
           1.0
         ]
       ],
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "out.npz",
       "profile_file_in": null,
@@ -1621,8 +1656,21 @@
     }
   },
   "dim2_native/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'zz'",
+    "bad": [
+      "Lx",
+      "Ly",
+      "anim_clim_max",
+      "anim_clim_min",
+      "cell",
+      "cfl",
+      "charge",
+      "cx",
+      "cy",
+      "n_snapshots",
+      "order",
+      "t_end"
+    ],
+    "error": "'Lx' is not a number: 'x'\n'Ly' is not a number: ''\n'cell size' is not a number: '0,025'\n'charge' must be a finite number: 'nan'\n'order' is not a reconstruction order: 'zz'\n'cfl' must be a finite number: 'inf'\n'snapshots' must be a whole number: '1.5'\n'end time' is not a number: ''\n'video colour min' is not a number: 'lo'\n'video colour max' is not a number: ''\n'burst x' is not a number: 'a'\n'burst y' is not a number: 'b'",
     "exception": "ValueError"
   },
   "dim2_native/fresh": {
@@ -2045,7 +2093,7 @@
       "cx": "0",
       "cy": "2",
       "eos": "idealGas",
-      "gauge_file": "None",
+      "gauge_file": "",
       "geometry": "axisymmetric",
       "init_mode": "charge",
       "material": "TNT",
@@ -2100,7 +2148,7 @@
       "det_radii": null,
       "dim": 2,
       "eos": "idealGas",
-      "gauge_file": "None",
+      "gauge_file": null,
       "gauges": [],
       "geometry": "axisymmetric",
       "init_mode": "charge",
@@ -2401,7 +2449,7 @@
       "det_radii": null,
       "dim": 2,
       "eos": "JWL",
-      "gauge_file": "",
+      "gauge_file": null,
       "gauges": [
         [
           1.0,
@@ -2580,8 +2628,8 @@
       ],
       "det_radii": null,
       "dim": 2,
-      "eos": "JWL",
-      "gauge_file": "",
+      "eos": "idealGas",
+      "gauge_file": null,
       "gauges": [
         [
           1.0,
@@ -2606,7 +2654,7 @@
           1.0
         ]
       ],
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file": "out.npz",
       "profile_file_in": null,
@@ -2720,8 +2768,13 @@
     }
   },
   "dim3_blastfoam/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'no'",
+    "bad": [
+      "Lz",
+      "amr_max_cells",
+      "cz",
+      "slice_pos"
+    ],
+    "error": "'AMR max cells' must be a whole number: '1.5'\n'Lz' is not a number: 'x'\n'burst z' is not a number: ''\n'slice position' is not a number: 'mid'",
     "exception": "ValueError"
   },
   "dim3_blastfoam/fresh": {
@@ -3222,7 +3275,7 @@
       ],
       "det_radii": null,
       "dim": 3,
-      "eos": "JWL",
+      "eos": "idealGas",
       "fixed_dt": 0.0,
       "gauge_file": "g3.txt",
       "gauges": [
@@ -3247,7 +3300,7 @@
           0.6
         ]
       ],
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file_in": null,
       "record_frames": 150,
@@ -3275,8 +3328,13 @@
     }
   },
   "dim3_native/bad": {
-    "bad": [],
-    "error": "invalid literal for int() with base 10: 'no'",
+    "bad": [
+      "Lz",
+      "cz",
+      "order",
+      "slice_pos"
+    ],
+    "error": "'order' is not a reconstruction order: 'no'\n'Lz' is not a number: 'x'\n'burst z' is not a number: ''\n'slice position' is not a number: 'mid'",
     "exception": "ValueError"
   },
   "dim3_native/fresh": {
@@ -3978,7 +4036,7 @@
       ],
       "det_radii": null,
       "dim": 3,
-      "eos": "JWL",
+      "eos": "idealGas",
       "fixed_dt": 0.0,
       "gauge_file": "g3.txt",
       "gauges": [
@@ -4003,7 +4061,7 @@
           0.6
         ]
       ],
-      "order": 2,
+      "order": 1,
       "probe_adjust": true,
       "profile_file_in": null,
       "record_frames": 150,

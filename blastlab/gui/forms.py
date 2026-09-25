@@ -6,16 +6,15 @@ Cards on a two-column grid; the SetupPanel pairs the scrollable form
 column with a live model-preview card and a validation status card.
 """
 
-import math
 import tkinter as tk
 from tkinter import filedialog, ttk
 
 import customtkinter as ctk
 
-from ..core.case import Case1D, Case2D, Case3D
-from ..core.bc import BC_KINDS, normalize_bc, normalize_bcs
+from ..core.bc import BC_KINDS
 from ..core.case import TRIGGER_ACTIONS
 from ..core.constants import ANIM_SCALE_LABELS, anim_scale_from_label
+from ..models import fields
 from ..solvers.foam.materials import MATERIAL_NAMES
 from . import mode as mode_mod
 from . import theme
@@ -71,46 +70,21 @@ def _combo(frame, var, values, width=176):
                            dropdown_font=theme.F_BODY)
 
 
+# The parsers live in models/fields.py (docs/ARCHITECTURE_REVIEW.md
+# section 5, Phase 5b); these take a tk variable, as they always did.
 def _trig(var):
-    """The trigger-gauge box as a 1-based gauge number, or None when it
-    is blank/zero. A non-numeric entry is treated as off here and caught
-    by validate_case, which reports it with the other field errors."""
-    raw = str(var.get()).strip()
-    if not raw:
-        return None
-    try:
-        n = int(float(raw))
-    except ValueError:
-        return None
-    return n or None
+    """`models.fields.parse_trigger` of a tk variable."""
+    return fields.parse_trigger(var.get())
 
 
 def _f(var, name):
-    """Parse a float StringVar with a helpful error.
-
-    'nan'/'inf'/'1e400' parse as floats but are not usable geometry: they
-    used to reach validation and produce messages like "r_exp = inf m
-    pokes through the boundary" instead of being refused."""
-    try:
-        val = float(var.get())
-    except ValueError:
-        raise ValueError(f"'{name}' is not a number: {var.get()!r}")
-    if not math.isfinite(val):
-        raise ValueError(f"'{name}' must be a finite number: {var.get()!r}")
-    return val
+    """`models.fields.parse_float` of a tk variable."""
+    return fields.parse_float(var.get(), name)
 
 
 def _i(var, name):
-    """Parse an integer StringVar. A fractional entry is refused rather
-    than silently truncated (n_snapshots = 2.7 used to become 2)."""
-    raw = var.get()
-    try:
-        val = float(raw)
-    except ValueError:
-        raise ValueError(f"'{name}' is not an integer: {raw!r}")
-    if not math.isfinite(val) or val != int(val):
-        raise ValueError(f"'{name}' must be a whole number: {raw!r}")
-    return int(val)
+    """`models.fields.parse_int` of a tk variable."""
+    return fields.parse_int(var.get(), name)
 
 
 class _PointList(ctk.CTkFrame):
@@ -286,17 +260,6 @@ class CaseForm(ctk.CTkFrame):
         var.trace_add('write', lambda *a: self._on_change())
         self.v[name] = var
         return var
-
-    def _set_trigger(self, case):
-        """T51 trigger rows out of a case (2D/3D - 1D has no trigger
-        card since T63)."""
-        n = getattr(case, 'trigger_gauge', None)
-        self.v['trigger_gauge'].set('' if n in (None, 0) else str(int(n)))
-        self.v['trigger_action'].set(
-            getattr(case, 'trigger_action', 'terminate') or 'terminate')
-        if 'trigger_file' in self.v:
-            self.v['trigger_file'].set(
-                getattr(case, 'trigger_file', None) or '')
 
     def _bool(self, name, value=True):
         var = tk.BooleanVar(value=value)
@@ -795,216 +758,43 @@ class CaseForm(ctk.CTkFrame):
         Fields hidden by the solver mode are STRIPPED, not read: the case
         carries that solver's defaults for them (what you see is what
         runs and saves), and a stale bad value in a hidden box can never
-        block a run. The form keeps the values for a later switch back."""
-        v = self.v
-        errs, bad = [], []
-        foam = self._mode == 'blastfoam'
+        block a run. The form keeps the values for a later switch back.
 
-        def _F(name, label):
-            try:
-                return _f(v[name], label)
-            except ValueError as exc:
-                errs.append(str(exc))
-                bad.append(name)
-                return 0.0
+        The mapping itself is `models.fields.case_from_fields`, shared
+        with the Qt form (docs/ARCHITECTURE_REVIEW.md section 5, Phase
+        5b)."""
+        case, errs, bad = fields.case_from_fields(
+            self.dim, self.field_values(), self._mode)
+        self.mark_fields(bad)
+        if errs:
+            raise ValueError('\n'.join(errs))
+        return case
 
-        def _I(name, label):
-            try:
-                return _i(v[name], label)
-            except ValueError as exc:
-                errs.append(str(exc))
-                bad.append(name)
-                return 0
+    def _point_lists(self):
+        """The form's point lists under their field names."""
+        return {name: getattr(self, name)
+                for name in ('gauges', 'obstacles', 'zones', 'det_pts',
+                             'extra_charges')
+                if hasattr(self, name)}
 
-        def _done(case):
-            self.mark_fields(bad)
-            if errs:
-                raise ValueError('\n'.join(errs))
-            return case
-
-        if self.dim == 1:
-            return _done(Case1D(
-                radius_m=_F('radius_m', 'radius'),
-                charge_kg=_F('charge', 'charge'),
-                cell_size_m=_F('cell', 'cell size'),
-                eos=v['eos'].get(), cfl=_F('cfl', 'cfl'),
-                order=int(str(v['order'].get()).split()[0] or 1),
-                bc_outer=v['bc_outer'].get(),
-                n_snapshots=_I('n_snapshots', 'snapshots'),
-                t_end=_F('t_end', 'end time'),
-                gauge_radii=[g[0] for g in self.gauges.get()],
-                gauge_file=v['gauge_file'].get(),
-                profile_file=v['profile_out'].get() or None,
-                solver=self._mode,
-                material=v['material'].get() if foam else 'TNT',
-                activation=v['activation'].get() if foam else 'linear',
-                afterburn=v['afterburn'].get() if foam else 'none'))
-
-        bcs = {side: v[f'bc_{side}'].get()
-               for side in (['x_lo', 'x_hi', 'y_lo', 'y_hi'] if self.dim == 2
-                            else ['x_lo', 'x_hi', 'y_lo', 'y_hi',
-                                  'z_lo', 'z_hi'])}
-        amr_levels = _I('amr_levels', 'AMR levels') if foam else 0
-        amr_on = foam and amr_levels > 0
-        # the two range boxes are read only while the scale is manual, so
-        # a stale value in a hidden box cannot block a run
-        anim_scale = anim_scale_from_label(v['anim_scale'].get())
-        common = dict(
-            Lx=_F('Lx', 'Lx'), Ly=_F('Ly', 'Ly'),
-            cell_size_m=_F('cell', 'cell size'),
-            init_mode=v['init_mode'].get(),
-            charge=_F('charge', 'charge'),
-            profile_file_in=v['profile_in'].get() or None,
-            eos=v['eos'].get(), bcs=bcs,
-            order=int(str(v['order'].get()).split()[0] or 1),
-            obstacles=self.obstacles.get(), cfl=_F('cfl', 'cfl'),
-            n_snapshots=_I('n_snapshots', 'snapshots'),
-            gauges=self.gauges.get(),
-            gauge_file=v['gauge_file'].get(),
-            t_end=_F('t_end', 'end time'),
-            trigger_gauge=_trig(v['trigger_gauge']),
-            trigger_action=v['trigger_action'].get(),
-            trigger_file=(v['trigger_file'].get() or None
-                          if self.dim < 3 else None),
-            anim_file=v['anim_file'].get() or None,
-            anim_mesh=bool(v['anim_mesh'].get()),
-            anim_scale=anim_scale,
-            anim_clim=((_F('anim_clim_min', 'video colour min'),
-                        _F('anim_clim_max', 'video colour max'))
-                       if anim_scale == 'manual' else None),
-            record_frames=150 if v['record'].get() else 0,
-            solver=self._mode,
-            material=v['material'].get() if foam else 'TNT',
-            activation=v['activation'].get() if foam else 'linear',
-            afterburn=v['afterburn'].get() if foam else 'none',
-            n_procs=_I('n_procs', 'MPI ranks') if foam else 0,
-            det_points=(self.det_pts.get() or None) if foam else None,
-            refine_zones=([(*z[:-1], int(round(z[-1])))
-                           for z in self.zones.get()] if foam else []),
-            charge_refine=(v['charge_refine'].get()
-                           if foam and not amr_on else 'global'),
-            amr_levels=amr_levels,
-            amr_estimator=(v['amr_estimator'].get() if amr_on
-                           else 'Lohner'),
-            amr_refine=(_F('amr_refine', 'AMR refine threshold')
-                        if amr_on else 0.4),
-            amr_unrefine=(_F('amr_unrefine', 'AMR unrefine threshold')
-                          if amr_on else 0.2),
-            amr_interval=(_I('amr_interval', 'AMR refine interval')
-                          if amr_on else 2),
-            amr_buffer=(_I('amr_buffer', 'AMR buffer layers')
-                        if amr_on else 2),
-            amr_max_cells=(_I('amr_max_cells', 'AMR max cells')
-                           if amr_on else 0),
-            amr_display_level=(
-                None if not amr_on
-                or v['amr_display_level'].get().strip() in ('', 'auto')
-                else _I('amr_display_level', 'AMR display level')),
-        )
-        if self.dim == 2:
-            return _done(Case2D(geometry=v['geometry'].get(),
-                                center=(_F('cx', 'burst x'),
-                                        _F('cy', 'burst y')),
-                                profile_file=v['profile_out'].get() or None,
-                                **common))
-        slice_raw = v['slice_pos'].get().strip()
-        return _done(Case3D(Lz=_F('Lz', 'Lz'),
-                            center=(_F('cx', 'burst x'),
-                                    _F('cy', 'burst y'),
-                                    _F('cz', 'burst z')),
-                            charge_resolution=(v['charge_res'].get()
-                                               if not foam else 'resolve'),
-                            slice_axis=v['slice_axis'].get(),
-                            slice_pos=(_F('slice_pos', 'slice position')
-                                       if slice_raw else None),
-                            charges=((self.extra_charges.get() or None)
-                                     if foam else None),
-                            **common))
+    def field_values(self):
+        """Every field's current value, point lists included, as the
+        plain dict `models.fields.case_from_fields` reads."""
+        values = {k: var.get() for k, var in self.v.items()}
+        values.update({k: pl.get() for k, pl in self._point_lists().items()})
+        return values
 
     def set_case(self, case):
-        v = self.v
-        if self.dim == 1:
-            v['radius_m'].set(f'{case.radius_m:g}')
-            v['charge'].set(f'{case.charge_kg:g}')
-            v['material'].set(getattr(case, 'material', 'TNT'))
-            v['activation'].set(getattr(case, 'activation', 'linear'))
-            v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
-            v['cell'].set(f'{case.cell_size_m:g}')
-            v['eos'].set(case.eos)
-            v['order'].set('2 (MUSCL)' if int(getattr(
-                case, 'order', 1) or 1) == 2 else '1 (Godunov)')
-            v['cfl'].set(f'{case.cfl:g}')
-            v['bc_outer'].set(normalize_bc(
-                getattr(case, 'bc_outer', 'terminate')))
-            v['n_snapshots'].set(str(case.n_snapshots))
-            v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
-            self.gauges.set([(g,) for g in case.gauge_radii])
-            v['gauge_file'].set(case.gauge_file)
-            v['profile_out'].set(case.profile_file or '')
-            return
-        if self.dim == 2:
-            v['geometry'].set(case.geometry)
-        v['Lx'].set(f'{case.Lx:g}')
-        v['Ly'].set(f'{case.Ly:g}')
-        if self.dim == 3:
-            v['Lz'].set(f'{case.Lz:g}')
-        v['cell'].set(f'{case.cell_size_m:g}')
-        v['init_mode'].set(case.init_mode)
-        v['charge'].set(f'{case.charge:g}' if case.charge is not None else '')
-        v['t_end'].set(f'{getattr(case, "t_end", 0.0):g}')
-        if self.dim == 3:
-            v['charge_res'].set(getattr(case, 'charge_resolution', 'resolve'))
-            v['slice_axis'].set(getattr(case, 'slice_axis', 'y'))
-            sp = getattr(case, 'slice_pos', None)
-            v['slice_pos'].set('' if sp is None else f'{sp:g}')
-        v['profile_in'].set(case.profile_file_in or '')
-        v['cx'].set(f'{case.center[0]:g}')
-        v['cy'].set(f'{case.center[1]:g}')
-        if self.dim == 3 and len(case.center) > 2:
-            v['cz'].set(f'{case.center[2]:g}')
-        v['material'].set(getattr(case, 'material', 'TNT'))
-        v['activation'].set(getattr(case, 'activation', 'linear'))
-        v['afterburn'].set(getattr(case, 'afterburn', 'none') or 'none')
-        v['charge_refine'].set(getattr(case, 'charge_refine', 'global'))
-        v['amr_levels'].set(str(int(getattr(case, 'amr_levels', 0) or 0)))
-        v['amr_estimator'].set(getattr(case, 'amr_estimator',
-                                       'Lohner') or 'Lohner')
-        for key, default in (('amr_refine', 0.4), ('amr_unrefine', 0.2),
-                             ('amr_interval', 2), ('amr_buffer', 2),
-                             ('amr_max_cells', 0)):
-            v[key].set(f'{getattr(case, key, default):g}')
-        dl = getattr(case, 'amr_display_level', None)
-        v['amr_display_level'].set('auto' if dl is None else str(int(dl)))
-        v['n_procs'].set(str(getattr(case, 'n_procs', 0)))
-        v['eos'].set(case.eos)
-        v['order'].set('2 (MUSCL)' if int(getattr(
-            case, 'order', 1) or 1) == 2 else '1 (Godunov)')
-        v['cfl'].set(f'{case.cfl:g}')
-        v['n_snapshots'].set(str(case.n_snapshots))
-        # a case built in code (not loaded through case_from_dict) can
-        # still carry the pre-T50 spellings; the combos only offer the
-        # three canonical ones
-        for side, val in normalize_bcs(dict(case.bcs)).items():
-            v[f'bc_{side}'].set(val)
-        self.gauges.set(case.gauges)
-        self.obstacles.set(case.obstacles)
-        self.zones.set(getattr(case, 'refine_zones', None) or [])
-        if self.dim == 3:
-            self.extra_charges.set(getattr(case, 'charges', None) or [])
-        self.det_pts.set(getattr(case, 'det_points', None) or [])
-        v['gauge_file'].set(case.gauge_file)
-        v['anim_file'].set(case.anim_file or '')
-        v['anim_mesh'].set(bool(getattr(case, 'anim_mesh', False)))
-        scale = anim_scale_from_label(getattr(case, 'anim_scale', 'run'))
-        v['anim_scale'].set(ANIM_SCALE_LABELS[scale])
-        clim = getattr(case, 'anim_clim', None)
-        if clim:
-            v['anim_clim_min'].set(f'{float(clim[0]):g}')
-            v['anim_clim_max'].set(f'{float(clim[1]):g}')
-        v['record'].set(case.record_frames > 0)
-        self._set_trigger(case)
-        if self.dim == 2:
-            v['profile_out'].set(case.profile_file or '')
+        """Load `case` into the widgets, in the order
+        `models.fields.fields_from_case` gives - the trace hooks each set
+        fires (the axisymmetric pin, the AMR rows, the video range rows)
+        depend on it. Point lists do not fire on_change."""
+        points = self._point_lists()
+        for name, value in fields.fields_from_case(case, self.dim).items():
+            if name in points:
+                points[name].set(value)
+            else:
+                self.v[name].set(value)
 
 
 class SetupPanel(ctk.CTkFrame):
