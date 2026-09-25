@@ -735,7 +735,12 @@ def _refine_dicts(spec, case):
 
 # ── system/ + constant/ dicts ───────────────────────────────────────────────
 
-def _controldict(spec, case):
+def _controldict_time(spec, case):
+    """controlDict run, time-step and write control: every top-level
+    keyword before `functions`, in file order. These are standard
+    OpenFOAM-9 controlDict keywords; the blastFoam User Guide v6.0 has no
+    section on them (its only controlDict text is the `functions` entry,
+    sec. 15, p. 122)."""
     d = {
         'application': 'blastFoam',
         # a profile-initialised stage continues an earlier stage's clock:
@@ -784,7 +789,17 @@ def _controldict(spec, case):
         d['deltaT'] = Raw(fmt(_dt))
         d['adjustTimeStep'] = 'no'
         d['writeControl'] = 'runTime'
+    return d
 
+
+def _controldict_function_objects(spec):
+    """The blastFoam function objects of the controlDict `functions`
+    entry (blastFoam User Guide v6.0, sec. 15, pp. 122-126), in file
+    order: conservedQuantities (sec. 15.4, p. 124), writeTimeList
+    (sec. 15.3, p. 124), impulse (sec. 15.11, p. 126), fieldMinMax
+    (sec. 15.2, p. 123), timeOfArrival (sec. 15.12, p. 126), overpressure
+    (sec. 15.10, p. 126). blastProbes (sec. 15.1) is rendered last, by
+    `_controldict_probes`."""
     functions = {}
     # N5-5: blastFoam's own volume integral of the conserved variables,
     # printed to the log at every write. The value here is NOT the drift
@@ -868,6 +883,17 @@ def _controldict(spec, case):
             'pRef': P_AIR,
             'store': True,
         }
+    return functions
+
+
+def _controldict_amr_fields(spec):
+    """The function object an adaptively refined mesh needs in the
+    controlDict: per-write cell centres (OpenFOAM's writeCellCentres).
+    AMR itself is configured in constant/dynamicMeshDict
+    (`_dynamicmeshdict`; blastFoam User Guide v6.0, ch. 11, p. 106), and
+    so is load balancing (sec. 11.2, p. 112) - nothing of either lives
+    in the controlDict."""
+    functions = {}
     if spec.dim >= 2 and spec.amr:
         # AMR (N16): the cell count and order change every write, so
         # each time dir carries its own cell centres (this FO) next to
@@ -878,6 +904,15 @@ def _controldict(spec, case):
             'libs': Raw('("libfieldFunctionObjects.so")'),
             'writeControl': 'writeTime',
         }
+    return functions
+
+
+def _controldict_live_sampling(spec, case):
+    """The live-view samplers: a p plane cut (`LIVE_SLICE`, 2D/3D) or a
+    p(r) line (`LIVE_SET`, 1D), every few solver steps. OpenFOAM's own
+    sampling-library function objects, which blastFoam loads by default
+    (blastFoam User Guide v6.0, sec. 15, p. 122)."""
+    functions = {}
     if spec.dim >= 2:
         # live p slice every few steps (same role as the 1D liveLine):
         # 2D cuts the z=0 mid-plane (the whole field, one face per
@@ -950,6 +985,13 @@ def _controldict(spec, case):
                         0.0, 0.0),
             })],
         }
+    return functions
+
+
+def _controldict_probes(spec):
+    """The gauge probes: blastProbes (blastFoam User Guide v6.0,
+    sec. 15.1, pp. 122-123), the last function object in the file."""
+    functions = {}
     if spec.probe_pts:
         functions['gauges'] = {
             'type': 'blastProbes',
@@ -962,6 +1004,19 @@ def _controldict(spec, case):
             # extras (velocity-magnitude + density gauge traces, N12)
             'fields': ['p', 'U', 'rho'],
         }
+    return functions
+
+
+def _controldict(spec, case):
+    """system/controlDict: the time/write control, then the `functions`
+    entry assembled section by section in the order the file has always
+    had (docs/ARCHITECTURE_REVIEW.md section 5, Phase 10)."""
+    d = _controldict_time(spec, case)
+    functions = {}
+    functions.update(_controldict_function_objects(spec))
+    functions.update(_controldict_amr_fields(spec))
+    functions.update(_controldict_live_sampling(spec, case))
+    functions.update(_controldict_probes(spec))
     if functions:
         d['functions'] = functions
     return foam_file('controlDict', block(d), location='system')
