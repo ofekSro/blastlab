@@ -394,3 +394,16 @@ Source: the arch-refactorer's phase 7 report. Nothing changed.
    "the whole burn" as outside the calibration window. Is the window defined in
    pressure terms that a vented case can never reach? (This connects to phase 0 item 3:
    the starter case is a weak check.)
+
+---
+
+## 2026-09-25 · `/refactor` phase 8 (`models/meta.py`, `474bd77`..`043aa4d`)
+
+Source: the arch-refactorer's phase 8 report. Nothing changed.
+
+1. **Every title says "kg TNT", whatever the EOS or material.** `output/plots.charge_label`
+   always writes "kg TNT" (or "kg/m TNT"). The native idealGas 3D case is titled
+   "8 kg TNT", and a blastFoam C4 run would be too. This is the display side of UX-E1:
+   the field is a material mass, not a TNT equivalent.
+2. **blastFoam 1D meta hard-codes `eos='JWL'`** and keeps the material separately in
+   `material`, so the 1D figure titles show the EOS but never the material.
