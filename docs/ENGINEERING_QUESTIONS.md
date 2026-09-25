@@ -360,3 +360,20 @@ Source: the arch-refactorer's phase 5a report. The Qt form's behaviour is pinned
    phase 5a; the baseline tested a negative charge in 1D only. It is a bug rather than an
    engineering question: a guard for mass <= 0 in the preview path (or in
    `charge_radius`) is a behaviour change, for TODO.md.
+
+---
+
+## 2026-09-25 · `/refactor` phase 6 (`services/exports.py`, `b980def`)
+
+Source: the arch-refactorer's phase 6 report. Nothing changed.
+
+1. **The report compares a ground burst with free-air Kingery-Bulmash.**
+   `output/report.py` `kb_rows` compares the gauge peaks with the free-air KB table.
+   It skips the comparison only for obstacles, extra charges and planar 2D, and never
+   checks the boundary conditions. So an axisymmetric case with a reflecting ground
+   (`y_lo='reflect'`, a height-of-burst case) and no obstacles is compared with
+   free-air values, and the ratio reads high: a reflected or Mach-stem peak against a
+   free-air one. Should the comparison be skipped there, or switched to the surface-burst
+   curve (hemispherical, 2W) when the charge sits on the ground?
+2. **The report footnote says "see ROADMAP N3", and no ROADMAP file exists.** It is the
+   same dead reference as in the `Afterburn` docstring (phase 1, item 2).
