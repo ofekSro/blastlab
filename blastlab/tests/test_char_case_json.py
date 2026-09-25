@@ -21,6 +21,7 @@ import char_common as cc
 from blastlab.core import assessment                      # noqa: E402
 from blastlab.core.case import (Case1D, Case2D, Case3D,   # noqa: E402
                                 case_from_dict, case_to_dict, load_case)
+from blastlab.models import fields                        # noqa: E402
 
 CASES_DIR = os.path.join(cc.HERE, 'cases')
 
@@ -64,7 +65,8 @@ def test_committed_case_files():
 #: Phase 5a: what one form round trip changes in a DEFAULT case, pinned as
 #: found. The Case2D/3D dataclass AMR thresholds are 0.2/0.1 (re-tuned
 #: 2026-09-10, models/case.py), but the form mapping substitutes 0.4/0.2
-#: whenever AMR is off and falls back to them in fields_from_case, so a
+#: (models/fields.AMR_FORM_FALLBACKS) whenever AMR is off and falls back
+#: to them in fields_from_case, so a
 #: default case read back through the form carries 0.4/0.2. Reported, not
 #: fixed (a characterisation test documents behaviour, correct or not).
 FORM_ROUNDTRIP_CHANGES = {
@@ -80,7 +82,6 @@ def test_fields_roundtrip_default_cases():
     cases and the default HD 1.3 case, both solver modes, no QApplication
     (Phase 5a): no errors, no bad fields, only the pinned changes, and a
     second round trip is a fixed point."""
-    from blastlab.models import fields
     for case in (Case1D(), Case2D(), Case3D(),
                  assessment.DeflagrationCase()):
         dim = case.dim

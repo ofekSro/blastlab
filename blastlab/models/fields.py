@@ -30,8 +30,24 @@ from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
 from .case import Case1D, Case2D, Case3D
 
 
+#: What the form shows / sends for the AMR knobs when AMR is off or the
+#: case has no such attribute. NOT the Case2D/3D dataclass defaults: those
+#: thresholds were re-tuned to 0.2/0.1 (models/case.py, 2026-09-10) and
+#: these were not. Open question, pinned by test_char_case_json - keep.
+AMR_FORM_FALLBACKS = {
+    'amr_refine': 0.4,
+    'amr_unrefine': 0.2,
+    'amr_interval': 2,
+    'amr_buffer': 2,
+    'amr_max_cells': 0,
+}
+
+BC_SIDES_2D = ('x_lo', 'x_hi', 'y_lo', 'y_hi')
+BC_SIDES_3D = BC_SIDES_2D + ('z_lo', 'z_hi')
+
+
 # ── parsers ──────────────────────────────────────────────────────────────
-def parse_float(raw, name):
+def parse_float(raw: str, name: str) -> float:
     """Parse a float field with a helpful error.
 
     'nan'/'inf'/'1e400' parse as floats but are not usable geometry: they
@@ -46,7 +62,7 @@ def parse_float(raw, name):
     return val
 
 
-def parse_int(raw, name):
+def parse_int(raw: str, name: str) -> int:
     """Parse an integer field. A fractional entry is refused rather than
     silently truncated (n_snapshots = 2.7 used to become 2)."""
     try:
@@ -58,7 +74,7 @@ def parse_int(raw, name):
     return int(val)
 
 
-def parse_trigger(raw):
+def parse_trigger(raw) -> int | None:
     """The trigger-gauge box as a 1-based gauge number, or None when it
     is blank/zero. A non-numeric entry is treated as off here and caught
     by validate_case, which reports it with the other field errors."""
@@ -72,7 +88,7 @@ def parse_trigger(raw):
     return n or None
 
 
-def parse_csv(text, n):
+def parse_csv(text: str, n: int) -> tuple:
     """`n` comma-separated numbers, or () when the field is blank.
 
     Blank is an ANSWER here, not a failure: every venting-stage row
@@ -93,7 +109,7 @@ def parse_csv(text, n):
         return ()
 
 
-def order_label(case):
+def order_label(case) -> str:
     """The reconstruction-order choice text for a case's `order`."""
     return ('2 (MUSCL)' if int(getattr(case, 'order', 1) or 1) == 2
             else '1 (Godunov)')
@@ -116,7 +132,7 @@ HD13_UNITS = (
 )
 
 
-def hd13_case_from_fields(values):
+def hd13_case_from_fields(values: dict) -> tuple:
     """`(DeflagrationCase, errors, bad_field_names)` from the 0-D form's
     values."""
     # deferred, as it was in the form: only the 0-D form needs it
@@ -125,8 +141,8 @@ def hd13_case_from_fields(values):
     errs, bad = [], []
 
     def num(name, label, factor=1.0, blank=None):
-        raw = v[name].strip()
-        if not raw:
+        # parse the raw value, not the stripped one: the error quotes it
+        if not v[name].strip():
             return blank
         try:
             return parse_float(v[name], label) * factor
@@ -134,6 +150,14 @@ def hd13_case_from_fields(values):
             errs.append(str(exc))
             bad.append(name)
             return blank if blank is not None else 0.0
+
+    def whole(name, label, fallback):
+        try:
+            return parse_int(v[name], label)
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append(name)
+            return fallback
 
     overrides, measured = {}, []
     for key, field_name, factor in HD13_UNITS:
@@ -144,26 +168,11 @@ def hd13_case_from_fields(values):
     if not v['measured']:
         measured = []
 
-    try:
-        cohorts = parse_int(v['n_cohorts'], 'Cohorts') or 1
-    except ValueError as exc:
-        errs.append(str(exc))
-        bad.append('n_cohorts')
-        cohorts = 1
-    try:
-        n_out = parse_int(v['n_out'], 'Samples') or 1000
-    except ValueError as exc:
-        errs.append(str(exc))
-        bad.append('n_out')
-        n_out = 1000
+    cohorts = whole('n_cohorts', 'Cohorts', 1) or 1
+    n_out = whole('n_out', 'Samples', 1000) or 1000
     # 0 means "the builder's default", so a blank box is not an error
-    try:
-        snap_vent = (parse_int(v['n_snap_vent'], 'Vent snapshots')
-                     if v['n_snap_vent'].strip() else 0)
-    except ValueError as exc:
-        errs.append(str(exc))
-        bad.append('n_snap_vent')
-        snap_vent = 0
+    snap_vent = (whole('n_snap_vent', 'Vent snapshots', 0)
+                 if v['n_snap_vent'].strip() else 0)
 
     span = num('span_m', 'Span', blank=0.0) or 0.0
     case = DeflagrationCase(
@@ -226,7 +235,7 @@ def hd13_case_from_fields(values):
     return case, errs, bad
 
 
-def hd13_fields_from_case(case):
+def hd13_fields_from_case(case) -> dict:
     """The 0-D form's values for `case`, in the order the form sets
     them."""
     out = {}
@@ -290,7 +299,7 @@ def hd13_fields_from_case(case):
 
 
 # ── the blast cases, dims 1-3 ────────────────────────────────────────────
-def case_from_fields(dim, values, mode):
+def case_from_fields(dim: int, values: dict, mode: str) -> tuple:
     """`(case, errors, bad_field_names)` from a form's values.
 
     `mode` is the normalised solver mode ('native' | 'blastfoam'). EVERY
@@ -346,6 +355,15 @@ def case_from_fields(dim, values, mode):
         # likewise ignored by blastFoam (validate_case notes it)
         return v['eos'] if not foam else 'idealGas'
 
+    def _charge_model():
+        """blastFoam-only knobs. Native mode always sends 'TNT' whatever
+        the hidden material box holds (open question UX-E2 - keep)."""
+        if not foam:
+            return dict(material='TNT', activation='linear',
+                        afterburn='none')
+        return dict(material=v['material'], activation=v['activation'],
+                    afterburn=v['afterburn'])
+
     if dim == 1:
         return Case1D(
             radius_m=_F('radius_m', 'radius'),
@@ -364,19 +382,15 @@ def case_from_fields(dim, values, mode):
             gauge_file=v['gauge_file'] or None,
             profile_file=v['profile_out'] or None,
             solver=mode,
-            material=v['material'] if foam else 'TNT',
-            activation=v['activation'] if foam else 'linear',
-            afterburn=v['afterburn'] if foam else 'none'), errs, bad
+            **_charge_model()), errs, bad
 
-    bcs = {side: v[f'bc_{side}']
-           for side in (('x_lo', 'x_hi', 'y_lo', 'y_hi') if dim == 2
-                        else ('x_lo', 'x_hi', 'y_lo', 'y_hi',
-                              'z_lo', 'z_hi'))}
+    sides = BC_SIDES_2D if dim == 2 else BC_SIDES_3D
+    bcs = {side: v[f'bc_{side}'] for side in sides}
     amr_levels = _I('amr_levels', 'AMR levels') if foam else 0
     amr_on = foam and amr_levels > 0
     # the two range boxes are read only while the scale is manual,
     # so a stale value in a hidden box cannot block a run
-    _anim_scale = anim_scale_from_label(v['anim_scale'])
+    anim_scale = anim_scale_from_label(v['anim_scale'])
     common = dict(
         Lx=_F('Lx', 'Lx'), Ly=_F('Ly', 'Ly'),
         cell_size_m=_F('cell', 'cell size'),
@@ -392,19 +406,17 @@ def case_from_fields(dim, values, mode):
         t_end=_F('t_end', 'end time'),
         trigger_gauge=parse_trigger(v['trigger_gauge']),
         trigger_action=v['trigger_action'],
-        trigger_file=(v['trigger_file'] or None
+        trigger_file=((v['trigger_file'] or None)
                       if dim < 3 else None),
         anim_file=v['anim_file'] or None,
         anim_mesh=bool(v['anim_mesh']),
-        anim_scale=_anim_scale,
+        anim_scale=anim_scale,
         anim_clim=((_F('anim_clim_min', 'video colour min'),
                     _F('anim_clim_max', 'video colour max'))
-                   if _anim_scale == 'manual' else None),
+                   if anim_scale == 'manual' else None),
         record_frames=150 if v['record'] else 0,
         solver=mode,
-        material=v['material'] if foam else 'TNT',
-        activation=v['activation'] if foam else 'linear',
-        afterburn=v['afterburn'] if foam else 'none',
+        **_charge_model(),
         n_procs=_I('n_procs', 'MPI ranks') if foam else 0,
         det_points=(v['det_pts'] or None) if foam else None,
         refine_zones=([(*z[:-1], int(round(z[-1])))
@@ -415,15 +427,15 @@ def case_from_fields(dim, values, mode):
         amr_estimator=(v['amr_estimator'] if amr_on
                        else 'Lohner'),
         amr_refine=(_F('amr_refine', 'AMR refine threshold')
-                    if amr_on else 0.4),
+                    if amr_on else AMR_FORM_FALLBACKS['amr_refine']),
         amr_unrefine=(_F('amr_unrefine', 'AMR unrefine threshold')
-                      if amr_on else 0.2),
+                      if amr_on else AMR_FORM_FALLBACKS['amr_unrefine']),
         amr_interval=(_I('amr_interval', 'AMR refine interval')
-                      if amr_on else 2),
+                      if amr_on else AMR_FORM_FALLBACKS['amr_interval']),
         amr_buffer=(_I('amr_buffer', 'AMR buffer layers')
-                    if amr_on else 2),
+                    if amr_on else AMR_FORM_FALLBACKS['amr_buffer']),
         amr_max_cells=(_I('amr_max_cells', 'AMR max cells')
-                       if amr_on else 0),
+                       if amr_on else AMR_FORM_FALLBACKS['amr_max_cells']),
         amr_display_level=(
             None if not amr_on
             or v['amr_display_level'].strip() in ('', 'auto')
@@ -450,7 +462,16 @@ def case_from_fields(dim, values, mode):
                   **common), errs, bad
 
 
-def fields_from_case(case, dim=None):
+def _charge_model_fields(case) -> dict:
+    """The blastFoam charge-model rows, in the order the form sets them."""
+    return {
+        'material': getattr(case, 'material', 'TNT'),
+        'activation': getattr(case, 'activation', 'linear'),
+        'afterburn': getattr(case, 'afterburn', 'none') or 'none',
+    }
+
+
+def fields_from_case(case, dim: int | None = None) -> dict:
     """The form's values for `case`, IN THE ORDER the form sets them.
 
     The order is part of the contract: setting a field fires the form's
@@ -465,9 +486,7 @@ def fields_from_case(case, dim=None):
     if dim == 1:
         out['radius_m'] = f'{case.radius_m:g}'
         out['charge'] = f'{case.charge_kg:g}'
-        out['material'] = getattr(case, 'material', 'TNT')
-        out['activation'] = getattr(case, 'activation', 'linear')
-        out['afterburn'] = getattr(case, 'afterburn', 'none') or 'none'
+        out.update(_charge_model_fields(case))
         out['cell'] = f'{case.cell_size_m:g}'
         out['eos'] = case.eos
         out['order'] = order_label(case)
@@ -500,16 +519,12 @@ def fields_from_case(case, dim=None):
     out['cy'] = f'{case.center[1]:g}'
     if dim == 3 and len(case.center) > 2:
         out['cz'] = f'{case.center[2]:g}'
-    out['material'] = getattr(case, 'material', 'TNT')
-    out['activation'] = getattr(case, 'activation', 'linear')
-    out['afterburn'] = getattr(case, 'afterburn', 'none') or 'none'
+    out.update(_charge_model_fields(case))
     out['charge_refine'] = getattr(case, 'charge_refine', 'global')
     out['amr_levels'] = str(int(getattr(case, 'amr_levels', 0) or 0))
     out['amr_estimator'] = (getattr(case, 'amr_estimator', 'Lohner')
                             or 'Lohner')
-    for key, default in (('amr_refine', 0.4), ('amr_unrefine', 0.2),
-                         ('amr_interval', 2), ('amr_buffer', 2),
-                         ('amr_max_cells', 0)):
+    for key, default in AMR_FORM_FALLBACKS.items():
         out[key] = f'{getattr(case, key, default):g}'
     dl = getattr(case, 'amr_display_level', None)
     out['amr_display_level'] = 'auto' if dl is None else str(int(dl))
