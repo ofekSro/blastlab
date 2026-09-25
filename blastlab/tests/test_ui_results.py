@@ -602,15 +602,18 @@ def main():
     an.max_box.editingFinished.emit()
     pump(20)
     seen = {}
-    real_write = exports.write_animation
-    exports.write_animation = lambda m, fn, **kw: seen.update(
+    # run_export lives in services.exports since Phase 6 and looks the
+    # writer up there; ui.exports only re-exports the name
+    from blastlab.services import exports as svc_exports
+    real_write = svc_exports.write_animation
+    svc_exports.write_animation = lambda m, fn, **kw: seen.update(
         dict(kw, target=fn))
     dialogs.save_file = lambda *a, **k: gif
     try:
         p.export('gif', threaded=False)
         pump(20)
     finally:
-        exports.write_animation = real_write
+        svc_exports.write_animation = real_write
         dialogs.save_file = real_save
     check("the Animation export uses the view's colour scale",
           seen.get('scale') == 'manual'

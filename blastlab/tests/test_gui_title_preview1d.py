@@ -90,12 +90,16 @@ def main():
     panel.title_var.set('')
     check('back to nothing', panel.title_extra() is None)
     import inspect
-    src = inspect.getsource(ResultsPanel)
+    # Phase 6: _export hands the writing to services.exports.run_export,
+    # so the export figure calls live there now (test_gui_char_exports.py
+    # pins the titled files the Tk panel writes)
+    from blastlab.services import exports as svc_exports
+    src = inspect.getsource(ResultsPanel) + inspect.getsource(svc_exports)
     for what in ('figure_results_1d', 'figure_gauges_1d',
                  'figure_gauges_nd', 'figures_fields_2d',
                  'figures_fields_3d', 'figure_isosurfaces_3d'):
         check(f'{what} is called with the title',
-              f'{what}(' in src and 'title_extra' in src)
+              f'plots.{what}' in src and 'title_extra' in src)
     check('the exported animation gets it',
           'title=title_extra' in src)
     check('the report heading gets it',

@@ -13,9 +13,7 @@ from matplotlib.figure import Figure
 
 from ..core.constants import P_AIR
 from ..output import gauge_summary, plots
-from ..output.animation import write_animation
-from ..output.gauges import save_gauges_1d, save_gauges_2d, save_gauges_3d
-from ..core.profiles import save_profile, save_profile_2d
+from ..services.exports import run_export
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import theme
 from .mpl import EmbeddedFigure
@@ -971,143 +969,17 @@ class ResultsPanel(ctk.CTkFrame):
         if not target:
             return
 
+        # Phase 6: the writing is services.exports.run_export, the same
+        # code the Qt GUI runs - it logs every file and every failure
+        # itself and never raises
+        opts = dict(show_mesh=show_mesh, title_extra=title_extra)
+
+        def on_error(title, text):
+            # a VTK conversion failure: the dialog belongs on the Tk thread
+            self.after(0, messagebox.showerror, title, text)
+
         def work():
-            try:
-                if kind == 'pngs':
-                    outdir = target
-                    figs = []
-                    if dim == 1:
-                        figs = [('blast_1d_results.png',
-                                 plots.figure_results_1d(
-                                     res.snapshots, res.meta['eos'],
-                                     res.meta['charge_kg'],
-                                     res.meta['radius_m'],
-                                     title_extra=title_extra)),
-                                ('blast_1d_gauges.png',
-                                 plots.figure_gauges_1d(
-                                     res.gauges, res.meta['charge_kg'],
-                                     res.meta['eos'],
-                                     title_extra=title_extra))]
-                    elif dim == 2:
-                        figs = plots.figures_fields_2d(
-                            res.snapshots, res.meta, include_peak=True,
-                            show_mesh=show_mesh, title_extra=title_extra)
-                        figs.append(('blast_2d_gauges.png',
-                                     plots.figure_gauges_nd(
-                                         res.gauges, res.meta,
-                                         title_extra=title_extra)))
-                    else:
-                        figs = plots.figures_fields_3d(
-                            res.snapshots, res.meta, include_peak=True,
-                            show_mesh=show_mesh, title_extra=title_extra)
-                        figs.append(('blast_3d_gauges.png',
-                                     plots.figure_gauges_nd(
-                                         res.gauges, res.meta,
-                                         title_extra=title_extra)))
-                        figs.append(('blast_3d_isosurface.png',
-                                     plots.figure_isosurfaces_3d(
-                                         res.snapshots, res.meta,
-                                         title_extra=title_extra)))
-                    for name, fig in figs:
-                        if fig is None:
-                            continue
-                        name = pre + name       # <run name>_... (N9)
-                        fig.savefig(os.path.join(outdir, name), dpi=150,
-                                    bbox_inches='tight')
-                        self._log(f'Saved {name}')
-                elif kind == 'tsv':
-                    {1: save_gauges_1d, 2: save_gauges_2d,
-                     3: save_gauges_3d}[dim](res.gauges, target)
-                    self._log(f'Saved {target}')
-                elif kind == 'fieldcsv':
-                    from ..output import report as report_mod
-                    written = report_mod.save_field_csvs(
-                        res, dim, target, prefix=pre)
-                    if written:
-                        self._log(f'Saved {len(written)} field CSV(s) '
-                                  f'into {target}')
-                    else:
-                        self._log('No exportable field maps in this '
-                                  'result.')
-                elif kind == 'report':
-                    from ..output import report as report_mod
-                    figs = []
-                    if dim == 1:
-                        figs = [('Results', plots.figure_results_1d(
-                                    res.snapshots, res.meta['eos'],
-                                    res.meta['charge_kg'],
-                                    res.meta['radius_m'],
-                                    title_extra=title_extra)),
-                                ('Gauge time histories',
-                                 plots.figure_gauges_1d(
-                                    res.gauges, res.meta['charge_kg'],
-                                    res.meta['eos'],
-                                    title_extra=title_extra))]
-                    else:
-                        builder = (plots.figures_fields_2d if dim == 2
-                                   else plots.figures_fields_3d)
-                        # UX-06: section headings from the field name,
-                        # not the file name - 'blast_2d_pressure.png'
-                        # used to become the heading 'blast 2d pressure'
-                        def _cap(fname):
-                            stem = fname.rsplit('.', 1)[0]
-                            pre = f'blast_{dim}d_'
-                            if stem.startswith(pre):
-                                stem = stem[len(pre):]
-                            stem = stem.replace('_', ' ')
-                            return stem[:1].upper() + stem[1:]
-                        figs = [(_cap(n), f)
-                                for n, f in builder(
-                                    res.snapshots, res.meta,
-                                    include_peak=True,
-                                    show_mesh=show_mesh,
-                                    title_extra=title_extra)]
-                        # 'Gauge time histories', not a second 'Gauges'
-                        # heading duplicating the table section's
-                        figs.append(('Gauge time histories',
-                                     plots.figure_gauges_nd(
-                                         res.gauges, res.meta,
-                                         title_extra=title_extra)))
-                    report_mod.save_html_report(
-                        res, dim, target, figures=figs,
-                        # the user's own line wins over the run
-                        # name for the report's heading (T58)
-                        title=title_extra or ent.label)
-                    self._log(f'Saved {target}')
-                    try:
-                        os.startfile(target)
-                    except OSError:
-                        pass
-                elif kind == 'summary':
-                    gauge_summary.save_gauge_summary(
-                        self.summary_rows(res), target)
-                    self._log(f'Saved {target}')
-                elif kind == 'vtk':
-                    from ..solvers.foam.export_vtk import export_vtk
-                    try:
-                        out = export_vtk(target, log=self._log)
-                    except RuntimeError as exc:
-                        self._log(f'VTK export failed: {exc}')
-                        self.after(0, messagebox.showerror, 'VTK export',
-                                   str(exc)[:600])
-                        return
-                    self._log(f'VTK export done: {out}')
-                    try:
-                        os.startfile(out)
-                    except OSError as exc:
-                        self._log(f'(could not open the folder: {exc})')
-                elif kind == 'gif':
-                    write_animation(res.meta, target,
-                                    show_mesh=show_mesh,
-                                    title=title_extra)
-                    self._log(f'Saved {target}')
-                elif kind == 'profile':
-                    if dim == 1:
-                        save_profile(res.meta['final_profile'], target)
-                    else:
-                        save_profile_2d(res.meta, target)
-                    self._log(f'Saved {target}')
-            except Exception as exc:               # surfaced to the log
-                self._log(f'Export failed: {exc}')
+            run_export(kind, ent, target, opts, log=self._log,
+                       on_error=on_error)
 
         threading.Thread(target=work, daemon=True).start()

@@ -266,8 +266,21 @@ def test_can_why_not():
         cc.check_json('exports_can.json', got)
 
 
+def test_ui_exports_reexports_services():
+    """Phase 6: ui.exports keeps every moved name as the very same object
+    services.exports holds (a copy would let the two drift)."""
+    from blastlab.services import exports as svc
+    from blastlab.ui import exports as ui
+    names = ('KINDS', 'DIR_KINDS', 'name_prefix', 'summary_rows', 'can',
+             'why_not', 'png_figures', 'report_figures', 'run_export',
+             '_report_caption', '_open', 'write_animation')
+    bad = [n for n in names if getattr(ui, n) is not getattr(svc, n)]
+    assert not bad, f'ui.exports copies, not re-exports: {bad}'
+
+
 def main():
-    return cc.run_main('CHAR EXPORTS', [test_can_why_not, test_qt_exports])
+    return cc.run_main('CHAR EXPORTS', [test_can_why_not, test_qt_exports,
+                                        test_ui_exports_reexports_services])
 
 
 if __name__ == '__main__':
