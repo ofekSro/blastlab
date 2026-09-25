@@ -20,6 +20,7 @@ from PySide6.QtWidgets import QCheckBox, QComboBox, QStackedWidget, QWidget
 import pyqtgraph as pg
 
 from ..core.constants import P_AIR
+from ..models.meta import charge_label, slice_geometry
 from ..output import plots
 from . import pg_plots, theme
 from .mpl_canvas import MplCanvas
@@ -77,8 +78,8 @@ def select_field(res, dim, snap_label, field, title_extra=None):
     panel = 'whole run' if (is_peak or is_imp) else snap_label
 
     if dim == 2:
-        sl = None
-        solid, xf, yf = meta['solid'], meta['x_face'], meta['y_face']
+        g = slice_geometry(meta, 'grid')
+        sl, solid, xf, yf = g.sl, g.solid, g.xf, g.yf
         axi = meta.get('geometry') == 'axisymmetric'
         xlabel = 'r [m]' if axi else 'x [m]'
         ylabel = 'z [m]' if axi else 'y [m]'
@@ -94,23 +95,19 @@ def select_field(res, dim, snap_label, field, title_extra=None):
                     'density': 'Density [kg/m³]',
                     'speed': 'Speed [m/s]'}[field]
     else:
-        j0, k0 = meta['j0'], meta['k0']
         is_ovp = field.startswith('overpressure')
-        if '(x-z)' in field:
-            sl = np.s_[:, j0, :]
-            xf, yf = meta['x_face'], meta['z_face']
+        plane = 'x-z' if '(x-z)' in field else 'x-y'
+        g = slice_geometry(meta, plane)
+        sl, solid, xf, yf = g.sl, g.solid, g.xf, g.yf
+        pos = f"{g.axis} = {g.coord:.2f} m"
+        if plane == 'x-z':
             xlabel, ylabel = 'x [m]', 'z [m]'
-            plane, pos = 'x-z', f"y = {meta['y_c'][j0]:.2f} m"
             raw = (snap['p'][sl] - np.float32(P_AIR) if is_ovp
                    else snap['rho_xz'])
         else:
-            sl = np.s_[:, :, k0]
-            xf, yf = meta['x_face'], meta['y_face']
             xlabel, ylabel = 'x [m]', 'y [m]'
-            plane, pos = 'x-y', f"z = {meta['z_c'][k0]:.2f} m"
             raw = (snap['p'][sl] - np.float32(P_AIR) if is_ovp
                    else snap['rho_xy'])
-        solid = meta['solid'][sl]
         if is_peak or is_imp:
             (_pl, pk), (_il, im) = plots.peak_items(meta, sl)
             z = pk if is_peak else im
@@ -279,9 +276,10 @@ class FieldsView(QWidget):
         res = ent.result
         try:
             if ent.dim == 1:
+                c = charge_label(res.meta)
                 fig = plots.figure_results_1d(
-                    res.snapshots, res.meta['eos'], res.meta['charge_kg'],
-                    res.meta['radius_m'], title_extra=self._title_extra)
+                    res.snapshots, c.eos, c.charge_kg, c.radius_m,
+                    title_extra=self._title_extra)
             else:
                 fig = plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,
