@@ -19,8 +19,9 @@ imported, so this is instant and needs no Qt, Tk or WSL - and asserts:
   * the engines (solvers/, output/, viz3d/) import no GUI package, and
     nothing from services/ except the command-line ENTRY_POINTS;
   * ui/ (Qt) imports nothing from gui/ (Tk), and gui/ nothing from ui/;
-  * solvers/foam/runloop.py does not import solvers/foam/backend.py -
-    backend drives the run loop, so the dependency runs one way (Phase 9).
+  * solvers/foam/runloop.py and solvers/foam/common.py do not import
+    solvers/foam/backend.py - backend drives the run loop, so the
+    dependency runs one way (Phase 9).
 
 Three allowlists, kept apart on purpose so that "no real upward edge"
 means something:
@@ -175,13 +176,16 @@ def imports(name, path, known):
 
 
 def edges():
+    """{module: its imports()} for every module outside tests/."""
     known = modules()
     return {name: imports(name, path, known)
             for name, path in known.items()}
 
 
 def _layer(mod):
-    return mod.split('.')[0] if mod else ''
+    """Top-level package of a module relative to blastlab ('' for the
+    package root itself)."""
+    return mod.split('.')[0]
 
 
 def _import_only(tree):
