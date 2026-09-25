@@ -1,23 +1,23 @@
 """The Qt half of the Results-tab exports: where to write, and wiring.
 
-The Tk version kept all of this inside `ResultsPanel._export`, a 200-line
-method that could only be exercised by building a window. The writing
-itself now lives in `services/exports.py`, shared by both GUIs
-(docs/ARCHITECTURE_REVIEW.md section 5, Phase 6); this module keeps the
+The writing itself lives in `services/exports.py`, shared by both GUIs
+(docs/ARCHITECTURE_REVIEW.md section 5, Phase 6). This module keeps the
 two Qt-facing functions: `pick_target` asks the user where (it must run
 on the GUI thread, because a file dialog spins an event loop) and
 `export` picks a target, then runs `run_export` on a worker.
 
-Every name moved to `services.exports` stays importable from here
-(`ui/results_gauges.py` imports `summary_rows`, `ui/results_panel.py`
-uses `can`, `why_not` and `KINDS`).
+Every name moved to `services.exports` stays importable from here as the
+same object (`ui/results_gauges.py` imports `summary_rows`,
+`ui/results_panel.py` uses `can` and `why_not`, and the tests read the
+rest - `write_animation` included, since a copy would let the two drift).
 """
 
 import threading
 
-from ..services.exports import *                        # noqa: F401,F403
-from ..services.exports import (_open, _report_caption,  # noqa: F401
-                                name_prefix, run_export)
+from ..services.exports import (DIR_KINDS, KINDS,          # noqa: F401
+                                _open, _report_caption, can, name_prefix,
+                                png_figures, report_figures, run_export,
+                                summary_rows, why_not, write_animation)
 from . import dialogs
 
 

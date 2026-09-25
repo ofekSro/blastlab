@@ -3,7 +3,7 @@
 The toolkit-free half of the export orchestration, shared by both GUIs
 (docs/ARCHITECTURE_REVIEW.md section 5, Phase 6; finding F7). Moved
 verbatim from `ui/exports.py`, which keeps `pick_target` and `export`
-(the Qt file dialogs) and re-exports every name here; the Tk
+(the Qt file dialogs) and re-exports the moved names; the Tk
 `ResultsPanel._export` keeps its own dialogs and worker thread and calls
 `run_export` for the writing.
 
