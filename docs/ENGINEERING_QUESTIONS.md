@@ -321,3 +321,33 @@ proves no behaviour changed; these were noticed on the way.
    radius itself instead of calling `_charge_radius`. It is correct (1D uses `charge_kg`,
    not `case.charge`), but it is another place where the formula could drift (see the
    architecture-review item 3).
+
+---
+
+## 2026-09-25 · `/refactor` phase 5a (`models/fields.py`, `8a3f486`)
+
+Source: the arch-refactorer's phase 5a report. The Qt form's behaviour is pinned as is.
+
+1. **The GUI uses the stale AMR thresholds.** `models/case.py:135-149` re-tuned the
+   default `amr_refine`/`amr_unrefine` to 0.2/0.1 on 2026-09-10; its own comment records
+   the sweep (0.4/0.2 gave -11.8 % gauge error, 0.2/0.1 gave -3.9 %). But 0.4/0.2 is
+   still used in:
+   - the Qt form defaults (`ui/setup_spec.py:118-119`);
+   - the Tk form defaults (`gui/forms.py:505-506`);
+   - the value both forms use when AMR is off, and the `set_case` fallback (now in
+     `models/fields.py`);
+   - the `getattr` fallback in `core/refine.py:1053-1054`.
+
+   **So a GUI user who switches AMR on gets the thresholds with ~12 % gauge error**
+   unless they type new ones. Should the forms default to 0.2/0.1?
+2. **Loading a case into the Qt form with AMR off rewrites its AMR fields.** For
+   `tests/cases/native_2d_small.json`, `amr_estimator` goes from `densityGradient` to
+   `Lohner` and `amr_refine`/`amr_unrefine` go from 0.2/0.1 to 0.4/0.2. No effect on a
+   run while AMR is off, but a file saved from the GUI no longer matches the one loaded.
+   It follows from item 1.
+3. **A profile-initialised 2D case with `charge=None` cannot be read back.** `set_case`
+   writes `''` into the charge box, and `get_case` then refuses it with `'charge' is not
+   a number: ''`, although profile initialisation does not use the charge.
+4. **HD1.3 form: a blank Samples or Cohorts box is an error** (`'Samples' is not an
+   integer: ''`), while the code's `or 1000` / `or 1` suggests a blank was meant to fall
+   back to the default.
