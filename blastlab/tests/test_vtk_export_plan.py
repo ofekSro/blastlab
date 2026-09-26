@@ -696,6 +696,22 @@ def test_b_final_copy_failure_is_recorded():
                 tree.close()
 
 
+def test_b_restart_dir_survives():
+    """A resume's restart time (backend.resume_run sets spec.restart_dir)
+    is never deleted, even when the replay ingested newer writes - the
+    P1-5 walk-back past inconsistent ones."""
+    tree = Tree(surfaces=False)
+    try:
+        tree.spec.restart_dir = T[1]
+        ex = tree.export()
+        assert T[1] in ex.protected
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.exists(T[1]), tree.deleted_times()
+        assert tree.deleted_times() == [T[0]] + T[2:-2], tree.deleted_times()
+    finally:
+        tree.close()
+
+
 def test_b_unexpected_error_keeps_the_scratch():
     """An error the export did not expect cuts the pass short without
     raising into the run, and is recorded as a not_converted entry of the
@@ -732,7 +748,8 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_parallel_needs_reconstruct, test_b_no_delete_switch,
            test_b_failing_delete_never_raises, test_b_runloop_wiring,
            test_b_protect_reasons, test_b_final_copy_failure_is_recorded,
-           test_b_unexpected_error_keeps_the_scratch]
+           test_b_unexpected_error_keeps_the_scratch,
+           test_b_restart_dir_survives]
 TESTS = TESTS_A + TESTS_B
 
 

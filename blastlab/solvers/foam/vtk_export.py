@@ -463,30 +463,33 @@ class VtkExport:
     plan allows; it waits for foamToVTK up to `final_wait_s(n_cells)`.
 
     Why deleting is safe (D1) - what finalize reads from disk, and how it
-    stays there (solvers/foam/backend.py, line numbers as of OUT-2 Step 7):
+    stays there (solvers/foam/backend.py, line numbers as of the Step 7
+    verification):
 
     ==========================  =====================  ===================
     reader (backend.py:line)    what it re-reads       kept by
     ==========================  =====================  ===================
     _final_read (:480)          the newest write,      KEEP_NEWEST = 2
                                 else the one before
-    finalize_1d (:1156, :1169)  final dir; the         newest two; the pin
-                                arrival-pin dir        candidate (:1030,
+    finalize_1d (:1167, :1180)  final dir; the         newest two; the pin
+                                arrival-pin dir        candidate (:1041,
                                 (snapshots come from   _track_pin :579)
                                 `store`, in memory)
-    finalize_2d (:1600, :1611,  final dir; every       newest two; each
-    :1688, :1707)               snap_names dir; the    snapshot (:1468),
+    finalize_2d (:1611, :1622,  final dir; every       newest two; each
+    :1699, :1718)               snap_names dir; the    snapshot (:1479),
                                 pin; the remap         the pin candidate
-                                trigger dir            (:1453), the remap
-                                                       trigger dir (:1498)
+                                trigger dir            (:1464), the remap
+                                                       trigger dir (:1509)
     finalize_2d arrived_2d      `p` of every write of  the run loop's
-    (:1672)                     the quiet prefix       `arrived` cache,
+    (:1683)                     the quiet prefix       `arrived` cache,
                                                        read only for a
                                                        deleted dir
-    finalize_3d (:2260, :2270)  final dir; every       newest two; each
-                                snap_names dir         snapshot (:2121)
-    PeakImpulse.final (:1663,   the final dir's pMax   newest two
-    :2283)                      / impulse
+    finalize_3d (:2271, :2281)  final dir; every       newest two; each
+                                snap_names dir         snapshot (:2132)
+    PeakImpulse.final (:1674,   the final dir's pMax   newest two
+    :2294)                      / impulse
+    resume_run (:882)           the restart time       'restart' (set as
+                                (the solver reads it)  spec.restart_dir)
     ==========================  =====================  ===================
 
     The first write where the arrival holds is kept as well ('arrival',
@@ -557,6 +560,10 @@ class VtkExport:
                       'mesh) - sections and obstacles only')
         if self.volumes_on and int(getattr(spec, 'n_procs', 1) or 1) > 1:
             self.reconstructed |= _root_whole(spec, fields)
+        # a resume's restart time (backend.resume_run): the solver reads
+        # it at start, and after a P1-5 walk-back the replay ingests
+        # newer writes, so it is not among the newest two
+        self.protect(getattr(spec, 'restart_dir', None), 'restart')
         self._resume_state()
         fams = ([VOLUMES] if self.volumes_on else []) + [
             k for fo, k in ((VTK_SECTIONS, SECTIONS),

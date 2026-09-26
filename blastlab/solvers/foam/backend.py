@@ -876,6 +876,10 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
     # that matches its mesh, which is what keeps the peak/impulse maps
     # continuous across the resume.
     start_name, skipped = _resume_start_time(spec, times, hooks)
+    # OUT-2: the VTK export never deletes the time the solver restarts
+    # from. After a P1-5 walk-back it is not among the newest writes the
+    # replay ingests, so KEEP_NEWEST alone would not keep it.
+    spec.restart_dir = start_name
     # ...and under AMR the accumulating FOs cannot be restarted at all
     _disable_fo_accumulators(spec, case, hooks)
     if skipped:
