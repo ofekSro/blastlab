@@ -134,7 +134,9 @@ class RunPanel(ctk.CTkFrame):
             corner_radius=theme.RADIUS, fg_color=c('card2'),
             hover_color=c('border'), command=self._browse_runs_dir)
         self._runs_browse.pack(side='left', padx=(0, PAD))
-        theme.tooltip(self._runs_browse, 'Choose the runs folder')
+        theme.tooltip(self._runs_browse,
+                      'Choose the Runs folder: the folder that holds one '
+                      'sub-folder per model.')
         # results used to be labelled by dim + a counter only, so three
         # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
         self.run_name = tk.StringVar(value='')

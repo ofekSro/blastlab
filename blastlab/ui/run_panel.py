@@ -21,6 +21,10 @@ from .theme import GAP, PAD
 from .widgets import (Card, Chip, Segmented, WrapRow, button, hbox, label,
                       set_button_kind)
 
+#: the Runs folder's Browse button (the Tk folder icon says the same)
+BROWSE_TIP = ('Choose the Runs folder: the folder that holds one '
+              'sub-folder per model.')
+
 
 class RunPanel(QWidget):
     run_requested = Signal()
@@ -133,6 +137,7 @@ class RunPanel(QWidget):
         mbar.addWidget(self.runs_dir, 1)
         self.runs_browse = button('Browse…', 'folder', height=30,
                                   on_click=self._browse_runs_dir)
+        self.runs_browse.setToolTip(BROWSE_TIP)
         mbar.addWidget(self.runs_browse)
         mbar.addSpacing(PAD - GAP)
         # results used to be labelled by dim + a counter only, so three
@@ -140,6 +145,7 @@ class RunPanel(QWidget):
         mbar.addWidget(label('Model', 'muted'))
         self.run_name = QLineEdit()
         self.run_name.setFixedWidth(180)
+        self.run_name.setPlaceholderText('MODEL')
         self.run_name.setToolTip(
             'Required. The model folder <Runs folder>\\<Model> that '
             'receives every file of this run (a valid Windows folder name, '

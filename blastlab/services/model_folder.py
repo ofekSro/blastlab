@@ -653,10 +653,18 @@ def _write_result_rows(res, case, dim, stage_dir, info, log, verify, fail,
         or os.path.basename(os.path.normpath(stage_dir))
     ent = SimpleNamespace(label=label, display=label, dim=dim, result=res)
 
+    def figures_log(msg):
+        # run_export names each PNG bare ("Saved x.png"); in the run log
+        # it reads as if in the working folder (GUI QA C3)
+        if msg.startswith('Saved '):
+            msg = f'Saved {os.path.join(FIGURES_DIR, msg[len("Saved "):])}'
+        log(msg)
+
     def export(kind, target):
         try:
-            return exports.run_export(kind, ent, target, log=log,
-                                      open_after=False)
+            return exports.run_export(
+                kind, ent, target, open_after=False,
+                log=figures_log if kind == 'pngs' else log)
         except Exception as exc:        # run_export logs and returns None
             log(f'Export failed: {exc}')
             return None

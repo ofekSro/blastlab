@@ -149,7 +149,10 @@ class ChainPanel(QWidget):
         a dialog. A dialog that hangs or raises must not be able to
         swallow the reason."""
         lines = [str(ln) for ln in lines if str(ln).strip()]
-        self.status.setText(' '.join(' '.join(lines).split())[:300])
+        # one line of sentences: each ends with a stop (GUI QA V2)
+        said = [ln.rstrip() if ln.rstrip()[-1] in '.:!?'
+                else ln.rstrip() + '.' for ln in lines]
+        self.status.setText(' '.join(' '.join(said).split())[:300])
         for ln in lines:
             self._log(f'Chain: {ln}')
         try:
