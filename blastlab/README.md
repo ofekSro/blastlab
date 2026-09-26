@@ -44,7 +44,8 @@ blastlab_qt.bat                 # the GUI, double-clickable from anywhere
 blastlab.bat                    # the same thing (or: python -m blastlab)
 python -m blastlab --case a.json   # open a case at startup
 python -m blastlab --tk         # the Tkinter GUI, kept as the way back
-python -m blastlab --cli 2d     # historical prompt workflow
+python -m blastlab --cli 2d --runs-dir D:\runs --model M   # prompt workflow
+python -m blastlab --hd13 m.json --runs-dir D:\runs --model M  # HD 1.3
 python blast1d.py               # the old scripts still work (thin wrappers)
 ```
 
@@ -75,7 +76,57 @@ also sets how often the solver samples the live slice / profile, so
 the picture really moves every N solver steps), **Results** (snapshot
 browser, gauge histories, animation replay with a **0.25x - 4x speed**,
 exports), **Chain**
-(auto-wired 1D → 2D → 3D remap workflow into a workspace folder).
+(auto-wired 1D → 2D → 3D remap workflow into the Run tab's model folder).
+
+## Where a run's files go
+
+`OUT-1`, [model-folder-and-vtk-plan.md](../docs/model-folder-and-vtk-plan.md)
+§2. No run starts without a **Runs folder** and a **Model** name (the two
+boxes on the Run tab, both GUIs; the Runs folder is remembered). Run,
+Initialise Model, a resume, the Chain tab and the HD 1.3 tab all refuse,
+with one message naming the box, when the folder is empty or missing or
+the name is not a valid Windows folder name (at most 100 characters).
+Everything the run produces goes into `<Runs folder>\<Model>\`:
+
+| Path | Content |
+|---|---|
+| `MODEL.json` | the case exactly as run (paths relative to the folder) |
+| `run.log` | the solver-side log of the run |
+| `manifest.json` | model, times, solver, dim, git commit, stop reason, cells, ranks, steps, the WSL scratch, `outputs`, `missing` (with why), `failed` |
+| `gauges\gauges_<d>d.txt`, `gauges\gauges_<d>d_summary.csv` | gauge TSV and per-gauge peak / arrival / impulse |
+| `figures\*.png`, `fields\*.csv`, `report.html` | the Results-tab exports |
+| `animation.mp4` / `.gif` | only when replay frames were recorded; the format is the Setup tab's choice |
+| `profile.txt` / `profile_2d.npz` | 1D / axisymmetric 2D profile; `trigger_remap.npz` for a remap trigger |
+| `foam\` (blastFoam) | `system`, `constant`, `0`, `postProcessing`, `log.*` and `SHA256SUMS` |
+
+The Setup tab's output file-name boxes are gone (the names above are
+fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
+
+- **An existing model** is overwritten only after a Yes/No question, and
+  only if blastlab created it (it holds a `.blastlab-model` marker) or it
+  is empty; any other folder is refused. A file open elsewhere (ParaView)
+  refuses with the OS error.
+- **The WSL scratch.** blastFoam still solves in
+  `/root/blastlab_runs/<stamp>_<d>d_p<pid>-NN`. After a run that finished,
+  every row above is checked and `foam\` is verified against hashes taken
+  inside WSL; only then is the scratch deleted. A failed, stopped or
+  partly copied run keeps it (`manifest.json` says why), and the run
+  browser, `--load-foam-run` and the VTK button work on it as before.
+- **Chain**: `<MODEL>\1d\`, `2d\`, `3d\`, one folder per stage as above,
+  with `handoff_1d_to_2d.txt` and `handoff_2d_to_3d.npz` at the model root
+  and a root `manifest.json` listing the stages and hand-offs. There is no
+  workspace box any more.
+- **HD 1.3**: `<MODEL>\MODEL.json`, `hd13_report.html`, `hd13_loads\` (the
+  SBEDS CSVs) and `manifest.json`; `--hd13-wall-export` writes
+  `<MODEL>\wall_loads\`.
+- **Command line**: `--cli`, `--hd13` and `--hd13-wall-export` need
+  `--runs-dir DIR --model NAME` (without them: exit 2 and the usage);
+  an existing model is asked about with y/N. The native `--cli` runs the
+  historical prompts with the model folder as working directory, and its
+  manifest lists the rows that flow does not write. `--hd13-new`,
+  `--load-foam-run` and `--clean-foam-runs` take neither.
+- The Results-tab export buttons still work as before, and their file
+  dialogs open in the result's model folder.
 
 ## Solver mode
 

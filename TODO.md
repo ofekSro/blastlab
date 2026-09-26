@@ -28,7 +28,7 @@ fixed and approved — the disk.
 
 | Id | What | Order |
 |---|---|---|
-| `OUT-1` | **Model folder.** A runs folder and a model name are mandatory before any run (Qt, Tk, chain, HD1.3, CLI). Every output of a run lands in `<runs>\<MODEL>\` — case, log, gauges, figures, report, the OpenFOAM skeleton, VTK. The WSL scratch is deleted after a verified success, kept on failure. Re-running a model overwrites after confirmation. Plan §2 | 1 |
+| `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
 | `OUT-2` | **VTK output options** (Viper-style Output card, blastFoam only): off / sections and obstacles / volumes, a per-case field checklist, cadence in simulated ms or solver steps, files into `<MODEL>\vtk\`, time directories deleted as they are converted. Plan §3 | 2, then owner acceptance |
 | `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. Only after the owner accepts `OUT-1` + `OUT-2`. Plan §6 | 3 |
 | `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |

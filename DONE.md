@@ -504,6 +504,60 @@ hd1-16-load-export". Owner decisions of 2026-09-26, taken during planning:
 
 ---
 
+## 0c. 2026-09-26 — batch `out-1-model-folder` (OUT-1)
+
+Plan: `docs/batches/2026-09-26-out-1-model-folder.md`, specification
+`docs/model-folder-and-vtk-plan.md` §2. Owner answers of 2026-09-26: Q1 the output
+file-name boxes hidden, the .gif/.mp4 choice kept; Q2 the native `--cli` keeps its
+legacy prompts; Q3 export dialogs start in the model folder; Q4 only a folder blastlab
+created (or an empty one) is ever overwritten; the foam CLI reaches the model-folder
+writer through the `jobs` registration hook.
+
+### `OUT-1` · The model folder
+
+- **What:**
+  - No run starts without a **Runs folder** and a **Model** name (Qt and Tk Run tabs,
+    Initialise Model, resume, Chain, HD 1.3, `--cli` / `--hd13` / `--hd13-wall-export`).
+    A refusal names its box; nothing is written before it.
+  - Everything a run produces lands in `<runs>\<MODEL>\`: `MODEL.json`, `run.log`,
+    `manifest.json`, gauges, figures, fields, report, animation, profile, and for
+    blastFoam `foam\` with `SHA256SUMS`. The WSL scratch is deleted only after a
+    finished run's rows and hashes verify; a failed or stopped run keeps it, and the
+    manifest says why.
+  - Overwrite asks first, and only for a folder holding the `.blastlab-model` marker
+    or an empty one. The Desktop (or a model folder holding it) is refused.
+  - Chain: `<MODEL>\1d`, `2d`, `3d`, hand-offs and a root manifest at the model root;
+    the workspace box is gone. HD 1.3: `hd13_report.html`, `hd13_loads\`, `MODEL.json`
+    (replacing the leaked temp case file); `--report` is gone.
+  - The stage writer is `services/model_folder.stage_solve`, registered with
+    `solvers/jobs` (solvers never import services); its outcome reaches the GUIs in a
+    `('folder', …)` queue message.
+  - Found on the way: the Tk resume never started its worker. Fixed with the rest.
+- **Files:** `services/model_folder.py` (new), `services/{exports,hd13}.py`,
+  `solvers/{jobs,hooks,worker}.py`, `solvers/foam/{backend,cli_run}.py`,
+  `models/fields.py`, `output/{cli_hd13,load_csv,animation}.py`, `core/settings.py`,
+  `cli.py`, `__main__.py`, `ui/{app,run_panel,run_controller,chain_panel,exports,
+  fieldform,setup_spec,testing}.py`, `gui/{app,run_panel,chain_panel,forms,
+  results_panel}.py`.
+- **Tests:** new `test_model_folder.py` (A–D), `test_run_preflight.py` (Qt, CLI, Tk),
+  `_e2e_model_folder.py` (WSL: OK / KILLED / STOP, 26/26); `_qa_ui_harness.py` M01–M05
+  and `_qa_gui_harness.py` M01–M04 new, G01–G03 rewritten. D10 setup edits and golden
+  re-pins each in their own commit, no number moved. `test_regression` byte-identical.
+- **Commits:** Steps 1–4 `30f3e04` `313f087` `90c7419` `8a29628`, verify `b409af6`
+  `2ea3948` `2ce2c0b`; 4b `649b911`; 5 `ce603b9` `3d02565` `83f6cb6`; 6 `b7703b4`
+  `ccb3999`; 7 `0aa1f85` `9e125cf` `a59bced`; 8 `889d47f`; 9 `4d3b39f` `abf051c`;
+  10 `3b16825`; 11 the commit of this entry.
+- **Real runs (2026-09-26):** `_e2e_model_folder.py` 26/26, `_e2e_ui_resume_foam.py`
+  21/21, `_e2e_hd13_gui.py` PASS, harness M/G scenarios without a finding (Qt
+  offscreen + real window, Tk). `_e2e_ui_chain_foam.py` / `_e2e_gui_chain_foam.py`:
+  1D and 2D stages as specified (folders, root hand-offs, verified copies, scratches
+  released); the 3D stage was still solving at each script's own limit (30 / 40
+  min). It needs ~55 min here, and a 240 s A/B showed the model-folder path solving
+  at the plain path's rate (ratio 1.004), so the limit, not `OUT-1`, is short.
+- **QA:** `gui-qa-tester` screenshots pending (not run by the implementer).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
