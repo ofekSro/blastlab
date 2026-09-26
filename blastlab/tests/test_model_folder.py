@@ -693,6 +693,95 @@ def test_c_handoff_failure_keeps_rows():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def test_c_folder_message_before_result():
+    """verify (Steps 5-11): the stage's manifest and notice travel in a
+    ('folder', stage_dir, manifest, notice) message posted before the
+    stage's 'result', because a chain's next stage overwrites
+    hooks.stage_manifest. The result knows its model folder."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    try:
+        w, folder, seen = run_worker(case1d(), runs)
+        msgs = []
+        while not w.q.empty():
+            msgs.append(w.q.get_nowait())
+        tags = [m[0] for m in msgs]
+        assert tags.index('folder') < tags.index('result'), tags
+        folder_msg = msgs[tags.index('folder')]
+        assert folder_msg[1] == folder and folder_msg[3] is None
+        assert folder_msg[2] == _manifest(folder)
+        res = w.results[0]
+        assert res.meta['model_dir'] == folder
+        assert res.meta['scratch_released'] is False
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_resume_stage_writes_the_folder():
+    """verify (Steps 5-11): a resume with a model folder is a run stage -
+    the jobs files, every row, and the scratch release. stage_dir=None
+    stays the bare resume that writes nothing."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.foam import backend
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real_resume, real_release = backend.resume_run, \
+        mf.verify_and_release_scratch
+    calls = []
+
+    def fake_resume(path, hooks):
+        calls.append(('resume', path))
+        hooks.scratch_posix = POSIX
+        return solvers_pkg.get_solver(2, 'native')(case2d(), hooks)
+
+    def recorder(manifest, stage_dir, posix, errored, stopped_early,
+                 log=print, **kw):
+        calls.append(('release', posix, errored, stopped_early))
+        return manifest, None
+    backend.resume_run = fake_resume
+    mf.verify_and_release_scratch = recorder
+    try:
+        label, bare = jobs.resume_stage(2, POSIX)
+        assert label == 'Resume 2D (blastfoam)'
+        assert bare.__qualname__.endswith('resume')
+        folder = mf.prepare(runs, 'RESUMED', confirm=lambda t: True)
+        w = SolverWorker([jobs.resume_stage(
+            2, POSIX, case2d(solver='blastfoam'), stage_dir=folder,
+            run_info=dict(model='RESUMED'))])
+        w.run()
+        assert w.error is None, w.error
+        assert calls == [('resume', POSIX),
+                         ('release', POSIX, False, False)], calls
+        on_disk = files_on_disk(folder)
+        for rel in ('MODEL.json', 'run.log', 'report.html',
+                    'gauges/gauges_2d.txt', 'profile_2d.npz'):
+            assert on_disk.get(rel, 0) > 0, (rel, sorted(on_disk))
+        m = _manifest(folder)
+        assert m['solver'] == 'blastfoam' and m['failed'] == [], m
+    finally:
+        backend.resume_run = real_resume
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_run_info_and_layout():
+    from types import SimpleNamespace
+    t = mf.Target(runs_dir='R', model='M', folder=os.path.join('R', 'M'))
+    assert mf.stage_dirs(t, [2]) == [t.folder]
+    assert mf.stage_dirs(t, [1, 2, 3]) == [os.path.join(t.folder, d)
+                                           for d in ('1d', '2d', '3d')]
+    rep = SimpleNamespace(n_cells=864000,
+                          run_plan=SimpleNamespace(ranks=13))
+    info = mf.run_info(t, case2d(solver='blastfoam'), rep)
+    assert info == dict(model='M', runs_dir='R', model_dir=t.folder,
+                        n_cells=864000, n_procs=13), info
+    assert mf.run_info(t, case2d(), rep)['n_procs'] == 1
+    assert mf.run_info(t, case1d(solver='blastfoam'), rep)['n_procs'] == 1
+    assert 'n_cells' not in mf.run_info(t)
+    h = mf.handoff_paths(t, [1, 2, 3])
+    assert h == {(1, 2): os.path.join(t.folder, 'handoff_1d_to_2d.txt'),
+                 (2, 3): os.path.join(t.folder, 'handoff_2d_to_3d.npz')}
+
+
 def test_c_no_stage_dir_is_unchanged():
     """stage_dir=None returns the plain solve (test_char_write_failure
     pins what it does); nothing is bound or logged to a file."""
@@ -1035,6 +1124,8 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_c_worker_folder_complete_before_result,
          test_c_failed_gauge_tsv, test_c_solver_raises,
          test_c_stopped_before_start, test_c_handoff_failure_keeps_rows,
+         test_c_folder_message_before_result,
+         test_c_resume_stage_writes_the_folder, test_c_run_info_and_layout,
          test_c_no_stage_dir_is_unchanged,
          test_d_clean_run_releases_once, test_d_flipped_byte_keeps_scratch,
          test_d_partial_copy_keeps_scratch,

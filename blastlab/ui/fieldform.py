@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout,
                                QVBoxLayout, QWidget)
 
 from . import dialogs, theme
-from .setup_spec import INPUT_MIN, LABEL_WRAP, cards
+from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, cards
 from .theme import GAP
 from .widgets import Card, button, label
 
@@ -561,7 +561,7 @@ class FieldForm(QWidget):
             scope = getattr(card, '_blastlab_scope', None)
             card.setVisible(scope in (None, mode))
         for name, f in self._specs.items():
-            on = f.scope in (None, mode)
+            on = f.scope in (None, mode) and name not in HIDDEN_ROWS
             if on and f.group is not None:
                 on = bool(groups.get(f.group, True))
             self._set_row_visible(name, on)

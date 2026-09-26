@@ -22,6 +22,10 @@ def private_settings():
 
     A test must never delete a run directory, so the file is written with
     the sweep off rather than left absent.
+
+    OUT-1: it also carries a throwaway `runs_dir` (a `runs` folder beside
+    the file), so a test that runs something never writes a model folder
+    into the owner's runs folder.
     """
     path = os.environ.get('BLASTLAB_SETTINGS')
     if not path:
@@ -29,7 +33,57 @@ def private_settings():
                             'settings.json')
         os.environ['BLASTLAB_SETTINGS'] = path
     disable_cleanup(path)
+    private_runs_dir(path)
     return path
+
+
+def private_runs_dir(path=None):
+    """The throwaway runs folder of the private settings file at `path`:
+    `<dir of the file>\\runs`, created, and written into the file as
+    `runs_dir` unless the file already names an existing one. Returns
+    the folder (None without a settings file)."""
+    path = path or os.environ.get('BLASTLAB_SETTINGS')
+    if not path:
+        return None
+    data = {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, ValueError):
+        data = {}
+    runs = data.get('runs_dir')
+    if runs and os.path.isdir(runs):
+        return runs
+    runs = os.path.join(os.path.dirname(os.path.abspath(path)), 'runs')
+    os.makedirs(runs, exist_ok=True)
+    data['runs_dir'] = runs
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+    except OSError:
+        pass
+    return runs
+
+
+def use_model(win, name='QA', runs_dir=None):
+    """Fill the Run tab's Runs folder (default: the private one) and
+    Model boxes of the Qt window `win`, so pressing Run passes the OUT-1
+    pre-flight. An existing model folder of that name is removed first,
+    so no overwrite question comes up. Returns the model folder path."""
+    import shutil
+    from ..services import model_folder
+    runs = runs_dir or private_runs_dir()
+    folder = os.path.join(runs, name)
+    if os.path.isdir(folder):
+        if not model_folder.is_model_folder(folder):
+            raise RuntimeError(f'use_model: {folder} is not a blastlab '
+                               f'model folder - not deleting it')
+        shutil.rmtree(folder, ignore_errors=True)
+    win.run_panel.set_runs_dir(runs)
+    win.run_panel.run_name.setText(name)
+    return folder
 
 
 def disable_cleanup(path=None):

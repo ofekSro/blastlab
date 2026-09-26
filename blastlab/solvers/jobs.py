@@ -128,14 +128,43 @@ def solve_stage(dim, case, stage_dir=None, run_info=None):
                                  lambda bound: _solver(dim, bound)))
 
 
-def _solver(dim, case):
+def resume_stage(dim, path, case=None, stage_dir=None, run_info=None):
+    """(label, solve_callable(hooks) -> Result) resuming the stopped
+    blastFoam run at `path` (backend.resume_run).
+
+    Without `stage_dir` it is the plain resume, exactly as before OUT-1:
+    no file is written. With a prepared model folder the resume is a run
+    stage like any other (`solve_stage`): `case` - the run's own
+    case.json - is bound into the folder, the gauge TSV / animation /
+    profile are written, then every row of the model folder, and the WSL
+    scratch is released after a verified copy."""
+    label = f'Resume {dim}D (blastfoam)'
+
+    def resume(hooks):
+        from .foam.backend import resume_run
+        return resume_run(path, hooks)
+    if stage_dir is None:
+        return (label, resume)
+    if _stage_folder is None:
+        raise RuntimeError('resume_stage(stage_dir=...) needs '
+                           'blastlab.services.model_folder imported - it '
+                           'registers the model-folder writer')
+    return (label, _stage_folder(dim, case, stage_dir, run_info,
+                                 lambda bound: _solver(dim, bound, resume)))
+
+
+def _solver(dim, case, run=None):
     """The solve callable of `solve_stage`: solve, then write the case's
-    own output files."""
+    own output files. `run(hooks) -> Result` replaces the solver (a
+    resume)."""
     backend = getattr(case, 'solver', 'native')
 
     def solve(hooks):
-        from . import get_solver
-        res = get_solver(dim, backend)(case, hooks)
+        if run is not None:
+            res = run(hooks)
+        else:
+            from . import get_solver
+            res = get_solver(dim, backend)(case, hooks)
         handoff = []        # (path, reason) or None per hand-off write
         # Both halves of the guard matter: gauge POINTS say there is
         # something to write, gauge_file says the case asked for it.

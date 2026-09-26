@@ -137,6 +137,7 @@ class MainWindow(QMainWindow):
         self.run_panel.exec_requested.connect(self.ctrl.exec_cmd)
         self.run_panel.refresh_changed.connect(self._apply_refresh)
         self.run_panel.gauges_wanted.connect(self._gauges_wanted)
+        self.run_panel.runs_dir_changed.connect(self._save_runs_dir)
 
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
@@ -379,12 +380,21 @@ class MainWindow(QMainWindow):
             self._apply_refresh()
         except Exception:
             pass
+        self.run_panel.set_runs_dir(st.get('runs_dir', ''))
+
+    def _save_runs_dir(self):
+        """OUT-1: the Runs folder box is remembered across sessions."""
+        try:
+            app_settings.update(runs_dir=self.run_panel.current_runs_dir())
+        except Exception:
+            pass
 
     def _save_ui_state(self):
         try:
             val, mode = self.run_panel.refresh_policy_text()
             state = dict(appearance=theme.mode(), refresh_value=val,
-                         refresh_mode=mode, solver=self.solver_mode.get())
+                         refresh_mode=mode, solver=self.solver_mode.get(),
+                         runs_dir=self.run_panel.current_runs_dir())
             # only a real, normal window has a meaningful geometry
             if self.isVisible() and not self.isMinimized() \
                     and not self.isMaximized():
@@ -528,9 +538,45 @@ class MainWindow(QMainWindow):
             return
         if not self._confirm_long_run([case]):
             return
+        model = self._model_target()
+        if model is None:
+            return
         if self.ctrl.start_stages([(case.dim, case)], paused=paused,
-                                  run_name=self.run_panel.current_run_name()):
+                                  run_name=model.model, model=model,
+                                  reports=[rep]):
             self._show('run')
+
+    def model_check(self):
+        """OUT-1: what is wrong with the Run tab's Runs folder and Model
+        boxes ([] = a run may start). No file is touched."""
+        from ..services import model_folder
+        return model_folder.check(self.run_panel.current_runs_dir(),
+                                  self.run_panel.current_run_name())
+
+    def _model_target(self, title='Run'):
+        """OUT-1 pre-flight, after the case validation and before anything
+        is written: refuse with one message naming the box when the Runs
+        folder or the Model name is wrong, ask before overwriting an
+        existing model, and return the prepared `model_folder.Target` -
+        or None, having said why (or the user said No)."""
+        from ..services import model_folder
+        if self.ctrl.running:
+            # before prepare: an overwrite could hit the running model
+            dialogs.show_info('Run', 'A run is already in progress.')
+            return None
+        errors = self.model_check()
+        if errors:
+            self.show_error(title, '\n'.join(errors))
+            return None
+        try:
+            return model_folder.prepare_target(
+                self.run_panel.current_runs_dir(),
+                self.run_panel.current_run_name(),
+                confirm=lambda text: dialogs.ask_yes_no(
+                    'Model folder', text, self))
+        except model_folder.ModelFolderError as exc:
+            self.show_error(title, str(exc))
+            return None
 
     def _dim_changed(self, dim):
         """Hide, never grey, the controls a dimension does not have - the
@@ -795,12 +841,18 @@ class MainWindow(QMainWindow):
         try:
             _p, unc = _env.case_paths(path)
             dim = int((dims_from_case_json(unc) or '?').rstrip('D'))
-        except (ValueError, OSError, TypeError) as exc:
+            # OUT-1: the resume writes the model folder from the run's own
+            # case, like a fresh run
+            case = load_case(os.path.join(unc, 'case.json'))
+        except (ValueError, OSError, TypeError, KeyError) as exc:
             self.notify(f'cannot resume {path}: {exc}', 'error')
             self._log_threadsafe(f'  [runs] cannot resume {path}: {exc}')
             return False
-        return self.ctrl.resume_foam_run(
-            path, dim, run_name=self.run_panel.current_run_name())
+        model = self._model_target('Resume')
+        if model is None:
+            return False
+        return self.ctrl.resume_foam_run(path, dim, run_name=model.model,
+                                         model=model, case=case)
 
     # ── status line ──────────────────────────────────────────────────────
     def notify(self, text, level='info'):

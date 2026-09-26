@@ -67,6 +67,23 @@ def can(kind, ent):
     ).get(kind, True)
 
 
+#: OUT-1: the VTK button of a run whose WSL case directory was deleted
+#: after a verified copy (plan sec. 2.3)
+SCRATCH_RELEASED = (
+    "This run's WSL scratch was released after a verified copy into the "
+    "model folder. Its foam\\ folder keeps the dictionaries, mesh, probes "
+    "and logs, not the written fields, so there is nothing left to write "
+    "as VTK.")
+
+
+def model_dir(ent):
+    """The result's model folder (OUT-1), when it has one that still
+    exists: the start directory of the export dialogs (owner Q3)."""
+    path = (getattr(getattr(ent, 'result', None), 'meta', None) or {}).get(
+        'model_dir')
+    return path if path and os.path.isdir(path) else ''
+
+
 def why_not(kind, ent):
     """Why a disabled button is disabled. A greyed control that says
     nothing is worse than no control: 'Profile' in particular is off for
@@ -75,8 +92,9 @@ def why_not(kind, ent):
         return 'Select a result first.'
     dim = ent.dim
     return dict(
-        vtk='Only a blastFoam run whose case directory still exists can '
-            'be written as VTK.',
+        vtk=(SCRATCH_RELEASED if ent.result.meta.get('scratch_released')
+             else 'Only a blastFoam run whose case directory still exists '
+                  'can be written as VTK.'),
         gif='This result has no recorded frames - tick "Record replay '
             'frames" before the run.',
         summary='This result has no gauges.',

@@ -263,6 +263,89 @@ def prepare(runs_dir, model, confirm):
     return target
 
 
+class Target(SimpleNamespace):
+    """A prepared model folder: `runs_dir`, `model` (trimmed) and
+    `folder`, the directory `prepare` returned."""
+
+
+def prepare_target(runs_dir, model, confirm):
+    """The front ends' pre-flight after `check` passed: `prepare`, as a
+    Target, or None when the overwrite was declined. Raises
+    ModelFolderError like `prepare`."""
+    folder = prepare(runs_dir, model, confirm)
+    if folder is None:
+        return None
+    return Target(runs_dir=str(runs_dir).strip(), model=str(model).strip(),
+                  folder=folder)
+
+
+def stage_dirs(target, dims):
+    """Where each stage of a run writes: the model folder itself for one
+    stage, `<MODEL>\\1d`, `2d`, `3d` for a chain (plan sec. 2.2)."""
+    dims = list(dims)
+    if len(dims) == 1:
+        return [target.folder]
+    return [os.path.join(target.folder, f'{int(d)}d') for d in dims]
+
+
+def run_info(target, case=None, rep=None, handoff=None):
+    """The manifest facts a front end knows before the run: the model,
+    the runs folder, the model root (for folder-relative hand-off paths)
+    and, from the pre-flight ValidationReport, `n_cells` and `n_procs`
+    (the planned MPI ranks of a blastFoam run; 1 for a native one).
+    `handoff`: the chain hand-off this stage writes (`stage_solve`)."""
+    info = dict(model=target.model, runs_dir=target.runs_dir,
+                model_dir=target.folder)
+    if handoff:
+        info['handoff'] = handoff
+    if rep is not None and getattr(rep, 'n_cells', None):
+        info['n_cells'] = int(rep.n_cells)
+    if case is not None:
+        if getattr(case, 'solver', 'native') != 'blastfoam':
+            info['n_procs'] = 1
+        elif case.dim == 1:
+            info['n_procs'] = 1                 # 1D blastFoam runs serial
+        elif rep is not None and getattr(rep, 'run_plan', None) is not None:
+            info['n_procs'] = int(rep.run_plan.ranks)
+    return info
+
+
+HANDOFF_PREFIX = 'handoff_'
+
+
+def handoff_paths(target, dims):
+    """The chain's hand-off files at the model root (plan sec. 2.2):
+    `handoff_1d_to_2d.txt` into a 2D stage, `handoff_2d_to_3d.npz` into
+    a 3D one. {(from_dim, to_dim): path}."""
+    dims = [int(d) for d in dims]
+    out = {}
+    for a, b in zip(dims, dims[1:]):
+        ext = '.txt' if a == 1 else '.npz'
+        out[(a, b)] = os.path.join(
+            target.folder, f'{HANDOFF_PREFIX}{a}d_to_{b}d{ext}')
+    return out
+
+
+def write_chain_root(target, dims, folders):
+    """The chain's root manifest.json, written when the run is done:
+    {"chain": [1, 2, 3], "stages": {"1d": <stage manifest>}, "handoffs":
+    [...]} plus the model, the runs folder and the finish time.
+    `folders` maps each stage folder that was written to its manifest (a
+    stage that never ran is absent); `handoffs` lists the hand-off files
+    found at the model root. Returns an error text or None."""
+    stages = {os.path.basename(os.path.normpath(d)): m
+              for d, m in folders.items()}
+    try:
+        handoffs = sorted(n for n in os.listdir(target.folder)
+                          if n.startswith(HANDOFF_PREFIX))
+    except OSError:
+        handoffs = []
+    manifest = dict(model=target.model, runs_dir=target.runs_dir,
+                    finished=now_iso(), chain=[int(d) for d in dims],
+                    stages=stages, handoffs=handoffs)
+    return write_manifest(manifest, target.folder)
+
+
 # ── binding a case to its folder ─────────────────────────────────────────
 def anim_ext(anim_file):
     """The animation's extension: the case's own .gif / .mp4 choice
@@ -894,6 +977,14 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
         bound, res, err = case, None, None
         try:
             bound = bind_case(case, stage_dir)
+            if info.get('handoff'):
+                # a chain stage feeding the next: its profile IS the
+                # hand-off at the model root, and a 'remap' trigger writes
+                # there too - a blank trigger file, the form default the
+                # chain always ran with before OUT-1 (jobs falls back to
+                # profile_file)
+                bound.profile_file = info['handoff']
+                bound.trigger_file = None
             res = make_solve(bound)(hooks)
             return res
         except Exception as exc:
@@ -926,6 +1017,17 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                         hooks.log(f'  [warn] WSL scratch kept: the foam\\ '
                                   f'copy raised {exc!r}: {posix}')
                 hooks.stage_manifest = manifest
+                if res is not None:
+                    # the Results tab: export dialogs start here (Q3), and
+                    # the VTK button says why the case directory is gone
+                    res.meta['model_dir'] = stage_dir
+                    res.meta['scratch_released'] = bool(
+                        (manifest.get('wsl_scratch') or {}).get('deleted'))
+                try:
+                    hooks.folder_written(stage_dir, manifest,
+                                         hooks.folder_notice)
+                except Exception:          # a front end's bug is not the run's
+                    pass
             finally:
                 hooks.log_file = prev_log
     return solve

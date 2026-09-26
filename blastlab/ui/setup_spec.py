@@ -164,12 +164,21 @@ def _anim_ext():
     return default_ext()
 
 
+#: OUT-1 (owner Q1, 2026-09-26): the output FILE NAME rows are built but
+#: never shown - a run writes the model folder's own names (plan sec.
+#: 2.2) - and their values still pass through load -> save. The .gif /
+#: .mp4 choice stays visible as `anim_format`.
+HIDDEN_ROWS = ('gauge_file', 'anim_file', 'profile_out', 'trigger_file')
+
+
 def _outputs(dim):
     out = [F('gauge_file', 'Gauge TSV', 'text',
              f'gauges_{dim}d.txt' if dim > 1 else 'gauges.txt')]
     if dim > 1:
         out.append(F('anim_file', 'Animation (.gif / .mp4)', 'text',
                      f'blast_{dim}d_animation{_anim_ext()}'))
+        out.append(F('anim_format', 'Animation format', 'choice',
+                     _anim_ext(), values=('.mp4', '.gif')))
         # the video's colour range: one for the whole video by default,
         # so the colour bar means the same thing in every frame
         out.append(F('anim_scale', 'Video colours', 'choice',
@@ -202,8 +211,10 @@ def _trigger(dim):
             F('trigger_action', 'On arrival', 'choice', 'terminate',
               values=tuple(acts))]
     if dim < 3:
+        # hidden (HIDDEN_ROWS); non-blank so a 'remap' action validates -
+        # the run writes <MODEL>\trigger_remap.npz whatever it says
         rows.append(F('trigger_file', 'Remap file\n(blank = profile out)',
-                      'text'))
+                      'text', 'trigger_remap.npz'))
     return CardSpec('Trigger gauge', col=1, rows=tuple(rows))
 
 

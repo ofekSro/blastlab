@@ -584,6 +584,10 @@ class CaseForm(ctk.CTkFrame):
                         _entry(out, self._var(
                             'anim_file',
                             f'blast_{self.dim}d_animation{_ext}')))
+            # OUT-1 (owner Q1): the .gif / .mp4 choice, as in the Qt form
+            orow = _row(out, orow, 'Animation format',
+                        _combo(out, self._var('anim_format', _ext),
+                               ['.mp4', '.gif']))
             # the video's colour range. One range for the whole video by
             # default: the exporter used to rescale every frame, so the
             # colour bar meant something different in each one and the
@@ -642,8 +646,11 @@ class CaseForm(ctk.CTkFrame):
                         _combo(trig, self._var('trigger_action',
                                                'terminate'), acts))
             if self.dim < 3:
+                # non-blank, as in the Qt form (OUT-1): a 'remap' action
+                # validates, and the run writes <MODEL>\trigger_remap.npz
                 _row(trig, trow, 'Remap file\n(blank = profile out)',
-                     _entry(trig, self._var('trigger_file', '')))
+                     _entry(trig, self._var('trigger_file',
+                                            'trigger_remap.npz')))
 
         self._sync_geometry()
         self._apply_mode()

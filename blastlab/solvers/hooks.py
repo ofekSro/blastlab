@@ -155,6 +155,14 @@ class RunHooks:
         except (OSError, ValueError):
             pass
 
+    def folder_written(self, stage_dir, manifest, notice=None):
+        """OUT-1: a stage has finished writing its model folder. Called on
+        the worker thread, before the stage's 'result' / 'error', with
+        the manifest dict and a kept-scratch dialog text (or None). A
+        front end that runs several stages on one hooks object reads the
+        outcome from here, not from `hooks.stage_manifest`, which the
+        next stage overwrites."""
+
     def progress(self, p: Progress):
         """Called every step (cheap; receivers throttle themselves)."""
 
