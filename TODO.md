@@ -614,7 +614,7 @@ unit volume, so e0 [J/kg] = E0 / ρ0). Footnote b = "estimated quantities".
 | PETN | e0 | 5.81e6 | E0 0.1010 → 1.01e10 / 1770 = **5.706e6** | +1.8 % |
 | PETN | Pcj | 3.1e10 | 0.335 → 3.35e10 | -7 % |
 | PETN | A, B, R1, R2, ω | - | 6.170 / 0.16926 / 4.40 / 1.20 / 0.25 | matches (B rounded) |
-| **RDX** | all | A 7.78e11, B 7.07e9, R1 4.485, R2 1.068 | **not in Table 8-7** | unsourced |
+| **RDX** | all | *(removed 2026-09-26)* | **not in Table 8-7** | removed, see 2 |
 | **ANFO** | all | A 4.95e10, B 1.89e9, R1 3.90 ... | **not in Table 8-7** | unsourced |
 
 **Decision (owner):** every row must trace to a primary source, value for value.
@@ -627,6 +627,22 @@ unit volume, so e0 [J/kg] = E0 / ρ0). Footnote b = "estimated quantities".
    depends on diameter and density, so the choice is an engineering one. Until the owner
    decides, the row is marked **unsourced** in the code and in the GUI list, and its
    values stay as they are.
+   - **RDX: ✅ removed, owner 2026-09-26.** No primary source found a cylinder-test JWL
+     set for *pure* RDX: LLNL Table 8-7 and Lee, Hornig & Kury 1968 (UCRL-50422) give
+     only Comp B / cyclotol; Liu et al., *FirePhysChem* 6 (2026) 51-60, Table 1 gives
+     only aluminised / waxed RDX, KHT-computed. The old row was HMX's with ρ0 1770.
+     C4 (91 % RDX) stays. `core/materials.REMOVED` makes a saved RDX case fail
+     validation with the reason. ConWep (heats only) and the Viper theory manual (no
+     material data) were checked and carry nothing usable.
+   - **ANFO: source chosen, owner 2026-09-26, not yet applied.** The owner accepts the
+     blastFoam 6.2.0 set in `validation/blastFoam/rateStick/*/constant/phaseProperties`,
+     which cites Souers et al. (2000), *JWL++* (and Guilkey et al. 2007): products
+     **JWLC** A 2.9867e11, B 4.11706e9, R1 4.95, R2 1.15, C 7.206147e8, ω 0.35,
+     ρ0 1160; E0 4.0e9 J/m³ (e0 ≈ 3.45 MJ/kg); reactants Murnaghan n 7.4, κ 3.9e11,
+     Γ 0.35. Open before applying: (a) it is **JWLC** (a `C` term), not the table's JWL,
+     so `Material`, the writer and the native EOS need the C term or a documented
+     reason to drop it; (b) it has **no D and no Pcj**; (c) ρ0 1160 against today's
+     850. Changing it moves every ANFO result; re-baseline in its own commit.
 3. Changing C4 / HMX / PETN moves the results of runs with those materials, but **not
    TNT**, so the KB anchor and every TNT golden stay put. Check whether any golden uses
    another material, and if so re-baseline it in its own commit.

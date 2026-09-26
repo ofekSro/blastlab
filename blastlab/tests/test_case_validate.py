@@ -483,7 +483,7 @@ def afterburn_calibration_checks():
     check('TNT: still says it is calibrated',
           notes and 'calibrated against Kingery-Bulmash' in notes[0])
 
-    for mat in ('C4', 'RDX', 'HMX', 'PETN', 'ANFO'):
+    for mat in ('C4', 'HMX', 'PETN', 'ANFO'):
         warns, notes = msgs(mat)
         check(f'{mat}: warned, not quietly noted',
               len(warns) == 1 and not notes, (warns, notes))
