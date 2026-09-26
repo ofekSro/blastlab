@@ -749,6 +749,14 @@ Acceptance: a Z ≈ 6 gauge gets an arrival and a positive impulse; HD1-3d G1's 
 rises by ~1.1 %; peaks are unchanged everywhere; `test_regression.py` differs only in
 the arrival / impulse columns, and the table shows it.
 
+### P1-19 · The Tk process died once in a native 1D→2D chain · **found 2026-09-26 (OUT-1 QA F1)**
+
+1 of 7 Tk chains: after the hand-off, `vtkWin32OpenGLRenderWindow: wglMakeCurrent failed
+... error 170` four times, then exit with no Python traceback. The 2D axisymmetric stage
+builds a 3D scene inside the Tk process (`gui/app.py _attach_view3d_auto` →
+`gui/view3d_panel.py adopt_feed` → `_ensure_scene`). Pre-existing, not OUT-1. Evidence:
+`docs/qa/2026-09-26-out-1/tk_timing.out.txt`.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
@@ -951,6 +959,22 @@ criterion is re-judged.** C1-C13 were registered before the run and stand as jud
 
 Source: `docs/ENGINEERING_QUESTIONS.md` hd1-3d-close #1 (C10), #4, #7, #8;
 hd1-wall-load #2.
+
+### P2-16 · Tk: one `root.update()` runs 10-13 s in a chain's later stage · **found 2026-09-26 (OUT-1 QA §6)**
+
+The live-slice matplotlib redraw keeps queueing work (`gui/run_panel.py:712` →
+`mpl.py:104`), so the call does not return. The window stays responsive (WM_NULL
+≤ 1.3 s): a stall of one call, not a freeze.
+
+### P2-17 · Resume and the run browser do not know the model · **found 2026-09-26 (OUT-1 QA C2)**
+
+A resume writes to whatever the Model box says; the run browser never shows a run's
+model; after a resume the original model's manifest still says its scratch was kept.
+
+### P2-18 · Qt: Run chain during HD 1.3, and dialogs that break paths · **found 2026-09-26 (OUT-1 QA V1, V4)**
+
+Run chain stays enabled during an HD 1.3 assessment and its refusal is titled "Run". The
+Qt refusal and overwrite dialogs break a path after "C:".
 
 ---
 
