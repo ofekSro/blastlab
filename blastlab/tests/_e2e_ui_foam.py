@@ -66,7 +66,7 @@ def main():
                       f'({os.path.basename(str(filename))}:{lineno})')
     warnings.showwarning = grab
 
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case1D, Case2D, Case3D, validate_case
     from blastlab.ui import dialogs
@@ -74,6 +74,7 @@ def main():
 
     out = tempfile.mkdtemp(prefix='blastlab_ui_foam_out_')
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(200)
 

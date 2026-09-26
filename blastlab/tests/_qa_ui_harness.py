@@ -370,6 +370,10 @@ class QA:
         t0 = time.perf_counter()
         self.win = MainWindow()
         self.build_ms = (time.perf_counter() - t0) * 1e3
+        # OUT-1: Run needs a runs folder and a model; the private runs
+        # folder of ensure_qapp's settings file, never the owner's
+        from blastlab.ui.testing import use_model
+        use_model(self.win)
         self.win.resize(1280, 840)
         t1 = time.perf_counter()
         self.win.show()

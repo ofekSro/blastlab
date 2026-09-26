@@ -64,7 +64,7 @@ def main():
         return 0
     print(f'blastFoam: {detail}')
 
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case2D
     from blastlab.ui.app import MainWindow
@@ -78,6 +78,7 @@ def main():
                   solver='blastfoam', material='TNT')
 
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(200)
     win.setup.set_case(case)
@@ -126,6 +127,7 @@ def main():
         return 1
 
     print('\nR2: resume it, the way the run browser does')
+    use_model(win, 'QA_RESUME')     # OUT-1: the resume's own model folder
     started = win._resume_foam_run(path)   # the run browser's callback
     check('the resume was accepted', started is True, str(started))
     if started is not True:

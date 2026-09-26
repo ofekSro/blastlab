@@ -36,7 +36,7 @@ def check(name, ok, detail=''):
 
 
 def main():
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case2D
     from blastlab.core.constants import ANIM_SCALE_LABELS
@@ -55,6 +55,7 @@ def main():
                   anim_file=None)
 
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(200)
     win.setup.set_case(case)
