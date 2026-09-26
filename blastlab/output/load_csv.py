@@ -485,9 +485,16 @@ def export_wall_loads(case, out_dir, src_dir=WALL_LOAD_DIR):
 
     Returns dict(dir, files, messages, params) as `export_hd13` does, plus
     the clearing parameters per gamma. The caller validates the case
-    first (core/assessment.wall_errors)."""
+    first (core/assessment.wall_errors). Files a previous export left in
+    `out_dir` under the same naming (G1_g*.*, planemax_g*.*) are removed
+    first, as `export_hd13` does, so a clearing-off re-run does not leave
+    stale `_cleared` files beside the new unrelieved ones."""
     traces, params = wall_load_traces(case, src_dir)
     os.makedirs(out_dir, exist_ok=True)
+    for pat in ('G1_g*.csv', 'G1_g*.txt', 'planemax_g*.csv',
+                'planemax_g*.txt'):
+        for old in glob.glob(os.path.join(out_dir, pat)):
+            os.remove(old)
     files, messages = [], []
     for name, t, load, lines in traces:
         path = os.path.join(out_dir, name)

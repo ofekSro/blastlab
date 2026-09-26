@@ -231,6 +231,14 @@ def test_export_on(tmp):
           'Eq. 2-10' in side and 'NOT applied' in side)
     check('and that Ps and q come from the 749 writes, not the probe',
           '749 writes' in side and 'NOT from the probe' in side)
+    # a clearing-off re-run into the same directory must not leave the
+    # _cleared files of the earlier export beside the unrelieved ones
+    lc.export_wall_loads(_case(), os.path.join(tmp, 'on'))
+    left = sorted(n for n in os.listdir(os.path.join(tmp, 'on'))
+                  if n.endswith('.csv'))
+    check('a clearing-off re-run leaves no stale _cleared CSV behind',
+          left == ['G1_g124.csv', 'G1_g140.csv', 'planemax_g124.csv',
+                   'planemax_g140.csv'], str(left))
 
 
 def test_refused(tmp):
