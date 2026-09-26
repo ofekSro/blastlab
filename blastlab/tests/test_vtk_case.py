@@ -173,8 +173,194 @@ def test_keys():
               'must be an object' in str(exc), str(exc))
 
 
+# ── B: validation ─────────────────────────────────────────────────────────
+
+
+def said(rep, words, where=('errors', 'warnings', 'notes')):
+    return [m for w in where for m in getattr(rep, w) if words in m]
+
+
+def vtk_errors(rep):
+    return [m for m in rep.errors if 'VTK' in m or 'vtk_' in m]
+
+
+def s_on(**kw):
+    d = {'on': True, 'mode': 'time', 'value': 0.5, 'fields': ['p', 'pMax'],
+         'obstacle_fields': [], 'planes': []}
+    d.update(kw)
+    return d
+
+
+def v_on(**kw):
+    d = {'on': True, 'mode': 'step', 'value': 25,
+         'fields': ['p', 'rho', 'U']}
+    d.update(kw)
+    return d
+
+
+def rep3(**kw):
+    """The shipped 3D default on blastFoam (validates clean) plus `kw`."""
+    from blastlab.core.case import validate_case
+    base = dict(solver='blastfoam', t_end=0.002)
+    base.update(kw)
+    return validate_case(Case3D(**base))
+
+
+def rep2(**kw):
+    from blastlab.core.case import validate_case
+    base = dict(solver='blastfoam', t_end=0.002,
+                obstacles=[(2.0, 2.4, 0.0, 1.6)])
+    base.update(kw)
+    return validate_case(Case2D(**base))
+
+
+def rep1(**kw):
+    from blastlab.core.case import validate_case
+    base = dict(solver='blastfoam', radius_m=5.0, cell_size_m=0.02)
+    base.update(kw)
+    return validate_case(Case1D(**base))
+
+
+def test_validation():
+    print('\nB: validation')
+    base3, base2, base1 = rep3(), rep2(), rep1()
+    check('the three base cases have no error at all',
+          not base3.errors and not base2.errors and not base1.errors,
+          f'{base3.errors} {base2.errors} {base1.errors}')
+    check('   and not one word about VTK',
+          not any(said(r, 'VTK') for r in (base3, base2, base1)))
+    ok3 = rep3(vtk_surfaces=s_on(planes=[['y', 1.0], ['z', 0.4]],
+                                 obstacle_fields=[]),
+               vtk_volumes=v_on())
+    check('3D, both families on and sane: no error',
+          not ok3.errors, str(ok3.errors))
+    ok1 = rep1(vtk_volumes=v_on(fields=['p', 'rho', 'U', 'T', 'alpha.expl',
+                                        'rhoE']))
+    check('1D volumes with its six fields: no error', not ok1.errors,
+          str(ok1.errors))
+    ok2 = rep2(vtk_surfaces=s_on(fields=[], obstacle_fields=['p', 'pMax']),
+               vtk_volumes=v_on(mode='time', value=0.1))
+    check('2D obstacles + volumes: no error', not ok2.errors, str(ok2.errors))
+
+    refusals = (
+        ('value <= 0 (surfaces)', rep3(vtk_surfaces=s_on(value=0)),
+         'VTK sections/obstacles: the interval must be > 0'),
+        ('value < 0 (volumes)', rep3(vtk_volumes=v_on(value=-5)),
+         'VTK volumes: the interval must be > 0'),
+        ('a value that is not a number',
+         rep3(vtk_volumes=v_on(value='fast')),
+         'VTK volumes: the interval must be a number'),
+        ('a fractional Step value', rep3(vtk_volumes=v_on(value=2.5)),
+         'whole number of solver steps'),
+        ('a mode not in time|step', rep3(vtk_volumes=v_on(mode='frames')),
+         "VTK volumes: mode 'frames'"),
+        ('a field 1D does not have', rep1(vtk_volumes=v_on(fields=['pMax'])),
+         "VTK volumes: 'pMax' is not written in 1D"),
+        ('an unknown field', rep3(vtk_volumes=v_on(fields=['Ma'])),
+         "VTK volumes: unknown field 'Ma'"),
+        ('an unknown obstacle field',
+         rep3(obstacles=[(1.2, 1.4, 0.2, 1.3, 0.0, 0.6)],
+              vtk_surfaces=s_on(obstacle_fields=['q'])),
+         "VTK obstacles: unknown field 'q'"),
+        ('a plane axis not in x y z',
+         rep3(vtk_surfaces=s_on(planes=[['q', 1.0]])),
+         "plane axis 'q'"),
+        ('a plane on the domain edge',
+         rep3(vtk_surfaces=s_on(planes=[['y', 1.5]])),
+         'plane y = 1.5 m is not inside the domain'),
+        ('a plane at 0', rep3(vtk_surfaces=s_on(planes=[['x', 0.0]])),
+         'plane x = 0 m is not inside the domain'),
+        ('a plane outside', rep3(vtk_surfaces=s_on(planes=[['z', -1.0]])),
+         'plane z = -1 m is not inside the domain'),
+        ('two planes on one cell layer',
+         rep3(vtk_surfaces=s_on(planes=[['y', 1.0], ['y', 1.004]])),
+         'snap to one cell layer'),
+        ('a plane on the live slice layer',
+         rep3(vtk_surfaces=s_on(planes=[['y', 0.752]])),
+         'the live slice and y = 0.752 m snap to one cell layer'),
+        ('planes in 2D', rep2(vtk_surfaces=s_on(
+            fields=[], obstacle_fields=['p'], planes=[['y', 1.0]])),
+         'VTK sections: planes are 3D only'),
+        ('section fields in 2D', rep2(vtk_surfaces=s_on(fields=['p'])),
+         'VTK sections: a 2D case has no sections'),
+        ('2D surfaces without obstacles', rep2(
+            obstacles=[], vtk_surfaces=s_on(fields=[],
+                                            obstacle_fields=['p'])),
+         'VTK obstacles: the case has no obstacles - nothing to sample'),
+        ('3D obstacle fields only, without obstacles', rep3(
+            vtk_surfaces=s_on(fields=[], obstacle_fields=['p'])),
+         'VTK obstacles: the case has no obstacles - nothing to sample'),
+        ('a family with no field at all', rep3(vtk_volumes=v_on(fields=[])),
+         'VTK volumes: no field selected'),
+        ('surfaces with no field at all', rep3(vtk_surfaces=s_on(
+            fields=[], obstacle_fields=[])),
+         'VTK sections/obstacles: no field selected'),
+        ('volumes together with a write budget',
+         rep3(write_budget=20, vtk_volumes=v_on()),
+         'both pin the write interval - clear one'),
+        ('volumes on a parallel AMR case',
+         rep3(amr_levels=1, n_procs=4, vtk_volumes=v_on()),
+         'cannot be exported from a parallel AMR run'),
+        ('an unknown key inside a family',
+         rep3(vtk_volumes=dict(v_on(), planes=[])),
+         'Unknown vtk_volumes keys'),
+    )
+    for what, rep, words in refusals:
+        check(f'refused: {what}', said(rep, words, ('errors',)),
+              str(rep.errors))
+
+    check('3D obstacle fields without obstacles, with section fields: a '
+          'note, not an error',
+          said(rep3(vtk_surfaces=s_on(obstacle_fields=['p'])),
+               'only the sections are written', ('notes',))
+          and not vtk_errors(rep3(vtk_surfaces=s_on(obstacle_fields=['p']))))
+    check('volumes on a SERIAL AMR case are allowed',
+          not said(rep3(amr_levels=1, n_procs=1, vtk_volumes=v_on()),
+                   'parallel AMR', ('errors',)))
+    check('a write budget with surfaces only is allowed',
+          not vtk_errors(rep3(write_budget=20, vtk_surfaces=s_on())))
+    off = rep3(vtk_surfaces=s_on(on=False, value=-1),
+               vtk_volumes=v_on(on=False, mode='bad'))
+    check('a family that is off is not looked at', not said(off, 'VTK'))
+    nat = rep3(solver='native', vtk_volumes=v_on(value=-1))
+    check('native mode: one note, "the native solver ignores it", no error',
+          said(nat, 'VTK output is a blastFoam setting - the native solver '
+                    'ignores it', ('notes',))
+          and not said(nat, 'VTK', ('errors',)), str(nat.errors))
+    tm = rep3(vtk_volumes=v_on(mode='time', value=0.1))
+    check('Time-mode volumes: a note with the write count and the disk',
+          said(tm, 'VTK volumes: one write every 0.1 ms, 20 writes',
+               ('notes',)) and said(tm, 'GB of written times', ('notes',))
+          and said(tm, 'slows it', ('notes',)),
+          str(tm.notes))
+    auto = rep3(t_end=0.0, vtk_volumes=v_on(mode='time', value=0.5))
+    check('   with an automatic end time it says "up to"',
+          said(auto, 'writes (~', ('notes',))
+          and said(auto, ', up to ', ('notes',)), str(auto.notes))
+
+
 def main():
+    from blastlab.core import hardware
+    from blastlab.solvers.foam import env
     test_keys()
+    # the parallel-AMR refusal reads the rank plan and the caps read the
+    # machine: pin both, as test_case_validate.main does
+    hw_attrs = ('_cores', '_slots', '_ram_gb', '_cores_src', '_slots_src',
+                '_ram_src', '_cores_tried', '_slots_tried', '_ram_tried')
+    old = tuple(getattr(env, a) for a in hw_attrs)
+    old_host = (hardware._host_ram_gb, hardware._host_ram_src,
+                hardware._host_probed)
+    try:
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=512, source=hardware.MEASURED)
+        hardware.forget_host()
+        hardware.prime_host(ram_gb=256, source=hardware.MEASURED)
+        test_validation()
+    finally:
+        for a, v in zip(hw_attrs, old):
+            setattr(env, a, v)
+        (hardware._host_ram_gb, hardware._host_ram_src,
+         hardware._host_probed) = old_host
 
 
 if __name__ == '__main__':

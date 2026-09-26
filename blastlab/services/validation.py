@@ -43,6 +43,10 @@ from ..core.constants import (ANIM_SCALES, JWL_TNT, MIN_EXP_CELLS,
                               BYTES_PER_CELL)
 from ..core import hardware as _hardware
 from ..models.case import TRIGGER_ACTIONS, fmt_cells
+from ..models.case import VTK_FIELDS as _VTK_FIELDS
+from ..models.case import VTK_MODES as _VTK_MODES
+from ..models.case import vtk_family as _vtk_family
+from ..models.case import vtk_fields_for as _vtk_fields_for
 from ..models.result import ValidationReport
 
 
@@ -462,6 +466,189 @@ def _validate_write_budget(case, rep, n_cells, foam, amr):
              f"per cell per write, measured on HD1-3d), plus one "
              f"decomposed write (~{per / 1e9:.2f} GB) kept for a resume "
              f"when the run is parallel")
+
+
+#: OUT-2: the name each VTK family goes by in a message
+_VTK_LABELS = dict(vtk_surfaces='VTK sections/obstacles',
+                   vtk_volumes='VTK volumes')
+
+
+def _vtk_layers(case, ctx, axis):
+    """Cell-centre coordinates along `axis` of the grid the writer snaps a
+    VTK plane onto: the refined display grid when a plan exists, else the
+    uniform grid at the effective cell size. An AMR case shifts every
+    layer by the same offset (writer.snap_plane), so equal layers here are
+    equal layers there."""
+    if ctx.plan is not None:
+        return np.asarray(ctx.plan.fine[f'{axis}_c'])
+    from ..core.grid import make_grid
+    return make_grid(case.Lx, case.Ly, case.Lz, ctx.dx)[f'{axis}_c']
+
+
+def _validate_vtk_cadence(label, fam, err):
+    """mode and value of one VTK family. True when both are usable."""
+    mode, value = fam['mode'], fam['value']
+    if mode not in _VTK_MODES:
+        err(f"{label}: mode '{mode}' - expected 'time' or 'step'")
+        return False
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        err(f"{label}: the interval must be a number "
+            f"({'ms' if mode == 'time' else 'solver steps'})")
+        return False
+    if value <= 0:
+        err(f"{label}: the interval must be > 0 "
+            f"({'ms' if mode == 'time' else 'solver steps'})")
+        return False
+    if mode == 'step' and float(value) != int(value):
+        err(f"{label}: a Step interval must be a whole number of solver "
+            f"steps, not {value:g}")
+        return False
+    return True
+
+
+def _validate_vtk_fields(label, names, dim, err):
+    """Every name a field the dimension has (D4)."""
+    have = _vtk_fields_for(dim)
+    for f in names:
+        if f in have:
+            continue
+        if f in _VTK_FIELDS:
+            err(f"{label}: '{f}' is not written in 1D - blastFoam emits it "
+                f"for 2D and 3D only")
+        else:
+            err(f"{label}: unknown field '{f}' (expected one of "
+                f"{', '.join(have)})")
+
+
+def _validate_vtk_planes(case, rep, ctx, fam):
+    """3D section planes: axis, position strictly inside the domain, and
+    no two planes (the live slice included) on one cell layer."""
+    err = rep.errors.append
+    label = _VTK_LABELS['vtk_surfaces']
+    L = dict(x=case.Lx, y=case.Ly, z=case.Lz)
+    planes, ok = [], True
+    for row in fam['planes']:
+        if not (isinstance(row, (list, tuple)) and len(row) == 2):
+            err(f"{label}: plane {row!r} - expected [axis, position m]")
+            ok = False
+            continue
+        ax, pos = row
+        if ax not in ('x', 'y', 'z'):
+            err(f"{label}: plane axis '{ax}' - expected x, y or z")
+            ok = False
+        elif isinstance(pos, bool) or not isinstance(pos, (int, float)):
+            err(f"{label}: plane {ax} position {pos!r} is not a number")
+            ok = False
+        elif not 0.0 < pos < L[ax]:
+            err(f"{label}: plane {ax} = {pos:g} m is not inside the "
+                f"domain (0..{L[ax]:g} m, ends excluded)")
+            ok = False
+        else:
+            planes.append((ax, float(pos)))
+    if not ok or not fam['fields'] or ctx.dx is None or ctx.dx <= 0:
+        return
+    # the live-slice plane is always a section (plan sec. 3.1)
+    s_ax = getattr(case, 'slice_axis', 'y') or 'y'
+    if s_ax in ('x', 'y', 'z'):
+        s_pos = getattr(case, 'slice_pos', None)
+        target = (float(case.center['xyz'.index(s_ax)]) if s_pos is None
+                  else float(s_pos))
+        planes.insert(0, (s_ax, target, 'the live slice'))
+    seen = {}
+    for p in planes:
+        ax, pos = p[0], p[1]
+        what = p[2] if len(p) > 2 else f'{ax} = {pos:g} m'
+        c = _vtk_layers(case, ctx, ax)
+        layer = float(c[int(np.argmin(np.abs(c - pos)))])
+        key = (ax, layer)
+        name = (ax, f'{pos:.2f}')
+        clash = seen.get(key) or seen.get(name)
+        if clash:
+            err(f"{label}: {clash} and {what} snap to one cell layer "
+                f"({ax} = {layer:.4g} m) or share a name "
+                f"(slice_{ax}_{pos:.2f}) - remove one")
+        else:
+            seen[key] = seen[name] = what
+
+
+def _validate_vtk(case, rep, ctx):
+    """OUT-2 (plan sec. 3.3): the VTK output families. Runs after the
+    caps, where `rep.run_plan` holds the effective ranks. A family that
+    is None or off is not looked at, so a case without them is untouched."""
+    err, note = rep.errors.append, rep.notes.append
+    fams = {}
+    for key in ('vtk_surfaces', 'vtk_volumes'):
+        try:
+            fam = _vtk_family(case, key)
+        except ValueError as exc:       # an unknown key inside the family
+            err(str(exc))
+            continue
+        if fam:
+            fams[key] = fam
+    if not fams:
+        return
+    if not ctx.foam:
+        note("VTK output is a blastFoam setting - the native solver "
+             "ignores it")
+        return
+    surf, vol = fams.get('vtk_surfaces'), fams.get('vtk_volumes')
+    if surf:
+        label = _VTK_LABELS['vtk_surfaces']
+        _validate_vtk_cadence(label, surf, err)
+        _validate_vtk_fields('VTK sections', surf['fields'], case.dim, err)
+        _validate_vtk_fields('VTK obstacles', surf['obstacle_fields'],
+                             case.dim, err)
+        has_obst = bool(getattr(case, 'obstacles', None))
+        if case.dim == 2:
+            if surf['planes']:
+                err("VTK sections: planes are 3D only - the 2D domain is "
+                    "its own section (use VTK volumes)")
+            if surf['fields']:
+                err("VTK sections: a 2D case has no sections - choose "
+                    "obstacle fields, or VTK volumes for the whole domain")
+            if not has_obst:
+                err("VTK obstacles: the case has no obstacles - nothing to "
+                    "sample")
+        else:
+            _validate_vtk_planes(case, rep, ctx, surf)
+            if surf['obstacle_fields'] and not has_obst:
+                if surf['fields']:
+                    note("VTK obstacles: the case has no obstacles - only "
+                         "the sections are written")
+                else:
+                    err("VTK obstacles: the case has no obstacles - nothing "
+                        "to sample")
+        if not surf['fields'] and not surf['obstacle_fields']:
+            err(f"{label}: no field selected - nothing to write")
+    if vol:
+        label = _VTK_LABELS['vtk_volumes']
+        good = _validate_vtk_cadence(label, vol, err)
+        _validate_vtk_fields(label, vol['fields'], case.dim, err)
+        if not vol['fields']:
+            err(f"{label}: no field selected - nothing to write")
+        if int(getattr(case, 'write_budget', 0) or 0) > 0:
+            err("VTK volumes and the write budget both pin the write "
+                "interval - clear one")
+        ranks = (rep.run_plan.ranks if rep.run_plan is not None
+                 else int(getattr(case, 'n_procs', 0) or 0))
+        if ctx.amr and ranks != 1:
+            # plan sec. 3.5: a parallel AMR run keeps its writes per rank
+            # (CaseSpec.decomposed), which foamToVTK cannot convert
+            err("VTK volumes cannot be exported from a parallel AMR run: "
+                "its writes stay per rank, because reconstructPar cannot "
+                "follow a changing mesh - run it on 1 MPI rank, or export "
+                "sections/obstacles only")
+        if good and vol['mode'] == 'time':
+            t_end = float(getattr(case, 't_end', 0.0) or 0.0)
+            upto = '' if t_end > 0 else 'up to '
+            t_end = t_end if t_end > 0 else safety_cap_s(case)
+            n_w = max(1, int(math.ceil(t_end / (vol['value'] / 1e3))))
+            per = BYTES_PER_CELL_WRITE * (rep.n_cells or 0)
+            note(f"VTK volumes: one write every {vol['value']:g} ms, "
+                 f"{upto}{n_w} writes (~{n_w * per / 1e9:.1f} GB of written "
+                 f"times on the WSL disk at ~{BYTES_PER_CELL_WRITE} B per "
+                 f"cell per write, before conversion). Every write is also "
+                 f"ingested for the live view, so a dense cadence slows it")
 
 
 class _Ctx:
@@ -1277,6 +1464,9 @@ def validate_case(case, pending_inputs=False):
         return rep
     if case.dim == 1:
         _validate_1d(case, rep, ctx)
+        # OUT-2: here rather than inside _validate_1d, whose early return
+        # on a charge error would skip it
+        _validate_vtk(case, rep, ctx)
         return rep
     if not _validate_domain_and_charge(case, rep, ctx):
         return rep
@@ -1284,5 +1474,6 @@ def validate_case(case, pending_inputs=False):
     if not _validate_refinement(case, rep, ctx):
         return rep
     _validate_caps(case, rep, ctx)
+    _validate_vtk(case, rep, ctx)
     _validate_closing(case, rep, ctx)
     return rep
