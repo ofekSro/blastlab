@@ -16,7 +16,9 @@ dict holds what the form's widgets hold:
   * a text / number / choice / file field: the str the widget shows;
   * a check box ('measured', 'record', 'anim_mesh'): a bool;
   * a point list ('gauges', 'obstacles', 'zones', 'det_pts',
-    'extra_charges', 'standoffs', 'vent_gauges'): a list of float tuples.
+    'extra_charges', 'standoffs', 'vent_gauges'): a list of float tuples;
+    'vtk_planes' (OUT-2): a list of (axis str, float) tuples;
+  * the VTK quantity matrix ('vtk_fields'): {column: [field, ...]}.
 
 `case_from_fields` reports EVERY bad numeric field rather than the first,
 and never reads a field the active solver hides - that solver's default
@@ -28,7 +30,8 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import Case1D, Case2D, Case3D
+from .case import (Case1D, Case2D, Case3D, normalize_vtk, vtk_family,
+                   vtk_fields_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -124,6 +127,158 @@ def anim_file_with_format(anim_file, fmt):
     if not anim_file or fmt not in ANIM_FORMATS:
         return anim_file or None
     return os.path.splitext(anim_file)[0] + fmt
+
+
+# ── OUT-2: the "VTK output (ParaView)" card ──────────────────────────────
+# docs/model-folder-and-vtk-plan.md sec. 3.1-3.3 and the batch plan
+# docs/batches/2026-09-27-out-2-vtk-output.md Step 8 (owner Q2: separate
+# Sections and Obstacles columns). Shared by the Qt and the Tk card.
+
+#: the matrix rows, in VTK_FIELDS order (plan sec. 3.2)
+VTK_QUANTITY_LABELS = {
+    'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
+    'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
+    'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
+    'alpha.expl': 'Products fraction', 'rhoE': 'Energy',
+}
+#: decision 4: the Gauges column is shown, ticked and locked until OUT-4
+VTK_GAUGE_FIELDS = ('p', 'rho', 'U')
+#: the matrix columns of each dimension; 'gauges' is display only
+VTK_COLUMNS = {1: ('gauges', 'volumes'),
+               2: ('gauges', 'obstacles', 'volumes'),
+               3: ('gauges', 'sections', 'obstacles', 'volumes')}
+#: (family key, caption) per dimension, in card order (plan sec. 3.1):
+#: 's' = surfaces (vtk_surfaces), 'v' = volumes (vtk_volumes)
+VTK_FAMILIES = {1: (('v', 'Whole domain'),),
+                2: (('v', 'Whole domain'), ('s', 'Obstacles')),
+                3: (('s', 'Sections and obstacles'), ('v', 'Volumes'))}
+#: the matrix columns a family writes
+VTK_FAMILY_COLUMNS = {'s': ('sections', 'obstacles'), 'v': ('volumes',)}
+#: what the first tick of a family fills in, mirroring Viper (sec. 3.1)
+VTK_DEFAULTS = {'s': ('p', 'pMax'), 'v': ('p', 'rho', 'U')}
+#: the form's cadence defaults: Viper's 0.001 s = 1 ms, and 25 steps
+VTK_MS_DEFAULT = 1.0
+VTK_STEPS_DEFAULT = 25
+#: the plane table's column kinds (batch plan D7)
+VTK_PLANE_AXES = ('x', 'y', 'z')
+
+
+def vtk_column_label(dim, col):
+    """The matrix header of column `col`: in 1D/2D the volumes are the
+    whole domain (Viper's 2D tab)."""
+    if col == 'volumes' and int(dim) < 3:
+        return 'Whole domain'
+    return {'gauges': 'Gauges', 'sections': 'Sections',
+            'obstacles': 'Obstacles', 'volumes': 'Volumes'}[col]
+
+
+def vtk_matrix(value, dim):
+    """The matrix value in canonical form: one list per destination
+    column of `dim` (never 'gauges'), each in VTK_FIELDS order and
+    holding only the fields the dimension has (D4)."""
+    have = vtk_fields_for(int(dim))
+    value = value if isinstance(value, dict) else {}
+    return {col: [f for f in have if f in (value.get(col) or ())]
+            for col in VTK_COLUMNS[int(dim)] if col != 'gauges'}
+
+
+def vtk_family_columns(fam, dim):
+    """The matrix columns family `fam` writes in dimension `dim`."""
+    return tuple(c for c in VTK_FAMILY_COLUMNS[fam]
+                 if c in VTK_COLUMNS[int(dim)])
+
+
+def vtk_fill_defaults(matrix, fam, dim):
+    """`matrix` with family `fam`'s default ticks, when every column of
+    that family is still empty (the first tick, sec. 3.1); else as is."""
+    m = vtk_matrix(matrix, dim)
+    cols = vtk_family_columns(fam, dim)
+    if any(m[c] for c in cols):
+        return m
+    for c in cols:
+        m[c] = [f for f in vtk_fields_for(int(dim))
+                if f in VTK_DEFAULTS[fam]]
+    return m
+
+
+def parse_plane_axis(text):
+    """A section plane's axis: 'x', 'y' or 'z' (case-insensitive)."""
+    ax = str(text).strip().lower()
+    if ax not in VTK_PLANE_AXES:
+        raise ValueError(f"axis must be x, y or z, not {str(text)!r}")
+    return ax
+
+
+def _vtk_from_fields(dim, v, number, whole):
+    """The case's VTK keys from the card (blastFoam mode only - the
+    caller checks). A family that is off gives no key; only the ACTIVE
+    cadence box is read, so a bad value in the greyed one never blocks
+    a run. `number` / `whole` are case_from_fields' reporting parsers."""
+    out = {}
+    matrix = vtk_matrix(v.get('vtk_fields'), dim)
+    for fam, caption in VTK_FAMILIES[dim]:
+        if not v.get(f'vtk_{fam}_on'):
+            continue
+        mode = str(v.get(f'vtk_{fam}_mode') or 'time')
+        if mode == 'step':
+            value = whole(f'vtk_{fam}_steps', f'VTK {caption} every [steps]')
+        else:
+            value = number(f'vtk_{fam}_ms', f'VTK {caption} every [ms]')
+        if fam == 'v':
+            out['vtk_volumes'] = normalize_vtk(
+                dict(on=True, mode=mode, value=value,
+                     fields=matrix['volumes']), 'vtk_volumes')
+        else:
+            planes = ([[str(p[0]), float(p[1])]
+                       for p in v.get('vtk_planes') or []]
+                      if dim == 3 else [])
+            out['vtk_surfaces'] = normalize_vtk(
+                dict(on=True, mode=mode, value=value,
+                     fields=matrix.get('sections', []),
+                     obstacle_fields=matrix['obstacles'], planes=planes),
+                'vtk_surfaces')
+    return out
+
+
+def _vtk_fields_of_case(case, dim) -> dict:
+    """The card's values for `case`, in the order the form sets them:
+    per family its box, mode and both cadence boxes (a family that is
+    off shows the defaults), then the planes, then the matrix LAST, so
+    the first-tick hook the box fires cannot change what was loaded."""
+    out, matrix = {}, {}
+    for fam, _caption in VTK_FAMILIES[dim]:
+        key = 'vtk_volumes' if fam == 'v' else 'vtk_surfaces'
+        try:
+            d = vtk_family(case, key)
+        except ValueError:              # a malformed family: shown off
+            d = None
+        out[f'vtk_{fam}_on'] = bool(d)
+        mode = d['mode'] if d and d['mode'] in ('time', 'step') else 'time'
+        out[f'vtk_{fam}_mode'] = mode
+        ms, steps = VTK_MS_DEFAULT, VTK_STEPS_DEFAULT
+        if d and isinstance(d['value'], (int, float)) \
+                and not isinstance(d['value'], bool):
+            if mode == 'step':
+                steps = d['value']
+            else:
+                ms = d['value']
+        out[f'vtk_{fam}_ms'] = f'{ms:g}'
+        out[f'vtk_{fam}_steps'] = f'{steps:g}'
+        if d and fam == 'v':
+            matrix['volumes'] = d['fields']
+        elif d:
+            matrix['sections'] = d['fields']
+            matrix['obstacles'] = d['obstacle_fields']
+            if dim == 3:
+                out['vtk_planes'] = [tuple(p) for p in d['planes']
+                                     if isinstance(p, (list, tuple))
+                                     and len(p) == 2]
+    if dim == 3:
+        out.setdefault('vtk_planes', [])
+        # the planes before the matrix, whatever the family order
+        out['vtk_planes'] = out.pop('vtk_planes')
+    out['vtk_fields'] = vtk_matrix(matrix, dim)
+    return out
 
 
 def order_label(case) -> str:
@@ -340,6 +495,37 @@ def hd13_fields_from_case(case) -> dict:
 
 # ── the blast cases, dims 1-3 ────────────────────────────────────────────
 def case_from_fields(dim: int, values: dict, mode: str) -> tuple:
+    """`(case, errors, bad_field_names)` from a form's values: the blast
+    case of `_case_from_fields`, plus (OUT-2) the VTK card's keys in
+    blastFoam mode. Those are read last, so their messages follow the
+    rest of the form's; native mode never reads the card (the
+    hidden-in-native rule), so the case carries no VTK key."""
+    case, errs, bad = _case_from_fields(dim, values, mode)
+    if dim == 0 or mode != 'blastfoam':
+        return case, errs, bad
+
+    def number(name, label):
+        try:
+            return parse_float(values[name], label)
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append(name)
+            return 0.0
+
+    def whole(name, label):
+        try:
+            return parse_int(values[name], label)
+        except ValueError as exc:
+            errs.append(str(exc))
+            bad.append(name)
+            return 0
+
+    for key, fam in _vtk_from_fields(dim, values, number, whole).items():
+        setattr(case, key, fam)
+    return case, errs, bad
+
+
+def _case_from_fields(dim: int, values: dict, mode: str) -> tuple:
     """`(case, errors, bad_field_names)` from a form's values.
 
     `mode` is the normalised solver mode ('native' | 'blastfoam'). EVERY
@@ -539,6 +725,7 @@ def fields_from_case(case, dim: int | None = None) -> dict:
         out['gauges'] = [(g,) for g in case.gauge_radii]
         out['gauge_file'] = case.gauge_file or ''
         out['profile_out'] = case.profile_file or ''
+        out.update(_vtk_fields_of_case(case, dim))
         return out
     if dim == 2:
         out['geometry'] = case.geometry
@@ -608,4 +795,6 @@ def fields_from_case(case, dim: int | None = None) -> dict:
         out['trigger_file'] = getattr(case, 'trigger_file', None) or ''
     if dim == 2:
         out['profile_out'] = case.profile_file or ''
+    # OUT-2: last, after every field the VTK validation depends on
+    out.update(_vtk_fields_of_case(case, dim))
     return out

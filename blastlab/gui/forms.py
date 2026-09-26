@@ -796,7 +796,7 @@ class CaseForm(ctk.CTkFrame):
         for name, value in fields.fields_from_case(case, self.dim).items():
             if name in points:
                 points[name].set(value)
-            else:
+            elif name in self.v:     # OUT-2: until the Tk VTK card lands
                 self.v[name].set(value)
 
 

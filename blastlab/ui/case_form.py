@@ -6,6 +6,8 @@ Three imperative hooks, exactly the ones the Tk form had:
   - the AMR coefficient rows exist only while AMR is on, and the
     charge-refinement row only while it is off,
   - a 2D axisymmetric case relabels r/z and pins the burst to the axis.
+OUT-2 adds the VTK card's two: the Time / Step choice greys the other
+interval box, and the first tick of a family fills its default fields.
 
 `get_case()` reports EVERY bad numeric field rather than the first, and
 never reads a field the active solver hides - that solver's default goes
@@ -47,8 +49,14 @@ class CaseForm(FieldForm):
             self.on_field('amr_levels', self._apply_mode)
         if 'anim_scale' in self.v:
             self.on_field('anim_scale', self._apply_mode)
+        # OUT-2: the VTK card
+        for fam, _caption in fields.VTK_FAMILIES[self.dim]:
+            self.on_field(f'vtk_{fam}_on',
+                          lambda fam=fam: self._vtk_ticked(fam))
+            self.on_field(f'vtk_{fam}_mode', self._sync_vtk)
         self._sync_geometry()
         self._apply_mode()
+        self._sync_vtk()
 
     # ── the point lists, under the names the Tk form used ───────────────
     @property
@@ -131,6 +139,24 @@ class CaseForm(FieldForm):
         if axisym:
             self.v['cx'].set('0')
         self.set_enabled('cx', not axisym)
+
+    # ── OUT-2: the VTK output card ───────────────────────────────────────
+    def _sync_vtk(self):
+        """Viper's greying: of each family's two interval boxes only the
+        one of the chosen mode is live; the other keeps its value. The
+        one place on this form where greying, not hiding, is right."""
+        for fam, _caption in fields.VTK_FAMILIES.get(self.dim, ()):
+            step = self.v[f'vtk_{fam}_mode'].get() == 'step'
+            self.set_enabled(f'vtk_{fam}_ms', not step)
+            self.set_enabled(f'vtk_{fam}_steps', step)
+
+    def _vtk_ticked(self, fam):
+        """The first tick of a family fills its default quantities (plan
+        sec. 3.1) when its columns are empty; unticking keeps them."""
+        if not self.v[f'vtk_{fam}_on'].get():
+            return
+        var = self.v['vtk_fields']
+        var.set(fields.vtk_fill_defaults(var.get(), fam, self.dim))
 
     # ── HD 1.3, dim 0 (HD1-11c) ──────────────────────────────────────────
     def _sync_scenario(self):

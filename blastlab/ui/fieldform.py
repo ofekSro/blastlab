@@ -15,12 +15,14 @@ either re-enters or is lost.
 """
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout,
-                               QGridLayout, QHBoxLayout, QHeaderView,
-                               QLabel, QLineEdit, QScrollArea, QSizePolicy,
-                               QStackedWidget, QTreeWidget, QTreeWidgetItem,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
+                               QFormLayout, QGridLayout, QHBoxLayout,
+                               QHeaderView, QLabel, QLineEdit, QRadioButton,
+                               QScrollArea, QSizePolicy, QStackedWidget,
+                               QTreeWidget, QTreeWidgetItem, QVBoxLayout,
+                               QWidget)
 
+from ..models import fields
 from . import dialogs, theme
 from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, cards
 from .theme import GAP
@@ -104,18 +106,115 @@ class BoolVar(Var):
         return bool(value)
 
 
+class MatrixVar(Var):
+    """The VTK quantity matrix (OUT-2): `get()` returns
+    {column: [field, ...]} in canonical order, for the destination
+    columns of the form's dimension (models.fields.vtk_matrix)."""
+
+    def __init__(self, name, dim, value=None):
+        self._dim = int(dim)
+        super().__init__(name, value)
+
+    def _coerce(self, value):
+        return fields.vtk_matrix(value, self._dim)
+
+    def get(self):
+        return {k: list(v) for k, v in self._value.items()}
+
+
+# ── the Time / Step pair and the quantity matrix (OUT-2) ─────────────────
+class RadioRow(QWidget):
+    """One exclusive radio button per value, in a row. The Var holds the
+    value ('time'); the button shows it capitalised ('Time')."""
+
+    def __init__(self, var, values, parent=None):
+        super().__init__(parent)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(GAP * 2)
+        self.group = QButtonGroup(self)
+        self.group.setExclusive(True)
+        self.buttons = {}
+        for val in values:
+            b = QRadioButton(str(val).capitalize())
+            b.clicked.connect(lambda *_a, v=var, val=val: v._adopt(val))
+            self.group.addButton(b)
+            self.buttons[val] = b
+            lay.addWidget(b)
+        lay.addStretch(1)
+        var._push = self._push
+        self._push(var.get())
+
+    def _push(self, value):
+        b = self.buttons.get(value)
+        if b is not None:
+            _silently(b.setChecked, b, True)
+
+
+class MatrixGrid(QWidget):
+    """Viper's "Output Quantities" grid: one row per quantity, one tick
+    box per destination column (plan sec. 3.2). The Gauges column is
+    display only - p, rho, U ticked and disabled (decision 4)."""
+
+    def __init__(self, var, dim, rows, cols, parent=None):
+        super().__init__(parent)
+        self._var = var
+        self.boxes = {}                          # (field, col) -> QCheckBox
+        grid = QGridLayout(self)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(GAP)
+        grid.setVerticalSpacing(2)
+        grid.setColumnStretch(0, 1)
+        for j, col in enumerate(cols, start=1):
+            head = label(fields.vtk_column_label(dim, col), 'small')
+            head.setAlignment(Qt.AlignCenter)
+            grid.addWidget(head, 0, j)
+        for i, f in enumerate(rows, start=1):
+            name = label(fields.VTK_QUANTITY_LABELS.get(f, f), 'muted')
+            name.setToolTip(f'blastFoam field: {f}')
+            grid.addWidget(name, i, 0)
+            for j, col in enumerate(cols, start=1):
+                box = QCheckBox()
+                if col == 'gauges':
+                    box.setChecked(f in fields.VTK_GAUGE_FIELDS)
+                    box.setEnabled(False)
+                    box.setToolTip('The gauges always record p, rho and '
+                                   'U (fixed until OUT-4)')
+                else:
+                    box.clicked.connect(lambda *_a: self._adopt())
+                    self.boxes[(f, col)] = box
+                grid.addWidget(box, i, j, Qt.AlignCenter)
+        var._push = self._push
+        self._push(var.get())
+
+    def _adopt(self):
+        value = {}
+        for (f, col), box in self.boxes.items():
+            if box.isChecked():
+                value.setdefault(col, []).append(f)
+        self._var._adopt(value)
+
+    def _push(self, value):
+        for (f, col), box in self.boxes.items():
+            _silently(box.setChecked, box, f in value.get(col, ()))
+
+
 # ── the fixed-arity point list (gauges, obstacles, zones) ────────────────
 class PointList(QWidget):
     """A table of numeric tuples with an add/remove row.
 
     Everything typed must parse as `arity` numbers, separated by commas
     or spaces; a refusal turns the hint label red and says why rather
-    than failing silently."""
+    than failing silently. `kinds` (OUT-2, batch plan D7) gives a column
+    its own parser: 'axis' takes x / y / z, 'float' (the default) a
+    number, so the VTK plane table reads `y, 1.4`."""
 
-    def __init__(self, columns, on_change=None, rows=4, parent=None):
+    def __init__(self, columns, on_change=None, rows=4, parent=None,
+                 kinds=()):
         super().__init__(parent)
         self._columns = list(columns)
         self._arity = len(self._columns)
+        self._kinds = tuple(kinds) or ('float',) * self._arity
         self._on_change = on_change or (lambda: None)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -173,6 +272,8 @@ class PointList(QWidget):
         if not raw:
             self._reject(self._idle_text())
             return False
+        if any(k != 'float' for k in self._kinds):
+            return self._add_typed(raw)
         try:
             vals = [float(x) for x in raw]
         except ValueError:
@@ -185,6 +286,24 @@ class PointList(QWidget):
             return False
         self.tree.addTopLevelItem(
             QTreeWidgetItem([f'{v:g}' for v in vals]))
+        self.entry.clear()
+        self._accept()
+        self._on_change()
+        return True
+
+    def _add_typed(self, raw):
+        """`add` for a table with a non-numeric column (D7)."""
+        if len(raw) != self._arity:
+            self._reject(f'expected {self._arity} values '
+                         f'({"  ".join(self._columns)})')
+            return False
+        try:
+            vals = [_parse_cell(k, x) for k, x in zip(self._kinds, raw)]
+        except ValueError as exc:
+            self._reject(str(exc))
+            return False
+        self.tree.addTopLevelItem(QTreeWidgetItem(
+            [_fmt_cell(k, v) for k, v in zip(self._kinds, vals)]))
         self.entry.clear()
         self._accept()
         self._on_change()
@@ -205,8 +324,8 @@ class PointList(QWidget):
         for i in range(self.tree.topLevelItemCount()):
             it = self.tree.topLevelItem(i)
             try:
-                out.append(tuple(float(it.text(c))
-                                 for c in range(self._arity)))
+                out.append(tuple(_parse_cell(k, it.text(c))
+                                 for c, k in enumerate(self._kinds)))
             except ValueError:
                 continue
         return out
@@ -216,8 +335,8 @@ class PointList(QWidget):
         this, and the caller revalidates once at the end."""
         self.tree.clear()
         for row in tuples or []:
-            self.tree.addTopLevelItem(
-                QTreeWidgetItem([f'{float(v):g}' for v in row]))
+            self.tree.addTopLevelItem(QTreeWidgetItem(
+                [_fmt_cell(k, v) for k, v in zip(self._kinds, row)]))
         self._accept()
 
     def count(self):
@@ -230,6 +349,21 @@ def _is_number(text):
         return True
     except ValueError:
         return False
+
+
+def _parse_cell(kind, text):
+    """One table cell by its column kind: 'axis' -> 'x' | 'y' | 'z',
+    anything else -> float. Raises ValueError with the reason."""
+    if kind == 'axis':
+        return fields.parse_plane_axis(text)
+    try:
+        return float(text)
+    except ValueError:
+        raise ValueError(f'not a number: {text}')
+
+
+def _fmt_cell(kind, value):
+    return str(value) if kind == 'axis' else f'{float(value):g}'
 
 
 # ── file picker ──────────────────────────────────────────────────────────
@@ -454,8 +588,22 @@ class FieldForm(QWidget):
                                        else 0)
             grid.setColumnStretch(c * 2, 0)
             grid.setColumnStretch(c * 2 + 1, 1)
+        line = 0                  # the next grid row of a one-pair card
         for i, f in enumerate(spec.rows):
-            r, c = i // pairs, (i % pairs) * 2
+            r, c = ((i // pairs, (i % pairs) * 2) if pairs > 1
+                    else (line, 0))
+            line += 1
+            if f.kind in ('points', 'matrix'):
+                # a wide row (OUT-2): the caption above, the table across
+                # both columns below
+                lbl = label(f.label, 'muted', wrap=True)
+                grid.addWidget(lbl, r, 0, 1, 2)
+                grid.addWidget(self._make_widget(f), r + 1, 0, 1, 2)
+                line += 1
+                self.labels[f.name] = lbl
+                self.rows[f.name] = (grid, r)
+                self._card_of[f.name] = spec.title
+                continue
             w = self._make_widget(f)
             if f.kind == 'bool':
                 # the caption lives on the checkbox itself
@@ -474,6 +622,13 @@ class FieldForm(QWidget):
 
     def _make_widget(self, f):
         self._specs[f.name] = f
+        if f.kind == 'points':
+            # a point list inside a mixed card (the VTK plane table)
+            pl = PointList(f.cols, self._on_change, rows=f.rows,
+                           kinds=f.kinds)
+            self.points[f.name] = pl
+            self.widgets[f.name] = pl
+            return pl
         if f.kind == 'bool':
             var = BoolVar(f.name, f.default)
             w = QCheckBox(f.label)
@@ -495,6 +650,12 @@ class FieldForm(QWidget):
         elif f.kind == 'file':
             var = Var(f.name, f.default)
             w = FilePicker(var, f.file)
+        elif f.kind == 'radio':
+            var = Var(f.name, f.default)
+            w = RadioRow(var, f.values)
+        elif f.kind == 'matrix':
+            var = MatrixVar(f.name, self.dim, f.default)
+            w = MatrixGrid(var, self.dim, f.values, f.cols)
         else:                                   # text | float | int
             var = Var(f.name, _fmt(f.default))
             w = QLineEdit(var.get())
@@ -505,7 +666,7 @@ class FieldForm(QWidget):
         # write trace did
         var.trace_add('write', self._on_change)
         self.v[f.name] = var
-        if f.kind != 'bool':
+        if f.kind not in ('bool', 'matrix'):
             w.setMinimumWidth(INPUT_MIN)
         self.widgets[f.name] = w
         return w

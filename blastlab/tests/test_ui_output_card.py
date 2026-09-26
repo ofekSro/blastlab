@@ -1,0 +1,353 @@
+"""OUT-2 Step 8 (V5a): the Qt Setup card "VTK output (ParaView)".
+
+docs/batches/2026-09-27-out-2-vtk-output.md Step 8 and
+docs/model-folder-and-vtk-plan.md sec. 3.1-3.3 (owner Q2: separate
+Sections and Obstacles columns). Drives the REAL `ui.case_form.CaseForm`
+offscreen and checks:
+
+  C1  the families and the matrix cells of each dimension;
+  C2  native mode hides the whole card, and the case carries no key;
+  C3  Time / Step greys the other interval box, and keeps its value;
+  C4  the first tick of a family fills its defaults; unticking keeps them;
+  C5  the plane table refuses `q, 1` and accepts `y, 1.4`;
+  C6  form -> case -> JSON -> form is identical;
+  C7  a bad value in the inactive box never blocks a run, one in the
+      active box is reported and marked;
+  C8  validation of what the card builds (2D without obstacles: "nothing
+      to sample").
+
+Headless: offscreen Qt, no window shown, no solver run.
+Run:  cd blastlab/tests && python test_ui_output_card.py
+"""
+import json
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+
+from blastlab.ui.testing import ensure_qapp, pump          # noqa: E402
+
+app = ensure_qapp()
+
+from blastlab.core.case import (case_from_dict, case_to_dict,  # noqa: E402
+                                validate_case)
+from blastlab.models import fields as F                     # noqa: E402
+from blastlab.models.case import vtk_fields_for             # noqa: E402
+from blastlab.ui.case_form import CaseForm                  # noqa: E402
+
+FAIL = []
+TITLE = 'VTK output (ParaView)'
+
+
+def check(name, ok, detail=''):
+    print(f"  [{'PASS' if ok else 'FAIL'}] {name}"
+          + (f' - {detail}' if detail else ''))
+    if not ok:
+        FAIL.append(name)
+
+
+def form(dim, mode='blastfoam'):
+    f = CaseForm(dim, mode=mode)
+    f.resize(900, 700)
+    f.show()
+    pump(30)
+    return f
+
+
+def card_names(f):
+    return sorted(n for n, t in f._card_of.items() if t == TITLE)
+
+
+def main():
+    print('\nC1: the families and the matrix of each dimension')
+    want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
+                 3: ['vtk_s_on', 'vtk_v_on']}
+    want_cols = {1: ('gauges', 'volumes'),
+                 2: ('gauges', 'obstacles', 'volumes'),
+                 3: ('gauges', 'sections', 'obstacles', 'volumes')}
+    for d in (1, 2, 3):
+        f = form(d)
+        names = card_names(f)
+        fams = [n for n in f._card_of if n.endswith('_on')
+                and n.startswith('vtk_')]
+        check(f'{d}D: the card is there, in the right column',
+              TITLE in f.cards and f.card_visible(TITLE))
+        check(f'{d}D: its families, in order', fams == want_fams[d],
+              str(fams))
+        grid = f.widgets['vtk_fields']
+        rows = vtk_fields_for(d)
+        cols = sorted({c for _f, c in grid.boxes})
+        check(f'{d}D: {len(rows)} quantity rows (D4)',
+              sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
+              and len(rows) == (6 if d == 1 else 10), str(rows))
+        check(f'{d}D: destination columns {want_cols[d][1:]}',
+              cols == sorted(want_cols[d][1:]), str(cols))
+        check(f'{d}D: a tick box in every destination cell',
+              len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1))
+        check(f'{d}D: the plane table is 3D only',
+              ('vtk_planes' in names) == (d == 3), str(names))
+        # the locked Gauges column: p / rho / U ticked, all disabled
+        from PySide6.QtWidgets import QCheckBox
+        locked = [b for b in grid.findChildren(QCheckBox)
+                  if not b.isEnabled()]
+        ticked = [b for b in locked if b.isChecked()]
+        check(f'{d}D: the Gauges column is locked with p, rho, U ticked',
+              len(locked) == len(rows) and len(ticked) == 3,
+              f'{len(locked)} locked, {len(ticked)} ticked')
+        check(f'{d}D: the interval captions carry their units',
+              all('[ms]' in f.label_text(n) for n in names
+                  if n.endswith('_ms'))
+              and all('[steps]' in f.label_text(n) for n in names
+                      if n.endswith('_steps')))
+        check(f'{d}D: a fresh form writes no VTK key',
+              'vtk_volumes' not in case_to_dict(f.get_case())
+              and 'vtk_surfaces' not in case_to_dict(f.get_case()))
+    f2 = form(2)
+    check('2D: the surfaces family is called Obstacles',
+          f2.widgets['vtk_s_on'].text() == 'Obstacles'
+          and f2.widgets['vtk_v_on'].text() == 'Whole domain')
+
+    print('\nC2: native mode hides the card; the case has no key')
+    for d in (1, 2, 3):
+        f = form(d)
+        fam = 's' if d == 3 else 'v'
+        f.v[f'vtk_{fam}_on'].set(True)
+        f.set_mode('native')
+        pump(10)
+        check(f'{d}D native: the card is hidden', not f.card_visible(TITLE))
+        dd = case_to_dict(f.get_case())
+        check(f'{d}D native: no VTK key although a family is ticked',
+              'vtk_volumes' not in dd and 'vtk_surfaces' not in dd)
+        f.set_mode('blastfoam')
+        pump(10)
+        check(f'{d}D back to blastFoam: the card and the tick are back',
+              f.card_visible(TITLE) and f.v[f'vtk_{fam}_on'].get())
+
+    print('\nC3: Time / Step greys the other box')
+    f = form(3)
+    for fam in ('s', 'v'):
+        check(f'{fam}: Time by default, the steps box greyed',
+              f.v[f'vtk_{fam}_mode'].get() == 'time'
+              and f.is_enabled(f'vtk_{fam}_ms')
+              and not f.is_enabled(f'vtk_{fam}_steps'))
+        f.v[f'vtk_{fam}_ms'].set('0.75')
+        f.widgets[f'vtk_{fam}_mode'].buttons['step'].click()
+        pump(5)
+        check(f'{fam}: a click on Step greys the ms box instead',
+              f.v[f'vtk_{fam}_mode'].get() == 'step'
+              and not f.is_enabled(f'vtk_{fam}_ms')
+              and f.is_enabled(f'vtk_{fam}_steps'))
+        check(f'{fam}: and the greyed box keeps its value',
+              f.v[f'vtk_{fam}_ms'].get() == '0.75')
+        f.v[f'vtk_{fam}_mode'].set('time')
+        pump(5)
+        check(f'{fam}: set() back to Time checks the Time radio',
+              f.widgets[f'vtk_{fam}_mode'].buttons['time'].isChecked()
+              and f.is_enabled(f'vtk_{fam}_ms'))
+    check('the rest of the form is never greyed by the card',
+          f.is_enabled('cell') and f.is_enabled('t_end'))
+
+    print('\nC4: the first tick fills the defaults')
+    f = form(3)
+    f.widgets['vtk_s_on'].click()
+    pump(5)
+    m = f.v['vtk_fields'].get()
+    check('3D surfaces: p and pMax on sections and obstacles',
+          m['sections'] == ['p', 'pMax'] and m['obstacles'] == ['p', 'pMax']
+          and m['volumes'] == [], str(m))
+    grid = f.widgets['vtk_fields']
+    check('and the tick boxes show it',
+          grid.boxes[('pMax', 'sections')].isChecked()
+          and not grid.boxes[('rho', 'sections')].isChecked())
+    f.widgets['vtk_v_on'].click()
+    pump(5)
+    check('3D volumes: p, rho, U',
+          f.v['vtk_fields'].get()['volumes'] == ['p', 'rho', 'U'])
+    grid.boxes[('T', 'obstacles')].click()
+    grid.boxes[('p', 'sections')].click()
+    pump(5)
+    m = f.v['vtk_fields'].get()
+    check('a click on a cell edits that column only',
+          m['obstacles'] == ['p', 'pMax', 'T'] and m['sections'] == ['pMax'],
+          str(m))
+    f.widgets['vtk_s_on'].click()
+    pump(5)
+    check('unticking the family keeps its ticks',
+          not f.v['vtk_s_on'].get()
+          and f.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'])
+    f.widgets['vtk_s_on'].click()
+    pump(5)
+    check('and ticking it again does not overwrite them',
+          f.v['vtk_fields'].get()['sections'] == ['pMax'])
+    f1 = form(1)
+    f1.widgets['vtk_v_on'].click()
+    pump(5)
+    check('1D whole domain: p, rho, U',
+          f1.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']})
+    f2 = form(2)
+    f2.widgets['vtk_s_on'].click()
+    pump(5)
+    check('2D obstacles: p and pMax, no sections column',
+          f2.v['vtk_fields'].get() == {'obstacles': ['p', 'pMax'],
+                                       'volumes': []})
+
+    print('\nC5: the plane table (D7)')
+    f = form(3)
+    pl = f.points['vtk_planes']
+    pl.entry.setText('q, 1')
+    check('`q, 1` is refused, and the hint says why',
+          not pl.add() and 'x, y or z' in pl.hint.text() and pl.count() == 0,
+          pl.hint.text())
+    pl.entry.setText('y, abc')
+    check('`y, abc` is refused', not pl.add() and pl.count() == 0,
+          pl.hint.text())
+    pl.entry.setText('y')
+    check('a short row is refused', not pl.add() and pl.count() == 0)
+    pl.entry.setText('y, 1.4')
+    check('`y, 1.4` is accepted', pl.add() and pl.get() == [('y', 1.4)],
+          str(pl.get()))
+    pl.entry.setText('Z 0.5')
+    check('`Z 0.5` is accepted as z', pl.add()
+          and pl.get() == [('y', 1.4), ('z', 0.5)], str(pl.get()))
+    check('the gauges table still takes numbers only',
+          f.points['gauges']._kinds == ('float',) * 3)
+
+    print('\nC6: form -> case -> JSON -> form is identical')
+    for d in (1, 2, 3):
+        f = form(d)
+        if d > 1:
+            f.points['obstacles'].set(
+                [(0.1, 0.2, 0.3, 0.4)] if d == 2
+                else [(0.1, 0.2, 0.3, 0.4, 0.5, 0.6)])
+        for fam, _c in F.VTK_FAMILIES[d]:
+            f.widgets[f'vtk_{fam}_on'].click()
+        pump(5)
+        if d == 3:
+            f.v['vtk_s_mode'].set('step')
+            f.v['vtk_s_steps'].set('40')
+            f.v['vtk_v_ms'].set('0.25')
+            f.points['vtk_planes'].set([('x', 0.3), ('z', 1.1)])
+            f.widgets['vtk_fields'].boxes[('rhoE', 'volumes')].click()
+        elif d == 2:
+            f.v['vtk_v_mode'].set('step')
+            f.v['vtk_v_steps'].set('10')
+            f.widgets['vtk_fields'].boxes[('timeOfArrival',
+                                           'obstacles')].click()
+        else:
+            f.v['vtk_v_ms'].set('0.5')
+        pump(5)
+        case = f.get_case()
+        text = json.dumps(case_to_dict(case), sort_keys=True)
+        back = case_from_dict(json.loads(text))
+        g = form(d)
+        g.set_case(back)
+        pump(5)
+        keys = sorted(k for k in f.v if k.startswith('vtk_'))
+        diff = [k for k in keys if f.v[k].get() != g.v[k].get()]
+        if d == 3:
+            diff += (['vtk_planes'] if f.points['vtk_planes'].get()
+                     != g.points['vtk_planes'].get() else [])
+        check(f'{d}D: every card value survives the round trip', not diff,
+              str([(k, f.v[k].get(), g.v[k].get()) for k in diff
+                   if k in f.v][:2]))
+        again = json.dumps(case_to_dict(g.get_case()), sort_keys=True)
+        check(f'{d}D: and the case written again is the same JSON',
+              again == text)
+        check(f'{d}D: the greying follows the loaded mode',
+              all(g.is_enabled(f'vtk_{fam}_ms')
+                  == (g.v[f'vtk_{fam}_mode'].get() == 'time')
+                  for fam, _c in F.VTK_FAMILIES[d]))
+    dd = case_to_dict(f.get_case())
+    check('3D: the JSON holds both families as sec. 3.3 says',
+          dd['vtk_surfaces'] == {
+              'on': True, 'mode': 'step', 'value': 40,
+              'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'pMax'],
+              'planes': [['x', 0.3], ['z', 1.1]]}
+          and dd['vtk_volumes'] == {
+              'on': True, 'mode': 'time', 'value': 0.25,
+              'fields': ['p', 'rho', 'U', 'rhoE']}, str(dd.get('vtk_volumes')))
+    # loading a case without VTK keys resets the card
+    g.set_case(case_from_dict(json.loads(json.dumps(
+        {k: v for k, v in case_to_dict(case).items()
+         if not k.startswith('vtk_')}))))
+    pump(5)
+    check('loading a case without VTK keys switches both families off',
+          not g.v['vtk_s_on'].get() and not g.v['vtk_v_on'].get()
+          and g.points['vtk_planes'].get() == []
+          and g.v['vtk_fields'].get() == {'sections': [], 'obstacles': [],
+                                          'volumes': []})
+
+    print('\nC7: a bad value in the inactive box never blocks a run')
+    f = form(3)
+    f.widgets['vtk_v_on'].click()
+    f.v['vtk_v_steps'].set('lots')            # inactive: Time mode
+    pump(5)
+    try:
+        case = f.get_case()
+        ok = case.vtk_volumes['value'] == 1.0 and not f.bad
+    except ValueError as exc:
+        ok, case = False, exc
+    check('Time mode: a bad steps box is not read', ok, str(case)[:80])
+    f.v['vtk_v_mode'].set('step')
+    pump(5)
+    try:
+        f.get_case()
+        raised = ''
+    except ValueError as exc:
+        raised = str(exc)
+    check('Step mode: the same box is reported, and marked',
+          "'VTK Volumes every [steps]' is not an integer" in raised
+          and f.bad == {'vtk_v_steps'}, raised)
+    f.v['vtk_v_steps'].set('2.5')
+    try:
+        f.get_case()
+        raised = ''
+    except ValueError as exc:
+        raised = str(exc)
+    check('a fractional step count is refused', 'whole number' in raised,
+          raised)
+    f.v['vtk_v_on'].set(False)
+    pump(5)
+    try:
+        f.get_case()
+        ok = not f.bad
+    except ValueError:
+        ok = False
+    check('a family that is off is not read at all', ok)
+    f.set_mode('native')
+    f.v['vtk_v_on'].set(True)
+    try:
+        f.get_case()
+        ok = True
+    except ValueError:
+        ok = False
+    check('native mode never reads the card', ok)
+
+    print('\nC8: validation of what the card builds')
+    f = form(2)
+    f.widgets['vtk_s_on'].click()
+    pump(5)
+    rep = validate_case(f.get_case())
+    check('2D obstacles without obstacles: "nothing to sample"',
+          any('nothing to sample' in e for e in rep.errors), str(rep.errors))
+    f.points['obstacles'].set([(3.0, 3.2, 0.0, 0.5)])
+    rep = validate_case(f.get_case())
+    check('with an obstacle it validates', not rep.errors, str(rep.errors))
+    f = form(1)
+    f.widgets['vtk_v_on'].click()
+    pump(5)
+    rep = validate_case(f.get_case())
+    check('1D whole domain validates, with the write-count note',
+          not rep.errors and any('VTK volumes' in n for n in rep.notes),
+          str(rep.errors))
+
+    print('\n' + '=' * 52)
+    if FAIL:
+        print(f'FAILED: {len(FAIL)} check(s): {FAIL}')
+        sys.exit(1)
+    print('UI OUTPUT CARD: PASS')
+
+
+if __name__ == '__main__':
+    main()
