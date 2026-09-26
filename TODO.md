@@ -93,14 +93,20 @@ the *load*. With no SDOF in the app, both close. The worst case is found in SBED
 over every exported trace.
 
 **Step 1: export, and SDOF out of every output.**
-1. One CSV per trace. Columns: `t [ms]`, `p [kPa]`, `p [psi]`, cumulative impulse
-   `[kPa·ms]`. Header lines name the source case, the trace (gauge / plane-max /
-   band sample and its corner signs / nominal), **side-on or reflected**, and γ.
-   Overpressure over ambient, not absolute.
+1. One CSV per trace, **in the format SBEDS loads** (owner, 2026-09-26, replaces the
+   four-column spec): exactly two comma-separated columns, `t` in ms and overpressure
+   in kPa, **no header line and nothing else**, or SBEDS will not load it. E.g.
+   `0,100` / `2,50` / `3,0`. Overpressure over ambient, not absolute; negative
+   values (suction) are kept, because SBEDS accepts them (owner, 2026-09-26). What used to go
+   in the header (source case, trace, side-on or reflected, γ, the "still active"
+   line) goes in the file name and a sidecar `.txt` next to it.
 2. What is exported: **every** trace already computed. That means every sensitivity-band
    sample *including the nominal*, and for the wall load G1 and plane-max × both γ.
    The export must be the load *on the wall* (Pr, and Ps + C_D·q after clearing,
    UFC 3-340-02 §2-15.3.2), because SBEDS applies a user-defined load as given.
+   **Clearing is a user choice** (owner, 2026-09-26): off gives E = max(R, S) as
+   computed (upper bound); on asks for the loaded wall's H and W and applies Eq. 2-8 /
+   2-9 (C_D = 1). **Residual capacity stays in the report** (owner, 2026-09-26).
 2a. **Only what was computed. No tail rule** (owner, 2026-09-25): the T0 / T1 tails
    are not exported. The trace ends at the run's last sample. If the load has not
    returned to ambient by then (|p| above 1 % of the peak over the last 1 ms), the
@@ -142,6 +148,46 @@ over), μ 0.12, so it exercises nothing. **The owner supplies the design-basis s
 implementer builds the JSON, documents where each value came from, and replaces the
 characterisation goldens that pin the old case **as part of this decision** (§9), with a
 before/after note. Blocked on the owner's input.
+
+### `HD1-18` · Picking a material fills its fields with the severe preset · **owner decision 2026-09-26**
+
+**Why.** The HD 1.3 form is hard to use: the Material card's override rows are blank
+("blank = table") and the user has to know what goes in them. **Decision (owner):**
+choosing a material fills every material field with the value that gives the **most
+severe load on the structure**, with a grey note beside each field giving the range and
+its standing. The user may edit any field. Done **together with `P1-15`** (the form
+takes `a` in mm/s/MPaⁿ).
+
+1. **Qt and Tk** (§9). Selecting a propellant fills `ov_n`, `ov_a`, `ov_r_atm`,
+   `ov_web`, `ov_p_ext`, `ov_secondary`. Changing the material re-fills them. **Loading
+   a case file never re-fills**: the file's values stand, or a saved case stops
+   reproducing.
+2. **The severe direction, and the pivot (owner, 2026-09-26).** `n` is varied about the
+   pressure it was **measured** at, `p_piv = p_valid_min`, holding the burn rate there
+   fixed, not about 1 Pa. With `dn = sensitivity.DEFAULT_DN` and
+   `fa = sensitivity.DEFAULT_A_FACTOR` (one source for the widths):
+   `n_s = n0 - dn`, `a_s = fa · a0 · p_piv^dn` (SI). Below `p_piv` a lower `n` burns
+   faster, and the gun propellants spend the whole storage-room burn below it. The
+   composite's window starts at 1 MPa, inside the 0.1-2 MPa storage-room range, so its
+   direction is **measured, not assumed**: run both signs on the starter case and take
+   the higher peak. Record which one won. `p_extinction` = 0 (never goes out), which is
+   already the table value.
+3. **No invented ranges.** `r_atm`, `secondary_heat` and `web` have no range in the
+   repo. They are filled with the table value, and the note says "no range defined".
+   (`web` enters only as `a/w`, which the `a` range already covers.)
+4. **The grey note** per field: the range, the preset's end, and the standing, e.g.
+   "n 0.75-1.05 · preset 0.75 · class judgement, no source". It comes from the same
+   numbers the preset used.
+5. **Standing.** Filled values are **not measured**: `uncalibrated` does not shrink and
+   the `measured` box stays off. The report says the material is "severe preset (class
+   ranges, unsourced)", not "user override". `core/fuels.py` stays nominal, so no case
+   without overrides moves and no characterisation golden moves except the form's own.
+   Pin those with a before/after table.
+
+Acceptance: picking each of the three materials fills the six fields and the notes, in
+Qt and Tk; the preset's peak ≥ every corner of a band taken with the same pivot, on
+the starter case, for each material; a saved case reloads with its own values; P1-15's
+own acceptance; goldens unchanged except the form's; Qt and Tk GUI QA.
 
 ### `HD1-14` · A third `Cd` convergence point — optional, not done
 
@@ -623,6 +669,18 @@ Acceptance: validation's reported cell count equals the solver's built count for
 case in `tests/cases/` (a new test); `test_regression.py` byte-identical; a multi-charge
 'zone' case gets the main-charge dx and one zone per charge.
 Source: `docs/ENGINEERING_QUESTIONS.md` phase 0 #2, phase 4 #2.
+
+### P1-17 · The band varies `n` about 1 Pa, not about where it was measured · **found 2026-09-26, needs owner decision**
+
+`core/sensitivity._perturb` moves `n` and keeps `a` fixed in SI, so it pivots at
+p = 1 Pa. At a storage-room 1 MPa, dn = +0.15 then multiplies the burn rate by
+(1e6)^0.15 ≈ 7.9. The module docstring (lines 15-18) gives the reason for `n`
+dominating as the distance **from where `n` was fitted** (50-300 MPa), which is
+about ×1.8 for the same dn, and in the opposite direction: holding the measured rate,
+a higher `n` burns **slower** below the window. The band's reported 12.7 spread
+probably comes mostly from this. **Nothing changed.** HD1-18 uses the measured-window
+pivot (owner, 2026-09-26). Whether the band follows it is open. It moves every band
+number and its goldens, so it needs an owner decision and a before/after table first.
 
 ### P1-15 · The Vieille `a` override has no unit on screen · **owner decision 2026-09-26**
 
