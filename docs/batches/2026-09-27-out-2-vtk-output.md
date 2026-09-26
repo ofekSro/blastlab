@@ -371,6 +371,12 @@ Each is the interim the code uses now; a different answer is a small change in `
 - **P7 · A failed foamToVTK call over several writes is split.** The writes are converted one per call before attempts are counted, so one bad write does not give up a whole batch.
 - **P8 · Export cadence.** Outside the final sweep, the export looks at the disk at most once a second (`EVERY_S`), and each foamToVTK call takes at most 8 writes (50 at the final sweep).
 
+Added by the Checkpoint 2 verification (2026-09-27; none blocks):
+
+- **P9 · 1D snapshots after a resume that follows deletion.** 1D picks its snapshots at finalize from the writes it holds (`backend._pick_snapshots`), so no write can be protected for them during the run. A resumed 1D run picks them from the writes that are left, and the log says so. Q5's "snapshots survive" holds for 2D/3D only. The alternative is to never delete time dirs on a 1D run (1D writes are small).
+- **P10 · The final sweep after WSL went away (W3).** The loop learns that WSL died only after its final sweep. That sweep then tries foamToVTK against the dead distribution for up to `final_wait_s` before the auto-resume, and lists what it gives up on as not converted. The resumed export never retries a not-converted volume, so those times stay unexported. Nothing is lost: the scratch is kept (Q4). The alternatives are to skip the final conversion when the solver's tail shows the EIO signature, or to let a resumed export retry them once.
+- **P11 · Readers of a finished run after deletion.** `postmortem.load_run` (`--load-foam-run`), the run browser's resume (see `P2-17`) and the Results "Export VTK" button read only the writes left in WSL. Frames, 1D snapshots and a manual foamToVTK cover fewer times. The pin, the arrival write and the 2D/3D snapshots are kept. The alternative is to have them read `vtk\manifest.json` and say how many writes are gone.
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.
