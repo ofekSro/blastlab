@@ -394,6 +394,65 @@ so a tool that gives only pressure answers the wrong question. blastFoam does no
 radiation (`radiationModel none`), so this is a **declared empirical/standards path**,
 not CFD.
 
+### `HD1-12` · ✅ closed 2026-09-21 — it was the discretisation, not the speed
+
+*(Moved from TODO.md on 2026-09-26, unchanged.)*
+
+Opened as "the 0-D model is too slow at the cohort count it needs", with
+vectorising the Cash-Karp loop as the proposed fix. **The owner proposed the
+better one: ramp the ignition across each cohort's interval instead of lighting
+it in an instant.** That was right, and it removed the need for the speed work
+entirely.
+
+| `n` | staircase | ramp |
+|---|---|---|
+| 10 | 2.84 | **1.0223** |
+| 20 | 1.57 | 1.0101 |
+| 40 | 1.19 | 1.0054 |
+| 160 | 1.040 | 1.0028 |
+
+`n = 10` now lands within 2 % of converged, where the staircase was **still 1.2 %
+out at n = 160**. So the converged answer was never 1.04 either — a realistic
+magazine reaches **1.003× ambient**.
+
+**And the mechanism is not the one that sounds right.** The ramp is *not* higher
+order: measured, its entrainment error still falls as 1/n, the same as the
+staircase, because the cohort edges sit at `T(i/n)^(1/d)` and the first interval
+is `T/√n` wide. What it buys is **continuity** — the staircase jumps by a full
+`1/n` at every edge and each jump shock-loads the chamber, while a slope does
+not. Two wrong explanations were written into the code before that one, and
+`test_deflagration.py` caught both; the measured sequences are pinned there.
+
+Vectorising is no longer needed for correctness. Left undone.
+
+---
+
+## 0a. 2026-09-25/26 — the engineering-questions review
+
+The owner went through every open question in `docs/ENGINEERING_QUESTIONS.md` (the
+`/todo` batches of 09-24 and `/refactor` phases 0-8) in order of urgency. Each
+decision is noted under its question there, and the work is in TODO.md: `P0-5`,
+`HD1-16`, `HD1-17`, `P1-7` (side chosen), `P1-8` … `P1-16`, `P2-13`, `P2-14`,
+`P2-15`. Decisions of note:
+- **No SDOF in the app** (`HD1-16`). blastlab delivers the wall load as CSV, and the
+  structural response is solved in SBEDS. Only what was computed is exported, with no
+  tail rule.
+- **Every material row must be 100 % sourced** (`P1-14`). RDX and ANFO are owner-gated.
+- The settings file moves into the repo (`P0-5`). The write interval becomes a user
+  input with a disk estimate (`P1-12`).
+
+**Done in the session itself (the rest is open in TODO.md):**
+- *Stop-gap for `P0-5`:* `auto_cleanup` set to `false` in the virtualised settings
+  file the app actually reads
+  (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\Roaming\blastlab\settings.json`),
+  which a GUI start had rewritten on 2026-09-25 10:22 with cleanup on.
+- *The primary source for the JWL table* was found and read. It is Dobratz & Crawford,
+  LLNL Explosives Handbook, UCRL-52997 (1985), Table 8-7 (pp. 8-22/8-23), from the
+  Internet Archive, read off the page images. It is registered as
+  `llnl-explosives-handbook` in `docs/references/INDEX.md`, with the two table pages as
+  PNGs. The row-by-row comparison is in TODO `P1-14`: TNT matches, C4 `e0` is
+  1.1 % low, HMX and PETN differ, and RDX and ANFO are not in the handbook.
+
 ---
 
 ## 1. The timeline — T0–T70

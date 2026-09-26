@@ -82,6 +82,67 @@ next to the number rather than a footnote. Heat loss to the walls (`h_c`,
 `Q_wall`) is also in the forward model as of the same day — `core/calibration.py`
 had been inverting for a loss that `simulate` never applied.
 
+### `HD1-16` · No SDOF in the app — export the wall load for SBEDS · **owner decision 2026-09-25**
+
+**Decision (owner):** blastlab gives the load, not the structural response. The
+response is solved outside, in SBEDS. Replaces two open questions in
+`docs/ENGINEERING_QUESTIONS.md`: phase 0 #1 (the band's ends bracket everything but
+the nominal μ, 0.0509 / 0.1049 against 0.1164) and hd1-wall-load #1 (the envelope
+gives a lower μ than G1 alone). Both come from judging the response at the ends of
+the *load*. With no SDOF in the app, both close. The worst case is found in SBEDS
+over every exported trace.
+
+**Step 1: export, and SDOF out of every output.**
+1. One CSV per trace. Columns: `t [ms]`, `p [kPa]`, `p [psi]`, cumulative impulse
+   `[kPa·ms]`. Header lines name the source case, the trace (gauge / plane-max /
+   band sample and its corner signs / nominal), **side-on or reflected**, and γ.
+   Overpressure over ambient, not absolute.
+2. What is exported: **every** trace already computed. That means every sensitivity-band
+   sample *including the nominal*, and for the wall load G1 and plane-max × both γ.
+   The export must be the load *on the wall* (Pr, and Ps + C_D·q after clearing,
+   UFC 3-340-02 §2-15.3.2), because SBEDS applies a user-defined load as given.
+2a. **Only what was computed. No tail rule** (owner, 2026-09-25): the T0 / T1 tails
+   are not exported. The trace ends at the run's last sample. If the load has not
+   returned to ambient by then (|p| above 1 % of the peak over the last 1 ms), the
+   header says so, with the last value: **"record ends while the load is still
+   active: p = … kPa at t = … ms"**, and so does the export's console / GUI message.
+   To see what happens later, run longer. HD1-3d's 30 ms record ends at -22 to
+   -25 kPa, still in suction, at 0.198 of the drain time. The T0/T1 code goes with the
+   SDOF in step 2.
+3. Remove μ, support rotation and the survives / fails / undetermined verdict from the
+   HD 1.3 report, the CLI, the Qt and Tk forms, and the GUI result views. Callers in
+   `core/`: `assessment`, `scenario`, `sensitivity` (`structural_verdict`), `thermal`,
+   `unconfined`, `wallload`. Keep the module and its tests for now.
+4. Tests: the export round-trips (t, p) exactly, the impulse column matches the
+   trapezoid integral, and no output carries a μ. Tk and Qt suites run (§9).
+
+**Step 2 (after the owner has run one case through SBEDS):** delete `core/sdof.py`,
+`structural_verdict` and their tests. Mark the μ values in the HD1-3d / HD1-13
+records (C10's "survives") as historical, produced by the removed in-app SDOF.
+
+### `HD1-17` · The HD 1.3 starter case is a weak check, and two texts overstate · **owner decision 2026-09-25**
+
+Both report flags are **correct as coded**: "blast negligible: False" at Mach 0.0917
+is above `MACH_QUASI_STATIC = 0.05` (`core/unconfined.py:85`), and "the whole burn
+outside the calibration window" is the real HD1-3 limitation (a burn law measured in
+a closed vessel at tens-hundreds of MPa, applied at ~0.1 MPa). What is wrong is
+around them. Source: `docs/ENGINEERING_QUESTIONS.md` phase 7 #1-#2, phase 0 #3.
+
+**(a) Texts. No number or threshold moves.**
+1. The comment at `MACH_QUASI_STATIC` says the model's cases "come out two to three
+   orders below it". The starter case is 1.8× above. Rewrite it to state what has
+   actually been seen.
+2. The report and CLI say next to the Mach number that it is an **upper bound**.
+3. `output/cli_hd13.py` docstring: "in under a second" becomes the measured time
+   (~42 s; ~20 min with the band).
+
+**(b) A representative starter case.** Today's peaks at 102.35 kPa absolute (~1 kPa
+over), μ 0.12, so it exercises nothing. **The owner supplies the design-basis scenario**
+(room, vent, material and mass, from the standard / QD tables / advisor). The
+implementer builds the JSON, documents where each value came from, and replaces the
+characterisation goldens that pin the old case **as part of this decision** (§9), with a
+before/after note. Blocked on the owner's input.
+
 ### `HD1-14` · A third `Cd` convergence point — optional, not done
 
 24 cells across the opening, on a geometrically shrunken room: `Cd` depends on the
@@ -149,34 +210,7 @@ yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
 > perturb `h_c` at all, so the band reports `spans_heat_loss=False` rather than
 > inventing one.
 
-### `HD1-12` · ✅ closed 2026-09-21 — it was the discretisation, not the speed
-
-Opened as "the 0-D model is too slow at the cohort count it needs", with
-vectorising the Cash-Karp loop as the proposed fix. **The owner proposed the
-better one: ramp the ignition across each cohort's interval instead of lighting
-it in an instant.** That was right, and it removed the need for the speed work
-entirely.
-
-| `n` | staircase | ramp |
-|---|---|---|
-| 10 | 2.84 | **1.0223** |
-| 20 | 1.57 | 1.0101 |
-| 40 | 1.19 | 1.0054 |
-| 160 | 1.040 | 1.0028 |
-
-`n = 10` now lands within 2 % of converged, where the staircase was **still 1.2 %
-out at n = 160**. So the converged answer was never 1.04 either — a realistic
-magazine reaches **1.003× ambient**.
-
-**And the mechanism is not the one that sounds right.** The ramp is *not* higher
-order: measured, its entrainment error still falls as 1/n, the same as the
-staircase, because the cohort edges sit at `T(i/n)^(1/d)` and the first interval
-is `T/√n` wide. What it buys is **continuity** — the staircase jumps by a full
-`1/n` at every edge and each jump shock-loads the chamber, while a slope does
-not. Two wrong explanations were written into the code before that one, and
-`test_deflagration.py` caught both; the measured sequences are pinned there.
-
-Vectorising is no longer needed for correctness. Left undone.
+### `HD1-12` · ✅ closed 2026-09-21 — moved to [DONE.md](DONE.md) §0 on 2026-09-26
 
 ### Scope decision — pyrotechnics are out
 
@@ -218,8 +252,38 @@ not in `a`.
 
 ## P0 — Urgent: risk of losing work / broken repo
 
-**Nothing open.** P0-1, P0-2 and P0-3 closed 2026-09-09 (`e344d17`); P0-4 closed
-2026-09-17. See [DONE.md](DONE.md).
+P0-1, P0-2 and P0-3 closed 2026-09-09 (`e344d17`); P0-4 closed 2026-09-17. See
+[DONE.md](DONE.md).
+
+### P0-5 · The app reads a settings file nobody else sees · **owner decision 2026-09-25**
+
+Microsoft Store Python virtualises `%APPDATA%`: `core/settings.py:64-71` resolves to
+`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\Roaming\blastlab\settings.json`,
+while editors, PowerShell and the Read tool see the 27 B `%APPDATA%` file
+(`auto_cleanup: false`). The virtual copy had `auto_cleanup: true` (150 GB / 14 d /
+keep 10) and was rewritten by a GUI start on 2026-09-25 10:22. Set to `false` by hand
+the same day as a stop-gap. Source: `docs/ENGINEERING_QUESTIONS.md`, hd1-3d-close #3.
+
+**Decision (owner):** the settings file lives **in the repo**, at one explicit path
+that no virtualisation can redirect.
+
+1. `settings.default_path()` returns a repo-local file (e.g. `<repo>/settings.json`,
+   next to `blastlab/`), added to `.gitignore` - it carries machine-specific `hw_*`
+   fields and must never be committed.
+2. One-time migration: if the repo file is missing, seed it from the virtual copy (or
+   the `%APPDATA%` one), and **force `auto_cleanup: false`** in the result. Log which
+   source was used. Never delete the old files.
+3. A dry run: `env.cleanup_plan(settings)` returns what the policy *would* delete
+   (names, sizes, mtimes) and deletes nothing; `auto_cleanup` is built on it.
+4. CLAUDE.md §8.2, the P0-4 note below and P4-3 point at the dry run and the new path.
+   Replace the "check" `env.auto_cleanup(settings.load())`, which deletes.
+5. Tests: `default_path()` is inside the repo and ignored by git; migration forces
+   cleanup off; `cleanup_plan` touches no file. Tk and Qt both read the same file
+   (run the `test_gui_*` suites - §9).
+
+Acceptance: `python -c "from blastlab.core import settings; print(settings.default_path())"`
+prints the repo path under Store Python, and the Read tool sees the same bytes the app
+loads.
 
 > **But P0-4's trap is permanent and worth re-reading before any session that
 > matters:** every code path that builds the GUI can delete the run corpus, and
@@ -322,9 +386,292 @@ blocker.)*
 `backend._initial_frame` / `_initial_frame3d` silently skip the t = 0 frame for chamber
 and profile stages, and `_time_is_whole` fails on such a start dir. Found by
 hd1-wall-load A3 (see `docs/batches/2026-09-24-hd1-wall-load.*.md`), which worked
-around it locally in `_e2e_vent_wall.read_start`. *Decide which side to fix:*
-- the reader: visible in the GUI, so it needs QA;
-- the writer: moves goldens.
+around it locally in `_e2e_vent_wall.read_start`.
+
+**Decision (owner, 2026-09-25): fix the reader.** `reader._nonuniform_body` accepts both
+`)` and `);`. Both are valid OpenFOAM, and OpenFOAM already reads the writer's `);`. The
+writer and its goldens stay byte-identical. Add a test that writes a chamber / profile
+`0/` field with `writer`, reads it with `reader`, and checks the t = 0 frame is present.
+Once the reader handles it, remove the local workaround in
+`_e2e_vent_wall.read_start`. Qt GUI QA: the player now shows frame 0 for a chamber and
+a chained (1D → 2D) run.
+
+### P1-8 · The GUI turns AMR on with the stale 0.4/0.2 thresholds · **owner decision 2026-09-25**
+
+`models/case.py:135-149` re-tuned the defaults to `amr_refine`/`amr_unrefine` =
+0.2/0.1 on 2026-09-10 (sweep: 0.4/0.2 gave -11.8 % gauge error, 0.2/0.1 gave -3.9 %).
+The old 0.4/0.2 is still used in `ui/setup_spec.py:118-119`, `gui/forms.py:505-506`, the
+AMR-off / `set_case` fallback in `models/fields.py`, and the `getattr` fallback in
+`core/refine.py:1053-1054`. A GUI user who switches AMR on gets ~12 % gauge error.
+Also, loading a case with AMR off rewrites its AMR fields (`native_2d_small.json`:
+`densityGradient` → `Lohner`, 0.2/0.1 → 0.4/0.2), so a file saved from the GUI no longer
+matches the one loaded. Source: `docs/ENGINEERING_QUESTIONS.md`, phase 5a #1-#2.
+
+**Decision (owner):**
+1. One source: every place above reads the defaults from the constants in
+   `models/case.py` (0.2/0.1, `Lohner`). No literal thresholds left in `ui/`, `gui/`,
+   `models/fields.py` or `core/refine.py`.
+2. A form that loads a case with AMR off keeps the case's AMR fields and saves them back
+   unchanged.
+
+Acceptance: a grep finds no `0.4`/`0.2` AMR literal outside `models/case.py`; a
+load→save round trip of `native_2d_small.json` through both forms is identical in its
+AMR fields; `test_regression.py` stays byte-identical (AMR is off in every baseline,
+so confirm this rather than assume it); the phase 5a characterisation test that pins
+0.4/0.2 is updated **as part of this owner decision** (§9); Qt and Tk GUI QA.
+
+### P1-9 · The charge field is the material's mass, but everything says "kg TNT" · **owner decision 2026-09-25**
+
+`core/case.py:494-498` sizes the charge with the selected material's `rho0`, so the
+field is the **material mass**. Yet the form (`setup_spec.py:371,384,459,462`), the
+figure titles (`output/plots.charge_label`, `plots.py:56-57`) and the report say
+"kg TNT". The native form always sends `'TNT'` (`case_form.py:468/506`), against the
+comment at `core/case.py:548-566`. The preview circle uses TNT density
+(`output/preview_draw.py:117`, `viz3d/geometry.py:54`; ANFO's radius is 24 % larger).
+No gauge table shows Z. blastFoam 1D meta hard-codes `eos='JWL'` and titles never
+name the material. Source: `docs/ENGINEERING_QUESTIONS.md` UX E1/E2/E5, architecture
+#2, phase 8 #1-#2.
+
+**Decision (owner):** the field stays the material mass.
+1. Labels say "kg ‹material›" (e.g. "5 kg ANFO"; "kg/m" in planar 2D) everywhere:
+   form, figure titles, report, 1D meta titles. Tk and Qt both.
+2. The preview (2D and 3D) sizes the charge with the material's `rho0`.
+3. TNT equivalence per UFC 3-340-02 §2-9 **Eq. 2-1**, W_E = (H_d^EXP / H_d^TNT) ·
+   W_EXP, with H_d from **Table 2-1** (printed p. 311, `docs/references/ufc_3_340_02.pdf`).
+   Read the values off the PDF page itself, add an `h_d` field (with the table cited) to
+   each row of `core/materials.py`, and list any material Table 2-1 does not carry, for
+   the owner. Eq. 2-1 is for unconfined shock effects only (§2-9, last paragraph); say so
+   next to the number.
+4. The gauge table and the report gain a Z column computed with W_E. The KB comparison
+   uses W_E too.
+5. Native mode hides the material choice (TNT only), and the `core/case.py:548-566`
+   comment is corrected to match. No native number moves.
+
+Acceptance: no "kg TNT" string is left except for a TNT case; `test_regression.py` is
+byte-identical; for TNT, W_E = W and Z matches R/W^(1/3); Qt and Tk GUI QA with an ANFO
+case (label, preview radius, Z).
+
+### P1-10 · The report compares a ground burst with free-air KB · **owner decision 2026-09-25**
+
+`output/report.py:96-124` `kb_rows` compares gauge peaks with `KB_FREE_AIR`. It skips
+obstacles, extra charges and planar 2D, but never looks at the boundary conditions. So
+an axisymmetric case with `y_lo='reflect'`, or a 3D case with a reflecting side near
+the charge, sets a reflected or Mach-stem peak against a free-air one, and the ratio
+reads as a solver error. Source: `docs/ENGINEERING_QUESTIONS.md`, phase 6 #1.
+
+**Decision (owner):** classify the geometry and compare only against the matching curve.
+1. **Free air** (no reflecting boundary within reach of the charge): KB free-air, UFC
+   3-340-02 Figure 2-7, as today.
+2. **Charge on the ground** (centre within ~1 charge radius of a reflecting boundary):
+   KB hemispherical surface burst, UFC 3-340-02 **Figure 2-15** (text sidecar line
+   ~7041; read the values off the PDF page). `test_foam_kb_anchor.py` already carries a
+   10 kg hemispherical table; take it from there or from the figure, and cite which.
+3. **Elevated HOB, or anything else**: no comparison. The report prints one line
+   saying why. The HOB / Mach-region curves (Figs 2-9 to 2-13) are a separate item,
+   on request.
+4. W is W_E from `P1-9`. Pre-register the "on the ground" distance rule, in charge
+   radii, in the code comment before any case is judged by it.
+
+Acceptance: free-air cases give byte-identical report rows; an axisymmetric
+`y_lo='reflect'` surface-burst case is compared with Fig. 2-15; an elevated-HOB case
+prints the skip line; a planar 2D case is unchanged.
+
+### P1-11 · HD 1.3 inputs: a typo, a blank and an explicit 0 all become the default silently · **owner decision 2026-09-25**
+
+`models/case.py` (blast cases) refuses unknown keys, but `models/hd13_case.case_from_dict`
+drops them and never checks `version`. A misspelled wall or vent field gives an
+assessment of a different case with no warning. In the HD 1.3 form, a blank Samples
+or Cohorts box is an error (`'Samples' is not an integer: ''`) although the code's
+`or 1000` / `or 1` suggests a default. Meanwhile an explicit 0 in discharge coefficient,
+wall temperature, collapse rotation, cohorts or samples silently becomes the default.
+Source: `docs/ENGINEERING_QUESTIONS.md` phase 2 #1, phase 5a #4, UX E4.
+
+**Decision (owner):**
+1. The HD 1.3 reader refuses unknown keys as the blast reader does. The error names the
+   field and suggests the closest known one (difflib). `version` is checked.
+2. **Blank means default; an explicit 0 means 0**, or a validation error naming the
+   field if 0 is not physical. No `x or default` on a value the user typed. Qt and Tk
+   forms both.
+3. The HTML report and the CLI print the value **actually used** for every
+   defaultable field, marked "(default)" where it was not given.
+4. First load every HD 1.3 JSON in the repo (the starter case, `docs/hd13/`, test
+   fixtures) under the new reader. Any that fails is a real typo: record it and fix the
+   file, not the reader.
+
+Acceptance: a typo'd key raises with the suggestion; a blank Samples box runs with 1000;
+Cd = 0 is refused, not replaced; the report shows used values; `test_regression.py`
+and the HD 1.3 characterisation tests are unchanged for valid inputs; Qt and Tk GUI QA.
+
+### P1-12 · The user sets the write interval, and sees the disk it will take · **owner decision 2026-09-25**
+
+Today the writer picks the interval itself (the adaptive controller, clamp
+[interval0/4, 8·interval0]), and it cannot hold its own band: HD1-3d made **748 writes,
+172.96 GiB** in 30 ms. `HD1-15`'s `write_budget` fixes the count, but it defaults to 0,
+is not in the GUI, and the Qt form drops it on save. A write is a full OpenFOAM time
+directory (every field in every cell, ~130 MB per write in 3D, kept reconstructed and
+decomposed). Gauge histories are written every step and do **not** depend on it.
+Animation frames, resume points, chain hand-off and whole-field traces (plane-max) do.
+Source: `docs/ENGINEERING_QUESTIONS.md` hd1-3d-close #2, hd1-wall-load #8, phase 3 #4.
+
+**Decision (owner):** the run setup takes the write interval as an input, in one of two
+modes chosen by the user:
+- **every N time steps**, written as `writeControl timeStep; writeInterval N;`
+- **every Δt seconds**, written as `writeControl adjustableRunTime; writeInterval Δt;`
+
+Next to the field, the form shows a live **estimate**: number of writes and disk in GB.
+- by time: n = end_time / Δt;
+- by steps: n = (end_time / Δt_est) / N, with Δt_est from the CFL condition
+  (CFL · dx_min / (|u| + c) at the expected peak). Label it as an estimate, because
+  the step is adaptive;
+- disk ≈ n × cells × `BYTES_PER_CELL_WRITE` (155 B, measured HD1-3d), × 2 when the
+  decomposed copies are kept; for AMR use the max cell count. Resolve the "~60 B per
+  cell" AMR note against 155 (phase 3 #4) first.
+- Warn above a threshold (proposed 50 GB; owner to confirm).
+
+Details for the implementer:
+1. Qt and Tk forms both (§9), blastFoam mode only (hidden, not greyed, in native). The
+   value is saved in the case JSON and survives load→save.
+2. The GUI default is an interval that gives ~60 writes (end_time / 60). A headless
+   case that does not set it keeps today's behaviour, so the goldens and
+   `test_regression.py` stay byte-identical.
+3. When the user sets an interval, the adaptive controller and `write_budget` are off
+   for that run. Keep `write_budget` for headless use. `write_budget_of` returns 0 for
+   anything that is not a positive whole number (hd1-wall-load #8), with one new test.
+4. The live view / 3D viewer / plane-max traces sample at writes. Say so in the field's
+   tooltip.
+5. Ref: blastFoam user guide, `controlDict` `writeControl` (check the section in
+   `docs/references/INDEX.md` and cite it).
+
+Acceptance: both modes render the right `controlDict` lines (writer test); a 3D case at
+Δt = end_time/60 makes 60 ± 1 writes in a real WSL run, and its disk agrees with the
+estimate within 25 %; the estimate updates as the fields change; Qt and Tk GUI QA.
+
+### P1-14 · The material table against its primary source · **owner decision 2026-09-25: must be 100 % sourced**
+
+**Source found and read, 2026-09-25:** Dobratz & Crawford, *LLNL Explosives Handbook*,
+UCRL-52997 (1985), **Table 8-7**, pp. 8-22 / 8-23. The PDF is at
+`https://archive.org/download/LLNLExplosivesHandbook/LLNL%20Explosives%20Handbook.pdf`
+(PDF pages 229-230). Values were read off the page **images**, not the OCR text layer.
+Units there: ρ0 g/cm³, P and A/B/C Mbar, D cm/µs, E0 Mbar·cm³/cm³ (= 100 GPa, per
+unit volume, so e0 [J/kg] = E0 / ρ0). Footnote b = "estimated quantities".
+
+| Row | Field | `core/materials.py` | LLNL Table 8-7 | Gap |
+|---|---|---|---|---|
+| TNT | all 9 | - | 1.630 / 0.210 / 0.693 / 0.07 / 3.712 / 0.03231 / 4.15 / 0.95 / 0.30 | **matches** |
+| C4 | e0 | 5.56e6 | E0 0.090 → 9.0e9 / 1601 = **5.62e6** | -1.1 % |
+| C4 | other 8 | - | 1.601 / 0.280 / 0.8193 / 6.0977 / 0.1295 / 4.5 / 1.4 / 0.25 | matches |
+| HMX | ρ0, D | 1890, 9100 | 1.891, 0.911 | -0.05 %, -0.1 % |
+| HMX | e0 | 5.50e6 | E0 0.1050 → 1.05e10 / 1891 = **5.553e6** | -1.0 % |
+| HMX | Pcj | 3.9e10 | 0.420ᵇ (estimated) → 4.2e10 | -7 % |
+| HMX | A, B, R1, R2, ω | - | 7.783 / 0.07071 / 4.20 / 1.00 / 0.30 | matches |
+| PETN (ρ0 1.770) | D | 8400 | 0.830 → **8300** | +1.2 % |
+| PETN | e0 | 5.81e6 | E0 0.1010 → 1.01e10 / 1770 = **5.706e6** | +1.8 % |
+| PETN | Pcj | 3.1e10 | 0.335 → 3.35e10 | -7 % |
+| PETN | A, B, R1, R2, ω | - | 6.170 / 0.16926 / 4.40 / 1.20 / 0.25 | matches (B rounded) |
+| **RDX** | all | A 7.78e11, B 7.07e9, R1 4.485, R2 1.068 | **not in Table 8-7** | unsourced |
+| **ANFO** | all | A 4.95e10, B 1.89e9, R1 3.90 ... | **not in Table 8-7** | unsourced |
+
+**Decision (owner):** every row must trace to a primary source, value for value.
+1. The rows LLNL carries (TNT, C4, HMX, PETN) take **exactly** the Table 8-7 values,
+   with the table and page cited per row. C4's `E0` comment (9.0e9) was the handbook's
+   number, and it is `e0` that was off.
+2. **RDX and ANFO: owner-gated. Do not search, choose or change these rows without
+   an explicit owner decision** (owner, 2026-09-25). No agent picks a source. Candidates
+   may be listed for the owner, but the owner chooses. ANFO is non-ideal: its JWL
+   depends on diameter and density, so the choice is an engineering one. Until the owner
+   decides, the row is marked **unsourced** in the code and in the GUI list, and its
+   values stay as they are.
+3. Changing C4 / HMX / PETN moves the results of runs with those materials, but **not
+   TNT**, so the KB anchor and every TNT golden stay put. Check whether any golden uses
+   another material, and if so re-baseline it in its own commit.
+4. *(Done 2026-09-25: the handbook is registered as `llnl-explosives-handbook` in
+   `docs/references/INDEX.md`, with Table 8-7 pre-rendered as PNGs.)*
+5. Same pass, text fixes: the `Pcj` comment's "~7 % of every row" (ANFO is 14 %), the
+   `Afterburn` docstring's "~25 %" (the TNT ratios give 11-15 %, CLAUDE.md §7 says
+   ~13 %), the dead "ROADMAP N3" references (the docstring and the report footnote), and
+   the AMR "runs in parallel" comments in `services/validation.py` against CLAUDE.md §7
+   (serial). Check the code and fix whichever is stale.
+6. `blastfoam_toolkit/docs/jwl_parameters.md` gets the same corrections, or a note that
+   `core/materials.py` supersedes it.
+
+Source: `docs/ENGINEERING_QUESTIONS.md` architecture #1, phase 1 #1-#2, phase 4 #1,
+phase 6 #2.
+
+### P1-16 · Two grid mismatches: validation's cell count, and extra charges in 'zone' mode · **owner decision 2026-09-26, high priority**
+
+**(a) Validation counts a different grid from the one the solver builds.** For the
+native 2D case, validation reports dx 0.010542 and 113 × 151 = 17,063 cells (rounded
+down). The solver builds 114 × 152 = 17,328 at dx 0.010526. The cell-cap check exists
+to stop a `MemoryError` that takes the window down, and it undercounts by ~1.5 % in 2D,
+probably more in 3D. **Decision:** validation calls the same grid builder the solver
+uses (one source, `core/grid` or wherever the solver's is), in 1D, 2D and 3D, native and
+blastFoam. The solvers do not change. Validation messages and the cell-cap verdict may
+move slightly: pin the new numbers in the phase 3/4 characterisation tests **as part of
+this decision** (§9), with a before/after table.
+
+**(b) Extra charges refine dx when the main charge would not.** In
+`services/validation.py` `_validate_refinement`, the main charge skips dx refinement
+under `foam and charge_refine == 'zone'`, but extra charges refine dx whenever AMR is
+off, even in 'zone' mode. The whole mesh gets finer, and the run more expensive, for
+nothing. **Decision:** extra charges follow the main charge's rule. **First verify that
+every extra charge gets its own refinement zone** in `setRefinedFieldsDict`
+(`solvers/foam/writer.py`). If one does not, add it in the same change, or the charge
+ends up under-resolved. Writer test: a two-charge 'zone' case has two zones and the
+coarse dx.
+
+Acceptance: validation's reported cell count equals the solver's built count for every
+case in `tests/cases/` (a new test); `test_regression.py` byte-identical; a multi-charge
+'zone' case gets the main-charge dx and one zone per charge.
+Source: `docs/ENGINEERING_QUESTIONS.md` phase 0 #2, phase 4 #2.
+
+### P1-15 · The Vieille `a` override has no unit on screen · **owner decision 2026-09-26**
+
+The HD 1.3 form's "Vieille a" override (`ui/setup_spec.py:241`, Tk `gui/case_form.py:184`)
+shows no unit. The code expects SI (`core/fuels.py:92`: r in m/s with p in Pa, so `a`
+is in m/s/Paⁿ; the report prints `m/s/Pa^n`, `output/hd13.py:109`). Literature quotes `a`
+in mm/s/MPaⁿ, and the unit of `a` depends on n. For n = 0.8, 1 mm/s/MPa^0.8 is
+1.6e-8 m/s/Pa^0.8, so a pasted literature value is wrong by orders of magnitude with
+no warning. Source: `docs/ENGINEERING_QUESTIONS.md` UX E3.
+
+**Decision (owner):**
+1. The form takes `a` in **mm/s/MPaⁿ**, labelled "Vieille a [mm/s/MPaⁿ]", in both Qt
+   and Tk. It converts to SI internally: a_SI = a · 1e-3 · (1e-6)ⁿ, using the n in
+   effect (the override if given, else the table's).
+2. Next to the field, a live sanity readout shows the burn rate r at 1 MPa and 10 MPa,
+   in mm/s.
+3. The case JSON stores it under a unit-named key (`a_mm_s_MPa`). Existing files with
+   the old SI key still load, read as SI. Say so in the loader and test it.
+4. The report shows `a` in both unit systems.
+5. The table values in `core/fuels.py` and the solver stay SI. No number moves for a
+   case without an override.
+
+Acceptance: a literature value typed in mm/s/MPaⁿ gives the same assessment as the
+same value converted to SI by hand in an old-format JSON; the readout is right for one
+worked example; characterisation goldens are unchanged; Qt and Tk GUI QA.
+
+### P1-13 · Arrival is a fixed 1.1 × ambient threshold · **owner decision 2026-09-25**
+
+`output/gauge_summary.py:22-23,53` puts arrival at the first sample above 1.1 × ambient
+(~10.13 kPa over), and the positive-phase impulse starts there. A far gauge (Z ≳ 4 for
+1 kg) arrives late or `NaN` and gets no impulse. A gradual rise (HD1-3d G1) crosses
+1.19 ms after the first disturbance, and the impulse is 1.1-2.1 % low. The CSV does not
+say the numbers depend on the threshold. Source: `docs/ENGINEERING_QUESTIONS.md`
+hd1-3d-close #6, architecture #4.
+
+**Decision (owner):**
+1. Arrival is the first sample above a **fraction of that gauge's own peak
+   overpressure** (proposed 5 %; fix the number in the code comment before any output is
+   judged by it).
+2. The positive phase starts at the last zero crossing of overpressure before arrival,
+   i.e. the start of the rise, and ends at the next zero crossing after the peak.
+3. The rule is written in the gauge CSV header and in the report.
+4. Post-processing only; the solvers are untouched. The byte-pinned gauge summaries that
+   move are re-baselined **as part of this owner decision** (§9), in their own commit
+   with a before/after table: peak, impulse and arrival for every baseline gauge.
+
+Acceptance: a Z ≈ 6 gauge gets an arrival and a positive impulse; HD1-3d G1's impulse
+rises by ~1.1 %; peaks are unchanged everywhere; `test_regression.py` differs only in
+the arrival / impulse columns, and the table shows it.
 
 ---
 
@@ -444,6 +791,90 @@ Cause undetermined; two candidates:
   before the first regular write.
 
 If a resumed run's peak map is really wrong, this is P1.
+
+### P2-13 · Four broken or toothless committed tests · **owner decision 2026-09-26: edit permitted**
+
+**The owner explicitly permits editing these four committed tests (§9), and only
+these.** The rule is: **fix the test's mechanism, never its threshold or its expected
+value.** One commit per test, each citing this decision.
+1. **`P2-10`** `test_foam_wsl_resume.py`: complete the stub spec (`init_state` and
+   anything else `FoamRunLoop.__init__` now needs). Run it for real in WSL (§8.6 first).
+2. **`P2-11`** `test_foam_postmortem.py`: **find the cause of 620 vs 632 first.** If
+   it is a code bug, fix the code and leave the test alone, and it is P1 if a resumed
+   run's peak map is wrong. If the test itself is wrong, **stop and bring the evidence to
+   the owner** before changing it.
+3. `test_vent_wall.py`: `test_evidence` / `test_tails` / `test_step2_driver` take
+   arguments, so pytest reports 3 "fixture not found" errors. Rename the helpers or
+   give them fixtures so pytest collects only real tests, with the same checks.
+4. `test_refine.py`: `check()` only appends to a list, so its 10 pytest functions
+   cannot fail. Make a failing check fail, both under pytest and as a script. **Any
+   real failure this uncovers is reported to the owner as a finding.** Do not loosen it
+   to pass.
+
+Source: `docs/ENGINEERING_QUESTIONS.md` hd1-wall-load #3, phase 0 #4.
+
+### P2-14 · Code hygiene: small silent failures · **owner decision 2026-09-26**
+
+No number a user sees should move. `test_regression.py` stays byte-identical, and the
+validation dump over ~100 cases (phase 4) is compared before and after.
+
+1. **A negative charge breaks the 2D preview** (`core/refine.py:115` `effective_dx`,
+   from `ui/setup_panel.py:264`: a complex radius, swallowed by the event loop).
+   The radius function raises `ValueError` for mass ≤ 0. The preview catches it, draws
+   no charge and says "invalid charge mass". Validation already refuses the run.
+2. **A profile-initialised 2D case with `charge=None` cannot be read back** (`set_case`
+   writes `''`, and `get_case` refuses it). With profile initialisation the charge row
+   is hidden (mode-aware, as elsewhere) and a blank reads as `None`. In every other
+   mode a blank is still an error. Qt and Tk.
+3. **The ambient sound speed is defined four times** (`validate_case` 1D and 2D/3D
+   recompute `sqrt(1.4*101325/1.225)`; the fixed-dt Courant check hard-codes
+   `2.0*340.3` and says "~680 m/s"). All read `C_AMB_AIR`, and the message formats it.
+   Confirm with the validation dump that no warning flips.
+4. **Charge radius: one function, no TNT fallback.** Use the one in `core/materials.py`
+   everywhere (`services/validation._charge_radius`, `_validate_1d`'s own copy,
+   `core/case.py:494`, `core/refine.py:120`). `rho0` is required, and the result is always
+   a Python `float` (the planar branch returned `np.float64`). `models` `material_rho0`
+   catches only `KeyError`, so a broken import fails loudly.
+5. **The "Charge cells" note vanishes** when `set_mass_fraction` raises. Show
+   "Charge cells: could not compute (‹error›)" instead.
+6. `DecomposedPurge.run` logs "retrying at the next poll" after a failed final sweep, but
+   no poll follows. Say "final sweep failed; decomposed copies left at ‹paths›".
+7. `read_probes` aligns U and rho with p by row count. Align by the time column, and
+   raise if the times differ.
+8. `_e2e_foam_write_budget.du_sb`: use `env.WSL_DISTRO`, `stdin=DEVNULL`,
+   `CREATE_NO_WINDOW`, and check `returncode` before parsing. Rerun it in WSL (§8.6).
+9. `_e2e_vent_3d.evaluate` `traces[0]` raises `IndexError` on a run with no probes.
+   **Do not edit the frozen C6-C13 block.** Check before calling it, and raise
+   "run has no probes".
+10. *(No separate action: the `4 × n_snapshots` warning that ignores the clamp, and the Qt
+    form dropping `write_budget`, are resolved by `P1-12`.)*
+
+Source: `docs/ENGINEERING_QUESTIONS.md` phase 5a #3, #5; phase 3 #1, #2, #3, #5;
+phase 4 #3; phase 2 #2; architecture #3; hd1-wall-load #8; hd1-3d-close #8.
+
+### P2-15 · Notes on the HD1-3d / HD1-13 record · **owner decision 2026-09-26, docs only**
+
+Add to the records in `DONE.md` §0 (and their batch reports if they cite the same). **No
+criterion is re-judged.** C1-C13 were registered before the run and stand as judged.
+- **a. C8's scope.** State exactly what it checks and what it does not: G1 only, only
+  after t_peak + 4 ms, only at half the peak. It does not look at G1's second rise
+  (8.8 ms after arrival), and `x_hi` is 2 m behind G1. Point to the full traces in
+  `docs/hd13/vent3d_gauges_3d.txt`.
+- **b. Step 2's first attempt.** One line: attempt 1 aborted at t = 0, before any plane
+  number existed, because of `P1-7`. The rerun after `53f87ad` changed no rule or
+  threshold, and the verifier judged it legitimate.
+- **c.** "~141.7 MB each" for the decomposed copies becomes the measured per-write mean,
+  ~117.6 MB (corrected 2026-09-26).
+- **d. The `writeInterval` judgement is accepted by the owner (2026-09-26).** The
+  run's controlDict differs from a fresh render only in `writeInterval`, which is the
+  runner's own run-time rewrite (`runner.rewrite_control_entry`, the adaptive 8×
+  ceiling). Applying the runner's `sed` reproduces the run's file byte for byte, so it is
+  the same case.
+- **e.** Commit `1c9b238` gives the wrong cause for the disk use (snapshots). The
+  correct one is in `3798cec` and `P1-12`.
+
+Source: `docs/ENGINEERING_QUESTIONS.md` hd1-3d-close #1 (C10), #4, #7, #8;
+hd1-wall-load #2.
 
 ---
 
