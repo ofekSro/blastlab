@@ -74,12 +74,23 @@ def _norm(path):
 
 def _desktop_roots():
     """The Desktop folders a runs folder must never be (CLAUDE.md 8.5):
-    ~\\Desktop and the OneDrive-redirected ones."""
+    ~\\Desktop, the OneDrive-redirected ones, and wherever the Windows
+    shell says the Desktop is (a redirected known folder)."""
     roots = [os.path.join(os.path.expanduser('~'), 'Desktop')]
     for var in ('OneDrive', 'OneDriveCommercial', 'OneDriveConsumer'):
         base = os.environ.get(var)
         if base:
             roots.append(os.path.join(base, 'Desktop'))
+    if os.name == 'nt':
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(1024)
+            # CSIDL_DESKTOPDIRECTORY = 0x10; 0 = S_OK
+            if ctypes.windll.shell32.SHGetFolderPathW(
+                    None, 0x10, None, 0, buf) == 0 and buf.value:
+                roots.append(buf.value)
+        except (OSError, AttributeError, ValueError):
+            pass                  # the two sources above still apply
     return {_norm(r) for r in roots}
 
 
@@ -100,6 +111,14 @@ def check(runs_dir, model):
     why = validate_name(model)
     if why:
         errors.append(f'Model name: {why}')
+    elif not errors:
+        # the model folder itself must not be - or hold - a Desktop: with
+        # the home folder as runs folder, the model 'Desktop' would make
+        # an overwrite rmtree the thesis data (CLAUDE.md 8.5)
+        target = folder_for(runs_dir, model)
+        if any(_inside(d, target) for d in _desktop_roots()):
+            errors.append(f'Model name: {str(model).strip()} in {runs_dir} '
+                          f'is or holds the Desktop - choose another name')
     return errors
 
 

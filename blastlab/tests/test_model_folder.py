@@ -108,6 +108,46 @@ def test_a_check_messages():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_a_desktop_as_model_folder_refused():
+    """verify: a model folder that IS, or holds, a Desktop is refused -
+    home as runs folder + model 'Desktop' would rmtree the thesis data on
+    an overwrite. A folder inside the Desktop stays a valid runs folder."""
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_a_')
+    real = mf._desktop_roots
+    try:
+        home = os.path.join(tmp, 'Home')
+        desk = os.path.join(home, 'Desktop')
+        sub = os.path.join(desk, 'runs')
+        os.makedirs(sub)
+        mf._desktop_roots = lambda: {mf._norm(desk)}
+        for runs, model in ((home, 'Desktop'), (home, 'desktop'),
+                            (tmp, 'Home')):
+            got = mf.check(runs, model)
+            assert len(got) == 1 and got[0].startswith('Model name: ') \
+                and 'Desktop' in got[0], (runs, model, got)
+            asked = []
+            try:
+                mf.prepare(runs, model, confirm=lambda t: asked.append(t))
+            except mf.ModelFolderError:
+                pass
+            else:
+                raise AssertionError((runs, model))
+            assert asked == [], asked                # never even asked
+        assert mf.check(desk, 'MODEL')[0].startswith(
+            'Runs folder cannot be the Desktop')
+        assert mf.check(sub, 'MODEL') == []          # a sub-folder is fine
+        assert mf.check(home, 'Other') == []
+        assert os.listdir(desk) == ['runs']          # nothing touched
+    finally:
+        mf._desktop_roots = real
+        shutil.rmtree(tmp, ignore_errors=True)
+    # the real machine: home + 'Desktop' refused before any dialog
+    home = os.path.expanduser('~')
+    if os.path.isdir(os.path.join(home, 'Desktop')):
+        got = mf.check(home, 'Desktop')
+        assert got and 'Desktop' in got[-1], got
+
+
 def test_a_folder_for_case_insensitive():
     tmp = tempfile.mkdtemp(prefix='blastlab_mf_a_')
     try:
@@ -852,6 +892,7 @@ def test_d_stage_calls_release_for_foam():
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
+         test_a_desktop_as_model_folder_refused,
          test_a_folder_for_case_insensitive,
          test_b_native_1d, test_b_native_2d_axisym,
          test_b_missing_animation_and_planar_profile,
