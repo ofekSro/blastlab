@@ -112,6 +112,10 @@ fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
   inside WSL; only then is the scratch deleted. A failed, stopped or
   partly copied run keeps it (`manifest.json` says why), and the run
   browser, `--load-foam-run` and the VTK button work on it as before.
+- **A run that never ends** (the window closed mid-run) still leaves
+  `MODEL.json` and a `manifest.json` whose `stop_reason` begins
+  `unfinished:` - both are written when the run starts and replaced when
+  it ends.
 - **Chain**: `<MODEL>\1d\`, `2d\`, `3d\`, one folder per stage as above,
   with `handoff_1d_to_2d.txt` and `handoff_2d_to_3d.npz` at the model root
   and a root `manifest.json` listing the stages and hand-offs. There is no

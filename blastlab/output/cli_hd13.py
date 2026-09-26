@@ -10,9 +10,9 @@ without either of them owning the other.
 
     python -m blastlab --hd13-new magazine.json    # a starter case
     python -m blastlab --hd13 magazine.json --runs-dir D --model M
-        # run it: D\M\hd13_report.html and D\M\hd13_loads\ (OUT-1)
+        # run it: D\\M\\hd13_report.html and D\\M\\hd13_loads\\ (OUT-1)
     python -m blastlab --hd13-wall-export magazine.json --runs-dir D --model M
-        # HD1-13 wall CSVs into D\M\wall_loads\
+        # HD1-13 wall CSVs into D\\M\\wall_loads\\
 
 The validation report is printed before anything is computed, errors and
 warnings first, because for this model the warnings are the product. A
