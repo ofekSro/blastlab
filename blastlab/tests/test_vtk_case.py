@@ -314,6 +314,22 @@ def test_validation():
           said(rep3(vtk_surfaces=s_on(obstacle_fields=['p'])),
                'only the sections are written', ('notes',))
           and not vtk_errors(rep3(vtk_surfaces=s_on(obstacle_fields=['p']))))
+    # out-2 verify: the clash test must snap on the writer's own grid
+    # (refine.plan_levels), not a uniform grid rebuilt from the charge
+    # cell size - here those put x = 0.1534 / 0.1554 m on one layer, while
+    # the writer cuts them on two
+    from blastlab.solvers.foam import writer
+    near = dict(Lx=0.6, Ly=0.5, Lz=0.4, cell_size_m=0.05, charge=0.1,
+                center=(0.3, 0.25, 0.2), gauges=[(0.55, 0.25, 0.2)],
+                slice_axis='x', slice_pos=0.58,
+                vtk_surfaces=s_on(planes=[['x', 0.1534], ['x', 0.1554]]))
+    r_near = rep3(**near)
+    sp_near = writer.plan_case(Case3D(solver='blastfoam', t_end=0.002,
+                                      **near))
+    check('two planes the writer cuts on two layers are not refused',
+          not r_near.errors
+          and writer.snap_plane(sp_near, 'x', 0.1534)
+          != writer.snap_plane(sp_near, 'x', 0.1554), str(r_near.errors))
     check('volumes on a SERIAL AMR case are allowed',
           not said(rep3(amr_levels=1, n_procs=1, vtk_volumes=v_on()),
                    'parallel AMR', ('errors',)))

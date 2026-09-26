@@ -473,16 +473,23 @@ _VTK_LABELS = dict(vtk_surfaces='VTK sections/obstacles',
                    vtk_volumes='VTK volumes')
 
 
-def _vtk_layers(case, ctx, axis):
-    """Cell-centre coordinates along `axis` of the grid the writer snaps a
-    VTK plane onto: the refined display grid when a plan exists, else the
-    uniform grid at the effective cell size. An AMR case shifts every
-    layer by the same offset (writer.snap_plane), so equal layers here are
-    equal layers there."""
+def _vtk_grid(case, ctx):
+    """The grid the writer snaps a VTK plane onto (writer.plan_case takes
+    `refine.plan_levels(case, rho0).fine` for every 3D case): the refined
+    plan's when validation built one, else the same call here. A uniform
+    grid rebuilt from `ctx.dx` is NOT it - the writer sizes the charge
+    cell with `refine.effective_dx`, which lands on other layers (out-2
+    verify: 0.1534 and 0.1554 m were refused as one layer that the writer
+    puts on two). An AMR case shifts every layer by the same offset
+    (writer.snap_plane), so equal layers here are equal layers there.
+    None when the plan cannot be built (validation says why elsewhere)."""
     if ctx.plan is not None:
-        return np.asarray(ctx.plan.fine[f'{axis}_c'])
-    from ..core.grid import make_grid
-    return make_grid(case.Lx, case.Ly, case.Lz, ctx.dx)[f'{axis}_c']
+        return ctx.plan.fine
+    from ..core.refine import plan_levels
+    try:
+        return plan_levels(case, ctx.rho0).fine
+    except ValueError:
+        return None
 
 
 def _validate_vtk_cadence(label, fam, err):
@@ -547,6 +554,9 @@ def _validate_vtk_planes(case, rep, ctx, fam):
             planes.append((ax, float(pos)))
     if not ok or not fam['fields'] or ctx.dx is None or ctx.dx <= 0:
         return
+    grid = _vtk_grid(case, ctx)
+    if grid is None:
+        return
     # the live-slice plane is always a section (plan sec. 3.1)
     s_ax = getattr(case, 'slice_axis', 'y') or 'y'
     if s_ax in ('x', 'y', 'z'):
@@ -558,7 +568,7 @@ def _validate_vtk_planes(case, rep, ctx, fam):
     for p in planes:
         ax, pos = p[0], p[1]
         what = p[2] if len(p) > 2 else f'{ax} = {pos:g} m'
-        c = _vtk_layers(case, ctx, ax)
+        c = np.asarray(grid[f'{ax}_c'])
         layer = float(c[int(np.argmin(np.abs(c - pos)))])
         key = (ax, layer)
         name = (ax, f'{pos:.2f}')
