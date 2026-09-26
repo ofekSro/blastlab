@@ -5,17 +5,19 @@ is before the HD 1.3 orchestration moves out of `output/cli_hd13.py` into
 `services/hd13.py`, what a user of the two commands sees:
 
     python -m blastlab --hd13-new t.json
-    python -m blastlab --hd13 t.json
+    python -m blastlab --hd13 t.json --runs-dir runs --model M
 
   * stdout of each (byte for byte, CRLF folded to LF) and the exit code;
   * the starter case file `--hd13-new` writes, byte for byte;
-  * the HTML report `--hd13` writes next to the case, byte for byte after
-    its `datetime.now()` stamp (`output/hd13.py`, the banner line) and its
-    inlined PNGs are replaced by placeholders (the PNGs by pixel size) -
-    the masking `test_char_exports.py` uses for the blast report;
-  * the refused case (run with `--report r.html`): a case
-    `assessment.validate` refuses - the report printed on stdout, the
-    `SystemExit` text on stderr, exit code 1, and no report file written.
+  * the HTML report `--hd13` writes into the model folder (OUT-1:
+    runs\\M\\hd13_report.html, with MODEL.json, hd13_loads\\ and
+    manifest.json beside it), byte for byte after its `datetime.now()`
+    stamp (`output/hd13.py`, the banner line) and its inlined PNGs are
+    replaced by placeholders (the PNGs by pixel size) - the masking
+    `test_char_exports.py` uses for the blast report;
+  * the refused case: a case `assessment.validate` refuses - the report
+    printed on stdout, the `SystemExit` text on stderr, exit code 1, and
+    no model folder created.
 
 The commands run in a subprocess with the case given as a RELATIVE path
 from a temp working directory, so no absolute path reaches the output;
@@ -98,10 +100,13 @@ def test_starter_and_report():
         got = {'new': dict(code=code, stdout=out, stderr=err,
                            files=listing(tmp), case=read(
                                os.path.join(tmp, 't.json')))}
-        code, out, err = blastlab(tmp, '--hd13', 't.json')
-        report = os.path.join(tmp, 't_hd13.html')
+        os.mkdir(os.path.join(tmp, 'runs'))
+        code, out, err = blastlab(tmp, '--hd13', 't.json',
+                                  '--runs-dir', 'runs', '--model', 'M')
+        model = os.path.join(tmp, 'runs', 'M')
+        report = os.path.join(model, 'hd13_report.html')
         got['run'] = dict(code=code, stdout=out, stderr=err,
-                          files=listing(tmp),
+                          files=listing(tmp), model_files=listing(model),
                           report_crlf_count=crlf_count(report))
         cc.check_json('hd13_cli.json', got)
         cc.check_text('hd13_cli_report.html', normalise_html(read(report)))
@@ -121,11 +126,13 @@ def test_refused_case():
         case['t_end'] = 0.0
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(case, f, indent=2)
+        os.mkdir(os.path.join(tmp, 'runs'))
         code, out, err = blastlab(tmp, '--hd13', 'bad.json',
-                                  '--report', 'r.html')
+                                  '--runs-dir', 'runs', '--model', 'M')
         cc.check_json('hd13_cli_refused.json',
                       dict(code=code, stdout=out, stderr=err,
-                           files=listing(tmp)))
+                           files=listing(tmp),
+                           runs_files=listing(os.path.join(tmp, 'runs'))))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

@@ -11,10 +11,7 @@
       "switch_interval_s": 0.005
     },
     "assessment_runs": 1,
-    "cwd_files": [
-      "hd13_report.html",
-      "hd13_report_loads"
-    ],
+    "cwd_files": [],
     "during": {
       "bar_range": [
         0,
@@ -28,29 +25,26 @@
     },
     "errors": [],
     "log_added": [
-      "HD 1.3 report written: <tmp>/cwd/hd13_report.html",
-      "SBEDS loads: 1 CSV in <tmp>/cwd/hd13_report_loads",
-      "  <tmp>/cwd/hd13_report_loads/nominal.csv",
+      "HD 1.3 report written: <tmp>/runs/HD13_AGAIN/hd13_report.html",
+      "SBEDS loads: 1 CSV in <tmp>/runs/HD13_AGAIN/hd13_loads",
+      "  <tmp>/runs/HD13_AGAIN/hd13_loads/nominal.csv",
       "nominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms"
     ],
-    "mkdtemp": [
-      {
-        "dir": null,
-        "prefix": "blastlab_hd13_",
-        "suffix": null
-      }
+    "mkdtemp": [],
+    "out_files": [
+      ".blastlab-model",
+      "MODEL.json",
+      "hd13_loads",
+      "hd13_report.html",
+      "manifest.json"
     ],
     "same_report_as_typed": true,
     "status": "HD 1.3 done - report and 1 SBEDS load CSV written; 1 load record ends while the load is still active (see Log)",
     "status_is_warning": true,
     "status_timer_active": true,
-    "status_tooltip": "HD 1.3 report written: <tmp>/cwd/hd13_report.html\nSBEDS loads: 1 CSV in <tmp>/cwd/hd13_report_loads\n  <tmp>/cwd/hd13_report_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
-    "temp_dirs_left": 1,
-    "temp_files": {
-      "0": {
-        "case.json": "{\r\n  \"name\": \"magazine, 5 kg double-base, vented\",\r\n  \"propellant\": \"double_base\",\r\n  \"overrides\": {},\r\n  \"measured\": [],\r\n  \"charge_kg\": 5.0,\r\n  \"volume_m3\": 1.0,\r\n  \"vent_area_m2\": 0.02,\r\n  \"discharge_coeff\": 0.8,\r\n  \"p_ign\": 0.0,\r\n  \"p0_chamber\": 101325.0,\r\n  \"confinement\": \"both\",\r\n  \"scenario_kind\": \"flame_spread\",\r\n  \"n_cohorts\": 20,\r\n  \"spread_time\": 30.0,\r\n  \"spread_geometry\": \"area\",\r\n  \"t_end\": 60.0,\r\n  \"n_out\": 1000,\r\n  \"sensitivity\": false,\r\n  \"sensitivity_source\": \"\",\r\n  \"sens_dn\": 0.15,\r\n  \"sens_a_factor\": 1.5,\r\n  \"sens_pext_factor\": 2.0,\r\n  \"sens_hc_factor\": 2.0,\r\n  \"h_c\": 200.0,\r\n  \"wall_area_m2\": 6.0,\r\n  \"T_wall\": 300.0,\r\n  \"standoffs_m\": [\r\n    10.0,\r\n    25.0,\r\n    50.0\r\n  ],\r\n  \"qd_criteria\": [],\r\n  \"room_origin\": [\r\n    0.0,\r\n    0.0,\r\n    0.0\r\n  ],\r\n  \"room_size\": [],\r\n  \"room_wall_m\": 0.0,\r\n  \"vent_face\": \"x_lo\",\r\n  \"vent_rect\": [],\r\n  \"open_mode\": \"burst\",\r\n  \"p_burst\": 0.0,\r\n  \"domain_size\": [],\r\n  \"cfd_dx_m\": 0.0,\r\n  \"cfd_window_s\": 0.0,\r\n  \"n_snapshots_vent\": 0,\r\n  \"vent_gauges\": [],\r\n  \"span_m\": 3.0,\r\n  \"mass_per_area\": 480.0,\r\n  \"Ru_pa\": 400000.0,\r\n  \"kE_pa_m\": 30000000.0,\r\n  \"support\": \"simple\",\r\n  \"rotation_limit_deg\": 12.0,\r\n  \"schema\": \"blastlab-hd13\",\r\n  \"version\": 1\r\n}"
-      }
-    }
+    "status_tooltip": "HD 1.3 report written: <tmp>/runs/HD13_AGAIN/hd13_report.html\nSBEDS loads: 1 CSV in <tmp>/runs/HD13_AGAIN/hd13_loads\n  <tmp>/runs/HD13_AGAIN/hd13_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
+    "temp_dirs_left": 0,
+    "temp_files": {}
   },
   "raised": {
     "after": {
@@ -82,21 +76,17 @@
       ]
     ],
     "log_added": [],
-    "mkdtemp": [
-      {
-        "dir": null,
-        "prefix": "blastlab_hd13_",
-        "suffix": null
-      }
-    ],
+    "mkdtemp": [],
     "out_files": [
-      "report.html",
-      "report_loads"
+      ".blastlab-model",
+      "MODEL.json",
+      "manifest.json"
     ],
     "status": "",
     "status_is_warning": false,
     "status_timer_active": false,
     "status_tooltip": "",
+    "stop_reason": "ValueError: char: the assessment failed",
     "temp_dirs_left": 0,
     "temp_files": {}
   },
@@ -131,10 +121,7 @@
     ],
     "log_added": [],
     "mkdtemp": [],
-    "out_files": [
-      "report.html",
-      "report_loads"
-    ],
+    "out_files": null,
     "status": "",
     "status_is_warning": false,
     "status_timer_active": false,
@@ -167,32 +154,25 @@
     },
     "errors": [],
     "log_added": [
-      "HD 1.3 report written: <tmp>/out/report.html",
-      "SBEDS loads: 1 CSV in <tmp>/out/report_loads",
-      "  <tmp>/out/report_loads/nominal.csv",
+      "HD 1.3 report written: <tmp>/runs/HD13/hd13_report.html",
+      "SBEDS loads: 1 CSV in <tmp>/runs/HD13/hd13_loads",
+      "  <tmp>/runs/HD13/hd13_loads/nominal.csv",
       "nominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms"
     ],
-    "mkdtemp": [
-      {
-        "dir": null,
-        "prefix": "blastlab_hd13_",
-        "suffix": null
-      }
-    ],
+    "mkdtemp": [],
     "out_files": [
-      "report.html",
-      "report_loads"
+      ".blastlab-model",
+      "MODEL.json",
+      "hd13_loads",
+      "hd13_report.html",
+      "manifest.json"
     ],
     "report_crlf_count": 9,
     "status": "HD 1.3 done - report and 1 SBEDS load CSV written; 1 load record ends while the load is still active (see Log)",
     "status_is_warning": true,
     "status_timer_active": true,
-    "status_tooltip": "HD 1.3 report written: <tmp>/out/report.html\nSBEDS loads: 1 CSV in <tmp>/out/report_loads\n  <tmp>/out/report_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
-    "temp_dirs_left": 1,
-    "temp_files": {
-      "0": {
-        "case.json": "{\r\n  \"name\": \"magazine, 5 kg double-base, vented\",\r\n  \"propellant\": \"double_base\",\r\n  \"overrides\": {},\r\n  \"measured\": [],\r\n  \"charge_kg\": 5.0,\r\n  \"volume_m3\": 1.0,\r\n  \"vent_area_m2\": 0.02,\r\n  \"discharge_coeff\": 0.8,\r\n  \"p_ign\": 0.0,\r\n  \"p0_chamber\": 101325.0,\r\n  \"confinement\": \"both\",\r\n  \"scenario_kind\": \"flame_spread\",\r\n  \"n_cohorts\": 20,\r\n  \"spread_time\": 30.0,\r\n  \"spread_geometry\": \"area\",\r\n  \"t_end\": 60.0,\r\n  \"n_out\": 1000,\r\n  \"sensitivity\": false,\r\n  \"sensitivity_source\": \"\",\r\n  \"sens_dn\": 0.15,\r\n  \"sens_a_factor\": 1.5,\r\n  \"sens_pext_factor\": 2.0,\r\n  \"sens_hc_factor\": 2.0,\r\n  \"h_c\": 200.0,\r\n  \"wall_area_m2\": 6.0,\r\n  \"T_wall\": 300.0,\r\n  \"standoffs_m\": [\r\n    10.0,\r\n    25.0,\r\n    50.0\r\n  ],\r\n  \"qd_criteria\": [],\r\n  \"room_origin\": [\r\n    0.0,\r\n    0.0,\r\n    0.0\r\n  ],\r\n  \"room_size\": [],\r\n  \"room_wall_m\": 0.0,\r\n  \"vent_face\": \"x_lo\",\r\n  \"vent_rect\": [],\r\n  \"open_mode\": \"burst\",\r\n  \"p_burst\": 0.0,\r\n  \"domain_size\": [],\r\n  \"cfd_dx_m\": 0.0,\r\n  \"cfd_window_s\": 0.0,\r\n  \"n_snapshots_vent\": 0,\r\n  \"vent_gauges\": [],\r\n  \"span_m\": 3.0,\r\n  \"mass_per_area\": 480.0,\r\n  \"Ru_pa\": 400000.0,\r\n  \"kE_pa_m\": 30000000.0,\r\n  \"support\": \"simple\",\r\n  \"rotation_limit_deg\": 12.0,\r\n  \"schema\": \"blastlab-hd13\",\r\n  \"version\": 1\r\n}"
-      }
-    }
+    "status_tooltip": "HD 1.3 report written: <tmp>/runs/HD13/hd13_report.html\nSBEDS loads: 1 CSV in <tmp>/runs/HD13/hd13_loads\n  <tmp>/runs/HD13/hd13_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
+    "temp_dirs_left": 0,
+    "temp_files": {}
   }
 }

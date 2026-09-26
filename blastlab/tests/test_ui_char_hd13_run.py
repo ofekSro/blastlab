@@ -6,27 +6,29 @@ finding 1. Drives the REAL `ui.app.MainWindow` offscreen, switched to the
 `_run_hd13`, and pins in one golden (`char_golden/ui_hd13_run.json`) plus
 the report (`char_golden/ui_hd13_run_report.html`):
 
-  * with a report file typed in: which temp directories are made (their
-    `tempfile.mkdtemp` arguments), the temp case JSON written into each,
-    byte for byte (ARCHITECTURE_REVIEW Q4 - the owner has not yet said
-    whether it is provenance, so it is pinned as it is), the report written
-    where it was asked for (byte for byte after the timestamp and PNG
-    masking of `test_char_hd13_cli.py`), the status line, its tooltip,
-    colour and timer, the lines the run added to the Run log (HD1-16,
-    QA F2), no dialog, and HOW MANY TIMES `assessment.run` is called - once since
-    UX 1 (it was twice: once "to fail before touching disk", then again
-    in `services/hd13.assess`);
+  * `typed` - the real assessment into the model folder (OUT-1; before
+    OUT-1 a report file typed into the form): that no temp directory is
+    made any more (`tempfile.mkdtemp` is still recorded, and must stay
+    unused), the model folder's listing (MODEL.json - the case the
+    report is made from, ARCHITECTURE_REVIEW Q4 - hd13_report.html,
+    hd13_loads\\, manifest.json), the report byte for byte after the
+    timestamp and PNG masking of `test_char_hd13_cli.py`, the status
+    line, its tooltip, colour and timer, the lines the run added to the
+    Run log (HD1-16, QA F2), no dialog, and HOW MANY TIMES
+    `assessment.run` is called - once since UX 1 (it was twice: once "to
+    fail before touching disk", then again in `services/hd13.assess`);
   * the Run controls right after the press (`during`: Run and Initialise
     Model off, the bar indeterminate, the status line) and after it
     finishes (`after`), and that a second press while it works starts
     nothing;
-  * with the report field blank: the `hd13_report.html` fallback, written
-    relative to the working directory;
+  * `blank` - the report in a second model folder (before OUT-1: the
+    blank report field's `hd13_report.html` in the working directory):
+    the same report, and nothing written to the working directory;
   * a case `assessment.validate` refuses: the dialog title and text, no
-    temp directory, no run, no report;
-  * a run that raises: the dialog title and text, and nothing on disk -
-    the temp directory, made before the assessment since UX 1, is removed
-    again (`temp_dirs_left`).
+    model folder, no run, no report;
+  * a run that raises: the dialog title and text; its model folder keeps
+    MODEL.json and a manifest.json naming the error, like every model
+    folder of a run that failed.
 
 The assessment runs on a worker thread, so each press is waited out with
 the event loop running, and the longest gap between ticks of a 10 ms
@@ -44,6 +46,7 @@ can never sweep the run corpus (CLAUDE.md 8.2).
 
 Run:  cd blastlab/tests && python test_ui_char_hd13_run.py [--update]
 """
+import json
 import os
 import shutil
 import sys
@@ -209,19 +212,25 @@ def main_window():
 
 
 def collect(gaps):
+    from blastlab.ui.testing import use_model
     root = _REAL_MKDTEMP(prefix='blastlab_char_hd13run_')
     here = os.getcwd()
     win = main_window()
     form = win.setup.forms[0]
     got, report = {}, None
+    # OUT-1: every press names a model folder under <tmp>/runs
+    runs = os.path.join(root, 'runs')
+    os.makedirs(runs)
+
+    def model_files(name):
+        d = os.path.join(runs, name)
+        return sorted(os.listdir(d)) if os.path.isdir(d) else None
     try:
         starter = cc.hd13_starter_case()
 
-        # 1. a report file typed in - the real assessment
+        # 1. the real assessment, into the model folder
         form.set_case(starter)
-        out_dir = os.path.join(root, 'out')
-        os.makedirs(out_dir)
-        form.v['report_file'].set(os.path.join(out_dir, 'report.html'))
+        use_model(win, 'HD13', runs_dir=runs)
         pump(400)                       # past the 300 ms validation timer
         results = []
 
@@ -229,22 +238,25 @@ def collect(gaps):
             results.append(_REAL_RUN(case))
             return results[-1]
         g = press_run(win, root, real, gaps)
-        g['out_files'] = sorted(os.listdir(out_dir))
-        with open(os.path.join(out_dir, 'report.html'), 'rb') as f:
+        g['out_files'] = model_files('HD13')
+        with open(os.path.join(runs, 'HD13', 'hd13_report.html'),
+                  'rb') as f:
             data = f.read()
         g['report_crlf_count'] = data.count(b'\r\n')
         got['typed'] = g
         report = normalise_html(data.decode('utf-8'))
 
-        # 2. the report field blank: the fallback name, in the cwd
+        # 2. a second model folder; nothing lands in the working directory
         cwd = os.path.join(root, 'cwd')
         os.makedirs(cwd)
         os.chdir(cwd)
-        form.v['report_file'].set('')
+        use_model(win, 'HD13_AGAIN', runs_dir=runs)
         pump(400)
         g = press_run(win, root, lambda case: results[-1])
         g['cwd_files'] = sorted(os.listdir(cwd))
-        with open(os.path.join(cwd, 'hd13_report.html'), 'rb') as f:
+        g['out_files'] = model_files('HD13_AGAIN')
+        with open(os.path.join(runs, 'HD13_AGAIN', 'hd13_report.html'),
+                  'rb') as f:
             blank = f.read()
         g['same_report_as_typed'] = \
             normalise_html(blank.decode('utf-8')) == report \
@@ -253,23 +265,26 @@ def collect(gaps):
         os.chdir(here)
 
         # 3. a case the validator refuses (two errors, so the join shows)
-        form.v['report_file'].set(os.path.join(out_dir, 'refused.html'))
+        use_model(win, 'REFUSED', runs_dir=runs)
         form.v['charge_kg'].set('0')
         form.v['t_end'].set('0')
         pump(400)
         g = press_run(win, root)
-        g['out_files'] = sorted(os.listdir(out_dir))
+        g['out_files'] = model_files('REFUSED')
         got['refused'] = g
 
         # 4. a run that raises
         form.set_case(starter)
-        form.v['report_file'].set(os.path.join(out_dir, 'raised.html'))
+        use_model(win, 'RAISED', runs_dir=runs)
         pump(400)
 
         def boom(case):
             raise ValueError('char: the assessment failed')
         g = press_run(win, root, boom)
-        g['out_files'] = sorted(os.listdir(out_dir))
+        g['out_files'] = model_files('RAISED')
+        with open(os.path.join(runs, 'RAISED', 'manifest.json'),
+                  encoding='utf-8') as f:
+            g['stop_reason'] = json.load(f)['stop_reason']
         got['raised'] = g
     finally:
         os.chdir(here)
