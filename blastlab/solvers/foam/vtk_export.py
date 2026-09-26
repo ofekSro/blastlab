@@ -8,13 +8,25 @@ be deleted (`vtk_purge_plan`), the paths a delete may touch
 surface-output time directories a sweep takes (`surface_sweep_plan`) and
 where each file lands in the model folder (`dest_name`).
 
+`VtkExport` is the executor the run loop drives after every ingest pass
+and on the final sweep (Step 6).
+
 No Qt, no services/, no backend import: the run loop owns the executor
 and the backend only tells it which writes finalize still reads.
 """
 
+import collections
+import os
+import posixpath
 import re
+import shutil
+import subprocess
+import threading
+import time as _time
 
-from .runloop import _CASE_POSIX, _is_time, rm_scripts   # noqa: F401
+from ...models.case import vtk_fields_for
+from ...output import vtk_series
+from .runloop import _CASE_POSIX, _is_time, _root_whole, rm_scripts
 from .writer import VTK_OBSTACLES, VTK_SECTIONS
 
 #: the model folder's vtk\ subfolders (plan sec. 3.6)
@@ -139,14 +151,24 @@ def volume_file_paths(case_posix, names):
     return [f'{case}/{volume_file_name(case, n)}' for n in names]
 
 
+def _sample_time(name):
+    """`name` when it is a sample time (0 included: a surface function
+    object samples the initial state too, measured on this build), else
+    ValueError."""
+    s = str(name)
+    if not _is_time(s) or float(s) < 0.0:
+        raise ValueError(f'not a sample time: {s!r}')
+    return s
+
+
 def surface_dir_paths(case_posix, fo_name, names):
-    """`<case>/postProcessing/<fo_name>/<t>` for each written time, the
+    """`<case>/postProcessing/<fo_name>/<t>` for each sample time, the
     surface output a sweep has copied. `fo_name` must be one of the two
     VTK surface function objects the writer emits."""
     case = _case_path(case_posix)
     if fo_name not in (VTK_SECTIONS, VTK_OBSTACLES):
         raise ValueError(f'not a VTK surface function object: {fo_name!r}')
-    return [f'{case}/postProcessing/{fo_name}/{_written_time(n)}'
+    return [f'{case}/postProcessing/{fo_name}/{_sample_time(n)}'
             for n in names]
 
 
@@ -251,3 +273,659 @@ def split_surface_file(filename, fields=()):
     if not sep or not field or not surface:
         return None
     return field, surface
+
+
+# ── the executor (Step 6) ────────────────────────────────────────────────
+
+#: test-only switch (batch plan Step 11, rule 2): with it set to 1 the
+#: export converts and copies as usual but deletes nothing in WSL
+NO_DELETE_ENV = 'BLASTLAB_VTK_NO_DELETE'
+#: written times per foamToVTK call while the solver runs (one call at a
+#: time, D13) and at the final sweep
+BATCH_RUN = 8
+BATCH_FINAL = 50
+#: a failed conversion or copy is tried this many times in all, then the
+#: time goes into `not_converted` (plan sec. 3.5)
+ATTEMPTS = 2
+#: the final sweep waits for foamToVTK up to max(this, n_cells / 1e3) s
+FINAL_WAIT_MIN_S = 600.0
+#: while the solver runs, the export looks at the disk at most this often
+EVERY_S = 1.0
+
+_T_FILE = re.compile(r't_(.+)\.vtk')
+
+
+def final_wait_s(n_cells):
+    """The final sweep's bound on waiting for foamToVTK [s]."""
+    return max(FINAL_WAIT_MIN_S, float(n_cells or 0) / 1e3)
+
+
+def delete_wsl(paths):
+    """rm -rf `paths` inside WSL (no OpenFOAM env needed), one stage per
+    `rm_scripts` chunk (the Windows command-line cap). True when every
+    stage went through. The callers build `paths` with the guarded
+    builders above only."""
+    from . import env
+    for script in rm_scripts(paths):
+        try:
+            res = subprocess.run(env.wsl_plain_argv(script),
+                                 capture_output=True, timeout=300,
+                                 stdin=subprocess.DEVNULL,
+                                 creationflags=env.CREATE_NO_WINDOW)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if res.returncode != 0:
+            return False
+    return True
+
+
+class Conversion:
+    """One asynchronous foamToVTK call over several written times (D13):
+    a Popen and a pump thread, as `runner.run_stage_stoppable`, polled
+    once per lap so the ingest never blocks on it."""
+
+    def __init__(self, case_posix, names, fields):
+        from . import env
+        self.names = list(names)
+        script = (f'cd {_case_path(case_posix)} && '
+                  + vtk_argv_script(self.names, fields))
+        self.tail = collections.deque(maxlen=40)
+        self.proc = subprocess.Popen(
+            env.wsl_argv(script), stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            creationflags=env.CREATE_NO_WINDOW)
+        threading.Thread(target=self._pump, daemon=True).start()
+
+    def _pump(self):
+        try:
+            with self.proc.stdout as stream:
+                for raw in stream:
+                    self.tail.append(raw.decode('utf-8', 'replace').rstrip())
+        except (OSError, ValueError):
+            pass
+
+    def poll(self):
+        """None while it runs, else (ok, detail)."""
+        rc = self.proc.poll()
+        if rc is None:
+            return None
+        if rc == 0:
+            return True, ''
+        return False, (f'exit {rc}: '
+                       + ' / '.join(ln for ln in list(self.tail)[-3:] if ln))
+
+    def kill(self):
+        try:
+            self.proc.kill()
+            self.proc.wait(timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+
+
+def start_conversion(spec, names, fields):
+    """The default `runner`: a Conversion of `names` in the run's case."""
+    return Conversion(spec.case_posix, names, fields)
+
+
+def _size(path):
+    try:
+        return os.path.getsize(path)
+    except OSError:
+        return -1
+
+
+def _cadence(fam):
+    if not fam:
+        return None
+    return dict(mode=fam['mode'], value=fam['value'],
+                unit='ms' if fam['mode'] == 'time' else 'steps')
+
+
+class VtkExport:
+    """OUT-2 (plan sec. 3.5): convert, copy and verify every write of a
+    blastFoam run into `<MODEL>\\vtk\\`, then delete the WSL copies the
+    pure `vtk_purge_plan` allows.
+
+    Active only when the case has a VTK family on AND the hooks carry a
+    model folder (`hooks.vtk_dir`, set by model_folder.stage_solve; D12).
+    Without a folder the export is inactive: one log line, no converter
+    call, no delete.
+
+    `run(done, final)` - after every ingest pass and on the final sweep:
+
+    1. poll (or, final, wait for) the one asynchronous foamToVTK call
+       (D13) and start the next one over ingested, unconverted times;
+    2. copy `VTK/<case>_<t>.vtk` to `vtk\\volumes\\t_<t>.vtk`, size-check
+       it against the source;
+    3. sweep the surface function objects' output (`postProcessing/
+       vtkSections|vtkObstacles/<t>/<field>_<surface>.vtk`, all but the
+       newest sample until the final sweep) into `vtk\\sections\\<plane>\\
+       <field>\\` and `vtk\\obstacles\\<field>\\`;
+    4. rewrite the `.vtk.series` files and `vtk\\manifest.json` - BEFORE
+       any delete, so a resume never meets a deleted write the manifest
+       does not know was copied;
+    5. delete in WSL, in one chunked rm: the planned time dirs
+       (`time_dir_paths`), the copied `VTK/` files and the swept surface
+       dirs; then the manifest again (`deleted_in_wsl`).
+
+    Failures: a foamToVTK or copy failure logs one line per kind, keeps
+    the WSL copy and is retried once; then the time goes into
+    `not_converted`, which keeps the scratch (Q4). Nothing raises and the
+    run is never stopped by its export. The final sweep converts every
+    ingested write, protected ones included, but deletes only what the
+    plan allows; it waits for foamToVTK up to `final_wait_s(n_cells)`.
+
+    Why deleting is safe (D1) - what finalize reads from disk, and how it
+    stays there (solvers/foam/backend.py; line numbers as of OUT-2 Step 7):
+
+    ====================  ============================  ===================
+    reader                what it re-reads              kept by
+    ====================  ============================  ===================
+    _final_read           the newest write, falling     KEEP_NEWEST = 2
+                          back to earlier ones
+    finalize_1d           final dir; arrival-pin dir    newest two; the pin
+                          (snapshots: `store`, memory)  candidate, protected
+    finalize_2d           final dir; every snap_names   newest two; each
+                          dir; the pin; the trigger     snapshot, the pin
+                          dir; arrived_2d's `p` of the  candidate and the
+                          quiet prefix                  remap trigger dir
+                                                        protected; the
+                                                        `arrived` cache
+    finalize_3d           final dir; every snap_names   newest two; each
+                          dir (two-pass re-read)        snapshot protected
+    PeakImpulse.final     the final dir's pMax/impulse  newest two
+    ====================  ============================  ===================
+
+    A W3 auto-resume builds a new loop on the same hooks: construction
+    reads `vtk\\manifest.json` back, so no time is exported twice."""
+
+    def __init__(self, spec, hooks, fields, delete=None, runner=None,
+                 copy=None, sleep=None, clock=None):
+        self.spec, self.hooks, self.fields = spec, hooks, fields
+        self.delete = delete or delete_wsl
+        self.runner = runner or start_conversion
+        self.copy = copy or shutil.copyfile
+        self._sleep = sleep or _time.sleep
+        self._clock = clock or _time.monotonic
+        self.vtk_dir = getattr(hooks, 'vtk_dir', None)
+        self.vol = getattr(spec, 'vtk_volumes', None) or None
+        self.surf = getattr(spec, 'vtk_surfaces', None) or None
+        wanted = bool(self.vol or self.surf)
+        self.active = bool(wanted and self.vtk_dir)
+        decomposed = bool(getattr(spec, 'decomposed', False))
+        self.volumes_on = bool(self.active and self.vol and not decomposed)
+        self.no_delete = os.environ.get(NO_DELETE_ENV) == '1'
+        dim = int(getattr(spec, 'dim', 3) or 3)
+        have = vtk_fields_for(dim)
+        self.vol_fields = [f for f in (self.vol or {}).get('fields', ())
+                           if f in have]
+        surf = self.surf or {}
+        self.surf_fields = {
+            VTK_SECTIONS: (list(surf.get('fields', ())) if dim == 3
+                           else []),
+            VTK_OBSTACLES: list(surf.get('obstacle_fields', ()))}
+        self.protected, self.reconstructed = set(), set()
+        self.converted, self.copied, self.deleted = set(), set(), set()
+        self.swept = {VTK_SECTIONS: set(), VTK_OBSTACLES: set()}
+        self.failures = collections.Counter()
+        self.not_converted = {}         # (family, time) -> manifest entry
+        self.files = {}                 # dest rel -> (family, time)
+        self.series = {}                # series rel -> {entry: time}
+        self.changed = set()            # series rels to rewrite
+        self.rm_files, self.rm_surface = set(), set()
+        self.mesh_cache = {}
+        self.solo = set()               # writes of a failed batch call
+        self.job = None
+        self.replay_incomplete = False
+        self._said = set()
+        self._dirty = False
+        self._next = 0.0
+        self._summarised = False
+        if wanted and not self.vtk_dir:
+            hooks.log('  [blastfoam] VTK output is on, but this run has no '
+                      'model folder - nothing is converted and no written '
+                      'time is deleted')
+            return
+        if not self.active:
+            return
+        if self.vol and decomposed:
+            hooks.log('  [blastfoam] VTK volumes cannot be exported from a '
+                      'parallel AMR run (reconstructPar cannot follow the '
+                      'mesh) - sections and obstacles only')
+        if self.volumes_on and int(getattr(spec, 'n_procs', 1) or 1) > 1:
+            self.reconstructed |= _root_whole(spec, fields)
+        self._resume_state()
+        fams = ([VOLUMES] if self.volumes_on else []) + [
+            k for fo, k in ((VTK_SECTIONS, SECTIONS),
+                            (VTK_OBSTACLES, OBSTACLES))
+            if self.surf and self.surf_fields[fo]]
+        hooks.log(f'  [blastfoam] VTK output ({", ".join(fams)}) into '
+                  f'{self.vtk_dir}'
+                  + (f' - WSL deletes off ({NO_DELETE_ENV})'
+                     if self.no_delete else ''))
+
+    # ── what the backend and the loop tell it ──
+    def protect(self, name):
+        """Never delete written time `name` (finalize re-reads it)."""
+        if name is not None:
+            self.protected.add(str(name))
+
+    def unprotect(self, name):
+        if name is not None:
+            self.protected.discard(str(name))
+
+    def covered(self, names):
+        """Times a successful reconstructPar just covered (parallel)."""
+        if names:
+            self.reconstructed.update(str(n) for n in names)
+
+    # ── state ──
+    def _dest(self, rel):
+        return os.path.join(self.vtk_dir, *rel.split('/'))
+
+    def _once(self, kind, msg):
+        if kind not in self._said:
+            self._said.add(kind)
+            self.hooks.log(msg)
+
+    def _resume_state(self):
+        """Read back what an earlier loop on these hooks exported (a W3
+        auto-resume): the manifest is written before any delete, so it
+        is the record of what was copied and verified."""
+        state = vtk_series.load_vtk_manifest(self.vtk_dir)
+        if not state:
+            return
+        fams = state.get('families') or {}
+        for kind in KINDS:
+            for srel in (fams.get(kind) or {}).get('series') or ():
+                path = self._dest(str(srel))
+                for entry, t in vtk_series.read_series(path):
+                    rel = posixpath.normpath(posixpath.join(
+                        posixpath.dirname(srel), entry))
+                    m = _T_FILE.fullmatch(posixpath.basename(rel))
+                    if not m or _size(self._dest(rel)) <= 0:
+                        continue
+                    self.files[rel] = (kind, m.group(1))
+                    self.series.setdefault(str(srel), {})[entry] = \
+                        m.group(1)
+        for rel, (kind, t) in self.files.items():
+            if kind == VOLUMES:
+                self.converted.add(t)
+                self.copied.add(t)
+        for fo, kind in ((VTK_SECTIONS, SECTIONS),
+                         (VTK_OBSTACLES, OBSTACLES)):
+            self.swept[fo].update(
+                str(t) for t in (fams.get(kind) or {}).get('times') or ())
+        for e in state.get('not_converted') or ():
+            if isinstance(e, dict) and 'time' in e:
+                self.not_converted[(e.get('family', VOLUMES),
+                                    str(e['time']))] = dict(e)
+        self.deleted.update(str(t) for t in state.get('deleted_in_wsl') or ())
+        self.replay_incomplete = bool(state.get('replay_incomplete'))
+
+    def state(self):
+        """The vtk\\ manifest (output.vtk_series.write_vtk_manifest)."""
+        fams = {}
+        kinds = ([VOLUMES] if self.volumes_on else []) + [
+            k for fo, k in ((VTK_SECTIONS, SECTIONS),
+                            (VTK_OBSTACLES, OBSTACLES))
+            if self.surf and self.surf_fields[fo]]
+        for kind in kinds:
+            rels = [r for r, (k, _t) in self.files.items() if k == kind]
+            fams[kind] = dict(
+                count=len(rels),
+                times=sorted({self.files[r][1] for r in rels},
+                             key=_time_key),
+                series=sorted(s for s in self.series
+                              if s.startswith(kind + '/')))
+        fields = {}
+        if self.vol:
+            fields[VOLUMES] = list(self.vol_fields)
+        if self.surf:
+            fields[SECTIONS] = list(self.surf_fields[VTK_SECTIONS])
+            fields[OBSTACLES] = list(self.surf_fields[VTK_OBSTACLES])
+        cadence = {}
+        if self.vol:
+            cadence[VOLUMES] = _cadence(self.vol)
+        if self.surf:
+            cadence['surfaces'] = _cadence(self.surf)
+        nc = sorted(self.not_converted.values(),
+                    key=lambda e: (str(e.get('family')),
+                                   float(e.get('time', 0))))
+        return dict(fields=fields, cadence=cadence, families=fams,
+                    not_converted=nc,
+                    deleted_in_wsl=sorted(self.deleted, key=_time_key),
+                    replay_incomplete=self.replay_incomplete)
+
+    def _add_file(self, rel, kind, surface, field, t):
+        self.files[rel] = (kind, t)
+        srel = series_name(kind, surface, field)
+        entry = posixpath.relpath(rel, posixpath.dirname(srel))
+        self.series.setdefault(srel, {})[entry] = t
+        self.changed.add(srel)
+        self._dirty = True
+
+    def _fail(self, family, t, kind, why, path):
+        key = (kind, family, t)
+        self.failures[key] += 1
+        if self.failures[key] < ATTEMPTS:
+            self._once(f'retry-{kind}',
+                       f'  [blastfoam] VTK {family}: {kind} failed for t = '
+                       f'{t} ({why}) - its WSL copy is kept and it is tried '
+                       f'once more')
+            return
+        self.not_converted[(family, t)] = dict(time=t, family=family,
+                                               why=why, path=path)
+        self._dirty = True
+        self._once(f'gave-up-{kind}',
+                   f'  [warn] VTK {family}: {kind} failed twice for t = {t} '
+                   f'({why}) - its WSL copy is kept, it is listed as not '
+                   f'converted, and the scratch will not be released')
+
+    # ── the run-loop entry ──
+    def run(self, done, final=False):
+        """One export pass (see the class docstring). Never raises."""
+        if not self.active:
+            return
+        if not final:
+            now = self._clock()
+            if now < self._next:
+                return
+            self._next = now + EVERY_S
+        try:
+            self._run(done, final)
+        except Exception as exc:        # noqa: BLE001 - never stops the run
+            self._once('error', f'  [warn] VTK export: {exc!r} - the run '
+                                f'goes on; what was not exported stays in '
+                                f'WSL')
+
+    def _run(self, done, final):
+        names = []
+        if self.volumes_on:
+            self._convert(done, final)
+            self._copy_volumes()
+            names = [n for n in self._plan(done) if n not in self.deleted]
+        if self.surf:
+            self._sweep(final)
+        if not self._write_index():
+            return                      # no delete the manifest cannot vouch for
+        if not self.no_delete:
+            self._delete(names)
+        if final and not self._summarised:
+            self._summarised = True
+            self._summary()
+
+    def close(self):
+        """Kill a conversion still running (the loop's `finally`)."""
+        job, self.job = self.job, None
+        if job is not None and hasattr(job, 'kill'):
+            job.kill()
+
+    # ── 1-2: convert and copy the volumes ──
+    def _src_volume(self, name):
+        rel = volume_file_name(self.spec.case_posix, name)
+        return os.path.join(self.spec.case_unc, *rel.split('/'))
+
+    def _todo(self, done):
+        running = set(self.job.names) if self.job is not None else set()
+        out = []
+        for n in done:
+            n = str(n)
+            if (not _is_time(n) or float(n) <= 0.0 or n in self.converted
+                    or n in self.deleted or n in running
+                    or (VOLUMES, n) in self.not_converted):
+                continue
+            out.append(n)
+        return sorted(out, key=_time_key)
+
+    def _batch(self, todo, n):
+        """The next call's writes: a write of a failed batch alone, else
+        up to `n` of them."""
+        solo = [t for t in todo if t in self.solo]
+        return solo[:1] or todo[:n]
+
+    def _start(self, names):
+        try:
+            return self.runner(self.spec, names, self.vol_fields)
+        except Exception as exc:        # noqa: BLE001 - recorded, retried
+            self._finished(names, False, f'foamToVTK did not start: {exc}')
+            return None
+
+    def _finished(self, names, ok, detail):
+        if not ok and len(names) > 1:
+            # one bad write fails the whole call: convert these one at a
+            # time, so only the bad one is retried and given up
+            self.solo.update(names)
+            self._once('split', f'  [blastfoam] VTK volumes: foamToVTK '
+                                f'failed on {len(names)} writes ({detail}) '
+                                f'- converting them one at a time')
+            return
+        for n in names:
+            if ok and _size(self._src_volume(n)) > 0:
+                self.converted.add(n)
+                continue
+            why = detail if not ok else 'foamToVTK wrote no file'
+            self._fail(VOLUMES, n, 'conversion', f'foamToVTK: {why}',
+                       f'vtk/{dest_name(VOLUMES, None, None, n)}')
+
+    def _wait(self, job, deadline):
+        note = self._clock() + 60.0
+        while True:
+            res = job.poll()
+            if res is not None:
+                return res
+            now = self._clock()
+            if now > deadline:
+                if hasattr(job, 'kill'):
+                    job.kill()
+                return False, 'timed out at the final sweep'
+            if now >= note:
+                note += 60.0
+                self.hooks.log(f'  [blastfoam] VTK: waiting for foamToVTK '
+                               f'({len(job.names)} write(s), '
+                               f'{deadline - now:.0f} s left)')
+            self._sleep(0.25)
+
+    def _convert(self, done, final):
+        if self.job is not None:
+            res = (self.job.poll() if not final else
+                   self._wait(self.job, self._clock()
+                              + final_wait_s(self._n_cells())))
+            if res is None:
+                return                  # still converting: next lap
+            job, self.job = self.job, None
+            self._finished(job.names, *res)
+        todo = self._todo(done)
+        if not final:
+            if todo:
+                self.job = self._start(self._batch(todo, BATCH_RUN))
+            return
+        deadline = self._clock() + final_wait_s(self._n_cells())
+        while todo:
+            job = self._start(self._batch(todo, BATCH_FINAL))
+            if job is not None:
+                self._finished(job.names, *self._wait(job, deadline))
+            todo = self._todo(done)
+            if todo and self._clock() > deadline:
+                for n in todo:
+                    self.not_converted[(VOLUMES, n)] = dict(
+                        time=n, family=VOLUMES,
+                        why='the final sweep ran out of time',
+                        path=f'vtk/{dest_name(VOLUMES, None, None, n)}')
+                self._dirty = True
+                break
+
+    def _n_cells(self):
+        try:
+            return int(self.spec.n_cells or 0)
+        except (AttributeError, TypeError, ValueError):
+            return 0
+
+    def _copy_one(self, src, rel):
+        """Copy `src` to vtk\\<rel> and verify it; None, or why not."""
+        dst = self._dest(rel)
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            self.copy(src, dst)
+            want, got = os.path.getsize(src), os.path.getsize(dst)
+        except OSError as exc:
+            why = f'copy failed: {exc}'
+        else:
+            if got > 0 and got == want:
+                return None
+            why = ('the copy is empty' if got <= 0 else
+                   f'the copy holds {got} of {want} bytes')
+        try:
+            os.remove(dst)              # never leave a torn file behind
+        except OSError:
+            pass
+        return why
+
+    def _copy_volumes(self):
+        for n in sorted(self.converted - self.copied, key=_time_key):
+            if (VOLUMES, n) in self.not_converted:
+                continue
+            rel = dest_name(VOLUMES, None, None, n)
+            why = self._copy_one(self._src_volume(n), rel)
+            if why is None:
+                self.copied.add(n)
+                self._add_file(rel, VOLUMES, None, None, n)
+                self.rm_files.update(
+                    volume_file_paths(self.spec.case_posix, [n]))
+            else:
+                self._fail(VOLUMES, n, 'copy', why, f'vtk/{rel}')
+
+    # ── 3: the deletion plan ──
+    def _mesh_listing(self, done):
+        """(every time on disk, the ones holding polyMesh/) - D9, serial
+        AMR only; a complete (ingested) write's answer is cached."""
+        if not getattr(self.spec, 'amr', 0):
+            return (), frozenset()
+        from . import reader
+        names = [n for _t, n in reader.list_times(self.spec.case_unc)]
+        mesh = set()
+        for n in names:
+            has = self.mesh_cache.get(n)
+            if has is None:
+                has = os.path.isdir(os.path.join(self.spec.case_unc, n,
+                                                 'polyMesh'))
+                if n in done:
+                    self.mesh_cache[n] = has
+            if has:
+                mesh.add(n)
+        return names, frozenset(mesh)
+
+    def _plan(self, done):
+        names = [str(n) for n in done]
+        if not vtk_purge_plan(names, self.converted, self.copied, names,
+                              self.spec.start_dir, self.reconstructed,
+                              self.protected,
+                              getattr(self.spec, 'n_procs', 1)):
+            return []
+        ordered, mesh = self._mesh_listing(set(names))
+        return vtk_purge_plan(names, self.converted, self.copied, names,
+                              self.spec.start_dir, self.reconstructed,
+                              self.protected,
+                              getattr(self.spec, 'n_procs', 1),
+                              mesh_dirs=mesh, ordered=ordered)
+
+    # ── 4: the surfaces ──
+    def _sweep(self, final):
+        for fo, kind in ((VTK_SECTIONS, SECTIONS),
+                         (VTK_OBSTACLES, OBSTACLES)):
+            fields = self.surf_fields[fo]
+            if not fields:
+                continue
+            root = os.path.join(self.spec.case_unc, 'postProcessing', fo)
+            try:
+                listing = os.listdir(root)
+            except OSError:
+                continue                # nothing sampled yet
+            for t in surface_sweep_plan(listing, final):
+                if t in self.swept[fo] or (kind, t) in self.not_converted:
+                    continue
+                why = self._sweep_one(kind, fields, os.path.join(root, t), t)
+                if why is None:
+                    self.swept[fo].add(t)
+                    self._dirty = True
+                    self.rm_surface.update(surface_dir_paths(
+                        self.spec.case_posix, fo, [t]))
+                else:
+                    self._fail(kind, t, 'copy', why, f'vtk/{kind}')
+
+    def _sweep_one(self, kind, fields, tdir, t):
+        try:
+            files = sorted(os.listdir(tdir))
+        except OSError as exc:
+            return f'cannot list the sample: {exc}'
+        got = []
+        for f in files:
+            sp = split_surface_file(f, fields)
+            if sp is None:
+                return f'unexpected file {f}'
+            field, surface = sp
+            rel = dest_name(kind, surface, field, t)
+            why = self._copy_one(os.path.join(tdir, f), rel)
+            if why:
+                return f'{f}: {why}'
+            got.append((rel, kind, surface, field, t))
+        for args in got:
+            self._add_file(*args)
+        return None
+
+    # ── 5: the index, then the delete ──
+    def _write_index(self):
+        if not self._dirty:
+            return True
+        try:
+            for srel in sorted(self.changed):
+                vtk_series.write_series(
+                    self._dest(posixpath.dirname(srel)),
+                    posixpath.basename(srel),
+                    [(e, float(t)) for e, t in self.series[srel].items()])
+            vtk_series.write_vtk_manifest(self.vtk_dir, self.state())
+        except (OSError, ValueError) as exc:
+            self._once('index', f'  [warn] VTK: could not write the series '
+                                f'or vtk\\manifest.json ({exc}) - nothing '
+                                f'is deleted in WSL until it can')
+            return False
+        self.changed.clear()
+        self._dirty = False
+        return True
+
+    def _delete(self, names):
+        paths = []
+        if names:
+            paths += time_dir_paths(self.spec.case_posix,
+                                    getattr(self.spec, 'n_procs', 1), names)
+        files, surf = sorted(self.rm_files), sorted(self.rm_surface)
+        paths += files + surf
+        if not paths:
+            return
+        try:
+            ok = bool(self.delete(paths))
+        except Exception:               # noqa: BLE001 - retried next pass
+            ok = False
+        if not ok:
+            self._once('delete', '  [blastfoam] VTK: the WSL delete did not '
+                                 'go through - retried at the next pass; '
+                                 'nothing copied is lost')
+            return
+        self.rm_files.difference_update(files)
+        self.rm_surface.difference_update(surf)
+        if names:
+            self.deleted.update(names)
+            self._dirty = True
+            self._write_index()
+
+    def _summary(self):
+        st = self.state()
+        parts = [f'{v["count"]} {k} file(s)'
+                 for k, v in st['families'].items()]
+        msg = (f'  [blastfoam] VTK: {", ".join(parts) or "nothing"} in '
+               f'{self.vtk_dir}; {len(self.deleted)} written time(s) '
+               f'deleted in WSL')
+        if self.not_converted:
+            msg += (f'; {len(self.not_converted)} not converted (listed in '
+                    f'vtk\\manifest.json, the WSL scratch is kept)')
+        self.hooks.log(msg)

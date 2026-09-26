@@ -19,6 +19,7 @@ Run:  cd blastlab/tests && python test_vtk_export_plan.py   (or pytest)
 import itertools
 import os
 import sys
+from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
@@ -271,7 +272,381 @@ TESTS_A = [test_a_all_open_keeps_two_newest, test_a_each_exclusion_alone,
            test_a_rm_chunking_60_by_13, test_a_volume_and_surface_paths,
            test_a_argv_script, test_a_surface_sweep_plan,
            test_a_dest_and_series_names, test_a_split_surface_file]
-TESTS = TESTS_A
+
+
+# ── B: the executor on a fake scratch tree ───────────────────────────────
+RUN = '20260927-010203_3d_p1234-00'
+POSIX = env.RUNS_ROOT + '/' + RUN
+SAMPLES = ['0', '2e-05', '6e-05', '0.00011', '0.00017']
+
+
+class Tree:
+    """A fake scratch (time dirs + the two surface function objects'
+    output) and a model folder, in a temp dir. The injected runner,
+    copy and delete work on it; nothing touches WSL."""
+
+    def __init__(self, n_procs=1, surfaces=True, volumes=True,
+                 vtk_dir=True):
+        import tempfile
+        self.tmp = tempfile.mkdtemp(prefix='blastlab_vtk_export_')
+        self.unc = os.path.join(self.tmp, 'scratch', RUN)
+        self.vtk = os.path.join(self.tmp, 'MODEL', 'vtk') if vtk_dir \
+            else None
+        for t in ['0'] + T:
+            self.write(f'{t}/p', b'p field\n')
+            for i in range(n_procs if n_procs > 1 else 0):
+                self.write(f'processor{i}/{t}/p', b'rank\n')
+        for fo, files in (('vtkSections', ('p_slice_y_0.30.vtk',
+                                           'pMax_slice_y_0.30.vtk',
+                                           'p_slice_z_0.35.vtk',
+                                           'pMax_slice_z_0.35.vtk')),
+                          ('vtkObstacles', ('p_obstacles.vtk',))):
+            for t in SAMPLES:
+                for f in files:
+                    self.write(f'postProcessing/{fo}/{t}/{f}',
+                               f'{fo} {t} {f}\n'.encode() * 10)
+            self.write(f'postProcessing/{fo}/p_x.vtk.series', b'{}\n')
+        self.spec = SimpleNamespace(
+            dim=3, case_posix=POSIX, case_unc=self.unc, start_dir='0',
+            n_procs=n_procs, amr=0, decomposed=False, n_cells=1000,
+            vtk_volumes=(dict(on=True, mode='step', value=10,
+                              fields=['p', 'rho', 'U']) if volumes
+                         else None),
+            vtk_surfaces=(dict(on=True, mode='time', value=0.02,
+                               fields=['p', 'pMax'],
+                               obstacle_fields=['p'], planes=[['z', 0.35]])
+                          if surfaces else None))
+        self.lines = []
+        self.hooks = SimpleNamespace(vtk_dir=self.vtk, log=self.lines.append)
+        self.runs, self.deletes = [], []
+        self.fail_convert, self.empty_copy = set(), set()
+        self.clock = itertools.count(0, 10)
+
+    def write(self, rel, data):
+        path = os.path.join(self.unc, *rel.split('/'))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(data)
+
+    def exists(self, rel):
+        return os.path.exists(os.path.join(self.unc, *rel.split('/')))
+
+    def runner(self, spec, names, fields):
+        self.runs.append(list(names))
+        tree = self
+
+        class Job:
+            def __init__(self):
+                self.names = list(names)
+
+            def poll(self):
+                bad = [n for n in self.names if n in tree.fail_convert]
+                for n in self.names:
+                    if n not in bad:
+                        tree.write(f'VTK/{RUN}_{n}.vtk', b'# vtk\n' * 100)
+                return (not bad, 'boom' if bad else '')
+        return Job()
+
+    def copy(self, src, dst):
+        import shutil as sh
+        name = os.path.basename(dst)
+        if any(name == f't_{n}.vtk' for n in self.empty_copy):
+            open(dst, 'wb').close()
+            return
+        sh.copyfile(src, dst)
+
+    def delete(self, paths):
+        import shutil as sh
+        self.deletes.append(list(paths))
+        for p in paths:
+            assert p.startswith(POSIX + '/'), p
+            local = os.path.join(self.unc, *p[len(POSIX) + 1:].split('/'))
+            if os.path.isdir(local):
+                sh.rmtree(local)
+            elif os.path.exists(local):
+                os.remove(local)
+        return True
+
+    def export(self):
+        return vx.VtkExport(self.spec, self.hooks, ('p',),
+                            delete=self.delete, runner=self.runner,
+                            copy=self.copy, sleep=lambda s: None,
+                            clock=lambda: next(self.clock))
+
+    def deleted_times(self):
+        return [t for t in T if not self.exists(t)]
+
+    def model(self, rel):
+        return os.path.join(self.vtk, *rel.split('/'))
+
+    def close(self):
+        import shutil as sh
+        sh.rmtree(self.tmp, ignore_errors=True)
+
+
+def _series(path):
+    import json
+    with open(path, encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _manifest(tree):
+    from blastlab.output import vtk_series as vs
+    return vs.load_vtk_manifest(tree.vtk)
+
+
+def test_b_happy_path():
+    tree = Tree()
+    try:
+        ex = tree.export()
+        ex.run({t: 0 for t in T[:3]})          # starts a conversion
+        assert tree.runs == [T[:3]] and tree.deleted_times() == []
+        ex.run({t: 0 for t in T[:4]})          # polls it, copies, plans
+        assert tree.deleted_times() == T[:2], tree.deleted_times()
+        ex.run({t: 0 for t in T}, final=True)
+        # every ingested write converted, copied, and in the series
+        for t in T:
+            assert os.path.getsize(tree.model(f'volumes/t_{t}.vtk')) > 0, t
+        vol = _series(tree.model('volumes/volumes.vtk.series'))
+        assert [f['name'] for f in vol['files']] == [f't_{t}.vtk' for t in T]
+        assert vol['file-series-version'] == '1.0'
+        # exactly the planned dirs: all but the two newest; 0 stays
+        assert tree.deleted_times() == T[:-2], tree.deleted_times()
+        assert tree.exists('0') and tree.exists(T[-1]) and tree.exists(T[-2])
+        assert not os.path.isdir(os.path.join(tree.unc, 'VTK')) or not \
+            os.listdir(os.path.join(tree.unc, 'VTK'))
+        # the surfaces: every sample copied, one series per field and
+        # plane, and the WSL sample dirs gone (blastFoam's series stays)
+        for plane in ('slice_y_0.30', 'slice_z_0.35'):
+            for fld in ('p', 'pMax'):
+                s = _series(tree.model(f'sections/{plane}/{fld}.vtk.series'))
+                assert [f['name'] for f in s['files']] == [
+                    f'{fld}/t_{t}.vtk' for t in SAMPLES], s
+                for t in SAMPLES:
+                    assert os.path.isfile(tree.model(
+                        f'sections/{plane}/{fld}/t_{t}.vtk'))
+        s = _series(tree.model('obstacles/p.vtk.series'))
+        assert [f['time'] for f in s['files']] == [float(t) for t in SAMPLES]
+        for fo in ('vtkSections', 'vtkObstacles'):
+            left = os.listdir(os.path.join(tree.unc, 'postProcessing', fo))
+            assert left == ['p_x.vtk.series'], left
+        m = _manifest(tree)
+        assert m['families']['volumes']['count'] == len(T)
+        assert m['families']['volumes']['times'] == T
+        assert m['families']['sections']['count'] == 4 * len(SAMPLES)
+        assert m['families']['obstacles']['count'] == len(SAMPLES)
+        assert m['deleted_in_wsl'] == T[:-2]
+        assert m['not_converted'] == [] and m['replay_incomplete'] is False
+        assert m['cadence'] == {'volumes': dict(mode='step', value=10,
+                                                unit='steps'),
+                                'surfaces': dict(mode='time', value=0.02,
+                                                 unit='ms')}
+        assert any('VTK output (volumes, sections, obstacles)' in ln
+                   for ln in tree.lines), tree.lines
+        assert any('written time(s) deleted in WSL' in ln
+                   for ln in tree.lines), tree.lines
+    finally:
+        tree.close()
+
+
+def test_b_protected_and_start_dir_survive():
+    tree = Tree(surfaces=False)
+    try:
+        tree.spec.start_dir = T[0]
+        ex = tree.export()
+        ex.protect(T[2])
+        ex.protect(None)
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == [T[1], T[3]], tree.deleted_times()
+        ex.unprotect(T[2])
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == [T[1], T[2], T[3]]
+    finally:
+        tree.close()
+
+
+def test_b_converter_failure_deletes_nothing():
+    tree = Tree(surfaces=False)
+    try:
+        tree.fail_convert = {T[1]}
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert T[1] not in tree.deleted_times()
+        assert tree.exists(T[1])
+        m = _manifest(tree)
+        nc = m['not_converted']
+        assert [e['time'] for e in nc] == [T[1]], nc
+        assert 'foamToVTK' in nc[0]['why'] and nc[0]['family'] == 'volumes'
+        # the failed batch is split, then the bad write is tried twice on
+        # its own and given up (one retry line, one give-up line)
+        assert tree.runs[0] == T, tree.runs
+        assert [r for r in tree.runs[1:] if T[1] in r] == [[T[1]], [T[1]]]
+        assert all(len(r) == 1 for r in tree.runs[1:]), tree.runs
+        assert sum('tried once more' in ln for ln in tree.lines) == 1
+        assert sum('failed twice' in ln for ln in tree.lines) == 1
+        assert not os.path.exists(tree.model(f'volumes/t_{T[1]}.vtk'))
+    finally:
+        tree.close()
+
+
+def test_b_empty_copy_deletes_nothing():
+    tree = Tree(surfaces=False)
+    try:
+        tree.empty_copy = {T[0]}
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        ex.run({t: 0 for t in T}, final=True)
+        assert T[0] not in tree.deleted_times()
+        assert tree.exists(f'VTK/{RUN}_{T[0]}.vtk')   # its source kept
+        assert not os.path.exists(tree.model(f'volumes/t_{T[0]}.vtk'))
+        nc = _manifest(tree)['not_converted']
+        assert [(e['time'], e['path']) for e in nc] == [
+            (T[0], f'vtk/volumes/t_{T[0]}.vtk')], nc
+        assert 'empty' in nc[0]['why'], nc
+    finally:
+        tree.close()
+
+
+def test_b_inactive_without_vtk_dir():
+    tree = Tree(vtk_dir=False)
+    try:
+        ex = tree.export()
+        assert not ex.active
+        ex.run({t: 0 for t in T})
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.runs == [] and tree.deletes == []
+        assert tree.deleted_times() == []
+        assert len(tree.lines) == 1 and 'no model folder' in tree.lines[0]
+        # and nothing at all without a family
+        tree2 = Tree(surfaces=False, volumes=False)
+        try:
+            ex2 = tree2.export()
+            ex2.run({t: 0 for t in T}, final=True)
+            assert not ex2.active and tree2.lines == [] and not tree2.runs
+        finally:
+            tree2.close()
+    finally:
+        tree.close()
+
+
+def test_b_second_export_does_not_convert_twice():
+    tree = Tree(surfaces=False)
+    try:
+        ex = tree.export()
+        ex.run({t: 0 for t in T[:4]})
+        ex.run({t: 0 for t in T[:4]})
+        assert tree.runs == [T[:4]]
+        # a W3 auto-resume: a new loop, the same hooks and folder
+        tree.runs.clear()
+        ex2 = tree.export()
+        assert ex2.copied == set(T[:4]), ex2.copied
+        on_disk = {t: 0 for t in T if tree.exists(t)}
+        ex2.run(on_disk, final=True)
+        assert tree.runs == [T[4:]], tree.runs
+        vol = _series(tree.model('volumes/volumes.vtk.series'))
+        assert [f['name'] for f in vol['files']] == [f't_{t}.vtk' for t in T]
+        assert _manifest(tree)['families']['volumes']['count'] == len(T)
+    finally:
+        tree.close()
+
+
+def test_b_newest_sample_waits_for_final():
+    tree = Tree(volumes=False)
+    try:
+        ex = tree.export()
+        ex.run({})
+        newest = SAMPLES[-1]
+        for fo in ('vtkSections', 'vtkObstacles'):
+            assert tree.exists(f'postProcessing/{fo}/{newest}'), fo
+            for t in SAMPLES[:-1]:
+                assert not tree.exists(f'postProcessing/{fo}/{t}'), (fo, t)
+        assert not os.path.exists(tree.model(f'obstacles/p/t_{newest}.vtk'))
+        ex.run({}, final=True)
+        for fo in ('vtkSections', 'vtkObstacles'):
+            assert not tree.exists(f'postProcessing/{fo}/{newest}'), fo
+        assert os.path.isfile(tree.model(f'obstacles/p/t_{newest}.vtk'))
+        assert 'volumes' not in _manifest(tree)['families']
+    finally:
+        tree.close()
+
+
+def test_b_parallel_needs_reconstruct():
+    tree = Tree(surfaces=False, n_procs=2)
+    try:
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == []            # nothing covered yet
+        ex.covered(T[:3])
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == T[:3]
+        for t in T[:3]:
+            assert not tree.exists(f'processor0/{t}')
+            assert not tree.exists(f'processor1/{t}')
+        assert tree.exists(f'processor0/{T[3]}')
+    finally:
+        tree.close()
+
+
+def test_b_no_delete_switch():
+    tree = Tree()
+    os.environ[vx.NO_DELETE_ENV] = '1'
+    try:
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == [] and tree.deleted_times() == []
+        assert os.path.isfile(tree.model(f'volumes/t_{T[0]}.vtk'))
+        assert any(vx.NO_DELETE_ENV in ln for ln in tree.lines)
+    finally:
+        del os.environ[vx.NO_DELETE_ENV]
+        tree.close()
+
+
+def test_b_failing_delete_never_raises():
+    tree = Tree(surfaces=False)
+    try:
+        ex = tree.export()
+        ex.delete = lambda paths: (_ for _ in ()).throw(OSError('wsl gone'))
+        ex.run({t: 0 for t in T}, final=True)
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == []
+        assert sum('did not go through' in ln for ln in tree.lines) == 1
+        assert _manifest(tree)['deleted_in_wsl'] == []
+    finally:
+        tree.close()
+
+
+def test_b_runloop_wiring():
+    """FoamRunLoop builds the export and calls it after every ingest pass
+    and on the final sweep; a loop assembled with __new__ has none."""
+    loop = runloop.FoamRunLoop.__new__(runloop.FoamRunLoop)
+    assert loop.vtk is None
+    loop.protect('0.1')                  # no-ops without an export
+    loop.unprotect('0.1')
+    loop._export_vtk(final=True)
+    calls = []
+    loop.vtk = SimpleNamespace(
+        run=lambda done, final: calls.append(('run', final)),
+        covered=lambda names: calls.append(('covered', list(names))),
+        protect=lambda n: calls.append(('protect', n)),
+        unprotect=lambda n: calls.append(('unprotect', n)))
+    loop.done = {}
+    loop.purge = None
+    loop._covered(['0.1'])
+    loop._export_vtk(final=False)
+    loop.protect('0.2')
+    loop.unprotect('0.2')
+    assert calls == [('covered', ['0.1']), ('run', False),
+                     ('protect', '0.2'), ('unprotect', '0.2')], calls
+
+
+TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
+           test_b_converter_failure_deletes_nothing,
+           test_b_empty_copy_deletes_nothing, test_b_inactive_without_vtk_dir,
+           test_b_second_export_does_not_convert_twice,
+           test_b_newest_sample_waits_for_final,
+           test_b_parallel_needs_reconstruct, test_b_no_delete_switch,
+           test_b_failing_delete_never_raises, test_b_runloop_wiring]
+TESTS = TESTS_A + TESTS_B
 
 
 def main():

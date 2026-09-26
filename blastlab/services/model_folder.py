@@ -629,9 +629,14 @@ def write_all(res, case, dim, stage_dir, run_info=None, log=print):
             os.rmdir(os.path.join(stage_dir, sub))
         except OSError:
             pass                        # absent, or holds files
-    # OUT-2: the VTK export's own summary (additive; None without export)
+    # OUT-2: the VTK export's own summary (additive; None without export).
+    # A time it could not convert or copy is a failed row, so the WSL
+    # scratch - which still holds it - is kept for a manual export (Q4)
     from ..output.vtk_series import vtk_summary
     manifest['vtk'] = vtk_summary(os.path.join(stage_dir, VTK_DIR), VTK_DIR)
+    for e in (manifest['vtk'] or {}).get('not_converted') or ():
+        failed.append(dict(name='vtk', path=e.get('path') or VTK_DIR,
+                           why=f"t = {e.get('time')}: {e.get('why')}"))
     manifest['outputs'] = list_outputs(stage_dir)
     manifest['finished'] = now_iso()
     why = write_manifest(manifest, stage_dir)
@@ -774,27 +779,38 @@ SKELETON_DIRS = ('system', 'constant', '0', 'postProcessing')
 #: hashing a large polyMesh inside WSL takes seconds; this is the ceiling
 SKELETON_TIMEOUT_S = 600
 
+#: OUT-2 (batch plan D11): the VTK surface output under postProcessing/
+#: belongs to the export, which copies it into vtk\ and deletes it in
+#: WSL - never part of foam\ (and blastFoam's own .vtk.series there is
+#: not copied). The names are writer.VTK_SECTIONS / VTK_OBSTACLES.
+VTK_POST_DIRS = ('postProcessing/vtkSections', 'postProcessing/vtkObstacles')
+
 
 def skeleton_script(scratch_posix):
     """The bash line run inside WSL (no OpenFOAM env needed): hash every
     skeleton file into <scratch>/SHA256SUMS, `sha256sum` format
     (`<hex>  <relpath>`), sorted. Missing entries (a profile stage has no
-    0/, a run without logs has no log.*) are skipped silently."""
+    0/, a run without logs has no log.*) are skipped silently; the VTK
+    surface output (VTK_POST_DIRS) is left out."""
     tops = ' '.join(SKELETON_DIRS)
-    return (f"cd '{scratch_posix}' && find {tops} log.* -type f -print0 "
-            f"2>/dev/null | LC_ALL=C sort -z | xargs -0 -r sha256sum "
-            f"> {SUMS_FILE}")
+    prune = ''.join(f" -not -path '{d}/*'" for d in VTK_POST_DIRS)
+    return (f"cd '{scratch_posix}' && find {tops} log.* -type f{prune} "
+            f"-print0 2>/dev/null | LC_ALL=C sort -z | xargs -0 -r "
+            f"sha256sum > {SUMS_FILE}")
 
 
 def in_skeleton(rel):
     """True for a relative path that belongs in foam\\ (SKELETON_DIRS or
     a top-level log.*); a stray line can never pull in processor*/,
-    a time directory or a path outside the scratch."""
+    a time directory, the VTK surface output or a path outside the
+    scratch."""
     parts = rel.split('/')
     if not rel or rel.startswith('/') or '..' in parts or '' in parts:
         return False
     if len(parts) == 1:
         return parts[0].startswith('log.')
+    if any(rel.startswith(d + '/') for d in VTK_POST_DIRS):
+        return False
     return parts[0] in SKELETON_DIRS
 
 
@@ -1085,8 +1101,13 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
         os.makedirs(stage_dir, exist_ok=True)
         open(log_path, 'a', encoding='utf-8').close()   # exists from start
         prev_log = getattr(hooks, 'log_file', None)
+        prev_vtk = getattr(hooks, 'vtk_dir', None)
         hooks.log_file = log_path
         hooks.scratch_posix = None        # set by the blastFoam backend
+        # OUT-2 (D12): the VTK export writes into <stage>\vtk - only for a
+        # blastFoam stage with a family on; None keeps it inactive
+        hooks.vtk_dir = (os.path.join(stage_dir, VTK_DIR)
+                         if _exports_vtk(case) else None)
         p0 = getattr(hooks, '_last_p', None)
         bound, res, err = case, None, None
         try:
@@ -1146,7 +1167,20 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                                       f'could not take the manifest: {exc!r}')
             finally:
                 hooks.log_file = prev_log
+                hooks.vtk_dir = prev_vtk
     return solve
+
+
+def _exports_vtk(case):
+    """Does this blastFoam case have a VTK family switched on (OUT-2)?"""
+    if getattr(case, 'solver', 'native') != 'blastfoam':
+        return False
+    from ..models.case import vtk_family
+    try:
+        return bool(vtk_family(case, 'vtk_surfaces')
+                    or vtk_family(case, 'vtk_volumes'))
+    except ValueError:              # validation refuses it before the run
+        return False
 
 
 def _handoff_error():
