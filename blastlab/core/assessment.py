@@ -43,6 +43,22 @@ from ..models.hd13_case import (SCHEMA, VERSION,            # noqa: F401
 CONFINEMENTS = ('confined', 'unconfined', 'both')
 
 
+def wall_errors(case):
+    """HD1-16: clearing on needs the loaded wall's height and width (UFC
+    3-340-02 (2008) para. 2-15.3.2, Eq. 2-8). One error per missing or
+    non-positive field, naming it."""
+    if not getattr(case, 'clearing', False):
+        return []
+    errs = []
+    for key, what in (('wall_H_m', 'height H'), ('wall_W_m', 'width W')):
+        v = getattr(case, key, None)
+        if not (isinstance(v, (int, float)) and v > 0):
+            errs.append(f'Clearing is on, so the loaded wall needs its '
+                        f'{what}: {key} must be a positive number of '
+                        f'metres (got {v!r})')
+    return errs
+
+
 def validate(case):
     """Pre-flight report, in the same shape the blast cases use."""
     rep = ValidationReport()
@@ -79,6 +95,8 @@ def validate(case):
         case.build_scenario()
     except ValueError as exc:
         err(str(exc))
+    for e in wall_errors(case):
+        err(e)
 
     wants_confined = case.confinement in ('confined', 'both')
     if wants_confined:

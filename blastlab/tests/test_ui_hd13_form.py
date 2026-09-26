@@ -218,6 +218,37 @@ def main():
     check('which its own validator accepts', asm.validate(u).ok,
           str(asm.validate(u).errors))
 
+    # ── HD1-16 · THE LOADED WALL CARD ───────────────────────────────────
+    print('\n  the loaded wall (HD1-16): clearing, H, W')
+    check('the "Loaded wall" card holds clearing, wall_H_m and wall_W_m',
+          [f.name for c in cards if c.title == 'Loaded wall'
+           for f in c.rows] == ['clearing', 'wall_H_m', 'wall_W_m'])
+    wall = asm.DeflagrationCase(clearing=True, wall_H_m=3.0, wall_W_m=4.0)
+    form.set_case(wall)
+    check('H and W are enabled while clearing is on',
+          form.is_enabled('wall_H_m') and form.is_enabled('wall_W_m'))
+    bw = form.get_case()
+    check('clearing, wall_H_m and wall_W_m survive load -> save',
+          (bw.clearing, bw.wall_H_m, bw.wall_W_m) == (True, 3.0, 4.0),
+          f'{bw.clearing!r}, {bw.wall_H_m!r}, {bw.wall_W_m!r}')
+    form.v['clearing'].set(False)
+    check('H and W are disabled while clearing is off',
+          not form.is_enabled('wall_H_m')
+          and not form.is_enabled('wall_W_m'))
+    bw = form.get_case()
+    check('and their values are kept, not dropped',
+          (bw.clearing, bw.wall_H_m, bw.wall_W_m) == (False, 3.0, 4.0))
+    form.set_case(asm.DeflagrationCase())
+    b3 = form.get_case()
+    check('a case without a wall round-trips without one, H and W disabled',
+          (b3.clearing, b3.wall_H_m, b3.wall_W_m) == (False, 0.0, 0.0)
+          and not form.is_enabled('wall_H_m'))
+    form.v['clearing'].set(True)
+    b4 = form.get_case()
+    check('clearing ticked with H blank is refused by validation, naming '
+          'wall_H_m', any('wall_H_m' in e for e in asm.validate(b4).errors))
+    form.set_case(case)
+
     print('\n  a bad number is reported, not swallowed')
     form.v['charge_kg'].set('not a number')
     check('get_case raises with the field named',

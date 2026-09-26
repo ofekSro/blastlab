@@ -303,6 +303,15 @@ def _hd13_cards():
             F('support', 'Supports', 'choice', 'simple',
               values=tuple(SUPPORTS)),
             F('rot_limit', 'Collapse rotation [deg]', 'float', 12.0))),
+        # HD1-16: the wall the HD1-13 wall-load export is for
+        # (`python -m blastlab --hd13-wall-export`). Clearing is optional
+        # (owner, 2026-09-26) and relieves G1 only; H and W are enabled
+        # only while it is ticked. UFC 3-340-02 (2008) para. 2-15.3.2.
+        CardSpec('Loaded wall', col=1, rows=(
+            F('clearing', 'Clearing on G1 (UFC 3-340-02 2-15.3.2)',
+              'bool', False),
+            F('wall_H_m', 'Wall height H [m]', 'float'),
+            F('wall_W_m', 'Wall width W [m]', 'float'))),
         # HD1-3f. Every row blank by default: a 0-D assessment needs none
         # of it, and `wants_vent` is what decides whether a CFD case gets
         # built at all. A HALF-filled card is refused by validation

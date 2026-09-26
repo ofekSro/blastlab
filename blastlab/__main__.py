@@ -61,6 +61,11 @@ def main():
                          'plus closed-form models')
     ap.add_argument('--hd13-new', metavar='CASE',
                     help='write a starter HD 1.3 case file and exit')
+    ap.add_argument('--hd13-wall-export', metavar='CASE',
+                    help='write the HD1-13 wall-load traces (G1, plane-max '
+                         'x gamma 1.24/1.40) as two-column SBEDS CSVs '
+                         'into <case>_wall_loads/, with clearing if the '
+                         'case asks for it, then exit')
     ap.add_argument('--report', metavar='FILE',
                     help='where --hd13 writes its report '
                          '(default: alongside the case file)')
@@ -74,6 +79,10 @@ def main():
     if args.hd13:
         from .output.cli_hd13 import run_and_report
         run_and_report(args.hd13, args.report)
+        return
+    if args.hd13_wall_export:
+        from .output.cli_hd13 import wall_export
+        wall_export(args.hd13_wall_export)
         return
 
     # N21 follow-up: the hardware probe is process-local, and until this

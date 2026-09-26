@@ -132,6 +132,18 @@ class DeflagrationCase:
     support: str = 'simple'
     rotation_limit_deg: float = 12.0
 
+    # ── HD1-16 step 1, item 2 · the loaded wall of the wall-load export ──
+    #
+    # Optional (owner, 2026-09-26): clearing is the user's choice. With it
+    # off the wall-load CSVs are E = max(R, S) as HD1-13 computed it; with
+    # it on, G1 is relieved over t_c = 4S/((1+R)C_r) from this wall's
+    # height and width (UFC 3-340-02 (2008) para. 2-15.3.2, Eq. 2-8).
+    # Written to JSON only when set (see `case_to_dict`), so every case
+    # file that does not use them stays byte-identical.
+    clearing: bool = False
+    wall_H_m: float = 0.0
+    wall_W_m: float = 0.0
+
     @property
     def has_component(self):
         return all(v > 0 for v in (self.span_m, self.mass_per_area,
@@ -165,9 +177,18 @@ class DeflagrationCase:
             spread_time=self.spread_time, geometry=self.spread_geometry)
 
 
+#: HD1-16: optional fields left out of the JSON while at these defaults,
+#: so a case that does not use them saves exactly as it did before.
+_OPTIONAL_DEFAULTS = {'clearing': False, 'wall_H_m': 0.0, 'wall_W_m': 0.0}
+
+
 def case_to_dict(case):
-    """The case as a JSON-ready dict, stamped with schema and version."""
+    """The case as a JSON-ready dict, stamped with schema and version.
+    The `_OPTIONAL_DEFAULTS` keys are written only when not at default."""
     d = asdict(case)
+    for k, default in _OPTIONAL_DEFAULTS.items():
+        if d.get(k) == default:
+            del d[k]
     d['schema'] = SCHEMA
     d['version'] = VERSION
     return d

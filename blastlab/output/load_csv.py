@@ -64,10 +64,36 @@ WHICH TRACES (the HD 1.3 assessment, `export_hd13`)
     beside a new nominal.
 
 THE WALL-LOAD CFD TRACES (G1 and plane-max x gamma 1.24 / 1.40, HD1-13)
-are exported by `export_wall_loads` below (Step 2b), not with the chamber
-trace: their load definition and the optional clearing of UFC 3-340-02
-(2008), para. 2-15.3.2 (printed p. 65, Eq. 2-8 / 2-9) need the wall's
-H and W, which the chamber trace does not.
+are exported by `export_wall_loads` (Step 2b, owner answer Q1 of
+2026-09-26), not with the chamber trace: their load definition and the
+optional clearing of UFC 3-340-02 (2008), para. 2-15.3.2 (printed p. 65,
+Eq. 2-8 / 2-9) need the wall's H and W, which the chamber trace does not.
+Pre-registered interpretation (batch plan Step 2b; the owner may correct
+it):
+  * Source: the committed HD1-13 files in docs/hd13/ (no WSL, no solve),
+    `vent3d_wall_load_G1.txt` (the G1 probe, 3395 rows: R, S, E per gamma)
+    and `vent3d_wall_plane.txt` (749 writes: Emax per gamma, and G1cell_p,
+    G1cell_rho, G1cell_U*). Each file's units line is checked against
+    the one this parser was written for, and a mismatch is refused.
+  * Traces: G1 x {1.24, 1.40} and plane-max x {1.24, 1.40}, four files per
+    clearing setting: `{G1,planemax}_g{124,140}[_cleared].csv`.
+  * Clearing off: the file's E = max(R, S) as HD1-13 computed it, in kPa
+    (E / 1e3, bit for bit), "reflected + stagnation, no clearing, upper
+    bound".
+  * Clearing on (G1 ONLY): core/wallload.apply_clearing with the case's
+    wall H and W. Ps = G1cell_p - P_AIR and q = rho un^2 / 2 with
+    un = max(Ux, 0) (the wall at x = 10 m faces -x), from the 749 writes
+    (not the probe), interpolated linearly onto the probe times. C_r from
+    Rankine-Hugoniot at the trace's peak reflected state with the trace's
+    gamma: ps_peak = the side-on overpressure whose normal reflection is
+    max R (wallload.incident_from_reflected), then
+    wallload.reflected_sound_speed. The Eq. 2-10 check is not applied,
+    and the sidecar says so.
+  * Plane-max is a maximum over different cells at different times, not a
+    point on a wall, so clearing is not defined for it: it is always
+    exported unrelieved, and its sidecar says why.
+  * These traces come from ONE CFD run (HD1-3d); the case supplies only
+    the wall (clearing, H, W). Every sidecar names the run.
 
 Pure: no Qt, no pyplot, no VTK (tests/test_layering.py).
 """
@@ -290,3 +316,184 @@ def export_hd13(out, report_path, case_name=''):
                 f'trace: sensitivity-band sample, signs over ({axes}): '
                 f'{_signs_tag(signs)}', [spans])
     return dict(dir=d, files=files, messages=messages)
+
+
+# ── the HD1-13 wall-load traces (Step 2b) ────────────────────────────────
+
+#: Where the committed HD1-13 traces live.
+WALL_LOAD_DIR = os.path.abspath(os.path.join(
+    os.path.dirname(__file__), '..', '..', 'docs', 'hd13'))
+G1_FILE = 'vent3d_wall_load_G1.txt'
+PLANE_FILE = 'vent3d_wall_plane.txt'
+
+#: The units lines the parser was written for, verbatim. A file whose
+#: units line differs is refused rather than read under a guess.
+G1_UNITS = ('# units: t [s]; un [m/s]; R_1.24 [Pa over P_AIR]; '
+            'S_1.24 [Pa over P_AIR]; E_1.24 [Pa over P_AIR]; M_1.24 [-]; '
+            'R_1.40 [Pa over P_AIR]; S_1.40 [Pa over P_AIR]; '
+            'E_1.40 [Pa over P_AIR]; M_1.40 [-]')
+PLANE_UNITS = ('# units: t [s]; Emax_1.24 [Pa over P_AIR]; x_1.24 [m]; '
+               'y_1.24 [m]; z_1.24 [m]; Emax_1.40 [Pa over P_AIR]; '
+               'x_1.40 [m]; y_1.40 [m]; z_1.40 [m]; G1cell_p [Pa]; '
+               'G1cell_rho [kg/m3]; G1cell_Ux [m/s]; G1cell_Uy [m/s]; '
+               'G1cell_Uz [m/s]; G1cell_E_1.24 [Pa over P_AIR]; '
+               'G1cell_E_1.40 [Pa over P_AIR]; panel_momentum [Pa]; '
+               'panel_E_1.24 [Pa over P_AIR]; strip_E_1.24 [Pa over P_AIR]; '
+               'panel_E_1.40 [Pa over P_AIR]; strip_E_1.40 [Pa over P_AIR]')
+
+GAMMAS = ('1.24', '1.40')
+
+#: 1 ft/ms in m/s, to quote C_r in the units of UFC 3-340-02 Fig. 2-192.
+M_S_PER_FT_MS = 304.8
+
+LOAD_G1_UNRELIEVED = (
+    'load: reflected + stagnation, no clearing, upper bound - '
+    'E = max(R, S) at G1 as HD1-13 computed it (R the Rankine-Hugoniot '
+    'normal reflection, S the compressible stagnation of un = max(Ux, 0)), '
+    'unrelieved by clearing and taken as uniform over the wall')
+LOAD_PLANEMAX = (
+    'load: reflected + stagnation, no clearing, upper bound - the maximum '
+    'of E = max(R, S) over the wall plane x = 10 m at each write. It is a '
+    'maximum over different cells at different times, not a point on a '
+    'wall, so clearing is not defined for it and it is always exported '
+    'unrelieved, whatever the clearing setting')
+
+
+def read_hd13_table(path, units):
+    """(header comment lines, {column: float64 array}) of one HD1-13
+    trace file; ValueError unless its units line is exactly `units`."""
+    comments, cols, rows = [], None, []
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            line = line.rstrip('\n')
+            if line.startswith('#'):
+                comments.append(line)
+            elif cols is None:
+                cols = line.split()
+            elif line.strip():
+                rows.append([float(x) for x in line.split()])
+    got = [c for c in comments if c.startswith('# units:')]
+    if got != [units]:
+        raise ValueError(f'{os.path.basename(path)}: the units line is not '
+                         f'the one this parser expects; refusing to guess.\n'
+                         f'  expected: {units}\n  found:    {got}')
+    data = np.array(rows, dtype=float)
+    if data.ndim != 2 or data.shape[1] != len(cols):
+        raise ValueError(f'{os.path.basename(path)}: ragged table')
+    return comments, {c: data[:, i] for i, c in enumerate(cols)}
+
+
+def _source_lines(name, comments):
+    """The provenance lines of an HD1-13 file, for a sidecar."""
+    keep = [c[2:] for c in comments
+            if c.startswith(('# HD1-13', '# run', '# status'))]
+    return [f'source file: docs/hd13/{name}'] + [f'  {k}' for k in keep]
+
+
+def _gamma_line(g):
+    what = 'the double_base products' if g == '1.24' else 'air'
+    return (f'gamma: {g} ({what}; HD1-13 computed E at both because '
+            f'they bound any mixture)')
+
+
+def wall_load_traces(case, src_dir=WALL_LOAD_DIR):
+    """The wall-load traces of the export, without writing anything.
+
+    Returns [(csv name, t [s], load [Pa over ambient], sidecar lines)],
+    G1 then plane-max, gamma 1.24 then 1.40, and the dict of clearing
+    parameters per gamma (empty with clearing off)."""
+    from ..core import wallload
+    g1_c, g1 = read_hd13_table(os.path.join(src_dir, G1_FILE), G1_UNITS)
+    pl_c, pl = read_hd13_table(os.path.join(src_dir, PLANE_FILE),
+                               PLANE_UNITS)
+    clearing = bool(getattr(case, 'clearing', False))
+    common = [f'case: {getattr(case, "name", "") or "(unnamed)"} - the case '
+              f'supplies only the loaded wall (clearing, H, W); the traces '
+              f'are from the one HD1-13 CFD run named below',
+              f'p_ref: {P_AIR!r} Pa (core.constants.P_AIR); overpressure '
+              f'over ambient, not absolute',
+              'the T1 tail of docs/hd13/vent3d_wall_rule.txt is NOT '
+              'exported (TODO.md HD1-16 2a, owner 2026-09-25)']
+    out, params = [], {}
+    for g in GAMMAS:
+        tag, gam = 'g' + g.replace('.', ''), _gamma_line(g)
+        t = g1['t']
+        if not clearing:
+            out.append((f'G1_{tag}.csv', t, g1[f'E_{g}'],
+                        common + ['trace: G1, the probe at (10, 6, 1.4) m, '
+                                  f'column E_{g}', LOAD_G1_UNRELIEVED, gam]
+                        + _source_lines(G1_FILE, g1_c)))
+        else:
+            H, W = float(case.wall_H_m), float(case.wall_W_m)
+            ps = np.interp(t, pl['t'], pl['G1cell_p'] - P_AIR)
+            un = np.maximum(pl['G1cell_Ux'], 0.0)
+            q = np.interp(t, pl['t'], 0.5 * pl['G1cell_rho'] * un * un)
+            r_max = float(np.max(g1[f'R_{g}']))
+            ps_peak = float(wallload.incident_from_reflected(
+                r_max, float(g), P_AIR))
+            c_r = wallload.reflected_sound_speed(ps_peak, float(g), P_AIR)
+            res = wallload.apply_clearing(t, g1[f'E_{g}'], ps, q, H, W, c_r)
+            params[g] = dict(res, c_r=c_r, ps_peak=ps_peak, r_max=r_max)
+            ta = ('never (the trace does not rise)' if res['t_a'] is None
+                  else f'{res["t_a"] * 1e3:.6g} ms')
+            out.append((f'G1_{tag}_cleared.csv', t, res['L'], common + [
+                f'trace: G1, the probe at (10, 6, 1.4) m, column E_{g}, '
+                f'after clearing',
+                'load: front-wall load after clearing, UFC 3-340-02 (2008) '
+                'para. 2-15.3.2, Eq. 2-8 / 2-9, Fig. 2-191a (printed pp. '
+                '65, 266): L = E before arrival t_a, a linear blend '
+                '(1 - tau/t_c) E + (tau/t_c)(Ps + C_D q) for 0 <= tau = '
+                't - t_a <= t_c, then Ps + C_D q',
+                f'wall: H = {H:g} m, W = {W:g} m; S = min(H, W/2) = '
+                f'{res["S"]:g} m, G = max(H, W/2) = {res["G"]:g} m, R = S/G '
+                f'= {res["R"]:.6g}',
+                f'C_r = {c_r:.6g} m/s ({c_r / M_S_PER_FT_MS:.6g} ft/ms): '
+                f'Rankine-Hugoniot at the peak reflected state, max R_{g} = '
+                f'{r_max / 1e3:.6g} kPa -> side-on {ps_peak / 1e3:.6g} kPa, '
+                f'gamma {g}, ambient {P_AIR:g} Pa / RHO_AIR (UFC 3-340-02 '
+                f'Fig. 2-192 is for air, gamma 1.4)',
+                f't_c = 4 S / ((1 + R) C_r) = {res["t_c"] * 1e3:.6g} ms '
+                f'(Eq. 2-8); arrival t_a = {ta}, the first sample above '
+                f'{wallload.CLEARING_ARRIVAL_FRACTION:g} of peak E; '
+                f'C_D = {wallload.C_D_FRONT:g} (front wall, para. 2-15.3.2)',
+                'Ps = G1cell_p - P_AIR and q = rho un^2 / 2, un = '
+                'max(G1cell_Ux, 0), from docs/hd13/vent3d_wall_plane.txt '
+                '(the 749 writes, cell (9.95, 5.95, 1.35) m, which matches '
+                'the G1 probe at every write after 8 ms), NOT from the '
+                'probe; interpolated linearly onto the probe times',
+                'Eq. 2-10 check (fictitious duration t_rf = 2 i_r / P_r, '
+                'keep the smaller impulse): NOT applied - it is meant for '
+                'idealised triangles, not a computed trace',
+                gam] + _source_lines(G1_FILE, g1_c)
+                + _source_lines(PLANE_FILE, pl_c)))
+    for g in GAMMAS:
+        tag, gam = 'g' + g.replace('.', ''), _gamma_line(g)
+        out.append((f'planemax_{tag}.csv', pl['t'], pl[f'Emax_{g}'],
+                    common + [f'trace: plane maximum, column Emax_{g}',
+                              LOAD_PLANEMAX, gam]
+                    + _source_lines(PLANE_FILE, pl_c)))
+    return out, params
+
+
+def wall_loads_dir(case_path):
+    """`<case stem>_wall_loads`, beside the case file."""
+    return os.path.splitext(case_path)[0] + '_wall_loads'
+
+
+def export_wall_loads(case, out_dir, src_dir=WALL_LOAD_DIR):
+    """Write the four wall-load CSVs (+ sidecars) of `case` to `out_dir`.
+
+    Returns dict(dir, files, messages, params) as `export_hd13` does, plus
+    the clearing parameters per gamma. The caller validates the case
+    first (core/assessment.wall_errors)."""
+    traces, params = wall_load_traces(case, src_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    files, messages = [], []
+    for name, t, load, lines in traces:
+        path = os.path.join(out_dir, name)
+        msg = write_trace(path, 1e3 * np.asarray(t, dtype=float),
+                          np.asarray(load, dtype=float) / 1e3, lines)
+        files.append(path)
+        if msg:
+            messages.append((name, msg))
+    return dict(dir=out_dir, files=files, messages=messages, params=params)

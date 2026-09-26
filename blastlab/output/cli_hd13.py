@@ -9,6 +9,7 @@ without either of them owning the other.
 
     python -m blastlab --hd13-new magazine.json    # a starter case
     python -m blastlab --hd13 magazine.json        # run it, write the report
+    python -m blastlab --hd13-wall-export magazine.json   # HD1-13 wall CSVs
 
 The validation report is printed before anything is computed, errors and
 warnings first, because for this model the warnings are the product. A
@@ -117,6 +118,33 @@ def run_and_report(case_path: str, out_path: str | None = None,
         _print_headline(bundle['out'], out_path)
         _print_loads(bundle.get('loads'))
     return out_path
+
+
+def wall_export(case_path: str, quiet: bool = False) -> dict:
+    """HD1-16 step 1, item 2: write the HD1-13 wall-load traces as SBEDS
+    CSVs into `<case>_wall_loads/` (output/load_csv.export_wall_loads).
+
+    Only the case's loaded wall is read (clearing, wall_H_m, wall_W_m);
+    clearing on with H or W missing raises `SystemExit` naming the field.
+    """
+    from . import load_csv
+    case = assessment.load_case(case_path)
+    errs = assessment.wall_errors(case)
+    if errs:
+        raise SystemExit('refusing to export: ' + '; '.join(errs))
+    res = load_csv.export_wall_loads(case,
+                                     load_csv.wall_loads_dir(case_path))
+    if not quiet:
+        print(f'\nHD 1.3 wall-load export: {case.name or case_path}')
+        print('  clearing: ' + (
+            f'on, H = {case.wall_H_m:g} m, W = {case.wall_W_m:g} m (G1 '
+            f'only; plane-max is always unrelieved)' if case.clearing
+            else 'off (E = max(R, S), no clearing, upper bound)'))
+        for g, p in res['params'].items():
+            print(f'  gamma {g}: C_r {p["c_r"]:.4g} m/s, t_c '
+                  f'{p["t_c"] * 1e3:.4g} ms')
+        _print_loads(res)
+    return res
 
 
 def _print_loads(loads):
