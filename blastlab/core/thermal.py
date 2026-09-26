@@ -43,8 +43,9 @@ THREE THINGS, AND THE THIRD IS THE ONE WITH A TRAP IN IT
     time-varying Ru inside the dynamic response is not a refinement, it
     is a coupling that does not exist.
 
-    So there are two SERIAL questions, answered separately and reported
-    side by side:
+    So there are two SERIAL questions, answered separately (since HD1-16
+    the HD 1.3 assessment reports neither a response nor a verdict: the
+    first question is SBEDS's, from the exported load CSVs):
 
         sdof(Ru at ambient, pressure trace)   did the wall survive the pulse?
         residual_capacity(thermal history)    what is left of it afterwards?

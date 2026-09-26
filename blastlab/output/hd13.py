@@ -77,8 +77,12 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
     """Write the whole HD 1.3 analysis as one self-contained .html.
 
     Every argument is optional: the report prints the sections it was
-    given, so a bare 0-D run and a full confined/unconfined/thermal/SDOF
+    given, so a bare 0-D run and a full confined/unconfined/thermal
     study both render. Returns the list of sections written.
+
+    `sdof`, `component` and `verdict` are accepted and IGNORED (HD1-16
+    step 1, item 3: no output carries a structural response); they go
+    with core/sdof.py in HD1-16 step 2.
     """
     name = title or 'HD 1.3 assessment'
     p, sections = [], []
@@ -209,42 +213,9 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
                      'material alone.</div>')
         sections.append('unconfined')
 
-    if sdof is not None and component is not None:
-        s, c = sdof, component
-        rows = [
-            ('Natural period', _fmt(c.Tn * 1e3, 2), 'ms'),
-            ('Load duration', _fmt(s.td * 1e3, 2), 'ms'),
-            ('t<sub>d</sub> / T<sub>n</sub>', _fmt(s.td_over_Tn, 3), '-'),
-            ('<b>Regime</b>', f'<b>{html.escape(s.regime)}</b>', ''),
-            ('Peak deflection', _fmt(s.y_max * 1e3, 2), 'mm'),
-            ('Ductility', _fmt(s.ductility, 3), '-'),
-            ('Support rotation', _fmt(s.support_rotation_deg, 3), 'deg'),
-            ('Yielded', _fmt(s.yielded), ''),
-        ]
-        if getattr(s, 'collapsed', False):
-            rows.append(('<b>Outcome</b>',
-                         '<b>COLLAPSE</b> <span class="warn">rotation '
-                         'limit reached</span>', ''))
-            rows.append(('Time of collapse', _fmt(s.t_collapse * 1e3, 2),
-                         'ms'))
-        p.append('<h2>Structural response</h2>'
-                 + _table(('Quantity', 'Value', 'Unit'), rows))
-        if getattr(s, 'collapsed', False):
-            p.append('<div class="note"><b>The element did not survive.</b> '
-                     'The deflection passed the support-rotation limit and '
-                     'the solve stopped there. A quasi-static pressure '
-                     'above the ultimate resistance never reaches '
-                     'equilibrium, so the deflection is unbounded and the '
-                     'ductility past this point has no meaning - the '
-                     'answer is the collapse, not a number.</div>')
-        p.append('<div class="note"><b>Regime is the point.</b> A '
-                 'detonation puts a wall in the impulsive corner, where '
-                 'only the impulse matters. A confined deflagration puts '
-                 'it in the quasi-static one, where only the peak '
-                 'pressure does. A quasi-static pressure that merely '
-                 'reaches the element\'s ultimate resistance fails it, '
-                 'however slowly it arrives.</div>')
-        sections.append('sdof')
+    # HD1-16 step 1, item 3: no "Structural response" section. blastlab
+    # gives the load (the SBEDS CSVs beside this report), SBEDS the
+    # response.
 
     if thermal is not None:
         rows = [('Peak flux to the wall',
@@ -287,42 +258,8 @@ def save_hd13_report(path, prop=None, confined=None, unconfined=None,
         # that straddles extinction is not an interval at all.
         if sensitivity_note:
             p.append(f'<p class="warn">{html.escape(sensitivity_note)}</p>')
-        # THE VERDICT AT BOTH ENDS, because one at the nominal point says
-        # nothing about whether it holds across a band this wide. The
-        # third answer - the verdict flips inside the band - is printed
-        # as prominently as the other two, because "we cannot tell, and
-        # here is what would settle it" is the result in that case.
-        if verdict:
-            p.append(
-                '<h3>Does that verdict survive the band?</h3>'
-                + _table(
-                    ('End of band', 'Peak [MPa]', 'Ductility mu',
-                     'Rotation [deg]', 'Regime', 'Yields'),
-                    [(end,
-                      _fmt(verdict[end]['p_max'] / 1e6, 3),
-                      _fmt(verdict[end]['ductility'], 3),
-                      _fmt(verdict[end]['support_rotation_deg'], 2),
-                      html.escape(str(verdict[end]['regime'])),
-                      ('<span class="warn">yes</span>'
-                       if verdict[end]['yielded'] else
-                       '<span class="ok">no</span>'))
-                     for end in ('low', 'high')]))
-            css = ('note' if verdict['verdict']
-                   == 'undetermined_within_band' else 'meta')
-            p.append(f'<div class="{css}"><b>'
-                     f'{html.escape(verdict["verdict"].replace("_", " "))}'
-                     f'.</b> {html.escape(verdict["note"])}</div>')
-            # WHERE A CFD RUN SITS IN ALL THIS, when there was one. The
-            # CFD does not take Cd as an input - it produces one, set by
-            # how well the opening is resolved - so its load is a sample
-            # at one corner of that axis and not the envelope. Printed
-            # beside the verdict because that is where it would
-            # otherwise be misread as the answer.
-            if verdict.get('cfd_point'):
-                cp = verdict['cfd_point']
-                p.append(f'<div class="note"><b>The CFD is one point in '
-                         f'this envelope, not the envelope.</b> '
-                         f'{html.escape(cp["note"])}</div>')
+        # HD1-16: no "Does that verdict survive the band?" table - the
+        # band's traces go to SBEDS as band_<signs>.csv instead.
         if oat:
             p.append('<p class="meta">Which knob dominates, one at a '
                      'time:</p>'

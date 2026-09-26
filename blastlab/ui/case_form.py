@@ -37,6 +37,9 @@ class CaseForm(FieldForm):
             self._sync_scenario()
             self.on_field('clearing', self._sync_clearing)
             self._sync_clearing()
+            # HD1-16: built so its values pass through, never shown
+            for title in setup_spec.HIDDEN_CARDS_0:
+                self.cards[title].setVisible(False)
             return
         if self.dim == 2:
             self.on_field('geometry', self._sync_geometry)

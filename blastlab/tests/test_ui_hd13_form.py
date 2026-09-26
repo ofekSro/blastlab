@@ -71,10 +71,15 @@ def main():
           _raises(lambda: setup_spec.cards(4)))
     check('no row carries a solver scope - a 0-D case has no backend',
           all(f.scope is None for f in fields))
-    check('the material, chamber, ignition, structure and heat cards are '
-          'all there',
-          {'Material', 'Charge and chamber', 'Ignition', 'Structure',
+    check('the material, chamber, ignition and heat cards are all there',
+          {'Material', 'Charge and chamber', 'Ignition',
            'Heat'} <= {c.title for c in cards})
+    # HD1-16: the Structure card is still BUILT (its values pass through
+    # load -> save) but listed as hidden; the form test below checks it
+    # is not on screen
+    check('the Structure card is in the spec but listed as hidden',
+          'Structure' in {c.title for c in cards}
+          and 'Structure' in setup_spec.HIDDEN_CARDS_0)
     check('override rows default to blank, meaning "use the table"',
           all(setup_spec.by_name(0)[k].default == ''
               for k in ('ov_n', 'ov_a', 'ov_r_atm', 'ov_web', 'ov_p_ext',
@@ -92,6 +97,10 @@ def main():
 
     form = CaseForm(0)
     check('a dim-0 form builds', form.dim == 0)
+    form.show()
+    check('HD1-16: the Structure card is not visible, the others are',
+          not form.card_visible('Structure')
+          and form.card_visible('Heat') and form.card_visible('Loaded wall'))
 
     case = asm.DeflagrationCase(
         name='round trip', propellant='single_base', charge_kg=3.25,
@@ -123,6 +132,12 @@ def main():
         a, b = getattr(back, f), getattr(case, f)
         check(f'{f} survives its unit conversion', abs(a - b) <= tol,
               f'{a!r} vs {b!r}')
+    six = ('span_m', 'mass_per_area', 'Ru_pa', 'kE_pa_m', 'support',
+           'rotation_limit_deg')
+    check('HD1-16: the six hidden Structure keys load and save back '
+          'identical (pass-through)',
+          all(getattr(back, k) == getattr(case, k) for k in six),
+          str({k: getattr(back, k) for k in six}))
     check('the standoffs survive',
           [round(x, 6) for x in back.standoffs_m] == case.standoffs_m,
           str(back.standoffs_m))

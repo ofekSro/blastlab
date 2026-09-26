@@ -97,9 +97,12 @@ def main():
     body = open(out, encoding='utf-8').read()
     check('it wrote a file', os.path.getsize(out) > 5000,
           f'{os.path.getsize(out)} bytes')
-    for s in ('banner', 'material', 'confined', 'unconfined', 'sdof',
+    for s in ('banner', 'material', 'confined', 'unconfined',
               'thermal', 'radiation', 'sensitivity', 'figures'):
         check(f'section {s!r} present', s in sections)
+    # HD1-16 step 1, item 3: sdof= is still accepted and ignored
+    check("no 'sdof' section, even when sdof= and component= are passed",
+          'sdof' not in sections)
 
     print('\n  the caveats, which are the point')
     check('uncalibrated fields are labelled AT the number',
@@ -114,8 +117,9 @@ def main():
           'Ignition scenario' in body and 'flame_spread' in body)
     check('the TNT-equivalent warning is on every report',
           'opposite corner of the pressure-impulse diagram' in body)
-    check('the regime is called out for the structural answer',
-          'Regime is the point' in body and sres.regime in body)
+    check('HD1-16: no structural response table, ductility or rotation',
+          'Structural response' not in body and 'Ductility' not in body
+          and 'Support rotation' not in body)
     check('the empirical status of the fireball is stated next to it',
           'does not solve radiation' in body)
     check('the sensitivity is one envelope, and says so',

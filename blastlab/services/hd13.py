@@ -52,10 +52,7 @@ def assess(case, report=None) -> dict:
     if out['unconfined'] is not None:
         figures.append(('In the open',
                         plots.figure_unconfined(out['unconfined'])))
-    if out['sdof'] is not None:
-        figures.append(('Structural response',
-                        plots.figure_sdof_response(out['sdof'],
-                                                   out['component'])))
+    # HD1-16: no structural-response figure; the load goes to SBEDS.
     # The heat figure is drawn on the chamber's time axis: with no
     # confined result there is no axis, so no heat figure.
     if thermal is not None or out['radiation']:
@@ -79,12 +76,10 @@ def write_report(bundle: dict, out_path: str) -> str:
     case, out = bundle['case'], bundle['out']
     hd13.save_hd13_report(
         out_path, prop=out['prop'], confined=out['confined'],
-        unconfined=out['unconfined'], sdof=out['sdof'],
-        component=out['component'], thermal=out['thermal'],
+        unconfined=out['unconfined'], thermal=out['thermal'],
         radiation=out['radiation'], figures=bundle['figures'],
         sensitivity=out['sensitivity'],
-        sensitivity_note=out['sensitivity_note'],
-        verdict=out['verdict'], qd=out['qd'],
+        sensitivity_note=out['sensitivity_note'], qd=out['qd'],
         title=case.name or None)
     bundle['loads'] = load_csv.export_hd13(out, out_path,
                                            case_name=case.name)

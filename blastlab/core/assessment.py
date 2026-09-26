@@ -2,9 +2,10 @@
 
 Everything under it is a model with its own arguments. This is the layer
 that turns a stored file into the whole answer: chamber pressure, the
-open-air comparison, the structural response and the heat, in one call,
-so a result is reproducible from a case file rather than from a
-transcript of which function was called with what.
+open-air comparison and the heat, in one call, so a result is
+reproducible from a case file rather than from a transcript of which
+function was called with what. No structural response (HD1-16): the
+load goes to SBEDS as CSV (output/load_csv.py).
 
 It also puts the warnings in ONE place. Up to here every caveat lived in
 the module that knew about it, and a caller who forgot to look simply did
@@ -26,7 +27,6 @@ answer with the uncertainty hidden.
 from dataclasses import replace    # noqa: F401 - tests call assessment.replace
 
 from . import deflagration, scenario as _scenario, thermal, unconfined
-from .constants import P_AIR
 # Named at its real home, not through the core.case shim, so the layering
 # test sees this core -> models edge (Phase 9; tests/test_layering.py)
 from ..models.result import ValidationReport
@@ -190,11 +190,9 @@ def validate(case):
                'the extinction limit, the atmospheric rate or the '
                'secondary heat.')
 
-    if case.has_component:
-        note('A structural response will be computed at the AMBIENT '
-             'resistance. Thermal weakening is reported separately, for a '
-             'later load case - steel does not heat in the time the '
-             'pressure pulse lasts.')
+    # HD1-16: no structural response is computed or reported any more -
+    # blastlab gives the load (the SBEDS CSVs), SBEDS the response - so the
+    # old "a structural response will be computed" note is gone with it.
     if case.standoffs_m:
         warn('Fireball radiation uses correlations fitted to hydrocarbon '
              'and BLEVE data; nothing equivalent is published for '
@@ -544,49 +542,17 @@ def run(case):
         if not out['qd']['have_criteria']:
             rep.notes.append(_qd.NO_CRITERIA)
 
-    if case.has_component and conf is not None:
-        from . import sdof as _sdof
-        comp = _sdof.Component(span=case.span_m,
-                               mass_per_area=case.mass_per_area,
-                               Ru=case.Ru_pa, kE=case.kE_pa_m,
-                               support=case.support,
-                               rotation_limit_deg=case.rotation_limit_deg)
-        out['component'] = comp
-        out['sdof'] = _sdof.response(conf['t'], conf['p'], comp,
-                                     p_ref=P_AIR)
-        if out['thermal'] is not None:
-            out['residual'] = thermal.residual_capacity(
-                case.Ru_pa, out['thermal']['T_surface_max'])
-
-        # THE VERDICT AT BOTH ENDS OF THE BAND, not just at the nominal
-        # point. The band on a vented magazine spans more than an order
-        # of magnitude and a wall's response is not linear in the load,
-        # so a verdict at the middle says nothing about whether it holds
-        # at the ends. Three answers, and the third is an answer.
-        if out['band'] is not None:
-            from . import sensitivity as _sens
-            v = _sens.structural_verdict(out['band'], comp)
-            out['verdict'] = v
-            if v['verdict'] == 'undetermined_within_band':
-                rep.warnings.append(
-                    f'STRUCTURAL VERDICT UNDETERMINED. The element '
-                    f'survives the low end of the band '
-                    f'({v["low"]["p_max"]/1e6:.3f} MPa, mu '
-                    f'{v["low"]["ductility"]:.2f}) and yields at the high '
-                    f'end ({v["high"]["p_max"]/1e6:.3f} MPa, mu '
-                    f'{v["high"]["ductility"]:.2f}). Whether this wall '
-                    f'holds depends on a burn law nobody has measured for '
-                    f'this material; a closed-vessel record on the real '
-                    f'propellant is what settles it, and nothing else '
-                    f'will.')
-            else:
-                rep.notes.append(
-                    f'Structural verdict: {v["verdict"].replace("_", " ")} '
-                    f'(mu {v["low"]["ductility"]:.2f} at the low end, '
-                    f'{v["high"]["ductility"]:.2f} at the high). '
-                    + v['note']
-                    + ('' if v['ranges_sourced'] else
-                       ' The band it is taken across rests on ranges that '
-                       'are a judgement, so this robustness is only as '
-                       'wide as that judgement.'))
+    # HD1-16 step 1, item 3: NO STRUCTURAL RESPONSE. blastlab gives the
+    # load (output/load_csv.py, the SBEDS CSVs) and SBEDS gives the
+    # response, so `sdof.response` and `sensitivity.structural_verdict`
+    # are no longer called here. The keys stay, always None, so the
+    # `is None` checks downstream keep working until HD1-16 step 2
+    # removes core/sdof.py.
+    #
+    # Residual capacity (Ru after heating) is a capacity statement, not a
+    # response, and uses no SDOF: kept, unchanged, whenever the case
+    # carries Ru_pa and there is a thermal result (owner, Q2 2026-09-26).
+    if case.Ru_pa > 0 and out['thermal'] is not None:
+        out['residual'] = thermal.residual_capacity(
+            case.Ru_pa, out['thermal']['T_surface_max'])
     return out

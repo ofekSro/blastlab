@@ -295,6 +295,10 @@ def _hd13_cards():
         CardSpec('Radiation standoffs [m]', col=1, field_rows=1, rows=(
             F('standoffs', 'Radiation standoffs [m]', 'points',
               cols=('R',), rows=3),)),
+        # HD1-16 step 1, item 3: HIDDEN (HIDDEN_CARDS_0), not deleted -
+        # no output carries a structural response any more. Its six keys
+        # still load from and save back to the case JSON unchanged
+        # (pass-through); HD1-16 step 2 deletes it with core/sdof.py.
         CardSpec('Structure', col=1, rows=(
             F('span_m', 'Span [m]\n(0 = skip)', 'float', 3.0),
             F('mass_per_area', 'Mass [kg/m2]', 'float', 480.0),
@@ -341,6 +345,11 @@ def _hd13_cards():
               file=dict(title='Write the HD 1.3 report',
                         filter='HTML (*.html);;All files (*.*)')))),
     ]
+
+
+#: HD1-16: dim-0 cards that are built (so their values pass through
+#: load -> save) but never shown.
+HIDDEN_CARDS_0 = ('Structure',)
 
 
 # ── the cards of one dimension, in build order ───────────────────────────

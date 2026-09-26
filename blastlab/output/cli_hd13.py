@@ -73,21 +73,7 @@ def _print_headline(out, out_path):
     if u is not None:
         print(f"  unconfined expansion Mach {u['mach_max']:.4f} (upper bound)"
               f"   blast negligible: {u['blast_negligible']}")
-    if out['sdof'] is not None:
-        s = out['sdof']
-        if s.collapsed:
-            print(f'  structure  COLLAPSE at '
-                  f'{s.t_collapse * 1e3:.1f} ms   {s.regime}'
-                  f'   (rotation limit '
-                  f'{out["component"].rotation_limit_deg:g} deg)')
-        else:
-            print(f"  structure  mu {s.ductility:.3f}   {s.regime}"
-                  f"   theta {s.support_rotation_deg:.2f} deg")
-    if out['verdict'] is not None:
-        v = out['verdict']
-        print(f"  verdict    {v['verdict'].replace('_', ' ').upper()}"
-              f"   (mu {v['low']['ductility']:.2f} at the low end of "
-              f"the band, {v['high']['ductility']:.2f} at the high)")
+    # HD1-16: no structure / verdict lines; the load goes to SBEDS.
     if out['qd'] is not None:
         from ..core import qd as _qd      # lazy, as in core/assessment
         print(f"  siting     {_qd.summary_line(out['qd'])}")

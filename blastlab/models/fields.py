@@ -212,6 +212,8 @@ def hd13_case_from_fields(values: dict) -> tuple:
         wall_area_m2=num('wall_area', 'Wall area', blank=0.0) or 0.0,
         T_wall=num('t_wall', 'Wall temperature', blank=300.0) or 300.0,
         standoffs_m=[float(r[0]) for r in v['standoffs']],
+        # HD1-16: the Structure card is hidden, its six keys pass through
+        # load -> save unchanged (no output uses them for a response)
         span_m=span,
         mass_per_area=num('mass_per_area', 'Mass', blank=0.0) or 0.0,
         Ru_pa=num('ru_kpa', 'Ultimate resistance', 1e3, blank=0.0) or 0.0,
