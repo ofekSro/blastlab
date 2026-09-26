@@ -348,11 +348,10 @@ def _hd13_cards():
         CardSpec('Vent gauges [m]', col=0, field_rows=1, rows=(
             F('vent_gauges', 'Vent gauges [m]', 'points',
               cols=('x', 'y', 'z'), rows=3),)),
+        # OUT-1: no report-file row - the report is always
+        # <MODEL>\hd13_report.html, with the loads in <MODEL>\hd13_loads
         CardSpec('Outputs', col=1, rows=(
-            F('name', 'Run name', 'text', ''),
-            F('report_file', 'Report file', 'file', 'hd13_report.html',
-              file=dict(title='Write the HD 1.3 report',
-                        filter='HTML (*.html);;All files (*.*)')))),
+            F('name', 'Run name', 'text', ''),)),
     ]
 
 

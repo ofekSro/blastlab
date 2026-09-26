@@ -609,45 +609,34 @@ class MainWindow(QMainWindow):
         There is no Cancel: `assessment.run` has no cooperative stop
         hook, and the physics does not grow one for a button.
 
-        Validation and the report path are read here, on the GUI thread.
+        Validation and the model folder (OUT-1: `_model_target`, the same
+        pre-flight as every run) are settled here, on the GUI thread.
         Pinned by `tests/test_ui_char_hd13_run.py`.
         """
         # Imported here, and called through the module, so a test that
-        # patches `assessment.run` or `tempfile.mkdtemp` is honoured.
-        import shutil
-        import tempfile
+        # patches `assessment.run` is honoured.
         from ..core import assessment
         from ..services import hd13 as hd13_service
         rep = assessment.validate(case)
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
             return
-        path = self.setup.form.v['report_file'].get().strip() \
-            or 'hd13_report.html'
+        model = self._model_target()
+        if model is None:
+            return
 
         def work():
-            out = err = case_dir = loads = None
+            out = err = loads = None
             try:
-                # The temp case file is kept, and the report is made from
-                # the case read back from it, exactly as before Phase 7 of
-                # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
-                # open question Q4 there. It is now written BEFORE the one
-                # assessment, so a failure removes it again - a run that
-                # raises still leaves nothing on disk.
-                case_dir = tempfile.mkdtemp(prefix='blastlab_hd13_')
-                case_path = os.path.join(case_dir, 'case.json')
-                assessment.save_case(case, case_path)
-                bundle = hd13_service.assess(assessment.load_case(case_path))
+                # OUT-1: <MODEL>\MODEL.json, read back for the assessment
+                # (the provenance the leaked temp case file stood for,
+                # ARCHITECTURE_REVIEW Q4), then the report, the loads and
+                # the manifest; a failure leaves MODEL.json and a manifest
+                bundle = hd13_service.run_into_model_folder(
+                    case, model, log=self._log_threadsafe)
+                out, loads = bundle['report'], bundle.get('loads')
             except Exception as exc:           # noqa: BLE001 - shown to the user
                 err = exc
-                if case_dir:
-                    shutil.rmtree(case_dir, ignore_errors=True)
-            else:
-                try:
-                    out = hd13_service.write_report(bundle, path)
-                    loads = bundle.get('loads')
-                except Exception as exc:       # noqa: BLE001 - shown to the user
-                    err = exc
             finally:
                 self.bridge.post(self._hd13_done, out, err, loads)
 

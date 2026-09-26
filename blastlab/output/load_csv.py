@@ -267,17 +267,20 @@ def loads_dir(report_path: str) -> str:
     return os.path.splitext(report_path)[0] + '_loads'
 
 
-def export_hd13(out: dict, report_path: str, case_name: str = '') -> dict:
+def export_hd13(out: dict, report_path: str, case_name: str = '',
+                out_dir: str | None = None) -> dict:
     """Write every chamber trace of an `assessment.run` output.
 
-    Returns dict(dir, files, messages): the directory, the CSV paths
-    written, and [(csv name, message)] for every trace the HD1-16 2a rule
-    flagged. With no confined result nothing is written and `dir` is None.
+    Into `out_dir` when given (OUT-1: `<MODEL>\\hd13_loads`), else
+    `loads_dir(report_path)`. Returns dict(dir, files, messages): the
+    directory, the CSV paths written, and [(csv name, message)] for every
+    trace the HD1-16 2a rule flagged. With no confined result nothing is
+    written and `dir` is None.
     """
     conf = out.get('confined')
     if conf is None:
         return dict(dir=None, files=[], messages=[])
-    d = loads_dir(report_path)
+    d = out_dir or loads_dir(report_path)
     os.makedirs(d, exist_ok=True)
     _remove_old(d, _HD13_PATTERNS)
     prop = out['prop']

@@ -250,6 +250,34 @@ def part_a():
             foam_env.case_paths = real_paths
             shutil.rmtree(scratch, ignore_errors=True)
 
+        print('\nA9: the HD 1.3 Run goes through the same gate')
+        from blastlab.core import assessment
+        real_run = assessment.run
+        calls = []
+        assessment.run = lambda case: calls.append(case) or real_run(case)
+        try:
+            win.setup.set_dim(0)
+            pump(150)
+            win.setup.forms[0].set_case(assessment.DeflagrationCase(
+                name='preflight', charge_kg=5.0, volume_m3=1.0,
+                vent_area_m2=0.02, t_end=0.5, n_out=50))
+            pump(400)
+            dlg.clear()
+            rp.set_runs_dir(runs)
+            rp.run_name.setText('')
+            win._run_single()
+            pump(50)
+            check('an empty Model box refuses HD 1.3 before any assessment',
+                  len(dlg.errors) == 1
+                  and dlg.errors[0][1].startswith('Model name:')
+                  and calls == [] and not win._hd13_busy, str(dlg.errors))
+            check('the report-file row is gone from the 0-D form',
+                  'report_file' not in win.setup.forms[0].v)
+        finally:
+            assessment.run = real_run
+            win.setup.set_dim(2)
+            pump(150)
+
         print('\nA7: the Runs folder survives a close and a reopen')
         other = os.path.join(_dir, 'elsewhere')
         os.makedirs(other, exist_ok=True)

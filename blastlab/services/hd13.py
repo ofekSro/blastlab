@@ -20,11 +20,10 @@ from ..core import assessment
 from ..output import hd13, load_csv, plots
 
 
-def default_report_path(case_path: str) -> str:
-    """Where `--hd13` writes the report when not told: beside the case
-    file, `<case>_hd13.html`."""
-    base = os.path.splitext(case_path)[0]
-    return base + '_hd13.html'
+#: OUT-1 (plan sec. 2.2): the HD 1.3 rows of a model folder
+REPORT_NAME = 'hd13_report.html'
+LOADS_NAME = 'hd13_loads'
+WALL_LOADS_NAME = 'wall_loads'
 
 
 def assess(case, report=None) -> dict:
@@ -65,13 +64,14 @@ def assess(case, report=None) -> dict:
     return dict(case=case, out=out, figures=figures)
 
 
-def write_report(bundle: dict, out_path: str) -> str:
+def write_report(bundle: dict, out_path: str, loads_dir=None) -> str:
     """Write the HD 1.3 HTML report of an `assess` bundle to `out_path`;
     returns `out_path`.
 
-    Then the chamber load as SBEDS CSVs into `<report stem>_loads/`
-    (HD1-16, `output/load_csv.export_hd13`); what was written, and any
-    "record ends while the load is still active" message, is put in
+    Then the chamber load as SBEDS CSVs into `loads_dir` (OUT-1: the
+    model folder's `hd13_loads`), else `<report stem>_loads/` (HD1-16,
+    `output/load_csv.export_hd13`); what was written, and any "record
+    ends while the load is still active" message, is put in
     `bundle['loads']` for the caller to show."""
     case, out = bundle['case'], bundle['out']
     hd13.save_hd13_report(
@@ -82,5 +82,66 @@ def write_report(bundle: dict, out_path: str) -> str:
         sensitivity_note=out['sensitivity_note'], qd=out['qd'],
         title=case.name or None)
     bundle['loads'] = load_csv.export_hd13(out, out_path,
-                                           case_name=case.name)
+                                           case_name=case.name,
+                                           out_dir=loads_dir)
     return out_path
+
+
+def run_into_model_folder(case, target, report=None, log=print) -> dict:
+    """OUT-1: one HD 1.3 assessment into a prepared model folder
+    (`model_folder.Target`), the same for the Qt window and `--hd13`.
+
+    The case is saved as `<MODEL>\\MODEL.json` and the assessment is made
+    from the case read back from it; then `hd13_report.html`,
+    `hd13_loads\\` and `manifest.json`. Returns the `assess` bundle, with
+    the report path under `report`. A failure still leaves MODEL.json and
+    a manifest whose `stop_reason` says why, and is re-raised."""
+    from . import model_folder as mf
+    info = mf.run_info(target)
+    case_path = os.path.join(target.folder, mf.CASE_FILE)
+    try:
+        assessment.save_case(case, case_path)
+        bundle = assess(assessment.load_case(case_path), report)
+        write_to_model_folder(bundle, target.folder, case_path, info,
+                              log=log)
+        return bundle
+    except Exception as exc:
+        failed = hd13_manifest(target.folder, case_path, info)
+        failed['stop_reason'] = mf.headline(exc)
+        mf.write_manifest(failed, target.folder)
+        raise
+
+
+def write_to_model_folder(bundle: dict, folder: str, case_path: str,
+                          info: dict, log=print) -> dict:
+    """OUT-1: the HD 1.3 rows of a model folder, after `assess`:
+    `hd13_report.html`, `hd13_loads\\`, then `manifest.json` (`solver`
+    "hd13", `dim` 0, `wsl_scratch` null). `case_path` is the folder's
+    MODEL.json, already written. Returns the manifest. Raises what the
+    report writer raises (the caller shows it); the manifest itself goes
+    through `model_folder.write_manifest`, which never raises."""
+    from . import model_folder as mf
+    report = write_report(bundle, os.path.join(folder, REPORT_NAME),
+                          loads_dir=os.path.join(folder, LOADS_NAME))
+    manifest = hd13_manifest(folder, case_path, info)
+    manifest['stop_reason'] = (bundle['out'].get('confined') or {}).get(
+        'stop_reason')
+    err = mf.write_manifest(manifest, folder)
+    if err:
+        log(f'[warn] model folder: could not write '
+            f'{mf.MANIFEST_FILE}: {err}')
+    bundle['report'] = report
+    return manifest
+
+
+def hd13_manifest(folder: str, case_path: str, info: dict) -> dict:
+    """The manifest of an HD 1.3 model folder (plan sec. 2.2 keys): no
+    solver steps, no cells, no WSL scratch."""
+    from . import model_folder as mf
+    info = dict(info or {})
+    manifest = mf.new_manifest(None, 0, folder, info)
+    manifest.update(solver='hd13', dim=0,
+                    case_file=os.path.basename(case_path),
+                    finished=mf.now_iso())
+    manifest['outputs'] = mf.list_outputs(folder)
+    return manifest

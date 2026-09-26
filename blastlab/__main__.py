@@ -56,20 +56,32 @@ def main():
                          'path) and report its contents, then exit')
     ap.add_argument('--hd13', metavar='CASE',
                     help='run an HD 1.3 deflagration assessment from a '
-                         'case file and write its HTML report, then exit. '
-                         'No WSL and no GUI: the whole HD1.3 track is 0-D '
-                         'plus closed-form models')
+                         'case file and write its HTML report and SBEDS '
+                         'loads into the model folder, then exit. No WSL '
+                         'and no GUI: the whole HD1.3 track is 0-D plus '
+                         'closed-form models')
     ap.add_argument('--hd13-new', metavar='CASE',
                     help='write a starter HD 1.3 case file and exit')
     ap.add_argument('--hd13-wall-export', metavar='CASE',
                     help='write the HD1-13 wall-load traces (G1, plane-max '
                          'x gamma 1.24/1.40) as two-column SBEDS CSVs '
-                         'into <case>_wall_loads/, with clearing if the '
+                         'into <MODEL>\\wall_loads\\, with clearing if the '
                          'case asks for it, then exit')
-    ap.add_argument('--report', metavar='FILE',
-                    help='where --hd13 writes its report '
-                         '(default: alongside the case file)')
+    # OUT-1: every entry that produces output writes <runs-dir>\<model>\
+    ap.add_argument('--runs-dir', metavar='DIR',
+                    help='the runs folder; required by --hd13 and '
+                         '--hd13-wall-export')
+    ap.add_argument('--model', metavar='NAME',
+                    help='the model name: everything the run produces '
+                         'goes into <runs-dir>\\<NAME>\\ (asked before an '
+                         'existing model is overwritten); required with '
+                         '--runs-dir')
     args = ap.parse_args()
+    for flag, value in (('--hd13', args.hd13),
+                        ('--hd13-wall-export', args.hd13_wall_export)):
+        if value and not (args.runs_dir and args.model):
+            ap.error(f'{flag} needs --runs-dir DIR and --model NAME '
+                     f'(OUT-1: every run writes <runs-dir>\\<model>\\)')
 
     # These two need neither the WSL probe below nor any Qt import.
     if args.hd13_new:
@@ -78,11 +90,11 @@ def main():
         return
     if args.hd13:
         from .output.cli_hd13 import run_and_report
-        run_and_report(args.hd13, args.report)
+        run_and_report(args.hd13, args.runs_dir, args.model)
         return
     if args.hd13_wall_export:
         from .output.cli_hd13 import wall_export
-        wall_export(args.hd13_wall_export)
+        wall_export(args.hd13_wall_export, args.runs_dir, args.model)
         return
 
     # N21 follow-up: the hardware probe is process-local, and until this
