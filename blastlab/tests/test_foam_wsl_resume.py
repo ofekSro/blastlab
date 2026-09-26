@@ -141,7 +141,8 @@ def run_loop_with(tail, code=1):
         decomposed=False, time_root=lambda: root,
         time_dirs=lambda name: os.path.join(root, name),
         write_interval=1e-5, live_steps=0, dim=3, end_time=1.0,
-        n_cells=10, adaptive_write=False, start_dir='0')
+        n_cells=10, adaptive_write=False, start_dir='0',
+        init_state=None)          # WriterSpec's default; runloop reads it
     orig = runloop.runner.FoamRun
     foam = FakeFoam(code, tail)
     runloop.runner.FoamRun = lambda *a, **k: foam
