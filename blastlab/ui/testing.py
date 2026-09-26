@@ -81,6 +81,15 @@ def use_model(win, name='QA', runs_dir=None):
         if not model_folder.is_model_folder(folder):
             raise RuntimeError(f'use_model: {folder} is not a blastlab '
                                f'model folder - not deleting it')
+        # the run in progress writes there (Qt: ctrl, Tk: the app itself)
+        owner = getattr(win, 'ctrl', win)
+        live = getattr(owner, '_model', None)
+        running = (owner.running if hasattr(owner, 'running')
+                   else getattr(owner, '_drain_pending', False))
+        if running and live is not None and os.path.normcase(
+                live.folder) == os.path.normcase(folder):
+            raise RuntimeError(f'use_model: {folder} belongs to the run in '
+                               f'progress - not deleting it')
         shutil.rmtree(folder, ignore_errors=True)
     win.run_panel.set_runs_dir(runs)
     box = win.run_panel.run_name

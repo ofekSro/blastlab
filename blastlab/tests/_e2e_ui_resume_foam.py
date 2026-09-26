@@ -78,7 +78,7 @@ def main():
                   solver='blastfoam', material='TNT')
 
     win = MainWindow()
-    use_model(win)          # OUT-1: Run needs a runs folder and a model
+    first = use_model(win)  # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(200)
     win.setup.set_case(case)
@@ -127,7 +127,7 @@ def main():
         return 1
 
     print('\nR2: resume it, the way the run browser does')
-    use_model(win, 'QA_RESUME')     # OUT-1: the resume's own model folder
+    second = use_model(win, 'QA_RESUME')   # OUT-1: the resume's own folder
     started = win._resume_foam_run(path)   # the run browser's callback
     check('the resume was accepted', started is True, str(started))
     if started is not True:
@@ -169,6 +169,39 @@ def main():
           > len((getattr(stopped.result, 'gauges', {}) or {})
                 .get('times', [])),
           '')
+
+    print('\nR4: OUT-1 - the stop kept its scratch; the resume wrote its '
+          'model folder and released it')
+    import json
+    import subprocess
+
+    def manifest(folder):
+        try:
+            with open(os.path.join(folder, 'manifest.json'),
+                      encoding='utf-8') as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+    m1, m2 = manifest(first), manifest(second)
+    s1, s2 = m1.get('wsl_scratch') or {}, m2.get('wsl_scratch') or {}
+    check('the stopped run kept its scratch, and says why',
+          s1.get('deleted') is False and s1.get('kept_because')
+          == 'the run ended before its end time', str(s1))
+    got = sorted(os.listdir(second)) if os.path.isdir(second) else []
+    check('the resume wrote a complete model folder',
+          {'MODEL.json', 'run.log', 'report.html', 'gauges', 'foam',
+           'manifest.json'} <= set(got) and m2.get('failed') == [],
+          f'{got} failed={m2.get("failed")}')
+    check('and released the scratch after a verified copy',
+          s2.get('deleted') is True
+          and s2.get('posix') == s1.get('posix'), str(s2))
+    if s2.get('posix'):
+        rc = subprocess.run(env.wsl_plain_argv(
+            f"test -d '{s2['posix']}'"), capture_output=True,
+            stdin=subprocess.DEVNULL).returncode
+        check('WSL agrees: the scratch is gone', rc != 0, s2['posix'])
+    check('the Results VTK button now explains the release',
+          resumed.result.meta.get('scratch_released') is True)
 
     win.close()
     pump(200)
