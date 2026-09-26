@@ -140,15 +140,37 @@ def main():
     check('it reports the closed-vessel limit',
           'closed-vessel limit' in text.lower())
 
-    print('\n  pressing Run writes a report')
+    # HD1-16: the Structure card is built (its values pass through) but
+    # must not be on screen - asked of Win32, not of isVisible()
+    print('\n  the Structure card is not on screen (HD1-16), per Win32')
+    form = win.setup.forms[0]
+    QtNS = __import__('PySide6.QtCore', fromlist=['Qt']).Qt
+    struct_card = form.cards['Structure']
+    heat_card = form.cards['Heat']
+    for c in (struct_card, heat_card):
+        c.setAttribute(QtNS.WA_NativeWindow, True)
+    pump(200)
+    if sys.platform.startswith('win'):
+        vis = win32_visible(struct_card)
+        check('Win32: the Structure card is not visible', vis in (False, None)
+              and not struct_card.isVisible(), str(vis))
+        check('while a neighbouring card (Heat) is, so the probe works',
+              win32_visible(heat_card) is True)
+
+    print('\n  pressing Run writes a report and the SBEDS load CSVs')
     out = os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_gui_'),
                        'report.html')
-    form = win.setup.forms[0]
     form.v['report_file'].set(out)
     form.v['t_end'].set('20')
     pump(150)
     win._run_single()
-    pump(600)
+    # the assessment runs on a worker thread (UX 1): wait it out with the
+    # event loop running
+    import time
+    end = time.monotonic() + 900
+    while getattr(win, '_hd13_busy', False) and time.monotonic() < end:
+        pump(50)
+    pump(300)
     check('the report file exists', os.path.exists(out),
           out)
     if os.path.exists(out):
@@ -156,8 +178,18 @@ def main():
         check('it is a real report, with the caveats in it',
               len(body) > 3000 and 'uncalibrated' in body,
               f'{len(body)} bytes')
-    check('the status line says where it went',
+        check('and no Structural response section (HD1-16)',
+              'Structural response' not in body)
+    loads = os.path.splitext(out)[0] + '_loads'
+    check('the _loads/ directory is written, with nominal.csv and its '
+          'sidecar', os.path.isfile(os.path.join(loads, 'nominal.csv'))
+          and os.path.isfile(os.path.join(loads, 'nominal.txt')),
+          str(os.listdir(loads)) if os.path.isdir(loads) else 'missing')
+    check('the status line says where the report went',
           'HD 1.3 report' in win._status.text(), win._status.text())
+    check('and names the CSVs',
+          'SBEDS loads' in win._status.text() and 'CSV' in
+          win._status.text(), win._status.text())
 
     print('\n  nothing crashed')
     check('no unhandled exceptions', not crashes, str(crashes[:1]))
