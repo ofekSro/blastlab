@@ -146,6 +146,8 @@ REPORT_FILE = 'report.html'
 GAUGES_DIR = 'gauges'
 FIGURES_DIR = 'figures'
 FIELDS_DIR = 'fields'
+#: OUT-2: the VTK files for ParaView (plan sec. 3.6)
+VTK_DIR = 'vtk'
 
 def model_for_case_file(path):
     """The Model box after Open case (GUI QA 2026-09-26 C1): the file's
@@ -627,6 +629,9 @@ def write_all(res, case, dim, stage_dir, run_info=None, log=print):
             os.rmdir(os.path.join(stage_dir, sub))
         except OSError:
             pass                        # absent, or holds files
+    # OUT-2: the VTK export's own summary (additive; None without export)
+    from ..output.vtk_series import vtk_summary
+    manifest['vtk'] = vtk_summary(os.path.join(stage_dir, VTK_DIR), VTK_DIR)
     manifest['outputs'] = list_outputs(stage_dir)
     manifest['finished'] = now_iso()
     why = write_manifest(manifest, stage_dir)
