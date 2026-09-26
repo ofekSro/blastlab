@@ -143,15 +143,16 @@ class RunHooks:
         This is the model folder's run.log (OUT-1): the solver-side log,
         i.e. every line that goes through `log` - what the Run tab shows
         minus the lines the GUI adds itself ('[run finished]', the error
-        dialog text). A failed append never disturbs the run."""
+        dialog text). A failed append never disturbs the run: an
+        unencodable character becomes '?', an unwritable file is skipped."""
         path = self.log_file
         if not path:
             return
         try:
             with _LOG_FILE_LOCK, open(path, 'a', encoding='utf-8',
-                                      newline='\n') as f:
+                                      errors='replace', newline='\n') as f:
                 f.write(f'{msg}\n')
-        except OSError:
+        except (OSError, ValueError):
             pass
 
     def progress(self, p: Progress):

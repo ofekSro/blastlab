@@ -803,9 +803,10 @@ def _append(path, line):
     """One line into run.log directly, not through the hooks: the stage's
     closing line is not a solver line the Run tab should show twice."""
     try:
-        with open(path, 'a', encoding='utf-8', newline='\n') as f:
+        with open(path, 'a', encoding='utf-8', errors='replace',
+                  newline='\n') as f:
             f.write(f'{line}\n')
-    except OSError:
+    except (OSError, ValueError):
         pass
 
 

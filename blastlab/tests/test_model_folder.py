@@ -416,6 +416,26 @@ def test_b_prepare_refusals():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def test_b_log_file_never_raises():
+    """verify: a line the file cannot encode (a lone surrogate) or a log
+    path that cannot be opened never disturbs the run (ux(2))."""
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    try:
+        hooks = GuiHooks(queue.Queue(), threading.Event())
+        hooks.log_file = os.path.join(tmp, 'run.log')
+        hooks.log('before')
+        hooks.log('bad \udcff byte')
+        hooks.log('after')
+        with open(hooks.log_file, encoding='utf-8') as f:
+            assert f.read() == 'before\nbad ? byte\nafter\n'
+        assert hooks.q.qsize() == 3                  # the Run tab got all
+        hooks.log_file = tmp                         # a folder: cannot open
+        hooks.log('into a folder')
+        mf._append(tmp, 'into a folder \udcff')
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_b_git_commit():
     got = mf.git_commit()
     assert got is None or (len(got) == 7 and all(
@@ -898,6 +918,7 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_b_missing_animation_and_planar_profile,
          test_b_bind_case_names, test_b_prepare_overwrite_no_and_yes,
          test_b_prepare_locked_file, test_b_prepare_refusals,
+         test_b_log_file_never_raises,
          test_b_git_commit,
          test_c_worker_folder_complete_before_result,
          test_c_failed_gauge_tsv, test_c_solver_raises,
