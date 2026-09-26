@@ -87,7 +87,10 @@ def main():
     pump(root, 1.0)
 
     chain = app.chain
-    chain.ws_var.set(WS)
+    # OUT-1: the chain writes the Run tab's model folder (no workspace
+    # box); a model of its own beside the old workspace
+    from blastlab.ui.testing import use_model
+    ws = use_model(app, 'gui_foam_model', runs_dir=os.path.dirname(WS))
 
     # Deliberately small: the point is the hand-off, not the physics.
     # Stage 1 stops well inside stage 2's domain, and stage 2 inside
@@ -136,13 +139,15 @@ def main():
     pump(root, 1.0)
 
     # the panel's own workspace holds the hand-offs it wired
-    p1 = os.path.join(WS, 'stage1_profile.txt')
-    p2 = os.path.join(WS, 'stage2_profile.npz')
+    p1 = os.path.join(ws, 'handoff_1d_to_2d.txt')    # at the model root
+    p2 = os.path.join(ws, 'handoff_2d_to_3d.npz')
     check('stage 1 wrote the 1D profile the panel named', os.path.isfile(p1))
     check('stage 2 wrote the 2D profile the panel named', os.path.isfile(p2))
     for d in (1, 2, 3):
-        check(f'stage {d} case.json saved in the workspace',
-              os.path.isfile(os.path.join(WS, f'stage{d}_case.json')))
+        check(f'stage {d} MODEL.json saved in <MODEL>\\{d}d',
+              os.path.isfile(os.path.join(ws, f'{d}d', 'MODEL.json')))
+    check('and the chain root manifest.json',
+          os.path.isfile(os.path.join(ws, 'manifest.json')))
 
     # A stage that raised is the single most useful thing this script can
     # tell you, and it used to be thrown away entirely.

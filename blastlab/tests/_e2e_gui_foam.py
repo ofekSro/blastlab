@@ -92,6 +92,8 @@ def main():
     # ── real 1D blastFoam run through the Run button path ──────────────
     app.setup.set_case(cases[1])
     pump(root, 0.5)
+    from blastlab.ui.testing import use_model
+    use_model(app)          # OUT-1: Run needs a runs folder and a model
     app._run_single()
     t0 = time.time()
     while app.worker is not None and app.worker.is_alive() \
