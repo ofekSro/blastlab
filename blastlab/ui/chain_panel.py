@@ -1,7 +1,8 @@
 """The Chain tab: run 1D -> 2D -> 3D as one workflow.
 
-Profile hand-offs are wired automatically inside a chosen workspace, and
-each stage's case JSON is saved there so a chain can be reproduced.
+OUT-1: a chain writes into the Run tab's model folder (the workspace box
+is gone, owner decision 14): each stage into `<MODEL>\\1d`, `2d`, `3d`,
+with its own MODEL.json, and the profile hand-offs at the model root.
 
 Two things are deliberate here and both were paid for in Tk:
 
@@ -15,48 +16,48 @@ Two things are deliberate here and both were paid for in Tk:
   so the dialog is strictly last and its failure cannot swallow the
   reason.
 
-The order inside `_run()` is load-bearing and stays literal: the
-workspace directory is created only once the run is certain to start.
+The order inside `_run()` is load-bearing and stays literal: the model
+folder is created only once the run is certain to start - after every
+check here, by the window (`on_run_chain`), which asks before it
+overwrites an existing model.
 """
 
-import os
-
-from PySide6.QtWidgets import (QCheckBox, QLineEdit, QStackedWidget,
-                               QWidget)
+from PySide6.QtWidgets import QCheckBox, QStackedWidget, QWidget
 
 from ..core import mode as mode_mod
-from ..core.case import save_case
 from ..core import chain
 from ..core.chain import stage_errors
+from ..services import model_folder
 from . import dialogs
 from .case_form import CaseForm
 from . import theme
-from .theme import PAD
 from .widgets import (Card, ScrollColumn, Segmented, button, hbox, label,
                       vbox)
 
-HINT = ('The chain runs the checked stages in order. Profile files are '
-        'wired automatically: 1D saves stage1_profile.txt, the 2D stage '
-        'remaps it (axisymmetric), saves stage2_profile.npz, and the 3D '
-        'stage remaps that. The 2D burst height is taken from the 2D '
-        'form; the 3D burst height comes from the 2D profile.')
+HINT = ('The chain runs the checked stages in order, into the model folder '
+        'set on the Run tab (Runs folder and Model): each stage writes '
+        '<MODEL>\\1d, 2d or 3d. The profile hand-offs are wired '
+        'automatically at the model root: 1D writes handoff_1d_to_2d.txt, '
+        'the 2D stage remaps it (axisymmetric) and writes '
+        'handoff_2d_to_3d.npz, and the 3D stage remaps that. The 2D burst '
+        'height is taken from the 2D form; the 3D burst height comes from '
+        'the 2D profile.')
+
+#: added to a model-folder refusal: the boxes live on another tab
+WHERE_BOXES = 'The Runs folder and Model boxes are on the Run tab.'
 
 STAGE_LABELS = {1: 'Stage 1D', 2: 'Stage 2D', 3: 'Stage 3D'}
 
 
-def default_workspace():
-    """Under Documents rather than whatever the process CWD happens to
-    be, which for blastlab.bat is the install directory."""
-    docs = os.path.join(os.path.expanduser('~'), 'Documents')
-    base = docs if os.path.isdir(docs) else os.path.expanduser('~')
-    return os.path.join(base, 'blastlab', 'chain_workspace')
-
-
 class ChainPanel(QWidget):
     def __init__(self, on_run_chain=None, mode=None, log_fn=print,
-                 error_sink=None, parent=None):
+                 error_sink=None, model_source=None, parent=None):
         super().__init__(parent)
-        self._on_run_chain = on_run_chain or (lambda stages, ws: None)
+        #: on_run_chain([(dim, case), ...]) -> False when the window did
+        #: not start it (it said why); anything else = started
+        self._on_run_chain = on_run_chain or (lambda stages: None)
+        #: () -> (runs_dir, model): the Run tab's two boxes (OUT-1)
+        self._model_source = model_source or (lambda: ('', ''))
         self._running = False       # a run is live somewhere in the app
         self._log = log_fn
         self.error_sink = error_sink or self._default_sink
@@ -71,14 +72,6 @@ class ChainPanel(QWidget):
         top = Card()
         root.addWidget(top)
         bar = hbox()
-        bar.addWidget(label('Workspace', 'muted'))
-        self.ws_box = QLineEdit(default_workspace())
-        self.ws_box.setMinimumWidth(380)
-        bar.addWidget(self.ws_box, 1)
-        bar.addWidget(button('', 'folder', width=36, height=32,
-                             tooltip='Choose the chain workspace',
-                             on_click=self._pick_ws))
-        bar.addSpacing(PAD)
         bar.addWidget(label('Stages', 'muted'))
         self.use = {}
         for d in (1, 2, 3):
@@ -232,15 +225,6 @@ class ChainPanel(QWidget):
                 self.stack.setCurrentWidget(self._pages[d])
                 return
 
-    def _pick_ws(self):
-        path = dialogs.pick_dir('Chain workspace directory', self,
-                                self.ws_box.text())
-        if path:
-            self.ws_box.setText(path)
-
-    def workspace(self):
-        return self.ws_box.text().strip()
-
     def checked(self):
         return [d for d in (1, 2, 3) if self.use[d].isChecked()]
 
@@ -249,7 +233,7 @@ class ChainPanel(QWidget):
         """Validate, wire and launch. Returns True only if the chain was
         handed on; every refusal returns False having said why."""
         self.status.setText('')
-        # Refuse here, not after the workspace has been written.
+        # Refuse here, not after the model folder has been written.
         #
         # The button is disabled while a run is live, but a disabled
         # button is not a guard - anything that calls this directly (an
@@ -266,10 +250,17 @@ class ChainPanel(QWidget):
         if stages != list(range(stages[0], stages[-1] + 1)):
             return self._refuse(['Stages must be consecutive.'])
 
-        ws = self.workspace()
-        # the workspace used to be created even when the run was refused
-        p1 = os.path.join(ws, 'stage1_profile.txt')
-        p2 = os.path.join(ws, 'stage2_profile.npz')
+        # OUT-1: the Run tab's model folder, checked (nothing is written
+        # yet) before the forms are read, so the hand-off paths are known
+        runs_dir, model = self._model_source()
+        problems = model_folder.check(runs_dir, model)
+        if problems:
+            return self._refuse(problems + [WHERE_BOXES])
+        target = model_folder.Target(
+            runs_dir=str(runs_dir).strip(), model=str(model).strip(),
+            folder=model_folder.folder_for(runs_dir, model))
+        hand = model_folder.handoff_paths(target, stages)
+        p1, p2 = hand.get((1, 2)), hand.get((2, 3))
 
         cases = {}
         for d in stages:
@@ -294,12 +285,13 @@ class ChainPanel(QWidget):
         for case in cases.values():
             case.adaptive_write = False
 
-        if 1 in cases:
+        # the hand-offs live at the model root (plan sec. 2.2); a single
+        # stage has none and writes its own profile into the folder
+        if 1 in cases and 2 in cases:
             cases[1].profile_file = p1
+            cases[2].init_mode = 'profile1d'
+            cases[2].profile_file_in = p1
         if 2 in cases:
-            if 1 in cases:
-                cases[2].init_mode = 'profile1d'
-                cases[2].profile_file_in = p1
             if cases[2].geometry != 'axisymmetric' and 3 in cases:
                 self.focus_stage(2)
                 return self._refuse(['Stage 2 (2D): must be axisymmetric '
@@ -319,11 +311,11 @@ class ChainPanel(QWidget):
                     break
             return self._refuse(errors)
 
-        os.makedirs(ws, exist_ok=True)        # only once it will run
-        for d, case in cases.items():
-            save_case(case, os.path.join(ws, f'stage{d}_case.json'))
-        self._log(f'Chain: {len(stages)} stage(s) into {ws}')
-        self._on_run_chain([(d, cases[d]) for d in stages], ws)
+        # the window creates the model folder (after asking, for an
+        # existing one) only now, and each stage writes its own MODEL.json
+        if self._on_run_chain([(d, cases[d]) for d in stages]) is False:
+            return False
+        self._log(f'Chain: {len(stages)} stage(s) into {target.folder}')
         return True
 
     def set_running(self, running):

@@ -122,7 +122,10 @@ class MainWindow(QMainWindow):
                                     bridge=self.bridge)
         self.chain = ChainPanel(on_run_chain=self._run_chain,
                                 mode=self.solver_mode,
-                                log_fn=self._log_threadsafe)
+                                log_fn=self._log_threadsafe,
+                                model_source=lambda: (
+                                    self.run_panel.current_runs_dir(),
+                                    self.run_panel.current_run_name()))
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
@@ -742,16 +745,28 @@ class MainWindow(QMainWindow):
         lines.append('Start it?')
         return dialogs.ask_yes_no('Long run', '\n'.join(lines), self)
 
-    def _run_chain(self, dim_cases, workspace):
-        """The Chain panel has already validated and wired the stages and
-        written their case JSONs; all that is left is to launch them as
-        one worker, so the Run tab, Stop and Results behave as usual."""
-        if not self._confirm_long_run([c for _d, c in dim_cases]):
-            return
-        self.notify(f'Chain: {len(dim_cases)} stage(s) in {workspace}')
-        if self.ctrl.start_stages(
-                dim_cases, run_name=self.run_panel.current_run_name()):
+    def _run_chain(self, dim_cases):
+        """The Chain panel has already validated and wired the stages
+        into the model folder's paths; what is left is the long-run
+        question, the model folder itself (OUT-1: created only now, after
+        asking for an existing one) and the launch as one worker, so the
+        Run tab, Stop and Results behave as usual. False when it did not
+        start."""
+        cases = [c for _d, c in dim_cases]
+        if not self._confirm_long_run(cases):
+            return False
+        model = self._model_target('Chain')
+        if model is None:
+            return False
+        # the manifest's n_cells / n_procs, one report per stage
+        reports = [validate_case(c, pending_inputs=k > 0)
+                   for k, c in enumerate(cases)]
+        self.notify(f'Chain: {len(dim_cases)} stage(s) into {model.folder}')
+        if self.ctrl.start_stages(dim_cases, run_name=model.model,
+                                  model=model, reports=reports):
             self._show('run')
+            return True
+        return False
 
     def _init_model(self):
         """VIPER-style 'Initialise Model': start the run held at step 0
