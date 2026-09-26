@@ -21,6 +21,8 @@ this module is the command-line wrapper around it: it prints, and it
 turns a refused case into `SystemExit`.
 """
 
+import os
+
 from ..core import assessment
 from ..services import hd13 as hd13_service
 
@@ -113,4 +115,19 @@ def run_and_report(case_path: str, out_path: str | None = None,
 
     if not quiet:
         _print_headline(bundle['out'], out_path)
+        _print_loads(bundle.get('loads'))
     return out_path
+
+
+def _print_loads(loads):
+    """HD1-16: where the SBEDS load CSVs went, and any trace whose record
+    ends while the load is still active."""
+    if not loads or not loads['files']:
+        return
+    print(f"  loads:  {loads['dir']}   ({len(loads['files'])} CSV, "
+          f"t [ms], overpressure [kPa], each with a .txt sidecar)")
+    for path in loads['files']:
+        print(f'          {os.path.basename(path)}')
+    for name, msg in loads['messages']:
+        print(f'  {name}: {msg}')
+    print()

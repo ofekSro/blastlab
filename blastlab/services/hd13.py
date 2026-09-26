@@ -17,7 +17,7 @@ the OO-matplotlib ones of `output/plots.py`.
 import os
 
 from ..core import assessment
-from ..output import hd13, plots
+from ..output import hd13, load_csv, plots
 
 
 def default_report_path(case_path: str) -> str:
@@ -70,7 +70,12 @@ def assess(case, report=None) -> dict:
 
 def write_report(bundle: dict, out_path: str) -> str:
     """Write the HD 1.3 HTML report of an `assess` bundle to `out_path`;
-    returns `out_path`."""
+    returns `out_path`.
+
+    Then the chamber load as SBEDS CSVs into `<report stem>_loads/`
+    (HD1-16, `output/load_csv.export_hd13`); what was written, and any
+    "record ends while the load is still active" message, is put in
+    `bundle['loads']` for the caller to show."""
     case, out = bundle['case'], bundle['out']
     hd13.save_hd13_report(
         out_path, prop=out['prop'], confined=out['confined'],
@@ -81,4 +86,6 @@ def write_report(bundle: dict, out_path: str) -> str:
         sensitivity_note=out['sensitivity_note'],
         verdict=out['verdict'], qd=out['qd'],
         title=case.name or None)
+    bundle['loads'] = load_csv.export_hd13(out, out_path,
+                                           case_name=case.name)
     return out_path

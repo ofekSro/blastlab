@@ -576,7 +576,7 @@ class MainWindow(QMainWindow):
             or 'hd13_report.html'
 
         def work():
-            out = err = case_dir = None
+            out = err = case_dir = loads = None
             try:
                 # The temp case file is kept, and the report is made from
                 # the case read back from it, exactly as before Phase 7 of
@@ -595,10 +595,11 @@ class MainWindow(QMainWindow):
             else:
                 try:
                     out = hd13_service.write_report(bundle, path)
+                    loads = bundle.get('loads')
                 except Exception as exc:       # noqa: BLE001 - shown to the user
                     err = exc
             finally:
-                self.bridge.post(self._hd13_done, out, err)
+                self.bridge.post(self._hd13_done, out, err, loads)
 
         self._set_hd13_busy(True)
         threading.Thread(target=work, name='hd13-assessment',
@@ -624,14 +625,24 @@ class MainWindow(QMainWindow):
         else:
             sys.setswitchinterval(self._switch_interval)
 
-    def _hd13_done(self, out, err):
-        """GUI thread: the worker of `_run_hd13` has finished."""
+    def _hd13_done(self, out, err, loads=None):
+        """GUI thread: the worker of `_run_hd13` has finished.
+
+        `loads` is `output/load_csv.export_hd13`'s result (HD1-16): the
+        status line names the CSV directory and carries any "record ends
+        while the load is still active" message."""
         self._set_hd13_busy(False)
         if err is not None:
             self._status.setText('')
             self.show_error('HD 1.3 assessment', str(err))
             return
-        self._status.setText(f'HD 1.3 report written: {out}')
+        text = f'HD 1.3 report written: {out}'
+        if loads and loads['files']:
+            text += (f'; SBEDS loads: {len(loads["files"])} CSV in '
+                     f'{loads["dir"]}')
+            for name, msg in loads['messages']:
+                text += f'; {name}: {msg}'
+        self._status.setText(text)
         self._status_timer.start()
 
     def _confirm_long_run(self, cases):
