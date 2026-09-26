@@ -1,0 +1,145 @@
+﻿{"kind": "window", "t": "19:36:37", "title": "blastlab 1.0.0", "size": [1280, 840], "built_s": 8.21, "solver": "blastfoam"}
+{"kind": "step", "t": "19:36:37", "key": "1"}
+{"kind": "item1", "t": "19:36:39", "runs_dir_box": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "model_box": "", "browse_text": "", "tooltips": {"_runs_entry": "Required. The folder that holds one sub-folder per model; a run writes every file it produces into <Runs folder>\\<Model>. Remembered between sessions.", "_runs_browse": "Choose the runs folder", "_name_entry": "Required. The model folder <Runs folder>\\<Model> that receives every file of this run (a valid Windows folder name, at most 100 characters). It also names the run in the Results picker."}}
+{"kind": "shot", "t": "19:36:40", "path": "tk_01_run_tab_start.png"}
+{"kind": "item1_focus_chain", "t": "19:36:40", "chain": ["runs_dir", "run_name", "Entry:!ctkframe.!ctkframe3.!ctkcombobox.!entry", "Entry:rd.!ctkframe.!ctkframe3.!ctkentry.!entry", "Entry:ollableframe.!ctkframe2.!ctkentry.!entry"]}
+{"kind": "shot", "t": "19:36:41", "path": "tk_02_tooltip_runs_entry.png"}
+{"kind": "shot", "t": "19:36:42", "path": "tk_03_tooltip_runs_browse.png"}
+{"kind": "shot", "t": "19:36:43", "path": "tk_04_tooltip_name_entry.png"}
+{"kind": "step", "t": "19:36:43", "key": "2"}
+{"kind": "dialog", "t": "19:36:47", "title": "Run", "cls": "#32770", "texts": ["Runs folder is empty"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_05_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:47", "tag": "empty_runs_folder", "runs": "", "model": "TK_R2", "title": "Run", "texts": ["Runs folder is empty"], "buttons": ["OK"], "shot": "tk_05_dialog_OK.png", "running": false}
+{"kind": "dialog", "t": "19:36:49", "title": "Run", "cls": "#32770", "texts": ["Runs folder does not exist: C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\nope"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_06_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:49", "tag": "missing_runs_folder", "runs": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\nope", "model": "TK_R2", "title": "Run", "texts": ["Runs folder does not exist: C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\nope"], "buttons": ["OK"], "shot": "tk_06_dialog_OK.png", "running": false}
+{"kind": "dialog", "t": "19:36:52", "title": "Run", "cls": "#32770", "texts": ["Model name: a folder name cannot contain /"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_07_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:52", "tag": "bad_name", "runs": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "model": "a/b", "title": "Run", "texts": ["Model name: a folder name cannot contain /"], "buttons": ["OK"], "shot": "tk_07_dialog_OK.png", "running": false}
+{"kind": "dialog", "t": "19:36:54", "title": "Run", "cls": "#32770", "texts": ["Runs folder cannot be the Desktop itself: C:\\Users\\rotem.ofek\\Desktop"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_08_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:54", "tag": "runs_is_desktop", "runs": "C:\\Users\\rotem.ofek\\Desktop", "model": "TK_R2", "title": "Run", "texts": ["Runs folder cannot be the Desktop itself: C:\\Users\\rotem.ofek\\Desktop"], "buttons": ["OK"], "shot": "tk_08_dialog_OK.png", "running": false}
+{"kind": "dialog", "t": "19:36:56", "title": "Run", "cls": "#32770", "texts": ["Model name: Desktop in C:\\Users\\rotem.ofek is or holds the Desktop - choose another name"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_09_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:56", "tag": "model_is_desktop", "runs": "C:\\Users\\rotem.ofek", "model": "Desktop", "title": "Run", "texts": ["Model name: Desktop in C:\\Users\\rotem.ofek is or holds the Desktop - choose another name"], "buttons": ["OK"], "shot": "tk_09_dialog_OK.png", "running": false}
+{"kind": "dialog", "t": "19:36:59", "title": "Run", "cls": "#32770", "texts": ["C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_FOREIGN was not created by blastlab - choose another model name"], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_10_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item2", "t": "19:36:59", "tag": "foreign_folder", "runs": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "model": "TK_FOREIGN", "title": "Run", "texts": ["C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_FOREIGN was not created by blastlab - choose another model name"], "buttons": ["OK"], "shot": "tk_10_dialog_OK.png", "running": false}
+{"kind": "item2_after", "t": "19:36:59", "runs_same": true, "listing": ["EMPTYDIR", "FOREIGN", "QA_1D", "QA_2D", "QA_2DAX", "QA_CHAIN", "QA_CHAIN3S0", "QA_CHAINC0", "QA_CHAINT0", "QA_CHAINT1", "QA_FOAM1D", "QA_FOAM_STOP", "QA_HD13", "QA_HD13_BUSY", "TK_FOREIGN"], "foreign_intact": ["notes.txt"]}
+{"kind": "step", "t": "19:36:59", "key": "3"}
+{"kind": "dialog", "t": "19:38:37", "title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_11_dialog_enter.png", "action": ["enter"], "fg_ok": false}
+{"kind": "item3_enter", "t": "19:38:37", "info": {"title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_11_dialog_enter.png", "action": ["enter"], "fg_ok": false}, "folder_untouched": true, "run_started": false}
+{"kind": "dialog", "t": "19:38:39", "title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_12_dialog_No.png", "action": ["button", "No"]}
+{"kind": "item3_no", "t": "19:38:39", "info": {"title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_12_dialog_No.png", "action": ["button", "No"]}, "folder_untouched": true, "run_started": false}
+  Gauge data saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_1D\gauges\gauges_1d.txt  (1356 rows x 2 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_1D\profile.txt  (400 cells, t = 1.828 ms)
+{"kind": "dialog", "t": "19:38:42", "title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_13_dialog_Yes.png", "action": ["button", "Yes"]}
+{"kind": "item3_yes", "t": "19:38:42", "info": {"title": "Model folder", "cls": "#32770", "texts": ["TK_1D already exists in C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs. Overwrite? The previous run's files will be deleted."], "edits": [], "buttons": [{"text": "&Yes", "id": 6, "defpush": false}, {"text": "&No", "id": 7, "defpush": true}], "def_id": 7, "shot": "tk_13_dialog_Yes.png", "action": ["button", "Yes"]}, "old_gone": true, "run_started": true}
+python : Exception ignored in: <function Image.__del__ at 0x00000121400FFC40>
+At line:1 char:448
++ ... ings.json"; python -u docs\qa\2026-09-26-out-1\scripts\tk_pass.py > d ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception ignor...000121400FFC40>:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+{"kind": "shot", "t": "19:38:43", "path": "tk_14_1d_running.png"}
+{"kind": "tk_1d_done", "t": "19:38:46", "seconds": 6.9, "log_tail": " = 0.257 ms\n  Snapshot saved: t = 0.856 ms\n\n  Done. 1355 steps, t_final = 1.828 ms\n  Stopped: shock arrived at outer boundary (p_last = 1.014e+05 Pa)\n\nSaved C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_1D\\gauges\\gauges_1d_summary.csv\nSaved blast_1d_results.png\nSaved blast_1d_gauges.png\nSaved 6 field CSV(s) into C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_1D\\fields\nSaved C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_1D\\report.html\n  [run finished]\n\n"}
+{"kind": "shot", "t": "19:38:47", "path": "tk_15_1d_done.png"}
+{"kind": "folder", "t": "19:38:47", "tag": "TK_1D", "folder": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_1D", "files": [[".blastlab-model", 53], ["MODEL.json", 578], ["fields/t0p257ms_p.csv", 10812], ["fields/t0p257ms_rho.csv", 10817], ["fields/t0p856ms_p.csv", 10812], ["fields/t0p856ms_rho.csv", 10817], ["fields/t1p828ms_final_p.csv", 10812], ["fields/t1p828ms_final_rho.csv", 10817], ["figures/blast_1d_gauges.png", 72620], ["figures/blast_1d_results.png", 145238], ["gauges/gauges_1d.txt", 54281], ["gauges/gauges_1d_summary.csv", 270], ["manifest.json", 1585], ["profile.txt", 39170], ["report.html", 210978], ["run.log", 1005]], "manifest_keys": ["case_file", "created", "dim", "failed", "finished", "git_commit", "missing", "model", "n_cells", "n_procs", "n_steps", "outputs", "runs_dir", "solver", "stop_reason", "vtk", "wsl_scratch"], "manifest": {"model": "TK_1D", "runs_dir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "created": "2026-09-26T19:38:41", "finished": "2026-09-26T19:38:44", "solver": "native", "dim": 1, "case_file": "MODEL.json", "git_commit": "1e593c3", "stop_reason": "shock arrived at outer boundary (p_last = 1.014e+05 Pa)", "n_cells": 400, "n_procs": 1, "n_steps": 1355, "wsl_scratch": null, "outputs": [{"path": "MODEL.json", "bytes": 578}, {"path": "profile.txt", "bytes": 39170}, {"path": "report.html", "bytes": 210978}, {"path": "run.log", "bytes": 1005}, {"path": "fields/t0p257ms_p.csv", "bytes": 10812}, {"path":
+{"kind": "step", "t": "19:38:47", "key": "4"}
+{"kind": "shot", "t": "19:38:51", "path": "tk_16_2d_running.png"}
+  Gauge data saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_2D\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_2D\animation.mp4
+Exception ignored in: <function Image.__del__ at 0x00000121400FFC40>
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+{"kind": "shot", "t": "19:39:33", "path": "tk_17_2d_done.png"}
+{"kind": "folder", "t": "19:39:33", "tag": "TK_2D", "folder": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_2D", "files": [[".blastlab-model", 53], ["MODEL.json", 1429], ["animation.mp4", 50415], ["fields/impulse.csv", 995905], ["fields/p_peak.csv", 995902], ["fields/t0p110ms_p.csv", 995897], ["fields/t0p110ms_rho.csv", 995902], ["fields/t0p110ms_speed.csv", 997717], ["fields/t0p276ms_p.csv", 995897], ["fields/t0p276ms_rho.csv", 995902], ["fields/t0p276ms_speed.csv", 997417], ["fields/t0p466ms_final_p.csv", 995897], ["fields/t0p466ms_final_rho.csv", 995902], ["fields/t0p466ms_final_speed.csv", 996678], ["figures/blast_2d_density.png", 98506], ["figures/blast_2d_gauges.png", 53416], ["figures/blast_2d_impulse.png", 62273], ["figures/blast_2d_peak_overpressure.png", 58753], ["figures/blast_2d_pressure.png", 113751], ["gauges/gauges_2d.txt", 17148], ["gauges/gauges_2d_summary.csv", 240], ["manifest.json", 2236], ["report.html", 384215], ["run.log", 1514]], "manifest_keys": ["case_file", "created", "dim", "failed", "finished", "git_commit", "missing", "model", "n_cells", "n_procs", "n_steps", "outputs", "runs_dir", "solver", "stop_reason", "vtk", "wsl_scratch"], "manifest": {"model": "TK_2D", "runs_dir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "created": "2026-09-26T19:38:48", "finished": "2026-09-26T19:39:30", "solver": "native", "dim": 2, "case_file": "MODEL.json", "git_commit": "1e593c3", "stop_reason": "shock arrived at a termin
+{"kind": "item11_tk", "t": "19:39:34", "label": "TK_2D - 2D", "rows": [["G1 (0.300, 0.800) -> cell (0.305, 0.802) m", "7759.4", "0.211", "0.237", "0.255", "619.31", "619.32", "no"]]}
+{"kind": "shot", "t": "19:39:35", "path": "tk_18_results_gauges_2d.png"}
+{"kind": "step", "t": "19:39:35", "key": "9"}
+{"kind": "item9_tk", "t": "19:39:45", "fn": "asksaveasfilename", "title": "Save gauge summary CSV", "defaultextension": ".csv", "initialfile": "TK_2D_gauges_2d_summary.csv", "initialdir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_2D", "native": {"title": "Save gauge summary CSV", "cls": "#32770", "texts": ["Namespace Tree Control"], "edits": ["TK_2D_gauges_2d_summary.csv"], "buttons": [{"text": "", "id": 0, "defpush": false}, {"text": "&Save", "id": 1, "defpush": true}, {"text": "Cancel", "id": 2, "defpush": false}, {"text": "&Help", "id": 1038, "defpush": false}], "def_id": 1, "shot": "tk_19_export_asksaveasfilename.png", "action": ["close"]}, "returned": ""}
+{"kind": "item9_tk", "t": "19:39:45", "fn": "asksaveasfilename", "title": "Save HTML report", "defaultextension": ".html", "initialfile": "TK_2D_blast_2d_report.html", "initialdir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_2D", "native": {"title": "Save HTML report", "cls": "#32770", "texts": ["Namespace Tree Control"], "edits": ["TK_2D_blast_2d_report.html"], "buttons": [{"text": "", "id": 0, "defpush": false}, {"text": "&Save", "id": 1, "defpush": true}, {"text": "Cancel", "id": 2, "defpush": false}, {"text": "&Help", "id": 1038, "defpush": false}], "def_id": 1, "shot": "tk_20_export_asksaveasfilename.png", "action": ["close"]}, "returned": ""}
+{"kind": "item9_tk", "t": "19:39:45", "fn": "askdirectory", "title": "Save PNGs into", "initialdir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_2D", "native": {"title": "Save PNGs into", "cls": "#32770", "texts": ["Namespace Tree Control", "Folder:"], "edits": [], "buttons": [{"text": "Select Folder", "id": 1, "defpush": true}, {"text": "Cancel", "id": 2, "defpush": false}, {"text": "&Help", "id": 1038, "defpush": false}], "def_id": 1, "shot": "tk_21_export_askdirectory.png", "action": ["close"]}, "returned": ""}
+{"kind": "step", "t": "19:39:45", "key": "6"}
+{"kind": "item6_tk", "t": "19:39:46", "dim": "1D", "has_outputs_card": false, "has_trigger_card": false, "file_rows": [], "anim_format": false, "right_column": []}
+{"kind": "shot", "t": "19:39:47", "path": "tk_22_setup_1D_bottom.png"}
+{"kind": "item6_tk", "t": "19:39:48", "dim": "2D", "has_outputs_card": true, "has_trigger_card": true, "file_rows": [], "anim_format": true, "right_column": ["Outputs", "Animation format", "Video colours", "Trigger gauge", "Gauge number\n(blank = off)", "On arrival"]}
+{"kind": "shot", "t": "19:39:48", "path": "tk_23_setup_2D_bottom.png"}
+{"kind": "item6_tk", "t": "19:39:49", "dim": "3D", "has_outputs_card": true, "has_trigger_card": true, "file_rows": [], "anim_format": true, "right_column": ["Outputs", "Animation format", "Video colours", "Trigger gauge", "Gauge number\n(blank = off)", "On arrival"]}
+{"kind": "shot", "t": "19:39:50", "path": "tk_24_setup_3D_bottom.png"}
+{"kind": "step", "t": "19:39:51", "key": "7"}
+{"kind": "item7_tk_panel", "t": "19:39:51", "hint": ["The chain runs the checked stages in order, into the model folder set on the Run tab (Runs folder and Model): each stage writes <MODEL>\\1d, 2d or 3d. The profile hand-offs are wired automatically at the model root: 1D writes handoff_1d_to_2d.txt, the 2D stage remaps it (axisymmetric) and writes handoff_2d_to_3d.npz, and the 3D stage remaps that. The 2D burst height is taken from the 2D form; the 3D burst height comes from the 2D profile."], "workspace": []}
+{"kind": "shot", "t": "19:39:52", "path": "tk_25_chain_tab.png"}
+{"kind": "dialog", "t": "19:39:55", "title": "Chain", "cls": "#32770", "texts": ["Model name: the name is empty\nThe Runs folder and Model boxes are on the Run tab."], "edits": [], "buttons": [{"text": "OK", "id": 2, "defpush": true}], "def_id": 1, "shot": "tk_26_dialog_OK.png", "action": ["button", "OK"]}
+{"kind": "item7_tk_refusal", "t": "19:39:55", "returned": false, "texts": ["Model name: the name is empty\nThe Runs folder and Model boxes are on the Run tab."], "shot": "tk_26_dialog_OK.png", "folder": false}
+  Field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_CHAIN\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_CHAIN\2d\gauges\gauges_2d.txt  (3932 rows x 1 gauges)
+  2D field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_CHAIN\2d\profile_2d.npz  (33 x 53 cells, t = 47.440 ms)
+{"kind": "item12_tk", "t": "19:40:12", "returned": true, "marks": {"=== Stage 1D ===": 1.11, "=== Stage 2D ===": 11.98}, "gaps_over_250ms": [{"at_s": 1.11, "gap_ms": 1030}, {"at_s": 11.98, "gap_ms": 10871}, {"at_s": 15.07, "gap_ms": 819}], "total_s": 16.1}
+{"kind": "shot", "t": "19:40:12", "path": "tk_27_chain_done.png"}
+{"kind": "item7_tk_folder", "t": "19:40:12", "top": [".blastlab-model", "1d", "2d", "handoff_1d_to_2d.txt", "manifest.json"], "tree": [[".blastlab-model", 56], ["1d/MODEL.json", 568], ["1d/fields/t0p244ms_final_p.csv", 4062], ["1d/fields/t0p244ms_final_rho.csv", 4067], ["1d/figures/blast_1d_results.png", 112654], ["1d/manifest.json", 1071], ["1d/report.html", 109645], ["1d/run.log", 829], ["2d/MODEL.json", 1364], ["2d/fields/impulse.csv", 71734], ["2d/fields/p_peak.csv", 69982], ["2d/fields/t47p440ms_final_p.csv", 69977], ["2d/fields/t47p440ms_final_rho.csv", 69982], ["2d/fields/t47p440ms_final_speed.csv", 69982], ["2d/figures/blast_2d_density.png", 51047], ["2d/figures/blast_2d_gauges.png", 38172], ["2d/figures/blast_2d_impulse.png", 56038], ["2d/figures/blast_2d_peak_overpressure.png", 54916], ["2d/figures/blast_2d_pressure.png", 56361], ["2d/gauges/gauges_2d.txt", 106194], ["2d/gauges/gauges_2d_summary.csv", 242], ["2d/manifest.json", 1728], ["2d/profile_2d.npz", 65302], ["2d/report.html", 248236], ["2d/run.log", 1238], ["handoff_1d_to_2d.txt", 14765], ["manifest.json", 3621]], "root_manifest": {"model": "TK_CHAIN", "runs_dir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "finished": "2026-09-26T19:40:10", "chain": [1, 2], "stages": {"1d": {"model": "TK_CHAIN", "runs_dir": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs", "created": "2026-09-26T19:39:56", "finished": "2026-09-26T19:39:57", "solver": "native", "dim": 1, "case_file": "MOD
+bgerror failed to handle background error.
+    Original error: invalid command name "1241344406080check_dpi_scaling"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "1243231076160update"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "1241344395072_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "1241447550848_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "1241344795968_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "1241344400320<lambda>"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+Traceback (most recent call last):
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\docs\qa\2026-09-26-out-1\scripts\tk_pass.py", line 589, in 
+<module>
+    main()
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\docs\qa\2026-09-26-out-1\scripts\tk_pass.py", line 572, in 
+main
+    app = persist(app)
+          ^^^^^^^^^^^^
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\docs\qa\2026-09-26-out-1\scripts\tk_pass.py", line 487, in 
+persist
+    app2 = build()
+           ^^^^^^^
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\docs\qa\2026-09-26-out-1\scripts\tk_pass.py", line 100, in 
+build
+    app = gapp.App(root)
+          ^^^^^^^^^^^^^^
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\blastlab\gui\app.py", line 143, in __init__
+    self._build_sidebar(root)
+  File "C:\Users\rotem.ofek\blastlab-worktrees\out-track\blastlab\gui\app.py", line 536, in _build_sidebar
+    b = ctk.CTkButton(
+        ^^^^^^^^^^^^^^
+  File "C:\Users\rotem.ofek\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-
+packages\Python312\site-packages\customtkinter\windows\widgets\ctk_button.py", line 107, in __init__
+    self._draw()
+  File "C:\Users\rotem.ofek\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-
+packages\Python312\site-packages\customtkinter\windows\widgets\ctk_button.py", line 266, in _draw
+    self._update_image()  # set image
+    ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\rotem.ofek\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-
+packages\Python312\site-packages\customtkinter\windows\widgets\ctk_button.py", line 174, in _update_image
+    self._image_label.configure(image=self._image.create_scaled_photo_image(self._get_widget_scaling(),
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+1722, in configure
+    return self._configure('configure', cnf, kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+1712, in _configure
+    self.tk.call(_flatten((self._w, cmd)) + self._options(cnf))
+_tkinter.TclError: image "pyimage3" doesn't exist

@@ -1,0 +1,45 @@
+﻿python : Exception ignored in: <function Image.__del__ at 0x000001E5AF7DFC40>
+At line:1 char:584
++ ... ings.json"; python -u docs\qa\2026-09-26-out-1\scripts\tk_pass.py --r ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception ignor...0001E5AF7DFC40>:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+Exception ignored in: <function Image.__del__ at 0x000001E5AF7DFC40>
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+Exception ignored in: <function Image.__del__ at 0x000001E5AF7DFC40>
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+bgerror failed to handle background error.
+    Original error: invalid command name "2087527403072_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "2087527228800_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "2087150726784_render_tick"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "2086876510080update"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "2087527071680check_dpi_scaling"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed
+bgerror failed to handle background error.
+    Original error: invalid command name "2087149995904<lambda>"
+    Error in bgerror: can't invoke "tk" command: application has been destroyed

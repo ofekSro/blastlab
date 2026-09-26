@@ -1,0 +1,30 @@
+﻿python : Exception ignored in: <function Image.__del__ at 0x000001D487605760>
+At line:1 char:448
++ ... ings.json"; python -u docs\qa\2026-09-26-out-1\scripts\tk_timing.py > ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception ignor...0001D487605760>:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Traceback (most recent call last):
+  File "C:\Program 
+Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\tkinter\__init__.py", line 
+4119, in __del__
+    self.tk.call('image', 'delete', self.name)
+RuntimeError: main thread is not in main loop
+  Field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\TK_CHAIN_T0\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+2026-09-26 19:42:16.740 (   4.351s) [D39BF5DF60EB0ED2]vtkWin32OpenGLRenderWin:254    ERR| vtkWin32OpenGLRenderWindow 
+(000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+WARNING:root:ERROR: In vtkWin32OpenGLRenderWindow.cxx, line 254
+vtkWin32OpenGLRenderWindow (000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+2026-09-26 19:42:16.741 (   4.353s) [D39BF5DF60EB0ED2]vtkWin32OpenGLRenderWin:254    ERR| vtkWin32OpenGLRenderWindow 
+(000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+WARNING:root:ERROR: In vtkWin32OpenGLRenderWindow.cxx, line 254
+vtkWin32OpenGLRenderWindow (000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+2026-09-26 19:42:16.742 (   4.354s) [D39BF5DF60EB0ED2]vtkWin32OpenGLRenderWin:254    ERR| vtkWin32OpenGLRenderWindow 
+(000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+WARNING:root:ERROR: In vtkWin32OpenGLRenderWindow.cxx, line 254
+vtkWin32OpenGLRenderWindow (000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+2026-09-26 19:42:16.743 (   4.355s) [D39BF5DF60EB0ED2]vtkWin32OpenGLRenderWin:254    ERR| vtkWin32OpenGLRenderWindow 
+(000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
+WARNING:root:ERROR: In vtkWin32OpenGLRenderWindow.cxx, line 254
+vtkWin32OpenGLRenderWindow (000001D4C5D68BA0): wglMakeCurrent failed in MakeCurrent(), error: unknown error(code 170)
