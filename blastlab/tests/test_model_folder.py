@@ -9,6 +9,9 @@ docs/batches/2026-09-26-out-1-model-folder.md, Steps 1-4.
   C  jobs.solve_stage(..., stage_dir=...) on a SolverWorker run on this
      thread: the folder is complete before ('result', 0); a failed TSV, a
      failed hand-off, a raising solver and a stop before start
+  D  blastFoam: the foam\\ skeleton copy with SHA256SUMS and the scratch
+     release, on a fake scratch tree with `run` / `delete` injected - no
+     WSL is touched
 
 Everything runs in temp folders; the private settings file of
 `char_common` keeps the real one untouched (CLAUDE.md 8.2).
@@ -484,6 +487,8 @@ def test_c_solver_raises():
         assert m['failed'] == [] and m['missing'] == []
         assert [o['path'] for o in m['outputs']] == ['MODEL.json',
                                                      'run.log'], m
+        assert sorted(os.listdir(folder)) == ['MODEL.json', 'manifest.json',
+                                              'run.log']   # no empty dirs
         with open(os.path.join(folder, 'run.log'), encoding='utf-8') as f:
             log = f.read()
         assert log == ('  a line before the failure\n'
@@ -547,6 +552,303 @@ def test_c_no_stage_dir_is_unchanged():
         '2D blastFoam'
 
 
+# ── D: blastFoam foam\ skeleton and scratch release, no WSL ──────────────
+POSIX = '/root/blastlab_runs/20260926-120000_3d_p1234-00'
+
+#: the fake scratch: skeleton files, and what must never be copied
+SKELETON = {
+    'system/controlDict': b'FoamFile {}\nendTime 0.001;\n',
+    'system/fvSchemes': b'ddtSchemes { default Euler; }\n',
+    'constant/polyMesh/points': b'(0 0 0)\n(1 0 0)\n' * 50,
+    'constant/phaseProperties': b'phases (tnt air);\n',
+    '0/p': b'internalField uniform 101298;\n',
+    '0/U': b'internalField uniform (0 0 0);\n',
+    'postProcessing/probes/0/p': b'# Time p\n0 101298\n',
+    'log.blastFoam': b'Time = 1e-06\nExecutionTime = 0.1 s\n',
+    'log.blockMesh': b'End\n',
+}
+NEVER = {
+    'processor0/0/p': b'decomposed\n',
+    'processor0/constant/polyMesh/points': b'decomposed mesh\n',
+    '0.001/p': b'a written time\n',
+    '0.001/U': b'a written time\n',
+    'case.json': b'{}\n',
+}
+
+
+def make_scratch(tmp):
+    root = os.path.join(tmp, 'scratch')
+    for rel, data in {**SKELETON, **NEVER}.items():
+        path = os.path.join(root, *rel.split('/'))
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(data)
+    return root
+
+
+class FakeWsl:
+    """The injected `run`: hashes the fake scratch the way the WSL script
+    does, and adds stray lines for processor0/ and 0.001/ so the filter
+    on the Windows side is what keeps them out. `flip` changes one byte
+    of a file AFTER hashing; `extra` lists a file that does not exist
+    (a partial copy); `code` is the exit status."""
+
+    def __init__(self, root, flip=None, extra=None, code=0):
+        self.root, self.flip, self.extra, self.code = root, flip, extra, code
+        self.calls = []
+
+    def __call__(self, argv, **kw):
+        import hashlib
+        from types import SimpleNamespace
+        self.calls.append(argv)
+        script = argv[-1]
+        assert argv[:3] == ['wsl.exe', '-d', 'Ubuntu'], argv
+        assert 'source ' not in script          # wsl_plain_argv, no env
+        assert script == mf.skeleton_script(POSIX), script
+        if self.code:
+            return SimpleNamespace(returncode=self.code, stdout='',
+                                   stderr='sha256sum: boom\n')
+        lines = []
+        for rel in sorted({**SKELETON, **NEVER}):
+            with open(os.path.join(self.root, *rel.split('/')), 'rb') as f:
+                lines.append(f'{hashlib.sha256(f.read()).hexdigest()}  {rel}')
+        if self.extra:
+            lines.append('0' * 64 + '  ' + self.extra)
+        with open(os.path.join(self.root, 'SHA256SUMS'), 'w',
+                  newline='\n') as f:
+            f.write('\n'.join(lines) + '\n')
+        if self.flip:
+            path = os.path.join(self.root, *self.flip.split('/'))
+            with open(path, 'r+b') as f:
+                b = f.read(1)
+                f.seek(0)
+                f.write(bytes([b[0] ^ 0xFF]))
+        return SimpleNamespace(returncode=0, stdout='', stderr='')
+
+
+class FakeDelete:
+    def __init__(self, ok=True):
+        self.ok, self.calls = ok, []
+
+    def __call__(self, dirs):
+        self.calls.append(list(dirs))
+        return self.ok
+
+
+def release(tmp, errored=False, stopped=False, failed=None, posix=POSIX,
+            **fake):
+    """verify_and_release_scratch on a fake scratch and a model folder
+    holding one finished row. Returns (manifest, notice, run, delete,
+    folder, log lines)."""
+    root = make_scratch(tmp)
+    folder = os.path.join(tmp, 'MODEL')
+    os.makedirs(folder)
+    with open(os.path.join(folder, 'report.html'), 'w') as f:
+        f.write('<html></html>\n')
+    manifest = dict(model='MODEL', failed=list(failed or []), outputs=[],
+                    wsl_scratch=None)
+    run, delete, lines = FakeWsl(root, **fake), FakeDelete(), []
+    manifest, notice = mf.verify_and_release_scratch(
+        manifest, folder, posix, errored, stopped, log=lines.append,
+        run=run, delete=delete, unc=lambda p: root)
+    return manifest, notice, run, delete, folder, lines
+
+
+def test_d_clean_run_releases_once():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, run, delete, folder, _l = release(tmp)
+        assert delete.calls == [[POSIX]], delete.calls
+        assert notice is None
+        assert m['wsl_scratch']['deleted'] is True
+        assert m['wsl_scratch']['posix'] == POSIX
+        assert m['wsl_scratch']['deleted_at']
+        assert m['failed'] == []
+        copied = files_on_disk(os.path.join(folder, 'foam'))
+        assert sorted(copied) == sorted(list(SKELETON) + ['SHA256SUMS'])
+        for rel, data in SKELETON.items():
+            with open(os.path.join(folder, 'foam', *rel.split('/')),
+                      'rb') as f:
+                assert f.read() == data, rel
+        # processor0/ and 0.001/ (and anything else) never copied
+        assert not [p for p in copied if p.startswith(('processor', '0.0',
+                                                       'case.json'))]
+        paths = [o['path'] for o in m['outputs']]
+        assert 'foam/system/controlDict' in paths and 'report.html' in paths
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            assert json.load(f) == m
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_flipped_byte_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, _r, delete, _f, lines = release(
+            tmp, flip='system/controlDict')
+        assert delete.calls == []
+        assert m['wsl_scratch']['deleted'] is False
+        assert 'system/controlDict' in notice, notice
+        assert 'system/controlDict' in m['wsl_scratch']['kept_because']
+        assert dict(name='foam', path='foam/system/controlDict',
+                    why='hash mismatch') in m['failed']
+        assert any('kept' in ln and POSIX in ln for ln in lines), lines
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_partial_copy_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, _r, delete, _f, _l = release(
+            tmp, extra='postProcessing/probes/0/U')
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'postProcessing/probes/0/U' in notice, notice
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_wsl_hash_failure_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, _r, delete, _f, _l = release(tmp, code=1)
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'hashing in WSL failed' in notice, notice
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_stopped_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, run, delete, folder, lines = release(tmp, stopped=True)
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert notice is None                     # the user stopped it
+        assert len(run.calls) == 1                # but foam\ is copied
+        assert os.path.isfile(os.path.join(folder, 'foam', 'SHA256SUMS'))
+        assert m['wsl_scratch']['kept_because'] == \
+            'the run ended before its end time'
+        assert any('[note]' in ln for ln in lines), lines
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_raised_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, run, delete, folder, _l = release(tmp, errored=True)
+        assert delete.calls == [] and run.calls == []
+        assert not m['wsl_scratch']['deleted'] and notice is None
+        assert not os.path.exists(os.path.join(folder, 'foam'))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_failed_row_keeps_scratch():
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        row = dict(name='report', path='report.html', why='empty file')
+        m, notice, _r, delete, _f, _l = release(tmp, failed=[row])
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'report.html' in notice, notice
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_only_run_dirs_are_deleted():
+    for bad in ('/root/blastlab_runs', '/root/blastlab_runs/',
+                '/root/blastlab_runs/a/b', '/root/other/run',
+                '/root/blastlab_runs/..', '/', ''):
+        assert not mf.is_run_dir(bad), bad
+    assert mf.is_run_dir(POSIX)
+    # a finished, verified run outside the runs root is still kept (the
+    # fake WSL pins its script to POSIX, so the script is pinned too)
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    real = mf.skeleton_script
+    try:
+        mf.skeleton_script = lambda p: real(POSIX)
+        m, notice, _r, delete, _f, _l = release(tmp, posix='/root/x')
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'not a run directory' in notice, notice
+    finally:
+        mf.skeleton_script = real
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_release_decision_table():
+    import itertools
+    for errored, stopped, rows_ok, hashes_ok in itertools.product(
+            (False, True), repeat=4):
+        ok, why = mf.release_decision(
+            errored, stopped, dict(rows_ok=rows_ok, hashes_ok=hashes_ok,
+                                   rows_detail='report.html',
+                                   hash_detail='hash mismatch: 0/p'))
+        want = not errored and not stopped and rows_ok and hashes_ok
+        assert ok is want, (errored, stopped, rows_ok, hashes_ok, ok, why)
+        if errored:
+            assert why == 'the run did not finish (it raised)'
+        elif stopped:
+            assert why == 'the run ended before its end time'
+        elif not rows_ok:
+            assert why.endswith('report.html'), why
+        elif not hashes_ok:
+            assert why.endswith('0/p'), why
+
+
+def test_d_skeleton_filter_and_script():
+    s = mf.skeleton_script(POSIX)
+    assert s.startswith(f"cd '{POSIX}' && find system constant 0 "
+                        'postProcessing log.* -type f'), s
+    assert 'sha256sum > SHA256SUMS' in s and 'processor' not in s
+    for rel in SKELETON:
+        assert mf.in_skeleton(rel), rel
+    for rel in list(NEVER) + ['../etc/passwd', '/etc/passwd', 'system/../x',
+                              'logs/x', '']:
+        assert not mf.in_skeleton(rel), rel
+
+
+def test_d_stage_calls_release_for_foam():
+    """stage_solve: a blastFoam stage whose backend set scratch_posix goes
+    through verify_and_release_scratch with the run's own facts."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    real_solver, real_release = solvers_pkg.get_solver, \
+        mf.verify_and_release_scratch
+    calls = []
+
+    def foam_like(case, hooks):
+        hooks.scratch_posix = POSIX              # as backend._preflight
+        return real_solver(case.dim, 'native')(case, hooks)
+
+    def recorder(manifest, stage_dir, posix, errored, stopped_early,
+                 log=print, **kw):
+        calls.append((posix, errored, stopped_early))
+        return manifest, 'kept for a test'
+    solvers_pkg.get_solver = lambda dim, backend: foam_like
+    mf.verify_and_release_scratch = recorder
+    try:
+        folder = mf.prepare(runs, 'FOAM', confirm=lambda t: True)
+        w = SolverWorker([jobs.solve_stage(2, case2d(solver='blastfoam'),
+                                           stage_dir=folder)])
+        w.run()
+        assert calls == [(POSIX, False, False)], calls
+        assert w.hooks.folder_notice == 'kept for a test'
+        # a native stage on the same hooks never releases anything
+        calls.clear()
+        folder = mf.prepare(runs, 'NATIVE', confirm=lambda t: True)
+        solvers_pkg.get_solver = real_solver
+        w2 = SolverWorker([jobs.solve_stage(2, case2d(), stage_dir=folder)])
+        w2.hooks.scratch_posix = POSIX
+        w2.run()
+        assert calls == [] and w2.hooks.folder_notice is None
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
@@ -559,7 +861,14 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_c_worker_folder_complete_before_result,
          test_c_failed_gauge_tsv, test_c_solver_raises,
          test_c_stopped_before_start, test_c_handoff_failure_keeps_rows,
-         test_c_no_stage_dir_is_unchanged]
+         test_c_no_stage_dir_is_unchanged,
+         test_d_clean_run_releases_once, test_d_flipped_byte_keeps_scratch,
+         test_d_partial_copy_keeps_scratch,
+         test_d_wsl_hash_failure_keeps_scratch,
+         test_d_stopped_keeps_scratch, test_d_raised_keeps_scratch,
+         test_d_failed_row_keeps_scratch, test_d_only_run_dirs_are_deleted,
+         test_d_release_decision_table, test_d_skeleton_filter_and_script,
+         test_d_stage_calls_release_for_foam]
 
 
 if __name__ == '__main__':

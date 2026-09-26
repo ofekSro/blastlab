@@ -16,10 +16,12 @@ run runs (`RunHooks.log_file`).
 
 import copy
 import datetime
+import hashlib
 import json
 import os
 import shutil
 import stat
+import subprocess
 from types import SimpleNamespace
 
 #: the longest model name accepted (plan sec. 2.1)
@@ -444,6 +446,11 @@ def write_all(res, case, dim, stage_dir, run_info=None, log=print):
         manifest['stop_reason'] = info.get('stop_reason') \
             or res.stop_reason or None
 
+    for sub in (GAUGES_DIR, FIGURES_DIR, FIELDS_DIR):   # no empty folders
+        try:
+            os.rmdir(os.path.join(stage_dir, sub))
+        except OSError:
+            pass                        # absent, or holds files
     manifest['outputs'] = list_outputs(stage_dir)
     manifest['finished'] = now_iso()
     why = write_manifest(manifest, stage_dir)
@@ -518,14 +525,246 @@ def _write_result_rows(res, case, dim, stage_dir, info, log, verify, fail,
             missing.append(dict(name=name, why=why_none))
         for entry in sorted(os.listdir(target)):
             verify(name, os.path.join(target, entry))
-        if not os.listdir(target):
-            os.rmdir(target)
 
     target = os.path.join(stage_dir, REPORT_FILE)
     if export('report', target) is None:
         fail('report', target, 'export failed (see the log)')
     else:
         verify('report', target)
+
+
+# ── blastFoam: the foam\ skeleton and the WSL scratch (plan sec. 2.3) ────
+FOAM_DIR = 'foam'
+SUMS_FILE = 'SHA256SUMS'
+
+#: the case skeleton copied into foam\: the top-level entries of the run
+#: directory (`writer.write_case` layout), never processor*/ or a time dir
+SKELETON_DIRS = ('system', 'constant', '0', 'postProcessing')
+
+#: hashing a large polyMesh inside WSL takes seconds; this is the ceiling
+SKELETON_TIMEOUT_S = 600
+
+
+def skeleton_script(scratch_posix):
+    """The bash line run inside WSL (no OpenFOAM env needed): hash every
+    skeleton file into <scratch>/SHA256SUMS, `sha256sum` format
+    (`<hex>  <relpath>`), sorted. Missing entries (a profile stage has no
+    0/, a run without logs has no log.*) are skipped silently."""
+    tops = ' '.join(SKELETON_DIRS)
+    return (f"cd '{scratch_posix}' && find {tops} log.* -type f -print0 "
+            f"2>/dev/null | LC_ALL=C sort -z | xargs -0 -r sha256sum "
+            f"> {SUMS_FILE}")
+
+
+def in_skeleton(rel):
+    """True for a relative path that belongs in foam\\ (SKELETON_DIRS or
+    a top-level log.*); a stray line can never pull in processor*/,
+    a time directory or a path outside the scratch."""
+    parts = rel.split('/')
+    if not rel or rel.startswith('/') or '..' in parts or '' in parts:
+        return False
+    if len(parts) == 1:
+        return parts[0].startswith('log.')
+    return parts[0] in SKELETON_DIRS
+
+
+def parse_sums(text):
+    """[(hex, relpath)] from a sha256sum listing; other lines skipped."""
+    out = []
+    for line in text.splitlines():
+        if len(line) < 67 or line[64:66] not in ('  ', ' *'):
+            continue
+        digest, rel = line[:64].lower(), line[66:]
+        if all(c in '0123456789abcdef' for c in digest):
+            out.append((digest, rel))
+    return out
+
+
+def _sha256(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
+                       timeout=SKELETON_TIMEOUT_S):
+    """Copy the blastFoam case skeleton of `scratch_posix` into
+    `dest\\foam\\` and verify it (plan sec. 2.3):
+
+    1. inside WSL, `sha256sum` every skeleton file into SHA256SUMS
+       (`skeleton_script`, through `env.wsl_plain_argv`);
+    2. copy each listed file over the UNC path;
+    3. hash the copy on Windows and compare with the WSL hash;
+    4. copy SHA256SUMS itself.
+
+    `run` and `unc` (posix -> Windows path) are injectable for tests.
+    Never raises. Returns dict(ok, files, mismatches, errors, detail):
+    `ok` only when the listing ran, listed at least one file and every
+    file copied with a matching hash."""
+    from ..solvers.foam import env
+    unc = unc or env.unc
+    out = dict(ok=False, files=0, mismatches=[], errors=[], detail='')
+    if "'" in scratch_posix:
+        out['detail'] = f'unexpected scratch path {scratch_posix!r}'
+        return out
+    try:
+        res = run(env.wsl_plain_argv(skeleton_script(scratch_posix)),
+                  capture_output=True, text=True, timeout=timeout,
+                  stdin=subprocess.DEVNULL,
+                  creationflags=env.CREATE_NO_WINDOW)
+    except (OSError, subprocess.SubprocessError) as exc:
+        out['detail'] = f'hashing in WSL failed: {exc}'
+        return out
+    if res.returncode != 0:
+        err = (res.stderr or '').strip().splitlines()
+        out['detail'] = ('hashing in WSL failed (exit '
+                         f'{res.returncode}' + (f': {err[-1]}' if err else '')
+                         + ')')
+        return out
+    root = unc(scratch_posix)
+    foam = os.path.join(dest, FOAM_DIR)
+    try:
+        with open(os.path.join(root, SUMS_FILE), encoding='utf-8',
+                  errors='replace') as f:
+            listing = parse_sums(f.read())
+    except OSError as exc:
+        out['detail'] = f'cannot read {SUMS_FILE}: {exc}'
+        return out
+    listing = [(h, rel) for h, rel in listing if in_skeleton(rel)]
+    for digest, rel in listing:
+        parts = rel.split('/')
+        dst = os.path.join(foam, *parts)
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(os.path.join(root, *parts), dst)
+            got = _sha256(dst)
+        except OSError as exc:
+            out['errors'].append((rel, str(exc) or type(exc).__name__))
+            continue
+        out['files'] += 1
+        if got != digest:
+            out['mismatches'].append(rel)
+    try:
+        os.makedirs(foam, exist_ok=True)
+        shutil.copyfile(os.path.join(root, SUMS_FILE),
+                        os.path.join(foam, SUMS_FILE))
+    except OSError as exc:
+        out['errors'].append((SUMS_FILE, str(exc) or type(exc).__name__))
+    notes = []
+    if not listing:
+        notes.append('the WSL listing named no skeleton file')
+    if out['mismatches']:
+        notes.append('hash mismatch: ' + ', '.join(out['mismatches']))
+    if out['errors']:
+        notes.append('not copied: ' + ', '.join(
+            f'{rel} ({why})' for rel, why in out['errors']))
+    out['ok'] = not notes
+    out['detail'] = '; '.join(notes) or (f'{out["files"]} files copied '
+                                         f'and verified')
+    return out
+
+
+def release_decision(errored, stopped_early, verify):
+    """(release, why): may the WSL scratch be deleted? Pure.
+
+    Release only when the run did not raise, did not end early (a user
+    stop or `STOP_UNSTABLE`: `Result.stopped_early`), every row of sec.
+    2.2 was verified (`verify['rows_ok']`) and the foam\\ copy matched
+    its WSL hashes (`verify['hashes_ok']`). Otherwise `why` names the
+    first reason, in that order; `verify['rows_detail']` /
+    `['hash_detail']` say which files."""
+    if errored:
+        return False, 'the run did not finish (it raised)'
+    if stopped_early:
+        return False, 'the run ended before its end time'
+    if not verify.get('rows_ok'):
+        return False, ('not every output was written: '
+                       + (verify.get('rows_detail') or '?'))
+    if not verify.get('hashes_ok'):
+        return False, ('the foam\\ copy did not verify: '
+                       + (verify.get('hash_detail') or '?'))
+    return True, 'finished, every output written and foam\\ verified'
+
+
+def is_run_dir(posix):
+    """Only a direct child of the runs root is ever deleted."""
+    from ..solvers.foam import env
+    head = env.RUNS_ROOT.rstrip('/') + '/'
+    name = str(posix or '')[len(head):]
+    return (str(posix or '').startswith(head) and bool(name)
+            and '/' not in name and name not in ('.', '..')
+            and "'" not in name)
+
+
+def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
+                               stopped_early, log=print, run=subprocess.run,
+                               delete=None, unc=None):
+    """Copy foam\\, decide, and delete the WSL scratch only after a
+    verified copy of a finished run (plan sec. 2.3, decision 12).
+
+    A run that raised is not copied (WSL may be what failed; `errored` is
+    False for a HandoffWriteError, whose solve finished) and keeps its
+    scratch whole; a stopped run is copied and kept. The delete goes
+    through `env.delete_runs` (batch plan D11) on this run's own posix
+    path, and only a direct child of the runs root. The manifest gets
+    `wsl_scratch` {posix, deleted, deleted_at} (+ `kept_because`), a
+    failed copy's files in `failed`, and is written again.
+
+    Returns (manifest, notice): `notice` is the dialog text for the GUI
+    when a finished run's scratch was kept because the copy or a row
+    failed; None otherwise. Never raises."""
+    from ..solvers.foam import env
+    delete = delete or env.delete_runs
+    scratch = dict(posix=scratch_posix, deleted=False, deleted_at=None)
+    manifest['wsl_scratch'] = scratch
+    failed = manifest.setdefault('failed', [])
+    copied = dict(ok=False, detail='not copied: the run failed')
+    if not errored:
+        copied = copy_foam_skeleton(scratch_posix, stage_dir, run=run,
+                                    unc=unc)
+        for rel in copied.get('mismatches', []):
+            failed.append(dict(name='foam', path=f'{FOAM_DIR}/{rel}',
+                               why='hash mismatch'))
+        for rel, why in copied.get('errors', []):
+            failed.append(dict(name='foam', path=f'{FOAM_DIR}/{rel}',
+                               why=why))
+    rows = [f for f in failed if f.get('name') != 'foam']
+    verify = dict(rows_ok=not rows,
+                  rows_detail=', '.join(str(f.get('path')) for f in rows),
+                  hashes_ok=bool(copied.get('ok')),
+                  hash_detail=copied.get('detail', ''))
+    release, why = release_decision(errored, stopped_early, verify)
+    if release and not is_run_dir(scratch_posix):
+        release, why = False, (f'{scratch_posix} is not a run directory '
+                               f'directly under {env.RUNS_ROOT}')
+    if release:
+        try:
+            ok = delete([scratch_posix])
+        except Exception as exc:
+            ok, why = False, f'the WSL delete failed: {exc}'
+        if ok:
+            scratch.update(deleted=True, deleted_at=now_iso())
+            log(f'  [model folder] WSL scratch deleted: {scratch_posix}')
+        elif not why.startswith('the WSL delete'):
+            why = 'the WSL delete failed'
+    notice = None
+    if not scratch['deleted']:
+        scratch['kept_because'] = why
+        kind = 'note' if (errored or stopped_early) else 'warn'
+        log(f'  [{kind}] WSL scratch kept ({why}): {scratch_posix}')
+        if kind == 'warn':
+            notice = (f'The blastFoam run finished, but its WSL scratch was '
+                      f'kept:\n{why}\n\n{scratch_posix}\n\nThe model folder '
+                      f'{stage_dir} holds everything that could be copied. '
+                      f'The scratch still opens from the run browser.')
+    manifest['outputs'] = list_outputs(stage_dir)
+    manifest['finished'] = now_iso()
+    err = write_manifest(manifest, stage_dir)
+    if err:
+        log(f'[warn] model folder: could not write {MANIFEST_FILE}: {err}')
+    return manifest, notice
 
 
 # ── the run stage (solvers/jobs.solve_stage with a stage_dir) ────────────
@@ -566,7 +805,13 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
     HandoffWriteError carries one), and the exception is re-raised
     unchanged, so the worker's 'error' path is what it always was.
 
-    The manifest is left on `hooks.stage_manifest` for the front end."""
+    A blastFoam stage (`hooks.scratch_posix` set by the backend) then
+    copies foam\\ and releases or keeps its WSL scratch
+    (`verify_and_release_scratch`).
+
+    The manifest is left on `hooks.stage_manifest` and a kept-scratch
+    dialog text on `hooks.folder_notice` (None when there is nothing to
+    say) for the front end."""
     def solve(hooks):
         info = dict(run_info or {})
         info.setdefault('created', now_iso())
@@ -594,11 +839,32 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                 if err is not None:
                     info['stop_reason'] = headline(err)
                     _append(log_path, f'[stage ended: {info["stop_reason"]}]')
-                hooks.stage_manifest = write_all(
-                    res, bound, dim, stage_dir, info, log=hooks.log)
+                manifest = write_all(res, bound, dim, stage_dir, info,
+                                     log=hooks.log)
+                hooks.folder_notice = None
+                posix = getattr(hooks, 'scratch_posix', None)
+                if posix and getattr(case, 'solver', '') == 'blastfoam':
+                    try:
+                        manifest, hooks.folder_notice = \
+                            verify_and_release_scratch(
+                                manifest, stage_dir, posix,
+                                errored=err is not None and not isinstance(
+                                    err, _handoff_error()),
+                                stopped_early=bool(res is not None
+                                                   and res.stopped_early),
+                                log=hooks.log)
+                    except Exception as exc:   # keeps the scratch
+                        hooks.log(f'  [warn] WSL scratch kept: the foam\\ '
+                                  f'copy raised {exc!r}: {posix}')
+                hooks.stage_manifest = manifest
             finally:
                 hooks.log_file = prev_log
     return solve
+
+
+def _handoff_error():
+    from ..solvers.jobs import HandoffWriteError
+    return HandoffWriteError
 
 
 def _register():

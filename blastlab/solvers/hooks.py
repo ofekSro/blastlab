@@ -98,6 +98,11 @@ class RunHooks:
     #: else None. `log` appends every line to it (see `log_to_file`).
     log_file = None
 
+    #: OUT-1: the WSL scratch directory (posix) of the blastFoam run on
+    #: these hooks, set by backend._preflight / resume_run once the case
+    #: directory is known. None for a native run.
+    scratch_posix = None
+
     @staticmethod
     def _due(policy, step, last_draw):
         mode, val = policy
