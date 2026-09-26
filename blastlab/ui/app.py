@@ -104,7 +104,8 @@ class MainWindow(QMainWindow):
         self._status = label('', 'small')
         self._status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         column.addWidget(self._status)
-        self._status_timer.timeout.connect(lambda: self._status.setText(''))
+        self._status_timer.timeout.connect(
+            lambda: (self._status.setText(''), self._status.setToolTip('')))
 
         self.viewer_link = ViewerLink(self, log_fn=self._log_threadsafe)
         self.view3d = View3DHost(self.viewer_link, 'run',
@@ -620,6 +621,7 @@ class MainWindow(QMainWindow):
             sys.setswitchinterval(min(self._switch_interval,
                                       _HD13_SWITCH_INTERVAL))
             self._status.setText('HD 1.3 assessment running…')
+            self._status.setToolTip('')
             self._status.setStyleSheet(f'color: {theme.cur("muted")};')
             self._status_timer.stop()
         else:
@@ -628,22 +630,38 @@ class MainWindow(QMainWindow):
     def _hd13_done(self, out, err, loads=None):
         """GUI thread: the worker of `_run_hd13` has finished.
 
-        `loads` is `output/load_csv.export_hd13`'s result (HD1-16): the
-        status line names the CSV directory and carries any "record ends
-        while the load is still active" message."""
+        `loads` is `output/load_csv.export_hd13`'s result (HD1-16). The
+        full text - the report, the load folder and every CSV as absolute
+        paths, and each "record ends while the load is still active"
+        message verbatim - goes to the Run log and the status tooltip; the
+        status line gets a short summary that fits, as a warning when that
+        rule fired (QA 2026-09-26-hd1-16 F2: one line of ~3300 px was
+        clipped to "HD 1.3 report written: C:\\...")."""
         self._set_hd13_busy(False)
         if err is not None:
             self._status.setText('')
+            self._status.setToolTip('')
             self.show_error('HD 1.3 assessment', str(err))
             return
-        text = f'HD 1.3 report written: {out}'
-        if loads and loads['files']:
-            text += (f'; SBEDS loads: {len(loads["files"])} CSV in '
-                     f'{loads["dir"]}')
-            for name, msg in loads['messages']:
-                text += f'; {name}: {msg}'
-        self._status.setText(text)
-        self._status_timer.start()
+        files = (loads or {}).get('files') or []
+        msgs = (loads or {}).get('messages') or []
+        lines = [f'HD 1.3 report written: {os.path.abspath(out)}']
+        if files:
+            lines.append(f'SBEDS loads: {len(files)} CSV in '
+                         f'{os.path.abspath(loads["dir"])}')
+            lines += [f'  {os.path.abspath(f)}' for f in files]
+        lines += [f'{name}: {msg}' for name, msg in msgs]
+        for line in lines:
+            self.run_panel.on_log(line)
+        summary = (f'HD 1.3 done - report and {len(files)} SBEDS load CSV'
+                   f'{"" if len(files) == 1 else "s"} written' if files
+                   else 'HD 1.3 done - report written')
+        if msgs:
+            summary += (f'; {len(msgs)} load record'
+                        f'{" ends" if len(msgs) == 1 else "s end"} while '
+                        f'the load is still active')
+        self.notify(f'{summary} (see Log)', 'warn' if msgs else 'info')
+        self._status.setToolTip('\n'.join(lines))
 
     def _confirm_long_run(self, cases):
         """An end time past the automatic stop is now honoured (T52),
@@ -791,6 +809,7 @@ class MainWindow(QMainWindow):
             return
         colour = {'error': 'error', 'warn': 'warn'}.get(level, 'muted')
         self._status.setText(text[:200])
+        self._status.setToolTip(text)   # the whole text, past the cap
         self._status.setStyleSheet(f'color: {theme.cur(colour)};')
         self._status_timer.start()
 
