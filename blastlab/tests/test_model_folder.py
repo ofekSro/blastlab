@@ -180,13 +180,14 @@ def case2d(**kw):
 
 
 def files_on_disk(folder):
-    """{relative path: bytes} of every file but manifest.json."""
+    """{relative path: bytes} of every file but manifest.json and the
+    `.blastlab-model` marker (Q4)."""
     out = {}
     for root, _dirs, files in os.walk(folder):
         for f in files:
             full = os.path.join(root, f)
             rel = os.path.relpath(full, folder).replace('\\', '/')
-            if rel != 'manifest.json':
+            if rel not in ('manifest.json', '.blastlab-model'):
                 out[rel] = os.path.getsize(full)
     return out
 
@@ -360,8 +361,81 @@ def test_b_prepare_overwrite_no_and_yes():
         assert _snapshot(folder) == before
         got = mf.prepare(runs, 'MODEL', confirm=lambda t: True)
         assert got == folder
-        assert os.listdir(folder) == []
+        assert os.listdir(folder) == ['.blastlab-model']   # only the marker
         assert os.listdir(runs) == ['MODEL']        # the runs folder stays
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_b_marker_written_at_creation():
+    """Q4: `prepare` writes `.blastlab-model` (model name + creation time)
+    the moment it creates the folder."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    try:
+        folder = mf.prepare(runs, ' MODEL ', confirm=lambda t: True)
+        with open(os.path.join(folder, '.blastlab-model'),
+                  encoding='utf-8') as f:
+            marker = json.load(f)
+        assert marker['model'] == 'MODEL' and marker['created'], marker
+        assert mf.list_outputs(folder) == []        # not an output
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_b_overwrite_marker_folder_is_asked():
+    """Q4 case 1: a folder holding the marker (even an aborted run's)."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    try:
+        folder = mf.prepare(runs, 'MODEL', confirm=lambda t: True)
+        with open(os.path.join(folder, 'run.log'), 'w') as f:
+            f.write('aborted\n')
+        asked = []
+        assert mf.prepare(runs, 'MODEL', confirm=lambda t: asked.append(t)
+                          or True) == folder
+        assert len(asked) == 1
+        assert os.listdir(folder) == ['.blastlab-model']
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_b_overwrite_empty_folder_is_asked():
+    """Q4 case 2: an empty folder with no marker is asked about too."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    try:
+        os.mkdir(os.path.join(runs, 'MODEL'))
+        asked = []
+        assert mf.prepare(runs, 'MODEL', confirm=lambda t: asked.append(t)
+                          or False) is None
+        assert len(asked) == 1 and os.listdir(os.path.join(runs, 'MODEL')) \
+            == []                                   # No: untouched
+        folder = mf.prepare(runs, 'MODEL', confirm=lambda t: True)
+        assert os.listdir(folder) == ['.blastlab-model']
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_b_foreign_folder_refused_before_any_dialog():
+    """Q4 case 3: a non-empty folder without the marker is refused before
+    any question, and nothing in it is deleted."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    try:
+        foreign = os.path.join(runs, 'Thesis')
+        os.makedirs(os.path.join(foreign, 'chapter1'))
+        with open(os.path.join(foreign, 'notes.txt'), 'w') as f:
+            f.write('not a blastlab run\n')
+        before = _snapshot(foreign)
+        asked = []
+        try:
+            mf.prepare(runs, 'thesis', confirm=lambda t: asked.append(t)
+                       or True)
+        except mf.ModelFolderError as exc:
+            assert str(exc) == (f'{foreign} was not created by blastlab - '
+                                f'choose another model name'), str(exc)
+        else:
+            raise AssertionError('a foreign folder was not refused')
+        assert asked == []
+        assert _snapshot(foreign) == before
+        assert os.path.isdir(os.path.join(foreign, 'chapter1'))
     finally:
         shutil.rmtree(runs, ignore_errors=True)
 
@@ -562,7 +636,8 @@ def test_c_solver_raises():
         assert m['failed'] == [] and m['missing'] == []
         assert [o['path'] for o in m['outputs']] == ['MODEL.json',
                                                      'run.log'], m
-        assert sorted(os.listdir(folder)) == ['MODEL.json', 'manifest.json',
+        assert sorted(os.listdir(folder)) == ['.blastlab-model', 'MODEL.json',
+                                              'manifest.json',
                                               'run.log']   # no empty dirs
         with open(os.path.join(folder, 'run.log'), encoding='utf-8') as f:
             log = f.read()
@@ -949,6 +1024,10 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_b_native_1d, test_b_native_2d_axisym,
          test_b_missing_animation_and_planar_profile,
          test_b_bind_case_names, test_b_prepare_overwrite_no_and_yes,
+         test_b_marker_written_at_creation,
+         test_b_overwrite_marker_folder_is_asked,
+         test_b_overwrite_empty_folder_is_asked,
+         test_b_foreign_folder_refused_before_any_dialog,
          test_b_prepare_locked_file, test_b_prepare_refusals,
          test_b_log_file_never_raises,
          test_b_manifest_write_failure_is_a_failed_row,

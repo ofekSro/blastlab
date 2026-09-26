@@ -166,11 +166,42 @@ def now_iso():
 
 
 # ── prepare: create, or overwrite after a confirmation ───────────────────
+#: written by `prepare` the moment it creates a model folder, before
+#: anything else (owner Q4, 2026-09-26): only a folder holding it - or an
+#: empty one - may ever be overwritten
+MARKER_FILE = '.blastlab-model'
+
+
 def overwrite_text(runs_dir, model):
     """The confirmation question for an existing model (plan sec. 2.1)."""
     return (f'{str(model).strip()} already exists in '
             f'{str(runs_dir).strip()}. Overwrite? The previous run\'s '
             f'files will be deleted.')
+
+
+def foreign_text(target):
+    """The refusal for an existing folder blastlab did not create (Q4)."""
+    return (f'{target} was not created by blastlab - choose another model '
+            f'name')
+
+
+def is_model_folder(path):
+    """True when `path` holds the marker `prepare` writes, or is empty:
+    the only folders an overwrite may delete (owner Q4)."""
+    try:
+        entries = os.listdir(path)
+    except OSError:
+        return False
+    return not entries or MARKER_FILE in entries
+
+
+def write_marker(folder, model):
+    """The `.blastlab-model` marker: the model name and the creation time,
+    JSON, UTF-8. Raises OSError."""
+    with open(os.path.join(folder, MARKER_FILE), 'w', encoding='utf-8',
+              newline='\n') as f:
+        json.dump(dict(model=str(model).strip(), created=now_iso()), f)
+        f.write('\n')
 
 
 def _retry_writable(func, path, exc):
@@ -185,12 +216,17 @@ def _retry_writable(func, path, exc):
 
 
 def prepare(runs_dir, model, confirm):
-    """The empty model folder for a run, or None when the user declined.
+    """The model folder for a run, holding only its marker, or None when
+    the user declined.
 
-    Absent: created. Present: `confirm(overwrite_text(...))` is asked;
-    yes deletes it and creates it again, no returns None with nothing
-    touched. A folder that cannot be deleted (a file open in ParaView)
-    raises ModelFolderError with the OS text, and nothing is recreated.
+    Absent: created, and the `.blastlab-model` marker written first
+    (owner Q4). Present: only a folder with the marker, or an empty one,
+    may be overwritten - any other raises ModelFolderError
+    (`foreign_text`) before any question. Then
+    `confirm(overwrite_text(...))` is asked; yes deletes it and creates it
+    again, no returns None with nothing touched. A folder that cannot be
+    deleted (a file open in ParaView) raises ModelFolderError with the OS
+    text, and nothing is recreated.
 
     Guards (batch plan risk 1): the inputs must pass `check`, and the
     target must be a direct child of the runs folder - never the runs
@@ -209,6 +245,8 @@ def prepare(runs_dir, model, confirm):
                 or not os.path.isdir(target):
             raise ModelFolderError(f'{target} exists and is not a plain '
                                    f'folder - not deleting it')
+        if not is_model_folder(target):
+            raise ModelFolderError(foreign_text(target))
         if not confirm(overwrite_text(runs_dir, model)):
             return None
         try:
@@ -219,6 +257,7 @@ def prepare(runs_dir, model, confirm):
             ) from exc
     try:
         os.makedirs(target)
+        write_marker(target, model)
     except OSError as exc:
         raise ModelFolderError(f'Could not create {target}: {exc}') from exc
     return target
@@ -343,14 +382,15 @@ def git_commit(repo=None):
 
 def list_outputs(stage_dir):
     """[{'path': 'gauges/gauges_2d.txt', 'bytes': n}, ...]: every file in
-    the folder except manifest.json, sorted, '/' separators."""
+    the folder except manifest.json and the `.blastlab-model` marker
+    (bookkeeping, not an output), sorted, '/' separators."""
     out = []
     for root, dirs, files in os.walk(stage_dir):
         dirs.sort()
         for name in sorted(files):
             full = os.path.join(root, name)
             rel = os.path.relpath(full, stage_dir).replace('\\', '/')
-            if rel == MANIFEST_FILE:
+            if rel in (MANIFEST_FILE, MARKER_FILE):
                 continue
             try:
                 size = os.path.getsize(full)
