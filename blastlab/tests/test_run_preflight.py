@@ -339,11 +339,83 @@ def part_a_controller():
           shown == [('Model folder', 'kept: why')], str(shown))
 
 
+def blastlab(cwd, *args, stdin=''):
+    """`python -m blastlab *args` in `cwd`: (exit code, stdout, stderr)."""
+    import subprocess
+    env = dict(os.environ)
+    env['PYTHONIOENCODING'] = 'utf-8'
+    env['PYTHONPATH'] = (os.path.abspath(os.path.join(HERE, '..', '..'))
+                         + os.pathsep + env.get('PYTHONPATH', ''))
+    p = subprocess.run([sys.executable, '-m', 'blastlab', *args], cwd=cwd,
+                       env=env, capture_output=True, input=stdin.encode(),
+                       timeout=600)
+    return (p.returncode, p.stdout.decode('utf-8', 'replace'),
+            p.stderr.decode('utf-8', 'replace'))
+
+
+def part_b():
+    """Step 8: the entries that produce output refuse to start without
+    --runs-dir and --model; the ones that do not, still work."""
+    tmp = tempfile.mkdtemp(prefix='blastlab_preflight_cli_')
+    try:
+        code, out, _err = blastlab(tmp, '--hd13-new', 't.json')
+        check('--hd13-new needs neither argument',
+              code == 0 and os.path.isfile(os.path.join(tmp, 't.json')),
+              f'rc={code} {out.strip()[-80:]}')
+        for args in (('--cli', '1d'), ('--cli', '2d', '--solver',
+                                       'blastfoam'),
+                     ('--hd13', 't.json'), ('--hd13-wall-export', 't.json'),
+                     ('--hd13', 't.json', '--runs-dir', tmp),
+                     ('--cli', '3d', '--model', 'M')):
+            code, _out, err = blastlab(tmp, *args)
+            check(f'{" ".join(args)}: exit 2 naming --runs-dir',
+                  code == 2 and '--runs-dir' in err and 'usage:' in err,
+                  f'rc={code} {err.strip().splitlines()[-1][:120]}')
+        check('and nothing was written by any of them',
+              sorted(os.listdir(tmp)) == ['t.json'], str(os.listdir(tmp)))
+        code, _out, err = blastlab(tmp, '--hd13', 't.json', '--report',
+                                   'r.html')
+        check('--report is gone (argparse refuses it)',
+              code == 2 and '--report' in err, err.strip()[-120:])
+
+        print('\nB2: the native --cli runs in the model folder (D14)')
+        runs = os.path.join(tmp, 'runs')
+        os.mkdir(runs)
+        # legacy blast1d's prompts: charge, radius, cell size (a small,
+        # quick domain), then every other one at its default
+        code, out, err = blastlab(
+            tmp, '--cli', '1d', '--runs-dir', 'runs', '--model', 'CLI1D',
+            stdin='\n'.join(['0.5', '2', '0.01'] + [''] * 40) + '\n')
+        folder = os.path.join(runs, 'CLI1D')
+        got = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+        check('the run finished', code == 0,
+              f'rc={code} {(err or out).strip()[-200:]}')
+        check('its files landed in the model folder, none in the cwd',
+              'manifest.json' in got and '.blastlab-model' in got
+              and sorted(os.listdir(tmp)) == ['runs', 't.json']
+              and len(got) > 2, str(got))
+        if 'manifest.json' in got:
+            with open(os.path.join(folder, 'manifest.json'),
+                      encoding='utf-8') as f:
+                m = json.load(f)
+            names = [x['name'] for x in m['missing']]
+            check('the manifest lists what it wrote and what the prompt '
+                  'flow does not write',
+                  m['model'] == 'CLI1D' and m['dim'] == 1
+                  and m['outputs'] and 'report' in names
+                  and 'figures' in names and m['case_file'] is None,
+                  f"{[o['path'] for o in m['outputs']]} missing={names}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main():
     print('A: the Qt pre-flight')
     part_a()
     print('\nA8: the controller writes the model folder')
     part_a_controller()
+    print('\nB: the command line')
+    part_b()
     print('\n' + '=' * 52)
     if FAIL:
         print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')

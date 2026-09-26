@@ -1,9 +1,36 @@
 """Interactive CLI flow for `python -m blastlab --cli DIM --solver
 blastfoam`. Kept separate from cli.py/legacy so the byte-pinned native
-prompt flow stays untouched; the shared prompt helpers are reused."""
+prompt flow stays untouched; the shared prompt helpers are reused.
+
+OUT-1: with a model folder (`run(dim, stage_dir=...)`, prepared by
+cli.main) the solve is the ordinary run stage,
+`jobs.solve_stage(dim, case, stage_dir=...)`: the model-folder writer
+reaches this module only through the registration hook of
+`solvers.jobs` (solvers/ may not import services/, test_layering), so
+the flow asks for no output file names - every row of the model folder
+is written, foam\\ copied and the WSL scratch released after a verified
+copy - before the figures are shown."""
 
 from . import env
 from .materials import MATERIAL_NAMES
+
+
+def _solve_into(dim, case, stage_dir, run_info):
+    """Solve `case` as a run stage writing `stage_dir` (the model-folder
+    path of `jobs.solve_stage`), on ConsoleHooks. Prints where it went
+    and, for a kept WSL scratch, why. Returns the Result."""
+    from .. import jobs
+    from ..hooks import ConsoleHooks
+    hooks = ConsoleHooks(dim)
+    _label, solve = jobs.solve_stage(dim, case, stage_dir=stage_dir,
+                                     run_info=run_info)
+    res = solve(hooks)
+    manifest = getattr(hooks, 'stage_manifest', None) or {}
+    print(f"\n  Model folder: {stage_dir}  ({len(manifest.get('outputs', []))}"
+          f" file(s); see manifest.json)")
+    if getattr(hooks, 'folder_notice', None):
+        print(f"  [warn] {hooks.folder_notice}")
+    return res
 
 
 def _unavailable():
@@ -14,7 +41,11 @@ def _unavailable():
         + ", ".join(env.NEEDED_TOOLS))
 
 
-def run(dim):
+def run(dim, stage_dir=None, run_info=None):
+    """The blastFoam prompt flow. With `stage_dir` (a prepared model
+    folder) everything goes there (OUT-1); without, the historical
+    behaviour: the file names asked for, relative to the working
+    directory."""
     dim = str(dim).lower().lstrip('-')[0]
     print("blastlab - blastFoam (WSL) backend")
     print("  Checking WSL blastFoam availability...")
@@ -31,10 +62,11 @@ def run(dim):
     hw = env.probe_and_persist() or {}
     if hw.get('ram_gb'):
         print(f"  WSL VM: {hw.get('cores')} cores, {hw['ram_gb']} GB")
-    return {'1': _run_1d, '2': _run_2d, '3': _run_3d}[dim]()
+    return {'1': _run_1d, '2': _run_2d, '3': _run_3d}[dim](stage_dir,
+                                                           run_info)
 
 
-def _run_1d():
+def _run_1d(stage_dir=None, run_info=None):
     from ...cli import _ask, _ask_choice, _ask_gauges, _positive
     from ...core.bc import BC_KINDS
     from ...core.case import Case1D, validate_case
@@ -53,10 +85,13 @@ def _run_1d():
     n_snap = int(_ask("Snapshots", default=5, cast=int,
                       validator=_positive("Snapshots")))
     gauges = _ask_gauges(radius)
-    gauge_file = _ask("Gauge TSV file", default='gauges.txt', cast=str)
-    profile_out = _ask("Profile out (.txt, '-' = skip)",
-                       default='blast_profile.txt', cast=str)
-    profile_out = None if profile_out.strip() in ('-', '') else profile_out
+    gauge_file, profile_out = 'gauges.txt', None
+    if stage_dir is None:           # OUT-1: the model folder names them
+        gauge_file = _ask("Gauge TSV file", default='gauges.txt', cast=str)
+        profile_out = _ask("Profile out (.txt, '-' = skip)",
+                           default='blast_profile.txt', cast=str)
+        profile_out = (None if profile_out.strip() in ('-', '')
+                       else profile_out)
 
     case = Case1D(radius_m=radius, charge_kg=charge, cell_size_m=cell,
                   n_snapshots=n_snap, gauge_radii=gauges,
@@ -72,6 +107,11 @@ def _run_1d():
     if not rep.ok:
         raise SystemExit("  Invalid case:\n    "
                          + "\n    ".join(rep.errors))
+
+    if stage_dir is not None:
+        res = _solve_into(1, case, stage_dir, run_info)
+        _show_plots_1d(res, case)
+        return res
 
     from .backend import solve_1d_foam
     res = solve_1d_foam(case, ConsoleHooks(1))
@@ -199,6 +239,25 @@ def load_and_report(case_dir):
     return res
 
 
+def _ask_anim(dim, stage_dir):
+    """(anim_file or None, mesh overlay). Without a model folder the file
+    name is asked, as it always was; with one only whether to record the
+    animation - the model folder names it animation.<ext> (OUT-1)."""
+    from ...cli import _ask, _ask_choice
+    if stage_dir is None:
+        anim = _ask("Animation gif ('-' = skip)",
+                    default=f'blast_{dim}d_animation.gif', cast=str)
+        anim = None if anim.strip() in ('-', '') else anim
+    else:
+        from ...output.animation import default_ext
+        anim = (f'animation{default_ext()}' if _ask_choice(
+            "Record the animation?", ['yes', 'no'], 'yes') == 'yes'
+            else None)
+    anim_mesh = bool(anim) and _ask_choice(
+        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
+    return anim, anim_mesh
+
+
 def _validate_or_exit(case):
     from ...core.case import validate_case
     rep = validate_case(case)
@@ -211,7 +270,7 @@ def _validate_or_exit(case):
                          + "\n    ".join(rep.errors))
 
 
-def _run_2d():
+def _run_2d(stage_dir=None, run_info=None):
     from ...cli import (_ask, _ask_choice, _ask_gauges_2d, _positive)
     from ...core.case import Case2D
     from ...output.gauges import save_gauges_2d
@@ -235,16 +294,15 @@ def _run_2d():
     n_snap = int(_ask("Snapshots", default=6, cast=int,
                       validator=_positive("Snapshots")))
     gauges = _ask_gauges_2d(Lx, Ly, x0, y0)
-    gauge_file = _ask("Gauge TSV file", default='gauges_2d.txt', cast=str)
+    gauge_file = 'gauges_2d.txt'
+    if stage_dir is None:           # OUT-1: the model folder names it
+        gauge_file = _ask("Gauge TSV file", default='gauges_2d.txt',
+                          cast=str)
     t_end = _ask("End time [s] (0 = auto)", default=0.0)
     trig = _ask_trigger(len(gauges), remap=True)
-    anim = _ask("Animation gif ('-' = skip)",
-                default='blast_2d_animation.gif', cast=str)
-    anim = None if anim.strip() in ('-', '') else anim
-    anim_mesh = bool(anim) and _ask_choice(
-        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
+    anim, anim_mesh = _ask_anim(2, stage_dir)
     profile_out = None
-    if axisym:
+    if axisym and stage_dir is None:
         profile_out = _ask("Profile out (.npz, '-' = skip)", default='-',
                            cast=str)
         profile_out = (None if profile_out.strip() in ('-', '')
@@ -259,6 +317,8 @@ def _run_2d():
                   profile_file=profile_out,
                   solver='blastfoam', material=material)
     _validate_or_exit(case)
+    if stage_dir is not None:
+        return _solve_into(2, case, stage_dir, run_info)
 
     from .backend import solve_2d_foam
     res = solve_2d_foam(case, ConsoleHooks(2))
@@ -272,7 +332,7 @@ def _run_2d():
     return res
 
 
-def _run_3d():
+def _run_3d(stage_dir=None, run_info=None):
     from ...cli import (_ask, _ask_choice, _ask_gauges_3d, _positive)
     from ...core.case import Case3D
     from ...output.gauges import save_gauges_3d
@@ -295,13 +355,12 @@ def _run_3d():
     n_snap = int(_ask("Snapshots", default=6, cast=int,
                       validator=_positive("Snapshots")))
     gauges = _ask_gauges_3d(Lx, Ly, Lz, x0, y0, z0)
-    gauge_file = _ask("Gauge TSV file", default='gauges_3d.txt', cast=str)
+    gauge_file = 'gauges_3d.txt'
+    if stage_dir is None:           # OUT-1: the model folder names it
+        gauge_file = _ask("Gauge TSV file", default='gauges_3d.txt',
+                          cast=str)
     trig = _ask_trigger(len(gauges), remap=False)
-    anim = _ask("Animation gif ('-' = skip)",
-                default='blast_3d_animation.gif', cast=str)
-    anim = None if anim.strip() in ('-', '') else anim
-    anim_mesh = bool(anim) and _ask_choice(
-        "Draw the mesh on the animation?", ['no', 'yes'], 'no') == 'yes'
+    anim, anim_mesh = _ask_anim(3, stage_dir)
 
     case = Case3D(Lx=Lx, Ly=Ly, Lz=Lz, cell_size_m=cell, charge=charge,
                   center=(x0, y0, z0), t_end=t_end, gauges=gauges,
@@ -310,6 +369,8 @@ def _run_3d():
                   record_frames=150 if anim else 0,
                   solver='blastfoam', material=material)
     _validate_or_exit(case)
+    if stage_dir is not None:
+        return _solve_into(3, case, stage_dir, run_info)
 
     from .backend import solve_3d_foam
     res = solve_3d_foam(case, ConsoleHooks(3))

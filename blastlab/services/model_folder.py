@@ -310,6 +310,24 @@ def run_info(target, case=None, rep=None, handoff=None):
     return info
 
 
+def make_stages(target, dim_cases, reports=None):
+    """[(label, solve)] for a run into the model folder `target`, one per
+    (dim, case): each stage writes its own folder (`stage_dirs`) with the
+    pre-flight report's facts in its manifest, and a chain stage before
+    the last one keeps its hand-off - the `profile_file` the Chain tab
+    wired - as its profile. Shared by the Qt controller and the Tk app."""
+    from ..solvers.jobs import solve_stage
+    dims = [dim for dim, _ in dim_cases]
+    reports = list(reports or [None] * len(dim_cases))
+    last = len(dim_cases) - 1
+    return [solve_stage(dim, case, stage_dir=sd,
+                        run_info=run_info(target, case, rep,
+                                          handoff=(case.profile_file
+                                                   if k < last else None)))
+            for k, ((dim, case), sd, rep) in enumerate(zip(
+                dim_cases, stage_dirs(target, dims), reports))]
+
+
 HANDOFF_PREFIX = 'handoff_'
 
 
@@ -675,6 +693,45 @@ def _write_result_rows(res, case, dim, stage_dir, info, log, verify, fail,
         fail('report', target, 'export failed (see the log)')
     else:
         verify('report', target)
+
+
+# ── the native --cli (batch plan D14, owner Q2) ──────────────────────────
+#: the rows of plan sec. 2.2 the historical native prompt flow
+#: (legacy/blast*d._main, byte-pinned) never writes, and why
+CLI_NOT_WRITTEN = (
+    ('case', CASE_FILE, 'the native prompt flow writes no case file'),
+    ('run log', LOG_FILE, 'the native prompt flow prints to the console '
+                          'only'),
+    ('summary', f'{GAUGES_DIR}/', 'the native prompt flow writes no gauge '
+                                  'summary'),
+    ('figures', f'{FIGURES_DIR}/', 'the native prompt flow saves its own '
+                                   'plots (blast_*.png) instead of the '
+                                   'figures set'),
+    ('fields', f'{FIELDS_DIR}/', 'the native prompt flow writes no field '
+                                 'CSVs'),
+    ('report', REPORT_FILE, 'the native prompt flow writes no report'),
+)
+
+
+def cli_manifest(folder, dim, info=None, stop_reason=None):
+    """The manifest of a native `--cli` run (D14): what the legacy prompt
+    flow wrote into the folder (it ran with the folder as working
+    directory), and under `missing` every row of sec. 2.2 it does not
+    write. Written to manifest.json and returned; never raises."""
+    manifest = new_manifest(None, dim, folder, info)
+    manifest['stop_reason'] = stop_reason
+    for name, rel, why in CLI_NOT_WRITTEN:
+        if not os.path.exists(os.path.join(folder, *rel.rstrip('/')
+                                           .split('/'))):
+            manifest['missing'].append(dict(name=name, why=why))
+    manifest['case_file'] = None
+    manifest['outputs'] = list_outputs(folder)
+    manifest['finished'] = now_iso()
+    err = write_manifest(manifest, folder)
+    if err:
+        manifest['failed'].append(dict(name='manifest', path=MANIFEST_FILE,
+                                       why=err))
+    return manifest
 
 
 # ── blastFoam: the foam\ skeleton and the WSL scratch (plan sec. 2.3) ────

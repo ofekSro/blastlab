@@ -1,5 +1,6 @@
 """Entry point: `python -m blastlab` starts the GUI;
-`python -m blastlab --cli 1d|2d|3d` runs the prompt-based CLI.
+`python -m blastlab --cli 1d|2d|3d --runs-dir DIR --model NAME` runs the
+prompt-based CLI into the model folder DIR\\NAME\\ (OUT-1).
 
 The GUI is the PySide6 one (`blastlab.ui`), and `--qt` is accepted as a
 no-op so the shortcuts written during the port keep working.
@@ -69,7 +70,7 @@ def main():
                          'case asks for it, then exit')
     # OUT-1: every entry that produces output writes <runs-dir>\<model>\
     ap.add_argument('--runs-dir', metavar='DIR',
-                    help='the runs folder; required by --hd13 and '
+                    help='the runs folder; required by --cli, --hd13 and '
                          '--hd13-wall-export')
     ap.add_argument('--model', metavar='NAME',
                     help='the model name: everything the run produces '
@@ -77,7 +78,7 @@ def main():
                          'existing model is overwritten); required with '
                          '--runs-dir')
     args = ap.parse_args()
-    for flag, value in (('--hd13', args.hd13),
+    for flag, value in (('--cli', args.cli), ('--hd13', args.hd13),
                         ('--hd13-wall-export', args.hd13_wall_export)):
         if value and not (args.runs_dir and args.model):
             ap.error(f'{flag} needs --runs-dir DIR and --model NAME '
@@ -119,7 +120,8 @@ def main():
         return
     if args.cli:
         from .cli import main as cli_main
-        cli_main(args.cli, solver=args.solver)
+        cli_main(args.cli, solver=args.solver, runs_dir=args.runs_dir,
+                 model=args.model)
     elif args.tk:
         from .gui.app import main as gui_main
         gui_main(case_file=args.case)

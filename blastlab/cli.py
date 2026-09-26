@@ -703,10 +703,37 @@ def ask_user_3d():
     )
 
 
-def main(dim, solver='native'):
+def _ask_model_folder(runs_dir=None, model=None):
+    """OUT-1: the runs folder and the model name, prompted for whichever
+    is missing, before the first question of the flow (batch plan D13).
+    Refuses (SystemExit) what `model_folder.check` refuses."""
+    import os
+    from .services import model_folder
+    if not str(runs_dir or '').strip():
+        runs_dir = _ask("Runs folder (every run writes <runs>\\<model>\\)",
+                        cast=str, validator=lambda v: None if os.path.isdir(
+                            v.strip()) else f"Not a folder: {v}")
+    if not str(model or '').strip():
+        model = _ask("Model name", cast=str,
+                     validator=model_folder.validate_name)
+    errors = model_folder.check(runs_dir, model)
+    if errors:
+        raise SystemExit('refusing to run: ' + '; '.join(errors))
+    return runs_dir.strip(), model.strip()
+
+
+def main(dim, solver='native', runs_dir=None, model=None):
     """Run the prompt workflow for '1d', '2d' or '3d'. The historical
     (native) flow lives in legacy/; the blastFoam backend has its own
-    prompt flow so the byte-pinned legacy modules stay untouched."""
+    prompt flow so the byte-pinned legacy modules stay untouched.
+
+    OUT-1: everything the run writes goes into `<runs_dir>\\<model>\\`;
+    a missing one is prompted for first, and an existing model is only
+    overwritten after a y/N. The native flow runs with the model folder
+    as its working directory, so the files it names land there, and a
+    manifest lists them and every row it does not write (D14, owner Q2);
+    the blastFoam flow writes the whole model folder (`cli_run`)."""
+    import os
     # also here, not only in __main__: a script that imports
     # `blastlab.cli.main` directly must size against the real machine too
     from .solvers.foam.env import prime_from_settings
@@ -714,13 +741,34 @@ def main(dim, solver='native'):
     dim = str(dim).lower().lstrip('-')
     if dim not in ('1', '1d', '2', '2d', '3', '3d'):
         raise SystemExit(f"Unknown dimension '{dim}' (use 1d, 2d or 3d)")
+    # imported before any solve_stage(stage_dir=...): it registers the
+    # model-folder writer with solvers.jobs
+    from .services import model_folder
+    from .output.cli_hd13 import model_target
+    runs_dir, model = _ask_model_folder(runs_dir, model)
+    target = model_target(runs_dir, model)
+    print(f"  Model folder: {target.folder}")
+    info = model_folder.run_info(target)
     if solver == 'blastfoam':
         from .solvers.foam.cli_run import run
-        return run(dim)
+        return run(dim, stage_dir=target.folder, run_info=info)
     if dim in ('1', '1d'):
         from .legacy import blast1d as mod
     elif dim in ('2', '2d'):
         from .legacy import blast2d as mod
     else:
         from .legacy import blast3d as mod
-    mod._main()
+    here = os.getcwd()
+    stop = 'finished'
+    try:
+        os.chdir(target.folder)
+        mod._main()
+    except BaseException as exc:
+        stop = model_folder.headline(exc) if isinstance(exc, Exception) \
+            else type(exc).__name__
+        raise
+    finally:
+        os.chdir(here)
+        m = model_folder.cli_manifest(target.folder, int(dim[0]), info, stop)
+        print(f"  Model folder: {target.folder} ({len(m['outputs'])} "
+              f"file(s); see manifest.json)")
