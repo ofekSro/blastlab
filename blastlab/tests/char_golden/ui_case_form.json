@@ -400,7 +400,9 @@
     "disabled": [],
     "hidden": [
       "eos",
-      "order"
+      "gauge_file",
+      "order",
+      "profile_out"
     ],
     "points": {
       "gauges": [
@@ -576,7 +578,9 @@
     "disabled": [],
     "hidden": [
       "activation",
-      "afterburn"
+      "afterburn",
+      "gauge_file",
+      "profile_out"
     ],
     "points": {
       "gauges": [
@@ -810,7 +814,7 @@
       "solver": "blastfoam",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -898,7 +902,7 @@
       "solver": "blastfoam",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -909,9 +913,13 @@
       "cx"
     ],
     "hidden": [
+      "anim_file",
       "charge_refine",
       "eos",
-      "order"
+      "gauge_file",
+      "order",
+      "profile_out",
+      "trigger_file"
     ],
     "points": {
       "det_pts": [
@@ -960,6 +968,7 @@
       "anim_clim_max": "50",
       "anim_clim_min": "5",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "reflect",
@@ -1092,8 +1101,12 @@
       "amr_unrefine",
       "anim_clim_max",
       "anim_clim_min",
+      "anim_file",
       "eos",
-      "order"
+      "gauge_file",
+      "order",
+      "profile_out",
+      "trigger_file"
     ],
     "points": {
       "det_pts": [],
@@ -1117,6 +1130,7 @@
       "anim_clim_max": "500",
       "anim_clim_min": "0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -1368,7 +1382,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1431,7 +1445,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1511,7 +1525,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1531,8 +1545,12 @@
       "amr_max_cells",
       "amr_refine",
       "amr_unrefine",
+      "anim_file",
       "charge_refine",
-      "n_procs"
+      "gauge_file",
+      "n_procs",
+      "profile_out",
+      "trigger_file"
     ],
     "points": {
       "det_pts": [
@@ -1581,6 +1599,7 @@
       "anim_clim_max": "50",
       "anim_clim_min": "5",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "reflect",
@@ -1702,8 +1721,12 @@
       "amr_unrefine",
       "anim_clim_max",
       "anim_clim_min",
+      "anim_file",
       "charge_refine",
-      "n_procs"
+      "gauge_file",
+      "n_procs",
+      "profile_out",
+      "trigger_file"
     ],
     "points": {
       "det_pts": [],
@@ -1727,6 +1750,7 @@
       "anim_clim_max": "500",
       "anim_clim_min": "0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -2185,8 +2209,10 @@
       "amr_unrefine",
       "anim_clim_max",
       "anim_clim_min",
+      "anim_file",
       "charge_res",
       "eos",
+      "gauge_file",
       "order"
     ],
     "points": {
@@ -2226,6 +2252,7 @@
       "anim_clim_max": "500",
       "anim_clim_min": "0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": true,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -2623,7 +2650,9 @@
       "amr_unrefine",
       "anim_clim_max",
       "anim_clim_min",
+      "anim_file",
       "charge_refine",
+      "gauge_file",
       "n_procs"
     ],
     "points": {
@@ -2663,6 +2692,7 @@
       "anim_clim_max": "500",
       "anim_clim_min": "0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": true,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",

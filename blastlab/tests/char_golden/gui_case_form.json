@@ -681,7 +681,7 @@
       "solver": "blastfoam",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -771,7 +771,7 @@
       "solver": "blastfoam",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -816,6 +816,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "blast_2d_animation.mp4",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "terminate",
@@ -841,7 +842,7 @@
       "record": true,
       "t_end": "0.0",
       "trigger_action": "terminate",
-      "trigger_file": "",
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": ""
     }
   },
@@ -902,6 +903,7 @@
       "anim_clim_max": "50",
       "anim_clim_min": "5",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "reflect",
@@ -1112,6 +1114,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -1289,6 +1292,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -1587,7 +1591,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1650,7 +1654,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1731,7 +1735,7 @@
       "solver": "native",
       "t_end": 0.0,
       "trigger_action": "terminate",
-      "trigger_file": null,
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": null,
       "version": 13
     }
@@ -1781,6 +1785,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "blast_2d_animation.mp4",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "terminate",
@@ -1806,7 +1811,7 @@
       "record": true,
       "t_end": "0.0",
       "trigger_action": "terminate",
-      "trigger_file": "",
+      "trigger_file": "trigger_remap.npz",
       "trigger_gauge": ""
     }
   },
@@ -1878,6 +1883,7 @@
       "anim_clim_max": "50",
       "anim_clim_min": "5",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "reflect",
@@ -2080,6 +2086,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -2262,6 +2269,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -2553,6 +2561,7 @@
       "anim_clim_max": "2.5e2",
       "anim_clim_min": "1",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": true,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "terminate",
@@ -2889,6 +2898,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "blast_3d_animation.mp4",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "terminate",
@@ -2974,6 +2984,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": true,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -3454,6 +3465,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "blast_3d_animation.mp4",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "terminate",
@@ -3544,6 +3556,7 @@
       "anim_clim_max": "500.0",
       "anim_clim_min": "0.0",
       "anim_file": "",
+      "anim_format": ".mp4",
       "anim_mesh": true,
       "anim_scale": "fixed (whole video)",
       "bc_x_hi": "transmit",
@@ -3943,6 +3956,7 @@
       "anim_clim_max": "100",
       "anim_clim_min": "0",
       "anim_file": "blast_3d_animation.mp4",
+      "anim_format": ".mp4",
       "anim_mesh": false,
       "anim_scale": "fixed (manual)",
       "bc_x_hi": "terminate",
