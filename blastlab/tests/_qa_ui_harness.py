@@ -865,7 +865,11 @@ def b02_tabs_empty(qa):
             qa.finding('S3', 'silent-disable',
                        f'the {k} export is disabled with no tooltip '
                        f'saying why')
-    qa.note(f'Chain workspace default: {qa.win.chain.ws_box.text()!r}')
+    # OUT-1: no workspace box any more; the chain uses the Run tab's
+    # model folder
+    qa.note(f'Chain writes into the model folder '
+            f'{qa.win.run_panel.current_runs_dir()!r} / '
+            f'{qa.win.run_panel.current_run_name()!r}')
     qa.goto('setup')
 
 
@@ -2839,11 +2843,14 @@ def f11_close_during_foam(qa):
 # ═══════════════════════════════════════════════════════════════════════
 #  Group G - the Chain tab
 # ═══════════════════════════════════════════════════════════════════════
-def _chain_forms(qa):
-    """A small 1D -> 2D -> 3D chain, all three stages checked."""
+def _chain_forms(qa, model='QA_CHAIN'):
+    """A small 1D -> 2D -> 3D chain, all three stages checked, into the
+    model folder `model` (OUT-1: the Run tab's boxes). Returns the panel;
+    the folder is `qa.chain_folder`."""
     from blastlab.core.case import Case1D, Case2D, Case3D
+    from blastlab.ui.testing import use_model
     ch = qa.win.chain
-    ch.ws_box.setText(os.path.join(qa.out, 'chain_ws'))
+    qa.chain_folder = use_model(qa.win, model)
     ch.set_stage_case(1, Case1D(radius_m=0.6, charge_kg=0.5,
                                 cell_size_m=0.004, n_snapshots=1,
                                 gauge_radii=[], gauge_file=None))
@@ -2865,14 +2872,13 @@ def _chain_forms(qa):
 
 @scenario('G01', 'G', est=90)
 def g01_chain_validation(qa):
-    """Every Chain refusal, and the workspace that must NOT appear."""
+    """Every Chain refusal, and the model folder that must NOT appear."""
     qa.goto('chain')
-    ch = _chain_forms(qa)
+    # a model of its own (use_model removes a leftover one), so the
+    # assertion below cannot be satisfied by an earlier session's folder
+    ch = _chain_forms(qa, 'QA_CHAIN_REFUSED')
+    ws = qa.chain_folder
     qa.shot('chain_default')
-    # a workspace path of its own, so the assertion below cannot be
-    # satisfied by a directory some earlier session left behind
-    ws = os.path.join(qa.out, 'chain_ws_refused')
-    ch.ws_box.setText(ws)
     refusals = []
     ch.error_sink = lambda title, lines: refusals.append(list(lines))
 
@@ -2910,14 +2916,24 @@ def g01_chain_validation(qa):
     refuse('a charge outside stage 2')
     ch.forms[2].v['cy'].set('0.8')
     qa.pump(0.3)
+    # OUT-1: the Run tab's model boxes are checked by the chain too
+    rp = qa.win.run_panel
+    name = rp.current_run_name()
+    rp.run_name.setText('')
+    refuse('an empty Model name on the Run tab')
+    qa.check(any('Model name' in ln for ln in (refusals[-1] if refusals
+                                               else [])),
+             'and the refusal names the Model box', 'S2',
+             evidence=str(refusals[-1] if refusals else []))
+    rp.run_name.setText(name)
     qa.shot('after_refusals')
     qa.note(f'stage switcher after the refusals: stage {ch.stage()} '
             '(a refusal naming stage 2 should have brought it forward)')
-    # QA-23/T28: the workspace is created only once a chain will really
-    # run. This assertion used to encode the defect and now holds the fix.
+    # QA-23/T28, OUT-1: the model folder is created only once a chain
+    # will really run (it replaced the workspace this held before)
     qa.check(not os.path.isdir(ws),
-             'no workspace directory was created while every run was '
-             'refused', 'S2')
+             'no model folder was created while every run was refused',
+             'S2')
     qa.check(ch.run_btn.isEnabled(),
              'Run chain is still enabled after refused starts', 'S2')
 
@@ -2960,17 +2976,19 @@ def g02_chain_run(qa):
              'Run chain is enabled again afterwards', 'S2')
     labels = [e.label for e in qa.win.results.entries()]
     qa.note(f'results after the chain: {labels}')
-    ws = ch.ws_box.text()
+    # OUT-1: <MODEL>\1d, 2d, 3d, the hand-offs at the root
+    ws = qa.chain_folder
     files = sorted(os.listdir(ws)) if os.path.isdir(ws) else []
-    qa.note(f'workspace files: {files}')
-    qa.check(all(f in files for f in ('stage1_case.json',
-                                      'stage2_case.json',
-                                      'stage3_case.json')),
-             'the workspace holds a case JSON per stage', 'S2',
-             evidence=str(files))
-    qa.check(any('profile' in f for f in files),
-             'and the profiles that were handed over', 'S2',
-             evidence=str(files))
+    qa.note(f'model folder: {files}')
+    qa.check(all(os.path.isfile(os.path.join(ws, d, 'MODEL.json'))
+                 for d in ('1d', '2d', '3d')),
+             'the model folder holds a stage folder with its MODEL.json '
+             'per stage', 'S2', evidence=str(files))
+    qa.check(all(f in files for f in ('handoff_1d_to_2d.txt',
+                                      'handoff_2d_to_3d.npz',
+                                      'manifest.json')),
+             'and the hand-offs and the root manifest at the model root',
+             'S2', evidence=str(files))
     qa.goto('results')
     qa.shot('results_picker')
     _cache_result(qa, 'chain3d', dim=3)
