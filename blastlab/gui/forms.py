@@ -87,13 +87,29 @@ def _i(var, name):
     return fields.parse_int(var.get(), name)
 
 
-class _PointList(ctk.CTkFrame):
-    """Treeview of fixed-arity numeric tuples (gauges, obstacles)."""
+def _parse_cell(kind, value):
+    """One table cell by its column kind (OUT-2, batch plan D7): 'axis'
+    -> 'x' | 'y' | 'z', anything else -> float. Raises ValueError."""
+    if kind == 'axis':
+        return fields.parse_plane_axis(value)
+    return float(value)
 
-    def __init__(self, parent, columns, on_change=None, height=4):
+
+def _fmt_cell(kind, value):
+    return str(value) if kind == 'axis' else f'{float(value):g}'
+
+
+class _PointList(ctk.CTkFrame):
+    """Treeview of fixed-arity numeric tuples (gauges, obstacles).
+    `kinds` gives a column its own parser, as the Qt PointList: 'axis'
+    (x / y / z) or 'float' (the default) - the VTK plane table."""
+
+    def __init__(self, parent, columns, on_change=None, height=4,
+                 kinds=()):
         super().__init__(parent, fg_color='transparent')
         self._arity = len(columns)
         self._columns = list(columns)
+        self._kinds = tuple(kinds) or ('float',) * self._arity
         self._on_change = on_change
         self.tree = ttk.Treeview(self, columns=columns, show='headings',
                                  height=height)
@@ -152,16 +168,27 @@ class _PointList(ctk.CTkFrame):
         raw = text.replace(',', ' ').split()
         if not raw:
             return self._reject('enter ' + ' '.join(self._columns))
-        try:
-            vals = [float(v) for v in raw]
-        except ValueError:
-            return self._reject(f'not numbers: {text!r} - expected '
-                                + ' '.join(self._columns))
+        if any(k != 'float' for k in self._kinds):
+            if len(raw) != self._arity:
+                return self._reject(
+                    f'expected {self._arity} values ('
+                    + ' '.join(self._columns) + f'), got {len(raw)}')
+            try:
+                vals = [_parse_cell(k, x) for k, x in zip(self._kinds, raw)]
+            except ValueError as exc:
+                return self._reject(str(exc))
+        else:
+            try:
+                vals = [float(v) for v in raw]
+            except ValueError:
+                return self._reject(f'not numbers: {text!r} - expected '
+                                    + ' '.join(self._columns))
         if len(vals) != self._arity:
             return self._reject(
                 f'expected {self._arity} numbers ('
                 + ' '.join(self._columns) + f'), got {len(vals)}')
-        self.tree.insert('', 'end', values=[f'{v:g}' for v in vals])
+        self.tree.insert('', 'end', values=[
+            _fmt_cell(k, v) for k, v in zip(self._kinds, vals)])
         self.entry_var.set('')
         self._accept()
         if self._on_change:
@@ -178,14 +205,88 @@ class _PointList(ctk.CTkFrame):
             self._on_change()
 
     def get(self):
-        return [tuple(float(v) for v in self.tree.item(i)['values'])
+        return [tuple(_parse_cell(k, v) for k, v in
+                      zip(self._kinds, self.tree.item(i)['values']))
                 for i in self.tree.get_children()]
 
     def set(self, tuples):
         for i in self.tree.get_children():
             self.tree.delete(i)
         for tup in tuples or []:
-            self.tree.insert('', 'end', values=[f'{v:g}' for v in tup])
+            self.tree.insert('', 'end', values=[
+                _fmt_cell(k, v) for k, v in zip(self._kinds, tup)])
+
+
+class _MatrixVar:
+    """The VTK quantity matrix (OUT-2) as a form variable: `get()` gives
+    {column: [field, ...]} (models.fields.vtk_matrix), `set()` ticks the
+    boxes and fires the traces once, `trace_add('write', cb)` registers a
+    callback - the surface the form's `v` dict expects of a tk variable.
+    Each cell is a BooleanVar owned by `_MatrixGrid`."""
+
+    def __init__(self, dim):
+        self._dim = int(dim)
+        self.cells = {}                     # (field, column) -> BooleanVar
+        self._traces = []
+
+    def get(self):
+        value = {}
+        for (f, col), bv in self.cells.items():
+            if bv.get():
+                value.setdefault(col, []).append(f)
+        return fields.vtk_matrix(value, self._dim)
+
+    def set(self, value):
+        m = fields.vtk_matrix(value, self._dim)
+        for (f, col), bv in self.cells.items():
+            bv.set(f in m.get(col, ()))
+        self.fire()
+
+    def trace_add(self, _mode, callback):
+        self._traces.append(callback)
+        return callback
+
+    def fire(self):
+        for cb in list(self._traces):
+            cb()
+
+
+class _MatrixGrid(ctk.CTkFrame):
+    """Viper's "Output Quantities" grid (plan sec. 3.2), the twin of the
+    Qt MatrixGrid: a row per quantity, a tick box per destination column,
+    and the Gauges column display only - p, rho, U ticked and disabled
+    (decision 4)."""
+
+    def __init__(self, parent, var, dim):
+        super().__init__(parent, fg_color='transparent')
+        from ..models.case import vtk_fields_for
+        cols = fields.VTK_COLUMNS[int(dim)]
+        self.locked = []      # the Gauges boxes' vars: a tk variable that
+        #                       is garbage-collected unticks its box
+        self.columnconfigure(0, weight=1)
+        for j, col in enumerate(cols, start=1):
+            ctk.CTkLabel(self, text=fields.vtk_column_label(dim, col),
+                         font=theme.F_SMALL, text_color=c('muted')).grid(
+                row=0, column=j, padx=2)
+        for i, f in enumerate(vtk_fields_for(int(dim)), start=1):
+            ctk.CTkLabel(self, text=fields.VTK_QUANTITY_LABELS.get(f, f),
+                         font=theme.F_BODY, text_color=c('muted'),
+                         anchor='w').grid(row=i, column=0, sticky='w')
+            for j, col in enumerate(cols, start=1):
+                bv = tk.BooleanVar(value=(col == 'gauges'
+                                          and f in fields.VTK_GAUGE_FIELDS))
+                box = ctk.CTkCheckBox(
+                    self, text='', variable=bv, width=24,
+                    checkbox_width=18, checkbox_height=18, border_width=2,
+                    corner_radius=5, border_color=c('border'),
+                    fg_color=c('accent'), hover_color=c('accent_hover'),
+                    command=var.fire)
+                box.grid(row=i, column=j, pady=1)
+                if col == 'gauges':
+                    box.configure(state='disabled')
+                    self.locked.append((bv, box))
+                else:
+                    var.cells[(f, col)] = bv
 
 
 class _FilePicker(ctk.CTkFrame):
@@ -627,6 +728,8 @@ class CaseForm(ctk.CTkFrame):
         elif self.dim == 2:
             self._var('profile_out', '')                        # hidden
 
+        self._build_vtk_card()
+
         # ── Trigger gauge (T51) ───────────────────────────────────────
         # one gauge that ends the run and/or writes the remap file the
         # moment the wave reaches it. 3D has no remap format, so only
@@ -650,6 +753,98 @@ class CaseForm(ctk.CTkFrame):
 
         self._sync_geometry()
         self._apply_mode()
+
+    def _build_vtk_card(self):
+        """OUT-2: the "VTK output (ParaView)" card, the twin of the Qt one
+        (ui/setup_spec._vtk_card; docs/model-folder-and-vtk-plan.md sec.
+        3.1-3.2, owner Q2). blastFoam only: the whole card is hidden, never
+        greyed, in native mode. In 1D it is the first output card of the
+        right column - 1D has had no Outputs card since OUT-1."""
+        body = self._card(1, 'VTK output (ParaView)', scope='blastfoam')
+        self._vtk_card = body.master
+        self._vtk_entries = {}                    # name -> CTkEntry
+        self._vtk_radios = {}                     # family -> radio buttons
+        r = 0
+        for fam, caption in fields.VTK_FAMILIES[self.dim]:
+            box = ctk.CTkCheckBox(body, text=caption,
+                                  variable=self._bool(f'vtk_{fam}_on', False),
+                                  font=theme.F_BODY, corner_radius=6,
+                                  border_color=c('border'),
+                                  fg_color=c('accent'),
+                                  hover_color=c('accent_hover'))
+            box.grid(row=r, column=0, columnspan=2, sticky='w',
+                     pady=(GAP if r else 0, 4))
+            r += 1
+            mode = self._var(f'vtk_{fam}_mode', 'time')
+            pair = ctk.CTkFrame(body, fg_color='transparent')
+            self._vtk_radios[fam] = []
+            for val in ('time', 'step'):
+                rb = ctk.CTkRadioButton(pair, text=val.capitalize(),
+                                        variable=mode, value=val,
+                                        font=theme.F_BODY,
+                                        border_color=c('border'),
+                                        fg_color=c('accent'),
+                                        hover_color=c('accent_hover'))
+                rb.pack(side='left', padx=(0, GAP * 2))
+                self._vtk_radios[fam].append(rb)
+            r = _row(body, r, 'Cadence', pair)
+            # Q3: Time is simulated MILLISECONDS - the rest of the form
+            # is in seconds, so the unit is in the caption
+            for key, label, default in (
+                    ('ms', 'Every [ms]\n(simulated time)',
+                     fields.VTK_MS_DEFAULT),
+                    ('steps', 'Every [steps]\n(solver steps)',
+                     fields.VTK_STEPS_DEFAULT)):
+                name = f'vtk_{fam}_{key}'
+                ent = _entry(body, self._var(name, f'{default:g}'))
+                self._vtk_entries[name] = ent
+                r = _row(body, r, label, ent)
+            self.v[f'vtk_{fam}_on'].trace_add(
+                'write', lambda *a, fam=fam: self._vtk_ticked(fam))
+            mode.trace_add('write', lambda *a: self._sync_vtk())
+        if self.dim == 3:
+            # decision 7: the live-slice plane is always a section
+            ctk.CTkLabel(body, text='Extra section planes - the live-slice '
+                         'plane is always written', font=theme.F_BODY,
+                         text_color=c('muted'), anchor='w', justify='left',
+                         wraplength=LABEL_WRAP + INPUT_MIN).grid(
+                row=r, column=0, columnspan=2, sticky='w', pady=(GAP, 2))
+            self.vtk_planes = _PointList(body, ['axis', 'position [m]'],
+                                         self._on_change, height=3,
+                                         kinds=('axis', 'float'))
+            self.vtk_planes.grid(row=r + 1, column=0, columnspan=2,
+                                 sticky='nsew')
+            r += 2
+        ctk.CTkLabel(body, text='Quantities (Gauges: fixed until OUT-4)',
+                     font=theme.F_BODY, text_color=c('muted'),
+                     anchor='w').grid(row=r, column=0, columnspan=2,
+                                      sticky='w', pady=(GAP, 2))
+        matrix = _MatrixVar(self.dim)
+        matrix.trace_add('write', lambda *a: self._on_change())
+        self.v['vtk_fields'] = matrix
+        self._vtk_grid = _MatrixGrid(body, matrix, self.dim)
+        self._vtk_grid.grid(row=r + 1, column=0, columnspan=2, sticky='we')
+        self._sync_vtk()
+
+    def _sync_vtk(self):
+        """Viper's greying: of each family's two interval boxes only the
+        one of the chosen mode is live; the other keeps its value."""
+        for fam, _caption in fields.VTK_FAMILIES.get(self.dim, ()):
+            step = self.v[f'vtk_{fam}_mode'].get() == 'step'
+            for key, on in (('ms', not step), ('steps', step)):
+                self._vtk_entries[f'vtk_{fam}_{key}'].configure(
+                    state='normal' if on else 'disabled',
+                    text_color=c('text') if on else c('muted'))
+
+    def _vtk_ticked(self, fam):
+        """The first tick of a family fills its default quantities (plan
+        sec. 3.1) when its columns are empty; unticking keeps them."""
+        if not self.v[f'vtk_{fam}_on'].get():
+            return
+        var = self.v['vtk_fields']
+        new = fields.vtk_fill_defaults(var.get(), fam, self.dim)
+        if new != var.get():
+            var.set(new)
 
     def _amr_on(self):
         return (self._mode == 'blastfoam' and 'amr_levels' in self.v
@@ -777,7 +972,7 @@ class CaseForm(ctk.CTkFrame):
         """The form's point lists under their field names."""
         return {name: getattr(self, name)
                 for name in ('gauges', 'obstacles', 'zones', 'det_pts',
-                             'extra_charges')
+                             'extra_charges', 'vtk_planes')
                 if hasattr(self, name)}
 
     def field_values(self):
@@ -796,7 +991,7 @@ class CaseForm(ctk.CTkFrame):
         for name, value in fields.fields_from_case(case, self.dim).items():
             if name in points:
                 points[name].set(value)
-            elif name in self.v:     # OUT-2: until the Tk VTK card lands
+            else:
                 self.v[name].set(value)
 
 
