@@ -168,77 +168,99 @@ def scenario(name):
 
 
 _PERM = "PermissionError: [Errno 13] Permission denied: '<tmp>/{}'"
-_TB = 'Traceback (most recent call last):'
+_WARN = "[warn] could not write <tmp>/{0}: [Errno 13] Permission " \
+        "denied: '<tmp>/{0}'"
+#: the 'error' a failed hand-off write posts: first line, last line
+_HANDOFF = ["Could not write the hand-off file <tmp>/{0}: [Errno 13] "
+            "Permission denied: '<tmp>/{0}'",
+            'The result of this stage is kept in Results. The run stopped '
+            'here, so no later stage starts from a stale or missing '
+            'profile.']
 
-#: What happens TODAY (before UX 2): the failed write raises out of the
-#: stage callable, the worker posts 'error' and never 'result', and the
-#: writes after the failing one never happen.
+
+def _handoff(f):
+    return ['error'] + [line.format(f) for line in _HANDOFF]
+
+
+#: Since UX 2. Before it, every failure below posted ('error', traceback
+#: ending in the PermissionError) and never 'result', and the writes
+#: after the failing one never happened (commit "ux(2): characterise ...").
+#: Now: every write is attempted and a failure is logged as '[warn] could
+#: not write'; a gauge TSV or animation failure still posts the result
+#: and nothing else; a profile / trigger-remap (hand-off) failure posts
+#: the result, THEN an error, and stops the chain before the next stage -
+#: also when a stale hand-off file sits at the path.
 EXPECTED = {
     '2d_ok': dict(
         events=[['stage', 0], ['result', 0], ['done']], warns=[],
         files=['a.gif', 'g2.txt', 'p2.npz'], results=[True],
         error_stage=None),
     '2d_gauges': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('g2.txt')],
-                ['done']], warns=[],
-        files=[], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], ['done']],
+        warns=[_WARN.format('g2.txt')],
+        files=['a.gif', 'p2.npz'], results=[True], error_stage=None),
     '2d_anim': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('a.gif')],
-                ['done']], warns=[],
-        files=['g2.txt'], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], ['done']],
+        warns=[_WARN.format('a.gif')],
+        files=['g2.txt', 'p2.npz'], results=[True], error_stage=None),
     '2d_profile': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('p2.npz')],
-                ['done']], warns=[],
-        files=['a.gif', 'g2.txt'], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], _handoff('p2.npz'), ['done']],
+        warns=[_WARN.format('p2.npz')],
+        files=['a.gif', 'g2.txt'], results=[True], error_stage=0),
     '1d_gauges': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('g1.txt')],
-                ['done']], warns=[],
-        files=[], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], ['done']],
+        warns=[_WARN.format('g1.txt')],
+        files=['p1.txt'], results=[True], error_stage=None),
     '1d_profile': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('p1.txt')],
-                ['done']], warns=[],
-        files=['g1.txt'], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], _handoff('p1.txt'), ['done']],
+        warns=[_WARN.format('p1.txt')],
+        files=['g1.txt'], results=[True], error_stage=0),
     'chain_ok': dict(
         events=[['stage', 0], ['result', 0], ['stage', 1], ['result', 1],
                 ['done']], warns=[],
         files=['g1.txt', 'g2.txt', 'p1.txt'], results=[True, True],
         error_stage=None),
     'chain_profile': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('p1.txt')],
-                ['done']], warns=[],
-        files=['g1.txt'], results=[False, False], error_stage=0),
+        events=[['stage', 0], ['result', 0], _handoff('p1.txt'), ['done']],
+        warns=[_WARN.format('p1.txt')],
+        files=['g1.txt'], results=[True, False], error_stage=0),
     'chain_profile_stale': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('p1.txt')],
-                ['done']], warns=[],
-        files=['g1.txt', 'p1.txt'], results=[False, False], error_stage=0),
+        events=[['stage', 0], ['result', 0], _handoff('p1.txt'), ['done']],
+        warns=[_WARN.format('p1.txt')],
+        files=['g1.txt', 'p1.txt'], results=[True, False], error_stage=0),
     '2d_trigger': dict(
-        events=[['stage', 0], ['error', _TB, _PERM.format('trig.npz')],
-                ['done']], warns=[],
-        files=['g2.txt'], results=[False], error_stage=0),
+        events=[['stage', 0], ['result', 0], _handoff('trig.npz'),
+                ['done']],
+        warns=[_WARN.format('trig.npz')],
+        files=['g2.txt'], results=[True], error_stage=0),
 }
 
 
 def gui_log_line(line):
     """The run-log lines the two GUI scripts pin."""
     return (WARN in line or line.startswith('PermissionError')
-            or 'hand-off' in line or line.strip() == '[run finished]')
+            or 'hand-off' in line or 'no later stage' in line
+            or line.strip() == '[run finished]')
 
 
-#: What BOTH GUIs show (test_ui_/test_gui_char_write_failure.py), TODAY
-#: (before UX 2): no result, a "Run failed" dialog with the
-#: PermissionError, the traceback in the run log.
+#: What BOTH GUIs show (test_ui_/test_gui_char_write_failure.py) since
+#: UX 2. Before it: no result, a "Run failed" dialog with the
+#: PermissionError, the traceback in the run log. Now a failed animation
+#: is a warning in the run log and the result is in Results, with no
+#: dialog; a failed chain hand-off puts stage 1's result in Results, then
+#: "Run failed" names the file, and stage 2 never starts.
 EXPECTED_GUI = {
     '2d_anim': dict(
-        results=[],
-        dialogs=[['Run failed', _PERM.format('a.gif')
-                  + '\n\nSee the run log for details.']],
-        log=[_PERM.format('a.gif'), '[run finished]'],
+        results=['Run 1 - 2D'],
+        dialogs=[],
+        log=[_WARN.format('a.gif'), '[run finished]'],
         running=False, stop_enabled=False, run_back_to_idle=True),
     'chain_profile': dict(
-        results=[],
-        dialogs=[['Run failed', _PERM.format('p1.txt')
+        results=['Run 2 - 1D'],
+        dialogs=[['Run failed', _HANDOFF[0].format('p1.txt')
                   + '\n\nSee the run log for details.']],
-        log=[_PERM.format('p1.txt'), '[run finished]'],
+        log=[_WARN.format('p1.txt'), _HANDOFF[0].format('p1.txt'),
+             _HANDOFF[1], '[run finished]'],
         running=False, stop_enabled=False, run_back_to_idle=True),
 }
 
