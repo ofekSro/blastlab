@@ -2,8 +2,9 @@
 
 The whole HD 1.3 track is 0-D and closed form, so unlike every other run
 in this repo it needs no WSL, no solver and no GUI (the starter case takes
-about 40 s with the sensitivity band off, about 20 min with it on). That makes a command-line entry point the cheapest way to make
-the work usable, and it is deliberately the FIRST way rather than the
+about 40 s with the sensitivity band off, about 20 min with it on). That
+makes a command-line entry point the cheapest way to make the work
+usable, and it is deliberately the FIRST way rather than the
 fallback: a Qt form can be built on top of exactly these calls later
 without either of them owning the other.
 
@@ -122,10 +123,12 @@ def wall_export(case_path: str, quiet: bool = False) -> dict:
                                      load_csv.wall_loads_dir(case_path))
     if not quiet:
         print(f'\nHD 1.3 wall-load export: {case.name or case_path}')
-        print('  clearing: ' + (
-            f'on, H = {case.wall_H_m:g} m, W = {case.wall_W_m:g} m (G1 '
-            f'only; plane-max is always unrelieved)' if case.clearing
-            else 'off (E = max(R, S), no clearing, upper bound)'))
+        if case.clearing:
+            print(f'  clearing: on, H = {case.wall_H_m:g} m, W = '
+                  f'{case.wall_W_m:g} m (G1 only; plane-max is always '
+                  f'unrelieved)')
+        else:
+            print('  clearing: off (E = max(R, S), no clearing, upper bound)')
         for g, p in res['params'].items():
             print(f'  gamma {g}: C_r {p["c_r"]:.4g} m/s, t_c '
                   f'{p["t_c"] * 1e3:.4g} ms')

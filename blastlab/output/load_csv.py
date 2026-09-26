@@ -140,7 +140,7 @@ def _f(x):
     return repr(float(x))
 
 
-def still_active(t_ms, p_kpa):
+def still_active(t_ms, p_kpa) -> str | None:
     """The HD1-16 2a message, or None if the load is back near ambient.
 
     `t_ms`, `p_kpa`: the columns as written. The window is the samples
@@ -158,13 +158,13 @@ def still_active(t_ms, p_kpa):
     return None
 
 
-def net_impulse(t_ms, p_kpa):
+def net_impulse(t_ms, p_kpa) -> float:
     """Net impulse over the record [kPa*ms]: trapezoid of the columns."""
     return float(np.trapezoid(np.asarray(p_kpa, dtype=float),
                               np.asarray(t_ms, dtype=float)))
 
 
-def write_trace(csv_path, t_ms, p_kpa, sidecar_lines):
+def write_trace(csv_path: str, t_ms, p_kpa, sidecar_lines) -> str | None:
     """Write one two-column CSV and its sidecar `.txt` (same stem).
 
     `t_ms`, `p_kpa` are written as given with repr(float). The sidecar
@@ -203,7 +203,7 @@ def write_trace(csv_path, t_ms, p_kpa, sidecar_lines):
     return msg
 
 
-def read_trace(csv_path):
+def read_trace(csv_path: str) -> tuple[np.ndarray, np.ndarray]:
     """(t_ms, p_kpa) float64 arrays back from a two-column CSV; raises
     ValueError on any line that is not exactly two floats."""
     t, p = [], []
@@ -218,25 +218,56 @@ def read_trace(csv_path):
 
 
 def _signs_tag(signs):
+    """(1, -1, 0) -> '+1-1+0', the band file-name tag."""
     return ''.join(f'{int(s):+d}' for s in signs)
 
 
 def _pa_to_kpa_over(p):
+    """Absolute pressure [Pa] -> overpressure over P_AIR [kPa]."""
     return (np.asarray(p, dtype=float) - P_AIR) / 1e3
 
 
-def _clear_old(d):
-    for pat in ('nominal.csv', 'nominal.txt', 'band_*.csv', 'band_*.txt'):
+def _same_trace(a, b):
+    """True if the (t, p) traces `a` and `b` are equal sample for sample."""
+    t_a, p_a = a
+    t_b, p_b = b
+    return (np.array_equal(np.asarray(t_a, dtype=float),
+                           np.asarray(t_b, dtype=float))
+            and np.array_equal(np.asarray(p_a, dtype=float),
+                               np.asarray(p_b, dtype=float)))
+
+
+#: The files each export owns in its directory. They are removed before it
+#: writes, so a re-run that writes fewer traces (band off, clearing off)
+#: leaves no stale file beside the new ones (fix 95a62ce).
+_HD13_PATTERNS = ('nominal.csv', 'nominal.txt', 'band_*.csv', 'band_*.txt')
+_WALL_PATTERNS = ('G1_g*.csv', 'G1_g*.txt', 'planemax_g*.csv',
+                  'planemax_g*.txt')
+
+
+def _remove_old(d, patterns):
+    """Delete the files a previous export left in `d` under `patterns`."""
+    for pat in patterns:
         for old in glob.glob(os.path.join(d, pat)):
             os.remove(old)
 
 
-def loads_dir(report_path):
+def _write_and_record(d, name, t_ms, p_kpa, lines, files, messages):
+    """`write_trace` into `d/name`; append the path to `files` and, if the
+    still-active rule fired, (name, message) to `messages`."""
+    path = os.path.join(d, name)
+    msg = write_trace(path, t_ms, p_kpa, lines)
+    files.append(path)
+    if msg:
+        messages.append((name, msg))
+
+
+def loads_dir(report_path: str) -> str:
     """`<report stem>_loads`, beside the report."""
     return os.path.splitext(report_path)[0] + '_loads'
 
 
-def export_hd13(out, report_path, case_name=''):
+def export_hd13(out: dict, report_path: str, case_name: str = '') -> dict:
     """Write every chamber trace of an `assessment.run` output.
 
     Returns dict(dir, files, messages): the directory, the CSV paths
@@ -248,7 +279,7 @@ def export_hd13(out, report_path, case_name=''):
         return dict(dir=None, files=[], messages=[])
     d = loads_dir(report_path)
     os.makedirs(d, exist_ok=True)
-    _clear_old(d)
+    _remove_old(d, _HD13_PATTERNS)
     prop = out['prop']
     common = [
         f'case: {case_name or "(unnamed)"}',
@@ -262,30 +293,26 @@ def export_hd13(out, report_path, case_name=''):
     files, messages = [], []
 
     def one(name, t, p, trace_line, extra=()):
-        path = os.path.join(d, name)
         p_k = _pa_to_kpa_over(p)
         lines = common + [trace_line] + list(extra)
         if len(p_k) and float(np.min(p_k)) < 0.0:
             lines.append(NO_INFLOW)
-        msg = write_trace(path, 1e3 * np.asarray(t, dtype=float), p_k,
-                          lines)
-        files.append(path)
-        if msg:
-            messages.append((name, msg))
+        _write_and_record(d, name, 1e3 * np.asarray(t, dtype=float), p_k,
+                          lines, files, messages)
 
     b = out.get('band')
+    has_band = b is not None and 'traces' in b
     extra = []
-    band_nominal, same = None, True
-    if b is not None and 'traces' in b:
+    # True unless the band's own nominal sample exists and differs from
+    # out['confined']; only then is it written as band_nominal.csv
+    same = True
+    if has_band:
+        band_nominal = None
         for signs, t, p in b['traces']:
             if not any(signs):
                 band_nominal = (t, p)
         if band_nominal is not None:
-            same = (np.array_equal(np.asarray(band_nominal[0], dtype=float),
-                                   np.asarray(conf['t'], dtype=float))
-                    and np.array_equal(
-                        np.asarray(band_nominal[1], dtype=float),
-                        np.asarray(conf['p'], dtype=float)))
+            same = _same_trace(band_nominal, (conf['t'], conf['p']))
             if same:
                 extra.append('the sensitivity band\'s own nominal sample '
                              '(all signs +0) is identical to this trace '
@@ -297,7 +324,7 @@ def export_hd13(out, report_path, case_name=''):
     one('nominal.csv', conf['t'], conf['p'],
         'trace: nominal (the assessment\'s own chamber run)', extra)
 
-    if b is not None and 'traces' in b:
+    if has_band:
         axes = ', '.join(b.get('params', ()))
         hc = ('yes' if b.get('spans_heat_loss')
               else 'no (adiabatic, the h_c sign is inert)')
@@ -359,7 +386,7 @@ LOAD_PLANEMAX = (
     'unrelieved, whatever the clearing setting')
 
 
-def read_hd13_table(path, units):
+def read_hd13_table(path: str, units: str) -> tuple[list[str], dict]:
     """(header comment lines, {column: float64 array}) of one HD1-13
     trace file; ValueError unless its units line is exactly `units`."""
     comments, cols, rows = [], None, []
@@ -391,12 +418,54 @@ def _source_lines(name, comments):
 
 
 def _gamma_line(g):
+    """The sidecar's gamma line for the HD1-13 column gamma `g`."""
     what = 'the double_base products' if g == '1.24' else 'air'
     return (f'gamma: {g} ({what}; HD1-13 computed E at both because '
             f'they bound any mixture)')
 
 
-def wall_load_traces(case, src_dir=WALL_LOAD_DIR):
+def _gamma_tag(g):
+    """'1.24' -> 'g124', the file-name tag of a gamma."""
+    return 'g' + g.replace('.', '')
+
+
+def _cleared_lines(g, H, W, res, c_r, r_max, ps_peak):
+    """The sidecar lines that describe a cleared G1 trace: what was done
+    (UFC 3-340-02 (2008) para. 2-15.3.2), with which wall and C_r."""
+    from ..core import wallload
+    ta = ('never (the trace does not rise)' if res['t_a'] is None
+          else f'{res["t_a"] * 1e3:.6g} ms')
+    return [
+        f'trace: G1, the probe at (10, 6, 1.4) m, column E_{g}, '
+        f'after clearing',
+        'load: front-wall load after clearing, UFC 3-340-02 (2008) '
+        'para. 2-15.3.2, Eq. 2-8 / 2-9, Fig. 2-191a (printed pp. '
+        '65, 266): L = E before arrival t_a, a linear blend '
+        '(1 - tau/t_c) E + (tau/t_c)(Ps + C_D q) for 0 <= tau = '
+        't - t_a <= t_c, then Ps + C_D q',
+        f'wall: H = {H:g} m, W = {W:g} m; S = min(H, W/2) = '
+        f'{res["S"]:g} m, G = max(H, W/2) = {res["G"]:g} m, R = S/G '
+        f'= {res["R"]:.6g}',
+        f'C_r = {c_r:.6g} m/s ({c_r / M_S_PER_FT_MS:.6g} ft/ms): '
+        f'Rankine-Hugoniot at the peak reflected state, max R_{g} = '
+        f'{r_max / 1e3:.6g} kPa -> side-on {ps_peak / 1e3:.6g} kPa, '
+        f'gamma {g}, ambient {P_AIR:g} Pa / RHO_AIR (UFC 3-340-02 '
+        f'Fig. 2-192 is for air, gamma 1.4)',
+        f't_c = 4 S / ((1 + R) C_r) = {res["t_c"] * 1e3:.6g} ms '
+        f'(Eq. 2-8); arrival t_a = {ta}, the first sample above '
+        f'{wallload.CLEARING_ARRIVAL_FRACTION:g} of peak E; '
+        f'C_D = {wallload.C_D_FRONT:g} (front wall, para. 2-15.3.2)',
+        'Ps = G1cell_p - P_AIR and q = rho un^2 / 2, un = '
+        'max(G1cell_Ux, 0), from docs/hd13/vent3d_wall_plane.txt '
+        '(the 749 writes, cell (9.95, 5.95, 1.35) m, which matches '
+        'the G1 probe at every write after 8 ms), NOT from the '
+        'probe; interpolated linearly onto the probe times',
+        'Eq. 2-10 check (fictitious duration t_rf = 2 i_r / P_r, '
+        'keep the smaller impulse): NOT applied - it is meant for '
+        'idealised triangles, not a computed trace']
+
+
+def wall_load_traces(case, src_dir: str = WALL_LOAD_DIR) -> tuple[list, dict]:
     """The wall-load traces of the export, without writing anything.
 
     Returns [(csv name, t [s], load [Pa over ambient], sidecar lines)],
@@ -414,73 +483,54 @@ def wall_load_traces(case, src_dir=WALL_LOAD_DIR):
               f'over ambient, not absolute',
               'the T1 tail of docs/hd13/vent3d_wall_rule.txt is NOT '
               'exported (TODO.md HD1-16 2a, owner 2026-09-25)']
+    t = g1['t']
+    if clearing:
+        # The same for both gammas: the wall, and the G1 cell's Ps and q
+        # (from the 749 plane writes) on the probe times. The wall at
+        # x = 10 m faces -x, so only un = max(Ux, 0) loads it.
+        H, W = float(case.wall_H_m), float(case.wall_W_m)
+        ps = np.interp(t, pl['t'], pl['G1cell_p'] - P_AIR)
+        un = np.maximum(pl['G1cell_Ux'], 0.0)
+        q = np.interp(t, pl['t'], 0.5 * pl['G1cell_rho'] * un * un)
+
     out, params = [], {}
     for g in GAMMAS:
-        tag, gam = 'g' + g.replace('.', ''), _gamma_line(g)
-        t = g1['t']
+        tag, gam = _gamma_tag(g), _gamma_line(g)
         if not clearing:
             out.append((f'G1_{tag}.csv', t, g1[f'E_{g}'],
                         common + ['trace: G1, the probe at (10, 6, 1.4) m, '
                                   f'column E_{g}', LOAD_G1_UNRELIEVED, gam]
                         + _source_lines(G1_FILE, g1_c)))
-        else:
-            H, W = float(case.wall_H_m), float(case.wall_W_m)
-            ps = np.interp(t, pl['t'], pl['G1cell_p'] - P_AIR)
-            un = np.maximum(pl['G1cell_Ux'], 0.0)
-            q = np.interp(t, pl['t'], 0.5 * pl['G1cell_rho'] * un * un)
-            r_max = float(np.max(g1[f'R_{g}']))
-            ps_peak = float(wallload.incident_from_reflected(
-                r_max, float(g), P_AIR))
-            c_r = wallload.reflected_sound_speed(ps_peak, float(g), P_AIR)
-            res = wallload.apply_clearing(t, g1[f'E_{g}'], ps, q, H, W, c_r)
-            params[g] = dict(res, c_r=c_r, ps_peak=ps_peak, r_max=r_max)
-            ta = ('never (the trace does not rise)' if res['t_a'] is None
-                  else f'{res["t_a"] * 1e3:.6g} ms')
-            out.append((f'G1_{tag}_cleared.csv', t, res['L'], common + [
-                f'trace: G1, the probe at (10, 6, 1.4) m, column E_{g}, '
-                f'after clearing',
-                'load: front-wall load after clearing, UFC 3-340-02 (2008) '
-                'para. 2-15.3.2, Eq. 2-8 / 2-9, Fig. 2-191a (printed pp. '
-                '65, 266): L = E before arrival t_a, a linear blend '
-                '(1 - tau/t_c) E + (tau/t_c)(Ps + C_D q) for 0 <= tau = '
-                't - t_a <= t_c, then Ps + C_D q',
-                f'wall: H = {H:g} m, W = {W:g} m; S = min(H, W/2) = '
-                f'{res["S"]:g} m, G = max(H, W/2) = {res["G"]:g} m, R = S/G '
-                f'= {res["R"]:.6g}',
-                f'C_r = {c_r:.6g} m/s ({c_r / M_S_PER_FT_MS:.6g} ft/ms): '
-                f'Rankine-Hugoniot at the peak reflected state, max R_{g} = '
-                f'{r_max / 1e3:.6g} kPa -> side-on {ps_peak / 1e3:.6g} kPa, '
-                f'gamma {g}, ambient {P_AIR:g} Pa / RHO_AIR (UFC 3-340-02 '
-                f'Fig. 2-192 is for air, gamma 1.4)',
-                f't_c = 4 S / ((1 + R) C_r) = {res["t_c"] * 1e3:.6g} ms '
-                f'(Eq. 2-8); arrival t_a = {ta}, the first sample above '
-                f'{wallload.CLEARING_ARRIVAL_FRACTION:g} of peak E; '
-                f'C_D = {wallload.C_D_FRONT:g} (front wall, para. 2-15.3.2)',
-                'Ps = G1cell_p - P_AIR and q = rho un^2 / 2, un = '
-                'max(G1cell_Ux, 0), from docs/hd13/vent3d_wall_plane.txt '
-                '(the 749 writes, cell (9.95, 5.95, 1.35) m, which matches '
-                'the G1 probe at every write after 8 ms), NOT from the '
-                'probe; interpolated linearly onto the probe times',
-                'Eq. 2-10 check (fictitious duration t_rf = 2 i_r / P_r, '
-                'keep the smaller impulse): NOT applied - it is meant for '
-                'idealised triangles, not a computed trace',
-                gam] + _source_lines(G1_FILE, g1_c)
-                + _source_lines(PLANE_FILE, pl_c)))
+            continue
+        # C_r from Rankine-Hugoniot at the trace's peak reflected state
+        r_max = float(np.max(g1[f'R_{g}']))
+        ps_peak = float(wallload.incident_from_reflected(
+            r_max, float(g), P_AIR))
+        c_r = wallload.reflected_sound_speed(ps_peak, float(g), P_AIR)
+        res = wallload.apply_clearing(t, g1[f'E_{g}'], ps, q, H, W, c_r)
+        params[g] = dict(res, c_r=c_r, ps_peak=ps_peak, r_max=r_max)
+        lines = (common
+                 + _cleared_lines(g, H, W, res, c_r, r_max, ps_peak)
+                 + [gam]
+                 + _source_lines(G1_FILE, g1_c)
+                 + _source_lines(PLANE_FILE, pl_c))
+        out.append((f'G1_{tag}_cleared.csv', t, res['L'], lines))
     for g in GAMMAS:
-        tag, gam = 'g' + g.replace('.', ''), _gamma_line(g)
-        out.append((f'planemax_{tag}.csv', pl['t'], pl[f'Emax_{g}'],
+        out.append((f'planemax_{_gamma_tag(g)}.csv', pl['t'],
+                    pl[f'Emax_{g}'],
                     common + [f'trace: plane maximum, column Emax_{g}',
-                              LOAD_PLANEMAX, gam]
+                              LOAD_PLANEMAX, _gamma_line(g)]
                     + _source_lines(PLANE_FILE, pl_c)))
     return out, params
 
 
-def wall_loads_dir(case_path):
+def wall_loads_dir(case_path: str) -> str:
     """`<case stem>_wall_loads`, beside the case file."""
     return os.path.splitext(case_path)[0] + '_wall_loads'
 
 
-def export_wall_loads(case, out_dir, src_dir=WALL_LOAD_DIR):
+def export_wall_loads(case, out_dir: str,
+                      src_dir: str = WALL_LOAD_DIR) -> dict:
     """Write the four wall-load CSVs (+ sidecars) of `case` to `out_dir`.
 
     Returns dict(dir, files, messages, params) as `export_hd13` does, plus
@@ -491,16 +541,11 @@ def export_wall_loads(case, out_dir, src_dir=WALL_LOAD_DIR):
     stale `_cleared` files beside the new unrelieved ones."""
     traces, params = wall_load_traces(case, src_dir)
     os.makedirs(out_dir, exist_ok=True)
-    for pat in ('G1_g*.csv', 'G1_g*.txt', 'planemax_g*.csv',
-                'planemax_g*.txt'):
-        for old in glob.glob(os.path.join(out_dir, pat)):
-            os.remove(old)
+    _remove_old(out_dir, _WALL_PATTERNS)
     files, messages = [], []
     for name, t, load, lines in traces:
-        path = os.path.join(out_dir, name)
-        msg = write_trace(path, 1e3 * np.asarray(t, dtype=float),
-                          np.asarray(load, dtype=float) / 1e3, lines)
-        files.append(path)
-        if msg:
-            messages.append((name, msg))
+        # t [s] -> [ms], load [Pa over ambient] -> [kPa]
+        _write_and_record(out_dir, name, 1e3 * np.asarray(t, dtype=float),
+                          np.asarray(load, dtype=float) / 1e3, lines,
+                          files, messages)
     return dict(dir=out_dir, files=files, messages=messages, params=params)

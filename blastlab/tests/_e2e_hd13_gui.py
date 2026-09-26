@@ -83,6 +83,7 @@ def main():
     from blastlab.ui.testing import ensure_qapp, pump
     ensure_qapp(offscreen=False)
     from blastlab.ui.app import MainWindow
+    from blastlab.ui import theme
 
     crashes = []
     sys.excepthook = lambda *a: crashes.append(a)
@@ -161,7 +162,9 @@ def main():
     out = os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_gui_'),
                        'report.html')
     form.v['report_file'].set(out)
-    form.v['t_end'].set('20')
+    # the form's own end time, not a shortened one: the record has to end
+    # while the load is still active, so the "still active" path is shown
+    # (QA 2026-09-26-hd1-16 F2); an end time of 20 never fires that rule
     pump(150)
     win._run_single()
     # the assessment runs on a worker thread (UX 1): wait it out with the
@@ -185,11 +188,47 @@ def main():
           'sidecar', os.path.isfile(os.path.join(loads, 'nominal.csv'))
           and os.path.isfile(os.path.join(loads, 'nominal.txt')),
           str(os.listdir(loads)) if os.path.isdir(loads) else 'missing')
-    check('the status line says where the report went',
-          'HD 1.3 report' in win._status.text(), win._status.text())
-    check('and names the CSVs',
-          'SBEDS loads' in win._status.text() and 'CSV' in
-          win._status.text(), win._status.text())
+    # QA 2026-09-26-hd1-16 F2: the status line used to hold the whole
+    # ~3300 px text in a ~1170 px label, clipped and gone after 12 s. Now
+    # it is a short summary that must FIT (measured against the label's
+    # real width, per Win32), and the full text is in the tooltip and in
+    # the Run log.
+    status = win._status
+    s_text = status.text()
+    check('the status line is the short summary',
+          s_text.startswith('HD 1.3 done') and 'SBEDS load CSV' in s_text
+          and '(see Log)' in s_text, s_text)
+    text_w = status.fontMetrics().horizontalAdvance(s_text)
+    check('Qt: the summary fits inside the label',
+          text_w <= status.contentsRect().width(),
+          f'text {text_w} px, label {status.contentsRect().width()} px')
+    if sys.platform.startswith('win'):
+        status.setAttribute(QtNS.WA_NativeWindow, True)
+        pump(200)
+        r = win32_rect(status)
+        dpr = status.devicePixelRatioF()
+        check('Win32: the label is on screen', win32_visible(status) is True)
+        check('Win32: the summary fits inside the label',
+              r is not None and text_w * dpr <= r[2],
+              f'text {text_w * dpr:.0f} px (device), label rect {r}')
+    lines = win.run_panel.log_text().splitlines()
+    loads_abs = os.path.abspath(loads)
+    check('the Run log names the report',
+          f'HD 1.3 report written: {os.path.abspath(out)}' in lines)
+    check('the Run log names the load folder, absolute',
+          any(loads_abs in ln and 'SBEDS loads' in ln for ln in lines))
+    check('the Run log lists nominal.csv, absolute',
+          f'  {os.path.join(loads_abs, "nominal.csv")}' in lines)
+    active = [ln for ln in lines
+              if 'record ends while the load is still active' in ln]
+    check('the Run log carries the "still active" line', bool(active),
+          active[0] if active else 'missing')
+    check('so the status line is a warning',
+          status.styleSheet() == f'color: {theme.cur("warn")};'
+          and 'still active' in s_text, status.styleSheet())
+    check('the tooltip holds the full text',
+          all(ln in status.toolTip().splitlines() for ln in active)
+          and loads_abs in status.toolTip(), status.toolTip()[:120])
 
     print('\n  nothing crashed')
     check('no unhandled exceptions', not crashes, str(crashes[:1]))

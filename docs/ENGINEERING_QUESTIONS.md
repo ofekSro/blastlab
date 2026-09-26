@@ -454,3 +454,40 @@ Source: the arch-refactorer's phase 8 report. Nothing changed.
    the field is a material mass, not a TNT equivalent.
 2. **blastFoam 1D meta hard-codes `eos='JWL'`** and keeps the material separately in
    `material`, so the 1D figure titles show the EOS but never the material.
+
+---
+
+## 2026-09-26 · batch `hd1-16-load-export` (HD1-16 step 1, HD1-17(a))
+
+Sources: [implement report](batches/2026-09-26-hd1-16-load-export.implement.md),
+[verify report](batches/2026-09-26-hd1-16-load-export.verify.md),
+[QA](qa/2026-09-26-hd1-16/QA_REPORT.md), and [UX review](UX_REVIEW.md) (L1-L14, E6-E8).
+Nothing below was acted on. Every number and rule stays as registered.
+
+**The exported chamber load**
+
+1. **The starter case's SBEDS load is dominated by suction that the model itself
+   produces.**
+   - `nominal.csv` peaks at +1.01 kPa at 7.5 s, then falls to −45.36 kPa and ends there at 30.9 s. The net impulse is −216 000 kPa·ms.
+   - The cause: the 0-D vent has no inflow. `deflagration._vent_mdot` returns 0 whenever p ≤ p_amb (lines 352-353), so wall cooling pulls the room below ambient and nothing refills it.
+   - It is exported as computed, per the owner's decision to keep negatives. The sidecar explains it, but the report does not (UX L1).
+   - *Should the export stop at the return to ambient, should the vent get inflow, or should the trace stay as it is with a stronger warning?*
+2. **The CSV peak is 1.8 % below the model peak** (1.0085 against 1.0275 kPa), because the CSV has the `Samples` resolution of ~69 ms while the report peak is taken over every solver step. *Should the export sample more densely, or should the caption of "Samples" say that it sets the SBEDS resolution?*
+
+**Clearing (UFC 3-340-02 §2-15.3.2)**
+
+3. **Clearing is applied to a slowly rising jet load, not a reflected shock.**
+   - Arrival is at 1 % of peak, t_a = 9.58 ms, and t_c = 14.03 ms, so the E peak at ~23.8 ms falls after t_a + t_c.
+   - The whole peak is therefore relieved to Ps + q: G1 goes from 153.7 to 104.5 kPa at γ 1.24 (−32 %), and from 146.7 to 100.9 kPa at γ 1.40.
+   - *Is the Fig. 2-191a construction (1 %-of-peak arrival, then a linear blend over t_c) valid for this kind of trace, or is it unconservative here?*
+4. **After t_c the two cleared G1 files are identical** (e.g. 78.5335 kPa at 30 ms), because Ps + q comes from one plane file that does not depend on γ. The sidecar does not say so.
+5. **C_r at γ 1.24 is computed with ambient air's p and ρ** (ambient c ≈ 320 m/s instead of 340), giving 342.2 against 374.9 m/s at γ 1.40. *Which state should C_r use?*
+6. **Eq. 2-10** (t_rf = 2 i_r / P_r, keep the smaller impulse) is not applied to the CFD trace, and the sidecar says so. Its "keep the smaller" clause is on printed p. 66. *Should it be applied?*
+7. **The wall traces are the single HD1-13 run, whatever the case.** Only H and W come from the case, and only `--hd13-wall-export` uses them. Yet clearing ticked with H blank blocks the Qt Run and `--hd13`, which do not use the wall (UX L2, L4). *Should the Qt Run also write the wall CSVs, or should the check be only a warning outside the export?*
+8. **The defaulted wall fields (`clearing`, `wall_H_m`, `wall_W_m`) are left out of the JSON**, so existing files stay byte-identical. *Confirm.*
+
+**Other**
+
+9. **Residual capacity is computed but has never been shown**, before or after the batch. It is computed from Ru = 400 kPa, a default in the Structure card, which is now hidden. The owner's "stays in the report" answer therefore refers to a section that does not exist (UX E7). *Show it, with a visible Ru, or drop it?*
+10. **Pre-existing bug:** `services/hd13.assess` raises a ValueError for a case with `h_c = 0` that has standoffs, because `figure_thermal` gets an empty q. The batch does not make it newly reachable.
+11. **Validation looseness**, low: `wall_errors` accepts `True` as 1 m and accepts `inf`, and a bad H or W is silently read as 0 while clearing is off. This belongs with P1-11.
