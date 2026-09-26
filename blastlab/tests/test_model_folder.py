@@ -6,6 +6,9 @@ docs/batches/2026-09-26-out-1-model-folder.md, Steps 1-4.
   A  the name rule, the folder check and `folder_for` (pure)
   B  prepare / bind_case / write_all / the manifest / run.log, on a
      native 1D and a native 2D axisymmetric result (a few hundred steps)
+  C  jobs.solve_stage(..., stage_dir=...) on a SolverWorker run on this
+     thread: the folder is complete before ('result', 0); a failed TSV, a
+     failed hand-off, a raising solver and a stop before start
 
 Everything runs in temp folders; the private settings file of
 `char_common` keeps the real one untouched (CLAUDE.md 8.2).
@@ -377,6 +380,173 @@ def test_b_git_commit():
     assert mf.git_commit(tempfile.gettempdir()) is None
 
 
+# ── C: the worker with a stage_dir ───────────────────────────────────────
+class SnapQueue(queue.Queue):
+    """A worker queue that records the folder listing at the moment each
+    message is posted - to show the folder is complete BEFORE 'result'."""
+
+    def __init__(self, folder):
+        super().__init__()
+        self.folder = folder
+        self.seen = []
+
+    def put(self, item, *a, **kw):
+        self.seen.append((item[0], sorted(files_on_disk(self.folder))
+                          if os.path.isdir(self.folder) else []))
+        return super().put(item, *a, **kw)
+
+
+def run_worker(case, runs, model='MODEL', **info):
+    """prepare + a SolverWorker with one stage_dir stage, on this thread.
+    Returns (worker, folder, [(tag, listing at post time)])."""
+    from blastlab.solvers.worker import SolverWorker
+    folder = mf.prepare(runs, model, confirm=lambda t: True)
+    w = SolverWorker([jobs.solve_stage(case.dim, case, stage_dir=folder,
+                                       run_info=dict(model=model, **info))])
+    w.q = w.hooks.q = SnapQueue(folder)
+    w.run()
+    return w, folder, w.q.seen
+
+
+def _manifest(folder):
+    with open(os.path.join(folder, 'manifest.json'), encoding='utf-8') as f:
+        return json.load(f)
+
+
+def test_c_worker_folder_complete_before_result():
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    try:
+        w, folder, seen = run_worker(case2d(), runs, n_cells=1)
+        tags = [t for t, _ls in seen]
+        assert 'result' in tags and tags[-1] == 'done', tags
+        assert tags.index('result') < tags.index('done')
+        at_result = dict(seen)['result']
+        for rel in ('MODEL.json', 'run.log', 'report.html',
+                    'gauges/gauges_2d.txt', 'gauges/gauges_2d_summary.csv',
+                    'profile_2d.npz'):
+            assert rel in at_result, (rel, at_result)
+        assert os.path.isfile(os.path.join(folder, 'manifest.json'))
+        m = _manifest(folder)
+        assert m['failed'] == [] and m['n_steps'] and m['n_steps'] > 0, m
+        assert m['stop_reason'] == w.results[0].stop_reason
+        assert w.error is None
+        # the hooks are released: no later line lands in this run.log
+        assert w.hooks.log_file is None
+        assert w.hooks.stage_manifest == m
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_failed_gauge_tsv():
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real = jobs.save_gauges_2d
+
+    def locked(obj, path, *a, **kw):
+        raise PermissionError(13, 'Permission denied', str(path))
+    jobs.save_gauges_2d = locked
+    try:
+        w, folder, _seen = run_worker(case2d(), runs)
+    finally:
+        jobs.save_gauges_2d = real
+    try:
+        assert w.error is None and w.results[0] is not None
+        assert os.path.getsize(os.path.join(folder, 'report.html')) > 0
+        m = _manifest(folder)
+        assert [f['path'] for f in m['failed']] == ['gauges/gauges_2d.txt'], \
+            m['failed']
+        with open(os.path.join(folder, 'run.log'), encoding='utf-8') as f:
+            log = f.read()
+        assert '[warn] could not write' in log and 'gauges_2d.txt' in log
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_solver_raises():
+    import blastlab.solvers as solvers_pkg
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real = solvers_pkg.get_solver
+
+    def broken(case, hooks):
+        hooks.log('  a line before the failure')
+        raise RuntimeError('mesh exploded\nsecond line')
+    solvers_pkg.get_solver = lambda dim, backend: broken
+    try:
+        w, folder, seen = run_worker(case2d(), runs)
+    finally:
+        solvers_pkg.get_solver = real
+    try:
+        assert w.error and 'mesh exploded' in w.error
+        assert 'result' not in [t for t, _l in seen]
+        for rel in ('MODEL.json', 'run.log', 'manifest.json'):
+            assert os.path.getsize(os.path.join(folder, rel)) > 0, rel
+        m = _manifest(folder)
+        assert m['stop_reason'] == 'RuntimeError: mesh exploded', m
+        assert m['failed'] == [] and m['missing'] == []
+        assert [o['path'] for o in m['outputs']] == ['MODEL.json',
+                                                     'run.log'], m
+        with open(os.path.join(folder, 'run.log'), encoding='utf-8') as f:
+            log = f.read()
+        assert log == ('  a line before the failure\n'
+                       '[stage ended: RuntimeError: mesh exploded]\n'), log
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_stopped_before_start():
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.hooks import StoppedBeforeStart
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real = solvers_pkg.get_solver
+
+    def stopped(case, hooks):
+        raise StoppedBeforeStart('stopped before start (meshing)')
+    solvers_pkg.get_solver = lambda dim, backend: stopped
+    try:
+        w, folder, seen = run_worker(case1d(), runs)
+    finally:
+        solvers_pkg.get_solver = real
+    try:
+        assert w.error is None                     # not a failure
+        m = _manifest(folder)
+        assert m['stop_reason'] == 'stopped before start (meshing)'
+        assert os.path.isfile(os.path.join(folder, 'MODEL.json'))
+        assert os.path.isfile(os.path.join(folder, 'run.log'))
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_handoff_failure_keeps_rows():
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real = jobs.save_profile
+
+    def locked(obj, path, *a, **kw):
+        raise PermissionError(13, 'Permission denied', str(path))
+    jobs.save_profile = locked
+    try:
+        w, folder, seen = run_worker(case1d(), runs)
+    finally:
+        jobs.save_profile = real
+    try:
+        tags = [t for t, _l in seen]
+        # the worker's HandoffWriteError path: result, then error
+        assert tags.index('result') < tags.index('error'), tags
+        m = _manifest(folder)
+        assert [f['path'] for f in m['failed']] == ['profile.txt'], m
+        assert m['stop_reason'].startswith('Could not write the hand-off')
+        assert os.path.getsize(os.path.join(folder, 'report.html')) > 0
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_c_no_stage_dir_is_unchanged():
+    """stage_dir=None returns the plain solve (test_char_write_failure
+    pins what it does); nothing is bound or logged to a file."""
+    label, solve = jobs.solve_stage(1, case1d(gauge_file=None))
+    assert label == '1D' and solve.__qualname__ == '_solver.<locals>.solve'
+    assert jobs.solve_stage(2, case2d(solver='blastfoam'))[0] == \
+        '2D blastFoam'
+
+
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
@@ -385,7 +555,11 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_b_missing_animation_and_planar_profile,
          test_b_bind_case_names, test_b_prepare_overwrite_no_and_yes,
          test_b_prepare_locked_file, test_b_prepare_refusals,
-         test_b_git_commit]
+         test_b_git_commit,
+         test_c_worker_folder_complete_before_result,
+         test_c_failed_gauge_tsv, test_c_solver_raises,
+         test_c_stopped_before_start, test_c_handoff_failure_keeps_rows,
+         test_c_no_stage_dir_is_unchanged]
 
 
 if __name__ == '__main__':

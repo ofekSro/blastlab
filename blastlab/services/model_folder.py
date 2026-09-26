@@ -526,3 +526,84 @@ def _write_result_rows(res, case, dim, stage_dir, info, log, verify, fail,
         fail('report', target, 'export failed (see the log)')
     else:
         verify('report', target)
+
+
+# ── the run stage (solvers/jobs.solve_stage with a stage_dir) ────────────
+def headline(exc):
+    """The one line that says why a stage ended without finishing: the
+    manifest's `stop_reason` for a stage that raised."""
+    from ..solvers.hooks import StoppedBeforeStart
+    from ..solvers.jobs import HandoffWriteError
+    text = next((ln.strip() for ln in str(exc).splitlines() if ln.strip()),
+                '')
+    if isinstance(exc, (StoppedBeforeStart, HandoffWriteError)):
+        return text or type(exc).__name__
+    return f'{type(exc).__name__}: {text}' if text else type(exc).__name__
+
+
+def _append(path, line):
+    """One line into run.log directly, not through the hooks: the stage's
+    closing line is not a solver line the Run tab should show twice."""
+    try:
+        with open(path, 'a', encoding='utf-8', newline='\n') as f:
+            f.write(f'{line}\n')
+    except OSError:
+        pass
+
+
+def stage_solve(dim, case, stage_dir, run_info, make_solve):
+    """`solve(hooks)` for one run stage writing into `stage_dir`.
+
+    Registered with `solvers.jobs` (see `jobs.register_stage_folder`), so
+    `jobs.solve_stage(dim, case, stage_dir)` returns this. On the worker
+    thread it binds the case into the folder (`bind_case`), points
+    `hooks.log_file` at run.log, runs the ordinary stage
+    (`make_solve(bound)`: solve + the case's own files), then `write_all`.
+
+    A stage that raises - StoppedBeforeStart, a failed hand-off write, any
+    error - still gets MODEL.json, run.log and manifest.json
+    (`stop_reason` = the error's headline, and the result's rows when a
+    HandoffWriteError carries one), and the exception is re-raised
+    unchanged, so the worker's 'error' path is what it always was.
+
+    The manifest is left on `hooks.stage_manifest` for the front end."""
+    def solve(hooks):
+        info = dict(run_info or {})
+        info.setdefault('created', now_iso())
+        log_path = os.path.join(stage_dir, LOG_FILE)
+        os.makedirs(stage_dir, exist_ok=True)
+        open(log_path, 'a', encoding='utf-8').close()   # exists from start
+        prev_log = getattr(hooks, 'log_file', None)
+        hooks.log_file = log_path
+        hooks.scratch_posix = None        # set by the blastFoam backend
+        p0 = getattr(hooks, '_last_p', None)
+        bound, res, err = case, None, None
+        try:
+            bound = bind_case(case, stage_dir)
+            res = make_solve(bound)(hooks)
+            return res
+        except Exception as exc:
+            err = exc
+            res = getattr(exc, 'result', None)     # HandoffWriteError
+            raise
+        finally:
+            try:
+                p = getattr(hooks, '_last_p', None)
+                if p is not None and p is not p0:
+                    info.setdefault('n_steps', int(p.step))
+                if err is not None:
+                    info['stop_reason'] = headline(err)
+                    _append(log_path, f'[stage ended: {info["stop_reason"]}]')
+                hooks.stage_manifest = write_all(
+                    res, bound, dim, stage_dir, info, log=hooks.log)
+            finally:
+                hooks.log_file = prev_log
+    return solve
+
+
+def _register():
+    from ..solvers import jobs
+    jobs.register_stage_folder(stage_solve)
+
+
+_register()

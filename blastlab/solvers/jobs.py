@@ -86,14 +86,51 @@ def _animate(case, res, hooks=None):
                clim=getattr(case, 'anim_clim', None))
 
 
-def solve_stage(dim, case):
+#: OUT-1: the model-folder stage wrapper, `services.model_folder.
+#: stage_solve`, registered by that module when it is imported. solvers/
+#: may not import services/ (test_layering), so the dependency is
+#: inverted: every caller that passes a stage_dir has already imported
+#: model_folder (it prepared the folder with it).
+_stage_folder = None
+
+
+def register_stage_folder(wrap):
+    """Install `wrap(dim, case, stage_dir, run_info, make_solve) ->
+    solve(hooks)` as the stage_dir path of `solve_stage`."""
+    global _stage_folder
+    _stage_folder = wrap
+
+
+def solve_stage(dim, case, stage_dir=None, run_info=None):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
     callable also writes the case's own output files (gauges, animation,
     profile) exactly like the CLI flow does.
 
     Every write is attempted even when an earlier one failed; a failed
     hand-off write (profile, trigger remap) raises HandoffWriteError
-    carrying the Result once all writes are done (UX 2)."""
+    carrying the Result once all writes are done (UX 2).
+
+    OUT-1: with `stage_dir` (a prepared model folder) the stage binds the
+    case's output files into it, keeps run.log there and writes every
+    row of the model folder after the solve - also, as far as it can,
+    after a failure or a stop, before re-raising
+    (`services.model_folder.stage_solve`). `run_info` feeds the manifest.
+    `stage_dir=None` is exactly the behaviour before OUT-1."""
+    backend = getattr(case, 'solver', 'native')
+    label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
+    if stage_dir is None:
+        return (label, _solver(dim, case))
+    if _stage_folder is None:
+        raise RuntimeError('solve_stage(stage_dir=...) needs '
+                           'blastlab.services.model_folder imported - it '
+                           'registers the model-folder writer')
+    return (label, _stage_folder(dim, case, stage_dir, run_info,
+                                 lambda bound: _solver(dim, bound)))
+
+
+def _solver(dim, case):
+    """The solve callable of `solve_stage`: solve, then write the case's
+    own output files."""
     backend = getattr(case, 'solver', 'native')
 
     def solve(hooks):
@@ -132,5 +169,4 @@ def solve_stage(dim, case):
         if failed:
             raise HandoffWriteError(res, failed)
         return res
-    label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
-    return (label, solve)
+    return solve
