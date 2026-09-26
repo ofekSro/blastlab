@@ -558,6 +558,42 @@ writer through the `jobs` registration hook.
 
 ---
 
+## 0d. 2026-09-27 — batch `out-2-vtk-output` (OUT-2)
+
+Plan: `docs/batches/2026-09-27-out-2-vtk-output.md` (§0a D1–D15, owner answers Q1–Q7,
+parked P1–P13), specification `docs/model-folder-and-vtk-plan.md` §3.
+
+### `OUT-2` · VTK output for ParaView
+
+- **What:** the Setup card **VTK output (ParaView)** in both GUIs (blastFoam only;
+  families per dimension, Time [ms] / Step with the other box greyed, 3D extra planes,
+  a quantity matrix with a locked Gauge column and separate Sections / Obstacles /
+  Volumes columns, Q2); case keys `vtk_surfaces` / `vtk_volumes`, omitted while off;
+  validation of every refusal in §3.3; the writer's `vtkTimeSeries` surface function
+  objects (never alter dt) and the volumes write cadence; `VtkExport` in the run loop
+  (async foamToVTK, copy + size check, `.vtk.series` + `vtk\manifest.json`, then the
+  WSL delete that the pure `vtk_purge_plan` allows); the backend protects every write
+  finalize re-reads (D1). Layout `<MODEL>\vtk\volumes|sections\<plane>\<field>|
+  obstacles\<field>`, one series per field (Q1).
+- **Tests:** new `test_vtk_case`, `test_vtk_export_plan`, `test_vtk_series`,
+  `test_vtk_protect`, `test_ui_output_card`, `test_gui_output_card`; `test_foam_writer`
+  and `test_model_folder` additions; harness group V (Qt V01–V05, Tk V01–V04);
+  `_e2e_vtk_3d.py` (WSL, rules pre-registered in `6328bbd`). Goldens: only the two
+  char case-form re-pins, added rows only. `test_regression` byte-identical.
+- **Real run (2026-09-27):** `_e2e_vtk_3d.py` 36/38. Surfaces alone and deletion vs
+  none are byte-identical; counts, series, the protected set on 331 passes, the
+  release and a stopped run all pass. Rule 3 (volumes vs no export) fails at a
+  Z ≈ 0.07 gauge: peak +4.2 %, impulse +4.8 %, against a 1 % limit. A write budget
+  of 10 without export reproduces the export run byte for byte, so the cause is the
+  write schedule's dt clipping. Parked as P14. `_e2e_model_folder.py` 26/26.
+- **Commits:** Steps 1–7 and their verification up to `06c272b`; 8 `d0c4a57` `87ff5da`;
+  9 `3d1feae` `c675829`; 10 `96bcff3`; 11 `6328bbd` `7382e6a`; 12 `8557bf2`; 13 the
+  commit of this entry.
+- **Open:** owner acceptance in ParaView (Step 14); `gui-qa-tester` pass (the
+  implementer took real-window screenshots, `docs/qa/2026-09-27-out-2/`).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

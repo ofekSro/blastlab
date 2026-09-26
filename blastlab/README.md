@@ -132,6 +132,64 @@ fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
 - The Results-tab export buttons still work as before, and their file
   dialogs open in the result's model folder.
 
+### VTK files for ParaView (`vtk\`)
+
+`OUT-2`, [model-folder-and-vtk-plan.md](../docs/model-folder-and-vtk-plan.md)
+§3. blastFoam only: the Setup card **VTK output (ParaView)** is hidden in
+native mode, and a native run ignores the keys.
+
+- **The card** (both GUIs), laid out as Viper's "VTKs and Framerates":
+  1D *Whole domain*; 2D *Whole domain* and *Obstacles*; 3D *Sections and
+  obstacles* and *Volumes*. Each family has a box, a **Time / Step**
+  pair and one interval per mode (the other is greyed): **Time is
+  simulated milliseconds** (`Every [ms]`; the case JSON stores ms too),
+  Step is solver steps. 3D adds extra section planes (axis, position
+  [m]); the live-slice plane is always written, and a plane is snapped
+  to the nearest cell layer but keeps the name typed (`slice_x_0.20`).
+  The quantity matrix has a locked Gauge column (p, rho, U) and one
+  column per destination - Sect. / Obst. / Vol. (1D/2D: Domain). The
+  first tick of a family fills p + peak overpressure (surfaces) or p,
+  rho, U (volumes). Case keys: `vtk_surfaces` {on, mode, value, fields,
+  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields};
+  neither is written while off.
+- **Cadence.** Sections and obstacles are blastFoam surface function
+  objects (vtkTimeSeries, blastFoam User Guide v6.0, sec. 15.5 (p. 124))
+  that sample at their own cadence and never change the time step.
+  Volumes **are** the solver's write schedule (Time: every value / 1000
+  s of simulated time, landing exactly on it; Step: every N steps), so
+  they cannot be combined with a write budget, and every write is also
+  ingested for the live view.
+- **Layout** - `<time>` is OpenFOAM's own time name in seconds:
+
+  | Path | Content |
+  |---|---|
+  | `vtk\manifest.json` | fields, cadence, per family count / times / series, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete` |
+  | `vtk\volumes\t_<time>.vtk`, `volumes.vtk.series` | one file per write, every chosen field, cell data only |
+  | `vtk\sections\<plane>\<field>\t_<time>.vtk`, `sections\<plane>\<field>.vtk.series` | one series per plane and field |
+  | `vtk\obstacles\<field>\t_<time>.vtk`, `obstacles\<field>.vtk.series` | the obstacle walls, one series per field |
+
+  The model's `manifest.json` carries `vtk: {dir, counts, not_converted}`.
+- **What is deleted in WSL, and when.** After every ingest pass one
+  `foamToVTK` at a time converts the writes already read, the file is
+  copied into `vtk\` and size-checked, the index is rewritten, and only
+  then are the time directory and the converted file deleted in WSL.
+  Never deleted: `0`, a resume's start time, the two newest writes, and
+  every write the run's own finalize reads again (the snapshots, the
+  1D/2D arrival pin, the 2D remap trigger). Surface samples are copied
+  and removed the same way, the newest one after the run. A conversion
+  or copy that fails twice is listed in `not_converted`, its write stays
+  in WSL, and the scratch is not released. A run without a model folder
+  exports and deletes nothing.
+- **Limits.** A parallel AMR run cannot export volumes (its writes stay
+  per rank; `reconstructPar` cannot follow a changing mesh) - validation
+  says so before the run; sections and obstacles work there. A resume
+  after deletion replays only the writes left (`replay_incomplete`).
+- **In ParaView:** *File > Open* a `.vtk.series` file - `volumes\
+  volumes.vtk.series`, or several of `obstacles\` / `sections\<plane>\`
+  at once to get one pipeline item per field - and the time bar follows
+  the series times (a JSON list of relative file names and times, the
+  format blastFoam's own `createTimeSeries` writes, User Guide sec. 16.3).
+
 ## Solver mode
 
 The solver is chosen once, for the whole app, with the **native |
