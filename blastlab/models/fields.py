@@ -159,6 +159,17 @@ def hd13_case_from_fields(values: dict) -> tuple:
             bad.append(name)
             return fallback
 
+    def wall_dim(name, label):
+        """H or W [m]. Kept while clearing is off (the disabled box still
+        round-trips), but only an error while clearing is on."""
+        if v.get('clearing'):
+            return num(name, label, blank=0.0) or 0.0
+        raw = str(v.get(name, '') or '')
+        try:
+            return parse_float(raw, label) if raw.strip() else 0.0
+        except ValueError:
+            return 0.0
+
     overrides, measured = {}, []
     for key, field_name, factor in HD13_UNITS:
         got = num(key, field_name, factor)
@@ -201,6 +212,8 @@ def hd13_case_from_fields(values: dict) -> tuple:
         wall_area_m2=num('wall_area', 'Wall area', blank=0.0) or 0.0,
         T_wall=num('t_wall', 'Wall temperature', blank=300.0) or 300.0,
         standoffs_m=[float(r[0]) for r in v['standoffs']],
+        # HD1-16: the Structure card is hidden, its six keys pass through
+        # load -> save unchanged (no output uses them for a response)
         span_m=span,
         mass_per_area=num('mass_per_area', 'Mass', blank=0.0) or 0.0,
         Ru_pa=num('ru_kpa', 'Ultimate resistance', 1e3, blank=0.0) or 0.0,
@@ -226,6 +239,12 @@ def hd13_case_from_fields(values: dict) -> tuple:
         n_snapshots_vent=snap_vent,
         vent_gauges=[tuple(float(c) for c in r)
                      for r in v['vent_gauges']],
+        # HD1-16: the loaded wall of the wall-load export. Blank is 0,
+        # which `assessment.wall_errors` refuses by name while clearing
+        # is on.
+        clearing=bool(v.get('clearing', False)),
+        wall_H_m=wall_dim('wall_H_m', 'Wall height H'),
+        wall_W_m=wall_dim('wall_W_m', 'Wall width W'),
     )
     # a uniform scenario has no spread; saying so here keeps the form
     # from building a case its own validator would reject
@@ -295,6 +314,10 @@ def hd13_fields_from_case(case) -> dict:
     out['n_snap_vent'] = (f'{case.n_snapshots_vent:g}'
                           if case.n_snapshots_vent else '')
     out['vent_gauges'] = [tuple(g) for g in case.vent_gauges]
+    # HD1-16: the loaded wall; 0 shows as an empty box
+    out['clearing'] = bool(case.clearing)
+    out['wall_H_m'] = f'{case.wall_H_m:g}' if case.wall_H_m else ''
+    out['wall_W_m'] = f'{case.wall_W_m:g}' if case.wall_W_m else ''
     return out
 
 

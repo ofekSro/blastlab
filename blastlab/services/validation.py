@@ -56,6 +56,16 @@ def _charge_radius(case, rho0=None):
     return (3.0 * case.charge / (4.0 * np.pi * rho0)) ** (1.0 / 3.0)
 
 
+def _unknown_material(material):
+    """The refusal for a material not in the table - with the reason when
+    the row was taken out on purpose (core.materials.REMOVED)."""
+    from ..core.materials import REMOVED
+    why = REMOVED.get(material)
+    if why:
+        return f"Charge material '{material}' {why}"
+    return f"Unknown charge material '{material}'"
+
+
 def _validate_solver(case, rep):
     """Solver-backend gating. Returns the unreacted charge density used
     to size r_exp (material-aware for blastfoam), or None on a fatal
@@ -108,7 +118,7 @@ def _validate_solver(case, rep):
         # material table as blastFoam
         from ..core.materials import MATERIALS as _MATS
         if material not in _MATS:
-            err(f"Unknown charge material '{material}'")
+            err(_unknown_material(material))
             return None
         if n_procs > 1:
             note("MPI ranks are ignored by the native solver")
@@ -127,7 +137,7 @@ def _validate_solver(case, rep):
         return None
     from ..core.materials import MATERIALS
     if material not in MATERIALS:
-        err(f"Unknown charge material '{material}'")
+        err(_unknown_material(material))
         return None
     from ..solvers.foam import backend as foam_backend
     if case.dim not in foam_backend.IMPLEMENTED:

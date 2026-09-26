@@ -104,7 +104,8 @@ class MainWindow(QMainWindow):
         self._status = label('', 'small')
         self._status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         column.addWidget(self._status)
-        self._status_timer.timeout.connect(lambda: self._status.setText(''))
+        self._status_timer.timeout.connect(
+            lambda: (self._status.setText(''), self._status.setToolTip('')))
 
         self.viewer_link = ViewerLink(self, log_fn=self._log_threadsafe)
         self.view3d = View3DHost(self.viewer_link, 'run',
@@ -549,7 +550,8 @@ class MainWindow(QMainWindow):
         Not through RunController: that machinery is for a solve with
         frames, gauges, stepping and resume. A 0-D deflagration case is
         closed form but not instant - the starter case takes about 40 s
-        (sensitivity band off) - so the assessment runs ONCE, on a worker
+        with the sensitivity band off, about 20 min with it on - so the
+        assessment runs ONCE, on a worker
         thread, and the outcome comes back through `self.bridge`; the
         worker touches no widget (UX_REVIEW finding 1). Meanwhile Run,
         F5 and Initialise Model are off, the Run tab's bar is
@@ -575,7 +577,7 @@ class MainWindow(QMainWindow):
             or 'hd13_report.html'
 
         def work():
-            out = err = case_dir = None
+            out = err = case_dir = loads = None
             try:
                 # The temp case file is kept, and the report is made from
                 # the case read back from it, exactly as before Phase 7 of
@@ -594,10 +596,11 @@ class MainWindow(QMainWindow):
             else:
                 try:
                     out = hd13_service.write_report(bundle, path)
+                    loads = bundle.get('loads')
                 except Exception as exc:       # noqa: BLE001 - shown to the user
                     err = exc
             finally:
-                self.bridge.post(self._hd13_done, out, err)
+                self.bridge.post(self._hd13_done, out, err, loads)
 
         self._set_hd13_busy(True)
         threading.Thread(target=work, name='hd13-assessment',
@@ -618,20 +621,47 @@ class MainWindow(QMainWindow):
             sys.setswitchinterval(min(self._switch_interval,
                                       _HD13_SWITCH_INTERVAL))
             self._status.setText('HD 1.3 assessment running…')
+            self._status.setToolTip('')
             self._status.setStyleSheet(f'color: {theme.cur("muted")};')
             self._status_timer.stop()
         else:
             sys.setswitchinterval(self._switch_interval)
 
-    def _hd13_done(self, out, err):
-        """GUI thread: the worker of `_run_hd13` has finished."""
+    def _hd13_done(self, out, err, loads=None):
+        """GUI thread: the worker of `_run_hd13` has finished.
+
+        `loads` is `output/load_csv.export_hd13`'s result (HD1-16). The
+        full text - the report, the load folder and every CSV as absolute
+        paths, and each "record ends while the load is still active"
+        message verbatim - goes to the Run log and the status tooltip; the
+        status line gets a short summary that fits, as a warning when that
+        rule fired (QA 2026-09-26-hd1-16 F2: one line of ~3300 px was
+        clipped to "HD 1.3 report written: C:\\...")."""
         self._set_hd13_busy(False)
         if err is not None:
             self._status.setText('')
+            self._status.setToolTip('')
             self.show_error('HD 1.3 assessment', str(err))
             return
-        self._status.setText(f'HD 1.3 report written: {out}')
-        self._status_timer.start()
+        files = (loads or {}).get('files') or []
+        msgs = (loads or {}).get('messages') or []
+        lines = [f'HD 1.3 report written: {os.path.abspath(out)}']
+        if files:
+            lines.append(f'SBEDS loads: {len(files)} CSV in '
+                         f'{os.path.abspath(loads["dir"])}')
+            lines += [f'  {os.path.abspath(f)}' for f in files]
+        lines += [f'{name}: {msg}' for name, msg in msgs]
+        for line in lines:
+            self.run_panel.on_log(line)
+        summary = (f'HD 1.3 done - report and {len(files)} SBEDS load CSV'
+                   f'{"" if len(files) == 1 else "s"} written' if files
+                   else 'HD 1.3 done - report written')
+        if msgs:
+            summary += (f'; {len(msgs)} load record'
+                        f'{" ends" if len(msgs) == 1 else "s end"} while '
+                        f'the load is still active')
+        self.notify(f'{summary} (see Log)', 'warn' if msgs else 'info')
+        self._status.setToolTip('\n'.join(lines))
 
     def _confirm_long_run(self, cases):
         """An end time past the automatic stop is now honoured (T52),
@@ -779,6 +809,7 @@ class MainWindow(QMainWindow):
             return
         colour = {'error': 'error', 'warn': 'warn'}.get(level, 'muted')
         self._status.setText(text[:200])
+        self._status.setToolTip(text)   # the whole text, past the cap
         self._status.setStyleSheet(f'color: {theme.cur(colour)};')
         self._status_timer.start()
 

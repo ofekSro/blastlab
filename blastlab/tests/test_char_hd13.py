@@ -3,14 +3,11 @@
 docs/ARCHITECTURE_REVIEW.md section 5, Phase 0. Runs `core.assessment.run`
 on the starter case `output/cli_hd13.write_starter_case` writes and pins
 the numbers the report leads with: confined peak pressure and stop
-reason, unconfined expansion Mach number, SDOF ductility and response
-regime, and the structural verdict - to rel = 1e-9. Phase 7 moves the
-orchestration into `services/hd13.py`; these must not move.
+reason and unconfined expansion Mach number - to rel = 1e-9. Phase 7
+moves the orchestration into `services/hd13.py`; these must not move.
 
-The starter case has the sensitivity band OFF, so its verdict is None
-and is pinned as None. Switching the band on costs 15 more solves - many
-minutes at this case's 20 cohorts - which is too slow for a gate run on
-every phase, so the verdict itself is not characterised here.
+The SDOF ductility, regime and structural-verdict pins were removed with
+the structural response itself (TODO.md HD1-16 step 1, item 3).
 
 Run:  cd blastlab/tests && python test_char_hd13.py [--update]
 """
@@ -23,20 +20,14 @@ REL = 1e-9
 
 
 def headline(out):
+    """HD1-16 step 1, item 3: the sdof_* and verdict* pins are gone with
+    the structural response; every other pin is unchanged."""
     c = out['confined']
     u = out['unconfined']
-    s = out['sdof']
-    v = out['verdict']
     return dict(
         confined_p_max=c['p_max'],
         confined_stop_reason=c['stop_reason'],
         unconfined_mach_max=u['mach_max'],
-        sdof_ductility=s.ductility,
-        sdof_regime=s.regime,
-        sdof_collapsed=s.collapsed,
-        verdict=None if v is None else v['verdict'],
-        verdict_low_ductility=None if v is None else v['low']['ductility'],
-        verdict_high_ductility=None if v is None else v['high']['ductility'],
     )
 
 

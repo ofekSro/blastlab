@@ -12,7 +12,10 @@ with the GUI main thread ONLY through a queue of tagged tuples:
     ('frame3d',)                token: a fresh 3D payload is available
     ('stage', index, label)     a chain stage begins
     ('result', index, Result)   a stage finished (also on Stop)
-    ('error', traceback_text)   a stage raised
+    ('error', traceback_text)   a stage raised; after a failed hand-off
+                                write (jobs.HandoffWriteError) the
+                                stage's 'result' comes first and the
+                                text is the error's message
     ('done',)                   worker finished
 
 Live frames are coalesced into a single slot (latest wins) so a fast
@@ -29,6 +32,7 @@ import traceback
 import numpy as np
 
 from .hooks import RunHooks, StoppedBeforeStart
+from .jobs import HandoffWriteError
 
 
 class GuiHooks(RunHooks):
@@ -318,6 +322,18 @@ class SolverWorker(threading.Thread):
                     # nothing was computed, so there is no partial Result
                     # to post - and it is not a failure either
                     self.q.put(('log', f'  [{exc}]'))
+                    break
+                except HandoffWriteError as exc:
+                    # the solve finished but its hand-off file could not
+                    # be written (UX 2): the result still reaches Results,
+                    # then the chain stops like any failed stage - the
+                    # next one would read a stale or missing profile
+                    self.results[k] = exc.result
+                    self.hooks.flush_progress()
+                    self.q.put(('result', k, exc.result))
+                    self.error_stage = k
+                    self.error = str(exc)
+                    self.q.put(('error', self.error))
                     break
                 except Exception:
                     self.error_stage = k

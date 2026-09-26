@@ -394,6 +394,114 @@ so a tool that gives only pressure answers the wrong question. blastFoam does no
 radiation (`radiationModel none`), so this is a **declared empirical/standards path**,
 not CFD.
 
+### `HD1-12` · ✅ closed 2026-09-21 — it was the discretisation, not the speed
+
+*(Moved from TODO.md on 2026-09-26, unchanged.)*
+
+Opened as "the 0-D model is too slow at the cohort count it needs", with
+vectorising the Cash-Karp loop as the proposed fix. **The owner proposed the
+better one: ramp the ignition across each cohort's interval instead of lighting
+it in an instant.** That was right, and it removed the need for the speed work
+entirely.
+
+| `n` | staircase | ramp |
+|---|---|---|
+| 10 | 2.84 | **1.0223** |
+| 20 | 1.57 | 1.0101 |
+| 40 | 1.19 | 1.0054 |
+| 160 | 1.040 | 1.0028 |
+
+`n = 10` now lands within 2 % of converged, where the staircase was **still 1.2 %
+out at n = 160**. So the converged answer was never 1.04 either — a realistic
+magazine reaches **1.003× ambient**.
+
+**And the mechanism is not the one that sounds right.** The ramp is *not* higher
+order: measured, its entrainment error still falls as 1/n, the same as the
+staircase, because the cohort edges sit at `T(i/n)^(1/d)` and the first interval
+is `T/√n` wide. What it buys is **continuity** — the staircase jumps by a full
+`1/n` at every edge and each jump shock-loads the chamber, while a slope does
+not. Two wrong explanations were written into the code before that one, and
+`test_deflagration.py` caught both; the measured sequences are pinned there.
+
+Vectorising is no longer needed for correctness. Left undone.
+
+---
+
+## 0a. 2026-09-25/26 — the engineering-questions review
+
+The owner went through every open question in `docs/ENGINEERING_QUESTIONS.md` (the
+`/todo` batches of 09-24 and `/refactor` phases 0-8) in order of urgency. Each
+decision is noted under its question there, and the work is in TODO.md: `P0-5`,
+`HD1-16`, `HD1-17`, `P1-7` (side chosen), `P1-8` … `P1-16`, `P2-13`, `P2-14`,
+`P2-15`. Decisions of note:
+- **No SDOF in the app** (`HD1-16`). blastlab delivers the wall load as CSV, and the
+  structural response is solved in SBEDS. Only what was computed is exported, with no
+  tail rule.
+- **Every material row must be 100 % sourced** (`P1-14`). RDX and ANFO are owner-gated.
+- The settings file moves into the repo (`P0-5`). The write interval becomes a user
+  input with a disk estimate (`P1-12`).
+
+**Done in the session itself (the rest is open in TODO.md):**
+- *Stop-gap for `P0-5`:* `auto_cleanup` set to `false` in the virtualised settings
+  file the app actually reads
+  (`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\Roaming\blastlab\settings.json`),
+  which a GUI start had rewritten on 2026-09-25 10:22 with cleanup on.
+- *The primary source for the JWL table* was found and read. It is Dobratz & Crawford,
+  LLNL Explosives Handbook, UCRL-52997 (1985), Table 8-7 (pp. 8-22/8-23), from the
+  Internet Archive, read off the page images. It is registered as
+  `llnl-explosives-handbook` in `docs/references/INDEX.md`, with the two table pages as
+  PNGs. The row-by-row comparison is in TODO `P1-14`: TNT matches, C4 `e0` is
+  1.1 % low, HMX and PETN differ, and RDX and ANFO are not in the handbook.
+
+---
+
+## 0b. 2026-09-26 — batch `hd1-16-load-export` (HD1-16 step 1, HD1-17(a))
+
+Plan and reports are in `docs/batches/2026-09-26-hd1-16-load-export{,.implement,.verify}.md`,
+QA is in `docs/qa/2026-09-26-hd1-16/QA_REPORT.md`, and the UX review is in `docs/UX_REVIEW.md` §"2026-09-26 ·
+hd1-16-load-export". Owner decisions of 2026-09-26, taken during planning:
+- The SBEDS file is **two columns, t [ms] and overpressure [kPa], with no header and nothing else**, and suction is kept.
+- Metadata goes in a sidecar `.txt`.
+- Clearing is a user choice, taking the wall's H and W.
+- Residual capacity stays.
+- No Tk HD 1.3 form.
+
+### `HD1-16` step 1 · No SDOF in the app — the load goes to SBEDS as CSV
+
+- **What:**
+  - `output/load_csv.py` writes every computed chamber trace (the nominal and every band run) to `<report>_loads/` as SBEDS CSVs with sidecars.
+  - The "record ends while the load is still active" rule is 1 % of peak over the last 1 ms. It goes to the sidecar, the CLI, the Qt status line (as a warning) and the Run log.
+  - `--hd13-wall-export` exports the HD1-13 traces (G1 and plane-max, γ 1.24 and 1.40) from `docs/hd13/`. With optional clearing on G1 only, it applies UFC 3-340-02 §2-15.3.2 Eq. 2-8 / 2-9. C_r comes from Rankine-Hugoniot, which is within 1.09 % of Fig. 2-192 at 15 points.
+  - μ, support rotation and the verdict are gone from the report, CLI and Qt. The Structure card is hidden, and its keys pass through. `core/sdof.py` stays until step 2.
+- **Files:**
+  - `__main__.py`
+  - `core/`: `assessment`, `sensitivity` (the `'traces'` key), `thermal`, `unconfined`, `wallload` (new functions only)
+  - `models/`: `fields`, `hd13_case`
+  - `output/`: `cli_hd13`, `hd13`, `load_csv` (new)
+  - `services/hd13`
+  - `ui/`: `app`, `case_form`, `setup_spec`
+  - New tests `test_load_csv.py` and `test_wall_clearing.py`, with 7 goldens re-pinned, one commit each.
+- **Tests:** `test_regression` byte-identical. The HD1 matrix, Qt and Tk suites and the real-window `_e2e_hd13_gui.py` (31/31) all PASS at 50ad65b.
+- **Commits:**
+  - implementation: `7c681ca`, `385047b`, `13648b0`, `a11cf27`, `a9a9309`, `9a7e80e`, `ab5a7ae`, `f1cb45b`, `e339a38`, `2d65b8f`, `1fe4a1f`, `4a3e712`
+  - verify fix: `95a62ce` (stale `_cleared` files)
+  - simplify: `a3b3c7b`
+  - QA fix: `1b7817d`, `50ad65b`
+- **QA:** first pass 16 PASS / 3 FAIL. F2 (the status line was clipped and never logged) was caused by this batch; it was fixed and re-run with 5/5 PASS. F1 existed before the batch and is now `P1-18`.
+
+### `HD1-17(a)` · The HD 1.3 texts that overstate
+
+- **What:**
+  - The `MACH_QUASI_STATIC` comment now states what was seen: the starter case reaches Mach 0.092, 1.8× the threshold. The threshold stays 0.05.
+  - The CLI Mach line says "(upper bound)".
+  - The docstrings give the ~20 min band-on time.
+- **Files:** `core/unconfined.py`, `output/cli_hd13.py`, `ui/app.py`, golden `hd13_cli.json`.
+- **Tests:** `test_unconfined` and `test_char_hd13` are unchanged. The CLI golden diff is one line.
+- **Commits:** `658fb4c`, `5e0752d`.
+- **QA:** n/a (text only).
+
+*(Not part of the batch, though on the same branch: `a9c49ca` (P1-14, RDX removed) and `d2f5cb1` (the OUT track docs), from other sessions.)*
+
 ---
 
 ## 1. The timeline — T0–T70

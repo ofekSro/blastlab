@@ -11,8 +11,9 @@ the report (`char_golden/ui_hd13_run_report.html`):
     byte for byte (ARCHITECTURE_REVIEW Q4 - the owner has not yet said
     whether it is provenance, so it is pinned as it is), the report written
     where it was asked for (byte for byte after the timestamp and PNG
-    masking of `test_char_hd13_cli.py`), the status line and its timer,
-    no dialog, and HOW MANY TIMES `assessment.run` is called - once since
+    masking of `test_char_hd13_cli.py`), the status line, its tooltip,
+    colour and timer, the lines the run added to the Run log (HD1-16,
+    QA F2), no dialog, and HOW MANY TIMES `assessment.run` is called - once since
     UX 1 (it was twice: once "to fail before touching disk", then again
     in `services/hd13.assess`);
   * the Run controls right after the press (`during`: Run and Initialise
@@ -147,8 +148,11 @@ def press_run(win, root, run=None, gaps=None):
     the longest gap between its ticks goes into `gaps` when given - that
     is how long the window was unresponsive."""
     from PySide6.QtCore import QTimer
+    from blastlab.ui import theme
     win._status.setText('')
+    win._status.setToolTip('')
     win._status_timer.stop()
+    log_before = win.run_panel.log_text()
     ticks = []
     timer = QTimer()
     timer.setInterval(10)
@@ -174,10 +178,21 @@ def press_run(win, root, run=None, gaps=None):
         gaps.append(max(b - a for a, b in zip(ticks, ticks[1:])))
     after = ui_state(win)
     del after['status']
+    log = win.run_panel.log_text()
+    assert log.startswith(log_before), 'the Run log lost earlier lines'
+    new_log = log[len(log_before):].lstrip('\n')
     return dict(errors=rec.errors, mkdtemp=rec.mkdtemp,
                 temp_files=rec.temp_files(), assessment_runs=rec.runs,
                 temp_dirs_left=sum(os.path.isdir(d) for d in rec.dirs),
                 status=win._status.text(),
+                # QA 2026-09-26-hd1-16 F2: the full text is in the tooltip
+                # and the Run log, and the still-active rule makes the
+                # short status line a warning
+                status_tooltip=win._status.toolTip(),
+                status_is_warning=(bool(win._status.text())
+                                   and win._status.styleSheet()
+                                   == f'color: {theme.cur("warn")};'),
+                log_added=new_log.splitlines(),
                 status_timer_active=win._status_timer.isActive(),
                 during=during, after=after)
 

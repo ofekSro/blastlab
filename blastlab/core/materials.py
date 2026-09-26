@@ -42,8 +42,6 @@ MATERIALS = {
                      4.29e6, 6930.0, Pcj=2.1e10),
     'C4':   Material(6.0977e11, 1.295e10, 4.50,  1.40,  0.25, 1601.0,
                      5.56e6, 8193.0, Pcj=2.8e10),
-    'RDX':  Material(7.78e11,   7.07e9,   4.485, 1.068, 0.30, 1770.0,
-                     5.15e6, 8750.0, Pcj=3.4e10),
     'HMX':  Material(7.783e11,  7.071e9,  4.20,  1.00,  0.30, 1890.0,
                      5.50e6, 9100.0, Pcj=3.9e10),
     'PETN': Material(6.17e11,   1.69e10,  4.40,  1.20,  0.25, 1770.0,
@@ -53,6 +51,16 @@ MATERIALS = {
 }
 
 MATERIAL_NAMES = tuple(MATERIALS)   # combo/prompt order
+
+#: Rows taken out of the table, and why - so a saved case that names one
+#: is refused with the reason instead of a bare "unknown material".
+#: RDX (owner, 2026-09-26, TODO.md P1-14): no primary source carries a
+#: cylinder-test JWL set for PURE RDX - LLNL Table 8-7 and Lee, Hornig &
+#: Kury (1968) give only RDX mixtures (Comp B, cyclotol), and the row here
+#: was HMX's with a different density. C4 (91 % RDX) stays, fully sourced.
+REMOVED = {
+    'RDX': 'removed: no primary source for pure RDX (P1-14) - use C4',
+}
 
 
 @dataclass(frozen=True)
@@ -113,14 +121,13 @@ class Afterburn:
 #:
 #: The others scale TNT's Q0 by OXYGEN BALANCE - how much oxygen the
 #: molecule lacks to burn itself completely is what is left for the
-#: atmosphere to supply: TNT -74 %, RDX/HMX -21.6 %, C4 ~-21 % (91 %
+#: atmosphere to supply: TNT -74 %, HMX -21.6 %, C4 ~-21 % (91 %
 #: RDX), PETN -10.1 %, ANFO ~0 % (designed oxygen-balanced, so almost
 #: no afterburn). Only the TNT row is anchored to data; treat the rest
 #: as physically ordered estimates and calibrate before quoting.
 AFTERBURN = {
     'TNT':  Afterburn(Q0=2.00e6, a=1.45e-5),
     'C4':   Afterburn(Q0=0.57e6, a=1.45e-5),
-    'RDX':  Afterburn(Q0=0.58e6, a=1.45e-5),
     'HMX':  Afterburn(Q0=0.58e6, a=1.45e-5),
     'PETN': Afterburn(Q0=0.27e6, a=1.45e-5),
     'ANFO': Afterburn(Q0=0.10e6, a=1.45e-5),

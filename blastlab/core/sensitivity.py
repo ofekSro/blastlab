@@ -345,6 +345,10 @@ def band(prop, charge_kg, volume_m3, dn=DEFAULT_DN, a_factor=DEFAULT_A_FACTOR,
         'high_trace': (list(hi_row[2]['t']), list(hi_row[2]['p'])),
         'low_signs': lo_row[0],
         'high_signs': hi_row[0],
+        #: HD1-16: every run the band made, nominal (all signs 0),
+        #: corners and faces, as (signs, t, p), for the SBEDS load export
+        #: (output/load_csv.py). Additive; no other key depends on it.
+        'traces': [(g, list(r['t']), list(r['p'])) for g, _s, r in all_rows],
         'conserved': all(r['stop_reason'] != 'conservation_violation'
                          for _g, _s, r in all_rows),
         'cohort_converged': nominal_result['cohort_converged'],

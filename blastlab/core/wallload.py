@@ -155,6 +155,128 @@ def wall_load(times, p, U, rho, gamma, normal=(1.0, 0.0, 0.0),
                 R=R, S=S, M=M, un=un)
 
 
+# ── clearing of a front wall (HD1-16 step 1, item 2; owner 2026-09-26) ──
+#
+# UFC 3-340-02 (2008), para. 2-15.3.2 (printed p. 65, sidecar
+# `=== page 141 ===`): the reflected pressure on a front wall is relieved
+# over the clearing time
+#     t_c = 4 S / ((1 + R) C_r)                                (Eq. 2-8)
+# S = min(H, W/2) the clearing distance, G = max(H, W/2), R = S / G, C_r
+# the sound speed in the reflected region (Fig. 2-192, printed p. 267);
+# after t_c the wall carries P = Ps + C_D q with C_D = 1 on a front wall
+# (Eq. 2-9). Fig. 2-191a (printed p. 266) draws the relief as a straight
+# line from Pr at arrival to the Ps + C_D q curve at t_c.
+#
+# PRE-REGISTERED INTERPRETATION for a computed trace (batch plan
+# docs/batches/2026-09-26-hd1-16-load-export.md, Step 2b; the owner may
+# correct it): arrival t_a is the first sample where E exceeds
+# CLEARING_ARRIVAL_FRACTION of its peak; with tau = t - t_a,
+#     L = E                                        t < t_a
+#     L = (1 - tau/t_c) E + (tau/t_c) (Ps + C_D q)  0 <= tau <= t_c
+#     L = Ps + C_D q                               tau > t_c
+# The Eq. 2-10 check (fictitious duration t_rf = 2 i_r / P_r, keep the
+# smaller impulse) is NOT applied: it is for idealised triangles.
+
+#: C_D on a front wall, UFC 3-340-02 (2008), para. 2-15.3.2 (p. 65).
+C_D_FRONT = 1.0
+#: The arrival of a computed trace: the first sample above this fraction
+#: of its peak (batch plan Step 2b, pre-registered).
+CLEARING_ARRIVAL_FRACTION = 0.01
+
+
+def clearing_geometry(H: float, W: float) -> tuple[float, float, float]:
+    """(S, G, R) of a front wall of height `H` and width `W` [m]:
+    S = min(H, W/2), G = max(H, W/2), R = S/G. UFC 3-340-02 (2008),
+    para. 2-15.3.2, Eq. 2-8 (p. 65)."""
+    H, W = float(H), float(W)
+    if not (H > 0.0 and W > 0.0):
+        raise ValueError('wall height and width must both be positive')
+    S, G = min(H, 0.5 * W), max(H, 0.5 * W)
+    return S, G, S / G
+
+
+def clearing_time(H: float, W: float, c_r: float) -> float:
+    """t_c = 4 S / ((1 + R) C_r) [s], UFC 3-340-02 (2008) Eq. 2-8 (p. 65),
+    with `c_r` [m/s] the sound speed in the reflected region."""
+    S, _G, R = clearing_geometry(H, W)
+    if not c_r > 0.0:
+        raise ValueError('the reflected sound speed must be positive')
+    return 4.0 * S / ((1.0 + R) * float(c_r))
+
+
+def incident_from_reflected(r: float, gamma: float = 1.4,
+                            p0: float = P_AIR) -> float:
+    """The side-on overpressure `ps` [Pa] whose normal reflection is `r`
+    [Pa] - the inverse of `reflected_overpressure` for r > 0 (the
+    positive root of (3g-1) x^2 + (4 g p0 - (g-1) r) x - 2 g p0 r = 0).
+    `r <= 0` comes back unchanged, as `reflected_overpressure` does."""
+    g, r = float(gamma), float(r)
+    if r <= 0.0:
+        return r
+    a = 3.0 * g - 1.0
+    b = 4.0 * g * p0 - (g - 1.0) * r
+    c = -2.0 * g * p0 * r
+    return (-b + np.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)
+
+
+def _density_behind_shock(rho_a, p_a, p_b, g):
+    """Density behind a shock from state (p_a, rho_a) to pressure p_b,
+    Rankine-Hugoniot for an ideal gas of ratio g."""
+    return (rho_a * ((g + 1.0) * p_b + (g - 1.0) * p_a)
+            / ((g - 1.0) * p_b + (g + 1.0) * p_a))
+
+
+def reflected_sound_speed(ps: float, gamma: float = 1.4, p0: float = P_AIR,
+                          rho0: float | None = None) -> float:
+    """C_r [m/s], the sound speed behind the normally reflected shock of a
+    front of side-on overpressure `ps` [Pa] in still gas (p0, rho0).
+
+    Rankine-Hugoniot twice, ideal gas of ratio `gamma`: ambient -> incident
+    (p1 = p0 + ps), incident -> reflected (p2 = p0 + R, R from
+    `reflected_overpressure`), density ratio
+    ((g+1) p_b + (g-1) p_a) / ((g-1) p_b + (g+1) p_a) across each, and
+    C_r = sqrt(g p2 / rho2). The quantity UFC 3-340-02 (2008) Fig. 2-192
+    (printed p. 267) plots for air against Pso; `tests/test_wall_clearing.py`
+    checks it against that figure at gamma = 1.4."""
+    from .constants import RHO_AIR
+    rho0 = RHO_AIR if rho0 is None else float(rho0)
+    g, ps = float(gamma), max(float(ps), 0.0)
+    p1 = p0 + ps                                          # incident
+    p2 = p0 + float(reflected_overpressure(ps, g, p0))    # reflected
+    rho1 = _density_behind_shock(rho0, p0, p1, g)
+    rho2 = _density_behind_shock(rho1, p1, p2, g)
+    return float(np.sqrt(g * p2 / rho2))
+
+
+def apply_clearing(times, E, ps, q, H: float, W: float, c_r: float,
+                   arrival_fraction: float = CLEARING_ARRIVAL_FRACTION,
+                   c_d: float = C_D_FRONT) -> dict:
+    """The front-wall load of a computed trace after clearing.
+
+    `E` [Pa over ambient] is the unrelieved wall load, `ps` [Pa over
+    ambient] and `q` [Pa] the side-on and dynamic pressure on the same
+    `times` [s]; `H`, `W` [m] the loaded wall, `c_r` [m/s] the reflected
+    sound speed. Returns dict(L, t_a, t_c, S, G, R): the construction in
+    the comment block above (UFC 3-340-02 (2008) para. 2-15.3.2,
+    Eq. 2-8 / 2-9, Fig. 2-191a, applied to a CFD trace). A trace that
+    never rises (peak <= 0) comes back unchanged, with t_a = None."""
+    t = np.asarray(times, dtype=float)
+    E = np.asarray(E, dtype=float)
+    after = np.asarray(ps, dtype=float) + c_d * np.asarray(q, dtype=float)
+    if not (t.shape == E.shape == after.shape):
+        raise ValueError('times, E, ps and q must have one shape')
+    S, G, R = clearing_geometry(H, W)
+    t_c = clearing_time(H, W, c_r)
+    peak = float(np.max(E)) if E.size else 0.0
+    if not peak > 0.0:
+        return dict(L=E.copy(), t_a=None, t_c=t_c, S=S, G=G, R=R)
+    t_a = float(t[np.argmax(E > arrival_fraction * peak)])
+    tau = t - t_a
+    w = np.clip(tau / t_c, 0.0, 1.0)
+    L = np.where(tau < 0.0, E, (1.0 - w) * E + w * after)
+    return dict(L=L, t_a=t_a, t_c=t_c, S=S, G=G, R=R)
+
+
 def extend_with_tail(times, load, level, duration):
     """(times, load) with `level` held for `duration` [s] after the
     record ends - the HD1-13 rule's T1 tail.

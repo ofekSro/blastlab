@@ -2,13 +2,15 @@
 
 The whole HD 1.3 track is 0-D and closed form, so unlike every other run
 in this repo it needs no WSL, no solver and no GUI (the starter case takes
-about 40 s with the sensitivity band off). That makes a command-line entry point the cheapest way to make
-the work usable, and it is deliberately the FIRST way rather than the
+about 40 s with the sensitivity band off, about 20 min with it on). That
+makes a command-line entry point the cheapest way to make the work
+usable, and it is deliberately the FIRST way rather than the
 fallback: a Qt form can be built on top of exactly these calls later
 without either of them owning the other.
 
     python -m blastlab --hd13-new magazine.json    # a starter case
     python -m blastlab --hd13 magazine.json        # run it, write the report
+    python -m blastlab --hd13-wall-export magazine.json   # HD1-13 wall CSVs
 
 The validation report is printed before anything is computed, errors and
 warnings first, because for this model the warnings are the product. A
@@ -20,6 +22,8 @@ The assessment itself (validate, run, figures, report) is
 this module is the command-line wrapper around it: it prints, and it
 turns a refused case into `SystemExit`.
 """
+
+import os
 
 from ..core import assessment
 from ..services import hd13 as hd13_service
@@ -68,23 +72,9 @@ def _print_headline(out, out_path):
         if out['sensitivity_note']:
             print(f"             {out['sensitivity_note']}")
     if u is not None:
-        print(f"  unconfined expansion Mach {u['mach_max']:.4f}"
+        print(f"  unconfined expansion Mach {u['mach_max']:.4f} (upper bound)"
               f"   blast negligible: {u['blast_negligible']}")
-    if out['sdof'] is not None:
-        s = out['sdof']
-        if s.collapsed:
-            print(f'  structure  COLLAPSE at '
-                  f'{s.t_collapse * 1e3:.1f} ms   {s.regime}'
-                  f'   (rotation limit '
-                  f'{out["component"].rotation_limit_deg:g} deg)')
-        else:
-            print(f"  structure  mu {s.ductility:.3f}   {s.regime}"
-                  f"   theta {s.support_rotation_deg:.2f} deg")
-    if out['verdict'] is not None:
-        v = out['verdict']
-        print(f"  verdict    {v['verdict'].replace('_', ' ').upper()}"
-              f"   (mu {v['low']['ductility']:.2f} at the low end of "
-              f"the band, {v['high']['ductility']:.2f} at the high)")
+    # HD1-16: no structure / verdict lines; the load goes to SBEDS.
     if out['qd'] is not None:
         from ..core import qd as _qd      # lazy, as in core/assessment
         print(f"  siting     {_qd.summary_line(out['qd'])}")
@@ -113,4 +103,48 @@ def run_and_report(case_path: str, out_path: str | None = None,
 
     if not quiet:
         _print_headline(bundle['out'], out_path)
+        _print_loads(bundle.get('loads'))
     return out_path
+
+
+def wall_export(case_path: str, quiet: bool = False) -> dict:
+    """HD1-16 step 1, item 2: write the HD1-13 wall-load traces as SBEDS
+    CSVs into `<case>_wall_loads/` (output/load_csv.export_wall_loads).
+
+    Only the case's loaded wall is read (clearing, wall_H_m, wall_W_m);
+    clearing on with H or W missing raises `SystemExit` naming the field.
+    """
+    from . import load_csv
+    case = assessment.load_case(case_path)
+    errs = assessment.wall_errors(case)
+    if errs:
+        raise SystemExit('refusing to export: ' + '; '.join(errs))
+    res = load_csv.export_wall_loads(case,
+                                     load_csv.wall_loads_dir(case_path))
+    if not quiet:
+        print(f'\nHD 1.3 wall-load export: {case.name or case_path}')
+        if case.clearing:
+            print(f'  clearing: on, H = {case.wall_H_m:g} m, W = '
+                  f'{case.wall_W_m:g} m (G1 only; plane-max is always '
+                  f'unrelieved)')
+        else:
+            print('  clearing: off (E = max(R, S), no clearing, upper bound)')
+        for g, p in res['params'].items():
+            print(f'  gamma {g}: C_r {p["c_r"]:.4g} m/s, t_c '
+                  f'{p["t_c"] * 1e3:.4g} ms')
+        _print_loads(res)
+    return res
+
+
+def _print_loads(loads):
+    """HD1-16: where the SBEDS load CSVs went, and any trace whose record
+    ends while the load is still active."""
+    if not loads or not loads['files']:
+        return
+    print(f"  loads:  {loads['dir']}   ({len(loads['files'])} CSV, "
+          f"t [ms], overpressure [kPa], each with a .txt sidecar)")
+    for path in loads['files']:
+        print(f'          {os.path.basename(path)}')
+    for name, msg in loads['messages']:
+        print(f'  {name}: {msg}')
+    print()

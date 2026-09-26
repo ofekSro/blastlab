@@ -252,9 +252,9 @@ def main():
         # oxygen-balanced ones, in that order. Absolute KB ratios are
         # NOT asserted: validate_case warns, correctly, that nothing but
         # TNT is calibrated (P1-4).
-        print('--- afterburn sweep, all six materials ---')
+        print('--- afterburn sweep, all five materials ---')
         lift = {}
-        for mat in ('TNT', 'C4', 'RDX', 'HMX', 'PETN', 'ANFO'):
+        for mat in ('TNT', 'C4', 'HMX', 'PETN', 'ANFO'):
             no_ab = _peaks(_run(mat, afterburn='none'))
             with_ab = _peaks(_run(mat, afterburn='miller'))
             lift[mat] = with_ab[1] / no_ab[1]
@@ -266,7 +266,8 @@ def main():
                   lift[mat] >= 1.0 - 1e-9, f'x{lift[mat]:.4f}')
             check(f'{mat}: the lift stays physical (< x2)',
                   lift[mat] < 2.0, f'x{lift[mat]:.4f}')
-        # What the lift ordering actually supports, measured:
+        # What the lift ordering actually supports, measured (RDX was
+        # still in the table then; removed 2026-09-26, P1-14):
         #
         #   TNT 1.187 | RDX 1.052 | HMX 1.050 | C4 1.048
         #             | ANFO 1.022 | PETN 1.008

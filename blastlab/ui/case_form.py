@@ -35,6 +35,11 @@ class CaseForm(FieldForm):
         if self.dim == 0:
             self.on_field('scenario_kind', self._sync_scenario)
             self._sync_scenario()
+            self.on_field('clearing', self._sync_clearing)
+            self._sync_clearing()
+            # HD1-16: built so its values pass through, never shown
+            for title in setup_spec.HIDDEN_CARDS_0:
+                self.cards[title].setVisible(False)
             return
         if self.dim == 2:
             self.on_field('geometry', self._sync_geometry)
@@ -138,6 +143,16 @@ class CaseForm(FieldForm):
         spread = self.v['scenario_kind'].get() != 'uniform'
         for key in ('n_cohorts', 'spread_time', 'spread_geometry'):
             self.set_enabled(key, spread)
+
+    def _sync_clearing(self):
+        """HD1-16: the wall's H and W matter only when clearing is on, so
+        they are disabled (not hidden, as the spread rows) while it is
+        off; their values are kept."""
+        if self.dim != 0 or 'clearing' not in self.v:
+            return
+        on = bool(self.v['clearing'].get())
+        for key in ('wall_H_m', 'wall_W_m'):
+            self.set_enabled(key, on)
 
     # ── Case conversion (models/fields.py) ───────────────────────────────
     def field_values(self):

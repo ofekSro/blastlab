@@ -96,8 +96,9 @@ def main():
     check('a sound case validates', rep.ok, str(rep.errors))
     check('and still reports the closed-vessel limit and loading density',
           has(rep, 'closed-vessel limit') and has(rep, 'loading density'))
-    check('a structural run states it uses the AMBIENT resistance',
-          has(rep, 'ambient resistance'))
+    # HD1-16: no structural response is computed, so none is promised
+    check('no validation message promises a structural response',
+          not has(rep, 'structural response will be computed'))
 
     print('\n  the warnings that decide whether a number is quotable')
     check('the extrapolation below the calibrated window is raised BEFORE '
@@ -176,15 +177,16 @@ def main():
     # ── 3. one call, the whole assessment ───────────────────────────────
     print('\n  run()')
     out = asm.run(good)
-    for k in ('confined', 'unconfined', 'thermal', 'radiation', 'sdof',
-              'component'):
+    for k in ('confined', 'unconfined', 'thermal', 'radiation'):
         check(f'{k} was produced', out[k] is not None and out[k] != ())
     check('the confined and unconfined halves used the SAME fire',
           out['confined']['scenario_kind']
           == out['unconfined']['scenario_kind'] == 'flame_spread')
-    check('the structural response used the ambient resistance, not a '
-          'heated one',
-          out['component'].Ru == good.Ru_pa)
+    # HD1-16 step 1, item 3: the keys stay, always None, until step 2
+    check('no structural response, even with an element in the case: '
+          'sdof, component and verdict are None',
+          good.has_component and out['sdof'] is None
+          and out['component'] is None and out['verdict'] is None)
     check('residual capacity is reported separately, for a later case',
           'residual' in out
           and out['residual']['Ru_degraded'] <= good.Ru_pa
@@ -201,9 +203,9 @@ def main():
         unconfined=out['unconfined'], sdof=out['sdof'],
         component=out['component'], thermal=out['thermal'],
         radiation=out['radiation'], title=good.name)
-    check('every section rendered from one run() call',
-          {'confined', 'unconfined', 'sdof', 'thermal', 'radiation'}
-          <= set(sections), str(sections))
+    check('every section rendered from one run() call, and no structural '
+          'one', {'confined', 'unconfined', 'thermal', 'radiation'}
+          <= set(sections) and 'sdof' not in sections, str(sections))
 
     print('\n  a confined-only case skips what it did not ask for')
     lean = replace(good, confinement='confined', standoffs_m=[], h_c=0.0,
@@ -258,44 +260,60 @@ def main():
     check('and the caveat is IN the page, not left to the reader',
           'UNSOURCED' in page)
 
-    # THE VERDICT ACROSS THE BAND, wired through. A verdict at the
-    # nominal point of a band spanning an order of magnitude is not a
-    # verdict about the structure, it is a verdict about the middle of a
-    # guess.
-    print('\n  and the structural verdict across both ends of it')
-    with_wall = replace(banded, span_m=3.0, mass_per_area=300.0,
-                        Ru_pa=250e3, kE_pa_m=3.0e7, support='simple')
-    out4 = asm.run(with_wall)
-    v = out4['verdict']
-    check('a case with both a band and an element gets a verdict at each '
-          'end of the band, not one at the middle',
-          v is not None and 'low' in v and 'high' in v
-          and v['verdict'] in ('fails_across_band', 'survives_across_band',
-                               'undetermined_within_band'),
-          f"{v['verdict']}: mu {v['low']['ductility']:.2f} to "
-          f"{v['high']['ductility']:.2f}")
-    check('the two ends really are the ends of the band it was taken '
-          'across', abs(v['low']['p_max'] - out4['band']['low']['p_max']) < 1
-          and abs(v['high']['p_max'] - out4['band']['high']['p_max']) < 1)
-    check('and the report carries it, either as a warning when it flips '
-          'or as a note when it does not',
-          any('VERDICT UNDETERMINED' in m for m in out4['report'].warnings)
-          or any('Structural verdict' in m for m in out4['report'].notes),
-          str(out4['report'].notes[-1:] + out4['report'].warnings[-1:]))
+    # HD1-16 step 1, item 3: NO MU, NO ROTATION, NO VERDICT IN ANY OUTPUT.
+    # The grep check the batch plan registered: the starter case (which
+    # carries an element) with the band on at a tiny setting, through the
+    # report HTML, the CLI stdout and the validation messages - none of
+    # these strings may appear anywhere in them.
+    print('\n  no output carries a mu, a rotation or a verdict (HD1-16)')
+    import contextlib
+    import io
+    from blastlab.output import cli_hd13
+    forbidden = ('Ductility', 'ductility', 'mu ', 'Support rotation',
+                 'survives_across_band', 'fails_across_band',
+                 'undetermined_within_band', 'COLLAPSE')
+    gdir = tempfile.mkdtemp(prefix='blastlab_asm_grep_')
+    starter = cli_hd13.write_starter_case(os.path.join(gdir, 's.json'))
+    # tiny: adiabatic (so 25 band runs, not 43), short, few cohorts. No
+    # standoffs: with h_c = 0 AND standoffs, services/hd13.assess feeds
+    # figure_thermal an empty q (a pre-existing bug, reported, not fixed
+    # in this batch).
+    tiny = replace(asm.load_case(starter), sensitivity=True, t_end=5.0,
+                   n_cohorts=4, spread_time=4.0, h_c=0.0, standoffs_m=[])
+    check('the grep case carries an element, so a response WOULD have '
+          'been computed before HD1-16', tiny.has_component)
+    tiny_path = asm.save_case(tiny, os.path.join(gdir, 'tiny.json'))
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rpath = cli_hd13.run_and_report(tiny_path)
+    stdout = buf.getvalue()
+    with open(rpath, encoding='utf-8') as fh:
+        rpage = fh.read()
+    out4 = asm.run(tiny)
+    msgs = '\n'.join(out4['report'].errors + out4['report'].warnings
+                     + out4['report'].notes)
+    for label, text in (('report HTML', rpage), ('CLI stdout', stdout),
+                        ('validation messages', msgs)):
+        hits = [w for w in forbidden if w in text]
+        check(f'the {label} carries none of {len(forbidden)} forbidden '
+              f'strings', not hits, str(hits))
+    check('the band did run (so the verdict path was reachable)',
+          out4['band'] is not None and out4['verdict'] is None
+          and 'band_' in ''.join(os.listdir(
+              os.path.splitext(rpath)[0] + '_loads')))
+    check('and the report has no Structural response section or figure',
+          'Structural response' not in rpage
+          and 'survive the band' not in rpage)
     vpath = os.path.join(os.path.dirname(path), 'verdict.html')
-    vs = hd13.save_hd13_report(vpath, prop=out4['prop'],
-                               confined=out4['confined'],
-                               sensitivity=out4['sensitivity'],
-                               sensitivity_note=out4['sensitivity_note'],
-                               verdict=v)
+    fake = {'verdict': 'fails_across_band', 'note': 'x',
+            'low': {'ductility': 9.0}, 'high': {'ductility': 9.0}}
+    hd13.save_hd13_report(vpath, prop=out4['prop'],
+                          confined=out4['confined'], verdict=fake)
     with open(vpath, encoding='utf-8') as fh:
         vpage = fh.read()
-    check('the page shows both ends side by side and names the verdict',
-          'survive the band' in vpage
-          and v['verdict'].replace('_', ' ') in vpage, str(vs))
-    check('a case with an element but NO band gets no verdict, rather '
-          'than one computed at a single point and called robust',
-          asm.run(replace(with_wall, sensitivity=False))['verdict'] is None)
+    check('save_hd13_report ignores a verdict= it is still handed',
+          'fails across band' not in vpage and 'survive the band'
+          not in vpage)
 
     # THE BAND MUST RUN ON THE CASE'S OWN SCENARIO. Every band test in
     # test_sensitivity.py lights uniformly because that is fast, so the

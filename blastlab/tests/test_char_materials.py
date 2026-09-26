@@ -37,8 +37,6 @@ MATERIAL_ROWS = {
              1400.0, 815.0, 0.25, 55.0, 2.1e10),
     'C4':   (6.0977e11, 1.295e10, 4.50, 1.40, 0.25, 1601.0, 5.56e6, 8193.0,
              1400.0, 815.0, 0.25, 55.0, 2.8e10),
-    'RDX':  (7.78e11, 7.07e9, 4.485, 1.068, 0.30, 1770.0, 5.15e6, 8750.0,
-             1400.0, 815.0, 0.25, 55.0, 3.4e10),
     'HMX':  (7.783e11, 7.071e9, 4.20, 1.00, 0.30, 1890.0, 5.50e6, 9100.0,
              1400.0, 815.0, 0.25, 55.0, 3.9e10),
     'PETN': (6.17e11, 1.69e10, 4.40, 1.20, 0.25, 1770.0, 5.81e6, 8400.0,
@@ -51,14 +49,13 @@ MATERIAL_ROWS = {
 AFTERBURN_ROWS = {
     'TNT':  (2.00e6, 1.45e-5, 1.0, 0.5, 1.5e5),
     'C4':   (0.57e6, 1.45e-5, 1.0, 0.5, 1.5e5),
-    'RDX':  (0.58e6, 1.45e-5, 1.0, 0.5, 1.5e5),
     'HMX':  (0.58e6, 1.45e-5, 1.0, 0.5, 1.5e5),
     'PETN': (0.27e6, 1.45e-5, 1.0, 0.5, 1.5e5),
     'ANFO': (0.10e6, 1.45e-5, 1.0, 0.5, 1.5e5),
 }
 
 E0_VALUES = {
-    'TNT': 6992700000.0, 'C4': 8901560000.0, 'RDX': 9115500000.0,
+    'TNT': 6992700000.0, 'C4': 8901560000.0,
     'HMX': 10395000000.0, 'PETN': 10283700000.0, 'ANFO': 3230000000.0,
 }
 
@@ -70,8 +67,6 @@ RADII = {
              0.013974338580521863, 0.0698716929026093),
     'C4':   (0.005302817566152793, 0.05302817566152792, 0.2461349880174049,
              0.014100333922620886, 0.07050166961310443),
-    'RDX':  (0.005128370281018356, 0.05128370281018356, 0.23803786231006427,
-             0.013410298053702882, 0.06705149026851441),
     'HMX':  (0.005017451642478435, 0.05017451642478435, 0.23288947516919997,
              0.012977593351533746, 0.06488796675766872),
     'PETN': (0.005128370281018356, 0.05128370281018356, 0.23803786231006427,
@@ -86,7 +81,8 @@ SHIM_NAMES = ('Material', 'MATERIALS', 'MATERIAL_NAMES', 'Afterburn',
 
 
 def test_material_rows():
-    assert old.MATERIAL_NAMES == ('TNT', 'C4', 'RDX', 'HMX', 'PETN', 'ANFO')
+    # RDX taken out by owner decision, 2026-09-26 (TODO.md P1-14)
+    assert old.MATERIAL_NAMES == ('TNT', 'C4', 'HMX', 'PETN', 'ANFO')
     assert tuple(old.MATERIALS) == old.MATERIAL_NAMES
     for name, row in MATERIAL_ROWS.items():
         assert dataclasses.astuple(old.MATERIALS[name]) == row, name
@@ -122,6 +118,15 @@ def test_material_jwl():
             rho0=row[5], e0=row[6]), name
 
 
+def test_removed_rows_refused_with_reason():
+    """A saved case that names a removed row is refused, and says why."""
+    from blastlab.services.validation import _unknown_material
+    assert 'RDX' not in old.MATERIALS and 'RDX' not in old.AFTERBURN
+    msg = _unknown_material('RDX')
+    assert 'P1-14' in msg and 'C4' in msg, msg
+    assert _unknown_material('XYZ') == "Unknown charge material 'XYZ'"
+
+
 def test_shim_reexports_core():
     """The old path hands out the very objects core.materials owns."""
     from blastlab.core import materials as new
@@ -132,7 +137,8 @@ def test_shim_reexports_core():
 def main():
     return cc.run_main('CHAR MATERIALS', [
         test_material_rows, test_afterburn_rows, test_e0,
-        test_charge_radius, test_material_jwl, test_shim_reexports_core])
+        test_charge_radius, test_material_jwl,
+        test_removed_rows_refused_with_reason, test_shim_reexports_core])
 
 
 if __name__ == '__main__':

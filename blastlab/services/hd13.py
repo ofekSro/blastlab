@@ -17,7 +17,7 @@ the OO-matplotlib ones of `output/plots.py`.
 import os
 
 from ..core import assessment
-from ..output import hd13, plots
+from ..output import hd13, load_csv, plots
 
 
 def default_report_path(case_path: str) -> str:
@@ -52,10 +52,7 @@ def assess(case, report=None) -> dict:
     if out['unconfined'] is not None:
         figures.append(('In the open',
                         plots.figure_unconfined(out['unconfined'])))
-    if out['sdof'] is not None:
-        figures.append(('Structural response',
-                        plots.figure_sdof_response(out['sdof'],
-                                                   out['component'])))
+    # HD1-16: no structural-response figure; the load goes to SBEDS.
     # The heat figure is drawn on the chamber's time axis: with no
     # confined result there is no axis, so no heat figure.
     if thermal is not None or out['radiation']:
@@ -70,15 +67,20 @@ def assess(case, report=None) -> dict:
 
 def write_report(bundle: dict, out_path: str) -> str:
     """Write the HD 1.3 HTML report of an `assess` bundle to `out_path`;
-    returns `out_path`."""
+    returns `out_path`.
+
+    Then the chamber load as SBEDS CSVs into `<report stem>_loads/`
+    (HD1-16, `output/load_csv.export_hd13`); what was written, and any
+    "record ends while the load is still active" message, is put in
+    `bundle['loads']` for the caller to show."""
     case, out = bundle['case'], bundle['out']
     hd13.save_hd13_report(
         out_path, prop=out['prop'], confined=out['confined'],
-        unconfined=out['unconfined'], sdof=out['sdof'],
-        component=out['component'], thermal=out['thermal'],
+        unconfined=out['unconfined'], thermal=out['thermal'],
         radiation=out['radiation'], figures=bundle['figures'],
         sensitivity=out['sensitivity'],
-        sensitivity_note=out['sensitivity_note'],
-        verdict=out['verdict'], qd=out['qd'],
+        sensitivity_note=out['sensitivity_note'], qd=out['qd'],
         title=case.name or None)
+    bundle['loads'] = load_csv.export_hd13(out, out_path,
+                                           case_name=case.name)
     return out_path

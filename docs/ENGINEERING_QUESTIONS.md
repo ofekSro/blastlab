@@ -5,6 +5,12 @@ batch it came from; the batch reports under `docs/batches/` hold the full eviden
 Nothing here has been acted on: numbers, thresholds and defaults stay as they are
 until the owner decides.
 
+> **Owner review, 2026-09-25/26: every question below up to phase 8 is decided.** Each
+> decision is noted under its item, and the work is in TODO.md: `P0-5`, `HD1-16`,
+> `HD1-17`, `P1-7`, `P1-8` … `P1-16`, `P2-13`, `P2-14`, `P2-15`. Items that are pure
+> observations (hd1-wall-load #6, #7; phase 1 #3) need no action. New questions go
+> below this line's sections as before.
+
 ---
 
 ## 2026-09-24 · batch `hd1-3d-close` (HD1-3d, the 3D answer)
@@ -34,6 +40,8 @@ Sources: [implement report](batches/2026-09-24-hd1-3d-close.implement.md),
    `Cd` point), needs ~190 GB unless the write sizing changes. The script comment that
    blamed snapshots was corrected in `3798cec`; the `1c9b238` commit message carries
    the same wrong cause and cannot be amended.
+   **Decided 2026-09-25 → `P1-12`:** the user sets the write interval, every N steps or
+   every Δt s, and the form shows the estimated number of writes and disk.
 
 3. **The app and every other tool read different settings files.** Microsoft Store
    Python virtualizes AppData: `python` resolves
@@ -46,6 +54,8 @@ Sources: [implement report](batches/2026-09-24-hd1-3d-close.implement.md),
    CLAUDE.md §8.2 check `env.auto_cleanup(settings.load())` is not a check - it deletes
    whatever the policy selects before returning. A dry run is `env.cleanup_policy` on
    the listed sizes and mtimes. Which file should govern, and should §8.2 say so?
+   **Decided 2026-09-25 → `P0-5`:** one repo-local, git-ignored settings file; a dry-run
+   `cleanup_plan`; §8.2 rewritten. The virtual copy's `auto_cleanup` was set to false.
 
 4. **C8 is narrow.** It looks only at G1, only later than t_peak + 4 ms, and only at
    half the peak. G1's peak is itself a second rise, 8.8 ms after arrival, which C8
@@ -55,6 +65,9 @@ Sources: [implement report](batches/2026-09-24-hd1-3d-close.implement.md),
 5. **The negative phase is still open at 30 ms.** All three gauges sit 22-43 kPa below
    ambient from ~21 ms and are still -22 to -25 kPa at 30 ms; the SDOF sees the record
    only to 30 ms.
+   **Decided 2026-09-25 → `HD1-16` 2a:** export only what was computed, with no tail rule.
+   A record that ends while the load is still active says so. A longer window means a
+   longer run. Also covers hd1-wall-load items 4-5.
 
 6. **The arrival rule** (first sample above 1.1 x ambient, i.e. 10.13 kPa over) lands
    1.19 ms after the first disturbance on this gradual rise (G1 first exceeds 100 Pa at
@@ -62,6 +75,9 @@ Sources: [implement report](batches/2026-09-24-hd1-3d-close.implement.md),
    the impulse by 1.1 % (G1, 326.27 Pa s), 1.7 % (G2) and 2.1 % (G3); a weaker gauge
    would get no arrival and no positive-phase impulse at all. A definition note - no
    verdict attaches.
+   **Decided 2026-09-25 → `P1-13`:** arrival is a fraction (proposed 5 %) of the gauge's own
+   peak, and the positive phase starts at the start of the rise. Also covers
+   architecture item 4.
 
 7. **A judgement taken in the batch, for the owner to overrule.** The plan required
    the run's rendered dicts to be identical to a fresh render, or to differ only in
@@ -93,11 +109,15 @@ Sources: [implement report](batches/2026-09-24-hd1-wall-load.implement.md),
    T0 and T1) and take the worst response.** The rule's wording ("upper bound on the
    load") holds. The plan's rationale for P1 ("a uniform load ... loads the SDOF more")
    does not.
+   **Decided 2026-09-25 → `HD1-16`:** no SDOF in the app. Every trace is exported as CSV
+   for SBEDS, where the worst response is taken.
 
 2. **blastlab cannot read the `0/` fields it writes itself.** The writer closes lists
    with `);` and the reader wants a bare `)`. Chamber and profile stages therefore lose
    their t = 0 frame silently. Tracked as `P1-7` in TODO.md. Which side to fix is the
    owner's decision: the reader is GUI-visible and needs QA; the writer moves goldens.
+   **Decided 2026-09-25 → `P1-7`:** fix the reader, which accepts `)` and `);`. The writer
+   and its goldens stay as they are.
    The same defect made Step 2's first attempt print `NOT ESTABLISHED - Step 2 cannot be
    run read-only`. That attempt aborted at t = 0, before any plane number existed, and
    the re-run after fix `53f87ad` changed no rule or threshold. The verifier judged the
@@ -109,6 +129,8 @@ Sources: [implement report](batches/2026-09-24-hd1-wall-load.implement.md),
    spec lacks `init_state`; this is `P2-10`. `test_foam_postmortem.py`'s peak-map check
    fails deterministically at 2.90e-01, 620 against 632 samples; this is `P2-11`, cause
    undetermined. Fixing either means editing a committed test (§9).
+   **Decided 2026-09-26 → `P2-13`:** editing is permitted for these tests and phase 0 item
+   4's. Fix the mechanism, never the threshold. P2-11's cause is found first.
 
 4. **The T1 hold drives every T1 response.** Every T1 peak falls after the 30 ms record,
    which covers only 0.198 of the drain time. Any meshed-wall run (route (a)) wants a
@@ -170,6 +192,9 @@ GUI was not launched.
    `core/case.py:494-498` sizes it with the *selected material's* `rho0`. With ANFO,
    5 kg of ANFO is shown as "5 kg TNT". Is the field the material mass or a TNT
    equivalent?
+   **Decided 2026-09-25 → `P1-9`:** the field is the material mass. Labels name the
+   material, Z uses W_E from UFC 3-340-02 Eq. 2-1, and native hides the material choice.
+   This covers items 2 and 5 below, architecture item 2 and phase 8 items 1-2.
 2. **The native solver ignores the material the user picks.** In native mode the form
    always sends `'TNT'` (`case_form.py:468/506`), while `core/case.py:548-566` and the
    N11/T46 note say the native solvers take their JWL set from the shared table. Either
@@ -178,6 +203,8 @@ GUI was not launched.
 3. **The "Vieille a" override has no unit** (`setup_spec.py:241`, `case_form.py:184`).
    In r = a·p^n the unit of `a` depends on the units `n` was fitted in. A literature
    value in mm/s/MPa^n could be off by orders of magnitude with no warning.
+   **Decided 2026-09-26 → `P1-15`:** the form takes mm/s/MPaⁿ, converts to SI, shows r at 1
+   and 10 MPa, and old SI files still load.
 4. **HD 1.3 turns an explicit 0 into a default.** This applies to discharge coefficient,
    wall temperature, collapse rotation, cohorts and samples. Does the HTML report print
    the value actually used?
@@ -196,6 +223,9 @@ is part of the migration plan, and none affects the byte-pinned baselines.
    is 8.90e9 J/m³, 1.1 % lower. Either `e0` should be 5.62e6 or the 9.0e9 is rounded.
    The table matches `blastfoam_toolkit/docs/jwl_parameters.md:195-198`; check it against
    the guide's freeField tutorial. Affects blastFoam C4 runs only.
+   **Decided 2026-09-25 → `P1-14`:** LLNL UCRL-52997 Table 8-7 gives E0 = 0.090 Mbar, so
+   e0 = 5.62e6 J/kg and the table's 5.56e6 is 1.1 % low. HMX and PETN also differ, and
+   RDX / ANFO are not in the handbook. Every row must be sourced.
 2. **The preview charge circle uses TNT density for every material**
    (`output/preview_draw.py:117`, `viz3d/geometry.py:54`). For ANFO the real radius is
    24 % larger. Display only; the solver and the writer use the material. Related to
@@ -227,11 +257,16 @@ changed.
    therefore taken between two ends that bracket everything except the nominal point.
    Worth checking `core/sensitivity.band` and `structural_verdict`; the heat-loss (h_c)
    axis is a suspect.
+   **Decided 2026-09-25 → `HD1-16`:** the cause is that the ends are chosen by `p_max` and
+   the response is not monotone in it. Moot, since the SDOF leaves the app and every
+   band sample, nominal included, is exported for SBEDS.
 2. **`validate_case` reports a different grid from the one the native solver builds.**
    For the native 2D case, validation reports dx 0.010542 and 17,063 cells (113 × 151,
    rounded down). The solver builds 114 × 152 = 17,328 cells at dx 0.010526. So the
    cell-cap check undercounts by ~1.5 % in 2D, and probably more in 3D. Worth deciding
    before phases 3-4 split `validate_case`, because the split pins the current numbers.
+   **Decided 2026-09-26 → `P1-16`:** validation uses the solver's own grid builder. High
+   priority.
 3. **The HD 1.3 starter case is a weak check.** Its confined peak is 102.35 kPa absolute
    (~1 kPa over ambient), with ductility 0.12 (quasi-static). The `cli_hd13.py` docstring
    says the assessment finishes "in under a second". The starter case took ~42 s here,
@@ -271,6 +306,9 @@ Source: the eng-code-simplifier's phase 2 report. Nothing changed.
    typo in a DeflagrationCase JSON (for example a wall or vent parameter) gives an
    assessment of a different case with no warning. Should the HD 1.3 reader refuse
    unknown keys, as the blast reader does? That is a behaviour change, so it needs a test.
+   **Decided 2026-09-25 → `P1-11`:** yes, with a closest-name suggestion. It also covers
+   phase 5a item 4 and UX item 4: blank means default, an explicit 0 means 0, and the
+   report prints the value used.
 2. **`material_rho0` returns None on `KeyError`, `ImportError` or `AttributeError`.** A
    broken import of `core.materials` would quietly fall back to TNT density in the
    preview instead of failing. Low risk, but it hides a real fault.
@@ -317,6 +355,8 @@ proves no behaviour changed; these were noticed on the way.
    skips dx refinement under `foam and charge_refine == 'zone'`, but extra charges
    refine dx whenever AMR is off, even in 'zone' mode. Intended, or should extra charges
    follow the same rule?
+   **Decided 2026-09-26 → `P1-16` (b):** they follow the main charge's rule, after checking
+   that each one has its own refinement zone.
 3. **A second copy of the sphere-radius formula.** `_validate_1d` computes the charge
    radius itself instead of calling `_charge_radius`. It is correct (1D uses `charge_kg`,
    not `case.charge`), but it is another place where the formula could drift (see the
@@ -340,6 +380,8 @@ Source: the arch-refactorer's phase 5a report. The Qt form's behaviour is pinned
 
    **So a GUI user who switches AMR on gets the thresholds with ~12 % gauge error**
    unless they type new ones. Should the forms default to 0.2/0.1?
+   **Decided 2026-09-25 → `P1-8`:** yes, from one constant in `models/case.py`. This also
+   covers item 2 below: the form keeps the case's AMR fields when AMR is off.
 2. **Loading a case into the Qt form with AMR off rewrites its AMR fields.** For
    `tests/cases/native_2d_small.json`, `amr_estimator` goes from `densityGradient` to
    `Lohner` and `amr_refine`/`amr_unrefine` go from 0.2/0.1 to 0.4/0.2. No effect on a
@@ -375,6 +417,8 @@ Source: the arch-refactorer's phase 6 report. Nothing changed.
    free-air values, and the ratio reads high: a reflected or Mach-stem peak against a
    free-air one. Should the comparison be skipped there, or switched to the surface-burst
    curve (hemispherical, 2W) when the charge sits on the ground?
+   **Decided 2026-09-25 → `P1-10`:** free air → Fig. 2-7; charge on the ground →
+   Fig. 2-15; elevated HOB or anything else → no comparison, with the reason printed.
 2. **The report footnote says "see ROADMAP N3", and no ROADMAP file exists.** It is the
    same dead reference as in the `Afterburn` docstring (phase 1, item 2).
 
@@ -394,6 +438,9 @@ Source: the arch-refactorer's phase 7 report. Nothing changed.
    "the whole burn" as outside the calibration window. Is the window defined in
    pressure terms that a vented case can never reach? (This connects to phase 0 item 3:
    the starter case is a weak check.)
+   **Decided 2026-09-25 → `HD1-17`:** both flags are correct as coded. The Mach comment
+   and the CLI docstring are fixed, the Mach is labelled an upper bound, and a
+   representative starter case is built from the owner's design-basis scenario.
 
 ---
 
@@ -407,3 +454,40 @@ Source: the arch-refactorer's phase 8 report. Nothing changed.
    the field is a material mass, not a TNT equivalent.
 2. **blastFoam 1D meta hard-codes `eos='JWL'`** and keeps the material separately in
    `material`, so the 1D figure titles show the EOS but never the material.
+
+---
+
+## 2026-09-26 · batch `hd1-16-load-export` (HD1-16 step 1, HD1-17(a))
+
+Sources: [implement report](batches/2026-09-26-hd1-16-load-export.implement.md),
+[verify report](batches/2026-09-26-hd1-16-load-export.verify.md),
+[QA](qa/2026-09-26-hd1-16/QA_REPORT.md), and [UX review](UX_REVIEW.md) (L1-L14, E6-E8).
+Nothing below was acted on. Every number and rule stays as registered.
+
+**The exported chamber load**
+
+1. **The starter case's SBEDS load is dominated by suction that the model itself
+   produces.**
+   - `nominal.csv` peaks at +1.01 kPa at 7.5 s, then falls to −45.36 kPa and ends there at 30.9 s. The net impulse is −216 000 kPa·ms.
+   - The cause: the 0-D vent has no inflow. `deflagration._vent_mdot` returns 0 whenever p ≤ p_amb (lines 352-353), so wall cooling pulls the room below ambient and nothing refills it.
+   - It is exported as computed, per the owner's decision to keep negatives. The sidecar explains it, but the report does not (UX L1).
+   - *Should the export stop at the return to ambient, should the vent get inflow, or should the trace stay as it is with a stronger warning?*
+2. **The CSV peak is 1.8 % below the model peak** (1.0085 against 1.0275 kPa), because the CSV has the `Samples` resolution of ~69 ms while the report peak is taken over every solver step. *Should the export sample more densely, or should the caption of "Samples" say that it sets the SBEDS resolution?*
+
+**Clearing (UFC 3-340-02 §2-15.3.2)**
+
+3. **Clearing is applied to a slowly rising jet load, not a reflected shock.**
+   - Arrival is at 1 % of peak, t_a = 9.58 ms, and t_c = 14.03 ms, so the E peak at ~23.8 ms falls after t_a + t_c.
+   - The whole peak is therefore relieved to Ps + q: G1 goes from 153.7 to 104.5 kPa at γ 1.24 (−32 %), and from 146.7 to 100.9 kPa at γ 1.40.
+   - *Is the Fig. 2-191a construction (1 %-of-peak arrival, then a linear blend over t_c) valid for this kind of trace, or is it unconservative here?*
+4. **After t_c the two cleared G1 files are identical** (e.g. 78.5335 kPa at 30 ms), because Ps + q comes from one plane file that does not depend on γ. The sidecar does not say so.
+5. **C_r at γ 1.24 is computed with ambient air's p and ρ** (ambient c ≈ 320 m/s instead of 340), giving 342.2 against 374.9 m/s at γ 1.40. *Which state should C_r use?*
+6. **Eq. 2-10** (t_rf = 2 i_r / P_r, keep the smaller impulse) is not applied to the CFD trace, and the sidecar says so. Its "keep the smaller" clause is on printed p. 66. *Should it be applied?*
+7. **The wall traces are the single HD1-13 run, whatever the case.** Only H and W come from the case, and only `--hd13-wall-export` uses them. Yet clearing ticked with H blank blocks the Qt Run and `--hd13`, which do not use the wall (UX L2, L4). *Should the Qt Run also write the wall CSVs, or should the check be only a warning outside the export?*
+8. **The defaulted wall fields (`clearing`, `wall_H_m`, `wall_W_m`) are left out of the JSON**, so existing files stay byte-identical. *Confirm.*
+
+**Other**
+
+9. **Residual capacity is computed but has never been shown**, before or after the batch. It is computed from Ru = 400 kPa, a default in the Structure card, which is now hidden. The owner's "stays in the report" answer therefore refers to a section that does not exist (UX E7). *Show it, with a visible Ru, or drop it?*
+10. **Pre-existing bug:** `services/hd13.assess` raises a ValueError for a case with `h_c = 0` that has standoffs, because `figure_thermal` gets an empty q. The batch does not make it newly reachable.
+11. **Validation looseness**, low: `wall_errors` accepts `True` as 1 m and accepts `inf`, and a bad H or W is silently read as 0 while clearing is off. This belongs with P1-11.

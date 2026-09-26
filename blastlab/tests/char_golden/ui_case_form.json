@@ -69,7 +69,10 @@
     }
   },
   "dim0_native/set_starter": {
-    "disabled": [],
+    "disabled": [
+      "wall_H_m",
+      "wall_W_m"
+    ],
     "hidden": [],
     "points": {
       "standoffs": [
@@ -90,6 +93,7 @@
       "cfd_dx": "0",
       "cfd_window": "0",
       "charge_kg": "5",
+      "clearing": false,
       "confinement": "both",
       "domain_size": "",
       "h_c": "200",
@@ -128,6 +132,8 @@
       "vent_face": "x_lo",
       "vent_rect": "",
       "volume_m3": "1",
+      "wall_H_m": "",
+      "wall_W_m": "",
       "wall_area": "6"
     }
   },

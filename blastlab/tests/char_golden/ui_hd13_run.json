@@ -12,7 +12,8 @@
     },
     "assessment_runs": 1,
     "cwd_files": [
-      "hd13_report.html"
+      "hd13_report.html",
+      "hd13_report_loads"
     ],
     "during": {
       "bar_range": [
@@ -26,6 +27,12 @@
       "switch_interval_s": 0.0005
     },
     "errors": [],
+    "log_added": [
+      "HD 1.3 report written: <tmp>/cwd/hd13_report.html",
+      "SBEDS loads: 1 CSV in <tmp>/cwd/hd13_report_loads",
+      "  <tmp>/cwd/hd13_report_loads/nominal.csv",
+      "nominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms"
+    ],
     "mkdtemp": [
       {
         "dir": null,
@@ -34,8 +41,10 @@
       }
     ],
     "same_report_as_typed": true,
-    "status": "HD 1.3 report written: hd13_report.html",
+    "status": "HD 1.3 done - report and 1 SBEDS load CSV written; 1 load record ends while the load is still active (see Log)",
+    "status_is_warning": true,
     "status_timer_active": true,
+    "status_tooltip": "HD 1.3 report written: <tmp>/cwd/hd13_report.html\nSBEDS loads: 1 CSV in <tmp>/cwd/hd13_report_loads\n  <tmp>/cwd/hd13_report_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
     "temp_dirs_left": 1,
     "temp_files": {
       "0": {
@@ -72,6 +81,7 @@
         "char: the assessment failed"
       ]
     ],
+    "log_added": [],
     "mkdtemp": [
       {
         "dir": null,
@@ -80,10 +90,13 @@
       }
     ],
     "out_files": [
-      "report.html"
+      "report.html",
+      "report_loads"
     ],
     "status": "",
+    "status_is_warning": false,
     "status_timer_active": false,
+    "status_tooltip": "",
     "temp_dirs_left": 0,
     "temp_files": {}
   },
@@ -116,12 +129,16 @@
         "Charge mass must be positive\nEnd time must be positive"
       ]
     ],
+    "log_added": [],
     "mkdtemp": [],
     "out_files": [
-      "report.html"
+      "report.html",
+      "report_loads"
     ],
     "status": "",
+    "status_is_warning": false,
     "status_timer_active": false,
+    "status_tooltip": "",
     "temp_dirs_left": 0,
     "temp_files": {}
   },
@@ -149,6 +166,12 @@
       "switch_interval_s": 0.0005
     },
     "errors": [],
+    "log_added": [
+      "HD 1.3 report written: <tmp>/out/report.html",
+      "SBEDS loads: 1 CSV in <tmp>/out/report_loads",
+      "  <tmp>/out/report_loads/nominal.csv",
+      "nominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms"
+    ],
     "mkdtemp": [
       {
         "dir": null,
@@ -157,11 +180,14 @@
       }
     ],
     "out_files": [
-      "report.html"
+      "report.html",
+      "report_loads"
     ],
     "report_crlf_count": 9,
-    "status": "HD 1.3 report written: <tmp>/out/report.html",
+    "status": "HD 1.3 done - report and 1 SBEDS load CSV written; 1 load record ends while the load is still active (see Log)",
+    "status_is_warning": true,
     "status_timer_active": true,
+    "status_tooltip": "HD 1.3 report written: <tmp>/out/report.html\nSBEDS loads: 1 CSV in <tmp>/out/report_loads\n  <tmp>/out/report_loads/nominal.csv\nnominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms",
     "temp_dirs_left": 1,
     "temp_files": {
       "0": {
