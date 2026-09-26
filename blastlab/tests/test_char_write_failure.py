@@ -132,16 +132,12 @@ def scenario(name):
     tmp = tempfile.mkdtemp(prefix='blastlab_char_wfail_')
     try:
         p = lambda f: os.path.join(tmp, f)        # noqa: E731
-        if name == '2d_ok':
+        if name in ('2d_ok', '2d_gauges', '2d_anim', '2d_profile'):
+            target = {'2d_ok': None, '2d_gauges': 'g2.txt',
+                      '2d_anim': 'a.gif', '2d_profile': 'p2.npz'}[name]
             return run_stages([(2, case2d(tmp, anim_file=p('a.gif'),
                                           profile_file=p('p2.npz')))],
-                              None, tmp)
-        if name in ('2d_gauges', '2d_anim', '2d_profile'):
-            target = {'2d_gauges': 'g2.txt', '2d_anim': 'a.gif',
-                      '2d_profile': 'p2.npz'}[name]
-            return run_stages([(2, case2d(tmp, anim_file=p('a.gif'),
-                                          profile_file=p('p2.npz')))],
-                              p(target), tmp)
+                              None if target is None else p(target), tmp)
         if name in ('1d_gauges', '1d_profile'):
             target = {'1d_gauges': 'g1.txt', '1d_profile': 'p1.txt'}[name]
             return run_stages([(1, case1d(tmp, profile_file=p('p1.txt')))],
