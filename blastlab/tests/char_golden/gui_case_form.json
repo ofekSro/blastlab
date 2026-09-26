@@ -82,7 +82,9 @@
     }
   },
   "dim1_blastfoam/fresh/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_v_steps"
+    ],
     "hidden": [
       "eos",
       "order"
@@ -104,7 +106,14 @@
       "order": "1 (Godunov)",
       "profile_out": "blast_profile.txt",
       "radius_m": "10.0",
-      "t_end": "0.0"
+      "t_end": "0.0",
+      "vtk_fields": {
+        "volumes": []
+      },
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim1_blastfoam/order_blank_word": {
@@ -137,7 +146,9 @@
     }
   },
   "dim1_blastfoam/set_c1": {
-    "disabled": [],
+    "disabled": [
+      "vtk_v_steps"
+    ],
     "hidden": [
       "eos",
       "order"
@@ -166,7 +177,14 @@
       "order": "2 (MUSCL)",
       "profile_out": "prof.txt",
       "radius_m": "3",
-      "t_end": "0.004"
+      "t_end": "0.004",
+      "vtk_fields": {
+        "volumes": []
+      },
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim1_blastfoam/set_c1/get": {
@@ -216,7 +234,12 @@
     "t_end",
     "gauges",
     "gauge_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_fields"
   ],
   "dim1_blastfoam/typed": {
     "bad": [],
@@ -303,10 +326,14 @@
     }
   },
   "dim1_native/fresh/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_v_steps"
+    ],
     "hidden": [
       "activation",
-      "afterburn"
+      "afterburn",
+      "vtk_v_ms",
+      "vtk_v_steps"
     ],
     "points": {
       "gauges": []
@@ -325,7 +352,14 @@
       "order": "1 (Godunov)",
       "profile_out": "blast_profile.txt",
       "radius_m": "10.0",
-      "t_end": "0.0"
+      "t_end": "0.0",
+      "vtk_fields": {
+        "volumes": []
+      },
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim1_native/order_blank_word": {
@@ -358,10 +392,14 @@
     }
   },
   "dim1_native/set_c1": {
-    "disabled": [],
+    "disabled": [
+      "vtk_v_steps"
+    ],
     "hidden": [
       "activation",
-      "afterburn"
+      "afterburn",
+      "vtk_v_ms",
+      "vtk_v_steps"
     ],
     "points": {
       "gauges": [
@@ -387,7 +425,14 @@
       "order": "2 (MUSCL)",
       "profile_out": "prof.txt",
       "radius_m": "3",
-      "t_end": "0.004"
+      "t_end": "0.004",
+      "vtk_fields": {
+        "volumes": []
+      },
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim1_native/set_c1/get": {
@@ -437,7 +482,12 @@
     "t_end",
     "gauges",
     "gauge_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_fields"
   ],
   "dim1_native/typed": {
     "bad": [],
@@ -473,7 +523,9 @@
     }
   },
   "dim1_native_to_blastfoam/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_v_steps"
+    ],
     "hidden": [
       "eos",
       "order"
@@ -505,7 +557,14 @@
       "order": "2 (MUSCL)",
       "profile_out": "p.txt",
       "radius_m": " 12.5 ",
-      "t_end": "1e-2"
+      "t_end": "1e-2",
+      "vtk_fields": {
+        "volumes": []
+      },
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim1_native_to_blastfoam/typed": {
@@ -779,7 +838,9 @@
   "dim2_blastfoam/fresh/dump": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "amr_buffer",
@@ -843,13 +904,27 @@
       "t_end": "0.0",
       "trigger_action": "terminate",
       "trigger_file": "trigger_remap.npz",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_blastfoam/set_c2_axisym": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "charge_refine",
@@ -930,7 +1005,19 @@
       "t_end": "0.01",
       "trigger_action": "remap",
       "trigger_file": "r.npz",
-      "trigger_gauge": "1"
+      "trigger_gauge": "1",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_blastfoam/set_c2_axisym/get": {
@@ -1072,12 +1159,23 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_blastfoam/set_c2_no_gauge_file": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "amr_buffer",
@@ -1141,7 +1239,19 @@
       "t_end": "0",
       "trigger_action": "terminate",
       "trigger_file": "",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_blastfoam/set_c2_no_gauge_file/get": {
@@ -1253,10 +1363,22 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_blastfoam/set_c2_planar": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "amr_buffer",
       "amr_display_level",
@@ -1319,7 +1441,19 @@
       "t_end": "0",
       "trigger_action": "terminate",
       "trigger_file": "",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_blastfoam/set_c2_planar/get": {
@@ -1373,7 +1507,16 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_blastfoam/trigger0": {
     "bad": [],
@@ -1743,7 +1886,9 @@
   "dim2_native/fresh/dump": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "activation",
@@ -1761,6 +1906,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -1812,13 +1961,27 @@
       "t_end": "0.0",
       "trigger_action": "terminate",
       "trigger_file": "trigger_remap.npz",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_native/set_c2_axisym": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "activation",
@@ -1834,6 +1997,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -1910,7 +2077,19 @@
       "t_end": "0.01",
       "trigger_action": "remap",
       "trigger_file": "r.npz",
-      "trigger_gauge": "1"
+      "trigger_gauge": "1",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_native/set_c2_axisym/get": {
@@ -2039,12 +2218,23 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_native/set_c2_no_gauge_file": {
     "disabled": [
       "bc_x_lo",
-      "cx"
+      "cx",
+      "vtk_s_steps",
+      "vtk_v_steps"
     ],
     "hidden": [
       "activation",
@@ -2062,6 +2252,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -2113,7 +2307,19 @@
       "t_end": "0",
       "trigger_action": "terminate",
       "trigger_file": "",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_native/set_c2_no_gauge_file/get": {
@@ -2225,10 +2431,22 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_native/set_c2_planar": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "activation",
       "afterburn",
@@ -2245,6 +2463,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -2296,7 +2518,19 @@
       "t_end": "0",
       "trigger_action": "terminate",
       "trigger_file": "",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_native/set_c2_planar/get": {
@@ -2350,7 +2584,16 @@
     "trigger_gauge",
     "trigger_action",
     "trigger_file",
-    "profile_out"
+    "profile_out",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_fields"
   ],
   "dim2_native/trigger0": {
     "bad": [],
@@ -2498,7 +2741,10 @@
     }
   },
   "dim2_native_to_blastfoam/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "amr_buffer",
       "amr_display_level",
@@ -2588,7 +2834,19 @@
       "t_end": "0.02",
       "trigger_action": "terminate",
       "trigger_file": "",
-      "trigger_gauge": "2.9"
+      "trigger_gauge": "2.9",
+      "vtk_fields": {
+        "obstacles": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim2_native_to_blastfoam/typed": {
@@ -2859,7 +3117,10 @@
     }
   },
   "dim3_blastfoam/fresh/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "amr_buffer",
       "amr_display_level",
@@ -2928,11 +3189,27 @@
       "slice_pos": "",
       "t_end": "0.0",
       "trigger_action": "terminate",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "sections": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim3_blastfoam/set_c3": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "amr_buffer",
       "amr_display_level",
@@ -3014,7 +3291,20 @@
       "slice_pos": "0.25",
       "t_end": "0",
       "trigger_action": "terminate",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "sections": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim3_blastfoam/set_c3/get": {
@@ -3151,7 +3441,16 @@
     "anim_scale",
     "record",
     "trigger_gauge",
-    "trigger_action"
+    "trigger_action",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_fields"
   ],
   "dim3_blastfoam/slice_blank": {
     "bad": [],
@@ -3421,7 +3720,10 @@
     }
   },
   "dim3_native/fresh/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "activation",
       "afterburn",
@@ -3439,6 +3741,10 @@
       "det_pts",
       "extra_charges",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -3495,11 +3801,27 @@
       "slice_pos": "",
       "t_end": "0.0",
       "trigger_action": "terminate",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "sections": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim3_native/set_c3": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "activation",
       "afterburn",
@@ -3517,6 +3839,10 @@
       "det_pts",
       "extra_charges",
       "n_procs",
+      "vtk_s_ms",
+      "vtk_s_steps",
+      "vtk_v_ms",
+      "vtk_v_steps",
       "zones"
     ],
     "points": {
@@ -3586,7 +3912,20 @@
       "slice_pos": "0.25",
       "t_end": "0",
       "trigger_action": "terminate",
-      "trigger_gauge": ""
+      "trigger_gauge": "",
+      "vtk_fields": {
+        "obstacles": [],
+        "sections": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim3_native/set_c3/get": {
@@ -3716,7 +4055,16 @@
     "anim_scale",
     "record",
     "trigger_gauge",
-    "trigger_action"
+    "trigger_action",
+    "vtk_s_on",
+    "vtk_s_mode",
+    "vtk_s_ms",
+    "vtk_s_steps",
+    "vtk_v_on",
+    "vtk_v_mode",
+    "vtk_v_ms",
+    "vtk_v_steps",
+    "vtk_fields"
   ],
   "dim3_native/slice_blank": {
     "bad": [],
@@ -3881,7 +4229,10 @@
     }
   },
   "dim3_native_to_blastfoam/dump": {
-    "disabled": [],
+    "disabled": [
+      "vtk_s_steps",
+      "vtk_v_steps"
+    ],
     "hidden": [
       "amr_buffer",
       "amr_display_level",
@@ -3986,7 +4337,20 @@
       "slice_pos": " 0.75 ",
       "t_end": "5e-3",
       "trigger_action": "terminate",
-      "trigger_gauge": "1"
+      "trigger_gauge": "1",
+      "vtk_fields": {
+        "obstacles": [],
+        "sections": [],
+        "volumes": []
+      },
+      "vtk_s_mode": "time",
+      "vtk_s_ms": "1",
+      "vtk_s_on": false,
+      "vtk_s_steps": "25",
+      "vtk_v_mode": "time",
+      "vtk_v_ms": "1",
+      "vtk_v_on": false,
+      "vtk_v_steps": "25"
     }
   },
   "dim3_native_to_blastfoam/typed": {
