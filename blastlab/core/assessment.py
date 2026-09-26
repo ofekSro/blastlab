@@ -43,7 +43,7 @@ from ..models.hd13_case import (SCHEMA, VERSION,            # noqa: F401
 CONFINEMENTS = ('confined', 'unconfined', 'both')
 
 
-def wall_errors(case):
+def wall_errors(case) -> list[str]:
     """HD1-16: clearing on needs the loaded wall's height and width (UFC
     3-340-02 (2008) para. 2-15.3.2, Eq. 2-8). One error per missing or
     non-positive field, naming it."""

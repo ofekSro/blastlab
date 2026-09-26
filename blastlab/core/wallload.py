@@ -184,7 +184,7 @@ C_D_FRONT = 1.0
 CLEARING_ARRIVAL_FRACTION = 0.01
 
 
-def clearing_geometry(H, W):
+def clearing_geometry(H: float, W: float) -> tuple[float, float, float]:
     """(S, G, R) of a front wall of height `H` and width `W` [m]:
     S = min(H, W/2), G = max(H, W/2), R = S/G. UFC 3-340-02 (2008),
     para. 2-15.3.2, Eq. 2-8 (p. 65)."""
@@ -195,7 +195,7 @@ def clearing_geometry(H, W):
     return S, G, S / G
 
 
-def clearing_time(H, W, c_r):
+def clearing_time(H: float, W: float, c_r: float) -> float:
     """t_c = 4 S / ((1 + R) C_r) [s], UFC 3-340-02 (2008) Eq. 2-8 (p. 65),
     with `c_r` [m/s] the sound speed in the reflected region."""
     S, _G, R = clearing_geometry(H, W)
@@ -204,10 +204,12 @@ def clearing_time(H, W, c_r):
     return 4.0 * S / ((1.0 + R) * float(c_r))
 
 
-def incident_from_reflected(r, gamma=1.4, p0=P_AIR):
+def incident_from_reflected(r: float, gamma: float = 1.4,
+                            p0: float = P_AIR) -> float:
     """The side-on overpressure `ps` [Pa] whose normal reflection is `r`
     [Pa] - the inverse of `reflected_overpressure` for r > 0 (the
-    positive root of (3g-1) x^2 + (4 g p0 - (g-1) r) x - 2 g p0 r = 0)."""
+    positive root of (3g-1) x^2 + (4 g p0 - (g-1) r) x - 2 g p0 r = 0).
+    `r <= 0` comes back unchanged, as `reflected_overpressure` does."""
     g, r = float(gamma), float(r)
     if r <= 0.0:
         return r
@@ -217,7 +219,15 @@ def incident_from_reflected(r, gamma=1.4, p0=P_AIR):
     return (-b + np.sqrt(b * b - 4.0 * a * c)) / (2.0 * a)
 
 
-def reflected_sound_speed(ps, gamma=1.4, p0=P_AIR, rho0=None):
+def _density_behind_shock(rho_a, p_a, p_b, g):
+    """Density behind a shock from state (p_a, rho_a) to pressure p_b,
+    Rankine-Hugoniot for an ideal gas of ratio g."""
+    return (rho_a * ((g + 1.0) * p_b + (g - 1.0) * p_a)
+            / ((g - 1.0) * p_b + (g + 1.0) * p_a))
+
+
+def reflected_sound_speed(ps: float, gamma: float = 1.4, p0: float = P_AIR,
+                          rho0: float | None = None) -> float:
     """C_r [m/s], the sound speed behind the normally reflected shock of a
     front of side-on overpressure `ps` [Pa] in still gas (p0, rho0).
 
@@ -231,18 +241,16 @@ def reflected_sound_speed(ps, gamma=1.4, p0=P_AIR, rho0=None):
     from .constants import RHO_AIR
     rho0 = RHO_AIR if rho0 is None else float(rho0)
     g, ps = float(gamma), max(float(ps), 0.0)
-    p1 = p0 + ps
-    p2 = p0 + float(reflected_overpressure(ps, g, p0))
-    rho1 = rho0 * ((g + 1.0) * p1 + (g - 1.0) * p0) / \
-        ((g - 1.0) * p1 + (g + 1.0) * p0)
-    rho2 = rho1 * ((g + 1.0) * p2 + (g - 1.0) * p1) / \
-        ((g - 1.0) * p2 + (g + 1.0) * p1)
+    p1 = p0 + ps                                          # incident
+    p2 = p0 + float(reflected_overpressure(ps, g, p0))    # reflected
+    rho1 = _density_behind_shock(rho0, p0, p1, g)
+    rho2 = _density_behind_shock(rho1, p1, p2, g)
     return float(np.sqrt(g * p2 / rho2))
 
 
-def apply_clearing(times, E, ps, q, H, W, c_r,
-                   arrival_fraction=CLEARING_ARRIVAL_FRACTION,
-                   c_d=C_D_FRONT):
+def apply_clearing(times, E, ps, q, H: float, W: float, c_r: float,
+                   arrival_fraction: float = CLEARING_ARRIVAL_FRACTION,
+                   c_d: float = C_D_FRONT) -> dict:
     """The front-wall load of a computed trace after clearing.
 
     `E` [Pa over ambient] is the unrelieved wall load, `ps` [Pa over
