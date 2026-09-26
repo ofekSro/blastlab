@@ -1036,6 +1036,17 @@ hd1-wall-load #2.
 - `P3-10` A chained run prints "0 kg TNT" in the 3D initialisation line.
 - `P3-11` The semantics of `n_snapshots` differ between 1D and 2D/3D.
 
+**Architecture** *(owner decision 2026-09-26, during `OUT-1`)*
+
+- `P3-26` **A command-line layer outside `solvers/`.** `solvers/foam/cli_run.py` and the
+  prompt flows in `cli.py` are command-line code that lives in the solver layer, so
+  `test_layering` (solvers must not import services) forces the model folder to reach
+  them through a registration hook (`jobs.register_stage_folder`, `OUT-1` Steps 3 and 8).
+  The owner chose the hook for now and **the proper fix as a task**: move the
+  command-line flows into a `cli/` (or `output/`) layer that may import `services/`,
+  delete the hook, and leave `test_layering` untouched. Do it after the `OUT` track;
+  byte-identity of `test_regression.py` and the `legacy/` pins are the gates.
+
 ---
 
 ## P4 — Environment, disk, personal
