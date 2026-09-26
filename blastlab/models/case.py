@@ -17,6 +17,80 @@ from ..core.bc import normalize_bcs
 #: continue; the other two end it.
 TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 
+#: OUT-2: the fields a VTK family may export - what blastFoam already
+#: writes (docs/model-folder-and-vtk-plan.md sec. 3.2). The four
+#: function-object fields exist for dim >= 2 only: writer.py emits
+#: impulse / pMax / timeOfArrival / overpressure for 2D/3D alone.
+VTK_FIELDS = ('p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
+              'rho', 'U', 'T', 'alpha.expl', 'rhoE')
+VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival')
+#: cadence units: 'time' = simulated milliseconds (Q3: stored in ms,
+#: although every other time in the case is in seconds), 'step' = solver
+#: steps
+VTK_MODES = ('time', 'step')
+#: the keys of each family, in the order they are written
+VTK_VOLUME_KEYS = ('on', 'mode', 'value', 'fields')
+#: Q2 (owner, 2026-09-26): sections and obstacles keep separate field
+#: lists - `fields` for the section planes, `obstacle_fields` for the
+#: obstacle walls
+VTK_SURFACE_KEYS = ('on', 'mode', 'value', 'fields', 'obstacle_fields',
+                    'planes')
+
+
+def vtk_fields_for(dim):
+    """The VTK fields a case of dimension `dim` has (D4)."""
+    return tuple(f for f in VTK_FIELDS
+                 if dim >= 2 or f not in VTK_FO_FIELDS)
+
+
+def _num(v):
+    """float(v), or v itself when it is not a number (validation says so)."""
+    if isinstance(v, bool):
+        return v
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return v
+
+
+def normalize_vtk(d, key):
+    """One VTK family (`key` is 'vtk_surfaces' or 'vtk_volumes') in its
+    canonical form: every key present, in file order, `fields` a list of
+    str, `planes` a list of [axis, float], `value` a float in Time mode
+    (ms) and an int in Step mode when it is whole. None stays None. A
+    value that cannot be converted is kept as given, for validation to
+    name; an unknown key or a non-object is refused."""
+    if d is None:
+        return None
+    if not isinstance(d, dict):
+        raise ValueError(f"{key} must be an object, not {type(d).__name__}")
+    keys = VTK_SURFACE_KEYS if key == 'vtk_surfaces' else VTK_VOLUME_KEYS
+    unknown = set(d) - set(keys)
+    if unknown:
+        raise ValueError(f"Unknown {key} keys: {sorted(unknown)}")
+    mode = d.get('mode', 'time')
+    value = _num(d.get('value'))
+    if mode == 'step' and isinstance(value, float) and value.is_integer():
+        value = int(value)
+    out = dict(on=bool(d.get('on', False)), mode=mode, value=value,
+               fields=[str(f) for f in (d.get('fields') or [])])
+    if key == 'vtk_surfaces':
+        out['obstacle_fields'] = [str(f) for f in
+                                  (d.get('obstacle_fields') or [])]
+        out['planes'] = [[str(p[0]), _num(p[1])]
+                         if isinstance(p, (list, tuple)) and len(p) == 2
+                         else p for p in (d.get('planes') or [])]
+    return out
+
+
+def vtk_family(case, key):
+    """The case's VTK family `key`, normalised, when it is switched on;
+    else None."""
+    d = getattr(case, key, None)
+    if not isinstance(d, dict) or not d.get('on'):
+        return None
+    return normalize_vtk(d, key)
+
 SCHEMA = 'blastlab-case'
 VERSION = 13    # v2: n_procs, activation, charges, det_points (foam)
                 # v3: refine_zones, charge_refine (foam local refinement)
@@ -89,6 +163,11 @@ class Case1D:
     adaptive_write: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
                                       # 1D always runs serial)
+    #: OUT-2: VTK volumes (the whole radial line) for ParaView,
+    #: {on, mode, value, fields}; None or on = False is not written
+    #: (case_to_dict). 1D has no sections or obstacles, so no
+    #: vtk_surfaces: a 1D file carrying one is refused as an unknown key.
+    vtk_volumes: dict = None
 
 
 @dataclass
@@ -206,6 +285,13 @@ class Case2D:
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y), ...] (axisym: x = 0);
                                       # None = charge centre
+    #: OUT-2: VTK output for ParaView, blastFoam only. `vtk_surfaces` =
+    #: {on, mode, value, fields, obstacle_fields, planes} (2D: obstacles
+    #: only), `vtk_volumes` = {on, mode, value, fields}; `value` is ms in
+    #: Time mode, solver steps in Step mode. None or on = False is not
+    #: written (case_to_dict), so a case without them is byte-identical.
+    vtk_surfaces: dict = None
+    vtk_volumes: dict = None
 
 
 @dataclass
@@ -342,6 +428,10 @@ class Case3D:
     det_points: list = None           # blastFoam: detonation points
                                       # [(x, y, z), ...]; None = every
                                       # charge centre
+    #: see Case2D.vtk_surfaces; in 3D the sections are the live-slice
+    #: plane plus the `planes` rows [[axis, position m], ...]
+    vtk_surfaces: dict = None
+    vtk_volumes: dict = None
 
 
 _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
@@ -357,6 +447,12 @@ def case_to_dict(case):
     # older blastlab refuses a file that HAS a budget: "Unknown case keys".)
     if not d.get('write_budget'):
         d.pop('write_budget', None)
+    # OUT-2: the same for the VTK families - None or switched off is not
+    # written, so VERSION stays 13 and every case without them is
+    # byte-identical (an older blastlab refuses one that has them)
+    for key in ('vtk_surfaces', 'vtk_volumes'):
+        if key in d and not (isinstance(d[key], dict) and d[key].get('on')):
+            d.pop(key)
     d['schema'] = SCHEMA
     d['version'] = VERSION
     d['dim'] = case.dim
@@ -415,6 +511,9 @@ def case_from_dict(d):
     # JSON has no tuples: the animation colour range comes back a list
     if getattr(case, 'anim_clim', None) is not None:
         case.anim_clim = tuple(float(v) for v in case.anim_clim)
+    for key in ('vtk_surfaces', 'vtk_volumes'):
+        if hasattr(case, key):
+            setattr(case, key, normalize_vtk(getattr(case, key), key))
     return case
 
 
