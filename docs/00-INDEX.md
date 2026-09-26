@@ -43,6 +43,8 @@ the original Hebrew notes are preserved under [`archive/`](archive/).
 | File | What is in it |
 |---|---|
 | [heavy-runs.md](heavy-runs.md) | The heavy-run catalogue R1–R9, what each answered, and the ground rules for an unattended run |
+| [model-folder-and-vtk-plan.md](model-folder-and-vtk-plan.md) | **The `OUT` track (owner, 2026-09-26, highest priority):** mandatory model folder, Viper-style VTK output options, newest-fields-only in WSL, the rest of the Viper matrix, and the disk rebuild — decisions, specification, tasks, acceptance criteria |
+| [wsl-disk-reclaim-plan.md](wsl-disk-reclaim-plan.md) | Why the 481 GB WSL disk cannot be shrunk in place, and the prune → export → trial import → rebuild procedure with its six owner decisions (`OUT-5`) |
 
 ## The application and the learning material
 

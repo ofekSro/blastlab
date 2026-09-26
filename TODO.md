@@ -13,12 +13,30 @@ that code comments cite.
 Every item carries a stable id (`P2-3`, `N5-11`, `HD1-3`) — **cite it in commits
 and in discussion.**
 
-**The exception to the order: `HD1` sits above P0.** It is an owner directive of
-2026-09-20 and is not part of the P ranking.
+**Two exceptions sit above P0, in this order: `OUT`, then `HD1`.** Both are owner
+directives (2026-09-26 and 2026-09-20) and are not part of the P ranking.
 
 ---
 
-## HD1 · ⭐ First priority — HD1.3 effects on a structure
+## OUT · ⭐ Highest priority (owner, 2026-09-26) — model folder, VTK output, disk
+
+**The whole plan, approved on 2026-09-26, is
+[docs/model-folder-and-vtk-plan.md](docs/model-folder-and-vtk-plan.md).** This
+entry only orders it; the specification, the decisions and every acceptance
+criterion live there. Owner's words: first the VTK export; once it works, is
+fixed and approved — the disk.
+
+| Id | What | Order |
+|---|---|---|
+| `OUT-1` | **Model folder.** A runs folder and a model name are mandatory before any run (Qt, Tk, chain, HD1.3, CLI). Every output of a run lands in `<runs>\<MODEL>\` — case, log, gauges, figures, report, the OpenFOAM skeleton, VTK. The WSL scratch is deleted after a verified success, kept on failure. Re-running a model overwrites after confirmation. Plan §2 | 1 |
+| `OUT-2` | **VTK output options** (Viper-style Output card, blastFoam only): off / sections and obstacles / volumes, a per-case field checklist, cadence in simulated ms or solver steps, files into `<MODEL>\vtk\`, time directories deleted as they are converted. Plan §3 | 2, then owner acceptance |
+| `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. Only after the owner accepts `OUT-1` + `OUT-2`. Plan §6 | 3 |
+| `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
+| `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |
+
+---
+
+## HD1 · ⭐ Owner directive 2026-09-20 (second to `OUT` since 2026-09-26) — HD1.3 effects on a structure
 
 **What was asked:** compute the effects of an **HD1.3 — non-detonating** material
 on a structure.
@@ -1080,7 +1098,8 @@ hd1-3d-close #3).
 | amr2d | Relax the AMR accuracy thresholds to 15 %, or tighten the test's AMR configuration | Relax and document — the deviation is real AMR behaviour, not a bug |
 | decomposition | Leave `scotch`, or investigate a symmetric decomposition for the ±7 % near-field parallel deviation | Leave it. Two cases gave opposite answers and no mechanism explains both |
 | P4-1 | Move the repository out of OneDrive | Yes |
-| P4-2 | What to delete from disk | Not urgent |
+| P4-2 | What to delete from disk | Not urgent — superseded by `OUT-5` |
+| **OUT-5** | The six decisions on the WSL disk rebuild — [docs/wsl-disk-reclaim-plan.md §3](docs/wsl-disk-reclaim-plan.md) | Keep the evidence run as a skeleton, delete the 193 GB and 54 GB runs, keep the tar until the rebuilt install has solved once; decide after `OUT-2` is accepted |
 
 ---
 
