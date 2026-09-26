@@ -34,6 +34,9 @@ VOLUMES = 'volumes'
 SECTIONS = 'sections'
 OBSTACLES = 'obstacles'
 KINDS = (VOLUMES, SECTIONS, OBSTACLES)
+#: the `family` of a not_converted entry for the export as a whole (an
+#: unexpected error, VtkExport._broken)
+EXPORT = 'export'
 
 #: the newest complete writes a purge always keeps: a W3 resume restarts
 #: from the newest, and `backend._final_read` falls back to the one before
@@ -408,6 +411,16 @@ def _size(path):
         return -1
 
 
+def _nc_key(e):
+    """Sort key of a not_converted entry: family, then time (the export's
+    own entry has none)."""
+    try:
+        t = float(e.get('time'))
+    except (TypeError, ValueError):
+        t = -1.0
+    return str(e.get('family')), t
+
+
 def _cadence(fam):
     if not fam:
         return None
@@ -649,9 +662,7 @@ class VtkExport:
             cadence[VOLUMES] = _cadence(self.vol)
         if self.surf:
             cadence['surfaces'] = _cadence(self.surf)
-        nc = sorted(self.not_converted.values(),
-                    key=lambda e: (str(e.get('family')),
-                                   float(e.get('time', 0))))
+        nc = sorted(self.not_converted.values(), key=_nc_key)
         return dict(fields=fields, cadence=cadence, families=fams,
                     not_converted=nc,
                     deleted_in_wsl=sorted(self.deleted, key=_time_key),
@@ -697,13 +708,32 @@ class VtkExport:
         except Exception as exc:        # noqa: BLE001 - never stops the run
             self._once('error', f'  [warn] VTK export: {exc!r} - the run '
                                 f'goes on; what was not exported stays in '
-                                f'WSL')
+                                f'WSL, and the scratch is kept')
+            self._broken(exc)
+
+    def _broken(self, exc):
+        """An unexpected error cut a pass short, so which writes it missed
+        is unknown: record one `not_converted` entry for the export
+        itself. write_all turns it into a failed row, and the WSL scratch
+        that still holds those writes is kept (Q4) instead of being
+        released as if the export were complete."""
+        key = (EXPORT, 'None')
+        if key not in self.not_converted:
+            self.not_converted[key] = dict(
+                time=None, family=EXPORT, path='vtk',
+                why=f'the export stopped on {exc!r}; what it had not '
+                    f'copied is still in the WSL scratch')
+            self._dirty = True
+        try:
+            self._write_index()
+        except Exception:               # noqa: BLE001 - the log line stands
+            pass
 
     def _run(self, done, final):
         names = []
         if self.volumes_on:
             self._convert(done, final)
-            self._copy_volumes()
+            self._copy_volumes(final)
             names = [n for n in self._plan(done) if n not in self.deleted]
         if self.surf:
             self._sweep(final)
@@ -841,19 +871,29 @@ class VtkExport:
             pass
         return why
 
-    def _copy_volumes(self):
+    def _gave_up(self, family, t, final):
+        """After a failed attempt: stop trying for now? The final sweep
+        has no next pass, so it retries at once until `_fail` gives up -
+        a copy that fails only there must still reach `not_converted`,
+        or a finished run would release the scratch holding it (Q4)."""
+        return not final or (family, t) in self.not_converted
+
+    def _copy_volumes(self, final=False):
         for n in sorted(self.converted - self.copied, key=_time_key):
             if (VOLUMES, n) in self.not_converted:
                 continue
             rel = dest_name(VOLUMES, None, None, n)
-            why = self._copy_one(self._src_volume(n), rel)
-            if why is None:
-                self.copied.add(n)
-                self._add_file(rel, VOLUMES, None, None, n)
-                self.rm_files.update(
-                    volume_file_paths(self.spec.case_posix, [n]))
-            else:
+            while True:
+                why = self._copy_one(self._src_volume(n), rel)
+                if why is None:
+                    self.copied.add(n)
+                    self._add_file(rel, VOLUMES, None, None, n)
+                    self.rm_files.update(
+                        volume_file_paths(self.spec.case_posix, [n]))
+                    break
                 self._fail(VOLUMES, n, 'copy', why, f'vtk/{rel}')
+                if self._gave_up(VOLUMES, n, final):
+                    break
 
     # ── 3: the deletion plan ──
     def _mesh_listing(self, done):
@@ -904,14 +944,18 @@ class VtkExport:
             for t in surface_sweep_plan(listing, final):
                 if t in self.swept[fo] or (kind, t) in self.not_converted:
                     continue
-                why = self._sweep_one(kind, fields, os.path.join(root, t), t)
-                if why is None:
-                    self.swept[fo].add(t)
-                    self._dirty = True
-                    self.rm_surface.update(surface_dir_paths(
-                        self.spec.case_posix, fo, [t]))
-                else:
+                while True:
+                    why = self._sweep_one(kind, fields,
+                                          os.path.join(root, t), t)
+                    if why is None:
+                        self.swept[fo].add(t)
+                        self._dirty = True
+                        self.rm_surface.update(surface_dir_paths(
+                            self.spec.case_posix, fo, [t]))
+                        break
                     self._fail(kind, t, 'copy', why, f'vtk/{kind}')
+                    if self._gave_up(kind, t, final):
+                        break
 
     def _sweep_one(self, kind, fields, tdir, t):
         try:

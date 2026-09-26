@@ -658,6 +658,72 @@ def test_b_protect_reasons():
         tree.close()
 
 
+def test_b_final_copy_failure_is_recorded():
+    """The final sweep is the last pass: a copy that fails only there is
+    retried at once and, failing again, listed as not converted - never
+    left out of the record while a finished run releases the scratch
+    (Q4). A copy that fails once and then goes through is simply copied."""
+    import errno
+    for vol, want in ((True, T[0]), (False, SAMPLES[-1])):
+        for transient in (False, True):
+            tree = Tree(surfaces=not vol, volumes=vol)
+            try:
+                real, tries = tree.copy, []
+
+                def full(src, dst, real=real, tries=tries, want=want,
+                         transient=transient):
+                    if os.path.basename(dst) == f't_{want}.vtk' \
+                            and not (transient and tries):
+                        tries.append(dst)
+                        raise OSError(errno.ENOSPC, 'No space left on device')
+                    return real(src, dst)
+
+                tree.copy = full
+                ex = tree.export()
+                ex.run({t: 0 for t in T}, final=True)   # the one final pass
+                nc = [e['time'] for e in _manifest(tree)['not_converted']]
+                if transient:
+                    assert nc == [], (vol, nc)
+                    continue
+                assert want in nc, (vol, nc)
+                if vol:
+                    assert tree.exists(want) and tree.exists(
+                        f'VTK/{RUN}_{want}.vtk'), tree.deleted_times()
+                else:
+                    for fo in ('vtkSections', 'vtkObstacles'):
+                        assert tree.exists(f'postProcessing/{fo}/{want}'), fo
+            finally:
+                tree.close()
+
+
+def test_b_unexpected_error_keeps_the_scratch():
+    """An error the export did not expect cuts the pass short without
+    raising into the run, and is recorded as a not_converted entry of the
+    export itself, so write_all keeps the scratch (Q4); a W3 resume's
+    export reads it back."""
+    from blastlab.output import vtk_series as vs
+    tree = Tree(surfaces=False)
+    try:
+        def boom(src, dst):
+            raise RuntimeError('driver exploded')
+
+        tree.copy = boom
+        ex = tree.export()
+        ex.run({t: 0 for t in T})
+        ex.run({t: 0 for t in T}, final=True)
+        nc = _manifest(tree)['not_converted']
+        assert [(e['family'], e['time']) for e in nc] == [('export', None)], nc
+        assert 'driver exploded' in nc[0]['why'], nc
+        assert tree.deleted_times() == [] and tree.deletes == []
+        assert sum('the scratch is kept' in ln for ln in tree.lines) == 1
+        assert vs.vtk_summary(tree.vtk)['not_converted'] == nc
+        ex2 = tree.export()
+        assert ('export', 'None') in ex2.not_converted
+        assert ex2.state()['not_converted'] == nc
+    finally:
+        tree.close()
+
+
 TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_converter_failure_deletes_nothing,
            test_b_empty_copy_deletes_nothing, test_b_inactive_without_vtk_dir,
@@ -665,7 +731,8 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_newest_sample_waits_for_final,
            test_b_parallel_needs_reconstruct, test_b_no_delete_switch,
            test_b_failing_delete_never_raises, test_b_runloop_wiring,
-           test_b_protect_reasons]
+           test_b_protect_reasons, test_b_final_copy_failure_is_recorded,
+           test_b_unexpected_error_keeps_the_scratch]
 TESTS = TESTS_A + TESTS_B
 
 
