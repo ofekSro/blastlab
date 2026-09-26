@@ -436,6 +436,21 @@ def test_b_log_file_never_raises():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_b_manifest_write_failure_is_a_failed_row():
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_b_')
+    real = mf.write_manifest
+    try:
+        folder = mf.prepare(runs, 'MODEL', confirm=lambda t: True)
+        mf.write_manifest = lambda m, d: 'disk full'
+        m = mf.write_all(None, mf.bind_case(case1d(), folder), 1, folder,
+                         log=lambda s: None)
+        assert dict(name='manifest', path='manifest.json',
+                    why='disk full') in m['failed'], m['failed']
+    finally:
+        mf.write_manifest = real
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 def test_b_git_commit():
     got = mf.git_commit()
     assert got is None or (len(got) == 7 and all(
@@ -653,8 +668,9 @@ class FakeWsl:
     of a file AFTER hashing; `extra` lists a file that does not exist
     (a partial copy); `code` is the exit status."""
 
-    def __init__(self, root, flip=None, extra=None, code=0):
+    def __init__(self, root, flip=None, extra=None, code=0, extra_line=None):
         self.root, self.flip, self.extra, self.code = root, flip, extra, code
+        self.extra_line = extra_line          # a raw line, added as is
         self.calls = []
 
     def __call__(self, argv, **kw):
@@ -674,6 +690,8 @@ class FakeWsl:
                 lines.append(f'{hashlib.sha256(f.read()).hexdigest()}  {rel}')
         if self.extra:
             lines.append('0' * 64 + '  ' + self.extra)
+        if self.extra_line:
+            lines.append(self.extra_line)
         with open(os.path.join(self.root, 'SHA256SUMS'), 'w',
                   newline='\n') as f:
             f.write('\n'.join(lines) + '\n')
@@ -765,6 +783,20 @@ def test_d_partial_copy_keeps_scratch():
             tmp, extra='postProcessing/probes/0/U')
         assert delete.calls == [] and not m['wsl_scratch']['deleted']
         assert 'postProcessing/probes/0/U' in notice, notice
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_unreadable_sums_line_keeps_scratch():
+    """verify: sha256sum escapes a name with a backslash or newline as
+    `\\<hex>  <name>`; such a line is a file that is not copied, so the
+    copy is incomplete and the scratch stays."""
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, _r, delete, _f, _l = release(
+            tmp, extra_line='\\' + 'a' * 64 + '  system/odd\\\\name')
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'not understood' in notice, notice
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -919,6 +951,7 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_b_bind_case_names, test_b_prepare_overwrite_no_and_yes,
          test_b_prepare_locked_file, test_b_prepare_refusals,
          test_b_log_file_never_raises,
+         test_b_manifest_write_failure_is_a_failed_row,
          test_b_git_commit,
          test_c_worker_folder_complete_before_result,
          test_c_failed_gauge_tsv, test_c_solver_raises,
@@ -926,6 +959,7 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_c_no_stage_dir_is_unchanged,
          test_d_clean_run_releases_once, test_d_flipped_byte_keeps_scratch,
          test_d_partial_copy_keeps_scratch,
+         test_d_unreadable_sums_line_keeps_scratch,
          test_d_wsl_hash_failure_keeps_scratch,
          test_d_stopped_keeps_scratch, test_d_raised_keeps_scratch,
          test_d_failed_row_keeps_scratch, test_d_only_run_dirs_are_deleted,

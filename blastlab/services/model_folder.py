@@ -474,6 +474,8 @@ def write_all(res, case, dim, stage_dir, run_info=None, log=print):
     manifest['finished'] = now_iso()
     why = write_manifest(manifest, stage_dir)
     if why:
+        # a row of sec. 2.2 too: recorded, so the WSL scratch is kept
+        failed.append(dict(name='manifest', path=MANIFEST_FILE, why=why))
         log(f'[warn] model folder: could not write {MANIFEST_FILE}: {why}')
     return manifest
 
@@ -647,10 +649,17 @@ def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
     try:
         with open(os.path.join(root, SUMS_FILE), encoding='utf-8',
                   errors='replace') as f:
-            listing = parse_sums(f.read())
+            text = f.read()
     except OSError as exc:
         out['detail'] = f'cannot read {SUMS_FILE}: {exc}'
         return out
+    listing = parse_sums(text)
+    # a line parse_sums cannot read (sha256sum escapes a name holding a
+    # backslash or a newline) is a file that would not be copied: the
+    # copy is then not complete, and the scratch must stay
+    unread = sum(1 for ln in text.splitlines() if ln.strip()) - len(listing)
+    if unread:
+        out['errors'].append((SUMS_FILE, f'{unread} line(s) not understood'))
     listing = [(h, rel) for h, rel in listing if in_skeleton(rel)]
     for digest, rel in listing:
         parts = rel.split('/')
