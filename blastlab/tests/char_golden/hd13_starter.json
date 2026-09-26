@@ -1,11 +1,5 @@
 {
   "confined_p_max": 102352.5086539645,
   "confined_stop_reason": "burnt out and vented",
-  "sdof_collapsed": false,
-  "sdof_ductility": 0.11636652336338234,
-  "sdof_regime": "quasi-static",
-  "unconfined_mach_max": 0.09170897552772936,
-  "verdict": null,
-  "verdict_high_ductility": null,
-  "verdict_low_ductility": null
+  "unconfined_mach_max": 0.09170897552772936
 }
