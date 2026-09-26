@@ -632,9 +632,7 @@ def _log_banner_1d(hooks, case, spec):
             '  EOS             : JWL products + ideal-gas air',
             f'  vDet            : {m.vDet:g} m/s',
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + ('(initial, adaptive)' if spec.adaptive_write
-               else '(pinned schedule)'),
+            _write_interval_line(spec),
             f'  Live profile    : p(r) sampled every '
             f'{spec.live_steps or writer.live_sample_steps(1)} steps',
             bar, ''):
@@ -696,6 +694,15 @@ def _disable_fo_accumulators(spec, case, hooks):
               'across a mesh change. Peak and impulse are accumulated per '
               'write instead (the whole run, including everything before '
               'the stop) - see peak_source in the result.')
+    # OUT-2 (D4): the rewritten controlDict samples no pMax / impulse on
+    # the VTK surfaces either (writer.vtk_surface_fields)
+    surf = spec.vtk_surfaces or {}
+    dropped = sorted({f for k in ('fields', 'obstacle_fields')
+                      for f in surf.get(k, ())} & set(_FO_FIELDS))
+    if dropped:
+        hooks.log(f'  [blastfoam] VTK sections/obstacles: '
+                  f'{" and ".join(dropped)} are not written for this resumed '
+                  f'AMR leg (the function objects are off)')
     return True
 
 
@@ -947,12 +954,14 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
+    # OUT-2: VTK volumes pin the schedule too (their cadence IS it)
     spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True)))
+                           and bool(getattr(case, 'adaptive_write', True))
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     r = spec.grid['r']
     # T is in the readiness tuple because finalize_1d re-reads it
@@ -1301,8 +1310,7 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
             + ('shock arrival at a terminate boundary' if has_term
                else 'safety cap (no terminate boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + _interval_label(spec),
+            _write_interval_line(spec),
             f'  Live slice      : p sampled every '
             f'{spec.live_steps or writer.live_sample_steps(2)} steps'
             + (' + every written time (AMR)' if spec.amr else ''),
@@ -1327,11 +1335,12 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
                            and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0))
+                           and not getattr(spec, 'write_budget', 0)
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
@@ -1866,7 +1875,26 @@ def _interval_label(spec):
     write budget gets its own."""
     if getattr(spec, 'write_budget', 0):
         return f'(pinned: write budget {spec.write_budget})'
+    if getattr(spec, 'vtk_volumes', None):
+        return '(pinned: VTK volumes)'
     return '(initial, adaptive)' if spec.adaptive_write else '(pinned schedule)'
+
+
+def _write_interval_line(spec):
+    """The banner's `Write interval` line. OUT-2: VTK volumes in Step
+    mode write every N solver steps, and the line says so rather than
+    quote the transit-sized estimate that no longer schedules anything."""
+    if getattr(spec, 'write_steps', 0):
+        return (f'  Write interval  : every {spec.write_steps} solver steps '
+                f'(pinned: VTK volumes)')
+    return (f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
+            + _interval_label(spec))
+
+
+def _write_cadence_dt(spec):
+    """hooks.cadence's `dt`: writeInterval [s], or None (unknown) when
+    the writes come every N solver steps (OUT-2 Step mode)."""
+    return None if getattr(spec, 'write_steps', 0) else spec.write_interval
 
 
 def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
@@ -1904,8 +1932,7 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
                else 'safety cap (no terminate boundaries)'),
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + _interval_label(spec),
+            _write_interval_line(spec),
             ('  Live slice      : p of every written time (AMR)'
              if spec.amr else '  Live slice      : p sampled every step'),
             bar, ''):
@@ -1926,11 +1953,12 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
                            and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0))
+                           and not getattr(spec, 'write_budget', 0)
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
