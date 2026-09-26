@@ -583,11 +583,18 @@ def _track_pin(loop, pin, name, arrived):
     write where it holds (the forward scan's `names[first - 1]`); the
     candidate it replaces is released - for the pin only, so a write kept
     as a snapshot or trigger stays kept. `pin` is the caller's
-    {'name', 'frozen'} state."""
+    {'name', 'frozen'} state.
+
+    The first write where it holds is kept too ('arrival'): a resume
+    after deletion, and postmortem.load_run, re-run the forward scan on
+    the writes left on disk, and the boundary can vent back below the
+    threshold on later writes - without this one the replay never sees
+    the arrival, never stops, and hands on the last write (D10)."""
     if pin['frozen']:
         return
     if arrived:
         pin['frozen'] = True
+        loop.protect(name, 'arrival')
         return
     loop.unprotect(pin['name'], 'pin')
     pin['name'] = name

@@ -372,8 +372,10 @@ def note_resume(vtk_dir, times, log):
     VTK export of the run being resumed had already converted - and so
     possibly deleted - writes that are no longer there, say so once and
     set `replay_incomplete` in vtk\\manifest.json: the frames, and on AMR
-    the Python peak/impulse, cover only the writes that are left
-    (snapshots survive: their dirs are protected). True when it applied.
+    the Python peak/impulse, cover only the writes that are left. 2D/3D
+    snapshots survive (their dirs are protected); a 1D run picks its
+    snapshots at finalize from the writes it holds, so a resumed 1D run
+    picks them from the writes that are left. True when it applied.
     `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none."""
     if not isinstance(vtk_dir, str) or not vtk_dir:
         return False
@@ -393,7 +395,8 @@ def note_resume(vtk_dir, times, log):
     log(f'  [blastfoam] resuming after the VTK export removed {len(gone)} '
         f'written time(s) from WSL: the replay rebuilds the frames (and, '
         f'on AMR, the per-write peak/impulse) from the {len(times)} left; '
-        f'snapshots are kept. Recorded as replay_incomplete in '
+        f'2D/3D snapshots are kept, a 1D run picks its snapshots from the '
+        f'writes left. Recorded as replay_incomplete in '
         f'vtk\\manifest.json.')
     return True
 
@@ -473,8 +476,14 @@ class VtkExport:
     :2283)                      / impulse
     ==========================  =====================  ===================
 
+    The first write where the arrival holds is kept as well ('arrival',
+    `_track_pin`): a resume or a postmortem load re-runs the pin's
+    forward scan on the writes left on disk, and the boundary can vent
+    back below the threshold on later writes.
+
     1D snapshots and every frame live in memory; a resume after deletion
-    replays only what is left (D10, `note_resume`).
+    replays only what is left (D10, `note_resume`), so a resumed 1D run
+    picks its snapshots from the writes that are left.
 
     A W3 auto-resume builds a new loop on the same hooks: construction
     reads `vtk\\manifest.json` back, so no time is exported twice."""

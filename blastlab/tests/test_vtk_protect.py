@@ -227,8 +227,21 @@ def case_3d():
                            z_lo='reflect', z_hi='reflect'))
 
 
-def run(dim, purge):
-    """(Result, FakeLoop, log lines) of one fake run."""
+def _vent(spec, dist, times):
+    """The terminate boundary vents back below the arrival threshold on
+    these writes (measured on real runs, backend._arrival_pin): p goes
+    back to ambient everywhere."""
+    for t in times:
+        _scalar(os.path.join(spec.case_unc, writer.tfmt(t), 'p'),
+                np.full(len(dist), P_AIR))
+
+
+def run(dim, purge, vent=0, replay=False, more=0):
+    """(Result, FakeLoop, log lines) of one fake run. `more`: that many
+    writes more at the same front speed; `vent`: the last that many
+    writes vent back below arrival; `replay`: a second session (a
+    resume) then replays what is left on disk, without deleting, and its
+    Result is returned."""
     tmp = tempfile.mkdtemp(prefix=f'blastlab_vtk_protect_{dim}d_')
     real = backend.FoamRunLoop
     try:
@@ -249,15 +262,25 @@ def run(dim, purge):
             dist = np.sqrt((X - 0.4) ** 2 + (Y - 0.4) ** 2
                            + (Z - 0.4) ** 2).ravel(order='F')
             radii = [0.05 * k for k in range(1, 10)]
+        step = radii[1] - radii[0]
+        radii = radii + [radii[-1] + step * k for k in range(1, more + 1)]
         times = [1e-5 * k for k in range(1, len(radii) + 1)]
         write_tree(spec, dist, radii, times)
+        if vent:
+            _vent(spec, dist, times[-vent:])
         FakeLoop.purge = purge
         backend.FoamRunLoop = FakeLoop
         hooks = Hooks()
         solve = {1: backend.solve_1d_foam, 2: backend.solve_2d_foam,
                  3: backend.solve_3d_foam}[dim]
         res = solve(case, hooks, adaptive_write=False, spec=spec)
-        return res, FakeLoop.last, hooks.lines
+        first = FakeLoop.last           # the session that deleted
+        if replay:
+            FakeLoop.purge = False
+            hooks = Hooks()
+            res = solve(case, hooks, adaptive_write=False,
+                        spec=spec_for(case, tmp))
+        return res, first, hooks.lines
     finally:
         backend.FoamRunLoop = real
         FakeLoop.purge = False
@@ -371,6 +394,34 @@ def test_3d():
     return got
 
 
+def test_resume_keeps_the_arrival():
+    """D10: a resume after deletion replays only what is left, and must
+    still find the arrival and pin the same hand-off. The boundary vents
+    back below the threshold on the newest writes (backend._arrival_pin),
+    so the first ARRIVED write has to survive as well as the pin: without
+    it the replay never sees an arrival, never stops, and hands on the
+    last write."""
+    for dim, key, more, vent in ((1, 'final_profile', 0, 2),
+                                 (2, 'final_state', 3, 3)):
+        ref, _l, lines_ref = run(dim, purge=False, vent=vent, replay=True,
+                                 more=more)
+        got, loop, lines = run(dim, purge=True, vent=vent, replay=True,
+                               more=more)
+        assert loop.deleted, dim
+        assert ref.stop_reason.startswith('shock arrived'), ref.stop_reason
+        assert got.stop_reason == ref.stop_reason, (dim, got.stop_reason)
+        # the pinned time; the "N later write(s)" count is the record
+        # that is left, which a deletion shortens (Q5)
+        pin_t = [ln.split('(')[0] for ln in _pin_line(lines)]
+        assert pin_t == [ln.split('(')[0] for ln in _pin_line(lines_ref)] \
+            and pin_t, (dim, _pin_line(lines), _pin_line(lines_ref))
+        a, b = ref.meta[key], got.meta[key]
+        assert sorted(a) == sorted(b), dim
+        for k in a:
+            assert np.array_equal(np.asarray(a[k]), np.asarray(b[k])), \
+                (dim, k)
+
+
 def test_resume_note():
     """D10: resume_run's note - a write the export converted that is no
     longer on disk sets replay_incomplete, once, with one log line."""
@@ -399,7 +450,8 @@ def test_resume_note():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-TESTS = [test_1d, test_2d, test_3d, test_resume_note]
+TESTS = [test_1d, test_2d, test_3d, test_resume_keeps_the_arrival,
+         test_resume_note]
 
 
 def main():
