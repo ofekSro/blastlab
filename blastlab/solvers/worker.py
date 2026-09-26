@@ -114,6 +114,7 @@ class GuiHooks(RunHooks):
 
     def log(self, msg):
         self.q.put(('log', msg))
+        self.log_to_file(msg)          # run.log, when a model folder is set
 
     def progress(self, p):
         self._last_p = p

@@ -151,12 +151,14 @@ def report_figures(res, dim, show_mesh=False, title_extra=None):
 
 # ── doing the work ───────────────────────────────────────────────────────
 def run_export(kind, ent, target, opts=None, log=print, parent=None,
-               on_error=None):
+               on_error=None, open_after=True):
     """Write one export. Safe on a worker thread: it touches no widget,
     and every failure reaches `log`. Returns what was written, or None.
 
     `opts` may carry `show_mesh`, `title_extra`, and for `gif` an
     `anim_scale` / `anim_clim` override of the run's own colour range.
+    `open_after=False` skips showing a written report / VTK folder
+    (`os.startfile`): the model folder writes them unattended (OUT-1).
     """
     opts = opts or {}
     show_mesh = bool(opts.get('show_mesh'))
@@ -198,7 +200,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
                 # report's heading
                 title=title_extra or ent.label)
             log(f'Saved {target}')
-            _open(target, log)
+            if open_after:
+                _open(target, log)
             return target
         if kind == 'summary':
             gauge_summary.save_gauge_summary(summary_rows(res), target)
@@ -214,7 +217,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
                     on_error('VTK export', str(exc)[:600])
                 return None
             log(f'VTK export done: {out}')
-            _open(out, log)
+            if open_after:
+                _open(out, log)
             return out
         if kind == 'gif':
             write_animation(res.meta, target, show_mesh=show_mesh,

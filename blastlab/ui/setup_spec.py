@@ -158,12 +158,10 @@ def _boundaries(dim):
 def _anim_ext():
     """write_animation picks the writer from the extension: .mp4 when
     ffmpeg is on PATH, .gif otherwise. Default to what this machine can
-    actually write, as the CLI already does."""
-    try:
-        from matplotlib import animation
-        return '.mp4' if animation.FFMpegWriter.isAvailable() else '.gif'
-    except Exception:
-        return '.gif'
+    actually write, as the CLI already does. The logic lives in
+    output/animation.default_ext (OUT-1)."""
+    from ..output.animation import default_ext
+    return default_ext()
 
 
 def _outputs(dim):
