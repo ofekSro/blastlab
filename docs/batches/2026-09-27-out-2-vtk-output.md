@@ -333,6 +333,14 @@ The owner runs a real case, opens the series in ParaView, and says "fixed and ap
 
 ## 6. Owner questions (each with the interpretation used if there is no answer)
 
+**Owner answers, 2026-09-26 (binding):** Q1 - one series per field, each named after
+its field (e.g. `p.vtk.series`, `pMax.vtk.series`), laid out so that in ParaView the
+series load as a group per family and each field can be isolated. Q3, Q4, Q5, Q6, Q7 -
+accepted as written below. Q2 - **separate field lists for sections and for obstacles**,
+as Viper's Sections and Obstacles columns (spec §3.2): the matrix keeps two columns, the
+case carries `fields` (sections) and `obstacle_fields` (obstacles), and the writer emits
+two surface function objects (one per list, same cadence) so each list is honoured.
+
 - **Q1 · One file per field (D2).**
   - *Used:* `sections\<plane>\<field>\t_*.vtk`, one series per field.
   - *Alternative:* merge the per-field files into one file per time on Windows (legacy VTK parsing, ~100 lines, more risk).
