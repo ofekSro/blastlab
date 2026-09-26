@@ -3320,6 +3320,14 @@ def v02_vtk_2d_obstacles(qa):
     qa.check(not any('nothing to sample' in s for s in strip),
              'with an obstacle the refusal is gone', 'S2')
     _vtk_shots(qa, '2d_with_obstacle')
+    form.widgets['vtk_v_on'].click()
+    form.widgets['vtk_v_mode'].buttons['step'].click()
+    form.widgets['vtk_s_mode'].buttons['step'].click()
+    qa.pump(0.6)
+    qa.check(not form.is_enabled('vtk_v_ms')
+             and not form.is_enabled('vtk_s_ms'),
+             'Step on both 2D families greys both ms boxes', 'S2')
+    _vtk_shots(qa, '2d_step')
     _set_rows(qa, form.obstacles, [])
     _fresh2d(qa)
 
@@ -3386,7 +3394,15 @@ def v04_vtk_native(qa):
     form = _form(qa)
     qa.check(not form.card_visible(VTK_CARD),
              'native: the VTK card is hidden', 'S1')
-    qa.scroll_form(1.0)
+    # where the card sat: Outputs, then straight on to the Trigger card
+    # (the bottom of the scroll range is the stack's blank tail - the
+    # QStackedWidget takes its tallest page's height)
+    try:
+        qa.win.setup._scroll.ensureWidgetVisible(form.cards['Trigger gauge'],
+                                                 0, 0)
+    except Exception:
+        pass
+    qa.pump(0.4)
     qa.shot('native_no_card')
     saved = case_to_dict(qa.win.setup.get_case())
     path = os.path.join(qa.dirs['cache'], 'v04_native.json')
