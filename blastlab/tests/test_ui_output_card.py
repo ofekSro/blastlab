@@ -35,6 +35,7 @@ from blastlab.core.case import (case_from_dict, case_to_dict,  # noqa: E402
 from blastlab.models import fields as F                     # noqa: E402
 from blastlab.models.case import vtk_fields_for             # noqa: E402
 from blastlab.ui.case_form import CaseForm                  # noqa: E402
+from blastlab.ui.fieldform import CARD_PAD, COL_MIN         # noqa: E402
 
 FAIL = []
 TITLE = 'VTK output (ParaView)'
@@ -85,6 +86,12 @@ def main():
               cols == sorted(want_cols[d][1:]), str(cols))
         check(f'{d}D: a tick box in every destination cell',
               len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1))
+        # the first offscreen QA shots showed "Pressu" and "Obstacle": the
+        # matrix must fit the narrowest Setup column without squeezing
+        room = COL_MIN - 2 * CARD_PAD
+        need = grid.minimumSizeHint().width()
+        check(f'{d}D: the matrix fits the narrowest Setup column',
+              need <= room, f'{need} px vs {room} px')
         check(f'{d}D: the plane table is 3D only',
               ('vtk_planes' in names) == (d == 3), str(names))
         # the locked Gauges column: p / rho / U ticked, all disabled

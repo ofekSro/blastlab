@@ -283,7 +283,9 @@ class _MatrixGrid(ctk.CTkFrame):
                     command=var.fire)
                 box.grid(row=i, column=j, pady=1)
                 if col == 'gauges':
-                    box.configure(state='disabled')
+                    # CTk draws a disabled tick in the accent colour, so
+                    # a locked box looked live: draw it muted
+                    box.configure(state='disabled', fg_color=c('muted'))
                     self.locked.append((bv, box))
                 else:
                     var.cells[(f, col)] = bv
@@ -780,7 +782,7 @@ class CaseForm(ctk.CTkFrame):
             self._vtk_radios[fam] = []
             for val in ('time', 'step'):
                 rb = ctk.CTkRadioButton(pair, text=val.capitalize(),
-                                        variable=mode, value=val,
+                                        variable=mode, value=val, width=64,
                                         font=theme.F_BODY,
                                         border_color=c('border'),
                                         fg_color=c('accent'),

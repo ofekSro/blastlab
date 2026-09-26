@@ -134,13 +134,24 @@ def anim_file_with_format(anim_file, fmt):
 # docs/batches/2026-09-27-out-2-vtk-output.md Step 8 (owner Q2: separate
 # Sections and Obstacles columns). Shared by the Qt and the Tk card.
 
-#: the matrix rows, in VTK_FIELDS order (plan sec. 3.2)
+#: the matrix rows, in VTK_FIELDS order (plan sec. 3.2); short, because
+#: the matrix shares one Setup column - the tooltip names the field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
-    'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
+    'pMax': 'Peak overpr.', 'timeOfArrival': 'Arrival time',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
-    'alpha.expl': 'Products fraction', 'rhoE': 'Energy',
+    'alpha.expl': 'Products', 'rhoE': 'Energy',
 }
+#: the long names, for the row tooltips
+VTK_QUANTITY_TIPS = {'pMax': 'Peak overpressure',
+                     'alpha.expl': 'Products (volume fraction)',
+                     'timeOfArrival': 'Arrival time (first arrival)'}
+
+
+def vtk_quantity_tip(field):
+    """A matrix row's tooltip: its long name and the blastFoam field."""
+    name = VTK_QUANTITY_TIPS.get(field, VTK_QUANTITY_LABELS.get(field, field))
+    return f'{name} - blastFoam field {field}'
 #: decision 4: the Gauges column is shown, ticked and locked until OUT-4
 VTK_GAUGE_FIELDS = ('p', 'rho', 'U')
 #: the matrix columns of each dimension; 'gauges' is display only
@@ -164,12 +175,24 @@ VTK_PLANE_AXES = ('x', 'y', 'z')
 
 
 def vtk_column_label(dim, col):
-    """The matrix header of column `col`: in 1D/2D the volumes are the
-    whole domain (Viper's 2D tab)."""
+    """The matrix header of column `col`, short enough that four columns
+    and the quantity names fit one Setup column (the full name is
+    `vtk_column_tip`); in 1D/2D the volumes are the whole domain
+    (Viper's 2D tab)."""
     if col == 'volumes' and int(dim) < 3:
-        return 'Whole domain'
-    return {'gauges': 'Gauges', 'sections': 'Sections',
-            'obstacles': 'Obstacles', 'volumes': 'Volumes'}[col]
+        return 'Domain'
+    return {'gauges': 'Gauge', 'sections': 'Sect.', 'obstacles': 'Obst.',
+            'volumes': 'Vol.'}[col]
+
+
+def vtk_column_tip(dim, col):
+    """The full name of matrix column `col`, for its tooltip."""
+    if col == 'volumes' and int(dim) < 3:
+        return 'Whole domain (volumes)'
+    return {'gauges': 'Gauges - always p, rho and U (fixed until OUT-4)',
+            'sections': 'Sections - the live-slice plane and the extra '
+                        'planes', 'obstacles': 'Obstacles - their walls',
+            'volumes': 'Volumes - the whole 3D domain'}[col]
 
 
 def vtk_matrix(value, dim):

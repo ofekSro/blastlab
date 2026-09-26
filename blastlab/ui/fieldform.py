@@ -168,18 +168,19 @@ class MatrixGrid(QWidget):
         for j, col in enumerate(cols, start=1):
             head = label(fields.vtk_column_label(dim, col), 'small')
             head.setAlignment(Qt.AlignCenter)
+            head.setToolTip(fields.vtk_column_tip(dim, col))
             grid.addWidget(head, 0, j)
         for i, f in enumerate(rows, start=1):
             name = label(fields.VTK_QUANTITY_LABELS.get(f, f), 'muted')
-            name.setToolTip(f'blastFoam field: {f}')
+            name.setToolTip(fields.vtk_quantity_tip(f))
             grid.addWidget(name, i, 0)
             for j, col in enumerate(cols, start=1):
                 box = QCheckBox()
+                box.setToolTip(f'{fields.vtk_column_tip(dim, col)}: '
+                               f'{fields.vtk_quantity_tip(f)}')
                 if col == 'gauges':
                     box.setChecked(f in fields.VTK_GAUGE_FIELDS)
                     box.setEnabled(False)
-                    box.setToolTip('The gauges always record p, rho and '
-                                   'U (fixed until OUT-4)')
                 else:
                     box.clicked.connect(lambda *_a: self._adopt())
                     self.boxes[(f, col)] = box
