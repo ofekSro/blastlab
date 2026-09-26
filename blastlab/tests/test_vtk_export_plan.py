@@ -627,16 +627,35 @@ def test_b_runloop_wiring():
     loop.vtk = SimpleNamespace(
         run=lambda done, final: calls.append(('run', final)),
         covered=lambda names: calls.append(('covered', list(names))),
-        protect=lambda n: calls.append(('protect', n)),
-        unprotect=lambda n: calls.append(('unprotect', n)))
+        protect=lambda n, why: calls.append(('protect', n, why)),
+        unprotect=lambda n, why: calls.append(('unprotect', n, why)))
     loop.done = {}
     loop.purge = None
     loop._covered(['0.1'])
     loop._export_vtk(final=False)
     loop.protect('0.2')
-    loop.unprotect('0.2')
+    loop.unprotect('0.2', 'pin')
     assert calls == [('covered', ['0.1']), ('run', False),
-                     ('protect', '0.2'), ('unprotect', '0.2')], calls
+                     ('protect', '0.2', 'read'),
+                     ('unprotect', '0.2', 'pin')], calls
+
+
+def test_b_protect_reasons():
+    """Releasing one reason (the pin candidate moving on) never releases a
+    write kept for another (a snapshot)."""
+    tree = Tree(surfaces=False)
+    try:
+        ex = tree.export()
+        ex.protect(T[1], 'pin')
+        ex.protect(T[1])
+        ex.unprotect(T[1], 'pin')
+        assert ex.protected == {T[1]}
+        ex.unprotect(T[1])
+        ex.unprotect(T[1])                  # twice, and None: no-ops
+        ex.unprotect(None)
+        assert ex.protected == set()
+    finally:
+        tree.close()
 
 
 TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
@@ -645,7 +664,8 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_second_export_does_not_convert_twice,
            test_b_newest_sample_waits_for_final,
            test_b_parallel_needs_reconstruct, test_b_no_delete_switch,
-           test_b_failing_delete_never_raises, test_b_runloop_wiring]
+           test_b_failing_delete_never_raises, test_b_runloop_wiring,
+           test_b_protect_reasons]
 TESTS = TESTS_A + TESTS_B
 
 

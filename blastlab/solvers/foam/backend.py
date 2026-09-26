@@ -576,6 +576,36 @@ def _arrival_pin(names, t_of, stop_reason, arrived, hooks):
 # the crossing write itself - the long post-arrival tail is never read
 
 
+def _track_pin(loop, pin, name, arrived):
+    """OUT-2 (D1): keep the write `_arrival_pin` would pick on the VTK
+    export's never-delete list while the run is still writing. That is the
+    newest write whose arrival predicate is False, frozen at the first
+    write where it holds (the forward scan's `names[first - 1]`); the
+    candidate it replaces is released - for the pin only, so a write kept
+    as a snapshot or trigger stays kept. `pin` is the caller's
+    {'name', 'frozen'} state."""
+    if pin['frozen']:
+        return
+    if arrived:
+        pin['frozen'] = True
+        return
+    loop.unprotect(pin['name'], 'pin')
+    pin['name'] = name
+    loop.protect(name, 'pin')
+
+
+def _arrived_2d_grid(pg, bcs):
+    """The 2D arrival predicate on one write's `p` grid: any cell of a
+    terminate side above ARRIVAL_P (finalize_2d's `arrived_2d`, and the
+    run loop's on_frame for the OUT-2 cache)."""
+    for side, sl in (('x_lo', np.s_[0, :]), ('x_hi', np.s_[-1, :]),
+                     ('y_lo', np.s_[:, 0]), ('y_hi', np.s_[:, -1])):
+        if bcs.get(side) == 'terminate' \
+                and bool(np.any(pg[sl] > ARRIVAL_P)):
+            return True
+    return False
+
+
 def _gauges_from_probes(spec):
     """blastProbes output -> the native gauges dict (1D: radii)."""
     empty = dict(times=np.array([]), radii=[], pressures=[])
@@ -821,6 +851,9 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
              if float(_t) > 0 or n == '0']
     if len(times) < 1:
         raise RuntimeError(f'{unc} has no written times to resume from')
+    # OUT-2 (D10): writes the VTK export already removed are not replayed
+    from .vtk_export import note_resume
+    note_resume(getattr(hooks, 'vtk_dir', None), times, hooks.log)
 
     # a Stop leaves `stopAt writeNow` in the runTimeModifiable dict -
     # a resumed solver would exit immediately; and the run must pick up
@@ -979,6 +1012,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     _initial_frame(spec, hooks)
 
     store = {}                      # dirname -> dict(t, p, rho, u)
+    pin = dict(name=None, frozen=False)     # OUT-2 (D1): see _track_pin
 
     def read_dir(name, dpath):
         t, _dt = reader.read_time(dpath)
@@ -992,6 +1026,8 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     def on_frame(name, dpath, entry):
         store[name] = entry
+        # finalize_1d's own pin predicate, on the p already in hand
+        _track_pin(loop, pin, name, float(entry['p'][-1]) > ARRIVAL_P)
         st, live = loop.st, loop.live
         # shock-front position: real progress for the bar and for
         # the adaptive-interval controller
@@ -1397,6 +1433,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     snap_names = []
     acc = PeakImpulse()         # per-write Python + per-step FO accumulators
     slice_solid = solid if solid.any() else None
+    # OUT-2 (D1): the pin candidate the VTK export must keep, and each
+    # write's arrival predicate for finalize_2d once its dir is gone
+    pin = dict(name=None, frozen=False)
+    arrived_cache = {}
 
     def read_dir(name, dpath):
         t, _dt = reader.read_time(first_part(dpath))
@@ -1409,6 +1449,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
         if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             return False
         ingested[name] = t
+        arrived_cache[name] = _arrived_2d_grid(p, bcs)
+        _track_pin(loop, pin, name, arrived_cache[name])
         st, live = loop.st, loop.live
         if mesh is not None:
             hooks.log(amr_note(mesh, st.get('n_prev'), t))
@@ -1423,6 +1465,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
             snap_radii.pop(0)
             if name not in snap_names:
                 snap_names.append(name)
+                loop.protect(name)          # finalize_2d re-reads it
                 hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
                           f"(front at {r_front:.2f} m)")
         if record_frames > 0:
@@ -1451,6 +1494,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
                 _trigger_fire(loop, hooks, case, trig_k, t,
                               float(p[trig_cell])),
                 time_dir=name)
+            if 'remap' in trigger['action']:
+                loop.protect(name)          # finalize_2d reads its state
         if not loop.stop_requested and has_term \
                 and (p[term_edge] > ARRIVAL_P).any():
             loop.request_stop('shock arrived at a terminate boundary '
@@ -1510,18 +1555,22 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
                        ingested, snap_names, frame_t, frame_p,
                        record_frames, acc, frame_lv=frame_lv,
                        trig_k=trig_k, trigger=trigger,
-                       conserved=conserved_meta(loop.st))
+                       conserved=conserved_meta(loop.st),
+                       arrived_cache=arrived_cache)
 
 
 def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None, trig_k=None, trigger=None, conserved=None):
+                 frame_lv=None, trig_k=None, trigger=None, conserved=None,
+                 arrived_cache=None):
     """Build the exact native-shaped 2D Result via a two-pass snapshot
     re-read (also used by postmortem.load_run).
 
     `trig_k` / `trigger` are the T51 trigger-gauge index and record from
     the run loop; postmortem.load_run has neither (it never watched the
-    run) and passes nothing."""
+    run) and passes nothing. `arrived_cache` (OUT-2, D1): the arrival
+    predicate the run loop evaluated on each write's `p`, consulted only
+    for a write whose directory the VTK export has deleted."""
     m = MATERIALS[spec.material]
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
@@ -1623,15 +1672,14 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     def arrived_2d(name):
         """The loop's own stop criterion ('shock arrived at a terminate
         boundary'), re-evaluated on the WRITTEN data of one time dir -
-        deterministic where the stop instant is not."""
+        deterministic where the stop instant is not. A write the VTK
+        export deleted answers from the run loop's cache (OUT-2)."""
         dp = spec.time_dirs(name)
+        if arrived_cache and name in arrived_cache \
+                and not os.path.isdir(first_part(dp)):
+            return arrived_cache[name]
         pg = read_2d(dp, spec, ('p',), mesh=mesh_at(spec, dp))['p']
-        for side, sl in (('x_lo', np.s_[0, :]), ('x_hi', np.s_[-1, :]),
-                         ('y_lo', np.s_[:, 0]), ('y_hi', np.s_[:, -1])):
-            if bcs.get(side) == 'terminate' \
-                    and bool(np.any(pg[sl] > ARRIVAL_P)):
-                return True
-        return False
+        return _arrived_2d_grid(pg, bcs)
 
     pin = _arrival_pin(names, ingested.get, stop_reason, arrived_2d,
                        hooks)
@@ -2070,6 +2118,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
             snap_radii.pop(0)
             if name not in snap_names:
                 snap_names.append(name)
+                loop.protect(name)          # finalize_3d re-reads it
                 hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
                           f"(front at {r_front:.2f} m)")
 

@@ -1100,15 +1100,15 @@ class FoamRunLoop:
         if self.vtk is not None:
             self.vtk.run(self.done, final)
 
-    def protect(self, name):
+    def protect(self, name, why='read'):
         """The backend: finalize re-reads written time `name` - never
-        delete it (OUT-2, D1)."""
+        delete it (OUT-2, D1). `why` keys the reason (VtkExport.protect)."""
         if self.vtk is not None:
-            self.vtk.protect(name)
+            self.vtk.protect(name, why)
 
-    def unprotect(self, name):
+    def unprotect(self, name, why='read'):
         if self.vtk is not None:
-            self.vtk.unprotect(name)
+            self.vtk.unprotect(name, why)
 
     def run(self):
         """Drive the solver to completion (or stop/kill). Returns the

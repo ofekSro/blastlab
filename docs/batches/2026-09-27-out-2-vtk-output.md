@@ -358,6 +358,19 @@ two surface function objects (one per list, same cadence) so each list is honour
   - planes snapped to the nearest cell layer and named by the position asked for.
 - **Q7 · The pre-registered threshold for Step 11 rule 3.** *Used:* per gauge, |Δpeak| ≤ 1 %, |Δ positive-phase impulse| ≤ 1 %, |Δarrival| ≤ 0.5 %. It is written into the script before the first run and never changed afterwards.
 
+### Parked for the owner (2026-09-27, Steps 4-7; none blocks)
+
+Each is the interim the code uses now; a different answer is a small change in `solvers/foam/vtk_export.py`.
+
+- **P1 · Volumes keep one series.** `vtk\volumes\volumes.vtk.series` over `t_<time>.vtk`, each file holding every chosen field (D2, §3.6). Q1's one-series-per-field applies to the surfaces, where each file is one field; in ParaView each volume field is an array of the one series.
+- **P2 · Where a surface series sits.** `vtk\sections\<plane>\<field>.vtk.series` and `vtk\obstacles\<field>.vtk.series`, listing `<field>/t_<time>.vtk` (a name relative to the series file). To confirm in the Step 14 ParaView check.
+- **P3 · Per-family `fields` and `cadence` in `vtk\manifest.json`.** `fields: {volumes, sections, obstacles}`, `cadence: {volumes, surfaces}` (each `{mode, value, unit}`), because the two families have separate cadences. `not_converted` entries also carry `family` and `path` (additive).
+- **P4 · The root manifest's `outputs` lists every file under `vtk\`.** `list_outputs` is unchanged, so a long run adds thousands of rows. The alternative is to leave `vtk/` out and rely on the `vtk` summary.
+- **P5 · The final VTK sweep also runs after a failed solve** (converting what was ingested, with the bounded wait). The alternative is to skip it when the solver failed.
+- **P6 · Surface samples at t = 0 are exported.** The surface function objects sample the initial state too (measured on this build).
+- **P7 · A failed foamToVTK call over several writes is split.** The writes are converted one per call before attempts are counted, so one bad write does not give up a whole batch.
+- **P8 · Export cadence.** Outside the final sweep, the export looks at the disk at most once a second (`EVERY_S`), and each foamToVTK call takes at most 8 writes (50 at the final sweep).
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.

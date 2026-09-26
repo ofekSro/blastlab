@@ -367,6 +367,37 @@ def start_conversion(spec, names, fields):
     return Conversion(spec.case_posix, names, fields)
 
 
+def note_resume(vtk_dir, times, log):
+    """D10 / owner Q5: a resume replays the writes left on disk. When the
+    VTK export of the run being resumed had already converted - and so
+    possibly deleted - writes that are no longer there, say so once and
+    set `replay_incomplete` in vtk\\manifest.json: the frames, and on AMR
+    the Python peak/impulse, cover only the writes that are left
+    (snapshots survive: their dirs are protected). True when it applied.
+    `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none."""
+    if not isinstance(vtk_dir, str) or not vtk_dir:
+        return False
+    state = vtk_series.load_vtk_manifest(vtk_dir)
+    if not state:
+        return False
+    vol = (state.get('families') or {}).get(VOLUMES) or {}
+    gone = sorted({str(t) for t in vol.get('times') or ()}
+                  - {str(t) for t in times}, key=_time_key)
+    if not gone:
+        return False
+    state['replay_incomplete'] = True
+    try:
+        vtk_series.write_vtk_manifest(vtk_dir, state)
+    except OSError:
+        pass                            # the log line still says it
+    log(f'  [blastfoam] resuming after the VTK export removed {len(gone)} '
+        f'written time(s) from WSL: the replay rebuilds the frames (and, '
+        f'on AMR, the per-write peak/impulse) from the {len(times)} left; '
+        f'snapshots are kept. Recorded as replay_incomplete in '
+        f'vtk\\manifest.json.')
+    return True
+
+
 def _size(path):
     try:
         return os.path.getsize(path)
@@ -416,25 +447,34 @@ class VtkExport:
     plan allows; it waits for foamToVTK up to `final_wait_s(n_cells)`.
 
     Why deleting is safe (D1) - what finalize reads from disk, and how it
-    stays there (solvers/foam/backend.py; line numbers as of OUT-2 Step 7):
+    stays there (solvers/foam/backend.py, line numbers as of OUT-2 Step 7):
 
-    ====================  ============================  ===================
-    reader                what it re-reads              kept by
-    ====================  ============================  ===================
-    _final_read           the newest write, falling     KEEP_NEWEST = 2
-                          back to earlier ones
-    finalize_1d           final dir; arrival-pin dir    newest two; the pin
-                          (snapshots: `store`, memory)  candidate, protected
-    finalize_2d           final dir; every snap_names   newest two; each
-                          dir; the pin; the trigger     snapshot, the pin
-                          dir; arrived_2d's `p` of the  candidate and the
-                          quiet prefix                  remap trigger dir
-                                                        protected; the
-                                                        `arrived` cache
-    finalize_3d           final dir; every snap_names   newest two; each
-                          dir (two-pass re-read)        snapshot protected
-    PeakImpulse.final     the final dir's pMax/impulse  newest two
-    ====================  ============================  ===================
+    ==========================  =====================  ===================
+    reader (backend.py:line)    what it re-reads       kept by
+    ==========================  =====================  ===================
+    _final_read (:480)          the newest write,      KEEP_NEWEST = 2
+                                else the one before
+    finalize_1d (:1156, :1169)  final dir; the         newest two; the pin
+                                arrival-pin dir        candidate (:1030,
+                                (snapshots come from   _track_pin :579)
+                                `store`, in memory)
+    finalize_2d (:1600, :1611,  final dir; every       newest two; each
+    :1688, :1707)               snap_names dir; the    snapshot (:1468),
+                                pin; the remap         the pin candidate
+                                trigger dir            (:1453), the remap
+                                                       trigger dir (:1498)
+    finalize_2d arrived_2d      `p` of every write of  the run loop's
+    (:1672)                     the quiet prefix       `arrived` cache,
+                                                       read only for a
+                                                       deleted dir
+    finalize_3d (:2260, :2270)  final dir; every       newest two; each
+                                snap_names dir         snapshot (:2121)
+    PeakImpulse.final (:1663,   the final dir's pMax   newest two
+    :2283)                      / impulse
+    ==========================  =====================  ===================
+
+    1D snapshots and every frame live in memory; a resume after deletion
+    replays only what is left (D10, `note_resume`).
 
     A W3 auto-resume builds a new loop on the same hooks: construction
     reads `vtk\\manifest.json` back, so no time is exported twice."""
@@ -464,7 +504,8 @@ class VtkExport:
             VTK_SECTIONS: (list(surf.get('fields', ())) if dim == 3
                            else []),
             VTK_OBSTACLES: list(surf.get('obstacle_fields', ()))}
-        self.protected, self.reconstructed = set(), set()
+        self._protect = {}              # name -> the reasons it is kept
+        self.reconstructed = set()
         self.converted, self.copied, self.deleted = set(), set(), set()
         self.swept = {VTK_SECTIONS: set(), VTK_OBSTACLES: set()}
         self.failures = collections.Counter()
@@ -505,14 +546,24 @@ class VtkExport:
                      if self.no_delete else ''))
 
     # ── what the backend and the loop tell it ──
-    def protect(self, name):
-        """Never delete written time `name` (finalize re-reads it)."""
+    def protect(self, name, why='read'):
+        """Never delete written time `name`: finalize re-reads it. `why`
+        keys the reason, so releasing one (the pin candidate moving on)
+        never releases a write kept for another (a snapshot)."""
         if name is not None:
-            self.protected.add(str(name))
+            self._protect.setdefault(str(name), set()).add(why)
 
-    def unprotect(self, name):
-        if name is not None:
-            self.protected.discard(str(name))
+    def unprotect(self, name, why='read'):
+        keys = self._protect.get(str(name)) if name is not None else None
+        if keys is not None:
+            keys.discard(why)
+            if not keys:
+                del self._protect[str(name)]
+
+    @property
+    def protected(self):
+        """The written times finalize will re-read (any reason)."""
+        return set(self._protect)
 
     def covered(self, names):
         """Times a successful reconstructPar just covered (parallel)."""
