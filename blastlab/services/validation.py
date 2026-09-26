@@ -498,7 +498,10 @@ def _validate_vtk_cadence(label, fam, err):
     if mode not in _VTK_MODES:
         err(f"{label}: mode '{mode}' - expected 'time' or 'step'")
         return False
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if (isinstance(value, bool) or not isinstance(value, (int, float))
+            or not math.isfinite(value)):
+        # finite too: NaN passed `<= 0` and then broke int() below (and
+        # the write-count note) with a ValueError out of validate_case
         err(f"{label}: the interval must be a number "
             f"({'ms' if mode == 'time' else 'solver steps'})")
         return False

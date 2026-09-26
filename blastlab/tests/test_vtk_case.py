@@ -250,6 +250,11 @@ def test_validation():
         ('a value that is not a number',
          rep3(vtk_volumes=v_on(value='fast')),
          'VTK volumes: the interval must be a number'),
+        ('a NaN value (Step)', rep3(vtk_volumes=v_on(value=float('nan'))),
+         'VTK volumes: the interval must be a number'),
+        ('an infinite value (Time)', rep3(vtk_surfaces=s_on(
+            value=float('inf'))),
+         'VTK sections/obstacles: the interval must be a number'),
         ('a fractional Step value', rep3(vtk_volumes=v_on(value=2.5)),
          'whole number of solver steps'),
         ('a mode not in time|step', rep3(vtk_volumes=v_on(mode='frames')),
