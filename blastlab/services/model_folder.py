@@ -988,6 +988,32 @@ def headline(exc):
     return f'{type(exc).__name__}: {text}' if text else type(exc).__name__
 
 
+#: the provisional manifest's stop_reason, written when a stage starts and
+#: replaced when it ends: a folder that still says this was left by a run
+#: that never reached its end - blastlab closed mid-run, or the process died
+UNFINISHED = ('unfinished: the run did not reach its end (blastlab was '
+              'closed, or the process ended, during the run)')
+
+
+def write_started(case, dim, stage_dir, run_info=None):
+    """MODEL.json and a provisional manifest.json the moment a stage
+    starts, so a folder whose run never ends (the window closed mid-run:
+    the worker is a daemon thread and dies with the process) still says
+    what ran and that it did not finish. `write_all` replaces both at
+    the end. Never raises."""
+    info = dict(run_info or {})
+    manifest = new_manifest(case, dim, stage_dir, info)
+    manifest['stop_reason'] = UNFINISHED
+    try:
+        from ..models.case import save_case
+        save_case(relative_case(case, stage_dir, info.get('model_dir')),
+                  os.path.join(stage_dir, CASE_FILE))
+    except Exception:             # write_all writes it again, or says why
+        pass
+    manifest['outputs'] = list_outputs(stage_dir)
+    write_manifest(manifest, stage_dir)
+
+
 def _append(path, line):
     """One line into run.log directly, not through the hooks: the stage's
     closing line is not a solver line the Run tab should show twice."""
@@ -1005,8 +1031,10 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
     Registered with `solvers.jobs` (see `jobs.register_stage_folder`), so
     `jobs.solve_stage(dim, case, stage_dir)` returns this. On the worker
     thread it binds the case into the folder (`bind_case`), points
-    `hooks.log_file` at run.log, runs the ordinary stage
-    (`make_solve(bound)`: solve + the case's own files), then `write_all`.
+    `hooks.log_file` at run.log, writes MODEL.json and a provisional
+    manifest (`write_started`: a run that never ends still says so), runs
+    the ordinary stage (`make_solve(bound)`: solve + the case's own
+    files), then `write_all`.
 
     A stage that raises - StoppedBeforeStart, a failed hand-off write, any
     error - still gets MODEL.json, run.log and manifest.json
@@ -1042,6 +1070,7 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                 # profile_file)
                 bound.profile_file = info['handoff']
                 bound.trigger_file = None
+            write_started(bound, dim, stage_dir, info)
             res = make_solve(bound)(hooks)
             return res
         except Exception as exc:
@@ -1083,8 +1112,9 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                 try:
                     hooks.folder_written(stage_dir, manifest,
                                          hooks.folder_notice)
-                except Exception:          # a front end's bug is not the run's
-                    pass
+                except Exception as exc:   # a front end's bug is not the run's
+                    _append(log_path, f'[warn] model folder: the front end '
+                                      f'could not take the manifest: {exc!r}')
             finally:
                 hooks.log_file = prev_log
     return solve

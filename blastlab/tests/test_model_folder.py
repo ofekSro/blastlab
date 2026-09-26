@@ -782,6 +782,36 @@ def test_c_run_info_and_layout():
                  (2, 3): os.path.join(t.folder, 'handoff_2d_to_3d.npz')}
 
 
+def test_c_unfinished_stage_says_so():
+    """A stage whose run never ends (the window closed mid-run: the worker
+    is a daemon thread) already has MODEL.json and a manifest saying it
+    did not finish, written before the solver started; the end of the
+    stage replaces the provisional manifest (OUT-1 verifier, item 3a)."""
+    import blastlab.solvers as solvers_pkg
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_c_')
+    real = solvers_pkg.get_solver
+    during = {}
+
+    def peek(case, hooks):
+        folder = os.path.dirname(os.path.dirname(case.gauge_file))
+        during['files'] = sorted(files_on_disk(folder))
+        during['manifest'] = _manifest(folder)
+        raise RuntimeError('peeked')
+    solvers_pkg.get_solver = lambda dim, backend: peek
+    try:
+        _w, folder, _seen = run_worker(case2d(), runs)
+    finally:
+        solvers_pkg.get_solver = real
+    try:
+        assert 'MODEL.json' in during['files'], during['files']
+        m = during['manifest']
+        assert m['stop_reason'] == mf.UNFINISHED and m['finished'] is None, m
+        assert m['model'] == 'MODEL' and m['dim'] == 2, m
+        assert _manifest(folder)['stop_reason'] == 'RuntimeError: peeked'
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 def test_c_no_stage_dir_is_unchanged():
     """stage_dir=None returns the plain solve (test_char_write_failure
     pins what it does); nothing is bound or logged to a file."""
@@ -1126,6 +1156,7 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_c_stopped_before_start, test_c_handoff_failure_keeps_rows,
          test_c_folder_message_before_result,
          test_c_resume_stage_writes_the_folder, test_c_run_info_and_layout,
+         test_c_unfinished_stage_says_so,
          test_c_no_stage_dir_is_unchanged,
          test_d_clean_run_releases_once, test_d_flipped_byte_keeps_scratch,
          test_d_partial_copy_keeps_scratch,
