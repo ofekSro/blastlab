@@ -110,35 +110,10 @@ gives a lower μ than G1 alone). Both come from judging the response at the ends
 the *load*. With no SDOF in the app, both close. The worst case is found in SBEDS
 over every exported trace.
 
-**Step 1: export, and SDOF out of every output.**
-1. One CSV per trace, **in the format SBEDS loads** (owner, 2026-09-26, replaces the
-   four-column spec): exactly two comma-separated columns, `t` in ms and overpressure
-   in kPa, **no header line and nothing else**, or SBEDS will not load it. E.g.
-   `0,100` / `2,50` / `3,0`. Overpressure over ambient, not absolute; negative
-   values (suction) are kept, because SBEDS accepts them (owner, 2026-09-26). What used to go
-   in the header (source case, trace, side-on or reflected, γ, the "still active"
-   line) goes in the file name and a sidecar `.txt` next to it.
-2. What is exported: **every** trace already computed. That means every sensitivity-band
-   sample *including the nominal*, and for the wall load G1 and plane-max × both γ.
-   The export must be the load *on the wall* (Pr, and Ps + C_D·q after clearing,
-   UFC 3-340-02 §2-15.3.2), because SBEDS applies a user-defined load as given.
-   **Clearing is a user choice** (owner, 2026-09-26): off gives E = max(R, S) as
-   computed (upper bound); on asks for the loaded wall's H and W and applies Eq. 2-8 /
-   2-9 (C_D = 1). **Residual capacity stays in the report** (owner, 2026-09-26).
-2a. **Only what was computed. No tail rule** (owner, 2026-09-25): the T0 / T1 tails
-   are not exported. The trace ends at the run's last sample. If the load has not
-   returned to ambient by then (|p| above 1 % of the peak over the last 1 ms), the
-   header says so, with the last value: **"record ends while the load is still
-   active: p = … kPa at t = … ms"**, and so does the export's console / GUI message.
-   To see what happens later, run longer. HD1-3d's 30 ms record ends at -22 to
-   -25 kPa, still in suction, at 0.198 of the drain time. The T0/T1 code goes with the
-   SDOF in step 2.
-3. Remove μ, support rotation and the survives / fails / undetermined verdict from the
-   HD 1.3 report, the CLI, the Qt and Tk forms, and the GUI result views. Callers in
-   `core/`: `assessment`, `scenario`, `sensitivity` (`structural_verdict`), `thermal`,
-   `unconfined`, `wallload`. Keep the module and its tests for now.
-4. Tests: the export round-trips (t, p) exactly, the impulse column matches the
-   trapezoid integral, and no output carries a μ. Tk and Qt suites run (§9).
+**Step 1 is ✅ closed 2026-09-26** (batch `hd1-16-load-export`). The record is in
+[DONE.md](DONE.md) §0b: the SBEDS CSVs, the wall traces with optional clearing, and no
+μ or verdict in any output. The questions it raised are in
+`docs/ENGINEERING_QUESTIONS.md` under `hd1-16-load-export`.
 
 **Step 2 (after the owner has run one case through SBEDS):** delete `core/sdof.py`,
 `structural_verdict` and their tests. Mark the μ values in the HD1-3d / HD1-13
@@ -152,13 +127,8 @@ outside the calibration window" is the real HD1-3 limitation (a burn law measure
 a closed vessel at tens-hundreds of MPa, applied at ~0.1 MPa). What is wrong is
 around them. Source: `docs/ENGINEERING_QUESTIONS.md` phase 7 #1-#2, phase 0 #3.
 
-**(a) Texts. No number or threshold moves.**
-1. The comment at `MACH_QUASI_STATIC` says the model's cases "come out two to three
-   orders below it". The starter case is 1.8× above. Rewrite it to state what has
-   actually been seen.
-2. The report and CLI say next to the Mach number that it is an **upper bound**.
-3. `output/cli_hd13.py` docstring: "in under a second" becomes the measured time
-   (~42 s; ~20 min with the band).
+**(a) Texts: ✅ closed 2026-09-26** (batch `hd1-16-load-export`, `658fb4c`); see
+[DONE.md](DONE.md) §0b.
 
 **(b) A representative starter case.** Today's peaks at 102.35 kPa absolute (~1 kPa
 over), μ 0.12, so it exercises nothing. **The owner supplies the design-basis scenario**
@@ -715,6 +685,20 @@ a higher `n` burns **slower** below the window. The band's reported 12.7 spread
 probably comes mostly from this. **Nothing changed.** HD1-18 uses the measured-window
 pivot (owner, 2026-09-26). Whether the band follows it is open. It moves every band
 number and its goldens, so it needs an owner decision and a before/after table first.
+
+### P1-18 · The Qt app cannot open or re-open an HD 1.3 case file · **found 2026-09-26 (QA F1)**
+
+"Open case..." refuses every HD 1.3 JSON, including the `--hd13-new` starter, with "Not
+a blastlab case file". "Save case..." on the 0-D form writes a **blast** case
+(`schema "blastlab-case"`, version 13, dim 0), which the app then also refuses to open.
+The values survive; the schema does not. The cause: `ui/app.py:19` imports only the
+blast `load_case` / `save_case`, and `models/case.py:372-377` rejects the HD 1.3
+schema and has no dim 0. This was already so at `01ab997`, before HD1-16. The HD 1.3
+reader and writer (`models/hd13_case`) round-trip byte-identically at form level, so
+the fix is to dispatch on the schema in Open and on the solver mode in Save. Evidence:
+`docs/qa/2026-09-26-hd1-16/QA_REPORT.md` F1, screenshots `F1_*`, `F2_reopen_*`.
+Acceptance: Open loads the starter and a clearing case into the 0-D form; Save → Open
+round-trips byte-identically; blast cases are unchanged; Qt GUI QA.
 
 ### P1-15 · The Vieille `a` override has no unit on screen · **owner decision 2026-09-26**
 

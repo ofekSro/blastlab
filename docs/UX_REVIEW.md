@@ -516,3 +516,322 @@ never silently change either").
   Kingery-Bulmash validity range the repo anchors to. This is a display-only suggestion,
   not a change to the CSV. It is listed here because choosing the W (material mass or
   TNT equivalent, see E1) is an engineering decision.
+
+---
+
+## 2026-09-26 · hd1-16-load-export
+
+Reviewed: 2026-09-26, branch `hd1-16-load-export`, HEAD `a3b3c7b`, diff `a0f37e3..HEAD`
+without `a9c49ca` (RDX removal) and `d2f5cb1` (OUT-track docs). Read-only, from the code.
+The GUI was **not** launched, because another agent is doing on-screen QA. The only thing
+executed was the CLI starter case (`--hd13-new` then `--hd13`), in a scratch folder with
+no GUI, to read the CSV that an engineer would actually get. Batch plan:
+`docs/batches/2026-09-26-hd1-16-load-export.md`. Reference: UFC 3-340-02 (2008) para.
+2-15.3.2, Eq. 2-8 / 2-9 (via `docs/references/INDEX.md`). No SBEDS manual is registered,
+so nothing below claims what SBEDS accepts beyond the owner's stated format.
+
+Numbering: findings are `L1`-`L14`, so they do not collide with findings 1-27 above.
+
+### A. Screens touched
+
+| Screen | Where | What changed |
+|---|---|---|
+| Setup → 0D (HD 1.3) form | `ui/setup_spec.py:298-352`, `ui/case_form.py:35-43, 147-155` | "Structure" card built but hidden; new "Loaded wall" card (clearing checkbox, H, W) |
+| Main-window status line | `ui/app.py:628-646` | After an HD 1.3 Run it names the `_loads` folder and appends every "still active" message |
+| HD 1.3 HTML report | `output/hd13.py:72-317` | Structural response section, verdict table and SDOF figure removed |
+| CSV + sidecar `.txt` | `output/load_csv.py` | New: `<report>_loads/nominal.csv` (+ `band_*.csv`), and `<case>_wall_loads/{G1,planemax}_g{124,140}[_cleared].csv` |
+| CLI | `__main__.py:64-86`, `output/cli_hd13.py:103-150` | New `--hd13-wall-export CASE`; `--hd13` now lists the load files |
+
+### B. Flows (reconstructed)
+
+**B1. Setup → 0D, the "Loaded wall" card** (column 1, after "Radiation standoffs", before
+"Outputs"; `setup_spec.py:314-318`).
+- `clearing`: checkbox "Clearing on G1 (UFC 3-340-02 2-15.3.2)", default off.
+- `wall_H_m`: "Wall height H [m]", blank. `wall_W_m`: "Wall width W [m]", blank.
+- H and W are `setEnabled(False)` while the box is unticked (`case_form.py:147-155`).
+  Their values are kept and still saved.
+- Parse (`models/fields.py:162-171`): with clearing on, a blank H or W becomes 0.0, and
+  non-numeric text is a parse error. With clearing off, any unparsable text silently
+  becomes 0.0.
+- Validation (`core/assessment.py:46-59`, called from `validate` at `:98-99`): with
+  clearing on and H or W ≤ 0 → error "Clearing is on, so the loaded wall needs its
+  height H: wall_H_m must be a positive number of metres (got 0.0)". This is the same
+  live validator that feeds the Setup report card (`app.py:481-490`), so Run and F5 are
+  disabled ("1 error - see Setup").
+- What the fields drive: **only** `python -m blastlab --hd13-wall-export case.json`
+  (`cli_hd13.py:108-131`). The Qt Run never reads them. There is no Qt action that runs
+  the wall export.
+- What the wall export reads: the committed HD1-13 CFD traces in `docs/hd13/`
+  (`load_csv.py:351-354`). The case contributes only clearing, H and W. Charge, room and
+  vent in the same form have no effect on these traces.
+
+**B2. The "Structure" card.** It is built, so its six keys (span, mass, Ru, kE, supports,
+rotation limit) load from JSON and save back unchanged. It is hidden with
+`setVisible(False)` (`case_form.py:40-43`, `HIDDEN_CARDS_0`). `Ru_pa` from this hidden
+card still drives the residual-capacity computation (`assessment.py:555-557`), with a
+form default of 400 kPa.
+
+**B3. Qt Run (0D).** Validate on the GUI thread → worker: temp case JSON → `assess` →
+`write_report` → `export_hd13` → `bridge.post(_hd13_done, out, err, loads)`
+(`app.py:571-606`). This follows the threading rule. On success the status line reads,
+verbatim from the golden (`char_golden/ui_hd13_run.json:38`):
+`HD 1.3 report written: hd13_report.html; SBEDS loads: 1 CSV in hd13_report_loads;
+nominal.csv: record ends while the load is still active: p = -45.3645 kPa at t = 30916.4 ms`.
+The label is `label('', 'small')` with no word wrap (`app.py:104`), muted colour, and it
+clears after 12 s (`:77-79, 646`). This path does not go through `notify()`, so it gets
+no 200-character cap and no warn colour, and nothing is written to the Run log. On
+error: `show_error` with `str(err)`, and the form is kept.
+
+**B4. The report.** Banner → "What this is" (pressure-impulse note) → Material →
+[Calibration] → Confined (peak pressure in MPa, peak overpressure in kPa, time of peak
+in **s**) → Unconfined → Heat → Radiation → Sensitivity ("One envelope over the corners
+... not a set of runs to choose from") → Quantity-distance → figures. The report is
+written **before** the CSV export (`services/hd13.py:78-85`), and it contains no
+reference to the `_loads` folder, to SBEDS, to the "still active" line or to residual
+capacity.
+
+**B5. What the starter case actually exports** (run 2026-09-26, scratch folder):
+`nominal.csv` has 448 rows, t = 0 to 30 916 ms, **non-uniform** spacing from 4.6 ms to
+1200 ms. The first row is `0.0,0.3079875648800953`. The peak overpressure is **+1.01 kPa**
+at 7.5 s. The minimum is **-45.36 kPa**, and it is the last sample: the trace plunges
+from -16 kPa to -45 kPa in its last 420 ms. The net impulse is -216 204 kPa·ms. The
+sidecar carries the NO_INFLOW note, which says that the suction comes from a vent with
+no inflow in the 0-D model. The CLI headline says `confined peak 0.102 MPa`.
+
+**B6. CLI.** `--hd13` prints the headline, the report path, then
+`loads:  t_hd13_loads   (1 CSV, t [ms], overpressure [kPa], each with a .txt sidecar)`, the
+file names, and each "still active" line. `--hd13-wall-export CASE` prints the clearing
+state, C_r and t_c per γ, and then the same loads block. Its `--help` text is "write the
+HD1-13 wall-load traces (G1, plane-max x gamma 1.24/1.40) as two-column SBEDS CSVs into
+<case>_wall_loads/, with clearing if the case asks for it, then exit". A refused case
+gives `SystemExit('refusing to export: ...')`. A missing or changed `docs/hd13` file
+raises an uncaught `FileNotFoundError` / `ValueError`, so the user gets a traceback.
+
+### C. Findings
+
+#### High
+
+**L1. For the default case, the exported design load is dominated by a suction that
+the sidecar itself calls a model artefact. Only the sidecar and the status line say so.**
+- `output/load_csv.py:128-133, 298-299` (NO_INFLOW note), `:156-157` (still-active
+  rule); `output/hd13.py:156-185` (the report shows the peak only); B5 above.
+- What the engineer sees: the report and the CLI say "peak 0.102 MPa" (about +1 kPa
+  over ambient). The file they load into SBEDS has a -45 kPa end value, 45 times the
+  positive peak, and a strongly negative net impulse. The explanation, "the 0-D chamber
+  model has no inflow through the vent", is only in `nominal.txt`, in a line that comes
+  after the load-type and γ lines. The status line shows the -45 kPa as "the load is
+  still active" and gives no reason. An engineer who opens only the CSV in SBEDS runs a
+  wall against an unphysical suction. That is the dangerous direction for a design load:
+  batch plan risk 3 is about mislabelling, and this is mis-weighting.
+- Fix (UX only, no number changes): (a) put a **"Load summary"** block at the top of the
+  report: peak +, peak − (min), end value, net impulse, rows and span, with the NO_INFLOW
+  sentence beside the minimum whenever the trace goes below ambient; (b) move the
+  caveat lines (NO_INFLOW, still-active) to the **top** of the sidecar under a
+  `WARNINGS` heading; (c) in the status line and the CLI, add the reason: "record ends
+  at −45.4 kPa (sub-ambient: no inflow through the vent in the 0-D model, see
+  nominal.txt)". Whether that suction should be exported at all is an engineering
+  question for the owner (see E6 below). It is not a UX decision.
+
+**L2. The "Loaded wall" card suggests that H and W describe this case's wall. They
+describe the wall of one fixed, committed CFD run.**
+- `ui/setup_spec.py:310-318`; `output/load_csv.py:351-354, 479-485`; B1.
+- What the engineer sees: in the 0D form, "Loaded wall" sits under "Heat" (Wall area
+  [m2], Wall temperature [K]), which is the **chamber** wall of this case. The natural
+  reading is that H × W is that chamber wall, or the wall the chamber pressure
+  (nominal.csv, "acts on the inner face of the chamber wall") loads. In fact H and W feed
+  only UFC 3-340-02 Eq. 2-8 clearing (t_c = 4S/((1+R)C_r)) applied to probe **G1 at
+  (10, 6, 1.4) m** of the HD1-13 run in `docs/hd13/`. Charge, room and vent in the same
+  form do not change those traces. "G1" is an internal probe name, and "2-15.3.2" alone
+  does not say "front-wall clearing, Eq. 2-8". Nothing on screen says which wall, which
+  run, or that this is for the exterior wall facing the vent.
+- Fix: rename the card "Exterior wall load export (HD1-13 CFD run, CLI only)". Caption
+  the box "Apply front-wall clearing to probe G1 (UFC 3-340-02 para. 2-15.3.2, Eq.
+  2-8/2-9)". Caption the fields "Exterior wall height H [m]" and "Exterior wall width W
+  [m] (clearing: S = min(H, W/2))". Add a muted two-line hint inside the card: "Used by
+  `python -m blastlab --hd13-wall-export case.json` only. The traces come from the
+  committed HD1-13 run (docs/hd13), not from this form's charge or room. Plane-max is
+  never cleared." Move the card to column 0, directly under "Vent stage (blastFoam)" /
+  "Vent gauges", which is the CFD it belongs to.
+
+**L3. The only on-screen record of the export and its warning is a 12-second, unwrapped,
+muted status line. It is not logged, and it grows without limit.**
+- `ui/app.py:104-106, 639-646`; compare `notify()` at `:788-795`. This aggravates
+  findings 12 and 18 above.
+- What the engineer sees: an HD 1.3 run takes about 40 s, or about 20 min with the band.
+  The user is often away when it ends. The text that names the CSV folder and the
+  still-active warning vanishes 12 s later, in the same grey as a routine message. With
+  the band on, one "; band_+1-1+1+1+1: record ends while ..." segment is appended per
+  flagged trace (up to about 33 segments). The label has no word wrap and no cap, so its
+  minimum width, and therefore the window's, grows with the text. That is likely to
+  push the window wider than the screen. **This is from reading the code and needs
+  confirming on the real window (CLAUDE.md 8.7).** The Run log gets nothing, although
+  the batch plan says "the Qt status line / log shows it".
+- Fix: route through `notify()` with level `'warn'` when `loads['messages']` is
+  non-empty, and summarise ("SBEDS loads: 33 CSV in …; 12 traces end while the load is
+  still active, see the sidecars"). Write the full list to the Run log via
+  `_log_threadsafe`. Keep warn-level status text until clicked (finding 18). Add an
+  "Open folder" link (`QDesktopServices.openUrl(QUrl.fromLocalFile(dir))`) and make the
+  paths absolute (finding 12: the default `hd13_report.html` still resolves against the
+  process working directory, and so does `hd13_report_loads`).
+
+#### Medium
+
+**L4. Ticking clearing blocks the Qt Run, although the Qt Run does not use it.**
+- `core/assessment.py:98-99` (inside `validate`); `ui/app.py:571-574`.
+- What the engineer sees: they tick clearing to prepare the case for the CLI export,
+  and Run turns grey with "1 error". The error names `wall_H_m`, an internal key, next to
+  the caption "Wall height H [m]". "(got 0.0)" is also shown when the box was left blank.
+  The H field gets no red border, because this is a validation error and not a parse error.
+- Fix: in `assessment.validate`, report missing H or W while clearing is on as a
+  **warning** ("Clearing is on but H is blank: `--hd13-wall-export` will refuse this
+  case"). Keep the hard error in `cli_hd13.wall_export`, where it matters. Word it with
+  the caption: "Wall height H [m] is blank". Whatever the severity, mark the field with
+  the red border the parse errors use (`fieldform.py`). If the owner prefers the hard error (the saved case
+  is then always exportable), keep it but add the reason to the message.
+
+**L5. The report does not say where the load went, and one of its sentences now
+contradicts the export.**
+- `services/hd13.py:78-85` (report written before export); `output/hd13.py:252-255, 261-262`.
+- What the engineer sees: the report is the document they file. It no longer has a
+  structural section and does not mention the SBEDS CSVs at all. The code comment at
+  `hd13.py:217` says "the SBEDS CSVs beside this report", but the HTML does not. The
+  Sensitivity section still says "One envelope over the corners … not a set of runs to
+  choose from", while the export writes **one CSV per band run** with no guidance on
+  which to use. The "What this is" note on the pressure-impulse diagram now has no
+  structural section after it, but it still reads correctly as a statement about load
+  regime. Keep it.
+- Fix: export first, then write the report with a final **"Load files for SBEDS"**
+  section: folder (absolute, as a `file://` link), a table of file, trace, peak +,
+  min, end value, still-active (yes/no), and one sentence: "Two columns, t [ms] and
+  overpressure [kPa], no header. Each file has a .txt sidecar." For the band add: "Run
+  every band_*.csv and take the governing response. The band is an envelope, and no
+  single file is 'the' answer." Put the same links in the CLI "loads:" block.
+
+**L6. Residual capacity is computed from a hidden input and shown nowhere. It never has
+been.**
+- `core/assessment.py:555-557`; `ui/setup_spec.py:305` (`ru_kpa` default 400, card
+  hidden); `services/hd13.py:78-84` passes no `residual`; `output/hd13.py` has no
+  parameter for it. `git grep residual a0f37e3 -- blastlab/output blastlab/services
+  blastlab/ui` is empty, so it was not displayed before this batch either.
+- Why it matters: the owner's Q2 answer reads "residual capacity **stays in the
+  report**, unchanged", but it has never been in the report. In the Qt path it is
+  computed on every run from Ru = 400 kPa, a value the user can no longer see or edit.
+  It has no user-visible effect today, so it misleads no one yet, but the owner's
+  decision was based on a report section that does not exist.
+- Fix: owner decision. Either (a) add a one-row "Residual capacity (for a later load
+  case)" table to the Heat section, only when the case JSON carries `Ru_pa`, and move
+  `Ru` out of the hidden card into Heat as "Wall ultimate resistance [kPa] (0 = skip)",
+  or (b) drop the computation until HD1-16 step 2. Either is better than a value computed
+  from a hidden default.
+
+**L7. The CSV peak and the report peak are different numbers, and nothing says why.**
+- `core/deflagration.py:987-989` (`p_max` is taken over every integration step);
+  `output/load_csv.py:183-189` (the sidecar peak is the maximum of the sampled rows);
+  `setup_spec.py:288-289` ("Samples" 1000).
+- What the engineer sees: the report gives the integrator peak, and the sidecar gives
+  the peak of the n_out samples. On a sparse 0-D output, 60 ms to 1200 ms apart here,
+  these can differ, and the CSV is what SBEDS integrates. "Samples" in the Run card now
+  sets the time resolution of the design load, but its caption does not say so.
+- Fix: in the sidecar, print both ("peak in this file: X kPa; integrator peak: Y kPa")
+  and flag a difference over 1 %. Caption the field "Samples (also the SBEDS load's
+  resolution)". Use ms in the report's "Time of peak" row, or add the ms equivalent, so
+  report and CSV share a time unit.
+
+**L8. `--hd13-wall-export` is worded for the developer, not the engineer.**
+- `__main__.py:64-68`; `cli_hd13.py:108-131`.
+- What the engineer sees: the help text says "HD1-13", "G1", "plane-max x gamma" and
+  does not say that the traces come from a fixed committed run. The clearing-off line
+  says "E = max(R, S)" without defining R and S. A missing `docs/hd13` file (for example
+  in an installed copy) or a changed units line ends in a Python traceback.
+- Fix: help: "write the exterior-wall load traces of the committed HD1-13 CFD run
+  (probe G1 and the wall-plane maximum, γ = 1.24 and 1.40) as SBEDS CSVs (t [ms],
+  overpressure [kPa]) into <case>_wall_loads/. The case supplies only the wall H, W and
+  whether to apply UFC 3-340-02 front-wall clearing." Print "clearing: off (reflected or
+  stagnation pressure, whichever is larger; no clearing; upper bound)". Catch `OSError`
+  / `ValueError` in `wall_export` and raise `SystemExit` with the file name.
+
+#### Low
+
+**L9. The sidecar puts the most important lines last.** `load_csv.py:184-199`. The trace
+identity is line 8, and the still-active line is the final line. Fix: order it as
+file / trace / load type / WARNINGS (NO_INFLOW, still active, clearing not applied to
+plane-max) / numbers / provenance.
+
+**L10. Precision in the sidecar is inconsistent.** The net impulse is printed with
+`repr` (`-216203.85000140627 kPa*ms`) while the peak uses `.6g`. Fix: `.6g` for display.
+The CSV keeps `repr` (the round-trip contract).
+
+**L11. The band file names are cryptic.** `band_+1-1+1+1+1.csv` needs the sidecar to
+decode. Fix: keep the names (tests pin them), and write a `README.txt` / `index.csv` in
+the `_loads` folder with file, the sign per named axis (n, a, p_ext, h_c, cd), peak and
+min.
+
+**L12. Invalid H or W text while clearing is off is silently dropped.**
+`models/fields.py:172-177`. If you type "3,5" with clearing on, untick, and save, the
+value is saved as 0 and shows blank on reload. Fix: keep the raw text in the form, or
+parse-error it regardless of the checkbox. This is minor, because the fields are
+disabled while unticked.
+
+**L13. The sidecar has no export timestamp or code version.** Design-load provenance.
+Fix: add `exported: <ISO time>, blastlab <git short hash or version>`.
+
+**L14. The first row is non-zero.** `nominal.csv` starts `0.0,0.308` (igniter or initial
+state). If SBEDS interpolates from a zero load before t = 0, this is a step. Fix:
+state it in the sidecar ("load at t = 0 is 0.308 kPa, not zero"), with no change to the
+data. This is for the owner to check against the SBEDS manual when it is registered.
+
+### D. Proposed arrangement of the 0D form (changed cards only)
+
+```
+col 0                                   col 1
++-------------------------------+       +-------------------------------+
+| Material                      |       | Run                           |
+| Charge and chamber            |       |  End time [s] | Samples       |
+| Ignition                      |       |  (Samples = SBEDS resolution) |
+| Vent stage (blastFoam)        |       | Heat (chamber wall)           |
+| Vent gauges [m]               |       |  h_c | Wall area | T_wall     |
+| Exterior wall load export     |       |  [Ru for residual, if kept]   |
+|  (HD1-13 CFD run, CLI only)   |       | Radiation standoffs [m]       |
+|  [ ] Front-wall clearing on   |       | Outputs                       |
+|      probe G1 (UFC 2-15.3.2,  |       |  Run name | Report file       |
+|      Eq. 2-8/2-9)             |       |  -> loads: <report>_loads/    |
+|  H [m] ___  W [m] ___  (grey  |       |     [Open folder]             |
+|   until ticked)               |       +-------------------------------+
+|  hint: python -m blastlab     |
+|   --hd13-wall-export case.json|
++-------------------------------+
+```
+Report order after the batch: banner → **Load summary + Load files for SBEDS** (L1, L5)
+→ Material → Confined → Unconfined → Heat (+ residual if kept, L6) → Radiation →
+Sensitivity (with "run every band file") → QD → figures.
+
+### E. Quick wins
+
+1. **Reason and colour on the status line** (L1c, L3): route `_hd13_done` through
+   `notify(..., 'warn')` with a summary, and log the full list. About 10 lines in `ui/app.py`.
+2. **Relabel the Loaded wall card and add the CLI-only hint** (L2). Captions and one
+   muted label in `setup_spec.py`. The keys do not change, so the JSON and goldens hold,
+   except `ui_case_form.json` captions.
+3. **Load-files section in the report** (L5). Swap two calls in
+   `services/hd13.write_report` and add one table in `output/hd13.py`.
+4. **Sidecar order: WARNINGS block first** (L9, L10). Reordering in
+   `load_csv.write_trace`. The CSV bytes do not change.
+5. **Missing H or W while clearing is on becomes a warning in the Qt validator, and
+   stays an error in the CLI** (L4). One branch in `assessment.validate`. Owner to confirm.
+
+### F. For the owner (engineering, not UX)
+
+- **E6. The starter case's chamber load ends in a -45 kPa suction that the model says is
+  an artefact** (B5, L1). With no vent inflow, cooling drives the chamber far below
+  ambient in the last 0.4 s of the record, and that value is exported "as computed"
+  (owner, 2026-09-26: SBEDS accepts negatives). Confirming "negative values are exported
+  as computed" was a decision about format. Whether an unphysical negative phase belongs
+  in a design load is a separate question, and it is not answered yet. Options: export
+  as is (current); clip at the first sub-ambient sample and say so; or end the record
+  where venting completes. Pre-register the rule before judging any SBEDS response
+  (CLAUDE.md 6).
+- **E7. Q2 was answered against a section that does not exist** (L6).
+- **E8. Which H × W is physically meaningful for G1?** Clearing per Eq. 2-8 assumes the
+  whole front wall. G1 is one point at (10, 6, 1.4) m on the HD1-13 wall plane. The UI
+  should at least show the HD1-13 wall's extent so that H and W can be checked against
+  it. No validation compares them today.
