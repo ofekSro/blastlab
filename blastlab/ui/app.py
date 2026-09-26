@@ -20,6 +20,7 @@ from ..core.case import (load_case, long_run_note, save_case,
                          validate_case)
 from ..core.mode import SolverMode
 from ..models.case import load_any_case
+from ..services.model_folder import model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
@@ -452,9 +453,10 @@ class MainWindow(QMainWindow):
         self._case_path = path
         self.setup.set_case(case)
         self._maybe_prewarm_viewer(case)
-        # a run started from this case is named after the file (N9)
-        self.run_panel.set_run_name(
-            os.path.splitext(os.path.basename(path))[0])
+        # a run started from this case is named after the file (N9) - the
+        # model it came from, replacing the last name (GUI QA C1: the next
+        # Run offered to overwrite the PREVIOUS model)
+        self.run_panel.set_run_name(model_for_case_file(path), replace=True)
         self._show('setup')
         self._schedule_validate()
 

@@ -147,6 +147,22 @@ GAUGES_DIR = 'gauges'
 FIGURES_DIR = 'figures'
 FIELDS_DIR = 'fields'
 
+def model_for_case_file(path):
+    """The Model box after Open case (GUI QA 2026-09-26 C1): the file's
+    stem, except for a model folder's own `<MODEL>\\MODEL.json`, which
+    names the folder - and a chain stage's `<MODEL>\\2d\\MODEL.json` the
+    chain's model folder (a stage folder is not a model)."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    if stem != os.path.splitext(CASE_FILE)[0]:
+        return stem
+    folder = os.path.dirname(os.path.abspath(path))
+    parent = os.path.dirname(folder)
+    if os.path.basename(folder) in ('1d', '2d', '3d') \
+            and os.path.isfile(os.path.join(parent, MARKER_FILE)):
+        folder = parent
+    return os.path.basename(folder) or stem
+
+
 #: the case keys that name a file. MODEL.json writes them relative to
 #: itself, so the folder can move (load_case resolves profile_file_in)
 PATH_KEYS = ('gauge_file', 'anim_file', 'profile_file', 'trigger_file',

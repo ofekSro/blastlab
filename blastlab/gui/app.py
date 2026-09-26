@@ -660,9 +660,11 @@ class App:
                              f'(python -m blastlab).')
             return
         self.setup.set_case(case)
-        # a run started from this case is named after the file (N9)
+        # a run started from this case is named after the file (N9) - the
+        # model it came from, replacing the last name (GUI QA C1: the next
+        # Run offered to overwrite the PREVIOUS model)
         self.run_panel.set_run_name(
-            os.path.splitext(os.path.basename(path))[0])
+            model_folder.model_for_case_file(path), replace=True)
         self._show('setup')
 
     def _save_case(self):

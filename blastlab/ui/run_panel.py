@@ -286,9 +286,10 @@ class RunPanel(QWidget):
         self._shape = None
 
     # ── run name ─────────────────────────────────────────────────────────
-    def set_run_name(self, name):
-        """Pre-fill the run name (Open case uses the file stem)."""
-        if not self.run_name.text().strip():
+    def set_run_name(self, name, replace=False):
+        """Pre-fill the run name when the box is empty; `replace` sets it
+        regardless (Open case: the opened model, GUI QA C1)."""
+        if replace or not self.run_name.text().strip():
             self.run_name.setText(str(name or ''))
 
     def current_run_name(self):

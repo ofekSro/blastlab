@@ -1,10 +1,14 @@
-"""Open case in both toolkits (OUT-1 GUI QA 2026-09-26, F2).
+"""Open case in both toolkits (OUT-1 GUI QA 2026-09-26, F2 and C1).
 
   F2  an HD 1.3 `MODEL.json` (schema `blastlab-hd13`) opens: the Qt app
       loads it into the 0-D assessment form; the Tk app, which has no
       HD 1.3 form, says so instead of "Not a blastlab case file". A blast
       case opens as before, and a file neither loader reads keeps the
       blast loader's error.
+  C1  Open case sets the Model box to the opened model: the folder's name
+      for `<MODEL>\\MODEL.json` (the chain's model for a stage's
+      `<MODEL>\\2d\\MODEL.json`), the file stem otherwise - replacing
+      whatever the box held before. A refused file leaves the box alone.
 
 Each toolkit runs in its own child process (Qt offscreen, Tk withdrawn),
 against a private settings file with `auto_cleanup: false` (CLAUDE.md 8.2).
@@ -90,6 +94,14 @@ def part_pure(tmp):
         msg = str(exc)
     check('a file neither loader reads keeps the blast error',
           msg == 'Not a blastlab case file', repr(msg))
+    from blastlab.services.model_folder import model_for_case_file
+    got = {k: model_for_case_file(p[k]) for k in
+           ('hd13', 'blast_model', 'blast_stem', 'chain_stage', 'hd13_stem')}
+    check('the Model name: the folder for MODEL.json, the chain for a '
+          'stage, else the stem',
+          got == dict(hd13='HD_MODEL', blast_model='BLAST_MODEL',
+                      blast_stem='kitchen_case', chain_stage='CHAIN',
+                      hd13_stem='hd_file'), str(got))
 
 
 def part_qt(tmp):
@@ -101,8 +113,10 @@ def part_qt(tmp):
     win = MainWindow()
     errors = []
     win.show_error = lambda t, m: errors.append((t, m))
+    rp = win.run_panel
     try:
         pump(50)
+        rp.run_name.setText('PREVIOUS')
         win._open_case(p['hd13'])
         pump(50)
         case = win.current_case()
@@ -111,19 +125,34 @@ def part_qt(tmp):
               and isinstance(case, hd13_case.DeflagrationCase)
               and hd13_case.case_to_dict(case) == p['hd13_dict'],
               f'{errors} dim={win.setup.dim}')
+        check('Qt: the Model box names the HD 1.3 model folder, replacing '
+              'the previous name',
+              rp.current_run_name() == 'HD_MODEL', rp.current_run_name())
         win._open_case(p['blast_model'])
         pump(50)
         check('Qt: a blast MODEL.json still opens (1D)',
               not errors and win.setup.dim == 1, str(errors))
+        check('Qt: ... and the Model box names its folder',
+              rp.current_run_name() == 'BLAST_MODEL', rp.current_run_name())
         win._open_case(p['blast_stem'])
         pump(50)
-        check('Qt: a plain blast case file still opens (2D)',
-              not errors and win.setup.dim == 2, str(errors))
+        check('Qt: a plain blast case file still opens (2D), named after '
+              'its stem',
+              not errors and win.setup.dim == 2
+              and rp.current_run_name() == 'kitchen_case',
+              f'{errors} {rp.current_run_name()}')
+        win._open_case(p['chain_stage'])
+        pump(50)
+        check("Qt: a chain stage's MODEL.json names the chain's model",
+              not errors and rp.current_run_name() == 'CHAIN',
+              rp.current_run_name())
         win._open_case(p['neither'])
         pump(50)
-        check('Qt: a file neither loader reads is refused as before',
+        check('Qt: a file neither loader reads is refused as before, and '
+              'the Model box is left alone',
               errors == [('Open case', 'Not a blastlab case file')]
-              and win.setup.dim == 2, str(errors))
+              and win.setup.dim == 2 and rp.current_run_name() == 'CHAIN',
+              f'{errors} {rp.current_run_name()}')
     finally:
         win.close()
         pump(30)
@@ -141,15 +170,27 @@ def part_tk(tmp):
     errors = []
     real = appmod.messagebox.showerror
     appmod.messagebox.showerror = lambda t, m, **k: errors.append((t, m))
+    rp = app.run_panel
     try:
+        rp.run_name.set('PREVIOUS')
         app._open_case(p['blast_model'])
         root.update()
         check('Tk: a blast MODEL.json opens (1D)',
               not errors and app.setup.dim_var.get() == 1, str(errors))
+        check('Tk: the Model box names its folder, replacing the previous '
+              'name',
+              rp.current_run_name() == 'BLAST_MODEL', rp.current_run_name())
         app._open_case(p['blast_stem'])
         root.update()
-        check('Tk: a plain blast case file opens (2D)',
-              not errors and app.setup.dim_var.get() == 2, str(errors))
+        check('Tk: a plain blast case file opens (2D), named after its stem',
+              not errors and app.setup.dim_var.get() == 2
+              and rp.current_run_name() == 'kitchen_case',
+              f'{errors} {rp.current_run_name()}')
+        app._open_case(p['chain_stage'])
+        root.update()
+        check("Tk: a chain stage's MODEL.json names the chain's model",
+              not errors and rp.current_run_name() == 'CHAIN',
+              rp.current_run_name())
         app._open_case(p['hd13'])
         root.update()
         check('Tk: an HD 1.3 file is recognised, not called "not a case '
@@ -158,8 +199,10 @@ def part_tk(tmp):
               and 'HD 1.3 case file' in errors[0][1]
               and 'python -m blastlab' in errors[0][1]
               and 'Not a blastlab' not in errors[0][1], str(errors))
-        check('Tk: ... and leaves the form alone',
-              app.setup.dim_var.get() == 2, str(app.setup.dim_var.get()))
+        check('Tk: ... and leaves the form and the Model box alone',
+              app.setup.dim_var.get() == 2
+              and rp.current_run_name() == 'CHAIN',
+              f'{app.setup.dim_var.get()} {rp.current_run_name()}')
         errors.clear()
         app._open_case(p['neither'])
         root.update()

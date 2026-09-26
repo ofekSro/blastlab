@@ -310,9 +310,10 @@ class RunPanel(ctk.CTkFrame):
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
 
-    def set_run_name(self, name):
-        """Pre-fill the run name (Open case uses the file stem)."""
-        if not self.run_name.get().strip():
+    def set_run_name(self, name, replace=False):
+        """Pre-fill the run name when the box is empty; `replace` sets it
+        regardless (Open case: the opened model, GUI QA C1)."""
+        if replace or not self.run_name.get().strip():
             self.run_name.set(str(name or ''))
 
     def current_run_name(self):
