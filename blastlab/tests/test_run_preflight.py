@@ -409,6 +409,84 @@ def part_b():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def part_c():
+    """Step 9: the Tk app is a full equivalent - the same boxes, the same
+    refusals, the same overwrite question, the folder written by a real
+    tiny run, and the Runs folder remembered."""
+    import time
+    import customtkinter as ctk
+    from blastlab.gui import app as appmod
+    from blastlab.models.case import Case1D
+    from blastlab.ui.testing import private_runs_dir
+    runs = private_runs_dir()
+    root = ctk.CTk()
+    root.withdraw()
+    app = appmod.App(root)
+    root.update()
+    errors, questions, answer = [], [], [False]
+    app.show_error = lambda t, m: errors.append((t, m))
+
+    def ask(t, m):
+        questions.append((t, m))
+        return answer[0]
+    app.ask_yes_no = ask
+    rp = app.run_panel
+    try:
+        check('Tk: the private settings fill the Runs folder box',
+              rp.current_runs_dir() == runs, rp.current_runs_dir())
+        app.setup.set_case(Case1D(radius_m=1.0, charge_kg=0.5,
+                                  cell_size_m=0.01, n_snapshots=1,
+                                  t_end=3e-4, gauge_radii=[0.5]))
+        root.update()
+        before = listing(runs)
+        rp.set_runs_dir('')
+        rp.run_name.set('TK')
+        app._run_single()
+        check('Tk: an empty Runs folder refuses, naming the box',
+              errors == [('Run', 'Runs folder is empty')]
+              and not app._drain_pending and listing(runs) == before,
+              str(errors))
+        errors.clear()
+        rp.set_runs_dir(runs)
+        rp.run_name.set('bad:name')
+        app._init_model()
+        check('Tk: Initialise Model with a bad name refuses the same way',
+              len(errors) == 1 and errors[0][1].startswith('Model name:')
+              and not app._drain_pending, str(errors))
+        errors.clear()
+        rp.run_name.set('TK')
+        app._run_single()
+        t0 = time.monotonic()
+        while app._drain_pending and time.monotonic() - t0 < 120:
+            root.update()
+            time.sleep(0.02)
+        folder = os.path.join(runs, 'TK')
+        got = listing(folder) if os.path.isdir(folder) else []
+        check('Tk: a real 1D run writes the model folder',
+              {'MODEL.json', 'manifest.json', 'report.html', 'run.log',
+               'profile.txt'} <= set(got) and errors == [], str(got))
+        check('Tk: the result is named after the model',
+              [e.label for e in app.results._entries][-1:] == ['TK - 1D'],
+              str([e.label for e in app.results._entries]))
+        app._run_single()
+        check('Tk: an existing model asks first; No starts nothing',
+              len(questions) == 1 and 'TK already exists in' in
+              questions[0][1] and not app._drain_pending
+              and 'MODEL.json' in os.listdir(folder), str(questions))
+        rp.set_runs_dir(os.path.join(runs))
+        rp._on_runs_dir()
+        with open(os.environ['BLASTLAB_SETTINGS'], encoding='utf-8') as f:
+            saved = json.load(f).get('runs_dir')
+        check('Tk: the Runs folder is saved to the settings', saved == runs,
+              str(saved))
+    finally:
+        app._on_close()
+        try:
+            root.destroy()
+        except Exception:
+            pass
+
+
 def main():
     print('A: the Qt pre-flight')
     part_a()
@@ -416,6 +494,8 @@ def main():
     part_a_controller()
     print('\nB: the command line')
     part_b()
+    print('\nC: the Tk pre-flight (Step 9)')
+    part_c()
     print('\n' + '=' * 52)
     if FAIL:
         print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')

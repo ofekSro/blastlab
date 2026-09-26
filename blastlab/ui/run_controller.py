@@ -140,18 +140,7 @@ class RunController(QObject):
         if model is None:
             stages = [solve_stage(dim, case) for dim, case in dim_cases]
         else:
-            reports = list(reports or [None] * len(dim_cases))
-            last = len(dim_cases) - 1
-            # a chain stage before the last writes its hand-off, which
-            # the Chain tab wired as its profile_file
-            stages = [solve_stage(dim, case, stage_dir=sd,
-                                  run_info=model_folder.run_info(
-                                      model, case, rep,
-                                      handoff=(case.profile_file
-                                               if k < last else None)))
-                      for k, ((dim, case), sd, rep) in enumerate(zip(
-                          dim_cases, model_folder.stage_dirs(model, dims),
-                          reports))]
+            stages = model_folder.make_stages(model, dim_cases, reports)
         return self._launch(stages, dims, paused=paused, run_name=run_name,
                             model=model)
 

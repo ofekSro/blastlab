@@ -69,12 +69,13 @@ def private_runs_dir(path=None):
 
 def use_model(win, name='QA', runs_dir=None):
     """Fill the Run tab's Runs folder (default: the private one) and
-    Model boxes of the Qt window `win`, so pressing Run passes the OUT-1
-    pre-flight. An existing model folder of that name is removed first,
-    so no overwrite question comes up. Returns the model folder path."""
+    Model boxes of the Qt window - or the Tk app - `win`, so pressing Run
+    passes the OUT-1 pre-flight. An existing model folder of that name is
+    removed first, so no overwrite question comes up. Returns the model
+    folder path."""
     import shutil
     from ..services import model_folder
-    runs = runs_dir or private_runs_dir()
+    runs = runs_dir or private_runs_dir(private_settings())
     folder = os.path.join(runs, name)
     if os.path.isdir(folder):
         if not model_folder.is_model_folder(folder):
@@ -82,7 +83,8 @@ def use_model(win, name='QA', runs_dir=None):
                                f'model folder - not deleting it')
         shutil.rmtree(folder, ignore_errors=True)
     win.run_panel.set_runs_dir(runs)
-    win.run_panel.run_name.setText(name)
+    box = win.run_panel.run_name
+    (box.setText if hasattr(box, 'setText') else box.set)(name)  # Qt | Tk
     return folder
 
 

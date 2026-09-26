@@ -1,26 +1,46 @@
-"""Remap-chaining panel: run 1D -> 2D -> 3D as one workflow. Profile
-files are auto-wired inside a chosen workspace directory; each stage's
-case JSON is saved there for reproducibility."""
+"""Remap-chaining panel: run 1D -> 2D -> 3D as one workflow.
 
-import os
+OUT-1, as the Qt Chain tab: the chain writes into the Run tab's model
+folder (the workspace box is gone, owner decision 14) - each stage into
+`<MODEL>\\1d`, `2d`, `3d` with its own MODEL.json, the profile hand-offs
+at the model root. The folder is created by the app, only once the run
+is certain to start."""
+
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 
 import customtkinter as ctk
 
 from ..core.case import save_case, validate_case  # noqa: F401
 # moved to core/chain.py (shared with the Qt front-end); re-exported
 from ..core.chain import handoff_conflicts, stage_errors  # noqa: F401
+from ..services import model_folder
 from . import mode as mode_mod
 from . import theme
 from .forms import CaseForm
 from .theme import GAP, PAD, Card, c, icon
 
+HINT = ('The chain runs the checked stages in order, into the model folder '
+        'set on the Run tab (Runs folder and Model): each stage writes '
+        '<MODEL>\\1d, 2d or 3d. The profile hand-offs are wired '
+        'automatically at the model root: 1D writes handoff_1d_to_2d.txt, '
+        'the 2D stage remaps it (axisymmetric) and writes '
+        'handoff_2d_to_3d.npz, and the 3D stage remaps that. The 2D burst '
+        'height is taken from the 2D form; the 3D burst height comes from '
+        'the 2D profile.')
+
+#: added to a model-folder refusal: the boxes live on another tab
+WHERE_BOXES = 'The Runs folder and Model boxes are on the Run tab.'
+
 
 class ChainPanel(ctk.CTkFrame):
-    def __init__(self, parent, on_run_chain, mode=None):
+    def __init__(self, parent, on_run_chain, mode=None, model_source=None):
         super().__init__(parent, fg_color='transparent')
+        #: on_run_chain([(dim, case), ...]) -> False when the app did not
+        #: start it (it said why); anything else = started
         self._on_run_chain = on_run_chain
+        #: () -> (runs_dir, model): the Run tab's two boxes (OUT-1)
+        self._model_source = model_source or (lambda: ('', ''))
         # T34: every stage starts on the app-level solver mode and can be
         # overridden per stage (a native 2D stage can follow a blastFoam
         # 1D one); a global change presets all three again
@@ -31,29 +51,11 @@ class ChainPanel(ctk.CTkFrame):
         ctk.CTkLabel(head, text='Chain', font=theme.F_H1,
                      text_color=c('text')).pack(side='left')
 
-        # ── workspace / stages card ──────────────────────────────────────
+        # ── stages card ──────────────────────────────────────────────────
         top = Card(self)
         top.pack(fill='x', pady=(0, PAD - 4))
         bar = ctk.CTkFrame(top.body, fg_color='transparent')
         bar.pack(fill='x')
-        ctk.CTkLabel(bar, text='Workspace', font=theme.F_BODY,
-                     text_color=c('muted')).pack(side='left',
-                                                 padx=(0, GAP))
-        # under Documents rather than whatever the process CWD happens to
-        # be (which for blastlab.bat is the install directory)
-        _docs = os.path.join(os.path.expanduser('~'), 'Documents')
-        _base = _docs if os.path.isdir(_docs) else os.path.expanduser('~')
-        self.ws_var = tk.StringVar(
-            value=os.path.join(_base, 'blastlab', 'chain_workspace'))
-        ctk.CTkEntry(bar, textvariable=self.ws_var, width=380, height=32,
-                     font=theme.F_BODY, corner_radius=8,
-                     fg_color=c('entry'), border_color=c('border')).pack(
-            side='left')
-        ctk.CTkButton(bar, text='', image=icon('folder', 14), width=34,
-                      height=32, corner_radius=theme.RADIUS,
-                      fg_color=c('card2'), hover_color=c('border'),
-                      command=self._pick_ws).pack(side='left',
-                                                  padx=(GAP, PAD))
 
         self.use = {d: tk.BooleanVar(value=True) for d in (1, 2, 3)}
         ctk.CTkLabel(bar, text='Stages', font=theme.F_BODY,
@@ -75,12 +77,7 @@ class ChainPanel(ctk.CTkFrame):
             text_color='white', command=self._run)
         self.run_btn.pack(side='right')
 
-        hint = ("The chain runs the checked stages in order. Profile files "
-                "are wired automatically: 1D saves stage1_profile.txt, the "
-                "2D stage remaps it (axisymmetric), saves "
-                "stage2_profile.npz, and the 3D stage remaps that. The 2D "
-                "burst height is taken from the 2D form; the 3D burst "
-                "height comes from the 2D profile.")
+        hint = HINT
         hrow = ctk.CTkFrame(top.body, fg_color='transparent')
         hrow.pack(fill='x', pady=(GAP, 0))
         ctk.CTkLabel(hrow, text='', width=18,
@@ -226,24 +223,29 @@ class ChainPanel(ctk.CTkFrame):
         self._current = self._stage_wrap[d]
         self._current.pack(fill='both', expand=True)
 
-    def _pick_ws(self):
-        d = filedialog.askdirectory(title='Chain workspace directory')
-        if d:
-            self.ws_var.set(d)
-
     def _run(self):
+        """Validate, wire and hand on. True only if the chain was started;
+        every refusal says why and returns False."""
         stages = [d for d in (1, 2, 3) if self.use[d].get()]
         if not stages:
             messagebox.showerror('Chain', 'No stages selected.')
-            return
+            return False
         if stages != list(range(stages[0], stages[-1] + 1)):
             messagebox.showerror('Chain', 'Stages must be consecutive.')
-            return
+            return False
 
-        ws = self.ws_var.get()
-        # the workspace used to be created even when the run was refused
-        p1 = os.path.join(ws, 'stage1_profile.txt')
-        p2 = os.path.join(ws, 'stage2_profile.npz')
+        # OUT-1: the Run tab's model folder, checked (nothing is written
+        # yet) before the forms are read, so the hand-off paths are known
+        runs_dir, model = self._model_source()
+        problems = model_folder.check(runs_dir, model)
+        if problems:
+            messagebox.showerror('Chain', '\n'.join(problems + [WHERE_BOXES]))
+            return False
+        target = model_folder.Target(
+            runs_dir=str(runs_dir).strip(), model=str(model).strip(),
+            folder=model_folder.folder_for(runs_dir, model))
+        hand = model_folder.handoff_paths(target, stages)
+        p1, p2 = hand.get((1, 2)), hand.get((2, 3))
 
         cases = {}
         for d in stages:
@@ -257,7 +259,7 @@ class ChainPanel(ctk.CTkFrame):
                 messagebox.showerror('Chain', '\n'.join(
                     f'Stage {d} ({d}D): {ln}'
                     for ln in str(exc).splitlines() if ln.strip()))
-                return
+                return False
 
         # N2-13: a chain must be reproducible, so every stage runs on a
         # PINNED write schedule. The adaptive-writeInterval controller
@@ -269,19 +271,19 @@ class ChainPanel(ctk.CTkFrame):
         for c in cases.values():
             c.adaptive_write = False
 
-        # auto-wire profile hand-offs
-        if 1 in cases:
+        # auto-wire profile hand-offs, at the model root (plan sec. 2.2);
+        # a single stage has none and writes its own profile
+        if 1 in cases and 2 in cases:
             cases[1].profile_file = p1
+            cases[2].init_mode = 'profile1d'
+            cases[2].profile_file_in = p1
         if 2 in cases:
-            if 1 in cases:
-                cases[2].init_mode = 'profile1d'
-                cases[2].profile_file_in = p1
             if cases[2].geometry != 'axisymmetric' and 3 in cases:
                 self.focus_stage(2)          # the dialog names stage 2
                 messagebox.showerror(
                     'Chain', 'Stage 2 (2D): must be axisymmetric to '
                              'feed the 3D stage.')
-                return
+                return False
             if 3 in cases:
                 cases[2].profile_file = p2
         if 3 in cases and 2 in cases:
@@ -295,13 +297,12 @@ class ChainPanel(ctk.CTkFrame):
                     self.focus_stage(d)
                     break
             messagebox.showerror('Chain', '\n'.join(errors))
-            return
+            return False
 
-        os.makedirs(ws, exist_ok=True)           # only once it will run
-        for d, case in cases.items():
-            save_case(case, os.path.join(ws, f'stage{d}_case.json'))
-
-        self._on_run_chain([(d, cases[d]) for d in stages], ws)
+        # the app creates the model folder (after asking, for an existing
+        # one) only now; each stage writes its own MODEL.json
+        return self._on_run_chain([(d, cases[d]) for d in stages]) \
+            is not False
 
     def set_running(self, running):
         """Mirror the Run button's state: a second start while a run is

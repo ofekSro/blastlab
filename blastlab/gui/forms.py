@@ -566,12 +566,15 @@ class CaseForm(ctk.CTkFrame):
             self.det_pts.grid(row=0, column=0, columnspan=2,
                               sticky='nsew')
 
-        out = self._card(1, 'Outputs')
+        # 1D has no visible output row left (OUT-1), so no Outputs card
+        out = self._card(1, 'Outputs') if self.dim > 1 else None
         orow = 0
-        orow = _row(out, orow, 'Gauge TSV',
-                    _entry(out, self._var('gauge_file',
-                                          f'gauges_{self.dim}d.txt'
-                                          if self.dim > 1 else 'gauges.txt')))
+        # OUT-1 (owner Q1), as the Qt form's HIDDEN_ROWS: the output file
+        # NAME rows (gauge TSV, animation, profile out, remap file) are
+        # variables without a row - a run writes the model folder's own
+        # names - and their values still pass through load -> save
+        self._var('gauge_file',
+                  f'gauges_{self.dim}d.txt' if self.dim > 1 else 'gauges.txt')
         if self.dim > 1:
             # write_animation picks the writer from the extension:
             # .mp4 when ffmpeg is on PATH, .gif otherwise (and it says
@@ -580,10 +583,7 @@ class CaseForm(ctk.CTkFrame):
             # mp4 is both smaller and free of the gif 256-colour banding.
             from matplotlib import animation as _mplanim
             _ext = '.mp4' if _mplanim.FFMpegWriter.isAvailable() else '.gif'
-            orow = _row(out, orow, 'Animation (.gif / .mp4)',
-                        _entry(out, self._var(
-                            'anim_file',
-                            f'blast_{self.dim}d_animation{_ext}')))
+            self._var('anim_file', f'blast_{self.dim}d_animation{_ext}')
             # OUT-1 (owner Q1): the .gif / .mp4 choice, as in the Qt form
             orow = _row(out, orow, 'Animation format',
                         _combo(out, self._var('anim_format', _ext),
@@ -623,12 +623,9 @@ class CaseForm(ctk.CTkFrame):
                 row=orow, column=0, columnspan=2, sticky='w', pady=(0, 4))
             orow += 1
         if self.dim == 1:
-            orow = _row(out, orow, 'Profile out (.txt)',
-                        _entry(out, self._var('profile_out',
-                                              'blast_profile.txt')))
+            self._var('profile_out', 'blast_profile.txt')      # hidden
         elif self.dim == 2:
-            orow = _row(out, orow, 'Profile out (.npz)',
-                        _entry(out, self._var('profile_out', '')))
+            self._var('profile_out', '')                        # hidden
 
         # ── Trigger gauge (T51) ───────────────────────────────────────
         # one gauge that ends the run and/or writes the remap file the
@@ -646,11 +643,10 @@ class CaseForm(ctk.CTkFrame):
                         _combo(trig, self._var('trigger_action',
                                                'terminate'), acts))
             if self.dim < 3:
-                # non-blank, as in the Qt form (OUT-1): a 'remap' action
-                # validates, and the run writes <MODEL>\trigger_remap.npz
-                _row(trig, trow, 'Remap file\n(blank = profile out)',
-                     _entry(trig, self._var('trigger_file',
-                                            'trigger_remap.npz')))
+                # hidden, and non-blank, as in the Qt form (OUT-1): a
+                # 'remap' action validates, and the run writes
+                # <MODEL>\trigger_remap.npz
+                self._var('trigger_file', 'trigger_remap.npz')
 
         self._sync_geometry()
         self._apply_mode()

@@ -16,8 +16,12 @@ from .. import __version__
 from ..core import hardware
 from ..core.case import load_case, save_case, validate_case
 from ..solvers.foam import env as foam_env
+# imported before any solve_stage(stage_dir=...): it registers the
+# model-folder writer with solvers.jobs (OUT-1)
+from ..services import model_folder
 # moved to solvers/jobs.py (shared with the Qt front-end); the old names
 # stay importable from here for the tests that use them
+from ..solvers.jobs import resume_stage
 from ..solvers.jobs import solve_stage as _solve_stage  # noqa: F401
 from ..solvers.jobs import write_trigger_remap as _write_trigger_remap  # noqa: F401
 from ..viz3d import MISSING_MSG, pyvista_available
@@ -91,6 +95,13 @@ class App:
     #: test_gui_drain.py:241-242 stubs the dialog.
     show_error = staticmethod(
         lambda title, msg: messagebox.showerror(title, msg))
+    #: OUT-1: the model-folder overwrite question; injectable like
+    #: show_error, and resolved through the module at call time
+    ask_yes_no = staticmethod(
+        lambda title, msg: messagebox.askyesno(title, msg))
+    #: OUT-1: the run's model folder and its stages' manifests
+    _model = None
+    _folders = {}
 
     def __init__(self, root, case_file=None):
         self.root = root
@@ -143,7 +154,8 @@ class App:
                                   on_view3d=self._open_view3d,
                                   on_init=self._init_model,
                                   on_exec=self._exec,
-                                  on_refresh=self._apply_refresh)
+                                  on_refresh=self._apply_refresh,
+                                  on_runs_dir=self._save_runs_dir)
         self.results = ResultsPanel(content, log_fn=self._result_msg,
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run)
@@ -152,7 +164,10 @@ class App:
         self._cleanup_thread = foam_env.start_auto_cleanup(
             st, self._log_threadsafe)
         self.chain = ChainPanel(content, on_run_chain=self._run_chain,
-                                mode=self.solver_mode)
+                                mode=self.solver_mode,
+                                model_source=lambda: (
+                                    self.run_panel.current_runs_dir(),
+                                    self.run_panel.current_run_name()))
 
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
@@ -445,6 +460,14 @@ class App:
             mode = str(st.get('refresh_mode', 'seconds'))
             if mode in ('seconds', 'steps'):
                 self.run_panel.refresh_mode.set(mode)
+            self.run_panel.set_runs_dir(st.get('runs_dir', ''))
+        except Exception:
+            pass
+
+    def _save_runs_dir(self):
+        """OUT-1: the Runs folder box is remembered across sessions."""
+        try:
+            gui_settings.update(runs_dir=self.run_panel.current_runs_dir())
         except Exception:
             pass
 
@@ -454,7 +477,8 @@ class App:
                 appearance=('dark' if self._mode_switch.get() else 'light'),
                 refresh_value=self.run_panel.refresh_val.get(),
                 refresh_mode=self.run_panel.refresh_mode.get(),
-                solver=self.solver_mode.get())
+                solver=self.solver_mode.get(),
+                runs_dir=self.run_panel.current_runs_dir())
             # only a real, mapped window has a meaningful geometry: a
             # minimised or never-shown one reports the placeholder size
             geo = self.root.geometry()
@@ -691,66 +715,109 @@ class App:
         if not rep.ok:
             messagebox.showerror('Run', '\n'.join(rep.errors))
             return
-        self._start([(case.dim, case)], paused=paused)
+        model = self._model_target()
+        if model is None:
+            return
+        self._start([(case.dim, case)], paused=paused, model=model,
+                    reports=[rep])
 
     def _init_model(self):
         """VIPER-style 'Initialise Model': start the run held at step 0
         so the initial field is visible; Exec buttons advance it."""
         self._run_single(paused=True)
 
-    def _run_chain(self, dim_cases, workspace):
-        self._start(dim_cases)
+    def _running(self):
+        """A run is live, or its 'done' is not drained yet (G5)."""
+        return self._drain_pending or (self.worker is not None
+                                       and self.worker.is_alive())
+
+    def _model_target(self, title='Run'):
+        """OUT-1 pre-flight, as the Qt window's: after the case validation
+        and before anything is written, refuse with one message naming
+        the box, refuse a folder blastlab did not create, ask before an
+        overwrite, and return the prepared `model_folder.Target` - or
+        None, having said why (or the user said No)."""
+        if self._running():
+            # before prepare: an overwrite could hit the running model
+            messagebox.showinfo('Run', 'A run is already in progress.')
+            return None
+        runs, name = (self.run_panel.current_runs_dir(),
+                      self.run_panel.current_run_name())
+        errors = model_folder.check(runs, name)
+        if errors:
+            self.show_error(title, '\n'.join(errors))
+            return None
+        try:
+            return model_folder.prepare_target(
+                runs, name,
+                confirm=lambda text: self.ask_yes_no('Model folder', text))
+        except model_folder.ModelFolderError as exc:
+            self.show_error(title, str(exc))
+            return None
+
+    def _run_chain(self, dim_cases):
+        """The Chain panel has validated and wired the stages into the
+        model folder's paths; the folder itself is created here, only
+        now (OUT-1). False when it did not start."""
+        model = self._model_target('Chain')
+        if model is None:
+            return False
+        reports = [validate_case(c, pending_inputs=k > 0)
+                   for k, (_d, c) in enumerate(dim_cases)]
+        if not self._start(dim_cases, model=model, reports=reports):
+            return False
         self._show('run')
+        return True
 
     def _resume_foam_run(self, path):
         """Resume a stopped blastFoam run (N6/T43) through the ordinary
         worker pipeline, so the Run tab, live view, Stop and Results all
-        behave exactly as in a fresh run."""
+        behave exactly as in a fresh run - and, OUT-1, into a model
+        folder like one."""
         from .run_browser import dims_from_case_json
         from ..solvers.foam import env as _env
         try:
             _p, unc = _env.case_paths(path)
             dim = int((dims_from_case_json(unc) or '?').rstrip('D'))
-        except (ValueError, OSError) as exc:
+            case = load_case(os.path.join(unc, 'case.json'))
+        except (ValueError, OSError, TypeError, KeyError) as exc:
             self._log(f'  [runs] cannot resume {path}: {exc}')
-            return
-        if self._drain_pending or (self.worker is not None
-                                   and self.worker.is_alive()):
-            messagebox.showinfo('Run', 'A run is already in progress.')
-            return
+            return False
+        model = self._model_target('Resume')
+        if model is None:
+            return False
+        stage = resume_stage(dim, path, case, stage_dir=model.folder,
+                             run_info=model_folder.run_info(model, case))
+        return self._launch([stage], [dim], model=model)
 
-        def solve(hooks):
-            from ..solvers.foam.backend import resume_run
-            return resume_run(path, hooks)
+    def _start(self, dim_cases, paused=False, model=None, reports=None):
+        """Run [(dim, case), ...] on a worker. OUT-1: with a `model`
+        (the prepared model folder) every stage writes into it
+        (`model_folder.make_stages`); `model=None` is the headless /
+        test path. False when a run is already in progress."""
+        if model is None:
+            stages = [_solve_stage(dim, case) for dim, case in dim_cases]
+        else:
+            stages = model_folder.make_stages(model, dim_cases, reports)
+        return self._launch(stages, [dim for dim, _ in dim_cases],
+                            paused=paused, model=model)
 
-        self._drain_pending = True
-        self._run_count += 1
-        self._run_name = self.run_panel.current_run_name()
-        self._run_stopped_early = self._run_errored = False
-        self._stage_dims = [dim]
-        self.worker = SolverWorker([(f'Resume {dim}D (blastfoam)', solve)])
-        self.worker.hooks.auto3d = pyvista_available()
-        self._apply_refresh()
-        self.run_panel.set_running(True)
-        self.chain.set_running(True)
-        self._show('run')
-
-    def _start(self, dim_cases, paused=False):
+    def _launch(self, stages, dims, paused=False, model=None):
         # `is_alive()` alone leaves a ~50 ms window after the worker exits
         # but before the drain sees its 'done': starting there would
         # orphan the old queue and drop its finished result (G5)
-        if self._drain_pending or (self.worker is not None
-                                   and self.worker.is_alive()):
+        if self._running():
             messagebox.showinfo('Run', 'A run is already in progress.')
-            return
+            return False
         self._drain_pending = True
         self._run_count += 1
         # the name the user typed on the Run tab labels every result of
         # this run (and its exports) - blank keeps the old "Run N - 2D"
         self._run_name = self.run_panel.current_run_name()
         self._run_stopped_early = self._run_errored = False
-        self._stage_dims = [dim for dim, _ in dim_cases]
-        stages = [_solve_stage(dim, case) for dim, case in dim_cases]
+        self._stage_dims = list(dims)
+        self._model = model
+        self._folders = {}
         self.worker = SolverWorker(stages)
         # 3D runs attach the embedded 3D view automatically at run start
         self.worker.hooks.auto3d = pyvista_available()
@@ -768,6 +835,7 @@ class App:
         self._show('run')
         self.worker.start()
         self.root.after(50, self._drain)
+        return True
 
     def _stop(self):
         if self.worker is not None:
@@ -892,6 +960,12 @@ class App:
                 self.run_panel.view3d.on_frame(*fr)
         elif tag == 'stage':
             self.run_panel.on_log(f'=== Stage {msg[2]} ===')
+        elif tag == 'folder':
+            # OUT-1: the stage's model folder is written; a finished
+            # blastFoam run whose WSL scratch had to be kept says why
+            self.__dict__.setdefault('_folders', {})[msg[1]] = msg[2]
+            if msg[3]:
+                self.show_error('Model folder', msg[3])
         elif tag == 'result':
             k, res = msg[1], msg[2]
             dim = self._stage_dims[k]
@@ -951,6 +1025,14 @@ class App:
             # finalize the embedded 3D view if the last stage's 'result'
             # did not (idempotent: no-op when there is no live feed)
             self._finish_view3d('run complete')
+            # OUT-1: a chain's root manifest.json, once every stage is in
+            if self._model is not None and len(self._stage_dims) > 1:
+                err = model_folder.write_chain_root(
+                    self._model, self._stage_dims, self._folders)
+                if err:
+                    self.run_panel.on_log(f'  [warn] model folder: could '
+                                          f'not write the chain '
+                                          f'manifest.json: {err}')
             self.run_panel.set_running(False)
             self.chain.set_running(False)
             if not (self._run_stopped_early or self._run_errored):
