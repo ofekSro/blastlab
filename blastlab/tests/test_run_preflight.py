@@ -278,6 +278,26 @@ def part_a():
             win.setup.set_dim(2)
             pump(150)
 
+        print('\nA10: no model folder is prepared while HD 1.3 is busy')
+        # the assessment runs on its own thread, not the controller: the
+        # Chain tab and a resume are not greyed by it, and the same Model
+        # name would otherwise be overwritten under it (OUT-1 verifier)
+        dlg.clear()
+        launches.calls.clear()
+        rp.set_runs_dir(runs)
+        rp.run_name.setText('BUSY')
+        before = listing(runs)
+        win._hd13_busy = True
+        try:
+            got = win._model_target('Chain')
+        finally:
+            win._hd13_busy = False
+        check('refused with "a run is already in progress", nothing made',
+              got is None and len(dlg.infos) == 1
+              and 'already in progress' in dlg.infos[0][1]
+              and dlg.questions == [] and listing(runs) == before,
+              f'{got!r} {dlg.infos}')
+
         print('\nA7: the Runs folder survives a close and a reopen')
         other = os.path.join(_dir, 'elsewhere')
         os.makedirs(other, exist_ok=True)

@@ -563,8 +563,10 @@ class MainWindow(QMainWindow):
         existing model, and return the prepared `model_folder.Target` -
         or None, having said why (or the user said No)."""
         from ..services import model_folder
-        if self.ctrl.running:
-            # before prepare: an overwrite could hit the running model
+        if self.ctrl.running or self._hd13_busy:
+            # before prepare: an overwrite could hit the running model (an
+            # HD 1.3 assessment runs on its own thread, not the controller:
+            # the Chain tab and a resume are not greyed by it)
             dialogs.show_info('Run', 'A run is already in progress.')
             return None
         errors = self.model_check()

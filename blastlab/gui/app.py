@@ -96,9 +96,10 @@ class App:
     show_error = staticmethod(
         lambda title, msg: messagebox.showerror(title, msg))
     #: OUT-1: the model-folder overwrite question; injectable like
-    #: show_error, and resolved through the module at call time
+    #: show_error, and resolved through the module at call time. No is
+    #: the default button, as in the Qt dialog: Enter must not delete
     ask_yes_no = staticmethod(
-        lambda title, msg: messagebox.askyesno(title, msg))
+        lambda title, msg: messagebox.askyesno(title, msg, default='no'))
     #: OUT-1: the run's model folder and its stages' manifests
     _model = None
     _folders = {}
