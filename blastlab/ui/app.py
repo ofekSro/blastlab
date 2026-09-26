@@ -549,7 +549,8 @@ class MainWindow(QMainWindow):
         Not through RunController: that machinery is for a solve with
         frames, gauges, stepping and resume. A 0-D deflagration case is
         closed form but not instant - the starter case takes about 40 s
-        (sensitivity band off) - so the assessment runs ONCE, on a worker
+        with the sensitivity band off, about 20 min with it on - so the
+        assessment runs ONCE, on a worker
         thread, and the outcome comes back through `self.bridge`; the
         worker touches no widget (UX_REVIEW finding 1). Meanwhile Run,
         F5 and Initialise Model are off, the Run tab's bar is

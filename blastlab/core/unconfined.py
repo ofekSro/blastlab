@@ -80,8 +80,10 @@ _BURNOUT_EPS = 1.0e-6
 C_AMB = math.sqrt(GAMMA_AIR * P_AIR / RHO_AIR)
 
 #: Below this expansion Mach number the release cannot steepen into a
-#: shock and the event is thermal, not blast. Deliberately generous: the
-#: cases this model is for come out two to three orders below it.
+#: shock and the event is thermal, not blast. What has actually been seen
+#: (TODO.md HD1-17(a)): the starter case (5 kg double-base, spread
+#: ignition) reaches Mach 0.092, 1.8x ABOVE this threshold, so it is not
+#: "orders below" for realistic cases. `mach_max` is itself an upper bound.
 MACH_QUASI_STATIC = 0.05
 
 

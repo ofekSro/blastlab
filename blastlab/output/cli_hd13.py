@@ -2,7 +2,7 @@
 
 The whole HD 1.3 track is 0-D and closed form, so unlike every other run
 in this repo it needs no WSL, no solver and no GUI (the starter case takes
-about 40 s with the sensitivity band off). That makes a command-line entry point the cheapest way to make
+about 40 s with the sensitivity band off, about 20 min with it on). That makes a command-line entry point the cheapest way to make
 the work usable, and it is deliberately the FIRST way rather than the
 fallback: a Qt form can be built on top of exactly these calls later
 without either of them owning the other.
@@ -68,7 +68,7 @@ def _print_headline(out, out_path):
         if out['sensitivity_note']:
             print(f"             {out['sensitivity_note']}")
     if u is not None:
-        print(f"  unconfined expansion Mach {u['mach_max']:.4f}"
+        print(f"  unconfined expansion Mach {u['mach_max']:.4f} (upper bound)"
               f"   blast negligible: {u['blast_negligible']}")
     if out['sdof'] is not None:
         s = out['sdof']
