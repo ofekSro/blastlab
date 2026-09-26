@@ -10,6 +10,10 @@ import warnings
 os.environ.setdefault('MPLBACKEND', 'Agg')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+# CLAUDE.md 8.2: the App's startup sweep and its Runs folder box must never
+# read or write the owner's settings file - a throwaway one, sweep off
+from blastlab.ui.testing import private_settings  # noqa: E402
+private_settings()
 
 import tkinter as tk
 

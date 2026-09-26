@@ -13,8 +13,9 @@ What this drives, all through the panel's own widgets:
   * the three stage forms, each switched to blastFoam through the
     per-stage selector (T34);
   * the Chain Run button, so the profile hand-offs are wired by
-    `ChainPanel._run` and not by the test - stage1_profile.txt and
-    stage2_profile.npz come out of the panel's own workspace;
+    `ChainPanel._run` and not by the test - handoff_1d_to_2d.txt and
+    handoff_2d_to_3d.npz land at the root of the Run tab's model folder
+    (OUT-1), each stage in <MODEL>\\1d, 2d, 3d;
   * the real worker thread and queue drainer, so each stage's result
     lands in the Results panel the way a user sees it;
   * one physical clock across the stages (N7/T41): the 2D and 3D stages
@@ -27,12 +28,21 @@ Run:  cd blastlab/tests && python _e2e_gui_chain_foam.py
 """
 import os
 import sys
+import tempfile
 import time
 import warnings
 
 os.environ.setdefault('MPLBACKEND', 'Agg')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+# CLAUDE.md 8.2: building the App starts the startup cleanup sweep and the
+# Run tab saves its Runs folder box into the settings - never the owner's
+# file; a throwaway one with the sweep off (as _e2e_ui_chain_foam.py)
+_dir = tempfile.mkdtemp(prefix='blastlab_gui_chain_foam_')
+_settings = os.path.join(_dir, 'settings.json')
+with open(_settings, 'w', encoding='utf-8') as _f:
+    _f.write('{"auto_cleanup": false}')
+os.environ['BLASTLAB_SETTINGS'] = _settings
 
 WS = os.path.join(HERE, '_chain_study', 'gui_foam')
 FAIL = []
