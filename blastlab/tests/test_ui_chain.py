@@ -3,7 +3,9 @@
 The order inside `ChainPanel.run()` is load-bearing, and most of these
 checks exist because getting it wrong is silent:
 
-- the workspace directory must NOT appear when the run is refused
+- the model folder must NOT appear when the run is refused, and the
+  panel itself never creates it - the window does, only once the run is
+  certain to start (OUT-1; before OUT-1 this was the workspace box)
 - `adaptive_write` must be False on every stage, or the arrival-pinned
   hand-off lands on a different write from one run to the next
 - a bad field must name ITS stage and bring that form to the front, or
@@ -63,26 +65,117 @@ class Recorder:
         self.calls = []
 
 
+def real_chain_run():
+    """The window's path: Chain tab -> _run_chain -> _model_target ->
+    the controller. Lands <MODEL>\\1d, 2d, the hand-off at the root and
+    the root manifest.json."""
+    import time
+    from blastlab.models.case import Case1D, Case2D
+    from blastlab.ui import dialogs
+    from blastlab.ui.app import MainWindow
+    from blastlab.ui.testing import use_model
+    real = (dialogs.show_error, dialogs.ask_yes_no)
+    shown = []
+    dialogs.show_error = lambda t, m, p=None: shown.append((t, m))
+    dialogs.ask_yes_no = lambda t, m, p=None: True
+    try:
+        win = MainWindow()
+        win.set_solver('native')
+        folder = use_model(win, 'CHAIN_RUN')
+        win.show()
+        pump(100)
+        ch = win.chain
+        ch.use[3].setChecked(False)
+        ch.set_stage_case(1, Case1D(radius_m=1.0, charge_kg=0.5,
+                                    cell_size_m=0.01, n_snapshots=1,
+                                    t_end=3e-4, gauge_radii=[0.5]))
+        ch.set_stage_case(2, Case2D(Lx=0.6, Ly=1.2, cell_size_m=0.03,
+                                    charge=0.5, center=(0.0, 0.6),
+                                    n_snapshots=1, t_end=2e-4,
+                                    record_frames=0,
+                                    gauges=[(0.25, 0.6)],
+                                    bcs=dict(x_lo='reflect',
+                                             x_hi='transmit',
+                                             y_lo='reflect',
+                                             y_hi='transmit')))
+        pump(50)
+        ok = ch.run()
+        check('the chain started', ok is True,
+              f'{ch.status.text()} | {shown}')
+        t0 = time.time()
+        while win.ctrl.running and time.time() - t0 < 300:
+            pump(50)
+        check('and finished without an error dialog',
+              not win.ctrl.running and shown == [], str(shown))
+        got = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+        check('the model root holds 1d\\, 2d\\, the hand-off and the '
+              'root manifest',
+              got == ['.blastlab-model', '1d', '2d',
+                      'handoff_1d_to_2d.txt', 'manifest.json'], str(got))
+        for d in ('1d', '2d'):
+            sub = os.path.join(folder, d)
+            names = sorted(os.listdir(sub)) if os.path.isdir(sub) else []
+            check(f'{d}\\ is a complete stage folder',
+                  {'MODEL.json', 'run.log', 'manifest.json',
+                   'report.html'} <= set(names), str(names))
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            root = json.load(f)
+        check('the root manifest names the chain, both stages and the '
+              'hand-off',
+              root.get('chain') == [1, 2]
+              and sorted(root.get('stages', {})) == ['1d', '2d']
+              and root.get('handoffs') == ['handoff_1d_to_2d.txt'],
+              str({k: root.get(k) for k in ('chain', 'handoffs')}))
+        with open(os.path.join(folder, '2d', 'MODEL.json'),
+                  encoding='utf-8') as f:
+            two = json.load(f)
+        with open(os.path.join(folder, '1d', 'MODEL.json'),
+                  encoding='utf-8') as f:
+            one = json.load(f)
+        check('the 2D stage reads the hand-off, folder-relative',
+              two.get('profile_file_in') == '../handoff_1d_to_2d.txt'
+              and two.get('init_mode') == 'profile1d', str(
+                  {k: two.get(k) for k in ('profile_file_in',
+                                           'init_mode')}))
+        check('the 1D stage wrote it',
+              one.get('profile_file') == '../handoff_1d_to_2d.txt',
+              str(one.get('profile_file')))
+        check('both stages ran on a pinned write schedule (N2-13)',
+              one.get('adaptive_write') is False
+              and two.get('adaptive_write') is False)
+        names = [lbl for lbl, _d, _r in win._results]
+        check('the results are named after the model',
+              names == ['CHAIN_RUN - 1D', 'CHAIN_RUN - 2D'], str(names))
+        win.close()
+        pump(50)
+    finally:
+        dialogs.show_error, dialogs.ask_yes_no = real
+
+
 def main():
     ensure_qapp()
-    from blastlab.ui.chain_panel import ChainPanel, default_workspace
+    from blastlab.ui.chain_panel import HINT, ChainPanel
 
     launched = []
     errs = Recorder()
     log = []
-    panel = ChainPanel(on_run_chain=lambda stages, ws: launched.append(
-        (list(stages), ws)), log_fn=log.append, error_sink=errs)
+    ws_root = tempfile.mkdtemp(prefix='blastlab_ws_')
+    source = [ws_root, 'CHAIN']         # the Run tab's two boxes
+    panel = ChainPanel(on_run_chain=lambda stages: launched.append(
+        list(stages)), log_fn=log.append, error_sink=errs,
+        model_source=lambda: tuple(source))
     panel.resize(1100, 760)
     panel.show()
     pump(60)
-    ws_root = tempfile.mkdtemp(prefix='blastlab_ws_')
-    ws = os.path.join(ws_root, 'chain')
-    panel.ws_box.setText(ws)
+    ws = os.path.join(ws_root, 'CHAIN')           # the model folder
+    p1 = os.path.join(ws, 'handoff_1d_to_2d.txt')
+    p2 = os.path.join(ws, 'handoff_2d_to_3d.npz')
 
     print('\nC1: the panel')
-    check('a workspace is suggested under Documents, not the CWD',
-          'blastlab' in default_workspace()
-          and os.path.isabs(default_workspace()), default_workspace())
+    check('OUT-1: no workspace box - the Run tab\'s model folder is it',
+          not hasattr(panel, 'ws_box') and 'model folder' in HINT
+          and 'handoff_1d_to_2d.txt' in HINT, HINT[:80])
     check('all three stages start checked', panel.checked() == [1, 2, 3])
     check('and each has its own form',
           sorted(panel.forms) == [1, 2, 3]
@@ -112,8 +205,28 @@ def main():
           panel.run() is False
           and errs.lines == ['Stages must be consecutive.'],
           str(errs.lines))
-    check('the workspace was NOT created by a refused run',
+    check('the model folder was NOT created by a refused run',
           not os.path.exists(ws))
+
+    print('\nC2b: OUT-1 - the model folder is refused before anything')
+    for d in (1, 2, 3):
+        panel.use[d].setChecked(True)
+    for runs, model, want in (('', 'CHAIN', 'Runs folder is empty'),
+                              (ws_root, '', 'Model name: '),
+                              (os.path.join(ws_root, 'no'), 'CHAIN',
+                               'Runs folder does not exist')):
+        source[:] = [runs, model]
+        errs.clear()
+        launched.clear()
+        check(f'{want.strip()} -> refused, naming the box',
+              panel.run() is False and errs.lines
+              and errs.lines[0].startswith(want)
+              and errs.lines[-1] == 'The Runs folder and Model boxes are '
+                                    'on the Run tab.'
+              and not launched, str(errs.lines))
+    source[:] = [ws_root, 'CHAIN']
+    check('and still nothing on disk', os.listdir(ws_root) == [],
+          str(os.listdir(ws_root)))
 
     print('\nC3: a bad field names its own stage and shows it')
     for d in (1, 2, 3):
@@ -130,7 +243,7 @@ def main():
     check('and stage 2 is now the one on screen', panel.stage() == 2)
     check('the log carries it as well',
           any('Stage 2 (2D)' in s for s in log), str(log[-2:]))
-    check('still no workspace', not os.path.exists(ws))
+    check('still no model folder', not os.path.exists(ws))
     panel.forms[2].v['Lx'].set('4')
     pump(20)
 
@@ -154,11 +267,9 @@ def main():
           str(errs.lines) + ' | ' + str(panel.status.text()))
     check('and handed on as three stages in order',
           len(launched) == 1
-          and [d for d, _c in launched[0][0]] == [1, 2, 3]
-          and launched[0][1] == ws, str(launched[:1]))
-    stages = dict(launched[0][0])
-    p1 = os.path.join(ws, 'stage1_profile.txt')
-    p2 = os.path.join(ws, 'stage2_profile.npz')
+          and [d for d, _c in launched[0]] == [1, 2, 3],
+          str([[d for d, _c in st] for st in launched]))
+    stages = dict(launched[0])
     check('1D writes the profile the 2D stage reads',
           stages[1].profile_file == p1
           and stages[2].profile_file_in == p1
@@ -170,26 +281,17 @@ def main():
     check('N2-13: every stage runs on a PINNED write schedule',
           all(c.adaptive_write is False for c in stages.values()),
           str([c.adaptive_write for c in stages.values()]))
-    check('the workspace exists now, and only now',
-          os.path.isdir(ws))
-    saved = sorted(f for f in os.listdir(ws) if f.endswith('.json'))
-    check('one case JSON per stage, for reproducibility',
-          saved == ['stage1_case.json', 'stage2_case.json',
-                    'stage3_case.json'], str(saved))
-    with open(os.path.join(ws, 'stage2_case.json'), encoding='utf-8') as f:
-        on_disk = json.load(f)
-    check('and the JSON carries the wiring, not the form defaults',
-          on_disk.get('profile_file_in') == p1
-          and on_disk.get('adaptive_write') is False,
-          str({k: on_disk.get(k)
-               for k in ('profile_file_in', 'adaptive_write')}))
+    check('the hand-offs sit at the model root (plan sec. 2.2)',
+          os.path.dirname(p1) == ws and os.path.dirname(p2) == ws)
+    check('the panel wrote nothing: the window creates the folder, and '
+          'each stage its own MODEL.json', not os.path.exists(ws))
 
     print('\nC6: a shorter chain wires only what it has')
     panel.use[3].setChecked(False)
     launched.clear()
     errs.clear()
     check('1 -> 2 accepted', panel.run() is True, str(errs.lines))
-    two = dict(launched[0][0])
+    two = dict(launched[0])
     check('the 2D stage no longer writes a profile for a 3D stage',
           two[2].profile_file != p2 and two[2].profile_file_in == p1,
           f'{two[2].profile_file} / {two[2].profile_file_in}')
@@ -198,7 +300,7 @@ def main():
     launched.clear()
     errs.clear()
     check('2 -> 3 accepted', panel.run() is True, str(errs.lines))
-    late = dict(launched[0][0])
+    late = dict(launched[0])
     check('a 2D stage with no 1D before it starts from its own case',
           late[2].init_mode != 'profile1d'
           and late[3].profile_file_in == p2,
@@ -337,6 +439,9 @@ def main():
           panel.run_btn.isEnabled())
 
     shutil.rmtree(ws_root, ignore_errors=True)
+
+    print('\nC11: OUT-1 - a tiny native 1D -> 2D chain, run in a window')
+    real_chain_run()
     print('\n' + '=' * 52)
     if FAIL:
         print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')

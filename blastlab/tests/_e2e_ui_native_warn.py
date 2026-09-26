@@ -20,7 +20,7 @@ def check(name, ok, detail=""):
 
 
 def main():
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     app = ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case2D
     from blastlab.ui.app import MainWindow
@@ -36,6 +36,7 @@ def main():
                   n_snapshots=1, record_frames=0)
 
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(200)
     notes = []

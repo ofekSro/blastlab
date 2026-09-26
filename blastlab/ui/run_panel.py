@@ -3,6 +3,8 @@ the scrolled log and the live view (2D slice in pyqtgraph | the 3D
 viewer host). A port of gui/run_panel.py; the controller feeds it
 through the same on_* methods."""
 
+import os
+
 import numpy as np
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QTextCursor
@@ -19,6 +21,10 @@ from .theme import GAP, PAD
 from .widgets import (Card, Chip, Segmented, WrapRow, button, hbox, label,
                       set_button_kind)
 
+#: the Runs folder's Browse button (the Tk folder icon says the same)
+BROWSE_TIP = ('Choose the Runs folder: the folder that holds one '
+              'sub-folder per model.')
+
 
 class RunPanel(QWidget):
     run_requested = Signal()
@@ -30,6 +36,8 @@ class RunPanel(QWidget):
     #: the live gauge view was opened or left; the solver only collects
     #: traces while something is watching
     gauges_wanted = Signal(bool)
+    #: the Runs folder box was edited or browsed (saved to settings)
+    runs_dir_changed = Signal()
 
     #: share of the Run-tab width given to the log; the live/3D pane
     #: keeps the rest (>= 60 %, the QA-17 target)
@@ -69,15 +77,6 @@ class RunPanel(QWidget):
         for b in (self.run_btn, self.stop_btn, self.view3d_btn):
             bar.addWidget(b)
         bar.addSpacing(PAD - GAP)
-        # results used to be labelled by dim + a counter only, so three
-        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
-        bar.addWidget(label('Name', 'muted'))
-        self.run_name = QLineEdit()
-        self.run_name.setFixedWidth(130)
-        self.run_name.setToolTip('Names this run in the Results picker and '
-                                 'in the exported file names; blank falls '
-                                 'back to "Run N - 2D".')
-        bar.addWidget(self.run_name)
         self.progress = QProgressBar()
         self.progress.setRange(0, 1000)
         self.progress.setValue(0)
@@ -121,6 +120,38 @@ class RunPanel(QWidget):
         # the AMR chip stays hidden until a frame carries a level map
         self.chip_row.add(self._chip_cells, hidden=True)
         bar.addWidget(self.chip_row, 1)
+
+        # ── the model folder (OUT-1): <Runs folder>\<Model>\ receives
+        # every file of a run; both boxes are required before Run ──────
+        mbar = hbox()
+        ctl.add_layout(mbar)
+        mbar.addWidget(label('Runs folder', 'muted'))
+        self.runs_dir = QLineEdit()
+        self.runs_dir.setMinimumWidth(220)
+        self.runs_dir.setPlaceholderText(r'e.g. C:\Users\me\BLASTLAB_RUNS')
+        self.runs_dir.setToolTip(
+            'Required. The folder that holds one sub-folder per model; a '
+            'run writes every file it produces into <Runs folder>\\<Model>. '
+            'Remembered between sessions.')
+        self.runs_dir.editingFinished.connect(self.runs_dir_changed.emit)
+        mbar.addWidget(self.runs_dir, 1)
+        self.runs_browse = button('Browse…', 'folder', height=30,
+                                  on_click=self._browse_runs_dir)
+        self.runs_browse.setToolTip(BROWSE_TIP)
+        mbar.addWidget(self.runs_browse)
+        mbar.addSpacing(PAD - GAP)
+        # results used to be labelled by dim + a counter only, so three
+        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
+        mbar.addWidget(label('Model', 'muted'))
+        self.run_name = QLineEdit()
+        self.run_name.setFixedWidth(180)
+        self.run_name.setPlaceholderText('MODEL')
+        self.run_name.setToolTip(
+            'Required. The model folder <Runs folder>\\<Model> that '
+            'receives every file of this run (a valid Windows folder name, '
+            'at most 100 characters). It also names the run in the Results '
+            'picker.')
+        mbar.addWidget(self.run_name)
 
         # ── stepped execution row (VIPER-style) ──────────────────────────
         ebar = hbox()
@@ -255,13 +286,28 @@ class RunPanel(QWidget):
         self._shape = None
 
     # ── run name ─────────────────────────────────────────────────────────
-    def set_run_name(self, name):
-        """Pre-fill the run name (Open case uses the file stem)."""
-        if not self.run_name.text().strip():
+    def set_run_name(self, name, replace=False):
+        """Pre-fill the run name when the box is empty; `replace` sets it
+        regardless (Open case: the opened model, GUI QA C1)."""
+        if replace or not self.run_name.text().strip():
             self.run_name.setText(str(name or ''))
 
     def current_run_name(self):
         return self.run_name.text().strip()
+
+    # ── the runs folder (OUT-1) ──────────────────────────────────────────
+    def current_runs_dir(self):
+        return self.runs_dir.text().strip()
+
+    def set_runs_dir(self, path):
+        self.runs_dir.setText(str(path or ''))
+
+    def _browse_runs_dir(self):
+        from . import dialogs
+        path = dialogs.pick_dir('Runs folder', self, self.current_runs_dir())
+        if path:
+            self.runs_dir.setText(os.path.normpath(path))
+            self.runs_dir_changed.emit()
 
     # ── readouts, for the QA harness and the e2e suites ──────────────────
     def chip_texts(self):
@@ -341,7 +387,8 @@ class RunPanel(QWidget):
         scroll and copy. It just goes last, after every control.
         """
         chain = [self.run_btn, self.stop_btn, self.view3d_btn,
-                 self.run_name, self.init_btn, *self._exec_btns,
+                 self.runs_dir, self.runs_browse, self.run_name,
+                 self.init_btn, *self._exec_btns,
                  self.refresh_val, self.refresh_mode,
                  self._view_seg, self.show_mesh, self.auto_clim,
                  self.clim_min, self.clim_max, self.log]

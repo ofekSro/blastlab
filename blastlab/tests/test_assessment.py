@@ -285,7 +285,9 @@ def main():
     tiny_path = asm.save_case(tiny, os.path.join(gdir, 'tiny.json'))
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        rpath = cli_hd13.run_and_report(tiny_path)
+        # OUT-1: into the model folder <gdir>\grep\ (hd13_report.html,
+        # hd13_loads\)
+        rpath = cli_hd13.run_and_report(tiny_path, gdir, 'grep')
     stdout = buf.getvalue()
     with open(rpath, encoding='utf-8') as fh:
         rpage = fh.read()
@@ -300,7 +302,7 @@ def main():
     check('the band did run (so the verdict path was reachable)',
           out4['band'] is not None and out4['verdict'] is None
           and 'band_' in ''.join(os.listdir(
-              os.path.splitext(rpath)[0] + '_loads')))
+              os.path.join(os.path.dirname(rpath), 'hd13_loads'))))
     check('and the report has no Structural response section or figure',
           'Structural response' not in rpage
           and 'survive the band' not in rpage)

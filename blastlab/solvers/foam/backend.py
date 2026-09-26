@@ -285,6 +285,7 @@ def _preflight(case, hooks):
     spec = writer.write_case(
         case, n_procs=n_procs,
         live_steps=writer.live_steps_for(hooks.refresh, case.dim))
+    hooks.scratch_posix = spec.case_posix      # OUT-1: foam\ copy + release
     hooks.log(f"  [blastfoam] case directory: {spec.case_unc}")
     # one wsl call per stage (not one `&&` chain): that is what lets a
     # Stop land between stages and kill the running one, and it lets the
@@ -797,6 +798,7 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
         case, n_procs=n_procs,
         live_steps=writer.live_steps_for(hooks.refresh, case.dim))
     spec.case_posix, spec.case_unc = posix, unc
+    hooks.scratch_posix = spec.case_posix      # OUT-1: foam\ copy + release
     spec.files = None                   # everything is already on disk
     spec.adaptive_write = bool(adaptive_write)
     if spec.lmax or spec.amr:

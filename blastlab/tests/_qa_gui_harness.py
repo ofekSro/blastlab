@@ -280,6 +280,10 @@ class QA:
         app = appmod.App(root)
         self.app = app
         self.build_ms = (time.perf_counter() - t0) * 1e3
+        # OUT-1: Run needs a runs folder and a model; the private runs
+        # folder of the harness's settings file, never the owner's
+        from blastlab.ui.testing import use_model
+        use_model(app)
         root.geometry('1280x840+0+0')
         root.deiconify()
         root.lift()
@@ -989,7 +993,11 @@ def b02_tabs_empty(qa):
                  for k, b in rs._export_btns.items() if k != 'vtk')
              or True, 'export buttons enabled with no result selected '
              '(clicking them is a silent no-op - G3)', 'S3')
-    qa.note(f'Chain workspace default: {qa.app.chain.ws_var.get()!r}')
+    # OUT-1: no workspace box any more; the chain uses the Run tab's
+    # model folder
+    qa.note(f'Chain writes into the model folder '
+            f'{qa.app.run_panel.current_runs_dir()!r} / '
+            f'{qa.app.run_panel.current_run_name()!r}')
     qa.goto('setup')
 
 
@@ -2047,8 +2055,11 @@ def e09_duplicate_labels(qa):
 # ─────────────────────────────────────────────────────────────────────────
 # GROUP G - Chain tab
 # ─────────────────────────────────────────────────────────────────────────
-def _chain_forms(qa, planar2d=False, foam2d=False):
+def _chain_forms(qa, planar2d=False, foam2d=False, model='QA_CHAIN'):
+    """The three stage forms, into the model folder `model` (OUT-1: the
+    Run tab's boxes); the folder is `qa.chain_folder`."""
     from blastlab.core.case import Case1D, Case2D, Case3D
+    from blastlab.ui.testing import use_model
     ch = qa.app.chain
     # 1D radius < 2D half-size and 2D size < 3D half-size so each
     # profile fits inside the next stage's domain
@@ -2067,7 +2078,7 @@ def _chain_forms(qa, planar2d=False, foam2d=False):
                                 record_frames=30))
     for d in (1, 2, 3):
         ch.use[d].set(True)
-    ch.ws_var.set(os.path.join(qa.dirs['cwd'], 'chain_workspace'))
+    qa.chain_folder = use_model(qa.app, model)
     qa.pump(0.5)
 
 
@@ -2076,12 +2087,11 @@ def g01_chain_validation(qa):
     """Every Chain validation dialog; a foam stage fed by a profile is
     accepted since T41 (N7)."""
     qa.goto('chain')
-    _chain_forms(qa)
+    # a model of its own (use_model removes a leftover one), so the check
+    # below cannot be satisfied by an earlier session's folder
+    _chain_forms(qa, model='QA_CHAIN_REFUSED')
     ch = qa.app.chain
     qa.shot('chain_default')
-    # a path of its own, so the check below cannot be satisfied by a
-    # leftover workspace from an earlier session
-    ch.ws_var.set(os.path.join(qa.out, 'chain_ws_refused'))
     for d in (1, 2, 3):
         ch.use[d].set(False)
     ch._run()
@@ -2156,11 +2166,16 @@ def g01_chain_validation(qa):
     qa.shot('after_dialogs')
     qa.note(f'stage switcher after the dialogs: {ch._stage_seg.get()} '
             f'(the dialog named stage 2)')
-    # QA-23/T28: the workspace is created only once a chain will really
-    # run - this assertion used to encode the defect (dir present after
-    # five refusals) and now checks the fix
-    qa.check(not os.path.isdir(ch.ws_var.get()),
-             'workspace dir NOT created while every run was refused',
+    # OUT-1: the Run tab's Model box is checked by the chain too
+    name = qa.app.run_panel.current_run_name()
+    qa.app.run_panel.run_name.set('')
+    ch._run()
+    qa.pump(0.3)
+    qa.app.run_panel.run_name.set(name)
+    # QA-23/T28, OUT-1: the model folder (it replaced the workspace this
+    # held before) is created only once a chain will really run
+    qa.check(not os.path.isdir(qa.chain_folder),
+             'model folder NOT created while every run was refused',
              'S4')
     qa.check(str(ch.run_btn.cget('state')) == 'normal',
              'Run chain still enabled after refused starts', 'S2')
@@ -2199,15 +2214,17 @@ def g02_chain_run(qa):
              'Run chain re-enabled after the chain', 'S2')
     labels = [e.label for e in qa.app.results._entries]
     qa.note(f'results after chain: {labels}')
-    ws = ch.ws_var.get()
+    # OUT-1: <MODEL>\1d, 2d, 3d, the hand-offs at the root
+    ws = qa.chain_folder
     files = sorted(os.listdir(ws)) if os.path.isdir(ws) else []
-    qa.note(f'workspace files: {files}')
-    qa.check(all(f in files for f in ('stage1_profile.txt',
-                                      'stage2_profile.npz',
-                                      'stage1_case.json', 'stage2_case.json',
-                                      'stage3_case.json')),
-             'workspace has the profiles and case JSONs', 'S2',
-             evidence=str(files))
+    qa.note(f'model folder: {files}')
+    qa.check(all(f in files for f in ('handoff_1d_to_2d.txt',
+                                      'handoff_2d_to_3d.npz',
+                                      'manifest.json'))
+             and all(os.path.isfile(os.path.join(ws, d, 'MODEL.json'))
+                     for d in ('1d', '2d', '3d')),
+             'the model folder has the hand-offs and a MODEL.json per '
+             'stage', 'S2', evidence=str(files))
     qa.goto('results')
     qa.shot('results_combo')
     _cache_result(qa, 'chain3d')
@@ -2216,9 +2233,13 @@ def g02_chain_run(qa):
 @scenario('G03', 'G', est=120)
 def g03_cross_tab_guard(qa):
     """Run chain while a Run-tab run is live."""
+    from blastlab.ui.testing import use_model
     C = cases()
     qa.goto('setup')
     qa.set_case(C['N2D'])
+    # OUT-1: a model of its own - _chain_forms below resets QA_CHAIN,
+    # which must not be the folder this run is writing
+    use_model(qa.app, 'QA_G03')
     qa.goto('run')
     qa.click(qa.app.run_panel.run_btn, 'Run')
     qa.wait_log('2D Blast Solver', 30)
@@ -2785,6 +2806,151 @@ def f11_close_during_foam(qa):
     qa.check(not alive, 'no own solver alive after closing the window '
              'mid-run', 'S1', evidence=str(alive))
     qa.note(f'pgrep after close: {qa.wsl_pgrep()}')
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# GROUP M - the model folder (OUT-1), the Tk twin of the Qt harness's M
+# ─────────────────────────────────────────────────────────────────────────
+def _last_dialog(qa):
+    """The newest record of dialogs.jsonl ({} when there is none)."""
+    try:
+        with open(os.path.join(qa.out, 'dialogs.jsonl'),
+                  encoding='utf-8') as f:
+            lines = [ln for ln in f.read().splitlines() if ln.strip()]
+    except OSError:
+        return {}
+    return json.loads(lines[-1]) if lines else {}
+
+
+@scenario('M01', 'M', est=40)
+def m01_model_refusal(qa):
+    """Run refuses an empty Runs folder, then a bad Model name; each
+    message names its box and no folder appears."""
+    from blastlab.ui.testing import private_runs_dir, use_model
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N1D'])
+    qa.goto('run')
+    rp = qa.app.run_panel
+    runs = private_runs_dir()
+    before = sorted(os.listdir(runs))
+    rp.set_runs_dir('')
+    rp.run_name.set('M01')
+    qa.pump(0.3)
+    qa.shot('empty_runs_folder')
+    qa.click(rp.run_btn, 'Run')
+    d = _last_dialog(qa)
+    qa.check(d.get('fn') == 'showerror' and 'Runs folder' in d.get('text',
+                                                                    ''),
+             'an empty Runs folder is refused, naming the box', 'S1',
+             evidence=str(d))
+    rp.set_runs_dir(runs)
+    rp.run_name.set('bad:name')
+    qa.pump(0.3)
+    qa.click(rp.run_btn, 'Run')
+    d = _last_dialog(qa)
+    qa.check(d.get('fn') == 'showerror'
+             and d.get('text', '').startswith('Model name:'),
+             'a bad Model name is refused, naming the box', 'S1',
+             evidence=str(d))
+    qa.check(not qa.worker_alive() and not qa.app._drain_pending
+             and sorted(os.listdir(runs)) == before,
+             'no run started and no folder was created', 'S1',
+             evidence=str(sorted(os.listdir(runs))))
+    qa.shot('refused_model_name')
+    use_model(qa.app)
+
+
+@scenario('M02', 'M', est=120)
+def m02_overwrite(qa):
+    """An existing model: No leaves it untouched, Yes replaces it."""
+    from blastlab.services import model_folder
+    from blastlab.ui.testing import private_runs_dir, use_model
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N1D'])
+    qa.goto('run')
+    rp = qa.app.run_panel
+    folder = use_model(qa.app, 'M02')
+    model_folder.prepare(private_runs_dir(), 'M02', confirm=lambda t: True)
+    old = os.path.join(folder, 'old_run.txt')
+    with open(old, 'w', encoding='utf-8') as f:
+        f.write('the previous run\n')
+    qa.script_answers(False)
+    qa.click(rp.run_btn, 'Run')
+    d = _last_dialog(qa)
+    qa.check(d.get('fn') == 'askyesno'
+             and 'M02 already exists in' in d.get('text', ''),
+             'an existing model asks before overwriting', 'S1',
+             evidence=str(d))
+    qa.check(os.path.isfile(old) and not qa.app._drain_pending,
+             'No: the folder is untouched and no run started', 'S1')
+    qa.script_answers(True)
+    qa.click(rp.run_btn, 'Run')
+    qa.check(not os.path.exists(old), 'Yes: the old file is gone', 'S1')
+    qa.check(qa.run_wait(180), 'and the run finished', 'S1')
+    qa.shot('overwritten')
+    qa.check('MODEL.json' in os.listdir(folder),
+             'the new run wrote its folder', 'S2',
+             evidence=str(sorted(os.listdir(folder))))
+
+
+@scenario('M03', 'M', est=240)
+def m03_native_2d_folder(qa):
+    """A finished native 2D run: the plan sec. 2.2 rows, a manifest that
+    lists them, and a non-empty run.log."""
+    from blastlab.ui.testing import use_model
+    C = cases()
+    qa.goto('setup')
+    qa.set_case(C['N2D'])
+    folder = use_model(qa.app, 'M03')
+    qa.goto('run')
+    qa.click(qa.app.run_panel.run_btn, 'Run')
+    qa.check(qa.run_wait(300), 'the 2D run finished', 'S1')
+    qa.shot('finished')
+    top = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+    qa.note(f'M03 model folder: {top}')
+    for want in ('MODEL.json', 'run.log', 'manifest.json', 'report.html',
+                 'gauges', 'figures', 'fields'):
+        qa.check(want in top, f'the folder holds {want}', 'S1',
+                 evidence=str(top))
+    try:
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            m = json.load(f)
+    except (OSError, ValueError) as exc:
+        m = {'error': str(exc)}
+    qa.check(m.get('failed') == [] and m.get('model') == 'M03',
+             'the manifest names the model and nothing failed', 'S1',
+             evidence=str(m)[:600])
+    qa.check(os.path.getsize(os.path.join(folder, 'run.log')) > 0,
+             'run.log is not empty', 'S1')
+
+
+@scenario('M04', 'M', est=240)
+def m04_chain_folder(qa):
+    """A 1D -> 2D chain: 1d\\ and 2d\\ under the model, the hand-off and
+    the chain manifest at its root."""
+    qa.goto('chain')
+    _chain_forms(qa, model='M04')
+    ch = qa.app.chain
+    ch.use[3].set(False)
+    qa.pump(0.4)
+    qa.shot('chain_two_stages')
+    started = ch._run()
+    qa.check(started is True, 'the chain started', 'S1')
+    if started is not True:
+        return
+    qa.check(qa.run_wait(420), 'the chain finished', 'S1')
+    folder = qa.chain_folder
+    top = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+    qa.note(f'M04 model folder: {top}')
+    qa.check(top == ['.blastlab-model', '1d', '2d',
+                     'handoff_1d_to_2d.txt', 'manifest.json'],
+             '1d\\, 2d\\, the hand-off and the root manifest', 'S1',
+             evidence=str(top))
+    qa.goto('run')
+    qa.shot('chain_done')
 
 
 # ─────────────────────────────────────────────────────────────────────────

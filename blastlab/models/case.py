@@ -363,6 +363,10 @@ def case_to_dict(case):
     return d
 
 
+#: case_from_dict's refusal of another schema (`load_any_case` keys on it)
+NOT_A_CASE = "Not a blastlab case file"
+
+
 def case_from_dict(d):
     """Case1D/2D/3D from a `case_to_dict` dict (or its JSON round trip).
 
@@ -370,7 +374,7 @@ def case_from_dict(d):
     the tuples JSON turned into lists and normalises boundary kinds."""
     d = dict(d)
     if d.pop('schema', SCHEMA) != SCHEMA:
-        raise ValueError("Not a blastlab case file")
+        raise ValueError(NOT_A_CASE)
     if d.pop('version', VERSION) > VERSION:
         raise ValueError("Case file from a newer blastlab version")
     dim = d.pop('dim')
@@ -431,6 +435,26 @@ def load_case(path):
         if not os.path.isabs(case.profile_file_in):
             case.profile_file_in = os.path.join(base, case.profile_file_in)
     return case
+
+
+def load_any_case(path):
+    """What Open case reads: a blast case (`load_case`) or, for a file
+    that `load_case` refuses as another schema, an HD 1.3 case
+    (`models.hd13_case.load_case`, a DeflagrationCase with dim 0). OUT-1
+    writes one into every HD 1.3 model folder (GUI QA 2026-09-26 F2). A
+    file neither loader reads keeps `load_case`'s error."""
+    try:
+        return load_case(path)
+    except ValueError as exc:
+        if str(exc) != NOT_A_CASE:
+            raise
+        from . import hd13_case
+        try:
+            return hd13_case.load_case(path)
+        except ValueError as exc13:
+            if str(exc13).startswith('not an HD 1.3 case file'):
+                raise exc from None
+            raise
 
 
 def material_rho0(case):

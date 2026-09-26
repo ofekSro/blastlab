@@ -13,8 +13,9 @@ What this drives, all through the panel's own widgets:
   * the three stage forms, each switched to blastFoam through the
     per-stage selector (T34);
   * the Chain Run button, so the profile hand-offs are wired by
-    `ChainPanel._run` and not by the test - stage1_profile.txt and
-    stage2_profile.npz come out of the panel's own workspace;
+    `ChainPanel._run` and not by the test - handoff_1d_to_2d.txt and
+    handoff_2d_to_3d.npz land at the root of the Run tab's model folder
+    (OUT-1), each stage in <MODEL>\\1d, 2d, 3d;
   * the real worker thread and queue drainer, so each stage's result
     lands in the Results panel the way a user sees it;
   * one physical clock across the stages (N7/T41): the 2D and 3D stages
@@ -27,12 +28,21 @@ Run:  cd blastlab/tests && python _e2e_gui_chain_foam.py
 """
 import os
 import sys
+import tempfile
 import time
 import warnings
 
 os.environ.setdefault('MPLBACKEND', 'Agg')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+# CLAUDE.md 8.2: building the App starts the startup cleanup sweep and the
+# Run tab saves its Runs folder box into the settings - never the owner's
+# file; a throwaway one with the sweep off (as _e2e_ui_chain_foam.py)
+_dir = tempfile.mkdtemp(prefix='blastlab_gui_chain_foam_')
+_settings = os.path.join(_dir, 'settings.json')
+with open(_settings, 'w', encoding='utf-8') as _f:
+    _f.write('{"auto_cleanup": false}')
+os.environ['BLASTLAB_SETTINGS'] = _settings
 
 WS = os.path.join(HERE, '_chain_study', 'gui_foam')
 FAIL = []
@@ -87,7 +97,10 @@ def main():
     pump(root, 1.0)
 
     chain = app.chain
-    chain.ws_var.set(WS)
+    # OUT-1: the chain writes the Run tab's model folder (no workspace
+    # box); a model of its own beside the old workspace
+    from blastlab.ui.testing import use_model
+    ws = use_model(app, 'gui_foam_model', runs_dir=os.path.dirname(WS))
 
     # Deliberately small: the point is the hand-off, not the physics.
     # Stage 1 stops well inside stage 2's domain, and stage 2 inside
@@ -136,13 +149,15 @@ def main():
     pump(root, 1.0)
 
     # the panel's own workspace holds the hand-offs it wired
-    p1 = os.path.join(WS, 'stage1_profile.txt')
-    p2 = os.path.join(WS, 'stage2_profile.npz')
+    p1 = os.path.join(ws, 'handoff_1d_to_2d.txt')    # at the model root
+    p2 = os.path.join(ws, 'handoff_2d_to_3d.npz')
     check('stage 1 wrote the 1D profile the panel named', os.path.isfile(p1))
     check('stage 2 wrote the 2D profile the panel named', os.path.isfile(p2))
     for d in (1, 2, 3):
-        check(f'stage {d} case.json saved in the workspace',
-              os.path.isfile(os.path.join(WS, f'stage{d}_case.json')))
+        check(f'stage {d} MODEL.json saved in <MODEL>\\{d}d',
+              os.path.isfile(os.path.join(ws, f'{d}d', 'MODEL.json')))
+    check('and the chain root manifest.json',
+          os.path.isfile(os.path.join(ws, 'manifest.json')))
 
     # A stage that raised is the single most useful thing this script can
     # tell you, and it used to be thrown away entirely.

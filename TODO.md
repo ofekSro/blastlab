@@ -28,7 +28,7 @@ fixed and approved — the disk.
 
 | Id | What | Order |
 |---|---|---|
-| `OUT-1` | **Model folder.** A runs folder and a model name are mandatory before any run (Qt, Tk, chain, HD1.3, CLI). Every output of a run lands in `<runs>\<MODEL>\` — case, log, gauges, figures, report, the OpenFOAM skeleton, VTK. The WSL scratch is deleted after a verified success, kept on failure. Re-running a model overwrites after confirmation. Plan §2 | 1 |
+| `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
 | `OUT-2` | **VTK output options** (Viper-style Output card, blastFoam only): off / sections and obstacles / volumes, a per-case field checklist, cadence in simulated ms or solver steps, files into `<MODEL>\vtk\`, time directories deleted as they are converted. Plan §3 | 2, then owner acceptance |
 | `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. Only after the owner accepts `OUT-1` + `OUT-2`. Plan §6 | 3 |
 | `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
@@ -749,6 +749,14 @@ Acceptance: a Z ≈ 6 gauge gets an arrival and a positive impulse; HD1-3d G1's 
 rises by ~1.1 %; peaks are unchanged everywhere; `test_regression.py` differs only in
 the arrival / impulse columns, and the table shows it.
 
+### P1-19 · The Tk process died once in a native 1D→2D chain · **found 2026-09-26 (OUT-1 QA F1)**
+
+1 of 7 Tk chains: after the hand-off, `vtkWin32OpenGLRenderWindow: wglMakeCurrent failed
+... error 170` four times, then exit with no Python traceback. The 2D axisymmetric stage
+builds a 3D scene inside the Tk process (`gui/app.py _attach_view3d_auto` →
+`gui/view3d_panel.py adopt_feed` → `_ensure_scene`). Pre-existing, not OUT-1. Evidence:
+`docs/qa/2026-09-26-out-1/tk_timing.out.txt`.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
@@ -952,6 +960,22 @@ criterion is re-judged.** C1-C13 were registered before the run and stand as jud
 Source: `docs/ENGINEERING_QUESTIONS.md` hd1-3d-close #1 (C10), #4, #7, #8;
 hd1-wall-load #2.
 
+### P2-16 · Tk: one `root.update()` runs 10-13 s in a chain's later stage · **found 2026-09-26 (OUT-1 QA §6)**
+
+The live-slice matplotlib redraw keeps queueing work (`gui/run_panel.py:712` →
+`mpl.py:104`), so the call does not return. The window stays responsive (WM_NULL
+≤ 1.3 s): a stall of one call, not a freeze.
+
+### P2-17 · Resume and the run browser do not know the model · **found 2026-09-26 (OUT-1 QA C2)**
+
+A resume writes to whatever the Model box says; the run browser never shows a run's
+model; after a resume the original model's manifest still says its scratch was kept.
+
+### P2-18 · Qt: Run chain during HD 1.3, and dialogs that break paths · **found 2026-09-26 (OUT-1 QA V1, V4)**
+
+Run chain stays enabled during an HD 1.3 assessment and its refusal is titled "Run". The
+Qt refusal and overwrite dialogs break a path after "C:".
+
 ---
 
 ## P3 — Capabilities and improvements, on request
@@ -1035,6 +1059,17 @@ hd1-wall-load #2.
 - `P3-9` The x-axis label on an axisymmetric animation: `x [m]` → `r [m]`.
 - `P3-10` A chained run prints "0 kg TNT" in the 3D initialisation line.
 - `P3-11` The semantics of `n_snapshots` differ between 1D and 2D/3D.
+
+**Architecture** *(owner decision 2026-09-26, during `OUT-1`)*
+
+- `P3-26` **A command-line layer outside `solvers/`.** `solvers/foam/cli_run.py` and the
+  prompt flows in `cli.py` are command-line code that lives in the solver layer, so
+  `test_layering` (solvers must not import services) forces the model folder to reach
+  them through a registration hook (`jobs.register_stage_folder`, `OUT-1` Steps 3 and 8).
+  The owner chose the hook for now and **the proper fix as a task**: move the
+  command-line flows into a `cli/` (or `output/`) layer that may import `services/`,
+  delete the hook, and leave `test_layering` untouched. Do it after the `OUT` track;
+  byte-identity of `test_regression.py` and the `legacy/` pins are the gates.
 
 ---
 

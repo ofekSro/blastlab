@@ -1,0 +1,8 @@
+﻿  Field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_0\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_0\2d\gauges\gauges_2d.txt  (3932 rows x 1 gauges)
+  2D field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_0\2d\profile_2d.npz  (33 x 53 cells, t = 47.440 ms)
+{"kind": "responsiveness", "t": "19:55:28", "kit": "tk", "tag": "chain0", "marks": {"=== Stage 1D ===": 0.9, "=== Stage 2D ===": 12.26}, "timer_gaps_over_250ms": [[0.12, 281], [1.16, 827], [2.02, 491], [40.37, 562]], "max_timer_gap_ms": 827, "wm_null_unanswered": [[0.45, 331], [1.21, 1299], [11.93, 206], [40.21, 165], [40.42, 510]], "max_unanswered_ms": 1299, "pump_gaps_over_250ms": [[0.12, 781], [1.17, 11084], [40.17, 766]]}
+  Field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_1\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_1\2d\gauges\gauges_2d.txt  (3932 rows x 1 gauges)
+  2D field profile saved: C:\Users\rotem.ofek\blastlab_qa\out1_20260926_191440\runs\RESP_TK_1\2d\profile_2d.npz  (33 x 53 cells, t = 47.440 ms)
+{"kind": "responsiveness", "t": "19:55:45", "kit": "tk", "tag": "chain1", "marks": {"=== Stage 1D ===": 13.56, "=== Stage 2D ===": 13.56}, "timer_gaps_over_250ms": [[0.08, 460], [0.62, 388], [1.1, 881], [1.98, 500], [16.07, 557]], "max_timer_gap_ms": 881, "wm_null_unanswered": [[0.14, 407], [0.67, 337], [1.17, 815], [2.04, 496], [13.26, 180], [15.92, 704]], "max_unanswered_ms": 815, "pump_gaps_over_250ms": [[0.08, 13480], [15.88, 744]]}

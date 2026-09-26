@@ -38,18 +38,17 @@ def check(name, ok, detail=''):
 
 
 def main():
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case1D, Case2D
     from blastlab.ui.app import MainWindow
 
-    ws = os.path.join(tempfile.mkdtemp(prefix='blastlab_ui_chain_ws_'),
-                      'chain')
     win = MainWindow()
+    # OUT-1: the chain writes into the Run tab's model folder
+    ws = use_model(win, 'CHAIN')
     win.show()
     pump(200)
     ch = win.chain
-    ch.ws_box.setText(ws)
     ch.use[3].setChecked(False)
     ch.set_stage_case(1, Case1D(radius_m=1.5, charge_kg=1.0,
                                 cell_size_m=0.004, n_snapshots=2,
@@ -84,7 +83,7 @@ def main():
           '1D' in log and '2D' in log)
 
     print('\nX3: the profile really was handed over on disk')
-    p1 = os.path.join(ws, 'stage1_profile.txt')
+    p1 = os.path.join(ws, 'handoff_1d_to_2d.txt')     # at the model root
     check('the 1D stage wrote its profile',
           os.path.exists(p1) and os.path.getsize(p1) > 100,
           str(os.path.getsize(p1) if os.path.exists(p1) else 0))
@@ -107,20 +106,23 @@ def main():
               page in ('image', 'figure'), page)
 
     print('\nX5: the chain can be reproduced from what it left behind')
-    saved = sorted(f for f in os.listdir(ws) if f.endswith('.json'))
+    # OUT-1: each stage's MODEL.json in <MODEL>\1d, 2d (was stageN_case.json)
+    saved = [os.path.join(d, 'MODEL.json') for d in ('1d', '2d')
+             if os.path.isfile(os.path.join(ws, d, 'MODEL.json'))]
     check('a case JSON per stage',
-          saved == ['stage1_case.json', 'stage2_case.json'], str(saved))
+          saved == [os.path.join('1d', 'MODEL.json'),
+                    os.path.join('2d', 'MODEL.json')], str(saved))
     for name in saved:
         with open(os.path.join(ws, name), encoding='utf-8') as f:
             d = json.load(f)
         check(f'{name} pins the write schedule',
               d.get('adaptive_write') is False,
               str(d.get('adaptive_write')))
-    with open(os.path.join(ws, 'stage2_case.json'),
+    with open(os.path.join(ws, '2d', 'MODEL.json'),
               encoding='utf-8') as f:
         d2 = json.load(f)
     check('and stage 2 records where its profile came from',
-          d2.get('profile_file_in') == p1
+          d2.get('profile_file_in') == '../handoff_1d_to_2d.txt'
           and d2.get('init_mode') == 'profile1d',
           f"{d2.get('init_mode')} {d2.get('profile_file_in')}")
 

@@ -12,8 +12,7 @@
   "notes": [
     "Closed-vessel limit p_max = lambda C / (V - b C) = 5.53 MPa",
     "Loading density C/V = 5.000 kg/m3",
-    "Vent parameter A/V^(2/3) = 0.0200",
-    "A structural response will be computed at the AMBIENT resistance. Thermal weakening is reported separately, for a later load case - steel does not heat in the time the pressure pulse lasts."
+    "Vent parameter A/V^(2/3) = 0.0200"
   ],
   "r_exp": null,
   "run_plan": null,

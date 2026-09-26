@@ -125,6 +125,17 @@ def resolve_clim(meta, pressures, solid=None, scale=None, clim=None):
     return (None if lo is None else (lo, hi)), 'run', clipped
 
 
+def default_ext():
+    """The animation extension this machine can write: .mp4 when ffmpeg
+    is on PATH, .gif otherwise (`write_animation` picks the writer from
+    the extension). Moved here from `ui/setup_spec._anim_ext` so the
+    model folder (OUT-1) can name the file without importing ui/."""
+    try:
+        return '.mp4' if animation.FFMpegWriter.isAvailable() else '.gif'
+    except Exception:
+        return '.gif'
+
+
 def write_animation(meta, filename='blast_animation.gif', fps=15,
                     progress_callback=None, show_mesh=False,
                     title=None, scale=None, clim=None):

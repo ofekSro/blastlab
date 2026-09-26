@@ -63,7 +63,7 @@ def main():
 
     import numpy as np
     from PySide6.QtWidgets import QApplication
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen=False)
     app = QApplication.instance()
     if app.platformName() == 'offscreen':
@@ -102,6 +102,7 @@ def main():
                   solver='blastfoam', material='TNT')
 
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.resize(1280, 860)
     win.show()
     pump(200)

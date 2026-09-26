@@ -34,8 +34,11 @@ def _chip(parent, caption):
 
 class RunPanel(ctk.CTkFrame):
     def __init__(self, parent, on_run, on_stop, on_view3d=None,
-                 on_init=None, on_exec=None, on_refresh=None):
+                 on_init=None, on_exec=None, on_refresh=None,
+                 on_runs_dir=None):
         super().__init__(parent, fg_color='transparent')
+        #: the Runs folder box was edited or browsed (saved to settings)
+        self._on_runs_dir = on_runs_dir or (lambda: None)
 
         head = ctk.CTkFrame(self, fg_color='transparent')
         head.pack(fill='x', pady=(0, PAD - 4))
@@ -69,24 +72,6 @@ class RunPanel(ctk.CTkFrame):
             hover_color=c('border'), text_color=c('text'),
             state='disabled', command=on_view3d or (lambda: None))
         self.view3d_btn.pack(side='left', padx=(0, PAD))
-
-        # results used to be labelled by dim + a counter only, so three
-        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
-        # (CTkEntry drops its placeholder as soon as a textvariable is
-        # attached, so the box gets a real label instead)
-        self.run_name = tk.StringVar(value='')
-        ctk.CTkLabel(bar, text='Name', font=theme.F_BODY,
-                     text_color=c('muted')).pack(side='left',
-                                                 padx=(0, 6))
-        self._name_entry = ctk.CTkEntry(
-            bar, textvariable=self.run_name, width=130, height=32,
-            font=theme.F_BODY, corner_radius=8, fg_color=c('entry'),
-            border_color=c('border'))
-        self._name_entry.pack(side='left', padx=(0, GAP))
-        theme.tooltip(self._name_entry,
-                      'Names this run in the Results picker and in the '
-                      'exported file names; blank falls back to '
-                      '"Run N - 2D".')
 
         self.progress = ctk.CTkProgressBar(
             bar, width=120, height=8, corner_radius=4,
@@ -122,6 +107,51 @@ class RunPanel(ctk.CTkFrame):
         # carries a level map, so a static run keeps its four chips.
         self._chip_cells = _chip(chips, 'cells')
         self._chip_cells.master.pack_forget()
+
+        # ── the model folder (OUT-1), as the Qt Run tab: <Runs folder>\
+        # <Model>\ receives every file of a run; both are required ──────
+        # (CTkEntry drops its placeholder as soon as a textvariable is
+        # attached, so each box gets a real label instead)
+        mbar = ctk.CTkFrame(ctl.body, fg_color='transparent')
+        mbar.pack(fill='x', pady=(GAP + 2, 0))
+        ctk.CTkLabel(mbar, text='Runs folder', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='left', padx=(0, 6))
+        self.runs_dir = tk.StringVar(value='')
+        self._runs_entry = ctk.CTkEntry(
+            mbar, textvariable=self.runs_dir, width=320, height=32,
+            font=theme.F_BODY, corner_radius=8, fg_color=c('entry'),
+            border_color=c('border'))
+        self._runs_entry.pack(side='left', padx=(0, GAP), fill='x',
+                              expand=True)
+        self._runs_entry.bind('<Return>', lambda e: self._on_runs_dir())
+        self._runs_entry.bind('<FocusOut>', lambda e: self._on_runs_dir())
+        theme.tooltip(self._runs_entry,
+                      'Required. The folder that holds one sub-folder per '
+                      'model; a run writes every file it produces into '
+                      '<Runs folder>\\<Model>. Remembered between sessions.')
+        self._runs_browse = ctk.CTkButton(
+            mbar, text='', image=icon('folder', 14), width=34, height=32,
+            corner_radius=theme.RADIUS, fg_color=c('card2'),
+            hover_color=c('border'), command=self._browse_runs_dir)
+        self._runs_browse.pack(side='left', padx=(0, PAD))
+        theme.tooltip(self._runs_browse,
+                      'Choose the Runs folder: the folder that holds one '
+                      'sub-folder per model.')
+        # results used to be labelled by dim + a counter only, so three
+        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
+        self.run_name = tk.StringVar(value='')
+        ctk.CTkLabel(mbar, text='Model', font=theme.F_BODY,
+                     text_color=c('muted')).pack(side='left', padx=(0, 6))
+        self._name_entry = ctk.CTkEntry(
+            mbar, textvariable=self.run_name, width=180, height=32,
+            font=theme.F_BODY, corner_radius=8, fg_color=c('entry'),
+            border_color=c('border'))
+        self._name_entry.pack(side='left')
+        theme.tooltip(self._name_entry,
+                      'Required. The model folder <Runs folder>\\<Model> that '
+                      'receives every file of this run (a valid Windows '
+                      'folder name, at most 100 characters). It also names '
+                      'the run in the Results picker.')
 
         # ── stepped execution row (VIPER-style) ──────────────────────────
         on_exec = on_exec or (lambda cmd: None)
@@ -280,13 +310,31 @@ class RunPanel(ctk.CTkFrame):
         self._running = False
         self._case_ok = True        # latest validation verdict (Setup tab)
 
-    def set_run_name(self, name):
-        """Pre-fill the run name (Open case uses the file stem)."""
-        if not self.run_name.get().strip():
+    def set_run_name(self, name, replace=False):
+        """Pre-fill the run name when the box is empty; `replace` sets it
+        regardless (Open case: the opened model, GUI QA C1)."""
+        if replace or not self.run_name.get().strip():
             self.run_name.set(str(name or ''))
 
     def current_run_name(self):
         return self.run_name.get().strip()
+
+    # ── the runs folder (OUT-1) ──────────────────────────────────────────
+    def current_runs_dir(self):
+        return self.runs_dir.get().strip()
+
+    def set_runs_dir(self, path):
+        self.runs_dir.set(str(path or ''))
+
+    def _browse_runs_dir(self):
+        import os
+        from tkinter import filedialog
+        path = filedialog.askdirectory(title='Runs folder',
+                                       initialdir=self.current_runs_dir()
+                                       or None)
+        if path:
+            self.runs_dir.set(os.path.normpath(path))
+            self._on_runs_dir()
 
     # ── body sash ────────────────────────────────────────────────────────
     #: share of the Run-tab width given to the log; the live/3D pane keeps

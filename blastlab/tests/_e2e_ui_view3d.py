@@ -24,12 +24,13 @@ def main():
     shots = '--shots' in sys.argv
     from PySide6.QtWidgets import QApplication
     from blastlab.ui import theme
-    from blastlab.ui.testing import pump
+    from blastlab.ui.testing import pump, use_model
     from blastlab.ui.app import MainWindow
     app = QApplication.instance() or QApplication(['blastlab-e2e'])
     theme.apply(app, 'dark')
     case = os.path.join(HERE, 'cases', 'native_3d_small.json')
     win = MainWindow(case_file=case)
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(300)
     check("case loaded", win.current_case() is not None
@@ -135,6 +136,7 @@ def main():
 
     print("\nG4: a second run replaces the scene cleanly")
     win.run_panel.show_slice_tab()
+    use_model(win)          # OUT-1: the same model again, no overwrite modal
     win._run_single()
     for _ in range(2400):
         pump(50)

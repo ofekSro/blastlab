@@ -50,7 +50,7 @@ the original Hebrew notes are preserved under [`archive/`](archive/).
 
 | File | What is in it |
 |---|---|
-| [../blastlab/README.md](../blastlab/README.md) | The application itself: tabs, options, features |
+| [../blastlab/README.md](../blastlab/README.md) | The application itself: tabs, options, features; [where a run's files go](../blastlab/README.md#where-a-runs-files-go) (the model folder, `OUT-1`) |
 | [../BlastFoam_Basic_Info/](../BlastFoam_Basic_Info/) | Learning material — a blastFoam guide, JWL parameter tables, a cheatsheet (Hebrew) |
 
 ## Archive

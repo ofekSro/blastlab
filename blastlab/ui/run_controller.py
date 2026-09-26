@@ -21,7 +21,10 @@ import traceback
 
 from PySide6.QtCore import QObject, QTimer
 
-from ..solvers.jobs import solve_stage
+# imported before any solve_stage(stage_dir=...): it registers the
+# model-folder writer with solvers.jobs (OUT-1)
+from ..services import model_folder
+from ..solvers.jobs import resume_stage, solve_stage
 from ..solvers.worker import SolverWorker
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import dialogs
@@ -93,6 +96,8 @@ class RunController(QObject):
         self._drain_pending = False
         self._done_seen = True
         self._refresh = None            # last accepted refresh policy
+        self._model = None              # OUT-1: the run's model folder
+        self._folders = {}              # stage_dir -> manifest
         self._timer = QTimer(self)
         self._timer.setInterval(self.DRAIN_MS)
         self._timer.timeout.connect(self._drain)
@@ -114,38 +119,53 @@ class RunController(QObject):
         return self.worker.is_alive()
 
     # ── starting / stopping ──────────────────────────────────────────────
-    def start_stages(self, dim_cases, paused=False, run_name=''):
+    def start_stages(self, dim_cases, paused=False, run_name='', model=None,
+                     reports=None):
         """Run [(dim, case), ...] sequentially on a worker thread.
-        Returns False when a run is already in progress."""
+        Returns False when a run is already in progress.
+
+        OUT-1: `model` is the prepared model folder
+        (`model_folder.Target`); every stage writes into it - the folder
+        itself for one stage, `<MODEL>\\<d>d` for a chain - and
+        `reports` (the pre-flight ValidationReports, one per stage) feed
+        its manifest. `model=None` is the headless / test path, which
+        writes what it always did."""
         # `is_alive()` alone leaves a ~50 ms window after the worker
         # exits but before the drain sees its 'done': starting there
         # would orphan the old queue and drop its finished result (G5)
         if self.running:
             dialogs.show_info('Run', 'A run is already in progress.')
             return False
-        stages = [solve_stage(dim, case) for dim, case in dim_cases]
-        return self._launch(stages, [dim for dim, _ in dim_cases],
-                            paused=paused, run_name=run_name)
+        dims = [dim for dim, _ in dim_cases]
+        if model is None:
+            stages = [solve_stage(dim, case) for dim, case in dim_cases]
+        else:
+            stages = model_folder.make_stages(model, dim_cases, reports)
+        return self._launch(stages, dims, paused=paused, run_name=run_name,
+                            model=model)
 
-    def resume_foam_run(self, path, dim, run_name=''):
+    def resume_foam_run(self, path, dim, run_name='', model=None, case=None):
         """Resume a stopped blastFoam run through the ordinary worker
         pipeline, so the Run tab, live view, Stop and Results all behave
-        exactly as in a fresh run."""
+        exactly as in a fresh run. With a `model` (and the run's own
+        `case`) the resume writes the model folder and releases the WSL
+        scratch like a fresh run (OUT-1)."""
         if self.running:
             dialogs.show_info('Run', 'A run is already in progress.')
             return False
+        if model is None:
+            stage = resume_stage(dim, path)
+        else:
+            stage = resume_stage(dim, path, case, stage_dir=model.folder,
+                                 run_info=model_folder.run_info(model, case))
+        return self._launch([stage], [dim], run_name=run_name, model=model)
 
-        def solve(hooks):
-            from ..solvers.foam.backend import resume_run
-            return resume_run(path, hooks)
-
-        return self._launch([(f'Resume {dim}D (blastfoam)', solve)], [dim],
-                            run_name=run_name)
-
-    def _launch(self, stages, dims, paused=False, run_name=''):
+    def _launch(self, stages, dims, paused=False, run_name='', model=None):
         self._drain_pending = True
         self._done_seen = False
         self._run_count += 1
+        self._model = model
+        self._folders = {}              # stage_dir -> manifest (OUT-1)
         # the name the user typed on the Run tab labels every result of
         # this run (and its exports) - blank keeps the old "Run N - 2D"
         self._run_name = str(run_name or '').strip()
@@ -318,6 +338,13 @@ class RunController(QObject):
             w.hooks.latest_frame3d()
         elif tag == 'stage':
             h.on_log(f'=== Stage {msg[2]} ===')
+        elif tag == 'folder':
+            # OUT-1: the stage's model folder is written; a finished
+            # blastFoam run whose WSL scratch had to be kept says why
+            stage_dir, manifest, notice = msg[1], msg[2], msg[3]
+            self._folders[stage_dir] = manifest
+            if notice:
+                self.show_error('Model folder', notice)
         elif tag == 'result':
             k, res = msg[1], msg[2]
             dim = self._stage_dims[k] if k < len(self._stage_dims) else 0
@@ -375,10 +402,24 @@ class RunController(QObject):
             # finalize the embedded 3D view if the last stage's 'result'
             # did not (idempotent: no-op when there is no live feed)
             self._finish_view3d('run complete')
+            self._write_chain_manifest()
             self.handlers.on_running(False)
             self.handlers.on_finished(self._run_stopped_early,
                                       self._run_errored)
             self.handlers.on_log('  [run finished]')
+
+    def _write_chain_manifest(self):
+        """A chain's root manifest.json, at 'done' (OUT-1, plan sec.
+        2.2): the stages that wrote a folder and the hand-offs at the
+        model root."""
+        model = getattr(self, '_model', None)
+        if model is None or len(self._stage_dims) < 2:
+            return
+        err = model_folder.write_chain_root(model, self._stage_dims,
+                                            self._folders)
+        if err:
+            self.handlers.on_log(f'  [warn] model folder: could not write '
+                                 f'the chain manifest.json: {err}')
 
     # ── shutdown ─────────────────────────────────────────────────────────
     def shutdown(self, join_s=10.0):

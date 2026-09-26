@@ -159,9 +159,10 @@ def main():
               win32_visible(heat_card) is True)
 
     print('\n  pressing Run writes a report and the SBEDS load CSVs')
-    out = os.path.join(tempfile.mkdtemp(prefix='blastlab_hd13_gui_'),
-                       'report.html')
-    form.v['report_file'].set(out)
+    # OUT-1: into the model folder, <MODEL>\hd13_report.html + hd13_loads\
+    from blastlab.ui.testing import use_model
+    folder = use_model(win, 'HD13_GUI')
+    out = os.path.join(folder, 'hd13_report.html')
     # the form's own end time, not a shortened one: the record has to end
     # while the load is still active, so the "still active" path is shown
     # (QA 2026-09-26-hd1-16 F2); an end time of 20 never fires that rule
@@ -183,8 +184,8 @@ def main():
               f'{len(body)} bytes')
         check('and no Structural response section (HD1-16)',
               'Structural response' not in body)
-    loads = os.path.splitext(out)[0] + '_loads'
-    check('the _loads/ directory is written, with nominal.csv and its '
+    loads = os.path.join(folder, 'hd13_loads')
+    check('the hd13_loads/ directory is written, with nominal.csv and its '
           'sidecar', os.path.isfile(os.path.join(loads, 'nominal.csv'))
           and os.path.isfile(os.path.join(loads, 'nominal.txt')),
           str(os.listdir(loads)) if os.path.isdir(loads) else 'missing')
@@ -229,6 +230,12 @@ def main():
     check('the tooltip holds the full text',
           all(ln in status.toolTip().splitlines() for ln in active)
           and loads_abs in status.toolTip(), status.toolTip()[:120])
+
+    listing = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+    check('OUT-1: the model folder holds the case, the report, the loads '
+          'and the manifest',
+          listing == ['.blastlab-model', 'MODEL.json', 'hd13_loads',
+                      'hd13_report.html', 'manifest.json'], str(listing))
 
     print('\n  nothing crashed')
     check('no unhandled exceptions', not crashes, str(crashes[:1]))

@@ -10,6 +10,10 @@ import warnings
 os.environ.setdefault('MPLBACKEND', 'Agg')
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+# CLAUDE.md 8.2: the App's startup sweep and its Runs folder box must never
+# read or write the owner's settings file - a throwaway one, sweep off
+from blastlab.ui.testing import private_settings  # noqa: E402
+private_settings()
 
 import tkinter as tk
 
@@ -92,6 +96,8 @@ def main():
     # ── real 1D blastFoam run through the Run button path ──────────────
     app.setup.set_case(cases[1])
     pump(root, 0.5)
+    from blastlab.ui.testing import use_model
+    use_model(app)          # OUT-1: Run needs a runs folder and a model
     app._run_single()
     t0 = time.time()
     while app.worker is not None and app.worker.is_alive() \

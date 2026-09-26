@@ -6,7 +6,12 @@ matplotlib live window); the GUI supplies its own hooks that forward to
 a Tk-safe queue.
 """
 
+import threading
 import time
+
+#: serialises run.log appends: the solver thread and the blastFoam run
+#: loop's helper threads can log at once
+_LOG_FILE_LOCK = threading.Lock()
 
 
 #: memory budget for the recorded replay frames [bytes]. The record
@@ -89,6 +94,15 @@ class RunHooks:
     refresh = ('seconds', 0.05)
     refresh3d = ('seconds', 0.2)
 
+    #: OUT-1: the model folder's run.log while a stage writes into one,
+    #: else None. `log` appends every line to it (see `log_to_file`).
+    log_file = None
+
+    #: OUT-1: the WSL scratch directory (posix) of the blastFoam run on
+    #: these hooks, set by backend._preflight / resume_run once the case
+    #: directory is known. None for a native run.
+    scratch_posix = None
+
     @staticmethod
     def _due(policy, step, last_draw):
         mode, val = policy
@@ -122,6 +136,32 @@ class RunHooks:
 
     def log(self, msg):
         """A line of run output (summaries, notes, warnings)."""
+
+    def log_to_file(self, msg):
+        """Append one log line to `log_file` (UTF-8, LF), when one is set.
+
+        This is the model folder's run.log (OUT-1): the solver-side log,
+        i.e. every line that goes through `log` - what the Run tab shows
+        minus the lines the GUI adds itself ('[run finished]', the error
+        dialog text). A failed append never disturbs the run: an
+        unencodable character becomes '?', an unwritable file is skipped."""
+        path = self.log_file
+        if not path:
+            return
+        try:
+            with _LOG_FILE_LOCK, open(path, 'a', encoding='utf-8',
+                                      errors='replace', newline='\n') as f:
+                f.write(f'{msg}\n')
+        except (OSError, ValueError):
+            pass
+
+    def folder_written(self, stage_dir, manifest, notice=None):
+        """OUT-1: a stage has finished writing its model folder. Called on
+        the worker thread, before the stage's 'result' / 'error', with
+        the manifest dict and a kept-scratch dialog text (or None). A
+        front end that runs several stages on one hooks object reads the
+        outcome from here, not from `hooks.stage_manifest`, which the
+        next stage overwrites."""
 
     def progress(self, p: Progress):
         """Called every step (cheap; receivers throttle themselves)."""
@@ -229,6 +269,7 @@ class ConsoleHooks(RunHooks):
 
     def log(self, msg):
         print(msg)
+        self.log_to_file(msg)
 
     def progress(self, p: Progress):
         if p.step > 0 and p.step % _STEP_EVERY[self.dim] == 0:

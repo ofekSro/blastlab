@@ -486,9 +486,11 @@ class ResultsPanel(ctk.CTkFrame):
         )
         # a greyed button has to say why it is greyed - "Profile" in
         # particular is off for every 3D and planar-2D result (QA-16)
+        from ..services.exports import SCRATCH_RELEASED
         why = dict(
-            vtk='Only a blastFoam run whose case directory still exists '
-                'can be written as VTK.',
+            vtk=(SCRATCH_RELEASED if meta.get('scratch_released') else
+                 'Only a blastFoam run whose case directory still exists '
+                 'can be written as VTK.'),
             gif='This result has no recorded frames - tick "Record replay '
                 'frames" before the run.',
             summary='This result has no gauges.',
@@ -902,27 +904,36 @@ class ResultsPanel(ctk.CTkFrame):
 
         # File dialogs must run on the Tk main thread; only the heavy
         # figure building / writing goes to the worker thread.
+        # OUT-1 (owner Q3): a result with a model folder opens every
+        # dialog there; any other exactly as before (no initialdir)
+        from ..services.exports import SCRATCH_RELEASED, model_dir
+        home = model_dir(ent)
+        where = dict(initialdir=home) if home else {}
         target = None
         if kind == 'pngs':
-            target = filedialog.askdirectory(title='Save PNGs into')
+            target = filedialog.askdirectory(title='Save PNGs into',
+                                             **where)
         elif kind == 'fieldcsv':
             # N14: p_peak / impulse / snapshot fields, one long-format
             # CSV per field
-            target = filedialog.askdirectory(title='Save field CSVs into')
+            target = filedialog.askdirectory(title='Save field CSVs into',
+                                             **where)
         elif kind == 'report':
             # N13: one self-contained HTML file
             target = filedialog.asksaveasfilename(
                 title='Save HTML report', defaultextension='.html',
-                initialfile=f'{pre}blast_{dim}d_report.html')
+                initialfile=f'{pre}blast_{dim}d_report.html', **where)
         elif kind == 'tsv':
             target = filedialog.asksaveasfilename(
                 title='Save gauges TSV', defaultextension='.txt',
-                initialfile=f'{pre}gauges_{dim}d.txt')
+                initialfile=f'{pre}gauges_{dim}d.txt', **where)
         elif kind == 'vtk':
             from ..solvers.foam.export_vtk import can_export
             if not can_export(res.meta):
-                self._log('VTK export needs a blastFoam run whose case '
-                          'directory still exists.')
+                self._log(SCRATCH_RELEASED
+                          if res.meta.get('scratch_released')
+                          else 'VTK export needs a blastFoam run whose '
+                               'case directory still exists.')
                 return
             target = res.meta['case_dir']
         elif kind == 'summary':
@@ -931,7 +942,7 @@ class ResultsPanel(ctk.CTkFrame):
                 return
             target = filedialog.asksaveasfilename(
                 title='Save gauge summary CSV', defaultextension='.csv',
-                initialfile=f'{pre}gauges_{dim}d_summary.csv')
+                initialfile=f'{pre}gauges_{dim}d_summary.csv', **where)
         elif kind == 'gif':
             if not res.meta.get('frames'):
                 self._log('No recorded frames in this result.')
@@ -946,7 +957,7 @@ class ResultsPanel(ctk.CTkFrame):
                 title='Save animation', defaultextension=ext,
                 filetypes=[('MP4 video', '*.mp4'),
                            ('Animated GIF', '*.gif')],
-                initialfile=f'{pre}blast_{dim}d_animation{ext}')
+                initialfile=f'{pre}blast_{dim}d_animation{ext}', **where)
         elif kind == 'profile':
             if dim == 3:
                 self._log('3D results have no profile export.')
@@ -955,7 +966,7 @@ class ResultsPanel(ctk.CTkFrame):
                 title='Save profile',
                 defaultextension='.txt' if dim == 1 else '.npz',
                 initialfile=(f'{pre}blast_profile.txt' if dim == 1
-                             else f'{pre}blast_profile_2d.npz'))
+                             else f'{pre}blast_profile_2d.npz'), **where)
         if not target:
             return
 

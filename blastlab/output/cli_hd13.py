@@ -9,8 +9,10 @@ fallback: a Qt form can be built on top of exactly these calls later
 without either of them owning the other.
 
     python -m blastlab --hd13-new magazine.json    # a starter case
-    python -m blastlab --hd13 magazine.json        # run it, write the report
-    python -m blastlab --hd13-wall-export magazine.json   # HD1-13 wall CSVs
+    python -m blastlab --hd13 magazine.json --runs-dir D --model M
+        # run it: D\\M\\hd13_report.html and D\\M\\hd13_loads\\ (OUT-1)
+    python -m blastlab --hd13-wall-export magazine.json --runs-dir D --model M
+        # HD1-13 wall CSVs into D\\M\\wall_loads\\
 
 The validation report is printed before anything is computed, errors and
 warnings first, because for this model the warnings are the product. A
@@ -81,12 +83,44 @@ def _print_headline(out, out_path):
     print(f'\n  report: {out_path}\n')
 
 
-def run_and_report(case_path: str, out_path: str | None = None,
-                   quiet: bool = False) -> str:
-    """Load, validate, run and write the report. Returns its path.
+def console_confirm(text: str) -> bool:
+    """The overwrite question on the console: yes only for y / yes. No
+    console (EOF) is a no."""
+    try:
+        return input(f'{text} [y/N] ').strip().lower() in ('y', 'yes')
+    except EOFError:
+        return False
+
+
+def model_target(runs_dir, model, confirm=None):
+    """OUT-1 pre-flight for the command line: the prepared model folder
+    (`model_folder.Target`), or `SystemExit` naming the problem - a bad
+    Runs folder or Model name, a folder blastlab did not create, a
+    declined overwrite. Nothing is written before it returns."""
+    from ..services import model_folder
+    errors = model_folder.check(runs_dir, model)
+    if errors:
+        raise SystemExit('refusing to run: ' + '; '.join(errors))
+    try:
+        target = model_folder.prepare_target(runs_dir, model,
+                                             confirm or console_confirm)
+    except model_folder.ModelFolderError as exc:
+        raise SystemExit(f'refusing to run: {exc}') from exc
+    if target is None:
+        raise SystemExit('not overwritten - nothing was run')
+    return target
+
+
+def run_and_report(case_path: str, runs_dir: str, model: str,
+                   quiet: bool = False, confirm=None) -> str:
+    """Load, validate, run and write `<runs_dir>\\<model>\\` (OUT-1:
+    MODEL.json, hd13_report.html, hd13_loads\\, manifest.json). Returns
+    the report's path.
 
     Prints the validation report and the headline numbers unless `quiet`;
-    a refused case raises `SystemExit('refusing to run: ...')`.
+    a refused case raises `SystemExit('refusing to run: ...')` before the
+    model folder is touched. `confirm(text)` answers the overwrite
+    question (default: a y/N console prompt).
     """
     case = assessment.load_case(case_path)
     rep = assessment.validate(case)
@@ -96,10 +130,10 @@ def run_and_report(case_path: str, out_path: str | None = None,
     if not rep.ok:
         raise SystemExit('refusing to run: ' + '; '.join(rep.errors))
 
-    bundle = hd13_service.assess(case, rep)
-    if out_path is None:
-        out_path = hd13_service.default_report_path(case_path)
-    hd13_service.write_report(bundle, out_path)
+    target = model_target(runs_dir, model, confirm)
+    bundle = hd13_service.run_into_model_folder(
+        case, target, rep, log=print if not quiet else (lambda s: None))
+    out_path = bundle['report']
 
     if not quiet:
         _print_headline(bundle['out'], out_path)
@@ -107,20 +141,32 @@ def run_and_report(case_path: str, out_path: str | None = None,
     return out_path
 
 
-def wall_export(case_path: str, quiet: bool = False) -> dict:
+def wall_export(case_path: str, runs_dir: str, model: str,
+                quiet: bool = False, confirm=None) -> dict:
     """HD1-16 step 1, item 2: write the HD1-13 wall-load traces as SBEDS
-    CSVs into `<case>_wall_loads/` (output/load_csv.export_wall_loads).
+    CSVs into `<runs_dir>\\<model>\\wall_loads\\` (OUT-1;
+    output/load_csv.export_wall_loads), beside the case as MODEL.json
+    and a manifest.json.
 
     Only the case's loaded wall is read (clearing, wall_H_m, wall_W_m);
-    clearing on with H or W missing raises `SystemExit` naming the field.
+    clearing on with H or W missing raises `SystemExit` naming the field,
+    before the model folder is touched.
     """
     from . import load_csv
+    from ..services import model_folder
     case = assessment.load_case(case_path)
     errs = assessment.wall_errors(case)
     if errs:
         raise SystemExit('refusing to export: ' + '; '.join(errs))
-    res = load_csv.export_wall_loads(case,
-                                     load_csv.wall_loads_dir(case_path))
+    target = model_target(runs_dir, model, confirm)
+    case_json = os.path.join(target.folder, model_folder.CASE_FILE)
+    assessment.save_case(case, case_json)
+    res = load_csv.export_wall_loads(
+        case, os.path.join(target.folder, hd13_service.WALL_LOADS_NAME))
+    manifest = hd13_service.hd13_manifest(
+        target.folder, case_json, model_folder.run_info(target))
+    manifest['stop_reason'] = 'wall-load export'
+    model_folder.write_manifest(manifest, target.folder)
     if not quiet:
         print(f'\nHD 1.3 wall-load export: {case.name or case_path}')
         if case.clearing:

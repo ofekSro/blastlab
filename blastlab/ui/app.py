@@ -19,6 +19,8 @@ from ..core import settings as app_settings
 from ..core.case import (load_case, long_run_note, save_case,
                          validate_case)
 from ..core.mode import SolverMode
+from ..models.case import load_any_case
+from ..services.model_folder import model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
@@ -122,7 +124,10 @@ class MainWindow(QMainWindow):
                                     bridge=self.bridge)
         self.chain = ChainPanel(on_run_chain=self._run_chain,
                                 mode=self.solver_mode,
-                                log_fn=self._log_threadsafe)
+                                log_fn=self._log_threadsafe,
+                                model_source=lambda: (
+                                    self.run_panel.current_runs_dir(),
+                                    self.run_panel.current_run_name()))
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
@@ -137,6 +142,7 @@ class MainWindow(QMainWindow):
         self.run_panel.exec_requested.connect(self.ctrl.exec_cmd)
         self.run_panel.refresh_changed.connect(self._apply_refresh)
         self.run_panel.gauges_wanted.connect(self._gauges_wanted)
+        self.run_panel.runs_dir_changed.connect(self._save_runs_dir)
 
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
@@ -379,12 +385,21 @@ class MainWindow(QMainWindow):
             self._apply_refresh()
         except Exception:
             pass
+        self.run_panel.set_runs_dir(st.get('runs_dir', ''))
+
+    def _save_runs_dir(self):
+        """OUT-1: the Runs folder box is remembered across sessions."""
+        try:
+            app_settings.update(runs_dir=self.run_panel.current_runs_dir())
+        except Exception:
+            pass
 
     def _save_ui_state(self):
         try:
             val, mode = self.run_panel.refresh_policy_text()
             state = dict(appearance=theme.mode(), refresh_value=val,
-                         refresh_mode=mode, solver=self.solver_mode.get())
+                         refresh_mode=mode, solver=self.solver_mode.get(),
+                         runs_dir=self.run_panel.current_runs_dir())
             # only a real, normal window has a meaningful geometry
             if self.isVisible() and not self.isMinimized() \
                     and not self.isMaximized():
@@ -411,7 +426,8 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            case = load_case(path)
+            # a blast case, or an HD 1.3 one for the 0-D form (QA F2)
+            case = load_any_case(path)
         except FileNotFoundError:
             self.show_error('Open case', f'File not found: {path}')
             return
@@ -437,9 +453,10 @@ class MainWindow(QMainWindow):
         self._case_path = path
         self.setup.set_case(case)
         self._maybe_prewarm_viewer(case)
-        # a run started from this case is named after the file (N9)
-        self.run_panel.set_run_name(
-            os.path.splitext(os.path.basename(path))[0])
+        # a run started from this case is named after the file (N9) - the
+        # model it came from, replacing the last name (GUI QA C1: the next
+        # Run offered to overwrite the PREVIOUS model)
+        self.run_panel.set_run_name(model_for_case_file(path), replace=True)
         self._show('setup')
         self._schedule_validate()
 
@@ -528,9 +545,47 @@ class MainWindow(QMainWindow):
             return
         if not self._confirm_long_run([case]):
             return
+        model = self._model_target()
+        if model is None:
+            return
         if self.ctrl.start_stages([(case.dim, case)], paused=paused,
-                                  run_name=self.run_panel.current_run_name()):
+                                  run_name=model.model, model=model,
+                                  reports=[rep]):
             self._show('run')
+
+    def model_check(self):
+        """OUT-1: what is wrong with the Run tab's Runs folder and Model
+        boxes ([] = a run may start). No file is touched."""
+        from ..services import model_folder
+        return model_folder.check(self.run_panel.current_runs_dir(),
+                                  self.run_panel.current_run_name())
+
+    def _model_target(self, title='Run'):
+        """OUT-1 pre-flight, after the case validation and before anything
+        is written: refuse with one message naming the box when the Runs
+        folder or the Model name is wrong, ask before overwriting an
+        existing model, and return the prepared `model_folder.Target` -
+        or None, having said why (or the user said No)."""
+        from ..services import model_folder
+        if self.ctrl.running or self._hd13_busy:
+            # before prepare: an overwrite could hit the running model (an
+            # HD 1.3 assessment runs on its own thread, not the controller:
+            # the Chain tab and a resume are not greyed by it)
+            dialogs.show_info('Run', 'A run is already in progress.')
+            return None
+        errors = self.model_check()
+        if errors:
+            self.show_error(title, '\n'.join(errors))
+            return None
+        try:
+            return model_folder.prepare_target(
+                self.run_panel.current_runs_dir(),
+                self.run_panel.current_run_name(),
+                confirm=lambda text: dialogs.ask_yes_no(
+                    'Model folder', text, self))
+        except model_folder.ModelFolderError as exc:
+            self.show_error(title, str(exc))
+            return None
 
     def _dim_changed(self, dim):
         """Hide, never grey, the controls a dimension does not have - the
@@ -560,45 +615,34 @@ class MainWindow(QMainWindow):
         There is no Cancel: `assessment.run` has no cooperative stop
         hook, and the physics does not grow one for a button.
 
-        Validation and the report path are read here, on the GUI thread.
+        Validation and the model folder (OUT-1: `_model_target`, the same
+        pre-flight as every run) are settled here, on the GUI thread.
         Pinned by `tests/test_ui_char_hd13_run.py`.
         """
         # Imported here, and called through the module, so a test that
-        # patches `assessment.run` or `tempfile.mkdtemp` is honoured.
-        import shutil
-        import tempfile
+        # patches `assessment.run` is honoured.
         from ..core import assessment
         from ..services import hd13 as hd13_service
         rep = assessment.validate(case)
         if not rep.ok:
             self.show_error('Run', '\n'.join(rep.errors))
             return
-        path = self.setup.form.v['report_file'].get().strip() \
-            or 'hd13_report.html'
+        model = self._model_target()
+        if model is None:
+            return
 
         def work():
-            out = err = case_dir = loads = None
+            out = err = loads = None
             try:
-                # The temp case file is kept, and the report is made from
-                # the case read back from it, exactly as before Phase 7 of
-                # docs/ARCHITECTURE_REVIEW.md: whether it is provenance is
-                # open question Q4 there. It is now written BEFORE the one
-                # assessment, so a failure removes it again - a run that
-                # raises still leaves nothing on disk.
-                case_dir = tempfile.mkdtemp(prefix='blastlab_hd13_')
-                case_path = os.path.join(case_dir, 'case.json')
-                assessment.save_case(case, case_path)
-                bundle = hd13_service.assess(assessment.load_case(case_path))
+                # OUT-1: <MODEL>\MODEL.json, read back for the assessment
+                # (the provenance the leaked temp case file stood for,
+                # ARCHITECTURE_REVIEW Q4), then the report, the loads and
+                # the manifest; a failure leaves MODEL.json and a manifest
+                bundle = hd13_service.run_into_model_folder(
+                    case, model, log=self._log_threadsafe)
+                out, loads = bundle['report'], bundle.get('loads')
             except Exception as exc:           # noqa: BLE001 - shown to the user
                 err = exc
-                if case_dir:
-                    shutil.rmtree(case_dir, ignore_errors=True)
-            else:
-                try:
-                    out = hd13_service.write_report(bundle, path)
-                    loads = bundle.get('loads')
-                except Exception as exc:       # noqa: BLE001 - shown to the user
-                    err = exc
             finally:
                 self.bridge.post(self._hd13_done, out, err, loads)
 
@@ -696,16 +740,28 @@ class MainWindow(QMainWindow):
         lines.append('Start it?')
         return dialogs.ask_yes_no('Long run', '\n'.join(lines), self)
 
-    def _run_chain(self, dim_cases, workspace):
-        """The Chain panel has already validated and wired the stages and
-        written their case JSONs; all that is left is to launch them as
-        one worker, so the Run tab, Stop and Results behave as usual."""
-        if not self._confirm_long_run([c for _d, c in dim_cases]):
-            return
-        self.notify(f'Chain: {len(dim_cases)} stage(s) in {workspace}')
-        if self.ctrl.start_stages(
-                dim_cases, run_name=self.run_panel.current_run_name()):
+    def _run_chain(self, dim_cases):
+        """The Chain panel has already validated and wired the stages
+        into the model folder's paths; what is left is the long-run
+        question, the model folder itself (OUT-1: created only now, after
+        asking for an existing one) and the launch as one worker, so the
+        Run tab, Stop and Results behave as usual. False when it did not
+        start."""
+        cases = [c for _d, c in dim_cases]
+        if not self._confirm_long_run(cases):
+            return False
+        model = self._model_target('Chain')
+        if model is None:
+            return False
+        # the manifest's n_cells / n_procs, one report per stage
+        reports = [validate_case(c, pending_inputs=k > 0)
+                   for k, c in enumerate(cases)]
+        self.notify(f'Chain: {len(dim_cases)} stage(s) into {model.folder}')
+        if self.ctrl.start_stages(dim_cases, run_name=model.model,
+                                  model=model, reports=reports):
             self._show('run')
+            return True
+        return False
 
     def _init_model(self):
         """VIPER-style 'Initialise Model': start the run held at step 0
@@ -795,12 +851,18 @@ class MainWindow(QMainWindow):
         try:
             _p, unc = _env.case_paths(path)
             dim = int((dims_from_case_json(unc) or '?').rstrip('D'))
-        except (ValueError, OSError, TypeError) as exc:
+            # OUT-1: the resume writes the model folder from the run's own
+            # case, like a fresh run
+            case = load_case(os.path.join(unc, 'case.json'))
+        except (ValueError, OSError, TypeError, KeyError) as exc:
             self.notify(f'cannot resume {path}: {exc}', 'error')
             self._log_threadsafe(f'  [runs] cannot resume {path}: {exc}')
             return False
-        return self.ctrl.resume_foam_run(
-            path, dim, run_name=self.run_panel.current_run_name())
+        model = self._model_target('Resume')
+        if model is None:
+            return False
+        return self.ctrl.resume_foam_run(path, dim, run_name=model.model,
+                                         model=model, case=case)
 
     # ── status line ──────────────────────────────────────────────────────
     def notify(self, text, level='info'):

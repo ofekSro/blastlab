@@ -47,7 +47,7 @@ def check(name, ok, detail=''):
 
 def main():
     import numpy as np
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp()
     from blastlab.core.case import Case2D
     from blastlab.core.constants import P_AIR
@@ -80,6 +80,7 @@ def main():
           _labels(dict(radii=[0.5]), 1)[0])
 
     win = MainWindow()
+    use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
     pump(150)
     rp = win.run_panel

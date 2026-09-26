@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QFormLayout,
                                QVBoxLayout, QWidget)
 
 from . import dialogs, theme
-from .setup_spec import INPUT_MIN, LABEL_WRAP, cards
+from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, cards
 from .theme import GAP
 from .widgets import Card, button, label
 
@@ -557,11 +557,18 @@ class FieldForm(QWidget):
         hide whole cards the same way. Values are never touched, so
         switching back restores what the user typed."""
         groups = groups or {}
+        # OUT-1: a card whose every row is a hidden file-name row (the 1D
+        # Outputs card) would be an empty frame
+        emptied = set()
+        for t in self.cards:
+            names = [n for n, ct in self._card_of.items() if ct == t]
+            if names and all(n in HIDDEN_ROWS for n in names):
+                emptied.add(t)
         for title, card in self.cards.items():
             scope = getattr(card, '_blastlab_scope', None)
-            card.setVisible(scope in (None, mode))
+            card.setVisible(scope in (None, mode) and title not in emptied)
         for name, f in self._specs.items():
-            on = f.scope in (None, mode)
+            on = f.scope in (None, mode) and name not in HIDDEN_ROWS
             if on and f.group is not None:
                 on = bool(groups.get(f.group, True))
             self._set_row_visible(name, on)

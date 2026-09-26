@@ -60,7 +60,8 @@ class _LogPanel:
 def chain_feedback_checks(root):
     """QA-23 / T28: the chain refuses BEFORE it creates anything, names
     the offending stage in the dialog, and brings that stage's form to
-    the front."""
+    the front. OUT-1: what must not appear is the model folder (the
+    workspace box is gone, owner decision 14)."""
     import tempfile, shutil
     from blastlab.gui import chain_panel as cp
 
@@ -68,11 +69,13 @@ def chain_feedback_checks(root):
     real = cp.messagebox.showerror
     cp.messagebox.showerror = lambda title, msg: seen.append(msg)
     tmp = tempfile.mkdtemp(prefix='blastlab_chain_')
-    ws = os.path.join(tmp, 'workspace')      # deliberately absent
+    ws = os.path.join(tmp, 'CHAINMODEL')     # the model folder, absent
+    launched = []
     try:
-        panel = cp.ChainPanel(root, on_run_chain=lambda *a: seen.append(
-            'RAN'))
-        panel.ws_var.set(ws)
+        panel = cp.ChainPanel(
+            root, on_run_chain=lambda st: (seen.append('RAN'),
+                                           launched.append(st)),
+            model_source=lambda: (tmp, 'CHAINMODEL'))
         for d in (1, 2, 3):
             panel.use[d].set(d in (1, 2))
         panel.focus_stage(1)
@@ -85,15 +88,37 @@ def chain_feedback_checks(root):
         check("chain switches to the offending stage",
               panel._current is panel._stage_wrap[2]
               and panel.forms[2].winfo_manager() == 'pack')
-        check("chain does not create the workspace when it refuses",
+        check("chain does not create the model folder when it refuses",
               not os.path.exists(ws))
         check("chain did not start", 'RAN' not in seen)
 
-        # a default under the user profile, not the process CWD
-        home = os.path.expanduser('~')
-        check("chain workspace defaults under the user profile",
-              cp.ChainPanel(root, on_run_chain=lambda *a: None)
-              .ws_var.get().startswith(home))
+        # OUT-1: no workspace box; the Run tab's model boxes are checked
+        check("chain has no workspace box any more",
+              not hasattr(panel, 'ws_var'))
+        empty = cp.ChainPanel(root, on_run_chain=lambda *a: seen.append(
+            'RAN'), model_source=lambda: ('', 'CHAINMODEL'))
+        for d in (1, 2, 3):
+            empty.use[d].set(d in (1, 2))
+        check("an empty Runs folder refuses, naming the box",
+              empty._run() is False and seen[-1].startswith(
+                  'Runs folder is empty') and 'RAN' not in seen,
+              seen[-1] if seen else '<no dialog>')
+
+        # a chain that is handed on: the hand-off wired at the model root
+        panel.forms[2].v['Lx'].set('4')
+        started = panel._run()
+        stages = dict(launched[-1]) if launched else {}
+        hand = os.path.join(ws, 'handoff_1d_to_2d.txt')
+        check("a valid 1 -> 2 chain is handed on",
+              started is True and sorted(stages) == [1, 2],
+              seen[-1] if seen else '')
+        check("with the hand-off at the model root as the 1D profile and "
+              "the 2D input",
+              stages and stages[1].profile_file == hand
+              and stages[2].profile_file_in == hand
+              and stages[2].init_mode == 'profile1d')
+        check("and the panel itself wrote nothing (the app creates the "
+              "folder)", not os.path.exists(ws))
     finally:
         cp.messagebox.showerror = real
         shutil.rmtree(tmp, ignore_errors=True)

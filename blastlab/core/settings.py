@@ -57,6 +57,9 @@ DEFAULTS = dict(
     #: N21: hard rank ceiling (0 = auto). MAX_AUTO_PROCS is
     #: now only the fallback for an unknown core count.
     mpi_max_ranks=0,
+    #: OUT-1: the Run tab's "Runs folder"; every run writes into
+    #: <runs_dir>\<MODEL>\ (docs/model-folder-and-vtk-plan.md sec. 2.1)
+    runs_dir='',
 )
 
 

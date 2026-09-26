@@ -82,17 +82,17 @@ def main():
                                f'({os.path.basename(str(filename))}:'
                                f'{lineno})')
 
-    from blastlab.ui.testing import ensure_qapp, pump
+    from blastlab.ui.testing import ensure_qapp, pump, use_model
     ensure_qapp(offscreen='--window' not in sys.argv)
     from blastlab.core.case import Case1D, Case2D, Case3D
     from blastlab.ui.app import MainWindow
 
-    ws = os.path.join(_dir, 'chain')
     win = MainWindow()
+    # OUT-1: the chain writes into the Run tab's model folder
+    ws = use_model(win, 'CHAIN_FOAM')
     win.show()
     pump(200)
     ch = win.chain
-    ch.ws_box.setText(ws)
 
     # Each stage stops well inside the next one's domain, so every
     # hand-off really continues a state instead of restarting one.
@@ -149,11 +149,17 @@ def main():
               [ln for ln in log.splitlines() if 'Stage' in ln][:4])
 
     print('\nC3: the hand-off really happened on disk')
+    # OUT-1: MODEL\1d, 2d, 3d with the hand-offs at the model root
     saved = sorted(os.listdir(ws)) if os.path.isdir(ws) else []
+    check('the model root holds 1d\\, 2d\\, 3d\\, both hand-offs and the '
+          'root manifest',
+          saved == ['.blastlab-model', '1d', '2d', '3d',
+                    'handoff_1d_to_2d.txt', 'handoff_2d_to_3d.npz',
+                    'manifest.json'], str(saved))
     p1 = next((os.path.join(ws, f) for f in saved
-               if 'stage1' in f and 'profile' in f), None)
+               if f.startswith('handoff_1d')), None)
     p2 = next((os.path.join(ws, f) for f in saved
-               if 'stage2' in f and 'profile' in f), None)
+               if f.startswith('handoff_2d')), None)
     check('stage 1 wrote a profile',
           p1 is not None and os.path.getsize(p1) > 100,
           str(saved))
@@ -190,7 +196,8 @@ def main():
           and ordered[0] < ordered[1] < ordered[2], str(ordered))
 
     print('\nC5: the chain can be reproduced from what it left behind')
-    jsons = sorted(f for f in saved if f.endswith('.json'))
+    jsons = [os.path.join(d, 'MODEL.json') for d in ('1d', '2d', '3d')
+             if os.path.isfile(os.path.join(ws, d, 'MODEL.json'))]
     check('a case JSON per stage', len(jsons) == 3, str(jsons))
     for name in jsons:
         with open(os.path.join(ws, name), encoding='utf-8') as f:
@@ -200,6 +207,27 @@ def main():
               and d.get('solver') == 'blastfoam',
               f"adaptive_write={d.get('adaptive_write')} "
               f"solver={d.get('solver')}")
+
+    print('\nC6: OUT-1 - every stage copied foam\\ and released its scratch')
+    for d in ('1d', '2d', '3d'):
+        try:
+            with open(os.path.join(ws, d, 'manifest.json'),
+                      encoding='utf-8') as f:
+                m = json.load(f)
+        except (OSError, ValueError):
+            m = {}
+        scratch = m.get('wsl_scratch') or {}
+        check(f'{d}: foam\\SHA256SUMS copied, scratch deleted',
+              os.path.isfile(os.path.join(ws, d, 'foam', 'SHA256SUMS'))
+              and scratch.get('deleted') is True and not m.get('failed'),
+              f"{scratch} failed={m.get('failed')}")
+        posix = scratch.get('posix')
+        if posix:
+            import subprocess
+            rc = subprocess.run(env.wsl_plain_argv(f"test -d '{posix}'"),
+                                capture_output=True,
+                                stdin=subprocess.DEVNULL).returncode
+            check(f'{d}: the WSL scratch is really gone', rc != 0, posix)
 
     real = [w for w in caught if 'DeprecationWarning' in w
             or 'UserWarning' in w or 'RuntimeWarning' in w]

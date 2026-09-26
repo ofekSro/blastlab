@@ -67,6 +67,23 @@ def can(kind, ent):
     ).get(kind, True)
 
 
+#: OUT-1: the VTK button of a run whose WSL case directory was deleted
+#: after a verified copy (plan sec. 2.3)
+SCRATCH_RELEASED = (
+    "This run's WSL scratch was released after a verified copy into the "
+    "model folder. Its foam\\ folder keeps the dictionaries, mesh, probes "
+    "and logs, not the written fields, so there is nothing left to write "
+    "as VTK.")
+
+
+def model_dir(ent):
+    """The result's model folder (OUT-1), when it has one that still
+    exists: the start directory of the export dialogs (owner Q3)."""
+    path = (getattr(getattr(ent, 'result', None), 'meta', None) or {}).get(
+        'model_dir')
+    return path if path and os.path.isdir(path) else ''
+
+
 def why_not(kind, ent):
     """Why a disabled button is disabled. A greyed control that says
     nothing is worse than no control: 'Profile' in particular is off for
@@ -75,8 +92,9 @@ def why_not(kind, ent):
         return 'Select a result first.'
     dim = ent.dim
     return dict(
-        vtk='Only a blastFoam run whose case directory still exists can '
-            'be written as VTK.',
+        vtk=(SCRATCH_RELEASED if ent.result.meta.get('scratch_released')
+             else 'Only a blastFoam run whose case directory still exists '
+                  'can be written as VTK.'),
         gif='This result has no recorded frames - tick "Record replay '
             'frames" before the run.',
         summary='This result has no gauges.',
@@ -151,12 +169,14 @@ def report_figures(res, dim, show_mesh=False, title_extra=None):
 
 # ── doing the work ───────────────────────────────────────────────────────
 def run_export(kind, ent, target, opts=None, log=print, parent=None,
-               on_error=None):
+               on_error=None, open_after=True):
     """Write one export. Safe on a worker thread: it touches no widget,
     and every failure reaches `log`. Returns what was written, or None.
 
     `opts` may carry `show_mesh`, `title_extra`, and for `gif` an
     `anim_scale` / `anim_clim` override of the run's own colour range.
+    `open_after=False` skips showing a written report / VTK folder
+    (`os.startfile`): the model folder writes them unattended (OUT-1).
     """
     opts = opts or {}
     show_mesh = bool(opts.get('show_mesh'))
@@ -198,7 +218,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
                 # report's heading
                 title=title_extra or ent.label)
             log(f'Saved {target}')
-            _open(target, log)
+            if open_after:
+                _open(target, log)
             return target
         if kind == 'summary':
             gauge_summary.save_gauge_summary(summary_rows(res), target)
@@ -214,7 +235,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
                     on_error('VTK export', str(exc)[:600])
                 return None
             log(f'VTK export done: {out}')
-            _open(out, log)
+            if open_after:
+                _open(out, log)
             return out
         if kind == 'gif':
             write_animation(res.meta, target, show_mesh=show_mesh,

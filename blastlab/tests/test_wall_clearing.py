@@ -256,12 +256,17 @@ def test_refused(tmp):
     env = dict(os.environ, PYTHONIOENCODING='utf-8',
                PYTHONPATH=REPO + os.pathsep + os.environ.get('PYTHONPATH',
                                                               ''))
+    # OUT-1: the export needs --runs-dir / --model; nothing may appear
+    # in the model folder either
+    os.makedirs(os.path.join(tmp, 'runs'), exist_ok=True)
     p = subprocess.run([sys.executable, '-m', 'blastlab',
-                        '--hd13-wall-export', 'noh.json'], cwd=tmp, env=env,
-                       capture_output=True, text=True)
+                        '--hd13-wall-export', 'noh.json',
+                        '--runs-dir', 'runs', '--model', 'NOH'], cwd=tmp,
+                       env=env, capture_output=True, text=True)
     check('the CLI exits non-zero naming wall_H_m and writes nothing',
           p.returncode != 0 and 'wall_H_m' in p.stderr
-          and not os.path.exists(os.path.join(tmp, 'noh_wall_loads')),
+          and not os.path.exists(os.path.join(tmp, 'noh_wall_loads'))
+          and not os.path.exists(os.path.join(tmp, 'runs', 'NOH')),
           p.stderr.strip()[-120:])
 
 

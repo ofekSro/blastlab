@@ -86,19 +86,85 @@ def _animate(case, res, hooks=None):
                clim=getattr(case, 'anim_clim', None))
 
 
-def solve_stage(dim, case):
+#: OUT-1: the model-folder stage wrapper, `services.model_folder.
+#: stage_solve`, registered by that module when it is imported. solvers/
+#: may not import services/ (test_layering), so the dependency is
+#: inverted: every caller that passes a stage_dir has already imported
+#: model_folder (it prepared the folder with it).
+_stage_folder = None
+
+
+def register_stage_folder(wrap):
+    """Install `wrap(dim, case, stage_dir, run_info, make_solve) ->
+    solve(hooks)` as the stage_dir path of `solve_stage`."""
+    global _stage_folder
+    _stage_folder = wrap
+
+
+def solve_stage(dim, case, stage_dir=None, run_info=None):
     """Return (label, solve_callable(hooks) -> Result) for a case; the
     callable also writes the case's own output files (gauges, animation,
     profile) exactly like the CLI flow does.
 
     Every write is attempted even when an earlier one failed; a failed
     hand-off write (profile, trigger remap) raises HandoffWriteError
-    carrying the Result once all writes are done (UX 2)."""
+    carrying the Result once all writes are done (UX 2).
+
+    OUT-1: with `stage_dir` (a prepared model folder) the stage binds the
+    case's output files into it, keeps run.log there and writes every
+    row of the model folder after the solve - also, as far as it can,
+    after a failure or a stop, before re-raising
+    (`services.model_folder.stage_solve`). `run_info` feeds the manifest.
+    `stage_dir=None` is exactly the behaviour before OUT-1."""
+    backend = getattr(case, 'solver', 'native')
+    label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
+    if stage_dir is None:
+        return (label, _solver(dim, case))
+    if _stage_folder is None:
+        raise RuntimeError('solve_stage(stage_dir=...) needs '
+                           'blastlab.services.model_folder imported - it '
+                           'registers the model-folder writer')
+    return (label, _stage_folder(dim, case, stage_dir, run_info,
+                                 lambda bound: _solver(dim, bound)))
+
+
+def resume_stage(dim, path, case=None, stage_dir=None, run_info=None):
+    """(label, solve_callable(hooks) -> Result) resuming the stopped
+    blastFoam run at `path` (backend.resume_run).
+
+    Without `stage_dir` it is the plain resume, exactly as before OUT-1:
+    no file is written. With a prepared model folder the resume is a run
+    stage like any other (`solve_stage`): `case` - the run's own
+    case.json - is bound into the folder, the gauge TSV / animation /
+    profile are written, then every row of the model folder, and the WSL
+    scratch is released after a verified copy."""
+    label = f'Resume {dim}D (blastfoam)'
+
+    def resume(hooks):
+        from .foam.backend import resume_run
+        return resume_run(path, hooks)
+    if stage_dir is None:
+        return (label, resume)
+    if _stage_folder is None:
+        raise RuntimeError('resume_stage(stage_dir=...) needs '
+                           'blastlab.services.model_folder imported - it '
+                           'registers the model-folder writer')
+    return (label, _stage_folder(dim, case, stage_dir, run_info,
+                                 lambda bound: _solver(dim, bound, resume)))
+
+
+def _solver(dim, case, run=None):
+    """The solve callable of `solve_stage`: solve, then write the case's
+    own output files. `run(hooks) -> Result` replaces the solver (a
+    resume)."""
     backend = getattr(case, 'solver', 'native')
 
     def solve(hooks):
-        from . import get_solver
-        res = get_solver(dim, backend)(case, hooks)
+        if run is not None:
+            res = run(hooks)
+        else:
+            from . import get_solver
+            res = get_solver(dim, backend)(case, hooks)
         handoff = []        # (path, reason) or None per hand-off write
         # Both halves of the guard matter: gauge POINTS say there is
         # something to write, gauge_file says the case asked for it.
@@ -132,5 +198,4 @@ def solve_stage(dim, case):
         if failed:
             raise HandoffWriteError(res, failed)
         return res
-    label = f'{dim}D' + (' blastFoam' if backend == 'blastfoam' else '')
-    return (label, solve)
+    return solve

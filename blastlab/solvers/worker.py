@@ -11,6 +11,10 @@ with the GUI main thread ONLY through a queue of tagged tuples:
     ('frame',)                  token: a fresh live frame is available
     ('frame3d',)                token: a fresh 3D payload is available
     ('stage', index, label)     a chain stage begins
+    ('folder', stage_dir, manifest, notice)
+                                OUT-1: the stage's model folder is
+                                written (before its 'result' / 'error');
+                                notice = kept-scratch dialog text or None
     ('result', index, Result)   a stage finished (also on Stop)
     ('error', traceback_text)   a stage raised; after a failed hand-off
                                 write (jobs.HandoffWriteError) the
@@ -114,6 +118,12 @@ class GuiHooks(RunHooks):
 
     def log(self, msg):
         self.q.put(('log', msg))
+        self.log_to_file(msg)          # run.log, when a model folder is set
+
+    def folder_written(self, stage_dir, manifest, notice=None):
+        # carried in the message: a chain's next stage overwrites
+        # hooks.stage_manifest / folder_notice before the GUI drains
+        self.q.put(('folder', stage_dir, manifest, notice))
 
     def progress(self, p):
         self._last_p = p

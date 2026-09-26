@@ -24,6 +24,7 @@ goes into the case instead, so what the user sees is what runs and saves.
 """
 
 import math
+import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
@@ -107,6 +108,22 @@ def parse_csv(text: str, n: int) -> tuple:
         return tuple(float(p) for p in parts)
     except ValueError:
         return ()
+
+
+#: OUT-1 (owner Q1): the Setup form's visible animation format. The file
+#: NAME row is hidden - a run writes <MODEL>\animation.<ext> - but the
+#: .gif / .mp4 choice stays the user's, carried as the extension of
+#: `anim_file`.
+ANIM_FORMATS = ('.mp4', '.gif')
+
+
+def anim_file_with_format(anim_file, fmt):
+    """`anim_file` with the extension `fmt` ('.mp4' / '.gif'); unchanged
+    for a blank name (no animation) or an unknown format."""
+    fmt = str(fmt or '').strip().lower()
+    if not anim_file or fmt not in ANIM_FORMATS:
+        return anim_file or None
+    return os.path.splitext(anim_file)[0] + fmt
 
 
 def order_label(case) -> str:
@@ -431,7 +448,8 @@ def case_from_fields(dim: int, values: dict, mode: str) -> tuple:
         trigger_action=v['trigger_action'],
         trigger_file=((v['trigger_file'] or None)
                       if dim < 3 else None),
-        anim_file=v['anim_file'] or None,
+        anim_file=anim_file_with_format(v['anim_file'],
+                                        v.get('anim_format')),
         anim_mesh=bool(v['anim_mesh']),
         anim_scale=anim_scale,
         anim_clim=((_F('anim_clim_min', 'video colour min'),
@@ -569,6 +587,9 @@ def fields_from_case(case, dim: int | None = None) -> dict:
     out['det_pts'] = getattr(case, 'det_points', None) or []
     out['gauge_file'] = case.gauge_file or ''
     out['anim_file'] = case.anim_file or ''
+    ext = os.path.splitext(case.anim_file or '')[1].lower()
+    if ext in ANIM_FORMATS:
+        out['anim_format'] = ext
     out['anim_mesh'] = bool(getattr(case, 'anim_mesh', False))
     scale = anim_scale_from_label(getattr(case, 'anim_scale', 'run'))
     out['anim_scale'] = ANIM_SCALE_LABELS[scale]

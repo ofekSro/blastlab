@@ -1,0 +1,2367 @@
+[
+ {
+  "folder": "QA_1D",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile.txt",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.014e+05 Pa)",
+  "solver": "native",
+  "n": [
+   400,
+   1,
+   1355
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "profile.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  },
+  "gauges": [
+   {
+    "csv": "gauges_1d_summary.csv",
+    "csv_peak": [
+     "3412.8",
+     "934.0"
+    ],
+    "tsv_peak_minus_101325": [
+     3412.8,
+     934.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_2D",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "animation.mp4",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "profile",
+    "why": "3D / planar 2D has no profile export"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)",
+  "solver": "native",
+  "n": [
+   24576,
+   1,
+   633
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": null,
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "7759.4"
+    ],
+    "tsv_peak_minus_101325": [
+     7759.4
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_2DAX",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   12544,
+   1,
+   10853
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "2862.7",
+     "1176.6"
+    ],
+    "tsv_peak_minus_101325": [
+     2862.7,
+     1176.6
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_CHAIN",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "QA_CHAIN\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAIN\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAIN\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_CHAIN3S0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "3d",
+   "handoff_1d_to_2d.txt",
+   "handoff_2d_to_3d.npz",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "QA_CHAIN3S0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAIN3S0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "../handoff_2d_to_3d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAIN3S0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": null
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_CHAIN3S0\\3d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "profile",
+    "why": "3D / planar 2D has no profile export"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   3375,
+   1,
+   1946
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case3D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_3d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": null,
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAIN3S0\\3d\\../handoff_2d_to_3d.npz",
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAINC0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "QA_CHAINC0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAINC0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAINC0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_CHAINT0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "QA_CHAINT0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAINT0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAINT0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_CHAINT1",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "QA_CHAINT1\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "QA_CHAINT1\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\QA_CHAINT1\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_FOAM1D",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "foam",
+   "gauges",
+   "manifest.json",
+   "profile.txt",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.025e+05 Pa)",
+  "solver": "blastfoam",
+  "n": [
+   301,
+   1,
+   3445
+  ],
+  "wsl_scratch": {
+   "posix": "/root/blastlab_runs/20260926-193214_1d_p37864-00",
+   "deleted": true,
+   "deleted_at": "2026-09-26T19:32:55"
+  },
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "profile.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  },
+  "gauges": [
+   {
+    "csv": "gauges_1d_summary.csv",
+    "csv_peak": [
+     "4400.1",
+     "1041.2"
+    ],
+    "tsv_peak_minus_101325": [
+     4400.1,
+     1041.2
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_FOAM_STOP",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "foam",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "stopped by user",
+  "solver": "blastfoam",
+  "n": [
+   16562,
+   1,
+   222
+  ],
+  "wsl_scratch": {
+   "posix": "/root/blastlab_runs/20260926-193305_2d_p37864-01",
+   "deleted": false,
+   "deleted_at": null,
+   "kept_because": "the run ended before its end time"
+  },
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "0.0"
+    ],
+    "tsv_peak_minus_101325": [
+     0.0,
+     -101.3,
+     -101.3
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "QA_HD13",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "hd13_loads",
+   "hd13_report.html",
+   "manifest.json"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [],
+  "failed": [],
+  "stop_reason": "burnt out and vented",
+  "solver": "hd13",
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "ERROR Not a blastlab case file"
+ },
+ {
+  "folder": "QA_HD13_BUSY",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "hd13_loads",
+   "hd13_report.html",
+   "manifest.json"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [],
+  "failed": [],
+  "stop_reason": "burnt out and vented",
+  "solver": "hd13",
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "ERROR Not a blastlab case file"
+ },
+ {
+  "folder": "RESP_QT_0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "RESP_QT_0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "RESP_QT_0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\RESP_QT_0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "RESP_QT_1",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "RESP_QT_1\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "RESP_QT_1\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\RESP_QT_1\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "RESP_TK_0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "RESP_TK_0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "RESP_TK_0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\RESP_TK_0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "RESP_TK_1",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "RESP_TK_1\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "RESP_TK_1\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\RESP_TK_1\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_1D",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile.txt",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.014e+05 Pa)",
+  "solver": "native",
+  "n": [
+   400,
+   1,
+   1355
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "profile.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  },
+  "gauges": [
+   {
+    "csv": "gauges_1d_summary.csv",
+    "csv_peak": [
+     "3412.8",
+     "934.0"
+    ],
+    "tsv_peak_minus_101325": [
+     3412.8,
+     934.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_2D",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "animation.mp4",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "profile",
+    "why": "3D / planar 2D has no profile export"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)",
+  "solver": "native",
+  "n": [
+   24576,
+   1,
+   633
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": null,
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "7759.4"
+    ],
+    "tsv_peak_minus_101325": [
+     7759.4
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_CHAIN",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "TK_CHAIN\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "TK_CHAIN\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_CHAIN\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_CHAIN_T0",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "TK_CHAIN_T0\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "TK_CHAIN_T0\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_CHAIN_T0\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_CHAIN_T1",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "TK_CHAIN_T1\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "TK_CHAIN_T1\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_CHAIN_T1\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_CHAIN_T2",
+  "top": [
+   ".blastlab-model",
+   "1d",
+   "2d",
+   "handoff_1d_to_2d.txt",
+   "manifest.json"
+  ],
+  "keys_extra": [
+   "chain",
+   "handoffs",
+   "stages"
+  ],
+  "keys_missing": "chain root",
+  "missing": null,
+  "failed": null,
+  "stop_reason": null,
+  "solver": null,
+  "n": [
+   null,
+   null,
+   null
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": []
+ },
+ {
+  "folder": "TK_CHAIN_T2\\1d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "../handoff_1d_to_2d.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "TK_CHAIN_T2\\2d",
+  "top": [
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   1749,
+   1,
+   3931
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": "C:\\Users\\rotem.ofek\\blastlab_qa\\out1_20260926_191440\\runs\\TK_CHAIN_T2\\2d\\../handoff_1d_to_2d.txt",
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "975.0"
+    ],
+    "tsv_peak_minus_101325": [
+     975.0
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_RESUME",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "foam",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at a terminate boundary (p_edge = 1.016e+05 Pa, live sample)",
+  "solver": "blastfoam",
+  "n": [
+   null,
+   null,
+   288
+  ],
+  "wsl_scratch": {
+   "posix": "/root/blastlab_runs/20260926-193305_2d_p37864-01",
+   "deleted": true,
+   "deleted_at": "2026-09-26T19:58:40"
+  },
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "4905.5"
+    ],
+    "tsv_peak_minus_101325": [
+     4905.5,
+     -101.3
+    ]
+   }
+  ]
+ },
+ {
+  "folder": "TK_RUN1D_T",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "manifest.json",
+   "profile.txt",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   },
+   {
+    "name": "gauges",
+    "why": "the case has no gauges"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.016e+05 Pa)",
+  "solver": "native",
+  "n": [
+   150,
+   1,
+   372
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case1D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_1d.txt",
+   "anim_file": null,
+   "profile_file": "profile.txt",
+   "profile_file_in": null,
+   "trigger_file": null
+  }
+ },
+ {
+  "folder": "TK_RUN2D_T",
+  "top": [
+   ".blastlab-model",
+   "MODEL.json",
+   "fields",
+   "figures",
+   "gauges",
+   "manifest.json",
+   "profile_2d.npz",
+   "report.html",
+   "run.log"
+  ],
+  "keys_extra": [],
+  "keys_missing": [],
+  "missing": [
+   {
+    "name": "animation",
+    "why": "replay frames were not recorded"
+   }
+  ],
+  "failed": [],
+  "stop_reason": "safety cap",
+  "solver": "native",
+  "n": [
+   22729,
+   1,
+   16674
+  ],
+  "wsl_scratch": null,
+  "vtk": null,
+  "empty": [],
+  "outputs_equal_disk": true,
+  "only_listed": [],
+  "only_disk": [],
+  "size_mismatch": [],
+  "model_json_loads": "Case2D",
+  "model_json_paths": {
+   "gauge_file": "gauges/gauges_2d.txt",
+   "anim_file": "animation.mp4",
+   "profile_file": "profile_2d.npz",
+   "profile_file_in": null,
+   "trigger_file": "trigger_remap.npz"
+  },
+  "gauges": [
+   {
+    "csv": "gauges_2d_summary.csv",
+    "csv_peak": [
+     "1367.3"
+    ],
+    "tsv_peak_minus_101325": [
+     1367.3
+    ]
+   }
+  ]
+ }
+]

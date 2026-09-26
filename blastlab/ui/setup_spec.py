@@ -158,12 +158,17 @@ def _boundaries(dim):
 def _anim_ext():
     """write_animation picks the writer from the extension: .mp4 when
     ffmpeg is on PATH, .gif otherwise. Default to what this machine can
-    actually write, as the CLI already does."""
-    try:
-        from matplotlib import animation
-        return '.mp4' if animation.FFMpegWriter.isAvailable() else '.gif'
-    except Exception:
-        return '.gif'
+    actually write, as the CLI already does. The logic lives in
+    output/animation.default_ext (OUT-1)."""
+    from ..output.animation import default_ext
+    return default_ext()
+
+
+#: OUT-1 (owner Q1, 2026-09-26): the output FILE NAME rows are built but
+#: never shown - a run writes the model folder's own names (plan sec.
+#: 2.2) - and their values still pass through load -> save. The .gif /
+#: .mp4 choice stays visible as `anim_format`.
+HIDDEN_ROWS = ('gauge_file', 'anim_file', 'profile_out', 'trigger_file')
 
 
 def _outputs(dim):
@@ -172,6 +177,8 @@ def _outputs(dim):
     if dim > 1:
         out.append(F('anim_file', 'Animation (.gif / .mp4)', 'text',
                      f'blast_{dim}d_animation{_anim_ext()}'))
+        out.append(F('anim_format', 'Animation format', 'choice',
+                     _anim_ext(), values=('.mp4', '.gif')))
         # the video's colour range: one for the whole video by default,
         # so the colour bar means the same thing in every frame
         out.append(F('anim_scale', 'Video colours', 'choice',
@@ -204,8 +211,10 @@ def _trigger(dim):
             F('trigger_action', 'On arrival', 'choice', 'terminate',
               values=tuple(acts))]
     if dim < 3:
+        # hidden (HIDDEN_ROWS); non-blank so a 'remap' action validates -
+        # the run writes <MODEL>\trigger_remap.npz whatever it says
         rows.append(F('trigger_file', 'Remap file\n(blank = profile out)',
-                      'text'))
+                      'text', 'trigger_remap.npz'))
     return CardSpec('Trigger gauge', col=1, rows=tuple(rows))
 
 
@@ -339,11 +348,10 @@ def _hd13_cards():
         CardSpec('Vent gauges [m]', col=0, field_rows=1, rows=(
             F('vent_gauges', 'Vent gauges [m]', 'points',
               cols=('x', 'y', 'z'), rows=3),)),
+        # OUT-1: no report-file row - the report is always
+        # <MODEL>\hd13_report.html, with the loads in <MODEL>\hd13_loads
         CardSpec('Outputs', col=1, rows=(
-            F('name', 'Run name', 'text', ''),
-            F('report_file', 'Report file', 'file', 'hd13_report.html',
-              file=dict(title='Write the HD 1.3 report',
-                        filter='HTML (*.html);;All files (*.*)')))),
+            F('name', 'Run name', 'text', ''),)),
     ]
 
 
