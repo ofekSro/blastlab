@@ -19,6 +19,7 @@ from ..core import settings as app_settings
 from ..core.case import (load_case, long_run_note, save_case,
                          validate_case)
 from ..core.mode import SolverMode
+from ..models.case import load_any_case
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
@@ -424,7 +425,8 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            case = load_case(path)
+            # a blast case, or an HD 1.3 one for the 0-D form (QA F2)
+            case = load_any_case(path)
         except FileNotFoundError:
             self.show_error('Open case', f'File not found: {path}')
             return

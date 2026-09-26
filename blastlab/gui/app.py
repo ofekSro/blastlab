@@ -15,6 +15,7 @@ import customtkinter as ctk
 from .. import __version__
 from ..core import hardware
 from ..core.case import load_case, save_case, validate_case
+from ..models.case import load_any_case
 from ..solvers.foam import env as foam_env
 # imported before any solve_stage(stage_dir=...): it registers the
 # model-folder writer with solvers.jobs (OUT-1)
@@ -624,7 +625,8 @@ class App:
         if not path:
             return
         try:
-            case = load_case(path)
+            # the same reader as the Qt app: a blast or an HD 1.3 case
+            case = load_any_case(path)
         except FileNotFoundError:
             messagebox.showerror('Open case', f'File not found: {path}')
             return
@@ -648,6 +650,14 @@ class App:
             messagebox.showerror(
                 'Open case', msg if 'case file' in msg.lower()
                 else f'Not a blastlab case file: {msg}')
+            return
+        if not case.dim:
+            # QA F2: this app has no HD 1.3 (0-D) form; say what the file
+            # is rather than "not a case file"
+            messagebox.showerror(
+                'Open case', f'{path} is an HD 1.3 case file. This window '
+                             f'has no HD 1.3 form: open it in the Qt GUI '
+                             f'(python -m blastlab).')
             return
         self.setup.set_case(case)
         # a run started from this case is named after the file (N9)
