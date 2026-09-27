@@ -1239,6 +1239,42 @@ def test_d_stage_sets_vtk_dir():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def test_e_stage_sets_purge_fields():
+    """OUT-3 (E4): a blastFoam stage runs with hooks.purge_fields (no VTK
+    family needed), a ticked box gives keep_all_fields instead, a native
+    stage gets neither; all three are restored afterwards."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+    real_solver, real_release = solvers_pkg.get_solver, \
+        mf.verify_and_release_scratch
+    seen = []
+
+    def foam_like(case, hooks):
+        seen.append((hooks.purge_fields, hooks.keep_all_fields,
+                     hooks.fields_deleted))
+        return real_solver(case.dim, 'native')(case, hooks)
+    solvers_pkg.get_solver = lambda dim, backend: foam_like
+    mf.verify_and_release_scratch = lambda m, *a, **k: (m, None)
+    try:
+        for name, case, want in (
+                ('DEF', case2d(solver='blastfoam'), (True, False, set())),
+                ('KEEP', case2d(solver='blastfoam', keep_all_fields=True),
+                 (False, True, set())),
+                ('NAT', case2d(), (False, False, set()))):
+            seen.clear()
+            folder = mf.prepare(runs, name, confirm=lambda t: True)
+            w = SolverWorker([jobs.solve_stage(2, case, stage_dir=folder)])
+            w.run()
+            assert seen == [want], (name, seen)
+            assert (w.hooks.purge_fields, w.hooks.keep_all_fields,
+                    w.hooks.fields_deleted) == (False, False, None), name
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
@@ -1271,7 +1307,8 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_release_decision_table, test_d_skeleton_filter_and_script,
          test_d_stage_calls_release_for_foam,
          test_d_vtk_not_converted_keeps_scratch,
-         test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir]
+         test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir,
+         test_e_stage_sets_purge_fields]
 
 
 if __name__ == '__main__':

@@ -1021,7 +1021,167 @@ def test_c_decomposed_rank_mixed_mesh():
 TESTS_C = [test_c_no_copy_gate, test_c_d9_chain_without_copy,
            test_c_decomposed_ready_on_every_rank,
            test_c_decomposed_rank_mixed_mesh]
-TESTS = TESTS_A + TESTS_B + TESTS_C
+
+
+# ── D: OUT-3, the executor keeping only the newest fields ────────────────
+def fields_tree(purge=True, keep_all=False, **kw):
+    """A Tree with no VTK family and no vtk\\ folder unless `kw` asks for
+    them; the hooks as model_folder.stage_solve sets them."""
+    args = dict(surfaces=False, volumes=False, vtk_dir=False)
+    args.update(kw)
+    tree = Tree(**args)
+    tree.hooks.purge_fields = purge and not keep_all
+    tree.hooks.keep_all_fields = keep_all
+    tree.hooks.fields_deleted = set()
+    return tree
+
+
+def test_d_no_family_purges():
+    tree = fields_tree()
+    try:
+        ex = tree.export()
+        assert ex.active and ex.purge_fields and not ex.export_on
+        ex.run({t: 0 for t in T[:3]})
+        assert tree.deleted_times() == T[:1], tree.deleted_times()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == T[:-2], tree.deleted_times()
+        assert tree.runs == []                          # nothing converted
+        assert not os.path.exists(os.path.join(tree.tmp, 'MODEL'))
+        assert tree.hooks.fields_deleted == set(T[:-2])
+        gone = [p for batch in tree.deletes for p in batch]
+        assert gone == [f'{POSIX}/{t}' for t in T[:-2]], gone
+        assert tree.exists('0') and tree.exists('postProcessing')
+        assert any('keeping only the newest writes' in ln
+                   for ln in tree.lines), tree.lines
+        assert any('4 older written time(s) deleted' in ln
+                   for ln in tree.lines), tree.lines
+    finally:
+        tree.close()
+
+
+def test_d_without_the_flag_nothing():
+    tree = fields_tree(purge=False)
+    try:
+        ex = tree.export()
+        assert not ex.active
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == [] and tree.lines == []
+    finally:
+        tree.close()
+
+
+def test_d_keep_all_deletes_no_time_dir():
+    tree = fields_tree(keep_all=True)
+    try:
+        ex = tree.export()
+        assert not ex.active
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == []
+        assert len(tree.lines) == 1 and 'keeping all fields' in tree.lines[0]
+    finally:
+        tree.close()
+    # E8: with VTK volumes on, they are converted and copied, their VTK/
+    # copies go, but no written time is deleted
+    tree = fields_tree(keep_all=True, volumes=True, surfaces=True,
+                       vtk_dir=True)
+    try:
+        ex = tree.export()
+        assert ex.active and ex.export_on and not ex.purge_fields
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == []
+        for t in T:
+            assert os.path.getsize(tree.model(f'volumes/t_{t}.vtk')) > 0
+            assert not tree.exists(f'VTK/{RUN}_{t}.vtk'), t
+        assert _manifest(tree)['deleted_in_wsl'] == []
+    finally:
+        tree.close()
+
+
+def test_d_1d_deletes_nothing():
+    tree = fields_tree()
+    try:
+        tree.spec.dim = 1
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == [] and tree.deleted_times() == []
+        assert any('1D keeps every written time' in ln for ln in tree.lines)
+    finally:
+        tree.close()
+
+
+def test_d_delete_failure_is_retried():
+    tree = fields_tree()
+    try:
+        ex = tree.export()
+        calls = []
+
+        def flaky(paths):
+            calls.append(paths)
+            if len(calls) == 1:
+                raise OSError('wsl gone')
+            return tree.delete(paths)
+        ex.delete = flaky
+        ex.run({t: 0 for t in T})
+        assert tree.deleted_times() == []
+        ex.run({t: 0 for t in T})
+        assert tree.deleted_times() == T[:-2]
+        assert sum('did not go through' in ln for ln in tree.lines) == 1
+        assert tree.hooks.fields_deleted == set(T[:-2])
+    finally:
+        tree.close()
+
+
+def test_d_auto_resume_keeps_the_record():
+    """A W3 auto-resume: a new export on the same hooks starts from what
+    the first one deleted, and never asks to delete it again."""
+    tree = fields_tree()
+    try:
+        tree.export().run({t: 0 for t in T[:4]}, final=True)
+        assert tree.deleted_times() == T[:2]
+        n = len(tree.deletes)
+        ex2 = tree.export()
+        assert ex2.deleted == set(T[:2])
+        ex2.run({t: 0 for t in T[2:]}, final=True)
+        assert tree.deleted_times() == T[:-2]
+        assert [p for b in tree.deletes[n:] for p in b] == [
+            f'{POSIX}/{t}' for t in T[2:4]], tree.deletes[n:]
+    finally:
+        tree.close()
+
+
+def test_d_volumes_still_need_the_copy():
+    """With VTK volumes on, a purge-fields run still deletes a write only
+    after its copy (require_copy=True)."""
+    tree = fields_tree(volumes=True, vtk_dir=True)
+    try:
+        tree.fail_convert = {T[1]}
+        ex = tree.export()
+        assert ex.purge_fields and ex.volumes_on
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.exists(T[1])
+        assert tree.deleted_times() == [t for t in T[:-2] if t != T[1]]
+    finally:
+        tree.close()
+
+
+def test_d_protected_survive():
+    tree = fields_tree()
+    try:
+        tree.spec.restart_dir = T[0]
+        ex = tree.export()
+        ex.protect(T[2], 'snapshot')
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == [T[1], T[3]], tree.deleted_times()
+    finally:
+        tree.close()
+
+
+TESTS_D = [test_d_no_family_purges, test_d_without_the_flag_nothing,
+           test_d_keep_all_deletes_no_time_dir, test_d_1d_deletes_nothing,
+           test_d_delete_failure_is_retried,
+           test_d_auto_resume_keeps_the_record,
+           test_d_volumes_still_need_the_copy, test_d_protected_survive]
+TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D
 
 
 def main():

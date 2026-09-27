@@ -1108,12 +1108,22 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
         open(log_path, 'a', encoding='utf-8').close()   # exists from start
         prev_log = getattr(hooks, 'log_file', None)
         prev_vtk = getattr(hooks, 'vtk_dir', None)
+        prev_fields = (getattr(hooks, 'purge_fields', False),
+                       getattr(hooks, 'keep_all_fields', False),
+                       getattr(hooks, 'fields_deleted', None))
         hooks.log_file = log_path
         hooks.scratch_posix = None        # set by the blastFoam backend
         # OUT-2 (D12): the VTK export writes into <stage>\vtk - only for a
         # blastFoam stage with a family on; None keeps it inactive
         hooks.vtk_dir = (os.path.join(stage_dir, VTK_DIR)
                          if _exports_vtk(case) else None)
+        # OUT-3 (E4): a blastFoam stage keeps only its newest writes in
+        # WSL unless "Keep all fields in WSL" is ticked
+        foam = getattr(case, 'solver', 'native') == 'blastfoam'
+        keep = foam and getattr(case, 'keep_all_fields', False) is True
+        hooks.purge_fields = foam and not keep
+        hooks.keep_all_fields = keep
+        hooks.fields_deleted = set()
         p0 = getattr(hooks, '_last_p', None)
         bound, res, err = case, None, None
         try:
@@ -1174,6 +1184,8 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
             finally:
                 hooks.log_file = prev_log
                 hooks.vtk_dir = prev_vtk
+                (hooks.purge_fields, hooks.keep_all_fields,
+                 hooks.fields_deleted) = prev_fields
     return solve
 
 
