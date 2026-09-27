@@ -282,6 +282,15 @@ true first-arrival field `Arrival_Time` (10 % threshold, like the gauge summary)
 it can be computed exactly during the run; feasibility is checked in 4b, not now. The
 relabel belongs to 4b (B1). **Q2-Q6:** use the interims above; do not ask again.
 
+**Owner decisions Q2-Q6 (2026-09-27), all matching the interims:**
+- **Q2** yes: the per-cell running max of the net impulse, written as `Peak_Impulse`
+  in every file (4b).
+- **Q3** option 1: an `Obstacle_ID` array, no mesh change (4b).
+- **Q4** subsample per axis, 3D volumes only, plus a card warning line "decimated
+  files are for viewing only; peaks may be missed" (4c, now unblocked).
+- **Q5** the magnitude only, q = ½ρ|U|².
+- **Q6** impulse at the gauges is NOT ticked by default.
+
 ## 7a. Batch notes
 
 **A1 baseline (2026-09-27, branch `out-4a-gauges` from `6af6a11`, before any code
