@@ -56,7 +56,12 @@ _warned = False
 _lock = threading.Lock()
 
 DEFAULTS = dict(
-    auto_cleanup=True,          # sweep old/large foam run dirs at GUI start
+    # sweep old/large foam run dirs at GUI start. OFF by default (owner
+    # 2026-09-27): deletion inside WSL is final, a full disk is
+    # recoverable, so the sweep runs only when the file says true. With
+    # it off the GUI warns instead when the runs root passes
+    # cleanup_max_gb (env.start_disk_warning).
+    auto_cleanup=False,
     cleanup_max_gb=20.0,        # keep the runs root under this total size
     cleanup_max_age_days=14,    # delete runs untouched for longer than this
     cleanup_keep_recent=3,      # never delete the N most recent runs
@@ -153,8 +158,10 @@ def _migrate(target):
 def load(path=None):
     """DEFAULTS updated with whatever the file holds.
 
-    A missing or unreadable file gives the defaults with ONE exception:
-    `auto_cleanup` comes back False. The sweep deletes run directories,
+    A missing or unreadable file gives the defaults, with `auto_cleanup`
+    forced False. Since 2026-09-27 that is also the default, so the
+    force is a second lock rather than an exception; it predates the
+    default change and stays. The sweep deletes run directories,
     and a settings file we could not read means nobody has told us
     anything about this machine - `cleanup_max_gb = 20` is then a policy
     the user has never seen, applied to data they may care about very

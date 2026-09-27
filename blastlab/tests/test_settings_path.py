@@ -369,11 +369,129 @@ def test_auto_cleanup_on_the_plan():
           got == (0, 0) and not any(calls.values()), str(calls))
 
 
+# ── owner 2026-09-27 (Q3): cleanup off by default, a disk warning instead ──
+
+def test_default_is_off():
+    print('\nauto_cleanup defaults to off')
+    from blastlab.solvers.foam import env
+    check('DEFAULTS auto_cleanup is False',
+          settings.DEFAULTS['auto_cleanup'] is False)
+    with stub_wsl(fake_runs(), delete=True) as (calls, deleted):
+        got = env.auto_cleanup({}, now=NOW)
+    check('a settings dict without the key does not sweep',
+          got == (0, 0) and not any(calls.values()), str(calls))
+    with sandbox() as tmp:
+        target = settings.default_path()
+        with open(target, 'w', encoding='utf-8') as f:
+            f.write('{}')
+        check('a file without the key loads cleanup off',
+              settings.load()['auto_cleanup'] is False)
+
+
+def _warn_run(cfg, runs, **kw):
+    """start_disk_warning with the WSL stubs; (warnings, stub calls)."""
+    from blastlab.solvers.foam import env
+    got = []
+    with stub_wsl(runs) as (calls, _deleted):
+        th = env.start_disk_warning(cfg, got.append, **kw)
+        if th is not None:
+            th.join(10)
+    return got, calls, th
+
+
+def test_disk_warning():
+    print('\nthe disk warning (sweep off)')
+    from blastlab.solvers.foam import env
+    text = env.disk_warning_text(15 * GB, 10, 2, 7 * GB)
+    check('text: size, limit, the plan and the CLI',
+          '15.0 GB' in text and 'the 10 GB limit' in text
+          and 'would delete 2 runs (7.0 GB)' in text
+          and 'nothing was deleted' in text
+          and '--clean-foam-runs' in text, text)
+    check('text: one run is singular',
+          'would delete 1 run (' in env.disk_warning_text(GB, 0.5, 1, GB))
+    runs = fake_runs()                                   # 15 GB in all
+    over = dict(auto_cleanup=False, cleanup_max_gb=10,
+                cleanup_max_age_days=14)
+    got, calls, _th = _warn_run(over, runs, private_ok=True)
+    check('over the limit: exactly one warning',
+          len(got) == 1 and got[0] == env.disk_warning_text(
+              15 * GB, 10, 2, 7 * GB), str(got))
+    check('over the limit: delete_runs never called (the stub raises)',
+          calls['delete_runs'] == 0, str(calls))
+    check('over the limit: one du round trip',
+          calls['run_info'] == 1 and calls['run_dirs'] == 1, str(calls))
+    under = dict(over, cleanup_max_gb=20)
+    got, calls, _th = _warn_run(under, runs, private_ok=True)
+    check('under the limit: no warning, no liveness probe',
+          got == [] and calls['runs_alive'] == 0, str((got, calls)))
+    got, calls, _th = _warn_run(dict(over, auto_cleanup=True), runs,
+                                private_ok=True)
+    check('sweep on: no warning and no WSL (the sweep is the answer)',
+          got == [] and not any(calls.values()), str((got, calls)))
+    # WSL unreachable: no info, or a probe that raises
+    with stub_wsl(runs) as (calls, _deleted):
+        env.run_info = lambda dirs=None, timeout=None: {}
+        got = []
+        env.start_disk_warning(over, got.append, private_ok=True).join(10)
+    check('WSL unreachable (no info): no warning', got == [], str(got))
+
+    def boom():
+        raise OSError('wsl is gone')
+    with stub_wsl(runs) as (calls, _deleted):
+        env.run_dirs = boom
+        got = []
+        th = env.start_disk_warning(over, got.append, private_ok=True)
+        th.join(10)
+    check('WSL error: no warning, and the thread ends quietly',
+          got == [] and not th.is_alive(), str(got))
+    # a private settings file (tests, harnesses) never starts it
+    saved = os.environ.get('BLASTLAB_SETTINGS')
+    os.environ['BLASTLAB_SETTINGS'] = os.path.join(
+        tempfile.gettempdir(), 'blastlab_never_written.json')
+    try:
+        got, calls, th = _warn_run(over, runs)
+    finally:
+        if saved is None:
+            os.environ.pop('BLASTLAB_SETTINGS', None)
+        else:
+            os.environ['BLASTLAB_SETTINGS'] = saved
+    check('private settings: no thread, no WSL touched',
+          th is None and got == [] and not any(calls.values()), str(calls))
+
+
+def test_disk_warning_sinks():
+    print('\nthe GUI sinks: a log line and a status warning, nothing modal')
+    from types import SimpleNamespace
+    posted, logged = [], []
+    from blastlab.ui.app import MainWindow
+    qt = SimpleNamespace(_log_threadsafe=logged.append,
+                         bridge=SimpleNamespace(
+                             post=lambda fn, *a: posted.append((fn, a))),
+                         notify='NOTIFY')
+    MainWindow._disk_warning(qt, 'W')
+    check('Qt: one log line and one status warning via the bridge',
+          logged == ['  [blastfoam] W'] and posted == [('NOTIFY', ('W',
+                                                                   'warn'))],
+          str((logged, posted)))
+    from blastlab.gui.app import App
+    after, logged = [], []
+    tk = SimpleNamespace(_log_threadsafe=logged.append, notify='NOTIFY',
+                         root=SimpleNamespace(
+                             after=lambda ms, fn, *a: after.append(
+                                 (ms, fn, a))))
+    App._disk_warning(tk, 'W')
+    check('Tk: one log line and one status warning via after()',
+          logged == ['  [blastfoam] W']
+          and after == [(0, 'NOTIFY', ('W', 'warn'))], str((logged, after)))
+
+
 TESTS = [test_default_path, test_migrate_from_virtual_copy,
          test_migrate_from_appdata, test_no_source,
          test_override_never_migrates, test_existing_file_untouched,
          test_tk_and_qt_share_the_path, test_cleanup_plan_dry_run,
-         test_auto_cleanup_on_the_plan]
+         test_auto_cleanup_on_the_plan, test_default_is_off,
+         test_disk_warning, test_disk_warning_sinks]
 
 
 if __name__ == '__main__':

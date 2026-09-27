@@ -148,6 +148,10 @@ class MainWindow(QMainWindow):
         # off-thread (WSL round trips must never block the window)
         self._cleanup_thread = foam_env.start_auto_cleanup(
             st, self._log_threadsafe)
+        # owner 2026-09-27: with the sweep off (the default), warn - never
+        # delete - when the runs root is over cleanup_max_gb
+        self._disk_warning_thread = foam_env.start_disk_warning(
+            st, self._disk_warning)
 
         self._show('setup')
         self._restore_ui_state(st)
@@ -878,6 +882,12 @@ class MainWindow(QMainWindow):
     def _log_threadsafe(self, text):
         """Log sink for worker threads (cleanup, viewer link)."""
         self.bridge.post(self.run_panel.on_log, str(text))
+
+    def _disk_warning(self, text):
+        """`foam_env.start_disk_warning`'s sink, called on its thread: one
+        Run-log line and one status-line warning, nothing modal."""
+        self._log_threadsafe(f'  [blastfoam] {text}')
+        self.bridge.post(self.notify, text, 'warn')
 
     def _result_msg(self, text):
         """Results-panel messages - exports, post-mortem loads, viewer

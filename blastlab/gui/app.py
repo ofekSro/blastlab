@@ -183,6 +183,11 @@ class App:
         self._status.grid(row=1, column=1, sticky='we',
                           padx=(0, PAD), pady=(0, 6))
         self._status_job = None
+        # owner 2026-09-27: with the sweep off (the default), warn - never
+        # delete - when the runs root is over cleanup_max_gb. Started once
+        # the status line exists, which the warning lands in.
+        self._disk_warning_thread = foam_env.start_disk_warning(
+            st, self._disk_warning)
         self._show('setup')
         self._restore_ui_state()
         self._bind_accelerators(root)
@@ -1089,6 +1094,15 @@ class App:
         except (tk.TclError, RuntimeError):
             # window already closed (worker tail), or a thread reaching
             # Tk while no mainloop runs (headless drivers pump update())
+            pass
+
+    def _disk_warning(self, text):
+        """`foam_env.start_disk_warning`'s sink, called on its thread: one
+        Run-log line and one status-line warning, nothing modal."""
+        self._log_threadsafe(f'  [blastfoam] {text}')
+        try:
+            self.root.after(0, self.notify, text, 'warn')
+        except (tk.TclError, RuntimeError):
             pass
 
     # ── shutdown ─────────────────────────────────────────────────────────

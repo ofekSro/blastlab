@@ -1103,8 +1103,10 @@ hd1-3d-close #3).
 **The `ext4.vhdx` does not shrink by itself.** Reclaim with `wsl --shutdown` then
 `wsl --manage Ubuntu --set-sparse true`.
 
-> The corpus once reached **374 GB and filled C:**. Cleanup is now on with a 150 GB
-> ceiling and 10 runs kept.
+> The corpus once reached **374 GB and filled C:**. Cleanup is **off by default** since
+> 2026-09-27 (owner: deletion inside WSL is final, a full disk is recoverable); it runs
+> only when the settings file says `auto_cleanup: true`. With it off, the GUI warns at
+> start when the runs root passes `cleanup_max_gb` (150 GB here) and deletes nothing.
 
 ---
 
