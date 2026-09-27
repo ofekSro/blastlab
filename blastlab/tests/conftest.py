@@ -58,6 +58,16 @@ collect_ignore_glob = [
     'make_baseline.py',
 ]
 
+@pytest.fixture(scope='module')
+def tmp(tmp_path_factory):
+    """The one temp directory a script suite's `main()` makes and passes
+    to each of its `test_*(tmp)` functions (`test_load_csv`,
+    `test_wall_clearing`). Module-scoped, as in `main()`, so a test that
+    reads what an earlier one wrote still finds it (P2-13 item 5, owner
+    2026-09-27)."""
+    return str(tmp_path_factory.mktemp('suite'))
+
+
 #: The module-level failure lists the suites' `check()` appends to
 #: (grep `def check(` here: every one appends to FAIL or FAILS).
 FAIL_LIST_NAMES = ('FAIL', 'FAILS', 'FAILED', 'FAILURES')

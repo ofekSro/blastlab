@@ -799,9 +799,8 @@ a `conftest.py` hook for every suite (owner, 2026-09-27); it uncovered no failur
    it is a code bug, fix the code and leave the test alone, and it is P1 if a resumed
    run's peak map is wrong. If the test itself is wrong, **stop and bring the evidence to
    the owner** before changing it.
-5. **New, 2026-09-27, needs owner permission:** `test_load_csv.py` (4) and
-   `test_wall_clearing.py` (4) give pytest "fixture 'tmp' not found" errors - the same
-   kind as item 3 was. They pass as scripts. These two files are outside this permission.
+5. ✅ 2026-09-27: the "fixture 'tmp' not found" errors of `test_load_csv` /
+   `test_wall_clearing` - a module-scoped `tmp` fixture in `conftest.py`, no test edited.
 
 Source: `docs/ENGINEERING_QUESTIONS.md` hd1-wall-load #3, phase 0 #4.
 

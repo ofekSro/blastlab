@@ -618,8 +618,10 @@ Owner answers of 2026-09-27:
   - Item 4, widened by the owner: a `conftest.py` hookwrapper fails any test whose
     module's `FAIL`/`FAILS` list grew. No test file changed.
   - Whole-directory pytest went from 158 passed / 11 errors to 172 passed / 8 errors.
-  - No test newly fails. The 8 errors that remain are TODO `P2-13` item 5.
-- **Commits:** `1e0795f` `c944da6`.
+  - No test newly fails. The 8 remaining errors ("fixture 'tmp' not found",
+    `test_load_csv` / `test_wall_clearing`) are fixed by a module-scoped `tmp`
+    fixture in `conftest.py`, with no test edited (owner, item 5).
+- **Commits:** `1e0795f` `c944da6`, item 5 in the commit that adds this line.
 
 ### `P2-14` item 7 · `read_probes` aligns rho/U with p by time
 - **What:**
