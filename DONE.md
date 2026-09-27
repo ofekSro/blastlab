@@ -558,7 +558,7 @@ writer through the `jobs` registration hook.
 
 ---
 
-## 0d. 2026-09-27 — batch `p0-5-settings-reader-save`
+## 0g. 2026-09-27 — batch `p0-5-settings-reader-save`
 
 Plan and reports: `docs/batches/2026-09-27-p0-5-settings-reader-save{,.implement,.verify}.md`.
 Branch `todo-batch` (worktree outside OneDrive), in parallel with OUT-2. No WSL solve.

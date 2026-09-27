@@ -288,7 +288,7 @@ not in `a`.
 
 P0-1, P0-2 and P0-3 closed 2026-09-09 (`e344d17`); P0-4 closed 2026-09-17; P0-5
 (settings file in the repo, cleanup off by default) closed 2026-09-27. See
-[DONE.md](DONE.md) §0d. No P0 item is open.
+[DONE.md](DONE.md) §0g. No P0 item is open.
 
 > **But P0-4's trap is permanent and worth re-reading before any session that
 > matters:** every code path that builds the GUI can delete the run corpus, and
@@ -386,7 +386,7 @@ blocker.)*
 
 ### P1-7 · On-screen check only: the player shows frame 0 · **code fixed 2026-09-27**
 
-The reader fix, its test and the workaround removal are done ([DONE.md](DONE.md) §0d).
+The reader fix, its test and the workaround removal are done ([DONE.md](DONE.md) §0g).
 Left: Qt GUI QA with a real run (WSL + screen) - the player shows frame 0 for a
 chamber and a chained (1D → 2D) run.
 
@@ -793,7 +793,7 @@ If a resumed run's peak map is really wrong, this is P1.
 **The owner explicitly permits editing these four committed tests (§9), and only
 these.** The rule is: **fix the test's mechanism, never its threshold or its expected
 value.** One commit per test, each citing this decision.
-Items 1 (`P2-10`), 3 and 4 closed 2026-09-27 - see [DONE.md](DONE.md) §0d. Item 4 is now
+Items 1 (`P2-10`), 3 and 4 closed 2026-09-27 - see [DONE.md](DONE.md) §0g. Item 4 is now
 a `conftest.py` hook for every suite (owner, 2026-09-27); it uncovered no failure.
 2. **`P2-11`** `test_foam_postmortem.py`: **find the cause of 620 vs 632 first.** If
    it is a code bug, fix the code and leave the test alone, and it is P1 if a resumed
@@ -831,7 +831,7 @@ validation dump over ~100 cases (phase 4) is compared before and after.
    "Charge cells: could not compute (‹error›)" instead.
 6. `DecomposedPurge.run` logs "retrying at the next poll" after a failed final sweep, but
    no poll follows. Say "final sweep failed; decomposed copies left at ‹paths›".
-7. ✅ 2026-09-27 ([DONE.md](DONE.md) §0d): `read_probes` aligns by time; on a mismatch
+7. ✅ 2026-09-27 ([DONE.md](DONE.md) §0g): `read_probes` aligns by time; on a mismatch
    it keeps p only and warns (owner: never raise).
 8. `_e2e_foam_write_budget.du_sb`: use `env.WSL_DISTRO`, `stdin=DEVNULL`,
    `CREATE_NO_WINDOW`, and check `returncode` before parsing. Rerun it in WSL (§8.6).
