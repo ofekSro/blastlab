@@ -7,6 +7,27 @@ regression baseline.
 
 import numpy as np
 
+#: OUT-4a: the gauge extras a blastFoam case may record (vtk_gauges), as
+#: (gauge_out key, column prefix, unit), appended after every older column
+#: and only when present - a run without them writes the same file as before
+EXTRA_COLUMNS = (('overpressures', 'p_over', 'Pa'),
+                 ('impulses', 'impulse', 'Pa s'),
+                 ('temperatures', 'T', 'K'),
+                 ('dyn_pressures', 'q', 'Pa'))
+
+
+def _extras(gauge_out, n, label):
+    """(header suffix, columns) of the OUT-4a extras for `n` gauges, each
+    gauge's column named `<prefix>_<label(k)>[<unit>]`."""
+    head, cols = '', []
+    for key, prefix, unit in EXTRA_COLUMNS:
+        extra = gauge_out.get(key)
+        if extra and len(extra) == n:
+            head += '\t' + '\t'.join(f'{prefix}_{label(k)}[{unit}]'
+                                     for k in range(n))
+            cols += list(extra)
+    return head, cols
+
 
 def save_gauges_1d(gauge_out, filename='gauges.txt'):
     """
@@ -23,7 +44,11 @@ def save_gauges_1d(gauge_out, filename='gauges.txt'):
         return
 
     header = 'time[s]\t' + '\t'.join(f'p_r={r:.4f}m[Pa]' for r in radii)
-    matrix = np.column_stack([times] + pdata)
+    # OUT-4a: T and q, when the (blastFoam) run recorded them
+    head, extra = _extras(gauge_out, len(radii),
+                          lambda k: f'r={radii[k]:.4f}m')
+    header += head
+    matrix = np.column_stack([times] + list(pdata) + extra)
     np.savetxt(filename, matrix, delimiter='\t', header=header,
                comments='', fmt='%.6e')
     print(f"  Gauge data saved: {filename}  "
@@ -53,6 +78,10 @@ def save_gauges_2d(gauge_out, filename='gauges_2d.txt'):
             header += '\t' + '\t'.join(
                 f'{unit}_({x:.3f},{y:.3f})m' for (x, y) in points)
             cols += list(extra)
+    head, extra = _extras(gauge_out, len(points), lambda k: '({:.3f},{:.3f})m'
+                          .format(*points[k]))
+    header += head
+    cols += extra
     matrix = np.column_stack([times] + cols)
     np.savetxt(filename, matrix, delimiter='\t', header=header,
                comments='', fmt='%.6e')
@@ -84,6 +113,10 @@ def save_gauges_3d(gauge_out, filename='gauges_3d.txt'):
                 f'{unit}_({x:.3f},{y:.3f},{z:.3f})m'
                 for (x, y, z) in points)
             cols += list(extra)
+    head, extra = _extras(gauge_out, len(points),
+                          lambda k: '({:.3f},{:.3f},{:.3f})m'.format(*points[k]))
+    header += head
+    cols += extra
     matrix = np.column_stack([times] + cols)
     np.savetxt(filename, matrix, delimiter='\t', header=header,
                comments='', fmt='%.6e')
