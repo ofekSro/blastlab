@@ -156,10 +156,13 @@ native mode, and a native run ignores the keys.
   destination, in full words and in the order of the family boxes -
   Sections / Obstacles / Volumes in 3D, Whole domain / Obstacles in 2D
   (P24), Whole domain in 1D. The
-  first tick of a family fills p + peak pressure (surfaces) or p,
-  rho, U (volumes). **`pMax` (Peak pressure) is the running per-cell
-  maximum of the absolute pressure `p`**, not an overpressure -
-  subtract ambient (101.325 kPa) for the peak overpressure. Case keys: `vtk_surfaces` {on, mode, value, fields,
+  first tick of a family fills p + peak overpressure (surfaces) or p,
+  rho, U (volumes). **Peak overpressure** is blastFoam's `pMax` - the
+  running per-cell maximum of the absolute pressure `p` - minus the
+  ambient 101.325 kPa (`core.constants.P_AIR`, the value the gauges'
+  overpressure uses); the subtraction is done when the files are
+  written, like Viper's `Peak_Overpressure` (owner decision 4,
+  2026-09-27). Case keys: `vtk_surfaces` {on, mode, value, fields,
   obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
   family that is off is written only when it still has a field ticked,
   as `on: false` with its ticks, so a reload restores the card; the
@@ -178,14 +181,34 @@ native mode, and a native run ignores the keys.
   are therefore not round multiples. The one exact write is the end
   time (T62), as on every run. Validation notes the write count, and
   in Step mode that the count depends on the step count.
-- **Layout** - `<time>` is OpenFOAM's own time name in seconds:
+- **Layout** (the owner's Viper-style layout, 2026-09-27,
+  `docs/batches/2026-09-27-out-2-surface-layout.md`) - one folder per
+  series, its `.vtk.series` beside it, every series at the top of
+  `vtk\`; `<time>` is OpenFOAM's own time name in seconds:
 
   | Path | Content |
   |---|---|
-  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete` |
-  | `vtk\volumes\t_<time>.vtk`, `volumes.vtk.series` | one file per write, every chosen field, cell data only |
-  | `vtk\sections\<plane>\<field>\t_<time>.vtk`, `sections\<plane>\<field>.vtk.series` | one series per plane and field |
-  | `vtk\obstacles\<field>\t_<time>.vtk`, `obstacles\<field>.vtk.series` | the obstacle walls, one series per field |
+  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete`, `arrays` (field -> array name), `p_ambient` |
+  | `vtk\volumes\t_<time>.vtk`, `vtk\volumes.vtk.series` | one file per write, every chosen field, cell data only |
+  | `vtk\slice_x_0.20\t_<time>.vtk`, `vtk\slice_x_0.20.vtk.series` | one series per section plane, one file per sample holding every chosen field |
+  | `vtk\obstacles\t_<time>.vtk`, `vtk\obstacles.vtk.series` | the obstacle walls, one file per sample holding every chosen field |
+
+  **What is in a file.** Legacy VTK 3.0, BINARY (big-endian), as Viper
+  writes its section and obstacle files. blastFoam's surface writer
+  emits one file per field per surface; after each sample is copied to
+  Windows, the per-field files of one surface are checked to share one
+  geometry (same points and faces) and merged into one file with every
+  field as a cell-data array (point data would stay point data - nothing
+  is interpolated). The volumes are foamToVTK's files with their arrays
+  renamed. Every file carries the sample time [s] as `FIELD FieldData 1`
+  / `TIME 1 1 float`. The array names are the same in every family:
+  `pressure`, `Peak_Overpressure`, `Impulse`, `Overpressure`,
+  `Arrival_Time`, `density`, `velocity`, `temperature`,
+  `Products_Fraction`, `Energy` (foamToVTK's `cellID` is kept). Each file
+  is written atomically and read back with a strict parser
+  (`output/legacy_vtk.py`) before the WSL source may be deleted; a
+  sample whose files disagree is kept in WSL and listed in
+  `not_converted`.
 
   The model's `manifest.json` carries only numbers for `vtk\`: `vtk: {dir,
   counts, files, bytes, not_converted}`, and its `outputs` list leaves
@@ -193,7 +216,8 @@ native mode, and a native run ignores the keys.
   list is `vtk\manifest.json` (owner decision P4).
 - **What is deleted in WSL, and when.** After every ingest pass one
   `foamToVTK` at a time converts the writes already read, the file is
-  copied into `vtk\` and size-checked, the index is rewritten, and only
+  copied into `vtk\`, size-checked, rewritten and read back, the index
+  is rewritten, and only
   then are the time directory and the converted file deleted in WSL.
   Never deleted: `0`, a resume's start time, the two newest writes, and
   every write the run's own finalize reads again (the snapshots, the
@@ -217,11 +241,12 @@ native mode, and a native run ignores the keys.
   decision P11). It finds the model by the run directory recorded as
   `scratch` in `vtk\manifest.json`, under the Runs folder of the
   settings.
-- **In ParaView:** *File > Open* a `.vtk.series` file - `volumes\
-  volumes.vtk.series`, or several of `obstacles\` / `sections\<plane>\`
-  at once to get one pipeline item per field - and the time bar follows
-  the series times (a JSON list of relative file names and times, the
-  format blastFoam's own `createTimeSeries` writes, User Guide sec. 16.3).
+- **In ParaView:** *File > Open* one `.vtk.series` file per surface or
+  volume - `vtk\volumes.vtk.series`, `vtk\slice_x_0.20.vtk.series`,
+  `vtk\obstacles.vtk.series` - each on its own (owner decision 3); pick
+  the array to colour by in the pipeline item. The time bar follows the
+  series times (a JSON list of relative file names and times, the format
+  blastFoam's own `createTimeSeries` writes, User Guide sec. 16.3).
 - **Results tab.** For a run that wrote `vtk\` and released its WSL
   scratch, the **VTK** button opens `<MODEL>\vtk\` (its tooltip gives the
   path and the file count) instead of converting; while the case
