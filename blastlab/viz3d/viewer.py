@@ -90,6 +90,13 @@ VIEW_PRESETS = {
 }
 
 
+def log_clim(lo, hi, decades=LOG_DECADES):
+    """Colour range for a log scale: the lower bound clamped positive and
+    at most `decades` below `hi` (P3-25: shared by every colour-mapped
+    layer, so planes, volume and loads floor at the same value)."""
+    return max(lo, hi * 10.0 ** -decades, 1e-9), hi
+
+
 def _ovp_kpa(p):
     return (np.asarray(p, np.float32) - np.float32(P_AIR)) / np.float32(1e3)
 
@@ -573,7 +580,7 @@ class BlastScene(_CameraOps):
                 lo, hi = float(np.nanmin(arr)), float(np.nanmax(arr))
         hi = max(hi, lo + 1e-9)
         if self.log_scale:
-            lo = max(lo, hi * 10.0 ** -LOG_DECADES, 1e-9)
+            lo, hi = log_clim(lo, hi)
         return lo, hi
 
     def _scrub(self, v):
@@ -1148,12 +1155,14 @@ class _SurfaceLoads(_Layer):
 
     def _load_clim(self):
         """Manual Min/Max applies only when it is an overpressure range;
-        otherwise the faces keep their own per-frame overpressure range."""
+        otherwise the faces keep their own per-frame overpressure range.
+        Log scale clamps either range positive, as the planes do (P3-25)."""
         s = self.s
         if not s.auto_scale and FIELDS[s.field]['ovp']:
-            return s.active_clim()
+            return s.active_clim()          # already log-clamped
         lo, hi = self._own
-        return (lo, max(hi, lo + 1e-6))
+        hi = max(hi, lo + 1e-6)
+        return log_clim(lo, hi) if s.log_scale else (lo, hi)
 
     def _track(self, loads):
         """Per-frame overpressure range of the faces (2 % dead-band)."""
@@ -1173,6 +1182,8 @@ class _SurfaceLoads(_Layer):
             actor = self.s.pl.actors.get(f'load_{fid}')
             if actor is not None:
                 actor.mapper.scalar_range = clim
+                # the loads bar reads the first face's LUT: log ticks follow
+                actor.mapper.lookup_table.log_scale = self.s.log_scale
 
     def _remove_all(self):
         s = self.s
@@ -1205,6 +1216,7 @@ class _SurfaceLoads(_Layer):
             if name not in s.pl.actors:
                 first_bar = self._bar_actor is None
                 kw = dict(scalars='load', cmap=CMAP, clim=clim, name=name,
+                          log_scale=s.log_scale,
                           nan_color='#4a4f57', show_scalar_bar=first_bar,
                           reset_camera=False, render=False)
                 if first_bar:
@@ -1227,7 +1239,9 @@ class _SurfaceLoads(_Layer):
                                   viewport=True, font_size=6,
                                   color='white', name=LOADS_CAPTION)
             else:
-                s.pl.actors[name].mapper.scalar_range = clim
+                mapper = s.pl.actors[name].mapper
+                mapper.scalar_range = clim
+                mapper.lookup_table.log_scale = s.log_scale
 
 
 class _Volume(_Layer):

@@ -167,6 +167,70 @@ scene.layers['volume'].set_visible(False)
 scene.layers['loads'].set_visible(False)
 check("hiding loads removes their scalar bar", LOADS_TITLE not in pl.scalar_bars)
 scene.layers['loads'].set_visible(True)
+
+print("\nS3-P25: surface loads follow the log flag")
+from blastlab.viz3d.viewer import log_clim
+# pin active_clim before/after the log_clim refactor: values of the old
+# inline expression max(lo, hi * 10**-6, 1e-9)
+_saved = (scene.vmin, scene.cmax, scene.log_scale)
+for _lo, _hi, _log, _want in ((10.0, 300.0, False, (10.0, 300.0)),
+                              (10.0, 300.0, True, (10.0, 300.0)),
+                              (0.0, 300.0, True, (300.0 * 10.0 ** -6.0, 300.0))):
+    scene.vmin, scene.cmax, scene.log_scale = _lo, _hi, _log
+    check(f"active_clim unchanged ({_lo}, {_hi}, log={_log})",
+          scene.active_clim() == _want, str(scene.active_clim()))
+scene.vmin, scene.cmax, scene.log_scale = _saved
+
+
+def _loads_state():
+    acts = [a for n, a in pl.actors.items() if n.startswith('load_')]
+    bar = pl.scalar_bars[LOADS_BAR_KEY].GetLookupTable().GetScale()
+    return acts, bar
+
+
+def _check_loads_log(tag, on, own_rng):
+    acts, bar = _loads_state()
+    want = log_clim(*own_rng) if on else own_rng
+    rngs = [tuple(a.mapper.scalar_range) for a in acts]
+    check(f"{tag}: every load LUT log_scale is {on}",
+          len(acts) == len(specs)
+          and all(a.mapper.lookup_table.log_scale is on for a in acts),
+          str([a.mapper.lookup_table.log_scale for a in acts]))
+    check(f"{tag}: load range == {'log_clim(own)' if on else 'own'}",
+          all(r == tuple(want) for r in rngs)
+          and ((rngs[0][0] > 0) if on else (rngs[0][0] == 0.0)),
+          f"{rngs[0]} vs {tuple(want)}")
+    check(f"{tag}: loads bar scale == {1 if on else 0}", bar == (1 if on else 0),
+          str(bar))
+
+
+own = tuple(load_actor.mapper.scalar_range)
+scene.set_log_scale(True)
+_check_loads_log("log on", True, own)
+scene.set_log_scale(False)
+_check_loads_log("log off", False, own)
+scene.set_log_scale(True)
+scene.on_message(('frame', 7.5e-3, synth_frame(7.5e-3, 1.5), False))
+own = scene.layers['loads']._own
+_check_loads_log("log on, new frame", True, own)
+scene.layers['loads'].set_visible(False)
+scene.layers['loads'].set_visible(True)
+_check_loads_log("log on, loads toggled off/on", True, own)
+load_actor = next(a for n, a in pl.actors.items() if n.startswith('load_'))
+scene.set_field('rho')
+check("B19 + log: Density active, loads keep the overpressure range",
+      tuple(load_actor.mapper.scalar_range) == log_clim(*own)
+      and scene.layers['loads']._own[1] == own[1],
+      f"{load_actor.mapper.scalar_range} vs {own}")
+scene.set_field('p')
+scene.set_clim(0.0, 250.0)
+check("B19 + log: manual overpressure Min/Max reaches the loads as log_clim",
+      tuple(load_actor.mapper.scalar_range) == log_clim(0.0, 250.0),
+      str(load_actor.mapper.scalar_range))
+scene._set_auto_scale(True)
+scene.set_log_scale(False)
+_check_loads_log("log off again", False, scene.layers['loads']._own)
+
 scene.layers['plane2'].set_visible(True)
 check("plane2 actor", 'cut_plane2' in pl.actors)
 
