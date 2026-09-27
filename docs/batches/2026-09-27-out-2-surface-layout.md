@@ -34,6 +34,9 @@ as a cell-data array on that surface, with the sample time inside the file**.
    of the case, computed when the files are assembled on Windows. (The card row and
    tooltip must then say peak overpressure again - the F1 rename to "Peak pressure"
    described the raw blastFoam field; the exported quantity is now the overpressure.)
+   Owner addendum 2026-09-27: blastFoam's pMax starts at 0, so the running max includes
+   the current pressure - `max(pMax, p) - p_ambient` when `p` is in the same file, else
+   `max(pMax - p_ambient, 0)`; gauges unchanged.
 5. **Readable field names in the files, the same in every family**, like Viper:
    `pressure`, `Peak_Overpressure`, `Impulse`, `Overpressure`, `Arrival_Time`,
    `density`, `velocity`, `temperature`, `Products_Fraction`, `Energy`

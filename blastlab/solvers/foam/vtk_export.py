@@ -276,14 +276,25 @@ def readable_arrays(arrays, p_ambient=P_AIR):
     kept), `pMax` turned into the peak overpressure pMax - `p_ambient`
     [Pa], and each array written the Viper way: one component as SCALARS,
     three (velocity) as VECTORS, anything else as a FIELD array. Pure;
-    ValueError when two arrays end up with one name."""
+    ValueError when two arrays end up with one name.
+
+    blastFoam's pMax starts at 0, so at t = 0 a bare pMax - p_ambient
+    reads -p_ambient everywhere. Owner decision (2026-09-27): the running
+    max includes the current pressure - max(pMax, p) - p_ambient when `p`
+    of the same length is among `arrays`, else max(pMax - p_ambient, 0)."""
+    p_now = next((np.asarray(a.values, dtype=np.float64) for a in arrays
+                  if a.name == 'p'), None)
     out = []
     for a in arrays:
         vals = a.values
         if a.name == 'pMax':
             # decision 4: peak OVERPRESSURE, over the ambient the gauges
             # use (core.constants.P_AIR; writer.py's pRef, gauge_summary)
-            vals = np.asarray(vals, dtype=np.float64) - float(p_ambient)
+            vals = np.asarray(vals, dtype=np.float64)
+            if p_now is not None and p_now.shape == vals.shape:
+                vals = np.maximum(vals, p_now) - float(p_ambient)
+            else:
+                vals = np.maximum(vals - float(p_ambient), 0.0)
         if a.ncomp == 1:
             kind = 'scalars'
         elif a.ncomp == 3 and a.vtk_type in ('float', 'double'):

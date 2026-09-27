@@ -248,6 +248,27 @@ def test_every_readable_name():
         raise AssertionError('two arrays named pressure accepted')
 
 
+def test_peak_overpressure_at_t0():
+    """Owner decision 2026-09-27: blastFoam's pMax starts at 0, so the
+    running max includes the current pressure p when it is in the file,
+    and is floored at 0 overpressure when it is not."""
+    from blastlab.solvers.foam import vtk_export as vx
+    pmax0 = np.zeros(3)
+    p = np.array([P_AIR, P_AIR + 50.0, P_AIR - 10.0])
+    out = vx.readable_arrays([lv.Array('pMax', pmax0), lv.Array('p', p)])
+    assert np.allclose(out[0].values, [0.0, 50.0, -10.0])
+    assert np.allclose(out[1].values, p)            # p itself untouched
+    # later times: pMax >= p, so the value is pMax - P_AIR as before
+    pmax = np.array([P_AIR + 900.0, P_AIR + 50.0, P_AIR])
+    out = vx.readable_arrays([lv.Array('pMax', pmax), lv.Array('p', p)])
+    assert np.allclose(out[0].values, [900.0, 50.0, 0.0])
+    # no p in the file: floored at 0
+    out = vx.readable_arrays([lv.Array('pMax', pmax0)])
+    assert np.allclose(out[0].values, 0.0)
+    out = vx.readable_arrays([lv.Array('pMax', pmax)])
+    assert np.allclose(out[0].values, [900.0, 50.0, 0.0])
+
+
 # ── refusals ─────────────────────────────────────────────────────────────
 def test_geometry_mismatch_refused():
     pts, polys = surface_geometry()
@@ -378,7 +399,7 @@ def test_viper_reference_structure():
 TESTS = [test_round_trip_merge, test_point_data_stays_point_data,
          test_vectors_and_keyword_order, test_binary_is_big_endian,
          test_volume_rewrite, test_every_readable_name,
-         test_geometry_mismatch_refused, test_strict_parser,
+         test_peak_overpressure_at_t0, test_geometry_mismatch_refused, test_strict_parser,
          test_atomic_write_keeps_old_file, test_viper_reference_structure]
 
 

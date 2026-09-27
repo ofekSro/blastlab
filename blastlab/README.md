@@ -162,7 +162,9 @@ native mode, and a native run ignores the keys.
   ambient 101.325 kPa (`core.constants.P_AIR`, the value the gauges'
   overpressure uses); the subtraction is done when the files are
   written, like Viper's `Peak_Overpressure` (owner decision 4,
-  2026-09-27). Case keys: `vtk_surfaces` {on, mode, value, fields,
+  2026-09-27). `pMax` starts at 0, so the written value is
+  max(pMax, p) - ambient when `p` is in the same file, else
+  max(pMax - ambient, 0) - never -101 kPa at t = 0. Case keys: `vtk_surfaces` {on, mode, value, fields,
   obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
   family that is off is written only when it still has a field ticked,
   as `on: false` with its ticks, so a reload restores the card; the
