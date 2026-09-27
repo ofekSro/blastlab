@@ -3100,6 +3100,43 @@ def v04_vtk_native(qa):
     qa.set_case(Case3D())
 
 
+@scenario('V05', 'V', est=40)
+def v05_keep_all_fields(qa):
+    """OUT-3: the "Keep all fields in WSL" box on the Tk VTK card (the twin
+    of the Qt harness's V06); native mode hides it with the card."""
+    from blastlab.core.case import Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    qa.goto('setup')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _vtk_see(qa)
+    box = form._keep_all_box
+    qa.check(box.winfo_manager() == 'grid'
+             and str(box.cget('text')) == mfields.KEEP_ALL_CAPTION
+             and not form.v['keep_all_fields'].get(),
+             '3D: the box is on the card, unticked', 'S2')
+    qa.shot('3d_keep_off')
+    qa.field('keep_all_fields', True)
+    strip = qa.strip_text()
+    qa.note('3D keep-all strip: ' + ' | '.join(strip))
+    qa.check(any('Keep all fields' in s and 'disk estimate' in s
+                 for s in strip),
+             '3D: the strip explains the box (disk estimate)', 'S3')
+    qa.check(case_to_dict(qa.app.setup.get_case()).get('keep_all_fields')
+             is True, '3D: the case carries it', 'S1')
+    _vtk_see(qa)
+    qa.shot('3d_keep_on')
+    qa.solver('native')
+    qa.check(form._vtk_card.winfo_manager() == ''
+             and box.winfo_manager() == ''
+             and 'keep_all_fields' not in case_to_dict(
+                 qa.app.setup.get_case()),
+             'native: the box is hidden with the card, not in the case',
+             'S1')
+    qa.solver('blastfoam')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # GROUP H - theme toggle mid-session (G6 theme half)
 # ─────────────────────────────────────────────────────────────────────────

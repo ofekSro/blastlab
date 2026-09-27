@@ -128,6 +128,40 @@ def locked_column_is_muted():
         theme.apply(app_, 'dark')
 
 
+def keep_all_box():
+    """OUT-3 Step 6: the "Keep all fields in WSL" box on the card."""
+    print('\nC11: the Keep all fields in WSL box (OUT-3)')
+    from PySide6.QtWidgets import QCheckBox
+    for d in (1, 2, 3):
+        f = form(d)
+        w = f.widgets.get('keep_all_fields')
+        check(f'{d}D: the box is on the card, unticked, with its tooltip',
+              isinstance(w, QCheckBox) and 'keep_all_fields' in card_names(f)
+              and w.text() == F.KEEP_ALL_CAPTION and not w.isChecked()
+              and w.toolTip() == F.KEEP_ALL_TIP and w.isVisible())
+        check(f'{d}D: default case has keep_all_fields False, not written',
+              f.get_case().keep_all_fields is False
+              and 'keep_all_fields' not in case_to_dict(f.get_case()))
+        w.click()
+        pump(5)
+        text = json.dumps(case_to_dict(f.get_case()), sort_keys=True)
+        check(f'{d}D: ticked -> the case and its JSON carry it',
+              json.loads(text).get('keep_all_fields') is True)
+        g = form(d)
+        g.set_case(case_from_dict(json.loads(text)))
+        pump(5)
+        check(f'{d}D: form -> case -> JSON -> form keeps the tick',
+              g.v['keep_all_fields'].get() is True
+              and g.widgets['keep_all_fields'].isChecked()
+              and json.dumps(case_to_dict(g.get_case()),
+                             sort_keys=True) == text)
+        f.set_mode('native')
+        pump(10)
+        check(f'{d}D native: hidden with the card, and not in the case',
+              not f.card_visible(TITLE) and not w.isVisible()
+              and 'keep_all_fields' not in case_to_dict(f.get_case()))
+
+
 def main():
     print('\nC1: the families and the matrix of each dimension')
     want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
@@ -558,6 +592,7 @@ def main():
           and "depends on the run's step count" in n, n)
 
     locked_column_is_muted()
+    keep_all_box()
 
     print('\n' + '=' * 52)
     if FAIL:

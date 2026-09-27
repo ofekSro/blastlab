@@ -64,14 +64,20 @@ def _time_key(name):
 
 def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
                    reconstructed, protected=(), n_procs=1,
-                   mesh_dirs=frozenset(), ordered=()):
+                   mesh_dirs=frozenset(), ordered=(), require_copy=True,
+                   per_rank_ready=None, rank_mesh=None):
     """Pure. The written times whose WSL time directory may be deleted,
     sorted by time. A name qualifies only when all of these hold:
 
     * the ingest has read it (`done`), foamToVTK converted it
-      (`converted`) and its file was copied and verified (`copied_ok`);
+      (`converted`) and its file was copied and verified (`copied_ok`) -
+      the last two only with `require_copy` (OUT-3: a run that keeps only
+      its newest fields without VTK volumes passes False);
     * in parallel (`n_procs` > 1) a successful reconstructPar covered it
-      (`reconstructed`), so the root copy is the whole write;
+      (`reconstructed`), so the root copy is the whole write - or, on a
+      decomposed (parallel AMR) run, `per_rank_ready` is given instead:
+      the times complete on every rank (runloop.common_ready_times); only
+      those count as complete, and only those may go (OUT-3, E6);
     * it is not `0`, not the run's `start_dir` and not `protected` (the
       writes finalize re-reads: snapshots, the arrival pin, the trigger);
     * it is older than the KEEP_NEWEST newest of `newest_complete`, the
@@ -80,12 +86,23 @@ def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
       goes only when the next newer time that stays is a mesh time too -
       otherwise that kept time, which has no mesh of its own, would
       resolve to an older instance. `ordered` is every time on disk;
-      without it the names given here stand for the listing."""
-    ok = set(done or ()) & set(converted or ()) & set(copied_ok or ())
-    if int(n_procs or 1) > 1:
+      without it the names given here stand for the listing.
+      `rank_mesh` {rank: times holding processor<rank>/<t>/polyMesh/}
+      applies the rule per rank, conservatively (E6): a time is a mesh
+      time when ANY rank holds a mesh there, and the next kept time counts
+      as a mesh time only when EVERY rank holds one there."""
+    ok = set(done or ())
+    if require_copy:
+        ok &= set(converted or ()) & set(copied_ok or ())
+    ready = None
+    if per_rank_ready is not None:
+        ready = {str(t) for t in per_rank_ready}
+        ok &= ready
+    elif int(n_procs or 1) > 1:
         ok &= set(reconstructed or ())
     complete = sorted({str(t) for t in (newest_complete or ())
-                       if _is_time(t)}, key=_time_key)
+                       if _is_time(t) and (ready is None or str(t) in ready)},
+                      key=_time_key)
     if len(complete) < KEEP_NEWEST:
         return []
     floor = float(complete[-KEEP_NEWEST])
@@ -97,14 +114,18 @@ def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
     known = set(ordered or ()) or (set(done or ()) | set(complete) | cand
                                    | set(protected or ()))
     listing = sorted({str(t) for t in known if _is_time(t)}, key=_time_key)
-    mesh = set(mesh_dirs or ())
+    mesh_any = mesh_all = set(mesh_dirs or ())
+    if rank_mesh:
+        sets = [{str(t) for t in v} for v in rank_mesh.values()]
+        mesh_any = set().union(*sets)
+        mesh_all = set.intersection(*sets)
     out = set()
     next_kept_is_mesh = False
     for t in reversed(listing):            # newest first
-        if t in cand and (t not in mesh or next_kept_is_mesh):
+        if t in cand and (t not in mesh_any or next_kept_is_mesh):
             out.add(t)
             continue
-        next_kept_is_mesh = t in mesh
+        next_kept_is_mesh = t in mesh_all
     return sorted(out, key=_time_key)
 
 
@@ -436,7 +457,7 @@ def start_conversion(spec, names, fields):
     return Conversion(spec.case_posix, names, fields)
 
 
-def note_resume(vtk_dir, times, log):
+def note_resume(vtk_dir, times, log, deleted=None):
     """D10 / owner Q5: a resume replays the writes left on disk. When the
     VTK export of the run being resumed had already converted - and so
     possibly deleted - writes that are no longer there, say so once and
@@ -444,12 +465,23 @@ def note_resume(vtk_dir, times, log):
     the Python peak/impulse, cover only the writes that are left. 2D/3D
     snapshots survive (their dirs are protected); a 1D run deletes no
     written time (P9), so it never gets here. True when it applied.
-    `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none."""
-    if not isinstance(vtk_dir, str) or not vtk_dir:
-        return False
-    state = vtk_series.load_vtk_manifest(vtk_dir)
+    `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none.
+
+    OUT-3: without a vtk\\ manifest, `deleted` (`hooks.fields_deleted`,
+    what this stage's purge removed) gives the same one line."""
+    state = (vtk_series.load_vtk_manifest(vtk_dir)
+             if isinstance(vtk_dir, str) and vtk_dir else None)
     if not state:
-        return False
+        gone = sorted({str(t) for t in (deleted or ())}
+                      - {str(t) for t in times}, key=_time_key)
+        if not gone:
+            return False
+        log(f'  [blastfoam] resuming after {len(gone)} older written '
+            f'time(s) were deleted in WSL (only the newest writes are '
+            f'kept): the replay rebuilds the frames (and, on AMR, the '
+            f'per-write peak/impulse) from the {len(times)} left; the '
+            f'snapshots are kept.')
+        return True
     vol = (state.get('families') or {}).get(VOLUMES) or {}
     gone = sorted({str(t) for t in vol.get('times') or ()}
                   - {str(t) for t in times}, key=_time_key)
@@ -474,15 +506,30 @@ def deleted_note(case_dir, vtk_dir=None):
     written times after converting them, else None. `vtk_dir` is the
     model's vtk\\ when the caller knows it (the Results tab); otherwise
     it is found under the settings' runs folder by the manifest's
-    `scratch`. Never raises."""
+    `scratch`. Never raises.
+
+    OUT-3: a run with no VTK export that kept only its newest writes is
+    found by the model root manifest's `wsl_scratch.posix`, and its
+    `wsl_fields` gives the line (`vtk_series.fields_warning`)."""
     try:
+        posix = runs_dir = None
         if not vtk_dir:
             from . import env
             from ...core import settings
             posix = env.case_paths(case_dir)[0]
-            vtk_dir = vtk_series.find_vtk_dir(
-                posix, settings.load().get('runs_dir'))
-        return vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
+            runs_dir = settings.load().get('runs_dir')
+            vtk_dir = vtk_series.find_vtk_dir(posix, runs_dir)
+        note = vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
+        if note:
+            return note
+        if vtk_dir:
+            path = os.path.join(os.path.dirname(os.path.normpath(vtk_dir)),
+                                vtk_series.ROOT_MANIFEST)
+            state = vtk_series.load_vtk_manifest(os.path.dirname(path))
+            found = (path, state) if state else None
+        else:
+            found = vtk_series.find_model_manifest(posix, runs_dir)
+        return vtk_series.fields_warning(*found) if found else None
     except Exception:                   # noqa: BLE001 - a note, never a failure
         return None
 
@@ -607,7 +654,15 @@ class VtkExport:
     `note_resume`).
 
     A W3 auto-resume builds a new loop on the same hooks: construction
-    reads `vtk\\manifest.json` back, so no time is exported twice."""
+    reads `vtk\\manifest.json` back, so no time is exported twice.
+
+    OUT-3 (docs/batches/2026-09-27-out-3-newest-fields.md): with
+    `hooks.purge_fields` (every blastFoam stage with a model folder unless
+    "Keep all fields in WSL" is ticked) the same plan deletes the older
+    written times of a run with no VTK family too, without the copy gate
+    (`require_copy=False` when volumes are off); no vtk\\ folder is made,
+    and the deleted times go to `hooks.fields_deleted`. With
+    `hooks.keep_all_fields` no written time is deleted at all (E8)."""
 
     def __init__(self, spec, hooks, fields, delete=None, runner=None,
                  copy=None, sleep=None, clock=None):
@@ -621,9 +676,18 @@ class VtkExport:
         self.vol = getattr(spec, 'vtk_volumes', None) or None
         self.surf = getattr(spec, 'vtk_surfaces', None) or None
         wanted = bool(self.vol or self.surf)
-        self.active = bool(wanted and self.vtk_dir)
+        #: OUT-2: the VTK export proper (a family and a model folder)
+        self.export_on = bool(wanted and self.vtk_dir)
+        #: OUT-3: "Keep all fields in WSL" - no written time is deleted,
+        #: by this purge or by the export (batch plan E8)
+        self.keep_all = getattr(hooks, 'keep_all_fields', False) is True
+        #: OUT-3: keep only the newest writes in WSL, whatever the
+        #: families - set by model_folder.stage_solve (E4)
+        self.purge_fields = (getattr(hooks, 'purge_fields', False) is True
+                             and not self.keep_all)
+        self.active = self.export_on or self.purge_fields
         decomposed = bool(getattr(spec, 'decomposed', False))
-        self.volumes_on = bool(self.active and self.vol and not decomposed)
+        self.volumes_on = bool(self.export_on and self.vol and not decomposed)
         self.no_delete = os.environ.get(NO_DELETE_ENV) == '1'
         dim = int(getattr(spec, 'dim', 3) or 3)
         #: P9: the written time dirs of a 1D run stay in WSL until the
@@ -659,32 +723,56 @@ class VtkExport:
         self._dirty = False
         self._next = 0.0
         self._summarised = False
+        #: OUT-3: what this run has deleted so far, shared on the hooks
+        #: so a W3 auto-resume (a new loop on the same hooks) and the
+        #: model folder's manifest (`wsl_fields`) see it
+        rec = getattr(hooks, 'fields_deleted', None)
+        self._record = rec if isinstance(rec, set) else None
+        if self._record:
+            self.deleted.update(self._record)
+        if self.keep_all:
+            hooks.log('  [blastfoam] keeping all fields in WSL ("Keep all '
+                      'fields in WSL" is ticked): no written time is '
+                      'deleted, and the scratch is kept after the run')
         if wanted and not self.vtk_dir:
             hooks.log('  [blastfoam] VTK output is on, but this run has no '
                       'model folder - nothing is converted and no written '
                       'time is deleted')
-            return
         if not self.active:
             return
-        if self.vol and decomposed:
+        if self.export_on and self.vol and decomposed:
             hooks.log('  [blastfoam] VTK volumes cannot be exported from a '
                       'parallel AMR run (reconstructPar cannot follow the '
                       'mesh) - sections and obstacles only')
-        if self.volumes_on and int(getattr(spec, 'n_procs', 1) or 1) > 1:
+        if ((self.volumes_on or self.purge_fields) and not decomposed
+                and int(getattr(spec, 'n_procs', 1) or 1) > 1):
             self.reconstructed |= _root_whole(spec, fields)
         # a resume's restart time (backend.resume_run): the solver reads
         # it at start, and after a P1-5 walk-back the replay ingests
         # newer writes, so it is not among the newest two
         self.protect(getattr(spec, 'restart_dir', None), 'restart')
-        self._resume_state()
-        fams = ([VOLUMES] if self.volumes_on else []) + [
-            k for fo, k in ((VTK_SECTIONS, SECTIONS),
-                            (VTK_OBSTACLES, OBSTACLES))
-            if self.surf and self.surf_fields[fo]]
-        hooks.log(f'  [blastfoam] VTK output ({", ".join(fams)}) into '
-                  f'{self.vtk_dir}'
-                  + (f' - WSL deletes off ({NO_DELETE_ENV})'
-                     if self.no_delete else ''))
+        if self.export_on:
+            self._resume_state()
+            fams = ([VOLUMES] if self.volumes_on else []) + [
+                k for fo, k in ((VTK_SECTIONS, SECTIONS),
+                                (VTK_OBSTACLES, OBSTACLES))
+                if self.surf and self.surf_fields[fo]]
+            hooks.log(f'  [blastfoam] VTK output ({", ".join(fams)}) into '
+                      f'{self.vtk_dir}'
+                      + (f' - WSL deletes off ({NO_DELETE_ENV})'
+                         if self.no_delete else ''))
+        if self.purge_fields:
+            if self.keep_time_dirs:
+                # owner decision P9 (OUT-2), carried over (OUT-3 E3, Q1)
+                hooks.log('  [blastfoam] 1D keeps every written time in WSL '
+                          'until the scratch is released (P9)')
+            else:
+                hooks.log('  [blastfoam] keeping only the newest writes in '
+                          'WSL: an older written time is deleted once it is '
+                          'ingested and nothing reads it again ("Keep all '
+                          'fields in WSL" turns this off)'
+                          + (f' - WSL deletes off ({NO_DELETE_ENV})'
+                             if self.no_delete else ''))
 
     # ── what the backend and the loop tell it ──
     def protect(self, name, why='read'):
@@ -844,6 +932,13 @@ class VtkExport:
         try:
             self._run(done, final)
         except Exception as exc:        # noqa: BLE001 - never stops the run
+            if not self.export_on:
+                # OUT-3 alone: stop deleting, the run goes on
+                self.active = False
+                self.hooks.log(f'  [warn] WSL field purge: {exc!r} - the '
+                               f'run goes on and nothing more is deleted '
+                               f'in WSL')
+                return
             self._once('error', f'  [warn] VTK export: {exc!r} - the run '
                                 f'goes on; what was not exported stays in '
                                 f'WSL, and the scratch is kept')
@@ -872,16 +967,15 @@ class VtkExport:
         if self.volumes_on:
             self._convert(done, final)
             self._copy_volumes(final)
-            # owner decision P9 (2026-09-27): a 1D run never deletes a
-            # written time - 1D picks its snapshots at finalize from the
-            # writes on disk (backend._pick_snapshots), and 1D writes are
-            # small. Converted VTK/ files are still removed after the copy.
-            if self.keep_time_dirs:
-                names = []
-            else:
-                names = [n for n in self._plan(done)
-                         if n not in self.deleted]
-        if self.surf:
+        # owner decision P9 (2026-09-27): a 1D run never deletes a
+        # written time - 1D picks its snapshots at finalize from the
+        # writes on disk (backend._pick_snapshots), and 1D writes are
+        # small. Converted VTK/ files are still removed after the copy.
+        # OUT-3 (E8): with "Keep all fields in WSL" no time dir goes.
+        if ((self.volumes_on or self.purge_fields)
+                and not self.keep_time_dirs and not self.keep_all):
+            names = [n for n in self._plan(done) if n not in self.deleted]
+        if self.export_on and self.surf:
             self._sweep(final)
         if not self._write_index():
             return                      # no delete the manifest cannot vouch for
@@ -1099,19 +1193,63 @@ class VtkExport:
                 mesh.add(n)
         return names, frozenset(mesh)
 
+    def _rank_listing(self, done):
+        """(every time on any rank, {rank: times holding polyMesh/}) of a
+        decomposed run (OUT-3, E6), or None when a rank dir cannot be
+        listed. An ingested time's answer is cached, as `mesh_cache`."""
+        from . import reader
+        ordered, rank_mesh = set(), {}
+        for i in range(int(self.spec.n_procs)):
+            pu = os.path.join(self.spec.case_unc, f'processor{i}')
+            try:
+                names = [n for _t, n in reader.list_times(pu)]
+            except OSError:
+                return None
+            ordered.update(names)
+            mesh = set()
+            for n in names:
+                has = self.mesh_cache.get((i, n))
+                if has is None:
+                    has = os.path.isdir(os.path.join(pu, n, 'polyMesh'))
+                    if n in done:
+                        self.mesh_cache[(i, n)] = has
+                if has:
+                    mesh.add(n)
+            rank_mesh[i] = mesh
+        return sorted(ordered, key=_time_key), rank_mesh
+
     def _plan(self, done):
         names = [str(n) for n in done]
+        # OUT-3: without VTK volumes nothing is converted or copied first
+        kw = dict(require_copy=self.volumes_on)
+        decomposed = bool(getattr(self.spec, 'decomposed', False))
+        if decomposed:
+            # E6: read per rank, so "complete on every rank" stands for
+            # "reconstructed"; the newest such time is the restart anchor
+            # and is one of the KEEP_NEWEST kept (runloop.common_ready_times)
+            from .runloop import common_ready_times
+            ready = common_ready_times(self.spec, self.fields)
+            if not ready:
+                return []
+            kw['per_rank_ready'] = ready
         if not vtk_purge_plan(names, self.converted, self.copied, names,
                               self.spec.start_dir, self.reconstructed,
                               self.protected,
-                              getattr(self.spec, 'n_procs', 1)):
+                              getattr(self.spec, 'n_procs', 1), **kw):
             return []
-        ordered, mesh = self._mesh_listing(set(names))
+        if decomposed:
+            listing = self._rank_listing(set(names))
+            if listing is None:
+                return []
+            ordered, kw['rank_mesh'] = listing
+            mesh = frozenset()
+        else:
+            ordered, mesh = self._mesh_listing(set(names))
         return vtk_purge_plan(names, self.converted, self.copied, names,
                               self.spec.start_dir, self.reconstructed,
                               self.protected,
                               getattr(self.spec, 'n_procs', 1),
-                              mesh_dirs=mesh, ordered=ordered)
+                              mesh_dirs=mesh, ordered=ordered, **kw)
 
     # ── 4: the surfaces ──
     def _sweep(self, final):
@@ -1205,6 +1343,11 @@ class VtkExport:
 
     # ── 5: the index, then the delete ──
     def _write_index(self):
+        if not self.export_on:
+            # OUT-3 alone: no vtk\ folder and no vtk\ manifest; the record
+            # is the hooks' `fields_deleted` (model folder `wsl_fields`)
+            self._dirty = False
+            return True
         if not self._dirty:
             return True
         try:
@@ -1239,16 +1382,26 @@ class VtkExport:
         if not ok:
             self._once('delete', '  [blastfoam] VTK: the WSL delete did not '
                                  'go through - retried at the next pass; '
-                                 'nothing copied is lost')
+                                 'nothing copied is lost' if self.export_on
+                       else '  [blastfoam] the WSL delete of older written '
+                            'times did not go through - retried at the next '
+                            'pass; nothing ingested is lost')
             return
         self.rm_files.difference_update(files)
         self.rm_surface.difference_update(surf)
         if names:
             self.deleted.update(names)
+            if self._record is not None:
+                self._record.update(names)
             self._dirty = True
             self._write_index()
 
     def _summary(self):
+        if not self.export_on:
+            self.hooks.log(f'  [blastfoam] {len(self.deleted)} older written '
+                           f'time(s) deleted in WSL (only the newest writes '
+                           f'and the ones finalize reads are kept)')
+            return
         st = self.state()
         parts = [f'{v["count"]} {k} file(s)'
                  for k, v in st['families'].items()]

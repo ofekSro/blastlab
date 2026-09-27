@@ -779,6 +779,8 @@ class FieldForm(QWidget):
         self.v[f.name] = var
         if f.kind not in ('bool', 'matrix'):
             w.setMinimumWidth(INPUT_MIN)
+        if f.tip:
+            w.setToolTip(f.tip)
         self.widgets[f.name] = w
         return w
 

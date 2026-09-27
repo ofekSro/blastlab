@@ -20,6 +20,10 @@ docs/batches/2026-09-27-out-2-vtk-output.md, Steps 4 and 6.
      surface files merged into one file per surface per time, volumes
      renamed, TIME inside, a geometry mismatch kept in WSL.
 
+  C  OUT-3 (docs/batches/2026-09-27-out-3-newest-fields.md, Step 2): the
+     decision table again with require_copy=False, the D9 chain, and the
+     decomposed (E6) branch - readiness on every rank, rank-mixed meshes.
+
 Run:  cd blastlab/tests && python test_vtk_export_plan.py   (or pytest)
 """
 import itertools
@@ -941,7 +945,342 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_restart_dir_survives, test_b_1d_deletes_no_time_dir,
            test_b_geometry_mismatch_keeps_the_sample,
            test_b_unreadable_volume_is_kept]
-TESTS = TESTS_A + TESTS_B
+
+
+# ── C: OUT-3, the plan without the copy gate, and decomposed runs ────────
+def nplan(**kw):
+    """vtk_purge_plan for a run that keeps only its newest fields: no
+    conversion, no copy (require_copy=False)."""
+    args = dict(converted=(), copied_ok=(), require_copy=False)
+    args.update(kw)
+    return plan(**args)
+
+
+def test_c_no_copy_gate():
+    assert nplan() == T[:-2]
+    # with the gate the same call deletes nothing
+    assert plan(converted=(), copied_ok=()) == []
+    x = '0.0002'
+    rest = [t for t in T[:-2] if t != x]
+    without = [t for t in T if t != x]
+    for why, kw in {
+            'not ingested': dict(done=without),
+            'start dir': dict(start_dir=x),
+            'protected (snapshot)': dict(protected={x}),
+            'not reconstructed (parallel)': dict(reconstructed=without,
+                                                 n_procs=4)}.items():
+        assert nplan(**kw) == rest, (why, nplan(**kw))
+    got = nplan(start_dir='0.0001', protected=['0.0003'], done=['0'] + T)
+    assert got == ['0.0002', '0.0004'], got
+    for keep in ('0', '0.0001', '0.0003', T[-1], T[-2]):
+        assert keep not in got
+    assert nplan(newest_complete=['0.0006']) == []
+    assert nplan(reconstructed=(), n_procs=2) == []
+
+
+def test_c_d9_chain_without_copy():
+    mesh = {'0.0001', '0.0003', '0.0005'}
+    assert nplan(mesh_dirs=mesh, ordered=T) == T[:4]
+    assert nplan(mesh_dirs=mesh, ordered=T, protected=['0.0004']) == \
+        ['0.0001', '0.0002']
+    assert nplan(mesh_dirs=mesh, ordered=T, protected=['0.0002']) == \
+        ['0.0003', '0.0004']
+
+
+def test_c_decomposed_ready_on_every_rank():
+    # E6: `reconstructed` is not looked at; readiness on every rank is
+    everyone = nplan(n_procs=3, reconstructed=(), per_rank_ready=T)
+    assert everyone == T[:-2], everyone
+    # 0.0002 is not complete on one rank: it survives
+    got = nplan(n_procs=3, reconstructed=(),
+                per_rank_ready=[t for t in T if t != '0.0002'])
+    assert got == ['0.0001', '0.0003', '0.0004'], got
+    # the newest write is ingested at the root listing but not ready on
+    # every rank: the two newest READY ones (4, 5) are the kept anchors
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T[:-1])
+    assert got == T[:3], got
+
+
+def test_c_decomposed_rank_mixed_mesh():
+    # rank 0 holds a mesh at 3 and 5, rank 1 at 3 only, rank 2 at 3 and 5
+    ranks = {0: {'0.0003', '0.0005'}, 1: {'0.0003'},
+             2: {'0.0003', '0.0005'}}
+    # 5 is kept (newest two) but is not a mesh time on EVERY rank, so 3
+    # (a mesh time on some rank) must stay; 4 (no mesh) goes; 2 and 1
+    # (no mesh anywhere) go
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T,
+                rank_mesh=ranks, ordered=T)
+    assert got == ['0.0001', '0.0002', '0.0004'], got
+    # every rank meshes at 5: 3 may go too
+    ranks[1] = {'0.0003', '0.0005'}
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T,
+                rank_mesh=ranks, ordered=T)
+    assert got == T[:4], got
+
+
+TESTS_C = [test_c_no_copy_gate, test_c_d9_chain_without_copy,
+           test_c_decomposed_ready_on_every_rank,
+           test_c_decomposed_rank_mixed_mesh]
+
+
+# ── D: OUT-3, the executor keeping only the newest fields ────────────────
+def fields_tree(purge=True, keep_all=False, **kw):
+    """A Tree with no VTK family and no vtk\\ folder unless `kw` asks for
+    them; the hooks as model_folder.stage_solve sets them."""
+    args = dict(surfaces=False, volumes=False, vtk_dir=False)
+    args.update(kw)
+    tree = Tree(**args)
+    tree.hooks.purge_fields = purge and not keep_all
+    tree.hooks.keep_all_fields = keep_all
+    tree.hooks.fields_deleted = set()
+    return tree
+
+
+def test_d_no_family_purges():
+    tree = fields_tree()
+    try:
+        ex = tree.export()
+        assert ex.active and ex.purge_fields and not ex.export_on
+        ex.run({t: 0 for t in T[:3]})
+        assert tree.deleted_times() == T[:1], tree.deleted_times()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == T[:-2], tree.deleted_times()
+        assert tree.runs == []                          # nothing converted
+        assert not os.path.exists(os.path.join(tree.tmp, 'MODEL'))
+        assert tree.hooks.fields_deleted == set(T[:-2])
+        gone = [p for batch in tree.deletes for p in batch]
+        assert gone == [f'{POSIX}/{t}' for t in T[:-2]], gone
+        assert tree.exists('0') and tree.exists('postProcessing')
+        assert any('keeping only the newest writes' in ln
+                   for ln in tree.lines), tree.lines
+        assert any('4 older written time(s) deleted' in ln
+                   for ln in tree.lines), tree.lines
+    finally:
+        tree.close()
+
+
+def test_d_without_the_flag_nothing():
+    tree = fields_tree(purge=False)
+    try:
+        ex = tree.export()
+        assert not ex.active
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == [] and tree.lines == []
+    finally:
+        tree.close()
+
+
+def test_d_keep_all_deletes_no_time_dir():
+    tree = fields_tree(keep_all=True)
+    try:
+        ex = tree.export()
+        assert not ex.active
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == []
+        assert len(tree.lines) == 1 and 'keeping all fields' in tree.lines[0]
+    finally:
+        tree.close()
+    # E8: with VTK volumes on, they are converted and copied, their VTK/
+    # copies go, but no written time is deleted
+    tree = fields_tree(keep_all=True, volumes=True, surfaces=True,
+                       vtk_dir=True)
+    try:
+        ex = tree.export()
+        assert ex.active and ex.export_on and not ex.purge_fields
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == []
+        for t in T:
+            assert os.path.getsize(tree.model(f'volumes/t_{t}.vtk')) > 0
+            assert not tree.exists(f'VTK/{RUN}_{t}.vtk'), t
+        assert _manifest(tree)['deleted_in_wsl'] == []
+    finally:
+        tree.close()
+
+
+def test_d_1d_deletes_nothing():
+    tree = fields_tree()
+    try:
+        tree.spec.dim = 1
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deletes == [] and tree.deleted_times() == []
+        assert any('1D keeps every written time' in ln for ln in tree.lines)
+    finally:
+        tree.close()
+
+
+def test_d_delete_failure_is_retried():
+    tree = fields_tree()
+    try:
+        ex = tree.export()
+        calls = []
+
+        def flaky(paths):
+            calls.append(paths)
+            if len(calls) == 1:
+                raise OSError('wsl gone')
+            return tree.delete(paths)
+        ex.delete = flaky
+        ex.run({t: 0 for t in T})
+        assert tree.deleted_times() == []
+        ex.run({t: 0 for t in T})
+        assert tree.deleted_times() == T[:-2]
+        assert sum('did not go through' in ln for ln in tree.lines) == 1
+        assert tree.hooks.fields_deleted == set(T[:-2])
+    finally:
+        tree.close()
+
+
+def test_d_auto_resume_keeps_the_record():
+    """A W3 auto-resume: a new export on the same hooks starts from what
+    the first one deleted, and never asks to delete it again."""
+    tree = fields_tree()
+    try:
+        tree.export().run({t: 0 for t in T[:4]}, final=True)
+        assert tree.deleted_times() == T[:2]
+        n = len(tree.deletes)
+        ex2 = tree.export()
+        assert ex2.deleted == set(T[:2])
+        ex2.run({t: 0 for t in T[2:]}, final=True)
+        assert tree.deleted_times() == T[:-2]
+        assert [p for b in tree.deletes[n:] for p in b] == [
+            f'{POSIX}/{t}' for t in T[2:4]], tree.deletes[n:]
+    finally:
+        tree.close()
+
+
+def test_d_volumes_still_need_the_copy():
+    """With VTK volumes on, a purge-fields run still deletes a write only
+    after its copy (require_copy=True)."""
+    tree = fields_tree(volumes=True, vtk_dir=True)
+    try:
+        tree.fail_convert = {T[1]}
+        ex = tree.export()
+        assert ex.purge_fields and ex.volumes_on
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.exists(T[1])
+        assert tree.deleted_times() == [t for t in T[:-2] if t != T[1]]
+    finally:
+        tree.close()
+
+
+def test_d_protected_survive():
+    tree = fields_tree()
+    try:
+        tree.spec.restart_dir = T[0]
+        ex = tree.export()
+        ex.protect(T[2], 'snapshot')
+        ex.run({t: 0 for t in T}, final=True)
+        assert tree.deleted_times() == [T[1], T[3]], tree.deleted_times()
+    finally:
+        tree.close()
+
+
+def _foam_scalar(path, n):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    body = '\n'.join('101325' for _ in range(n))
+    with open(path, 'w', encoding='ascii', newline='\n') as f:
+        f.write('FoamFile\n{\n    format      ascii;\n    class       '
+                'volScalarField;\n}\n\ninternalField   nonuniform '
+                f'List<scalar>\n{n}\n(\n{body}\n)\n;\n')
+
+
+def decomposed_tree():
+    """A fake 3-rank parallel AMR scratch (OUT-3 E6): uneven readiness -
+    T[2] is missing `p` on rank 1, the newest T[5] on rank 2 - polyMesh/
+    at T[1] on every rank and at T[3] on ranks 0 and 2 only, and T[4]'s
+    pMax on rank 1 at the old cell count (not whole: the P1-5 walk-back
+    goes past it to T[3])."""
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix='blastlab_vtk_e6_')
+    unc = os.path.join(tmp, RUN)
+    mesh = {0: {T[1], T[3]}, 1: {T[1]}, 2: {T[1], T[3]}}
+    for i in range(3):
+        for t in ['0'] + T:
+            d = os.path.join(unc, f'processor{i}', t)
+            os.makedirs(os.path.join(d, 'uniform'), exist_ok=True)
+            with open(os.path.join(d, 'uniform', 'time'), 'w') as f:
+                f.write('value 0;\n')
+            if not ((t == T[2] and i == 1) or (t == T[5] and i == 2)):
+                _foam_scalar(os.path.join(d, 'p'), 8)
+            _foam_scalar(os.path.join(d, 'pMax'),
+                         7 if (t == T[4] and i == 1) else 8)
+            if t in mesh[i]:
+                os.makedirs(os.path.join(d, 'polyMesh'))
+    spec = SimpleNamespace(
+        dim=2, case_posix=POSIX, case_unc=unc, start_dir='0', n_procs=3,
+        amr=1, decomposed=True, vtk_volumes=None, vtk_surfaces=None,
+        n_cells=24,
+        time_root=lambda: os.path.join(unc, 'processor0'),
+        time_dirs=lambda name: [os.path.join(unc, f'processor{i}', name)
+                                for i in range(3)])
+    return tmp, unc, spec, mesh
+
+
+def test_d_decomposed_amr():
+    import shutil as sh
+    from blastlab.solvers.foam import backend, reader
+    tmp, unc, spec, mesh = decomposed_tree()
+    try:
+        lines, gone = [], []
+        hooks = SimpleNamespace(purge_fields=True, fields_deleted=set(),
+                                log=lines.append)
+
+        def rm(paths):
+            for p in paths:
+                assert p.startswith(POSIX + '/'), p
+                local = os.path.join(unc, *p[len(POSIX) + 1:].split('/'))
+                if os.path.isdir(local):
+                    sh.rmtree(local)
+                gone.append(p)
+            return True
+
+        def start():
+            times = [n for _t, n in reader.list_times(spec.time_root())]
+            return backend._resume_start_time(spec, times, hooks)[0]
+        before = start()
+        assert before == T[3], before
+        ready = runloop.common_ready_times(spec, ('p',))
+        assert ready == {'0', T[0], T[1], T[3], T[4]}, ready
+        want = vx.vtk_purge_plan(T, (), (), T, '0', (), n_procs=3,
+                                 ordered=T, require_copy=False,
+                                 per_rank_ready=ready, rank_mesh=mesh)
+        # T[1] is a mesh time and the next kept (T[2], not ready) is not a
+        # mesh time on every rank, so only T[0] may go
+        assert want == [T[0]], want
+        ex = vx.VtkExport(spec, hooks, ('p',), delete=rm,
+                          clock=lambda: 0.0)
+        ex.run({t: 0 for t in T}, final=True)
+        left = {i: sorted(n for _t, n in reader.list_times(
+            os.path.join(unc, f'processor{i}'))) for i in range(3)}
+        for i in range(3):
+            assert T[0] not in left[i] and set(T[1:]) <= set(left[i]), \
+                (i, left[i])
+        assert hooks.fields_deleted == {T[0]}
+        assert start() == before
+        # the restart anchor (newest ready on every rank) is never listed
+        assert max(ready, key=float) not in {p.rsplit('/', 1)[1]
+                                             for p in gone}
+    finally:
+        sh.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_decomposed_purge_untouched():
+    """DecomposedPurge (HD1-15) is left as it was: inactive on a
+    decomposed run, whatever OUT-3 does."""
+    spec = SimpleNamespace(write_budget=10, n_procs=3, decomposed=True)
+    assert not runloop.purge_active(spec)
+    spec.decomposed = False
+    assert runloop.purge_active(spec)
+
+
+TESTS_D = [test_d_no_family_purges, test_d_without_the_flag_nothing,
+           test_d_keep_all_deletes_no_time_dir, test_d_1d_deletes_nothing,
+           test_d_delete_failure_is_retried,
+           test_d_auto_resume_keeps_the_record,
+           test_d_volumes_still_need_the_copy, test_d_protected_survive,
+           test_d_decomposed_amr, test_d_decomposed_purge_untouched]
+TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D
 
 
 def main():

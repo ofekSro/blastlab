@@ -108,6 +108,15 @@ class RunHooks:
     #: None - and then the run's VTK export is inactive (batch plan D12)
     vtk_dir = None
 
+    #: OUT-3: set by model_folder.stage_solve for a blastFoam stage.
+    #: `purge_fields`: keep only the newest writes in WSL (the default);
+    #: `keep_all_fields`: the "Keep all fields in WSL" box - no written
+    #: time is deleted. `fields_deleted`: the set of written times the
+    #: run deleted in WSL (vtk_export.VtkExport), None outside a stage.
+    purge_fields = False
+    keep_all_fields = False
+    fields_deleted = None
+
     @staticmethod
     def _due(policy, step, last_draw):
         mode, val = policy

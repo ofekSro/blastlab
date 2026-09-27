@@ -34,11 +34,12 @@ from blastlab.services import model_folder as mf            # noqa: E402
 from blastlab.solvers import jobs                            # noqa: E402
 from blastlab.solvers.worker import GuiHooks                 # noqa: E402
 
-#: the keys of plan sec. 2.2, in order, plus the additive `failed`
+#: the keys of plan sec. 2.2, in order, plus the additive `vtk` (OUT-2),
+#: `wsl_fields` (OUT-3) and `failed`
 MANIFEST_KEYS = ['model', 'runs_dir', 'created', 'finished', 'solver',
                  'dim', 'case_file', 'git_commit', 'stop_reason',
                  'n_cells', 'n_procs', 'n_steps', 'wsl_scratch', 'outputs',
-                 'missing', 'vtk', 'failed']
+                 'missing', 'vtk', 'wsl_fields', 'failed']
 
 
 # ── A: the name rule, check, folder_for ──────────────────────────────────
@@ -908,7 +909,7 @@ class FakeDelete:
 
 
 def release(tmp, errored=False, stopped=False, failed=None, posix=POSIX,
-            **fake):
+            keep_all=False, **fake):
     """verify_and_release_scratch on a fake scratch and a model folder
     holding one finished row. Returns (manifest, notice, run, delete,
     folder, log lines)."""
@@ -922,7 +923,7 @@ def release(tmp, errored=False, stopped=False, failed=None, posix=POSIX,
     run, delete, lines = FakeWsl(root, **fake), FakeDelete(), []
     manifest, notice = mf.verify_and_release_scratch(
         manifest, folder, posix, errored, stopped, log=lines.append,
-        run=run, delete=delete, unc=lambda p: root)
+        run=run, delete=delete, unc=lambda p: root, keep_all=keep_all)
     return manifest, notice, run, delete, folder, lines
 
 
@@ -1239,6 +1240,95 @@ def test_d_stage_sets_vtk_dir():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def test_e_stage_sets_purge_fields():
+    """OUT-3 (E4): a blastFoam stage runs with hooks.purge_fields (no VTK
+    family needed), a ticked box gives keep_all_fields instead, a native
+    stage gets neither; all three are restored afterwards."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+    real_solver, real_release = solvers_pkg.get_solver, \
+        mf.verify_and_release_scratch
+    seen = []
+
+    def foam_like(case, hooks):
+        seen.append((hooks.purge_fields, hooks.keep_all_fields,
+                     hooks.fields_deleted))
+        return real_solver(case.dim, 'native')(case, hooks)
+    solvers_pkg.get_solver = lambda dim, backend: foam_like
+    mf.verify_and_release_scratch = lambda m, *a, **k: (m, None)
+    try:
+        for name, case, want in (
+                ('DEF', case2d(solver='blastfoam'), (True, False, set())),
+                ('KEEP', case2d(solver='blastfoam', keep_all_fields=True),
+                 (False, True, set())),
+                ('NAT', case2d(), (False, False, set()))):
+            seen.clear()
+            folder = mf.prepare(runs, name, confirm=lambda t: True)
+            w = SolverWorker([jobs.solve_stage(2, case, stage_dir=folder)])
+            w.run()
+            assert seen == [want], (name, seen)
+            assert (w.hooks.purge_fields, w.hooks.keep_all_fields,
+                    w.hooks.fields_deleted) == (False, False, None), name
+            mode = _manifest(folder)['wsl_fields']
+            assert (mode or {}).get('mode') == dict(
+                DEF='newest', KEEP='keep_all', NAT=None)[name], (name, mode)
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_e_wsl_fields_record():
+    """OUT-3 (E7): the root manifest's `wsl_fields` for each mode."""
+    rec = mf.wsl_fields_record
+    assert rec(False, False, 2, {'0.1'}) is None               # native
+    assert rec(True, False, 1, set()) == dict(mode='off', deleted=0,
+                                              first=None, last=None)
+    assert rec(True, True, 3, set()) == dict(mode='keep_all', deleted=0,
+                                             first=None, last=None)
+    assert rec(True, False, 2, {'0.0002', '1e-05', '0.0001'}) == dict(
+        mode='newest', deleted=3, first='1e-05', last='0.0002')
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+    try:
+        folder = os.path.join(tmp, 'MODEL')
+        os.makedirs(folder)
+        want = rec(True, False, 2, {'0.0001'})
+        m = mf.write_all(None, case2d(solver='blastfoam'), 2, folder,
+                         dict(wsl_fields=want), log=lambda *_a: None)
+        assert m['wsl_fields'] == want
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            assert json.load(f)['wsl_fields'] == want
+        m = mf.write_all(None, case2d(), 2, folder, log=lambda *_a: None)
+        assert m['wsl_fields'] is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_e_keep_all_keeps_the_scratch():
+    """OUT-3 (E5): a finished run with the box ticked keeps its scratch,
+    says why, and the default is released as before."""
+    assert mf.release_decision(False, False, dict(rows_ok=True,
+                                                  hashes_ok=True),
+                               keep_all=True) == (False, mf.KEEP_ALL_WHY)
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+    try:
+        m, notice, _r, delete, _f, lines = release(tmp, keep_all=True)
+        assert delete.calls == [] and m['wsl_scratch']['deleted'] is False
+        assert m['wsl_scratch']['kept_because'] == mf.KEEP_ALL_WHY
+        assert mf.KEEP_ALL_WHY in notice, notice
+        assert any('[note] WSL scratch kept' in ln for ln in lines), lines
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+    try:
+        m, notice, _r, delete, _f, _l = release(tmp)
+        assert delete.calls == [[POSIX]] and notice is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
@@ -1271,7 +1361,9 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_release_decision_table, test_d_skeleton_filter_and_script,
          test_d_stage_calls_release_for_foam,
          test_d_vtk_not_converted_keeps_scratch,
-         test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir]
+         test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir,
+         test_e_stage_sets_purge_fields, test_e_wsl_fields_record,
+         test_e_keep_all_keeps_the_scratch]
 
 
 if __name__ == '__main__':

@@ -860,8 +860,13 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
         raise RuntimeError(f'{unc} has no written times to resume from')
     # OUT-2 (D10): writes the VTK export already removed are not replayed
     from .vtk_export import deleted_note, note_resume
-    if getattr(hooks, 'vtk_dir', None):
-        note_resume(hooks.vtk_dir, times, hooks.log)
+    # OUT-3: ...and so are the older writes this stage's purge removed
+    # (a W3 auto-resume on the same hooks)
+    rec = getattr(hooks, 'fields_deleted', None)
+    rec = rec if isinstance(rec, set) else None
+    if getattr(hooks, 'vtk_dir', None) or rec:
+        note_resume(getattr(hooks, 'vtk_dir', None), times, hooks.log,
+                    deleted=rec)
     else:
         # owner decision P11: a resume from the run browser has no model
         # folder (P2-17), so find the run's vtk\ by its scratch and warn

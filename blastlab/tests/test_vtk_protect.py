@@ -133,6 +133,25 @@ class FakeLoop:
         self._protect = {}
         self.deleted = []
         FakeLoop.last = self
+        self.vtk = None
+        if self.purge == 'fields':
+            # OUT-3: the real executor, no VTK family, hooks as
+            # model_folder.stage_solve sets them; its deletes land here
+            import itertools
+            clock = itertools.count(0, 10)
+            self.vtk = vx.VtkExport(
+                spec, SimpleNamespace(purge_fields=True, fields_deleted=set(),
+                                      log=lambda m: None),
+                fields, delete=self._rm, clock=lambda: next(clock))
+
+    def _rm(self, paths):
+        head = self.spec.case_posix + '/'
+        for p in paths:
+            assert p.startswith(head), p
+            rel = p[len(head):]
+            shutil.rmtree(os.path.join(self.spec.case_unc, *rel.split('/')))
+            self.deleted.append(rel)
+        return True
 
     @property
     def protected(self):
@@ -156,6 +175,8 @@ class FakeLoop:
     def protect(self, name, why='read'):
         if name is not None:
             self._protect.setdefault(name, set()).add(why)
+        if self.vtk is not None:
+            self.vtk.protect(name, why)
 
     def unprotect(self, name, why='read'):
         keys = self._protect.get(name)
@@ -163,6 +184,8 @@ class FakeLoop:
             keys.discard(why)
             if not keys:
                 del self._protect[name]
+        if self.vtk is not None:
+            self.vtk.unprotect(name, why)
 
     def run(self):
         spec = self.spec
@@ -172,7 +195,9 @@ class FakeLoop:
             self.st['step'] += 10
             dpath = spec.time_dirs(name)
             self.on_frame(name, dpath, self.read_dir(name, dpath))
-            if self.purge:
+            if self.vtk is not None:
+                self.vtk.run(self.done)
+            elif self.purge:
                 done = list(self.done)
                 for t in vx.vtk_purge_plan(done, done, done, done,
                                            spec.start_dir, done,
@@ -446,12 +471,44 @@ def test_resume_note():
         ex = vx.VtkExport(spec, SimpleNamespace(vtk_dir=tmp,
                                                 log=lines.append), ('p',))
         assert ex.replay_incomplete and ex.state()['replay_incomplete']
+        # OUT-3: no vtk\ manifest, the hooks' record of the purge instead
+        lines.clear()
+        empty = os.path.join(tmp, 'none')
+        assert vx.note_resume(empty, ['0', '0.003'], lines.append,
+                              deleted={'0.001', '0.002'})
+        assert len(lines) == 1 and 'resuming after 2 older' in lines[0]
+        assert not vx.note_resume(None, ['0.001'], lines.append, deleted=())
+        # with a vtk\ manifest, that one answers (one line, as before)
+        lines.clear()
+        assert vx.note_resume(tmp, ['0', '0.003'], lines.append,
+                              deleted={'0.001', '0.002'})
+        assert len(lines) == 1 and 'VTK export removed' in lines[0], lines
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_fields_purge():
+    """OUT-3 Step 3: the real executor keeping only the newest fields (no
+    VTK family) deletes writes, and finalize reads the same Result as with
+    nothing deleted - pin time, snapshots, final_state, trigger, maps.
+    1D deletes nothing (P9)."""
+    out = []
+    for dim in (1, 2, 3):
+        keep, _l, lines_k = run(dim, purge=False)
+        got, loop, lines = run(dim, purge='fields')
+        if dim == 1:
+            assert loop.deleted == [], loop.deleted
+        else:
+            assert loop.deleted, f'{dim}D: the purge deleted nothing'
+        ok, why = same(keep, got)
+        assert ok, f'{dim}D keep vs fields purge differ at {why}'
+        assert _pin_line(lines_k) == _pin_line(lines)
+        out.append(f'{dim}D {len(loop.deleted)} deleted')
+    return ', '.join(out)
+
+
 TESTS = [test_1d, test_2d, test_3d, test_resume_keeps_the_arrival,
-         test_resume_note]
+         test_resume_note, test_fields_purge]
 
 
 def main():

@@ -101,6 +101,7 @@
       "charge": "1.0",
       "eos": "idealGas",
       "gauge_file": "gauges.txt",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_snapshots": "5",
       "order": "1 (Godunov)",
@@ -172,6 +173,7 @@
       "charge": "0.5",
       "eos": "JWL",
       "gauge_file": "",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
@@ -239,6 +241,7 @@
     "vtk_v_mode",
     "vtk_v_time",
     "vtk_v_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim1_blastfoam/typed": {
@@ -347,6 +350,7 @@
       "charge": "1.0",
       "eos": "idealGas",
       "gauge_file": "gauges.txt",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_snapshots": "5",
       "order": "1 (Godunov)",
@@ -420,6 +424,7 @@
       "charge": "0.5",
       "eos": "JWL",
       "gauge_file": "",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
@@ -487,6 +492,7 @@
     "vtk_v_mode",
     "vtk_v_time",
     "vtk_v_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim1_native/typed": {
@@ -552,6 +558,7 @@
       "charge": "2e0",
       "eos": "JWL",
       "gauge_file": "",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_snapshots": "7.0",
       "order": "2 (MUSCL)",
@@ -894,6 +901,7 @@
       "gauge_file": "gauges_2d.txt",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -995,6 +1003,7 @@
       "gauge_file": "g.txt",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_procs": "3",
       "n_snapshots": "6",
@@ -1168,6 +1177,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_blastfoam/set_c2_no_gauge_file": {
@@ -1229,6 +1239,7 @@
       "gauge_file": "",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -1372,6 +1383,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_blastfoam/set_c2_planar": {
@@ -1431,6 +1443,7 @@
       "gauge_file": "gauges_2d.txt",
       "geometry": "planar",
       "init_mode": "profile1d",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -1516,6 +1529,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_blastfoam/trigger0": {
@@ -1951,6 +1965,7 @@
       "gauge_file": "gauges_2d.txt",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -2067,6 +2082,7 @@
       "gauge_file": "g.txt",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_procs": "3",
       "n_snapshots": "6",
@@ -2227,6 +2243,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_native/set_c2_no_gauge_file": {
@@ -2297,6 +2314,7 @@
       "gauge_file": "",
       "geometry": "axisymmetric",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -2440,6 +2458,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_native/set_c2_planar": {
@@ -2508,6 +2527,7 @@
       "gauge_file": "gauges_2d.txt",
       "geometry": "planar",
       "init_mode": "profile1d",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -2593,6 +2613,7 @@
     "vtk_s_mode",
     "vtk_s_time",
     "vtk_s_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim2_native/trigger0": {
@@ -2824,6 +2845,7 @@
       "gauge_file": "",
       "geometry": "planar",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_procs": "6",
       "n_snapshots": "4",
@@ -3179,6 +3201,7 @@
       "eos": "idealGas",
       "gauge_file": "gauges_3d.txt",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -3281,6 +3304,7 @@
       "eos": "idealGas",
       "gauge_file": "gauges_3d.txt",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -3450,6 +3474,7 @@
     "vtk_v_mode",
     "vtk_v_time",
     "vtk_v_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim3_blastfoam/slice_blank": {
@@ -3791,6 +3816,7 @@
       "eos": "idealGas",
       "gauge_file": "gauges_3d.txt",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -3902,6 +3928,7 @@
       "eos": "idealGas",
       "gauge_file": "gauges_3d.txt",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "TNT",
       "n_procs": "0",
       "n_snapshots": "6",
@@ -4064,6 +4091,7 @@
     "vtk_v_mode",
     "vtk_v_time",
     "vtk_v_steps",
+    "keep_all_fields",
     "vtk_fields"
   ],
   "dim3_native/slice_blank": {
@@ -4327,6 +4355,7 @@
       "eos": "JWL",
       "gauge_file": "g3.txt",
       "init_mode": "charge",
+      "keep_all_fields": false,
       "material": "PETN",
       "n_procs": "4",
       "n_snapshots": "6",

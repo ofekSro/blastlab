@@ -3500,6 +3500,56 @@ def v05_vtk_manifest(qa):
              evidence=f"outputs {listed[:6]}; failed {m.get('failed')}")
 
 
+@scenario('V06', 'V', est=60)
+def v06_keep_all_fields(qa):
+    """OUT-3: the "Keep all fields in WSL" box on the VTK card, 1D and 3D,
+    its tooltip and strip note; native mode hides it with the card; the
+    kept-scratch reason of a ticked finished run (release_decision)."""
+    from blastlab.core.case import Case1D, Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    from blastlab.services import model_folder as mf
+    qa.goto('setup')
+    for dim, cls in ((1, Case1D), (3, Case3D)):
+        qa.set_case(cls(solver='blastfoam'))
+        form = _form(qa)
+        w = form.widgets.get('keep_all_fields')
+        qa.check(w is not None and w.isVisible() and not w.isChecked()
+                 and w.text() == mfields.KEEP_ALL_CAPTION
+                 and w.toolTip() == mfields.KEEP_ALL_TIP,
+                 f'{dim}D: the box is on the card, unticked, with its '
+                 f'tooltip', 'S2')
+        _vtk_shots(qa, f'{dim}d_keep_off')
+        qa.action = f'{dim}D: tick Keep all fields in WSL'
+        w.click()
+        qa.pump(0.8)
+        strip = qa.strip_text()
+        qa.note(f'{dim}D keep-all strip: ' + ' | '.join(strip))
+        want = 'P9' if dim == 1 else 'disk estimate'
+        qa.check(any('Keep all fields' in s and want in s for s in strip),
+                 f'{dim}D: the strip explains the box ({want})', 'S3')
+        qa.check(case_to_dict(qa.win.setup.get_case()).get(
+            'keep_all_fields') is True, f'{dim}D: the case carries it', 'S1')
+        _vtk_shots(qa, f'{dim}d_keep_on')
+    qa.solver('native')
+    form = _form(qa)
+    qa.check(not form.card_visible(VTK_CARD)
+             and not form.widgets['keep_all_fields'].isVisible()
+             and 'keep_all_fields' not in case_to_dict(
+                 qa.win.setup.get_case()),
+             'native: the box is hidden with the card, not in the case',
+             'S1')
+    qa.shot('native_keep_hidden')
+    qa.solver('blastfoam')
+    ok, why = mf.release_decision(False, False, dict(rows_ok=True,
+                                                     hashes_ok=True),
+                                  keep_all=True)
+    qa.note(f'V06 kept-scratch reason: {why}')
+    qa.check(not ok and why == mf.KEEP_ALL_WHY,
+             'a ticked finished run keeps its scratch, and says why', 'S2')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
 # ═══════════════════════════════════════════════════════════════════════
 #  Group H - light mode over everything that draws
 # ═══════════════════════════════════════════════════════════════════════

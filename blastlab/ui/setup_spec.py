@@ -22,7 +22,8 @@ from ..core.case import TRIGGER_ACTIONS
 from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
 from ..models.case import vtk_fields_for
-from ..models.fields import (VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
+from ..models.fields import (KEEP_ALL_CAPTION, KEEP_ALL_TIP,
+                             VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
                              VTK_PLANES_CAPTION, VTK_SECONDS_NOTE,
                              VTK_STEPS_DEFAULT, VTK_TIME_DEFAULT)
 from ..solvers.foam.materials import MATERIAL_NAMES
@@ -63,6 +64,7 @@ class F:
     rows: int = 4                 # 'points': visible rows
     file: dict = None             # 'file': dialog title + filters
     kinds: tuple = ()             # 'points': per-column parser
+    tip: str = ''                 # the input's tooltip (OUT-3)
 
 
 @dataclass(frozen=True)
@@ -247,6 +249,10 @@ def _vtk_card(dim):
         rows.append(F('vtk_planes', VTK_PLANES_CAPTION, 'points',
                       cols=('axis', 'position [m]'),
                       kinds=('axis', 'float'), rows=3))
+    # OUT-3: every blastFoam run keeps only its newest writes in WSL
+    # unless this is ticked - on this card, hidden with it in native mode
+    rows.append(F('keep_all_fields', KEEP_ALL_CAPTION, 'bool', False,
+                  tip=KEEP_ALL_TIP))
     rows.append(F('vtk_fields', VTK_MATRIX_CAPTION,
                   'matrix', values=vtk_fields_for(dim),
                   cols=VTK_COLUMNS[dim]))

@@ -225,6 +225,13 @@ VTK_PLANES_CAPTION = ('Extra section planes - the live-slice plane is also '
                       'written when "Sections and obstacles" is ticked')
 VTK_MATRIX_CAPTION = 'Quantities (Gauges: fixed - pressure, density, velocity)'
 
+#: OUT-3: the box on the same card, and its tooltip (both toolkits)
+KEEP_ALL_CAPTION = 'Keep all fields in WSL'
+KEEP_ALL_TIP = ('Off (default): WSL keeps only the newest writes while the '
+                'run goes on; the Results tab, gauges and resume are '
+                'unaffected. On: every write stays, and so does the WSL '
+                'scratch after the run.')
+
 
 def vtk_matrix(value, dim):
     """The matrix value in canonical form: one list per destination
@@ -356,6 +363,8 @@ def _vtk_fields_of_case(case, dim) -> dict:
         out.setdefault('vtk_planes', [])
         # the planes before the matrix, whatever the family order
         out['vtk_planes'] = out.pop('vtk_planes')
+    # OUT-3: the "Keep all fields in WSL" box sits on the same card
+    out['keep_all_fields'] = getattr(case, 'keep_all_fields', False) is True
     out['vtk_fields'] = vtk_matrix(matrix, dim)
     return out
 
@@ -601,6 +610,8 @@ def case_from_fields(dim: int, values: dict, mode: str) -> tuple:
 
     for key, fam in _vtk_from_fields(dim, values, number, whole).items():
         setattr(case, key, fam)
+    # OUT-3: blastFoam only, like the rest of the card
+    case.keep_all_fields = bool(values.get('keep_all_fields'))
     return case, errs, bad
 
 

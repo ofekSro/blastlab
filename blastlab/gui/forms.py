@@ -854,6 +854,19 @@ class CaseForm(ctk.CTkFrame):
             self.vtk_planes.grid(row=r + 1, column=0, columnspan=2,
                                  sticky='nsew')
             r += 2
+        # OUT-3: every blastFoam run keeps only its newest writes in WSL
+        # unless this is ticked (the Qt twin: setup_spec._vtk_card)
+        keep = ctk.CTkCheckBox(body, text=fields.KEEP_ALL_CAPTION,
+                               variable=self._bool('keep_all_fields', False),
+                               font=theme.F_BODY, corner_radius=6,
+                               border_color=c('border'),
+                               fg_color=c('accent'),
+                               hover_color=c('accent_hover'))
+        keep.grid(row=r, column=0, columnspan=2, sticky='w', pady=(GAP, 0))
+        theme.tooltip(keep, fields.KEEP_ALL_TIP)
+        self._scoped['blastfoam'].append(keep)
+        self._keep_all_box = keep
+        r += 1
         ctk.CTkLabel(right, text=fields.VTK_MATRIX_CAPTION,
                      font=theme.F_BODY, text_color=c('muted'),
                      anchor='w', justify='left',
