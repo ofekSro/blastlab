@@ -651,17 +651,35 @@ def _validate_vtk(case, rep, ctx):
                 "its writes stay per rank, because reconstructPar cannot "
                 "follow a changing mesh - run it on 1 MPI rank, or export "
                 "sections/obstacles only")
+        per = BYTES_PER_CELL_WRITE * (rep.n_cells or 0)
         if good and vol['mode'] == 'time':
             t_end = float(getattr(case, 't_end', 0.0) or 0.0)
             upto = '' if t_end > 0 else 'up to '
             t_end = t_end if t_end > 0 else safety_cap_s(case)
             n_w = max(1, int(math.ceil(t_end / (vol['value'] / 1e3))))
-            per = BYTES_PER_CELL_WRITE * (rep.n_cells or 0)
+            # GUI QA 2026-09-27 confusion 7 / batch plan P14: Time-mode
+            # writes land exactly on their times (adjustableRunTime), which
+            # clips dt - measured +4.2 % peak at a Z ~ 0.07 gauge
             note(f"VTK volumes: one write every {vol['value']:g} ms, "
                  f"{upto}{n_w} writes (~{n_w * per / 1e9:.1f} GB of written "
                  f"times on the WSL disk at ~{BYTES_PER_CELL_WRITE} B per "
                  f"cell per write, before conversion). Every write is also "
-                 f"ingested for the live view, so a dense cadence slows it")
+                 f"ingested for the live view, so a dense cadence slows it. "
+                 f"This cadence becomes the solver's write schedule: the "
+                 f"writes land exactly on their times and shorten the time "
+                 f"step there, which can change the solution slightly (see "
+                 f"the README, 'VTK files for ParaView')")
+        elif good:
+            # Step mode: the write count is the solver's step count / N,
+            # which is not known before the run (confusion 6)
+            note(f"VTK volumes: one write every {int(vol['value'])} solver "
+                 f"steps, ~{per / 1e9:.2f} GB per write on the WSL disk at "
+                 f"~{BYTES_PER_CELL_WRITE} B per cell per write, before "
+                 f"conversion. The number of writes depends on the run's "
+                 f"step count, which is not known before the run - a small "
+                 f"step interval on a large case can mean thousands of "
+                 f"full-field writes. Every write is also ingested for the "
+                 f"live view")
 
 
 class _Ctx:

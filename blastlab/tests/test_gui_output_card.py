@@ -262,6 +262,27 @@ def main():
     check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
           all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
                                  '101.325 kPa')), tip)
+
+    def tip_of(text):
+        return getattr(getattr(labels.get(text), '_blastlab_tip', None),
+                       'text', '')
+    def walk(w):
+        yield w
+        for ch in w.winfo_children():
+            yield from walk(ch)
+    card = [str(w.cget('text')) for w in walk(f._vtk_card)
+            if isinstance(w, ctk.CTkLabel)]
+    check('the Tk card shows the shared captions (Qt parity)',
+          F.VTK_PLANES_CAPTION in card and F.VTK_MATRIX_CAPTION in card,
+          str([t for t in card if 'Quantities' in t or 'planes' in t]))
+    check('no user-facing "OUT-4" on the card or its header tooltips',
+          not any('OUT-' in t for t in card + [tip_of(t) for t in labels]))
+    for row, want in (('Energy', 'total energy per unit volume'),
+                      ('Products', 'volume fraction of detonation products')):
+        check(f'the "{row}" tooltip explains it', want in tip_of(row),
+              tip_of(row))
+    check('the "Vol." header tooltip says whole-domain output',
+          'whole-domain output' in tip_of('Vol.'), tip_of('Vol.'))
     f.destroy()
 
     ROOT.destroy()

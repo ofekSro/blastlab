@@ -811,9 +811,10 @@ class CaseForm(ctk.CTkFrame):
                 'write', lambda *a, fam=fam: self._vtk_ticked(fam))
             mode.trace_add('write', lambda *a: self._sync_vtk())
         if self.dim == 3:
-            # decision 7: the live-slice plane is always a section
-            ctk.CTkLabel(body, text='Extra section planes - the live-slice '
-                         'plane is always written', font=theme.F_BODY,
+            # decision 7: the live-slice plane is always a section, when
+            # the surfaces family is on
+            ctk.CTkLabel(body, text=fields.VTK_PLANES_CAPTION,
+                         font=theme.F_BODY,
                          text_color=c('muted'), anchor='w', justify='left',
                          wraplength=LABEL_WRAP + INPUT_MIN).grid(
                 row=r, column=0, columnspan=2, sticky='w', pady=(GAP, 2))
@@ -823,10 +824,11 @@ class CaseForm(ctk.CTkFrame):
             self.vtk_planes.grid(row=r + 1, column=0, columnspan=2,
                                  sticky='nsew')
             r += 2
-        ctk.CTkLabel(body, text='Quantities (Gauges: fixed until OUT-4)',
+        ctk.CTkLabel(body, text=fields.VTK_MATRIX_CAPTION,
                      font=theme.F_BODY, text_color=c('muted'),
-                     anchor='w').grid(row=r, column=0, columnspan=2,
-                                      sticky='w', pady=(GAP, 2))
+                     anchor='w', justify='left',
+                     wraplength=LABEL_WRAP + INPUT_MIN).grid(
+            row=r, column=0, columnspan=2, sticky='w', pady=(GAP, 2))
         matrix = _MatrixVar(self.dim)
         matrix.trace_add('write', lambda *a: self._on_change())
         self.v['vtk_fields'] = matrix

@@ -146,12 +146,16 @@ VTK_QUANTITY_LABELS = {
 #: maximum of the ABSOLUTE pressure p: fieldMinMax on p with no pRef
 #: (solvers/foam/writer.py, the pMax function object; blastFoam User
 #: Guide v6.0, sec. 15.2 (p. 123); GUI QA 2026-09-27 F1 measured it cell
-#: by cell against the exported p)
+#: by cell against the exported p). rhoE: E is the total energy, thermal
+#: and kinetic (blastFoam User Guide v6.0, sec. 2, eq. 2.7)
 VTK_QUANTITY_TIPS = {
     'pMax': 'Peak pressure (the running maximum of the ABSOLUTE pressure '
             'p in each cell; subtract ambient, 101.325 kPa, for the peak '
             'overpressure)',
-    'alpha.expl': 'Products (volume fraction)',
+    'rhoE': 'Energy (total energy per unit volume, thermal + kinetic) '
+            '[J/m3]',
+    'alpha.expl': 'Products (volume fraction of detonation products, '
+                  '0..1)',
     'timeOfArrival': 'Arrival time (first arrival)'}
 
 
@@ -198,10 +202,20 @@ def vtk_column_tip(dim, col):
     """The full name of matrix column `col`, for its tooltip."""
     if col == 'volumes' and int(dim) < 3:
         return 'Whole domain (volumes)'
-    return {'gauges': 'Gauges - always p, rho and U (fixed until OUT-4)',
+    return {'gauges': 'Gauges - the gauge TSV always carries p, rho and U '
+                      '(fixed; gauges get no VTK files)',
             'sections': 'Sections - the live-slice plane and the extra '
                         'planes', 'obstacles': 'Obstacles - their walls',
-            'volumes': 'Volumes - the whole 3D domain'}[col]
+            'volumes': 'Volumes - whole-domain output: every cell of the 3D '
+                       'domain, one file per write (not the quantity '
+                       '"volume")'}[col]
+
+
+#: the captions above the plane table and the matrix, shared by both
+#: toolkits (GUI QA 2026-09-27, confusions 3 and 5)
+VTK_PLANES_CAPTION = ('Extra section planes - the live-slice plane is also '
+                      'written when "Sections and obstacles" is ticked')
+VTK_MATRIX_CAPTION = 'Quantities (Gauges: fixed - pressure, density, velocity)'
 
 
 def vtk_matrix(value, dim):

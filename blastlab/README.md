@@ -144,7 +144,8 @@ native mode, and a native run ignores the keys.
   pair and one interval per mode (the other is greyed): **Time is
   simulated milliseconds** (`Every [ms]`; the case JSON stores ms too),
   Step is solver steps. 3D adds extra section planes (axis, position
-  [m]); the live-slice plane is always written, and a plane is snapped
+  [m]); the live-slice plane is also written whenever *Sections and
+  obstacles* is ticked, and a plane is snapped
   to the nearest cell layer but keeps the name typed (`slice_x_0.20`).
   The quantity matrix has a locked Gauge column (p, rho, U) and one
   column per destination - Sect. / Obst. / Vol. (1D/2D: Domain). The
@@ -160,7 +161,14 @@ native mode, and a native run ignores the keys.
   Volumes **are** the solver's write schedule (Time: every value / 1000
   s of simulated time, landing exactly on it; Step: every N steps), so
   they cannot be combined with a write budget, and every write is also
-  ingested for the live view.
+  ingested for the live view. **Choosing a volumes cadence is choosing
+  the write schedule, and that can change the solution slightly:** a
+  Time-mode write shortens the time step to land on its time, which the
+  default schedule does differently. Measured once (batch plan P14): a
+  gauge at Z ≈ 0.07 m/kg^1/3 read +4.2 % peak and +4.8 % impulse
+  against the same run without export; the same schedule without export
+  reproduces the export run byte for byte. Validation notes it, and in
+  Step mode notes that the write count depends on the step count.
 - **Layout** - `<time>` is OpenFOAM's own time name in seconds:
 
   | Path | Content |

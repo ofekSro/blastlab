@@ -364,6 +364,35 @@ def main():
     check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
           all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
                                  '101.325 kPa')), tip)
+    # the confusing-wording list: no internal ids, what the rows mean
+    caps = [f.label_text('vtk_planes'), f.label_text('vtk_fields')]
+    check('no user-facing "OUT-4" in the captions or header tooltips',
+          not any('OUT-' in t for t in caps + [
+              w.toolTip() for w in labels.values()]), str(caps))
+    check('the live-slice note says "when Sections and obstacles is ticked"',
+          'when "Sections and obstacles" is ticked' in caps[0], caps[0])
+    check('Gauges: fixed - pressure, density, velocity',
+          'pressure, density, velocity' in caps[1], caps[1])
+    for row, want in (('Energy', 'total energy per unit volume'),
+                      ('Products', 'volume fraction of detonation products')):
+        t = labels[row].toolTip() if row in labels else ''
+        check(f'the "{row}" tooltip explains it', want in t, t)
+    t = labels['Vol.'].toolTip() if 'Vol.' in labels else ''
+    check('the "Vol." header tooltip says whole-domain output',
+          'whole-domain output' in t, t)
+    f.widgets['vtk_v_on'].click()
+    pump(5)
+    rep = validate_case(f.get_case())
+    n = next((x for x in rep.notes if x.startswith('VTK volumes')), '')
+    check('Time-mode volumes note: the cadence is the write schedule',
+          "solver's write schedule" in n and 'README' in n, n)
+    f.v['vtk_v_mode'].set('step')
+    pump(5)
+    rep = validate_case(f.get_case())
+    n = next((x for x in rep.notes if x.startswith('VTK volumes')), '')
+    check('Step-mode volumes note: size per write, count depends on steps',
+          'every 25 solver steps' in n and 'GB per write' in n
+          and "depends on the run's step count" in n, n)
 
     print('\n' + '=' * 52)
     if FAIL:

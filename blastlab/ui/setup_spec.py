@@ -22,7 +22,8 @@ from ..core.case import TRIGGER_ACTIONS
 from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
 from ..models.case import vtk_fields_for
-from ..models.fields import (VTK_COLUMNS, VTK_FAMILIES, VTK_MS_DEFAULT,
+from ..models.fields import (VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
+                             VTK_MS_DEFAULT, VTK_PLANES_CAPTION,
                              VTK_STEPS_DEFAULT)
 from ..solvers.foam.materials import MATERIAL_NAMES
 
@@ -230,12 +231,12 @@ def _vtk_card(dim):
               VTK_STEPS_DEFAULT),
         ]
     if dim == 3:
-        # decision 7: the live-slice plane is always a section
-        rows.append(F('vtk_planes', 'Extra section planes - the live-slice '
-                      'plane is always written', 'points',
+        # decision 7: the live-slice plane is always a section, when the
+        # surfaces family is on
+        rows.append(F('vtk_planes', VTK_PLANES_CAPTION, 'points',
                       cols=('axis', 'position [m]'),
                       kinds=('axis', 'float'), rows=3))
-    rows.append(F('vtk_fields', 'Quantities (Gauges: fixed until OUT-4)',
+    rows.append(F('vtk_fields', VTK_MATRIX_CAPTION,
                   'matrix', values=vtk_fields_for(dim),
                   cols=VTK_COLUMNS[dim]))
     return CardSpec('VTK output (ParaView)', col=1, scope='blastfoam',
