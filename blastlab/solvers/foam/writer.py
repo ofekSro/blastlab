@@ -36,6 +36,7 @@ from ...core.bc import normalize_bc
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
+from ...models.case import vtk_family, vtk_fields_for
 from . import env
 from .dicts import (AMR_ALLOWABLE_IMBALANCE, AMR_BALANCE_INTERVAL,
                     AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
@@ -147,6 +148,14 @@ class CaseSpec:
     #: then carries the peak/impulse maps, which it can, because the
     #: resume's ingest replays every write the stopped run left.
     fo_accumulators: bool = True
+    #: OUT-2: the case's VTK families, normalised (models.case.vtk_family),
+    #: on a blastFoam case with the family switched on; else None
+    vtk_surfaces: dict = None
+    vtk_volumes: dict = None
+    #: OUT-2: N > 0 when VTK volumes run in Step mode: the solver writes
+    #: every N steps (`writeControl timeStep`) and `write_interval` is
+    #: then only the transit-sized estimate, not the schedule
+    write_steps: int = 0
 
     @property
     def burst_points(self):
@@ -383,6 +392,30 @@ def _apply_budget(spec, case):
         spec.adaptive_write = False
 
 
+def _apply_vtk(spec, case):
+    """OUT-2: carry the case's VTK families onto a blastFoam spec. VTK
+    volumes make their cadence the solver's own write schedule (plan
+    sec. 3.4): Time mode pins writeInterval to `value` (seconds, P22) with
+    `writeControl runTime` (the first step past each multiple, dt left
+    alone - owner decision P14 (b)), Step mode writes every N steps.
+    Either way the adaptive controller is off; the
+    end-time write (writeTimes, T62) stays. Validation refuses volumes
+    together with a write budget; should both arrive, volumes win and the
+    budget (and with it the decomposed purge) is dropped."""
+    if getattr(case, 'solver', 'native') != 'blastfoam':
+        return
+    spec.vtk_surfaces = vtk_family(case, 'vtk_surfaces')
+    spec.vtk_volumes = vol = vtk_family(case, 'vtk_volumes')
+    if not vol:
+        return
+    spec.adaptive_write = False
+    spec.write_budget = 0
+    if vol['mode'] == 'step':
+        spec.write_steps = int(vol['value'])
+    else:
+        spec.write_interval = float(vol['value'])     # [s], P22
+
+
 def plan_case(case):
     """Geometry/timing plan (no text yet). Returns a CaseSpec without
     `files`."""
@@ -408,6 +441,7 @@ def plan_case(case):
         spec.probe_pts = [(g, 0.0, 0.0) for g in gauges]
         spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
             case, R_out, R_out, case.n_snapshots)
+        _apply_vtk(spec, case)
         return spec
 
     if case.dim == 2:
@@ -474,6 +508,7 @@ def plan_case(case):
         spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
             case, max(Lx_eff, Ly_eff), est, case.n_snapshots)
         _apply_budget(spec, case)
+        _apply_vtk(spec, case)
         return spec
 
     # 3D - the primary charge plus any extras; the grid resolves the
@@ -539,6 +574,7 @@ def plan_case(case):
     spec.end_time, spec.write_interval, spec.cap_is_end = _timing(
         case, max(Ls), est, case.n_snapshots)
     _apply_budget(spec, case)
+    _apply_vtk(spec, case)
     return spec
 
 
@@ -784,11 +820,26 @@ def _controldict_time(spec, case):
     # exactly uniform and exactly at rest has Co = 0 and
     # `Time::adjustDeltaT` divides by it - a SIGFPE on the first step,
     # measured. Falsy by default, so every golden is untouched.
+    # OUT-2: VTK volumes in Step mode write every N solver steps. Time
+    # mode (its interval already sits in spec.write_interval, see
+    # _apply_vtk) writes with `runTime`, never adjustableRunTime: the
+    # latter clips deltaT to land on each write time (OF-9
+    # timeControlFunctionObject.C, timeToNextWrite), which changed the
+    # solve (batch plan P14: +4.2 % peak at a Z ~ 0.07 gauge). runTime
+    # writes at the first step past each multiple and leaves dt alone
+    # (owner decision P14 (b), 2026-09-27). The exact end-time write
+    # (writeTimes, T62) still clips dt once, at t_end, as on every case.
+    if spec.write_steps:
+        d['writeControl'] = 'timeStep'
+        d['writeInterval'] = int(spec.write_steps)
+    elif spec.vtk_volumes:
+        d['writeControl'] = 'runTime'
     fixed_dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
     if fixed_dt > 0.0:
         d['deltaT'] = Raw(fmt(fixed_dt))
         d['adjustTimeStep'] = 'no'
-        d['writeControl'] = 'runTime'
+        if not spec.write_steps:
+            d['writeControl'] = 'runTime'
     return d
 
 
@@ -908,6 +959,41 @@ def _controldict_amr_fields(spec):
     return functions
 
 
+def live_slice_target(spec, case):
+    """(axis, position asked for [m]) of the 3D live-slice plane: the
+    case's slice_axis / slice_pos, or the burst point when blank."""
+    axis = getattr(case, 'slice_axis', 'y') or 'y'
+    target = (spec.center['xyz'.index(axis)]
+              if getattr(case, 'slice_pos', None) is None
+              else float(case.slice_pos))
+    return axis, target
+
+
+def snap_plane(spec, axis, target):
+    """Position [m] a 3D sampling plane normal to `axis` actually cuts at:
+    the nearest cell-centre layer to `target` (the first one on a tie),
+    so an uncut plane samples one face per cell with the cell value.
+    Shared by the live slice and the OUT-2 VTK sections."""
+    ax_i = 'xyz'.index(axis)
+    c = spec.grid[('x_c', 'y_c', 'z_c')[ax_i]]
+    pos = float(min(c, key=lambda c_i: abs(float(c_i) - target)))
+    if spec.amr and spec.display_level < spec.amr:
+        # cells finer than the display grid have faces at the
+        # display-layer centre: cut through the centre of the
+        # first finest-level sub-layer instead (a half-odd
+        # multiple of the finest cell never lies on a face of
+        # any level); in-plane centres are unaffected
+        pos += (spec.dx_base / 2 ** spec.amr - spec.dx) / 2.0
+    return pos
+
+
+def plane_point_normal(axis, pos):
+    """(point, normal) of the plane normal to `axis` at `pos`."""
+    ax_i = 'xyz'.index(axis)
+    return (tuple(pos if a == ax_i else 0.0 for a in range(3)),
+            tuple(1 if a == ax_i else 0 for a in range(3)))
+
+
 def _controldict_live_sampling(spec, case):
     """The live-view samplers: a p plane cut (`LIVE_SLICE`, 2D/3D) or a
     p(r) line (`LIVE_SET`, 1D), every few solver steps. OpenFOAM's own
@@ -928,23 +1014,8 @@ def _controldict_live_sampling(spec, case):
         if spec.dim == 2:
             pt, nrm = (0.0, 0.0, 0.0), (0, 0, 1)
         else:
-            axis = getattr(case, 'slice_axis', 'y') or 'y'
-            ax_i = 'xyz'.index(axis)
-            c = spec.grid[('x_c', 'y_c', 'z_c')[ax_i]]
-            target = (spec.center[ax_i]
-                      if getattr(case, 'slice_pos', None) is None
-                      else float(case.slice_pos))
-            # snap to the nearest cell-centre layer (first one on a tie)
-            pos = float(min(c, key=lambda c_i: abs(float(c_i) - target)))
-            if spec.amr and spec.display_level < spec.amr:
-                # cells finer than the display grid have faces at the
-                # display-layer centre: cut through the centre of the
-                # first finest-level sub-layer instead (a half-odd
-                # multiple of the finest cell never lies on a face of
-                # any level); in-plane centres are unaffected
-                pos += (spec.dx_base / 2 ** spec.amr - spec.dx) / 2.0
-            pt = tuple(pos if a == ax_i else 0.0 for a in range(3))
-            nrm = tuple(1 if a == ax_i else 0 for a in range(3))
+            axis, target = live_slice_target(spec, case)
+            pt, nrm = plane_point_normal(axis, snap_plane(spec, axis, target))
         functions[LIVE_SLICE] = {
             'type': 'surfaces',
             'libs': Raw('("libsampling.so")'),
@@ -1009,16 +1080,114 @@ def _controldict_probes(spec):
     return functions
 
 
+#: OUT-2: the two VTK surface function objects (owner answer Q2: one per
+#: field list, same cadence). Each writes under postProcessing/<name>/.
+VTK_SECTIONS = 'vtkSections'
+VTK_OBSTACLES = 'vtkObstacles'
+#: the function objects that accumulate per step: their fields exist
+#: only while `fo_accumulators` is on (P1-5, a resumed AMR leg)
+_FO_ACCUMULATED = ('pMax', 'impulse')
+
+
+def vtk_surface_fields(spec, names):
+    """`names` minus what this spec does not write: a field the
+    dimension lacks (validation refuses those) and, on a resumed AMR leg
+    (`fo_accumulators` off), pMax / impulse (D4)."""
+    have = vtk_fields_for(spec.dim)
+    return [f for f in names if f in have
+            and (spec.fo_accumulators or f not in _FO_ACCUMULATED)]
+
+
+def vtk_plane_name(axis, pos):
+    """The surface name of a VTK section: the position the user asked
+    for, not the snapped one (Q6)."""
+    return f'slice_{axis}_{float(pos):.2f}'
+
+
+def _controldict_vtk_surfaces(spec, case):
+    """OUT-2: the VTK section planes and obstacle walls, one `surfaces`
+    function object per field list (owner answer Q2), written with
+    blastFoam's vtkTimeSeries surface writer, which also keeps a
+    `.vtk.series` index for ParaView (blastFoam User Guide v6.0, sec. 15.5
+    (p. 124); the pattern of the tutorial building3DWorkshop controlDict).
+
+    * `libs`: the sampling library is loaded by default (guide sec. 15,
+      p. 122); the vtkTimeSeries writer itself lives in
+      libblastFunctionObjects (blastfoam src/functionObjects/Make/files,
+      read on this machine), named too so the entry stands on its own.
+    * Time mode samples with `writeControl runTime`, never
+      adjustableRunTime: a function object on adjustableRunTime clips the
+      solver's deltaT to land on its own times (OF-9
+      timeControlFunctionObject.C, timeToNextWrite, which answers vGreat
+      for every other writeControl), which would change the solve (D5). runTime takes the first step past each multiple. Step mode is
+      `timeStep`.
+    * Planes are type `plane` with interpolate/triangulate off - the
+      sampler the live slice already runs on this build - so raw cell
+      values and peaks are not smeared (Q6), snapped to the nearest
+      cell-centre layer like the live slice and named by the position
+      asked for. The live-slice plane always comes first.
+    * The obstacles entry exists only when the mesh has the `obstacles`
+      wall patch."""
+    fam = spec.vtk_surfaces
+    functions = {}
+    if not fam:
+        return functions
+    if fam['mode'] == 'step':
+        control, interval = 'timeStep', int(fam['value'])
+    else:
+        control, interval = 'runTime', float(fam['value'])   # [s], P22
+
+    def surfaces_fo(fields, surfaces):
+        return {
+            'type': 'surfaces',
+            'libs': Raw('("libsampling.so" "libblastFunctionObjects.so")'),
+            'writeControl': control,
+            'writeInterval': interval,
+            'surfaceFormat': 'vtkTimeSeries',
+            'interpolationScheme': 'cell',
+            'fields': fields,
+            'surfaces': surfaces,
+        }
+
+    sections = vtk_surface_fields(spec, fam['fields'])
+    if sections and spec.dim == 3:
+        planes = [live_slice_target(spec, case)] + [
+            (str(ax), float(pos)) for ax, pos in fam['planes']]
+        surfaces = []
+        for axis, target in planes:
+            pt, nrm = plane_point_normal(axis,
+                                         snap_plane(spec, axis, target))
+            surfaces.append((vtk_plane_name(axis, target), {
+                'type': 'plane',
+                'planeType': 'pointAndNormal',
+                'pointAndNormalDict': {'point': pt, 'normal': nrm},
+                'interpolate': False,
+                'triangulate': False,
+            }))
+        functions[VTK_SECTIONS] = surfaces_fo(sections, surfaces)
+    walls = vtk_surface_fields(spec, fam['obstacle_fields'])
+    if walls and ('obstacles', 'wall') in spec.patches:
+        functions[VTK_OBSTACLES] = surfaces_fo(walls, [('obstacles', {
+            'type': 'patch',
+            'patches': ['obstacles'],
+            'triangulate': False,
+        })])
+    return functions
+
+
 def _controldict(spec, case):
     """system/controlDict: the time/write control, then the `functions`
     entry assembled section by section in the order the file has always
-    had (docs/ARCHITECTURE_REVIEW.md section 5, Phase 10)."""
+    had (docs/ARCHITECTURE_REVIEW.md section 5, Phase 10). The OUT-2 VTK
+    surfaces come last, after the probes, so every accumulating function
+    object has already run in the step they sample."""
     d = _controldict_time(spec, case)
     functions = {}
     functions.update(_controldict_function_objects(spec))
     functions.update(_controldict_amr_fields(spec))
     functions.update(_controldict_live_sampling(spec, case))
     functions.update(_controldict_probes(spec))
+    functions.update(_controldict_vtk_surfaces(spec, case))
     if functions:
         d['functions'] = functions
     return foam_file('controlDict', block(d), location='system')

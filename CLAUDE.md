@@ -387,10 +387,10 @@ there: `env.detect_ram_gb` derives the cell cap from the VM's memory, so a cap
 silently shrinks the largest case the app will allow.
 
 **8.5 Disk.** The run corpus once reached 374 GB and filled C:, and the
-`ext4.vhdx` is **not sparse** - deleting runs inside WSL does not return the
-space. Reclaim with `wsl --shutdown` then
-`wsl --manage Ubuntu --set-sparse true`. **Never touch `~\Desktop`** - about
-930 GB of thesis data.
+`ext4.vhdx` only grows - deleting runs inside WSL does not return the space, and
+`--set-sparse` / `compact vdisk` no longer work. Reclaim = prune the runs, then
+export/import the distro: `docs/wsl-disk-reclaim-plan.md` (done 2026-09-27, 481 ->
+8.6 GB). **Never touch `~\Desktop`** - about 930 GB of thesis data.
 
 **8.6 Before any WSL run, confirm the VM is free:**
 `wsl -d Ubuntu -- pgrep -a blastFoam` must come back empty. A foreign solver

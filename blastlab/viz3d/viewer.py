@@ -90,6 +90,13 @@ VIEW_PRESETS = {
 }
 
 
+def log_clim(lo, hi, decades=LOG_DECADES):
+    """Colour range for a log scale: the lower bound clamped positive and
+    at most `decades` below `hi` (P3-25: shared by every colour-mapped
+    layer, so planes, volume and loads floor at the same value)."""
+    return max(lo, hi * 10.0 ** -decades, 1e-9), hi
+
+
 def _ovp_kpa(p):
     return (np.asarray(p, np.float32) - np.float32(P_AIR)) / np.float32(1e3)
 
@@ -472,8 +479,15 @@ class BlastScene(_CameraOps):
         if key in self._stale and self.frame is not None:
             arr = self.frame.get(key)
             if arr is not None:
-                vals = _ovp_kpa(arr) if FIELDS[key]['ovp'] \
-                    else np.asarray(arr, np.float32)
+                # one F-ordered float32 buffer, so ravel(order='F') is a
+                # view (P3-7: was a float32 temp + an F copy). Bit-identical
+                # to _ovp_kpa: float32(arr) - float32(P_AIR), / float32(1e3)
+                if FIELDS[key]['ovp']:
+                    vals = np.subtract(arr, np.float32(P_AIR),
+                                       dtype=np.float32, order='F')
+                    vals /= np.float32(1e3)
+                else:
+                    vals = np.asarray(arr, np.float32, order='F')
                 self.grid.point_data[key] = vals.ravel(order='F')
             self._stale.discard(key)
 
@@ -547,7 +561,9 @@ class BlastScene(_CameraOps):
     def _auto_clim(self):
         """Track the current frame's range of the active field (dead-band
         so tiny changes don't re-render every layer every frame)."""
-        arr = self.grid.point_data[self.field]
+        # np.asarray: nanmax/nanmin on the pyvista_ndarray subclass miss
+        # numpy's fast path and copy the field plus a mask (P3-7)
+        arr = np.asarray(self.grid.point_data[self.field])
         if arr.size == 0:
             return
         hi = float(np.nanmax(arr))
@@ -573,7 +589,7 @@ class BlastScene(_CameraOps):
                 lo, hi = float(np.nanmin(arr)), float(np.nanmax(arr))
         hi = max(hi, lo + 1e-9)
         if self.log_scale:
-            lo = max(lo, hi * 10.0 ** -LOG_DECADES, 1e-9)
+            lo, hi = log_clim(lo, hi)
         return lo, hi
 
     def _scrub(self, v):
@@ -656,7 +672,7 @@ class BlastScene(_CameraOps):
         self._update_hud()
 
     def _update_hud(self):
-        peak = (float(np.nanmax(self.grid.point_data['p']))
+        peak = (float(np.nanmax(np.asarray(self.grid.point_data['p'])))
                 if self.frame is not None else 0.0)
         mode = ('PLAYBACK' if self.done else
                 'LIVE' if self.follow_live else 'LIVE (paused view)')
@@ -827,7 +843,9 @@ class _CutPlane(_Layer):
         s.ensure_field(scal)
         clim = s.active_clim()
         if self._actor is None or scal != self._scalars:
-            s.pl.remove_actor(self.name)
+            # render=False throughout the scene (P3-7): the host tick is
+            # the one render per frame; pyvista's default renders here
+            s.pl.remove_actor(self.name, render=False)
             title = field_title(s, s.field)
             if self._scalars is not None and self._scalars != scal:
                 # pyvista keeps a removed actor's scalar bar: drop the old
@@ -849,7 +867,8 @@ class _CutPlane(_Layer):
                                      # narrow embedded viewport (QA-17)
                                      position_x=0.82, position_y=0.30,
                                      width=0.06, height=0.52,
-                                     title_font_size=11, label_font_size=10),
+                                     title_font_size=11, label_font_size=10,
+                                     render=False),
                 reset_camera=False, render=False)
             self._scalars = scal
         else:
@@ -944,7 +963,7 @@ class _SampledPlane(_Layer):
     def clear(self):
         self.t = None
         if self._actor is not None:
-            self.s.pl.remove_actor(self.name)
+            self.s.pl.remove_actor(self.name, render=False)
             self._actor = None
 
     def refresh(self):
@@ -991,7 +1010,7 @@ class _MeshEdges(_Layer):
 
     def _remove(self):
         try:
-            self.s.pl.remove_actor(self.NAME)
+            self.s.pl.remove_actor(self.NAME, render=False)
         except Exception:
             pass
         self._built = None
@@ -1148,22 +1167,22 @@ class _SurfaceLoads(_Layer):
 
     def _load_clim(self):
         """Manual Min/Max applies only when it is an overpressure range;
-        otherwise the faces keep their own per-frame overpressure range."""
+        otherwise the faces keep their own per-frame overpressure range.
+        Log scale clamps either range positive, as the planes do (P3-25)."""
         s = self.s
         if not s.auto_scale and FIELDS[s.field]['ovp']:
-            return s.active_clim()
+            return s.active_clim()          # already log-clamped
         lo, hi = self._own
-        return (lo, max(hi, lo + 1e-6))
+        hi = max(hi, lo + 1e-6)
+        return log_clim(lo, hi) if s.log_scale else (lo, hi)
 
-    def _track(self, loads):
-        """Per-frame overpressure range of the faces (2 % dead-band)."""
+    def _track(self, ovp):
+        """Per-frame overpressure range of the faces (2 % dead-band).
+        `ovp`: {face id: overpressure [kPa]}, converted once per frame."""
         hi = 0.0
-        for fid in self.meshes:
-            arr = loads.get(fid)
-            if arr is not None:
-                v = _ovp_kpa(arr)
-                if v.size:
-                    hi = max(hi, float(np.nanmax(v)))
+        for v in ovp.values():
+            if v.size:
+                hi = max(hi, float(np.nanmax(v)))
         if abs(hi - self._own[1]) > 0.02 * max(self._own[1], 1e-9):
             self._own = (0.0, max(hi, 1e-6))
 
@@ -1173,11 +1192,13 @@ class _SurfaceLoads(_Layer):
             actor = self.s.pl.actors.get(f'load_{fid}')
             if actor is not None:
                 actor.mapper.scalar_range = clim
+                # the loads bar reads the first face's LUT: log ticks follow
+                actor.mapper.lookup_table.log_scale = self.s.log_scale
 
     def _remove_all(self):
         s = self.s
         for fid in self.meshes:
-            s.pl.remove_actor(f'load_{fid}')
+            s.pl.remove_actor(f'load_{fid}', render=False)
         try:
             s.pl.remove_scalar_bar(LOADS_BAR_KEY, render=False)
         except Exception:
@@ -1194,17 +1215,20 @@ class _SurfaceLoads(_Layer):
             self._remove_all()
             return
         loads = s.frame.get('loads') or {}
-        self._track(loads)
+        ovp = {fid: _ovp_kpa(loads[fid]) for fid in self.meshes
+               if loads.get(fid) is not None}
+        self._track(ovp)
         clim = self._load_clim()
         for fid, mesh in self.meshes.items():
-            arr = loads.get(fid)
-            if arr is None:
+            v = ovp.get(fid)
+            if v is None:
                 continue
-            mesh.cell_data['load'] = _ovp_kpa(arr).ravel(order='F')
+            mesh.cell_data['load'] = v.ravel(order='F')
             name = f'load_{fid}'
             if name not in s.pl.actors:
                 first_bar = self._bar_actor is None
                 kw = dict(scalars='load', cmap=CMAP, clim=clim, name=name,
+                          log_scale=s.log_scale,
                           nan_color='#4a4f57', show_scalar_bar=first_bar,
                           reset_camera=False, render=False)
                 if first_bar:
@@ -1215,7 +1239,7 @@ class _SurfaceLoads(_Layer):
                         title=LOADS_BAR_KEY, color='white', fmt='%.0f',
                         vertical=False, position_x=0.28, position_y=0.02,
                         width=0.44, height=0.10, n_labels=4,
-                        title_font_size=1, label_font_size=9)
+                        title_font_size=1, label_font_size=9, render=False)
                 if s.init.get('cyl'):
                     # cylindrical domain: cells beyond the outer radius
                     # are no-data - hide them so the ground is a disc
@@ -1225,33 +1249,74 @@ class _SurfaceLoads(_Layer):
                     self._bar_actor = actor
                     s.pl.add_text(LOADS_TITLE, position=(0.395, 0.10),
                                   viewport=True, font_size=6,
-                                  color='white', name=LOADS_CAPTION)
+                                  color='white', name=LOADS_CAPTION,
+                                  render=False)
             else:
-                s.pl.actors[name].mapper.scalar_range = clim
+                mapper = s.pl.actors[name].mapper
+                mapper.scalar_range = clim
+                mapper.lookup_table.log_scale = s.log_scale
+
+
+#: derived point array the volume draws in log mode: log10 of the active
+#: field, clipped to the log colour range (P3-8)
+VOL_LOG_KEY = 'vol_log'
 
 
 class _Volume(_Layer):
-    """Semi-transparent cloud of the active field."""
+    """Semi-transparent cloud of the active field.
+
+    Log scale (P3-8) is a DATA transform, not a LUT flag: pyvista samples
+    a volume's colour/opacity transfer functions at linearly spaced values
+    even with log_scale=True, and a hand-built log-spaced transfer function
+    hits the GPU mapper's 32768-texel table (six decades collapse the air
+    shock into one texel). So in log mode the volume draws VOL_LOG_KEY =
+    log10(clip(field, lo, hi)) over (log10 lo, log10 hi) with linear
+    transfer functions - colour and opacity linear in log(value). It costs
+    one extra float32 display field per frame, only while the volume is on
+    AND log is on. The volume shows no scalar bar, so log10 values are
+    never printed; the planes' bar is the reference."""
 
     def __init__(self, scene, on):
         self.s = scene
         self.name = 'volume_f'
-        self._added = None           # field key currently added, or None
+        self._added = None           # (field, log_scale) added, or None
         self.set_visible(on)
+
+    def _clim(self):
+        """Mapper range: the active clim, or its log10 in log mode."""
+        lo, hi = self.s.active_clim()
+        if self.s.log_scale:
+            return float(np.log10(lo)), float(np.log10(hi))
+        return lo, hi
+
+    def _fill_log(self):
+        """VOL_LOG_KEY from the active field, clipped to the same (lo, hi)
+        the planes use (active_clim is log-clamped in log mode)."""
+        s = self.s
+        lo, hi = s.active_clim()
+        vals = np.clip(s.grid.point_data[s.field], np.float32(lo),
+                       np.float32(hi))
+        np.log10(vals, out=vals)
+        s.grid.point_data[VOL_LOG_KEY] = vals
 
     def on_clim_changed(self):
         if not self._added:
             return
+        if self._added[1] != self.s.log_scale:
+            self._remove()           # log toggled: a checkbox, never per frame
+            self.refresh()
+            return
         actor = self.s.pl.actors.get(self.name)
         try:
-            actor.mapper.scalar_range = self.s.active_clim()
+            # pyvista re-ranges both transfer functions on this setter
+            actor.mapper.scalar_range = self._clim()
         except Exception:       # mapper cannot rescale live: rebuild
             self._remove()
             self.refresh()
 
     def _remove(self):
         try:
-            self.s.pl.remove_actor(self.name)
+            self.s.pl.remove_actor(self.name, render=False)
         except Exception:
             pass
         self._added = None
@@ -1262,14 +1327,27 @@ class _Volume(_Layer):
             self._remove()
             return
         s.ensure_field(s.field)
-        if self._added != s.field:
+        key = (s.field, s.log_scale)
+        if s.log_scale:
+            self._fill_log()            # per displayed frame, log mode only
+        if self._added != key:
             self._remove()
-            s.pl.add_volume(s.grid, scalars=s.field, cmap=CMAP,
-                            clim=s.active_clim(), opacity='linear',
-                            opacity_unit_distance=4 * s.grid.spacing[0],
-                            name=self.name, show_scalar_bar=False,
-                            reset_camera=False, render=False)
-            self._added = s.field
+            scal = VOL_LOG_KEY if s.log_scale else s.field
+            actor = s.pl.add_volume(
+                s.grid, scalars=scal, cmap=CMAP, clim=self._clim(),
+                opacity='linear',
+                opacity_unit_distance=4 * s.grid.spacing[0],
+                name=self.name, show_scalar_bar=False,
+                reset_camera=False, render=False)
+            # add_volume draws a COPY of the grid (pyvista 0.49:
+            # cell_data_to_point_data), so grid.Modified() below never
+            # reached it and the cloud froze on the frame it was built on.
+            # Bind the mapper to the scene grid, by array name.
+            m = actor.mapper
+            m.SetInputData(s.grid)
+            m.SetScalarModeToUsePointFieldData()
+            m.SelectScalarArray(scal)
+            self._added = key
         else:
             s.grid.Modified()
 

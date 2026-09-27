@@ -21,12 +21,18 @@ from ..core.bc import BC_KINDS
 from ..core.case import TRIGGER_ACTIONS
 from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
+from ..models.case import vtk_fields_for
+from ..models.fields import (VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
+                             VTK_PLANES_CAPTION, VTK_SECONDS_NOTE,
+                             VTK_STEPS_DEFAULT, VTK_TIME_DEFAULT)
 from ..solvers.foam.materials import MATERIAL_NAMES
 
 #: caption wrap width and the minimum width reserved for the input
 #: column, so a value stays readable at the 1100x720 minimum window
 LABEL_WRAP = 132
 INPUT_MIN = 146
+#: CardSpec.col of a card that spans both columns (below them)
+SPAN = 2
 
 
 @dataclass(frozen=True)
@@ -34,10 +40,15 @@ class F:
     """One labelled input row.
 
     kind:   'text' | 'float' | 'int' | 'choice' | 'bool' | 'file' | 'points'
+            | 'radio' (one of `values`) | 'matrix' (OUT-2: rows `values`
+            x columns `cols`, a tick box per cell)
     scope:  None (both solvers) | 'native' | 'blastfoam'
     group:  a sub-group whose visibility a hook toggles ('amr', 'cref')
     dyn:    the caption is rewritten at runtime (axisymmetric r/z)
-    cols:   'points' only - the column captions; the arity is len(cols)
+    cols:   'points' - the column captions; the arity is len(cols).
+            'matrix' - the column keys (models.fields.VTK_COLUMNS)
+    kinds:  'points' only - a parser per column, 'float' (the default)
+            or 'axis' (x / y / z); empty = every column a number
     """
 
     name: str
@@ -51,12 +62,16 @@ class F:
     cols: tuple = ()
     rows: int = 4                 # 'points': visible rows
     file: dict = None             # 'file': dialog title + filters
+    kinds: tuple = ()             # 'points': per-column parser
 
 
 @dataclass(frozen=True)
 class CardSpec:
-    """A titled card in one of the two columns. `grid` > 1 lays the rows
-    out as that many label+input pairs per line (the boundary grid)."""
+    """A titled card in one of the two columns - or, with `col` = SPAN,
+    across both, below them (OUT-2's VTK card, owner decision P13). `grid`
+    > 1 lays the rows out as that many label+input pairs per line (the
+    boundary grid). `note` is a muted line under the rows (no field of
+    its own)."""
 
     title: str
     col: int
@@ -64,6 +79,7 @@ class CardSpec:
     scope: str = None
     grid: int = 1
     field_rows: int = 0           # 'points' cards: stretch this card
+    note: str = ''
 
 
 # ── shared row groups ────────────────────────────────────────────────────
@@ -197,6 +213,45 @@ def _outputs(dim):
     elif dim == 2:
         out.append(F('profile_out', 'Profile out (.npz)', 'text'))
     return CardSpec('Outputs', col=1, rows=tuple(out))
+
+
+def _vtk_card(dim):
+    """OUT-2: VTK files for ParaView, blastFoam only (the card is hidden,
+    never greyed, in native mode). Laid out as Viper's "VTKs and
+    Framerates" block (docs/model-folder-and-vtk-plan.md sec. 3.1, 9):
+    per family a box, a Time / Step pair and one interval box per mode
+    - the inactive one greyed by case_form - then, in 3D, the extra
+    section planes, and the quantity x destination matrix (sec. 3.2,
+    owner Q2: separate Sections and Obstacles columns).
+
+    The card spans both Setup columns (owner decision P13), so the matrix
+    headers are full words: the families and planes on the left, the
+    matrix on the right, stacked when the width does not allow both
+    (fieldform.FieldForm._fit_columns)."""
+    rows = []
+    for fam, caption in VTK_FAMILIES[dim]:
+        rows += [
+            F(f'vtk_{fam}_on', caption, 'bool', False),
+            F(f'vtk_{fam}_mode', 'Cadence', 'radio', 'time',
+              values=('time', 'step')),
+            # P22 (owner, 2026-09-27): simulated SECONDS, like the rest
+            # of the form, the case file and the files ParaView reads
+            F(f'vtk_{fam}_time', 'Every [s]\n(simulated time)', 'float',
+              VTK_TIME_DEFAULT),
+            F(f'vtk_{fam}_steps', 'Every [steps]\n(solver steps)', 'int',
+              VTK_STEPS_DEFAULT),
+        ]
+    if dim == 3:
+        # decision 7: the live-slice plane is always a section, when the
+        # surfaces family is on
+        rows.append(F('vtk_planes', VTK_PLANES_CAPTION, 'points',
+                      cols=('axis', 'position [m]'),
+                      kinds=('axis', 'float'), rows=3))
+    rows.append(F('vtk_fields', VTK_MATRIX_CAPTION,
+                  'matrix', values=vtk_fields_for(dim),
+                  cols=VTK_COLUMNS[dim]))
+    return CardSpec('VTK output (ParaView)', col=SPAN, scope='blastfoam',
+                    rows=tuple(rows), note=VTK_SECONDS_NOTE)
 
 
 def _trigger(dim):
@@ -462,6 +517,7 @@ def cards(dim):
               rows=3),)))
 
     out.append(_outputs(dim))
+    out.append(_vtk_card(dim))
     if dim > 1:
         out.append(_trigger(dim))
     return tuple(out)

@@ -558,6 +558,103 @@ writer through the `jobs` registration hook.
 
 ---
 
+## 0d. 2026-09-27 — batch `out-2-vtk-output` (OUT-2)
+
+Plan: `docs/batches/2026-09-27-out-2-vtk-output.md` (§0a D1–D15, owner answers Q1–Q7,
+parked P1–P16), specification `docs/model-folder-and-vtk-plan.md` §3.
+
+### `OUT-2` · VTK output for ParaView
+
+- **What:** the Setup card **VTK output (ParaView)** in both GUIs (blastFoam only;
+  families per dimension, Time [ms] / Step with the other box greyed, 3D extra planes,
+  a quantity matrix with a locked Gauge column and separate Sections / Obstacles /
+  Volumes columns, Q2); case keys `vtk_surfaces` / `vtk_volumes`, omitted while off;
+  validation of every refusal in §3.3; the writer's `vtkTimeSeries` surface function
+  objects (never alter dt) and the volumes write cadence; `VtkExport` in the run loop
+  (async foamToVTK, copy + size check, `.vtk.series` + `vtk\manifest.json`, then the
+  WSL delete that the pure `vtk_purge_plan` allows); the backend protects every write
+  finalize re-reads (D1). Layout `<MODEL>\vtk\volumes|sections\<plane>\<field>|
+  obstacles\<field>`, one series per field (Q1).
+- **Tests:** new `test_vtk_case`, `test_vtk_export_plan`, `test_vtk_series`,
+  `test_vtk_protect`, `test_ui_output_card`, `test_gui_output_card`; `test_foam_writer`
+  and `test_model_folder` additions; harness group V (Qt V01–V05, Tk V01–V04);
+  `_e2e_vtk_3d.py` (WSL, rules pre-registered in `6328bbd`). Goldens: only the two
+  char case-form re-pins, added rows only. `test_regression` byte-identical.
+- **Real run (2026-09-27):** `_e2e_vtk_3d.py` 36/38. Surfaces alone and deletion vs
+  none are byte-identical; counts, series, the protected set on 331 passes, the
+  release and a stopped run all pass. Rule 3 (volumes vs no export) fails at a
+  Z ≈ 0.07 gauge: peak +4.2 %, impulse +4.8 %, against a 1 % limit. A write budget
+  of 10 without export reproduces the export run byte for byte, so the cause is the
+  write schedule's dt clipping. Parked as P14. `_e2e_model_folder.py` 26/26.
+- **Commits:** Steps 1–7 and their verification up to `06c272b`; 8 `d0c4a57` `87ff5da`;
+  9 `3d1feae` `c675829`; 10 `96bcff3`; 11 `6328bbd` `7382e6a`; 12 `8557bf2`; 13 the
+  commit of this entry.
+- **Follow-up, Viper-style layout (owner, 2026-09-27;
+  `docs/batches/2026-09-27-out-2-surface-layout.md`):** one legacy 3.0 BINARY file
+  per surface per time with every chosen field (pure-NumPy `output/legacy_vtk.py`
+  merges blastFoam's per-field files, verify-then-delete kept), one folder per series
+  with its `.vtk.series` beside it, readable array names (`VTK_ARRAY_NAMES`), `TIME`
+  inside every file, `Peak_Overpressure` = max(pMax, p) − P_AIR (≥ 0 without p).
+  Supersedes the per-field layout and Q1 above. `e1c326b` `c827914` `84d3967` `3ab208e`.
+- **P14 (c) closed:** rule 3 re-registered (`7e81c86`) against a baseline whose dt is
+  not clipped (972 steps, same as the export run): peak, impulse and arrival identical,
+  e2e 41/41 (`0af4f1f`). Volume export does not change the gauges.
+- **Accepted** by the owner in ParaView, 2026-09-27; merged to master and pushed.
+
+---
+
+## 0e. 2026-09-27 — batch `viewer-polish` (P3-7, P3-8, P3-25)
+
+Plan: `docs/batches/2026-09-27-viewer-polish.md`. Owner decision of 2026-09-27: the
+Tk blit cap is **peak ≤ 2 × image + 64 KiB** (a fixed allowance, not a ratio), replacing
+the plan's ≤ 2.0×: Tk takes only `bytes`, so two full buffers are the floor.
+
+### `P3-25` · Surface loads follow the log flag
+
+- **What:** `log_clim()` factored out of `active_clim` (values unchanged); the loads
+  range, every `load_*` lookup table and the loads bar go log with the field bar.
+- **Commit:** `d7b79af`. **Tests:** `test_viz3d_scene.py` S3-P25.
+
+### `P3-8` · Log colour scale reaches the Volume layer
+
+- **What:** in log mode the volume draws `vol_log` = log10(clip(field, lo, hi)) over
+  (log10 lo, log10 hi). pyvista 0.49 `add_volume(log_scale=True)` does not colour in
+  log, and a log-spaced transfer function overflows VTK's texture - both rejected.
+- **Found on the way:** the volume layer was **frozen on its first frame** before this
+  batch (pyvista's `add_volume` draws a copy of the grid). The mapper is now bound to
+  the scene grid, so the volume follows the frames in linear and log mode.
+- **Commit:** `236c100`. **Tests:** `test_viz3d_scene.py` S3-P8, S5.
+
+### `P3-7` · Renders and copies per frame
+
+- **"Renders twice" was stale:** on pyvista 0.49 the Tk blit renders once.
+- **viz3d (`4d13172`):** `render=False` on every `remove_actor` and on the bars/text
+  inside `add_mesh`: in-scene renders per field switch 4 → 0, per sampled-plane frame
+  1 → 0, per volume or loads toggle → 0; peak memory per frame 2.31× → 1.13× one field
+  (`np.nanmax` on a `pyvista_ndarray` copied the field). Display values bit-identical.
+- **Tk host (`9e28417`):** `gui/vtk_host.py` `_blit` joins the header and a memoryview:
+  peak 3.00× → 2.0018× the image, 1 render per blit. New `test_viz3d_blit.py`.
+
+- **Tests:** `test_regression` byte-identical; all `test_viz3d_*`, the 14 `test_gui_*`,
+  `test_ui_no_vtk_in_main`, `test_ui_no_mpl_pyplot` PASS. The `bgerror` teardown noise
+  in `test_gui_solver_mode` is also on master `c73d4fc`.
+- **QA (real viewer child, Qt and Tk, native runs):** 7/7 PASS, including the volume
+  moving between frames. Evidence in `docs/qa/2026-09-27-viewer-polish/` (not committed,
+  25 MB). Not fixed, pre-existing: log bar ticks below 1 print as "0" (`fmt='%.0f'`,
+  field bar too). Merged after OUT-2: re-tested on the merge.
+
+## 0f. 2026-09-27 — `OUT-5` · the WSL disk rebuilt
+
+Plan and run record: `docs/wsl-disk-reclaim-plan.md` (§9). Owner decisions D1-D6 as
+recommended: the HD1-3d evidence run `20260923-195308_3d_p31468-00` kept as a skeleton
+(case, dicts, log, `postProcessing`, `0/`; 24/24 sha256 OK, `_e2e_vent_3d.py --load`
+PASS), the 193 / 54 / 6.1 / 2.3 GB runs deleted. Runs 431 → 2.9 GB, then export (8.6 GB
+tar), trial import, unregister + import with the owner watching: **vhdx 481 → 8.6 GB,
+C: free 137 → 618 GB**. Ladder V1-V8 green, including a real 1D solve. Tar kept at
+`%LOCALAPPDATA%\blastlab-wsl\export\` until 2026-10-27. `CLAUDE.md` §8.5 updated.
+
+---
+
 ## 0g. 2026-09-27 — batch `p0-5-settings-reader-save`
 
 Plan and reports: `docs/batches/2026-09-27-p0-5-settings-reader-save{,.implement,.verify}.md`.
@@ -580,14 +677,14 @@ Owner answers of 2026-09-27:
   - `DEFAULTS['auto_cleanup']` is now `False`. Qt and Tk start `env.start_disk_warning`,
     which gives one non-modal warning when the runs root exceeds `cleanup_max_gb` and
     deletes nothing.
-  - CLAUDE.md §8.2, `docs/heavy-runs.md` and P4-3 now show the dry run, not the old
-    "check" that deleted.
+  - CLAUDE.md §8.2, `docs/heavy-runs.md`, P4-3 and `docs/wsl-disk-reclaim-plan.md` P3
+    now show the dry run, not the old "check" that deleted.
   - Each checkout has its own `settings.json`.
 - **Files:** `core/settings.py`, `gui/settings.py`, `gui/app.py`, `ui/app.py`,
   `solvers/foam/env.py`, `.gitignore`, `CLAUDE.md`, `docs/heavy-runs.md`, new
   `tests/test_settings_path.py`.
 - **Commits:** `d702f90` `3bf7da7` `15f3352` `5d11686`, verify `5903522` `1bf0792`,
-  simplify `2d7ec9d`.
+  simplify `2d7ec9d`, docs `f2027aa`.
 
 ### `P1-7` · The reader accepts the `);` the writer emits (code; on-screen QA open)
 - **What:**
@@ -611,17 +708,18 @@ Owner answers of 2026-09-27:
 - **Files:** `ui/app.py`, `tests/test_open_case.py` (checks added).
 - **Commit:** `0bb3f1f`.
 
-### `P2-13` items 3 and 4 · pytest runs and fails what the scripts check
+### `P2-13` items 3, 4 and 5 · pytest runs and fails what the scripts check
 - **What:**
   - Item 3: `test_vent_wall`'s three argument-taking helpers are `_check_*`, run by one
     `test_built_case()`.
   - Item 4, widened by the owner: a `conftest.py` hookwrapper fails any test whose
     module's `FAIL`/`FAILS` list grew. No test file changed.
-  - Whole-directory pytest went from 158 passed / 11 errors to 172 passed / 8 errors.
-  - No test newly fails. The 8 remaining errors ("fixture 'tmp' not found",
-    `test_load_csv` / `test_wall_clearing`) are fixed by a module-scoped `tmp`
-    fixture in `conftest.py`, with no test edited (owner, item 5).
-- **Commits:** `1e0795f` `c944da6`, item 5 in the commit that adds this line.
+  - Item 5 (owner): a module-scoped `tmp` fixture in `conftest.py` fixes the
+    "fixture 'tmp' not found" errors of `test_load_csv` and `test_wall_clearing`, with
+    no test edited.
+  - Whole-directory pytest went from 158 passed / 11 errors to **180 passed, 0 errors**,
+    and no test newly fails.
+- **Commits:** `1e0795f` `c944da6` `a9c8d52`.
 
 ### `P2-14` item 7 · `read_probes` aligns rho/U with p by time
 - **What:**
@@ -641,8 +739,8 @@ Owner answers of 2026-09-27:
 - The CLAUDE.md §8.2 dry run prints `…\settings.json False []`.
 - **Not run:** the solving suites and `_e2e_*`.
 
-**QA:** the real-window check is pending: Qt Save → Open on the 0-D form, and the startup
-disk warning. The offscreen tests drive the same slots.
+**QA:** the real-window check (Qt Save → Open on the 0-D form, the startup disk warning)
+is pending.
 
 ---
 

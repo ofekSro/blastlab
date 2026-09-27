@@ -1164,6 +1164,286 @@ def deferred_state_checks():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def fo_block(text, name):
+    """The text of function object `name` in a controlDict (its header
+    line through its closing brace), or None."""
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        if line == f'    {name}':
+            depth, out = 0, []
+            for ln in lines[i:]:
+                out.append(ln)
+                depth += ln.count('{') - ln.count('}')
+                if depth == 0 and '}' in ln:
+                    return '\n'.join(out)
+    return None
+
+
+def fo_names(text):
+    """The function-object names of a controlDict, in file order."""
+    body = text.split('\nfunctions\n{\n', 1)[1]
+    return [ln.strip() for ln in body.split('\n')
+            if ln.startswith('    ') and not ln.startswith('     ')
+            and ln.strip() not in ('{', '}', '')]
+
+
+def top_entry(text, key):
+    """A top-level controlDict entry's value (function objects carry
+    their own, indented)."""
+    import re
+    m = re.search(rf'^{key}\s+([^;]+);', text, re.M)
+    return m.group(1).strip() if m else None
+
+
+def vtk_checks():
+    """OUT-2 Step 3: the VTK output dictionaries, line by line against
+    blastFoam User Guide v6.0 sec. 15.5 (p. 124) and the tutorial
+    building3DWorkshop/system/controlDict."""
+    from blastlab.solvers.foam import writer as W
+    print('\n  OUT-2: VTK output')
+    base = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05, charge=4.0,
+                center=(0.5, 1.0, 1.0),
+                obstacles=[(1.2, 1.5, 0.6, 1.4, 0.0, 1.2)],
+                gauges=[(1.8, 1.0, 1.0)], n_snapshots=3,
+                solver='blastfoam', material='TNT')
+    # Time-mode values are in seconds (owner decision P22): the writer
+    # writes them as they are
+    surf = {'on': True, 'mode': 'time', 'value': 0.0005,
+            'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'impulse'],
+            'planes': [['y', 1.4], ['z', 0.5]]}
+    vol = {'on': True, 'mode': 'step', 'value': 25,
+           'fields': ['p', 'rho', 'U']}
+    plain = render_case(Case3D(**base))
+    both = render_case(Case3D(**base, vtk_surfaces=surf, vtk_volumes=vol))
+    ctl, ctl0 = both.files['system/controlDict'], \
+        plain.files['system/controlDict']
+    names = fo_names(ctl)
+    check('vtk: the two surface objects are the LAST functions entries, '
+          'after the probes',
+          names[-3:] == ['gauges', W.VTK_SECTIONS, W.VTK_OBSTACLES],
+          str(names))
+    check('vtk: writeTimes (T62) is still there',
+          'writeTimes' in names and fo_block(ctl, 'writeTimes')
+          == fo_block(ctl0, 'writeTimes'))
+    sec = fo_block(ctl, W.VTK_SECTIONS)
+    for want in ('type surfaces;',
+                 'libs ("libsampling.so" "libblastFunctionObjects.so");',
+                 'writeControl runTime;', 'writeInterval 0.0005;',
+                 'surfaceFormat vtkTimeSeries;',
+                 'interpolationScheme cell;', 'fields (p pMax);'):
+        check(f'vtk sections: {want}', want in norm(sec), sec)
+    check('vtk sections: Time mode never uses adjustableRunTime (D5)',
+          'adjustableRunTime' not in sec)
+    # the live slice (burst point y = 1.0) first, then the table rows
+    y_live = W.snap_plane(both, 'y', 1.0)
+    y_14, z_05 = W.snap_plane(both, 'y', 1.4), W.snap_plane(both, 'z', 0.5)
+    yc, zc = both.grid['y_c'], both.grid['z_c']
+    check('vtk sections: planes snap to the nearest cell-centre layer',
+          y_14 == float(yc[np.argmin(abs(yc - 1.4))])
+          and z_05 == float(zc[np.argmin(abs(zc - 0.5))])
+          and y_14 != 1.4, f'{y_14} {z_05}')
+    order = [ln.strip() for ln in sec.split('\n')
+             if ln.startswith('            slice_')]
+    check('vtk sections: the live slice first, then the rows, named by the '
+          'position asked for (Q6)',
+          order == ['slice_y_1.00', 'slice_y_1.40', 'slice_z_0.50'],
+          str(order))
+    for name, axis, pos in (('slice_y_1.00', 'y', y_live),
+                            ('slice_y_1.40', 'y', y_14),
+                            ('slice_z_0.50', 'z', z_05)):
+        pt, nrm = W.plane_point_normal(axis, pos)
+        blk = norm(sec.split(name, 1)[1].split('}\n            }', 1)[0])
+        ok = all(w in blk for w in (
+            'type plane;', 'planeType pointAndNormal;',
+            f'point {fmt(pt)};', f'normal {fmt(nrm)};',
+            'interpolate no;', 'triangulate no;'))
+        check(f'vtk sections: {name} is an uncut plane through '
+              f'{axis} = {pos:g}', ok, blk)
+    check('vtk sections: the live slice itself is unchanged',
+          fo_block(ctl, W.LIVE_SLICE) == fo_block(ctl0, W.LIVE_SLICE))
+    obs = norm(fo_block(ctl, W.VTK_OBSTACLES))
+    for want in ('type surfaces;', 'writeControl runTime;',
+                 'writeInterval 0.0005;', 'surfaceFormat vtkTimeSeries;',
+                 'fields (p impulse);', 'obstacles {', 'type patch;',
+                 'patches (obstacles);', 'triangulate no;'):
+        check(f'vtk obstacles: {want}', want in obs, obs)
+    check('vtk volumes, Step mode: top-level writeControl timeStep, '
+          'writeInterval 25',
+          top_entry(ctl, 'writeControl') == 'timeStep'
+          and top_entry(ctl, 'writeInterval') == '25',
+          f"{top_entry(ctl, 'writeControl')} {top_entry(ctl, 'writeInterval')}")
+    check('vtk volumes, Step mode: spec.write_steps 25, adaptive off',
+          both.write_steps == 25 and both.adaptive_write is False
+          and plain.write_steps == 0 and plain.adaptive_write is True)
+
+    # surfaces only: the dictionary is the plain one plus the two blocks,
+    # nothing else moves (the solve is untouched, D5)
+    only = render_case(Case3D(**base, vtk_surfaces=surf))
+    oc = only.files['system/controlDict']
+    stripped = oc.replace(fo_block(oc, W.VTK_SECTIONS) + '\n', '').replace(
+        fo_block(oc, W.VTK_OBSTACLES) + '\n', '')
+    check('vtk surfaces only: remove the two blocks and the controlDict is '
+          'the plain one, byte for byte', stripped == ctl0)
+    check('   and every other file is byte-identical',
+          {k: v for k, v in only.files.items() if k != 'system/controlDict'}
+          == {k: v for k, v in plain.files.items()
+              if k != 'system/controlDict'})
+    check('   and the spec schedule is the plain one',
+          only.adaptive_write is True and only.write_steps == 0
+          and only.write_interval == plain.write_interval)
+
+    step = render_case(Case3D(**base, vtk_surfaces=dict(
+        surf, mode='step', value=10)))
+    sb = norm(fo_block(step.files['system/controlDict'], W.VTK_SECTIONS))
+    check('vtk surfaces, Step mode: writeControl timeStep; writeInterval 10',
+          'writeControl timeStep;' in sb and 'writeInterval 10;' in sb, sb)
+
+    tv = render_case(Case3D(**base, vtk_volumes=dict(vol, mode='time',
+                                                     value=0.0002)))
+    tc = tv.files['system/controlDict']
+    # owner decision P14 (b): runTime, so the writes never clip dt
+    check('vtk volumes, Time mode: runTime (never adjustableRunTime, '
+          'P14 b), writeInterval = value = 0.0002 s (P22), pinned',
+          top_entry(tc, 'writeControl') == 'runTime'
+          and 'adjustableRunTime' not in tc
+          and top_entry(tc, 'writeInterval') == '0.0002'
+          and tv.write_interval == 0.0002 and tv.adaptive_write is False
+          and tv.write_steps == 0)
+    fx = render_case(Case3D(**base, fixed_dt=1e-6,
+                            vtk_volumes=dict(vol, mode='time', value=0.0002)))
+    fs = render_case(Case3D(**base, fixed_dt=1e-6, vtk_volumes=vol))
+    check('vtk volumes with fixed_dt: Time mode runTime, Step mode stays '
+          'timeStep',
+          top_entry(fx.files['system/controlDict'], 'writeControl')
+          == 'runTime'
+          and top_entry(fs.files['system/controlDict'], 'writeControl')
+          == 'timeStep')
+    bud = render_case(Case3D(**base, t_end=0.003, write_budget=10,
+                             vtk_volumes=vol))
+    check('vtk volumes + a write budget (validation refuses it): volumes '
+          'win, no budget, so no decomposed purge',
+          bud.write_budget == 0 and bud.write_steps == 25)
+
+    no_obs = dict(base, obstacles=[], gauges=[(1.8, 1.0, 1.0)])
+    nob = render_case(Case3D(**no_obs, vtk_surfaces=surf))
+    nn = fo_names(nob.files['system/controlDict'])
+    check('vtk: no obstacles patch -> no obstacles object, sections still '
+          'written', W.VTK_OBSTACLES not in nn and W.VTK_SECTIONS in nn,
+          str(nn))
+    nat_base = dict(base, solver='native')
+    nat = render_case(Case3D(**nat_base, vtk_surfaces=surf,
+                             vtk_volumes=vol))
+    check('vtk: a native case carries nothing (solver != blastfoam)',
+          nat.vtk_surfaces is None and nat.vtk_volumes is None
+          and nat.files == render_case(Case3D(**nat_base)).files)
+    off = render_case(Case3D(**base, vtk_surfaces=dict(surf, on=False),
+                             vtk_volumes=dict(vol, on=False)))
+    check('vtk: families switched off render the plain case',
+          off.files == plain.files)
+
+    # 2D: obstacles only, and the obstacles patch exists
+    c2 = dict(Lx=4.0, Ly=4.0, cell_size_m=0.02, charge=1.0,
+              center=(0.0, 1.0), obstacles=[(2.0, 2.4, 0.0, 1.6)],
+              gauges=[(1.0, 1.0)], solver='blastfoam', material='TNT')
+    s2 = render_case(Case2D(**c2, vtk_surfaces=dict(
+        surf, fields=[], planes=[], obstacle_fields=['p', 'overpressure'])))
+    n2 = fo_names(s2.files['system/controlDict'])
+    check('vtk 2D: the obstacles object only, last',
+          n2[-1] == W.VTK_OBSTACLES and W.VTK_SECTIONS not in n2, str(n2))
+
+    # 1D volumes: the schedule only, no surfaces
+    c1 = dict(radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
+              gauge_radii=[1.0, 2.0], solver='blastfoam', material='TNT')
+    p1 = render_case(Case1D(**c1))
+    v1 = render_case(Case1D(**c1, vtk_volumes=dict(vol, value=40)))
+    t1 = render_case(Case1D(**c1, vtk_volumes=dict(vol, mode='time',
+                                                   value=0.00025)))
+    v1c, t1c = v1.files['system/controlDict'], t1.files['system/controlDict']
+    check('vtk 1D volumes, Step mode: timeStep every 40, pinned',
+          top_entry(v1c, 'writeControl') == 'timeStep'
+          and top_entry(v1c, 'writeInterval') == '40'
+          and v1.write_steps == 40 and v1.adaptive_write is False)
+    check('vtk 1D volumes, Time mode: runTime 0.00025 s (P14 b)',
+          top_entry(t1c, 'writeControl') == 'runTime'
+          and top_entry(t1c, 'writeInterval') == '0.00025')
+    check('vtk 1D: no surface object, the rest of the functions unchanged',
+          fo_names(v1c) == fo_names(p1.files['system/controlDict']))
+
+    # the backend: the banner line, hooks.cadence and the adaptive flag
+    from blastlab.solvers.foam import backend as B
+    check('vtk banner, Step mode: "every 25 solver steps"',
+          B._write_interval_line(both)
+          == '  Write interval  : every 25 solver steps (pinned: VTK volumes)',
+          B._write_interval_line(both))
+    check('vtk banner, Time mode: the pinned ms interval',
+          B._write_interval_line(tv)
+          == '  Write interval  : 0.2000 ms (pinned: VTK volumes)',
+          B._write_interval_line(tv))
+    check('   and a case without VTK keeps its old line',
+          B._write_interval_line(plain) == '  Write interval  : '
+          f'{plain.write_interval * 1e3:.4f} ms (initial, adaptive)')
+
+    class _Stop(Exception):
+        pass
+
+    class _Hooks:
+        def __init__(self):
+            self.seen = None
+
+        def cadence(self, dt=None, steps=None):
+            self.seen = (dt, steps)
+            raise _Stop()                 # right after the expression
+
+        def __getattr__(self, _name):
+            return lambda *a, **k: None
+
+    for solve, case, dt_want in (
+            (B.solve_3d_foam, Case3D(**base, vtk_volumes=vol), None),
+            (B.solve_3d_foam, Case3D(**base, vtk_volumes=dict(
+                vol, mode='time', value=0.0002)), 0.0002),
+            (B.solve_2d_foam, Case2D(**c2, vtk_volumes=vol), None),
+            (B.solve_1d_foam, Case1D(**c1, vtk_volumes=vol), None)):
+        spec, h = render_case(case), _Hooks()
+        try:
+            solve(case, hooks=h, adaptive_write=True, spec=spec)
+        except _Stop:
+            pass
+        check(f'vtk volumes {case.dim}D {case.vtk_volumes["mode"]}: the '
+              f'solve keeps adaptive_write off, cadence dt {dt_want}',
+              spec.adaptive_write is False and h.seen is not None
+              and h.seen[0] == dt_want, f'{spec.adaptive_write} {h.seen}')
+
+    # P1-5: a resumed AMR leg has no pMax / impulse to sample (D4)
+    case_fo = Case3D(**base, vtk_surfaces=dict(
+        surf, fields=['p', 'pMax'], obstacle_fields=['impulse']))
+    spec_fo = render_case(case_fo)
+    spec_fo.fo_accumulators = False
+    rc = W._controldict(spec_fo, case_fo)
+    sb = norm(fo_block(rc, W.VTK_SECTIONS))
+    check('vtk, fo_accumulators off: pMax dropped from the sections, and '
+          'an obstacles list of impulse alone drops the object',
+          'fields (p);' in sb and W.VTK_OBSTACLES not in fo_names(rc), sb)
+    import tempfile
+    amr_case = Case3D(**dict(base, amr_levels=1), vtk_surfaces=surf)
+    amr_spec = render_case(amr_case)
+    lines = []
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, 'system'))
+        amr_spec.case_unc = d
+        applied = B._disable_fo_accumulators(
+            amr_spec, amr_case, type('H', (), {'log': lambda s, m:
+                                               lines.append(m)})())
+        with open(os.path.join(d, 'system', 'controlDict')) as f:
+            written = f.read()
+    said = [m for m in lines if 'VTK sections/obstacles' in m]
+    check('vtk, resumed AMR leg: one log line naming impulse and pMax, and '
+          'the rewritten controlDict samples neither',
+          applied and len(said) == 1 and 'impulse and pMax' in said[0]
+          and 'pMax' not in norm(fo_block(written, W.VTK_SECTIONS))
+          and 'impulse' not in norm(fo_block(written, W.VTK_OBSTACLES)),
+          str(lines))
+
+
 def specs_time_name():
     """A profile stage whose t0 needs more digits than timePrecision."""
     import numpy as np
@@ -1207,6 +1487,7 @@ def main():
     time_name_checks()
     deferred_state_checks()
     fresh_dir_checks()
+    vtk_checks()
     golden(specs, update)
     print()
     if FAIL:

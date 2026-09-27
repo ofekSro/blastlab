@@ -29,8 +29,8 @@ fixed and approved — the disk.
 | Id | What | Order |
 |---|---|---|
 | `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
-| `OUT-2` | **VTK output options** (Viper-style Output card, blastFoam only): off / sections and obstacles / volumes, a per-case field checklist, cadence in simulated ms or solver steps, files into `<MODEL>\vtk\`, time directories deleted as they are converted. Plan §3 | 2, then owner acceptance |
-| `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. Only after the owner accepts `OUT-1` + `OUT-2`. Plan §6 | 3 |
+| `OUT-2` | ✅ **VTK output options** — done and accepted by the owner in ParaView 2026-09-27 (DONE.md §0d, Viper-style layout, P14 closed). Plan §3 | 2 |
+| `OUT-5` | ✅ **Reclaim the 481 GB WSL disk** — done 2026-09-27 (DONE.md §0f): vhdx 481 → 8.6 GB. Delete the backup tar after 2026-10-27 (D5). Plan §6 | 3 |
 | `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
 | `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |
 
@@ -883,6 +883,10 @@ model; after a resume the original model's manifest still says its scratch was k
 Run chain stays enabled during an HD 1.3 assessment and its refusal is titled "Run". The
 Qt refusal and overwrite dialogs break a path after "C:".
 
+- `P2-19` Tk at the 1100x720 minimum clips the right column (OUT-2 QA F3; also native) - card widths vs the 13:7 split.
+- `P2-20` Tk dimension switch keeps the old scroll offset, form goes blank (OUT-2 QA F4; same on master) - `SetupPanel._swap`.
+- `P2-21` Qt 3D form shows a blank tail at the scroll end (OUT-2 QA F5) - the QStackedWidget takes its tallest page's height.
+
 ---
 
 ## P3 — Capabilities and improvements, on request
@@ -952,14 +956,11 @@ Qt refusal and overwrite dialogs break a path after "C:".
 
 - `P3-6` Read `processor*/` directly for uniform MPI runs too (skip reconstructPar) —
   only if the ~3 s per write is annoying. The mechanism already exists for AMR.
-- `P3-7` The viewer's blit path renders twice and allocates ~1.3 MB per frame.
+- `P3-7` ✅ closed 2026-09-27 (batch `viewer-polish`) — see [DONE.md](DONE.md) §0e.
 
 **Viewer polish**
 
-- `P3-8` Log contours apply only to slice planes.
-- `P3-25` The **"Surface loads" colour bar stays linear** while the field bar is
-  logarithmic — the loads layer holds its own range and does not receive the log
-  flag.
+- `P3-8`, `P3-25` ✅ closed 2026-09-27 (batch `viewer-polish`) — see [DONE.md](DONE.md) §0e.
 
 **Cosmetic** *(anything touching solver stdout needs a re-baseline)*
 
@@ -1029,7 +1030,6 @@ as a 4 GB VM (CLAUDE.md §4).
 | decomposition | Leave `scotch`, or investigate a symmetric decomposition for the ±7 % near-field parallel deviation | Leave it. Two cases gave opposite answers and no mechanism explains both |
 | P4-1 | Move the repository out of OneDrive | Yes |
 | P4-2 | What to delete from disk | Not urgent — superseded by `OUT-5` |
-| **OUT-5** | The six decisions on the WSL disk rebuild — [docs/wsl-disk-reclaim-plan.md §3](docs/wsl-disk-reclaim-plan.md) | Keep the evidence run as a skeleton, delete the 193 GB and 54 GB runs, keep the tar until the rebuilt install has solved once; decide after `OUT-2` is accepted |
 
 ---
 

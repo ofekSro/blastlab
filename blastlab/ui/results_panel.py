@@ -332,9 +332,11 @@ class ResultsPanel(QWidget):
         for kind, b in self._export_btns.items():
             good = exports.can(kind, ent)
             b.setEnabled(bool(good))
-            # a greyed button has to say why
-            b.setToolTip(EXPORT_HELP.get(kind, '') if good
-                         else exports.why_not(kind, ent))
+            # a greyed button has to say why; a VTK button that opens the
+            # run's own vtk\ folder says where it is (GUI QA F2)
+            tip = exports.vtk_tip(ent) if kind == 'vtk' else ''
+            b.setToolTip(tip or (EXPORT_HELP.get(kind, '') if good
+                                 else exports.why_not(kind, ent)))
 
     def export_enabled(self, kind):
         return self._export_btns[kind].isEnabled()
@@ -405,6 +407,9 @@ class ResultsPanel(QWidget):
             except Exception as exc:
                 self._log(f'Load failed: {exc}')
                 return
+            # OUT-2 P11: the run's VTK export deleted written times
+            if res.meta.get('vtk_deleted_note'):
+                self._log(res.meta['vtk_deleted_note'].strip())
             dim = 1 if 'radius_m' in res.meta else (
                 3 if 'z_c' in res.meta else 2)
             name = (str(res.meta.get('name') or '').strip()

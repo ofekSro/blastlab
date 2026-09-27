@@ -167,6 +167,139 @@ scene.layers['volume'].set_visible(False)
 scene.layers['loads'].set_visible(False)
 check("hiding loads removes their scalar bar", LOADS_TITLE not in pl.scalar_bars)
 scene.layers['loads'].set_visible(True)
+
+print("\nS3-P25: surface loads follow the log flag")
+from blastlab.viz3d.viewer import log_clim
+# pin active_clim before/after the log_clim refactor: values of the old
+# inline expression max(lo, hi * 10**-6, 1e-9)
+_saved = (scene.vmin, scene.cmax, scene.log_scale)
+for _lo, _hi, _log, _want in ((10.0, 300.0, False, (10.0, 300.0)),
+                              (10.0, 300.0, True, (10.0, 300.0)),
+                              (0.0, 300.0, True, (300.0 * 10.0 ** -6.0, 300.0))):
+    scene.vmin, scene.cmax, scene.log_scale = _lo, _hi, _log
+    check(f"active_clim unchanged ({_lo}, {_hi}, log={_log})",
+          scene.active_clim() == _want, str(scene.active_clim()))
+scene.vmin, scene.cmax, scene.log_scale = _saved
+
+
+def _loads_state():
+    acts = [a for n, a in pl.actors.items() if n.startswith('load_')]
+    bar = pl.scalar_bars[LOADS_BAR_KEY].GetLookupTable().GetScale()
+    return acts, bar
+
+
+def _check_loads_log(tag, on, own_rng):
+    acts, bar = _loads_state()
+    want = log_clim(*own_rng) if on else own_rng
+    rngs = [tuple(a.mapper.scalar_range) for a in acts]
+    check(f"{tag}: every load LUT log_scale is {on}",
+          len(acts) == len(specs)
+          and all(a.mapper.lookup_table.log_scale is on for a in acts),
+          str([a.mapper.lookup_table.log_scale for a in acts]))
+    check(f"{tag}: load range == {'log_clim(own)' if on else 'own'}",
+          all(r == tuple(want) for r in rngs)
+          and ((rngs[0][0] > 0) if on else (rngs[0][0] == 0.0)),
+          f"{rngs[0]} vs {tuple(want)}")
+    check(f"{tag}: loads bar scale == {1 if on else 0}", bar == (1 if on else 0),
+          str(bar))
+
+
+own = tuple(load_actor.mapper.scalar_range)
+scene.set_log_scale(True)
+_check_loads_log("log on", True, own)
+scene.set_log_scale(False)
+_check_loads_log("log off", False, own)
+scene.set_log_scale(True)
+scene.on_message(('frame', 7.5e-3, synth_frame(7.5e-3, 1.5), False))
+own = scene.layers['loads']._own
+_check_loads_log("log on, new frame", True, own)
+scene.layers['loads'].set_visible(False)
+scene.layers['loads'].set_visible(True)
+_check_loads_log("log on, loads toggled off/on", True, own)
+load_actor = next(a for n, a in pl.actors.items() if n.startswith('load_'))
+scene.set_field('rho')
+check("B19 + log: Density active, loads keep the overpressure range",
+      tuple(load_actor.mapper.scalar_range) == log_clim(*own)
+      and scene.layers['loads']._own[1] == own[1],
+      f"{load_actor.mapper.scalar_range} vs {own}")
+scene.set_field('p')
+scene.set_clim(0.0, 250.0)
+check("B19 + log: manual overpressure Min/Max reaches the loads as log_clim",
+      tuple(load_actor.mapper.scalar_range) == log_clim(0.0, 250.0),
+      str(load_actor.mapper.scalar_range))
+scene._set_auto_scale(True)
+scene.set_log_scale(False)
+_check_loads_log("log off again", False, scene.layers['loads']._own)
+
+print("\nS3-P8: log colour scale reaches the Volume layer")
+from blastlab.viz3d.viewer import VOL_LOG_KEY
+_turbo_mid = np.asarray(pv.LookupTable('turbo').map_value(0.5)[:3], float)
+if max(_turbo_mid) > 1.0:
+    _turbo_mid = _turbo_mid / 255.0
+
+
+def _vol_colour_checks(tag, field):
+    vol = pl.actors['volume_f']
+    lo, hi = scene.active_clim()
+    rng = tuple(vol.mapper.scalar_range)
+    want_rng = (float(np.log10(lo)), float(np.log10(hi)))
+    check(f"{tag}: volume draws '{VOL_LOG_KEY}'",
+          vol.mapper.array_name == VOL_LOG_KEY, str(vol.mapper.array_name))
+    check(f"{tag}: volume range == (log10 lo, log10 hi)",
+          np.allclose(rng, want_rng, rtol=1e-12, atol=0), f"{rng} vs {want_rng}")
+    got = np.asarray(scene.grid.point_data[VOL_LOG_KEY], float)
+    ref = np.log10(np.clip(np.asarray(scene.grid.point_data[field], float), lo, hi))
+    err = float(np.max(np.abs(got - ref) / np.maximum(np.abs(ref), 1e-30)))
+    check(f"{tag}: vol_log == log10(clip({field}, lo, hi)) to 1e-5 rel",
+          err <= 1e-5, f"(max rel err {err:.2e})")
+    gmid = float(np.log10(np.sqrt(lo * hi)))
+    rgb = np.asarray(vol.prop.GetRGBTransferFunction().GetColor(gmid))
+    op = vol.prop.GetScalarOpacity().GetValue(gmid)
+    check(f"{tag}: colour at the geometric mid == turbo(0.5) within 0.02",
+          float(np.max(np.abs(rgb - _turbo_mid))) <= 0.02,
+          f"{np.round(rgb, 3)} vs {np.round(_turbo_mid, 3)}")
+    check(f"{tag}: opacity at the geometric mid == 0.5 within 0.02",
+          abs(op - 0.5) <= 0.02, f"({op:.3f})")
+    return vol
+
+
+scene.layers['volume'].set_visible(True)
+scene.set_log_scale(True)
+_vol_colour_checks("log on", 'p')
+# pyvista's add_volume draws a copy; the layer rebinds to the scene grid
+# so frames reach the cloud (it used to freeze on the frame it was built on)
+check("the volume draws the scene grid itself, not add_volume's copy",
+      pl.actors['volume_f'].mapper.GetInput().GetAddressAsString('vtkObject')
+      == scene.grid.GetAddressAsString('vtkObject'))
+scene.set_log_scale(False)
+vol = pl.actors['volume_f']
+lo, hi = scene.active_clim()
+check("log off: volume back on the field array",
+      vol.mapper.array_name == 'p', str(vol.mapper.array_name))
+check("log off: volume back on the linear range",
+      tuple(vol.mapper.scalar_range) == (lo, hi), str(vol.mapper.scalar_range))
+# the contrast being fixed (pre-registered): the same geometric midpoint
+# of the log range is nearly transparent on a linear ramp
+_glo, _ghi = log_clim(lo, hi)
+_op_lin = vol.prop.GetScalarOpacity().GetValue(float(np.sqrt(_glo * _ghi)))
+check("linear mode: geometric mid of the log range has opacity < 0.05",
+      _op_lin < 0.05, f"({_op_lin:.4f})")
+scene.set_log_scale(True)
+scene.set_field('rho')
+_vol_colour_checks("log on, field rho", 'rho')
+scene.set_field('p')
+_vol_colour_checks("log on, back to p", 'p')
+_max0 = float(np.max(scene.grid.point_data[VOL_LOG_KEY]))
+_f = synth_frame(7.8e-3, 1.6)
+_f['p'] = P_AIR + 3.0 * (_f['p'] - P_AIR)       # a clearly different peak
+scene.on_message(('frame', 7.8e-3, _f, False))
+_max1 = float(np.max(scene.grid.point_data[VOL_LOG_KEY]))
+check("a new frame refreshes vol_log", _max1 != _max0,
+      f"(max {_max0:.4f} -> {_max1:.4f})")
+_vol_colour_checks("log on, new frame", 'p')
+scene.set_log_scale(False)
+scene.layers['volume'].set_visible(False)
+
 scene.layers['plane2'].set_visible(True)
 check("plane2 actor", 'cut_plane2' in pl.actors)
 
@@ -326,6 +459,15 @@ out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 img = pl.screenshot(out)
 check("screenshot written", os.path.exists(out) and img is not None)
 check("image not blank", float(np.asarray(img).std()) > 1.0)
+# P3-8: the log-mode volume renders too
+scene.layers['volume'].set_visible(True)
+scene.set_log_scale(True)
+img_v = pl.screenshot(None, return_img=True)
+check("image not blank with volume + log on",
+      float(np.asarray(img_v).std()) > 1.0,
+      f"(std {float(np.asarray(img_v).std()):.1f})")
+scene.set_log_scale(False)
+scene.layers['volume'].set_visible(False)
 pl.close()
 
 print("\nA8: frames never block the sender (shared-memory ring)")
@@ -385,6 +527,83 @@ gs.show(geo)                            # back to a plain case
 check("they go away with the case that had them",
       not any(k.startswith(('xcharge', 'det')) for k in pl3.actors))
 pl3.close()
+
+print("\nS7-P3-7: one render per frame (the host's), fewer copies per frame")
+import tracemalloc
+from blastlab.viz3d.viewer import VOL_LOG_KEY as _VLK
+pl7 = pv.Plotter(off_screen=True, window_size=(760, 560))
+init7 = dict(init, slice_axis='y', slice_index=20)
+scene7 = BlastScene(pl7, init7, embedded=True, n_planes=6)
+scene7.on_message(('frame', 1e-3, synth_frame(1e-3, 0.6), False))
+pl7.render()
+pl7.screenshot(return_img=True)            # warm-up: first-time render done
+_n_renders = [0]
+pl7.render_window.AddObserver(
+    'RenderEvent', lambda *_: _n_renders.__setitem__(0, _n_renders[0] + 1))
+
+
+def _renders(fn):
+    _n_renders[0] = 0
+    fn()
+    return _n_renders[0]
+
+
+_f2 = synth_frame(2e-3, 0.9)
+n = _renders(lambda: scene7.on_message(('frame', 2e-3, _f2, False)))
+# oracle: the pre-P3-7 upload expression, _ovp_kpa(arr).ravel(order='F')
+_oracle = ((np.asarray(_f2['p'], np.float32) - np.float32(P_AIR))
+           / np.float32(1e3)).ravel(order='F')
+check("bit-identity: grid 'p' equals the old expression (array_equal)",
+      np.array_equal(np.asarray(scene7.grid.point_data['p']), _oracle)
+      and np.asarray(scene7.grid.point_data['p']).dtype == np.float32)
+check("a plain frame fires 0 renders inside the scene", n == 0, f"({n})")
+_ax_n = [len(init['x_c']), len(init['z_c'])]
+_plane = P_AIR + 1e5 * np.ones(_ax_n, np.float32)
+check("sampled plane accepted", scene7.on_sampled_plane(2.5e-3, _plane))
+n = _renders(lambda: scene7.on_message(('frame', 3e-3,
+                                        synth_frame(3e-3, 1.1), False)))
+check("a frame superseding the sampled plane fires 0 renders", n == 0,
+      f"({n}; was 1)")
+n = _renders(lambda: (scene7.set_field('rho'), scene7.set_field('p')))
+check("field switch p->rho->p fires 0 renders", n == 0, f"({n}; was 4)")
+n = _renders(lambda: (scene7.layers['volume'].set_visible(True),
+                      scene7.layers['volume'].set_visible(False)))
+check("volume on/off fires 0 renders", n == 0, f"({n}; was 1)")
+scene7.layers['mesh'].set_visible(True)
+n = _renders(lambda: scene7.layers['mesh'].set_visible(False))
+check("mesh edges off fires 0 renders", n == 0, f"({n})")
+n = _renders(lambda: (scene7.layers['loads'].set_visible(False),
+                      scene7.layers['loads'].set_visible(True)))
+check("loads off/on fires 0 renders", n == 0, f"({n})")
+# P3-8 + P3-7: a frame while volume + log are on
+scene7.layers['volume'].set_visible(True)
+scene7.set_log_scale(True)
+_vmax0 = float(np.max(scene7.grid.point_data[_VLK]))
+_f4 = synth_frame(4e-3, 1.3)
+_f4['p'] = P_AIR + 2.5 * (_f4['p'] - P_AIR)
+n = _renders(lambda: scene7.on_message(('frame', 4e-3, _f4, False)))
+_vmax1 = float(np.max(scene7.grid.point_data[_VLK]))
+check("volume + log: a new frame fires 0 renders and refreshes vol_log",
+      n == 0 and _vmax1 != _vmax0, f"({n} renders; max {_vmax0:.3f} -> {_vmax1:.3f})")
+scene7.set_log_scale(False)
+scene7.layers['volume'].set_visible(False)
+# allocation per frame: field p, loads on, volume off; payload p/rho/loads
+check("allocation setup: loads on, volume off, field p",
+      scene7.layers['loads'].visible and not scene7.layers['volume'].visible
+      and scene7.field == 'p')
+_f5 = synth_frame(5e-3, 1.5)
+_one = scene7.grid.n_points * 4                       # one float32 field
+tracemalloc.start()
+tracemalloc.reset_peak()
+_base = tracemalloc.get_traced_memory()[0]
+scene7.on_message(('frame', 5e-3, _f5, False))
+_peak = tracemalloc.get_traced_memory()[1] - _base
+tracemalloc.stop()
+_ratio = _peak / _one
+check("tracemalloc peak per frame <= 1.5 x one float32 display field",
+      _ratio <= 1.5, f"({_peak / 1e6:.3f} MB = {_ratio:.2f} x {_one / 1e6:.3f} MB;"
+      f" was 0.59 MB, 2.3x)")
+pl7.close()
 
 print("\n" + "=" * 50)
 if FAIL:

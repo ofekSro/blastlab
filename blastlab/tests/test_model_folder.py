@@ -1135,6 +1135,110 @@ def test_d_stage_calls_release_for_foam():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def test_d_vtk_not_converted_keeps_scratch():
+    """OUT-2 (Q4): a time the VTK export could not convert is a failed
+    row of the root manifest, so the scratch that still holds it stays."""
+    from blastlab.output import vtk_series
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        root = make_scratch(tmp)
+        folder = os.path.join(tmp, 'MODEL')
+        os.makedirs(folder)
+        vtk_series.write_vtk_manifest(os.path.join(folder, 'vtk'), dict(
+            families={'volumes': dict(count=1, times=['0.0005'],
+                                      series=[])},
+            not_converted=[dict(time='0.001', family='volumes',
+                                why='foamToVTK: exit 1',
+                                path='vtk/volumes/t_0.001.vtk')]))
+        m = mf.write_all(None, case1d(solver='blastfoam'), 1, folder,
+                         log=lambda *_a: None)
+        # P4: plus files / bytes under vtk\ (here the manifest alone)
+        size = os.path.getsize(os.path.join(folder, 'vtk', 'manifest.json'))
+        assert m['vtk'] == dict(dir='vtk', counts={'volumes': 1}, files=1,
+                                bytes=size, not_converted=[dict(
+                                    time='0.001', family='volumes',
+                                    why='foamToVTK: exit 1',
+                                    path='vtk/volumes/t_0.001.vtk')])
+        assert dict(name='vtk', path='vtk/volumes/t_0.001.vtk',
+                    why='t = 0.001: foamToVTK: exit 1') in m['failed']
+        delete = FakeDelete()
+        m, notice = mf.verify_and_release_scratch(
+            m, folder, POSIX, False, False, log=lambda *_a: None,
+            run=FakeWsl(root), delete=delete, unc=lambda p: root)
+        assert delete.calls == [] and not m['wsl_scratch']['deleted']
+        assert 'vtk/volumes/t_0.001.vtk' in notice, notice
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_skeleton_omits_vtk_surfaces():
+    """OUT-2 (D11): the VTK surface output under postProcessing/ is the
+    export's, never part of foam\\ - pruned from the WSL listing and
+    refused by the filter; the names are the writer's own."""
+    from blastlab.solvers.foam import writer
+    assert mf.VTK_POST_DIRS == (f'postProcessing/{writer.VTK_SECTIONS}',
+                                f'postProcessing/{writer.VTK_OBSTACLES}')
+    s = mf.skeleton_script(POSIX)
+    for d in mf.VTK_POST_DIRS:
+        assert f"-not -path '{d}/*'" in s, s
+    for rel in ('postProcessing/vtkSections/0.001/p_slice_y_0.30.vtk',
+                'postProcessing/vtkSections/p_slice_y_0.30.vtk.series',
+                'postProcessing/vtkObstacles/0/p_obstacles.vtk'):
+        assert not mf.in_skeleton(rel), rel
+    assert mf.in_skeleton('postProcessing/probes/0/p')
+    assert mf.in_skeleton('postProcessing/vtkSectionsOther/x')
+    # a stray line in the listing is filtered on the Windows side too
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        m, notice, _r, delete, folder, _l = release(
+            tmp, extra_line='0' * 64 + '  postProcessing/vtkSections/'
+                                       '0.001/p_slice_y_0.30.vtk')
+        assert notice is None and m['wsl_scratch']['deleted'], notice
+        assert not os.path.exists(os.path.join(folder, 'foam',
+                                               'postProcessing',
+                                               'vtkSections'))
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_stage_sets_vtk_dir():
+    """OUT-2 (D12): a blastFoam stage with a VTK family runs with
+    hooks.vtk_dir = <stage>\\vtk, restored afterwards; without a family,
+    or native, it stays None."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    real_solver, real_release = solvers_pkg.get_solver, \
+        mf.verify_and_release_scratch
+    seen = []
+
+    def foam_like(case, hooks):
+        seen.append(hooks.vtk_dir)
+        return real_solver(case.dim, 'native')(case, hooks)
+    solvers_pkg.get_solver = lambda dim, backend: foam_like
+    mf.verify_and_release_scratch = lambda m, *a, **k: (m, None)
+    vol = dict(on=True, mode='time', value=0.00005, fields=['p'])   # [s]
+    try:
+        folder = mf.prepare(runs, 'VTK', confirm=lambda t: True)
+        w = SolverWorker([jobs.solve_stage(
+            2, case2d(solver='blastfoam', vtk_volumes=vol),
+            stage_dir=folder)])
+        w.run()
+        assert seen == [os.path.join(folder, 'vtk')], seen
+        assert w.hooks.vtk_dir is None
+        seen.clear()
+        folder = mf.prepare(runs, 'NOVTK', confirm=lambda t: True)
+        w = SolverWorker([jobs.solve_stage(
+            2, case2d(solver='blastfoam',
+                      vtk_volumes=dict(vol, on=False)), stage_dir=folder)])
+        w.run()
+        assert seen == [None], seen
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_a_reserved_names, test_a_trailing_dot_and_space,
          test_a_length, test_a_check_messages,
@@ -1165,7 +1269,9 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_stopped_keeps_scratch, test_d_raised_keeps_scratch,
          test_d_failed_row_keeps_scratch, test_d_only_run_dirs_are_deleted,
          test_d_release_decision_table, test_d_skeleton_filter_and_script,
-         test_d_stage_calls_release_for_foam]
+         test_d_stage_calls_release_for_foam,
+         test_d_vtk_not_converted_keeps_scratch,
+         test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir]
 
 
 if __name__ == '__main__':

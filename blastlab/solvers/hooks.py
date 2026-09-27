@@ -103,6 +103,11 @@ class RunHooks:
     #: directory is known. None for a native run.
     scratch_posix = None
 
+    #: OUT-2: `<stage folder>\vtk` while a blastFoam stage with a VTK
+    #: family writes into a model folder (model_folder.stage_solve), else
+    #: None - and then the run's VTK export is inactive (batch plan D12)
+    vtk_dir = None
+
     @staticmethod
     def _due(policy, step, last_draw):
         mode, val = policy
