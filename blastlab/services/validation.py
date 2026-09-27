@@ -684,6 +684,45 @@ def _validate_vtk(case, rep, ctx):
                  f"live view")
 
 
+#: the writer's adaptive write band tops out here (solvers/foam/writer.py
+#: N_WRITES_MAX); the keep-all disk estimate's write count without a budget
+_N_WRITES_MAX = 60
+
+
+def _validate_keep_all(case, rep, ctx):
+    """OUT-3: the "Keep all fields in WSL" box. Says nothing when it is
+    not ticked, so a case without it is untouched."""
+    if not getattr(case, 'keep_all_fields', False):
+        return
+    note = rep.notes.append
+    if not ctx.foam:
+        note("Keep all fields in WSL is a blastFoam setting - the native "
+             "solver ignores it")
+        return
+    if case.dim == 1:
+        note("Keep all fields in WSL: 1D keeps its written times until the "
+             "scratch is released anyway (P9); the box also keeps the "
+             "scratch after the run")
+        return
+    budget = int(getattr(case, 'write_budget', 0) or 0)
+    n_w, upto = budget, ''
+    if n_w <= 0:
+        n_w, upto = _N_WRITES_MAX, 'up to '
+        try:
+            vol = _vtk_family(case, 'vtk_volumes')
+        except ValueError:
+            vol = None
+        t_end = float(getattr(case, 't_end', 0.0) or 0.0)
+        if (vol and vol.get('mode') == 'time' and t_end > 0
+                and isinstance(vol.get('value'), (int, float))
+                and vol['value'] > 0):
+            n_w, upto = max(1, int(math.ceil(t_end / vol['value'] - 1e-9))), ''
+    gb = n_w * BYTES_PER_CELL_WRITE * (rep.n_cells or 0) / 1e9
+    note(f"Keep all fields in WSL: every write stays in WSL and the scratch "
+         f"is kept after the run; disk estimate ~{gb:.1f} GB ({upto}{n_w} "
+         f"writes at ~{BYTES_PER_CELL_WRITE} B per cell per write)")
+
+
 class _Ctx:
     """What the blocks of `validate_case` share, one per call (Phase 4 of
     docs/ARCHITECTURE_REVIEW.md). `_validate_common` fills the first
@@ -1500,6 +1539,7 @@ def validate_case(case, pending_inputs=False):
         # OUT-2: here rather than inside _validate_1d, whose early return
         # on a charge error would skip it
         _validate_vtk(case, rep, ctx)
+        _validate_keep_all(case, rep, ctx)
         return rep
     if not _validate_domain_and_charge(case, rep, ctx):
         return rep
@@ -1508,5 +1548,6 @@ def validate_case(case, pending_inputs=False):
         return rep
     _validate_caps(case, rep, ctx)
     _validate_vtk(case, rep, ctx)
+    _validate_keep_all(case, rep, ctx)
     _validate_closing(case, rep, ctx)
     return rep

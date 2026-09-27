@@ -186,6 +186,9 @@ class Case1D:
     #: (case_to_dict). 1D has no sections or obstacles, so no
     #: vtk_surfaces: a 1D file carrying one is refused as an unknown key.
     vtk_volumes: dict = None
+    #: OUT-3: keep every written time in WSL, and the scratch after the
+    #: run (blastFoam only). False (the default) is not written.
+    keep_all_fields: bool = False
 
 
 @dataclass
@@ -310,6 +313,7 @@ class Case2D:
     #: written (case_to_dict), so a case without them is byte-identical.
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
+    keep_all_fields: bool = False     # see Case1D.keep_all_fields (OUT-3)
 
 
 @dataclass
@@ -450,6 +454,7 @@ class Case3D:
     #: plane plus the `planes` rows [[axis, position m], ...]
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
+    keep_all_fields: bool = False     # see Case1D.keep_all_fields (OUT-3)
 
 
 _CASE_TYPES = {1: Case1D, 2: Case2D, 3: Case3D}
@@ -475,6 +480,9 @@ def case_to_dict(case):
     for key in ('vtk_surfaces', 'vtk_volumes'):
         if key in d and not vtk_written(d[key]):
             d.pop(key)
+    # OUT-3: the same for the "Keep all fields in WSL" box
+    if not d.get('keep_all_fields'):
+        d.pop('keep_all_fields', None)
     d['schema'] = SCHEMA
     d['version'] = VERSION
     d['dim'] = case.dim
@@ -536,6 +544,7 @@ def case_from_dict(d):
     for key in ('vtk_surfaces', 'vtk_volumes'):
         if hasattr(case, key):
             setattr(case, key, normalize_vtk(getattr(case, key), key))
+    case.keep_all_fields = bool(case.keep_all_fields)
     return case
 
 
