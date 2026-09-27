@@ -16,8 +16,8 @@ either re-enters or is lost.
 
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (QBoxLayout, QButtonGroup, QCheckBox,
-                               QComboBox, QFormLayout, QGridLayout,
-                               QHBoxLayout,
+                               QComboBox, QFormLayout, QGraphicsOpacityEffect,
+                               QGridLayout, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QRadioButton,
                                QScrollArea, QSizePolicy, QStackedWidget,
                                QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -124,6 +124,12 @@ class MatrixVar(Var):
 
 
 # ── the Time / Step pair and the quantity matrix (OUT-2) ─────────────────
+#: the opacity of the matrix's locked Gauges boxes (P20): low enough that
+#: a locked box stands out from the card less than half as much as a live
+#: one, in light and dark mode (test_ui_output_card C10)
+LOCKED_OPACITY = 0.35
+
+
 class RadioRow(QWidget):
     """One exclusive radio button per value, in a row. The Var holds the
     value ('time'); the button shows it capitalised ('Time')."""
@@ -182,6 +188,13 @@ class MatrixGrid(QWidget):
                 if col == 'gauges':
                     box.setChecked(f in fields.VTK_GAUGE_FIELDS)
                     box.setEnabled(False)
+                    # P20 (owner, 2026-09-27): Fusion draws a disabled box
+                    # with the live one's outline and tick, on the card's
+                    # white in light mode - so the locked column looked the
+                    # MORE active. Fade it: display only, in both modes.
+                    fade = QGraphicsOpacityEffect(box)
+                    fade.setOpacity(LOCKED_OPACITY)
+                    box.setGraphicsEffect(fade)
                 else:
                     box.clicked.connect(lambda *_a: self._adopt())
                     self.boxes[(f, col)] = box

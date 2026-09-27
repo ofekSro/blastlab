@@ -60,6 +60,74 @@ def card_names(f):
     return sorted(n for n, t in f._card_of.items() if t == TITLE)
 
 
+def _box_contrast(card, box, bg):
+    """Mean |rgb - bg| over the tick box's indicator square, as drawn on
+    the card (grab the opaque card: the matrix's own background is
+    transparent, and a faded box grabbed alone is composed over black)."""
+    img = card.grab().toImage()
+    r = box.geometry()
+    r.moveTopLeft(box.parentWidget().mapTo(card, r.topLeft()))
+    side = min(r.height(), 20)
+    x0 = r.x() + max(0, (r.width() - side) // 2)
+    y0 = r.y() + (r.height() - side) // 2
+    tot, n = 0.0, 0
+    for x in range(x0, x0 + side):
+        for y in range(y0, y0 + side):
+            c = img.pixelColor(x, y)
+            tot += (abs(c.red() - bg.red()) + abs(c.green() - bg.green())
+                    + abs(c.blue() - bg.blue())) / 3.0
+            n += 1
+    return tot / max(n, 1)
+
+
+def locked_column_is_muted():
+    """P20 (owner, fix now): the locked Gauges column must read as muted,
+    in light and dark mode - it was drawn white in light mode while the
+    live boxes were grey, so the locked column looked the more active.
+    Measured on the rendered grid: a locked box must stand out from the
+    card less than half as much as a live one, ticked and unticked.
+    Unfaded (LOCKED_OPACITY = 1): light 10.3 vs 17.5 and 32.5 vs 46.1,
+    dark 3.6 vs 9.6 and 16.3 vs 27.3 - three of the four fail. Faded to
+    0.35: light 3.5 / 11.2, dark 1.3 / 5.6."""
+    print('\nC10: the locked Gauges column is visibly muted (P20)')
+    from PySide6.QtWidgets import QApplication, QCheckBox
+    from blastlab.ui import theme
+    app_ = QApplication.instance()
+    try:
+        for mode in ('light', 'dark'):
+            theme.apply(app_, mode)
+            f = form(3)
+            grid = f.widgets['vtk_fields']
+            pump(30)
+            locked = [b for b in grid.findChildren(QCheckBox)
+                      if not b.isEnabled()]
+            # rows run in VTK_FIELDS order: index 1 is Overpressure, not a
+            # gauge field, so its locked box is unticked
+            lk = locked[1]
+            live = grid.boxes[('overpressure', 'volumes')]
+            bg = theme.qcolor('card')
+            card = f.cards[TITLE]
+            c_lk, c_live = (_box_contrast(card, lk, bg),
+                            _box_contrast(card, live, bg))
+            check(f'{mode}: an unticked locked box is fainter than a live '
+                  f'one', not lk.isChecked() and not live.isChecked()
+                  and c_lk < 0.5 * c_live,
+                  f'contrast to the card: locked {c_lk:.1f}, live '
+                  f'{c_live:.1f}')
+            tk_ = locked[0]
+            tl = grid.boxes[('p', 'volumes')]
+            tl.click()
+            pump(10)
+            c_tk, c_tl = (_box_contrast(card, tk_, bg),
+                          _box_contrast(card, tl, bg))
+            check(f'{mode}: and a ticked locked box is fainter than a ticked '
+                  f'live one', tk_.isChecked() and tl.isChecked()
+                  and c_tk < 0.5 * c_tl,
+                  f'locked {c_tk:.1f}, live {c_tl:.1f}')
+    finally:
+        theme.apply(app_, 'dark')
+
+
 def main():
     print('\nC1: the families and the matrix of each dimension')
     want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
@@ -476,6 +544,8 @@ def main():
     check('Step-mode volumes note: size per write, count depends on steps',
           'every 25 solver steps' in n and 'GB per write' in n
           and "depends on the run's step count" in n, n)
+
+    locked_column_is_muted()
 
     print('\n' + '=' * 52)
     if FAIL:
