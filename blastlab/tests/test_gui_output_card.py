@@ -337,6 +337,36 @@ def main():
         g.destroy()
     f.destroy()
 
+    print('\nK11: the Keep all fields in WSL box (OUT-3)')
+    for d in (1, 2, 3):
+        f = form(d)
+        box = f._keep_all_box
+        check(f'{d}D: the box is on the card, unticked, blastFoam-scoped',
+              str(box.cget('text')) == F.KEEP_ALL_CAPTION
+              and f.v['keep_all_fields'].get() is False
+              and box in f._scoped['blastfoam']
+              and box.winfo_manager() == 'grid')
+        check(f'{d}D: default case: False, not written',
+              f.get_case().keep_all_fields is False
+              and 'keep_all_fields' not in case_to_dict(f.get_case()))
+        box.select()
+        text = json.dumps(case_to_dict(f.get_case()), sort_keys=True)
+        check(f'{d}D: ticked -> the JSON carries it',
+              json.loads(text).get('keep_all_fields') is True)
+        g = form(d)
+        g.set_case(case_from_dict(json.loads(text)))
+        check(f'{d}D: form -> case -> JSON -> form keeps the tick',
+              g.v['keep_all_fields'].get() is True
+              and json.dumps(case_to_dict(g.get_case()),
+                             sort_keys=True) == text)
+        g.destroy()
+        f.set_mode('native')
+        ROOT.update_idletasks()
+        check(f'{d}D native: hidden, not in the case',
+              not card_shown(f) and box.winfo_manager() == ''
+              and 'keep_all_fields' not in case_to_dict(f.get_case()))
+        f.destroy()
+
     ROOT.destroy()
     print('\n' + '=' * 52)
     if FAIL:
