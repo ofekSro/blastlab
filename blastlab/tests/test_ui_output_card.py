@@ -384,8 +384,13 @@ def main():
     pump(5)
     rep = validate_case(f.get_case())
     n = next((x for x in rep.notes if x.startswith('VTK volumes')), '')
-    check('Time-mode volumes note: the cadence is the write schedule',
-          "solver's write schedule" in n and 'README' in n, n)
+    # owner decision P14 (b): no "changes the solution" warning; the
+    # writes are the first step past each interval
+    check('Time-mode volumes note: the write schedule, first step past '
+          'each interval, no "change the solution" warning',
+          "solver's write schedule" in n
+          and 'first solver step past its interval' in n
+          and 'solution' not in n, n)
     f.v['vtk_v_mode'].set('step')
     pump(5)
     rep = validate_case(f.get_case())

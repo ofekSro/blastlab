@@ -1299,9 +1299,11 @@ def vtk_checks():
     tv = render_case(Case3D(**base, vtk_volumes=dict(vol, mode='time',
                                                      value=0.2)))
     tc = tv.files['system/controlDict']
-    check('vtk volumes, Time mode: adjustableRunTime, writeInterval = '
-          'value_ms / 1000 = 0.0002 s, pinned',
-          top_entry(tc, 'writeControl') == 'adjustableRunTime'
+    # owner decision P14 (b): runTime, so the writes never clip dt
+    check('vtk volumes, Time mode: runTime (never adjustableRunTime, '
+          'P14 b), writeInterval = value_ms / 1000 = 0.0002 s, pinned',
+          top_entry(tc, 'writeControl') == 'runTime'
+          and 'adjustableRunTime' not in tc
           and top_entry(tc, 'writeInterval') == '0.0002'
           and tv.write_interval == 0.0002 and tv.adaptive_write is False
           and tv.write_steps == 0)
@@ -1359,8 +1361,8 @@ def vtk_checks():
           top_entry(v1c, 'writeControl') == 'timeStep'
           and top_entry(v1c, 'writeInterval') == '40'
           and v1.write_steps == 40 and v1.adaptive_write is False)
-    check('vtk 1D volumes, Time mode: adjustableRunTime 0.00025 s',
-          top_entry(t1c, 'writeControl') == 'adjustableRunTime'
+    check('vtk 1D volumes, Time mode: runTime 0.00025 s (P14 b)',
+          top_entry(t1c, 'writeControl') == 'runTime'
           and top_entry(t1c, 'writeInterval') == '0.00025')
     check('vtk 1D: no surface object, the rest of the functions unchanged',
           fo_names(v1c) == fo_names(p1.files['system/controlDict']))

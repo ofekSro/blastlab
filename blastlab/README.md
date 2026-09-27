@@ -159,16 +159,16 @@ native mode, and a native run ignores the keys.
   objects (vtkTimeSeries, blastFoam User Guide v6.0, sec. 15.5 (p. 124))
   that sample at their own cadence and never change the time step.
   Volumes **are** the solver's write schedule (Time: every value / 1000
-  s of simulated time, landing exactly on it; Step: every N steps), so
-  they cannot be combined with a write budget, and every write is also
-  ingested for the live view. **Choosing a volumes cadence is choosing
-  the write schedule, and that can change the solution slightly:** a
-  Time-mode write shortens the time step to land on its time, which the
-  default schedule does differently. Measured once (batch plan P14): a
-  gauge at Z ≈ 0.07 m/kg^1/3 read +4.2 % peak and +4.8 % impulse
-  against the same run without export; the same schedule without export
-  reproduces the export run byte for byte. Validation notes it, and in
-  Step mode notes that the write count depends on the step count.
+  s of simulated time; Step: every N steps), so they cannot be combined
+  with a write budget, and every write is also ingested for the live
+  view. A Time-mode volumes write is `writeControl runTime`: it lands on
+  **the first solver step past each interval**, and the time step is
+  never shortened to hit the interval exactly (owner decision P14 (b),
+  2026-09-27 - the earlier `adjustableRunTime` did shorten it, and
+  moved a near-field gauge by a few per cent). The written time names
+  are therefore not round multiples. The one exact write is the end
+  time (T62), as on every run. Validation notes the write count, and
+  in Step mode that the count depends on the step count.
 - **Layout** - `<time>` is OpenFOAM's own time name in seconds:
 
   | Path | Content |

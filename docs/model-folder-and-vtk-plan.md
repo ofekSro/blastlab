@@ -275,7 +275,7 @@ checked against the guide by the implementer:
 vtkSurfaces
 {
     type            surfaces;
-    writeControl    timeStep;            // or adjustableRunTime for Time mode
+    writeControl    timeStep;            // or runTime for Time mode (D5)
     writeInterval   25;                  // or value_ms / 1000
     surfaceFormat   vtkTimeSeries;
     interpolationScheme cellPoint;
@@ -297,10 +297,16 @@ The obstacles entry is emitted only when the case has obstacles (the
 carved out … exposed faces -> 'obstacles' wall patch").
 
 **Volumes** — the cadence becomes the solver's own write schedule: Time →
-`writeControl adjustableRunTime; writeInterval value_ms/1000`; Step →
+`writeControl runTime; writeInterval value_ms/1000`; Step →
 `writeControl timeStep; writeInterval N`. The adaptive interval controller is
 switched off for the run (`spec.adaptive_write = False`, as `_apply_budget`
 does) and the exact end-time write (`writeTimes`, T62) is kept.
+
+*Owner decision P14 (b), 2026-09-27:* Time mode uses `runTime`, not
+`adjustableRunTime`. `adjustableRunTime` shortens the time step to land each
+write exactly on its time, which changed the solve (batch plan P14: +4.2 %
+peak at a Z ≈ 0.07 gauge). With `runTime` each write lands on the first solver
+step past its interval and the time step is never touched.
 
 ### 3.5 Run loop: the `VtkExport` stage
 

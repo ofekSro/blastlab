@@ -395,8 +395,10 @@ def _apply_budget(spec, case):
 def _apply_vtk(spec, case):
     """OUT-2: carry the case's VTK families onto a blastFoam spec. VTK
     volumes make their cadence the solver's own write schedule (plan
-    sec. 3.4): Time mode pins writeInterval to value_ms / 1000, Step mode
-    writes every N steps. Either way the adaptive controller is off; the
+    sec. 3.4): Time mode pins writeInterval to value_ms / 1000 with
+    `writeControl runTime` (the first step past each multiple, dt left
+    alone - owner decision P14 (b)), Step mode writes every N steps.
+    Either way the adaptive controller is off; the
     end-time write (writeTimes, T62) stays. Validation refuses volumes
     together with a write budget; should both arrive, volumes win and the
     budget (and with it the decomposed purge) is dropped."""
@@ -818,11 +820,20 @@ def _controldict_time(spec, case):
     # exactly uniform and exactly at rest has Co = 0 and
     # `Time::adjustDeltaT` divides by it - a SIGFPE on the first step,
     # measured. Falsy by default, so every golden is untouched.
-    # OUT-2: VTK volumes in Step mode write every N solver steps (Time
-    # mode already sits in spec.write_interval, see _apply_vtk)
+    # OUT-2: VTK volumes in Step mode write every N solver steps. Time
+    # mode (its interval already sits in spec.write_interval, see
+    # _apply_vtk) writes with `runTime`, never adjustableRunTime: the
+    # latter clips deltaT to land on each write time (OF-9
+    # timeControlFunctionObject.C, timeToNextWrite), which changed the
+    # solve (batch plan P14: +4.2 % peak at a Z ~ 0.07 gauge). runTime
+    # writes at the first step past each multiple and leaves dt alone
+    # (owner decision P14 (b), 2026-09-27). The exact end-time write
+    # (writeTimes, T62) still clips dt once, at t_end, as on every case.
     if spec.write_steps:
         d['writeControl'] = 'timeStep'
         d['writeInterval'] = int(spec.write_steps)
+    elif spec.vtk_volumes:
+        d['writeControl'] = 'runTime'
     fixed_dt = float(getattr(case, 'fixed_dt', 0.0) or 0.0)
     if fixed_dt > 0.0:
         d['deltaT'] = Raw(fmt(fixed_dt))
