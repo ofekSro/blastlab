@@ -20,6 +20,10 @@ docs/batches/2026-09-27-out-2-vtk-output.md, Steps 4 and 6.
      surface files merged into one file per surface per time, volumes
      renamed, TIME inside, a geometry mismatch kept in WSL.
 
+  C  OUT-3 (docs/batches/2026-09-27-out-3-newest-fields.md, Step 2): the
+     decision table again with require_copy=False, the D9 chain, and the
+     decomposed (E6) branch - readiness on every rank, rank-mixed meshes.
+
 Run:  cd blastlab/tests && python test_vtk_export_plan.py   (or pytest)
 """
 import itertools
@@ -941,7 +945,83 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_restart_dir_survives, test_b_1d_deletes_no_time_dir,
            test_b_geometry_mismatch_keeps_the_sample,
            test_b_unreadable_volume_is_kept]
-TESTS = TESTS_A + TESTS_B
+
+
+# ── C: OUT-3, the plan without the copy gate, and decomposed runs ────────
+def nplan(**kw):
+    """vtk_purge_plan for a run that keeps only its newest fields: no
+    conversion, no copy (require_copy=False)."""
+    args = dict(converted=(), copied_ok=(), require_copy=False)
+    args.update(kw)
+    return plan(**args)
+
+
+def test_c_no_copy_gate():
+    assert nplan() == T[:-2]
+    # with the gate the same call deletes nothing
+    assert plan(converted=(), copied_ok=()) == []
+    x = '0.0002'
+    rest = [t for t in T[:-2] if t != x]
+    without = [t for t in T if t != x]
+    for why, kw in {
+            'not ingested': dict(done=without),
+            'start dir': dict(start_dir=x),
+            'protected (snapshot)': dict(protected={x}),
+            'not reconstructed (parallel)': dict(reconstructed=without,
+                                                 n_procs=4)}.items():
+        assert nplan(**kw) == rest, (why, nplan(**kw))
+    got = nplan(start_dir='0.0001', protected=['0.0003'], done=['0'] + T)
+    assert got == ['0.0002', '0.0004'], got
+    for keep in ('0', '0.0001', '0.0003', T[-1], T[-2]):
+        assert keep not in got
+    assert nplan(newest_complete=['0.0006']) == []
+    assert nplan(reconstructed=(), n_procs=2) == []
+
+
+def test_c_d9_chain_without_copy():
+    mesh = {'0.0001', '0.0003', '0.0005'}
+    assert nplan(mesh_dirs=mesh, ordered=T) == T[:4]
+    assert nplan(mesh_dirs=mesh, ordered=T, protected=['0.0004']) == \
+        ['0.0001', '0.0002']
+    assert nplan(mesh_dirs=mesh, ordered=T, protected=['0.0002']) == \
+        ['0.0003', '0.0004']
+
+
+def test_c_decomposed_ready_on_every_rank():
+    # E6: `reconstructed` is not looked at; readiness on every rank is
+    everyone = nplan(n_procs=3, reconstructed=(), per_rank_ready=T)
+    assert everyone == T[:-2], everyone
+    # 0.0002 is not complete on one rank: it survives
+    got = nplan(n_procs=3, reconstructed=(),
+                per_rank_ready=[t for t in T if t != '0.0002'])
+    assert got == ['0.0001', '0.0003', '0.0004'], got
+    # the newest write is ingested at the root listing but not ready on
+    # every rank: the two newest READY ones (4, 5) are the kept anchors
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T[:-1])
+    assert got == T[:3], got
+
+
+def test_c_decomposed_rank_mixed_mesh():
+    # rank 0 holds a mesh at 3 and 5, rank 1 at 3 only, rank 2 at 3 and 5
+    ranks = {0: {'0.0003', '0.0005'}, 1: {'0.0003'},
+             2: {'0.0003', '0.0005'}}
+    # 5 is kept (newest two) but is not a mesh time on EVERY rank, so 3
+    # (a mesh time on some rank) must stay; 4 (no mesh) goes; 2 and 1
+    # (no mesh anywhere) go
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T,
+                rank_mesh=ranks, ordered=T)
+    assert got == ['0.0001', '0.0002', '0.0004'], got
+    # every rank meshes at 5: 3 may go too
+    ranks[1] = {'0.0003', '0.0005'}
+    got = nplan(n_procs=3, reconstructed=(), per_rank_ready=T,
+                rank_mesh=ranks, ordered=T)
+    assert got == T[:4], got
+
+
+TESTS_C = [test_c_no_copy_gate, test_c_d9_chain_without_copy,
+           test_c_decomposed_ready_on_every_rank,
+           test_c_decomposed_rank_mixed_mesh]
+TESTS = TESTS_A + TESTS_B + TESTS_C
 
 
 def main():

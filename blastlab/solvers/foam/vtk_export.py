@@ -64,14 +64,20 @@ def _time_key(name):
 
 def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
                    reconstructed, protected=(), n_procs=1,
-                   mesh_dirs=frozenset(), ordered=()):
+                   mesh_dirs=frozenset(), ordered=(), require_copy=True,
+                   per_rank_ready=None, rank_mesh=None):
     """Pure. The written times whose WSL time directory may be deleted,
     sorted by time. A name qualifies only when all of these hold:
 
     * the ingest has read it (`done`), foamToVTK converted it
-      (`converted`) and its file was copied and verified (`copied_ok`);
+      (`converted`) and its file was copied and verified (`copied_ok`) -
+      the last two only with `require_copy` (OUT-3: a run that keeps only
+      its newest fields without VTK volumes passes False);
     * in parallel (`n_procs` > 1) a successful reconstructPar covered it
-      (`reconstructed`), so the root copy is the whole write;
+      (`reconstructed`), so the root copy is the whole write - or, on a
+      decomposed (parallel AMR) run, `per_rank_ready` is given instead:
+      the times complete on every rank (runloop.common_ready_times); only
+      those count as complete, and only those may go (OUT-3, E6);
     * it is not `0`, not the run's `start_dir` and not `protected` (the
       writes finalize re-reads: snapshots, the arrival pin, the trigger);
     * it is older than the KEEP_NEWEST newest of `newest_complete`, the
@@ -80,12 +86,23 @@ def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
       goes only when the next newer time that stays is a mesh time too -
       otherwise that kept time, which has no mesh of its own, would
       resolve to an older instance. `ordered` is every time on disk;
-      without it the names given here stand for the listing."""
-    ok = set(done or ()) & set(converted or ()) & set(copied_ok or ())
-    if int(n_procs or 1) > 1:
+      without it the names given here stand for the listing.
+      `rank_mesh` {rank: times holding processor<rank>/<t>/polyMesh/}
+      applies the rule per rank, conservatively (E6): a time is a mesh
+      time when ANY rank holds a mesh there, and the next kept time counts
+      as a mesh time only when EVERY rank holds one there."""
+    ok = set(done or ())
+    if require_copy:
+        ok &= set(converted or ()) & set(copied_ok or ())
+    ready = None
+    if per_rank_ready is not None:
+        ready = {str(t) for t in per_rank_ready}
+        ok &= ready
+    elif int(n_procs or 1) > 1:
         ok &= set(reconstructed or ())
     complete = sorted({str(t) for t in (newest_complete or ())
-                       if _is_time(t)}, key=_time_key)
+                       if _is_time(t) and (ready is None or str(t) in ready)},
+                      key=_time_key)
     if len(complete) < KEEP_NEWEST:
         return []
     floor = float(complete[-KEEP_NEWEST])
@@ -97,14 +114,18 @@ def vtk_purge_plan(done, converted, copied_ok, newest_complete, start_dir,
     known = set(ordered or ()) or (set(done or ()) | set(complete) | cand
                                    | set(protected or ()))
     listing = sorted({str(t) for t in known if _is_time(t)}, key=_time_key)
-    mesh = set(mesh_dirs or ())
+    mesh_any = mesh_all = set(mesh_dirs or ())
+    if rank_mesh:
+        sets = [{str(t) for t in v} for v in rank_mesh.values()]
+        mesh_any = set().union(*sets)
+        mesh_all = set.intersection(*sets)
     out = set()
     next_kept_is_mesh = False
     for t in reversed(listing):            # newest first
-        if t in cand and (t not in mesh or next_kept_is_mesh):
+        if t in cand and (t not in mesh_any or next_kept_is_mesh):
             out.add(t)
             continue
-        next_kept_is_mesh = t in mesh
+        next_kept_is_mesh = t in mesh_all
     return sorted(out, key=_time_key)
 
 
