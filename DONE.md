@@ -718,7 +718,9 @@ Owner answers of 2026-09-27:
     "fixture 'tmp' not found" errors of `test_load_csv` and `test_wall_clearing`, with
     no test edited.
   - Whole-directory pytest went from 158 passed / 11 errors to **180 passed, 0 errors**,
-    and no test newly fails.
+    and no test newly fails. After merging master (OUT-2's new suites): 245 passed and
+    1 failed - `test_vtk_case::test_validation`, a pytest-only isolation gap the hook now
+    exposes (TODO `P2-13` item 6).
 - **Commits:** `1e0795f` `c944da6` `a9c8d52`.
 
 ### `P2-14` item 7 · `read_probes` aligns rho/U with p by time
@@ -739,8 +741,15 @@ Owner answers of 2026-09-27:
 - The CLAUDE.md §8.2 dry run prints `…\settings.json False []`.
 - **Not run:** the solving suites and `_e2e_*`.
 
-**QA:** the real-window check (Qt Save → Open on the 0-D form, the startup disk warning)
-is pending.
+**QA:** real windows, `docs/qa/2026-09-27-p0-5/QA_REPORT.md`, **3/3 PASS**:
+- Qt Save → Open on the 0-D form.
+- The disk warning in Qt and Tk: one status message and one Run-log line, nothing modal,
+  nothing deleted.
+- Both apps launch and close cleanly.
+
+Fixed from QA: the warning ran to ~260 characters, so the 200-character status line cut
+off the command. It is now under 200, pinned by a test. Seen, not from this batch: at the
+default 1296×879 the Qt Setup card clips its input boxes at the right edge.
 
 ---
 

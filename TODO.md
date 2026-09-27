@@ -794,13 +794,20 @@ If a resumed run's peak map is really wrong, this is P1.
 these.** The rule is: **fix the test's mechanism, never its threshold or its expected
 value.** One commit per test, each citing this decision.
 Items 1 (`P2-10`), 3 and 4 closed 2026-09-27 - see [DONE.md](DONE.md) §0g. Item 4 is now
-a `conftest.py` hook for every suite (owner, 2026-09-27); it uncovered no failure.
+a `conftest.py` hook for every suite (owner, 2026-09-27); on `todo-batch` it uncovered no
+failure, and after merging master (OUT-2) it uncovered one - item 6.
 2. **`P2-11`** `test_foam_postmortem.py`: **find the cause of 620 vs 632 first.** If
    it is a code bug, fix the code and leave the test alone, and it is P1 if a resumed
    run's peak map is wrong. If the test itself is wrong, **stop and bring the evidence to
    the owner** before changing it.
 5. ✅ 2026-09-27: the "fixture 'tmp' not found" errors of `test_load_csv` /
    `test_wall_clearing` - a module-scoped `tmp` fixture in `conftest.py`, no test edited.
+6. **Finding, 2026-09-27 (OUT-2's test, not edited):** `test_vtk_case.py::test_validation`
+   fails under pytest - "two planes the writer cuts on two layers are not refused" - and
+   passes as a script. `main()` primes the hardware (8 cores / 512 GB) before calling it,
+   and pytest does not, so the case meets the 4 GB fallback cap (CLAUDE.md §4). The check
+   was silent under pytest before the item-4 hook. Fix the mechanism (a module fixture that
+   primes and restores as `main()` does), not the check. The script gate is green.
 
 Source: `docs/ENGINEERING_QUESTIONS.md` hd1-wall-load #3, phase 0 #4.
 

@@ -915,14 +915,14 @@ def start_auto_cleanup(settings=None, log=None):
 # ── the disk warning that replaces the default sweep (owner 2026-09-27) ────
 
 def disk_warning_text(total_bytes, limit_gb, n_plan, plan_bytes):
-    """The one-line runs-root warning. Pure."""
+    """The one-line runs-root warning. Pure. Kept under the 200-character
+    status line of both GUIs, so the command at its end stays visible."""
     gb = 1024 ** 3
     runs = 'run' if n_plan == 1 else 'runs'
-    return (f'WSL runs folder {RUNS_ROOT} holds {total_bytes / gb:.1f} GB, '
-            f'over the {float(limit_gb):g} GB limit (cleanup_max_gb). '
-            f'Automatic cleanup is off, so nothing was deleted; the cleanup '
-            f'policy would delete {n_plan} {runs} '
-            f'({plan_bytes / gb:.1f} GB). To free space: '
+    return (f'WSL runs folder holds {total_bytes / gb:.1f} GB, over the '
+            f'{float(limit_gb):g} GB limit; cleanup is off, nothing was '
+            f'deleted. Cleanup would delete {n_plan} {runs} '
+            f'({plan_bytes / gb:.1f} GB): '
             f'python -m blastlab --clean-foam-runs')
 
 

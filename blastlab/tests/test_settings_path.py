@@ -429,6 +429,9 @@ def test_disk_warning():
           and 'would delete 2 runs (7.0 GB)' in text
           and 'nothing was deleted' in text
           and '--clean-foam-runs' in text, text)
+    long_text = env.disk_warning_text(12345 * GB, 1000, 999, 9999 * GB)
+    check('text fits the 200-character status line of both GUIs',
+          len(long_text) <= 200, f'{len(long_text)} chars')
     check('text: one run is singular',
           'would delete 1 run (' in env.disk_warning_text(GB, 0.5, 1, GB))
     runs = fake_runs()                                   # 15 GB in all
