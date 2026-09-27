@@ -751,6 +751,27 @@ Fixed from QA: the warning ran to ~260 characters, so the 200-character status l
 off the command. It is now under 200, pinned by a test. Seen, not from this batch: at the
 default 1296×879 the Qt Setup card clips its input boxes at the right edge.
 
+## 0h. 2026-09-27 — batch `out-3-newest-fields` (OUT-3)
+
+Plan: `docs/batches/2026-09-27-out-3-newest-fields.md`; spec
+`docs/model-folder-and-vtk-plan.md` §4. Owner: on for every blastFoam run, default on,
+with a **Keep all fields in WSL** box (VTK card, Qt + Tk; case key `keep_all_fields`,
+omitted while off).
+
+- **What:** the OUT-2 purge machinery without the VTK copy gate - every blastFoam stage
+  deletes a written time dir after it has been ingested, keeping the two newest writes
+  (resume anchor + one), `0/`, the restart dir and every write finalize re-reads
+  (snapshots, pin, arrival, trigger). Decomposed AMR runs purge per rank, only times
+  ready on every rank. 1D deletes nothing (P9). The manifest records `wsl_fields`; a
+  ticked box keeps the scratch after a finished run. Parked Q1-Q7 on their interims.
+- **Tests:** `test_keep_all_fields`, `test_vtk_export_plan` 48/48, `test_vtk_protect`
+  6/6, harness Qt V06 / Tk V05, the two char case-form re-pins (rows added).
+  `test_regression` byte-identical. `_e2e_fields_purge.py` 41/41 after the owner's
+  gauge re-registration (`8dfca33`; the first gauge sat behind the obstacle ring):
+  resumed vs uninterrupted and AMR default vs ticked identical on peak, impulse and
+  arrival. GUI QA 22/22 Qt, 22/22 Tk.
+- **Commits:** `77314c2`..`8dfca33` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70

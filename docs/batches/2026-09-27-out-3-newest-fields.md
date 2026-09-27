@@ -174,6 +174,7 @@ A real case with the default and one with the box ticked. The owner checks the W
 **Owner decision (2026-09-27, binding):** OUT-3 is on for every blastFoam run, VTK or not, by default, with a "Keep all fields in WSL" box to turn it off per run. The earlier "always on" note is settled by this.
 
 **Owner decision (2026-09-27, Step 7 re-registration, committed before the re-run):** the first e2e gave 35/41 - rules 2c and 4a compared nothing, because the gauge at (0.35, 0.5) sat 2 cm behind the closed obstacle ring (0.30-0.33, 0.2-0.8) and never left 101325 Pa. The R1/R2/R4 gauge moves to (0.2, 0.5): an unobstructed straight line to the charge, 0.2 m away, inside the ring. Chosen from the geometry, not from any number. Rule text and thresholds unchanged.
+**Re-run result (2026-09-27 evening): `E2E FIELDS PURGE: PASS (41 checks)`.** 2c resumed vs A: peak 4734.53 Pa, impulse 58.468, arrival 0.0412999 - d 0.0000 % on all three. 4a (AMR, 2 ranks) default vs ticked: peak 6624.57 Pa, impulse 56.8376, arrival 0.0453356 - d 0.0000 %. GUI QA (Step 8): 22/22 Qt, 22/22 Tk, `docs/qa/2026-09-27-out-3/` (not committed).
 
 **Parked (none blocks; each is the interim the code uses, and a different answer is a small change in `vtk_export.py` / `model_folder.py`):**
 - **Q1 · 1D (E3).**

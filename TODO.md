@@ -31,7 +31,7 @@ fixed and approved — the disk.
 | `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
 | `OUT-2` | ✅ **VTK output options** — done and accepted by the owner in ParaView 2026-09-27 (DONE.md §0d, Viper-style layout, P14 closed). Plan §3 | 2 |
 | `OUT-5` | ✅ **Reclaim the 481 GB WSL disk** — done 2026-09-27 (DONE.md §0f): vhdx 481 → 8.6 GB. Delete the backup tar after 2026-10-27 (D5). Plan §6 | 3 |
-| `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
+| `OUT-3` | ✅ **Only the newest fields kept in WSL** — done 2026-09-27 (DONE.md §0h); parked Q1-Q7 in the batch plan §6. Plan §4 | 4 |
 | `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |
 
 ---
@@ -893,6 +893,9 @@ Qt refusal and overwrite dialogs break a path after "C:".
 - `P2-19` Tk at the 1100x720 minimum clips the right column (OUT-2 QA F3; also native) - card widths vs the 13:7 split.
 - `P2-20` Tk dimension switch keeps the old scroll offset, form goes blank (OUT-2 QA F4; same on master) - `SetupPanel._swap`.
 - `P2-21` Qt 3D form shows a blank tail at the scroll end (OUT-2 QA F5) - the QStackedWidget takes its tallest page's height.
+- `P2-22` Validation accepts a detonation point that activates no cell; blastFoam then dies at t = 0 ("No cells will be activated using the detonation point"). Seen in OUT-3 e2e and harness F05.
+- `P2-23` A resumed run's gauges lose U: after a restart blastProbes writes only p and rho, so `read_probes` drops U_mag (warns since 25ce709). Pre-existing on master (OUT-3 verifier).
+- `P2-24` Qt: the Keep all fields tooltip is one ~1000 px line - wrap it. Tk light mode: unselected sidebar / dimension buttons are very faint (OUT-3 QA).
 
 ---
 
