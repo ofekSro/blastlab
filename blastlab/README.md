@@ -175,10 +175,24 @@ native mode, and a native run ignores the keys.
   The card spans both Setup columns, below them (owner decision P13):
   the families and planes on the left, the quantity matrix on the right
   (one above the other when the window is too narrow for both). The
-  matrix has a locked Gauges column (p, rho, U) and one column per
+  matrix has a Gauges column and one column per
   destination, in full words and in the order of the family boxes -
   Sections / Obstacles / Volumes in 3D, Whole domain / Obstacles in 2D
-  (P24), Whole domain in 1D. The
+  (P24), Whole domain in 1D. A cell exists only where the pair means
+  something (`models.case.VTK_CELLS`). **Gauges** (`OUT-4a`): p, rho, U
+  are always recorded (ticked and locked); temperature and dynamic
+  pressure can be added, and in 2D/3D overpressure and impulse too. They
+  go into the case as `vtk_gauges: {"fields": [...]}` (omitted when none
+  is ticked), are probed by blastProbes next to p/U/rho, and appear as
+  extra gauge TSV columns with units (`p_over_...[Pa]`,
+  `impulse_...[Pa s]`, `T_...[K]`, `q_...[Pa]`) and in the Results tab's
+  trace selector. **Dynamic pressure** (`dynamicP`, every column) is
+  blastFoam's dynamicPressure function object (blastFoam User Guide v6.0,
+  sec. 15.9, p. 125), emitted only when ticked; it is the vector
+  0.5 rho U |U|, and blastlab writes its magnitude q = 0.5 rho |U|^2
+  (eq. 15.1) as `Dynamic_Pressure` in the files and `q` at the gauges
+  (owner decision Q5). A resumed AMR leg records no gauge impulse (the
+  function object is off, P1-5) and logs it. The
   first tick of a family fills p + peak overpressure (surfaces) or p,
   rho, U (volumes). **Peak overpressure** is blastFoam's `pMax` - the
   running per-cell maximum of the absolute pressure `p` - minus the
@@ -229,7 +243,8 @@ native mode, and a native run ignores the keys.
   / `TIME 1 1 float`. The array names are the same in every family:
   `pressure`, `Peak_Overpressure`, `Impulse`, `Overpressure`,
   `Arrival_Time`, `density`, `velocity`, `temperature`,
-  `Products_Fraction`, `Energy` (foamToVTK's `cellID` is kept). Each file
+  `Products_Fraction`, `Energy`, `Dynamic_Pressure` (a scalar, OUT-4a)
+  (foamToVTK's `cellID` is kept). Each file
   is written atomically and read back with a strict parser
   (`output/legacy_vtk.py`) before the WSL source may be deleted; a
   sample whose files disagree is kept in WSL and listed in
