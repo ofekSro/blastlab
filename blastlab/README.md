@@ -148,8 +148,10 @@ native mode, and a native run ignores the keys.
   to the nearest cell layer but keeps the name typed (`slice_x_0.20`).
   The quantity matrix has a locked Gauge column (p, rho, U) and one
   column per destination - Sect. / Obst. / Vol. (1D/2D: Domain). The
-  first tick of a family fills p + peak overpressure (surfaces) or p,
-  rho, U (volumes). Case keys: `vtk_surfaces` {on, mode, value, fields,
+  first tick of a family fills p + peak pressure (surfaces) or p,
+  rho, U (volumes). **`pMax` (Peak pressure) is the running per-cell
+  maximum of the absolute pressure `p`**, not an overpressure -
+  subtract ambient (101.325 kPa) for the peak overpressure. Case keys: `vtk_surfaces` {on, mode, value, fields,
   obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields};
   neither is written while off.
 - **Cadence.** Sections and obstacles are blastFoam surface function

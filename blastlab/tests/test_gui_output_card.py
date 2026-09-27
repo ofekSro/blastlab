@@ -249,6 +249,21 @@ def main():
           any('nothing to sample' in e for e in rep.errors), str(rep.errors))
     f.destroy()
 
+    print('\nK9: what the matrix labels say (GUI QA 2026-09-27)')
+    f = form(3)
+    labels = {str(w.cget('text')): w for w in
+              f._vtk_grid.winfo_children() if isinstance(w, ctk.CTkLabel)}
+    pk = labels.get('Peak pressure')
+    tip = getattr(getattr(pk, '_blastlab_tip', None), 'text', '')
+    check('F1: the pMax row reads "Peak pressure", not overpressure',
+          pk is not None and not any(t.startswith('Peak overpr')
+                                     for t in labels),
+          str(sorted(labels)))
+    check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
+          all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
+                                 '101.325 kPa')), tip)
+    f.destroy()
+
     ROOT.destroy()
     print('\n' + '=' * 52)
     if FAIL:

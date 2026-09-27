@@ -231,7 +231,7 @@ A checkbox grid; a cell exists only where blastFoam has the field.
 | Pressure | `p` | locked ✓ | ✓ | ✓ | ✓ |
 | Overpressure | `overpressure` | | ✓ | ✓ | ✓ |
 | Impulse | `impulse` | | ✓ | ✓ | ✓ |
-| Peak overpressure | `pMax` | | ✓ | ✓ | ✓ |
+| Peak pressure (absolute; subtract ambient for overpressure) | `pMax` | | ✓ | ✓ | ✓ |
 | Arrival time | `timeOfArrival` | | ✓ | ✓ | ✓ |
 | Density | `rho` | locked ✓ | ✓ | ✓ | ✓ |
 | Velocity | `U` | locked ✓ | ✓ | ✓ | ✓ |

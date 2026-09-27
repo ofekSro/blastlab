@@ -138,14 +138,21 @@ def anim_file_with_format(anim_file, fmt):
 #: the matrix shares one Setup column - the tooltip names the field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
-    'pMax': 'Peak overpr.', 'timeOfArrival': 'Arrival time',
+    'pMax': 'Peak pressure', 'timeOfArrival': 'Arrival time',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
 }
-#: the long names, for the row tooltips
-VTK_QUANTITY_TIPS = {'pMax': 'Peak overpressure',
-                     'alpha.expl': 'Products (volume fraction)',
-                     'timeOfArrival': 'Arrival time (first arrival)'}
+#: the long names, for the row tooltips. pMax is the running per-cell
+#: maximum of the ABSOLUTE pressure p: fieldMinMax on p with no pRef
+#: (solvers/foam/writer.py, the pMax function object; blastFoam User
+#: Guide v6.0, sec. 15.2 (p. 123); GUI QA 2026-09-27 F1 measured it cell
+#: by cell against the exported p)
+VTK_QUANTITY_TIPS = {
+    'pMax': 'Peak pressure (the running maximum of the ABSOLUTE pressure '
+            'p in each cell; subtract ambient, 101.325 kPa, for the peak '
+            'overpressure)',
+    'alpha.expl': 'Products (volume fraction)',
+    'timeOfArrival': 'Arrival time (first arrival)'}
 
 
 def vtk_quantity_tip(field):

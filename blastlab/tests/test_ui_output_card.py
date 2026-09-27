@@ -349,6 +349,22 @@ def main():
           not rep.errors and any('VTK volumes' in n for n in rep.notes),
           str(rep.errors))
 
+    print('\nC9: what the matrix labels say (GUI QA 2026-09-27)')
+    from PySide6.QtWidgets import QLabel
+    f = form(3)
+    labels = {w.text(): w for w in
+              f.widgets['vtk_fields'].findChildren(QLabel)}
+    pk = labels.get('Peak pressure')
+    tip = pk.toolTip() if pk is not None else ''
+    # F1: pMax is fieldMinMax on the absolute p, no pRef (writer.py)
+    check('F1: the pMax row reads "Peak pressure", not overpressure',
+          pk is not None and not any(t.startswith('Peak overpr')
+                                     for t in labels),
+          str(sorted(labels)))
+    check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
+          all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
+                                 '101.325 kPa')), tip)
+
     print('\n' + '=' * 52)
     if FAIL:
         print(f'FAILED: {len(FAIL)} check(s): {FAIL}')
