@@ -111,9 +111,9 @@
         "volumes": []
       },
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim1_blastfoam/order_blank_word": {
@@ -182,9 +182,9 @@
         "volumes": []
       },
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim1_blastfoam/set_c1/get": {
@@ -237,7 +237,7 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_fields"
   ],
@@ -332,8 +332,8 @@
     "hidden": [
       "activation",
       "afterburn",
-      "vtk_v_ms",
-      "vtk_v_steps"
+      "vtk_v_steps",
+      "vtk_v_time"
     ],
     "points": {
       "gauges": []
@@ -357,9 +357,9 @@
         "volumes": []
       },
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim1_native/order_blank_word": {
@@ -398,8 +398,8 @@
     "hidden": [
       "activation",
       "afterburn",
-      "vtk_v_ms",
-      "vtk_v_steps"
+      "vtk_v_steps",
+      "vtk_v_time"
     ],
     "points": {
       "gauges": [
@@ -430,9 +430,9 @@
         "volumes": []
       },
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim1_native/set_c1/get": {
@@ -485,7 +485,7 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_fields"
   ],
@@ -562,9 +562,9 @@
         "volumes": []
       },
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim1_native_to_blastfoam/typed": {
@@ -910,13 +910,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_blastfoam/set_c2_axisym": {
@@ -1011,13 +1011,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_blastfoam/set_c2_axisym/get": {
@@ -1162,11 +1162,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -1245,13 +1245,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_blastfoam/set_c2_no_gauge_file/get": {
@@ -1366,11 +1366,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -1447,13 +1447,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_blastfoam/set_c2_planar/get": {
@@ -1510,11 +1510,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -1906,10 +1906,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -1967,13 +1967,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_native/set_c2_axisym": {
@@ -1997,10 +1997,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -2083,13 +2083,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_native/set_c2_axisym/get": {
@@ -2221,11 +2221,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -2252,10 +2252,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -2313,13 +2313,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_native/set_c2_no_gauge_file/get": {
@@ -2434,11 +2434,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -2463,10 +2463,10 @@
       "charge_refine",
       "det_pts",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -2524,13 +2524,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_native/set_c2_planar/get": {
@@ -2587,11 +2587,11 @@
     "profile_out",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_fields"
   ],
@@ -2840,13 +2840,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim2_native_to_blastfoam/typed": {
@@ -3196,13 +3196,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim3_blastfoam/set_c3": {
@@ -3298,13 +3298,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim3_blastfoam/set_c3/get": {
@@ -3444,11 +3444,11 @@
     "trigger_action",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_fields"
   ],
@@ -3741,10 +3741,10 @@
       "det_pts",
       "extra_charges",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -3808,13 +3808,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim3_native/set_c3": {
@@ -3839,10 +3839,10 @@
       "det_pts",
       "extra_charges",
       "n_procs",
-      "vtk_s_ms",
       "vtk_s_steps",
-      "vtk_v_ms",
+      "vtk_s_time",
       "vtk_v_steps",
+      "vtk_v_time",
       "zones"
     ],
     "points": {
@@ -3919,13 +3919,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim3_native/set_c3/get": {
@@ -4058,11 +4058,11 @@
     "trigger_action",
     "vtk_s_on",
     "vtk_s_mode",
-    "vtk_s_ms",
+    "vtk_s_time",
     "vtk_s_steps",
     "vtk_v_on",
     "vtk_v_mode",
-    "vtk_v_ms",
+    "vtk_v_time",
     "vtk_v_steps",
     "vtk_fields"
   ],
@@ -4344,13 +4344,13 @@
         "volumes": []
       },
       "vtk_s_mode": "time",
-      "vtk_s_ms": "1",
       "vtk_s_on": false,
       "vtk_s_steps": "25",
+      "vtk_s_time": "0.001",
       "vtk_v_mode": "time",
-      "vtk_v_ms": "1",
       "vtk_v_on": false,
-      "vtk_v_steps": "25"
+      "vtk_v_steps": "25",
+      "vtk_v_time": "0.001"
     }
   },
   "dim3_native_to_blastfoam/typed": {
