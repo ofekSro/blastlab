@@ -589,8 +589,17 @@ parked P1–P16), specification `docs/model-folder-and-vtk-plan.md` §3.
 - **Commits:** Steps 1–7 and their verification up to `06c272b`; 8 `d0c4a57` `87ff5da`;
   9 `3d1feae` `c675829`; 10 `96bcff3`; 11 `6328bbd` `7382e6a`; 12 `8557bf2`; 13 the
   commit of this entry.
-- **Open:** owner acceptance in ParaView (Step 14); `gui-qa-tester` pass (the
-  implementer took real-window screenshots, `docs/qa/2026-09-27-out-2/`).
+- **Follow-up, Viper-style layout (owner, 2026-09-27;
+  `docs/batches/2026-09-27-out-2-surface-layout.md`):** one legacy 3.0 BINARY file
+  per surface per time with every chosen field (pure-NumPy `output/legacy_vtk.py`
+  merges blastFoam's per-field files, verify-then-delete kept), one folder per series
+  with its `.vtk.series` beside it, readable array names (`VTK_ARRAY_NAMES`), `TIME`
+  inside every file, `Peak_Overpressure` = max(pMax, p) − P_AIR (≥ 0 without p).
+  Supersedes the per-field layout and Q1 above. `e1c326b` `c827914` `84d3967` `3ab208e`.
+- **P14 (c) closed:** rule 3 re-registered (`7e81c86`) against a baseline whose dt is
+  not clipped (972 steps, same as the export run): peak, impulse and arrival identical,
+  e2e 41/41 (`0af4f1f`). Volume export does not change the gauges.
+- **Accepted** by the owner in ParaView, 2026-09-27; merged to master and pushed.
 
 ---
 
