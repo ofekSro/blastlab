@@ -95,5 +95,5 @@ def pytest_runtest_call(item):
         new += [f'{key[0]}.{key[1]}: {entry}' for entry in lst[start:]]
     if new:
         raise AssertionError(f'{len(new)} failing check(s): '
-                             + '; '.join(str(n) for n in new))
+                             + '; '.join(new))
     return result

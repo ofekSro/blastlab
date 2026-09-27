@@ -353,11 +353,10 @@ def test_cleanup_plan_dry_run():
               == plan)
     with stub_wsl({}) as (calls, _deleted):
         check('plan: no runs -> []', env.cleanup_plan({}, now=NOW) == [])
-    from blastlab.solvers.foam import env as env_mod
     with stub_wsl(runs) as (calls, _deleted):
-        env_mod.run_info = lambda dirs=None, timeout=None: {}
+        env.run_info = lambda dirs=None, timeout=None: {}
         check('plan: WSL unreachable (no info) -> []',
-              env_mod.cleanup_plan({}, now=NOW) == [])
+              env.cleanup_plan({}, now=NOW) == [])
 
 
 def test_auto_cleanup_on_the_plan():
@@ -410,7 +409,8 @@ def test_default_is_off():
 
 
 def _warn_run(cfg, runs, **kw):
-    """start_disk_warning with the WSL stubs; (warnings, stub calls)."""
+    """start_disk_warning with the WSL stubs; (warnings, stub calls,
+    thread or None)."""
     from blastlab.solvers.foam import env
     got = []
     with stub_wsl(runs) as (calls, _deleted):
@@ -514,8 +514,8 @@ def test_disk_warning_sinks():
 TESTS = [test_default_path, test_migrate_from_virtual_copy,
          test_migrate_from_appdata, test_no_source,
          test_override_never_migrates, test_existing_file_untouched,
-         test_unwritable_root, test_tk_and_qt_share_the_path, test_cleanup_plan_dry_run,
-         test_auto_cleanup_on_the_plan, test_default_is_off,
+         test_unwritable_root, test_tk_and_qt_share_the_path,
+         test_cleanup_plan_dry_run, test_auto_cleanup_on_the_plan, test_default_is_off,
          test_disk_warning, test_disk_warning_sinks]
 
 

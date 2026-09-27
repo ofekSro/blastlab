@@ -122,7 +122,7 @@ def _legacy_sources():
             local, 'Packages', 'PythonSoftwareFoundation.Python.3*_*',
             'LocalCache', 'Roaming', 'blastlab', 'settings.json')
         found = glob.glob(pattern)
-        found.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        found.sort(key=os.path.getmtime, reverse=True)
         out += found
     base = os.environ.get('APPDATA') or os.path.join(
         os.path.expanduser('~'), '.config')
@@ -143,7 +143,6 @@ def _migrate(target):
             continue
         if not isinstance(data, dict):
             continue
-        data = dict(data)
         # the sweep deletes WSL runs: never carry it across switched on
         data['auto_cleanup'] = False
         data['migrated_from'] = src
@@ -183,9 +182,9 @@ def load(path=None):
     docstring. Under the test override it never runs.
     """
     path = path or config_path()
-    if (not os.environ.get('BLASTLAB_SETTINGS')
-            and os.path.normcase(os.path.abspath(path))
-            == os.path.normcase(os.path.abspath(default_path()))
+    is_default = (os.path.normcase(os.path.abspath(path))
+                  == os.path.normcase(os.path.abspath(default_path())))
+    if (not os.environ.get('BLASTLAB_SETTINGS') and is_default
             and not os.path.exists(path)):
         _migrate(path)
     out = dict(DEFAULTS)

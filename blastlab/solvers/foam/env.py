@@ -960,7 +960,6 @@ def start_disk_warning(settings=None, warn=None, private_ok=False):
     BLASTLAB_SETTINGS set, unless `private_ok`: every test and QA harness
     builds windows that way (CLAUDE.md 8.2), and none of them should run
     `du` over the real corpus or get a status line it did not ask for."""
-    import threading
     if os.environ.get('BLASTLAB_SETTINGS') and not private_ok:
         return None
 
