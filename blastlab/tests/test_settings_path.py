@@ -244,10 +244,136 @@ def test_tk_and_qt_share_the_path():
               gui_settings.config_path() == settings.default_path())
 
 
+# ── P0-5 item 3: cleanup_plan, the dry run auto_cleanup is built on ─────────
+
+GB = 1024 ** 3
+DAY = 86400.0
+NOW = 2_000_000_000.0
+ROOT = '/root/blastlab_runs'
+
+
+def fake_runs():
+    """{dir: (bytes, mtime, alive)}: an alive run and an unknown one (both
+    old - only their state protects them), two old finished runs, and
+    three fresh ones that `cleanup_keep_recent = 3` protects anyway.
+    15 GB in all, under the 20 GB default, so only age decides."""
+    return {
+        f'{ROOT}/old_a': (4 * GB, NOW - 30 * DAY, False),
+        f'{ROOT}/alive': (2 * GB, NOW - 25 * DAY, True),
+        f'{ROOT}/old_b': (3 * GB, NOW - 20 * DAY, False),
+        f'{ROOT}/unknown': (3 * GB, NOW - 18 * DAY, None),
+        f'{ROOT}/fresh_1': (1 * GB, NOW - 3 * DAY, False),
+        f'{ROOT}/fresh_2': (1 * GB, NOW - 2 * DAY, False),
+        f'{ROOT}/fresh_3': (1 * GB, NOW - 1 * DAY, False),
+    }
+
+
+@contextlib.contextmanager
+def stub_wsl(runs, delete=None):
+    """Replace env's four WSL touch points. `delete` None = raise if
+    called. Yields the call log {name: count} and the deleted lists."""
+    from blastlab.solvers.foam import env
+    calls = dict(run_dirs=0, run_info=0, runs_alive=0, delete_runs=0)
+    deleted = []
+
+    def run_dirs():
+        calls['run_dirs'] += 1
+        return sorted(runs)
+
+    def run_info(dirs=None, timeout=None):
+        calls['run_info'] += 1
+        return {d: dict(bytes=int(runs[d][0]), mtime=int(runs[d][1]))
+                for d in (dirs or runs)}
+
+    def runs_alive(dirs=None, timeout=None):
+        calls['runs_alive'] += 1
+        return {d: runs[d][2] for d in (dirs or runs)}
+
+    def delete_runs(dirs, timeout=300):
+        calls['delete_runs'] += 1
+        if delete is None:
+            raise AssertionError('delete_runs called by a dry run')
+        deleted.append(list(dirs))
+        return delete
+
+    saved = {k: getattr(env, k) for k in calls}
+    env.run_dirs, env.run_info = run_dirs, run_info
+    env.runs_alive, env.delete_runs = runs_alive, delete_runs
+    try:
+        yield calls, deleted
+    finally:
+        for k, v in saved.items():
+            setattr(env, k, v)
+
+
+def test_cleanup_plan_dry_run():
+    print('\ncleanup_plan: the dry run')
+    from blastlab.solvers.foam import env
+    runs = fake_runs()
+    with stub_wsl(runs) as (calls, _deleted):
+        try:
+            plan = env.cleanup_plan(dict(auto_cleanup=False,
+                                         cleanup_max_age_days=14), now=NOW)
+            err = None
+        except Exception as exc:                   # noqa: BLE001
+            plan, err = [], exc
+        check('plan: does not raise (delete_runs never called)',
+              err is None and calls['delete_runs'] == 0, repr(err))
+        check('plan: the two old, non-alive runs, oldest first',
+              [r['dir'] for r in plan]
+              == [f'{ROOT}/old_a', f'{ROOT}/old_b'], str(plan))
+        check('plan: names, bytes and mtimes carried',
+              [(r['name'], r['bytes'], r['mtime']) for r in plan]
+              == [('old_a', 4 * GB, int(NOW - 30 * DAY)),
+                  ('old_b', 3 * GB, int(NOW - 20 * DAY))], str(plan))
+        check('plan: the flag is ignored (on gives the same list)',
+              env.cleanup_plan(dict(auto_cleanup=True,
+                                    cleanup_max_age_days=14), now=NOW)
+              == plan)
+    with stub_wsl({}) as (calls, _deleted):
+        check('plan: no runs -> []', env.cleanup_plan({}, now=NOW) == [])
+    from blastlab.solvers.foam import env as env_mod
+    with stub_wsl(runs) as (calls, _deleted):
+        env_mod.run_info = lambda dirs=None, timeout=None: {}
+        check('plan: WSL unreachable (no info) -> []',
+              env_mod.cleanup_plan({}, now=NOW) == [])
+
+
+def test_auto_cleanup_on_the_plan():
+    print('\nauto_cleanup is built on cleanup_plan')
+    from blastlab.solvers.foam import env
+    runs = fake_runs()
+    cfg = dict(auto_cleanup=True, cleanup_max_age_days=14)
+    with stub_wsl(runs) as (_c, _d):
+        plan = env.cleanup_plan(cfg, now=NOW)
+    logs = []
+    with stub_wsl(runs, delete=True) as (calls, deleted):
+        got = env.auto_cleanup(cfg, log=logs.append, now=NOW)
+    check('sweep: deletes exactly the plan, once',
+          deleted == [[r['dir'] for r in plan]], str(deleted))
+    check('sweep: returns (2, their bytes)',
+          got == (2, 7 * GB), str(got))
+    check('sweep: log line unchanged in form',
+          logs == ['  [blastfoam] run-dir cleanup: removed 2 old run(s), '
+                   '7.0 GB (5 kept)'], str(logs))
+    logs = []
+    with stub_wsl(runs, delete=False) as (calls, deleted):
+        got = env.auto_cleanup(cfg, log=logs.append, now=NOW)
+    check('sweep: WSL refusing the delete -> (0, 0) and says so',
+          got == (0, 0) and logs == ['  [blastfoam] run-dir cleanup: WSL '
+                                     'did not delete 2 old run(s)'],
+          str((got, logs)))
+    with stub_wsl(runs, delete=True) as (calls, deleted):
+        got = env.auto_cleanup(dict(auto_cleanup=False), now=NOW)
+    check('sweep off: (0, 0) and none of the four stubs called',
+          got == (0, 0) and not any(calls.values()), str(calls))
+
+
 TESTS = [test_default_path, test_migrate_from_virtual_copy,
          test_migrate_from_appdata, test_no_source,
          test_override_never_migrates, test_existing_file_untouched,
-         test_tk_and_qt_share_the_path]
+         test_tk_and_qt_share_the_path, test_cleanup_plan_dry_run,
+         test_auto_cleanup_on_the_plan]
 
 
 if __name__ == '__main__':

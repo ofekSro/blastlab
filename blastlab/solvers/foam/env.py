@@ -821,21 +821,35 @@ def cleanup_policy(records, now, max_bytes=None, max_age_s=None,
     return victims
 
 
-def auto_cleanup(settings=None, log=None, now=None):
-    """Sweep the runs root per the GUI settings (opt-out
-    `auto_cleanup=False`). Returns (n_deleted, bytes_deleted). One log
-    line when something was removed; silent otherwise."""
+def _cleanup_cfg(settings):
+    """DEFAULTS updated with `settings`: the one merge the dry run and
+    the sweep share, so they cannot disagree."""
     from ...core import settings as gui_settings
     cfg = dict(gui_settings.DEFAULTS)
     cfg.update(settings or {})
-    if not cfg.get('auto_cleanup', True):
-        return 0, 0
+    return cfg
+
+
+def cleanup_plan(settings=None, now=None):
+    """P0-5 dry run: what the sweep WOULD delete under `settings`'
+    thresholds, deleting nothing.
+
+    Returns [dict(dir, name, bytes, mtime)] in `cleanup_policy` order
+    (oldest first). The `auto_cleanup` flag is deliberately ignored, so
+    the owner can see what switching the sweep on would take. [] when
+    WSL cannot be reached or there are no runs. Never calls
+    `delete_runs`."""
+    return _plan_and_dirs(_cleanup_cfg(settings), now)[0]
+
+
+def _plan_and_dirs(cfg, now):
+    """(cleanup_plan's list, every run dir listed) for a merged cfg."""
     dirs = run_dirs()
     if not dirs:
-        return 0, 0
+        return [], dirs
     info = run_info(dirs)
     if not info:
-        return 0, 0
+        return [], dirs
     alive = runs_alive(dirs)
     records = [dict(dir=d, bytes=info.get(d, {}).get('bytes'),
                     mtime=info.get(d, {}).get('mtime'), alive=alive.get(d))
@@ -845,9 +859,26 @@ def auto_cleanup(settings=None, log=None, now=None):
         max_bytes=float(cfg.get('cleanup_max_gb', 20)) * 1024 ** 3,
         max_age_s=float(cfg.get('cleanup_max_age_days', 14)) * 86400.0,
         keep_recent=int(cfg.get('cleanup_keep_recent', 3)))
-    if not victims:
+    return [dict(dir=d, name=d.rstrip('/').rsplit('/', 1)[-1],
+                 bytes=int(info[d]['bytes'] or 0), mtime=info[d]['mtime'])
+            for d in victims], dirs
+
+
+def auto_cleanup(settings=None, log=None, now=None):
+    """Sweep the runs root per the GUI settings (opt-out
+    `auto_cleanup=False`). Returns (n_deleted, bytes_deleted). One log
+    line when something was removed; silent otherwise.
+
+    Built on `cleanup_plan` (P0-5): it deletes exactly the dirs the dry
+    run lists. With the flag off it lists nothing and touches no WSL."""
+    cfg = _cleanup_cfg(settings)
+    if not cfg.get('auto_cleanup', True):
         return 0, 0
-    freed = sum(int(info[d]['bytes'] or 0) for d in victims)
+    plan, dirs = _plan_and_dirs(cfg, now)
+    if not plan:
+        return 0, 0
+    victims = [r['dir'] for r in plan]
+    freed = sum(r['bytes'] for r in plan)
     if not delete_runs(victims):
         if log:
             log('  [blastfoam] run-dir cleanup: WSL did not delete '
