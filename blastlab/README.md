@@ -149,8 +149,13 @@ native mode, and a native run ignores the keys.
   [m]); the live-slice plane is also written whenever *Sections and
   obstacles* is ticked, and a plane is snapped
   to the nearest cell layer but keeps the name typed (`slice_x_0.20`).
-  The quantity matrix has a locked Gauge column (p, rho, U) and one
-  column per destination - Sect. / Obst. / Vol. (1D/2D: Domain). The
+  The card spans both Setup columns, below them (owner decision P13):
+  the families and planes on the left, the quantity matrix on the right
+  (one above the other when the window is too narrow for both). The
+  matrix has a locked Gauges column (p, rho, U) and one column per
+  destination, in full words and in the order of the family boxes -
+  Sections / Obstacles / Volumes in 3D, Whole domain / Obstacles in 2D
+  (P24), Whole domain in 1D. The
   first tick of a family fills p + peak pressure (surfaces) or p,
   rho, U (volumes). **`pMax` (Peak pressure) is the running per-cell
   maximum of the absolute pressure `p`**, not an overpressure -

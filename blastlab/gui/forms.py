@@ -264,8 +264,8 @@ class _MatrixGrid(ctk.CTkFrame):
         self.locked = []      # the Gauges boxes' vars: a tk variable that
         #                       is garbage-collected unticks its box
         self.columnconfigure(0, weight=1)
-        # the headers and row names are short (P13); the full names are
-        # tooltips, as on the Qt MatrixGrid
+        # full-word headers - the card spans both columns (owner decision
+        # P13); the longer descriptions are tooltips, as on the Qt grid
         for j, col in enumerate(cols, start=1):
             head = ctk.CTkLabel(self, text=fields.vtk_column_label(dim, col),
                                 font=theme.F_SMALL, text_color=c('muted'))
@@ -736,8 +736,6 @@ class CaseForm(ctk.CTkFrame):
         elif self.dim == 2:
             self._var('profile_out', '')                        # hidden
 
-        self._build_vtk_card()
-
         # ── Trigger gauge (T51) ───────────────────────────────────────
         # one gauge that ends the run and/or writes the remap file the
         # moment the wave reaches it. 3D has no remap format, so only
@@ -759,6 +757,9 @@ class CaseForm(ctk.CTkFrame):
                 # <MODEL>\trigger_remap.npz
                 self._var('trigger_file', 'trigger_remap.npz')
 
+        # below both columns, across them (owner decision P13)
+        self._build_vtk_card()
+
         self._sync_geometry()
         self._apply_mode()
 
@@ -766,10 +767,28 @@ class CaseForm(ctk.CTkFrame):
         """OUT-2: the "VTK output (ParaView)" card, the twin of the Qt one
         (ui/setup_spec._vtk_card; docs/model-folder-and-vtk-plan.md sec.
         3.1-3.2, owner Q2). blastFoam only: the whole card is hidden, never
-        greyed, in native mode. In 1D it is the first output card of the
-        right column - 1D has had no Outputs card since OUT-1."""
-        body = self._card(1, 'VTK output (ParaView)', scope='blastfoam')
-        self._vtk_card = body.master
+        greyed, in native mode. It spans both columns, below them (owner
+        decision P13): the families and planes on the left, the matrix
+        with its full-word headers on the right."""
+        card = Card(self, title='VTK output (ParaView)', pad=PAD)
+        card.grid(row=max(self._next_row.values()), column=0, columnspan=2,
+                  sticky='nwe', pady=(0, PAD - 4))
+        self._next_row = {k: max(self._next_row.values()) + 1
+                          for k in self._next_row}
+        self._scoped['blastfoam'].append(card)
+        self._vtk_card = card
+        outer = card.body
+        outer.columnconfigure(0, weight=1)
+        outer.columnconfigure(1, weight=1)
+        body = ctk.CTkFrame(outer, fg_color='transparent')
+        body.columnconfigure(0, weight=0)
+        body.columnconfigure(1, weight=1, minsize=INPUT_MIN)
+        right = ctk.CTkFrame(outer, fg_color='transparent')
+        right.columnconfigure(0, weight=1)
+        self._vtk_panes = (outer, body, right)
+        self._vtk_side = None
+        self._vtk_place(True)
+        outer.bind('<Configure>', lambda e: self._vtk_fit(e.width), add='+')
         self._vtk_entries = {}                    # name -> CTkEntry
         self._vtk_radios = {}                     # family -> radio buttons
         r = 0
@@ -832,17 +851,47 @@ class CaseForm(ctk.CTkFrame):
             self.vtk_planes.grid(row=r + 1, column=0, columnspan=2,
                                  sticky='nsew')
             r += 2
-        ctk.CTkLabel(body, text=fields.VTK_MATRIX_CAPTION,
+        ctk.CTkLabel(right, text=fields.VTK_MATRIX_CAPTION,
                      font=theme.F_BODY, text_color=c('muted'),
                      anchor='w', justify='left',
                      wraplength=LABEL_WRAP + INPUT_MIN).grid(
-            row=r, column=0, columnspan=2, sticky='w', pady=(GAP, 2))
+            row=0, column=0, sticky='w', pady=(0, 2))
         matrix = _MatrixVar(self.dim)
         matrix.trace_add('write', lambda *a: self._on_change())
         self.v['vtk_fields'] = matrix
-        self._vtk_grid = _MatrixGrid(body, matrix, self.dim)
-        self._vtk_grid.grid(row=r + 1, column=0, columnspan=2, sticky='we')
+        self._vtk_grid = _MatrixGrid(right, matrix, self.dim)
+        self._vtk_grid.grid(row=1, column=0, sticky='we')
         self._sync_vtk()
+
+    def _vtk_place(self, side):
+        """The VTK card's two panes side by side (`side`), or the matrix
+        under the families when the card is too narrow for both - at the
+        1100 px minimum window its row names were cut ('Peak pressure' at
+        59 of 82 px, measured)."""
+        if side == self._vtk_side:
+            return
+        self._vtk_side = side
+        outer, body, right = self._vtk_panes
+        if side:
+            outer.columnconfigure(0, weight=1, uniform='vtk')
+            outer.columnconfigure(1, weight=1, uniform='vtk')
+            body.grid(row=0, column=0, columnspan=1, sticky='nwe',
+                      padx=(0, PAD), pady=0)
+            right.grid(row=0, column=1, columnspan=1, sticky='nwe', pady=0)
+        else:
+            outer.columnconfigure(0, weight=1, uniform='')
+            outer.columnconfigure(1, weight=0, uniform='')
+            body.grid(row=0, column=0, columnspan=2, sticky='nwe', padx=0,
+                      pady=0)
+            right.grid(row=1, column=0, columnspan=2, sticky='nwe',
+                       pady=(GAP, 0))
+
+    def _vtk_fit(self, width):
+        """Side by side when the card body holds both panes' natural
+        widths, stacked otherwise (the Qt card's _fit_span)."""
+        _outer, body, right = self._vtk_panes
+        need = body.winfo_reqwidth() + right.winfo_reqwidth() + PAD
+        self._vtk_place(int(width) >= need)
 
     def _sync_vtk(self):
         """Viper's greying: of each family's two interval boxes only the

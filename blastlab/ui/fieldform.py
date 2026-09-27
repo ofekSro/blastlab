@@ -15,8 +15,9 @@ either re-enters or is lost.
 """
 
 from PySide6.QtCore import QEvent, Qt
-from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
-                               QFormLayout, QGridLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QBoxLayout, QButtonGroup, QCheckBox,
+                               QComboBox, QFormLayout, QGridLayout,
+                               QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QRadioButton,
                                QScrollArea, QSizePolicy, QStackedWidget,
                                QTreeWidget, QTreeWidgetItem, QVBoxLayout,
@@ -24,7 +25,7 @@ from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QComboBox,
 
 from ..models import fields
 from . import dialogs, theme
-from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, cards
+from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, SPAN, cards
 from .theme import GAP
 from .widgets import Card, button, label
 
@@ -426,10 +427,17 @@ class FieldForm(QWidget):
 
     # ── construction ─────────────────────────────────────────────────────
     def _build(self):
-        outer = QHBoxLayout(self)
+        # the two columns side by side, and under them the cards that
+        # span both (setup_spec.SPAN - the VTK card, owner decision P13)
+        outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(GAP)
+        outer.setSpacing(theme.PAD - 4)
+        top = QHBoxLayout()
+        top.setContentsMargins(0, 0, 0, 0)
+        top.setSpacing(GAP)
+        outer.addLayout(top, 1)
         self._cols, self._holders = [], []
+        self._span_panes = []        # (QBoxLayout, left, right) per card
         for _ in (0, 1):
             box = QVBoxLayout()
             box.setContentsMargins(0, 0, 0, 0)
@@ -442,9 +450,14 @@ class FieldForm(QWidget):
             # used `uniform=` to force the two the same, so give both the
             # same floor (a 6-column obstacle table needs it)
             holder.setMinimumWidth(COL_MIN)
-            outer.addWidget(holder, 1)
+            top.addWidget(holder, 1)
             self._cols.append(box)
             self._holders.append(holder)
+        wide = QVBoxLayout()
+        wide.setContentsMargins(0, 0, 0, 0)
+        wide.setSpacing(theme.PAD - 4)
+        outer.addLayout(wide, 0)
+        self._cols.append(wide)                 # index SPAN
         # (card, natural column, layout stretch) in spec order, which is
         # the reading order the single-column layout falls back to
         self._card_order = []
@@ -457,7 +470,7 @@ class FieldForm(QWidget):
             self._cols[spec.col].addWidget(
                 card, 1 if spec.field_rows else 0)
             self._fill_card(card, spec)
-        for box in self._cols:
+        for box in self._cols[:2]:
             box.addStretch(1)
         self._single = False
         self._watched = None
@@ -514,14 +527,61 @@ class FieldForm(QWidget):
         is the LARGEST of its pages whether they are visible or not - so
         collapsing only the page on screen changed nothing, and all
         three have to move together."""
-        single = self._avail_width() < 2 * COL_MIN + GAP
+        avail = self._avail_width()
+        single = avail < 2 * COL_MIN + GAP
         self._apply_single(single)
+        self._fit_span(avail)
         stack = self.parentWidget()
         if isinstance(stack, QStackedWidget):
             for i in range(stack.count()):
                 page = stack.widget(i)
                 if isinstance(page, FieldForm) and page is not self:
                     page._apply_single(single)
+                    page._fit_span(avail)
+
+    def _fit_span(self, avail):
+        """A spanning card (the VTK card) puts its two panes side by side
+        when the width holds both minimums, else one above the other -
+        so its full-word matrix headers (P13) are never clipped."""
+        for box, left, right in self._span_panes:
+            need = (left.minimumSizeHint().width()
+                    + right.minimumSizeHint().width() + box.spacing()
+                    + 2 * CARD_PAD)
+            want = (QBoxLayout.LeftToRight if avail >= need
+                    else QBoxLayout.TopToBottom)
+            if box.direction() != want:
+                box.setDirection(want)
+                # a page the stack is not showing does not re-activate
+                # its layouts, so the card and the page kept the side-by-
+                # side minimum (measured 688 px at a 620 px viewport,
+                # which clipped the whole stack): recompute up the chain
+                w = left.parentWidget()
+                while w is not None:
+                    lay = w.layout()
+                    if lay is not None:
+                        lay.invalidate()
+                        lay.activate()
+                    w.updateGeometry()
+                    if w is self:
+                        break
+                    w = w.parentWidget()
+
+    def _relayout(self):
+        """Recompute the form's layout minimum now, visible or not (see
+        _apply_single)."""
+        lay = self.layout()
+        if lay is not None:
+            lay.invalidate()
+            lay.activate()
+
+    def span_side_by_side(self, title):
+        """True when the spanning card `title` shows its panes side by
+        side (tests and the QA harness)."""
+        card = self.cards.get(title)
+        for box, left, _right in self._span_panes:
+            if card is not None and card.isAncestorOf(left):
+                return box.direction() == QBoxLayout.LeftToRight
+        return False
 
     def _apply_single(self, single):
         if single == self._single:
@@ -539,11 +599,16 @@ class FieldForm(QWidget):
         for card, col, stretch in self._card_order:
             self._cols[0 if single else col].addWidget(card, stretch)
             card.setVisible(not hidden[id(card)])
-        for box in self._cols:
+        for box in self._cols[:2]:
             box.addStretch(1)
         # a hidden holder contributes nothing to the minimum, which is
         # what lets the form shrink to the viewport at all
         self._holders[1].setVisible(not single)
+        # the columns sit in a nested layout (the spanning cards below
+        # them), and a page the stack is not showing keeps its outer
+        # layout's cached minimum - measured 612 px on a hidden 1D page
+        # in one column, which widened the whole stack. Recompute now.
+        self._relayout()
         # and the scroll area has to be told: it sized us before the
         # switch, so without this the width stays at the OLD minimum
         # (measured: minimumSizeHint drops 628 -> 310 while width stays
@@ -572,18 +637,32 @@ class FieldForm(QWidget):
             self._card_of[f.name] = spec.title
             card.add(pl, 1)
             return
-        # A grid, not a QFormLayout. QFormLayout over-constrained (a
-        # fixed caption column plus a field that wants to grow, inside a
-        # card narrower than their sum) lays the field ON TOP of the
-        # label - measured: label x=17 w=132, field x=21 w=272 on the
-        # same row - so a caption showed one character. A grid with an
-        # explicit caption column and a stretching input column cannot
-        # do that, and it is what the boundary card already used.
-        grid = QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(GAP)
-        grid.setVerticalSpacing(4)
+        if spec.col == SPAN:
+            # owner decision P13: a card across both columns - its rows on
+            # the left, its matrix on the right, one above the other when
+            # the width does not hold both (_fit_span)
+            left, right = QWidget(), QWidget()
+            panes = QBoxLayout(QBoxLayout.LeftToRight)
+            panes.setContentsMargins(0, 0, 0, 0)
+            panes.setSpacing(theme.PAD)
+            panes.addWidget(left, 1, Qt.AlignTop)
+            panes.addWidget(right, 1, Qt.AlignTop)
+            card.add_layout(panes)
+            self._span_panes.append((panes, left, right))
+            self._fill_grid(_grid(left), spec,
+                            [f for f in spec.rows if f.kind != 'matrix'])
+            self._fill_grid(_grid(right), spec,
+                            [f for f in spec.rows if f.kind == 'matrix'],
+                            note=False)
+            return
+        grid = _grid()
         card.add_layout(grid)
+        self._fill_grid(grid, spec, spec.rows)
+
+    def _fill_grid(self, grid, spec, rows, note=True):
+        """Lay `rows` of card `spec` into `grid`: caption + input pairs,
+        wide rows (a table, the matrix) across both grid columns, and the
+        card's note above the first wide row (or at the end)."""
         pairs = max(1, spec.grid)
         for c in range(pairs):
             grid.setColumnMinimumWidth(c * 2, LABEL_WRAP if pairs == 1
@@ -591,7 +670,7 @@ class FieldForm(QWidget):
             grid.setColumnStretch(c * 2, 0)
             grid.setColumnStretch(c * 2 + 1, 1)
         line = 0                  # the next grid row of a one-pair card
-        noted = not spec.note
+        noted = not (note and spec.note)
 
         def add_note(row):
             # the card's note (P22: the VTK card's "seconds" line), under
@@ -600,7 +679,7 @@ class FieldForm(QWidget):
             grid.addWidget(lbl, row, 0, 1, 2)
             self.notes[spec.title] = lbl
 
-        for i, f in enumerate(spec.rows):
+        for i, f in enumerate(rows):
             if not noted and f.kind in ('points', 'matrix') and pairs == 1:
                 add_note(line)
                 line, noted = line + 1, True
@@ -792,6 +871,22 @@ class FieldForm(QWidget):
     def is_enabled(self, name):
         w = self.widgets.get(name)
         return bool(w is not None and w.isEnabled())
+
+
+def _grid(parent=None):
+    """A card's row grid. A grid, not a QFormLayout: QFormLayout
+    over-constrained (a fixed caption column plus a field that wants to
+    grow, inside a card narrower than their sum) lays the field ON TOP of
+    the label - measured: label x=17 w=132, field x=21 w=272 on the same
+    row - so a caption showed one character. A grid with an explicit
+    caption column and a stretching input column cannot do that, and it
+    is what the boundary card already used. `parent` - a pane widget of a
+    spanning card - gets it as its layout."""
+    grid = QGridLayout(parent) if parent is not None else QGridLayout()
+    grid.setContentsMargins(0, 0, 0, 0)
+    grid.setHorizontalSpacing(GAP)
+    grid.setVerticalSpacing(4)
+    return grid
 
 
 def _silently(setter, widget, value):

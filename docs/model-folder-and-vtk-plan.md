@@ -246,6 +246,11 @@ A checkbox grid; a cell exists only where blastFoam has the field.
 | Products fraction | `alpha.expl` | | ✓ | ✓ | ✓ |
 | Energy | `rhoE` | | ✓ | ✓ | ✓ |
 
+*Owner decisions P13 and P24, 2026-09-27:* the card spans both Setup columns
+(below them), so the headers are the full words Gauges / Sections / Obstacles /
+Volumes (1D/2D: Whole domain), and the columns run in the order of the family
+boxes (2D: Whole domain, then Obstacles).
+
 `overpressure`, `impulse`, `pMax`, `timeOfArrival` are the function objects the
 writer already emits (`_controldict_function_objects`); the rest are solver
 fields. The Gauges column is display only until `OUT-4`.

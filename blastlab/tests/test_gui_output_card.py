@@ -303,8 +303,29 @@ def main():
                       ('Products', 'volume fraction of detonation products')):
         check(f'the "{row}" tooltip explains it', want in tip_of(row),
               tip_of(row))
-    check('the "Vol." header tooltip says whole-domain output',
-          'whole-domain output' in tip_of('Vol.'), tip_of('Vol.'))
+    check('the "Volumes" header tooltip says whole-domain output',
+          'whole-domain output' in tip_of('Volumes'), tip_of('Volumes'))
+    # P13 / P24: full-word headers, in the order of the family boxes
+    for d, want in ((1, ['Gauges', 'Whole domain']),
+                    (2, ['Gauges', 'Whole domain', 'Obstacles']),
+                    (3, ['Gauges', 'Sections', 'Obstacles', 'Volumes'])):
+        g = form(d)
+        heads = [str(w.cget('text')) for w in g._vtk_grid.winfo_children()
+                 if isinstance(w, ctk.CTkLabel)][:len(want)]
+        check(f'{d}D: full-word headers {want}', heads == want, str(heads))
+        info = g._vtk_card.grid_info()
+        check(f'{d}D: the card spans both columns, below every other card',
+              int(info.get('columnspan', 1)) == 2
+              and int(info.get('row', -1)) == max(
+                  int(w.grid_info().get('row', 0))
+                  for w in g.winfo_children() if w.winfo_manager() == 'grid'),
+              str(info))
+        g._vtk_fit(300)
+        side_narrow = g._vtk_side
+        g._vtk_fit(2000)
+        check(f'{d}D: stacked when narrow, side by side when wide',
+              side_narrow is False and g._vtk_side is True)
+        g.destroy()
     f.destroy()
 
     ROOT.destroy()

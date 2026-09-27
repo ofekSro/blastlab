@@ -133,8 +133,8 @@ def anim_file_with_format(anim_file, fmt):
 # docs/batches/2026-09-27-out-2-vtk-output.md Step 8 (owner Q2: separate
 # Sections and Obstacles columns). Shared by the Qt and the Tk card.
 
-#: the matrix rows, in VTK_FIELDS order (plan sec. 3.2); short, because
-#: the matrix shares one Setup column - the tooltip names the field
+#: the matrix rows, in VTK_FIELDS order (plan sec. 3.2); the tooltip
+#: gives the long name and the blastFoam field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
     'pMax': 'Peak pressure', 'timeOfArrival': 'Arrival time',
@@ -166,9 +166,11 @@ def vtk_quantity_tip(field):
 
 #: decision 4: the Gauges column is shown, ticked and locked until OUT-4
 VTK_GAUGE_FIELDS = ('p', 'rho', 'U')
-#: the matrix columns of each dimension; 'gauges' is display only
+#: the matrix columns of each dimension; 'gauges' is display only. The
+#: order follows the family boxes above the matrix (owner decision P24,
+#: 2026-09-27: 2D is Whole domain, then Obstacles)
 VTK_COLUMNS = {1: ('gauges', 'volumes'),
-               2: ('gauges', 'obstacles', 'volumes'),
+               2: ('gauges', 'volumes', 'obstacles'),
                3: ('gauges', 'sections', 'obstacles', 'volumes')}
 #: (family key, caption) per dimension, in card order (plan sec. 3.1):
 #: 's' = surfaces (vtk_surfaces), 'v' = volumes (vtk_volumes)
@@ -191,14 +193,14 @@ VTK_PLANE_AXES = ('x', 'y', 'z')
 
 
 def vtk_column_label(dim, col):
-    """The matrix header of column `col`, short enough that four columns
-    and the quantity names fit one Setup column (the full name is
-    `vtk_column_tip`); in 1D/2D the volumes are the whole domain
-    (Viper's 2D tab)."""
+    """The matrix header of column `col`, in full words - the card spans
+    both Setup columns, so they fit (owner decision P13, 2026-09-27; the
+    fuller description is `vtk_column_tip`). In 1D/2D the volumes are the
+    whole domain (Viper's 2D tab)."""
     if col == 'volumes' and int(dim) < 3:
-        return 'Domain'
-    return {'gauges': 'Gauge', 'sections': 'Sect.', 'obstacles': 'Obst.',
-            'volumes': 'Vol.'}[col]
+        return 'Whole domain'
+    return {'gauges': 'Gauges', 'sections': 'Sections',
+            'obstacles': 'Obstacles', 'volumes': 'Volumes'}[col]
 
 
 def vtk_column_tip(dim, col):

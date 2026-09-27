@@ -35,7 +35,7 @@ from blastlab.core.case import (case_from_dict, case_to_dict,  # noqa: E402
 from blastlab.models import fields as F                     # noqa: E402
 from blastlab.models.case import vtk_fields_for             # noqa: E402
 from blastlab.ui.case_form import CaseForm                  # noqa: E402
-from blastlab.ui.fieldform import CARD_PAD, COL_MIN         # noqa: E402
+from blastlab.ui.setup_spec import SPAN                     # noqa: E402
 
 FAIL = []
 TITLE = 'VTK output (ParaView)'
@@ -64,9 +64,14 @@ def main():
     print('\nC1: the families and the matrix of each dimension')
     want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
                  3: ['vtk_s_on', 'vtk_v_on']}
+    # P24: the 2D matrix runs in the order of the family boxes
     want_cols = {1: ('gauges', 'volumes'),
-                 2: ('gauges', 'obstacles', 'volumes'),
+                 2: ('gauges', 'volumes', 'obstacles'),
                  3: ('gauges', 'sections', 'obstacles', 'volumes')}
+    # P13: full-word headers
+    want_heads = {1: ['Gauges', 'Whole domain'],
+                  2: ['Gauges', 'Whole domain', 'Obstacles'],
+                  3: ['Gauges', 'Sections', 'Obstacles', 'Volumes']}
     for d in (1, 2, 3):
         f = form(d)
         names = card_names(f)
@@ -86,12 +91,45 @@ def main():
               cols == sorted(want_cols[d][1:]), str(cols))
         check(f'{d}D: a tick box in every destination cell',
               len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1))
-        # the first offscreen QA shots showed "Pressu" and "Obstacle": the
-        # matrix must fit the narrowest Setup column without squeezing
-        room = COL_MIN - 2 * CARD_PAD
-        need = grid.minimumSizeHint().width()
-        check(f'{d}D: the matrix fits the narrowest Setup column',
-              need <= room, f'{need} px vs {room} px')
+        # P13 (owner, 2026-09-27): the card spans both columns, below
+        # them, with full-word headers in the order of the families (P24)
+        from PySide6.QtWidgets import QLabel
+        heads = [lb.text() for lb in grid.findChildren(QLabel)][
+            :len(want_cols[d])]
+        check(f'{d}D: full-word headers in family order {want_heads[d]}',
+              heads == want_heads[d], str(heads))
+        card = f.cards[TITLE]
+        col = next(c for w, c, _s in f._card_order if w is card)
+        check(f'{d}D: the card spans both columns, below them',
+              col == SPAN and not f.single_column()
+              and f._cols[SPAN].indexOf(card) >= 0
+              and card.width() > f._holders[0].width(),
+              f'col {col}, card {card.width()} px, column '
+              f'{f._holders[0].width()} px')
+        # the first offscreen QA shots showed "Pressu" and "Obstacle":
+        # nothing on the card may be cut, side by side or stacked
+        # in a scroll area, as on the Setup tab: side by side when the
+        # viewport holds both panes, stacked (and one column) when narrow
+        from PySide6.QtWidgets import QScrollArea
+        sa = QScrollArea()
+        sa.setWidgetResizable(True)
+        sa.setWidget(f)
+        sa.show()
+        for width, side in ((1400, True), (460, False)):
+            sa.resize(width, 700)
+            pump(60)
+            vp = sa.viewport().width()
+            cut = [(lb.text(), lb.width()) for lb in card.findChildren(QLabel)
+                   if lb.isVisible() and not lb.wordWrap() and lb.text()
+                   and lb.width() + 1
+                   < lb.fontMetrics().horizontalAdvance(lb.text())]
+            check(f'{d}D at a {vp} px viewport: '
+                  f'{"side by side" if side else "stacked"}, nothing cut, '
+                  f'nothing wider than the viewport',
+                  f.span_side_by_side(TITLE) == side and not cut
+                  and f.width() <= vp and card.width() <= vp,
+                  f'side {f.span_side_by_side(TITLE)} cut {cut} form '
+                  f'{f.width()} card {card.width()} vp {vp}')
         check(f'{d}D: the plane table is 3D only',
               ('vtk_planes' in names) == (d == 3), str(names))
         # the locked Gauges column: p / rho / U ticked, all disabled
@@ -416,8 +454,8 @@ def main():
                       ('Products', 'volume fraction of detonation products')):
         t = labels[row].toolTip() if row in labels else ''
         check(f'the "{row}" tooltip explains it', want in t, t)
-    t = labels['Vol.'].toolTip() if 'Vol.' in labels else ''
-    check('the "Vol." header tooltip says whole-domain output',
+    t = labels['Volumes'].toolTip() if 'Volumes' in labels else ''
+    check('the "Volumes" header tooltip says whole-domain output',
           'whole-domain output' in t, t)
     f.widgets['vtk_v_on'].click()
     pump(5)

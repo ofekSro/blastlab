@@ -31,6 +31,8 @@ from ..solvers.foam.materials import MATERIAL_NAMES
 #: column, so a value stays readable at the 1100x720 minimum window
 LABEL_WRAP = 132
 INPUT_MIN = 146
+#: CardSpec.col of a card that spans both columns (below them)
+SPAN = 2
 
 
 @dataclass(frozen=True)
@@ -65,9 +67,11 @@ class F:
 
 @dataclass(frozen=True)
 class CardSpec:
-    """A titled card in one of the two columns. `grid` > 1 lays the rows
-    out as that many label+input pairs per line (the boundary grid).
-    `note` is a muted line under the rows (no field of its own)."""
+    """A titled card in one of the two columns - or, with `col` = SPAN,
+    across both, below them (OUT-2's VTK card, owner decision P13). `grid`
+    > 1 lays the rows out as that many label+input pairs per line (the
+    boundary grid). `note` is a muted line under the rows (no field of
+    its own)."""
 
     title: str
     col: int
@@ -218,7 +222,12 @@ def _vtk_card(dim):
     per family a box, a Time / Step pair and one interval box per mode
     - the inactive one greyed by case_form - then, in 3D, the extra
     section planes, and the quantity x destination matrix (sec. 3.2,
-    owner Q2: separate Sections and Obstacles columns)."""
+    owner Q2: separate Sections and Obstacles columns).
+
+    The card spans both Setup columns (owner decision P13), so the matrix
+    headers are full words: the families and planes on the left, the
+    matrix on the right, stacked when the width does not allow both
+    (fieldform.FieldForm._fit_columns)."""
     rows = []
     for fam, caption in VTK_FAMILIES[dim]:
         rows += [
@@ -241,7 +250,7 @@ def _vtk_card(dim):
     rows.append(F('vtk_fields', VTK_MATRIX_CAPTION,
                   'matrix', values=vtk_fields_for(dim),
                   cols=VTK_COLUMNS[dim]))
-    return CardSpec('VTK output (ParaView)', col=1, scope='blastfoam',
+    return CardSpec('VTK output (ParaView)', col=SPAN, scope='blastfoam',
                     rows=tuple(rows), note=VTK_SECONDS_NOTE)
 
 
