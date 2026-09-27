@@ -407,6 +407,32 @@ Parked (none blocks):
 - **P23 · The write-budget clash is unreachable from the GUI** (confusion 10): the Qt form has no `write_budget` field and drops it on Open case. Pre-existing; the GUI half belongs to `P1-12`.
 - **P24 · 2D column order** (confusion 2): the matrix runs `Obst. | Domain` while the family boxes run *Whole domain*, *Obstacles*.
 
+### Owner decisions on the parked list (2026-09-27 morning, binding)
+
+- **P14 → (b):** Time-mode volumes must NOT clip the solver's time step: write them with
+  `writeControl runTime` (as the surfaces), accepting that each file lands on the first
+  step past each multiple. Update the card note and README accordingly (the note about
+  changing the solution goes; say instead that write times are the first step past each
+  interval). Step 11's rules and thresholds stay as registered; re-run it and record.
+- **P1 → keep** one volumes series holding all fields (pick the field in ParaView).
+- **P9 → no deletion on 1D runs** (the export converts and copies, but 1D time dirs stay
+  in WSL until the scratch is released).
+- **P15 → keep a switched-off family's ticks in the case file** (write `{on: false, ...}`
+  when the family has fields; the solver ignores it).
+- **P22 → the cadence field is in SECONDS** (reverses Q3: the case stores seconds, like
+  the rest of the form; label `Every [s]`), **plus** one line on the card that the files
+  and ParaView show time in seconds.
+- **P13 → wide card with full headers** (the card spans both Setup columns; full words
+  Gauges / Sections / Obstacles / Volumes, Whole domain in 1D/2D).
+- **P24 → align the 2D column order** with the family boxes.
+- **P4 → the root manifest keeps only a numeric summary of `vtk\`**; the full list lives
+  in `vtk\manifest.json`.
+- **P11 → one warning line** in postmortem load, run-browser resume and the manual VTK
+  button when writes were deleted after conversion (count + "see vtk\").
+- **P20, P21 → fix now.** **P17-P19 → later** (TODO P2-19..21).
+- **P5, P6, P7, P8, P12, P16 → accepted as written.**
+- **P2 → confirmed or changed at the owner's ParaView check.** P3, P10, P23 stay parked.
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.
