@@ -57,7 +57,8 @@ def can(kind, ent):
     res, dim, meta = ent.result, ent.dim, ent.result.meta
     has_gauges = bool(res.gauges.get('pressures'))
     return dict(
-        vtk=can_export(meta),
+        # a run that wrote <MODEL>\vtk\ opens it (F2) even without a case dir
+        vtk=can_export(meta) or bool(run_vtk(ent)),
         gif=bool(meta.get('frames')),
         summary=has_gauges,
         tsv=has_gauges,
@@ -82,6 +83,60 @@ def model_dir(ent):
     path = (getattr(getattr(ent, 'result', None), 'meta', None) or {}).get(
         'model_dir')
     return path if path and os.path.isdir(path) else ''
+
+
+def run_vtk(ent):
+    """(vtk dir, file count) when the run itself wrote VTK files into the
+    result's model folder - `<MODEL>\\vtk\\` with its manifest.json
+    (OUT-2) - else None. GUI QA 2026-09-27 F2: the Results tab used to say
+    there was nothing to write while that folder held 258 files."""
+    home = model_dir(ent)
+    if not home:
+        return None
+    from ..output.vtk_series import MANIFEST_FILE
+    from .model_folder import VTK_DIR
+    vdir = os.path.join(home, VTK_DIR)
+    if not os.path.isfile(os.path.join(vdir, MANIFEST_FILE)):
+        return None
+    return vdir, sum(len(files) for _r, _d, files in os.walk(vdir))
+
+
+def run_vtk_text(found):
+    """The VTK button's tooltip for a `run_vtk` folder."""
+    vdir, n = found
+    return (f'Written during the run: {vdir} - {n} files (see '
+            f'vtk\\manifest.json). Click to open the folder; in ParaView, '
+            f'File > Open a .vtk.series file.')
+
+
+def vtk_opens_folder(ent):
+    """The `run_vtk` folder when the VTK button opens it instead of
+    converting: the run wrote VTK files and the case directory the
+    converter needs is gone (usually the released WSL scratch)."""
+    if ent is None:
+        return None
+    from ..solvers.foam.export_vtk import can_export
+    if can_export(ent.result.meta):
+        return None
+    return run_vtk(ent)
+
+
+def vtk_tip(ent):
+    """The VTK button's tooltip when it opens the run's vtk\\ folder, else
+    '' (the caller keeps its own text)."""
+    found = vtk_opens_folder(ent)
+    return run_vtk_text(found) if found else ''
+
+
+def open_run_vtk(ent, log=print):
+    """Open the run's vtk\\ folder (the VTK button of a run that wrote
+    one). Returns the folder, or '' when there is none."""
+    found = vtk_opens_folder(ent)
+    if not found:
+        return ''
+    log(f'VTK files written during the run: {found[0]} ({found[1]} files)')
+    _open(found[0], log)
+    return found[0]
 
 
 def why_not(kind, ent):

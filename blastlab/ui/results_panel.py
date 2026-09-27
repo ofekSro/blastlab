@@ -332,9 +332,11 @@ class ResultsPanel(QWidget):
         for kind, b in self._export_btns.items():
             good = exports.can(kind, ent)
             b.setEnabled(bool(good))
-            # a greyed button has to say why
-            b.setToolTip(EXPORT_HELP.get(kind, '') if good
-                         else exports.why_not(kind, ent))
+            # a greyed button has to say why; a VTK button that opens the
+            # run's own vtk\ folder says where it is (GUI QA F2)
+            tip = exports.vtk_tip(ent) if kind == 'vtk' else ''
+            b.setToolTip(tip or (EXPORT_HELP.get(kind, '') if good
+                                 else exports.why_not(kind, ent)))
 
     def export_enabled(self, kind):
         return self._export_btns[kind].isEnabled()

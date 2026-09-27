@@ -199,6 +199,10 @@ native mode, and a native run ignores the keys.
   at once to get one pipeline item per field - and the time bar follows
   the series times (a JSON list of relative file names and times, the
   format blastFoam's own `createTimeSeries` writes, User Guide sec. 16.3).
+- **Results tab.** For a run that wrote `vtk\` and released its WSL
+  scratch, the **VTK** button opens `<MODEL>\vtk\` (its tooltip gives the
+  path and the file count) instead of converting; while the case
+  directory still exists it runs the full `foamToVTK` as before.
 
 ## Solver mode
 
