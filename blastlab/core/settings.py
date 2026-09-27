@@ -1,4 +1,4 @@
-"""Tiny persistent settings: one json dict in the user config dir.
+"""Tiny persistent settings: one json dict in the repo checkout.
 
 Started for the foam run-dir auto-cleanup policy (N8); the same file is
 where G9's UI-state persistence (window geometry, appearance mode,
@@ -10,12 +10,41 @@ too - `solvers/foam/env.py` primes the hardware cache and the cleanup
 policy from here. `blastlab.gui.settings` re-exports this module for
 the Tk GUI, which stays as the permanent way back behind `--tk`
 (CLAUDE.md section 9).
+
+P0-5 (owner decision): the file lives IN THE REPO, at one explicit path
+no virtualisation can redirect.
+
+- `default_path()` is `<repo>\\settings.json`, `<repo>` being the parent
+  of the `blastlab/` package. It is git-ignored (it carries this
+  machine's `hw_*` fields). The Microsoft Store Python used to redirect
+  `%APPDATA%\\blastlab\\settings.json` to a private
+  `LocalCache\\Roaming` copy that the app read and nobody else saw.
+- `config_path()` is `BLASTLAB_SETTINGS` when set (tests, harnesses),
+  `default_path()` otherwise.
+- One-time migration, inside `load()`, only when the path in use is
+  `default_path()` (BLASTLAB_SETTINGS unset) and that file is missing:
+  the first readable JSON dict among the Store-Python virtual copy
+  (newest if several) and `%APPDATA%\\blastlab\\settings.json` is copied
+  there with `auto_cleanup` forced to False and a `migrated_from` key,
+  and one stderr line names the source. The sources are never written,
+  renamed or deleted, and an existing repo file is never overwritten.
+  No source: nothing is created, and the first `update()` writes it.
+- Every checkout (worktrees included) has its own file, seeded on its
+  first run - a consequence of "in the repo", not a bug.
+- The crash log (`ui/crashlog.py`) sits beside the settings file, so it
+  lands in the repo root too; `.gitignore` covers both.
 """
 
+import glob
 import json
 import os
 import sys
 import threading
+
+#: The repo checkout that holds the `blastlab/` package. A module-level
+#: name so the tests can point it at a temp dir.
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__))))
 
 #: one warning per process when a write fails - see save()
 _warned = False
@@ -63,15 +92,62 @@ DEFAULTS = dict(
 )
 
 
+def default_path():
+    """`<repo>\\settings.json`, beside the `blastlab/` package (P0-5)."""
+    return os.path.join(REPO_ROOT, 'settings.json')
+
+
 def config_path():
-    """%APPDATA%\\blastlab\\settings.json on Windows, ~/.config/blastlab
-    elsewhere; BLASTLAB_SETTINGS overrides (tests)."""
+    """BLASTLAB_SETTINGS when set (tests), else `default_path()`."""
     override = os.environ.get('BLASTLAB_SETTINGS')
     if override:
         return override
+    return default_path()
+
+
+def _legacy_sources():
+    """Where the settings lived before P0-5, in the order the migration
+    tries them: the Store-Python virtual copy of `%APPDATA%` (the file
+    the app actually read; newest mtime first if several), then the
+    real `%APPDATA%\\blastlab\\settings.json` (`~/.config` elsewhere)."""
+    out = []
+    local = os.environ.get('LOCALAPPDATA')
+    if local:
+        pattern = os.path.join(
+            local, 'Packages', 'PythonSoftwareFoundation.Python.3*_*',
+            'LocalCache', 'Roaming', 'blastlab', 'settings.json')
+        found = glob.glob(pattern)
+        found.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        out += found
     base = os.environ.get('APPDATA') or os.path.join(
         os.path.expanduser('~'), '.config')
-    return os.path.join(base, 'blastlab', 'settings.json')
+    out.append(os.path.join(base, 'blastlab', 'settings.json'))
+    return out
+
+
+def _migrate(target):
+    """Seed `target` once from the first readable legacy settings dict,
+    with `auto_cleanup` forced off. Returns the new dict, or None when
+    there was no source. Never writes, renames or deletes a source."""
+    for src in _legacy_sources():
+        try:
+            with open(src, encoding='utf-8') as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        data = dict(data)
+        # the sweep deletes WSL runs: never carry it across switched on
+        data['auto_cleanup'] = False
+        data['migrated_from'] = src
+        if os.path.exists(target):          # someone else got there first
+            return None
+        save(data, target)
+        print(f'[blastlab] settings: created {target} from {src} '
+              f'(auto_cleanup forced off)', file=sys.stderr)
+        return data
+    return None
 
 
 def load(path=None):
@@ -89,8 +165,17 @@ def load(path=None):
     does not exist - so each one built a GUI that swept the corpus to
     20 GB, keeping 3 runs, which is harsher than the real app with the
     user's own 150 GB / 10-run policy would ever have been.
+
+    P0-5: reading the repo file (BLASTLAB_SETTINGS unset) when it does
+    not exist yet runs the one-time migration first - see the module
+    docstring. Under the test override it never runs.
     """
     path = path or config_path()
+    if (not os.environ.get('BLASTLAB_SETTINGS')
+            and os.path.normcase(os.path.abspath(path))
+            == os.path.normcase(os.path.abspath(default_path()))
+            and not os.path.exists(path)):
+        _migrate(path)
     out = dict(DEFAULTS)
     try:
         with open(path, encoding='utf-8') as f:

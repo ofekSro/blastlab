@@ -18,6 +18,13 @@ blastlab/tests/_amr_ab/
 # Do not add logo.gif here: it is a GUI asset (gui/app.py::_LOGO).
 # ---------------------------------------------------------------------------
 
+# P0-5: the settings file lives in the repo root and carries this
+# machine's hw_* fields; the Qt crash log is written beside it. Anchored
+# to the root, so no fixture can match.
+/settings.json
+/settings.json.*.tmp
+/blastlab-crash.log
+
 # Run/workspace directories
 /run/
 /chain_workspace/
