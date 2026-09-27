@@ -501,10 +501,16 @@ def git_commit(repo=None):
 
 def list_outputs(stage_dir):
     """[{'path': 'gauges/gauges_2d.txt', 'bytes': n}, ...]: every file in
-    the folder except manifest.json and the `.blastlab-model` marker
-    (bookkeeping, not an output), sorted, '/' separators."""
+    the folder except manifest.json, the `.blastlab-model` marker
+    (bookkeeping, not an output) and the VTK export's `vtk/` (thousands
+    of files on a long run - the manifest's `vtk` entry carries its
+    numbers and vtk/manifest.json its full list; owner decision P4),
+    sorted, '/' separators."""
     out = []
+    top = os.path.normpath(stage_dir)
     for root, dirs, files in os.walk(stage_dir):
+        if os.path.normpath(root) == top and VTK_DIR in dirs:
+            dirs.remove(VTK_DIR)
         dirs.sort()
         for name in sorted(files):
             full = os.path.join(root, name)

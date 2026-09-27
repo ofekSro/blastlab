@@ -433,6 +433,12 @@ def test_b_happy_path():
         m = _manifest(tree)
         assert m['families']['volumes']['count'] == len(T)
         assert m['families']['volumes']['times'] == T
+        # P4: the full list lives here, in time order
+        assert m['families']['volumes']['files'] == [
+            f'volumes/t_{t}.vtk' for t in T]
+        assert len(m['families']['sections']['files']) == 4 * len(SAMPLES)
+        assert m['families']['obstacles']['files'] == [
+            f'obstacles/p/t_{t}.vtk' for t in SAMPLES]
         assert m['families']['sections']['count'] == 4 * len(SAMPLES)
         assert m['families']['obstacles']['count'] == len(SAMPLES)
         assert m['deleted_in_wsl'] == T[:-2]

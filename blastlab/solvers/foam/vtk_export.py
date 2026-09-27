@@ -661,7 +661,11 @@ class VtkExport:
                 times=sorted({self.files[r][1] for r in rels},
                              key=_time_key),
                 series=sorted(s for s in self.series
-                              if s.startswith(kind + '/')))
+                              if s.startswith(kind + '/')),
+                # owner decision P4: the full file list lives here; the
+                # model's root manifest keeps only the numbers
+                files=sorted(rels, key=lambda r: (_time_key(
+                    self.files[r][1]), r)))
         fields = {}
         if self.vol:
             fields[VOLUMES] = list(self.vol_fields)

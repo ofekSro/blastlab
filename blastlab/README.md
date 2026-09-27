@@ -177,12 +177,15 @@ native mode, and a native run ignores the keys.
 
   | Path | Content |
   |---|---|
-  | `vtk\manifest.json` | fields, cadence, per family count / times / series, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete` |
+  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete` |
   | `vtk\volumes\t_<time>.vtk`, `volumes.vtk.series` | one file per write, every chosen field, cell data only |
   | `vtk\sections\<plane>\<field>\t_<time>.vtk`, `sections\<plane>\<field>.vtk.series` | one series per plane and field |
   | `vtk\obstacles\<field>\t_<time>.vtk`, `obstacles\<field>.vtk.series` | the obstacle walls, one series per field |
 
-  The model's `manifest.json` carries `vtk: {dir, counts, not_converted}`.
+  The model's `manifest.json` carries only numbers for `vtk\`: `vtk: {dir,
+  counts, files, bytes, not_converted}`, and its `outputs` list leaves
+  `vtk\` out - a long run writes thousands of files there, and their full
+  list is `vtk\manifest.json` (owner decision P4).
 - **What is deleted in WSL, and when.** After every ingest pass one
   `foamToVTK` at a time converts the writes already read, the file is
   copied into `vtk\` and size-checked, the index is rewritten, and only

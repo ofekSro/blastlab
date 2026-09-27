@@ -110,7 +110,7 @@ def new_vtk_state():
 
 def write_vtk_manifest(vtk_dir, state):
     """`<vtk_dir>/manifest.json`: {fields, cadence, families{volumes |
-    sections | obstacles: {count, times, series}}, not_converted: [{time,
+    sections | obstacles: {count, times, series, files}}, not_converted: [{time,
     why}], deleted_in_wsl, replay_incomplete} (plan sec. 3.5 step 5).
     Keys missing from `state` get their empty value; extra keys follow.
     Returns the path; raises OSError on a failed write (old file kept)."""
@@ -137,13 +137,31 @@ def load_vtk_manifest(vtk_dir):
     return data if isinstance(data, dict) else None
 
 
+def _disk_totals(folder):
+    """(files, bytes) of everything under `folder`."""
+    n = size = 0
+    for root, _dirs, names in os.walk(folder):
+        for name in names:
+            try:
+                size += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                continue
+            n += 1
+    return n, size
+
+
 def vtk_summary(vtk_dir, rel='vtk'):
-    """The model folder manifest's `vtk` entry: {dir, counts, not_converted}
-    from the vtk\\ manifest, or None when the run exported nothing."""
+    """The model folder manifest's `vtk` entry, or None when the run
+    exported nothing: {dir, counts (converted files per family), files and
+    bytes (everything under vtk\\, series and manifest included),
+    not_converted}. Numbers only (owner decision P4, 2026-09-27): the
+    root manifest's `outputs` leaves vtk\\ out, and the full file list is
+    vtk\\manifest.json's `families.<family>.files`."""
     state = load_vtk_manifest(vtk_dir)
     if state is None:
         return None
     fams = state.get('families') or {}
     counts = {k: int((v or {}).get('count') or 0) for k, v in fams.items()}
-    return dict(dir=rel, counts=counts,
+    n, size = _disk_totals(vtk_dir)
+    return dict(dir=rel, counts=counts, files=n, bytes=size,
                 not_converted=list(state.get('not_converted') or []))

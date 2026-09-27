@@ -153,8 +153,12 @@ def test_vtk_manifest_and_summary():
         assert data['replay_incomplete'] is True
         assert data['deleted_in_wsl'] == [] and data['fields'] == {}
         assert vs.load_vtk_manifest(tmp) == data
+        # P4: numbers only - files and bytes under vtk\ (the manifest is
+        # the one file here so far)
+        size = os.path.getsize(os.path.join(tmp, 'manifest.json'))
         assert vs.vtk_summary(tmp) == dict(
-            dir='vtk', counts={'volumes': 2, 'sections': 4},
+            dir='vtk', counts={'volumes': 2, 'sections': 4}, files=1,
+            bytes=size,
             not_converted=[dict(time='3e-05', why='foamToVTK failed')])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -170,11 +174,35 @@ def test_write_all_carries_the_summary():
         case = Case1D(solver='blastfoam')
         m = mf.write_all(None, case, 1, tmp, log=lambda *_a: None)
         assert m['vtk'] is None
-        vs.write_vtk_manifest(os.path.join(tmp, 'vtk'), dict(
-            families={'volumes': dict(count=3, times=[], series=[])}))
+        vdir = os.path.join(tmp, 'vtk')
+        rels = [f'volumes/t_{t}.vtk' for t in ('0.0001', '0.0002', '0.0003')]
+        for rel in rels:
+            os.makedirs(os.path.join(vdir, 'volumes'), exist_ok=True)
+            with open(os.path.join(vdir, *rel.split('/')), 'wb') as f:
+                f.write(b'# vtk\n' * 10)
+        vs.write_series(os.path.join(vdir, 'volumes'), 'volumes',
+                        [(r.split('/')[1], float(r[len('volumes/t_'):-4]))
+                         for r in rels])
+        vs.write_vtk_manifest(vdir, dict(
+            families={'volumes': dict(count=3, times=[], series=[],
+                                      files=rels)}))
         m = mf.write_all(None, case, 1, tmp, log=lambda *_a: None)
-        assert m['vtk'] == dict(dir='vtk', counts={'volumes': 3},
-                                not_converted=[]), m['vtk']
+        n, size = 0, 0
+        for base, _d, names in os.walk(vdir):
+            for name in names:
+                n += 1
+                size += os.path.getsize(os.path.join(base, name))
+        assert m['vtk'] == dict(dir='vtk', counts={'volumes': 3}, files=5,
+                                bytes=size, not_converted=[]), m['vtk']
+        assert n == 5
+        # P4: the root manifest's outputs leave vtk\ out; its full list
+        # is vtk\manifest.json's
+        paths = [o['path'] for o in m['outputs']]
+        assert paths and not any(p.startswith('vtk/') for p in paths), paths
+        assert vs.load_vtk_manifest(vdir)['families']['volumes']['files'] \
+            == rels
+        with open(os.path.join(tmp, 'manifest.json'), encoding='utf-8') as f:
+            assert 'volumes/t_0.0001.vtk' not in f.read()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

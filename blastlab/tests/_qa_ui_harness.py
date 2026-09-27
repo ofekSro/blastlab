@@ -3480,15 +3480,21 @@ def v05_vtk_manifest(qa):
     except (OSError, ValueError) as exc:
         m = {'error': str(exc)}
     qa.note(f'V05 root manifest vtk: {m.get("vtk")}; tree: {_tree(folder)}')
-    qa.check(m.get('vtk') == dict(dir='vtk', counts={'volumes': 2},
-                                  not_converted=[]),
-             'the root manifest carries the vtk summary', 'S1',
+    v = m.get('vtk') or {}
+    qa.check({k: v.get(k) for k in ('dir', 'counts', 'files',
+                                     'not_converted')}
+             == dict(dir='vtk', counts={'volumes': 2}, files=4,
+                     not_converted=[]) and (v.get('bytes') or 0) > 0,
+             'the root manifest carries the numeric vtk summary (P4)', 'S1',
              evidence=str(m.get('vtk')))
+    listed = [o['path'] for o in m.get('outputs', [])]
     qa.check({'vtk/manifest.json', 'vtk/volumes/t_0.0005.vtk',
               'vtk/volumes/volumes.vtk.series'} <= set(_tree(folder))
+             and not any(p.startswith('vtk/') for p in listed)
              and not m.get('failed'),
-             'the vtk\\ tree is listed, nothing failed', 'S2',
-             evidence=str(m.get('failed')))
+             'the vtk\\ tree is on disk, left out of `outputs` (P4), '
+             'nothing failed', 'S2',
+             evidence=f"outputs {listed[:6]}; failed {m.get('failed')}")
 
 
 # ═══════════════════════════════════════════════════════════════════════

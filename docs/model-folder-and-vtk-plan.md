@@ -144,6 +144,11 @@ SBEDS CSVs), replacing today's `<case>_hd13.html` beside the case file.
 }
 ```
 
+OUT-2 (*owner decision P4, 2026-09-27*): after a VTK export `vtk` is a numeric
+summary, `{"dir": "vtk", "counts": {"volumes": 10, ...}, "files": 74,
+"bytes": 5120000, "not_converted": []}`, and `outputs` leaves `vtk\` out; the
+full file list is `vtk\manifest.json` (`families.<family>.files`).
+
 ### 2.3 The WSL scratch
 
 - The solver still runs in `/root/blastlab_runs/<stamp>_<dim>d_p<pid>-NN`

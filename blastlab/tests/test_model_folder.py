@@ -1152,8 +1152,10 @@ def test_d_vtk_not_converted_keeps_scratch():
                                 path='vtk/volumes/t_0.001.vtk')]))
         m = mf.write_all(None, case1d(solver='blastfoam'), 1, folder,
                          log=lambda *_a: None)
-        assert m['vtk'] == dict(dir='vtk', counts={'volumes': 1},
-                                not_converted=[dict(
+        # P4: plus files / bytes under vtk\ (here the manifest alone)
+        size = os.path.getsize(os.path.join(folder, 'vtk', 'manifest.json'))
+        assert m['vtk'] == dict(dir='vtk', counts={'volumes': 1}, files=1,
+                                bytes=size, not_converted=[dict(
                                     time='0.001', family='volumes',
                                     why='foamToVTK: exit 1',
                                     path='vtk/volumes/t_0.001.vtk')])
