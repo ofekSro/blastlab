@@ -282,6 +282,14 @@ true first-arrival field `Arrival_Time` (10 % threshold, like the gauge summary)
 it can be computed exactly during the run; feasibility is checked in 4b, not now. The
 relabel belongs to 4b (B1). **Q2-Q6:** use the interims above; do not ask again.
 
+## 7a. Batch notes
+
+**A1 baseline (2026-09-27, branch `out-4a-gauges` from `6af6a11`, before any code
+edit):** `test_regression.py` REGRESSION: PASS (byte-identical);
+`test_foam_writer.py` FOAM WRITER: PASS; `test_vtk_case.py` VTK CASE: PASS;
+`test_foam_reader.py` FOAM READER: PASS; `test_gauge_summary.py` GAUGE SUMMARY: PASS.
+Also green: `test_legacy_vtk.py` (11/11), `test_case_validate.py`.
+
 ## 7. Remaining backlog after OUT-4
 
 The OUT track is then complete except OUT-1's pending `gui-qa-tester` screenshots and
