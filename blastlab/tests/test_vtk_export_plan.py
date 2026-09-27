@@ -741,6 +741,44 @@ def test_b_unexpected_error_keeps_the_scratch():
         tree.close()
 
 
+def test_b_1d_deletes_no_time_dir():
+    """Owner decision P9: a 1D run converts and copies every write, and
+    removes the converted VTK/ files in WSL, but never deletes a written
+    time (1D picks its snapshots at finalize from the writes on disk)."""
+    tree = Tree(surfaces=False)
+    try:
+        tree.spec.dim = 1
+        ex = tree.export()
+        assert ex.keep_time_dirs
+        ex.run({t: 0 for t in T[:3]})
+        ex.run({t: 0 for t in T[:4]})
+        ex.run({t: 0 for t in T}, final=True)
+        for t in T:
+            assert os.path.getsize(tree.model(f'volumes/t_{t}.vtk')) > 0, t
+        assert tree.deleted_times() == [], tree.deleted_times()
+        m = _manifest(tree)
+        assert m['deleted_in_wsl'] == [] and m['not_converted'] == []
+        assert m['families']['volumes']['count'] == len(T)
+        # only the converted files went, never a time dir
+        gone = [p for batch in tree.deletes for p in batch]
+        assert gone and all('/VTK/' in p for p in gone), gone
+        vtk_left = os.path.join(tree.unc, 'VTK')
+        assert not os.path.isdir(vtk_left) or not os.listdir(vtk_left)
+        assert any('0 written time(s) deleted in WSL' in ln
+                   for ln in tree.lines), tree.lines
+        # a 3D run of the same tree does delete (the control)
+        tree3 = Tree(surfaces=False)
+        try:
+            ex3 = tree3.export()
+            assert not ex3.keep_time_dirs
+            ex3.run({t: 0 for t in T}, final=True)
+            assert tree3.deleted_times() == T[:-2]
+        finally:
+            tree3.close()
+    finally:
+        tree.close()
+
+
 TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_converter_failure_deletes_nothing,
            test_b_empty_copy_deletes_nothing, test_b_inactive_without_vtk_dir,
@@ -750,7 +788,7 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_failing_delete_never_raises, test_b_runloop_wiring,
            test_b_protect_reasons, test_b_final_copy_failure_is_recorded,
            test_b_unexpected_error_keeps_the_scratch,
-           test_b_restart_dir_survives]
+           test_b_restart_dir_survives, test_b_1d_deletes_no_time_dir]
 TESTS = TESTS_A + TESTS_B
 
 

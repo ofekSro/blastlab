@@ -187,7 +187,11 @@ native mode, and a native run ignores the keys.
   then are the time directory and the converted file deleted in WSL.
   Never deleted: `0`, a resume's start time, the two newest writes, and
   every write the run's own finalize reads again (the snapshots, the
-  1D/2D arrival pin, the 2D remap trigger). Surface samples are copied
+  2D arrival pin, the 2D remap trigger). **A 1D run deletes no written
+  time at all** (owner decision P9): it converts and copies every write,
+  removes only the converted file, and its time directories stay in WSL
+  until the scratch is released - 1D picks its snapshots from the writes
+  on disk, and 1D writes are small. Surface samples are copied
   and removed the same way, the newest one after the run. A conversion
   or copy that fails twice is listed in `not_converted`, its write stays
   in WSL, and the scratch is not released. A run without a model folder

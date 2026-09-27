@@ -376,9 +376,8 @@ def note_resume(vtk_dir, times, log):
     possibly deleted - writes that are no longer there, say so once and
     set `replay_incomplete` in vtk\\manifest.json: the frames, and on AMR
     the Python peak/impulse, cover only the writes that are left. 2D/3D
-    snapshots survive (their dirs are protected); a 1D run picks its
-    snapshots at finalize from the writes it holds, so a resumed 1D run
-    picks them from the writes that are left. True when it applied.
+    snapshots survive (their dirs are protected); a 1D run deletes no
+    written time (P9), so it never gets here. True when it applied.
     `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none."""
     if not isinstance(vtk_dir, str) or not vtk_dir:
         return False
@@ -398,8 +397,7 @@ def note_resume(vtk_dir, times, log):
     log(f'  [blastfoam] resuming after the VTK export removed {len(gone)} '
         f'written time(s) from WSL: the replay rebuilds the frames (and, '
         f'on AMR, the per-write peak/impulse) from the {len(times)} left; '
-        f'2D/3D snapshots are kept, a 1D run picks its snapshots from the '
-        f'writes left. Recorded as replay_incomplete in '
+        f'the snapshots are kept. Recorded as replay_incomplete in '
         f'vtk\\manifest.json.')
     return True
 
@@ -498,9 +496,11 @@ class VtkExport:
     forward scan on the writes left on disk, and the boundary can vent
     back below the threshold on later writes.
 
-    1D snapshots and every frame live in memory; a resume after deletion
-    replays only what is left (D10, `note_resume`), so a resumed 1D run
-    picks its snapshots from the writes that are left.
+    A 1D run deletes no written time at all (owner decision P9): its
+    snapshots are picked at finalize from the writes on disk, so a
+    resumed 1D run still has every one. Every frame lives in memory; a
+    2D/3D resume after deletion replays only what is left (D10,
+    `note_resume`).
 
     A W3 auto-resume builds a new loop on the same hooks: construction
     reads `vtk\\manifest.json` back, so no time is exported twice."""
@@ -522,6 +522,9 @@ class VtkExport:
         self.volumes_on = bool(self.active and self.vol and not decomposed)
         self.no_delete = os.environ.get(NO_DELETE_ENV) == '1'
         dim = int(getattr(spec, 'dim', 3) or 3)
+        #: P9: the written time dirs of a 1D run stay in WSL until the
+        #: scratch is released (see _run)
+        self.keep_time_dirs = dim == 1
         have = vtk_fields_for(dim)
         self.vol_fields = [f for f in (self.vol or {}).get('fields', ())
                            if f in have]
@@ -742,7 +745,15 @@ class VtkExport:
         if self.volumes_on:
             self._convert(done, final)
             self._copy_volumes(final)
-            names = [n for n in self._plan(done) if n not in self.deleted]
+            # owner decision P9 (2026-09-27): a 1D run never deletes a
+            # written time - 1D picks its snapshots at finalize from the
+            # writes on disk (backend._pick_snapshots), and 1D writes are
+            # small. Converted VTK/ files are still removed after the copy.
+            if self.keep_time_dirs:
+                names = []
+            else:
+                names = [n for n in self._plan(done)
+                         if n not in self.deleted]
         if self.surf:
             self._sweep(final)
         if not self._write_index():
