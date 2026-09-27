@@ -12,7 +12,13 @@ docs/batches/2026-09-27-out-2-vtk-output.md, Steps 4 and 6.
        `constant`, `-1` and `0`, and builds the root plus processor0..N-1;
        rm_scripts chunks 60 writes x 13 ranks under the command-line cap;
      * vtk_argv_script (D14), surface_sweep_plan, dest_name / series_name
-       (D2, Q1) and split_surface_file.
+       (the owner's Viper-style layout, docs/batches/2026-09-27-out-2-
+       surface-layout.md decisions 1-2) and split_surface_file.
+
+  B  (V3b) the executor on a fake scratch tree whose files are real
+     legacy VTK (test_legacy_vtk's blastFoam-style builders): per-field
+     surface files merged into one file per surface per time, volumes
+     renamed, TIME inside, a geometry mismatch kept in WSL.
 
 Run:  cd blastlab/tests && python test_vtk_export_plan.py   (or pytest)
 """
@@ -23,9 +29,16 @@ from types import SimpleNamespace
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
+sys.path.insert(0, HERE)
 
+import numpy as np                                            # noqa: E402
+
+from blastlab.core.constants import P_AIR                      # noqa: E402
+from blastlab.output import legacy_vtk as lv                   # noqa: E402
 from blastlab.solvers.foam import env, runloop                  # noqa: E402
 from blastlab.solvers.foam import vtk_export as vx              # noqa: E402
+from test_legacy_vtk import (foam_surface_ascii,               # noqa: E402
+                             foam_volume_binary, surface_geometry)
 
 CASE = env.RUNS_ROOT + '/20260927-010203_3d_p1234-00'
 T = ['0.0001', '0.0002', '0.0003', '0.0004', '0.0005', '0.0006']
@@ -228,22 +241,24 @@ def test_a_surface_sweep_plan():
 
 
 def test_a_dest_and_series_names():
-    assert vx.dest_name('volumes', None, None, '0.0005') == \
-        'volumes/t_0.0005.vtk'
-    assert vx.dest_name('sections', 'slice_y_1.40', 'p', '1e-05') == \
-        'sections/slice_y_1.40/p/t_1e-05.vtk'
-    assert vx.dest_name('obstacles', 'obstacles', 'alpha.expl', '0.0005') == \
-        'obstacles/alpha.expl/t_0.0005.vtk'
-    assert vx.series_name('volumes', None, None) == \
-        'volumes/volumes.vtk.series'
-    assert vx.series_name('sections', 'slice_z_0.50', 'pMax') == \
-        'sections/slice_z_0.50/pMax.vtk.series'
-    assert vx.series_name('obstacles', 'obstacles', 'p') == \
-        'obstacles/p.vtk.series'
-    for bad in (('sections', '..', 'p', '0.1'), ('sections', 'a/b', 'p',
-                                                   '0.1'),
-                ('obstacles', 'o', '..', '0.1'), ('volumes', 0, 0, 'x'),
-                ('other', 'o', 'p', '0.1')):
+    """Owner decisions 1-2 (2026-09-27, the Viper-style layout): one
+    folder per series, one file per surface per time, every .vtk.series
+    beside its folder at the top of vtk\\."""
+    assert vx.dest_name('volumes', None, '0.0005') == 'volumes/t_0.0005.vtk'
+    assert vx.dest_name('sections', 'slice_y_1.40', '1e-05') == \
+        'slice_y_1.40/t_1e-05.vtk'
+    assert vx.dest_name('obstacles', 'obstacles', '0.0005') == \
+        'obstacles/t_0.0005.vtk'
+    assert vx.series_name('volumes') == 'volumes.vtk.series'
+    assert vx.series_name('sections', 'slice_z_0.50') == \
+        'slice_z_0.50.vtk.series'
+    assert vx.series_name('obstacles', 'obstacles') == \
+        'obstacles.vtk.series'
+    for bad in (('sections', '..', '0.1'), ('sections', 'a/b', '0.1'),
+                ('sections', 'volumes', '0.1'),
+                ('sections', 'obstacles', '0.1'),
+                ('sections', 'manifest', '0.1'), ('volumes', 0, 'x'),
+                ('other', 'o', '0.1')):
         try:
             vx.dest_name(*bad)
         except ValueError:
@@ -278,12 +293,35 @@ TESTS_A = [test_a_all_open_keeps_two_newest, test_a_each_exclusion_alone,
 RUN = '20260927-010203_3d_p1234-00'
 POSIX = env.RUNS_ROOT + '/' + RUN
 SAMPLES = ['0', '2e-05', '6e-05', '0.00011', '0.00017']
+#: each surface's own geometry (a 3 x 3 quad patch, shifted)
+SHIFT = {'slice_y_0.30': 0.0, 'slice_z_0.35': 1.0, 'obstacles': 2.0}
+
+
+def surface_values(field, surface, t):
+    """The values a fake per-field file holds (exact in 6 digits)."""
+    base = {'p': 101325.0, 'pMax': 250000.0}[field]
+    return base + 10.0 * np.arange(9) + SAMPLES.index(t) \
+        + 100.0 * list(SHIFT).index(surface)
+
+
+def surface_file(field, surface, t, shift=None):
+    pts, polys = surface_geometry(SHIFT[surface] if shift is None else shift)
+    return foam_surface_ascii(field, surface_values(field, surface, t),
+                              pts, polys)
+
+
+def is_for(src, t):
+    """The WSL source `src` belongs to written / sample time `t`: a
+    volume `VTK/<run>_<t>.vtk` or a file of `postProcessing/<fo>/<t>/`."""
+    return (os.path.basename(src) == f'{RUN}_{t}.vtk'
+            or os.path.basename(os.path.dirname(src)) == t)
 
 
 class Tree:
     """A fake scratch (time dirs + the two surface function objects'
-    output) and a model folder, in a temp dir. The injected runner,
-    copy and delete work on it; nothing touches WSL."""
+    output, real legacy VTK files as blastFoam writes them) and a model
+    folder, in a temp dir. The injected runner, copy and delete work on
+    it; nothing touches WSL."""
 
     def __init__(self, n_procs=1, surfaces=True, volumes=True,
                  vtk_dir=True):
@@ -303,8 +341,9 @@ class Tree:
                           ('vtkObstacles', ('p_obstacles.vtk',))):
             for t in SAMPLES:
                 for f in files:
+                    field, surface = vx.split_surface_file(f)
                     self.write(f'postProcessing/{fo}/{t}/{f}',
-                               f'{fo} {t} {f}\n'.encode() * 10)
+                               surface_file(field, surface, t))
             self.write(f'postProcessing/{fo}/p_x.vtk.series', b'{}\n')
         self.spec = SimpleNamespace(
             dim=3, case_posix=POSIX, case_unc=self.unc, start_dir='0',
@@ -343,14 +382,14 @@ class Tree:
                 bad = [n for n in self.names if n in tree.fail_convert]
                 for n in self.names:
                     if n not in bad:
-                        tree.write(f'VTK/{RUN}_{n}.vtk', b'# vtk\n' * 100)
+                        tree.write(f'VTK/{RUN}_{n}.vtk', foam_volume_binary(
+                            t=float(n), name=RUN)[0])
                 return (not bad, 'boom' if bad else '')
         return Job()
 
     def copy(self, src, dst):
         import shutil as sh
-        name = os.path.basename(dst)
-        if any(name == f't_{n}.vtk' for n in self.empty_copy):
+        if any(is_for(src, n) for n in self.empty_copy):
             open(dst, 'wb').close()
             return
         sh.copyfile(src, dst)
@@ -407,40 +446,78 @@ def test_b_happy_path():
         # every ingested write converted, copied, and in the series
         for t in T:
             assert os.path.getsize(tree.model(f'volumes/t_{t}.vtk')) > 0, t
-        vol = _series(tree.model('volumes/volumes.vtk.series'))
-        assert [f['name'] for f in vol['files']] == [f't_{t}.vtk' for t in T]
+        vol = _series(tree.model('volumes.vtk.series'))
+        assert [f['name'] for f in vol['files']] == [
+            f'volumes/t_{t}.vtk' for t in T]
         assert vol['file-series-version'] == '1.0'
+        # the volumes: readable names in the card's order, cellID kept
+        # (last), TIME inside
+        vd = lv.read(tree.model(f'volumes/t_{T[2]}.vtk'))
+        assert [a.name for a in vd.cell_data] == ['pressure', 'density',
+                                                  'velocity', 'cellID']
+        assert float(vd.field_data[0].values[0]) == np.float32(T[2])
         # exactly the planned dirs: all but the two newest; 0 stays
         assert tree.deleted_times() == T[:-2], tree.deleted_times()
         assert tree.exists('0') and tree.exists(T[-1]) and tree.exists(T[-2])
         assert not os.path.isdir(os.path.join(tree.unc, 'VTK')) or not \
             os.listdir(os.path.join(tree.unc, 'VTK'))
-        # the surfaces: every sample copied, one series per field and
-        # plane, and the WSL sample dirs gone (blastFoam's series stays)
+        # the surfaces (owner decisions 1-2): one series per plane and one
+        # for the obstacles, all at the top of vtk\, each file holding
+        # every field of its surface; the WSL sample dirs gone
+        # (blastFoam's own series stays); no staging file left
+        assert sorted(os.listdir(tree.vtk)) == [
+            'manifest.json', 'obstacles', 'obstacles.vtk.series',
+            'slice_y_0.30', 'slice_y_0.30.vtk.series', 'slice_z_0.35',
+            'slice_z_0.35.vtk.series', 'volumes', 'volumes.vtk.series']
         for plane in ('slice_y_0.30', 'slice_z_0.35'):
-            for fld in ('p', 'pMax'):
-                s = _series(tree.model(f'sections/{plane}/{fld}.vtk.series'))
-                assert [f['name'] for f in s['files']] == [
-                    f'{fld}/t_{t}.vtk' for t in SAMPLES], s
-                for t in SAMPLES:
-                    assert os.path.isfile(tree.model(
-                        f'sections/{plane}/{fld}/t_{t}.vtk'))
-        s = _series(tree.model('obstacles/p.vtk.series'))
+            s = _series(tree.model(f'{plane}.vtk.series'))
+            assert [f['name'] for f in s['files']] == [
+                f'{plane}/t_{t}.vtk' for t in SAMPLES], s
+            assert sorted(os.listdir(tree.model(plane))) == sorted(
+                f't_{t}.vtk' for t in SAMPLES)
+            for t in SAMPLES:
+                vd = lv.read(tree.model(f'{plane}/t_{t}.vtk'))
+                assert vd.dataset == 'POLYDATA' and vd.n_cells == 9
+                assert [a.name for a in vd.cell_data] == [
+                    'pressure', 'Peak_Overpressure'], vd.cell_data
+                assert np.array_equal(
+                    vd.cell_data[0].values,
+                    surface_values('p', plane, t).astype(np.float32))
+                # decision 4: peak OVERPRESSURE, over P_AIR
+                assert np.array_equal(
+                    vd.cell_data[1].values,
+                    (surface_values('pMax', plane, t) - P_AIR)
+                    .astype(np.float32))
+                assert [a.name for a in vd.field_data] == ['TIME']
+                assert float(vd.field_data[0].values[0]) == np.float32(t)
+        s = _series(tree.model('obstacles.vtk.series'))
         assert [f['time'] for f in s['files']] == [float(t) for t in SAMPLES]
+        assert [f['name'] for f in s['files']] == [
+            f'obstacles/t_{t}.vtk' for t in SAMPLES]
+        vd = lv.read(tree.model(f'obstacles/t_{SAMPLES[1]}.vtk'))
+        assert [a.name for a in vd.cell_data] == ['pressure']
         for fo in ('vtkSections', 'vtkObstacles'):
             left = os.listdir(os.path.join(tree.unc, 'postProcessing', fo))
             assert left == ['p_x.vtk.series'], left
         m = _manifest(tree)
         assert m['families']['volumes']['count'] == len(T)
         assert m['families']['volumes']['times'] == T
+        assert m['families']['volumes']['series'] == ['volumes.vtk.series']
+        assert m['families']['sections']['series'] == [
+            'slice_y_0.30.vtk.series', 'slice_z_0.35.vtk.series']
+        assert m['families']['obstacles']['series'] == [
+            'obstacles.vtk.series']
         # P4: the full list lives here, in time order
         assert m['families']['volumes']['files'] == [
             f'volumes/t_{t}.vtk' for t in T]
-        assert len(m['families']['sections']['files']) == 4 * len(SAMPLES)
+        assert len(m['families']['sections']['files']) == 2 * len(SAMPLES)
         assert m['families']['obstacles']['files'] == [
-            f'obstacles/p/t_{t}.vtk' for t in SAMPLES]
-        assert m['families']['sections']['count'] == 4 * len(SAMPLES)
+            f'obstacles/t_{t}.vtk' for t in SAMPLES]
+        assert m['families']['sections']['count'] == 2 * len(SAMPLES)
         assert m['families']['obstacles']['count'] == len(SAMPLES)
+        assert m['arrays'] == {'U': 'velocity', 'p': 'pressure',
+                               'pMax': 'Peak_Overpressure', 'rho': 'density'}
+        assert m['p_ambient'] == P_AIR
         assert m['deleted_in_wsl'] == T[:-2]
         assert m['not_converted'] == [] and m['replay_incomplete'] is False
         assert m['cadence'] == {'volumes': dict(mode='step', value=10,
@@ -550,8 +627,9 @@ def test_b_second_export_does_not_convert_twice():
         on_disk = {t: 0 for t in T if tree.exists(t)}
         ex2.run(on_disk, final=True)
         assert tree.runs == [T[4:]], tree.runs
-        vol = _series(tree.model('volumes/volumes.vtk.series'))
-        assert [f['name'] for f in vol['files']] == [f't_{t}.vtk' for t in T]
+        vol = _series(tree.model('volumes.vtk.series'))
+        assert [f['name'] for f in vol['files']] == [
+            f'volumes/t_{t}.vtk' for t in T]
         assert _manifest(tree)['families']['volumes']['count'] == len(T)
     finally:
         tree.close()
@@ -567,11 +645,11 @@ def test_b_newest_sample_waits_for_final():
             assert tree.exists(f'postProcessing/{fo}/{newest}'), fo
             for t in SAMPLES[:-1]:
                 assert not tree.exists(f'postProcessing/{fo}/{t}'), (fo, t)
-        assert not os.path.exists(tree.model(f'obstacles/p/t_{newest}.vtk'))
+        assert not os.path.exists(tree.model(f'obstacles/t_{newest}.vtk'))
         ex.run({}, final=True)
         for fo in ('vtkSections', 'vtkObstacles'):
             assert not tree.exists(f'postProcessing/{fo}/{newest}'), fo
-        assert os.path.isfile(tree.model(f'obstacles/p/t_{newest}.vtk'))
+        assert os.path.isfile(tree.model(f'obstacles/t_{newest}.vtk'))
         assert 'volumes' not in _manifest(tree)['families']
     finally:
         tree.close()
@@ -679,8 +757,7 @@ def test_b_final_copy_failure_is_recorded():
 
                 def full(src, dst, real=real, tries=tries, want=want,
                          transient=transient):
-                    if os.path.basename(dst) == f't_{want}.vtk' \
-                            and not (transient and tries):
+                    if is_for(src, want) and not (transient and tries):
                         tries.append(dst)
                         raise OSError(errno.ENOSPC, 'No space left on device')
                     return real(src, dst)
@@ -785,6 +862,73 @@ def test_b_1d_deletes_no_time_dir():
         tree.close()
 
 
+def test_b_geometry_mismatch_keeps_the_sample():
+    """Owner spec: the per-field files of one surface and time must share
+    one geometry. When they do not, nothing is merged for that time: no
+    file (not even for the other surfaces of that time), the time is
+    listed as not converted, and its WSL sample dir is kept (Q4); the
+    other times go through."""
+    tree = Tree(volumes=False)
+    try:
+        bad = SAMPLES[2]
+        tree.write(f'postProcessing/vtkSections/{bad}/pMax_slice_z_0.35.vtk',
+                   surface_file('pMax', 'slice_z_0.35', bad, shift=1.5))
+        ex = tree.export()
+        ex.run({}, final=True)
+        assert tree.exists(f'postProcessing/vtkSections/{bad}')
+        for plane in ('slice_y_0.30', 'slice_z_0.35'):
+            assert not os.path.exists(tree.model(f'{plane}/t_{bad}.vtk'))
+            s = _series(tree.model(f'{plane}.vtk.series'))
+            assert [f['name'] for f in s['files']] == [
+                f'{plane}/t_{t}.vtk' for t in SAMPLES if t != bad], s
+        nc = _manifest(tree)['not_converted']
+        assert [(e['family'], e['time']) for e in nc] == [('sections', bad)]
+        assert 'differ in geometry' in nc[0]['why'], nc
+        assert 'slice_z_0.35' in nc[0]['why'], nc
+        # the obstacles of that time are unaffected
+        assert os.path.isfile(tree.model(f'obstacles/t_{bad}.vtk'))
+        assert not tree.exists(f'postProcessing/vtkObstacles/{bad}')
+    finally:
+        tree.close()
+
+
+def test_b_unreadable_volume_is_kept():
+    """A foamToVTK file the strict parser refuses is never half-written
+    into vtk\\ and never deleted in WSL: tried twice, then not
+    converted."""
+    tree = Tree(surfaces=False)
+    try:
+        real = tree.runner
+
+        def runner(spec, names, fields):
+            job = real(spec, names, fields)
+            poll = job.poll
+
+            def torn():
+                res = poll()
+                if T[1] in job.names:
+                    tree.write(f'VTK/{RUN}_{T[1]}.vtk',
+                               b'# vtk DataFile Version 2.0\nx\nBINARY\n'
+                               b'DATASET UNSTRUCTURED_GRID\n'
+                               b'POINTS 12 float\n\x00\x01')
+                return res
+            job.poll = torn
+            return job
+
+        tree.runner = runner
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        nc = _manifest(tree)['not_converted']
+        assert [(e['family'], e['time']) for e in nc] == [('volumes', T[1])]
+        assert 'not a readable VTK file' in nc[0]['why'], nc
+        assert tree.exists(T[1]) and tree.exists(f'VTK/{RUN}_{T[1]}.vtk')
+        assert not os.path.exists(tree.model(f'volumes/t_{T[1]}.vtk'))
+        assert not [n for n in os.listdir(tree.model('volumes'))
+                    if not n.startswith('t_')], 'a staging file was left'
+    finally:
+        tree.close()
+
+
 TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_converter_failure_deletes_nothing,
            test_b_empty_copy_deletes_nothing, test_b_inactive_without_vtk_dir,
@@ -794,7 +938,9 @@ TESTS_B = [test_b_happy_path, test_b_protected_and_start_dir_survive,
            test_b_failing_delete_never_raises, test_b_runloop_wiring,
            test_b_protect_reasons, test_b_final_copy_failure_is_recorded,
            test_b_unexpected_error_keeps_the_scratch,
-           test_b_restart_dir_survives, test_b_1d_deletes_no_time_dir]
+           test_b_restart_dir_survives, test_b_1d_deletes_no_time_dir,
+           test_b_geometry_mismatch_keeps_the_sample,
+           test_b_unreadable_volume_is_kept]
 TESTS = TESTS_A + TESTS_B
 
 

@@ -11,6 +11,12 @@ where each file lands in the model folder (`dest_name`).
 `VtkExport` is the executor the run loop drives after every ingest pass
 and on the final sweep (Step 6).
 
+The file layout is the owner's Viper-style one (docs/batches/2026-09-27-
+out-2-surface-layout.md, decisions 1-6): one file per surface per sample
+time holding every chosen field, one folder per series with its
+`.vtk.series` beside it, readable array names, `pMax` written as the
+peak overpressure, and the sample time inside every file.
+
 No Qt, no services/, no backend import: the run loop owns the executor
 and the backend only tells it which writes finalize still reads.
 """
@@ -24,8 +30,11 @@ import subprocess
 import threading
 import time as _time
 
-from ...models.case import vtk_fields_for
-from ...output import vtk_series
+import numpy as np
+
+from ...core.constants import P_AIR
+from ...models.case import VTK_ARRAY_NAMES, VTK_FIELDS, vtk_fields_for
+from ...output import legacy_vtk, vtk_series
 from .runloop import _CASE_POSIX, _is_time, _root_whole, rm_scripts
 from .writer import VTK_OBSTACLES, VTK_SECTIONS
 
@@ -219,44 +228,90 @@ def _safe(name, what):
     return s
 
 
-def dest_name(kind, surface, field, time):
-    """Where a converted file lands inside the model folder's vtk\\
-    (D2 / owner Q1), relative, '/' separators, with OpenFOAM's own time
-    name never reformatted:
+#: vtk\\ names a section plane may not take: the other series' folders
+#: and the manifest (the writer names planes `slice_<axis>_<pos>`)
+_RESERVED = (VOLUMES, OBSTACLES, SECTIONS, 'manifest')
 
-    * volumes:   `volumes/t_<time>.vtk` (one file per time, every field);
-    * sections:  `sections/<plane>/<field>/t_<time>.vtk`;
-    * obstacles: `obstacles/<field>/t_<time>.vtk`.
 
-    `surface` / `field` are ignored where the layout has no place for
-    them."""
+def series_folder(kind, surface=None):
+    """The folder of one series inside vtk\\ (owner decision 2,
+    2026-09-27): `volumes`, the section plane's own name
+    (`slice_x_0.20`), or `obstacles`."""
+    if kind == VOLUMES:
+        return VOLUMES
+    if kind == SECTIONS:
+        s = _safe(surface, 'surface')
+        if s in _RESERVED:
+            raise ValueError(f'a section plane cannot be named {s!r}')
+        return s
+    if kind == OBSTACLES:
+        return OBSTACLES
+    raise ValueError(f'not a VTK family: {kind!r}')
+
+
+def dest_name(kind, surface, time):
+    """Where a file lands inside the model folder's vtk\\, relative, '/'
+    separators, with OpenFOAM's own time name never reformatted (owner
+    decisions 1-2): `<series folder>/t_<time>.vtk` - `volumes/`,
+    `slice_x_0.20/`, `obstacles/` - one file per surface per time holding
+    every chosen field."""
     s = str(time)
     if not _is_time(s):
         raise ValueError(f'not a written time: {s!r}')
-    if kind == VOLUMES:
-        return f'{VOLUMES}/t_{s}.vtk'
-    if kind == SECTIONS:
-        return (f'{SECTIONS}/{_safe(surface, "surface")}/'
-                f'{_safe(field, "field")}/t_{s}.vtk')
-    if kind == OBSTACLES:
-        return f'{OBSTACLES}/{_safe(field, "field")}/t_{s}.vtk'
-    raise ValueError(f'not a VTK family: {kind!r}')
+    return f'{series_folder(kind, surface)}/t_{s}.vtk'
 
 
-def series_name(kind, surface, field):
-    """The `.vtk.series` of one file series, relative to vtk\\ (owner Q1:
-    one series per field, named after the field, beside the field's own
-    folder, so one family's series sit together): `volumes/volumes.vtk.
-    series`, `sections/<plane>/<field>.vtk.series`,
-    `obstacles/<field>.vtk.series`."""
-    if kind == VOLUMES:
-        return f'{VOLUMES}/{VOLUMES}.vtk.series'
-    if kind == SECTIONS:
-        return (f'{SECTIONS}/{_safe(surface, "surface")}/'
-                f'{_safe(field, "field")}.vtk.series')
-    if kind == OBSTACLES:
-        return f'{OBSTACLES}/{_safe(field, "field")}.vtk.series'
-    raise ValueError(f'not a VTK family: {kind!r}')
+def series_name(kind, surface=None):
+    """The `.vtk.series` of one series, relative to vtk\\, beside its
+    folder, every series at one level (owner decision 2):
+    `volumes.vtk.series`, `slice_x_0.20.vtk.series`,
+    `obstacles.vtk.series`. Each is opened on its own in ParaView
+    (decision 3)."""
+    return f'{series_folder(kind, surface)}{vtk_series.SERIES_SUFFIX}'
+
+
+def readable_arrays(arrays, p_ambient=P_AIR):
+    """The attribute arrays as they are written (owner decisions 4-5):
+    renamed by VTK_ARRAY_NAMES (a name not in it - foamToVTK's `cellID` -
+    kept), `pMax` turned into the peak overpressure pMax - `p_ambient`
+    [Pa], and each array written the Viper way: one component as SCALARS,
+    three (velocity) as VECTORS, anything else as a FIELD array. Pure;
+    ValueError when two arrays end up with one name."""
+    out = []
+    for a in arrays:
+        vals = a.values
+        if a.name == 'pMax':
+            # decision 4: peak OVERPRESSURE, over the ambient the gauges
+            # use (core.constants.P_AIR; writer.py's pRef, gauge_summary)
+            vals = np.asarray(vals, dtype=np.float64) - float(p_ambient)
+        if a.ncomp == 1:
+            kind = 'scalars'
+        elif a.ncomp == 3 and a.vtk_type in ('float', 'double'):
+            kind = 'vectors'
+        else:
+            kind = 'field'
+        out.append(legacy_vtk.Array(VTK_ARRAY_NAMES.get(a.name, a.name),
+                                    vals, a.vtk_type, kind))
+    names = [a.name for a in out]
+    dup = sorted({n for n in names if names.count(n) > 1})
+    if dup:
+        raise ValueError(f'array name(s) given twice: {dup}')
+    return out
+
+
+def export_file(vd, t, p_ambient=P_AIR, title=None):
+    """`vd` as it is written: readable arrays (cell and point data kept
+    apart, as the source holds them) and the sample time `t` [s] inside
+    (owner decision 6)."""
+    vd.cell_data = readable_arrays(vd.cell_data, p_ambient)
+    vd.point_data = readable_arrays(vd.point_data, p_ambient)
+    names = vd.arrays()
+    dup = sorted({n for n in names if names.count(n) > 1})
+    if dup:
+        raise ValueError(f'array name(s) given twice: {dup}')
+    if title is not None:
+        vd.title = title
+    return legacy_vtk.with_time(vd, float(t))
 
 
 def split_surface_file(filename, fields=()):
@@ -428,6 +483,20 @@ def _size(path):
         return -1
 
 
+def _field_order(part):
+    """Sort key of a (field, file) part: VTK_FIELDS order, then name."""
+    field = part[0]
+    return (VTK_FIELDS.index(field) if field in VTK_FIELDS
+            else len(VTK_FIELDS), field)
+
+
+def _remove(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
 def _nc_key(e):
     """Sort key of a not_converted entry: family, then time (the export's
     own entry has none)."""
@@ -460,12 +529,17 @@ class VtkExport:
 
     1. poll (or, final, wait for) the one asynchronous foamToVTK call
        (D13) and start the next one over ingested, unconverted times;
-    2. copy `VTK/<case>_<t>.vtk` to `vtk\\volumes\\t_<t>.vtk`, size-check
-       it against the source;
+    2. copy `VTK/<case>_<t>.vtk` to a staging file beside its destination
+       (size-checked against the source), rename its arrays, add the
+       TIME field and write `vtk\\volumes\\t_<t>.vtk` atomically, then
+       read it back with the strict parser (output/legacy_vtk.py);
     3. sweep the surface function objects' output (`postProcessing/
        vtkSections|vtkObstacles/<t>/<field>_<surface>.vtk`, all but the
-       newest sample until the final sweep) into `vtk\\sections\\<plane>\\
-       <field>\\` and `vtk\\obstacles\\<field>\\`;
+       newest sample until the final sweep): per surface and time, stage
+       every per-field file, check they share one geometry, and merge
+       them into one `vtk\\<plane>\\t_<t>.vtk` / `vtk\\obstacles\\
+       t_<t>.vtk` holding every field (owner decisions 1-6), written and
+       verified the same way;
     4. rewrite the `.vtk.series` files and `vtk\\manifest.json` - BEFORE
        any delete, so a resume never meets a deleted write the manifest
        does not know was copied;
@@ -560,6 +634,10 @@ class VtkExport:
         self.not_converted = {}         # (family, time) -> manifest entry
         self.files = {}                 # dest rel -> (family, time)
         self.series = {}                # series rel -> {entry: time}
+        self.series_kind = {}           # series rel -> family
+        #: owner decision 4: Peak_Overpressure = pMax - this [Pa], the
+        #: ambient the gauges' overpressure uses
+        self.p_ambient = float(P_AIR)
         self.changed = set()            # series rels to rewrite
         self.rm_files, self.rm_surface = set(), set()
         self.mesh_cache = {}
@@ -651,6 +729,7 @@ class VtkExport:
                     self.files[rel] = (kind, m.group(1))
                     self.series.setdefault(str(srel), {})[entry] = \
                         m.group(1)
+                    self.series_kind[str(srel)] = kind
         for rel, (kind, t) in self.files.items():
             if kind == VOLUMES:
                 self.converted.add(t)
@@ -680,7 +759,7 @@ class VtkExport:
                 times=sorted({self.files[r][1] for r in rels},
                              key=_time_key),
                 series=sorted(s for s in self.series
-                              if s.startswith(kind + '/')),
+                              if self.series_kind.get(s) == kind),
                 # owner decision P4: the full file list lives here; the
                 # model's root manifest keeps only the numbers
                 files=sorted(rels, key=lambda r: (_time_key(
@@ -697,20 +776,30 @@ class VtkExport:
         if self.surf:
             cadence['surfaces'] = _cadence(self.surf)
         nc = sorted(self.not_converted.values(), key=_nc_key)
+        chosen = {f for fl in fields.values() for f in fl}
         # `scratch` (additive): the WSL run directory, so a reader that
         # holds only that (postmortem, the run browser) finds this
-        # manifest - owner decision P11, deleted_note
+        # manifest - owner decision P11, deleted_note. `arrays` and
+        # `p_ambient` (additive): the array name of each chosen field in
+        # the files, and the ambient Peak_Overpressure is taken over
+        # (owner decisions 4-5)
         return dict(fields=fields, cadence=cadence, families=fams,
                     not_converted=nc,
                     deleted_in_wsl=sorted(self.deleted, key=_time_key),
                     replay_incomplete=self.replay_incomplete,
-                    scratch=getattr(self.spec, 'case_posix', None))
+                    scratch=getattr(self.spec, 'case_posix', None),
+                    arrays={f: VTK_ARRAY_NAMES.get(f, f)
+                            for f in sorted(chosen)},
+                    p_ambient=self.p_ambient)
 
-    def _add_file(self, rel, kind, surface, field, t):
+    def _add_file(self, rel, kind, surface, t):
         self.files[rel] = (kind, t)
-        srel = series_name(kind, surface, field)
-        entry = posixpath.relpath(rel, posixpath.dirname(srel))
+        srel = series_name(kind, surface)
+        # entries relative to the series file, which sits beside the
+        # series' folder at the top of vtk\ (decision 2)
+        entry = posixpath.relpath(rel, posixpath.dirname(srel) or '.')
         self.series.setdefault(srel, {})[entry] = t
+        self.series_kind[srel] = kind
         self.changed.add(srel)
         self._dirty = True
 
@@ -842,7 +931,7 @@ class VtkExport:
                 continue
             why = detail if not ok else 'foamToVTK wrote no file'
             self._fail(VOLUMES, n, 'conversion', f'foamToVTK: {why}',
-                       f'vtk/{dest_name(VOLUMES, None, None, n)}')
+                       f'vtk/{dest_name(VOLUMES, None, n)}')
 
     def _wait(self, job, deadline):
         note = self._clock() + 60.0
@@ -887,7 +976,7 @@ class VtkExport:
                     self.not_converted[(VOLUMES, n)] = dict(
                         time=n, family=VOLUMES,
                         why='the final sweep ran out of time',
-                        path=f'vtk/{dest_name(VOLUMES, None, None, n)}')
+                        path=f'vtk/{dest_name(VOLUMES, None, n)}')
                 self._dirty = True
                 break
 
@@ -897,25 +986,63 @@ class VtkExport:
         except (AttributeError, TypeError, ValueError):
             return 0
 
-    def _copy_one(self, src, rel):
-        """Copy `src` to vtk\\<rel> and verify it; None, or why not."""
-        dst = self._dest(rel)
+    def _stage(self, src, folder):
+        """Copy the WSL file `src` to a staging file in `folder` (beside
+        its destination; a dot name no series lists) and size-check it
+        against the source: (path, None) or (None, why not)."""
+        stage = os.path.join(folder, f'.{os.path.basename(src)}.part')
         try:
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            self.copy(src, dst)
-            want, got = os.path.getsize(src), os.path.getsize(dst)
+            os.makedirs(folder, exist_ok=True)
+            self.copy(src, stage)
+            want, got = os.path.getsize(src), os.path.getsize(stage)
         except OSError as exc:
             why = f'copy failed: {exc}'
         else:
             if got > 0 and got == want:
-                return None
+                return stage, None
             why = ('the copy is empty' if got <= 0 else
                    f'the copy holds {got} of {want} bytes')
+        _remove(stage)                  # never leave a torn file behind
+        return None, why
+
+    def _write_verified(self, vd, rel):
+        """Write `vd` to vtk\\<rel> (atomic) and read it back with the
+        strict parser; None, or why not (nothing left behind)."""
+        dst = self._dest(rel)
         try:
-            os.remove(dst)              # never leave a torn file behind
-        except OSError:
-            pass
-        return why
+            legacy_vtk.write(dst, vd)
+            legacy_vtk.verify(dst, vd)
+        except (OSError, ValueError) as exc:
+            _remove(dst)
+            return f'writing {rel} failed: {exc}'
+        return None
+
+    def _title(self, what, t):
+        return (f'blastlab {what} t = {t} s '
+                f'({os.path.basename(str(self.spec.case_posix))})')
+
+    def _transfer_volume(self, src, rel, t):
+        """vtk\\<rel> from foamToVTK's file `src`: staged, arrays renamed,
+        TIME added (foamToVTK writes none - read on this build), written
+        and verified. None, or why not."""
+        dst = self._dest(rel)
+        stage, why = self._stage(src, os.path.dirname(dst))
+        if why:
+            return why
+        try:
+            try:
+                vd = legacy_vtk.read(stage)
+                # foamToVTK writes cellID rho p U: put them in the card's
+                # field order (pressure first, as the surfaces), cellID last
+                vd.cell_data.sort(key=lambda a: _field_order((a.name,)))
+                vd.point_data.sort(key=lambda a: _field_order((a.name,)))
+                export_file(vd, t, self.p_ambient,
+                            self._title('volumes', t))
+            except ValueError as exc:
+                return f'not a readable VTK file: {exc}'
+            return self._write_verified(vd, rel)
+        finally:
+            _remove(stage)
 
     def _gave_up(self, family, t, final):
         """After a failed attempt: stop trying for now? The final sweep
@@ -928,12 +1055,12 @@ class VtkExport:
         for n in sorted(self.converted - self.copied, key=_time_key):
             if (VOLUMES, n) in self.not_converted:
                 continue
-            rel = dest_name(VOLUMES, None, None, n)
+            rel = dest_name(VOLUMES, None, n)
             while True:
-                why = self._copy_one(self._src_volume(n), rel)
+                why = self._transfer_volume(self._src_volume(n), rel, n)
                 if why is None:
                     self.copied.add(n)
-                    self._add_file(rel, VOLUMES, None, None, n)
+                    self._add_file(rel, VOLUMES, None, n)
                     self.rm_files.update(
                         volume_file_paths(self.spec.case_posix, [n]))
                     break
@@ -999,29 +1126,71 @@ class VtkExport:
                         self.rm_surface.update(surface_dir_paths(
                             self.spec.case_posix, fo, [t]))
                         break
-                    self._fail(kind, t, 'copy', why, f'vtk/{kind}')
+                    self._fail(kind, t, 'copy', why,
+                               'vtk' if kind == SECTIONS
+                               else f'vtk/{OBSTACLES}')
                     if self._gave_up(kind, t, final):
                         break
 
     def _sweep_one(self, kind, fields, tdir, t):
+        """One sample time of one surface function object: per surface,
+        its per-field files merged into one file (owner decision 1). All
+        surfaces of the time or none: a failure removes what this attempt
+        wrote, so the WSL sample is kept whole for the retry."""
         try:
             files = sorted(os.listdir(tdir))
         except OSError as exc:
             return f'cannot list the sample: {exc}'
-        got = []
+        by_surface = {}
         for f in files:
             sp = split_surface_file(f, fields)
             if sp is None:
                 return f'unexpected file {f}'
             field, surface = sp
-            rel = dest_name(kind, surface, field, t)
-            why = self._copy_one(os.path.join(tdir, f), rel)
+            by_surface.setdefault(surface, []).append((field, f))
+        got = []
+        for surface in sorted(by_surface):
+            rel = dest_name(kind, surface, t)
+            # the arrays in the card's field order, so `pressure` comes
+            # first and is what ParaView colours by (as in Viper's files)
+            parts = sorted(by_surface[surface], key=_field_order)
+            why = self._merge_surface(kind, surface, parts, tdir, rel, t)
             if why:
-                return f'{f}: {why}'
-            got.append((rel, kind, surface, field, t))
+                for done_rel, *_ in got:
+                    _remove(self._dest(done_rel))
+                return f'{surface}: {why}'
+            got.append((rel, kind, surface, t))
         for args in got:
             self._add_file(*args)
         return None
+
+    def _merge_surface(self, kind, surface, parts, tdir, rel, t):
+        """vtk\\<rel> from one surface's per-field files `parts` [(field,
+        file name)]: each staged and parsed, their geometry checked to be
+        one, merged, renamed, TIME added, written and verified. The source
+        association (cell or point data) is kept; nothing is
+        interpolated. None, or why not."""
+        folder = os.path.dirname(self._dest(rel))
+        stages, loaded = [], []
+        try:
+            for field, name in parts:
+                stage, why = self._stage(os.path.join(tdir, name), folder)
+                if why:
+                    return f'{name}: {why}'
+                stages.append(stage)
+                try:
+                    loaded.append((field, legacy_vtk.read(stage)))
+                except ValueError as exc:
+                    return f'{name}: not a readable VTK file: {exc}'
+            try:
+                vd = export_file(legacy_vtk.merge(loaded), t, self.p_ambient,
+                                 self._title(surface, t))
+            except ValueError as exc:
+                return str(exc)
+            return self._write_verified(vd, rel)
+        finally:
+            for s in stages:
+                _remove(s)
 
     # ── 5: the index, then the delete ──
     def _write_index(self):

@@ -35,6 +35,16 @@ VTK_VOLUME_KEYS = ('on', 'mode', 'value', 'fields')
 #: obstacle walls
 VTK_SURFACE_KEYS = ('on', 'mode', 'value', 'fields', 'obstacle_fields',
                     'planes')
+#: the array name each field gets inside the exported .vtk files, the same
+#: in every family (owner decision 5, docs/batches/2026-09-27-out-2-
+#: surface-layout.md, after the Viper samples' `pressure` /
+#: `Peak_Ovepressure`, spelled "Overpressure"). `pMax` is written as the
+#: peak OVERPRESSURE, pMax - ambient (owner decision 4).
+VTK_ARRAY_NAMES = {'p': 'pressure', 'pMax': 'Peak_Overpressure',
+                   'impulse': 'Impulse', 'overpressure': 'Overpressure',
+                   'timeOfArrival': 'Arrival_Time', 'rho': 'density',
+                   'U': 'velocity', 'T': 'temperature',
+                   'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy'}
 
 
 def vtk_fields_for(dim):

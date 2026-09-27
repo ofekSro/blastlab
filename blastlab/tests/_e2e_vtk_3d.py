@@ -341,10 +341,14 @@ def rule2(C, D):
     ok, detail, counts = series_ok(vtk)
     n_steps = int(C['m'].get('n_steps') or 0)
     want_s = n_steps // SURF_STEPS + 1
-    surf = {k: v for k, v in counts.items()
-            if k.startswith(('sections/', 'obstacles/'))}
+    # the layout, not the rule: since the owner's Viper-style layout
+    # (docs/batches/2026-09-27-out-2-surface-layout.md) every series sits
+    # at the top of vtk\ and each surface is ONE series holding all its
+    # fields - the two planes and the obstacles, 3 series (6 per-field
+    # series before)
+    surf = {k: v for k, v in counts.items() if k != 'volumes.vtk.series'}
     check('2b each section / obstacle series: n_steps // 25 + 1 +/- 1',
-          len(surf) == 6 and all(abs(v - want_s) <= 1
+          len(surf) == 3 and all(abs(v - want_s) <= 1
                                  for v in surf.values()),
           f'want {want_s} (n_steps {n_steps}): {surf}')
     check('2c every .vtk > 0 bytes; every series parses and names only '

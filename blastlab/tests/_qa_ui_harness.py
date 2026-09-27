@@ -3446,12 +3446,15 @@ def v05_vtk_manifest(qa):
             with open(os.path.join(vdir, f't_{t}.vtk'), 'w',
                       encoding='utf-8') as f:
                 f.write('# vtk DataFile Version 2.0\nfake\n')
-        vtk_series.write_series(vdir, 'volumes',
-                                [(f't_{t}.vtk', float(t)) for t in times])
+        # the owner's Viper-style layout (2026-09-27): the series beside
+        # its folder, at the top of vtk\
+        vtk_series.write_series(hooks.vtk_dir, 'volumes',
+                                [(f'volumes/t_{t}.vtk', float(t))
+                                 for t in times])
         vtk_series.write_vtk_manifest(hooks.vtk_dir, dict(
             fields=dict(volumes=['p']),
             families=dict(volumes=dict(count=2, times=times,
-                                       series=['volumes/volumes.vtk.series'])
+                                       series=['volumes.vtk.series'])
                           )))
         return res
 
@@ -3489,7 +3492,7 @@ def v05_vtk_manifest(qa):
              evidence=str(m.get('vtk')))
     listed = [o['path'] for o in m.get('outputs', [])]
     qa.check({'vtk/manifest.json', 'vtk/volumes/t_0.0005.vtk',
-              'vtk/volumes/volumes.vtk.series'} <= set(_tree(folder))
+              'vtk/volumes.vtk.series'} <= set(_tree(folder))
              and not any(p.startswith('vtk/') for p in listed)
              and not m.get('failed'),
              'the vtk\\ tree is on disk, left out of `outputs` (P4), '
