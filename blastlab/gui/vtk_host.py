@@ -131,8 +131,12 @@ class VtkTkHost(ctk.CTkFrame):
         # pyvista's screenshot() only renders on its FIRST call; without
         # an explicit render every blit would show a stale frame.
         self._plotter.render()
-        img = self._plotter.screenshot(return_img=True)
+        import numpy as np
+        img = np.ascontiguousarray(self._plotter.screenshot(return_img=True))
         h, w = img.shape[:2]
-        ppm = b'P6\n%d %d\n255\n' % (w, h) + img.tobytes()
+        # P3-7: two buffers (image + PPM) instead of three - no tobytes()
+        # copy. Tk accepts only bytes here, so two is the floor.
+        ppm = b''.join((b'P6\n%d %d\n255\n' % (w, h),
+                        memoryview(img).cast('B')))
         self._photo = tk.PhotoImage(data=ppm, format='PPM')
         self.view.configure(image=self._photo, text='')
