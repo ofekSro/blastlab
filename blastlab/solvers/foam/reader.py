@@ -17,6 +17,7 @@ Grid mapping: a single-block blockMesh numbers cells x-fastest, so
 
 import os
 import re
+import sys
 import time as _time
 
 import numpy as np
@@ -455,14 +456,38 @@ def _merge_chunks(base, tdirs, field, parse):
     return pts, rows
 
 
+def _extra_mismatch(xrows, times, ncol_need):
+    """Why an extra probe field (rho, U) cannot ride along with p: a
+    (kind, reason) pair, or None when its time column equals p's, row
+    for row, and it has a column for every probe. Pure."""
+    if len(xrows) != len(times):
+        return 'times', (f'{len(xrows)} rows vs {len(times)} in p - a torn '
+                         f'or extra tail')
+    xt = np.array([r[0] for r in xrows])
+    if not np.array_equal(xt, times):
+        k = int(np.flatnonzero(xt != times)[0])
+        return 'times', (f'row {k}: t = {xt[k]:g} vs {times[k]:g} in p')
+    if min(len(r) for r in xrows) < ncol_need:
+        return 'columns', 'fewer probe columns than p'
+    return None
+
+
 def read_probes(case_unc, name='gauges', field='p'):
     """blastProbes output -> dict(points, times, pressures) or None.
 
     When the run also recorded U and rho (T44/N12) and their rows align
-    row-for-row with p's, the dict gains `speeds` (|U| per probe),
-    `velocities` (the (n, 3) U vectors per probe, HD1-13: a wall load
-    needs the component INTO the wall, not |U|) and `rhos`; consumers
-    that only know `pressures` see exactly the shape they always did."""
+    with p's, the dict gains `speeds` (|U| per probe), `velocities` (the
+    (n, 3) U vectors per probe, HD1-13: a wall load needs the component
+    INTO the wall, not |U|) and `rhos`; consumers that only know
+    `pressures` see exactly the shape they always did.
+
+    P2-14 item 7 (owner 2026-09-27): "align" means the TIME COLUMN equals
+    p's, row for row - not merely the row count. An extra whose times do
+    not match (same count but shifted, or a torn tail) is dropped, p is
+    kept, and the dict gains `warnings` (one reason per dropped field)
+    plus one stderr line per field. Never raises for it: a finished run's
+    finalise must not fail on a torn probe file. When nothing is dropped
+    the dict is exactly what it was before, with no `warnings` key."""
     base = os.path.join(case_unc, 'postProcessing', name)
     tdirs = list_sample_times(case_unc, name)
     if not tdirs:
@@ -482,23 +507,37 @@ def read_probes(case_unc, name='gauges', field='p'):
     out = dict(points=pts, times=a[:, 0],
                pressures=[a[:, i + 1] for i in range(n_probes)])
 
-    # T44 extras, attached only when they align with p sample-for-sample
-    # (they are written by the same FO in lockstep; a torn tail degrades
-    # back to p-only rather than misaligning)
+    # T44 extras, attached only when their time column equals p's (they
+    # are written by the same FO in lockstep; anything else degrades back
+    # to p-only, with a warning, rather than misaligning)
+    dropped = []
+
+    def fits(fname, xrows, ncol_need):
+        if not xrows:
+            return False
+        why = _extra_mismatch(xrows, out['times'], ncol_need)
+        if why is None:
+            return True
+        kind, reason = why
+        print(f'[blastlab] probes: {fname} {kind} do not match p - using p '
+              f'only ({reason})', file=sys.stderr)
+        dropped.append(f'{fname}: {kind} do not match p ({reason})')
+        return False
+
     _p2, rrows = _merge_chunks(base, tdirs, 'rho', _parse_probes_file)
-    if rrows and len(rrows) == len(rows) \
-            and min(len(r) for r in rrows) >= ncol:
+    if fits('rho', rrows, ncol):
         ra = np.array([r[:ncol] for r in rrows])
         out['rhos'] = [ra[:, i + 1] for i in range(n_probes)]
     _p3, urows = _merge_chunks(base, tdirs, 'U', _parse_probes_vec)
-    if urows and len(urows) == len(rows) \
-            and min(len(r) for r in urows) >= 1 + 3 * n_probes:
+    if fits('U', urows, 1 + 3 * n_probes):
         ua = np.array([r[:1 + 3 * n_probes] for r in urows])
         out['speeds'] = [np.sqrt((ua[:, 1 + 3 * i:4 + 3 * i] ** 2)
                                  .sum(axis=1))
                          for i in range(n_probes)]
         out['velocities'] = [ua[:, 1 + 3 * i:4 + 3 * i].copy()
                              for i in range(n_probes)]
+    if dropped:
+        out['warnings'] = dropped
     return out
 
 
