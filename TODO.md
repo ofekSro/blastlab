@@ -29,7 +29,7 @@ fixed and approved — the disk.
 | Id | What | Order |
 |---|---|---|
 | `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
-| `OUT-2` | ✅ **VTK output options** — done 2026-09-27 (DONE.md §0d); owner acceptance in ParaView pending, and the parked P1–P14 (batch plan §6; P14 = Step 11 rule 3). Plan §3 | 2, then owner acceptance |
+| `OUT-2` | ✅ **VTK output options** — done 2026-09-27 (DONE.md §0d); owner acceptance in ParaView pending, and the parked P1–P16 (batch plan §6; P14 = Step 11 rule 3). Plan §3 | 2, then owner acceptance |
 | `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. Only after the owner accepts `OUT-1` + `OUT-2`. Plan §6 | 3 |
 | `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
 | `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |

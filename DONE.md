@@ -561,7 +561,7 @@ writer through the `jobs` registration hook.
 ## 0d. 2026-09-27 — batch `out-2-vtk-output` (OUT-2)
 
 Plan: `docs/batches/2026-09-27-out-2-vtk-output.md` (§0a D1–D15, owner answers Q1–Q7,
-parked P1–P14), specification `docs/model-folder-and-vtk-plan.md` §3.
+parked P1–P16), specification `docs/model-folder-and-vtk-plan.md` §3.
 
 ### `OUT-2` · VTK output for ParaView
 
