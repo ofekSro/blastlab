@@ -173,6 +173,8 @@ A real case with the default and one with the box ticked. The owner checks the W
 
 **Owner decision (2026-09-27, binding):** OUT-3 is on for every blastFoam run, VTK or not, by default, with a "Keep all fields in WSL" box to turn it off per run. The earlier "always on" note is settled by this.
 
+**Owner decision (2026-09-27, Step 7 re-registration, committed before the re-run):** the first e2e gave 35/41 - rules 2c and 4a compared nothing, because the gauge at (0.35, 0.5) sat 2 cm behind the closed obstacle ring (0.30-0.33, 0.2-0.8) and never left 101325 Pa. The R1/R2/R4 gauge moves to (0.2, 0.5): an unobstructed straight line to the charge, 0.2 m away, inside the ring. Chosen from the geometry, not from any number. Rule text and thresholds unchanged.
+
 **Parked (none blocks; each is the interim the code uses, and a different answer is a small change in `vtk_export.py` / `model_folder.py`):**
 - **Q1 · 1D (E3).**
   - *Interim:* P9 carries over; a 1D run deletes nothing until the scratch is released.

@@ -8,7 +8,9 @@ so `model_folder.stage_solve` sets the hooks exactly as the GUI does.
 The cases (tiny, serial unless said):
   R1  2D axisymmetric, 0.5 x 1.0 m, 1 cm base cell with a level-1 charge
       zone (~5,100 cells), 0.2 kg TNT on the axis, one obstacle, one gauge
-      at 0.35 m, t_end = 0.6 ms, write budget 10 (~10 pinned writes, no
+      at 0.2 m, inside the obstacle ring (re-registered 2026-09-27 by the
+      owner: at 0.35 m it sat behind the closed ring and never saw the
+      blast; rules and thresholds unchanged), t_end = 0.6 ms, write budget 10 (~10 pinned writes, no
       adaptive interval), n_snapshots default, transmit sides (reflect on
       the axis), activation 'none' (see the note below). A = the box
       ticked, B = the default.
@@ -124,7 +126,7 @@ def case2d(**kw):
     from blastlab.models.case import Case2D
     base = dict(geometry='axisymmetric', Lx=0.5, Ly=1.0, cell_size_m=0.01,
                 charge=0.2, center=(0.0, 0.5), charge_refine='zone',
-                gauges=[(0.35, 0.5)], obstacles=[(0.3, 0.33, 0.2, 0.8)],
+                gauges=[(0.2, 0.5)], obstacles=[(0.3, 0.33, 0.2, 0.8)],
                 solver='blastfoam', material='TNT', n_procs=1,
                 adaptive_write=False, write_budget=10, t_end=T_END,
                 record_frames=20, bcs=dict(AXIS), activation='none')
