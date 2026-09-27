@@ -264,14 +264,20 @@ class _MatrixGrid(ctk.CTkFrame):
         self.locked = []      # the Gauges boxes' vars: a tk variable that
         #                       is garbage-collected unticks its box
         self.columnconfigure(0, weight=1)
+        # the headers and row names are short (P13); the full names are
+        # tooltips, as on the Qt MatrixGrid
         for j, col in enumerate(cols, start=1):
-            ctk.CTkLabel(self, text=fields.vtk_column_label(dim, col),
-                         font=theme.F_SMALL, text_color=c('muted')).grid(
-                row=0, column=j, padx=2)
+            head = ctk.CTkLabel(self, text=fields.vtk_column_label(dim, col),
+                                font=theme.F_SMALL, text_color=c('muted'))
+            head.grid(row=0, column=j, padx=2)
+            theme.tooltip(head, fields.vtk_column_tip(dim, col))
         for i, f in enumerate(vtk_fields_for(int(dim)), start=1):
-            ctk.CTkLabel(self, text=fields.VTK_QUANTITY_LABELS.get(f, f),
-                         font=theme.F_BODY, text_color=c('muted'),
-                         anchor='w').grid(row=i, column=0, sticky='w')
+            name = ctk.CTkLabel(self,
+                                text=fields.VTK_QUANTITY_LABELS.get(f, f),
+                                font=theme.F_BODY, text_color=c('muted'),
+                                anchor='w')
+            name.grid(row=i, column=0, sticky='w')
+            theme.tooltip(name, fields.vtk_quantity_tip(f))
             for j, col in enumerate(cols, start=1):
                 bv = tk.BooleanVar(value=(col == 'gauges'
                                           and f in fields.VTK_GAUGE_FIELDS))

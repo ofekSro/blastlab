@@ -152,6 +152,8 @@ def vtk_quantity_tip(field):
     """A matrix row's tooltip: its long name and the blastFoam field."""
     name = VTK_QUANTITY_TIPS.get(field, VTK_QUANTITY_LABELS.get(field, field))
     return f'{name} - blastFoam field {field}'
+
+
 #: decision 4: the Gauges column is shown, ticked and locked until OUT-4
 VTK_GAUGE_FIELDS = ('p', 'rho', 'U')
 #: the matrix columns of each dimension; 'gauges' is display only
