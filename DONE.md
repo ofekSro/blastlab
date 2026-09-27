@@ -643,6 +643,16 @@ the plan's ≤ 2.0×: Tk takes only `bytes`, so two full buffers are the floor.
   25 MB). Not fixed, pre-existing: log bar ticks below 1 print as "0" (`fmt='%.0f'`,
   field bar too). Merged after OUT-2: re-tested on the merge.
 
+## 0f. 2026-09-27 — `OUT-5` · the WSL disk rebuilt
+
+Plan and run record: `docs/wsl-disk-reclaim-plan.md` (§9). Owner decisions D1-D6 as
+recommended: the HD1-3d evidence run `20260923-195308_3d_p31468-00` kept as a skeleton
+(case, dicts, log, `postProcessing`, `0/`; 24/24 sha256 OK, `_e2e_vent_3d.py --load`
+PASS), the 193 / 54 / 6.1 / 2.3 GB runs deleted. Runs 431 → 2.9 GB, then export (8.6 GB
+tar), trial import, unregister + import with the owner watching: **vhdx 481 → 8.6 GB,
+C: free 137 → 618 GB**. Ladder V1-V8 green, including a real 1D solve. Tar kept at
+`%LOCALAPPDATA%\blastlab-wsl\export\` until 2026-10-27. `CLAUDE.md` §8.5 updated.
+
 ---
 
 ## 1. The timeline — T0–T70

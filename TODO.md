@@ -30,7 +30,7 @@ fixed and approved — the disk.
 |---|---|---|
 | `OUT-1` | ✅ **Model folder** — done 2026-09-26 (DONE.md §0c); `gui-qa-tester` screenshots and owner acceptance pending. Plan §2 | 1 |
 | `OUT-2` | ✅ **VTK output options** — done and accepted by the owner in ParaView 2026-09-27 (DONE.md §0d, Viper-style layout, P14 closed). Plan §3 | 2 |
-| `OUT-5` | **Reclaim the 481 GB WSL disk** — [docs/wsl-disk-reclaim-plan.md](docs/wsl-disk-reclaim-plan.md); the six owner decisions in its §3. `OUT-1` + `OUT-2` accepted; next, with the owner present. Plan §6 | 3 |
+| `OUT-5` | ✅ **Reclaim the 481 GB WSL disk** — done 2026-09-27 (DONE.md §0f): vhdx 481 → 8.6 GB. Delete the backup tar after 2026-10-27 (D5). Plan §6 | 3 |
 | `OUT-3` | **Only the newest fields kept in WSL**, every blastFoam run, default on, with a "keep all fields" box. Mandatory. Plan §4 | 4 |
 | `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |
 
@@ -1119,7 +1119,6 @@ hd1-3d-close #3).
 | decomposition | Leave `scotch`, or investigate a symmetric decomposition for the ±7 % near-field parallel deviation | Leave it. Two cases gave opposite answers and no mechanism explains both |
 | P4-1 | Move the repository out of OneDrive | Yes |
 | P4-2 | What to delete from disk | Not urgent — superseded by `OUT-5` |
-| **OUT-5** | The six decisions on the WSL disk rebuild — [docs/wsl-disk-reclaim-plan.md §3](docs/wsl-disk-reclaim-plan.md) | Keep the evidence run as a skeleton, delete the 193 GB and 54 GB runs, keep the tar until the rebuilt install has solved once; decide after `OUT-2` is accepted |
 
 ---
 

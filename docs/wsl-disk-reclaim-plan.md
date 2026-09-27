@@ -1,8 +1,8 @@
-# Reclaiming the 481 GB WSL disk - a plan, nothing executed
+# Reclaiming the 481 GB WSL disk
 
-**Status: PLAN ONLY.** Written 2026-09-26 from read-only measurements. No run was
-deleted, no WSL command that changes state was issued, no other file was touched.
-Every step below waits for the owner's tick in §3 and an explicit "go".
+**Status: EXECUTED 2026-09-27 (OUT-5), owner present for S6.** Written 2026-09-26
+from read-only measurements; the record of the run is §9. Reuse it as the recipe
+whenever the vhdx grows again.
 
 The question that prompted it: *the solves saved while building the app take a
 lot of disk - are they really needed?* Short answer: **no, except one, and even
@@ -96,6 +96,9 @@ because* §1 first cuts the content to ~10 GB. Therefore the order is fixed:
 ## 3. Decisions the owner makes before anything runs
 
 Tick and return; each blank one blocks the plan.
+
+**Owner, 2026-09-27: all six accepted as recommended** - D1 skeleton, D2-D4 delete,
+D5 keep the tar 30 days after S7 passes, D6 the owner watches S6.
 
 - [ ] **D1 - the evidence run.** *Recommended:* keep the skeleton (file set in
       §1), delete its 749 time directories and 13 `processor*` directories.
@@ -320,3 +323,23 @@ mark and stay there. What keeps it small:
 4. Watch two numbers: `Get-Item ...\Ubuntu\ext4.vhdx` (the ratchet) and
    `du -sh /root/blastlab_runs` (the current content). If the vhdx passes
    ~150 GB, repeat this plan while the content is still small enough to export.
+
+---
+
+## 9. The run, 2026-09-27
+
+- **Pre-flight:** P1-P8, P10 as expected (C: 154 GB free). P9 as written could not
+  run: the WSL original never held `SHA256SUMS.source`; the record exists only in
+  the Windows copy, and has **24** entries (not 25, and `0/` is not in it). Checked
+  the WSL original against that record instead: 24 × OK. Three runs newer than §1
+  (1.2 + 1.2 GB 3D of 09-26, 358 MB 2D of 09-27) were not covered by D1-D4 and kept.
+- **S1:** `/root/blastlab_runs` 431 GB -> 2.9 GB, 10 runs; the record was copied into
+  the skeleton, 24 × OK. Gate S1 `VENT 3D: PASS`.
+- **S3:** `Ubuntu-slim-2026-09-27.tar`, 8.6 GB, 113 s. Gate S3: four hits (Windows
+  `tar.exe` also warned about two entries with unreadable names - cosmetic).
+- **S4:** trial import passed (root, seven tools, ten runs); file counts of `/root`,
+  `/opt`, `/usr`, `/etc`, `/var`, `/home` identical to the original. Trial removed.
+- **S6** (owner watching): unregister -> C: free 137 -> 618 GB; import; vhdx **8.6 GB**.
+- **S7:** V1-V8 all green (V4 = a real 1D solve, `FOAM 1D VS NATIVE: PASS`).
+- **S8:** baseline removed; the tar is kept until **2026-10-27** (D5), then deleted.
+  `CLAUDE.md` §8.5 and the memory note now point here.
