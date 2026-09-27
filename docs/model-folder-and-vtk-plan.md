@@ -220,7 +220,7 @@ form) is always included; a small table below it adds planes as (axis,
 position [m]) rows — the `points`-style field the form already renders.
 
 Defaults when a family is switched on, mirroring Viper: sections and obstacles
-= pressure + peak overpressure; volumes = pressure, density, velocity.
+= pressure + peak pressure (`pMax`, absolute); volumes = pressure, density, velocity.
 
 ### 3.2 The quantity matrix
 

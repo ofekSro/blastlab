@@ -976,6 +976,10 @@ model; after a resume the original model's manifest still says its scratch was k
 Run chain stays enabled during an HD 1.3 assessment and its refusal is titled "Run". The
 Qt refusal and overwrite dialogs break a path after "C:".
 
+- `P2-19` Tk at the 1100x720 minimum clips the right column (OUT-2 QA F3; also native) - card widths vs the 13:7 split.
+- `P2-20` Tk dimension switch keeps the old scroll offset, form goes blank (OUT-2 QA F4; same on master) - `SetupPanel._swap`.
+- `P2-21` Qt 3D form shows a blank tail at the scroll end (OUT-2 QA F5) - the QStackedWidget takes its tallest page's height.
+
 ---
 
 ## P3 — Capabilities and improvements, on request
