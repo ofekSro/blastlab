@@ -154,16 +154,75 @@ def main():
                       for s, v in zip(pr2['speeds'], vel)))
         check('p-only run: no velocities key either',
               'velocities' not in pr)
+        # P2-14 item 7: identical times -> rho/U attached exactly as
+        # before, and the key set is today's (no `warnings` key), so the
+        # gauge TSVs written from this dict stay byte-identical
+        check('identical times: the key set is exactly today\'s',
+              set(pr2) == {'points', 'times', 'pressures', 'rhos',
+                           'speeds', 'velocities'}, str(sorted(pr2)))
+        check('identical times: rho/U arrays exactly as written',
+              np.array_equal(pr2['rhos'][0], np.array([1.225, 2.45, 4.9]))
+              and np.array_equal(pr2['rhos'][1],
+                                 np.array([1.225, 1.225, 1.3]))
+              and np.array_equal(pr2['speeds'][0],
+                                 np.sqrt(np.array([0.0, 25.0, 100.0])))
+              and np.array_equal(pr2['speeds'][1],
+                                 np.sqrt(np.array([0.0, 0.0, 9.0])))
+              and all(r.dtype == np.float64 for r in pr2['rhos']),
+              str((pr2.get('rhos'), pr2.get('speeds'))))
         # a torn U file (fewer rows) must NOT misalign - drop it
         with open(os.path.join(pdir, 'U'), 'w') as f:
             f.write('# Probe 0 (0.5 0 0)\n'
                     '#         Time             0\n'
                     '            0    (0 0 0)\n')
-        pr3 = reader.read_probes(td)
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            pr3 = reader.read_probes(td)
         check('torn U file degrades to p-only, never misaligns',
               'speeds' not in pr3 and 'rhos' in pr3)
         check('and drops the vectors with it',
               'velocities' not in pr3)
+        check('torn U: one warning naming U, in the dict and on stderr',
+              len(pr3.get('warnings', [])) == 1
+              and pr3['warnings'][0].startswith('U: times do not match p')
+              and err.getvalue().count('\n') == 1
+              and err.getvalue().startswith(
+                  '[blastlab] probes: U times do not match p - using p '
+                  'only ('), repr((pr3.get('warnings'), err.getvalue())))
+        # equal row count but shifted times: never misaligned by count -
+        # p-only for that field, a warning, no raise
+        with open(os.path.join(pdir, 'U'), 'w') as f:
+            f.write('# Probe 0 (0.5 0 0)\n'
+                    '# Probe 1 (1 0 0)\n'
+                    '#         Time             0             1\n'
+                    '  1.19964e-07    (0 0 0)    (0 0 0)\n'
+                    '  2.63446e-07    (3 4 0)    (0 0 0)\n'
+                    '  3.91000e-07    (6 8 0)    (1 2 2)\n')
+        err = io.StringIO()
+        try:
+            with contextlib.redirect_stderr(err):
+                pr4 = reader.read_probes(td)
+            raised = None
+        except Exception as exc:            # noqa: BLE001 - diagnostic
+            pr4, raised = None, exc
+        check('shifted U times (same row count): no raise', raised is None,
+              repr(raised))
+        check('shifted U times: p kept, U dropped, rho still attached',
+              pr4 is not None and 'speeds' not in pr4
+              and 'velocities' not in pr4 and 'rhos' in pr4
+              and np.array_equal(pr4['pressures'][0],
+                                 np.array([101325.0, 201325.0, 301325.0])),
+              str(None if pr4 is None else sorted(pr4)))
+        check('shifted U times: one warning, dict and stderr',
+              pr4 is not None and len(pr4.get('warnings', [])) == 1
+              and 'row 0' in pr4['warnings'][0]
+              and err.getvalue().startswith(
+                  '[blastlab] probes: U times do not match p - using p '
+                  'only (row 0: t = 1.19964e-07 vs 0 in p)'),
+              repr((None if pr4 is None else pr4.get('warnings'),
+                    err.getvalue())))
 
     # ── binary format (fixtures from a writeFormat-binary sector run) ──
     NB = 190                    # cells in the binary fixture run

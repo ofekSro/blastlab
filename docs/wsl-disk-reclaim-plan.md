@@ -127,7 +127,7 @@ All read-only. If any line fails, stop and report; do not improvise.
 |---|---|---|---|
 | P1 | no solver running (`CLAUDE.md` §8.6) | `wsl -d Ubuntu -- pgrep -a blastFoam` | empty |
 | P2 | no blastlab GUI, no `_e2e_*` / `_qa_*` suite running | Task Manager / `Get-Process python` | none that build the GUI |
-| P3 | the app's sweep is off (§8.2) | `Get-Content $env:APPDATA\blastlab\settings.json` | `"auto_cleanup": false` (it is, today) |
+| P3 | the app's sweep is off (§8.2) | the CLAUDE.md §8.2 dry run (`env.cleanup_plan`; reads `<repo>\settings.json`, deletes nothing) | `<repo>\settings.json False [...]` |
 | P4 | free space on C: | `Get-PSDrive C` | ≥ 40 GB (today 148) |
 | P5 | exactly one distro, version 2, named `Ubuntu` | `wsl -l -v` | `* Ubuntu  Running/Stopped  2` |
 | P6 | the install is healthy *before* we touch it | the seven-tool probe from `CLAUDE.md` §3 | seven paths, exit 0 |

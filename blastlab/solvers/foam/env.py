@@ -821,21 +821,36 @@ def cleanup_policy(records, now, max_bytes=None, max_age_s=None,
     return victims
 
 
-def auto_cleanup(settings=None, log=None, now=None):
-    """Sweep the runs root per the GUI settings (opt-out
-    `auto_cleanup=False`). Returns (n_deleted, bytes_deleted). One log
-    line when something was removed; silent otherwise."""
+def _cleanup_cfg(settings):
+    """DEFAULTS updated with `settings`: the one merge the dry run and
+    the sweep share, so they cannot disagree."""
     from ...core import settings as gui_settings
     cfg = dict(gui_settings.DEFAULTS)
     cfg.update(settings or {})
-    if not cfg.get('auto_cleanup', True):
-        return 0, 0
-    dirs = run_dirs()
+    return cfg
+
+
+def cleanup_plan(settings=None, now=None):
+    """P0-5 dry run: what the sweep WOULD delete under `settings`'
+    thresholds, deleting nothing.
+
+    Returns [dict(dir, name, bytes, mtime)] in `cleanup_policy` order
+    (oldest first). The `auto_cleanup` flag is deliberately ignored, so
+    the owner can see what switching the sweep on would take. [] when
+    WSL cannot be reached or there are no runs. Never calls
+    `delete_runs`."""
+    return _plan_and_dirs(_cleanup_cfg(settings), now)[0]
+
+
+def _plan_and_dirs(cfg, now, dirs=None, info=None):
+    """(cleanup_plan's list, every run dir listed) for a merged cfg.
+    `dirs` / `info` already listed are reused (one `du`, not two)."""
+    dirs = run_dirs() if dirs is None else dirs
     if not dirs:
-        return 0, 0
-    info = run_info(dirs)
+        return [], dirs
+    info = run_info(dirs) if info is None else info
     if not info:
-        return 0, 0
+        return [], dirs
     alive = runs_alive(dirs)
     records = [dict(dir=d, bytes=info.get(d, {}).get('bytes'),
                     mtime=info.get(d, {}).get('mtime'), alive=alive.get(d))
@@ -845,9 +860,28 @@ def auto_cleanup(settings=None, log=None, now=None):
         max_bytes=float(cfg.get('cleanup_max_gb', 20)) * 1024 ** 3,
         max_age_s=float(cfg.get('cleanup_max_age_days', 14)) * 86400.0,
         keep_recent=int(cfg.get('cleanup_keep_recent', 3)))
-    if not victims:
+    return [dict(dir=d, name=d.rstrip('/').rsplit('/', 1)[-1],
+                 bytes=int(info[d]['bytes'] or 0), mtime=info[d]['mtime'])
+            for d in victims], dirs
+
+
+def auto_cleanup(settings=None, log=None, now=None):
+    """Sweep the runs root per the GUI settings - opt-in: it runs only
+    when the settings say `auto_cleanup: true` (the default is off since
+    2026-09-27, owner: deletion inside WSL is final, a full disk is
+    recoverable). Returns (n_deleted, bytes_deleted). One log line when
+    something was removed; silent otherwise.
+
+    Built on `cleanup_plan` (P0-5): it deletes exactly the dirs the dry
+    run lists. With the flag off it lists nothing and touches no WSL."""
+    cfg = _cleanup_cfg(settings)
+    if not cfg.get('auto_cleanup', False):
         return 0, 0
-    freed = sum(int(info[d]['bytes'] or 0) for d in victims)
+    plan, dirs = _plan_and_dirs(cfg, now)
+    if not plan:
+        return 0, 0
+    victims = [r['dir'] for r in plan]
+    freed = sum(r['bytes'] for r in plan)
     if not delete_runs(victims):
         if log:
             log('  [blastfoam] run-dir cleanup: WSL did not delete '
@@ -874,6 +908,76 @@ def start_auto_cleanup(settings=None, log=None):
 
     th = threading.Thread(target=work, daemon=True,
                           name='blastlab-run-cleanup')
+    th.start()
+    return th
+
+
+# ── the disk warning that replaces the default sweep (owner 2026-09-27) ────
+
+def disk_warning_text(total_bytes, limit_gb, n_plan, plan_bytes):
+    """The one-line runs-root warning. Pure. Kept under the 200-character
+    status line of both GUIs, so the command at its end stays visible."""
+    gb = 1024 ** 3
+    runs = 'run' if n_plan == 1 else 'runs'
+    return (f'WSL runs folder holds {total_bytes / gb:.1f} GB, over the '
+            f'{float(limit_gb):g} GB limit; cleanup is off, nothing was '
+            f'deleted. Cleanup would delete {n_plan} {runs} '
+            f'({plan_bytes / gb:.1f} GB): '
+            f'python -m blastlab --clean-foam-runs')
+
+
+def disk_warning(settings=None, now=None):
+    """The warning text when the sweep is OFF and the runs root is over
+    `cleanup_max_gb`; None otherwise (sweep on, under the limit, no runs,
+    or WSL unreachable). Lists and sizes only - never calls
+    `delete_runs`. One `du` round trip; `runs_alive` only when over."""
+    cfg = _cleanup_cfg(settings)
+    if cfg.get('auto_cleanup', False):
+        return None
+    dirs = run_dirs()
+    if not dirs:
+        return None
+    info = run_info(dirs)
+    if not info:
+        return None
+    total = sum(int(r.get('bytes') or 0) for r in info.values())
+    limit_gb = float(cfg.get('cleanup_max_gb', 20))
+    if total <= limit_gb * 1024 ** 3:
+        return None
+    plan = _plan_and_dirs(cfg, now, dirs, info)[0]
+    return disk_warning_text(total, limit_gb, len(plan),
+                             sum(r['bytes'] for r in plan))
+
+
+def start_disk_warning(settings=None, warn=None, private_ok=False):
+    """Run `disk_warning` on a daemon thread at GUI start and hand a
+    non-None text to `warn` (from that thread - the caller marshals it
+    to its GUI thread). Silent in the GUI on any error: WSL unreachable
+    must never reach the user as a fault (an unexpected exception gets
+    one stderr line). Deletes nothing.
+
+    Not started (returns None) under a private settings file, i.e. with
+    BLASTLAB_SETTINGS set, unless `private_ok`: every test and QA harness
+    builds windows that way (CLAUDE.md 8.2), and none of them should run
+    `du` over the real corpus or get a status line it did not ask for."""
+    if os.environ.get('BLASTLAB_SETTINGS') and not private_ok:
+        return None
+
+    def work():
+        try:
+            text = disk_warning(settings)
+            if text and warn:
+                warn(text)
+        except Exception as exc:              # never kill the GUI for this
+            # WSL unreachable does not raise (run_dirs / run_info return
+            # empty), so what lands here is a fault or a closed window:
+            # one stderr line, never the GUI, never swallowed silently
+            import sys
+            print(f'[blastlab] disk warning skipped: '
+                  f'{type(exc).__name__}: {exc}', file=sys.stderr)
+
+    th = threading.Thread(target=work, daemon=True,
+                          name='blastlab-disk-warning')
     th.start()
     return th
 

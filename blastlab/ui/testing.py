@@ -21,7 +21,8 @@ def private_settings():
     run corpus harder than the real app would have.
 
     A test must never delete a run directory, so the file is written with
-    the sweep off rather than left absent.
+    the sweep off rather than left absent. (Since 2026-09-27 DEFAULTS
+    has the sweep off too; the explicit key stays as a second lock.)
 
     OUT-1: it also carries a throwaway `runs_dir` (a `runs` folder beside
     the file), so a test that runs something never writes a model folder

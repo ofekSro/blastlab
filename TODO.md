@@ -286,44 +286,15 @@ not in `a`.
 
 ## P0 — Urgent: risk of losing work / broken repo
 
-P0-1, P0-2 and P0-3 closed 2026-09-09 (`e344d17`); P0-4 closed 2026-09-17. See
-[DONE.md](DONE.md).
-
-### P0-5 · The app reads a settings file nobody else sees · **owner decision 2026-09-25**
-
-Microsoft Store Python virtualises `%APPDATA%`: `core/settings.py:64-71` resolves to
-`%LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\Roaming\blastlab\settings.json`,
-while editors, PowerShell and the Read tool see the 27 B `%APPDATA%` file
-(`auto_cleanup: false`). The virtual copy had `auto_cleanup: true` (150 GB / 14 d /
-keep 10) and was rewritten by a GUI start on 2026-09-25 10:22. Set to `false` by hand
-the same day as a stop-gap. Source: `docs/ENGINEERING_QUESTIONS.md`, hd1-3d-close #3.
-
-**Decision (owner):** the settings file lives **in the repo**, at one explicit path
-that no virtualisation can redirect.
-
-1. `settings.default_path()` returns a repo-local file (e.g. `<repo>/settings.json`,
-   next to `blastlab/`), added to `.gitignore` - it carries machine-specific `hw_*`
-   fields and must never be committed.
-2. One-time migration: if the repo file is missing, seed it from the virtual copy (or
-   the `%APPDATA%` one), and **force `auto_cleanup: false`** in the result. Log which
-   source was used. Never delete the old files.
-3. A dry run: `env.cleanup_plan(settings)` returns what the policy *would* delete
-   (names, sizes, mtimes) and deletes nothing; `auto_cleanup` is built on it.
-4. CLAUDE.md §8.2, the P0-4 note below and P4-3 point at the dry run and the new path.
-   Replace the "check" `env.auto_cleanup(settings.load())`, which deletes.
-5. Tests: `default_path()` is inside the repo and ignored by git; migration forces
-   cleanup off; `cleanup_plan` touches no file. Tk and Qt both read the same file
-   (run the `test_gui_*` suites - §9).
-
-Acceptance: `python -c "from blastlab.core import settings; print(settings.default_path())"`
-prints the repo path under Store Python, and the Read tool sees the same bytes the app
-loads.
+P0-1, P0-2 and P0-3 closed 2026-09-09 (`e344d17`); P0-4 closed 2026-09-17; P0-5
+(settings file in the repo, cleanup off by default) closed 2026-09-27. See
+[DONE.md](DONE.md) §0g. No P0 item is open.
 
 > **But P0-4's trap is permanent and worth re-reading before any session that
 > matters:** every code path that builds the GUI can delete the run corpus, and
-> `_e2e_gui_*` and the QA harnesses build one. Verify
-> `env.auto_cleanup(settings.load())` returns `(0, 0)`, and copy out any run you
-> care about. Deletion inside WSL is not reversible.
+> `_e2e_gui_*` and the QA harnesses build one. Run the dry run from CLAUDE.md §8.2
+> (`env.cleanup_plan`, which deletes nothing) and expect `<repo>\settings.json False`,
+> and copy out any run you care about. Deletion inside WSL is not reversible.
 
 ---
 
@@ -413,22 +384,11 @@ blocker.)*
 - **Prefer `sum(lambda)` over `count(lambda >= 0.99)`** in any future ignition
   measurement; the count is valid only at the first write.
 
-### P1-7 · blastlab cannot read the `0/` fields it writes itself · **found 2026-09-24**
+### P1-7 · On-screen check only: the player shows frame 0 · **code fixed 2026-09-27**
 
-`writer._nonuniform` / `_render_fields` close a nonuniform list with `);`, but
-`reader._nonuniform_body` requires a bare `)`. **Consequences:**
-`backend._initial_frame` / `_initial_frame3d` silently skip the t = 0 frame for chamber
-and profile stages, and `_time_is_whole` fails on such a start dir. Found by
-hd1-wall-load A3 (see `docs/batches/2026-09-24-hd1-wall-load.*.md`), which worked
-around it locally in `_e2e_vent_wall.read_start`.
-
-**Decision (owner, 2026-09-25): fix the reader.** `reader._nonuniform_body` accepts both
-`)` and `);`. Both are valid OpenFOAM, and OpenFOAM already reads the writer's `);`. The
-writer and its goldens stay byte-identical. Add a test that writes a chamber / profile
-`0/` field with `writer`, reads it with `reader`, and checks the t = 0 frame is present.
-Once the reader handles it, remove the local workaround in
-`_e2e_vent_wall.read_start`. Qt GUI QA: the player now shows frame 0 for a chamber and
-a chained (1D → 2D) run.
+The reader fix, its test and the workaround removal are done ([DONE.md](DONE.md) §0g).
+Left: Qt GUI QA with a real run (WSL + screen) - the player shows frame 0 for a
+chamber and a chained (1D → 2D) run.
 
 ### P1-8 · The GUI turns AMR on with the stale 0.4/0.2 thresholds · **owner decision 2026-09-25**
 
@@ -686,20 +646,6 @@ probably comes mostly from this. **Nothing changed.** HD1-18 uses the measured-w
 pivot (owner, 2026-09-26). Whether the band follows it is open. It moves every band
 number and its goldens, so it needs an owner decision and a before/after table first.
 
-### P1-18 · The Qt app cannot open or re-open an HD 1.3 case file · **found 2026-09-26 (QA F1)**
-
-"Open case..." refuses every HD 1.3 JSON, including the `--hd13-new` starter, with "Not
-a blastlab case file". "Save case..." on the 0-D form writes a **blast** case
-(`schema "blastlab-case"`, version 13, dim 0), which the app then also refuses to open.
-The values survive; the schema does not. The cause: `ui/app.py:19` imports only the
-blast `load_case` / `save_case`, and `models/case.py:372-377` rejects the HD 1.3
-schema and has no dim 0. This was already so at `01ab997`, before HD1-16. The HD 1.3
-reader and writer (`models/hd13_case`) round-trip byte-identically at form level, so
-the fix is to dispatch on the schema in Open and on the solver mode in Save. Evidence:
-`docs/qa/2026-09-26-hd1-16/QA_REPORT.md` F1, screenshots `F1_*`, `F2_reopen_*`.
-Acceptance: Open loads the starter and a clearing case into the 0-D form; Save → Open
-round-trips byte-identically; blast cases are unchanged; Qt GUI QA.
-
 ### P1-15 · The Vieille `a` override has no unit on screen · **owner decision 2026-09-26**
 
 The HD 1.3 form's "Vieille a" override (`ui/setup_spec.py:241`, Tk `gui/case_form.py:184`)
@@ -792,32 +738,6 @@ Four things that need a person at a screen. Full instructions in
 the run browser, post-mortem loading, Stop at every stage — was confirmed by eye in
 the 2026-09-07 QA round. No need to repeat.)*
 
-### P2-7 · `test_foam_parallel` can compare np1 against np1 without saying so
-
-An explicit rank count is clamped to the machine's ceiling (cores minus headroom,
-and RAM divided by `RAM_GB_PER_RANK = 2`). On a small VM the ceiling is 1, and the
-test will run np1 against np1, **pass, and test nothing**. This is a weakness in the
-test, not in the code.
-
-**Fix:** have it call `env.rank_ceiling` at the start and skip explicitly
-(`[SKIP] VM too small for 2 ranks`) rather than passing silently.
-
-### P2-8 · `test_gui_run_browser` hangs on a modal dialog
-
-`run_browser.delete_selected` (`:295`) calls `messagebox.showwarning(..., parent=self)`
-when refusing to delete a live run. The test does not patch `messagebox`, so it
-hangs there until timeout. Verified to exist independently of any recent change: the
-test hangs on the same line in two consecutive runs, and passed once in the same
-round — i.e. the behaviour depends on window focus, and the test is
-non-deterministic.
-
-**Fix:** inject a `warner=` alongside the existing `confirm=` (the test already
-injects `lister`, `sizer`, `deleter`, `confirm`, `on_resume`) and let the test
-supply a stub.
-
-> This is on the Tk side. It stays as long as `--tk` does — see the standing owner
-> decision in [docs/history/ui-migration.md](docs/history/ui-migration.md).
-
 ### The `_e2e_foam_amr2d` accuracy thresholds · **owner decision**
 
 AMR reads **−11.8 % on peak** and **+11.1 % on arrival** against the uniform
@@ -857,14 +777,6 @@ and the activation dropdown is wired in both front ends. **What is missing is th
 GUI table**: it changes the data shape of the `det_points` widget and needs a parity
 design of its own.
 
-### P2-10 · `test_foam_wsl_resume.py` has not run since 2026-09-19 · **found 2026-09-24**
-
-It fails with `AttributeError: 'types.SimpleNamespace' object has no attribute
-'init_state'` in `FoamRunLoop.__init__`, identically at `7dd2446` and at HEAD: its stub
-spec predates `9b9a039`. **The W3 regression suite has been dark for five days.** That
-suite checks the auto-resume after WSL is torn down under a run (CLAUDE.md §8.3).
-Fixing it means editing a committed test, so it is the owner's call (§9).
-
 ### P2-11 · `test_foam_postmortem.py`: the peak-map check fails deterministically · **found 2026-09-24**
 
 "final peak map within 0.5 %" fails with rel 2.90e-01 (620 against 632 samples),
@@ -881,19 +793,21 @@ If a resumed run's peak map is really wrong, this is P1.
 **The owner explicitly permits editing these four committed tests (§9), and only
 these.** The rule is: **fix the test's mechanism, never its threshold or its expected
 value.** One commit per test, each citing this decision.
-1. **`P2-10`** `test_foam_wsl_resume.py`: complete the stub spec (`init_state` and
-   anything else `FoamRunLoop.__init__` now needs). Run it for real in WSL (§8.6 first).
+Items 1 (`P2-10`), 3 and 4 closed 2026-09-27 - see [DONE.md](DONE.md) §0g. Item 4 is now
+a `conftest.py` hook for every suite (owner, 2026-09-27); on `todo-batch` it uncovered no
+failure, and after merging master (OUT-2) it uncovered one - item 6.
 2. **`P2-11`** `test_foam_postmortem.py`: **find the cause of 620 vs 632 first.** If
    it is a code bug, fix the code and leave the test alone, and it is P1 if a resumed
    run's peak map is wrong. If the test itself is wrong, **stop and bring the evidence to
    the owner** before changing it.
-3. `test_vent_wall.py`: `test_evidence` / `test_tails` / `test_step2_driver` take
-   arguments, so pytest reports 3 "fixture not found" errors. Rename the helpers or
-   give them fixtures so pytest collects only real tests, with the same checks.
-4. `test_refine.py`: `check()` only appends to a list, so its 10 pytest functions
-   cannot fail. Make a failing check fail, both under pytest and as a script. **Any
-   real failure this uncovers is reported to the owner as a finding.** Do not loosen it
-   to pass.
+5. ✅ 2026-09-27: the "fixture 'tmp' not found" errors of `test_load_csv` /
+   `test_wall_clearing` - a module-scoped `tmp` fixture in `conftest.py`, no test edited.
+6. **Finding, 2026-09-27 (OUT-2's test, not edited):** `test_vtk_case.py::test_validation`
+   fails under pytest - "two planes the writer cuts on two layers are not refused" - and
+   passes as a script. `main()` primes the hardware (8 cores / 512 GB) before calling it,
+   and pytest does not, so the case meets the 4 GB fallback cap (CLAUDE.md §4). The check
+   was silent under pytest before the item-4 hook. Fix the mechanism (a module fixture that
+   primes and restores as `main()` does), not the check. The script gate is green.
 
 Source: `docs/ENGINEERING_QUESTIONS.md` hd1-wall-load #3, phase 0 #4.
 
@@ -923,8 +837,8 @@ validation dump over ~100 cases (phase 4) is compared before and after.
    "Charge cells: could not compute (‹error›)" instead.
 6. `DecomposedPurge.run` logs "retrying at the next poll" after a failed final sweep, but
    no poll follows. Say "final sweep failed; decomposed copies left at ‹paths›".
-7. `read_probes` aligns U and rho with p by row count. Align by the time column, and
-   raise if the times differ.
+7. ✅ 2026-09-27 ([DONE.md](DONE.md) §0g): `read_probes` aligns by time; on a mismatch
+   it keeps p only and warns (owner: never raise).
 8. `_e2e_foam_write_budget.du_sb`: use `env.WSL_DISTRO`, `stdin=DEVNULL`,
    `CREATE_NO_WINDOW`, and check `returncode` before parsing. Rerun it in WSL (§8.6).
 9. `_e2e_vent_3d.evaluate` `traces[0]` raises `IndexError` on a run with no probes.
@@ -1095,17 +1009,21 @@ if Hibernate is unused.
 ### P4-3 · WSL run cleanup, and the trap inside it
 
 `python -m blastlab --clean-foam-runs` (also `--older-than N` / `--keep-gb N`).
-Automatic cleanup runs on GUI start; disable with `auto_cleanup: false` in
-`%APPDATA%\blastlab\settings.json`. **But under the Microsoft Store Python the app
-reads a virtualised copy of that file, not this one**, and the P0 check above
-deletes rather than checks. See `docs/ENGINEERING_QUESTIONS.md` (2026-09-24,
-hd1-3d-close #3).
+Automatic cleanup on GUI start runs only with `auto_cleanup: true` in
+`<repo>\settings.json` (P0-5: the file lives in the checkout, git-ignored; every
+checkout and worktree has its own). To see what it *would* delete, run the dry run
+`env.cleanup_plan` (CLAUDE.md §8.2), never `env.auto_cleanup`, which deletes. In the
+OneDrive checkout a sync lock can fail the atomic write in `settings.save()` (the
+`P4-1` symptom): it warns once, and the lost `hw_*` cache caps the next headless run
+as a 4 GB VM (CLAUDE.md §4).
 
 **The `ext4.vhdx` does not shrink by itself.** Reclaim with `wsl --shutdown` then
 `wsl --manage Ubuntu --set-sparse true`.
 
-> The corpus once reached **374 GB and filled C:**. Cleanup is now on with a 150 GB
-> ceiling and 10 runs kept.
+> The corpus once reached **374 GB and filled C:**. Cleanup is **off by default** since
+> 2026-09-27 (owner: deletion inside WSL is final, a full disk is recoverable); it runs
+> only when the settings file says `auto_cleanup: true`. With it off, the GUI warns at
+> start when the runs root passes `cleanup_max_gb` (150 GB here) and deletes nothing.
 
 ---
 
@@ -1225,6 +1143,8 @@ python test_hardware.py           # machine identity, cache TTL, host RAM, nativ
 python test_adaptive_interval.py  # writeInterval controller
 python test_foam_live_due.py      # live-frame cadence gate
 python test_refine.py             # refined-mesh plan + AMR remap + validation guards
+python test_settings_path.py      # repo settings file, migration, cleanup dry run, disk warning
+python test_foam_start_frame.py   # the reader reads the writer's ");" - t = 0 frame
 python test_bc_trigger.py         # boundary kinds, end time, trigger gauge, markers
 python test_foam_postmortem_decomposed.py   # loading a parallel AMR run
 python test_foam_resume.py        # restart points + the AMR FO disable

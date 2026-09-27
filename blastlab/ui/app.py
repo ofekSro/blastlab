@@ -19,6 +19,7 @@ from ..core import settings as app_settings
 from ..core.case import (load_case, long_run_note, save_case,
                          validate_case)
 from ..core.mode import SolverMode
+from ..models import hd13_case
 from ..models.case import load_any_case
 from ..services.model_folder import model_for_case_file
 from ..solvers.foam import env as foam_env
@@ -148,6 +149,10 @@ class MainWindow(QMainWindow):
         # off-thread (WSL round trips must never block the window)
         self._cleanup_thread = foam_env.start_auto_cleanup(
             st, self._log_threadsafe)
+        # owner 2026-09-27: with the sweep off (the default), warn - never
+        # delete - when the runs root is over cleanup_max_gb
+        self._disk_warning_thread = foam_env.start_disk_warning(
+            st, self._disk_warning)
 
         self._show('setup')
         self._restore_ui_state(st)
@@ -480,7 +485,14 @@ class MainWindow(QMainWindow):
             return
         path = dialogs.save_file('Save case', 'blastlab case (*.json)', self,
                                  default_suffix='json')
-        if path:
+        if not path:
+            return
+        if getattr(case, 'dim', None) == 0:
+            # P1-18: the 0-D form's DeflagrationCase is an HD 1.3 file
+            # (schema 'blastlab-hd13'), which Open reads back; the blast
+            # writer used to stamp it 'blastlab-case' and Open refused it
+            hd13_case.save_case(case, path)
+        else:
             save_case(case, path)
 
     # ── live validation ──────────────────────────────────────────────────
@@ -878,6 +890,12 @@ class MainWindow(QMainWindow):
     def _log_threadsafe(self, text):
         """Log sink for worker threads (cleanup, viewer link)."""
         self.bridge.post(self.run_panel.on_log, str(text))
+
+    def _disk_warning(self, text):
+        """`foam_env.start_disk_warning`'s sink, called on its thread: one
+        Run-log line and one status-line warning, nothing modal."""
+        self._log_threadsafe(f'  [blastfoam] {text}')
+        self.bridge.post(self.notify, text, 'warn')
 
     def _result_msg(self, text):
         """Results-panel messages - exports, post-mortem loads, viewer

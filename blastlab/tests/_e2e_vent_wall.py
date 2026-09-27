@@ -809,35 +809,11 @@ def mapping_check(write_t, cells, probe_t, probe_p, probe_rho, probe_U,
 
 def read_start(path, n, vector=False):
     """One field of the START time, which blastlab's own writer wrote
-    (`writer._nonuniform`), not the solver. `reader` is tried first; the
-    writer closes its ascii list with ');' on one line, which reader's
-    ascii path (written for OpenFOAM's own ')' line) refuses as
-    "unterminated", and only that refusal falls through to a parse that
-    also accepts ');', with reader's own float parser. The count must
-    still be exactly `n`."""
-    try:
-        return (reader.read_vector if vector else reader.read_scalar)(path, n)
-    except ValueError as exc:
-        if 'unterminated internalField list' not in str(exc):
-            raise
-    lines = reader._read_text(path).splitlines()
-    i = next((k for k, ln in enumerate(lines)
-              if ln.startswith('internalField')), None)
-    j = (None if i is None else
-         next((k for k in range(i + 1, min(i + 4, len(lines)))
-               if lines[k].strip() == '('), None))
-    end = (None if j is None else
-           next((k for k in range(j + 1, len(lines))
-                 if lines[k].strip() in (')', ');')), None))
-    if end is None:
-        raise ValueError(f'unterminated internalField list in {path}')
-    body = '\n'.join(lines[j + 1:end])
-    vals = reader._floats(body.replace('(', ' ').replace(')', ' ')
-                          if vector else body)
-    ncomp = 3 if vector else 1
-    if len(vals) != n * ncomp:
-        raise ValueError(f'{path}: {len(vals)} values, expected {n * ncomp}')
-    return vals.reshape(-1, 3) if vector else vals
+    (`writer._nonuniform`, closing its list with ');'), not the solver.
+    Read by `reader` itself since P1-7 taught it that framing; the local
+    fallback parse this used to carry is gone. The count must still be
+    exactly `n`."""
+    return (reader.read_vector if vector else reader.read_scalar)(path, n)
 
 
 def start_state(tdir, spec):

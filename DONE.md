@@ -655,6 +655,104 @@ C: free 137 → 618 GB**. Ladder V1-V8 green, including a real 1D solve. Tar kep
 
 ---
 
+## 0g. 2026-09-27 — batch `p0-5-settings-reader-save`
+
+Plan and reports: `docs/batches/2026-09-27-p0-5-settings-reader-save{,.implement,.verify}.md`.
+Branch `todo-batch` (worktree outside OneDrive), in parallel with OUT-2. No WSL solve.
+Owner answers of 2026-09-27:
+- **Q1** `read_probes` never raises.
+- **Q2** `P2-7` was already done.
+- **Q3** cleanup is off by default, with a startup disk warning instead. The warning is
+  skipped when `BLASTLAB_SETTINGS` is set, i.e. under every test and harness.
+- **Q4** one sweeping pytest fix for every suite.
+
+### `P0-5` · The settings file lives in the repo
+- **What:**
+  - `settings.default_path()` is `<repo>\settings.json`, git-ignored with
+    `blastlab-crash.log`. `config_path()` still honours `BLASTLAB_SETTINGS`.
+  - On first load it is seeded once from the Store-Python virtual copy (or `%APPDATA%`),
+    with `auto_cleanup` forced off and `migrated_from` recorded. Old files are never
+    touched, and it claims nothing if the write fails.
+  - `env.cleanup_plan` is the dry run, and `auto_cleanup` deletes exactly its plan.
+  - `DEFAULTS['auto_cleanup']` is now `False`. Qt and Tk start `env.start_disk_warning`,
+    which gives one non-modal warning when the runs root exceeds `cleanup_max_gb` and
+    deletes nothing.
+  - CLAUDE.md §8.2, `docs/heavy-runs.md`, P4-3 and `docs/wsl-disk-reclaim-plan.md` P3
+    now show the dry run, not the old "check" that deleted.
+  - Each checkout has its own `settings.json`.
+- **Files:** `core/settings.py`, `gui/settings.py`, `gui/app.py`, `ui/app.py`,
+  `solvers/foam/env.py`, `.gitignore`, `CLAUDE.md`, `docs/heavy-runs.md`, new
+  `tests/test_settings_path.py`.
+- **Commits:** `d702f90` `3bf7da7` `15f3352` `5d11686`, verify `5903522` `1bf0792`,
+  simplify `2d7ec9d`, docs `f2027aa`.
+
+### `P1-7` · The reader accepts the `);` the writer emits (code; on-screen QA open)
+- **What:**
+  - `reader._nonuniform_body` accepts `)` or `);`, so chamber and profile starts get
+    their t = 0 frame.
+  - `_e2e_vent_wall.read_start` is now the plain reader call.
+  - The one `test_vent_wall` check that pinned the bug flips, as the owner decision
+    authorises.
+  - The guide (sec. 20, p. 144) does not define the terminator.
+- **Files:** `solvers/foam/reader.py`, `tests/_e2e_vent_wall.py`, `tests/test_vent_wall.py`,
+  new `tests/test_foam_start_frame.py`.
+- **Commit:** `806d81d`.
+- **Open:** the on-screen frame-0 check stays in TODO `P1-7`.
+
+### `P1-18` · Qt Save case on the 0-D form writes an HD 1.3 file
+- **What:**
+  - `ui/app._save_case` saves `dim == 0` cases with `hd13_case.save_case`.
+  - Save → Open → Save is byte-identical, for the starter and for a clearing case.
+  - Blast saves are unchanged.
+  - The Open half was done earlier, by `13f78e2`.
+- **Files:** `ui/app.py`, `tests/test_open_case.py` (checks added).
+- **Commit:** `0bb3f1f`.
+
+### `P2-13` items 3, 4 and 5 · pytest runs and fails what the scripts check
+- **What:**
+  - Item 3: `test_vent_wall`'s three argument-taking helpers are `_check_*`, run by one
+    `test_built_case()`.
+  - Item 4, widened by the owner: a `conftest.py` hookwrapper fails any test whose
+    module's `FAIL`/`FAILS` list grew. No test file changed.
+  - Item 5 (owner): a module-scoped `tmp` fixture in `conftest.py` fixes the
+    "fixture 'tmp' not found" errors of `test_load_csv` and `test_wall_clearing`, with
+    no test edited.
+  - Whole-directory pytest went from 158 passed / 11 errors to **180 passed, 0 errors**,
+    and no test newly fails. After merging master (OUT-2's new suites): 245 passed and
+    1 failed - `test_vtk_case::test_validation`, a pytest-only isolation gap the hook now
+    exposes (TODO `P2-13` item 6).
+- **Commits:** `1e0795f` `c944da6` `a9c8d52`.
+
+### `P2-14` item 7 · `read_probes` aligns rho/U with p by time
+- **What:**
+  - On a time mismatch it keeps p only, prints one stderr line and returns a `warnings`
+    list. It never raises.
+  - The matched case returns exactly the old dict.
+- **Files:** `solvers/foam/reader.py`, `tests/test_foam_reader.py` (checks added).
+- **Commit:** `25ce709`.
+
+### Closed as already done: `P2-7`, `P2-8` (`c1f3101`), `P2-10` = `P2-13` item 1 (`f8f57f9`)
+
+**Tests (whole batch):**
+- `test_regression` is byte-identical.
+- No-WSL foam, script and Qt offscreen suites PASS.
+- After the simplify commit, all 14 Tk `test_gui_*` PASS (§9), as do `test_open_case`
+  (Qt and Tk), `test_run_preflight` (66 checks) and `test_foam_env`.
+- The CLAUDE.md §8.2 dry run prints `…\settings.json False []`.
+- **Not run:** the solving suites and `_e2e_*`.
+
+**QA:** real windows, `docs/qa/2026-09-27-p0-5/QA_REPORT.md`, **3/3 PASS**:
+- Qt Save → Open on the 0-D form.
+- The disk warning in Qt and Tk: one status message and one Run-log line, nothing modal,
+  nothing deleted.
+- Both apps launch and close cleanly.
+
+Fixed from QA: the warning ran to ~260 characters, so the 200-character status line cut
+off the command. It is now under 200, pinned by a test. Seen, not from this batch: at the
+default 1296×879 the Qt Setup card clips its input boxes at the right edge.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

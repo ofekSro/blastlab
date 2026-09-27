@@ -144,7 +144,7 @@ def make_evidence(root, cfd):
 
 # ── the checks ─────────────────────────────────────────────────────────
 
-def test_evidence(case, cfd, info):
+def _check_evidence(case, cfd, info):
     print('\nthe evidence: sha256, identity, read-only')
     comp = ew.component(case)
     with tempfile.TemporaryDirectory() as ev:
@@ -237,7 +237,7 @@ def test_evidence(case, cfd, info):
           res is None and 'REFUSED' in text, text)
 
 
-def test_tails(case):
+def _check_tails(case):
     print('\nthe example panel\'s two tails, as the rule builds them')
     comp = ew.component(case)
     t = np.concatenate([np.linspace(0.0, 0.008, 801),
@@ -532,13 +532,18 @@ def test_start_reader():
             paths[name] = os.path.join(d, name)
             with open(paths[name], 'w', encoding='ascii', newline='\n') as f:
                 f.write(text)
+        # P1-7 (owner decision 2026-09-25): this check used to pin the
+        # reader REFUSING the writer's ');' ("reader alone refuses it - the
+        # mismatch Step 2 works around"). The decision fixes the reader, so
+        # the expectation flips; every other check here is unchanged.
         try:
-            reader.read_scalar(paths['p'], 3)
-            check('reader alone refuses it - the mismatch Step 2 works '
-                  'around', False)
+            got = reader.read_scalar(paths['p'], 3)
+            err = ''
         except ValueError as exc:
-            check('reader alone refuses it - the mismatch Step 2 works '
-                  'around', 'unterminated' in str(exc), str(exc))
+            got, err = None, str(exc)
+        check('reader reads the writer\'s ");" framing itself',
+              got is not None
+              and np.array_equal(got, [101325.0, 2.0e5, 3.5e5]), err)
         check('read_start reads the scalars',
               np.array_equal(ew.read_start(paths['p'], 3),
                              [101325.0, 2.0e5, 3.5e5]))
@@ -568,7 +573,7 @@ def test_start_reader():
                              reader.read_scalar(of, 3)))
 
 
-def test_step2_driver(case):
+def _check_step2_driver(case):
     print('\nStep 2 end to end on a tiny fake run (no WSL)')
     from types import SimpleNamespace
     from blastlab.solvers.foam import env
@@ -730,18 +735,30 @@ def test_step2_driver(case):
         env.case_paths = real_paths
 
 
+def test_built_case():
+    """pytest's entry to the three checks that need the built case
+    (P2-13 item 3: they take arguments, so pytest reported them as
+    "fixture not found"). Builds it once, as `main()` does, and runs them
+    in the same order. The script calls them directly from `main()`."""
+    case = ew.build()
+    cfd, info = asm.build_vent_case(case)
+    _check_evidence(case, cfd, info)
+    _check_tails(case)
+    _check_step2_driver(case)
+
+
 def main():
     case = ew.build()
     cfd, info = asm.build_vent_case(case)
-    test_evidence(case, cfd, info)
-    test_tails(case)
+    _check_evidence(case, cfd, info)
+    _check_tails(case)
     test_premises()
     test_outcome()
     test_refusals()
     test_plane_parts()
     test_mapping()
     test_start_reader()
-    test_step2_driver(case)
+    _check_step2_driver(case)
 
 
 if __name__ == '__main__':
