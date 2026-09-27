@@ -95,7 +95,18 @@ def _floats(joined):
 
 def _nonuniform_body(text, path):
     """Lines of the internalField nonuniform list (between the bare
-    '(' and ')' lines)."""
+    '(' line and the closing ')' or ');' line).
+
+    P1-7 (owner decision 2026-09-25): OpenFOAM writes the closing ')'
+    alone and the ';' on the next line; blastlab's own writer
+    (`writer._nonuniform` inside `_render_fields`) closes chamber and
+    profile 0/ fields with ');' on one line. Both are accepted. The
+    authority for ');' is the owner decision and the fact that blastFoam
+    has read the writer's 0/ files in every chamber and profile run: the
+    blastFoam User Guide v6.0 shows only `internalField uniform` (sec. 20,
+    p. 144) and does not define the list terminator. A vector entry is
+    '(a b c)' on one line and can never equal either terminator; a torn
+    file with neither still raises "unterminated"."""
     lines = text.splitlines()
     start = None
     for i, ln in enumerate(lines):
@@ -108,7 +119,7 @@ def _nonuniform_body(text, path):
     if start is None:
         raise ValueError(f'no internalField list in {path}')
     for k in range(start, len(lines)):
-        if lines[k].strip() == ')':
+        if lines[k].strip() in (')', ');'):
             return lines[start:k]
     raise ValueError(f'unterminated internalField list in {path}')
 

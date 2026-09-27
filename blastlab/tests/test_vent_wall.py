@@ -532,13 +532,18 @@ def test_start_reader():
             paths[name] = os.path.join(d, name)
             with open(paths[name], 'w', encoding='ascii', newline='\n') as f:
                 f.write(text)
+        # P1-7 (owner decision 2026-09-25): this check used to pin the
+        # reader REFUSING the writer's ');' ("reader alone refuses it - the
+        # mismatch Step 2 works around"). The decision fixes the reader, so
+        # the expectation flips; every other check here is unchanged.
         try:
-            reader.read_scalar(paths['p'], 3)
-            check('reader alone refuses it - the mismatch Step 2 works '
-                  'around', False)
+            got = reader.read_scalar(paths['p'], 3)
+            err = ''
         except ValueError as exc:
-            check('reader alone refuses it - the mismatch Step 2 works '
-                  'around', 'unterminated' in str(exc), str(exc))
+            got, err = None, str(exc)
+        check('reader reads the writer\'s ");" framing itself',
+              got is not None
+              and np.array_equal(got, [101325.0, 2.0e5, 3.5e5]), err)
         check('read_start reads the scalars',
               np.array_equal(ew.read_start(paths['p'], 3),
                              [101325.0, 2.0e5, 3.5e5]))
