@@ -19,6 +19,7 @@ from ..core import settings as app_settings
 from ..core.case import (load_case, long_run_note, save_case,
                          validate_case)
 from ..core.mode import SolverMode
+from ..models import hd13_case
 from ..models.case import load_any_case
 from ..services.model_folder import model_for_case_file
 from ..solvers.foam import env as foam_env
@@ -484,7 +485,14 @@ class MainWindow(QMainWindow):
             return
         path = dialogs.save_file('Save case', 'blastlab case (*.json)', self,
                                  default_suffix='json')
-        if path:
+        if not path:
+            return
+        if getattr(case, 'dim', None) == 0:
+            # P1-18: the 0-D form's DeflagrationCase is an HD 1.3 file
+            # (schema 'blastlab-hd13'), which Open reads back; the blast
+            # writer used to stamp it 'blastlab-case' and Open refused it
+            hd13_case.save_case(case, path)
+        else:
             save_case(case, path)
 
     # ── live validation ──────────────────────────────────────────────────

@@ -153,9 +153,80 @@ def part_qt(tmp):
               errors == [('Open case', 'Not a blastlab case file')]
               and win.setup.dim == 2 and rp.current_run_name() == 'CHAIN',
               f'{errors} {rp.current_run_name()}')
+        errors.clear()
+        save_round_trips(win, p, tmp, errors)
     finally:
         win.close()
         pump(30)
+
+
+def save_round_trips(win, p, tmp, errors):
+    """P1-18, the Save half: Save case... (the slot Ctrl+S drives) from
+    the 0-D form writes an HD 1.3 file that Open reads back, and a blast
+    case saves exactly as `models.case.save_case` writes it."""
+    import dataclasses
+    from blastlab.models import hd13_case
+    from blastlab.models.case import save_case as blast_save
+    from blastlab.ui import dialogs
+    from blastlab.ui.testing import pump
+    target = []
+
+    def save_file(title, filters='All files (*.*)', parent=None, start='',
+                  default_suffix=None):
+        return target[-1]
+
+    def read(path):
+        with open(path, 'rb') as f:
+            return f.read()
+
+    def save_as(name):
+        target.append(os.path.join(tmp, name))
+        win._save_case()
+        pump(30)
+        return target[-1]
+
+    real = dialogs.save_file
+    dialogs.save_file = save_file
+    try:
+        clearing = os.path.join(tmp, 'clearing.json')
+        hd13_case.save_case(dataclasses.replace(
+            hd13_case.load_case(p['hd13']), clearing=True, wall_H_m=3.0,
+            wall_W_m=4.0), clearing)
+        for what, src in (('the starter', p['hd13']),
+                          ('a clearing case', clearing)):
+            want = hd13_case.case_to_dict(hd13_case.load_case(src))
+            win._open_case(src)
+            pump(50)
+            b = save_as(f'B_{len(target)}.json')
+            with open(b, encoding='utf-8') as f:
+                schema = json.load(f).get('schema')
+            check(f'Qt Save, {what}: the 0-D form writes schema '
+                  f'blastlab-hd13', schema == 'blastlab-hd13', str(schema))
+            win._open_case(b)
+            pump(50)
+            case = win.current_case()
+            check(f'Qt Save, {what}: the saved file reopens into the 0-D '
+                  f'form, equal to the source',
+                  not errors and win.setup.dim == 0
+                  and isinstance(case, hd13_case.DeflagrationCase)
+                  and hd13_case.case_to_dict(case) == want
+                  and hd13_case.case_to_dict(hd13_case.load_case(b)) == want,
+                  f'{errors} dim={win.setup.dim}')
+            c = save_as(f'C_{len(target)}.json')
+            check(f'Qt Save, {what}: Save -> Open -> Save is byte-identical',
+                  read(b) == read(c))
+        win._open_case(p['blast_stem'])
+        pump(50)
+        blast = win.current_case()
+        got = save_as('blast_saved.json')
+        ref = os.path.join(tmp, 'blast_ref.json')
+        blast_save(blast, ref)
+        check('Qt Save: a 2D blast case saves exactly as models.case.'
+              'save_case writes it',
+              not errors and win.setup.dim == 2 and read(got) == read(ref),
+              str(errors))
+    finally:
+        dialogs.save_file = real
 
 
 def part_tk(tmp):
