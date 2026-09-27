@@ -562,7 +562,24 @@ def new_manifest(case, dim, stage_dir, run_info=None):
         outputs=[],
         missing=[],
         vtk=None,
+        wsl_fields=None,
         failed=[])
+
+
+def wsl_fields_record(foam, keep_all, dim, deleted):
+    """OUT-3 (E7, Q6): the root manifest's `wsl_fields` - {mode, deleted,
+    first, last} - or None for a native stage. `mode`: 'newest' (older
+    writes deleted once ingested), 'keep_all' (the box was ticked) or
+    'off' (1D keeps every write, P9). Numbers only, as P4's root
+    manifest; the times deleted are counted, first and last named."""
+    if not foam:
+        return None
+    mode = 'keep_all' if keep_all else ('off' if int(dim) == 1
+                                        else 'newest')
+    times = sorted({str(t) for t in (deleted or ())}, key=float)
+    return dict(mode=mode, deleted=len(times),
+                first=times[0] if times else None,
+                last=times[-1] if times else None)
 
 
 def _file_problem(path):
@@ -643,6 +660,9 @@ def write_all(res, case, dim, stage_dir, run_info=None, log=print):
     for e in (manifest['vtk'] or {}).get('not_converted') or ():
         failed.append(dict(name='vtk', path=e.get('path') or VTK_DIR,
                            why=f"t = {e.get('time')}: {e.get('why')}"))
+    # OUT-3: what the run kept in WSL (additive; None for a native run
+    # and for a caller that does not say - run_info['wsl_fields'])
+    manifest['wsl_fields'] = info.get('wsl_fields')
     manifest['outputs'] = list_outputs(stage_dir)
     manifest['finished'] = now_iso()
     why = write_manifest(manifest, stage_dir)
@@ -925,7 +945,11 @@ def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
     return out
 
 
-def release_decision(errored, stopped_early, verify):
+#: OUT-3 (E5, Q3): why a finished run with the box ticked keeps its scratch
+KEEP_ALL_WHY = 'Keep all fields in WSL was ticked'
+
+
+def release_decision(errored, stopped_early, verify, keep_all=False):
     """(release, why): may the WSL scratch be deleted? Pure.
 
     Release only when the run did not raise, did not end early (a user
@@ -933,7 +957,9 @@ def release_decision(errored, stopped_early, verify):
     2.2 was verified (`verify['rows_ok']`) and the foam\\ copy matched
     its WSL hashes (`verify['hashes_ok']`). Otherwise `why` names the
     first reason, in that order; `verify['rows_detail']` /
-    `['hash_detail']` say which files."""
+    `['hash_detail']` say which files. OUT-3 (E5): `keep_all` (the "Keep
+    all fields in WSL" box) keeps the scratch of a run that would
+    otherwise be released - else the box would keep nothing."""
     if errored:
         return False, 'the run did not finish (it raised)'
     if stopped_early:
@@ -944,6 +970,8 @@ def release_decision(errored, stopped_early, verify):
     if not verify.get('hashes_ok'):
         return False, ('the foam\\ copy did not verify: '
                        + (verify.get('hash_detail') or '?'))
+    if keep_all:
+        return False, KEEP_ALL_WHY
     return True, 'finished, every output written and foam\\ verified'
 
 
@@ -959,7 +987,7 @@ def is_run_dir(posix):
 
 def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
                                stopped_early, log=print, run=subprocess.run,
-                               delete=None, unc=None):
+                               delete=None, unc=None, keep_all=False):
     """Copy foam\\, decide, and delete the WSL scratch only after a
     verified copy of a finished run (plan sec. 2.3, decision 12).
 
@@ -994,7 +1022,8 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
                   rows_detail=', '.join(str(f.get('path')) for f in rows),
                   hashes_ok=bool(copied.get('ok')),
                   hash_detail=copied.get('detail', ''))
-    release, why = release_decision(errored, stopped_early, verify)
+    release, why = release_decision(errored, stopped_early, verify,
+                                    keep_all=keep_all)
     if release and not is_run_dir(scratch_posix):
         release, why = False, (f'{scratch_posix} is not a run directory '
                                f'directly under {env.RUNS_ROOT}')
@@ -1012,7 +1041,8 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
     if not scratch['deleted']:
         scratch['kept_because'] = why
         kind = 'note' if (errored or stopped_early) else 'warn'
-        log(f'  [{kind}] WSL scratch kept ({why}): {scratch_posix}')
+        log(f'  [{"note" if why == KEEP_ALL_WHY else kind}] WSL scratch '
+            f'kept ({why}): {scratch_posix}')
         if kind == 'warn':
             notice = (f'The blastFoam run finished, but its WSL scratch was '
                       f'kept:\n{why}\n\n{scratch_posix}\n\nThe model folder '
@@ -1151,6 +1181,8 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                 if err is not None:
                     info['stop_reason'] = headline(err)
                     _append(log_path, f'[stage ended: {info["stop_reason"]}]')
+                info['wsl_fields'] = wsl_fields_record(
+                    foam, keep, dim, hooks.fields_deleted)
                 manifest = write_all(res, bound, dim, stage_dir, info,
                                      log=hooks.log)
                 hooks.folder_notice = None
@@ -1164,7 +1196,7 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                                     err, _handoff_error()),
                                 stopped_early=bool(res is not None
                                                    and res.stopped_early),
-                                log=hooks.log)
+                                log=hooks.log, keep_all=keep)
                     except Exception as exc:   # keeps the scratch
                         hooks.log(f'  [warn] WSL scratch kept: the foam\\ '
                                   f'copy raised {exc!r}: {posix}')

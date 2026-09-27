@@ -172,6 +172,44 @@ def deleted_warning(vtk_dir):
             f'the writes left - see {vtk_dir} (vtk\\manifest.json)')
 
 
+#: the model folder's root manifest (services/model_folder.MANIFEST_FILE)
+ROOT_MANIFEST = 'manifest.json'
+
+
+def find_model_manifest(case_posix, runs_dir):
+    """OUT-3: the root manifest.json of the model stage whose blastFoam
+    run used the WSL run directory `case_posix` - its `wsl_scratch.posix`
+    names it - searched as `<runs_dir>\\<MODEL>\\` and, for a chain stage,
+    `<runs_dir>\\<MODEL>\\<stage>\\`. (path, dict) or None."""
+    import glob
+    want = str(case_posix or '').rstrip('/')
+    if not want or not runs_dir or not os.path.isdir(str(runs_dir)):
+        return None
+    for depth in (('*',), ('*', '*')):
+        pattern = os.path.join(glob.escape(str(runs_dir)), *depth,
+                               ROOT_MANIFEST)
+        for path in sorted(glob.glob(pattern)):
+            state = load_vtk_manifest(os.path.dirname(path)) or {}
+            scratch = state.get('wsl_scratch') or {}
+            if (isinstance(scratch, dict) and str(
+                    scratch.get('posix') or '').rstrip('/') == want):
+                return path, state
+    return None
+
+
+def fields_warning(path, state):
+    """The P11 line for a run that kept only its newest writes in WSL
+    (root manifest `wsl_fields`, OUT-3) and deleted some, else None."""
+    rec = (state or {}).get('wsl_fields') or {}
+    n = int(rec.get('deleted') or 0) if isinstance(rec, dict) else 0
+    if not n:
+        return None
+    return (f'  [warn] {n} older written time(s) of this run were deleted '
+            f'in WSL during the run (only the newest writes are kept), so '
+            f'what is read here covers only the writes left - see {path} '
+            f'(wsl_fields)')
+
+
 def _disk_totals(folder):
     """(files, bytes) of everything under `folder`."""
     n = size = 0

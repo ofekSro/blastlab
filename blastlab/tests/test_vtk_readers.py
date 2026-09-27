@@ -245,11 +245,87 @@ def test_export_button():
         shutil.rmtree(runs, ignore_errors=True)
 
 
+def root_model(runs, rel, scratch, mode, n):
+    """A model stage's root manifest.json (OUT-3 `wsl_fields`)."""
+    import json
+    folder = os.path.join(runs, *rel.split('/'))
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, 'manifest.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(dict(model=rel, wsl_scratch=dict(posix=scratch),
+                       vtk=None, wsl_fields=dict(
+                           mode=mode, deleted=n,
+                           first='1e-05' if n else None,
+                           last='3e-05' if n else None)), f)
+    return path
+
+
+def fields_lines(lines):
+    return [ln for ln in lines if 'deleted in WSL during the run' in ln]
+
+
+def test_fields_purge():
+    print('\nR7: OUT-3 - a run with no VTK that kept only its newest writes')
+    root, runs = _run_tree(), tempfile.mkdtemp(prefix='blastlab_vr_runs_')
+    from blastlab.solvers.foam import export_vtk as ev
+    from blastlab.solvers.foam import postmortem
+    saved = (ev.env.case_paths, ev.runner.run_stage, postmortem._paths)
+    ev.env.case_paths = lambda _d: (POSIX, root)
+    ev.runner.run_stage = lambda *_a, **_k: None
+    postmortem._paths = lambda _d: (POSIX, root)
+    try:
+        with _Settings(runs):
+            keep = root_model(runs, 'KEEP', POSIX, 'keep_all', 0)
+            check('keep_all: no note', vx.deleted_note(POSIX) is None)
+            os.remove(keep)
+            path = root_model(runs, 'CHAIN/2d', POSIX, 'newest', 3)
+            note = vx.deleted_note(POSIX)
+            check('newest: the line, the count, the root manifest',
+                  note is not None and '[warn]' in note
+                  and ' 3 older written time(s)' in note and path in note
+                  and '\n' not in note, str(note))
+            check('   another run: None',
+                  vs.find_model_manifest(OTHER, runs) is None)
+            lines = []
+            ev.export_vtk(root, log=lines.append)
+            check('the VTK button logs it once',
+                  len(fields_lines(lines)) == 1, str(lines))
+            from test_foam_amr_ingest import Log
+            log = Log()
+            res = postmortem.load_run(root, log)
+            check('postmortem logs it once and puts it on the Result',
+                  len(fields_lines(log.lines)) == 1
+                  and res.meta.get('vtk_deleted_note') == note,
+                  str(log.lines))
+        # the model's vtk\ given (the Results tab of a VTK run with no
+        # VTK deletion): the stage's root manifest still answers
+        vdir = model(runs, 'CHAIN/2d', POSIX, [])
+        lines = []
+        ev.export_vtk(root, log=lines.append, vtk_dir=vdir)
+        check('   with vtk_dir: the stage root manifest answers',
+              len(fields_lines(lines)) == 1, str(lines))
+        # the in-stage W3 auto-resume: hooks.fields_deleted
+        lines = []
+        check('note_resume from the hooks record',
+              vx.note_resume(None, ['0', '3e-05'], lines.append,
+                             deleted={'1e-05', '2e-05'})
+              and len(lines) == 1 and 'resuming after 2 older' in lines[0],
+              str(lines))
+        check('   nothing gone: no line',
+              not vx.note_resume(None, ['1e-05'], lines.append,
+                                 deleted={'1e-05'}) and len(lines) == 1)
+    finally:
+        (ev.env.case_paths, ev.runner.run_stage, postmortem._paths) = saved
+        shutil.rmtree(root, ignore_errors=True)
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 if __name__ == '__main__':
     test_find_and_warn()
     test_postmortem()
     test_resume()
     test_export_button()
+    test_fields_purge()
     print()
     print('VTK READERS: ' + ('PASS' if not FAILS else
                              f'FAIL ({len(FAILS)}): ' + ', '.join(FAILS)))

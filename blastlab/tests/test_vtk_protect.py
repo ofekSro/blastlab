@@ -471,6 +471,18 @@ def test_resume_note():
         ex = vx.VtkExport(spec, SimpleNamespace(vtk_dir=tmp,
                                                 log=lines.append), ('p',))
         assert ex.replay_incomplete and ex.state()['replay_incomplete']
+        # OUT-3: no vtk\ manifest, the hooks' record of the purge instead
+        lines.clear()
+        empty = os.path.join(tmp, 'none')
+        assert vx.note_resume(empty, ['0', '0.003'], lines.append,
+                              deleted={'0.001', '0.002'})
+        assert len(lines) == 1 and 'resuming after 2 older' in lines[0]
+        assert not vx.note_resume(None, ['0.001'], lines.append, deleted=())
+        # with a vtk\ manifest, that one answers (one line, as before)
+        lines.clear()
+        assert vx.note_resume(tmp, ['0', '0.003'], lines.append,
+                              deleted={'0.001', '0.002'})
+        assert len(lines) == 1 and 'VTK export removed' in lines[0], lines
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

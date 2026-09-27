@@ -457,7 +457,7 @@ def start_conversion(spec, names, fields):
     return Conversion(spec.case_posix, names, fields)
 
 
-def note_resume(vtk_dir, times, log):
+def note_resume(vtk_dir, times, log, deleted=None):
     """D10 / owner Q5: a resume replays the writes left on disk. When the
     VTK export of the run being resumed had already converted - and so
     possibly deleted - writes that are no longer there, say so once and
@@ -465,12 +465,23 @@ def note_resume(vtk_dir, times, log):
     the Python peak/impulse, cover only the writes that are left. 2D/3D
     snapshots survive (their dirs are protected); a 1D run deletes no
     written time (P9), so it never gets here. True when it applied.
-    `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none."""
-    if not isinstance(vtk_dir, str) or not vtk_dir:
-        return False
-    state = vtk_series.load_vtk_manifest(vtk_dir)
+    `vtk_dir` is `hooks.vtk_dir`; a run without a model folder has none.
+
+    OUT-3: without a vtk\\ manifest, `deleted` (`hooks.fields_deleted`,
+    what this stage's purge removed) gives the same one line."""
+    state = (vtk_series.load_vtk_manifest(vtk_dir)
+             if isinstance(vtk_dir, str) and vtk_dir else None)
     if not state:
-        return False
+        gone = sorted({str(t) for t in (deleted or ())}
+                      - {str(t) for t in times}, key=_time_key)
+        if not gone:
+            return False
+        log(f'  [blastfoam] resuming after {len(gone)} older written '
+            f'time(s) were deleted in WSL (only the newest writes are '
+            f'kept): the replay rebuilds the frames (and, on AMR, the '
+            f'per-write peak/impulse) from the {len(times)} left; the '
+            f'snapshots are kept.')
+        return True
     vol = (state.get('families') or {}).get(VOLUMES) or {}
     gone = sorted({str(t) for t in vol.get('times') or ()}
                   - {str(t) for t in times}, key=_time_key)
@@ -495,15 +506,30 @@ def deleted_note(case_dir, vtk_dir=None):
     written times after converting them, else None. `vtk_dir` is the
     model's vtk\\ when the caller knows it (the Results tab); otherwise
     it is found under the settings' runs folder by the manifest's
-    `scratch`. Never raises."""
+    `scratch`. Never raises.
+
+    OUT-3: a run with no VTK export that kept only its newest writes is
+    found by the model root manifest's `wsl_scratch.posix`, and its
+    `wsl_fields` gives the line (`vtk_series.fields_warning`)."""
     try:
+        posix = runs_dir = None
         if not vtk_dir:
             from . import env
             from ...core import settings
             posix = env.case_paths(case_dir)[0]
-            vtk_dir = vtk_series.find_vtk_dir(
-                posix, settings.load().get('runs_dir'))
-        return vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
+            runs_dir = settings.load().get('runs_dir')
+            vtk_dir = vtk_series.find_vtk_dir(posix, runs_dir)
+        note = vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
+        if note:
+            return note
+        if vtk_dir:
+            path = os.path.join(os.path.dirname(os.path.normpath(vtk_dir)),
+                                vtk_series.ROOT_MANIFEST)
+            state = vtk_series.load_vtk_manifest(os.path.dirname(path))
+            found = (path, state) if state else None
+        else:
+            found = vtk_series.find_model_manifest(posix, runs_dir)
+        return vtk_series.fields_warning(*found) if found else None
     except Exception:                   # noqa: BLE001 - a note, never a failure
         return None
 
