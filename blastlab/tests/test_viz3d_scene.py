@@ -528,6 +528,83 @@ check("they go away with the case that had them",
       not any(k.startswith(('xcharge', 'det')) for k in pl3.actors))
 pl3.close()
 
+print("\nS7-P3-7: one render per frame (the host's), fewer copies per frame")
+import tracemalloc
+from blastlab.viz3d.viewer import VOL_LOG_KEY as _VLK
+pl7 = pv.Plotter(off_screen=True, window_size=(760, 560))
+init7 = dict(init, slice_axis='y', slice_index=20)
+scene7 = BlastScene(pl7, init7, embedded=True, n_planes=6)
+scene7.on_message(('frame', 1e-3, synth_frame(1e-3, 0.6), False))
+pl7.render()
+pl7.screenshot(return_img=True)            # warm-up: first-time render done
+_n_renders = [0]
+pl7.render_window.AddObserver(
+    'RenderEvent', lambda *_: _n_renders.__setitem__(0, _n_renders[0] + 1))
+
+
+def _renders(fn):
+    _n_renders[0] = 0
+    fn()
+    return _n_renders[0]
+
+
+_f2 = synth_frame(2e-3, 0.9)
+n = _renders(lambda: scene7.on_message(('frame', 2e-3, _f2, False)))
+# oracle: the pre-P3-7 upload expression, _ovp_kpa(arr).ravel(order='F')
+_oracle = ((np.asarray(_f2['p'], np.float32) - np.float32(P_AIR))
+           / np.float32(1e3)).ravel(order='F')
+check("bit-identity: grid 'p' equals the old expression (array_equal)",
+      np.array_equal(np.asarray(scene7.grid.point_data['p']), _oracle)
+      and np.asarray(scene7.grid.point_data['p']).dtype == np.float32)
+check("a plain frame fires 0 renders inside the scene", n == 0, f"({n})")
+_ax_n = [len(init['x_c']), len(init['z_c'])]
+_plane = P_AIR + 1e5 * np.ones(_ax_n, np.float32)
+check("sampled plane accepted", scene7.on_sampled_plane(2.5e-3, _plane))
+n = _renders(lambda: scene7.on_message(('frame', 3e-3,
+                                        synth_frame(3e-3, 1.1), False)))
+check("a frame superseding the sampled plane fires 0 renders", n == 0,
+      f"({n}; was 1)")
+n = _renders(lambda: (scene7.set_field('rho'), scene7.set_field('p')))
+check("field switch p->rho->p fires 0 renders", n == 0, f"({n}; was 4)")
+n = _renders(lambda: (scene7.layers['volume'].set_visible(True),
+                      scene7.layers['volume'].set_visible(False)))
+check("volume on/off fires 0 renders", n == 0, f"({n}; was 1)")
+scene7.layers['mesh'].set_visible(True)
+n = _renders(lambda: scene7.layers['mesh'].set_visible(False))
+check("mesh edges off fires 0 renders", n == 0, f"({n})")
+n = _renders(lambda: (scene7.layers['loads'].set_visible(False),
+                      scene7.layers['loads'].set_visible(True)))
+check("loads off/on fires 0 renders", n == 0, f"({n})")
+# P3-8 + P3-7: a frame while volume + log are on
+scene7.layers['volume'].set_visible(True)
+scene7.set_log_scale(True)
+_vmax0 = float(np.max(scene7.grid.point_data[_VLK]))
+_f4 = synth_frame(4e-3, 1.3)
+_f4['p'] = P_AIR + 2.5 * (_f4['p'] - P_AIR)
+n = _renders(lambda: scene7.on_message(('frame', 4e-3, _f4, False)))
+_vmax1 = float(np.max(scene7.grid.point_data[_VLK]))
+check("volume + log: a new frame fires 0 renders and refreshes vol_log",
+      n == 0 and _vmax1 != _vmax0, f"({n} renders; max {_vmax0:.3f} -> {_vmax1:.3f})")
+scene7.set_log_scale(False)
+scene7.layers['volume'].set_visible(False)
+# allocation per frame: field p, loads on, volume off; payload p/rho/loads
+check("allocation setup: loads on, volume off, field p",
+      scene7.layers['loads'].visible and not scene7.layers['volume'].visible
+      and scene7.field == 'p')
+_f5 = synth_frame(5e-3, 1.5)
+_one = scene7.grid.n_points * 4                       # one float32 field
+tracemalloc.start()
+tracemalloc.reset_peak()
+_base = tracemalloc.get_traced_memory()[0]
+scene7.on_message(('frame', 5e-3, _f5, False))
+_peak = tracemalloc.get_traced_memory()[1] - _base
+tracemalloc.stop()
+_ratio = _peak / _one
+check("tracemalloc peak per frame <= 1.5 x one float32 display field",
+      _ratio <= 1.5, f"({_peak / 1e6:.3f} MB = {_ratio:.2f} x {_one / 1e6:.3f} MB;"
+      f" was 0.59 MB, 2.3x)")
+pl7.close()
+
 print("\n" + "=" * 50)
 if FAIL:
     print(f"FAILED: {len(FAIL)} check(s): {FAIL}")

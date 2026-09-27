@@ -479,8 +479,15 @@ class BlastScene(_CameraOps):
         if key in self._stale and self.frame is not None:
             arr = self.frame.get(key)
             if arr is not None:
-                vals = _ovp_kpa(arr) if FIELDS[key]['ovp'] \
-                    else np.asarray(arr, np.float32)
+                # one F-ordered float32 buffer, so ravel(order='F') is a
+                # view (P3-7: was a float32 temp + an F copy). Bit-identical
+                # to _ovp_kpa: float32(arr) - float32(P_AIR), / float32(1e3)
+                if FIELDS[key]['ovp']:
+                    vals = np.subtract(arr, np.float32(P_AIR),
+                                       dtype=np.float32, order='F')
+                    vals /= np.float32(1e3)
+                else:
+                    vals = np.asarray(arr, np.float32, order='F')
                 self.grid.point_data[key] = vals.ravel(order='F')
             self._stale.discard(key)
 
@@ -554,7 +561,9 @@ class BlastScene(_CameraOps):
     def _auto_clim(self):
         """Track the current frame's range of the active field (dead-band
         so tiny changes don't re-render every layer every frame)."""
-        arr = self.grid.point_data[self.field]
+        # np.asarray: nanmax/nanmin on the pyvista_ndarray subclass miss
+        # numpy's fast path and copy the field plus a mask (P3-7)
+        arr = np.asarray(self.grid.point_data[self.field])
         if arr.size == 0:
             return
         hi = float(np.nanmax(arr))
@@ -663,7 +672,7 @@ class BlastScene(_CameraOps):
         self._update_hud()
 
     def _update_hud(self):
-        peak = (float(np.nanmax(self.grid.point_data['p']))
+        peak = (float(np.nanmax(np.asarray(self.grid.point_data['p'])))
                 if self.frame is not None else 0.0)
         mode = ('PLAYBACK' if self.done else
                 'LIVE' if self.follow_live else 'LIVE (paused view)')
@@ -834,7 +843,9 @@ class _CutPlane(_Layer):
         s.ensure_field(scal)
         clim = s.active_clim()
         if self._actor is None or scal != self._scalars:
-            s.pl.remove_actor(self.name)
+            # render=False throughout the scene (P3-7): the host tick is
+            # the one render per frame; pyvista's default renders here
+            s.pl.remove_actor(self.name, render=False)
             title = field_title(s, s.field)
             if self._scalars is not None and self._scalars != scal:
                 # pyvista keeps a removed actor's scalar bar: drop the old
@@ -856,7 +867,8 @@ class _CutPlane(_Layer):
                                      # narrow embedded viewport (QA-17)
                                      position_x=0.82, position_y=0.30,
                                      width=0.06, height=0.52,
-                                     title_font_size=11, label_font_size=10),
+                                     title_font_size=11, label_font_size=10,
+                                     render=False),
                 reset_camera=False, render=False)
             self._scalars = scal
         else:
@@ -951,7 +963,7 @@ class _SampledPlane(_Layer):
     def clear(self):
         self.t = None
         if self._actor is not None:
-            self.s.pl.remove_actor(self.name)
+            self.s.pl.remove_actor(self.name, render=False)
             self._actor = None
 
     def refresh(self):
@@ -998,7 +1010,7 @@ class _MeshEdges(_Layer):
 
     def _remove(self):
         try:
-            self.s.pl.remove_actor(self.NAME)
+            self.s.pl.remove_actor(self.NAME, render=False)
         except Exception:
             pass
         self._built = None
@@ -1164,15 +1176,13 @@ class _SurfaceLoads(_Layer):
         hi = max(hi, lo + 1e-6)
         return log_clim(lo, hi) if s.log_scale else (lo, hi)
 
-    def _track(self, loads):
-        """Per-frame overpressure range of the faces (2 % dead-band)."""
+    def _track(self, ovp):
+        """Per-frame overpressure range of the faces (2 % dead-band).
+        `ovp`: {face id: overpressure [kPa]}, converted once per frame."""
         hi = 0.0
-        for fid in self.meshes:
-            arr = loads.get(fid)
-            if arr is not None:
-                v = _ovp_kpa(arr)
-                if v.size:
-                    hi = max(hi, float(np.nanmax(v)))
+        for v in ovp.values():
+            if v.size:
+                hi = max(hi, float(np.nanmax(v)))
         if abs(hi - self._own[1]) > 0.02 * max(self._own[1], 1e-9):
             self._own = (0.0, max(hi, 1e-6))
 
@@ -1188,7 +1198,7 @@ class _SurfaceLoads(_Layer):
     def _remove_all(self):
         s = self.s
         for fid in self.meshes:
-            s.pl.remove_actor(f'load_{fid}')
+            s.pl.remove_actor(f'load_{fid}', render=False)
         try:
             s.pl.remove_scalar_bar(LOADS_BAR_KEY, render=False)
         except Exception:
@@ -1205,13 +1215,15 @@ class _SurfaceLoads(_Layer):
             self._remove_all()
             return
         loads = s.frame.get('loads') or {}
-        self._track(loads)
+        ovp = {fid: _ovp_kpa(loads[fid]) for fid in self.meshes
+               if loads.get(fid) is not None}
+        self._track(ovp)
         clim = self._load_clim()
         for fid, mesh in self.meshes.items():
-            arr = loads.get(fid)
-            if arr is None:
+            v = ovp.get(fid)
+            if v is None:
                 continue
-            mesh.cell_data['load'] = _ovp_kpa(arr).ravel(order='F')
+            mesh.cell_data['load'] = v.ravel(order='F')
             name = f'load_{fid}'
             if name not in s.pl.actors:
                 first_bar = self._bar_actor is None
@@ -1227,7 +1239,7 @@ class _SurfaceLoads(_Layer):
                         title=LOADS_BAR_KEY, color='white', fmt='%.0f',
                         vertical=False, position_x=0.28, position_y=0.02,
                         width=0.44, height=0.10, n_labels=4,
-                        title_font_size=1, label_font_size=9)
+                        title_font_size=1, label_font_size=9, render=False)
                 if s.init.get('cyl'):
                     # cylindrical domain: cells beyond the outer radius
                     # are no-data - hide them so the ground is a disc
@@ -1237,7 +1249,8 @@ class _SurfaceLoads(_Layer):
                     self._bar_actor = actor
                     s.pl.add_text(LOADS_TITLE, position=(0.395, 0.10),
                                   viewport=True, font_size=6,
-                                  color='white', name=LOADS_CAPTION)
+                                  color='white', name=LOADS_CAPTION,
+                                  render=False)
             else:
                 mapper = s.pl.actors[name].mapper
                 mapper.scalar_range = clim
@@ -1303,7 +1316,7 @@ class _Volume(_Layer):
 
     def _remove(self):
         try:
-            self.s.pl.remove_actor(self.name)
+            self.s.pl.remove_actor(self.name, render=False)
         except Exception:
             pass
         self._added = None
