@@ -558,6 +558,48 @@ writer through the `jobs` registration hook.
 
 ---
 
+## 0e. 2026-09-27 — batch `viewer-polish` (P3-7, P3-8, P3-25)
+
+Plan: `docs/batches/2026-09-27-viewer-polish.md`. Owner decision of 2026-09-27: the
+Tk blit cap is **peak ≤ 2 × image + 64 KiB** (a fixed allowance, not a ratio), replacing
+the plan's ≤ 2.0×: Tk takes only `bytes`, so two full buffers are the floor.
+
+### `P3-25` · Surface loads follow the log flag
+
+- **What:** `log_clim()` factored out of `active_clim` (values unchanged); the loads
+  range, every `load_*` lookup table and the loads bar go log with the field bar.
+- **Commit:** `d7b79af`. **Tests:** `test_viz3d_scene.py` S3-P25.
+
+### `P3-8` · Log colour scale reaches the Volume layer
+
+- **What:** in log mode the volume draws `vol_log` = log10(clip(field, lo, hi)) over
+  (log10 lo, log10 hi). pyvista 0.49 `add_volume(log_scale=True)` does not colour in
+  log, and a log-spaced transfer function overflows VTK's texture - both rejected.
+- **Found on the way:** the volume layer was **frozen on its first frame** before this
+  batch (pyvista's `add_volume` draws a copy of the grid). The mapper is now bound to
+  the scene grid, so the volume follows the frames in linear and log mode.
+- **Commit:** `236c100`. **Tests:** `test_viz3d_scene.py` S3-P8, S5.
+
+### `P3-7` · Renders and copies per frame
+
+- **"Renders twice" was stale:** on pyvista 0.49 the Tk blit renders once.
+- **viz3d (`4d13172`):** `render=False` on every `remove_actor` and on the bars/text
+  inside `add_mesh`: in-scene renders per field switch 4 → 0, per sampled-plane frame
+  1 → 0, per volume or loads toggle → 0; peak memory per frame 2.31× → 1.13× one field
+  (`np.nanmax` on a `pyvista_ndarray` copied the field). Display values bit-identical.
+- **Tk host (`9e28417`):** `gui/vtk_host.py` `_blit` joins the header and a memoryview:
+  peak 3.00× → 2.0018× the image, 1 render per blit. New `test_viz3d_blit.py`.
+
+- **Tests:** `test_regression` byte-identical; all `test_viz3d_*`, the 14 `test_gui_*`,
+  `test_ui_no_vtk_in_main`, `test_ui_no_mpl_pyplot` PASS. The `bgerror` teardown noise
+  in `test_gui_solver_mode` is also on master `c73d4fc`.
+- **QA (real viewer child, Qt and Tk, native runs):** 7/7 PASS, including the volume
+  moving between frames. Evidence in `docs/qa/2026-09-27-viewer-polish/` (not committed,
+  25 MB). Not fixed, pre-existing: log bar ticks below 1 print as "0" (`fmt='%.0f'`,
+  field bar too).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

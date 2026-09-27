@@ -1045,14 +1045,11 @@ Qt refusal and overwrite dialogs break a path after "C:".
 
 - `P3-6` Read `processor*/` directly for uniform MPI runs too (skip reconstructPar) —
   only if the ~3 s per write is annoying. The mechanism already exists for AMR.
-- `P3-7` The viewer's blit path renders twice and allocates ~1.3 MB per frame.
+- `P3-7` ✅ closed 2026-09-27 (batch `viewer-polish`) — see [DONE.md](DONE.md) §0e.
 
 **Viewer polish**
 
-- `P3-8` Log contours apply only to slice planes.
-- `P3-25` The **"Surface loads" colour bar stays linear** while the field bar is
-  logarithmic — the loads layer holds its own range and does not receive the log
-  flag.
+- `P3-8`, `P3-25` ✅ closed 2026-09-27 (batch `viewer-polish`) — see [DONE.md](DONE.md) §0e.
 
 **Cosmetic** *(anything touching solver stdout needs a re-baseline)*
 
