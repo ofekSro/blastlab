@@ -1,0 +1,174 @@
+# C:\Users\rotem.ofek\blastlab_qa\20260927_out2\runs_real\QA_OUT2_VTK\vtk\ after the QA pass real run (Qt GUI, Run button)
+
+vtk/  (1 files)
+    manifest.json                                   3,296 B
+vtk/obstacles/  (2 files)
+    p.vtk.series                                    3,222 B
+    pMax.vtk.series                                 3,342 B
+      series p.vtk.series: 40 entries, t 0 .. 0.000979553 s
+      series pMax.vtk.series: 40 entries, t 0 .. 0.000979553 s
+vtk/obstacles/p/  (40 files)
+    t_0.00010616096.vtk                            33,285 B
+    t_0.00012013341.vtk                            33,138 B
+    t_0.00013578675.vtk                            33,109 B
+    ... 37 more t_<time>.vtk
+vtk/obstacles/pMax/  (40 files)
+    t_0.00010616096.vtk                            33,840 B
+    t_0.00012013341.vtk                            33,840 B
+    t_0.00013578675.vtk                            33,840 B
+    ... 37 more t_<time>.vtk
+vtk/sections/  (0 files)
+vtk/sections/slice_x_0.20/  (2 files)
+    p.vtk.series                                    3,222 B
+    pMax.vtk.series                                 3,342 B
+      series p.vtk.series: 40 entries, t 0 .. 0.000979553 s
+      series pMax.vtk.series: 40 entries, t 0 .. 0.000979553 s
+vtk/sections/slice_x_0.20/p/  (40 files)
+    t_0.00010616096.vtk                            67,402 B
+    t_0.00012013341.vtk                            67,417 B
+    t_0.00013578675.vtk                            67,424 B
+    ... 37 more t_<time>.vtk
+vtk/sections/slice_x_0.20/pMax/  (40 files)
+    t_0.00010616096.vtk                            67,349 B
+    t_0.00012013341.vtk                            67,352 B
+    t_0.00013578675.vtk                            67,350 B
+    ... 37 more t_<time>.vtk
+vtk/sections/slice_y_0.30/  (2 files)
+    p.vtk.series                                    3,222 B
+    pMax.vtk.series                                 3,342 B
+      series p.vtk.series: 40 entries, t 0 .. 0.000979553 s
+      series pMax.vtk.series: 40 entries, t 0 .. 0.000979553 s
+vtk/sections/slice_y_0.30/p/  (40 files)
+    t_0.00010616096.vtk                            62,681 B
+    t_0.00012013341.vtk                            62,681 B
+    t_0.00013578675.vtk                            62,701 B
+    ... 37 more t_<time>.vtk
+vtk/sections/slice_y_0.30/pMax/  (40 files)
+    t_0.00010616096.vtk                            62,838 B
+    t_0.00012013341.vtk                            62,842 B
+    t_0.00013578675.vtk                            62,838 B
+    ... 37 more t_<time>.vtk
+vtk/volumes/  (11 files)
+    volumes.vtk.series                                690 B
+    t_0.0001.vtk                                2,956,987 B
+    t_0.0002.vtk                                2,956,987 B
+    t_0.0003.vtk                                2,956,987 B
+    ... 7 more t_<time>.vtk
+      series volumes.vtk.series: 10 entries, t 0.0001 .. 0.001 s
+
+258 files, 42.4 MB
+
+problems: none
+
+## vtk/manifest.json
+
+{
+ "fields": {
+  "volumes": [
+   "p",
+   "rho",
+   "U"
+  ],
+  "sections": [
+   "p",
+   "pMax"
+  ],
+  "obstacles": [
+   "p",
+   "pMax"
+  ]
+ },
+ "cadence": {
+  "volumes": {
+   "mode": "time",
+   "value": 0.1,
+   "unit": "ms"
+  },
+  "surfaces": {
+   "mode": "step",
+   "value": 25,
+   "unit": "steps"
+  }
+ },
+ "families": {
+  "volumes": {
+   "count": 10,
+   "times": [
+    "0.0001",
+    "0.0002",
+    "0.0003",
+    "...",
+    "0.0009",
+    "0.001"
+   ],
+   "series": [
+    "volumes/volumes.vtk.series"
+   ]
+  },
+  "sections": {
+   "count": 160,
+   "times": [
+    "0",
+    "9.8229778e-06",
+    "1.9605344e-05",
+    "...",
+    "0.00094711926",
+    "0.00097955278"
+   ],
+   "series": [
+    "sections/slice_x_0.20/p.vtk.series",
+    "sections/slice_x_0.20/pMax.vtk.series",
+    "sections/slice_y_0.30/p.vtk.series",
+    "sections/slice_y_0.30/pMax.vtk.series"
+   ]
+  },
+  "obstacles": {
+   "count": 80,
+   "times": [
+    "0",
+    "9.8229778e-06",
+    "1.9605344e-05",
+    "...",
+    "0.00094711926",
+    "0.00097955278"
+   ],
+   "series": [
+    "obstacles/p.vtk.series",
+    "obstacles/pMax.vtk.series"
+   ]
+  }
+ },
+ "not_converted": [],
+ "deleted_in_wsl": [
+  "0.0002",
+  "0.0003",
+  "0.0004",
+  "0.0005",
+  "0.0006",
+  "0.0007",
+  "0.0008"
+ ],
+ "replay_incomplete": false
+}
+
+## the model manifest: vtk, failed, wsl_scratch
+
+{
+ "vtk": {
+  "dir": "vtk",
+  "counts": {
+   "volumes": 10,
+   "sections": 160,
+   "obstacles": 80
+  },
+  "not_converted": []
+ },
+ "failed": [],
+ "wsl_scratch": {
+  "posix": "/root/blastlab_runs/20260927-035403_3d_p41036-00",
+  "deleted": true,
+  "deleted_at": "2026-09-27T03:59:57"
+ },
+ "n_steps": 991,
+ "n_cells": 35937
+}

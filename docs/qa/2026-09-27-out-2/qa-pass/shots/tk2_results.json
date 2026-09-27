@@ -1,0 +1,736 @@
+{
+ "tips": {
+  "dark Gauge": {
+   "text": "Gauges - always p, rho and U (fixed until OUT-4)",
+   "rect": [
+    766,
+    183,
+    1041,
+    221
+   ],
+   "label_at": [
+    754,
+    149
+   ]
+  },
+  "dark Sect.": {
+   "text": "Sections - the live-slice plane and the extra planes",
+   "rect": [
+    804,
+    183,
+    1088,
+    221
+   ],
+   "label_at": [
+    792,
+    149
+   ]
+  },
+  "dark Obst.": {
+   "text": "Obstacles - their walls",
+   "rect": [
+    832,
+    183,
+    973,
+    221
+   ],
+   "label_at": [
+    820,
+    149
+   ]
+  },
+  "dark Vol.": {
+   "text": "Volumes - the whole 3D domain",
+   "rect": [
+    864,
+    183,
+    1057,
+    221
+   ],
+   "label_at": [
+    852,
+    149
+   ]
+  },
+  "dark Peak overpr.": {
+   "text": "Peak overpressure - blastFoam field pMax",
+   "rect": [
+    602,
+    295,
+    843,
+    333
+   ],
+   "label_at": [
+    590,
+    261
+   ]
+  },
+  "dark Products": {
+   "text": "Products (volume fraction) - blastFoam field alpha.expl",
+   "rect": [
+    602,
+    435,
+    909,
+    473
+   ],
+   "label_at": [
+    590,
+    401
+   ]
+  },
+  "dark Arrival time": {
+   "text": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+   "rect": [
+    602,
+    323,
+    909,
+    361
+   ],
+   "label_at": [
+    590,
+    289
+   ]
+  },
+  "light Gauge": {
+   "text": "Gauges - always p, rho and U (fixed until OUT-4)",
+   "rect": [
+    766,
+    183,
+    1041,
+    221
+   ],
+   "label_at": [
+    754,
+    149
+   ]
+  },
+  "light Sect.": {
+   "text": "Sections - the live-slice plane and the extra planes",
+   "rect": [
+    804,
+    183,
+    1088,
+    221
+   ],
+   "label_at": [
+    792,
+    149
+   ]
+  },
+  "light Obst.": {
+   "text": "Obstacles - their walls",
+   "rect": [
+    832,
+    183,
+    973,
+    221
+   ],
+   "label_at": [
+    820,
+    149
+   ]
+  },
+  "light Vol.": {
+   "text": "Volumes - the whole 3D domain",
+   "rect": [
+    864,
+    183,
+    1057,
+    221
+   ],
+   "label_at": [
+    852,
+    149
+   ]
+  },
+  "light Peak overpr.": {
+   "text": "Peak overpressure - blastFoam field pMax",
+   "rect": [
+    602,
+    295,
+    843,
+    333
+   ],
+   "label_at": [
+    590,
+    261
+   ]
+  },
+  "light Products": {
+   "text": "Products (volume fraction) - blastFoam field alpha.expl",
+   "rect": [
+    602,
+    435,
+    909,
+    473
+   ],
+   "label_at": [
+    590,
+    401
+   ]
+  },
+  "light Arrival time": {
+   "text": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+   "rect": [
+    602,
+    323,
+    909,
+    361
+   ],
+   "label_at": [
+    590,
+    289
+   ]
+  }
+ },
+ "widths": {
+  "blastfoam_1d": {
+   "canvas_w": 534,
+   "form_req": 710,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 298,
+     "got": 259
+    },
+    {
+     "title": "Charge",
+     "col": 0,
+     "shown": true,
+     "req": 312,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 335,
+     "got": 259
+    },
+    {
+     "title": "Gauge radii [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": 1,
+     "shown": true,
+     "req": 293,
+     "got": 259
+    }
+   ]
+  },
+  "blastfoam_2d": {
+   "canvas_w": 534,
+   "form_req": 714,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 290,
+     "got": 259
+    },
+    {
+     "title": "Initialization",
+     "col": 0,
+     "shown": true,
+     "req": 322,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Dynamic refinement (AMR)",
+     "col": 0,
+     "shown": true,
+     "req": 332,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 349,
+     "got": 259
+    },
+    {
+     "title": "Gauges [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Obstacles [m]",
+     "col": 1,
+     "shown": true,
+     "req": 268,
+     "got": 259
+    },
+    {
+     "title": "Refinement zones [m, level]",
+     "col": 1,
+     "shown": true,
+     "req": 326,
+     "got": 259
+    },
+    {
+     "title": "Detonation points [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Outputs",
+     "col": 1,
+     "shown": true,
+     "req": 317,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": 1,
+     "shown": true,
+     "req": 293,
+     "got": 259
+    },
+    {
+     "title": "Trigger gauge",
+     "col": 1,
+     "shown": true,
+     "req": 303,
+     "got": 259
+    }
+   ]
+  },
+  "blastfoam_3d": {
+   "canvas_w": 534,
+   "form_req": 900,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 260,
+     "got": 259
+    },
+    {
+     "title": "Initialization",
+     "col": 0,
+     "shown": true,
+     "req": 322,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Dynamic refinement (AMR)",
+     "col": 0,
+     "shown": true,
+     "req": 332,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 349,
+     "got": 259
+    },
+    {
+     "title": "Gauges [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Obstacles [m]",
+     "col": 1,
+     "shown": true,
+     "req": 384,
+     "got": 259
+    },
+    {
+     "title": "Refinement zones [m, level]",
+     "col": 1,
+     "shown": true,
+     "req": 442,
+     "got": 259
+    },
+    {
+     "title": "Extra charges [m, kg]",
+     "col": 1,
+     "shown": true,
+     "req": 268,
+     "got": 259
+    },
+    {
+     "title": "Detonation points [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Outputs",
+     "col": 1,
+     "shown": true,
+     "req": 317,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": 1,
+     "shown": true,
+     "req": 293,
+     "got": 259
+    },
+    {
+     "title": "Trigger gauge",
+     "col": 1,
+     "shown": true,
+     "req": 303,
+     "got": 259
+    }
+   ]
+  },
+  "native_1d": {
+   "canvas_w": 534,
+   "form_req": 710,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 298,
+     "got": 259
+    },
+    {
+     "title": "Charge",
+     "col": 0,
+     "shown": true,
+     "req": 312,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 335,
+     "got": 259
+    },
+    {
+     "title": "Gauge radii [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": null,
+     "shown": false,
+     "req": 293,
+     "got": 259
+    }
+   ]
+  },
+  "native_2d": {
+   "canvas_w": 534,
+   "form_req": 714,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 290,
+     "got": 259
+    },
+    {
+     "title": "Initialization",
+     "col": 0,
+     "shown": true,
+     "req": 322,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Dynamic refinement (AMR)",
+     "col": null,
+     "shown": false,
+     "req": 332,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 349,
+     "got": 259
+    },
+    {
+     "title": "Gauges [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Obstacles [m]",
+     "col": 1,
+     "shown": true,
+     "req": 268,
+     "got": 259
+    },
+    {
+     "title": "Refinement zones [m, level]",
+     "col": null,
+     "shown": false,
+     "req": 326,
+     "got": 259
+    },
+    {
+     "title": "Detonation points [m]",
+     "col": null,
+     "shown": false,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Outputs",
+     "col": 1,
+     "shown": true,
+     "req": 317,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": null,
+     "shown": false,
+     "req": 293,
+     "got": 259
+    },
+    {
+     "title": "Trigger gauge",
+     "col": 1,
+     "shown": true,
+     "req": 303,
+     "got": 259
+    }
+   ]
+  },
+  "native_3d": {
+   "canvas_w": 534,
+   "form_req": 784,
+   "form_w": 534,
+   "cards": [
+    {
+     "title": "Domain",
+     "col": 0,
+     "shown": true,
+     "req": 260,
+     "got": 259
+    },
+    {
+     "title": "Initialization",
+     "col": 0,
+     "shown": true,
+     "req": 330,
+     "got": 259
+    },
+    {
+     "title": "Numerics",
+     "col": 0,
+     "shown": true,
+     "req": 347,
+     "got": 259
+    },
+    {
+     "title": "Dynamic refinement (AMR)",
+     "col": null,
+     "shown": false,
+     "req": 332,
+     "got": 259
+    },
+    {
+     "title": "Boundaries",
+     "col": 0,
+     "shown": true,
+     "req": 349,
+     "got": 259
+    },
+    {
+     "title": "Gauges [m]",
+     "col": 1,
+     "shown": true,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Obstacles [m]",
+     "col": 1,
+     "shown": true,
+     "req": 384,
+     "got": 259
+    },
+    {
+     "title": "Refinement zones [m, level]",
+     "col": null,
+     "shown": false,
+     "req": 442,
+     "got": 259
+    },
+    {
+     "title": "Extra charges [m, kg]",
+     "col": null,
+     "shown": false,
+     "req": 268,
+     "got": 259
+    },
+    {
+     "title": "Detonation points [m]",
+     "col": null,
+     "shown": false,
+     "req": 264,
+     "got": 259
+    },
+    {
+     "title": "Outputs",
+     "col": 1,
+     "shown": true,
+     "req": 317,
+     "got": 259
+    },
+    {
+     "title": "VTK output (ParaView)",
+     "col": null,
+     "shown": false,
+     "req": 293,
+     "got": 259
+    },
+    {
+     "title": "Trigger gauge",
+     "col": 1,
+     "shown": true,
+     "req": 303,
+     "got": 259
+    }
+   ]
+  }
+ },
+ "checks": [
+  [
+   "dark Gauge",
+   true,
+   "Gauges - always p, rho and U (fixed until OUT-4)"
+  ],
+  [
+   "dark Sect.",
+   true,
+   "Sections - the live-slice plane and the extra planes"
+  ],
+  [
+   "dark Obst.",
+   true,
+   "Obstacles - their walls"
+  ],
+  [
+   "dark Vol.",
+   true,
+   "Volumes - the whole 3D domain"
+  ],
+  [
+   "dark Peak overpr.",
+   true,
+   "Peak overpressure - blastFoam field pMax"
+  ],
+  [
+   "dark Products",
+   true,
+   "Products (volume fraction) - blastFoam field alpha.expl"
+  ],
+  [
+   "dark Arrival time",
+   true,
+   "Arrival time (first arrival) - blastFoam field timeOfArrival"
+  ],
+  [
+   "light Gauge",
+   true,
+   "Gauges - always p, rho and U (fixed until OUT-4)"
+  ],
+  [
+   "light Sect.",
+   true,
+   "Sections - the live-slice plane and the extra planes"
+  ],
+  [
+   "light Obst.",
+   true,
+   "Obstacles - their walls"
+  ],
+  [
+   "light Vol.",
+   true,
+   "Volumes - the whole 3D domain"
+  ],
+  [
+   "light Peak overpr.",
+   true,
+   "Peak overpressure - blastFoam field pMax"
+  ],
+  [
+   "light Products",
+   true,
+   "Products (volume fraction) - blastFoam field alpha.expl"
+  ],
+  [
+   "light Arrival time",
+   true,
+   "Arrival time (first arrival) - blastFoam field timeOfArrival"
+  ]
+ ]
+}

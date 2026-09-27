@@ -1,0 +1,43 @@
+{
+ "dialogs": [],
+ "log": "=== Stage 3D blastFoam ===\n  [blastfoam] checking WSL / blastFoam availability...\n  [blastfoam] blastFoam ready in WSL (Ubuntu)\n  [blastfoam] case directory: \\\\wsl.localhost\\Ubuntu\\root\\blastlab_runs\\20260927-035403_3d_p41036-00\n  [blastfoam] meshing (blockMesh)...\n  [blastfoam] carving 1 obstacle box(es) (1,008 cells) - topoSet...\n  [blastfoam] carving 1 obstacle box(es) (1,008 cells) - subsetMesh...\n  [blastfoam] charge init (setRefinedFields)...\n  [note] blastFoam set 20.35 kg of explosive (1.02 of the 20 kg requested)\n\n==============================================================\n  3D Blast - blastFoam (WSL)\n==============================================================\n  Charge          : 20 kg TNT (sphere)\n  Explosive radius: 0.1431 m\n  Burst point     : (0.3, 0.3, 0.3) m\n  Domain          : 0.6 x 0.6 x 0.6 m,  cell 0.0176471 m\n  Grid            : 34 x 34 x 34 = 38,296 cells (obstacle cells carved out)\n  EOS             : JWL products + ideal-gas air (vDet 6930 m/s)\n  Boundaries      : x_lo=transmit, x_hi=transmit, y_lo=transmit, y_hi=transmit, z_lo=transmit, z_hi=transmit\n  Obstacles       : 1 (carved out of the mesh, rigid walls)\n  Obstacle snapped: (0.47, 0.57, 0.1, 0.3, 0.1, 0.3) -> (0.458824, 0.582353, 0.0882353, 0.3, 0.0882353, 0.3) m (outward, to 0.0176471 m cell faces)\n  Gauges          : 1\n  Stop condition  : safety cap (no terminate boundaries)\n  End time        : 1.0 ms\n  Write interval  : 0.1000 ms (pinned: VTK volumes)\n  Live slice      : p sampled every step\n==============================================================\n\n  [3D view active - frames stream while the solver runs]\n  [blastfoam] VTK output (volumes, sections, obstacles) into C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK\\vtk\n  Snapshot saved: t = 0.100 ms  (front at 0.50 m)\n  [blastfoam] VTK: 10 volumes file(s), 160 sections file(s), 80 obstacles file(s) in C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK\\vtk; 7 written time(s) deleted in WSL\n\n  Done. 991 solver steps, t_final = 1.000 ms\n  Stopped: end time reached\n\nSaved C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK\\gauges\\gauges_3d_summary.csv\nSaved figures\\blast_3d_pressure_vertical.png\nSaved figures\\blast_3d_pressure_horizontal.png\nSaved figures\\blast_3d_density_vertical.png\nSaved figures\\blast_3d_density_horizontal.png\nSaved figures\\blast_3d_peak_overpressure_vertical.png\nSaved figures\\blast_3d_impulse_vertical.png\nSaved figures\\blast_3d_peak_overpressure_horizontal.png\nSaved figures\\blast_3d_impulse_horizontal.png\nSaved figures\\blast_3d_gauges.png\nSaved figures\\blast_3d_isosurface.png\nSaved 4 field CSV(s) into C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK\\fields\nSaved C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK\\report.html\n  [model folder] WSL scratch deleted: /root/blastlab_runs/20260927-035403_3d_p41036-00\n  [run finished]",
+ "notes": [],
+ "folder": "C:\\Users\\rotem.ofek\\blastlab_qa\\20260927_out2\\runs_real\\QA_OUT2_VTK",
+ "strip": [
+  "note: Obstacles: cells inside each box are carved out of the mesh (rigid walls)",
+  "note: blastFoam ready in WSL (Ubuntu)",
+  "note: Cell size will be refined to 0.01789 m (8 cells across the charge radius)",
+  "note: Charge cells: 2,148 at 0.017885 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+  "note: Parallel run: requested: 1 MPI ranks",
+  "note: VTK volumes: one write every 0.1 ms, 10 writes (~0.1 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it",
+  "note: ~35,937 cells at dx = 0.0178852 m"
+ ],
+ "run_btn_enabled_before": true,
+ "run_btn_enabled_during": false,
+ "stop_btn_enabled_during": true,
+ "elapsed_s": 354,
+ "results_texts": [
+  "Results",
+  "Result",
+  "Export",
+  "Title",
+  "Snapshot",
+  "Field",
+  "Remove",
+  "3D Viewer",
+  "Foam runs\u2026",
+  "Profile",
+  "Animation",
+  "VTK",
+  "Summary CSV",
+  "Gauges TSV",
+  "Field CSV",
+  "Report",
+  "PNGs",
+  "Fields",
+  "Gauges",
+  "Animation",
+  "3D",
+  "Show mesh"
+ ]
+}
