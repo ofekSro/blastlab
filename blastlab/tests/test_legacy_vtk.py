@@ -250,6 +250,21 @@ def test_every_readable_name():
         raise AssertionError('two arrays named pressure accepted')
 
 
+def test_dynamic_pressure_magnitude():
+    """OUT-4a (owner Q5): blastFoam's dynamicP vector 0.5 rho U |U| is
+    written as its magnitude q = 0.5 rho |U|^2, one scalar
+    (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1)."""
+    from blastlab.solvers.foam import vtk_export as vx
+    rho = np.array([1.2, 2.0])
+    U = np.array([[3.0, 4.0, 0.0], [0.0, -10.0, 0.0]])
+    mag = np.sqrt((U * U).sum(axis=1))
+    vec = 0.5 * rho[:, None] * U * mag[:, None]
+    out = vx.readable_arrays([lv.Array('dynamicP', vec, 'float', 'vectors')])
+    assert out[0].name == 'Dynamic_Pressure' and out[0].ncomp == 1
+    assert out[0].kind == 'scalars'
+    assert np.allclose(out[0].values, 0.5 * rho * mag ** 2, rtol=1e-12)
+
+
 def test_peak_overpressure_at_t0():
     """Owner decision 2026-09-27: blastFoam's pMax starts at 0, so the
     running max includes the current pressure p when it is in the file,
@@ -401,6 +416,7 @@ def test_viper_reference_structure():
 TESTS = [test_round_trip_merge, test_point_data_stays_point_data,
          test_vectors_and_keyword_order, test_binary_is_big_endian,
          test_volume_rewrite, test_every_readable_name,
+         test_dynamic_pressure_magnitude,
          test_peak_overpressure_at_t0, test_geometry_mismatch_refused, test_strict_parser,
          test_atomic_write_keeps_old_file, test_viper_reference_structure]
 

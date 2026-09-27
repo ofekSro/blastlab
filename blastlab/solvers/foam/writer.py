@@ -36,7 +36,7 @@ from ...core.bc import normalize_bc
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
-from ...models.case import vtk_family, vtk_fields_for
+from ...models.case import vtk_family, vtk_fields_for, vtk_gauge_fields
 from . import env
 from .dicts import (AMR_ALLOWABLE_IMBALANCE, AMR_BALANCE_INTERVAL,
                     AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
@@ -152,6 +152,9 @@ class CaseSpec:
     #: on a blastFoam case with the family switched on; else None
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
+    #: OUT-4a: the extra gauge fields (models.case.vtk_gauge_fields), on
+    #: top of the p/U/rho every blastProbes entry records
+    gauge_fields: tuple = ()
     #: OUT-2: N > 0 when VTK volumes run in Step mode: the solver writes
     #: every N steps (`writeControl timeStep`) and `write_interval` is
     #: then only the transit-sized estimate, not the schedule
@@ -406,6 +409,8 @@ def _apply_vtk(spec, case):
         return
     spec.vtk_surfaces = vtk_family(case, 'vtk_surfaces')
     spec.vtk_volumes = vol = vtk_family(case, 'vtk_volumes')
+    spec.gauge_fields = tuple(f for f in vtk_gauge_fields(case)
+                              if f in vtk_fields_for(spec.dim))
     if not vol:
         return
     spec.adaptive_write = False
@@ -935,7 +940,46 @@ def _controldict_function_objects(spec):
             'pRef': P_AIR,
             'store': True,
         }
+    # OUT-4a: dynamic pressure, only when something samples it. blastFoam
+    # User Guide v6.0, sec. 15.9 (p. 125): the vector 0.5 rho U |U|
+    # (eq. 15.1), whose magnitude is the standard dynamic pressure; keys
+    # rhoName / UName default to rho / U. The result field is `dynamicP`
+    # and is `store`d every step (dynamicPressure.C:66-68,83,
+    # fieldExpression default result name - the guide does not name it),
+    # and written at writeTime for the VTK volumes. It sits BEFORE the
+    # probes and the VTK surfaces, so they sample this step's field.
+    if wants_dynamic_pressure(spec):
+        functions['dynamicPressure'] = {
+            'type': 'dynamicPressure',
+            'libs': blast_libs,
+            'writeControl': 'writeTime',
+        }
     return functions
+
+
+def wants_dynamic_pressure(spec):
+    """OUT-4a: does any output of this spec sample `dynamicP` - the gauges
+    (with probes), the VTK volumes, the 3D sections, or the obstacle walls
+    (with the obstacles patch)?"""
+    if spec.probe_pts and 'dynamicP' in (spec.gauge_fields or ()):
+        return True
+    if 'dynamicP' in ((spec.vtk_volumes or {}).get('fields') or ()):
+        return True
+    surf = spec.vtk_surfaces or {}
+    if spec.dim == 3 and 'dynamicP' in (surf.get('fields') or ()):
+        return True
+    return ('dynamicP' in (surf.get('obstacle_fields') or ())
+            and ('obstacles', 'wall') in spec.patches)
+
+
+def probe_fields(spec):
+    """OUT-4a: the blastProbes `fields`: p, U, rho (T44) and then the
+    case's gauge extras in VTK_FIELDS order. On a resumed AMR leg
+    (`fo_accumulators` off) impulse is dropped - its function object is
+    off (backend._disable_fo_accumulators logs it)."""
+    return ['p', 'U', 'rho'] + [
+        f for f in (spec.gauge_fields or ())
+        if spec.fo_accumulators or f not in _FO_ACCUMULATED]
 
 
 def _controldict_amr_fields(spec):
@@ -1074,8 +1118,9 @@ def _controldict_probes(spec):
             'append': 'yes',
             'probeLocations': [tuple(p) for p in spec.probe_pts],
             # p drives every existing consumer; U and rho are the T44
-            # extras (velocity-magnitude + density gauge traces, N12)
-            'fields': ['p', 'U', 'rho'],
+            # extras (velocity-magnitude + density gauge traces, N12);
+            # OUT-4a appends the case's gauge extras (probe_fields)
+            'fields': probe_fields(spec),
         }
     return functions
 

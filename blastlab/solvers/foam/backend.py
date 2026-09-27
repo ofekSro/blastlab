@@ -740,6 +740,10 @@ def _disable_fo_accumulators(spec, case, hooks):
         hooks.log(f'  [blastfoam] VTK sections/obstacles: '
                   f'{" and ".join(dropped)} are not written for this resumed '
                   f'AMR leg (the function objects are off)')
+    # OUT-4a: the same for the gauge impulse trace (writer.probe_fields)
+    if 'impulse' in (spec.gauge_fields or ()):
+        hooks.log('  [blastfoam] VTK gauges: impulse is not recorded for '
+                  'this resumed AMR leg (the function object is off)')
     return True
 
 

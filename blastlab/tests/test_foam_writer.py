@@ -1444,6 +1444,114 @@ def vtk_checks():
           str(lines))
 
 
+def gauge_checks():
+    """OUT-4a A3: the dynamicPressure function object and the gauge probe
+    fields, line by line against blastFoam User Guide v6.0 sec. 15.1
+    (blastProbes, pp. 122-123) and sec. 15.9 (dynamicPressure, p. 125)."""
+    from blastlab.solvers.foam import writer as W
+    from blastlab.solvers.foam import backend as B
+    print('\n  OUT-4a: gauge extras + dynamicPressure')
+    base = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05, charge=4.0,
+                center=(0.5, 1.0, 1.0),
+                obstacles=[(1.2, 1.5, 0.6, 1.4, 0.0, 1.2)],
+                gauges=[(1.8, 1.0, 1.0)], n_snapshots=3,
+                solver='blastfoam', material='TNT')
+    extras = {'fields': ['overpressure', 'impulse', 'T', 'dynamicP']}
+    plain = render_case(Case3D(**base))
+    allx = render_case(Case3D(**base, vtk_gauges=extras))
+    ctl, ctl0 = allx.files['system/controlDict'], \
+        plain.files['system/controlDict']
+    check('gauges: an empty vtk_gauges renders the plain case, byte for '
+          'byte', render_case(Case3D(**base, vtk_gauges={'fields': []}))
+          .files == plain.files)
+    check('gauges: no dynamicPressure object in the plain case',
+          'dynamicPressure' not in fo_names(ctl0))
+    names = fo_names(ctl)
+    check('gauges: dynamicPressure comes before the probes (A3 FO order)',
+          'dynamicPressure' in names and 'gauges' in names
+          and names.index('dynamicPressure') < names.index('gauges'),
+          str(names))
+    check('   and after every accumulating function object',
+          all(names.index(n) < names.index('dynamicPressure')
+              for n in ('impulse', 'pMax', 'arrival', 'overpressure')),
+          str(names))
+    dp = norm(fo_block(ctl, 'dynamicPressure'))
+    for want in ('type dynamicPressure;',
+                 'libs ("libblastFunctionObjects.so");',
+                 'writeControl writeTime;'):
+        check(f'dynamicPressure: {want}', want in dp, dp)
+    check('dynamicPressure: rhoName / UName left at the guide defaults',
+          'rhoName' not in dp and 'UName' not in dp, dp)
+    pr = norm(fo_block(ctl, 'gauges'))
+    check('probes: fields (p U rho overpressure impulse T dynamicP)',
+          'fields (p U rho overpressure impulse T dynamicP);' in pr, pr)
+    check('probes: the plain case keeps fields (p U rho)',
+          'fields (p U rho);' in norm(fo_block(ctl0, 'gauges')))
+    stripped = norm(ctl.replace(fo_block(ctl, 'dynamicPressure') + '\n',
+                                '')).replace(
+        'fields (p U rho overpressure impulse T dynamicP);',
+        'fields (p U rho);')
+    check('gauges: remove the object and the extras and the controlDict is '
+          'the plain one', stripped == norm(ctl0))
+    check('   and every other file is byte-identical',
+          {k: v for k, v in allx.files.items() if k != 'system/controlDict'}
+          == {k: v for k, v in plain.files.items()
+              if k != 'system/controlDict'})
+    # only T at the gauges: no dynamicPressure object
+    t_only = render_case(Case3D(**base, vtk_gauges={'fields': ['T']}))
+    check('gauges: T only -> no dynamicPressure object',
+          'dynamicPressure' not in fo_names(t_only.files['system/controlDict']))
+    # dynamicP ticked in a VTK family only
+    vol = {'on': True, 'mode': 'step', 'value': 25, 'fields': ['p', 'dynamicP']}
+    vv = render_case(Case3D(**base, vtk_volumes=vol))
+    check('volumes with dynamicP: the object is emitted',
+          'dynamicPressure' in fo_names(vv.files['system/controlDict']))
+    surf = {'on': True, 'mode': 'time', 'value': 0.0005, 'fields': [],
+            'obstacle_fields': ['dynamicP'], 'planes': []}
+    ss = render_case(Case3D(**base, vtk_surfaces=surf))
+    sn = fo_names(ss.files['system/controlDict'])
+    check('obstacles with dynamicP: the object precedes vtkObstacles',
+          sn.index('dynamicPressure') < sn.index(W.VTK_OBSTACLES), str(sn))
+    no_g = render_case(Case3D(**dict(base, gauges=[]), vtk_gauges=extras))
+    check('dynamicP at gauges without gauges: no object, no probes',
+          'dynamicPressure' not in fo_names(no_g.files['system/controlDict'])
+          and 'gauges' not in fo_names(no_g.files['system/controlDict']))
+    nat = render_case(Case3D(**dict(base, solver='native'),
+                             vtk_gauges=extras))
+    check('native: vtk_gauges changes nothing',
+          nat.gauge_fields == ()
+          and nat.files == render_case(Case3D(**dict(
+              base, solver='native'))).files)
+    # 1D: T and dynamicP only (overpressure / impulse are 2D/3D, D4)
+    c1 = dict(radius_m=5.0, charge_kg=1.0, cell_size_m=0.02,
+              gauge_radii=[1.0, 2.0], solver='blastfoam', material='TNT')
+    one = render_case(Case1D(**c1, vtk_gauges=extras))
+    c1t = one.files['system/controlDict']
+    check('1D: overpressure / impulse dropped, T and dynamicP probed',
+          one.gauge_fields == ('T', 'dynamicP')
+          and 'fields (p U rho T dynamicP);' in norm(fo_block(c1t, 'gauges'))
+          and fo_names(c1t).index('dynamicPressure')
+          < fo_names(c1t).index('gauges'), norm(fo_block(c1t, 'gauges')))
+    # resumed AMR leg: impulse dropped from the probes, with one log line
+    import tempfile
+    amr_case = Case3D(**dict(base, amr_levels=1), vtk_gauges=extras)
+    amr_spec = render_case(amr_case)
+    lines = []
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, 'system'))
+        amr_spec.case_unc = d
+        B._disable_fo_accumulators(
+            amr_spec, amr_case, type('H', (), {'log': lambda s, m:
+                                               lines.append(m)})())
+        with open(os.path.join(d, 'system', 'controlDict')) as f:
+            written = f.read()
+    said = [m for m in lines if 'VTK gauges' in m]
+    check('resumed AMR leg: impulse dropped from the probes, one log line',
+          len(said) == 1 and 'impulse' in said[0]
+          and 'fields (p U rho overpressure T dynamicP);'
+          in norm(fo_block(written, 'gauges')), str(lines))
+
+
 def specs_time_name():
     """A profile stage whose t0 needs more digits than timePrecision."""
     import numpy as np
@@ -1488,6 +1596,7 @@ def main():
     deferred_state_checks()
     fresh_dir_checks()
     vtk_checks()
+    gauge_checks()
     golden(specs, update)
     print()
     if FAIL:

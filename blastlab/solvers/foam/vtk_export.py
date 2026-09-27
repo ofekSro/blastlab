@@ -316,7 +316,15 @@ def readable_arrays(arrays, p_ambient=P_AIR):
                 vals = np.maximum(vals, p_now) - float(p_ambient)
             else:
                 vals = np.maximum(vals - float(p_ambient), 0.0)
-        if a.ncomp == 1:
+        ncomp = a.ncomp
+        if a.name == 'dynamicP' and ncomp == 3:
+            # OUT-4a (owner Q5 interim): the magnitude of blastFoam's
+            # dynamicP vector 0.5 rho U |U| is the dynamic pressure
+            # q = 0.5 rho |U|^2 (blastFoam User Guide v6.0, sec. 15.9,
+            # eq. 15.1, p. 125) - written as one scalar
+            v = np.asarray(vals, dtype=np.float64).reshape(-1, 3)
+            vals, ncomp = np.sqrt((v * v).sum(axis=1)), 1
+        if ncomp == 1:
             kind = 'scalars'
         elif a.ncomp == 3 and a.vtk_type in ('float', 'double'):
             kind = 'vectors'
