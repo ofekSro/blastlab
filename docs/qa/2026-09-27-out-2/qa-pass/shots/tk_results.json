@@ -1,0 +1,249 @@
+{
+ "checks": [
+  {
+   "name": "1280x840: scrolled to the end, the Trigger gauge card is fully in view",
+   "ok": true,
+   "detail": "(324, 460, 472)"
+  },
+  {
+   "name": "1280x840: the validation strip is on screen",
+   "ok": true,
+   "detail": "(554, 236, 840)"
+  },
+  {
+   "name": "1280x840: matrix labels not clipped and matrix inside its card",
+   "ok": true,
+   "detail": "clipped [], grid right 875 card right 891"
+  },
+  {
+   "name": "1100x720: scrolled to the end, the Trigger gauge card is fully in view",
+   "ok": true,
+   "detail": "(204, 340, 352)"
+  },
+  {
+   "name": "1100x720: the validation strip is on screen",
+   "ok": true,
+   "detail": "(434, 236, 720)"
+  },
+  {
+   "name": "1100x720: matrix labels not clipped and matrix inside its card",
+   "ok": false,
+   "detail": "clipped [], grid right 778 card right 774"
+  },
+  {
+   "name": "dark: Step greys the sections ms box (disabled, muted text) and leaves steps live",
+   "ok": true,
+   "detail": "{'vtk_s_ms': {'state': 'disabled', 'text_color': \"('#5f6b7a', '#9aa4b2')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_s_steps': {'state': 'normal', 'text_color': \"('#1f2430', '#e8e8e8')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_v_ms': {'state': 'normal', 'text_color': \"('#1f2430', '#e8e8e8')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_v_steps': {'state': 'disabled', 'text_color': \"('#5f6b7a', '#9aa4b2')\", 'fg': \"('#f2f4f7', '#222222')\"}}"
+  },
+  {
+   "name": "dark: <Enter> on 'Sect.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "dark: <Enter> on 'Obst.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "dark: <Enter> on 'Vol.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "dark: <Enter> on 'Gauge' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "dark: <Enter> on 'Peak overpr.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "dark: <Enter> on 'Products' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: Step greys the sections ms box (disabled, muted text) and leaves steps live",
+   "ok": true,
+   "detail": "{'vtk_s_ms': {'state': 'disabled', 'text_color': \"('#5f6b7a', '#9aa4b2')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_s_steps': {'state': 'normal', 'text_color': \"('#1f2430', '#e8e8e8')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_v_ms': {'state': 'normal', 'text_color': \"('#1f2430', '#e8e8e8')\", 'fg': \"('#f2f4f7', '#222222')\"}, 'vtk_v_steps': {'state': 'disabled', 'text_color': \"('#5f6b7a', '#9aa4b2')\", 'fg': \"('#f2f4f7', '#222222')\"}}"
+  },
+  {
+   "name": "light: <Enter> on 'Sect.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: <Enter> on 'Obst.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: <Enter> on 'Vol.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: <Enter> on 'Gauge' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: <Enter> on 'Peak overpr.' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "light: <Enter> on 'Products' shows its tooltip",
+   "ok": false,
+   "detail": "None"
+  },
+  {
+   "name": "Tk plane \"q, 1\" refused with a reason",
+   "ok": true,
+   "detail": "axis must be x, y or z, not 'q'"
+  },
+  {
+   "name": "Tk plane \"y, 1.4\" accepted",
+   "ok": true,
+   "detail": "[('y', 1.4)]"
+  },
+  {
+   "name": "Tk blastFoam save carries both vtk_ keys",
+   "ok": true,
+   "detail": "{'vtk_surfaces': {'on': True, 'mode': 'time', 'value': 1.0, 'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'pMax'], 'planes': []}, 'vtk_volumes': {'on': True, 'mode': 'step', 'value': 25, 'fields': ['p', 'rho', 'U']}}"
+  },
+  {
+   "name": "Tk native: the card is not gridded (hidden, not greyed)",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "Tk native save has no vtk_ key",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "Tk back to blastFoam: card shown, ticks and mode restored",
+   "ok": true,
+   "detail": "({'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}, True, True, 'step') -> ({'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}, True, True, 'step')"
+  },
+  {
+   "name": "Tk 2D Obstacles, none drawn: \"nothing to sample\"",
+   "ok": true,
+   "detail": "['VTK obstacles: the case has no obstacles - nothing to sample', \"No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.\"]"
+  },
+  {
+   "name": "Tk 2D: an obstacle added with + clears it",
+   "ok": true,
+   "detail": "[\"No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'Obstacles: cells inside each box are carved out of the mesh (rigid walls)']"
+  },
+  {
+   "name": "Tk load with keys: shown, greying follows each mode",
+   "ok": true,
+   "detail": "{'s_on': True, 's_mode': 'step', 's_steps': '10', 'v_on': True, 'v_mode': 'time', 'v_ms': '0.5', 'planes': [('x', 0.5), ('z', 0.3)], 'm': {'sections': ['p', 'impulse'], 'obstacles': ['pMax'], 'volumes': ['p', 'T']}, 'live': {'vtk_s_ms': False, 'vtk_s_steps': True, 'vtk_v_ms': True, 'vtk_v_steps': False}}"
+  },
+  {
+   "name": "Tk load without keys: P12 defaults, greying follows Time",
+   "ok": true,
+   "detail": "{'s_on': False, 's_mode': 'time', 's_steps': '25', 's_ms': '1', 'v_on': False, 'v_mode': 'time', 'v_ms': '1', 'v_steps': '25', 'planes': [], 'm': {'sections': [], 'obstacles': [], 'volumes': []}, 'live': {'vtk_s_ms': True, 'vtk_s_steps': False, 'vtk_v_ms': True, 'vtk_v_steps': False}}"
+  }
+ ],
+ "notes": [
+  "title 'blastlab 1.0.0', geometry 1280x840+10+10"
+ ],
+ "errors": [],
+ "strips": {
+  "2D none": [
+   "VTK obstacles: the case has no obstacles - nothing to sample",
+   "No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "blastFoam ready in WSL (Ubuntu)",
+   "Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "~368,449 cells at dx = 0.00658898 m"
+  ],
+  "2D one": [
+   "No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "Obstacles: cells inside each box are carved out of the mesh (rigid walls)",
+   "blastFoam ready in WSL (Ubuntu)",
+   "Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "~368,449 cells at dx = 0.00658898 m"
+  ]
+ },
+ "geo": {
+  "1280x840": {
+   "form_h": 2790,
+   "canvas_h": 472,
+   "col0_bottom": 1412,
+   "col1_bottom": 2778,
+   "vtk_y": 1700,
+   "vtk_h": 930,
+   "vtk_w": 317,
+   "trigger_y": 2642
+  },
+  "1100x720": {
+   "form_h": 2790,
+   "canvas_h": 352,
+   "col0_bottom": 1412,
+   "col1_bottom": 2778,
+   "vtk_y": 1700,
+   "vtk_h": 930,
+   "vtk_w": 259,
+   "trigger_y": 2642
+  }
+ },
+ "colours": {
+  "dark": {
+   "vtk_s_ms": {
+    "state": "disabled",
+    "text_color": "('#5f6b7a', '#9aa4b2')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_s_steps": {
+    "state": "normal",
+    "text_color": "('#1f2430', '#e8e8e8')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_v_ms": {
+    "state": "normal",
+    "text_color": "('#1f2430', '#e8e8e8')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_v_steps": {
+    "state": "disabled",
+    "text_color": "('#5f6b7a', '#9aa4b2')",
+    "fg": "('#f2f4f7', '#222222')"
+   }
+  },
+  "light": {
+   "vtk_s_ms": {
+    "state": "disabled",
+    "text_color": "('#5f6b7a', '#9aa4b2')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_s_steps": {
+    "state": "normal",
+    "text_color": "('#1f2430', '#e8e8e8')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_v_ms": {
+    "state": "normal",
+    "text_color": "('#1f2430', '#e8e8e8')",
+    "fg": "('#f2f4f7', '#222222')"
+   },
+   "vtk_v_steps": {
+    "state": "disabled",
+    "text_color": "('#5f6b7a', '#9aa4b2')",
+    "fg": "('#f2f4f7', '#222222')"
+   }
+  }
+ },
+ "tips": {},
+ "dialogs": [],
+ "tk_callback_errors": []
+}

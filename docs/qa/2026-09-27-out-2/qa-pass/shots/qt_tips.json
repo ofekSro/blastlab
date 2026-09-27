@@ -1,0 +1,617 @@
+{
+ "dark_3d_Gauge": {
+  "label": "Gauge",
+  "tip": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "shown": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "visible": true,
+  "size": [
+   286,
+   42
+  ]
+ },
+ "dark_3d_Sect.": {
+  "label": "Sect.",
+  "tip": "Sections - the live-slice plane and the extra planes",
+  "shown": "Sections - the live-slice plane and the extra planes",
+  "visible": true,
+  "size": [
+   293,
+   42
+  ]
+ },
+ "dark_3d_Obst.": {
+  "label": "Obst.",
+  "tip": "Obstacles - their walls",
+  "shown": "Obstacles - their walls",
+  "visible": true,
+  "size": [
+   147,
+   42
+  ]
+ },
+ "dark_3d_Vol.": {
+  "label": "Vol.",
+  "tip": "Volumes - the whole 3D domain",
+  "shown": "Volumes - the whole 3D domain",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "dark_3d_Pressure": {
+  "label": "Pressure",
+  "tip": "Pressure - blastFoam field p",
+  "shown": "Pressure - blastFoam field p",
+  "visible": true,
+  "size": [
+   178,
+   42
+  ]
+ },
+ "dark_3d_Overpressure": {
+  "label": "Overpressure",
+  "tip": "Overpressure - blastFoam field overpressure",
+  "shown": "Overpressure - blastFoam field overpressure",
+  "visible": true,
+  "size": [
+   263,
+   42
+  ]
+ },
+ "dark_3d_Impulse": {
+  "label": "Impulse",
+  "tip": "Impulse - blastFoam field impulse",
+  "shown": "Impulse - blastFoam field impulse",
+  "visible": true,
+  "size": [
+   211,
+   42
+  ]
+ },
+ "dark_3d_Peak overpr.": {
+  "label": "Peak overpr.",
+  "tip": "Peak overpressure - blastFoam field pMax",
+  "shown": "Peak overpressure - blastFoam field pMax",
+  "visible": true,
+  "size": [
+   251,
+   42
+  ]
+ },
+ "dark_3d_Arrival time": {
+  "label": "Arrival time",
+  "tip": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "shown": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "visible": true,
+  "size": [
+   325,
+   42
+  ]
+ },
+ "dark_3d_Density": {
+  "label": "Density",
+  "tip": "Density - blastFoam field rho",
+  "shown": "Density - blastFoam field rho",
+  "visible": true,
+  "size": [
+   184,
+   42
+  ]
+ },
+ "dark_3d_Velocity": {
+  "label": "Velocity",
+  "tip": "Velocity - blastFoam field U",
+  "shown": "Velocity - blastFoam field U",
+  "visible": true,
+  "size": [
+   176,
+   42
+  ]
+ },
+ "dark_3d_Temperature": {
+  "label": "Temperature",
+  "tip": "Temperature - blastFoam field T",
+  "shown": "Temperature - blastFoam field T",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "dark_3d_Products": {
+  "label": "Products",
+  "tip": "Products (volume fraction) - blastFoam field alpha.expl",
+  "shown": "Products (volume fraction) - blastFoam field alpha.expl",
+  "visible": true,
+  "size": [
+   322,
+   42
+  ]
+ },
+ "dark_3d_Energy": {
+  "label": "Energy",
+  "tip": "Energy - blastFoam field rhoE",
+  "shown": "Energy - blastFoam field rhoE",
+  "visible": true,
+  "size": [
+   187,
+   42
+  ]
+ },
+ "dark_3d_locked_box_tooltip": "Gauges - always p, rho and U (fixed until OUT-4): Pressure - blastFoam field p",
+ "dark_3d_greyed_ms_tooltip": "",
+ "dark_2d_Gauge": {
+  "label": "Gauge",
+  "tip": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "shown": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "visible": true,
+  "size": [
+   286,
+   42
+  ]
+ },
+ "dark_2d_Obst.": {
+  "label": "Obst.",
+  "tip": "Obstacles - their walls",
+  "shown": "Obstacles - their walls",
+  "visible": true,
+  "size": [
+   147,
+   42
+  ]
+ },
+ "dark_2d_Domain": {
+  "label": "Domain",
+  "tip": "Whole domain (volumes)",
+  "shown": "Whole domain (volumes)",
+  "visible": true,
+  "size": [
+   166,
+   42
+  ]
+ },
+ "dark_2d_Pressure": {
+  "label": "Pressure",
+  "tip": "Pressure - blastFoam field p",
+  "shown": "Pressure - blastFoam field p",
+  "visible": true,
+  "size": [
+   178,
+   42
+  ]
+ },
+ "dark_2d_Overpressure": {
+  "label": "Overpressure",
+  "tip": "Overpressure - blastFoam field overpressure",
+  "shown": "Overpressure - blastFoam field overpressure",
+  "visible": true,
+  "size": [
+   263,
+   42
+  ]
+ },
+ "dark_2d_Impulse": {
+  "label": "Impulse",
+  "tip": "Impulse - blastFoam field impulse",
+  "shown": "Impulse - blastFoam field impulse",
+  "visible": true,
+  "size": [
+   211,
+   42
+  ]
+ },
+ "dark_2d_Peak overpr.": {
+  "label": "Peak overpr.",
+  "tip": "Peak overpressure - blastFoam field pMax",
+  "shown": "Peak overpressure - blastFoam field pMax",
+  "visible": true,
+  "size": [
+   251,
+   42
+  ]
+ },
+ "dark_2d_Arrival time": {
+  "label": "Arrival time",
+  "tip": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "shown": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "visible": true,
+  "size": [
+   325,
+   42
+  ]
+ },
+ "dark_2d_Density": {
+  "label": "Density",
+  "tip": "Density - blastFoam field rho",
+  "shown": "Density - blastFoam field rho",
+  "visible": true,
+  "size": [
+   184,
+   42
+  ]
+ },
+ "dark_2d_Velocity": {
+  "label": "Velocity",
+  "tip": "Velocity - blastFoam field U",
+  "shown": "Velocity - blastFoam field U",
+  "visible": true,
+  "size": [
+   176,
+   42
+  ]
+ },
+ "dark_2d_Temperature": {
+  "label": "Temperature",
+  "tip": "Temperature - blastFoam field T",
+  "shown": "Temperature - blastFoam field T",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "dark_2d_Products": {
+  "label": "Products",
+  "tip": "Products (volume fraction) - blastFoam field alpha.expl",
+  "shown": "Products (volume fraction) - blastFoam field alpha.expl",
+  "visible": true,
+  "size": [
+   322,
+   42
+  ]
+ },
+ "dark_2d_Energy": {
+  "label": "Energy",
+  "tip": "Energy - blastFoam field rhoE",
+  "shown": "Energy - blastFoam field rhoE",
+  "visible": true,
+  "size": [
+   187,
+   42
+  ]
+ },
+ "dark_2d_locked_box_tooltip": "Gauges - always p, rho and U (fixed until OUT-4): Pressure - blastFoam field p",
+ "dark_2d_greyed_ms_tooltip": "",
+ "light_3d_Gauge": {
+  "label": "Gauge",
+  "tip": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "shown": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "visible": true,
+  "size": [
+   286,
+   42
+  ]
+ },
+ "light_3d_Sect.": {
+  "label": "Sect.",
+  "tip": "Sections - the live-slice plane and the extra planes",
+  "shown": "Sections - the live-slice plane and the extra planes",
+  "visible": true,
+  "size": [
+   293,
+   42
+  ]
+ },
+ "light_3d_Obst.": {
+  "label": "Obst.",
+  "tip": "Obstacles - their walls",
+  "shown": "Obstacles - their walls",
+  "visible": true,
+  "size": [
+   147,
+   42
+  ]
+ },
+ "light_3d_Vol.": {
+  "label": "Vol.",
+  "tip": "Volumes - the whole 3D domain",
+  "shown": "Volumes - the whole 3D domain",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "light_3d_Pressure": {
+  "label": "Pressure",
+  "tip": "Pressure - blastFoam field p",
+  "shown": "Pressure - blastFoam field p",
+  "visible": true,
+  "size": [
+   178,
+   42
+  ]
+ },
+ "light_3d_Overpressure": {
+  "label": "Overpressure",
+  "tip": "Overpressure - blastFoam field overpressure",
+  "shown": "Overpressure - blastFoam field overpressure",
+  "visible": true,
+  "size": [
+   263,
+   42
+  ]
+ },
+ "light_3d_Impulse": {
+  "label": "Impulse",
+  "tip": "Impulse - blastFoam field impulse",
+  "shown": "Impulse - blastFoam field impulse",
+  "visible": true,
+  "size": [
+   211,
+   42
+  ]
+ },
+ "light_3d_Peak overpr.": {
+  "label": "Peak overpr.",
+  "tip": "Peak overpressure - blastFoam field pMax",
+  "shown": "Peak overpressure - blastFoam field pMax",
+  "visible": true,
+  "size": [
+   251,
+   42
+  ]
+ },
+ "light_3d_Arrival time": {
+  "label": "Arrival time",
+  "tip": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "shown": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "visible": true,
+  "size": [
+   325,
+   42
+  ]
+ },
+ "light_3d_Density": {
+  "label": "Density",
+  "tip": "Density - blastFoam field rho",
+  "shown": "Density - blastFoam field rho",
+  "visible": true,
+  "size": [
+   184,
+   42
+  ]
+ },
+ "light_3d_Velocity": {
+  "label": "Velocity",
+  "tip": "Velocity - blastFoam field U",
+  "shown": "Velocity - blastFoam field U",
+  "visible": true,
+  "size": [
+   176,
+   42
+  ]
+ },
+ "light_3d_Temperature": {
+  "label": "Temperature",
+  "tip": "Temperature - blastFoam field T",
+  "shown": "Temperature - blastFoam field T",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "light_3d_Products": {
+  "label": "Products",
+  "tip": "Products (volume fraction) - blastFoam field alpha.expl",
+  "shown": "Products (volume fraction) - blastFoam field alpha.expl",
+  "visible": true,
+  "size": [
+   322,
+   42
+  ]
+ },
+ "light_3d_Energy": {
+  "label": "Energy",
+  "tip": "Energy - blastFoam field rhoE",
+  "shown": "Energy - blastFoam field rhoE",
+  "visible": true,
+  "size": [
+   187,
+   42
+  ]
+ },
+ "light_3d_locked_box_tooltip": "Gauges - always p, rho and U (fixed until OUT-4): Pressure - blastFoam field p",
+ "light_3d_greyed_ms_tooltip": "",
+ "light_2d_Gauge": {
+  "label": "Gauge",
+  "tip": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "shown": "Gauges - always p, rho and U (fixed until OUT-4)",
+  "visible": true,
+  "size": [
+   286,
+   42
+  ]
+ },
+ "light_2d_Obst.": {
+  "label": "Obst.",
+  "tip": "Obstacles - their walls",
+  "shown": "Obstacles - their walls",
+  "visible": true,
+  "size": [
+   147,
+   42
+  ]
+ },
+ "light_2d_Domain": {
+  "label": "Domain",
+  "tip": "Whole domain (volumes)",
+  "shown": "Whole domain (volumes)",
+  "visible": true,
+  "size": [
+   166,
+   42
+  ]
+ },
+ "light_2d_Pressure": {
+  "label": "Pressure",
+  "tip": "Pressure - blastFoam field p",
+  "shown": "Pressure - blastFoam field p",
+  "visible": true,
+  "size": [
+   178,
+   42
+  ]
+ },
+ "light_2d_Overpressure": {
+  "label": "Overpressure",
+  "tip": "Overpressure - blastFoam field overpressure",
+  "shown": "Overpressure - blastFoam field overpressure",
+  "visible": true,
+  "size": [
+   263,
+   42
+  ]
+ },
+ "light_2d_Impulse": {
+  "label": "Impulse",
+  "tip": "Impulse - blastFoam field impulse",
+  "shown": "Impulse - blastFoam field impulse",
+  "visible": true,
+  "size": [
+   211,
+   42
+  ]
+ },
+ "light_2d_Peak overpr.": {
+  "label": "Peak overpr.",
+  "tip": "Peak overpressure - blastFoam field pMax",
+  "shown": "Peak overpressure - blastFoam field pMax",
+  "visible": true,
+  "size": [
+   251,
+   42
+  ]
+ },
+ "light_2d_Arrival time": {
+  "label": "Arrival time",
+  "tip": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "shown": "Arrival time (first arrival) - blastFoam field timeOfArrival",
+  "visible": true,
+  "size": [
+   325,
+   42
+  ]
+ },
+ "light_2d_Density": {
+  "label": "Density",
+  "tip": "Density - blastFoam field rho",
+  "shown": "Density - blastFoam field rho",
+  "visible": true,
+  "size": [
+   184,
+   42
+  ]
+ },
+ "light_2d_Velocity": {
+  "label": "Velocity",
+  "tip": "Velocity - blastFoam field U",
+  "shown": "Velocity - blastFoam field U",
+  "visible": true,
+  "size": [
+   176,
+   42
+  ]
+ },
+ "light_2d_Temperature": {
+  "label": "Temperature",
+  "tip": "Temperature - blastFoam field T",
+  "shown": "Temperature - blastFoam field T",
+  "visible": true,
+  "size": [
+   201,
+   42
+  ]
+ },
+ "light_2d_Products": {
+  "label": "Products",
+  "tip": "Products (volume fraction) - blastFoam field alpha.expl",
+  "shown": "Products (volume fraction) - blastFoam field alpha.expl",
+  "visible": true,
+  "size": [
+   322,
+   42
+  ]
+ },
+ "light_2d_Energy": {
+  "label": "Energy",
+  "tip": "Energy - blastFoam field rhoE",
+  "shown": "Energy - blastFoam field rhoE",
+  "visible": true,
+  "size": [
+   187,
+   42
+  ]
+ },
+ "light_2d_locked_box_tooltip": "Gauges - always p, rho and U (fixed until OUT-4): Pressure - blastFoam field p",
+ "light_2d_greyed_ms_tooltip": "",
+ "card_edges_1280": {
+  "Domain": {
+   "left": 0,
+   "right": 306,
+   "viewport_w": 620
+  },
+  "Initialization": {
+   "left": 0,
+   "right": 306,
+   "viewport_w": 620
+  },
+  "Numerics": {
+   "left": 0,
+   "right": 306,
+   "viewport_w": 620
+  },
+  "Dynamic refinement (AMR)": {
+   "left": 0,
+   "right": 306,
+   "viewport_w": 620
+  },
+  "Boundaries": {
+   "left": 0,
+   "right": 306,
+   "viewport_w": 620
+  },
+  "Gauges [m]": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Obstacles [m]": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Refinement zones [m, level]": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Extra charges [m, kg]": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Detonation points [m]": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Outputs": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "VTK output (ParaView)": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  },
+  "Trigger gauge": {
+   "left": 314,
+   "right": 620,
+   "viewport_w": 620
+  }
+ }
+}

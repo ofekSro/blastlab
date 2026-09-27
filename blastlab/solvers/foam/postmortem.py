@@ -111,6 +111,19 @@ def load_run(case_dir, hooks=None):
     n_frames = len(times)
     hooks.log(f'  [postmortem] {unc}: {n_frames} written frames')
     stop_reason = f'loaded post-mortem ({n_frames} frames)'
+    # OUT-2, owner decision P11: say so when the run's VTK export deleted
+    # written times - the frames and snapshots below cover only the rest.
+    # Also on the Result, for the Results tab to show (its load passes no
+    # hooks).
+    from .vtk_export import deleted_note
+    vtk_note = deleted_note(posix)
+    if vtk_note:
+        hooks.log(vtk_note)
+
+    def _done(res):
+        if vtk_note:
+            res.meta['vtk_deleted_note'] = vtk_note
+        return res
 
     # sanity: the re-planned grid must match what is on disk. A run
     # killed mid-write can leave a torn newest dir, so walk back until
@@ -156,7 +169,7 @@ def load_run(case_dir, hooks=None):
             store[name] = entry
         if not store:
             raise RuntimeError(f'no readable time directory in {unc}')
-        return finalize_1d(case, spec, store, hooks, stop_reason, 0)
+        return _done(finalize_1d(case, spec, store, hooks, stop_reason, 0))
 
     # 2D / 3D: replay the ingest - per-frame shock front drives the
     # native radius-crossing snapshot picks
@@ -217,12 +230,12 @@ def load_run(case_dir, hooks=None):
     if not ingested:
         raise RuntimeError(f'no readable time directory in {unc}')
     if case.dim == 2:
-        return finalize_2d(case, spec, hooks, stop_reason, 0,
-                            ingested, snap_names, frame_t, frame_p,
-                            record_frames, acc, frame_lv=frame_lv)
-    return finalize_3d(case, spec, hooks, stop_reason, 0,
-                        ingested, snap_names, frame_t, frame_p,
-                        record_frames, acc, frame_lv=frame_lv)
+        return _done(finalize_2d(case, spec, hooks, stop_reason, 0,
+                                 ingested, snap_names, frame_t, frame_p,
+                                 record_frames, acc, frame_lv=frame_lv))
+    return _done(finalize_3d(case, spec, hooks, stop_reason, 0,
+                             ingested, snap_names, frame_t, frame_p,
+                             record_frames, acc, frame_lv=frame_lv))
 
 
 def list_runs(check_alive=False):

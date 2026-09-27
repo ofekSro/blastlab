@@ -144,6 +144,11 @@ SBEDS CSVs), replacing today's `<case>_hd13.html` beside the case file.
 }
 ```
 
+OUT-2 (*owner decision P4, 2026-09-27*): after a VTK export `vtk` is a numeric
+summary, `{"dir": "vtk", "counts": {"volumes": 10, ...}, "files": 74,
+"bytes": 5120000, "not_converted": []}`, and `outputs` leaves `vtk\` out; the
+full file list is `vtk\manifest.json` (`families.<family>.files`).
+
 ### 2.3 The WSL scratch
 
 - The solver still runs in `/root/blastlab_runs/<stamp>_<dim>d_p<pid>-NN`
@@ -211,8 +216,10 @@ Viper's 1D / 2D / 3D tabs are:
 
 Per family: an enable box; a **Time / Step** radio pair; one value box per
 mode, the other greyed out (exactly Viper's *VTKs and Framerates* block).
-Time is **simulated time in milliseconds** — the label says `[ms]`, because the
-rest of the form works in seconds and the difference must be visible. Step is
+Time is **simulated time in seconds** — the label says `[s]`, like the rest of
+the form, and one line on the card says that the files and ParaView show time
+in seconds (*owner decision P22, 2026-09-27*, reversing the earlier `[ms]`,
+batch plan Q3: a typed 0.5 ms reappeared as 0.0005 in the files). Step is
 solver steps, the unit the live-view refresh already uses.
 
 Sections (3D): the live-slice plane (`slice_axis`, `slice_pos`, already on the
@@ -220,7 +227,7 @@ form) is always included; a small table below it adds planes as (axis,
 position [m]) rows — the `points`-style field the form already renders.
 
 Defaults when a family is switched on, mirroring Viper: sections and obstacles
-= pressure + peak overpressure; volumes = pressure, density, velocity.
+= pressure + peak pressure (`pMax`, absolute); volumes = pressure, density, velocity.
 
 ### 3.2 The quantity matrix
 
@@ -231,13 +238,18 @@ A checkbox grid; a cell exists only where blastFoam has the field.
 | Pressure | `p` | locked ✓ | ✓ | ✓ | ✓ |
 | Overpressure | `overpressure` | | ✓ | ✓ | ✓ |
 | Impulse | `impulse` | | ✓ | ✓ | ✓ |
-| Peak overpressure | `pMax` | | ✓ | ✓ | ✓ |
+| Peak pressure (absolute; subtract ambient for overpressure) | `pMax` | | ✓ | ✓ | ✓ |
 | Arrival time | `timeOfArrival` | | ✓ | ✓ | ✓ |
 | Density | `rho` | locked ✓ | ✓ | ✓ | ✓ |
 | Velocity | `U` | locked ✓ | ✓ | ✓ | ✓ |
 | Temperature | `T` | | ✓ | ✓ | ✓ |
 | Products fraction | `alpha.expl` | | ✓ | ✓ | ✓ |
 | Energy | `rhoE` | | ✓ | ✓ | ✓ |
+
+*Owner decisions P13 and P24, 2026-09-27:* the card spans both Setup columns
+(below them), so the headers are the full words Gauges / Sections / Obstacles /
+Volumes (1D/2D: Whole domain), and the columns run in the order of the family
+boxes (2D: Whole domain, then Obstacles).
 
 `overpressure`, `impulse`, `pMax`, `timeOfArrival` are the function objects the
 writer already emits (`_controldict_function_objects`); the rest are solver
@@ -246,7 +258,7 @@ fields. The Gauges column is display only until `OUT-4`.
 ### 3.3 Case keys and validation
 
 ```json
-"vtk_surfaces": {"on": true, "mode": "time", "value": 0.5,
+"vtk_surfaces": {"on": true, "mode": "time", "value": 0.0005,
                  "fields": ["p", "pMax"],
                  "planes": [["y", 1.4], ["z", 0.5]]},
 "vtk_volumes":  {"on": true, "mode": "step", "value": 25,
@@ -256,6 +268,9 @@ fields. The Gauges column is display only until `OUT-4`.
 - Both groups are omitted from the JSON when off (the `write_budget` pattern):
   default files stay byte-identical, `VERSION` stays 13, an older blastlab
   refuses a file that has them with the existing "Unknown case keys".
+  *Owner decision P15, 2026-09-27:* a group that is off but still has a field
+  ticked is written as `{"on": false, ...}` with all its keys, so a reload
+  restores the card's ticks; the solver and validation ignore it.
 - Validation refuses: `value <= 0`; `mode` not in `time|step`; a field the
   dimension does not have; a plane axis not in `x y z` or a position outside
   the domain; `vtk_volumes.on` together with `write_budget > 0` (both pin the
@@ -275,8 +290,8 @@ checked against the guide by the implementer:
 vtkSurfaces
 {
     type            surfaces;
-    writeControl    timeStep;            // or adjustableRunTime for Time mode
-    writeInterval   25;                  // or value_ms / 1000
+    writeControl    timeStep;            // or runTime for Time mode (D5)
+    writeInterval   25;                  // or value [s] (P22)
     surfaceFormat   vtkTimeSeries;
     interpolationScheme cellPoint;
     fields          (p pMax);
@@ -297,10 +312,16 @@ The obstacles entry is emitted only when the case has obstacles (the
 carved out … exposed faces -> 'obstacles' wall patch").
 
 **Volumes** — the cadence becomes the solver's own write schedule: Time →
-`writeControl adjustableRunTime; writeInterval value_ms/1000`; Step →
+`writeControl runTime; writeInterval value` (seconds, P22); Step →
 `writeControl timeStep; writeInterval N`. The adaptive interval controller is
 switched off for the run (`spec.adaptive_write = False`, as `_apply_budget`
 does) and the exact end-time write (`writeTimes`, T62) is kept.
+
+*Owner decision P14 (b), 2026-09-27:* Time mode uses `runTime`, not
+`adjustableRunTime`. `adjustableRunTime` shortens the time step to land each
+write exactly on its time, which changed the solve (batch plan P14: +4.2 %
+peak at a Z ≈ 0.07 gauge). With `runTime` each write lands on the first solver
+step past its interval and the time step is never touched.
 
 ### 3.5 Run loop: the `VtkExport` stage
 
