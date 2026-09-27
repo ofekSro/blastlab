@@ -943,16 +943,20 @@ def _controldict_function_objects(spec):
     # OUT-4a: dynamic pressure, only when something samples it. blastFoam
     # User Guide v6.0, sec. 15.9 (p. 125): the vector 0.5 rho U |U|
     # (eq. 15.1), whose magnitude is the standard dynamic pressure; keys
-    # rhoName / UName default to rho / U. The result field is `dynamicP`
-    # and is `store`d every step (dynamicPressure.C:66-68,83,
-    # fieldExpression default result name - the guide does not name it),
-    # and written at writeTime for the VTK volumes. It sits BEFORE the
-    # probes and the VTK surfaces, so they sample this step's field.
+    # rhoName / UName default to rho / U. The result is `store`d every
+    # step and written at writeTime for the VTK volumes. It sits BEFORE
+    # the probes and the VTK surfaces, so they sample this step's field.
+    # `result dynamicP` is REQUIRED: the guide does not name the field,
+    # and dynamicPressure.C passes "dynamicP" as OF-9 fieldExpression's
+    # defaultFieldName, not its result, so without the keyword the field
+    # is named `dynamicPressure` (fieldExpression.C:47-60, the `result`
+    # keyword; measured: the first OUT-4a e2e run sampled nothing).
     if wants_dynamic_pressure(spec):
         functions['dynamicPressure'] = {
             'type': 'dynamicPressure',
             'libs': blast_libs,
             'writeControl': 'writeTime',
+            'result': 'dynamicP',
         }
     return functions
 

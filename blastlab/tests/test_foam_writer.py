@@ -1478,7 +1478,10 @@ def gauge_checks():
     dp = norm(fo_block(ctl, 'dynamicPressure'))
     for want in ('type dynamicPressure;',
                  'libs ("libblastFunctionObjects.so");',
-                 'writeControl writeTime;'):
+                 'writeControl writeTime;',
+                 # OF-9 fieldExpression names the result `dynamicPressure`
+                 # unless told (first OUT-4a e2e run, 2026-09-27)
+                 'result dynamicP;'):
         check(f'dynamicPressure: {want}', want in dp, dp)
     check('dynamicPressure: rhoName / UName left at the guide defaults',
           'rhoName' not in dp and 'UName' not in dp, dp)
