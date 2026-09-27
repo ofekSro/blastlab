@@ -321,9 +321,9 @@ loads.
 
 > **But P0-4's trap is permanent and worth re-reading before any session that
 > matters:** every code path that builds the GUI can delete the run corpus, and
-> `_e2e_gui_*` and the QA harnesses build one. Verify
-> `env.auto_cleanup(settings.load())` returns `(0, 0)`, and copy out any run you
-> care about. Deletion inside WSL is not reversible.
+> `_e2e_gui_*` and the QA harnesses build one. Run the dry run from CLAUDE.md §8.2
+> (`env.cleanup_plan`, which deletes nothing) and expect `<repo>\settings.json False`,
+> and copy out any run you care about. Deletion inside WSL is not reversible.
 
 ---
 
@@ -1094,11 +1094,13 @@ if Hibernate is unused.
 ### P4-3 · WSL run cleanup, and the trap inside it
 
 `python -m blastlab --clean-foam-runs` (also `--older-than N` / `--keep-gb N`).
-Automatic cleanup runs on GUI start; disable with `auto_cleanup: false` in
-`%APPDATA%\blastlab\settings.json`. **But under the Microsoft Store Python the app
-reads a virtualised copy of that file, not this one**, and the P0 check above
-deletes rather than checks. See `docs/ENGINEERING_QUESTIONS.md` (2026-09-24,
-hd1-3d-close #3).
+Automatic cleanup on GUI start runs only with `auto_cleanup: true` in
+`<repo>\settings.json` (P0-5: the file lives in the checkout, git-ignored; every
+checkout and worktree has its own). To see what it *would* delete, run the dry run
+`env.cleanup_plan` (CLAUDE.md §8.2), never `env.auto_cleanup`, which deletes. In the
+OneDrive checkout a sync lock can fail the atomic write in `settings.save()` (the
+`P4-1` symptom): it warns once, and the lost `hw_*` cache caps the next headless run
+as a 4 GB VM (CLAUDE.md §4).
 
 **The `ext4.vhdx` does not shrink by itself.** Reclaim with `wsl --shutdown` then
 `wsl --manage Ubuntu --set-sparse true`.

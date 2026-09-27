@@ -119,9 +119,11 @@ trustworthy, and two of them were learned the hard way.
    > **And the trap that actually bit:** you do not have to run the cleanup for it
    > to happen. **blastlab cleans automatically on every GUI start**, and any
    > `_e2e_gui_*` test starts a GUI. That is how 34 runs — including the crash
-   > directory under investigation — were destroyed in seconds. Before a session
-   > that matters, verify `env.auto_cleanup(settings.load())` returns `(0, 0)`, and
-   > copy out any run you care about.
+   > directory under investigation — were destroyed in seconds. (Since 2026-09-27
+   > the sweep is off unless `<repo>\settings.json` says `auto_cleanup: true`.) Before
+   > a session that matters, run the dry run from CLAUDE.md §8.2 - it prints the
+   > settings path, `False`, and what the sweep *would* delete, and deletes nothing -
+   > and copy out any run you care about.
 5. **Do not use a timeout** on the deliberately-long runs (`test_blast3d`,
    `_e2e_foam_obstacle2d`) — an interrupted run looks like a failure and is not.
    Give everything else a generous timeout (30 min) so one stuck run cannot

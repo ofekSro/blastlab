@@ -362,11 +362,14 @@ blastlab's automatic cleanup fires at startup - including from
 `tests/_e2e_gui_*.py` and the QA harnesses - and it does not ask. It once took
 `/root/blastlab_runs` from 56 GB / 40 runs to 12 GB / 6 runs in seconds,
 destroying the crashed run that was the entire subject of that night's
-investigation. Fixed in two layers on 2026-09-17 (`core/settings.load()`
-returns `auto_cleanup=False` for a missing or corrupt file;
-`ui/testing.private_settings()` now actually writes the flag). Still, before a
-session that matters: `env.auto_cleanup(settings.load())` should return
-`(0, 0)`, and copy any run you care about out of `/root/blastlab_runs`.
+investigation. Now locked in layers: `auto_cleanup` defaults to off (2026-09-27;
+with it off the GUI only warns when the runs root passes `cleanup_max_gb`),
+`ui/testing.private_settings()` writes the flag, and the settings file is
+`<repo>\settings.json` (P0-5: git-ignored, beyond Store-Python virtualisation).
+Before a session that matters, run the dry run (it deletes nothing; expect `False`):
+`python -c "from blastlab.core import settings as s; from blastlab.solvers.foam import env; d=s.load(); print(s.config_path(), d['auto_cleanup'], [r['name'] for r in env.cleanup_plan(d)])"`
+- the list is what the sweep would take if it were on - and copy any run you
+care about out of `/root/blastlab_runs`.
 
 **8.3 WSL can be torn down under a running solve.** On 2026-09-16 a 13-rank 3D
 run died 11 minutes in because WSL terminated the distro - "Init has exited",
