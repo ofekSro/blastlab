@@ -380,13 +380,32 @@ Added by the Checkpoint 2 verification (2026-09-27; none blocks):
 Added by Steps 8-12 (2026-09-27; none blocks - each is a one-line change in `models/fields.py`):
 
 - **P12 · The card's defaults.** Time mode, `Every [ms]` = 1 (Viper's 0.001 s), `Every [steps]` = 25 (Viper's Step value), both families off. Loading a case without VTK keys puts the card back to these; a family that is on shows its own mode and value, and the other box keeps the default.
-- **P13 · Short matrix headers.** `Gauge | Sect. | Obst. | Vol.` (1D/2D: `Domain` for the whole-domain volumes), rows `Peak overpr.` and `Products`, with the full names as Qt tooltips. The full words did not fit one Setup column at the 1100 px minimum window (the first QA shots showed "Pressu" and "Obstacle"). The alternative is a card spanning both columns.
+- **P13 · Short matrix headers.** `Gauge | Sect. | Obst. | Vol.` (1D/2D: `Domain` for the whole-domain volumes), rows `Peak pressure` (was `Peak overpr.`, renamed by the QA fix F1 below: `pMax` is absolute) and `Products`, with the full names as Qt tooltips. The full words did not fit one Setup column at the 1100 px minimum window (the first QA shots showed "Pressu" and "Obstacle"). The alternative is a card spanning both columns.
 - **P14 · Step 11 rule 3 failed as registered, and why.** `_e2e_vtk_3d.py` (rules committed in `6328bbd` before the run): 36 of 38 checks pass. Rules 1, 2 and 4 pass in full, byte for byte. Rule 3 (C, VTK volumes every 0.1 ms, against A, no export) fails at the one gauge, 0.20 m from the centre of 20 kg TNT (Z ≈ 0.07 m/kg^1/3, 5.7 cm off the charge surface): peak +4.17 %, positive-phase impulse +4.85 %, arrival +0.43 % (limits 1 / 1 / 0.5 %). An exploratory run afterwards, not judged by any rule, shows the cause. A1 (no export, `write_budget = 10`, the same 10 writes) gives gauges **byte-identical** to C. So the export changes nothing beyond the write schedule it sets, and the difference is the time step that `adjustableRunTime` writes clip. A's default pinned schedule writes every 0.0041 ms (1,500 steps; C and A1 take 991), and the production default (`adaptive_write` on, 1,096 steps) differs from A by +16.6 % peak. The threshold is not changed. Interim: the code stays as plan §3.4 says (Time-mode volumes land exactly on their times and clip dt). Owner: (a) keep it, and accept that choosing a volumes cadence is choosing a write schedule (the validation note could say so); or (b) write Time-mode volumes with `runTime`, as the surfaces do (D5): dt untouched, and the write times become the first step past each multiple. (c) Separately: is a Q7 comparison at Z ≈ 0.07 meaningful, or should rule 3 use a mid-field gauge?
 
 Added by the Steps 8-13 verification (2026-09-27; none blocks):
 
 - **P15 · A family that is off keeps its ticks only until the case is saved.** Unticking a family keeps its matrix column on the card (Step 8), but `case_to_dict` drops a family with `on: false` (Step 1), so after save and reload that column is empty and the next tick fills the defaults again. The alternative is to write `{on: false, fields…}` for a family whose column is not empty, which changes the Step 1 rule that an off family is not written.
 - **P16 · Step 11 rule 2e is the registered reading, not the plan's words.** The plan says WSL holds "at most the protected dirs plus the two newest" during the run; the rule committed in `6328bbd` also allows a write that is not yet converted and copied, because the converter runs behind the ingest by design (D13). After the final sweep the plan's stricter bound held (left `0`, the protected `0.0001`, and the two newest). Owner: confirm that reading.
+
+### After the GUI QA pass (2026-09-27, `docs/qa/2026-09-27-out-2/qa-pass/QA_REPORT.md`)
+
+Fixed in the follow-up batch (commits `out-2: qa - ...`; labels, tooltips, notes and docs only, no field, writer or number changed):
+
+- **F1 · `pMax` is peak absolute pressure.** Row `Peak pressure`; the tooltip says it is the running per-cell maximum of the absolute `p` (blastFoam field `pMax`) and to subtract 101.325 kPa for overpressure. README and spec §3.2 row corrected.
+- **F2 · Results tab after an OUT-2 export.** When the case dir is gone and `<MODEL>\vtk\manifest.json` exists, the VTK button is live, says "Written during the run: `<MODEL>\vtk` - N files (see vtk\manifest.json)", and opens that folder. Qt and Tk.
+- **Confusions 3, 5, 6, 7, 8 and the `Vol.` tooltip (2).** No "OUT-4" on screen ("Gauges: fixed - pressure, density, velocity"); the live-slice note says "when Sections and obstacles is ticked"; the Time-mode volumes note says the cadence is the write schedule and can change the solution slightly (README, P14); Step-mode volumes get a size-per-write note and say the count depends on the step count; Energy / Products tooltips; `Vol.` tooltip "whole-domain output". Short headers unchanged (P13).
+
+Parked (none blocks):
+
+- **P17 · F3, Tk at the 1100x720 minimum: the right column is clipped** (`Ste`, half a `Vol.` column, cut strip rows). Pre-existing: native mode overflows the same way. `gui/forms.py` card widths vs the 13:7 split, fixed `wraplength=520`.
+- **P18 · F4, Tk: a dimension switch keeps the old scroll offset, so the form goes blank.** Pre-existing (same on `master`); `SetupPanel._swap` does not reset `yview` / the scrollregion. OUT-2 makes the 3D form 51 % taller.
+- **P19 · F5, Qt: the 3D native form has a blank tail** when scrolled to the end (the `QStackedWidget` takes its tallest page's height). Pre-existing; the card makes the tail longer.
+- **P20 · Qt locked Gauge column in light mode** (V1): the locked unticked boxes are drawn white, the live ones grey, so the disabled column looks the more active one. Dark mode is weak but right.
+- **P21 · Rejected plane text survives Open case** (V3): `ui/fieldform.py` `PointList.set` does not clear the entry, and the hint goes back to idle.
+- **P22 · `[ms]` on the card vs seconds in the files and ParaView** (confusion 1): a typed 0.5 reappears as 0.0005. The alternative is one line on the card saying the files use seconds.
+- **P23 · The write-budget clash is unreachable from the GUI** (confusion 10): the Qt form has no `write_budget` field and drops it on Open case. Pre-existing; the GUI half belongs to `P1-12`.
+- **P24 · 2D column order** (confusion 2): the matrix runs `Obst. | Domain` while the family boxes run *Whole domain*, *Obstacles*.
 
 ## 7. Needs the machine free
 
