@@ -2988,7 +2988,8 @@ def v01_vtk_1d(qa):
              'Time by default: the steps box is disabled', 'S2')
     qa.shot('1d_off')
     qa.field('vtk_v_on', True)
-    qa.check(form.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']},
+    qa.check(form.v['vtk_fields'].get() == {'gauges': [],
+                                            'volumes': ['p', 'rho', 'U']},
              'the first tick fills p, rho, U', 'S2',
              evidence=str(form.v['vtk_fields'].get()))
     qa.note('1D VTK strip: ' + ' | '.join(qa.strip_text()))
@@ -3038,16 +3039,17 @@ def v03_vtk_3d(qa):
     qa.set_case(Case3D(solver='blastfoam'))
     form = _vtk_see(qa)
     cols = sorted({c for _f, c in form.v['vtk_fields'].cells})
-    qa.check(cols == ['obstacles', 'sections', 'volumes']
-             and len(form._vtk_grid.locked) == 10,
-             'three destination columns plus the locked Gauges column (Q2)',
+    # OUT-4a: the Gauges column has live cells (the extras); p/rho/U locked
+    qa.check(cols == ['gauges', 'obstacles', 'sections', 'volumes']
+             and len(form._vtk_grid.locked) == 3,
+             'three destination columns plus the Gauges column (Q2, OUT-4a)',
              'S2', evidence=str(cols))
     qa.shot('3d_off')
     qa.field('vtk_s_on', True)
     qa.field('vtk_v_on', True)
     m = form.v['vtk_fields'].get()
-    qa.check(m == {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'],
-                   'volumes': ['p', 'rho', 'U']},
+    qa.check(m == {'gauges': [], 'sections': ['p', 'pMax'],
+                   'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']},
              'the first ticks fill the Viper defaults', 'S2', evidence=str(m))
     form._vtk_radios['s'][1].invoke()
     qa.pump(0.6)
@@ -3135,6 +3137,69 @@ def v05_keep_all_fields(qa):
     qa.solver('blastfoam')
     qa.scroll_form(0.0)
     qa.set_case(Case3D())
+
+
+def _vtk_gauge_extras(qa, dim):
+    """OUT-4a: the Tk Gauges column of dimension `dim` (the twin of the Qt
+    harness's V07-V09): p/rho/U locked, the extras live; ticking them all
+    reaches `vtk_gauges`, the case validates, native writes no key."""
+    from blastlab.core.case import Case1D, Case2D, Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    cls = {1: Case1D, 2: Case2D, 3: Case3D}[dim]
+    g = ([1.0] if dim == 1 else [(1.0, 1.0)] if dim == 2
+         else [(1.0, 0.75, 0.75)])
+    qa.goto('setup')
+    qa.set_case(cls(solver='blastfoam', **({'gauge_radii': g} if dim == 1
+                                            else {'gauges': g})))
+    form = _vtk_see(qa)
+    var = form.v['vtk_fields']
+    extras = mfields.vtk_gauge_extras_for(dim)
+    live = sorted(f for f, c in var.cells if c == 'gauges')
+    qa.check(len(form._vtk_grid.locked) == 3
+             and all(v.get() for v, _b in form._vtk_grid.locked)
+             and live == sorted(extras),
+             f'{dim}D: p/rho/U locked and ticked; live gauge cells '
+             f'{list(extras)}', 'S2', evidence=f'live {live}')
+    qa.scroll_form(1.0)
+    qa.shot(f'{dim}d_gauges_off')
+    for f in extras:
+        var.cells[(f, 'gauges')].set(True)
+    var.fire()
+    qa.pump(0.6)
+    case = qa.app.setup.get_case()
+    qa.check(case_to_dict(case).get('vtk_gauges') == {'fields': list(extras)},
+             f'{dim}D: the ticks reach vtk_gauges', 'S1',
+             evidence=str(case.vtk_gauges))
+    strip = qa.strip_text()
+    qa.check(not any('VTK gauges' in s for s in strip),
+             f'{dim}D: no VTK gauges message on the strip', 'S2',
+             evidence=str(strip))
+    qa.scroll_form(1.0)
+    qa.shot(f'{dim}d_gauges_on')
+    qa.solver('native')
+    qa.check('vtk_gauges' not in case_to_dict(qa.app.setup.get_case()),
+             f'{dim}D native: no vtk_gauges key', 'S1')
+    qa.solver('blastfoam')
+    qa.scroll_form(0.0)
+    qa.set_case(cls())
+
+
+@scenario('V06', 'V', est=40)
+def v06_vtk_gauges_1d(qa):
+    """OUT-4a, 1D: T and dynamic pressure at the gauges."""
+    _vtk_gauge_extras(qa, 1)
+
+
+@scenario('V07', 'V', est=40)
+def v07_vtk_gauges_2d(qa):
+    """OUT-4a, 2D: the four gauge extras."""
+    _vtk_gauge_extras(qa, 2)
+
+
+@scenario('V08', 'V', est=40)
+def v08_vtk_gauges_3d(qa):
+    """OUT-4a, 3D: the four gauge extras."""
+    _vtk_gauge_extras(qa, 3)
 
 
 # ─────────────────────────────────────────────────────────────────────────

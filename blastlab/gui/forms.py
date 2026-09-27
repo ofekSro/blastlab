@@ -256,9 +256,10 @@ class _MatrixVar:
 
 class _MatrixGrid(ctk.CTkFrame):
     """Viper's "Output Quantities" grid (plan sec. 3.2), the twin of the
-    Qt MatrixGrid: a row per quantity, a tick box per destination column,
-    and the Gauges column display only - p, rho, U ticked and disabled
-    (decision 4)."""
+    Qt MatrixGrid: a row per quantity, a tick box per column where the
+    pair means something (models.case.VTK_CELLS), p, rho, U ticked and
+    disabled at the Gauges (decision 4), the other gauge cells tickable
+    (OUT-4a)."""
 
     def __init__(self, parent, var, dim):
         super().__init__(parent, fg_color='transparent')
@@ -274,6 +275,7 @@ class _MatrixGrid(ctk.CTkFrame):
                                 font=theme.F_SMALL, text_color=c('muted'))
             head.grid(row=0, column=j, padx=2)
             theme.tooltip(head, fields.vtk_column_tip(dim, col))
+        extras = fields.vtk_gauge_extras_for(int(dim))
         for i, f in enumerate(vtk_fields_for(int(dim)), start=1):
             name = ctk.CTkLabel(self,
                                 text=fields.VTK_QUANTITY_LABELS.get(f, f),
@@ -282,8 +284,12 @@ class _MatrixGrid(ctk.CTkFrame):
             name.grid(row=i, column=0, sticky='w')
             theme.tooltip(name, fields.vtk_quantity_tip(f))
             for j, col in enumerate(cols, start=1):
-                bv = tk.BooleanVar(value=(col == 'gauges'
-                                          and f in fields.VTK_GAUGE_FIELDS))
+                locked = col == 'gauges' and f in fields.VTK_GAUGE_FIELDS
+                # OUT-4a: no box where the pair means nothing (VTK_CELLS)
+                if col not in fields.VTK_CELLS.get(f, ()) or (
+                        col == 'gauges' and not locked and f not in extras):
+                    continue
+                bv = tk.BooleanVar(value=locked)
                 box = ctk.CTkCheckBox(
                     self, text='', variable=bv, width=24,
                     checkbox_width=18, checkbox_height=18, border_width=2,
@@ -291,7 +297,7 @@ class _MatrixGrid(ctk.CTkFrame):
                     fg_color=c('accent'), hover_color=c('accent_hover'),
                     command=var.fire)
                 box.grid(row=i, column=j, pady=1)
-                if col == 'gauges':
+                if locked:
                     # CTk draws a disabled tick in the accent colour, so
                     # a locked box looked live: draw it muted
                     box.configure(state='disabled', fg_color=c('muted'))

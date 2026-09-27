@@ -219,8 +219,11 @@ def vtk_column_tip(dim, col):
     """The full name of matrix column `col`, for its tooltip."""
     if col == 'volumes' and int(dim) < 3:
         return 'Whole domain (volumes)'
-    return {'gauges': 'Gauges - the gauge TSV always carries p, rho and U '
-                      '(fixed; gauges get no VTK files)',
+    extra = ('temperature and dynamic pressure' if int(dim) < 2 else
+             'overpressure, impulse, temperature and dynamic pressure')
+    return {'gauges': f'Gauges - the gauge TSV always carries p, rho and U '
+                      f'(locked); tick {extra} to add them (gauges get no '
+                      f'VTK files)',
             'sections': 'Sections - the live-slice plane and the extra '
                         'planes', 'obstacles': 'Obstacles - their walls',
             'volumes': 'Volumes - whole-domain output: every cell of the 3D '
@@ -232,7 +235,8 @@ def vtk_column_tip(dim, col):
 #: toolkits (GUI QA 2026-09-27, confusions 3 and 5)
 VTK_PLANES_CAPTION = ('Extra section planes - the live-slice plane is also '
                       'written when "Sections and obstacles" is ticked')
-VTK_MATRIX_CAPTION = 'Quantities (Gauges: fixed - pressure, density, velocity)'
+VTK_MATRIX_CAPTION = ('Quantities (Gauges: pressure, density and velocity '
+                      'are always recorded)')
 
 #: OUT-3: the box on the same card, and its tooltip (both toolkits)
 KEEP_ALL_CAPTION = 'Keep all fields in WSL'

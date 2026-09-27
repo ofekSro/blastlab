@@ -160,8 +160,9 @@ class RadioRow(QWidget):
 
 class MatrixGrid(QWidget):
     """Viper's "Output Quantities" grid: one row per quantity, one tick
-    box per destination column (plan sec. 3.2). The Gauges column is
-    display only - p, rho, U ticked and disabled (decision 4)."""
+    box per column where the pair means something (models.case.VTK_CELLS,
+    plan sec. 3.2). At the Gauges p, rho, U are ticked and locked
+    (decision 4); OUT-4a makes the other gauge cells tickable."""
 
     def __init__(self, var, dim, rows, cols, parent=None):
         super().__init__(parent)
@@ -177,15 +178,21 @@ class MatrixGrid(QWidget):
             head.setAlignment(Qt.AlignCenter)
             head.setToolTip(fields.vtk_column_tip(dim, col))
             grid.addWidget(head, 0, j)
+        extras = fields.vtk_gauge_extras_for(int(dim))
         for i, f in enumerate(rows, start=1):
             name = label(fields.VTK_QUANTITY_LABELS.get(f, f), 'muted')
             name.setToolTip(fields.vtk_quantity_tip(f))
             grid.addWidget(name, i, 0)
             for j, col in enumerate(cols, start=1):
+                # OUT-4a: no box where the pair means nothing (VTK_CELLS)
+                if col not in fields.VTK_CELLS.get(f, ()) or (
+                        col == 'gauges' and f not in extras
+                        and f not in fields.VTK_GAUGE_FIELDS):
+                    continue
                 box = QCheckBox()
                 box.setToolTip(f'{fields.vtk_column_tip(dim, col)}: '
                                f'{fields.vtk_quantity_tip(f)}')
-                if col == 'gauges':
+                if col == 'gauges' and f in fields.VTK_GAUGE_FIELDS:
                     box.setChecked(f in fields.VTK_GAUGE_FIELDS)
                     box.setEnabled(False)
                     # P20 (owner, 2026-09-27): Fusion draws a disabled box

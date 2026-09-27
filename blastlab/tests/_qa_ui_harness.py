@@ -3278,7 +3278,8 @@ def v01_vtk_1d(qa):
     qa.action = 'tick Whole domain'
     form.widgets['vtk_v_on'].click()
     qa.pump(0.8)
-    qa.check(form.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']},
+    qa.check(form.v['vtk_fields'].get() == {'gauges': [],
+                                            'volumes': ['p', 'rho', 'U']},
              'the first tick fills p, rho, U', 'S2',
              evidence=str(form.v['vtk_fields'].get()))
     strip = qa.strip_text()
@@ -3342,16 +3343,17 @@ def v03_vtk_3d(qa):
     form = _form(qa)
     grid = form.widgets['vtk_fields']
     cols = sorted({c for _f, c in grid.boxes})
-    qa.check(cols == ['obstacles', 'sections', 'volumes'],
-             'three destination columns plus the locked Gauges column (Q2)',
+    # OUT-4a: the Gauges column has live cells (the extras) too
+    qa.check(cols == ['gauges', 'obstacles', 'sections', 'volumes'],
+             'three destination columns plus the Gauges column (Q2, OUT-4a)',
              'S2', evidence=str(cols))
     _vtk_shots(qa, '3d_off')
     form.widgets['vtk_s_on'].click()
     form.widgets['vtk_v_on'].click()
     qa.pump(0.8)
     m = form.v['vtk_fields'].get()
-    qa.check(m == {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'],
-                   'volumes': ['p', 'rho', 'U']},
+    qa.check(m == {'gauges': [], 'sections': ['p', 'pMax'],
+                   'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']},
              'first ticks: p/pMax on sections and obstacles, p/rho/U on '
              'volumes', 'S2', evidence=str(m))
     _vtk_shots(qa, '3d_time')
@@ -3548,6 +3550,68 @@ def v06_keep_all_fields(qa):
              'a ticked finished run keeps its scratch, and says why', 'S2')
     qa.scroll_form(0.0)
     qa.set_case(Case3D())
+
+
+def _vtk_gauge_extras(qa, dim):
+    """OUT-4a: the Gauges column of dimension `dim` - p/rho/U locked and
+    ticked, the extras live; ticking them all reaches `vtk_gauges`, the
+    case validates, and native mode writes no key."""
+    from PySide6.QtWidgets import QCheckBox
+    from blastlab.core.case import Case1D, Case2D, Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    cls = {1: Case1D, 2: Case2D, 3: Case3D}[dim]
+    g = ([1.0] if dim == 1 else [(1.0, 1.0)] if dim == 2
+         else [(1.0, 0.75, 0.75)])
+    qa.goto('setup')
+    qa.set_case(cls(solver='blastfoam', **({'gauge_radii': g} if dim == 1
+                                            else {'gauges': g})))
+    form = _form(qa)
+    grid = form.widgets['vtk_fields']
+    extras = mfields.vtk_gauge_extras_for(dim)
+    locked = [b for b in grid.findChildren(QCheckBox) if not b.isEnabled()]
+    live = sorted(f for f, c in grid.boxes if c == 'gauges')
+    qa.check(len(locked) == 3 and all(b.isChecked() for b in locked)
+             and live == sorted(extras),
+             f'{dim}D: p/rho/U locked and ticked; live gauge cells '
+             f'{list(extras)}', 'S2', evidence=f'{len(locked)} locked, '
+                                               f'live {live}')
+    _vtk_shots(qa, f'{dim}d_gauges_off')
+    qa.action = f'{dim}D: tick every gauge extra'
+    for f in extras:
+        grid.boxes[(f, 'gauges')].click()
+    qa.pump(0.8)
+    case = qa.win.setup.get_case()
+    qa.check(case_to_dict(case).get('vtk_gauges') == {'fields': list(extras)},
+             f'{dim}D: the ticks reach vtk_gauges', 'S1',
+             evidence=str(case.vtk_gauges))
+    rows = qa.win.setup.report_rows()
+    errs = [t for sev, t in rows if sev == 'error' and 'VTK' in t]
+    qa.check(not errs, f'{dim}D: the case validates', 'S2', evidence=str(errs))
+    _vtk_shots(qa, f'{dim}d_gauges_on')
+    qa.solver('native')
+    qa.check('vtk_gauges' not in case_to_dict(qa.win.setup.get_case()),
+             f'{dim}D native: no vtk_gauges key', 'S1')
+    qa.solver('blastfoam')
+    qa.scroll_form(0.0)
+    qa.set_case(cls())
+
+
+@scenario('V07', 'V', est=40)
+def v07_vtk_gauges_1d(qa):
+    """OUT-4a, 1D: T and dynamic pressure at the gauges."""
+    _vtk_gauge_extras(qa, 1)
+
+
+@scenario('V08', 'V', est=40)
+def v08_vtk_gauges_2d(qa):
+    """OUT-4a, 2D: the four gauge extras."""
+    _vtk_gauge_extras(qa, 2)
+
+
+@scenario('V09', 'V', est=40)
+def v09_vtk_gauges_3d(qa):
+    """OUT-4a, 3D: the four gauge extras."""
+    _vtk_gauge_extras(qa, 3)
 
 
 # ═══════════════════════════════════════════════════════════════════════
