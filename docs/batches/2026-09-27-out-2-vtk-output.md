@@ -469,6 +469,12 @@ untouched), so its writes never clip dt. Proof, as a pre-registered check:
 (1 / 1 / 0.5 %), rule text otherwise unchanged; rule 1 still compares B
 with A.
 
+**Result (one run, 2026-09-27, `7e81c86`): PASS, 41 of 41 checks.** Steps:
+A 1500, B 1500, C 972, D 972, A2 **972** (the proof check passes).
+Rule 3, C vs A2 at the Z ≈ 0.07 gauge: peak 106963 / 106963 Pa, positive-
+phase impulse 6865.51 / 6865.51, arrival 0.0169987 / 0.0169987 ms - all
+three d = 0.0000 %. Rules 1, 2 and 4 pass as before. Nothing re-tuned.
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.
