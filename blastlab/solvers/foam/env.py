@@ -952,8 +952,9 @@ def disk_warning(settings=None, now=None):
 def start_disk_warning(settings=None, warn=None, private_ok=False):
     """Run `disk_warning` on a daemon thread at GUI start and hand a
     non-None text to `warn` (from that thread - the caller marshals it
-    to its GUI thread). Silent on any error: WSL unreachable must never
-    reach the user as a fault. Deletes nothing.
+    to its GUI thread). Silent in the GUI on any error: WSL unreachable
+    must never reach the user as a fault (an unexpected exception gets
+    one stderr line). Deletes nothing.
 
     Not started (returns None) under a private settings file, i.e. with
     BLASTLAB_SETTINGS set, unless `private_ok`: every test and QA harness
@@ -968,8 +969,13 @@ def start_disk_warning(settings=None, warn=None, private_ok=False):
             text = disk_warning(settings)
             if text and warn:
                 warn(text)
-        except Exception:                     # never kill the GUI for this
-            pass
+        except Exception as exc:              # never kill the GUI for this
+            # WSL unreachable does not raise (run_dirs / run_info return
+            # empty), so what lands here is a fault or a closed window:
+            # one stderr line, never the GUI, never swallowed silently
+            import sys
+            print(f'[blastlab] disk warning skipped: '
+                  f'{type(exc).__name__}: {exc}', file=sys.stderr)
 
     th = threading.Thread(target=work, daemon=True,
                           name='blastlab-disk-warning')

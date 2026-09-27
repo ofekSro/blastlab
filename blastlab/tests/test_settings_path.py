@@ -459,13 +459,17 @@ def test_disk_warning():
 
     def boom():
         raise OSError('wsl is gone')
-    with stub_wsl(runs) as (calls, _deleted):
+    err = io.StringIO()
+    with stub_wsl(runs) as (calls, _deleted), contextlib.redirect_stderr(err):
         env.run_dirs = boom
         got = []
         th = env.start_disk_warning(over, got.append, private_ok=True)
         th.join(10)
     check('WSL error: no warning, and the thread ends quietly',
           got == [] and not th.is_alive(), str(got))
+    check('WSL error: not swallowed - one stderr line names it',
+          err.getvalue() == '[blastlab] disk warning skipped: '
+                            'OSError: wsl is gone\n', repr(err.getvalue()))
     # a private settings file (tests, harnesses) never starts it
     saved = os.environ.get('BLASTLAB_SETTINGS')
     os.environ['BLASTLAB_SETTINGS'] = os.path.join(
