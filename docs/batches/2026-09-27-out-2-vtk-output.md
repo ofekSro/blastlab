@@ -433,6 +433,32 @@ Parked (none blocks):
 - **P5, P6, P7, P8, P12, P16 → accepted as written.**
 - **P2 → confirmed or changed at the owner's ParaView check.** P3, P10, P23 stay parked.
 
+### The decisions, implemented (2026-09-27)
+
+One commit per decision: `4ebcf29` P14 (b) · `022902f` P22 + `4aa162b` its
+golden re-pin (the field `vtk_<s|v>_ms` renamed `vtk_<s|v>_time`, default 1 →
+0.001; nothing else moved) · `c3759bb` P9 · `d074867` P15 · `23c78e3` P4 ·
+`5237e51` P11 · `2d67b05` P13 + P24 · `56dfe61` P20 · `56f2fb3` P21.
+Real-window screenshots of the wide card (Qt and Tk, 3D, dark and light,
+1100 and 1280 px): `docs/qa/2026-09-27-out-2/decisions/`.
+
+**Step 11 re-run on real WSL** (`_e2e_vtk_3d.py`, rules and thresholds as
+registered in `6328bbd`; only the volumes value is now written in seconds,
+`VOL_S = 1e-4`, the same 0.1 ms): **35 of 38 checks pass.** Rules 1, 2 and 4
+pass in full, byte for byte (2b: 10 volume files, 39 per surface series; 2e:
+seven written times deleted in C, none in D; 2f: scratch released,
+`SHA256SUMS` 27/27). Rule 3 (C vs A, the one gauge at Z ≈ 0.07) fails as
+registered: peak A 101221 / C 106963 Pa (+5.67 %), positive-phase impulse
+6565.38 / 6865.51 (+4.57 %), arrival 0.017247 / 0.0169987 ms (−1.44 %)
+(limits 1 / 1 / 0.5 %). With `runTime` the export no longer touches dt: C
+and D now take **972** steps (991 before P14 (b)). A takes **1500**: its own
+default schedule (`adaptive_write = False`, the transit-sized pinned
+interval under `adjustableRunTime`) is what clips dt, so rule 3 compares
+against a run whose steps are set by its writes. B (surfaces only) also
+takes 1500 and is byte-identical to A. Thresholds not changed; P14 (c) (a
+mid-field gauge for rule 3, or an A without clipped writes) stays with the
+owner.
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.
