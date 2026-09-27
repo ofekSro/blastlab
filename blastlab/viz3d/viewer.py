@@ -1244,21 +1244,59 @@ class _SurfaceLoads(_Layer):
                 mapper.lookup_table.log_scale = s.log_scale
 
 
+#: derived point array the volume draws in log mode: log10 of the active
+#: field, clipped to the log colour range (P3-8)
+VOL_LOG_KEY = 'vol_log'
+
+
 class _Volume(_Layer):
-    """Semi-transparent cloud of the active field."""
+    """Semi-transparent cloud of the active field.
+
+    Log scale (P3-8) is a DATA transform, not a LUT flag: pyvista samples
+    a volume's colour/opacity transfer functions at linearly spaced values
+    even with log_scale=True, and a hand-built log-spaced transfer function
+    hits the GPU mapper's 32768-texel table (six decades collapse the air
+    shock into one texel). So in log mode the volume draws VOL_LOG_KEY =
+    log10(clip(field, lo, hi)) over (log10 lo, log10 hi) with linear
+    transfer functions - colour and opacity linear in log(value). It costs
+    one extra float32 display field per frame, only while the volume is on
+    AND log is on. The volume shows no scalar bar, so log10 values are
+    never printed; the planes' bar is the reference."""
 
     def __init__(self, scene, on):
         self.s = scene
         self.name = 'volume_f'
-        self._added = None           # field key currently added, or None
+        self._added = None           # (field, log_scale) added, or None
         self.set_visible(on)
+
+    def _clim(self):
+        """Mapper range: the active clim, or its log10 in log mode."""
+        lo, hi = self.s.active_clim()
+        if self.s.log_scale:
+            return float(np.log10(lo)), float(np.log10(hi))
+        return lo, hi
+
+    def _fill_log(self):
+        """VOL_LOG_KEY from the active field, clipped to the same (lo, hi)
+        the planes use (active_clim is log-clamped in log mode)."""
+        s = self.s
+        lo, hi = s.active_clim()
+        vals = np.clip(s.grid.point_data[s.field], np.float32(lo),
+                       np.float32(hi))
+        np.log10(vals, out=vals)
+        s.grid.point_data[VOL_LOG_KEY] = vals
 
     def on_clim_changed(self):
         if not self._added:
             return
+        if self._added[1] != self.s.log_scale:
+            self._remove()           # log toggled: a checkbox, never per frame
+            self.refresh()
+            return
         actor = self.s.pl.actors.get(self.name)
         try:
-            actor.mapper.scalar_range = self.s.active_clim()
+            # pyvista re-ranges both transfer functions on this setter
+            actor.mapper.scalar_range = self._clim()
         except Exception:       # mapper cannot rescale live: rebuild
             self._remove()
             self.refresh()
@@ -1276,14 +1314,27 @@ class _Volume(_Layer):
             self._remove()
             return
         s.ensure_field(s.field)
-        if self._added != s.field:
+        key = (s.field, s.log_scale)
+        if s.log_scale:
+            self._fill_log()            # per displayed frame, log mode only
+        if self._added != key:
             self._remove()
-            s.pl.add_volume(s.grid, scalars=s.field, cmap=CMAP,
-                            clim=s.active_clim(), opacity='linear',
-                            opacity_unit_distance=4 * s.grid.spacing[0],
-                            name=self.name, show_scalar_bar=False,
-                            reset_camera=False, render=False)
-            self._added = s.field
+            scal = VOL_LOG_KEY if s.log_scale else s.field
+            actor = s.pl.add_volume(
+                s.grid, scalars=scal, cmap=CMAP, clim=self._clim(),
+                opacity='linear',
+                opacity_unit_distance=4 * s.grid.spacing[0],
+                name=self.name, show_scalar_bar=False,
+                reset_camera=False, render=False)
+            # add_volume draws a COPY of the grid (pyvista 0.49:
+            # cell_data_to_point_data), so grid.Modified() below never
+            # reached it and the cloud froze on the frame it was built on.
+            # Bind the mapper to the scene grid, by array name.
+            m = actor.mapper
+            m.SetInputData(s.grid)
+            m.SetScalarModeToUsePointFieldData()
+            m.SelectScalarArray(scal)
+            self._added = key
         else:
             s.grid.Modified()
 

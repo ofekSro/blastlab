@@ -231,6 +231,75 @@ scene._set_auto_scale(True)
 scene.set_log_scale(False)
 _check_loads_log("log off again", False, scene.layers['loads']._own)
 
+print("\nS3-P8: log colour scale reaches the Volume layer")
+from blastlab.viz3d.viewer import VOL_LOG_KEY
+_turbo_mid = np.asarray(pv.LookupTable('turbo').map_value(0.5)[:3], float)
+if max(_turbo_mid) > 1.0:
+    _turbo_mid = _turbo_mid / 255.0
+
+
+def _vol_colour_checks(tag, field):
+    vol = pl.actors['volume_f']
+    lo, hi = scene.active_clim()
+    rng = tuple(vol.mapper.scalar_range)
+    want_rng = (float(np.log10(lo)), float(np.log10(hi)))
+    check(f"{tag}: volume draws '{VOL_LOG_KEY}'",
+          vol.mapper.array_name == VOL_LOG_KEY, str(vol.mapper.array_name))
+    check(f"{tag}: volume range == (log10 lo, log10 hi)",
+          np.allclose(rng, want_rng, rtol=1e-12, atol=0), f"{rng} vs {want_rng}")
+    got = np.asarray(scene.grid.point_data[VOL_LOG_KEY], float)
+    ref = np.log10(np.clip(np.asarray(scene.grid.point_data[field], float), lo, hi))
+    err = float(np.max(np.abs(got - ref) / np.maximum(np.abs(ref), 1e-30)))
+    check(f"{tag}: vol_log == log10(clip({field}, lo, hi)) to 1e-5 rel",
+          err <= 1e-5, f"(max rel err {err:.2e})")
+    gmid = float(np.log10(np.sqrt(lo * hi)))
+    rgb = np.asarray(vol.prop.GetRGBTransferFunction().GetColor(gmid))
+    op = vol.prop.GetScalarOpacity().GetValue(gmid)
+    check(f"{tag}: colour at the geometric mid == turbo(0.5) within 0.02",
+          float(np.max(np.abs(rgb - _turbo_mid))) <= 0.02,
+          f"{np.round(rgb, 3)} vs {np.round(_turbo_mid, 3)}")
+    check(f"{tag}: opacity at the geometric mid == 0.5 within 0.02",
+          abs(op - 0.5) <= 0.02, f"({op:.3f})")
+    return vol
+
+
+scene.layers['volume'].set_visible(True)
+scene.set_log_scale(True)
+_vol_colour_checks("log on", 'p')
+# pyvista's add_volume draws a copy; the layer rebinds to the scene grid
+# so frames reach the cloud (it used to freeze on the frame it was built on)
+check("the volume draws the scene grid itself, not add_volume's copy",
+      pl.actors['volume_f'].mapper.GetInput().GetAddressAsString('vtkObject')
+      == scene.grid.GetAddressAsString('vtkObject'))
+scene.set_log_scale(False)
+vol = pl.actors['volume_f']
+lo, hi = scene.active_clim()
+check("log off: volume back on the field array",
+      vol.mapper.array_name == 'p', str(vol.mapper.array_name))
+check("log off: volume back on the linear range",
+      tuple(vol.mapper.scalar_range) == (lo, hi), str(vol.mapper.scalar_range))
+# the contrast being fixed (pre-registered): the same geometric midpoint
+# of the log range is nearly transparent on a linear ramp
+_glo, _ghi = log_clim(lo, hi)
+_op_lin = vol.prop.GetScalarOpacity().GetValue(float(np.sqrt(_glo * _ghi)))
+check("linear mode: geometric mid of the log range has opacity < 0.05",
+      _op_lin < 0.05, f"({_op_lin:.4f})")
+scene.set_log_scale(True)
+scene.set_field('rho')
+_vol_colour_checks("log on, field rho", 'rho')
+scene.set_field('p')
+_vol_colour_checks("log on, back to p", 'p')
+_max0 = float(np.max(scene.grid.point_data[VOL_LOG_KEY]))
+_f = synth_frame(7.8e-3, 1.6)
+_f['p'] = P_AIR + 3.0 * (_f['p'] - P_AIR)       # a clearly different peak
+scene.on_message(('frame', 7.8e-3, _f, False))
+_max1 = float(np.max(scene.grid.point_data[VOL_LOG_KEY]))
+check("a new frame refreshes vol_log", _max1 != _max0,
+      f"(max {_max0:.4f} -> {_max1:.4f})")
+_vol_colour_checks("log on, new frame", 'p')
+scene.set_log_scale(False)
+scene.layers['volume'].set_visible(False)
+
 scene.layers['plane2'].set_visible(True)
 check("plane2 actor", 'cut_plane2' in pl.actors)
 
@@ -390,6 +459,15 @@ out = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 img = pl.screenshot(out)
 check("screenshot written", os.path.exists(out) and img is not None)
 check("image not blank", float(np.asarray(img).std()) > 1.0)
+# P3-8: the log-mode volume renders too
+scene.layers['volume'].set_visible(True)
+scene.set_log_scale(True)
+img_v = pl.screenshot(None, return_img=True)
+check("image not blank with volume + log on",
+      float(np.asarray(img_v).std()) > 1.0,
+      f"(std {float(np.asarray(img_v).std()):.1f})")
+scene.set_log_scale(False)
+scene.layers['volume'].set_visible(False)
 pl.close()
 
 print("\nA8: frames never block the sender (shared-memory ring)")
