@@ -188,7 +188,8 @@ def main():
         cols = sorted({c for _f, c in grid.boxes})
         check(f'{d}D: {len(rows)} quantity rows (D4)',
               sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
-              and len(rows) == (6 if d == 1 else 10), str(rows))
+              # OUT-4a: + the Dynamic pressure row
+              and len(rows) == (7 if d == 1 else 11), str(rows))
         check(f'{d}D: destination columns {want_cols[d][1:]}',
               cols == sorted(want_cols[d][1:]), str(cols))
         check(f'{d}D: a tick box in every destination cell',
@@ -370,12 +371,14 @@ def main():
     f1.widgets['vtk_v_on'].click()
     pump(5)
     check('1D whole domain: p, rho, U',
-          f1.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']})
+          f1.v['vtk_fields'].get() == {'gauges': [],   # OUT-4a column
+                                       'volumes': ['p', 'rho', 'U']})
     f2 = form(2)
     f2.widgets['vtk_s_on'].click()
     pump(5)
     check('2D obstacles: p and pMax, no sections column',
-          f2.v['vtk_fields'].get() == {'obstacles': ['p', 'pMax'],
+          f2.v['vtk_fields'].get() == {'gauges': [],   # OUT-4a column
+                                       'obstacles': ['p', 'pMax'],
                                        'volumes': []})
 
     print('\nC5: the plane table (D7)')
@@ -472,7 +475,8 @@ def main():
     check('loading a case without VTK keys switches both families off',
           not g.v['vtk_s_on'].get() and not g.v['vtk_v_on'].get()
           and g.points['vtk_planes'].get() == []
-          and g.v['vtk_fields'].get() == {'sections': [], 'obstacles': [],
+          and g.v['vtk_fields'].get() == {'gauges': [],  # OUT-4a column
+                                          'sections': [], 'obstacles': [],
                                           'volumes': []})
 
     print('\nC7: a bad value in the inactive box never blocks a run')

@@ -231,7 +231,9 @@ def test_every_readable_name():
         'p': 'pressure', 'pMax': 'Peak_Overpressure', 'impulse': 'Impulse',
         'overpressure': 'Overpressure', 'timeOfArrival': 'Arrival_Time',
         'rho': 'density', 'U': 'velocity', 'T': 'temperature',
-        'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy'}
+        'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
+        # OUT-4a A2: a spec addition (batch plan), not a change to pass
+        'dynamicP': 'Dynamic_Pressure'}
     arrs = [lv.Array(f, np.ones(2), 'float', 'field') for f in VTK_FIELDS]
     out = vx.readable_arrays(arrs)
     assert [a.name for a in out] == [VTK_ARRAY_NAMES[f] for f in VTK_FIELDS]

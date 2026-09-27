@@ -140,7 +140,8 @@ def main():
     f = form(3)
     f.v['vtk_s_on'].set(True)
     check('3D surfaces: p, pMax on sections and obstacles',
-          f.v['vtk_fields'].get() == {'sections': ['p', 'pMax'],
+          f.v['vtk_fields'].get() == {'gauges': [],     # OUT-4a column
+                                      'sections': ['p', 'pMax'],
                                       'obstacles': ['p', 'pMax'],
                                       'volumes': []},
           str(f.v['vtk_fields'].get()))
@@ -173,7 +174,8 @@ def main():
     f = form(2)
     f.v['vtk_s_on'].set(True)
     check('2D obstacles: p, pMax',
-          f.v['vtk_fields'].get() == {'obstacles': ['p', 'pMax'],
+          f.v['vtk_fields'].get() == {'gauges': [],     # OUT-4a column
+                                      'obstacles': ['p', 'pMax'],
                                       'volumes': []})
     f.destroy()
 
