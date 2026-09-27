@@ -407,6 +407,9 @@ class ResultsPanel(QWidget):
             except Exception as exc:
                 self._log(f'Load failed: {exc}')
                 return
+            # OUT-2 P11: the run's VTK export deleted written times
+            if res.meta.get('vtk_deleted_note'):
+                self._log(res.meta['vtk_deleted_note'].strip())
             dim = 1 if 'radius_m' in res.meta else (
                 3 if 'z_c' in res.meta else 2)
             name = (str(res.meta.get('name') or '').strip()

@@ -402,6 +402,25 @@ def note_resume(vtk_dir, times, log):
     return True
 
 
+def deleted_note(case_dir, vtk_dir=None):
+    """Owner decision P11: the warning line for a reader of the finished
+    run `case_dir` (UNC / posix / run name) whose VTK export deleted
+    written times after converting them, else None. `vtk_dir` is the
+    model's vtk\\ when the caller knows it (the Results tab); otherwise
+    it is found under the settings' runs folder by the manifest's
+    `scratch`. Never raises."""
+    try:
+        if not vtk_dir:
+            from . import env
+            from ...core import settings
+            posix = env.case_paths(case_dir)[0]
+            vtk_dir = vtk_series.find_vtk_dir(
+                posix, settings.load().get('runs_dir'))
+        return vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
+    except Exception:                   # noqa: BLE001 - a note, never a failure
+        return None
+
+
 def _size(path):
     try:
         return os.path.getsize(path)
@@ -678,10 +697,14 @@ class VtkExport:
         if self.surf:
             cadence['surfaces'] = _cadence(self.surf)
         nc = sorted(self.not_converted.values(), key=_nc_key)
+        # `scratch` (additive): the WSL run directory, so a reader that
+        # holds only that (postmortem, the run browser) finds this
+        # manifest - owner decision P11, deleted_note
         return dict(fields=fields, cadence=cadence, families=fams,
                     not_converted=nc,
                     deleted_in_wsl=sorted(self.deleted, key=_time_key),
-                    replay_incomplete=self.replay_incomplete)
+                    replay_incomplete=self.replay_incomplete,
+                    scratch=getattr(self.spec, 'case_posix', None))
 
     def _add_file(self, rel, kind, surface, field, t):
         self.files[rel] = (kind, t)

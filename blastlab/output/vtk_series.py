@@ -137,6 +137,41 @@ def load_vtk_manifest(vtk_dir):
     return data if isinstance(data, dict) else None
 
 
+def find_vtk_dir(case_posix, runs_dir):
+    """The vtk\\ folder of the model whose VTK export ran in the WSL run
+    directory `case_posix` - its manifest's `scratch` names it - searched
+    as `<runs_dir>\\<MODEL>\\vtk\\` and, for a chain stage,
+    `<runs_dir>\\<MODEL>\\<stage>\\vtk\\`. None when there is none (no
+    runs folder, no export, or a manifest from before `scratch`)."""
+    import glob
+    want = str(case_posix or '').rstrip('/')
+    if not want or not runs_dir or not os.path.isdir(str(runs_dir)):
+        return None
+    for depth in (('*',), ('*', '*')):
+        pattern = os.path.join(glob.escape(str(runs_dir)), *depth, 'vtk',
+                               MANIFEST_FILE)
+        for path in sorted(glob.glob(pattern)):
+            vdir = os.path.dirname(path)
+            state = load_vtk_manifest(vdir) or {}
+            if str(state.get('scratch') or '').rstrip('/') == want:
+                return vdir
+    return None
+
+
+def deleted_warning(vtk_dir):
+    """The one warning line a reader of a finished run's WSL writes
+    (postmortem load, the run browser's resume, the manual VTK button)
+    gives when the run's VTK export deleted written times after their
+    conversion (owner decision P11), else None."""
+    state = load_vtk_manifest(vtk_dir) if vtk_dir else None
+    n = len((state or {}).get('deleted_in_wsl') or ())
+    if not n:
+        return None
+    return (f'  [warn] {n} written time(s) of this run were deleted in WSL '
+            f'after their VTK conversion, so what is read here covers only '
+            f'the writes left - see {vtk_dir} (vtk\\manifest.json)')
+
+
 def _disk_totals(folder):
     """(files, bytes) of everything under `folder`."""
     n = size = 0

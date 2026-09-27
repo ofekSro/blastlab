@@ -859,8 +859,15 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
     if len(times) < 1:
         raise RuntimeError(f'{unc} has no written times to resume from')
     # OUT-2 (D10): writes the VTK export already removed are not replayed
-    from .vtk_export import note_resume
-    note_resume(getattr(hooks, 'vtk_dir', None), times, hooks.log)
+    from .vtk_export import deleted_note, note_resume
+    if getattr(hooks, 'vtk_dir', None):
+        note_resume(hooks.vtk_dir, times, hooks.log)
+    else:
+        # owner decision P11: a resume from the run browser has no model
+        # folder (P2-17), so find the run's vtk\ by its scratch and warn
+        note = deleted_note(posix)
+        if note:
+            hooks.log(note)
 
     # a Stop leaves `stopAt writeNow` in the runTimeModifiable dict -
     # a resumed solver would exit immediately; and the run must pick up

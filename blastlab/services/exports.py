@@ -282,8 +282,10 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
             return target
         if kind == 'vtk':
             from ..solvers.foam.export_vtk import export_vtk
+            found = run_vtk(ent)
             try:
-                out = export_vtk(target, log=log)
+                out = export_vtk(target, log=log,
+                                 vtk_dir=found[0] if found else None)
             except RuntimeError as exc:
                 log(f'VTK export failed: {exc}')
                 if on_error is not None:

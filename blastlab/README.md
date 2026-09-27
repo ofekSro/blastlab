@@ -205,6 +205,13 @@ native mode, and a native run ignores the keys.
   per rank; `reconstructPar` cannot follow a changing mesh) - validation
   says so before the run; sections and obstacles work there. A resume
   after deletion replays only the writes left (`replay_incomplete`).
+  Every reader of a finished run's WSL writes - `--load-foam-run` / the
+  run browser's Load, its Resume, and the Results **VTK** button on a
+  run whose case directory still exists - says so in one `[warn]` line
+  with the number of deleted writes and "see `<MODEL>\vtk`" (owner
+  decision P11). It finds the model by the run directory recorded as
+  `scratch` in `vtk\manifest.json`, under the Runs folder of the
+  settings.
 - **In ParaView:** *File > Open* a `.vtk.series` file - `volumes\
   volumes.vtk.series`, or several of `obstacles\` / `sections\<plane>\`
   at once to get one pipeline item per field - and the time bar follows
