@@ -424,8 +424,9 @@ def _nc_key(e):
 def _cadence(fam):
     if not fam:
         return None
+    # Time mode is in seconds (owner decision P22)
     return dict(mode=fam['mode'], value=fam['value'],
-                unit='ms' if fam['mode'] == 'time' else 'steps')
+                unit='s' if fam['mode'] == 'time' else 'steps')
 
 
 class VtkExport:

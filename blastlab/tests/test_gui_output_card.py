@@ -124,16 +124,16 @@ def main():
     f = form(3)
     for fam in ('s', 'v'):
         check(f'{fam}: Time, the steps box disabled',
-              entry_on(f, f'vtk_{fam}_ms')
+              entry_on(f, f'vtk_{fam}_time')
               and not entry_on(f, f'vtk_{fam}_steps'))
-        f.v[f'vtk_{fam}_ms'].set('0.75')
+        f.v[f'vtk_{fam}_time'].set('0.00075')
         f._vtk_radios[fam][1].invoke()          # Step
-        check(f'{fam}: Step disables the ms box instead',
+        check(f'{fam}: Step disables the seconds box instead',
               f.v[f'vtk_{fam}_mode'].get() == 'step'
-              and not entry_on(f, f'vtk_{fam}_ms')
+              and not entry_on(f, f'vtk_{fam}_time')
               and entry_on(f, f'vtk_{fam}_steps'))
         check(f'{fam}: which keeps its value',
-              f.v[f'vtk_{fam}_ms'].get() == '0.75')
+              f.v[f'vtk_{fam}_time'].get() == '0.00075')
     f.destroy()
 
     print('\nK5: the first tick fills the defaults')
@@ -184,7 +184,7 @@ def main():
         if d == 3:
             f.v['vtk_s_mode'].set('step')
             f.v['vtk_s_steps'].set('40')
-            f.v['vtk_v_ms'].set('0.25')
+            f.v['vtk_v_time'].set('0.00025')
             f.vtk_planes.set([('x', 0.3), ('z', 1.1)])
             f.v['vtk_fields'].cells[('rhoE', 'volumes')].set(True)
         case = f.get_case()
@@ -199,7 +199,7 @@ def main():
         check(f'{d}D: the case written again is the same JSON',
               json.dumps(case_to_dict(g.get_case()), sort_keys=True) == text)
         check(f'{d}D: the loaded mode sets the disabled box',
-              all(entry_on(g, f'vtk_{fam}_ms')
+              all(entry_on(g, f'vtk_{fam}_time')
                   == (g.v[f'vtk_{fam}_mode'].get() == 'time')
                   for fam in want[d]))
         if d == 3:
@@ -207,6 +207,7 @@ def main():
             check('3D: the JSON of sec. 3.3',
                   got['vtk_surfaces']['planes'] == [['x', 0.3], ['z', 1.1]]
                   and got['vtk_surfaces']['value'] == 40
+                  and got['vtk_volumes']['value'] == 0.00025      # [s]
                   and got['vtk_volumes']['fields']
                   == ['p', 'rho', 'U', 'rhoE'], str(got['vtk_surfaces']))
             # the Qt form builds the same case from the same file
@@ -228,7 +229,7 @@ def main():
     f.v['vtk_v_on'].set(True)
     f.v['vtk_v_steps'].set('lots')
     try:
-        ok = f.get_case().vtk_volumes['value'] == 1.0 and not f._bad
+        ok = f.get_case().vtk_volumes['value'] == 0.001 and not f._bad
     except ValueError:
         ok = False
     check('Time mode: a bad steps box is not read', ok)
@@ -275,6 +276,10 @@ def main():
     check('the Tk card shows the shared captions (Qt parity)',
           F.VTK_PLANES_CAPTION in card and F.VTK_MATRIX_CAPTION in card,
           str([t for t in card if 'Quantities' in t or 'planes' in t]))
+    check('P22: "Every [s]" and the line that the files use seconds',
+          any(t.startswith('Every [s]') for t in card)
+          and F.VTK_SECONDS_NOTE in card
+          and not any('[ms]' in t for t in card), str(card))
     check('no user-facing "OUT-4" on the card or its header tooltips',
           not any('OUT-' in t for t in card + [tip_of(t) for t in labels]))
     for row, want in (('Energy', 'total energy per unit volume'),

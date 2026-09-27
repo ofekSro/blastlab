@@ -142,7 +142,9 @@ native mode, and a native run ignores the keys.
   1D *Whole domain*; 2D *Whole domain* and *Obstacles*; 3D *Sections and
   obstacles* and *Volumes*. Each family has a box, a **Time / Step**
   pair and one interval per mode (the other is greyed): **Time is
-  simulated milliseconds** (`Every [ms]`; the case JSON stores ms too),
+  simulated seconds** (`Every [s]`, default 0.001; the case JSON stores
+  seconds too, like every other time in the case, and the card says that
+  the files and ParaView show time in seconds - owner decision P22),
   Step is solver steps. 3D adds extra section planes (axis, position
   [m]); the live-slice plane is also written whenever *Sections and
   obstacles* is ticked, and a plane is snapped
@@ -158,8 +160,8 @@ native mode, and a native run ignores the keys.
 - **Cadence.** Sections and obstacles are blastFoam surface function
   objects (vtkTimeSeries, blastFoam User Guide v6.0, sec. 15.5 (p. 124))
   that sample at their own cadence and never change the time step.
-  Volumes **are** the solver's write schedule (Time: every value / 1000
-  s of simulated time; Step: every N steps), so they cannot be combined
+  Volumes **are** the solver's write schedule (Time: every `value` s of
+  simulated time; Step: every N steps), so they cannot be combined
   with a write budget, and every write is also ingested for the live
   view. A Time-mode volumes write is `writeControl runTime`: it lands on
   **the first solver step past each interval**, and the time step is

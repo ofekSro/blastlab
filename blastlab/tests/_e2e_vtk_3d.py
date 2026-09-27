@@ -77,12 +77,15 @@ RAN = []
 PASSES = []
 
 T_END = 1e-3
-VOL_MS = 0.1
+#: every 0.1 ms, as registered. The case key is in SECONDS since owner
+#: decision P22 (2026-09-27); before that this was VOL_MS = 0.1 - the
+#: same cadence, so the rules below are unchanged
+VOL_S = 1e-4
 SURF_STEPS = 25
 STOP_AT = 3.5e-4
 SURF = dict(on=True, mode='step', value=SURF_STEPS, fields=['p', 'pMax'],
             obstacle_fields=['p', 'pMax'], planes=[['x', 0.2]])
-VOL = dict(on=True, mode='time', value=VOL_MS, fields=['p', 'rho', 'U'])
+VOL = dict(on=True, mode='time', value=VOL_S, fields=['p', 'rho', 'U'])
 #: rule 3 (Q7): relative tolerances
 TOL = dict(peak=0.01, impulse=0.01, arrival=0.005)
 
@@ -332,7 +335,7 @@ def rule2(C, D):
     vm = load_json(os.path.join(vtk, 'manifest.json'))
     fams = vm.get('families') or {}
     n_vol = (fams.get('volumes') or {}).get('count', 0)
-    want_vol = int(round(T_END / (VOL_MS / 1e3)))
+    want_vol = int(round(T_END / VOL_S))
     check('2b volumes: t_end / 0.1 ms files +/- 1',
           abs(n_vol - want_vol) <= 1, f'{n_vol} vs {want_vol}')
     ok, detail, counts = series_ok(vtk)

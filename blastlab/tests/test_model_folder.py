@@ -1215,7 +1215,7 @@ def test_d_stage_sets_vtk_dir():
         return real_solver(case.dim, 'native')(case, hooks)
     solvers_pkg.get_solver = lambda dim, backend: foam_like
     mf.verify_and_release_scratch = lambda m, *a, **k: (m, None)
-    vol = dict(on=True, mode='time', value=0.05, fields=['p'])
+    vol = dict(on=True, mode='time', value=0.00005, fields=['p'])   # [s]
     try:
         folder = mf.prepare(runs, 'VTK', confirm=lambda t: True)
         w = SolverWorker([jobs.solve_stage(

@@ -441,7 +441,7 @@ def test_resume_note():
         assert vs.load_vtk_manifest(tmp)['replay_incomplete'] is True
         # a W3 auto-resume's new export keeps the flag
         spec = SimpleNamespace(dim=3, vtk_volumes=dict(
-            on=True, mode='time', value=0.1, fields=['p']),
+            on=True, mode='time', value=0.0001, fields=['p']),
             vtk_surfaces=None, decomposed=False, n_procs=1)
         ex = vx.VtkExport(spec, SimpleNamespace(vtk_dir=tmp,
                                                 log=lines.append), ('p',))

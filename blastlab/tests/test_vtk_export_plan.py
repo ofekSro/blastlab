@@ -312,7 +312,7 @@ class Tree:
             vtk_volumes=(dict(on=True, mode='step', value=10,
                               fields=['p', 'rho', 'U']) if volumes
                          else None),
-            vtk_surfaces=(dict(on=True, mode='time', value=0.02,
+            vtk_surfaces=(dict(on=True, mode='time', value=0.00002,
                                fields=['p', 'pMax'],
                                obstacle_fields=['p'], planes=[['z', 0.35]])
                           if surfaces else None))
@@ -439,8 +439,9 @@ def test_b_happy_path():
         assert m['not_converted'] == [] and m['replay_incomplete'] is False
         assert m['cadence'] == {'volumes': dict(mode='step', value=10,
                                                 unit='steps'),
-                                'surfaces': dict(mode='time', value=0.02,
-                                                 unit='ms')}
+                                # P22: Time mode is in seconds
+                                'surfaces': dict(mode='time', value=0.00002,
+                                                 unit='s')}
         assert any('VTK output (volumes, sections, obstacles)' in ln
                    for ln in tree.lines), tree.lines
         assert any('written time(s) deleted in WSL' in ln

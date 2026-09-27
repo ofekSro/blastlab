@@ -416,6 +416,7 @@ class FieldForm(QWidget):
         self.widgets = {}            # name -> input widget
         self.labels = {}             # name -> QLabel (None for bool rows)
         self.cards = {}              # title -> Card
+        self.notes = {}              # card title -> its note QLabel
         self._specs = {}             # name -> F
         self._card_of = {}           # name -> card title
         self._notifying = False
@@ -590,7 +591,19 @@ class FieldForm(QWidget):
             grid.setColumnStretch(c * 2, 0)
             grid.setColumnStretch(c * 2 + 1, 1)
         line = 0                  # the next grid row of a one-pair card
+        noted = not spec.note
+
+        def add_note(row):
+            # the card's note (P22: the VTK card's "seconds" line), under
+            # the label+input rows and above any wide table
+            lbl = label(spec.note, 'small', wrap=True)
+            grid.addWidget(lbl, row, 0, 1, 2)
+            self.notes[spec.title] = lbl
+
         for i, f in enumerate(spec.rows):
+            if not noted and f.kind in ('points', 'matrix') and pairs == 1:
+                add_note(line)
+                line, noted = line + 1, True
             r, c = ((i // pairs, (i % pairs) * 2) if pairs > 1
                     else (line, 0))
             line += 1
@@ -620,6 +633,8 @@ class FieldForm(QWidget):
                 self.labels[f.name] = lbl
             self.rows[f.name] = (grid, r)
             self._card_of[f.name] = spec.title
+        if not noted:
+            add_note(line)
 
     def _make_widget(self, f):
         self._specs[f.name] = f

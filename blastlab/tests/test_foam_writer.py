@@ -1206,7 +1206,9 @@ def vtk_checks():
                 obstacles=[(1.2, 1.5, 0.6, 1.4, 0.0, 1.2)],
                 gauges=[(1.8, 1.0, 1.0)], n_snapshots=3,
                 solver='blastfoam', material='TNT')
-    surf = {'on': True, 'mode': 'time', 'value': 0.5,
+    # Time-mode values are in seconds (owner decision P22): the writer
+    # writes them as they are
+    surf = {'on': True, 'mode': 'time', 'value': 0.0005,
             'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'impulse'],
             'planes': [['y', 1.4], ['z', 0.5]]}
     vol = {'on': True, 'mode': 'step', 'value': 25,
@@ -1297,18 +1299,18 @@ def vtk_checks():
           'writeControl timeStep;' in sb and 'writeInterval 10;' in sb, sb)
 
     tv = render_case(Case3D(**base, vtk_volumes=dict(vol, mode='time',
-                                                     value=0.2)))
+                                                     value=0.0002)))
     tc = tv.files['system/controlDict']
     # owner decision P14 (b): runTime, so the writes never clip dt
     check('vtk volumes, Time mode: runTime (never adjustableRunTime, '
-          'P14 b), writeInterval = value_ms / 1000 = 0.0002 s, pinned',
+          'P14 b), writeInterval = value = 0.0002 s (P22), pinned',
           top_entry(tc, 'writeControl') == 'runTime'
           and 'adjustableRunTime' not in tc
           and top_entry(tc, 'writeInterval') == '0.0002'
           and tv.write_interval == 0.0002 and tv.adaptive_write is False
           and tv.write_steps == 0)
     fx = render_case(Case3D(**base, fixed_dt=1e-6,
-                            vtk_volumes=dict(vol, mode='time', value=0.2)))
+                            vtk_volumes=dict(vol, mode='time', value=0.0002)))
     fs = render_case(Case3D(**base, fixed_dt=1e-6, vtk_volumes=vol))
     check('vtk volumes with fixed_dt: Time mode runTime, Step mode stays '
           'timeStep',
@@ -1355,7 +1357,7 @@ def vtk_checks():
     p1 = render_case(Case1D(**c1))
     v1 = render_case(Case1D(**c1, vtk_volumes=dict(vol, value=40)))
     t1 = render_case(Case1D(**c1, vtk_volumes=dict(vol, mode='time',
-                                                   value=0.25)))
+                                                   value=0.00025)))
     v1c, t1c = v1.files['system/controlDict'], t1.files['system/controlDict']
     check('vtk 1D volumes, Step mode: timeStep every 40, pinned',
           top_entry(v1c, 'writeControl') == 'timeStep'
@@ -1398,7 +1400,7 @@ def vtk_checks():
     for solve, case, dt_want in (
             (B.solve_3d_foam, Case3D(**base, vtk_volumes=vol), None),
             (B.solve_3d_foam, Case3D(**base, vtk_volumes=dict(
-                vol, mode='time', value=0.2)), 0.0002),
+                vol, mode='time', value=0.0002)), 0.0002),
             (B.solve_2d_foam, Case2D(**c2, vtk_volumes=vol), None),
             (B.solve_1d_foam, Case1D(**c1, vtk_volumes=vol), None)):
         spec, h = render_case(case), _Hooks()

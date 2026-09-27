@@ -796,11 +796,11 @@ class CaseForm(ctk.CTkFrame):
                 rb.pack(side='left', padx=(0, GAP * 2))
                 self._vtk_radios[fam].append(rb)
             r = _row(body, r, 'Cadence', pair)
-            # Q3: Time is simulated MILLISECONDS - the rest of the form
-            # is in seconds, so the unit is in the caption
+            # P22 (owner, 2026-09-27): simulated SECONDS, like the rest
+            # of the form, the case file and the files ParaView reads
             for key, label, default in (
-                    ('ms', 'Every [ms]\n(simulated time)',
-                     fields.VTK_MS_DEFAULT),
+                    ('time', 'Every [s]\n(simulated time)',
+                     fields.VTK_TIME_DEFAULT),
                     ('steps', 'Every [steps]\n(solver steps)',
                      fields.VTK_STEPS_DEFAULT)):
                 name = f'vtk_{fam}_{key}'
@@ -810,6 +810,14 @@ class CaseForm(ctk.CTkFrame):
             self.v[f'vtk_{fam}_on'].trace_add(
                 'write', lambda *a, fam=fam: self._vtk_ticked(fam))
             mode.trace_add('write', lambda *a: self._sync_vtk())
+        # P22: the files and ParaView use seconds, as the Time box does
+        self._vtk_note = ctk.CTkLabel(
+            body, text=fields.VTK_SECONDS_NOTE, font=theme.F_SMALL,
+            text_color=c('muted'), anchor='w', justify='left',
+            wraplength=LABEL_WRAP + INPUT_MIN)
+        self._vtk_note.grid(row=r, column=0, columnspan=2, sticky='w',
+                            pady=(GAP, 0))
+        r += 1
         if self.dim == 3:
             # decision 7: the live-slice plane is always a section, when
             # the surfaces family is on
@@ -841,7 +849,7 @@ class CaseForm(ctk.CTkFrame):
         one of the chosen mode is live; the other keeps its value."""
         for fam, _caption in fields.VTK_FAMILIES.get(self.dim, ()):
             step = self.v[f'vtk_{fam}_mode'].get() == 'step'
-            for key, on in (('ms', not step), ('steps', step)):
+            for key, on in (('time', not step), ('steps', step)):
                 self._vtk_entries[f'vtk_{fam}_{key}'].configure(
                     state='normal' if on else 'disabled',
                     text_color=c('text') if on else c('muted'))

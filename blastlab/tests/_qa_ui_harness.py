@@ -3271,7 +3271,7 @@ def v01_vtk_1d(qa):
     qa.check(fams == ['vtk_v_on']
              and form.widgets['vtk_v_on'].text() == 'Whole domain',
              '1D offers one family, "Whole domain"', 'S2', evidence=str(fams))
-    qa.check(form.is_enabled('vtk_v_ms')
+    qa.check(form.is_enabled('vtk_v_time')
              and not form.is_enabled('vtk_v_steps'),
              'Time by default: the steps box is greyed', 'S2')
     _vtk_shots(qa, '1d_off')
@@ -3288,9 +3288,9 @@ def v01_vtk_1d(qa):
     _vtk_shots(qa, '1d_time')
     form.widgets['vtk_v_mode'].buttons['step'].click()
     qa.pump(0.6)
-    qa.check(not form.is_enabled('vtk_v_ms')
+    qa.check(not form.is_enabled('vtk_v_time')
              and form.is_enabled('vtk_v_steps'),
-             'Step greys the ms box instead', 'S2')
+             'Step greys the seconds box instead', 'S2')
     _vtk_shots(qa, '1d_step')
     qa.set_case(Case1D())
 
@@ -3324,9 +3324,9 @@ def v02_vtk_2d_obstacles(qa):
     form.widgets['vtk_v_mode'].buttons['step'].click()
     form.widgets['vtk_s_mode'].buttons['step'].click()
     qa.pump(0.6)
-    qa.check(not form.is_enabled('vtk_v_ms')
-             and not form.is_enabled('vtk_s_ms'),
-             'Step on both 2D families greys both ms boxes', 'S2')
+    qa.check(not form.is_enabled('vtk_v_time')
+             and not form.is_enabled('vtk_s_time'),
+             'Step on both 2D families greys both seconds boxes', 'S2')
     _vtk_shots(qa, '2d_step')
     _set_rows(qa, form.obstacles, [])
     _fresh2d(qa)
@@ -3357,10 +3357,10 @@ def v03_vtk_3d(qa):
     _vtk_shots(qa, '3d_time')
     form.widgets['vtk_s_mode'].buttons['step'].click()
     qa.pump(0.6)
-    qa.check(not form.is_enabled('vtk_s_ms')
+    qa.check(not form.is_enabled('vtk_s_time')
              and form.is_enabled('vtk_s_steps')
-             and form.is_enabled('vtk_v_ms'),
-             'Step on the surfaces greys their ms box only', 'S2')
+             and form.is_enabled('vtk_v_time'),
+             'Step on the surfaces greys their seconds box only', 'S2')
     pl = form.points['vtk_planes']
     ok_q = _add_row(qa, pl, 'q, 1')
     qa.shot('3d_plane_q1_refused_card', widget=_vtk_card(qa))
@@ -3462,7 +3462,7 @@ def v05_vtk_manifest(qa):
         folder = mf.prepare(runs, 'V05', confirm=lambda t: True)
         case = Case1D(radius_m=2.0, charge_kg=0.2, cell_size_m=0.01,
                       gauge_radii=[1.0], solver='blastfoam',
-                      vtk_volumes=dict(on=True, mode='time', value=0.5,
+                      vtk_volumes=dict(on=True, mode='time', value=0.0005,
                                        fields=['p']))
         w = SolverWorker([jobs.solve_stage(1, case, stage_dir=folder)])
         qa.action = 'stubbed foam stage'

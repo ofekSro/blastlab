@@ -23,8 +23,8 @@ from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
 from ..models.case import vtk_fields_for
 from ..models.fields import (VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
-                             VTK_MS_DEFAULT, VTK_PLANES_CAPTION,
-                             VTK_STEPS_DEFAULT)
+                             VTK_PLANES_CAPTION, VTK_SECONDS_NOTE,
+                             VTK_STEPS_DEFAULT, VTK_TIME_DEFAULT)
 from ..solvers.foam.materials import MATERIAL_NAMES
 
 #: caption wrap width and the minimum width reserved for the input
@@ -66,7 +66,8 @@ class F:
 @dataclass(frozen=True)
 class CardSpec:
     """A titled card in one of the two columns. `grid` > 1 lays the rows
-    out as that many label+input pairs per line (the boundary grid)."""
+    out as that many label+input pairs per line (the boundary grid).
+    `note` is a muted line under the rows (no field of its own)."""
 
     title: str
     col: int
@@ -74,6 +75,7 @@ class CardSpec:
     scope: str = None
     grid: int = 1
     field_rows: int = 0           # 'points' cards: stretch this card
+    note: str = ''
 
 
 # ── shared row groups ────────────────────────────────────────────────────
@@ -223,10 +225,10 @@ def _vtk_card(dim):
             F(f'vtk_{fam}_on', caption, 'bool', False),
             F(f'vtk_{fam}_mode', 'Cadence', 'radio', 'time',
               values=('time', 'step')),
-            # Q3: Time is simulated MILLISECONDS - the rest of the form
-            # is in seconds, so the unit is in the caption
-            F(f'vtk_{fam}_ms', 'Every [ms]\n(simulated time)', 'float',
-              VTK_MS_DEFAULT),
+            # P22 (owner, 2026-09-27): simulated SECONDS, like the rest
+            # of the form, the case file and the files ParaView reads
+            F(f'vtk_{fam}_time', 'Every [s]\n(simulated time)', 'float',
+              VTK_TIME_DEFAULT),
             F(f'vtk_{fam}_steps', 'Every [steps]\n(solver steps)', 'int',
               VTK_STEPS_DEFAULT),
         ]
@@ -240,7 +242,7 @@ def _vtk_card(dim):
                   'matrix', values=vtk_fields_for(dim),
                   cols=VTK_COLUMNS[dim]))
     return CardSpec('VTK output (ParaView)', col=1, scope='blastfoam',
-                    rows=tuple(rows))
+                    rows=tuple(rows), note=VTK_SECONDS_NOTE)
 
 
 def _trigger(dim):

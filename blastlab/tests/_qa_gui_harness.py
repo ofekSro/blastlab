@@ -2983,7 +2983,7 @@ def v01_vtk_1d(qa):
     form = _vtk_see(qa)
     qa.check(form._vtk_card.winfo_manager() == 'grid',
              'the 1D card is shown in blastFoam mode', 'S1')
-    qa.check(_vtk_live(form, 'vtk_v_ms')
+    qa.check(_vtk_live(form, 'vtk_v_time')
              and not _vtk_live(form, 'vtk_v_steps'),
              'Time by default: the steps box is disabled', 'S2')
     qa.shot('1d_off')
@@ -2996,9 +2996,9 @@ def v01_vtk_1d(qa):
     qa.shot('1d_time')
     form._vtk_radios['v'][1].invoke()
     qa.pump(0.6)
-    qa.check(not _vtk_live(form, 'vtk_v_ms')
+    qa.check(not _vtk_live(form, 'vtk_v_time')
              and _vtk_live(form, 'vtk_v_steps'),
-             'Step disables the ms box instead', 'S2')
+             'Step disables the seconds box instead', 'S2')
     qa.shot('1d_step')
     qa.set_case(Case1D())
 
@@ -3051,10 +3051,10 @@ def v03_vtk_3d(qa):
              'the first ticks fill the Viper defaults', 'S2', evidence=str(m))
     form._vtk_radios['s'][1].invoke()
     qa.pump(0.6)
-    qa.check(not _vtk_live(form, 'vtk_s_ms')
+    qa.check(not _vtk_live(form, 'vtk_s_time')
              and _vtk_live(form, 'vtk_s_steps')
-             and _vtk_live(form, 'vtk_v_ms'),
-             'Step on the surfaces disables their ms box only', 'S2')
+             and _vtk_live(form, 'vtk_v_time'),
+             'Step on the surfaces disables their seconds box only', 'S2')
     qa.add_row(form.vtk_planes, 'q, 1')
     qa.check(form.vtk_planes.get() == []
              and 'x, y or z' in form.vtk_planes._hint.cget('text'),

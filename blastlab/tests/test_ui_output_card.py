@@ -102,11 +102,18 @@ def main():
         check(f'{d}D: the Gauges column is locked with p, rho, U ticked',
               len(locked) == len(rows) and len(ticked) == 3,
               f'{len(locked)} locked, {len(ticked)} ticked')
+        # P22: the Time box is in seconds, and the card says the files are
         check(f'{d}D: the interval captions carry their units',
-              all('[ms]' in f.label_text(n) for n in names
-                  if n.endswith('_ms'))
+              all('[s]' in f.label_text(n) for n in names
+                  if n.endswith('_time'))
+              and any(n.endswith('_time') for n in names)
               and all('[steps]' in f.label_text(n) for n in names
                       if n.endswith('_steps')))
+        note = f.notes.get(TITLE)
+        check(f'{d}D: the card says the files and ParaView use seconds',
+              note is not None
+              and note.text() == 'Files and ParaView show time in seconds.',
+              note.text() if note is not None else 'no note')
         check(f'{d}D: a fresh form writes no VTK key',
               'vtk_volumes' not in case_to_dict(f.get_case())
               and 'vtk_surfaces' not in case_to_dict(f.get_case()))
@@ -136,22 +143,22 @@ def main():
     for fam in ('s', 'v'):
         check(f'{fam}: Time by default, the steps box greyed',
               f.v[f'vtk_{fam}_mode'].get() == 'time'
-              and f.is_enabled(f'vtk_{fam}_ms')
+              and f.is_enabled(f'vtk_{fam}_time')
               and not f.is_enabled(f'vtk_{fam}_steps'))
-        f.v[f'vtk_{fam}_ms'].set('0.75')
+        f.v[f'vtk_{fam}_time'].set('0.00075')
         f.widgets[f'vtk_{fam}_mode'].buttons['step'].click()
         pump(5)
-        check(f'{fam}: a click on Step greys the ms box instead',
+        check(f'{fam}: a click on Step greys the seconds box instead',
               f.v[f'vtk_{fam}_mode'].get() == 'step'
-              and not f.is_enabled(f'vtk_{fam}_ms')
+              and not f.is_enabled(f'vtk_{fam}_time')
               and f.is_enabled(f'vtk_{fam}_steps'))
         check(f'{fam}: and the greyed box keeps its value',
-              f.v[f'vtk_{fam}_ms'].get() == '0.75')
+              f.v[f'vtk_{fam}_time'].get() == '0.00075')
         f.v[f'vtk_{fam}_mode'].set('time')
         pump(5)
         check(f'{fam}: set() back to Time checks the Time radio',
               f.widgets[f'vtk_{fam}_mode'].buttons['time'].isChecked()
-              and f.is_enabled(f'vtk_{fam}_ms'))
+              and f.is_enabled(f'vtk_{fam}_time'))
     check('the rest of the form is never greyed by the card',
           f.is_enabled('cell') and f.is_enabled('t_end'))
 
@@ -233,7 +240,7 @@ def main():
         if d == 3:
             f.v['vtk_s_mode'].set('step')
             f.v['vtk_s_steps'].set('40')
-            f.v['vtk_v_ms'].set('0.25')
+            f.v['vtk_v_time'].set('0.00025')
             f.points['vtk_planes'].set([('x', 0.3), ('z', 1.1)])
             f.widgets['vtk_fields'].boxes[('rhoE', 'volumes')].click()
         elif d == 2:
@@ -242,7 +249,7 @@ def main():
             f.widgets['vtk_fields'].boxes[('timeOfArrival',
                                            'obstacles')].click()
         else:
-            f.v['vtk_v_ms'].set('0.5')
+            f.v['vtk_v_time'].set('0.0005')
         pump(5)
         case = f.get_case()
         text = json.dumps(case_to_dict(case), sort_keys=True)
@@ -262,7 +269,7 @@ def main():
         check(f'{d}D: and the case written again is the same JSON',
               again == text)
         check(f'{d}D: the greying follows the loaded mode',
-              all(g.is_enabled(f'vtk_{fam}_ms')
+              all(g.is_enabled(f'vtk_{fam}_time')
                   == (g.v[f'vtk_{fam}_mode'].get() == 'time')
                   for fam, _c in F.VTK_FAMILIES[d]))
     dd = case_to_dict(f.get_case())
@@ -272,7 +279,7 @@ def main():
               'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'pMax'],
               'planes': [['x', 0.3], ['z', 1.1]]}
           and dd['vtk_volumes'] == {
-              'on': True, 'mode': 'time', 'value': 0.25,
+              'on': True, 'mode': 'time', 'value': 0.00025,
               'fields': ['p', 'rho', 'U', 'rhoE']}, str(dd.get('vtk_volumes')))
     # loading a case without VTK keys resets the card
     g.set_case(case_from_dict(json.loads(json.dumps(
@@ -292,7 +299,7 @@ def main():
     pump(5)
     try:
         case = f.get_case()
-        ok = case.vtk_volumes['value'] == 1.0 and not f.bad
+        ok = case.vtk_volumes['value'] == 0.001 and not f.bad
     except ValueError as exc:
         ok, case = False, exc
     check('Time mode: a bad steps box is not read', ok, str(case)[:80])
@@ -389,6 +396,7 @@ def main():
     check('Time-mode volumes note: the write schedule, first step past '
           'each interval, no "change the solution" warning',
           "solver's write schedule" in n
+          and 'one write every 0.001 s' in n                  # P22
           and 'first solver step past its interval' in n
           and 'solution' not in n, n)
     f.v['vtk_v_mode'].set('step')

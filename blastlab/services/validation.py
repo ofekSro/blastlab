@@ -503,11 +503,11 @@ def _validate_vtk_cadence(label, fam, err):
         # finite too: NaN passed `<= 0` and then broke int() below (and
         # the write-count note) with a ValueError out of validate_case
         err(f"{label}: the interval must be a number "
-            f"({'ms' if mode == 'time' else 'solver steps'})")
+            f"({'s' if mode == 'time' else 'solver steps'})")
         return False
     if value <= 0:
         err(f"{label}: the interval must be > 0 "
-            f"({'ms' if mode == 'time' else 'solver steps'})")
+            f"({'s' if mode == 'time' else 'solver steps'})")
         return False
     if mode == 'step' and float(value) != int(value):
         err(f"{label}: a Step interval must be a whole number of solver "
@@ -656,11 +656,13 @@ def _validate_vtk(case, rep, ctx):
             t_end = float(getattr(case, 't_end', 0.0) or 0.0)
             upto = '' if t_end > 0 else 'up to '
             t_end = t_end if t_end > 0 else safety_cap_s(case)
-            n_w = max(1, int(math.ceil(t_end / (vol['value'] / 1e3))))
+            # the value is in seconds (owner decision P22)
+            # (1e-9: 0.002 / 0.0001 is 20.000000000000004 in floats)
+            n_w = max(1, int(math.ceil(t_end / vol['value'] - 1e-9)))
             # owner decision P14 (b): Time-mode writes use runTime, so
             # they never clip dt; each lands on the first solver step
             # past its interval (writer._controldict_time)
-            note(f"VTK volumes: one write every {vol['value']:g} ms, "
+            note(f"VTK volumes: one write every {vol['value']:g} s, "
                  f"{upto}{n_w} writes (~{n_w * per / 1e9:.1f} GB of written "
                  f"times on the WSL disk at ~{BYTES_PER_CELL_WRITE} B per "
                  f"cell per write, before conversion). Every write is also "

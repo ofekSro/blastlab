@@ -147,7 +147,7 @@ class CaseForm(FieldForm):
         one place on this form where greying, not hiding, is right."""
         for fam, _caption in fields.VTK_FAMILIES.get(self.dim, ()):
             step = self.v[f'vtk_{fam}_mode'].get() == 'step'
-            self.set_enabled(f'vtk_{fam}_ms', not step)
+            self.set_enabled(f'vtk_{fam}_time', not step)
             self.set_enabled(f'vtk_{fam}_steps', step)
 
     def _vtk_ticked(self, fam):

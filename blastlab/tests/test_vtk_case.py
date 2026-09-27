@@ -67,7 +67,8 @@ def roundtrip(case):
         return raw, load_case(path)
 
 
-SURF = {'on': True, 'mode': 'time', 'value': 0.5,
+#: Time-mode values are in SECONDS (owner decision P22, reversing Q3's ms)
+SURF = {'on': True, 'mode': 'time', 'value': 0.0005,
         'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'impulse'],
         'planes': [['y', 1.4], ['z', 0.5]]}
 VOL = {'on': True, 'mode': 'step', 'value': 25, 'fields': ['p', 'rho', 'U']}
@@ -102,16 +103,17 @@ def test_keys():
                 obstacles=[(2.0, 2.4, 0.0, 1.6)],
                 vtk_surfaces={'on': True, 'mode': 'step', 'value': 10,
                               'obstacle_fields': ['p']},
-                vtk_volumes={'on': True, 'mode': 'time', 'value': 1,
+                vtk_volumes={'on': True, 'mode': 'time', 'value': 0.001,
                              'fields': ['p']})
     raw2, back2 = roundtrip(c2)
     check('2D: a family written without some keys comes back complete',
           back2.vtk_surfaces == {'on': True, 'mode': 'step', 'value': 10,
                                  'fields': [], 'obstacle_fields': ['p'],
                                  'planes': []}, str(back2.vtk_surfaces))
-    check('   Time-mode value is a float in ms, Step-mode value an int',
+    check('   Time-mode value is a float in s (P22), Step-mode value an int',
           isinstance(back2.vtk_volumes['value'], float)
-          and back2.vtk_volumes['value'] == 1.0
+          and back2.vtk_volumes['value'] == 0.001
+          and raw2['vtk_volumes']['value'] == 0.001
           and type(back2.vtk_surfaces['value']) is int)
 
     d = case_to_dict(Case3D())
@@ -185,7 +187,7 @@ def vtk_errors(rep):
 
 
 def s_on(**kw):
-    d = {'on': True, 'mode': 'time', 'value': 0.5, 'fields': ['p', 'pMax'],
+    d = {'on': True, 'mode': 'time', 'value': 0.0005, 'fields': ['p', 'pMax'],
          'obstacle_fields': [], 'planes': []}
     d.update(kw)
     return d
@@ -239,7 +241,7 @@ def test_validation():
     check('1D volumes with its six fields: no error', not ok1.errors,
           str(ok1.errors))
     ok2 = rep2(vtk_surfaces=s_on(fields=[], obstacle_fields=['p', 'pMax']),
-               vtk_volumes=v_on(mode='time', value=0.1))
+               vtk_volumes=v_on(mode='time', value=0.0001))
     check('2D obstacles + volumes: no error', not ok2.errors, str(ok2.errors))
 
     refusals = (
@@ -348,13 +350,23 @@ def test_validation():
           said(nat, 'VTK output is a blastFoam setting - the native solver '
                     'ignores it', ('notes',))
           and not said(nat, 'VTK', ('errors',)), str(nat.errors))
-    tm = rep3(vtk_volumes=v_on(mode='time', value=0.1))
+    # P22: seconds - 0.002 s / 0.0001 s = 20 writes (not 21: the float
+    # quotient is 20.000000000000004)
+    tm = rep3(vtk_volumes=v_on(mode='time', value=0.0001))
     check('Time-mode volumes: a note with the write count and the disk',
-          said(tm, 'VTK volumes: one write every 0.1 ms, 20 writes',
+          said(tm, 'VTK volumes: one write every 0.0001 s, 20 writes',
                ('notes',)) and said(tm, 'GB of written times', ('notes',))
           and said(tm, 'slows it', ('notes',)),
           str(tm.notes))
-    auto = rep3(t_end=0.0, vtk_volumes=v_on(mode='time', value=0.5))
+    fr = rep3(vtk_volumes=v_on(mode='time', value=0.0003))
+    check('   a cadence that does not divide t_end rounds the count up',
+          said(fr, 'one write every 0.0003 s, 7 writes', ('notes',)),
+          str(fr.notes))
+    s_err = rep3(vtk_surfaces=s_on(value=0))
+    check('   the refusal names seconds, not ms',
+          said(s_err, 'the interval must be > 0 (s)', ('errors',)),
+          str(s_err.errors))
+    auto = rep3(t_end=0.0, vtk_volumes=v_on(mode='time', value=0.0005))
     check('   with an automatic end time it says "up to"',
           said(auto, 'writes (~', ('notes',))
           and said(auto, ', up to ', ('notes',)), str(auto.notes))

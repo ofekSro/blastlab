@@ -180,9 +180,13 @@ VTK_FAMILIES = {1: (('v', 'Whole domain'),),
 VTK_FAMILY_COLUMNS = {'s': ('sections', 'obstacles'), 'v': ('volumes',)}
 #: what the first tick of a family fills in, mirroring Viper (sec. 3.1)
 VTK_DEFAULTS = {'s': ('p', 'pMax'), 'v': ('p', 'rho', 'U')}
-#: the form's cadence defaults: Viper's 0.001 s = 1 ms, and 25 steps
-VTK_MS_DEFAULT = 1.0
+#: the form's cadence defaults: Viper's 0.001 s, and 25 steps. The Time
+#: box is in SECONDS, like the rest of the form and the files (owner
+#: decision P22, 2026-09-27, reversing Q3's ms)
+VTK_TIME_DEFAULT = 0.001
 VTK_STEPS_DEFAULT = 25
+#: the card's line under the cadence boxes (P22)
+VTK_SECONDS_NOTE = 'Files and ParaView show time in seconds.'
 #: the plane table's column kinds (batch plan D7)
 VTK_PLANE_AXES = ('x', 'y', 'z')
 
@@ -269,7 +273,7 @@ def _vtk_from_fields(dim, v, number, whole):
         if mode == 'step':
             value = whole(f'vtk_{fam}_steps', f'VTK {caption} every [steps]')
         else:
-            value = number(f'vtk_{fam}_ms', f'VTK {caption} every [ms]')
+            value = number(f'vtk_{fam}_time', f'VTK {caption} every [s]')
         if fam == 'v':
             out['vtk_volumes'] = normalize_vtk(
                 dict(on=True, mode=mode, value=value,
@@ -301,14 +305,14 @@ def _vtk_fields_of_case(case, dim) -> dict:
         out[f'vtk_{fam}_on'] = bool(d)
         mode = d['mode'] if d and d['mode'] in ('time', 'step') else 'time'
         out[f'vtk_{fam}_mode'] = mode
-        ms, steps = VTK_MS_DEFAULT, VTK_STEPS_DEFAULT
+        every_s, steps = VTK_TIME_DEFAULT, VTK_STEPS_DEFAULT
         if d and isinstance(d['value'], (int, float)) \
                 and not isinstance(d['value'], bool):
             if mode == 'step':
                 steps = d['value']
             else:
-                ms = d['value']
-        out[f'vtk_{fam}_ms'] = f'{ms:g}'
+                every_s = d['value']
+        out[f'vtk_{fam}_time'] = f'{every_s:g}'
         out[f'vtk_{fam}_steps'] = f'{steps:g}'
         if d and fam == 'v':
             matrix['volumes'] = d['fields']

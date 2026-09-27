@@ -211,8 +211,10 @@ Viper's 1D / 2D / 3D tabs are:
 
 Per family: an enable box; a **Time / Step** radio pair; one value box per
 mode, the other greyed out (exactly Viper's *VTKs and Framerates* block).
-Time is **simulated time in milliseconds** — the label says `[ms]`, because the
-rest of the form works in seconds and the difference must be visible. Step is
+Time is **simulated time in seconds** — the label says `[s]`, like the rest of
+the form, and one line on the card says that the files and ParaView show time
+in seconds (*owner decision P22, 2026-09-27*, reversing the earlier `[ms]`,
+batch plan Q3: a typed 0.5 ms reappeared as 0.0005 in the files). Step is
 solver steps, the unit the live-view refresh already uses.
 
 Sections (3D): the live-slice plane (`slice_axis`, `slice_pos`, already on the
@@ -246,7 +248,7 @@ fields. The Gauges column is display only until `OUT-4`.
 ### 3.3 Case keys and validation
 
 ```json
-"vtk_surfaces": {"on": true, "mode": "time", "value": 0.5,
+"vtk_surfaces": {"on": true, "mode": "time", "value": 0.0005,
                  "fields": ["p", "pMax"],
                  "planes": [["y", 1.4], ["z", 0.5]]},
 "vtk_volumes":  {"on": true, "mode": "step", "value": 25,
@@ -276,7 +278,7 @@ vtkSurfaces
 {
     type            surfaces;
     writeControl    timeStep;            // or runTime for Time mode (D5)
-    writeInterval   25;                  // or value_ms / 1000
+    writeInterval   25;                  // or value [s] (P22)
     surfaceFormat   vtkTimeSeries;
     interpolationScheme cellPoint;
     fields          (p pMax);
@@ -297,7 +299,7 @@ The obstacles entry is emitted only when the case has obstacles (the
 carved out … exposed faces -> 'obstacles' wall patch").
 
 **Volumes** — the cadence becomes the solver's own write schedule: Time →
-`writeControl runTime; writeInterval value_ms/1000`; Step →
+`writeControl runTime; writeInterval value` (seconds, P22); Step →
 `writeControl timeStep; writeInterval N`. The adaptive interval controller is
 switched off for the run (`spec.adaptive_write = False`, as `_apply_budget`
 does) and the exact end-time write (`writeTimes`, T62) is kept.

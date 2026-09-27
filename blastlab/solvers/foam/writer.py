@@ -395,7 +395,7 @@ def _apply_budget(spec, case):
 def _apply_vtk(spec, case):
     """OUT-2: carry the case's VTK families onto a blastFoam spec. VTK
     volumes make their cadence the solver's own write schedule (plan
-    sec. 3.4): Time mode pins writeInterval to value_ms / 1000 with
+    sec. 3.4): Time mode pins writeInterval to `value` (seconds, P22) with
     `writeControl runTime` (the first step past each multiple, dt left
     alone - owner decision P14 (b)), Step mode writes every N steps.
     Either way the adaptive controller is off; the
@@ -413,7 +413,7 @@ def _apply_vtk(spec, case):
     if vol['mode'] == 'step':
         spec.write_steps = int(vol['value'])
     else:
-        spec.write_interval = float(vol['value']) / 1000.0
+        spec.write_interval = float(vol['value'])     # [s], P22
 
 
 def plan_case(case):
@@ -1135,7 +1135,7 @@ def _controldict_vtk_surfaces(spec, case):
     if fam['mode'] == 'step':
         control, interval = 'timeStep', int(fam['value'])
     else:
-        control, interval = 'runTime', float(fam['value']) / 1000.0
+        control, interval = 'runTime', float(fam['value'])   # [s], P22
 
     def surfaces_fo(fields, surfaces):
         return {

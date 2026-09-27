@@ -24,9 +24,9 @@ TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 VTK_FIELDS = ('p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
               'rho', 'U', 'T', 'alpha.expl', 'rhoE')
 VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival')
-#: cadence units: 'time' = simulated milliseconds (Q3: stored in ms,
-#: although every other time in the case is in seconds), 'step' = solver
-#: steps
+#: cadence units: 'time' = simulated SECONDS, like every other time in
+#: the case (owner decision P22, 2026-09-27, reversing Q3's ms), 'step' =
+#: solver steps
 VTK_MODES = ('time', 'step')
 #: the keys of each family, in the order they are written
 VTK_VOLUME_KEYS = ('on', 'mode', 'value', 'fields')
@@ -57,7 +57,7 @@ def normalize_vtk(d, key):
     """One VTK family (`key` is 'vtk_surfaces' or 'vtk_volumes') in its
     canonical form: every key present, in file order, `fields` a list of
     str, `planes` a list of [axis, float], `value` a float in Time mode
-    (ms) and an int in Step mode when it is whole. None stays None. A
+    (s) and an int in Step mode when it is whole. None stays None. A
     value that cannot be converted is kept as given, for validation to
     name; an unknown key or a non-object is refused."""
     if d is None:
@@ -287,8 +287,8 @@ class Case2D:
                                       # None = charge centre
     #: OUT-2: VTK output for ParaView, blastFoam only. `vtk_surfaces` =
     #: {on, mode, value, fields, obstacle_fields, planes} (2D: obstacles
-    #: only), `vtk_volumes` = {on, mode, value, fields}; `value` is ms in
-    #: Time mode, solver steps in Step mode. None or on = False is not
+    #: only), `vtk_volumes` = {on, mode, value, fields}; `value` is seconds
+    #: in Time mode (P22), solver steps in Step mode. None or on = False is not
     #: written (case_to_dict), so a case without them is byte-identical.
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
