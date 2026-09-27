@@ -1176,11 +1176,110 @@ def test_d_protected_survive():
         tree.close()
 
 
+def _foam_scalar(path, n):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    body = '\n'.join('101325' for _ in range(n))
+    with open(path, 'w', encoding='ascii', newline='\n') as f:
+        f.write('FoamFile\n{\n    format      ascii;\n    class       '
+                'volScalarField;\n}\n\ninternalField   nonuniform '
+                f'List<scalar>\n{n}\n(\n{body}\n)\n;\n')
+
+
+def decomposed_tree():
+    """A fake 3-rank parallel AMR scratch (OUT-3 E6): uneven readiness -
+    T[2] is missing `p` on rank 1, the newest T[5] on rank 2 - polyMesh/
+    at T[1] on every rank and at T[3] on ranks 0 and 2 only, and T[4]'s
+    pMax on rank 1 at the old cell count (not whole: the P1-5 walk-back
+    goes past it to T[3])."""
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix='blastlab_vtk_e6_')
+    unc = os.path.join(tmp, RUN)
+    mesh = {0: {T[1], T[3]}, 1: {T[1]}, 2: {T[1], T[3]}}
+    for i in range(3):
+        for t in ['0'] + T:
+            d = os.path.join(unc, f'processor{i}', t)
+            os.makedirs(os.path.join(d, 'uniform'), exist_ok=True)
+            with open(os.path.join(d, 'uniform', 'time'), 'w') as f:
+                f.write('value 0;\n')
+            if not ((t == T[2] and i == 1) or (t == T[5] and i == 2)):
+                _foam_scalar(os.path.join(d, 'p'), 8)
+            _foam_scalar(os.path.join(d, 'pMax'),
+                         7 if (t == T[4] and i == 1) else 8)
+            if t in mesh[i]:
+                os.makedirs(os.path.join(d, 'polyMesh'))
+    spec = SimpleNamespace(
+        dim=2, case_posix=POSIX, case_unc=unc, start_dir='0', n_procs=3,
+        amr=1, decomposed=True, vtk_volumes=None, vtk_surfaces=None,
+        n_cells=24,
+        time_root=lambda: os.path.join(unc, 'processor0'),
+        time_dirs=lambda name: [os.path.join(unc, f'processor{i}', name)
+                                for i in range(3)])
+    return tmp, unc, spec, mesh
+
+
+def test_d_decomposed_amr():
+    import shutil as sh
+    from blastlab.solvers.foam import backend, reader
+    tmp, unc, spec, mesh = decomposed_tree()
+    try:
+        lines, gone = [], []
+        hooks = SimpleNamespace(purge_fields=True, fields_deleted=set(),
+                                log=lines.append)
+
+        def rm(paths):
+            for p in paths:
+                assert p.startswith(POSIX + '/'), p
+                local = os.path.join(unc, *p[len(POSIX) + 1:].split('/'))
+                if os.path.isdir(local):
+                    sh.rmtree(local)
+                gone.append(p)
+            return True
+
+        def start():
+            times = [n for _t, n in reader.list_times(spec.time_root())]
+            return backend._resume_start_time(spec, times, hooks)[0]
+        before = start()
+        assert before == T[3], before
+        ready = runloop.common_ready_times(spec, ('p',))
+        assert ready == {'0', T[0], T[1], T[3], T[4]}, ready
+        want = vx.vtk_purge_plan(T, (), (), T, '0', (), n_procs=3,
+                                 ordered=T, require_copy=False,
+                                 per_rank_ready=ready, rank_mesh=mesh)
+        # T[1] is a mesh time and the next kept (T[2], not ready) is not a
+        # mesh time on every rank, so only T[0] may go
+        assert want == [T[0]], want
+        ex = vx.VtkExport(spec, hooks, ('p',), delete=rm,
+                          clock=lambda: 0.0)
+        ex.run({t: 0 for t in T}, final=True)
+        left = {i: sorted(n for _t, n in reader.list_times(
+            os.path.join(unc, f'processor{i}'))) for i in range(3)}
+        for i in range(3):
+            assert T[0] not in left[i] and set(T[1:]) <= set(left[i]), \
+                (i, left[i])
+        assert hooks.fields_deleted == {T[0]}
+        assert start() == before
+        # the restart anchor (newest ready on every rank) is never listed
+        assert max(ready, key=float) not in {p.rsplit('/', 1)[1]
+                                             for p in gone}
+    finally:
+        sh.rmtree(tmp, ignore_errors=True)
+
+
+def test_d_decomposed_purge_untouched():
+    """DecomposedPurge (HD1-15) is left as it was: inactive on a
+    decomposed run, whatever OUT-3 does."""
+    spec = SimpleNamespace(write_budget=10, n_procs=3, decomposed=True)
+    assert not runloop.purge_active(spec)
+    spec.decomposed = False
+    assert runloop.purge_active(spec)
+
+
 TESTS_D = [test_d_no_family_purges, test_d_without_the_flag_nothing,
            test_d_keep_all_deletes_no_time_dir, test_d_1d_deletes_nothing,
            test_d_delete_failure_is_retried,
            test_d_auto_resume_keeps_the_record,
-           test_d_volumes_still_need_the_copy, test_d_protected_survive]
+           test_d_volumes_still_need_the_copy, test_d_protected_survive,
+           test_d_decomposed_amr, test_d_decomposed_purge_untouched]
 TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D
 
 

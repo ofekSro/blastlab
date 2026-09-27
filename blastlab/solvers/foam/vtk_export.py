@@ -1167,16 +1167,58 @@ class VtkExport:
                 mesh.add(n)
         return names, frozenset(mesh)
 
+    def _rank_listing(self, done):
+        """(every time on any rank, {rank: times holding polyMesh/}) of a
+        decomposed run (OUT-3, E6), or None when a rank dir cannot be
+        listed. An ingested time's answer is cached, as `mesh_cache`."""
+        from . import reader
+        ordered, rank_mesh = set(), {}
+        for i in range(int(self.spec.n_procs)):
+            pu = os.path.join(self.spec.case_unc, f'processor{i}')
+            try:
+                names = [n for _t, n in reader.list_times(pu)]
+            except OSError:
+                return None
+            ordered.update(names)
+            mesh = set()
+            for n in names:
+                has = self.mesh_cache.get((i, n))
+                if has is None:
+                    has = os.path.isdir(os.path.join(pu, n, 'polyMesh'))
+                    if n in done:
+                        self.mesh_cache[(i, n)] = has
+                if has:
+                    mesh.add(n)
+            rank_mesh[i] = mesh
+        return sorted(ordered, key=_time_key), rank_mesh
+
     def _plan(self, done):
         names = [str(n) for n in done]
         # OUT-3: without VTK volumes nothing is converted or copied first
         kw = dict(require_copy=self.volumes_on)
+        decomposed = bool(getattr(self.spec, 'decomposed', False))
+        if decomposed:
+            # E6: read per rank, so "complete on every rank" stands for
+            # "reconstructed"; the newest such time is the restart anchor
+            # and is one of the KEEP_NEWEST kept (runloop.common_ready_times)
+            from .runloop import common_ready_times
+            ready = common_ready_times(self.spec, self.fields)
+            if not ready:
+                return []
+            kw['per_rank_ready'] = ready
         if not vtk_purge_plan(names, self.converted, self.copied, names,
                               self.spec.start_dir, self.reconstructed,
                               self.protected,
                               getattr(self.spec, 'n_procs', 1), **kw):
             return []
-        ordered, mesh = self._mesh_listing(set(names))
+        if decomposed:
+            listing = self._rank_listing(set(names))
+            if listing is None:
+                return []
+            ordered, kw['rank_mesh'] = listing
+            mesh = frozenset()
+        else:
+            ordered, mesh = self._mesh_listing(set(names))
         return vtk_purge_plan(names, self.converted, self.copied, names,
                               self.spec.start_dir, self.reconstructed,
                               self.protected,
