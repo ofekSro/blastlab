@@ -15,6 +15,10 @@ transmit on every side - run five times as model-folder stages
   C  BOTH     B's surfaces + vtk_volumes: Time mode, every 0.1 ms, p rho U
   D  NODEL    C with BLASTLAB_VTK_NO_DELETE=1 (nothing deleted in WSL)
   E  STOP     C, Stop pressed once the solver passed t = 0.35 ms
+  A2 NOCLIP   A's case (no VTK key), with the controlDict's writeControl
+              switched from adjustableRunTime to runTime - the control C
+              uses since P14 (b) - so its writes never clip dt; the
+              baseline of rule 3 since P14 (c) (owner, 2026-09-27)
 
 PRE-REGISTERED RULES (CLAUDE.md sec. 6; written and committed before the
 first run, never changed afterwards):
@@ -41,10 +45,15 @@ first run, never changed afterwards):
        and C deleted at least one written time in WSL (D deleted none);
     f. after the release the scratch is gone (manifest and `test -d`)
        and foam\\SHA256SUMS verifies against the copied files.
- 3. C vs A (volumes vs no export, Q7), per gauge, with
+ 3. C vs A2 (volumes vs no export, Q7), per gauge, with
     output/gauge_summary.summarize_trace on gauges_3d.txt:
     |d peak| <= 1 %, |d positive-phase impulse| <= 1 %, |d arrival|
     <= 0.5 %. All three, never peak alone.
+    Re-registered 2026-09-27 (owner decision P14 (c), before the run):
+    the baseline was A, whose pinned adjustableRunTime schedule clips dt
+    (1500 steps vs C's 972); it is now A2. Proof that A2's dt is not
+    clipped by its writes: n_steps(A2) == n_steps(C), exactly. Gauge,
+    thresholds and text otherwise unchanged; rule 1 still uses A.
  4. E (stopped): the scratch is kept (manifest deleted = false and
     `test -d`), at least one volume file was converted, every file a
     series names exists with > 0 bytes, every series parses with its
@@ -135,6 +144,25 @@ def spy_export():
             copied=set(self.copied), deleted=set(self.deleted),
             not_conv={t for (_f, t) in self.not_converted}))
     vx.VtkExport.run = run
+
+
+#: set while A2 runs: its controlDict writes with runTime (see A2 above)
+NOCLIP = []
+
+
+def spy_write_control():
+    """A2: switch writeControl adjustableRunTime -> runTime, the control
+    C's volumes use (writer._controldict_time, P14 (b)): the first step
+    past each multiple, dt left alone. Only while NOCLIP is set."""
+    from blastlab.solvers.foam import writer
+    real = writer._controldict_time
+
+    def time_dict(spec, case):
+        d = real(spec, case)
+        if NOCLIP and d.get('writeControl') == 'adjustableRunTime':
+            d['writeControl'] = 'runTime'
+        return d
+    writer._controldict_time = time_dict
 
 
 def newest_two(done):
@@ -397,7 +425,12 @@ def rule2(C, D):
 
 
 def rule3(A, C):
-    print('\nRule 3: C (volumes) vs A (no export), Q7', flush=True)
+    """A is the unclipped baseline A2 (P14 (c))."""
+    print('\nRule 3: C (volumes) vs A2 (no export, dt not clipped), Q7',
+          flush=True)
+    na, nc = A['m'].get('n_steps'), C['m'].get('n_steps')
+    check('3 A2 dt not clipped by its writes: n_steps(A2) == n_steps(C)',
+          bool(na) and na == nc, f'A2 {na}, C {nc}')
     ma, mc = gauge_metrics(A['folder']), gauge_metrics(C['folder'])
     check('3 the same gauges', [g['gauge'] for g in ma]
           == [g['gauge'] for g in mc] and ma, str(ma))
@@ -453,6 +486,7 @@ def main():
         return 0
     env.hardware(probe=True)                # CLAUDE.md 4: headless
     spy_export()
+    spy_write_control()
     runs = tempfile.mkdtemp(prefix='blastlab_e2e_vtk_')
     print(f'runs folder (kept as evidence): {runs}', flush=True)
     kept = None
@@ -468,7 +502,15 @@ def main():
         E = run_stage(runs, 'E2E_VTK_E_STOP',
                       case(vtk_surfaces=SURF, vtk_volumes=VOL),
                       stop_at=STOP_AT)
-        for tag, r in (('A', A), ('B', B), ('C', C), ('D', D)):
+        NOCLIP.append(True)
+        try:
+            A2 = run_stage(runs, 'E2E_VTK_A2_NOCLIP', case())
+        finally:
+            NOCLIP.clear()
+        print(f'    steps: A {A["m"].get("n_steps")}, A2 '
+              f'{A2["m"].get("n_steps")}, C {C["m"].get("n_steps")}',
+              flush=True)
+        for tag, r in (('A', A), ('B', B), ('C', C), ('D', D), ('A2', A2)):
             check(f'{tag}: finished without an error, not stopped early',
                   r['error'] is None and r['res'] is not None
                   and not r['res'].stopped_early,
@@ -476,7 +518,7 @@ def main():
         print('\nRule 1: B (surfaces only) vs A (no export)', flush=True)
         byte_rules('1 B vs A', B, A)
         rule2(C, D)
-        rule3(A, C)
+        rule3(A2, C)
         kept = rule4(E)
     finally:
         if kept and model_folder.is_run_dir(kept):

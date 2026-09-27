@@ -459,6 +459,16 @@ takes 1500 and is byte-identical to A. Thresholds not changed; P14 (c) (a
 mid-field gauge for rule 3, or an A without clipped writes) stays with the
 owner.
 
+**P14 (c), rule 3 re-registered (owner decision, 2026-09-27, committed
+before the run).** Rule 3's baseline is no longer A but a sixth stage **A2**:
+A's case (no VTK key), with the controlDict's `writeControl` switched from
+`adjustableRunTime` to `runTime` (the control C's volumes use since P14 (b);
+a test-side wrapper of `writer._controldict_time`, solver defaults
+untouched), so its writes never clip dt. Proof, as a pre-registered check:
+`n_steps(A2) == n_steps(C)` exactly. Same gauge, same thresholds
+(1 / 1 / 0.5 %), rule text otherwise unchanged; rule 1 still compares B
+with A.
+
 ## 7. Needs the machine free
 
 **Check that `wsl -d Ubuntu -- pgrep -a blastFoam` is empty, and tell the owner first.** Copy any run you care about out of `/root/blastlab_runs` before anything that builds a GUI. Use `python -u`, no timeout, in the background.
