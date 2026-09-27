@@ -10,7 +10,8 @@ The cases (tiny, serial unless said):
       zone (~5,100 cells), 0.2 kg TNT on the axis, one obstacle, one gauge
       at 0.35 m, t_end = 0.6 ms, write budget 10 (~10 pinned writes, no
       adaptive interval), n_snapshots default, transmit sides (reflect on
-      the axis). A = the box ticked, B = the default.
+      the axis), activation 'none' (see the note below). A = the box
+      ticked, B = the default.
   R2  C = R1's default case stopped once the solver passed t = 0.3 ms,
       then resumed as a model-folder stage (`jobs.resume_stage`).
   R3  a 1D -> 2D chain (1D 0.4 m, 0.2 kg; 2D axisymmetric from the
@@ -65,6 +66,14 @@ first run, never changed afterwards; a failure is recorded, not re-tuned):
        ingested times ready on every rank, and every protected time, are
        still on every rank.
 
+Harness note (2026-09-27, after the first attempt, rules unchanged): with
+the default `linear` activation, blastFoam refused the R1 case at t = 0 -
+"No cells will be activated using the detonation point (0 0.5 0)" - so no
+solve ran and no rule was evaluated. The detonation point lies on the axis
+of the zone-refined wedge. The cases now use activation 'none' (the whole
+charge at t = 0, as the native solvers do); the rules above are as
+committed in bb16d91.
+
 The model folders stay under the printed runs folder, as evidence. The
 scratches this script keeps (the ticked runs, E5) are deleted at the end.
 
@@ -118,7 +127,7 @@ def case2d(**kw):
                 gauges=[(0.35, 0.5)], obstacles=[(0.3, 0.33, 0.2, 0.8)],
                 solver='blastfoam', material='TNT', n_procs=1,
                 adaptive_write=False, write_budget=10, t_end=T_END,
-                record_frames=20, bcs=dict(AXIS))
+                record_frames=20, bcs=dict(AXIS), activation='none')
     base.update(kw)
     return Case2D(**base)
 
