@@ -299,6 +299,24 @@ edit):** `test_regression.py` REGRESSION: PASS (byte-identical);
 `test_foam_reader.py` FOAM READER: PASS; `test_gauge_summary.py` GAUGE SUMMARY: PASS.
 Also green: `test_legacy_vtk.py` (11/11), `test_case_validate.py`.
 
+**A7 e2e (`_e2e_out4_gauges.py`, rules committed in `3273d74` before any run):**
+- Run 1 FAILED: no `dynamicP` anywhere ("Cannot find registered field matching
+  dynamicP"). Cause: OF-9 `fieldExpression` takes dynamicPressure.C's "dynamicP" as
+  the *default field name*, so the result is named `dynamicPressure`
+  (fieldExpression.C:47-60). F3 above is wrong on this. Fixed in `38f067c`
+  (`result dynamicP;`); no rule changed.
+- Run 2: 26/28 PASS. A-R1 |d| = 0 on peak / impulse / arrival (p arrays identical,
+  972 steps both); A-R2, A-R3a (0.14 %), A-R3b (1 sample), A-R4a (worst 1.3e-5),
+  A-R4b, A-R5, A-R6a/b pass. **Two FAIL, both in how the script reads the numbers,
+  not in the recorded data; per the rules, stopped and reported, script not changed:**
+  - A-R3c: the same sample on both sides (t = 1.69987e-05 s), but the p side went
+    through gauge_summary's ms and back (1.6998700000000004e-05 vs 1.69987e-05).
+  - A-R6c: the probe time column has 6 significant digits (blastProbes
+    writePrecision), so no row matches the last volume time 0.00099946659 s to
+    1e-9; the nearest row is 0.000999467. The value comparison never ran.
+  Owner decision needed: re-register A-R3c (compare sample indices) and A-R6c
+  (match the row to the probe file's printed precision), then rerun.
+
 ## 7. Remaining backlog after OUT-4
 
 The OUT track is then complete except OUT-1's pending `gui-qa-tester` screenshots and
