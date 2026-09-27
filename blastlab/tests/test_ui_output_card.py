@@ -510,16 +510,17 @@ def main():
     f = form(3)
     labels = {w.text(): w for w in
               f.widgets['vtk_fields'].findChildren(QLabel)}
-    pk = labels.get('Peak pressure')
+    pk = labels.get('Peak overpressure')
     tip = pk.toolTip() if pk is not None else ''
-    # F1: pMax is fieldMinMax on the absolute p, no pRef (writer.py)
-    check('F1: the pMax row reads "Peak pressure", not overpressure',
-          pk is not None and not any(t.startswith('Peak overpr')
-                                     for t in labels),
+    # owner decision 4 (2026-09-27, out-2-surface-layout.md), replacing
+    # F1: the export writes pMax - ambient, so the row says what is
+    # exported
+    check('decision 4: the pMax row reads "Peak overpressure"',
+          pk is not None and 'Peak pressure' not in labels,
           str(sorted(labels)))
-    check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
-          all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
-                                 '101.325 kPa')), tip)
+    check('decision 4: its tooltip says minus ambient, the array name and '
+          'pMax', all(s in tip for s in ('minus ambient', '101.325 kPa',
+                                          'Peak_Overpressure', 'pMax')), tip)
     # the confusing-wording list: no internal ids, what the rows mean
     caps = [f.label_text('vtk_planes'), f.label_text('vtk_fields')]
     check('no user-facing "OUT-4" in the captions or header tooltips',

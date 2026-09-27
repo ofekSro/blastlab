@@ -137,20 +137,23 @@ def anim_file_with_format(anim_file, fmt):
 #: gives the long name and the blastFoam field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
-    'pMax': 'Peak pressure', 'timeOfArrival': 'Arrival time',
+    'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
 }
-#: the long names, for the row tooltips. pMax is the running per-cell
-#: maximum of the ABSOLUTE pressure p: fieldMinMax on p with no pRef
-#: (solvers/foam/writer.py, the pMax function object; blastFoam User
+#: the long names, for the row tooltips. blastFoam's pMax is the running
+#: per-cell maximum of the ABSOLUTE pressure p: fieldMinMax on p with no
+#: pRef (solvers/foam/writer.py, the pMax function object; blastFoam User
 #: Guide v6.0, sec. 15.2 (p. 123); GUI QA 2026-09-27 F1 measured it cell
-#: by cell against the exported p). rhoE: E is the total energy, thermal
-#: and kinetic (blastFoam User Guide v6.0, sec. 2, eq. 2.7)
+#: by cell against the exported p). The export writes it as the peak
+#: OVERPRESSURE, pMax - 101.325 kPa (owner decision 4, 2026-09-27,
+#: docs/batches/2026-09-27-out-2-surface-layout.md), so the row describes
+#: what is exported. rhoE: E is the total energy, thermal and kinetic
+#: (blastFoam User Guide v6.0, sec. 2, eq. 2.7)
 VTK_QUANTITY_TIPS = {
-    'pMax': 'Peak pressure (the running maximum of the ABSOLUTE pressure '
-            'p in each cell; subtract ambient, 101.325 kPa, for the peak '
-            'overpressure)',
+    'pMax': 'Peak overpressure (the running maximum of the pressure in '
+            'each cell minus ambient, 101.325 kPa; written to the files '
+            'as Peak_Overpressure)',
     'rhoE': 'Energy (total energy per unit volume, thermal + kinetic) '
             '[J/m3]',
     'alpha.expl': 'Products (volume fraction of detonation products, '

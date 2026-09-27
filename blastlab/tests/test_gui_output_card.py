@@ -279,15 +279,16 @@ def main():
     f = form(3)
     labels = {str(w.cget('text')): w for w in
               f._vtk_grid.winfo_children() if isinstance(w, ctk.CTkLabel)}
-    pk = labels.get('Peak pressure')
+    pk = labels.get('Peak overpressure')
     tip = getattr(getattr(pk, '_blastlab_tip', None), 'text', '')
-    check('F1: the pMax row reads "Peak pressure", not overpressure',
-          pk is not None and not any(t.startswith('Peak overpr')
-                                     for t in labels),
+    # owner decision 4 (2026-09-27, out-2-surface-layout.md), replacing
+    # F1: the export writes pMax - ambient
+    check('decision 4: the pMax row reads "Peak overpressure"',
+          pk is not None and 'Peak pressure' not in labels,
           str(sorted(labels)))
-    check('F1: its tooltip says absolute p, pMax, and to subtract ambient',
-          all(s in tip for s in ('ABSOLUTE pressure', 'pMax',
-                                 '101.325 kPa')), tip)
+    check('decision 4: its tooltip says minus ambient, the array name and '
+          'pMax', all(s in tip for s in ('minus ambient', '101.325 kPa',
+                                          'Peak_Overpressure', 'pMax')), tip)
 
     def tip_of(text):
         return getattr(getattr(labels.get(text), '_blastlab_tip', None),
