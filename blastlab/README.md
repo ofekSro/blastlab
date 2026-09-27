@@ -92,7 +92,7 @@ Everything the run produces goes into `<Runs folder>\<Model>\`:
 |---|---|
 | `MODEL.json` | the case exactly as run (paths relative to the folder) |
 | `run.log` | the solver-side log of the run |
-| `manifest.json` | model, times, solver, dim, git commit, stop reason, cells, ranks, steps, the WSL scratch, `outputs`, `missing` (with why), `failed` |
+| `manifest.json` | model, times, solver, dim, git commit, stop reason, cells, ranks, steps, the WSL scratch, `outputs`, `missing` (with why), `vtk`, `wsl_fields`, `failed` |
 | `gauges\gauges_<d>d.txt`, `gauges\gauges_<d>d_summary.csv` | gauge TSV and per-gauge peak / arrival / impulse |
 | `figures\*.png`, `fields\*.csv`, `report.html` | the Results-tab exports |
 | `animation.mp4` / `.gif` | only when replay frames were recorded; the format is the Setup tab's choice |
@@ -112,6 +112,29 @@ fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
   inside WSL; only then is the scratch deleted. A failed, stopped or
   partly copied run keeps it (`manifest.json` says why), and the run
   browser, `--load-foam-run` and the VTK button work on it as before.
+- **Only the newest writes stay in WSL** (`OUT-3`, plan §4). While a
+  blastFoam run goes on, a written time directory is deleted in WSL once
+  the app has ingested it and nothing will read it again. What stays: `0/`,
+  the start directory, the two newest complete writes (a resume restarts
+  from the newest, and finalize falls back to the one before it), and the
+  writes finalize, the chain or a resume re-read - the snapshots, the
+  hand-off pin and the first arrived write, the remap trigger, a resume's
+  restart time. On AMR a write that holds its own mesh stays while a kept
+  newer write still needs it; a parallel AMR run is read per rank, so only
+  times complete on every rank go, per rank. The Results tab, the gauges,
+  the frames and a resume are unaffected; `--load-foam-run` on a stopped
+  run then reads only the writes left, and says so in one line. A 1D run
+  keeps every write (P9), and a run without a model folder (a headless
+  script, a run-browser resume) keeps all of them. `manifest.json` records
+  it as `wsl_fields` {mode `newest` | `keep_all` | `off`, deleted, first,
+  last}.
+- **Keep all fields in WSL** (a box on the VTK output card, both GUIs,
+  blastFoam only; case key `keep_all_fields`) turns that off for one run:
+  no written time is deleted - not by this, not by the VTK export - and
+  the WSL scratch is kept after a finished run too, with "Keep all fields
+  in WSL was ticked" as the reason in `manifest.json` and the folder
+  notice (otherwise the release at the end would keep nothing). The
+  validation strip gives the disk estimate.
 - **A run that never ends** (the window closed mid-run) still leaves
   `MODEL.json` and a `manifest.json` whose `stop_reason` begins
   `unfinished:` - both are written when the run starts and replaced when
