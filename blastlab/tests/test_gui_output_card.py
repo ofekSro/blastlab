@@ -152,6 +152,23 @@ def main():
     f.v['vtk_s_on'].set(True)
     check('unticking and ticking again keeps the edited column',
           f.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'])
+    # owner decision P15: an off family keeps its ticks through a save
+    f.v['vtk_s_on'].set(False)
+    text = json.dumps(case_to_dict(f.get_case()), sort_keys=True)
+    saved = json.loads(text)
+    check('P15: the off family is written, on: false, with its ticks',
+          saved.get('vtk_surfaces', {}).get('on') is False
+          and saved['vtk_surfaces']['obstacle_fields'] == ['p', 'pMax', 'T'],
+          str(saved.get('vtk_surfaces')))
+    g = form(3)
+    g.set_case(case_from_dict(saved))
+    check('P15: reloaded, the box is unticked and the ticks are back',
+          not g.v['vtk_s_on'].get()
+          and g.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'],
+          str(g.v['vtk_fields'].get()))
+    check('P15: and the case written again is the same JSON',
+          json.dumps(case_to_dict(g.get_case()), sort_keys=True) == text)
+    g.destroy()
     f.destroy()
     f = form(2)
     f.v['vtk_s_on'].set(True)

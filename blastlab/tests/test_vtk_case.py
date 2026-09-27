@@ -130,20 +130,41 @@ def test_keys():
     check('   a fractional Step value is kept, for validation to refuse',
           got['value'] == 2.5)
 
-    for off in ({'on': False, 'mode': 'time', 'value': 1.0,
-                 'fields': ['p']}, None):
+    # owner decision P15: `on: false` is dropped only when the family has
+    # no field ticked; with fields it is written, so a reload keeps them
+    for off in ({'on': False, 'mode': 'time', 'value': 0.001,
+                 'fields': [], 'obstacle_fields': []}, None):
         for cls in (Case2D, Case3D):
             c = cls(vtk_surfaces=off, vtk_volumes=off)
             d = case_to_dict(c)
-            check(f'{cls.__name__}: {off and "on: false" or "None"} is not '
-                  f'written',
+            check(f'{cls.__name__}: {off and "on: false, no field" or "None"}'
+                  f' is not written',
                   'vtk_surfaces' not in d and 'vtk_volumes' not in d)
         d1 = case_to_dict(Case1D(vtk_volumes=off))
-        check(f'Case1D: {off and "on: false" or "None"} is not written',
-              'vtk_volumes' not in d1)
+        check(f'Case1D: {off and "on: false, no field" or "None"} is not '
+              f'written', 'vtk_volumes' not in d1)
     check('   and an on:false case saves byte-identical to the default',
           saved_bytes(Case3D(vtk_volumes={'on': False}))
           == saved_bytes(Case3D()))
+    off_s = dict(SURF, on=False)
+    off_v = dict(VOL, on=False)
+    raw, back = roundtrip(Case3D(solver='blastfoam', vtk_surfaces=dict(off_s),
+                                 vtk_volumes=dict(off_v)))
+    check('P15: a family switched off WITH fields is written, on: false',
+          raw.get('vtk_surfaces') == off_s and raw.get('vtk_volumes') == off_v,
+          f"{raw.get('vtk_surfaces')} {raw.get('vtk_volumes')}")
+    check('   and read back with every key (fields, planes, mode, value)',
+          back.vtk_surfaces == off_s and back.vtk_volumes == off_v,
+          f'{back.vtk_surfaces} {back.vtk_volumes}')
+    check('   obstacle fields alone are enough to write it',
+          'vtk_surfaces' in case_to_dict(Case3D(vtk_surfaces=dict(
+              off_s, fields=[]))))
+    check('   and the solver side sees no family (vtk_family reads on)',
+          mcase.vtk_family(back, 'vtk_surfaces') is None
+          and mcase.vtk_family(back, 'vtk_volumes') is None)
+    d1 = case_to_dict(Case1D(vtk_volumes=dict(off_v)))
+    check('   Case1D writes an off vtk_volumes with fields too',
+          d1.get('vtk_volumes') == off_v, str(d1.get('vtk_volumes')))
 
     d1 = case_to_dict(Case1D())
     d1['vtk_surfaces'] = dict(SURF)

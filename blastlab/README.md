@@ -155,8 +155,10 @@ native mode, and a native run ignores the keys.
   rho, U (volumes). **`pMax` (Peak pressure) is the running per-cell
   maximum of the absolute pressure `p`**, not an overpressure -
   subtract ambient (101.325 kPa) for the peak overpressure. Case keys: `vtk_surfaces` {on, mode, value, fields,
-  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields};
-  neither is written while off.
+  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
+  family that is off is written only when it still has a field ticked,
+  as `on: false` with its ticks, so a reload restores the card; the
+  solver ignores it (owner decision P15).
 - **Cadence.** Sections and obstacles are blastFoam surface function
   objects (vtkTimeSeries, blastFoam User Guide v6.0, sec. 15.5 (p. 124))
   that sample at their own cadence and never change the time step.

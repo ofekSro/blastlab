@@ -190,6 +190,38 @@ def main():
     check('unticking the family keeps its ticks',
           not f.v['vtk_s_on'].get()
           and f.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'])
+    # owner decision P15: the ticks of a family that is off survive a
+    # save and reload (written `on: false`), and the solver ignores it
+    f.v['vtk_s_mode'].set('step')
+    f.v['vtk_s_steps'].set('30')
+    text = json.dumps(case_to_dict(f.get_case()), sort_keys=True)
+    saved = json.loads(text)
+    check('P15: the off family is written, on: false, with its ticks',
+          saved.get('vtk_surfaces', {}).get('on') is False
+          and saved['vtk_surfaces']['obstacle_fields'] == ['p', 'pMax', 'T']
+          and saved['vtk_surfaces']['fields'] == ['pMax']
+          and saved['vtk_surfaces']['mode'] == 'step'
+          and saved['vtk_surfaces']['value'] == 30,
+          str(saved.get('vtk_surfaces')))
+    g = form(3)
+    g.set_case(case_from_dict(saved))
+    pump(5)
+    check('P15: reloaded, the box is unticked and the ticks are back',
+          not g.v['vtk_s_on'].get() and g.v['vtk_s_mode'].get() == 'step'
+          and g.v['vtk_s_steps'].get() == '30'
+          and g.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T']
+          and g.v['vtk_fields'].get()['sections'] == ['pMax'],
+          str(g.v['vtk_fields'].get()))
+    check('P15: and the case written again is the same JSON',
+          json.dumps(case_to_dict(g.get_case()), sort_keys=True) == text)
+    from blastlab.models.case import vtk_family
+    check('P15: the solver side sees no surfaces family',
+          vtk_family(g.get_case(), 'vtk_surfaces') is None)
+    g.widgets['vtk_s_on'].click()
+    pump(5)
+    check('P15: ticking the reloaded family keeps its ticks (no defaults)',
+          g.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'])
+    f.v['vtk_s_mode'].set('time')
     f.widgets['vtk_s_on'].click()
     pump(5)
     check('and ticking it again does not overwrite them',

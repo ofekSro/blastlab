@@ -258,6 +258,9 @@ fields. The Gauges column is display only until `OUT-4`.
 - Both groups are omitted from the JSON when off (the `write_budget` pattern):
   default files stay byte-identical, `VERSION` stays 13, an older blastlab
   refuses a file that has them with the existing "Unknown case keys".
+  *Owner decision P15, 2026-09-27:* a group that is off but still has a field
+  ticked is written as `{"on": false, ...}` with all its keys, so a reload
+  restores the card's ticks; the solver and validation ignore it.
 - Validation refuses: `value <= 0`; `mode` not in `time|step`; a field the
   dimension does not have; a plane axis not in `x y z` or a position outside
   the domain; `vtk_volumes.on` together with `write_budget > 0` (both pin the

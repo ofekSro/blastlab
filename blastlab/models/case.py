@@ -83,6 +83,14 @@ def normalize_vtk(d, key):
     return out
 
 
+def vtk_written(d):
+    """Does case_to_dict write this VTK family? When it is on, or when it
+    is off but still has a field ticked (owner decision P15)."""
+    if not isinstance(d, dict):
+        return False
+    return bool(d.get('on') or d.get('fields') or d.get('obstacle_fields'))
+
+
 def vtk_family(case, key):
     """The case's VTK family `key`, normalised, when it is switched on;
     else None."""
@@ -447,11 +455,15 @@ def case_to_dict(case):
     # older blastlab refuses a file that HAS a budget: "Unknown case keys".)
     if not d.get('write_budget'):
         d.pop('write_budget', None)
-    # OUT-2: the same for the VTK families - None or switched off is not
-    # written, so VERSION stays 13 and every case without them is
-    # byte-identical (an older blastlab refuses one that has them)
+    # OUT-2: the same for the VTK families - None, or switched off with
+    # no field ticked, is not written, so VERSION stays 13 and every case
+    # without them is byte-identical (an older blastlab refuses one that
+    # has them). A family switched OFF that still has ticked fields IS
+    # written, `on: false` and all (owner decision P15, 2026-09-27), so
+    # a reload restores the card's ticks; the solver ignores it
+    # (vtk_family reads `on`).
     for key in ('vtk_surfaces', 'vtk_volumes'):
-        if key in d and not (isinstance(d[key], dict) and d[key].get('on')):
+        if key in d and not vtk_written(d[key]):
             d.pop(key)
     d['schema'] = SCHEMA
     d['version'] = VERSION

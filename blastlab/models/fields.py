@@ -30,8 +30,7 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import (Case1D, Case2D, Case3D, normalize_vtk, vtk_family,
-                   vtk_fields_for)
+from .case import (Case1D, Case2D, Case3D, normalize_vtk, vtk_fields_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -259,31 +258,54 @@ def parse_plane_axis(text):
     return ax
 
 
+def _quiet(parse, raw, default):
+    """`parse(raw)`, or `default` when it does not parse - for a family
+    that is off, whose boxes are never reported (P15)."""
+    try:
+        return parse(raw, '')
+    except (TypeError, ValueError):
+        return default
+
+
 def _vtk_from_fields(dim, v, number, whole):
     """The case's VTK keys from the card (blastFoam mode only - the
-    caller checks). A family that is off gives no key; only the ACTIVE
-    cadence box is read, so a bad value in the greyed one never blocks
-    a run. `number` / `whole` are case_from_fields' reporting parsers."""
+    caller checks). Only the ACTIVE cadence box is read, so a bad value
+    in the greyed one never blocks a run. `number` / `whole` are
+    case_from_fields' reporting parsers.
+
+    A family that is off gives a key only when its matrix columns still
+    hold a tick (owner decision P15): `on: false` with its mode, value,
+    fields and planes, so a reload restores the card. Its boxes are read
+    quietly - a family that is off never reports an error, and a value
+    that does not parse is written as the default."""
     out = {}
     matrix = vtk_matrix(v.get('vtk_fields'), dim)
     for fam, caption in VTK_FAMILIES[dim]:
-        if not v.get(f'vtk_{fam}_on'):
+        on = bool(v.get(f'vtk_{fam}_on'))
+        cols = vtk_family_columns(fam, dim)
+        if not on and not any(matrix.get(c) for c in cols):
             continue
         mode = str(v.get(f'vtk_{fam}_mode') or 'time')
         if mode == 'step':
-            value = whole(f'vtk_{fam}_steps', f'VTK {caption} every [steps]')
+            value = (whole(f'vtk_{fam}_steps', f'VTK {caption} every [steps]')
+                     if on else _quiet(parse_int,
+                                       v.get(f'vtk_{fam}_steps'),
+                                       VTK_STEPS_DEFAULT))
         else:
-            value = number(f'vtk_{fam}_time', f'VTK {caption} every [s]')
+            value = (number(f'vtk_{fam}_time', f'VTK {caption} every [s]')
+                     if on else _quiet(parse_float,
+                                       v.get(f'vtk_{fam}_time'),
+                                       VTK_TIME_DEFAULT))
         if fam == 'v':
             out['vtk_volumes'] = normalize_vtk(
-                dict(on=True, mode=mode, value=value,
+                dict(on=on, mode=mode, value=value,
                      fields=matrix['volumes']), 'vtk_volumes')
         else:
             planes = ([[str(p[0]), float(p[1])]
                        for p in v.get('vtk_planes') or []]
                       if dim == 3 else [])
             out['vtk_surfaces'] = normalize_vtk(
-                dict(on=True, mode=mode, value=value,
+                dict(on=on, mode=mode, value=value,
                      fields=matrix.get('sections', []),
                      obstacle_fields=matrix['obstacles'], planes=planes),
                 'vtk_surfaces')
@@ -292,17 +314,19 @@ def _vtk_from_fields(dim, v, number, whole):
 
 def _vtk_fields_of_case(case, dim) -> dict:
     """The card's values for `case`, in the order the form sets them:
-    per family its box, mode and both cadence boxes (a family that is
-    off shows the defaults), then the planes, then the matrix LAST, so
-    the first-tick hook the box fires cannot change what was loaded."""
+    per family its box, mode and both cadence boxes (a family the case
+    does not carry shows the defaults), then the planes, then the matrix
+    LAST, so the first-tick hook the box fires cannot change what was
+    loaded. A family written `on: false` (P15) restores its mode, value,
+    planes and ticks with the box unticked."""
     out, matrix = {}, {}
     for fam, _caption in VTK_FAMILIES[dim]:
         key = 'vtk_volumes' if fam == 'v' else 'vtk_surfaces'
         try:
-            d = vtk_family(case, key)
+            d = normalize_vtk(getattr(case, key, None), key)
         except ValueError:              # a malformed family: shown off
             d = None
-        out[f'vtk_{fam}_on'] = bool(d)
+        out[f'vtk_{fam}_on'] = bool(d and d['on'])
         mode = d['mode'] if d and d['mode'] in ('time', 'step') else 'time'
         out[f'vtk_{fam}_mode'] = mode
         every_s, steps = VTK_TIME_DEFAULT, VTK_STEPS_DEFAULT
