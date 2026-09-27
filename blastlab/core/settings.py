@@ -133,7 +133,8 @@ def _legacy_sources():
 def _migrate(target):
     """Seed `target` once from the first readable legacy settings dict,
     with `auto_cleanup` forced off. Returns the new dict, or None when
-    there was no source. Never writes, renames or deletes a source."""
+    there was no source or the target could not be written. Never
+    writes, renames or deletes a source."""
     for src in _legacy_sources():
         try:
             with open(src, encoding='utf-8') as f:
@@ -148,7 +149,11 @@ def _migrate(target):
         data['migrated_from'] = src
         if os.path.exists(target):          # someone else got there first
             return None
-        save(data, target)
+        if not save(data, target):
+            # e.g. a read-only checkout: save() has said so once on
+            # stderr; claim nothing, and load() falls back to the
+            # defaults with the sweep off
+            return None
         print(f'[blastlab] settings: created {target} from {src} '
               f'(auto_cleanup forced off)', file=sys.stderr)
         return data

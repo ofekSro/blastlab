@@ -232,6 +232,27 @@ def test_existing_file_untouched():
               str(got) + repr(err))
 
 
+def test_unwritable_root():
+    print('\n(h) a repo root that cannot be written')
+    with sandbox() as tmp:
+        src = virtual_copy(tmp)
+        write_json(src, dict(auto_cleanup=True, cleanup_max_gb=150.0))
+        before = read_bytes(src)
+        # the root's parent is a FILE, so save() cannot create anything
+        blocker = os.path.join(tmp, 'blocker')
+        with open(blocker, 'w', encoding='utf-8') as f:
+            f.write('not a directory')
+        settings.REPO_ROOT = os.path.join(blocker, 'root')
+        got, err = load_quiet()
+        check('(h) no file claimed: no "created" line',
+              'created' not in err, repr(err))
+        check('(h) load() still reads cleanup off',
+              got.get('auto_cleanup') is False, str(got))
+        check('(h) nothing written, the source untouched',
+              not os.path.exists(settings.default_path())
+              and read_bytes(src) == before)
+
+
 def test_tk_and_qt_share_the_path():
     print('\n(g) one path for Tk and Qt')
     from blastlab.gui import settings as gui_settings
@@ -489,7 +510,7 @@ def test_disk_warning_sinks():
 TESTS = [test_default_path, test_migrate_from_virtual_copy,
          test_migrate_from_appdata, test_no_source,
          test_override_never_migrates, test_existing_file_untouched,
-         test_tk_and_qt_share_the_path, test_cleanup_plan_dry_run,
+         test_unwritable_root, test_tk_and_qt_share_the_path, test_cleanup_plan_dry_run,
          test_auto_cleanup_on_the_plan, test_default_is_off,
          test_disk_warning, test_disk_warning_sinks]
 
