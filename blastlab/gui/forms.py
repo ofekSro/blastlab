@@ -215,6 +215,9 @@ class _PointList(ctk.CTkFrame):
         for tup in tuples or []:
             self.tree.insert('', 'end', values=[
                 _fmt_cell(k, v) for k, v in zip(self._kinds, tup)])
+        # P21, as the Qt PointList: a refused row does not survive a load
+        self.entry_var.set('')
+        self._accept()
 
 
 class _MatrixVar:

@@ -347,11 +347,14 @@ class PointList(QWidget):
 
     def set(self, tuples):
         """Replace the rows. Does NOT fire on_change - `set_case` drives
-        this, and the caller revalidates once at the end."""
+        this, and the caller revalidates once at the end. The entry is
+        cleared too: a refused row left in it survived Open case while
+        the hint went back to idle (P21, GUI QA 2026-09-27 V3)."""
         self.tree.clear()
         for row in tuples or []:
             self.tree.addTopLevelItem(QTreeWidgetItem(
                 [_fmt_cell(k, v) for k, v in zip(self._kinds, row)]))
+        self.entry.clear()
         self._accept()
 
     def count(self):

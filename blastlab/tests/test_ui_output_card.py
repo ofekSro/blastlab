@@ -364,6 +364,17 @@ def main():
           and pl.get() == [('y', 1.4), ('z', 0.5)], str(pl.get()))
     check('the gauges table still takes numbers only',
           f.points['gauges']._kinds == ('float',) * 3)
+    # P21: a refused row must not survive Open case / set_case
+    pl.entry.setText('q, 1')
+    pl.add()
+    refused = pl.entry.text() == 'q, 1' and pl.entry.property('bad') == 'true'
+    f.set_case(case_from_dict(case_to_dict(f.get_case())))
+    pump(5)
+    check('P21: a load clears a refused row and its red state',
+          refused and pl.entry.text() == ''
+          and pl.entry.property('bad') == 'false'
+          and pl.hint.text().startswith('add a row'),
+          f'{pl.entry.text()!r} {pl.entry.property("bad")} {pl.hint.text()!r}')
 
     print('\nC6: form -> case -> JSON -> form is identical')
     for d in (1, 2, 3):

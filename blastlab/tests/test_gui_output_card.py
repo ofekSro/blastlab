@@ -188,6 +188,14 @@ def main():
     pl.entry_var.set('y, 1.4')
     pl._add()
     check('`y, 1.4` is accepted', pl.get() == [('y', 1.4)], str(pl.get()))
+    # P21: a refused row does not survive a load
+    pl.entry_var.set('q, 1')
+    pl._add()
+    f.set_case(case_from_dict(case_to_dict(f.get_case())))
+    check('P21: a load clears a refused row and the hint',
+          pl.entry_var.get() == ''
+          and pl._hint.cget('text').startswith('add a row'),
+          f'{pl.entry_var.get()!r} {pl._hint.cget("text")!r}')
     f.destroy()
 
     print('\nK7: form -> case -> JSON -> form, and the Qt twin agrees')
