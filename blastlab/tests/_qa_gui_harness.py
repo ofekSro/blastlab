@@ -2954,6 +2954,153 @@ def m04_chain_folder(qa):
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# GROUP V - the "VTK output (ParaView)" card (OUT-2, batch plan
+# docs/batches/2026-09-27-out-2-vtk-output.md Step 10): the Tk twin of the
+# Qt harness's V01-V04 (CLAUDE.md sec. 9 - the way back is a full
+# equivalent)
+# ─────────────────────────────────────────────────────────────────────────
+def _vtk_see(qa):
+    """Scroll the form column so the VTK card's top is in view."""
+    form = qa.app.setup.form
+    card = form._vtk_card
+    qa.root.update_idletasks()
+    h = max(1, form.winfo_height())
+    qa.scroll_form(max(0.0, (card.winfo_y() - 10) / h))
+    return form
+
+
+def _vtk_live(form, name):
+    return str(form._vtk_entries[name].cget('state')) == 'normal'
+
+
+@scenario('V01', 'V', est=40)
+def v01_vtk_1d(qa):
+    """1D in blastFoam mode: one family (Whole domain), Time / Step
+    disabling, the first tick fills p / rho / U."""
+    from blastlab.core.case import Case1D
+    qa.goto('setup')
+    qa.set_case(Case1D(solver='blastfoam'))
+    form = _vtk_see(qa)
+    qa.check(form._vtk_card.winfo_manager() == 'grid',
+             'the 1D card is shown in blastFoam mode', 'S1')
+    qa.check(_vtk_live(form, 'vtk_v_time')
+             and not _vtk_live(form, 'vtk_v_steps'),
+             'Time by default: the steps box is disabled', 'S2')
+    qa.shot('1d_off')
+    qa.field('vtk_v_on', True)
+    qa.check(form.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']},
+             'the first tick fills p, rho, U', 'S2',
+             evidence=str(form.v['vtk_fields'].get()))
+    qa.note('1D VTK strip: ' + ' | '.join(qa.strip_text()))
+    _vtk_see(qa)
+    qa.shot('1d_time')
+    form._vtk_radios['v'][1].invoke()
+    qa.pump(0.6)
+    qa.check(not _vtk_live(form, 'vtk_v_time')
+             and _vtk_live(form, 'vtk_v_steps'),
+             'Step disables the seconds box instead', 'S2')
+    qa.shot('1d_step')
+    qa.set_case(Case1D())
+
+
+@scenario('V02', 'V', est=50)
+def v02_vtk_2d_obstacles(qa):
+    """2D: Whole domain and Obstacles; without obstacles the strip says
+    "nothing to sample", with one it is gone."""
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D(solver='blastfoam'))
+    form = _vtk_see(qa)
+    qa.field('vtk_s_on', True)
+    strip = qa.strip_text()
+    qa.note('2D obstacles, none drawn: ' + ' | '.join(strip))
+    qa.check(any('nothing to sample' in s for s in strip),
+             'no obstacles: the strip says "nothing to sample"', 'S2')
+    _vtk_see(qa)
+    qa.shot('2d_no_obstacles')
+    _set_rows(qa, form.obstacles, [(3.0, 3.2, 0.0, 0.5)])
+    strip = qa.strip_text()
+    qa.check(not any('nothing to sample' in s for s in strip),
+             'with an obstacle the refusal is gone', 'S2',
+             evidence=str(strip))
+    _vtk_see(qa)
+    qa.shot('2d_with_obstacle')
+    _set_rows(qa, form.obstacles, [])
+    _fresh2d(qa)
+
+
+@scenario('V03', 'V', est=60)
+def v03_vtk_3d(qa):
+    """3D: the matrix with the locked Gauges column, the plane table and
+    Time / Step on both families."""
+    from blastlab.core.case import Case3D
+    qa.goto('setup')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _vtk_see(qa)
+    cols = sorted({c for _f, c in form.v['vtk_fields'].cells})
+    qa.check(cols == ['obstacles', 'sections', 'volumes']
+             and len(form._vtk_grid.locked) == 10,
+             'three destination columns plus the locked Gauges column (Q2)',
+             'S2', evidence=str(cols))
+    qa.shot('3d_off')
+    qa.field('vtk_s_on', True)
+    qa.field('vtk_v_on', True)
+    m = form.v['vtk_fields'].get()
+    qa.check(m == {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'],
+                   'volumes': ['p', 'rho', 'U']},
+             'the first ticks fill the Viper defaults', 'S2', evidence=str(m))
+    form._vtk_radios['s'][1].invoke()
+    qa.pump(0.6)
+    qa.check(not _vtk_live(form, 'vtk_s_time')
+             and _vtk_live(form, 'vtk_s_steps')
+             and _vtk_live(form, 'vtk_v_time'),
+             'Step on the surfaces disables their seconds box only', 'S2')
+    qa.add_row(form.vtk_planes, 'q, 1')
+    qa.check(form.vtk_planes.get() == []
+             and 'x, y or z' in form.vtk_planes._hint.cget('text'),
+             'a plane `q, 1` is refused with a reason', 'S2')
+    _vtk_see(qa)
+    qa.shot('3d_plane_q1_refused')
+    qa.add_row(form.vtk_planes, 'y, 1.4')
+    qa.check(form.vtk_planes.get() == [('y', 1.4)],
+             'a plane `y, 1.4` is accepted', 'S2',
+             evidence=str(form.vtk_planes.get()))
+    qa.note('3D VTK strip: ' + ' | '.join(qa.strip_text()))
+    _vtk_see(qa)
+    qa.shot('3d_step_plane')
+    qa.scroll_form(1.0)
+    qa.shot('3d_matrix')
+    qa.set_case(Case3D())
+
+
+@scenario('V04', 'V', est=40)
+def v04_vtk_native(qa):
+    """Native mode hides the card; a saved case carries no vtk_ key."""
+    from blastlab.core.case import Case3D, case_to_dict
+    qa.goto('setup')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = qa.app.setup.form
+    qa.field('vtk_v_on', True)
+    qa.solver('native')
+    qa.check(form._vtk_card.winfo_manager() == '',
+             'native: the VTK card is hidden', 'S1')
+    qa.scroll_form(1.0)
+    qa.shot('native_no_card')
+    saved = case_to_dict(qa.app.setup.get_case())
+    qa.check(not any(k.startswith('vtk_') for k in saved),
+             'the native case has no vtk_ key', 'S1',
+             evidence=str(sorted(saved)))
+    qa.solver('blastfoam')
+    qa.check(form._vtk_card.winfo_manager() == 'grid'
+             and form.v['vtk_v_on'].get(),
+             'back to blastFoam: the card and the tick are back', 'S2')
+    _vtk_see(qa)
+    qa.shot('foam_again')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # GROUP H - theme toggle mid-session (G6 theme half)
 # ─────────────────────────────────────────────────────────────────────────
 @scenario('H01', 'H', est=60)

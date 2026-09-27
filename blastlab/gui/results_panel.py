@@ -474,9 +474,11 @@ class ResultsPanel(ctk.CTkFrame):
         res, dim = ent.result, ent.dim
         meta = res.meta
         from ..solvers.foam.export_vtk import can_export
+        from ..services.exports import run_vtk, vtk_tip
         has_gauges = bool(res.gauges.get('pressures'))
         ok = dict(
-            vtk=can_export(meta),
+            # a run that wrote <MODEL>\vtk\ opens it (GUI QA F2)
+            vtk=can_export(meta) or bool(run_vtk(ent)),
             gif=bool(meta.get('frames')),
             summary=has_gauges,
             tsv=has_gauges,
@@ -499,10 +501,12 @@ class ResultsPanel(ctk.CTkFrame):
             profile=('3D results have no profile export.' if dim == 3 else
                      'Only axisymmetric 2D fields can be remapped into 3D.'),
         )
+        run_tip = vtk_tip(ent)
         for kind, b in self._export_btns.items():
             good = ok.get(kind, True)
             b.configure(state='normal' if good else 'disabled')
-            theme.tooltip(b, '' if good else why.get(kind, ''))
+            tip = run_tip if kind == 'vtk' else ''
+            theme.tooltip(b, tip or ('' if good else why.get(kind, '')))
 
     def _mesh_toggled(self):
         self._draw_field()
@@ -868,6 +872,9 @@ class ResultsPanel(ctk.CTkFrame):
             except Exception as exc:
                 self._log(f'Load failed: {exc}')
                 return
+            # OUT-2 P11: the run's VTK export deleted written times
+            if res.meta.get('vtk_deleted_note'):
+                self._log(res.meta['vtk_deleted_note'].strip())
             dim = 1 if 'radius_m' in res.meta else \
                 (3 if 'z_c' in res.meta else 2)
             name = (str(res.meta.get('name') or '').strip()
@@ -928,7 +935,12 @@ class ResultsPanel(ctk.CTkFrame):
                 title='Save gauges TSV', defaultextension='.txt',
                 initialfile=f'{pre}gauges_{dim}d.txt', **where)
         elif kind == 'vtk':
+            from ..services.exports import open_run_vtk
             from ..solvers.foam.export_vtk import can_export
+            if open_run_vtk(ent, self._log):
+                # the run wrote <MODEL>\vtk\ itself (OUT-2): show it,
+                # write nothing (GUI QA 2026-09-27 F2)
+                return
             if not can_export(res.meta):
                 self._log(SCRATCH_RELEASED
                           if res.meta.get('scratch_released')

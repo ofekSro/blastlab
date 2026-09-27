@@ -132,6 +132,128 @@ fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
 - The Results-tab export buttons still work as before, and their file
   dialogs open in the result's model folder.
 
+### VTK files for ParaView (`vtk\`)
+
+`OUT-2`, [model-folder-and-vtk-plan.md](../docs/model-folder-and-vtk-plan.md)
+§3. blastFoam only: the Setup card **VTK output (ParaView)** is hidden in
+native mode, and a native run ignores the keys.
+
+- **The card** (both GUIs), laid out as Viper's "VTKs and Framerates":
+  1D *Whole domain*; 2D *Whole domain* and *Obstacles*; 3D *Sections and
+  obstacles* and *Volumes*. Each family has a box, a **Time / Step**
+  pair and one interval per mode (the other is greyed): **Time is
+  simulated seconds** (`Every [s]`, default 0.001; the case JSON stores
+  seconds too, like every other time in the case, and the card says that
+  the files and ParaView show time in seconds - owner decision P22),
+  Step is solver steps. 3D adds extra section planes (axis, position
+  [m]); the live-slice plane is also written whenever *Sections and
+  obstacles* is ticked, and a plane is snapped
+  to the nearest cell layer but keeps the name typed (`slice_x_0.20`).
+  The card spans both Setup columns, below them (owner decision P13):
+  the families and planes on the left, the quantity matrix on the right
+  (one above the other when the window is too narrow for both). The
+  matrix has a locked Gauges column (p, rho, U) and one column per
+  destination, in full words and in the order of the family boxes -
+  Sections / Obstacles / Volumes in 3D, Whole domain / Obstacles in 2D
+  (P24), Whole domain in 1D. The
+  first tick of a family fills p + peak overpressure (surfaces) or p,
+  rho, U (volumes). **Peak overpressure** is blastFoam's `pMax` - the
+  running per-cell maximum of the absolute pressure `p` - minus the
+  ambient 101.325 kPa (`core.constants.P_AIR`, the value the gauges'
+  overpressure uses); the subtraction is done when the files are
+  written, like Viper's `Peak_Overpressure` (owner decision 4,
+  2026-09-27). `pMax` starts at 0, so the written value is
+  max(pMax, p) - ambient when `p` is in the same file, else
+  max(pMax - ambient, 0) - never -101 kPa at t = 0. Case keys: `vtk_surfaces` {on, mode, value, fields,
+  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
+  family that is off is written only when it still has a field ticked,
+  as `on: false` with its ticks, so a reload restores the card; the
+  solver ignores it (owner decision P15).
+- **Cadence.** Sections and obstacles are blastFoam surface function
+  objects (vtkTimeSeries, blastFoam User Guide v6.0, sec. 15.5 (p. 124))
+  that sample at their own cadence and never change the time step.
+  Volumes **are** the solver's write schedule (Time: every `value` s of
+  simulated time; Step: every N steps), so they cannot be combined
+  with a write budget, and every write is also ingested for the live
+  view. A Time-mode volumes write is `writeControl runTime`: it lands on
+  **the first solver step past each interval**, and the time step is
+  never shortened to hit the interval exactly (owner decision P14 (b),
+  2026-09-27 - the earlier `adjustableRunTime` did shorten it, and
+  moved a near-field gauge by a few per cent). The written time names
+  are therefore not round multiples. The one exact write is the end
+  time (T62), as on every run. Validation notes the write count, and
+  in Step mode that the count depends on the step count.
+- **Layout** (the owner's Viper-style layout, 2026-09-27,
+  `docs/batches/2026-09-27-out-2-surface-layout.md`) - one folder per
+  series, its `.vtk.series` beside it, every series at the top of
+  `vtk\`; `<time>` is OpenFOAM's own time name in seconds:
+
+  | Path | Content |
+  |---|---|
+  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete`, `arrays` (field -> array name), `p_ambient` |
+  | `vtk\volumes\t_<time>.vtk`, `vtk\volumes.vtk.series` | one file per write, every chosen field, cell data only |
+  | `vtk\slice_x_0.20\t_<time>.vtk`, `vtk\slice_x_0.20.vtk.series` | one series per section plane, one file per sample holding every chosen field |
+  | `vtk\obstacles\t_<time>.vtk`, `vtk\obstacles.vtk.series` | the obstacle walls, one file per sample holding every chosen field |
+
+  **What is in a file.** Legacy VTK 3.0, BINARY (big-endian), as Viper
+  writes its section and obstacle files. blastFoam's surface writer
+  emits one file per field per surface; after each sample is copied to
+  Windows, the per-field files of one surface are checked to share one
+  geometry (same points and faces) and merged into one file with every
+  field as a cell-data array (point data would stay point data - nothing
+  is interpolated). The volumes are foamToVTK's files with their arrays
+  renamed. Every file carries the sample time [s] as `FIELD FieldData 1`
+  / `TIME 1 1 float`. The array names are the same in every family:
+  `pressure`, `Peak_Overpressure`, `Impulse`, `Overpressure`,
+  `Arrival_Time`, `density`, `velocity`, `temperature`,
+  `Products_Fraction`, `Energy` (foamToVTK's `cellID` is kept). Each file
+  is written atomically and read back with a strict parser
+  (`output/legacy_vtk.py`) before the WSL source may be deleted; a
+  sample whose files disagree is kept in WSL and listed in
+  `not_converted`.
+
+  The model's `manifest.json` carries only numbers for `vtk\`: `vtk: {dir,
+  counts, files, bytes, not_converted}`, and its `outputs` list leaves
+  `vtk\` out - a long run writes thousands of files there, and their full
+  list is `vtk\manifest.json` (owner decision P4).
+- **What is deleted in WSL, and when.** After every ingest pass one
+  `foamToVTK` at a time converts the writes already read, the file is
+  copied into `vtk\`, size-checked, rewritten and read back, the index
+  is rewritten, and only
+  then are the time directory and the converted file deleted in WSL.
+  Never deleted: `0`, a resume's start time, the two newest writes, and
+  every write the run's own finalize reads again (the snapshots, the
+  2D arrival pin, the 2D remap trigger). **A 1D run deletes no written
+  time at all** (owner decision P9): it converts and copies every write,
+  removes only the converted file, and its time directories stay in WSL
+  until the scratch is released - 1D picks its snapshots from the writes
+  on disk, and 1D writes are small. Surface samples are copied
+  and removed the same way, the newest one after the run. A conversion
+  or copy that fails twice is listed in `not_converted`, its write stays
+  in WSL, and the scratch is not released. A run without a model folder
+  exports and deletes nothing.
+- **Limits.** A parallel AMR run cannot export volumes (its writes stay
+  per rank; `reconstructPar` cannot follow a changing mesh) - validation
+  says so before the run; sections and obstacles work there. A resume
+  after deletion replays only the writes left (`replay_incomplete`).
+  Every reader of a finished run's WSL writes - `--load-foam-run` / the
+  run browser's Load, its Resume, and the Results **VTK** button on a
+  run whose case directory still exists - says so in one `[warn]` line
+  with the number of deleted writes and "see `<MODEL>\vtk`" (owner
+  decision P11). It finds the model by the run directory recorded as
+  `scratch` in `vtk\manifest.json`, under the Runs folder of the
+  settings.
+- **In ParaView:** *File > Open* one `.vtk.series` file per surface or
+  volume - `vtk\volumes.vtk.series`, `vtk\slice_x_0.20.vtk.series`,
+  `vtk\obstacles.vtk.series` - each on its own (owner decision 3); pick
+  the array to colour by in the pipeline item. The time bar follows the
+  series times (a JSON list of relative file names and times, the format
+  blastFoam's own `createTimeSeries` writes, User Guide sec. 16.3).
+- **Results tab.** For a run that wrote `vtk\` and released its WSL
+  scratch, the **VTK** button opens `<MODEL>\vtk\` (its tooltip gives the
+  path and the file count) instead of converting; while the case
+  directory still exists it runs the full `foamToVTK` as before.
+
 ## Solver mode
 
 The solver is chosen once, for the whole app, with the **native |

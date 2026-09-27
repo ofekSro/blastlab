@@ -3233,6 +3233,274 @@ def m05_hd13_folder(qa):
 
 
 # ═══════════════════════════════════════════════════════════════════════
+#  Group V - the "VTK output (ParaView)" card (OUT-2, batch plan
+#  docs/batches/2026-09-27-out-2-vtk-output.md Step 10)
+# ═══════════════════════════════════════════════════════════════════════
+VTK_CARD = 'VTK output (ParaView)'
+
+
+def _vtk_card(qa):
+    """Scroll the Setup form so the VTK card is on screen; return it."""
+    card = _form(qa).cards[VTK_CARD]
+    try:
+        qa.win.setup._scroll.ensureWidgetVisible(card, 0, 0)
+    except Exception:
+        pass
+    qa.pump(0.4)
+    return card
+
+
+def _vtk_shots(qa, state):
+    """The window, and the card on its own (readable at full size)."""
+    card = _vtk_card(qa)
+    qa.shot(state)
+    qa.shot(f'{state}_card', widget=card)
+
+
+@scenario('V01', 'V', est=40)
+def v01_vtk_1d(qa):
+    """1D in blastFoam mode: one family (Whole domain), Time / Step
+    greying, the first tick fills p / rho / U, the write-count note."""
+    from blastlab.core.case import Case1D
+    qa.goto('setup')
+    qa.set_case(Case1D(solver='blastfoam'))
+    form = _form(qa)
+    qa.check(form.card_visible(VTK_CARD), 'the 1D card is shown in '
+             'blastFoam mode', 'S1')
+    fams = [n for n in form.v if n.startswith('vtk_') and n.endswith('_on')]
+    qa.check(fams == ['vtk_v_on']
+             and form.widgets['vtk_v_on'].text() == 'Whole domain',
+             '1D offers one family, "Whole domain"', 'S2', evidence=str(fams))
+    qa.check(form.is_enabled('vtk_v_time')
+             and not form.is_enabled('vtk_v_steps'),
+             'Time by default: the steps box is greyed', 'S2')
+    _vtk_shots(qa, '1d_off')
+    qa.action = 'tick Whole domain'
+    form.widgets['vtk_v_on'].click()
+    qa.pump(0.8)
+    qa.check(form.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']},
+             'the first tick fills p, rho, U', 'S2',
+             evidence=str(form.v['vtk_fields'].get()))
+    strip = qa.strip_text()
+    qa.note('1D VTK strip: ' + ' | '.join(strip))
+    qa.check(any('VTK volumes' in s for s in strip),
+             'the strip gives the write count and the disk estimate', 'S3')
+    _vtk_shots(qa, '1d_time')
+    form.widgets['vtk_v_mode'].buttons['step'].click()
+    qa.pump(0.6)
+    qa.check(not form.is_enabled('vtk_v_time')
+             and form.is_enabled('vtk_v_steps'),
+             'Step greys the seconds box instead', 'S2')
+    _vtk_shots(qa, '1d_step')
+    qa.set_case(Case1D())
+
+
+@scenario('V02', 'V', est=50)
+def v02_vtk_2d_obstacles(qa):
+    """2D: Whole domain and Obstacles; without obstacles the strip says
+    "nothing to sample", with one the case validates."""
+    from blastlab.core.case import Case2D
+    qa.goto('setup')
+    qa.set_case(Case2D(solver='blastfoam'))
+    form = _form(qa)
+    qa.check(form.widgets['vtk_v_on'].text() == 'Whole domain'
+             and form.widgets['vtk_s_on'].text() == 'Obstacles',
+             '2D offers Whole domain and Obstacles', 'S2')
+    qa.action = 'tick Obstacles'
+    form.widgets['vtk_s_on'].click()
+    qa.pump(0.8)
+    strip = qa.strip_text()
+    qa.note('2D obstacles, none drawn: ' + ' | '.join(strip))
+    qa.check(any('nothing to sample' in s for s in strip),
+             'no obstacles: the strip says "nothing to sample"', 'S2')
+    _vtk_shots(qa, '2d_no_obstacles')
+    _set_rows(qa, form.obstacles, [(3.0, 3.2, 0.0, 0.5)])
+    strip = qa.strip_text()
+    qa.note('2D obstacles, one drawn: ' + ' | '.join(strip))
+    qa.check(not any('nothing to sample' in s for s in strip),
+             'with an obstacle the refusal is gone', 'S2')
+    _vtk_shots(qa, '2d_with_obstacle')
+    form.widgets['vtk_v_on'].click()
+    form.widgets['vtk_v_mode'].buttons['step'].click()
+    form.widgets['vtk_s_mode'].buttons['step'].click()
+    qa.pump(0.6)
+    qa.check(not form.is_enabled('vtk_v_time')
+             and not form.is_enabled('vtk_s_time'),
+             'Step on both 2D families greys both seconds boxes', 'S2')
+    _vtk_shots(qa, '2d_step')
+    _set_rows(qa, form.obstacles, [])
+    _fresh2d(qa)
+
+
+@scenario('V03', 'V', est=60)
+def v03_vtk_3d(qa):
+    """3D: the four-column matrix (Gauges locked), the plane table and
+    the Time / Step greying of both families."""
+    from blastlab.core.case import Case3D
+    qa.goto('setup')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _form(qa)
+    grid = form.widgets['vtk_fields']
+    cols = sorted({c for _f, c in grid.boxes})
+    qa.check(cols == ['obstacles', 'sections', 'volumes'],
+             'three destination columns plus the locked Gauges column (Q2)',
+             'S2', evidence=str(cols))
+    _vtk_shots(qa, '3d_off')
+    form.widgets['vtk_s_on'].click()
+    form.widgets['vtk_v_on'].click()
+    qa.pump(0.8)
+    m = form.v['vtk_fields'].get()
+    qa.check(m == {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'],
+                   'volumes': ['p', 'rho', 'U']},
+             'first ticks: p/pMax on sections and obstacles, p/rho/U on '
+             'volumes', 'S2', evidence=str(m))
+    _vtk_shots(qa, '3d_time')
+    form.widgets['vtk_s_mode'].buttons['step'].click()
+    qa.pump(0.6)
+    qa.check(not form.is_enabled('vtk_s_time')
+             and form.is_enabled('vtk_s_steps')
+             and form.is_enabled('vtk_v_time'),
+             'Step on the surfaces greys their seconds box only', 'S2')
+    pl = form.points['vtk_planes']
+    ok_q = _add_row(qa, pl, 'q, 1')
+    qa.shot('3d_plane_q1_refused_card', widget=_vtk_card(qa))
+    qa.check(not ok_q and 'x, y or z' in pl.hint.text(),
+             'a plane `q, 1` is refused with a reason', 'S2',
+             evidence=pl.hint.text())
+    ok_y = _add_row(qa, pl, 'y, 1.4')
+    qa.check(ok_y and pl.get() == [('y', 1.4)],
+             'a plane `y, 1.4` is accepted', 'S2', evidence=str(pl.get()))
+    _vtk_shots(qa, '3d_step_plane')
+    rows = qa.win.setup.report_rows()
+    qa.note('3D VTK strip: ' + ' | '.join(t for _s, t in rows))
+    vtk_errs = [t for sev, t in rows if sev == 'error' and 'VTK' in t]
+    qa.check(not vtk_errs, 'both families with a plane at y = 1.4 m '
+             'validate (Ly = 1.5 m; the live slice is at the burst)', 'S2',
+             evidence=str(vtk_errs))
+    qa.set_case(Case3D())
+
+
+@scenario('V04', 'V', est=40)
+def v04_vtk_native(qa):
+    """Native mode hides the whole card (never greys it), and a saved
+    case carries no vtk_ key; back in blastFoam the ticks are there."""
+    from blastlab.core.case import Case3D, case_to_dict
+    qa.goto('setup')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _form(qa)
+    form.widgets['vtk_v_on'].click()
+    qa.pump(0.6)
+    qa.solver('native')
+    form = _form(qa)
+    qa.check(not form.card_visible(VTK_CARD),
+             'native: the VTK card is hidden', 'S1')
+    # where the card sat: Outputs, then straight on to the Trigger card
+    # (the bottom of the scroll range is the stack's blank tail - the
+    # QStackedWidget takes its tallest page's height)
+    try:
+        qa.win.setup._scroll.ensureWidgetVisible(form.cards['Trigger gauge'],
+                                                 0, 0)
+    except Exception:
+        pass
+    qa.pump(0.4)
+    qa.shot('native_no_card')
+    saved = case_to_dict(qa.win.setup.get_case())
+    path = os.path.join(qa.dirs['cache'], 'v04_native.json')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(saved, f, indent=1)
+    qa.check(not any(k.startswith('vtk_') for k in saved),
+             'the saved native case has no vtk_ key', 'S1',
+             evidence=str(sorted(saved)))
+    qa.solver('blastfoam')
+    form = _form(qa)
+    qa.check(form.card_visible(VTK_CARD) and form.v['vtk_v_on'].get(),
+             'back to blastFoam: the card and the tick are back', 'S2')
+    _vtk_shots(qa, 'foam_again')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
+@scenario('V05', 'V', est=90)
+def v05_vtk_manifest(qa):
+    """A finished, STUBBED foam stage (the native solver under a fake
+    backend that writes a fake vtk\\ tree) gives a root manifest with a
+    `vtk` summary. No WSL."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.core.case import Case1D
+    from blastlab.output import vtk_series
+    from blastlab.services import model_folder as mf
+    from blastlab.solvers import jobs
+    from blastlab.solvers.worker import SolverWorker
+    from blastlab.ui.testing import private_runs_dir
+    real_solver = solvers_pkg.get_solver
+    real_release = mf.verify_and_release_scratch
+    seen = []
+
+    def foam_like(case, hooks):
+        seen.append(hooks.vtk_dir)
+        res = real_solver(case.dim, 'native')(case, hooks)
+        vdir = os.path.join(hooks.vtk_dir, 'volumes')
+        os.makedirs(vdir, exist_ok=True)
+        times = ['0.0005', '0.001']
+        for t in times:
+            with open(os.path.join(vdir, f't_{t}.vtk'), 'w',
+                      encoding='utf-8') as f:
+                f.write('# vtk DataFile Version 2.0\nfake\n')
+        # the owner's Viper-style layout (2026-09-27): the series beside
+        # its folder, at the top of vtk\
+        vtk_series.write_series(hooks.vtk_dir, 'volumes',
+                                [(f'volumes/t_{t}.vtk', float(t))
+                                 for t in times])
+        vtk_series.write_vtk_manifest(hooks.vtk_dir, dict(
+            fields=dict(volumes=['p']),
+            families=dict(volumes=dict(count=2, times=times,
+                                       series=['volumes.vtk.series'])
+                          )))
+        return res
+
+    solvers_pkg.get_solver = lambda dim, backend: foam_like
+    mf.verify_and_release_scratch = lambda m, *a, **k: (m, None)
+    try:
+        runs = private_runs_dir()
+        folder = mf.prepare(runs, 'V05', confirm=lambda t: True)
+        case = Case1D(radius_m=2.0, charge_kg=0.2, cell_size_m=0.01,
+                      gauge_radii=[1.0], solver='blastfoam',
+                      vtk_volumes=dict(on=True, mode='time', value=0.0005,
+                                       fields=['p']))
+        w = SolverWorker([jobs.solve_stage(1, case, stage_dir=folder)])
+        qa.action = 'stubbed foam stage'
+        w.run()
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+    qa.check(seen == [os.path.join(folder, 'vtk')],
+             'the stage ran with hooks.vtk_dir = <model>\\vtk', 'S1',
+             evidence=str(seen))
+    try:
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            m = json.load(f)
+    except (OSError, ValueError) as exc:
+        m = {'error': str(exc)}
+    qa.note(f'V05 root manifest vtk: {m.get("vtk")}; tree: {_tree(folder)}')
+    v = m.get('vtk') or {}
+    qa.check({k: v.get(k) for k in ('dir', 'counts', 'files',
+                                     'not_converted')}
+             == dict(dir='vtk', counts={'volumes': 2}, files=4,
+                     not_converted=[]) and (v.get('bytes') or 0) > 0,
+             'the root manifest carries the numeric vtk summary (P4)', 'S1',
+             evidence=str(m.get('vtk')))
+    listed = [o['path'] for o in m.get('outputs', [])]
+    qa.check({'vtk/manifest.json', 'vtk/volumes/t_0.0005.vtk',
+              'vtk/volumes.vtk.series'} <= set(_tree(folder))
+             and not any(p.startswith('vtk/') for p in listed)
+             and not m.get('failed'),
+             'the vtk\\ tree is on disk, left out of `outputs` (P4), '
+             'nothing failed', 'S2',
+             evidence=f"outputs {listed[:6]}; failed {m.get('failed')}")
+
+
+# ═══════════════════════════════════════════════════════════════════════
 #  Group H - light mode over everything that draws
 # ═══════════════════════════════════════════════════════════════════════
 @scenario('H01', 'H', est=60)

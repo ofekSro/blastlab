@@ -17,9 +17,10 @@ import threading
 
 from ..services.exports import (DIR_KINDS, KINDS,          # noqa: F401
                                 SCRATCH_RELEASED, _open, _report_caption,
-                                can, model_dir, name_prefix, png_figures,
-                                report_figures, run_export, summary_rows,
-                                why_not, write_animation)
+                                can, model_dir, name_prefix, open_run_vtk,
+                                png_figures, report_figures, run_export,
+                                run_vtk, summary_rows, vtk_tip, why_not,
+                                write_animation)
 from . import dialogs
 
 
@@ -57,6 +58,10 @@ def pick_target(kind, ent, log=print, parent=None):
             start(f'{pre}gauges_{dim}d_summary.csv'), '.csv')
     if kind == 'vtk':
         from ..solvers.foam.export_vtk import can_export
+        if open_run_vtk(ent, log):
+            # the run wrote <MODEL>\vtk\ itself (OUT-2): show it, write
+            # nothing (GUI QA 2026-09-27 F2)
+            return ''
         if not can_export(res.meta):
             log(SCRATCH_RELEASED if res.meta.get('scratch_released')
                 else 'VTK export needs a blastFoam run whose case '

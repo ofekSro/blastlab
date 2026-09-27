@@ -918,6 +918,8 @@ class FoamRunLoop:
     #: HD1-15 (DecomposedPurge). A class default so a loop assembled
     #: with __new__ (the stop-latency test does) simply has none.
     purge = None
+    #: OUT-2 (vtk_export.VtkExport), with the same class-default reason
+    vtk = None
 
     def __init__(self, spec, hooks, fields, done, live_set, decode,
                  read_dir, on_frame):
@@ -955,6 +957,10 @@ class FoamRunLoop:
         # HD1-15: with a write budget, the decomposed copy of the latest
         # write only - inactive (no listing, no deletes) otherwise
         self.purge = DecomposedPurge(spec, fields, hooks)
+        # OUT-2: VTK output into the model folder - inactive (no converter
+        # call, no delete) without a VTK family or without a folder (D12)
+        from .vtk_export import VtkExport
+        self.vtk = VtkExport(spec, hooks, fields)
         self.foam = runner.FoamRun(spec.case_posix, spec.case_unc,
                                    n_procs=spec.n_procs, log=hooks.log)
 
@@ -1069,11 +1075,15 @@ class FoamRunLoop:
             if not final:
                 self._check_stop()
         self._purge_decomposed()
+        self._export_vtk(final)
 
     def _covered(self, names):
-        """Tell the HD1-15 purge what a reconstructPar just covered."""
+        """Tell the HD1-15 purge (and the OUT-2 export) what a
+        reconstructPar just covered."""
         if self.purge is not None:
             self.purge.covered(names)
+        if self.vtk is not None:
+            self.vtk.covered(names)
 
     def _purge_decomposed(self):
         """HD1-15: drop the decomposed copies the root now holds for good
@@ -1081,6 +1091,24 @@ class FoamRunLoop:
         every ingest pass, the final sweep's included."""
         if self.purge is not None:
             self.purge.run(self.done)
+
+    def _export_vtk(self, final=False):
+        """OUT-2: convert, copy and delete what the VTK export allows now
+        (VtkExport; a no-op without a family or a model folder). After
+        every ingest pass and on the final sweep, which converts every
+        ingested write before finalize reads the ones it keeps."""
+        if self.vtk is not None:
+            self.vtk.run(self.done, final)
+
+    def protect(self, name, why='read'):
+        """The backend: finalize re-reads written time `name` - never
+        delete it (OUT-2, D1). `why` keys the reason (VtkExport.protect)."""
+        if self.vtk is not None:
+            self.vtk.protect(name, why)
+
+    def unprotect(self, name, why='read'):
+        if self.vtk is not None:
+            self.vtk.unprotect(name, why)
 
     def run(self):
         """Drive the solver to completion (or stop/kill). Returns the
@@ -1125,6 +1153,8 @@ class FoamRunLoop:
             if foam.running:
                 foam.kill()
             foam.release()          # the W3 keepalive session
+            if self.vtk is not None:
+                self.vtk.close()    # a foamToVTK still running (OUT-2)
             # live samples are display-only; drop the leftovers so a kept
             # case dir holds just the real record (time dirs + probes)
             if self.live_set:

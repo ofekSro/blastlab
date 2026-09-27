@@ -576,6 +576,43 @@ def _arrival_pin(names, t_of, stop_reason, arrived, hooks):
 # the crossing write itself - the long post-arrival tail is never read
 
 
+def _track_pin(loop, pin, name, arrived):
+    """OUT-2 (D1): keep the write `_arrival_pin` would pick on the VTK
+    export's never-delete list while the run is still writing. That is the
+    newest write whose arrival predicate is False, frozen at the first
+    write where it holds (the forward scan's `names[first - 1]`); the
+    candidate it replaces is released - for the pin only, so a write kept
+    as a snapshot or trigger stays kept. `pin` is the caller's
+    {'name', 'frozen'} state.
+
+    The first write where it holds is kept too ('arrival'): a resume
+    after deletion, and postmortem.load_run, re-run the forward scan on
+    the writes left on disk, and the boundary can vent back below the
+    threshold on later writes - without this one the replay never sees
+    the arrival, never stops, and hands on the last write (D10)."""
+    if pin['frozen']:
+        return
+    if arrived:
+        pin['frozen'] = True
+        loop.protect(name, 'arrival')
+        return
+    loop.unprotect(pin['name'], 'pin')
+    pin['name'] = name
+    loop.protect(name, 'pin')
+
+
+def _arrived_2d_grid(pg, bcs):
+    """The 2D arrival predicate on one write's `p` grid: any cell of a
+    terminate side above ARRIVAL_P (finalize_2d's `arrived_2d`, and the
+    run loop's on_frame for the OUT-2 cache)."""
+    for side, sl in (('x_lo', np.s_[0, :]), ('x_hi', np.s_[-1, :]),
+                     ('y_lo', np.s_[:, 0]), ('y_hi', np.s_[:, -1])):
+        if bcs.get(side) == 'terminate' \
+                and bool(np.any(pg[sl] > ARRIVAL_P)):
+            return True
+    return False
+
+
 def _gauges_from_probes(spec):
     """blastProbes output -> the native gauges dict (1D: radii)."""
     empty = dict(times=np.array([]), radii=[], pressures=[])
@@ -632,9 +669,7 @@ def _log_banner_1d(hooks, case, spec):
             '  EOS             : JWL products + ideal-gas air',
             f'  vDet            : {m.vDet:g} m/s',
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + ('(initial, adaptive)' if spec.adaptive_write
-               else '(pinned schedule)'),
+            _write_interval_line(spec),
             f'  Live profile    : p(r) sampled every '
             f'{spec.live_steps or writer.live_sample_steps(1)} steps',
             bar, ''):
@@ -696,6 +731,15 @@ def _disable_fo_accumulators(spec, case, hooks):
               'across a mesh change. Peak and impulse are accumulated per '
               'write instead (the whole run, including everything before '
               'the stop) - see peak_source in the result.')
+    # OUT-2 (D4): the rewritten controlDict samples no pMax / impulse on
+    # the VTK surfaces either (writer.vtk_surface_fields)
+    surf = spec.vtk_surfaces or {}
+    dropped = sorted({f for k in ('fields', 'obstacle_fields')
+                      for f in surf.get(k, ())} & set(_FO_FIELDS))
+    if dropped:
+        hooks.log(f'  [blastfoam] VTK sections/obstacles: '
+                  f'{" and ".join(dropped)} are not written for this resumed '
+                  f'AMR leg (the function objects are off)')
     return True
 
 
@@ -814,6 +858,16 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
              if float(_t) > 0 or n == '0']
     if len(times) < 1:
         raise RuntimeError(f'{unc} has no written times to resume from')
+    # OUT-2 (D10): writes the VTK export already removed are not replayed
+    from .vtk_export import deleted_note, note_resume
+    if getattr(hooks, 'vtk_dir', None):
+        note_resume(hooks.vtk_dir, times, hooks.log)
+    else:
+        # owner decision P11: a resume from the run browser has no model
+        # folder (P2-17), so find the run's vtk\ by its scratch and warn
+        note = deleted_note(posix)
+        if note:
+            hooks.log(note)
 
     # a Stop leaves `stopAt writeNow` in the runTimeModifiable dict -
     # a resumed solver would exit immediately; and the run must pick up
@@ -829,6 +883,10 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
     # that matches its mesh, which is what keeps the peak/impulse maps
     # continuous across the resume.
     start_name, skipped = _resume_start_time(spec, times, hooks)
+    # OUT-2: the VTK export never deletes the time the solver restarts
+    # from. After a P1-5 walk-back it is not among the newest writes the
+    # replay ingests, so KEEP_NEWEST alone would not keep it.
+    spec.restart_dir = start_name
     # ...and under AMR the accumulating FOs cannot be restarted at all
     _disable_fo_accumulators(spec, case, hooks)
     if skipped:
@@ -947,12 +1005,14 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
+    # OUT-2: VTK volumes pin the schedule too (their cadence IS it)
     spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True)))
+                           and bool(getattr(case, 'adaptive_write', True))
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     r = spec.grid['r']
     # T is in the readiness tuple because finalize_1d re-reads it
@@ -970,6 +1030,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     _initial_frame(spec, hooks)
 
     store = {}                      # dirname -> dict(t, p, rho, u)
+    pin = dict(name=None, frozen=False)     # OUT-2 (D1): see _track_pin
 
     def read_dir(name, dpath):
         t, _dt = reader.read_time(dpath)
@@ -983,6 +1044,8 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     def on_frame(name, dpath, entry):
         store[name] = entry
+        # finalize_1d's own pin predicate, on the p already in hand
+        _track_pin(loop, pin, name, float(entry['p'][-1]) > ARRIVAL_P)
         st, live = loop.st, loop.live
         # shock-front position: real progress for the bar and for
         # the adaptive-interval controller
@@ -1301,8 +1364,7 @@ def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
             + ('shock arrival at a terminate boundary' if has_term
                else 'safety cap (no terminate boundaries)'),
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + _interval_label(spec),
+            _write_interval_line(spec),
             f'  Live slice      : p sampled every '
             f'{spec.live_steps or writer.live_sample_steps(2)} steps'
             + (' + every written time (AMR)' if spec.amr else ''),
@@ -1327,11 +1389,12 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
                            and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0))
+                           and not getattr(spec, 'write_budget', 0)
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
@@ -1388,6 +1451,10 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     snap_names = []
     acc = PeakImpulse()         # per-write Python + per-step FO accumulators
     slice_solid = solid if solid.any() else None
+    # OUT-2 (D1): the pin candidate the VTK export must keep, and each
+    # write's arrival predicate for finalize_2d once its dir is gone
+    pin = dict(name=None, frozen=False)
+    arrived_cache = {}
 
     def read_dir(name, dpath):
         t, _dt = reader.read_time(first_part(dpath))
@@ -1400,6 +1467,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
         if not acc.add(p, t, dpath, spec, hooks, mesh=mesh):
             return False
         ingested[name] = t
+        arrived_cache[name] = _arrived_2d_grid(p, bcs)
+        _track_pin(loop, pin, name, arrived_cache[name])
         st, live = loop.st, loop.live
         if mesh is not None:
             hooks.log(amr_note(mesh, st.get('n_prev'), t))
@@ -1414,6 +1483,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
             snap_radii.pop(0)
             if name not in snap_names:
                 snap_names.append(name)
+                loop.protect(name)          # finalize_2d re-reads it
                 hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
                           f"(front at {r_front:.2f} m)")
         if record_frames > 0:
@@ -1442,6 +1512,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
                 _trigger_fire(loop, hooks, case, trig_k, t,
                               float(p[trig_cell])),
                 time_dir=name)
+            if 'remap' in trigger['action']:
+                loop.protect(name)          # finalize_2d reads its state
         if not loop.stop_requested and has_term \
                 and (p[term_edge] > ARRIVAL_P).any():
             loop.request_stop('shock arrived at a terminate boundary '
@@ -1501,18 +1573,22 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
                        ingested, snap_names, frame_t, frame_p,
                        record_frames, acc, frame_lv=frame_lv,
                        trig_k=trig_k, trigger=trigger,
-                       conserved=conserved_meta(loop.st))
+                       conserved=conserved_meta(loop.st),
+                       arrived_cache=arrived_cache)
 
 
 def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                  snap_names, frame_t, frame_p, record_frames, acc,
-                 frame_lv=None, trig_k=None, trigger=None, conserved=None):
+                 frame_lv=None, trig_k=None, trigger=None, conserved=None,
+                 arrived_cache=None):
     """Build the exact native-shaped 2D Result via a two-pass snapshot
     re-read (also used by postmortem.load_run).
 
     `trig_k` / `trigger` are the T51 trigger-gauge index and record from
     the run loop; postmortem.load_run has neither (it never watched the
-    run) and passes nothing."""
+    run) and passes nothing. `arrived_cache` (OUT-2, D1): the arrival
+    predicate the run loop evaluated on each write's `p`, consulted only
+    for a write whose directory the VTK export has deleted."""
     m = MATERIALS[spec.material]
     g = spec.grid
     x_c, y_c = g['x_c'], g['y_c']
@@ -1614,15 +1690,14 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     def arrived_2d(name):
         """The loop's own stop criterion ('shock arrived at a terminate
         boundary'), re-evaluated on the WRITTEN data of one time dir -
-        deterministic where the stop instant is not."""
+        deterministic where the stop instant is not. A write the VTK
+        export deleted answers from the run loop's cache (OUT-2)."""
         dp = spec.time_dirs(name)
+        if arrived_cache and name in arrived_cache \
+                and not os.path.isdir(first_part(dp)):
+            return arrived_cache[name]
         pg = read_2d(dp, spec, ('p',), mesh=mesh_at(spec, dp))['p']
-        for side, sl in (('x_lo', np.s_[0, :]), ('x_hi', np.s_[-1, :]),
-                         ('y_lo', np.s_[:, 0]), ('y_hi', np.s_[:, -1])):
-            if bcs.get(side) == 'terminate' \
-                    and bool(np.any(pg[sl] > ARRIVAL_P)):
-                return True
-        return False
+        return _arrived_2d_grid(pg, bcs)
 
     pin = _arrival_pin(names, ingested.get, stop_reason, arrived_2d,
                        hooks)
@@ -1866,7 +1941,26 @@ def _interval_label(spec):
     write budget gets its own."""
     if getattr(spec, 'write_budget', 0):
         return f'(pinned: write budget {spec.write_budget})'
+    if getattr(spec, 'vtk_volumes', None):
+        return '(pinned: VTK volumes)'
     return '(initial, adaptive)' if spec.adaptive_write else '(pinned schedule)'
+
+
+def _write_interval_line(spec):
+    """The banner's `Write interval` line. OUT-2: VTK volumes in Step
+    mode write every N solver steps, and the line says so rather than
+    quote the transit-sized estimate that no longer schedules anything."""
+    if getattr(spec, 'write_steps', 0):
+        return (f'  Write interval  : every {spec.write_steps} solver steps '
+                f'(pinned: VTK volumes)')
+    return (f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
+            + _interval_label(spec))
+
+
+def _write_cadence_dt(spec):
+    """hooks.cadence's `dt`: writeInterval [s], or None (unknown) when
+    the writes come every N solver steps (OUT-2 Step mode)."""
+    return None if getattr(spec, 'write_steps', 0) else spec.write_interval
 
 
 def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
@@ -1904,8 +1998,7 @@ def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
                else 'safety cap (no terminate boundaries)'),
             f'  {"End time" if spec.cap_is_end else "Safety cap":<16}: '
             f'{spec.end_time*1e3:.1f} ms',
-            f'  Write interval  : {spec.write_interval*1e3:.4f} ms '
-            + _interval_label(spec),
+            _write_interval_line(spec),
             ('  Live slice      : p of every written time (AMR)'
              if spec.amr else '  Live slice      : p sampled every step'),
             bar, ''):
@@ -1926,11 +2019,12 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     # solve_1d_foam docstring), and so does a write budget (HD1-15)
     spec.adaptive_write = (bool(adaptive_write)
                            and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0))
+                           and not getattr(spec, 'write_budget', 0)
+                           and not getattr(spec, 'vtk_volumes', None))
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
-    hooks.cadence(dt=spec.write_interval,
+    hooks.cadence(dt=_write_cadence_dt(spec),
                   steps=spec.live_steps or writer.live_sample_steps(case.dim))
     g = spec.grid
     x_c, y_c, z_c = g['x_c'], g['y_c'], g['z_c']
@@ -2042,6 +2136,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
             snap_radii.pop(0)
             if name not in snap_names:
                 snap_names.append(name)
+                loop.protect(name)          # finalize_3d re-reads it
                 hooks.log(f"  Snapshot saved: t = {t*1e3:.3f} ms  "
                           f"(front at {r_front:.2f} m)")
 

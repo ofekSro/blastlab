@@ -558,6 +558,51 @@ writer through the `jobs` registration hook.
 
 ---
 
+## 0d. 2026-09-27 — batch `out-2-vtk-output` (OUT-2)
+
+Plan: `docs/batches/2026-09-27-out-2-vtk-output.md` (§0a D1–D15, owner answers Q1–Q7,
+parked P1–P16), specification `docs/model-folder-and-vtk-plan.md` §3.
+
+### `OUT-2` · VTK output for ParaView
+
+- **What:** the Setup card **VTK output (ParaView)** in both GUIs (blastFoam only;
+  families per dimension, Time [ms] / Step with the other box greyed, 3D extra planes,
+  a quantity matrix with a locked Gauge column and separate Sections / Obstacles /
+  Volumes columns, Q2); case keys `vtk_surfaces` / `vtk_volumes`, omitted while off;
+  validation of every refusal in §3.3; the writer's `vtkTimeSeries` surface function
+  objects (never alter dt) and the volumes write cadence; `VtkExport` in the run loop
+  (async foamToVTK, copy + size check, `.vtk.series` + `vtk\manifest.json`, then the
+  WSL delete that the pure `vtk_purge_plan` allows); the backend protects every write
+  finalize re-reads (D1). Layout `<MODEL>\vtk\volumes|sections\<plane>\<field>|
+  obstacles\<field>`, one series per field (Q1).
+- **Tests:** new `test_vtk_case`, `test_vtk_export_plan`, `test_vtk_series`,
+  `test_vtk_protect`, `test_ui_output_card`, `test_gui_output_card`; `test_foam_writer`
+  and `test_model_folder` additions; harness group V (Qt V01–V05, Tk V01–V04);
+  `_e2e_vtk_3d.py` (WSL, rules pre-registered in `6328bbd`). Goldens: only the two
+  char case-form re-pins, added rows only. `test_regression` byte-identical.
+- **Real run (2026-09-27):** `_e2e_vtk_3d.py` 36/38. Surfaces alone and deletion vs
+  none are byte-identical; counts, series, the protected set on 331 passes, the
+  release and a stopped run all pass. Rule 3 (volumes vs no export) fails at a
+  Z ≈ 0.07 gauge: peak +4.2 %, impulse +4.8 %, against a 1 % limit. A write budget
+  of 10 without export reproduces the export run byte for byte, so the cause is the
+  write schedule's dt clipping. Parked as P14. `_e2e_model_folder.py` 26/26.
+- **Commits:** Steps 1–7 and their verification up to `06c272b`; 8 `d0c4a57` `87ff5da`;
+  9 `3d1feae` `c675829`; 10 `96bcff3`; 11 `6328bbd` `7382e6a`; 12 `8557bf2`; 13 the
+  commit of this entry.
+- **Follow-up, Viper-style layout (owner, 2026-09-27;
+  `docs/batches/2026-09-27-out-2-surface-layout.md`):** one legacy 3.0 BINARY file
+  per surface per time with every chosen field (pure-NumPy `output/legacy_vtk.py`
+  merges blastFoam's per-field files, verify-then-delete kept), one folder per series
+  with its `.vtk.series` beside it, readable array names (`VTK_ARRAY_NAMES`), `TIME`
+  inside every file, `Peak_Overpressure` = max(pMax, p) − P_AIR (≥ 0 without p).
+  Supersedes the per-field layout and Q1 above. `e1c326b` `c827914` `84d3967` `3ab208e`.
+- **P14 (c) closed:** rule 3 re-registered (`7e81c86`) against a baseline whose dt is
+  not clipped (972 steps, same as the export run): peak, impulse and arrival identical,
+  e2e 41/41 (`0af4f1f`). Volume export does not change the gauges.
+- **Accepted** by the owner in ParaView, 2026-09-27; merged to master and pushed.
+
+---
+
 ## 0e. 2026-09-27 — batch `viewer-polish` (P3-7, P3-8, P3-25)
 
 Plan: `docs/batches/2026-09-27-viewer-polish.md`. Owner decision of 2026-09-27: the
@@ -596,7 +641,7 @@ the plan's ≤ 2.0×: Tk takes only `bytes`, so two full buffers are the floor.
 - **QA (real viewer child, Qt and Tk, native runs):** 7/7 PASS, including the volume
   moving between frames. Evidence in `docs/qa/2026-09-27-viewer-polish/` (not committed,
   25 MB). Not fixed, pre-existing: log bar ticks below 1 print as "0" (`fmt='%.0f'`,
-  field bar too).
+  field bar too). Merged after OUT-2: re-tested on the merge.
 
 ---
 

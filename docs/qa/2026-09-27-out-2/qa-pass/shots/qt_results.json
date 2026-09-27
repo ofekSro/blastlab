@@ -1,0 +1,822 @@
+{
+ "checks": [
+  {
+   "name": "1D@1100: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "1D_time_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "1D@1100 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "1D@1100 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "1D_step_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2D@1100: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "2D_time_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2D@1100 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "2D@1100 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "2D_step_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "3D@1100: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "3D_time_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "3D@1100 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "3D@1100 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "3D_step_1100: the card and matrix fit (1100x720, card 440px, matrix 414px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "1D@1280: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "1D_time_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "1D@1280 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "1D@1280 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "1D_step_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2D@1280: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "2D_time_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "2D@1280 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "2D@1280 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "2D_step_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "3D@1280: first ticks fill the defaults",
+   "ok": true,
+   "detail": "{'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}"
+  },
+  {
+   "name": "3D_time_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "3D@1280 Time: steps boxes disabled, ms live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "3D@1280 Step: ms boxes disabled, steps live",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "name": "3D_step_1280: the card and matrix fit (1280x840, card 306px, matrix 280px)",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "dark: locked Gauge tick differs from a live tick (RGB distance > 40)",
+   "ok": false,
+   "detail": "distance 9"
+  },
+  {
+   "name": "plane \"q, 1\" refused with a reason",
+   "ok": true,
+   "detail": "rows [], hint \"axis must be x, y or z, not 'q'\""
+  },
+  {
+   "name": "plane \"y, 1.4\" accepted",
+   "ok": true,
+   "detail": "rows [('y', 1.4)], hint 'add a row: axis  position [m]'"
+  },
+  {
+   "name": "bad vtk_v_ms='-1': the strip reports an error, others kept",
+   "ok": true,
+   "detail": "['error: VTK volumes: the interval must be > 0 (ms)', \"warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'note: blastFoam ready in WSL (Ubuntu)']"
+  },
+  {
+   "name": "bad vtk_v_ms='0': the strip reports an error, others kept",
+   "ok": true,
+   "detail": "['error: VTK volumes: the interval must be > 0 (ms)', \"warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'note: blastFoam ready in WSL (Ubuntu)']"
+  },
+  {
+   "name": "bad vtk_v_ms='abc': the strip reports an error, others kept",
+   "ok": true,
+   "detail": "[\"error: 'VTK Volumes every [ms]' is not a number: 'abc'\"]"
+  },
+  {
+   "name": "bad vtk_v_ms='': the strip reports an error, others kept",
+   "ok": true,
+   "detail": "[\"error: 'VTK Volumes every [ms]' is not a number: ''\"]"
+  },
+  {
+   "name": "bad vtk_s_steps='2.5': the strip reports an error, others kept",
+   "ok": true,
+   "detail": "[\"error: 'VTK Sections and obstacles every [steps]' must be a whole number: '2.5'\"]"
+  },
+  {
+   "name": "an \"abc\" in the greyed steps box does not block",
+   "ok": true,
+   "detail": "[\"warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'note: blastFoam ready in WSL (Ubuntu)', 'note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)']"
+  },
+  {
+   "name": "blastFoam save carries vtk_surfaces and vtk_volumes",
+   "ok": true,
+   "detail": "{'vtk_surfaces': {'on': True, 'mode': 'time', 'value': 1.0, 'fields': ['p', 'pMax'], 'obstacle_fields': ['p', 'pMax'], 'planes': []}, 'vtk_volumes': {'on': True, 'mode': 'step', 'value': 25, 'fields': ['p', 'rho', 'U']}}"
+  },
+  {
+   "name": "native: the VTK card is hidden (isHidden)",
+   "ok": true,
+   "detail": "hidden=True enabled=True"
+  },
+  {
+   "name": "native save has no vtk_ key",
+   "ok": true,
+   "detail": "[]"
+  },
+  {
+   "name": "back to blastFoam: card visible and ticks/mode restored",
+   "ok": true,
+   "detail": "before {'m': {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}, 's': True, 'v': True, 'vmode': 'step'} after {'m': {'sections': ['p', 'pMax'], 'obstacles': ['p', 'pMax'], 'volumes': ['p', 'rho', 'U']}, 's': True, 'v': True, 'vmode': 'step'}"
+  },
+  {
+   "name": "2D Obstacles, no obstacles: \"nothing to sample\" in the strip",
+   "ok": true,
+   "detail": "['error: VTK obstacles: the case has no obstacles - nothing to sample', \"warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'note: blastFoam ready in WSL (Ubuntu)', 'note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)', 'note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)', 'note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)', 'note: ~368,449 cells at dx = 0.00658898 m']"
+  },
+  {
+   "name": "2D: after typing an obstacle the refusal clears",
+   "ok": true,
+   "detail": "[\"warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'note: Obstacles: cells inside each box are carved out of the mesh (rigid walls)', 'note: blastFoam ready in WSL (Ubuntu)', 'note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)', 'note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)', 'note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)', 'note: ~368,449 cells at dx = 0.00658898 m']"
+  },
+  {
+   "name": "load with keys: every key shown, greying follows each mode",
+   "ok": true,
+   "detail": "{'s_on': True, 's_mode': 'step', 's_steps': '10', 's_ms': '1', 'v_on': True, 'v_mode': 'time', 'v_ms': '0.5', 'v_steps': '25', 'planes': [('x', 0.5), ('z', 0.3)], 'm': {'sections': ['p', 'impulse'], 'obstacles': ['pMax'], 'volumes': ['p', 'T']}, 's_ms_enabled': False, 's_steps_enabled': True, 'v_ms_enabled': True, 'v_steps_enabled': False}"
+  },
+  {
+   "name": "load without keys: P12 defaults, greying follows Time",
+   "ok": true,
+   "detail": "{'s_on': False, 's_mode': 'time', 's_steps': '25', 's_ms': '1', 'v_on': False, 'v_mode': 'time', 'v_ms': '1', 'v_steps': '25', 'planes': [], 'm': {'sections': [], 'obstacles': [], 'volumes': []}, 's_ms_enabled': True, 's_steps_enabled': False, 'v_ms_enabled': True, 'v_steps_enabled': False, 'step_radio_checked': False, 'time_radio_checked': True}"
+  },
+  {
+   "name": "load a native case: the card is hidden",
+   "ok": true,
+   "detail": "mode native"
+  },
+  {
+   "name": "light: locked Gauge tick differs from a live tick (> 40)",
+   "ok": false,
+   "detail": "distance 32 {'locked_ticked': (214, 216, 219), 'live_ticked': (195, 197, 202), 'live_unticked': (237, 239, 242), 'ms_greyed': (240, 242, 245), 'ms_live': (240, 242, 245)}"
+  }
+ ],
+ "notes": [
+  "screen: 3360x1080 logical, dpr 1.0",
+  "window: 1280x840, title 'blastlab 1.0.0', minimum 1100x720",
+  "dark colours: {'locked_ticked': (56, 58, 60), 'live_ticked': (63, 63, 63), 'locked_unticked': (40, 40, 40), 'live_unticked': (32, 32, 32), 'ms_live': (37, 37, 37), 'ms_greyed': (36, 36, 36), 'steps_live': (38, 38, 38), 'steps_greyed': (37, 37, 38)}",
+  "greyed ms box text: 1"
+ ],
+ "errors": [
+  "Traceback (most recent call last):\n  File \"C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-27-out-2\\qa-pass\\harness\\qa_qt.py\", line 317, in main\n    screen_shot(f'tip_{safe}', lbl)\n  File \"C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-27-out-2\\qa-pass\\harness\\qa_qt.py\", line 114, in screen_shot\n    ImageGrab.grab(bbox=(max(0, x0), max(0, y0), x1, y1),\n  File \"C:\\Users\\rotem.ofek\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python312\\site-packages\\PIL\\ImageGrab.py\", line 93, in grab\n    offset, size, data = Image.core.grabscreen_win32(\n                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nOSError: screen grab failed\n"
+ ],
+ "fit": {
+  "1D_time_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 208,
+   "hscroll_max": 0
+  },
+  "1D_step_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 208,
+   "hscroll_max": 0
+  },
+  "2D_time_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 254,
+   "hscroll_max": 0
+  },
+  "2D_step_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 254,
+   "hscroll_max": 0
+  },
+  "3D_time_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 264,
+   "hscroll_max": 0
+  },
+  "3D_step_1100": {
+   "window": "1100x720",
+   "card_w": 440,
+   "issues": [],
+   "grid_w": 414,
+   "grid_min_w": 264,
+   "hscroll_max": 0
+  },
+  "1D_time_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 208,
+   "hscroll_max": 0
+  },
+  "1D_step_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 208,
+   "hscroll_max": 0
+  },
+  "2D_time_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 254,
+   "hscroll_max": 0
+  },
+  "2D_step_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 254,
+   "hscroll_max": 0
+  },
+  "3D_time_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 264,
+   "hscroll_max": 0
+  },
+  "3D_step_1280": {
+   "window": "1280x840",
+   "card_w": 306,
+   "issues": [],
+   "grid_w": 280,
+   "grid_min_w": 264,
+   "hscroll_max": 0
+  }
+ },
+ "colours": {
+  "dark": {
+   "locked_ticked": [
+    56,
+    58,
+    60
+   ],
+   "live_ticked": [
+    63,
+    63,
+    63
+   ],
+   "locked_unticked": [
+    40,
+    40,
+    40
+   ],
+   "live_unticked": [
+    32,
+    32,
+    32
+   ],
+   "ms_live": [
+    37,
+    37,
+    37
+   ],
+   "ms_greyed": [
+    36,
+    36,
+    36
+   ],
+   "steps_live": [
+    38,
+    38,
+    38
+   ],
+   "steps_greyed": [
+    37,
+    37,
+    38
+   ]
+  },
+  "light": {
+   "locked_ticked": [
+    214,
+    216,
+    219
+   ],
+   "live_ticked": [
+    195,
+    197,
+    202
+   ],
+   "live_unticked": [
+    237,
+    239,
+    242
+   ],
+   "ms_greyed": [
+    240,
+    242,
+    245
+   ],
+   "ms_live": [
+    240,
+    242,
+    245
+   ]
+  }
+ },
+ "strips": {
+  "1D_step_1100": [
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: ~10,000 cells at dx = 0.001 m"
+  ],
+  "2D_step_1100": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: Obstacles: cells inside each box are carved out of the mesh (rigid walls)",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "note: ~368,449 cells at dx = 0.00658898 m"
+  ],
+  "3D_step_1100": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "1D_step_1280": [
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: ~10,000 cells at dx = 0.001 m"
+  ],
+  "2D_step_1280": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: Obstacles: cells inside each box are carved out of the mesh (rigid walls)",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "note: ~368,449 cells at dx = 0.00658898 m"
+  ],
+  "3D_step_1280": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "3D_plane_y14": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "3D_plane_z9": [
+   "error: VTK sections/obstacles: plane z = 9 m is not inside the domain (0..1.5 m, ends excluded)",
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "bad vtk_v_ms='-1'": [
+   "error: VTK volumes: the interval must be > 0 (ms)",
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "bad vtk_v_ms='0'": [
+   "error: VTK volumes: the interval must be > 0 (ms)",
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "bad vtk_v_ms='abc'": [
+   "error: 'VTK Volumes every [ms]' is not a number: 'abc'"
+  ],
+  "bad vtk_v_ms=''": [
+   "error: 'VTK Volumes every [ms]' is not a number: ''"
+  ],
+  "bad vtk_s_steps='2.5'": [
+   "error: 'VTK Sections and obstacles every [steps]' must be a whole number: '2.5'"
+  ],
+  "inactive steps=abc": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.01927 m (8 cells across the charge radius)",
+   "note: Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank)",
+   "note: VTK obstacles: the case has no obstacles - only the sections are written",
+   "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it",
+   "note: ~456,533 cells at dx = 0.0192663 m"
+  ],
+  "2D obstacles none": [
+   "error: VTK obstacles: the case has no obstacles - nothing to sample",
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "note: ~368,449 cells at dx = 0.00658898 m"
+  ],
+  "2D obstacles one": [
+   "warn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.",
+   "note: Obstacles: cells inside each box are carved out of the mesh (rigid walls)",
+   "note: blastFoam ready in WSL (Ubuntu)",
+   "note: Cell size will be refined to 0.00659 m (8 cells across the charge radius)",
+   "note: Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)",
+   "note: Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)",
+   "note: ~368,449 cells at dx = 0.00658898 m"
+  ]
+ },
+ "tips": {
+  "Gauge": {
+   "visible": false,
+   "text": "",
+   "expected": "Gauges - always p, rho and U (fixed until OUT-4)"
+  }
+ },
+ "labels": {
+  "matrix": [
+   [
+    "Gauge",
+    "Gauges - always p, rho and U (fixed until OUT-4)"
+   ],
+   [
+    "Sect.",
+    "Sections - the live-slice plane and the extra planes"
+   ],
+   [
+    "Obst.",
+    "Obstacles - their walls"
+   ],
+   [
+    "Vol.",
+    "Volumes - the whole 3D domain"
+   ],
+   [
+    "Pressure",
+    "Pressure - blastFoam field p"
+   ],
+   [
+    "Overpressure",
+    "Overpressure - blastFoam field overpressure"
+   ],
+   [
+    "Impulse",
+    "Impulse - blastFoam field impulse"
+   ],
+   [
+    "Peak overpr.",
+    "Peak overpressure - blastFoam field pMax"
+   ],
+   [
+    "Arrival time",
+    "Arrival time (first arrival) - blastFoam field timeOfArrival"
+   ],
+   [
+    "Density",
+    "Density - blastFoam field rho"
+   ],
+   [
+    "Velocity",
+    "Velocity - blastFoam field U"
+   ],
+   [
+    "Temperature",
+    "Temperature - blastFoam field T"
+   ],
+   [
+    "Products",
+    "Products (volume fraction) - blastFoam field alpha.expl"
+   ],
+   [
+    "Energy",
+    "Energy - blastFoam field rhoE"
+   ]
+  ],
+  "plane_refusal": "axis must be x, y or z, not 'q'",
+  "plane 'z, 9'": {
+   "rows": [
+    [
+     "y",
+     1.4
+    ],
+    [
+     "z",
+     9.0
+    ]
+   ],
+   "hint": "add a row: axis  position [m]",
+   "strip": [
+    "error: VTK sections/obstacles: plane z = 9 m is not inside the domain (0..1.5 m, ends excluded)",
+    "note: VTK obstacles: the case has no obstacles - only the sections are written",
+    "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it"
+   ]
+  },
+  "plane 'x, abc'": {
+   "rows": [
+    [
+     "y",
+     1.4
+    ],
+    [
+     "z",
+     9.0
+    ]
+   ],
+   "hint": "not a number: abc",
+   "strip": [
+    "error: VTK sections/obstacles: plane z = 9 m is not inside the domain (0..1.5 m, ends excluded)",
+    "note: VTK obstacles: the case has no obstacles - only the sections are written",
+    "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it"
+   ]
+  },
+  "plane 'x 0.5 1'": {
+   "rows": [
+    [
+     "y",
+     1.4
+    ],
+    [
+     "z",
+     9.0
+    ]
+   ],
+   "hint": "expected 2 values (axis  position [m])",
+   "strip": [
+    "error: VTK sections/obstacles: plane z = 9 m is not inside the domain (0..1.5 m, ends excluded)",
+    "note: VTK obstacles: the case has no obstacles - only the sections are written",
+    "note: VTK volumes: one write every 1 ms, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it"
+   ]
+  },
+  "loaded_with": {
+   "s_on": true,
+   "s_mode": "step",
+   "s_steps": "10",
+   "s_ms": "1",
+   "v_on": true,
+   "v_mode": "time",
+   "v_ms": "0.5",
+   "v_steps": "25",
+   "planes": [
+    [
+     "x",
+     0.5
+    ],
+    [
+     "z",
+     0.3
+    ]
+   ],
+   "m": {
+    "sections": [
+     "p",
+     "impulse"
+    ],
+    "obstacles": [
+     "pMax"
+    ],
+    "volumes": [
+     "p",
+     "T"
+    ]
+   },
+   "s_ms_enabled": false,
+   "s_steps_enabled": true,
+   "v_ms_enabled": true,
+   "v_steps_enabled": false
+  },
+  "loaded_without": {
+   "s_on": false,
+   "s_mode": "time",
+   "s_steps": "25",
+   "s_ms": "1",
+   "v_on": false,
+   "v_mode": "time",
+   "v_ms": "1",
+   "v_steps": "25",
+   "planes": [],
+   "m": {
+    "sections": [],
+    "obstacles": [],
+    "volumes": []
+   },
+   "s_ms_enabled": true,
+   "s_steps_enabled": false,
+   "v_ms_enabled": true,
+   "v_steps_enabled": false,
+   "step_radio_checked": false,
+   "time_radio_checked": true
+  },
+  "card_texts": [
+   "VTK output (ParaView)",
+   "Cadence",
+   "Every [ms]\n(simulated time)",
+   "Every [steps]\n(solver steps)",
+   "Cadence",
+   "Every [ms]\n(simulated time)",
+   "Every [steps]\n(solver steps)",
+   "Extra section planes - the live-slice plane is always written",
+   "add a row: axis  position [m]",
+   "Quantities (Gauges: fixed until OUT-4)",
+   "Gauge",
+   "Sect.",
+   "Obst.",
+   "Vol.",
+   "Pressure",
+   "Overpressure",
+   "Impulse",
+   "Peak overpr.",
+   "Arrival time",
+   "Density",
+   "Velocity",
+   "Temperature",
+   "Products",
+   "Energy"
+  ],
+  "card_checkboxes": [
+   "Sections and obstacles",
+   "Volumes"
+  ],
+  "t_end_label": "End time [s] (0 = auto)",
+  "all_row_labels": {
+   "Lx": "Lx [m]",
+   "Ly": "Ly [m]",
+   "Lz": "Lz [m]",
+   "cell": "Cell size [m]",
+   "init_mode": "Initialize from",
+   "charge": "Charge [kg TNT]",
+   "material": "Material",
+   "charge_res": "Charge resolution",
+   "profile_in": "Profile file",
+   "cx": "Burst x [m]",
+   "cy": "Burst y [m]",
+   "cz": "Burst z [m]",
+   "eos": "EOS",
+   "order": "Order",
+   "activation": "Detonation",
+   "afterburn": "Afterburn",
+   "charge_refine": "Charge refinement",
+   "n_snapshots": "Snapshots",
+   "cfl": "CFL",
+   "n_procs": "MPI ranks (0 = auto)",
+   "t_end": "End time [s] (0 = auto)",
+   "slice_axis": "Live slice normal",
+   "slice_pos": "Slice position [m]\n(blank = burst)",
+   "amr_levels": "AMR levels (0 = off)",
+   "amr_estimator": "Error estimator",
+   "amr_refine": "Refine above",
+   "amr_unrefine": "Unrefine below",
+   "amr_interval": "Refine every [steps]",
+   "amr_buffer": "Buffer layers",
+   "amr_max_cells": "Max cells (0 = default)",
+   "amr_display_level": "Display level",
+   "bc_x_lo": "x_lo",
+   "bc_x_hi": "x_hi",
+   "bc_y_lo": "y_lo",
+   "bc_y_hi": "y_hi",
+   "bc_z_lo": "z_lo",
+   "bc_z_hi": "z_hi",
+   "gauge_file": "Gauge TSV",
+   "anim_file": "Animation (.gif / .mp4)",
+   "anim_format": "Animation format",
+   "anim_scale": "Video colours",
+   "anim_clim_min": "Video min [kPa]",
+   "anim_clim_max": "Video max [kPa]",
+   "record": null,
+   "anim_mesh": null,
+   "vtk_s_on": null,
+   "vtk_s_mode": "Cadence",
+   "vtk_s_ms": "Every [ms]\n(simulated time)",
+   "vtk_s_steps": "Every [steps]\n(solver steps)",
+   "vtk_v_on": null,
+   "vtk_v_mode": "Cadence",
+   "vtk_v_ms": "Every [ms]\n(simulated time)",
+   "vtk_v_steps": "Every [steps]\n(solver steps)",
+   "vtk_planes": "Extra section planes - the live-slice plane is always written",
+   "vtk_fields": "Quantities (Gauges: fixed until OUT-4)",
+   "trigger_gauge": "Gauge number\n(blank = off)",
+   "trigger_action": "On arrival"
+  }
+ }
+}
