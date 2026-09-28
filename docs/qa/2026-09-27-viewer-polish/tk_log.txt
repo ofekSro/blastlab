@@ -1,0 +1,27 @@
+﻿
+== starting a 3D run through the worker ==
+  [PASS] view3d button enabled after 15.3s
+
+== opening the embedded 3D view mid-run ==
+  [PASS] feed attached to hooks 
+  [PASS] scene created 
+  [PASS] worker done after 130.4s
+  [PASS] frames arrived live (panel updates on frames) n=544
+  [PASS] panel in playback 
+  [PASS] blit happened 
+  [shot:plotter] 25_item6_tk_00_baseline.png
+
+== toggling controls with playback paused ==
+  [shot:plotter] 26_item6_tk_volume_on.png
+  [shot:plotter] 27_item6_tk_volume_off.png
+  [shot:plotter] 28_item6_tk_log_toggled.png
+  [shot:plotter] 29_item6_tk_mesh_on.png
+  [shot:plotter] 30_item6_tk_mesh_off.png
+  [PASS] Tk control toggles updated the panel (on control toggles) 
+
+== simulating a camera drag (on camera drags) ==
+  [shot:plotter] 31_item6_tk_after_drag.png
+  [PASS] camera drag handled without error 
+
+==================================================
+Item 6 (Tk) checks completed.

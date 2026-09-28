@@ -1,0 +1,420 @@
+
+=== page 1 ===
+Viper Applied Science
+Viper Blast
+Theory Manual
+Dr James Wurster & Dr Peter McDonald
+August 21, 2025
+1
+
+=== page 2 ===
+Contents
+1 Introduction 3
+2 Continuum equations 3
+2.1 Equations of state . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+3 Numerical methods 4
+3.1 Scheme . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+3.2 Boundary conditions . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+3.2.1 Transmitting . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+3.2.2 Reflecting . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+3.2.3 Terminating . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 5
+3.3 Obstacles . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.4 Dimensionality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.4.1 Remaps . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.5 Viscosity . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+3.6 Afterburn . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 6
+4 Conclusion 6
+A Papers that use Viper 9
+2
+
+=== page 3 ===
+1 Introduction
+Viper Blast (herein Viper) is a computational fluid dynamics (CFD) based tool for simulating the airblast
+environment resulting from detonation of high explosives and other sources, such as vapours and high pressure gas.
+The primary purpose of Viper is to predict blast loads on structures of non-trivial geometry.
+Two important aspects of Viper are the graphical user interface (GUI) and the hardware acceleration of the
+numerical scheme. The GUI is designed for ease-of-use with a short learning curve and is intended for use within
+a blast engineering consultancy environment where rapid project turnaround is required. Implementation of the
+numerical scheme has been targeted at NVIDIA GPUs (Graphic Processing Units) in order to further reduce
+analysis times and project costs.
+This theory manual is intended for primarily internal use and for use by the enthusiastic customer who wants
+an in-depth understanding of Viper. This will be a comprehensive and detailed guide of the physics and numerical
+implementation. For specifics on how to use Viper, we refer the reader to the User Manual.
+The basic functionality of Viper is based largely upon the methodology described by Rose [2001] and the Air3D
+manual [Rose, 2006] and uses the AUSMDV numerical scheme as described by Wada and Liou [1994].
+2 Continuum equations
+To model air blasts, we solve the Euler equations. This includes the continuity equation,
+∂ρ
+∂t +∇· (ρV ) = 0, (2.1)
+the momentum equations,
+∂(ρu)
+∂t +∇· (ρuV ) +∂p
+∂x = 0, (2.2a)
+∂(ρv)
+∂t +∇· (ρvV ) +∂p
+∂y = 0, (2.2b)
+∂(ρw)
+∂t +∇· (ρwV ) +∂p
+∂z = 0, (2.2c)
+and the total energy equation,
+∂
+∂t
+
+ρ
+
+e + V 2
+2
+
++∇·
+
+ρ
+
+e + V 2
+2
+
++p
+
+V = 0, (2.3)
+where ρ is density, V is the velocity vector with components u, v, and w, in the x−, y−, and z−directions,
+respectively,p is the pressure, and e is the specific internal energy. For simplicity, we define specific total energy
+to be
+E =e + V 2
+2 . (2.4)
+Finally, we also require an equation of state (see Section 2.1) for closure.
+For succinctness, these equations are generally condensed to a single equation. In one dimension,
+∂U
+∂t + ∂F
+∂x = 0 (2.5)
+and in three dimensions,
+∂U
+∂t + ∂Fx
+∂x + ∂Fy
+∂y + ∂Fz
+∂z = 0. (2.6)
+Here, U is the complete system of conserved variables and F is flux vectors. In three-dimensions, these vectors are
+3
+
+=== page 4 ===
+given by
+U =
+
+
+
+ρ
+ρu
+ρv
+ρw
+ρ
+
+e + V 2
+2
+
+
+
+
+, (2.7)
+Fx =
+
+
+
+ρu
+ρu2 +p
+ρuv
+ρuw
+ρu
+
+e + V 2
+2
+
++pu
+
+
+
+, Fy =
+
+
+
+ρv
+ρvu
+ρv2 +p
+ρuw
+ρv
+
+e + V 2
+2
+
++pv
+
+
+
+, Fz =
+
+
+
+ρw
+ρwu
+ρwv
+ρw2 +p
+ρw
+
+e + V 2
+2
+
++pw
+
+
+
+. (2.8)
+To decrease from three- to one-dimension, only the first, second, and fifth rows of U and Fx are required.
+2.1 Equations of state
+Currently, Viper has two equations of state, ideal gas and Jones-Wilkins-Lee (JWL). Each solver (see below) is
+hard-coded with one of the two equations of state for efficiency.
+The ideal equation of state is given by
+p = (γ− 1)ρe (2.9)
+whereγ = 1.4 is the (hard-coded) adiabatic index for air. The fixedγ means that the results become less accurate at
+high temperatures, but the results are still typically within reasonable uncertainty when comparing to experiments.
+In many models and many regimes, this is an acceptable approximation.
+When ideal gas may not fully represent the scenario being modelled, the JWL [Jones and Miller, 1948, Wilkins
+et al., 1964, Lee et al., 1968] equation of state 1 can be used. This EOS describes the thermodynamics of both
+detonation products and unreacted high explosives, and retains accuracy at high temperatures. This roughly takes
+the form of
+p =A
+
+1− ω
+R1V
+
+e−R1V +B
+
+1− ω
+R2V
+
+e−R2V + ωE
+V , (2.10a)
+p(∆) =Ae−R1V +Be−R2V + C
+V ω+1, (2.10b)
+whereA,B,C,E,R1 andR2, are parameters that depend on the type of explosive. These parameters are emper-
+ically determined by comparison to experiments, thus inherently include uncertainty from the experiments. Viper
+includes default values for the included explosives, but they can be be modified by the user during initialisation.
+For further details and definition of the terms, see eqn 1.3 and associated text of of Lee et al. [1968].
+3 Numerical methods
+Viper includes several user options, including dimensionality, boundaries, equations of state, all of which can be
+modified in the GUI prior to execution.
+3.1 Scheme
+Viper evolves the fluid equations (2.6) using the AUSMDV scheme [Wada and Liou, 1994]. This is a combination
+of the AUSMD & AUSMV schemes, which themselves are based upon the Advection Upstream Splitting Method
+[AUSM; Liou and Steffen, 1993]. The sheme in Viper is second order in both time and space, and is based upon
+that described in section 2 of Rose [2001]; it has since been improved for enhanced stability and performance. For
+example, Viper includes corrections for the Carbuncle instability and includes an option for improved stability
+when evolving the blast into the far field.
+1The JWL EOS is named and completely described in Lee et al. [1968], and builds upon Jones and Miller [1948] and Wilkins et al.
+[1964].
+4
+
+=== page 5 ===
+The general scheme effectively treats each dimension independently, and splits each dimension into two phases.
+In the first phase, the conserved variables at the centre of the cells are used to calculate the conserved values at the
+edge of the cells at the half-timestep. For each cell, this calculation is performed using a template of three cells,
+which comprises of the the given cell and cells on either side. This yields two values at each edge, since each cell
+uses a different template of three cells. Then in the second phase, edge values are first updated to produce a single
+edge value, and then these new edge values are used to calculate the conserved values in the centre of the cells at
+the full timestep.
+3.2 Boundary conditions
+In Viper, the active domain is surrounded by a layer of two boundary (or ghost) cells. These ghost cells are required
+to properly calculate the values in the cells near the edge of the active domain, but are not evolved themselves.
+Rather, at the end of each step, these ghost cells receive values from the neighbouring active cells depending on
+the type of boundary requested. Viper includes three possible boundary conditions, which can be set individually
+for each boundary at runtime.
+3.2.1 Transmitting
+In transmitting boundaries, the ghost cells take on the values of their neighbours. Here,
+U1,j,k =U2,j,k (3.1a)
+U0,j,k =U3,j,k (3.1b)
+Uncx+2,j,k =Uncx+1,j,k (3.1c)
+Uncx+3,j,k =Uncx+0,j,k (3.1d)
+for all U, where the values on the left-hand side of the expressions are the ghost cells and the values on the
+right-hand side are in the active domain; the active domain in the x direction extends from 2 to ncx+1. Similar
+expressions are used in the remaining two dimensions.
+3.2.2 Reflecting
+Reflecting boundaries are the same as transmitting, except that the momentum in the direction of evolution is the
+negative of the value in the active region. For example, in 3D, the reflecting boundaries for the first layer of ghost
+cells on the left-hand side of the domain are
+ρ1,j,k =ρ2,j,k (3.2a)
+ρvx
+1,j,k =−ρvx
+2,j,k (3.2b)
+ρvy
+1,j,k =ρvy
+2,j,k (3.2c)
+ρvz
+1,j,k =ρvz
+2,j,k (3.2d)
+ρE1,j,k =ρE2,j,k (3.2e)
+Similar expressions are required for the remaining three pairs of indices as shown in Eqn. 3.1, and similar expressions
+can be constructed for the right-hand side of the domain and the remaining directions.
+3.2.3 Terminating
+Terminating boundaries are designed to end the simulation once the flow has reached the desired boundary. Thus,
+the fluid is only ever evolved in the active region and is only ever affected by physics within the active regions. The
+conditions for terminating boundaries are below.
+If a terminating boundary is set in 1D, then the simulation will terminate if ∆ ρ =|ρncx+1−ρncx| > 0.001,
+where ρnxc+1 and ρncx are the final two cells in the active domain. Note that the boundary at i = 2 must be
+reflecting in 1D.
+If a terminating boundary is set in 2D, then the simulation will terminate if the momentum becomes non-zero
+in any active cell next to the boundary, i.e., if |ρvx|i,j > 0.01 or |ρvy|i,j > 0.01 for any ( i,j )∈{ (2,j ), (ncx +
+2,j ), (i, 2), (j, ncy + 2)}.
+Terminating boundaries are not available in 3D.
+5
+
+=== page 6 ===
+3.3 Obstacles
+Viper permits obstacles to be included within the fluid domain. Fluid cells are defined as fully inside or fully
+outside of the obstacle, so the obstacle boundary is necessarily coincident with the cell edge.
+3.4 Dimensionality
+Viper can be run in one-, two-, and three-dimensions. Each solver is hard-coded to be run in one of these
+dimensions.
+One dimension assumes spherical symmetry. The left-hand boundary is defined to be reflecting and the right-
+hand boundary it a termination boundary. The bomb is necessarily placed at the origin in one-dimension.
+Two dimensions assume cylindrical symmetry. The axis of symmetry is defined to be reflecting while the
+boundaries at the remaining three edges can be selected by the user.
+Three dimensions includes no assumptions on symmetry. Currently, the user can select reflecting or transmitting
+for each of the eight edges.
+3.4.1 Remaps
+For efficiency, the simulation can be paused and ‘remapped’ onto a higher-order grid by making use of the symmetry
+of the lower-dimension simulation. For example, an air burst can be modelled in 1D until just before the blast
+impacts the ground; just prior to impact, the simulation can be paused, remapped into 2D and then continued.
+This remapping is explained in the User Manual, and the (manual) work flow is designed for improved efficiency
+and accuracy since lower-dimensional simulations can be run at higher resolution and/or faster. No information is
+lost in the process as long as the remapping occurs prior to any symmetry-breaking, and so long as the remap is
+into ambient atomsphere.
+3.5 Viscosity
+There is no explicit viscosity, therefore turbulence can not be modelled. Artificial viscosity is not required for the
+AUSMDV method, thus not included; this is a departure from other advection schemes.
+3.6 Afterburn
+Afterburn is discussed in Example 23 of the User Manual. From a numerical perspective, at all times and for every
+cell that contains burned and/or unburned material, energy is added to the total energy of the cell. The amount
+of energy is calculated upon an ‘S-curve’, which is defined by an afterburn duration and total amount of energy
+to be added. Therefore, this curve dictates how much energy is to be added at each timestep by determining the
+difference in energies between the next timestep and the current step. Note that by the nature of the curve, at very
+small times and for times larger than the parameterised burn duration, the amount of energy added is negligible
+since this difference approaches zero.
+4 Conclusion
+We refer the reader to the User Manual for Examples and Verification & Validation of Viper itself.
+References
+Monjee K Almustafa and Moncef L Nehdi. Decay behavior and internal interactions of regularly reflected spherical
+blast waves. Physics of Fluids, 36(2), 2024.
+Alastair Chester. Data set for comparative analysis of blast prediction software for far-field shock wave effects
+behind a blast wall. 2024.
+Alastair Chester, Rachael Hazael, and Richard Critchley. Comparative analysis of blast prediction software
+for far-field shock wave effects behind a blast wall. International Journal of Protective Structures, page
+20414196241284299, 2024.
+6
+
+=== page 7 ===
+Alastair Chester, Richard Critchley, and Rachael Hazael. A comparison of far-field explosive loads by a selection
+of current and emerging blast software. International Journal of Protective Structures, 16(2):387–418, 2025.
+Mar´ ıa Chiquitoa, Andrew Nicholsonb, Peter McDonaldb Santosa, Chris Stirlingb, Claudia Rastrojoa, and Jose I
+Yenesc. Blast wave injury risk assessment in complex scenarios using numerical simulation. Shock & Impact
+Loads on Structures, page 14.
+Adam A Dennis and Sam E Rigby. The direction-encoded neural network: A machine learning approach to rapidly
+predict blast loading in obstructed environments. International Journal of Protective Structures, 15(3):455–483,
+2024.
+Adam A Dennis, Danny J Smyl, Chris G Stirling, and Samuel E Rigby. A branching algorithm to reduce compu-
+tational time of batch models: Application for blast analyses. International Journal of Protective Structures, 14
+(2):135–167, 2023.
+Adam Arthur Dennis. Machine Learning Tools for Blast Load Prediction in Obstructed Environments. PhD thesis,
+University of Sheffield, 2024.
+Idan E Edri. Blast injury risks to humans within a military trench. Defence Technology, 40:91–104, 2024.
+D Farrimond, A Ratcliff, A Dennis, S Rigby, A Tyas, S Clarke, T Lodge, and W Tolman. Microblast-a benchmarking
+study of gramme-scale explosive trials. In Proceedings of the 26th International Symposium on Military Aspects
+of Blast and Shock (MABS26). Military Aspects of Blast and Shock (MABS), 2023.
+Dain Farrimond, Andrew Nicholson, Piotr Nowak, Lewis Tetlow, Adam Dennis, Tommy Lodge, Genevieve Langdon,
+Andy Tyas, Piotr Sielicki, Tomasz Gajewski, et al. Experimental validation of viper underwater explosion cfd
+solver. In Proceedings of The 19th International Symposium on Interaction of the Effects of Munitions with
+Structures (ISIEMS). International Symposium on Interaction of the Effects of Munitions with, 2024.
+PJ Flink and SJH Meijers. Quantified effects of barriers and terrain elevations on design of buildings exposed to
+hemispherical open-air explosions. In Journal of Physics: Conference Series, volume 2647, page 052005. IOP
+Publishing, 2024.
+Sherlyn Gabriel, Jack Denny, Steeve Chung Kim Yuen, Genevieve S Langdon, and Reuben A Govender. The effect
+of scaling building configuration blast experiments on positive phase blast wave parameters. Applied Sciences,
+13(10):5956, 2023.
+Edward Chern Jinn Gan and Alex Remennikov. Blast propagation and hazard mapping outside coal mine tunnels
+and shafts. Tunnelling and Underground Space Technology, 148:105749, 2024.
+H. Jones and A. R. Miller. The Detonation of Solid Explosives: The Equilibrium Conditions in the Detonation
+Wave-Front and the Adiabatic Expansion of the Products of Detonation. Proceedings of the Royal Society of
+London Series A, 194(1039):480–507, November 1948. doi: 10.1098/rspa.1948.0093.
+Dulara Kalubadanage, Alex Remennikov, Tuan Ngo, and Chang Qi. Close-in blast resistance of large-scale auxetic
+re-entrant honeycomb sandwich panels. Journal of Sandwich Structures & Materials, 23(8):4016–4053, 2021.
+E. L. Lee, H. C. Hornig, and J. W. Kury. Adiabatic expansion of high explosive detonation products. 5 1968. doi:
+10.2172/4783904. URL https://www.osti.gov/biblio/4783904.
+Meng-Sing Liou and Christopher J. Steffen. A new flux splitting scheme. Journal of Computational Physics, 107:
+23–39, 1993. URL https://api.semanticscholar.org/CorpusID:115149106.
+Nicholas A Marks, Mark G Stewart, Michael D Netherton, and Chris G Stirling. Airblast variability and fatality
+risks from a vbied in a complex urban environment. Reliability Engineering & System Safety, 209:107459, 2021.
+Seungki Pang and Jinwon Shin. Blast overpressure evaluation for blast valves in protective tunnels with rectangular-
+shaped tunnel entrances. Journal of the Korean Society for Geothermal and Hydrothermal Energy, 17(4):79–90,
+2021.
+Seungki Pang and Jinwon Shin. Effects of expansion and side chambers on reduction and time delay of blast
+overpressures in underground protective facilities. Journal of the Korean Society of Hazard Mitigation, 22:
+199–207, 12 2022. doi: 10.9798/KOSHAM.2022.22.6.199.
+7
+
+=== page 8 ===
+Mark K Quinn, Elliott Nunn, John Adams, Mike Tanner, Steve Goulding, Alex Cardy, Michael Garrard, Neil Stokes,
+David A Roberts, and Terry Jewson. Application of pressure-sensitive paint for explosive blast measurements.
+Measurement Science and Technology, 35(3):035201, 2023.
+S Rigby, A Ratcliff, S Clarke, D Farrimond, S Fay, and W Wholey. Consequences of the 2020 beirut explosion.
+Fire and Blast Information Group Technical Newsletter, (88):6–10, 2024.
+Timothy Rose. An approach to the evaluation of blast loads on finite and semi-infinite structures. PhD Thesis,
+2001.
+Timothy Rose. A computational tool for airblast calculations: Air3d version 9 users’ guide. 2006.
+Jinwon Shin and Seungki Pang. Cfd-based overpressure evaluation inside expansion chamber-applied protective
+tunnels subjected to detonation of high explosives. Journal of Korean Association for Spatial Structures, 23(1):
+25–34, 2023.
+Jinwon Shin, Seungki Pang, and Dong-Keon Kim. Effects of entrance shape and blast pocket on internal overpressure
+mitigation for protective tunnels exposed to external detonation on the ground. Applied Sciences, 13(3):1759,
+2023.
+Jinwon Shin, Seungki Pang, and Woosuk Kim. Enhancing blast mitigation in tunnels with expansion chamber
+subjected to high explosives detonations for protecting underground facilities. Tunnelling and Underground
+Space Technology, 147:105720, 2024.
+Mark G Stewart, Michael D Netherton, Hao Qin, and Jun Li. Explosive field trial for repetitive testing of vbieds
+to probabilistically measure blast and fragmentation hazards. International Journal of Protective Structures, 15
+(4):937–963, 2024.
+Yasuhiro Wada and Meng Liou. A flux splitting scheme with high-resolution and robustness for discontinuities.
+32nd Aerospace Sciences Meeting and Exhibit, 07 1994. doi: 10.2514/6.1994-83.
+Will A Wholey, Daniel E Aggromito, Christopher G Stirling, and Julia M Abboud. Investigation of the suitability
+of viper: Blast cfd software for hydrogen and vapor cloud explosions. 2023.
+M L Wilkins, B Squier, and B Halperin. The equation of state of pbx 9404 and lx04-01. 4 1964. URL https:
+//www.osti.gov/biblio/4041362.
+Amir Zaghloul, Alex Remennikov, and Brian Uy. Enhancement of blast wave parameters due to shock focusing
+from multiple simultaneously detonated charges. International Journal of Protective Structures, 12(4):541–576,
+2021.
+8
+
+=== page 9 ===
+A Papers that use Viper
+The papers listed here use Viper in their research. This is not an exhaustive list.
+ Almustafa and Nehdi [2024]
+ Chester et al. [2024]
+ Chester [2024]
+ Chester et al. [2025]
+ Chiquitoa et al.
+ Dennis et al. [2023]
+ Dennis and Rigby [2024]
+ Dennis [2024]
+ Edri [2024]
+ Farrimond et al. [2023]
+ Farrimond et al. [2024]
+ Flink and Meijers [2024]
+ Gabriel et al. [2023]
+ Gan and Remennikov [2024]
+ Kalubadanage et al. [2021]
+ Marks et al. [2021]
+ Pang and Shin [2021]
+ Pang and Shin [2022]
+ Quinn et al. [2023]
+ Rigby et al. [2024]
+ Shin and Pang [2023]
+ Shin et al. [2023]
+ Shin et al. [2024]
+ Stewart et al. [2024]
+ Wholey et al. [2023]
+ Zaghloul et al. [2021]
+9

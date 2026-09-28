@@ -1,0 +1,42 @@
+﻿grid dims: 40 x 40 x 40
+grid dims: 40 x 40 x 40
+
+== starting standalone viewer child (real window) ==
+  [PASS] child ready ['ready', 'window']
+  [PASS] child alive 
+
+== feeding an expanding shock (5 frames) ==
+  [PASS] screenshot 01_start_linear_loads.png 
+
+== Item 1: Surface loads bar follows Log colour scale ==
+  [PASS] screenshot 02_item1_loads_log_on.png 
+  [PASS] screenshot 03_item1_loads_log_off.png 
+
+== Item 2: Volume render, log vs linear, watch for the VTK texture-size warning on stdout/stderr ==
+  [PASS] screenshot 04_item2_volume_linear.png 
+  [PASS] screenshot 05_item2_volume_log.png 
+
+== Item 3: playback with volume+log on, two frames compared ==
+  [PASS] screenshot 06_item3_log_frame0.png 
+  [PASS] screenshot 07_item3_log_frame5.png 
+  [PASS] screenshot 08_item3_linear_frame0.png 
+  [PASS] screenshot 09_item3_linear_frame5.png 
+
+== Item 4: field Density -> Pressure, volume+log still on ==
+  [PASS] screenshot 10_item4_field_density.png 
+  [PASS] screenshot 11_item4_field_pressure_back.png 
+
+== Item 5: ~20-frame playback with the sampled-plane HUD ==
+  [PASS] screenshot 12_item5_playback_mid.png 
+  [note] ~2.5 s of playback observed (2.50 s wall)
+
+== Item 7: standalone in-window checkboxes redraw at once ==
+  [PASS] screenshot 13_item7_loads_off_immediate.png 
+  [PASS] screenshot 14_item7_volume_on_immediate.png 
+  [PASS] screenshot 15_item7_volume_off_immediate.png 
+
+== closing ==
+  [PASS] child closed 
+
+==================================================
+All standalone viewer QA checks completed.

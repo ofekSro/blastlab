@@ -22,3 +22,10 @@ Agents: read this file before any task. Match the task against "Use for" and "Ke
 - Use for: any task that reads, adds or checks a JWL or C-J value in `blastlab/core/materials.py` (the primary source for TNT, C4, HMX and PETN, see TODO `P1-14`), `blastfoam_toolkit/docs/jwl_parameters.md`, or a blastFoam `thermophysicalProperties` JWL block; `programmedIgnition` Pcj; converting E0 per volume to e0 per mass (e0 = E0 / ρ0).
 - Cite as: Dobratz & Crawford, LLNL Explosives Handbook, UCRL-52997 (1985), Table 8-7, p. 8-23
 - Keywords: JWL, Jones-Wilkins-Lee, equation of state, C-J, Chapman-Jouguet, Pcj, detonation velocity, E0, detonation energy, R1, R2, omega, Gamma, TNT, C-4, HMX, PETN, cylinder test, Gurney, UCRL-52997
+
+## viper-theory
+- File: ViperTheoryManual_Client.pdf (text: ViperTheoryManual_Client.txt; 9 pages, `=== page N ===` = printed page)
+- Covers: J. Wurster & P. McDonald, *Viper Blast Theory Manual*, Viper Applied Science, 21 Aug 2025 (client edition). Euler equations (2); EOS, ideal gas with hard-coded gamma = 1.4 and JWL (2.1, eq. 2.10); AUSMDV scheme after Rose [2001] / Air3D (3.1); transmitting, reflecting and terminating boundaries (3.2); obstacles as whole cells (3.3); 1D spherical / 2D axisymmetric / 3D and remaps (3.4); no viscosity (3.5); afterburn as an S-curve energy addition (3.6); references and a list of papers that use Viper. **It contains no material data:** no JWL table and no ANFO or RDX values. It says Viper ships default values per explosive, and points to the User Manual for them and to Lee, Hornig & Kury (1968), UCRL-50422, OSTI 4783904, for the JWL form.
+- Use for: comparing blastlab's methods with a second airblast CFD code (scheme, boundaries, remap chain, afterburn model); **not** a source for any material constant (P1-14).
+- Cite as: Wurster & McDonald, Viper Blast Theory Manual (2025), sec. 2.1, p. 4
+- Keywords: Viper, Viper Blast, AUSMDV, Air3D, Rose, JWL, ideal gas, gamma 1.4, remap, afterburn, S-curve, transmitting boundary, reflecting boundary, terminating boundary, obstacles

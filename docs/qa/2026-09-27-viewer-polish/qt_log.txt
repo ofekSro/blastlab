@@ -1,0 +1,46 @@
+﻿  [PASS] case loaded 
+
+== starting the 3D run ==
+  [PASS] view3d button enabled after 0.3s
+  [PASS] viewer embedded 
+
+== waiting for the run to finish (playback) ==
+  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_59nbpn4y\runs\QA\gauges\gauges_3d.txt  (89 rows x 1 gauges)
+  [PASS] run finished after 40.3s
+  [PASS] viewer in playback (done) {'n': 9, 'index': 8, 't': 0.00015063572533423496, 'done': True, 'playing': False, 'follow': False, 'field': 'p', 'vmin': 0.0, 'vmax': 2602903.75, 'have': ['e', 'imp', 'p', 'p_peak', 'rho'], 'stop_reason': 'shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa)'}
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 16_item6_qt_00_baseline.png
+  [shot:viewer] 16v_item6_qt_00_baseline_viewer.png exists=True
+
+== toggling controls with playback paused (no new frames) ==
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 17_item6_qt_volume_on.png
+  [shot:viewer] 17v_item6_qt_volume_on_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 18_item6_qt_log_on.png
+  [shot:viewer] 18v_item6_qt_log_on_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 19_item6_qt_log_off.png
+  [shot:viewer] 19v_item6_qt_log_off_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 20_item6_qt_volume_off.png
+  [shot:viewer] 20v_item6_qt_volume_off_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 21_item6_qt_loads_off.png
+  [shot:viewer] 21v_item6_qt_loads_off_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 22_item6_qt_loads_on.png
+  [shot:viewer] 22v_item6_qt_loads_on_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 23_item6_qt_mesh_on.png
+  [shot:viewer] 23v_item6_qt_mesh_on_viewer.png exists=True
+  [note] desktop grab failed (screen grab failed); using QWidget.grab()
+  [shot:qwidget] 24_item6_qt_mesh_off.png
+  [shot:viewer] 24v_item6_qt_mesh_off_viewer.png exists=True
+  [PASS] toggle round-trip completed 
+
+== closing ==
+  [PASS] viewer process closed with the window 
+
+==================================================
+Item 6 (Qt) checks completed.

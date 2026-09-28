@@ -1,0 +1,30 @@
+﻿== waiting for the child ==
+  [PASS] first status received 
+
+== Item 3: 6 status-synced frames, volume+log on ==
+    frame 0: landed=True, n=1
+    frame 1: landed=True, n=2
+    frame 2: landed=True, n=3
+    frame 3: landed=True, n=4
+    frame 4: landed=True, n=5
+    frame 5: landed=True, n=6
+  [PASS] all 6 frames landed in the store 6
+  [PASS] screenshot 06b_item3_log_frame0.png 
+  [PASS] screenshot 07b_item3_log_frame_last.png 
+  [PASS] screenshot 08b_item3_linear_frame0.png 
+  [PASS] screenshot 09b_item3_linear_frame_last.png 
+
+== Item 5: ~20-frame playback, sampled-plane HUD present ==
+  [PASS] ~20 frames landed (status-synced) (20/20, 2.73s to feed)
+  [PASS] sampled-plane HUD line present at done (see screenshot for the 'burst plane sampled at' line)
+  [PASS] screenshot 12b_item5_playback_start.png 
+  -- measuring playback smoothness (informal) --
+  [PASS] playback visited multiple distinct frame indices (distinct indices seen: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+  [PASS] screenshot 12c_item5_playback_mid.png 
+  [note] 3.04 s of playback, 11 distinct indices observed (store has 26)
+
+== closing ==
+  [PASS] child closed 
+
+==================================================
+All playback re-check items completed.
