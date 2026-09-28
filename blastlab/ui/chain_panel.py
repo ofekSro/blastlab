@@ -41,7 +41,9 @@ HINT = ('The chain runs the checked stages in order, into the model folder '
         'the 2D stage remaps it (axisymmetric) and writes '
         'handoff_2d_to_3d.npz, and the 3D stage remaps that. The 2D burst '
         'height is taken from the 2D form; the 3D burst height comes from '
-        'the 2D profile.')
+        'the 2D profile. 1D and 3D without 2D hand handoff_1d_to_3d.txt '
+        'straight to the 3D stage; the 3D burst height comes from the 3D '
+        'form.')
 
 #: added to a model-folder refusal: the boxes live on another tab
 WHERE_BOXES = 'The Runs folder and Model boxes are on the Run tab.'
@@ -250,8 +252,9 @@ class ChainPanel(QWidget):
         stages = self.checked()
         if not stages:
             return self._refuse(['No stages selected.'])
-        if stages != list(range(stages[0], stages[-1] + 1)):
-            return self._refuse(['Stages must be consecutive.'])
+        # GUI-8 (plan sec. 8.3): no consecutive-stages guard any more.
+        # The only non-consecutive subset of {1, 2, 3} is {1, 3}, and
+        # that is now a supported route (wired below).
 
         # OUT-1: the Run tab's model folder, checked (nothing is written
         # yet) before the forms are read, so the hand-off paths are known
@@ -264,6 +267,7 @@ class ChainPanel(QWidget):
             folder=model_folder.folder_for(runs_dir, model))
         hand = model_folder.handoff_paths(target, stages)
         p1, p2 = hand.get((1, 2)), hand.get((2, 3))
+        p13 = hand.get((1, 3))
 
         cases = {}
         for d in stages:
@@ -304,6 +308,14 @@ class ChainPanel(QWidget):
         if 3 in cases and 2 in cases:
             cases[3].init_mode = 'profile2d'
             cases[3].profile_file_in = p2
+        # GUI-8 (plan sec. 8.3): 1D -> 3D without a 2D stage. The engine
+        # already supports it - solve_3d / the foam writer remap a 1D
+        # profile (core/profiles.remap_profile_1d_to_3d); the 3D burst
+        # height comes from the 3D form.
+        if 1 in cases and 3 in cases and 2 not in cases:
+            cases[1].profile_file = p13
+            cases[3].init_mode = 'profile1d'
+            cases[3].profile_file_in = p13
 
         # after the wiring, so the checks see what will actually run
         errors = stage_errors(stages, cases)

@@ -153,6 +153,88 @@ def real_chain_run():
         dialogs.show_error, dialogs.ask_yes_no = real
 
 
+def real_chain_run_13():
+    """GUI-8 (plan sec. 8.3): a tiny native 1D -> 3D chain through the
+    window path. The 3D stage must start FROM THE PROFILE - its first
+    recorded frame at t0 is non-ambient around the burst point."""
+    import time
+    from blastlab.models.case import Case1D, Case3D
+    from blastlab.ui import dialogs
+    from blastlab.ui.app import MainWindow
+    from blastlab.ui.testing import use_model
+    real = (dialogs.show_error, dialogs.ask_yes_no)
+    shown = []
+    dialogs.show_error = lambda t, m, p=None: shown.append((t, m))
+    dialogs.ask_yes_no = lambda t, m, p=None: True
+    try:
+        win = MainWindow()
+        win.set_solver('native')
+        folder = use_model(win, 'CHAIN13_RUN')
+        win.show()
+        pump(100)
+        ch = win.chain
+        ch.use[2].setChecked(False)
+        # hand off at t = 0.05 ms: the shock sits at r ~ 0.24 m then
+        # (measured), inside the 0.6 m box - a later hand-off leaves
+        # only the under-pressured core inside the 3D domain
+        ch.set_stage_case(1, Case1D(radius_m=1.0, charge_kg=0.5,
+                                    cell_size_m=0.01, n_snapshots=1,
+                                    t_end=5e-5, gauge_radii=[0.5]))
+        ch.set_stage_case(3, Case3D(Lx=0.6, Ly=0.6, Lz=0.6,
+                                    cell_size_m=0.05,
+                                    center=(0.3, 0.3, 0.3),
+                                    n_snapshots=1, t_end=2e-4,
+                                    record_frames=8,
+                                    gauges=[(0.45, 0.3, 0.3)]))
+        pump(50)
+        ok = ch.run()
+        check('the 1 -> 3 chain started', ok is True,
+              f'{ch.status.text()} | {shown}')
+        t0 = time.time()
+        while win.ctrl.running and time.time() - t0 < 300:
+            pump(50)
+        check('and finished without an error dialog',
+              not win.ctrl.running and shown == [], str(shown))
+        got = sorted(os.listdir(folder)) if os.path.isdir(folder) else []
+        check('the model root holds 1d\\, 3d\\, the hand-off and the '
+              'root manifest',
+              got == ['.blastlab-model', '1d', '3d',
+                      'handoff_1d_to_3d.txt', 'manifest.json'], str(got))
+        with open(os.path.join(folder, 'manifest.json'),
+                  encoding='utf-8') as f:
+            root = json.load(f)
+        check('the root manifest names the chain and the hand-off',
+              root.get('chain') == [1, 3]
+              and sorted(root.get('stages', {})) == ['1d', '3d']
+              and root.get('handoffs') == ['handoff_1d_to_3d.txt'],
+              str({k: root.get(k) for k in ('chain', 'handoffs')}))
+        with open(os.path.join(folder, '3d', 'MODEL.json'),
+                  encoding='utf-8') as f:
+            three = json.load(f)
+        check('the 3D stage reads the hand-off, folder-relative',
+              three.get('profile_file_in') == '../handoff_1d_to_3d.txt'
+              and three.get('init_mode') == 'profile1d', str(
+                  {k: three.get(k) for k in ('profile_file_in',
+                                             'init_mode')}))
+        res3 = next((r for lbl, d, r in win._results if d == 3), None)
+        fr = (res3.meta.get('frames') or {}) if res3 is not None else {}
+        t_first = float(fr['times'][0]) if len(fr.get('times', [])) else -1
+        p_first = fr['pressures'][0] if fr.get('pressures') else None
+        # the 3D clock continues from the profile's hand-off time, so
+        # this stage's t0 is the 1D t_end (5e-5 s)
+        check('the 3D stage started from the profile: the first frame '
+              'at t0 is non-ambient around the burst point',
+              res3 is not None and 0 <= t_first <= 6e-5
+              and p_first is not None
+              and float(p_first.max()) > 101325 + 1e4,
+              f't0={t_first} pmax='
+              f'{None if p_first is None else float(p_first.max()):}')
+        win.close()
+        pump(50)
+    finally:
+        dialogs.show_error, dialogs.ask_yes_no = real
+
+
 def main():
     ensure_qapp()
     from blastlab.ui.chain_panel import HINT, ChainPanel
@@ -171,6 +253,7 @@ def main():
     ws = os.path.join(ws_root, 'CHAIN')           # the model folder
     p1 = os.path.join(ws, 'handoff_1d_to_2d.txt')
     p2 = os.path.join(ws, 'handoff_2d_to_3d.npz')
+    p13 = os.path.join(ws, 'handoff_1d_to_3d.txt')
 
     print('\nC1: the panel')
     check('OUT-1: no workspace box - the Run tab\'s model folder is it',
@@ -189,7 +272,10 @@ def main():
     check('and focus_stage moves it back', panel.stage() == 1
           and panel.stage_seg.get() == 'Stage 1D')
 
-    print('\nC2: the two refusals')
+    print('\nC2: the empty refusal')
+    # GUI-8 (plan sec. 8.3): {1, 3} is a supported route now (C6b), so
+    # the old 'Stages must be consecutive' refusal has no reachable case
+    # left and is gone.
     for d in (1, 2, 3):
         panel.use[d].setChecked(False)
     errs.clear()
@@ -198,13 +284,6 @@ def main():
           and errs.lines == ['No stages selected.'], str(errs.lines))
     check('and the status line says it too',
           'No stages selected' in panel.status.text())
-    panel.use[1].setChecked(True)
-    panel.use[3].setChecked(True)
-    errs.clear()
-    check('1 and 3 without 2 -> refused as non-consecutive',
-          panel.run() is False
-          and errs.lines == ['Stages must be consecutive.'],
-          str(errs.lines))
     check('the model folder was NOT created by a refused run',
           not os.path.exists(ws))
 
@@ -306,6 +385,53 @@ def main():
           and late[3].profile_file_in == p2,
           f'{late[2].init_mode} / {late[3].profile_file_in}')
     panel.use[1].setChecked(True)
+
+    print('\nC6b: the 1D -> 3D route (GUI-8, plan sec. 8.3)')
+    panel.use[2].setChecked(False)
+    pump(20)
+    launched.clear()
+    errs.clear()
+    check('1 -> 3 accepted', panel.run() is True and not errs.calls,
+          str(errs.lines) + ' | ' + str(panel.status.text()))
+    check('and handed on as two stages in order',
+          len(launched) == 1
+          and [d for d, _c in launched[0]] == [1, 3],
+          str([[d for d, _c in st] for st in launched]))
+    pair = dict(launched[0])
+    check('1D writes the profile the 3D stage reads, at the model root',
+          pair[1].profile_file == p13
+          and pair[3].profile_file_in == p13
+          and pair[3].init_mode == 'profile1d'
+          and os.path.dirname(p13) == ws,
+          f'{pair[1].profile_file} / {pair[3].profile_file_in}')
+    check('N2-13: the new route runs on a PINNED write schedule too',
+          pair[1].adaptive_write is False
+          and pair[3].adaptive_write is False)
+    check('the panel wrote nothing to disk', not os.path.exists(ws))
+    from blastlab.services.chain import stage_errors
+    check('stage_errors is empty for the wired pair',
+          stage_errors([1, 3], pair) == [],
+          str(stage_errors([1, 3], pair)))
+
+    # the native -> blastFoam refusal covers the (1, 3) edge unchanged
+    panel.set_stage_solver(1, 'native')
+    panel.set_stage_solver(3, 'blastfoam')
+    pump(20)
+    check('native 1D feeding blastFoam 3D disables Run chain (N5-4)',
+          bool(panel._compat[3].text())
+          and not panel.run_btn.isEnabled(),
+          str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
+    errs.clear()
+    launched.clear()
+    from blastlab.services.chain import HANDOFF_MSG
+    check('and run() refuses it with the hand-off message',
+          panel.run() is False and not launched
+          and any(HANDOFF_MSG in ln for ln in errs.lines),
+          str(errs.lines)[:120])
+    panel.set_stage_solver(1, mode_mod.DEFAULT)
+    panel.set_stage_solver(3, mode_mod.DEFAULT)
+    panel.use[2].setChecked(True)
+    pump(20)
 
     print('\nC7: the per-stage solver')
     # the sidebar's mode is the preset, whatever it happens to be
@@ -442,6 +568,8 @@ def main():
 
     print('\nC11: OUT-1 - a tiny native 1D -> 2D chain, run in a window')
     real_chain_run()
+    print('\nC12: GUI-8 - a tiny native 1D -> 3D chain, run in a window')
+    real_chain_run_13()
     print('\n' + '=' * 52)
     if FAIL:
         print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')
