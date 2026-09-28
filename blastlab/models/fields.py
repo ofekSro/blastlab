@@ -30,9 +30,9 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, Case1D, Case2D, Case3D,
-                   normalize_vtk, normalize_vtk_gauges, vtk_fields_for,
-                   vtk_gauge_extras_for)
+from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, VTK_POST_FIELDS, Case1D,
+                   Case2D, Case3D, normalize_vtk, normalize_vtk_gauges,
+                   vtk_fields_for, vtk_gauge_extras_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -186,8 +186,13 @@ VTK_QUANTITY_TIPS = {
 
 
 def vtk_quantity_tip(field):
-    """A matrix row's tooltip: its long name and the blastFoam field."""
+    """A matrix row's tooltip: its long name and the blastFoam field -
+    or, for a pseudo-field the Windows export makes itself (OUT-4b
+    obstacleID, models.case.VTK_POST_FIELDS), that blastFoam has no such
+    field, so nobody looks for it in the case."""
     name = VTK_QUANTITY_TIPS.get(field, VTK_QUANTITY_LABELS.get(field, field))
+    if field in VTK_POST_FIELDS:
+        return f'{name} - made by the export on Windows, not a blastFoam field'
     return f'{name} - blastFoam field {field}'
 
 

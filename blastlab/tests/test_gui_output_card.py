@@ -325,6 +325,14 @@ def main():
           all(s in tip_of('Time of peak') for s in (
               'maximum', 'not the first arrival', 'Time_Of_Peak',
               'timeOfArrival')), tip_of('Time of peak'))
+    # OUT-4b B3 (verify): obstacleID is made by the export, never sampled
+    # - its tooltip must not send anyone looking for a blastFoam field
+    check('B3: the Obstacle ID tooltip names Obstacle_ID and says it is '
+          'not a blastFoam field',
+          'Obstacle_ID' in tip_of('Obstacle ID')
+          and 'not a blastFoam field' in tip_of('Obstacle ID')
+          and 'blastFoam field obstacleID' not in tip_of('Obstacle ID'),
+          tip_of('Obstacle ID'))
     def walk(w):
         yield w
         for ch in w.winfo_children():

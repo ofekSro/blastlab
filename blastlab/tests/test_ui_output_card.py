@@ -631,6 +631,15 @@ def main():
           'Time_Of_Peak and timeOfArrival',
           all(s in tip for s in ('maximum', 'not the first arrival',
                                  'Time_Of_Peak', 'timeOfArrival')), tip)
+    # OUT-4b B3 (verify): obstacleID is made by the export, never sampled
+    # - its tooltip must not send anyone looking for a blastFoam field
+    oid = labels.get('Obstacle ID')
+    tip = oid.toolTip() if oid is not None else ''
+    check('B3: the Obstacle ID tooltip names Obstacle_ID and says it is '
+          'not a blastFoam field',
+          oid is not None and 'Obstacle_ID' in tip
+          and 'not a blastFoam field' in tip
+          and 'blastFoam field obstacleID' not in tip, tip)
     # the confusing-wording list: no internal ids, what the rows mean
     caps = [f.label_text('vtk_planes'), f.label_text('vtk_fields')]
     check('no user-facing "OUT-4" in the captions or header tooltips',
