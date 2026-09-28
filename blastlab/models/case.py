@@ -21,9 +21,23 @@ TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 #: writes (docs/model-folder-and-vtk-plan.md sec. 3.2). The four
 #: function-object fields exist for dim >= 2 only: writer.py emits
 #: impulse / pMax / timeOfArrival / overpressure for 2D/3D alone.
+#: OUT-4a: `dynamicP` (blastFoam's dynamicPressure function object,
+#: blastFoam User Guide v6.0, sec. 15.9, p. 125) is APPENDED - vtk_matrix
+#: canonicalises in this order, so reordering would change saved JSON.
 VTK_FIELDS = ('p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
-              'rho', 'U', 'T', 'alpha.expl', 'rhoE')
+              'rho', 'U', 'T', 'alpha.expl', 'rhoE', 'dynamicP')
 VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival')
+#: OUT-4a: the matrix columns each field has a cell in (plan sec. 3.2,
+#: sec. 9). Every field is written to every file family; at the gauges
+#: (blastProbes, guide sec. 15.1) only what a trace means: p/rho/U (always
+#: recorded, locked) and the four extras T, overpressure, impulse, q.
+_FAMILIES = ('sections', 'obstacles', 'volumes')
+VTK_CELLS = {f: (('gauges',) if f in ('p', 'overpressure', 'impulse', 'rho',
+                                      'U', 'T', 'dynamicP') else ())
+             + _FAMILIES for f in VTK_FIELDS}
+#: the gauge fields every blastFoam run records (wallload and the plots
+#: consume them): shown ticked and locked, never listed in `vtk_gauges`
+VTK_GAUGE_LOCKED = ('p', 'rho', 'U')
 #: cadence units: 'time' = simulated SECONDS, like every other time in
 #: the case (owner decision P22, 2026-09-27, reversing Q3's ms), 'step' =
 #: solver steps
@@ -44,13 +58,57 @@ VTK_ARRAY_NAMES = {'p': 'pressure', 'pMax': 'Peak_Overpressure',
                    'impulse': 'Impulse', 'overpressure': 'Overpressure',
                    'timeOfArrival': 'Arrival_Time', 'rho': 'density',
                    'U': 'velocity', 'T': 'temperature',
-                   'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy'}
+                   'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
+                   'dynamicP': 'Dynamic_Pressure'}
 
 
 def vtk_fields_for(dim):
     """The VTK fields a case of dimension `dim` has (D4)."""
     return tuple(f for f in VTK_FIELDS
                  if dim >= 2 or f not in VTK_FO_FIELDS)
+
+
+def vtk_gauge_extras_for(dim):
+    """OUT-4a: the fields that may be ticked at the gauges of a case of
+    dimension `dim` - VTK_CELLS' gauge cells minus the locked three;
+    overpressure / impulse are 2D/3D only, like every function-object
+    field (D4)."""
+    return tuple(f for f in vtk_fields_for(dim)
+                 if 'gauges' in VTK_CELLS[f] and f not in VTK_GAUGE_LOCKED)
+
+
+def normalize_vtk_gauges(d):
+    """OUT-4a: `vtk_gauges` in canonical form, {'fields': [str, ...]}, or
+    None. An unknown key or a non-object is refused; the field names are
+    kept as given, for validation to name."""
+    if d is None:
+        return None
+    if not isinstance(d, dict):
+        raise ValueError(f"vtk_gauges must be an object, not "
+                         f"{type(d).__name__}")
+    unknown = set(d) - {'fields'}
+    if unknown:
+        raise ValueError(f"Unknown vtk_gauges keys: {sorted(unknown)}")
+    names = d.get('fields') or []
+    if not isinstance(names, (list, tuple)):
+        # a bare string would iterate as letters ("impulse" -> 'i', 'm'...)
+        raise ValueError(f"vtk_gauges.fields must be a list, not "
+                         f"{type(names).__name__}")
+    return {'fields': [str(f) for f in names]}
+
+
+def vtk_gauge_fields(case):
+    """OUT-4a: the extra gauge fields a blastFoam case asks for, in
+    VTK_FIELDS order (unknown names dropped - validation refuses them);
+    () for a native case or none ticked."""
+    if getattr(case, 'solver', 'native') != 'blastfoam':
+        return ()
+    try:
+        d = normalize_vtk_gauges(getattr(case, 'vtk_gauges', None))
+    except ValueError:
+        return ()
+    names = (d or {}).get('fields') or ()
+    return tuple(f for f in VTK_FIELDS if f in names)
 
 
 def _num(v):
@@ -186,6 +244,9 @@ class Case1D:
     #: (case_to_dict). 1D has no sections or obstacles, so no
     #: vtk_surfaces: a 1D file carrying one is refused as an unknown key.
     vtk_volumes: dict = None
+    #: OUT-4a: the extra gauge fields, {'fields': [...]} (only the extras;
+    #: p, rho, U are always recorded). None or empty is not written.
+    vtk_gauges: dict = None
     #: OUT-3: keep every written time in WSL, and the scratch after the
     #: run (blastFoam only). False (the default) is not written.
     keep_all_fields: bool = False
@@ -313,6 +374,7 @@ class Case2D:
     #: written (case_to_dict), so a case without them is byte-identical.
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
+    vtk_gauges: dict = None           # see Case1D.vtk_gauges (OUT-4a)
     keep_all_fields: bool = False     # see Case1D.keep_all_fields (OUT-3)
 
 
@@ -454,6 +516,7 @@ class Case3D:
     #: plane plus the `planes` rows [[axis, position m], ...]
     vtk_surfaces: dict = None
     vtk_volumes: dict = None
+    vtk_gauges: dict = None           # see Case1D.vtk_gauges (OUT-4a)
     keep_all_fields: bool = False     # see Case1D.keep_all_fields (OUT-3)
 
 
@@ -480,6 +543,10 @@ def case_to_dict(case):
     for key in ('vtk_surfaces', 'vtk_volumes'):
         if key in d and not vtk_written(d[key]):
             d.pop(key)
+    # OUT-4a: the gauge extras, the same way - omitted when none is ticked
+    g = d.get('vtk_gauges')
+    if not (isinstance(g, dict) and g.get('fields')):
+        d.pop('vtk_gauges', None)
     # OUT-3: the same for the "Keep all fields in WSL" box
     if not d.get('keep_all_fields'):
         d.pop('keep_all_fields', None)
@@ -544,6 +611,7 @@ def case_from_dict(d):
     for key in ('vtk_surfaces', 'vtk_volumes'):
         if hasattr(case, key):
             setattr(case, key, normalize_vtk(getattr(case, key), key))
+    case.vtk_gauges = normalize_vtk_gauges(case.vtk_gauges)
     case.keep_all_fields = bool(case.keep_all_fields)
     return case
 

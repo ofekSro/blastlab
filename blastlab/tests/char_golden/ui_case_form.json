@@ -432,6 +432,7 @@
       "radius_m": "3",
       "t_end": "0.004",
       "vtk_fields": {
+        "gauges": [],
         "volumes": []
       },
       "vtk_v_mode": "time",
@@ -620,6 +621,7 @@
       "radius_m": "3",
       "t_end": "0.004",
       "vtk_fields": {
+        "gauges": [],
         "volumes": []
       },
       "vtk_v_mode": "time",
@@ -1019,6 +1021,7 @@
       "trigger_file": "r.npz",
       "trigger_gauge": "1",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "volumes": []
       },
@@ -1197,6 +1200,7 @@
       "trigger_file": "",
       "trigger_gauge": "",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "volumes": []
       },
@@ -1681,6 +1685,7 @@
       "trigger_file": "r.npz",
       "trigger_gauge": "1",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "volumes": []
       },
@@ -1848,6 +1853,7 @@
       "trigger_file": "",
       "trigger_gauge": "",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "volumes": []
       },
@@ -2370,6 +2376,7 @@
       "trigger_action": "terminate",
       "trigger_gauge": "",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "sections": [],
         "volumes": []
@@ -2828,6 +2835,7 @@
       "trigger_action": "terminate",
       "trigger_gauge": "",
       "vtk_fields": {
+        "gauges": [],
         "obstacles": [],
         "sections": [],
         "volumes": []

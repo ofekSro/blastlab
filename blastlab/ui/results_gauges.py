@@ -152,7 +152,9 @@ class GaugesView(QWidget):
         if len(fields) > 1 and ent.dim != 1:
             if self.field_seg.values() != list(fields):
                 new = Segmented(list(fields), height=26, small=True)
-                new.setFixedWidth(200)
+                # OUT-4a: up to seven traces; 200 px holds the T44 three
+                new.setFixedWidth(200 if len(fields) <= 3
+                                  else 80 * len(fields))
                 new.changed.connect(self._field_changed)
                 lay = self._bar.layout()
                 lay.replaceWidget(self.field_seg, new)

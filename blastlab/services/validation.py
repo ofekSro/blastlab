@@ -47,6 +47,10 @@ from ..models.case import VTK_FIELDS as _VTK_FIELDS
 from ..models.case import VTK_MODES as _VTK_MODES
 from ..models.case import vtk_family as _vtk_family
 from ..models.case import vtk_fields_for as _vtk_fields_for
+from ..models.case import VTK_CELLS as _VTK_CELLS
+from ..models.case import VTK_GAUGE_LOCKED as _VTK_GAUGE_LOCKED
+from ..models.case import normalize_vtk_gauges as _normalize_vtk_gauges
+from ..models.case import vtk_gauge_extras_for as _vtk_gauge_extras_for
 from ..models.result import ValidationReport
 
 
@@ -584,6 +588,46 @@ def _validate_vtk_planes(case, rep, ctx, fam):
             seen[key] = seen[name] = what
 
 
+def _validate_vtk_gauges(case, rep, ctx):
+    """OUT-4a: the extra gauge fields (`vtk_gauges`). Each must have a
+    gauge cell in VTK_CELLS, must not be one of the locked p/rho/U, and
+    overpressure / impulse need a 2D/3D case (D4). True when the case
+    carries any extra (a native case gets the one VTK note)."""
+    err = rep.errors.append
+    try:
+        d = _normalize_vtk_gauges(getattr(case, 'vtk_gauges', None))
+    except ValueError as exc:
+        err(str(exc))
+        return True
+    names = (d or {}).get('fields') or []
+    if not names:
+        return False
+    if not ctx.foam:
+        rep.notes.append("VTK output is a blastFoam setting - the native "
+                         "solver ignores it")
+        return True
+    label = 'VTK gauges'
+    have = _vtk_fields_for(case.dim)
+    for f in names:
+        if f in _VTK_GAUGE_LOCKED:
+            err(f"{label}: '{f}' is always recorded at the gauges - it is "
+                f"not an extra")
+        elif f not in _VTK_CELLS:
+            err(f"{label}: unknown field '{f}' (expected one of "
+                f"{', '.join(_vtk_gauge_extras_for(case.dim))})")
+        elif 'gauges' not in _VTK_CELLS[f]:
+            err(f"{label}: '{f}' has no gauge cell - it is written to the "
+                f"VTK files only")
+        elif f not in have:
+            err(f"{label}: '{f}' is not written in 1D - blastFoam emits it "
+                f"for 2D and 3D only")
+    if not (getattr(case, 'gauges', None) or getattr(case, 'gauge_radii',
+                                                     None)):
+        rep.notes.append(f"{label}: the case has no gauges - the extra "
+                         f"fields record nothing")
+    return True
+
+
 def _validate_vtk(case, rep, ctx):
     """OUT-2 (plan sec. 3.3): the VTK output families. Runs after the
     caps, where `rep.run_plan` holds the effective ranks. A family that
@@ -598,11 +642,13 @@ def _validate_vtk(case, rep, ctx):
             continue
         if fam:
             fams[key] = fam
+    gauges = _validate_vtk_gauges(case, rep, ctx)
     if not fams:
         return
     if not ctx.foam:
-        note("VTK output is a blastFoam setting - the native solver "
-             "ignores it")
+        if not gauges:
+            note("VTK output is a blastFoam setting - the native solver "
+                 "ignores it")
         return
     surf, vol = fams.get('vtk_surfaces'), fams.get('vtk_volumes')
     if surf:

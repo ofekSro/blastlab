@@ -1,0 +1,19 @@
+{
+  "auto_cleanup": false,
+  "cleanup_max_gb": 20.0,
+  "cleanup_max_age_days": 14,
+  "cleanup_keep_recent": 3,
+  "geometry": "1280x840+0+0",
+  "appearance": "dark",
+  "refresh_value": "",
+  "refresh_mode": "seconds",
+  "solver": "native",
+  "hw_cores": 14,
+  "hw_ram_gb": 63,
+  "hw_stamp": "2026-09-28T14:14:13",
+  "hw_fingerprint": "3a84198e9fdd147c",
+  "hw_host_ram_gb": 127,
+  "mpi_headroom": 1,
+  "mpi_max_ranks": 0,
+  "runs_dir": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-28-out-4a\\qt_harness\\runs"
+}

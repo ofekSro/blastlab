@@ -772,6 +772,24 @@ omitted while off).
   arrival. GUI QA 22/22 Qt, 22/22 Tk.
 - **Commits:** `77314c2`..`8dfca33` and the commit of this entry.
 
+## 0i. 2026-09-28 — batch `out-4a-gauges` (OUT-4, part a)
+
+Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4a; owner decisions Q1-Q6 in the plan.
+
+- **What:** a Gauges column on the VTK card (Qt + Tk; case key `vtk_gauges`, omitted when
+  empty): T, overpressure, net impulse (2D/3D) and dynamic pressure q = ½ρ|U|² as extra
+  probe fields, none ticked by default (Q6). The `dynamicPressure` function object is
+  written only when q is ticked somewhere, with `result dynamicP` (blastFoam's default name
+  is `dynamicPressure` - plan finding F3 was wrong); volume/surface files carry it as
+  `Dynamic_Pressure`. Reader, TSV columns with units, Results trace selector (7 fields).
+  1D: T and q reach the TSV only (the 1D view is p-only).
+- **Tests:** `test_regression` byte-identical, writer goldens unchanged, char goldens gain
+  only `"gauges": []`. `_e2e_out4` 29/29 after the owner's re-registration of A-R3c
+  (compare the sample index) and A-R6c (match the probe row at its printed precision),
+  `825d553`, thresholds unchanged; A-R1 solve identical with extras on/off. Verifier fixed
+  a bare-string `fields` value (`ea6d444`). GUI QA Qt V06-V09, Tk V06-V08 all pass.
+- **Commits:** `f3c60b3`..`769c238` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70

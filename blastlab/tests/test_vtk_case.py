@@ -393,6 +393,110 @@ def test_validation():
           and said(auto, ', up to ', ('notes',)), str(auto.notes))
 
 
+def test_gauges():
+    """OUT-4a A2: the per-cell availability table and `vtk_gauges`."""
+    print('\nC: OUT-4a gauge extras (vtk_gauges, VTK_CELLS)')
+    from blastlab.models import fields as mf
+    check('dynamicP appended last to VTK_FIELDS, array Dynamic_Pressure',
+          mcase.VTK_FIELDS[-1] == 'dynamicP'
+          and mcase.VTK_FIELDS[:-1] == (
+              'p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
+              'rho', 'U', 'T', 'alpha.expl', 'rhoE')
+          and mcase.VTK_ARRAY_NAMES['dynamicP'] == 'Dynamic_Pressure')
+    check('VTK_CELLS: every field in every file family',
+          all(set(mcase.VTK_CELLS[f]) >= {'sections', 'obstacles', 'volumes'}
+              for f in mcase.VTK_FIELDS))
+    gauge_cells = {f for f in mcase.VTK_FIELDS
+                   if 'gauges' in mcase.VTK_CELLS[f]}
+    check('VTK_CELLS: gauge cells are p rho U T overpressure impulse q',
+          gauge_cells == {'p', 'rho', 'U', 'T', 'overpressure', 'impulse',
+                          'dynamicP'}, str(gauge_cells))
+    check('gauge extras: 3D has four, 1D only T and dynamicP',
+          mcase.vtk_gauge_extras_for(3) == ('overpressure', 'impulse', 'T',
+                                            'dynamicP')
+          and mcase.vtk_gauge_extras_for(1) == ('T', 'dynamicP'))
+    m = mf.vtk_matrix({'gauges': ['dynamicP', 'p', 'pMax', 'T']}, 3)
+    check('vtk_matrix keeps only gauge extras with a cell, in order',
+          m['gauges'] == ['T', 'dynamicP'], str(m))
+    for cls in (Case1D, Case2D, Case3D):
+        b = saved_bytes(cls(vtk_gauges={'fields': []}))
+        n, sha = DEFAULT_SAVES[cls.__name__]
+        check(f'{cls.__name__}: an empty vtk_gauges saves byte-identical',
+              len(b) == n and hashlib.sha256(b).hexdigest() == sha)
+    c3 = Case3D(solver='blastfoam',
+                vtk_gauges={'fields': ['T', 'impulse', 'dynamicP']})
+    raw, back = roundtrip(c3)
+    check('3D round trip restores the ticks (VERSION still 13)',
+          raw.get('vtk_gauges') == {'fields': ['T', 'impulse', 'dynamicP']}
+          and back.vtk_gauges == {'fields': ['T', 'impulse', 'dynamicP']}
+          and raw.get('version') == 13, str(raw.get('vtk_gauges')))
+    check('vtk_gauge_fields: VTK_FIELDS order; () in native mode',
+          mcase.vtk_gauge_fields(back) == ('impulse', 'T', 'dynamicP')
+          and mcase.vtk_gauge_fields(Case3D(
+              vtk_gauges={'fields': ['T']})) == ())
+    d = case_to_dict(Case3D())
+    d['vtk_gauges'] = {'fields': ['T'], 'on': True}
+    try:
+        case_from_dict(d)
+        check('an unknown key inside vtk_gauges is refused', False)
+    except ValueError as exc:
+        check('an unknown key inside vtk_gauges is refused',
+              'Unknown vtk_gauges keys' in str(exc), str(exc))
+    d['vtk_gauges'] = {'fields': 'impulse'}       # a string, not a list
+    try:
+        case_from_dict(d)
+        check('a bare string in vtk_gauges.fields is refused', False)
+    except ValueError as exc:
+        check('a bare string in vtk_gauges.fields is refused',
+              'must be a list' in str(exc), str(exc))
+    # the form mapping: ticks in the Gauges column <-> vtk_gauges
+    vals = mf.fields_from_case(back)
+    check('fields_from_case puts the extras in the Gauges column',
+          vals['vtk_fields']['gauges'] == ['impulse', 'T', 'dynamicP'],
+          str(vals['vtk_fields']))
+    case, errs, _bad = mf.case_from_fields(3, vals, 'blastfoam')
+    check('case_from_fields writes them back as vtk_gauges',
+          case.vtk_gauges == {'fields': ['impulse', 'T', 'dynamicP']}
+          and not errs, f'{case.vtk_gauges} {errs}')
+    nat, _e, _b = mf.case_from_fields(3, vals, 'native')
+    check('native mode: no vtk_gauges key is written',
+          'vtk_gauges' not in case_to_dict(nat))
+    none = dict(vals, vtk_fields=dict(vals['vtk_fields'], gauges=[]))
+    c0, _e, _b = mf.case_from_fields(3, none, 'blastfoam')
+    check('no extra ticked: no vtk_gauges key',
+          'vtk_gauges' not in case_to_dict(c0))
+
+    # validation
+    ok3 = rep3(gauges=[(1.0, 0.75, 0.75)], vtk_gauges={
+        'fields': ['overpressure', 'impulse', 'T', 'dynamicP']})
+    check('3D, all four extras: no error', not ok3.errors, str(ok3.errors))
+    ok1 = rep1(gauge_radii=[1.0], vtk_gauges={'fields': ['T', 'dynamicP']})
+    check('1D, T and dynamicP: no error', not ok1.errors, str(ok1.errors))
+    refusals = (
+        ('impulse at gauges in 1D',
+         rep1(vtk_gauges={'fields': ['impulse']}),
+         "VTK gauges: 'impulse' is not written in 1D"),
+        ('overpressure at gauges in 1D',
+         rep1(vtk_gauges={'fields': ['overpressure']}),
+         "VTK gauges: 'overpressure' is not written in 1D"),
+        ('a field with no gauge cell (pMax)',
+         rep3(vtk_gauges={'fields': ['pMax']}),
+         "VTK gauges: 'pMax' has no gauge cell"),
+        ('an unknown gauge field', rep3(vtk_gauges={'fields': ['Ma']}),
+         "VTK gauges: unknown field 'Ma'"),
+        ('a locked field listed as an extra',
+         rep3(vtk_gauges={'fields': ['rho']}),
+         "VTK gauges: 'rho' is always recorded at the gauges"),
+    )
+    for what, rep, words in refusals:
+        check(f'refused: {what}', said(rep, words, ('errors',)),
+              str(rep.errors))
+    nat = rep3(solver='native', vtk_gauges={'fields': ['pMax']})
+    check('native mode: a note, no error',
+          said(nat, 'native solver ignores it', ('notes',))
+          and not said(nat, 'VTK', ('errors',)), str(nat.errors))
+
+
 def main():
     from blastlab.core import hardware
     from blastlab.solvers.foam import env
@@ -410,6 +514,7 @@ def main():
         hardware.forget_host()
         hardware.prime_host(ram_gb=256, source=hardware.MEASURED)
         test_validation()
+        test_gauges()
     finally:
         for a, v in zip(hw_attrs, old):
             setattr(env, a, v)

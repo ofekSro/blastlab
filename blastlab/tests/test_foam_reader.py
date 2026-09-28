@@ -26,6 +26,118 @@ def check(name, ok, detail=''):
         FAIL.append(name)
 
 
+def gauge_extra_checks():
+    """OUT-4a A4: overpressure / impulse / T / dynamicP probe files ride
+    along under the P2-14 item 7 time-column rule, and the TSV gets one
+    column per extra with units - or stays byte-identical without them."""
+    import contextlib
+    import io
+    import tempfile
+    from blastlab.output import gauges as og
+    head = ('# Probe 0 (0.5 0 0)\n# Probe 1 (1 0 0)\n'
+            '#         Time             0             1\n')
+    times = ('0', '1.19964e-07', '2.63446e-07')
+
+    def scalar(rows):
+        return head + ''.join(f'  {t}  {a}  {b}\n'
+                              for t, (a, b) in zip(times, rows))
+
+    def vector(rows):
+        return head + ''.join(f'  {t}  ({a})  ({b})\n'
+                              for t, (a, b) in zip(times, rows))
+
+    files = {
+        'p': scalar([(101325, 101325), (201325, 101325), (301325, 111325)]),
+        'overpressure': scalar([(0, 0), (100000, 0), (200000, 10000)]),
+        'impulse': scalar([(0, 0), (0.012, 0), (0.04, 0.001)]),
+        'T': scalar([(288, 288), (400, 288), (600, 300)]),
+        'dynamicP': vector([('0 0 0', '0 0 0'), ('30 40 0', '0 0 0'),
+                            ('60 80 0', '1 2 2')]),
+    }
+    with tempfile.TemporaryDirectory() as td:
+        pdir = os.path.join(td, 'postProcessing', 'gauges', '0')
+        os.makedirs(pdir)
+        for name, text in files.items():
+            with open(os.path.join(pdir, name), 'w') as f:
+                f.write(text)
+        pr = reader.read_probes(td)
+        check('OUT-4a aligned extras: the four keys and the q vectors',
+              {'overpressures', 'impulses', 'temperatures', 'dyn_pressures',
+               'dyn_pressure_vecs'} <= set(pr) and 'warnings' not in pr,
+              str(sorted(pr)))
+        check('   values as written; q = |dynamicP| per probe',
+              np.array_equal(pr['overpressures'][0], [0, 100000, 200000])
+              and np.array_equal(pr['impulses'][1], [0, 0, 0.001])
+              and np.array_equal(pr['temperatures'][0], [288, 400, 600])
+              and np.array_equal(pr['dyn_pressures'][0], [0, 50, 100])
+              and np.array_equal(pr['dyn_pressures'][1], [0, 0, 3])
+              and pr['dyn_pressure_vecs'][0].shape == (3, 3),
+              str({k: pr.get(k) for k in ('overpressures', 'dyn_pressures')}))
+        # the TSV: one column per extra per gauge, units in the header
+        out = dict(times=pr['times'], points=[(0.5, 0.0), (1.0, 0.0)],
+                   pressures=pr['pressures'],
+                   **{k: pr[k] for k in reader.GAUGE_KEYS if k in pr})
+        tsv = os.path.join(td, 'g.txt')
+        with contextlib.redirect_stdout(io.StringIO()):
+            og.save_gauges_2d(out, tsv)
+        with open(tsv) as f:
+            hdr = f.readline().rstrip('\n').split('\t')
+        check('TSV: p, then p_over [Pa], impulse [Pa s], T [K], q [Pa]',
+              hdr == ['time[s]', 'p_(0.500,0.000)m[Pa]', 'p_(1.000,0.000)m[Pa]',
+                      'p_over_(0.500,0.000)m[Pa]', 'p_over_(1.000,0.000)m[Pa]',
+                      'impulse_(0.500,0.000)m[Pa s]',
+                      'impulse_(1.000,0.000)m[Pa s]',
+                      'T_(0.500,0.000)m[K]', 'T_(1.000,0.000)m[K]',
+                      'q_(0.500,0.000)m[Pa]', 'q_(1.000,0.000)m[Pa]'], str(hdr))
+        # a p-only dict writes exactly what the pre-OUT-4a writer wrote
+        plain = dict(times=pr['times'], points=[(0.5, 0.0, 0.0),
+                                                (1.0, 0.0, 0.0)],
+                     pressures=pr['pressures'])
+        with contextlib.redirect_stdout(io.StringIO()):
+            og.save_gauges_3d(plain, tsv)
+        with open(tsv, 'rb') as f:
+            got = f.read()
+        buf = io.BytesIO()
+        np.savetxt(buf, np.column_stack([pr['times']] + pr['pressures']),
+                   delimiter='\t', comments='', fmt='%.6e',
+                   header='time[s]\tp_(0.500,0.000,0.000)m[Pa]\t'
+                          'p_(1.000,0.000,0.000)m[Pa]')
+        check('TSV without extras: byte-identical to the old writer',
+              got == buf.getvalue().replace(b'\n', os.linesep.encode()))
+        r1 = dict(times=pr['times'], radii=[0.5, 1.0],
+                  pressures=pr['pressures'],
+                  temperatures=pr['temperatures'],
+                  dyn_pressures=pr['dyn_pressures'])
+        with contextlib.redirect_stdout(io.StringIO()):
+            og.save_gauges_1d(r1, tsv)
+        with open(tsv) as f:
+            hdr1 = f.readline().rstrip('\n').split('\t')
+        check('1D TSV: T and q columns after p',
+              hdr1[3:] == ['T_r=0.5000m[K]', 'T_r=1.0000m[K]',
+                           'q_r=0.5000m[Pa]', 'q_r=1.0000m[Pa]'], str(hdr1))
+        # a shifted time column drops that field with a warning, no raise
+        with open(os.path.join(pdir, 'impulse'), 'w') as f:
+            f.write(head + '  1e-9  0  0\n  1.19964e-07  1  1\n'
+                           '  2.63446e-07  2  2\n')
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            pr2 = reader.read_probes(td)
+        check('shifted impulse times: impulses dropped, the rest kept',
+              'impulses' not in pr2 and 'overpressures' in pr2
+              and 'dyn_pressures' in pr2, str(sorted(pr2)))
+        check('   one warning naming impulse (dict and stderr)',
+              len(pr2.get('warnings', [])) == 1
+              and pr2['warnings'][0].startswith('impulse: times do not match')
+              and 'probes: impulse times do not match p' in err.getvalue(),
+              repr(pr2.get('warnings')))
+        # absent extras: the dict is exactly today's
+        for name in ('overpressure', 'impulse', 'T', 'dynamicP'):
+            os.remove(os.path.join(pdir, name))
+        pr3 = reader.read_probes(td)
+        check('absent extra files: the key set is exactly today\'s',
+              set(pr3) == {'points', 'times', 'pressures'}, str(sorted(pr3)))
+
+
 def main():
     # nonuniform scalar (final-time p of the fixture run)
     p = reader.read_scalar(os.path.join(FIX, 'p_nonuniform'), N)
@@ -223,6 +335,8 @@ def main():
                   'only (row 0: t = 1.19964e-07 vs 0 in p)'),
               repr((None if pr4 is None else pr4.get('warnings'),
                     err.getvalue())))
+
+    gauge_extra_checks()
 
     # ── binary format (fixtures from a writeFormat-binary sector run) ──
     NB = 190                    # cells in the binary fixture run

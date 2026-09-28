@@ -349,6 +349,14 @@ GAUGE_FIELDS = {
             lambda a: (a - P_AIR) / 1e3),
     '|U|': ('speeds', 'Speed [m/s]', lambda a: a),
     'rho': ('rhos', 'Density [kg/m3]', lambda a: a),
+    # OUT-4a: the blastFoam gauge extras (vtk_gauges), when recorded.
+    # 1 Pa s = 1 kPa ms; q is the magnitude of blastFoam's dynamicP
+    # (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1)
+    'overpressure': ('overpressures', 'Overpressure (blastFoam) [kPa]',
+                     lambda a: a / 1e3),
+    'impulse': ('impulses', 'Impulse [kPa ms]', lambda a: a),
+    'T': ('temperatures', 'Temperature [K]', lambda a: a),
+    'q': ('dyn_pressures', 'Dynamic pressure [kPa]', lambda a: a / 1e3),
 }
 
 

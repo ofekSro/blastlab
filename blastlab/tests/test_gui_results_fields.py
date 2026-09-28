@@ -168,8 +168,52 @@ def main():
     check('peak shown as overpressure in kPa',
           np.allclose(pk['peak overpressure'], 6.0), str(pk['peak overpressure'].ravel()[:2]))
 
+    gauge_trace_checks(panel)
     qa_s2_checks(panel)
     root.destroy()
+
+
+def gauge_trace_checks(panel):
+    """OUT-4a A6: the Gauges view's trace selector offers every recorded
+    extra, a p-only result offers only p, and switching redraws with the
+    right y-label and units."""
+    print("\nOUT-4a: gauge trace selector")
+    t = np.linspace(0.0, 2e-3, 40)
+    p = [P_AIR + 3e5 * np.exp(-((t - 3e-4) / 2e-4) ** 2)]
+    res = fake_2d()
+    res.gauges = dict(times=t, points=[(0.2, 0.3)], pressures=p,
+                      overpressures=[p[0] - P_AIR],
+                      impulses=[np.cumsum(p[0] - P_AIR) * (t[1] - t[0])],
+                      temperatures=[np.full_like(t, 288.0)],
+                      dyn_pressures=[np.abs(p[0] - P_AIR) / 10.0])
+    panel.add_result('extras', 2, res)
+    panel.sel.set('extras')
+    panel._refresh()
+    panel._draw_gauges()
+    vals = list(panel._gauge_field_seg.cget('values'))
+    check('every recorded extra is offered',
+          vals == ['p', 'overpressure', 'impulse', 'T', 'q'], str(vals))
+    for fld, ylabel in (('overpressure', 'Overpressure (blastFoam) [kPa]'),
+                        ('impulse', 'Impulse [kPa ms]'),
+                        ('T', 'Temperature [K]'),
+                        ('q', 'Dynamic pressure [kPa]')):
+        panel._gauge_field_seg.set(fld)
+        panel._gauge_field_changed()
+        fig = getattr(panel.gauge_canvas, 'figure', None)
+        got = fig.axes[0].get_ylabel() if fig is not None else None
+        check(f'switching to {fld} redraws with "{ylabel}"', got == ylabel,
+              str(got))
+    only = fake_2d()
+    only.gauges = dict(times=t, points=[(0.2, 0.3)], pressures=p)
+    check('a p-only result offers only p',
+          plots.gauge_fields_available(only.gauges) == ['p'])
+    panel.add_result('p only', 2, only)
+    panel.sel.set('p only')
+    panel._refresh()
+    panel._draw_gauges()
+    check('   and the selector is hidden, the trace back to p',
+          panel._gauge_field == 'p'
+          and not panel._gauge_field_seg.winfo_manager())
 
 
 def qa_s2_checks(panel):

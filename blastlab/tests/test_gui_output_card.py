@@ -90,12 +90,19 @@ def main():
         rows = vtk_fields_for(d)
         cells = f.v['vtk_fields'].cells
         dest = [c for c in F.VTK_COLUMNS[d] if c != 'gauges']
-        check(f'{d}D: a box per quantity and destination column',
-              set(cells) == {(r, c) for r in rows for c in dest},
+        # OUT-4a: plus a live gauge cell per extra (VTK_CELLS)
+        extras = F.vtk_gauge_extras_for(d)
+        check(f'{d}D: a box per quantity and destination column, plus the '
+              f'gauge extras {extras}',
+              set(cells) == {(r, c) for r in rows for c in dest}
+              | {(x, 'gauges') for x in extras}
+              and set(extras) == ({'T', 'dynamicP'} if d == 1 else
+                                  {'T', 'dynamicP', 'overpressure',
+                                   'impulse'}),
               f'{len(cells)} cells')
         locked = f._vtk_grid.locked
-        check(f'{d}D: the Gauges column is locked, p / rho / U ticked',
-              len(locked) == len(rows)
+        check(f'{d}D: p / rho / U locked and ticked at the Gauges',
+              len(locked) == 3
               and all(str(b.cget('state')) == 'disabled' for _v, b in locked)
               and sum(v.get() for v, _b in locked) == 3)
         check(f'{d}D: a fresh form writes no VTK key',
@@ -140,7 +147,8 @@ def main():
     f = form(3)
     f.v['vtk_s_on'].set(True)
     check('3D surfaces: p, pMax on sections and obstacles',
-          f.v['vtk_fields'].get() == {'sections': ['p', 'pMax'],
+          f.v['vtk_fields'].get() == {'gauges': [],     # OUT-4a column
+                                      'sections': ['p', 'pMax'],
                                       'obstacles': ['p', 'pMax'],
                                       'volumes': []},
           str(f.v['vtk_fields'].get()))
@@ -173,7 +181,8 @@ def main():
     f = form(2)
     f.v['vtk_s_on'].set(True)
     check('2D obstacles: p, pMax',
-          f.v['vtk_fields'].get() == {'obstacles': ['p', 'pMax'],
+          f.v['vtk_fields'].get() == {'gauges': [],     # OUT-4a column
+                                      'obstacles': ['p', 'pMax'],
                                       'volumes': []})
     f.destroy()
 
@@ -335,6 +344,36 @@ def main():
         check(f'{d}D: stacked when narrow, side by side when wide',
               side_narrow is False and g._vtk_side is True)
         g.destroy()
+    f.destroy()
+
+    print('\nK12: the Gauges column extras (OUT-4a)')
+    for d in (1, 2, 3):
+        f = form(d)
+        f.v['vtk_fields'].cells[('T', 'gauges')].set(True)
+        f.v['vtk_fields'].fire()
+        case = f.get_case()
+        check(f'{d}D: a ticked T at the gauges is in vtk_gauges',
+              case.vtk_gauges == {'fields': ['T']}
+              and case_to_dict(case).get('vtk_gauges') == {'fields': ['T']},
+              str(case.vtk_gauges))
+        text = json.dumps(case_to_dict(case), sort_keys=True)
+        g = form(d)
+        g.set_case(case_from_dict(json.loads(text)))
+        check(f'{d}D: save / reload restores the tick',
+              g.v['vtk_fields'].cells[('T', 'gauges')].get() is True
+              and json.dumps(case_to_dict(g.get_case()),
+                             sort_keys=True) == text)
+        g.destroy()
+        f.set_mode('native')
+        ROOT.update_idletasks()
+        check(f'{d}D native: hidden, and no vtk_gauges key',
+              not card_shown(f)
+              and 'vtk_gauges' not in case_to_dict(f.get_case()))
+        f.destroy()
+    f = form(3)
+    check('the Tk caption says the gauges always record p, rho, U',
+          'always recorded' in F.VTK_MATRIX_CAPTION
+          and 'fixed' not in F.VTK_MATRIX_CAPTION)
     f.destroy()
 
     print('\nK11: the Keep all fields in WSL box (OUT-3)')

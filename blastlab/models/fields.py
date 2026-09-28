@@ -30,7 +30,9 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import (Case1D, Case2D, Case3D, normalize_vtk, vtk_fields_for)
+from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, Case1D, Case2D, Case3D,
+                   normalize_vtk, normalize_vtk_gauges, vtk_fields_for,
+                   vtk_gauge_extras_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -140,6 +142,7 @@ VTK_QUANTITY_LABELS = {
     'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
+    'dynamicP': 'Dynamic pressure',
 }
 #: the long names, for the row tooltips. blastFoam's pMax is the running
 #: per-cell maximum of the ABSOLUTE pressure p: fieldMinMax on p with no
@@ -158,7 +161,12 @@ VTK_QUANTITY_TIPS = {
             '[J/m3]',
     'alpha.expl': 'Products (volume fraction of detonation products, '
                   '0..1)',
-    'timeOfArrival': 'Arrival time (first arrival)'}
+    'timeOfArrival': 'Arrival time (first arrival)',
+    # OUT-4a (owner Q5 interim): blastFoam's dynamicP is the vector
+    # 0.5 rho U |U|; its magnitude is the standard dynamic pressure
+    # (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1, p. 125)
+    'dynamicP': 'Dynamic pressure (q = 1/2 rho |U|^2, the magnitude of '
+                'blastFoam\'s dynamicP) [Pa]'}
 
 
 def vtk_quantity_tip(field):
@@ -167,8 +175,9 @@ def vtk_quantity_tip(field):
     return f'{name} - blastFoam field {field}'
 
 
-#: decision 4: the Gauges column is shown, ticked and locked until OUT-4
-VTK_GAUGE_FIELDS = ('p', 'rho', 'U')
+#: decision 4: p, rho, U are always ticked and locked at the gauges;
+#: OUT-4a unlocks the rest of the column (models.case.VTK_CELLS)
+VTK_GAUGE_FIELDS = VTK_GAUGE_LOCKED
 #: the matrix columns of each dimension; 'gauges' is display only. The
 #: order follows the family boxes above the matrix (owner decision P24,
 #: 2026-09-27: 2D is Whole domain, then Obstacles)
@@ -210,8 +219,11 @@ def vtk_column_tip(dim, col):
     """The full name of matrix column `col`, for its tooltip."""
     if col == 'volumes' and int(dim) < 3:
         return 'Whole domain (volumes)'
-    return {'gauges': 'Gauges - the gauge TSV always carries p, rho and U '
-                      '(fixed; gauges get no VTK files)',
+    extra = ('temperature and dynamic pressure' if int(dim) < 2 else
+             'overpressure, impulse, temperature and dynamic pressure')
+    return {'gauges': f'Gauges - the gauge TSV always carries p, rho and U '
+                      f'(locked); tick {extra} to add them (gauges get no '
+                      f'VTK files)',
             'sections': 'Sections - the live-slice plane and the extra '
                         'planes', 'obstacles': 'Obstacles - their walls',
             'volumes': 'Volumes - whole-domain output: every cell of the 3D '
@@ -223,7 +235,8 @@ def vtk_column_tip(dim, col):
 #: toolkits (GUI QA 2026-09-27, confusions 3 and 5)
 VTK_PLANES_CAPTION = ('Extra section planes - the live-slice plane is also '
                       'written when "Sections and obstacles" is ticked')
-VTK_MATRIX_CAPTION = 'Quantities (Gauges: fixed - pressure, density, velocity)'
+VTK_MATRIX_CAPTION = ('Quantities (Gauges: pressure, density and velocity '
+                      'are always recorded)')
 
 #: OUT-3: the box on the same card, and its tooltip (both toolkits)
 KEEP_ALL_CAPTION = 'Keep all fields in WSL'
@@ -234,13 +247,17 @@ KEEP_ALL_TIP = ('Off (default): WSL keeps only the newest writes while the '
 
 
 def vtk_matrix(value, dim):
-    """The matrix value in canonical form: one list per destination
-    column of `dim` (never 'gauges'), each in VTK_FIELDS order and
-    holding only the fields the dimension has (D4)."""
-    have = vtk_fields_for(int(dim))
+    """The matrix value in canonical form: one list per column of `dim`,
+    each in VTK_FIELDS order and holding only the fields the dimension
+    has (D4) with a cell in that column (VTK_CELLS). OUT-4a: 'gauges'
+    holds the ticked EXTRAS only - the locked p/rho/U never appear."""
+    dim = int(dim)
+    have = vtk_fields_for(dim)
+    extras = vtk_gauge_extras_for(dim)
     value = value if isinstance(value, dict) else {}
-    return {col: [f for f in have if f in (value.get(col) or ())]
-            for col in VTK_COLUMNS[int(dim)] if col != 'gauges'}
+    return {col: [f for f in (extras if col == 'gauges' else have)
+                  if col in VTK_CELLS[f] and f in (value.get(col) or ())]
+            for col in VTK_COLUMNS[dim]}
 
 
 def vtk_family_columns(fam, dim):
@@ -321,6 +338,9 @@ def _vtk_from_fields(dim, v, number, whole):
                      fields=matrix.get('sections', []),
                      obstacle_fields=matrix['obstacles'], planes=planes),
                 'vtk_surfaces')
+    # OUT-4a: the ticked gauge extras; none ticked writes no key
+    if matrix.get('gauges'):
+        out['vtk_gauges'] = {'fields': list(matrix['gauges'])}
     return out
 
 
@@ -363,6 +383,12 @@ def _vtk_fields_of_case(case, dim) -> dict:
         out.setdefault('vtk_planes', [])
         # the planes before the matrix, whatever the family order
         out['vtk_planes'] = out.pop('vtk_planes')
+    # OUT-4a: the gauge extras (a malformed key shows nothing ticked)
+    try:
+        g = normalize_vtk_gauges(getattr(case, 'vtk_gauges', None))
+    except ValueError:
+        g = None
+    matrix['gauges'] = (g or {}).get('fields', [])
     # OUT-3: the "Keep all fields in WSL" box sits on the same card
     out['keep_all_fields'] = getattr(case, 'keep_all_fields', False) is True
     out['vtk_fields'] = vtk_matrix(matrix, dim)

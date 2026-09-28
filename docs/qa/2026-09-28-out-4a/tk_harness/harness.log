@@ -1,0 +1,30 @@
+[14:08:39] [boot] foreign WSL solvers at kickoff: []
+[14:08:48] [boot] App built in 5212 ms
+[14:08:48] [V06] === BEGIN V06 ===
+[14:08:51] [V06] ok: 1D: p/rho/U locked and ticked; live gauge cells ['T', 'dynamicP']
+[14:08:53] [V06] SHOT 001_V06_setup_1d_gauges_off_dark.png (printwindow, lum 39)
+[14:08:53] [V06] ok: 1D: the ticks reach vtk_gauges
+[14:08:53] [V06] ok: 1D: no VTK gauges message on the strip
+[14:08:54] [V06] SHOT 002_V06_setup_1d_gauges_on_dark.png (printwindow, lum 39)
+[14:08:56] [V06] ok: 1D native: no vtk_gauges key
+[14:08:59] [V06] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4a\tk_harness\sheets\contact_V06.png
+[14:08:59] [V06] === END V06: done (10s, max gap 1069 ms) ===
+[14:09:00] [V07] === BEGIN V07 ===
+[14:09:02] [V07] ok: 2D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[14:09:03] [V07] SHOT 003_V07_setup_2d_gauges_off_dark.png (printwindow, lum 40)
+[14:09:04] [V07] ok: 2D: the ticks reach vtk_gauges
+[14:09:04] [V07] ok: 2D: no VTK gauges message on the strip
+[14:09:05] [V07] SHOT 004_V07_setup_2d_gauges_on_dark.png (printwindow, lum 40)
+[14:09:06] [V07] ok: 2D native: no vtk_gauges key
+[14:09:09] [V07] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4a\tk_harness\sheets\contact_V07.png
+[14:09:09] [V07] === END V07: done (9s, max gap 529 ms) ===
+[14:09:10] [V08] === BEGIN V08 ===
+[14:09:13] [V08] ok: 3D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[14:09:15] [V08] SHOT 005_V08_setup_3d_gauges_off_dark.png (printwindow, lum 40)
+[14:09:15] [V08] ok: 3D: the ticks reach vtk_gauges
+[14:09:15] [V08] ok: 3D: no VTK gauges message on the strip
+[14:09:16] [V08] SHOT 006_V08_setup_3d_gauges_on_dark.png (printwindow, lum 40)
+[14:09:18] [V08] ok: 3D native: no vtk_gauges key
+[14:09:21] [V08] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4a\tk_harness\sheets\contact_V08.png
+[14:09:21] [V08] === END V08: done (11s, max gap 1187 ms) ===
+[14:09:27] [V08] exit 0; pending: []

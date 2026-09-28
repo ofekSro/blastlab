@@ -101,19 +101,13 @@ def locked_column_is_muted():
             pump(30)
             locked = [b for b in grid.findChildren(QCheckBox)
                       if not b.isEnabled()]
-            # rows run in VTK_FIELDS order: index 1 is Overpressure, not a
-            # gauge field, so its locked box is unticked
-            lk = locked[1]
-            live = grid.boxes[('overpressure', 'volumes')]
+            # OUT-4a: the only locked boxes left are p / rho / U, all
+            # ticked - an unticked gauge cell is a live one now
+            check(f'{mode}: no unticked locked box is left (OUT-4a)',
+                  len(locked) == 3 and all(b.isChecked() for b in locked),
+                  f'{len(locked)} locked')
             bg = theme.qcolor('card')
             card = f.cards[TITLE]
-            c_lk, c_live = (_box_contrast(card, lk, bg),
-                            _box_contrast(card, live, bg))
-            check(f'{mode}: an unticked locked box is fainter than a live '
-                  f'one', not lk.isChecked() and not live.isChecked()
-                  and c_lk < 0.5 * c_live,
-                  f'contrast to the card: locked {c_lk:.1f}, live '
-                  f'{c_live:.1f}')
             tk_ = locked[0]
             tl = grid.boxes[('p', 'volumes')]
             tl.click()
@@ -162,6 +156,46 @@ def keep_all_box():
               and 'keep_all_fields' not in case_to_dict(f.get_case()))
 
 
+def gauge_extras():
+    """OUT-4a A5: a ticked gauge extra reaches `vtk_gauges`, survives a
+    save/reload, and native mode hides the card and writes no key."""
+    print('\nC12: the Gauges column extras (OUT-4a)')
+    for d in (1, 2, 3):
+        f = form(d)
+        grid = f.widgets['vtk_fields']
+        grid.boxes[('T', 'gauges')].click()
+        pump(5)
+        case = f.get_case()
+        check(f'{d}D: a ticked T at the gauges is in vtk_gauges',
+              case.vtk_gauges == {'fields': ['T']}
+              and case_to_dict(case).get('vtk_gauges') == {'fields': ['T']},
+              str(case.vtk_gauges))
+        check(f'{d}D: ticking a gauge extra does not switch a family on',
+              not f.v['vtk_s_on'].get() if d > 1 else True)
+        text = json.dumps(case_to_dict(case), sort_keys=True)
+        g = form(d)
+        g.set_case(case_from_dict(json.loads(text)))
+        pump(5)
+        check(f'{d}D: save / reload restores the tick',
+              g.widgets['vtk_fields'].boxes[('T', 'gauges')].isChecked()
+              and json.dumps(case_to_dict(g.get_case()),
+                             sort_keys=True) == text)
+        f.set_mode('native')
+        pump(10)
+        check(f'{d}D native: the card is hidden and no vtk_gauges key',
+              not f.card_visible(TITLE)
+              and 'vtk_gauges' not in case_to_dict(f.get_case()))
+    f = form(3)
+    for fld in ('overpressure', 'impulse', 'dynamicP'):
+        f.widgets['vtk_fields'].boxes[(fld, 'gauges')].click()
+    pump(5)
+    rep = validate_case(f.get_case())
+    check('3D: overpressure, impulse, q at the gauges validate clean',
+          f.get_case().vtk_gauges == {'fields': ['overpressure', 'impulse',
+                                                 'dynamicP']}
+          and not rep.errors, str(rep.errors))
+
+
 def main():
     print('\nC1: the families and the matrix of each dimension')
     want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
@@ -188,11 +222,26 @@ def main():
         cols = sorted({c for _f, c in grid.boxes})
         check(f'{d}D: {len(rows)} quantity rows (D4)',
               sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
-              and len(rows) == (6 if d == 1 else 10), str(rows))
-        check(f'{d}D: destination columns {want_cols[d][1:]}',
-              cols == sorted(want_cols[d][1:]), str(cols))
-        check(f'{d}D: a tick box in every destination cell',
-              len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1))
+              # OUT-4a: + the Dynamic pressure row
+              and len(rows) == (7 if d == 1 else 11), str(rows))
+        # OUT-4a: the Gauges column has live boxes too (the extras)
+        check(f'{d}D: live columns {want_cols[d]}',
+              cols == sorted(want_cols[d]), str(cols))
+        extras = F.vtk_gauge_extras_for(d)
+        check(f'{d}D: a tick box in every destination cell, plus the '
+              f'gauge extras {extras}',
+              len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1)
+              + len(extras)
+              and {f_ for f_, c in grid.boxes if c == 'gauges'}
+              == set(extras), str(sorted(grid.boxes)))
+        want_gauge = ({'T', 'dynamicP'} if d == 1 else
+                      {'T', 'dynamicP', 'overpressure', 'impulse'})
+        from PySide6.QtWidgets import QCheckBox as _QCB
+        n_boxes = len(grid.findChildren(_QCB))
+        check(f'{d}D: gauge cells exist only for p, rho, U and '
+              f'{sorted(want_gauge)} (VTK_CELLS)',
+              set(extras) == want_gauge
+              and n_boxes == len(grid.boxes) + 3, f'{n_boxes} boxes')
         # P13 (owner, 2026-09-27): the card spans both columns, below
         # them, with full-word headers in the order of the families (P24)
         from PySide6.QtWidgets import QLabel
@@ -239,8 +288,8 @@ def main():
         locked = [b for b in grid.findChildren(QCheckBox)
                   if not b.isEnabled()]
         ticked = [b for b in locked if b.isChecked()]
-        check(f'{d}D: the Gauges column is locked with p, rho, U ticked',
-              len(locked) == len(rows) and len(ticked) == 3,
+        check(f'{d}D: p, rho, U locked and ticked at the Gauges',
+              len(locked) == 3 and len(ticked) == 3,
               f'{len(locked)} locked, {len(ticked)} ticked')
         # P22: the Time box is in seconds, and the card says the files are
         check(f'{d}D: the interval captions carry their units',
@@ -370,12 +419,14 @@ def main():
     f1.widgets['vtk_v_on'].click()
     pump(5)
     check('1D whole domain: p, rho, U',
-          f1.v['vtk_fields'].get() == {'volumes': ['p', 'rho', 'U']})
+          f1.v['vtk_fields'].get() == {'gauges': [],   # OUT-4a column
+                                       'volumes': ['p', 'rho', 'U']})
     f2 = form(2)
     f2.widgets['vtk_s_on'].click()
     pump(5)
     check('2D obstacles: p and pMax, no sections column',
-          f2.v['vtk_fields'].get() == {'obstacles': ['p', 'pMax'],
+          f2.v['vtk_fields'].get() == {'gauges': [],   # OUT-4a column
+                                       'obstacles': ['p', 'pMax'],
                                        'volumes': []})
 
     print('\nC5: the plane table (D7)')
@@ -472,7 +523,8 @@ def main():
     check('loading a case without VTK keys switches both families off',
           not g.v['vtk_s_on'].get() and not g.v['vtk_v_on'].get()
           and g.points['vtk_planes'].get() == []
-          and g.v['vtk_fields'].get() == {'sections': [], 'obstacles': [],
+          and g.v['vtk_fields'].get() == {'gauges': [],  # OUT-4a column
+                                          'sections': [], 'obstacles': [],
                                           'volumes': []})
 
     print('\nC7: a bad value in the inactive box never blocks a run')
@@ -562,8 +614,10 @@ def main():
               w.toolTip() for w in labels.values()]), str(caps))
     check('the live-slice note says "when Sections and obstacles is ticked"',
           'when "Sections and obstacles" is ticked' in caps[0], caps[0])
-    check('Gauges: fixed - pressure, density, velocity',
-          'pressure, density, velocity' in caps[1], caps[1])
+    # OUT-4a: the Gauges column is no longer fixed
+    check('Gauges: pressure, density and velocity are always recorded',
+          'pressure, density and velocity are always recorded' in caps[1]
+          and 'fixed' not in caps[1], caps[1])
     for row, want in (('Energy', 'total energy per unit volume'),
                       ('Products', 'volume fraction of detonation products')):
         t = labels[row].toolTip() if row in labels else ''
@@ -593,6 +647,7 @@ def main():
 
     locked_column_is_muted()
     keep_all_box()
+    gauge_extras()
 
     print('\n' + '=' * 52)
     if FAIL:

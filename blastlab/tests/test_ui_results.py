@@ -62,6 +62,17 @@ def with_gauges(res, n=3, fields=('p',)):
         res.gauges['speeds'] = [np.abs(p - P_AIR) / 400.0 for p in traces]
     if 'rho' in fields:
         res.gauges['rhos'] = [np.full_like(t, 1.2) for _ in traces]
+    # OUT-4a: the blastFoam gauge extras
+    if 'overpressure' in fields:
+        res.gauges['overpressures'] = [p - P_AIR for p in traces]
+    if 'impulse' in fields:
+        res.gauges['impulses'] = [np.cumsum(p - P_AIR) * (t[1] - t[0])
+                                  for p in traces]
+    if 'T' in fields:
+        res.gauges['temperatures'] = [np.full_like(t, 288.0) for _ in traces]
+    if 'q' in fields:
+        res.gauges['dyn_pressures'] = [np.abs(p - P_AIR) / 10.0
+                                       for p in traces]
     return res
 
 
@@ -364,6 +375,23 @@ def main():
     g.field_seg.changed.emit('|U|')
     pump(30)
     check('and switching it redraws that trace', g.field() == '|U|')
+    # OUT-4a: every recorded extra is offered, and each redraws with its
+    # own y-label and units
+    all7 = ('p', '|U|', 'rho', 'overpressure', 'impulse', 'T', 'q')
+    p.add_result('all extras', 2, with_gauges(fake_2d(), fields=all7))
+    pump(40)
+    check('OUT-4a: the selector offers each recorded extra',
+          g.field_seg.values() == list(all7), str(g.field_seg.values()))
+    for fld, ylabel in (('overpressure', 'Overpressure (blastFoam) [kPa]'),
+                        ('impulse', 'Impulse [kPa ms]'),
+                        ('T', 'Temperature [K]'),
+                        ('q', 'Dynamic pressure [kPa]')):
+        g.field_seg.changed.emit(fld)
+        pump(30)
+        fig = g.canvas.figure
+        got = fig.axes[0].get_ylabel() if fig is not None else None
+        check(f'OUT-4a: switching to {fld} redraws with "{ylabel}"',
+              g.field() == fld and got == ylabel, str(got))
     p.sel.setCurrentIndex(p.entries().index(gg))
     pump(40)
     check('going back to a p-only result resets and hides it',

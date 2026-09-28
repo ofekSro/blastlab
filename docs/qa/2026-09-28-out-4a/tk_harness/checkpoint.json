@@ -1,0 +1,96 @@
+{
+ "done": {
+  "V06": {
+   "status": "done",
+   "t": 1790593739.0860653,
+   "shots": [
+    "001_V06_setup_1d_gauges_off_dark.png",
+    "002_V06_setup_1d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 10.1
+  },
+  "V07": {
+   "status": "done",
+   "t": 1790593749.51215,
+   "shots": [
+    "003_V07_setup_2d_gauges_off_dark.png",
+    "004_V07_setup_2d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.1
+  },
+  "V08": {
+   "status": "done",
+   "t": 1790593761.4864054,
+   "shots": [
+    "005_V08_setup_3d_gauges_off_dark.png",
+    "006_V08_setup_3d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 10.6
+  }
+ },
+ "shot_counter": 6,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1790593719.7662675,
+   "argv": [
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-28-out-4a\\tk_harness",
+    "--scenario",
+    "V06,V07,V08"
+   ],
+   "end": 1790593767.5687234,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "V06": {
+   "wall_s": 10.1,
+   "max_gap_ms": 1069,
+   "p99_gap_ms": 424,
+   "big_gaps": [
+    [
+     1069,
+     ""
+    ],
+    [
+     863,
+     "set_case"
+    ],
+    [
+     424,
+     "set_case"
+    ]
+   ]
+  },
+  "V07": {
+   "wall_s": 9.1,
+   "max_gap_ms": 529,
+   "p99_gap_ms": 125,
+   "big_gaps": [
+    [
+     529,
+     "set_case"
+    ]
+   ]
+  },
+  "V08": {
+   "wall_s": 10.6,
+   "max_gap_ms": 1187,
+   "p99_gap_ms": 237,
+   "big_gaps": [
+    [
+     1187,
+     "set_case"
+    ],
+    [
+     401,
+     ""
+    ]
+   ]
+  }
+ }
+}

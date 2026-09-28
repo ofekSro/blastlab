@@ -628,7 +628,7 @@ def _gauges_from_probes(spec):
         else:
             radii.append(float(pt[0]))               # snapped location
     return dict(times=probes['times'], radii=radii,
-                **{k: probes[k] for k in ('speeds', 'rhos') if k in probes},
+                **{k: probes[k] for k in reader.GAUGE_KEYS if k in probes},
                 pressures=probes['pressures'])
 
 
@@ -740,6 +740,10 @@ def _disable_fo_accumulators(spec, case, hooks):
         hooks.log(f'  [blastfoam] VTK sections/obstacles: '
                   f'{" and ".join(dropped)} are not written for this resumed '
                   f'AMR leg (the function objects are off)')
+    # OUT-4a: the same for the gauge impulse trace (writer.probe_fields)
+    if 'impulse' in (spec.gauge_fields or ()):
+        hooks.log('  [blastfoam] VTK gauges: impulse is not recorded for '
+                  'this resumed AMR leg (the function object is off)')
     return True
 
 
@@ -1661,7 +1665,7 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                          points=[(pt[0], pt[1])
                                  for pt in probes['points']],
                          pressures=probes['pressures'],
-                         **{k: probes[k] for k in ('speeds', 'rhos') if k in probes})
+                         **{k: probes[k] for k in reader.GAUGE_KEYS if k in probes})
     else:
         gauge_out = dict(times=np.array([]), points=[], pressures=[])
 
@@ -2327,7 +2331,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
         gauge_out = dict(times=probes['times'],
                          points=[tuple(pt) for pt in probes['points']],
                          pressures=probes['pressures'],
-                         **{k: probes[k] for k in ('speeds', 'rhos') if k in probes})
+                         **{k: probes[k] for k in reader.GAUGE_KEYS if k in probes})
     else:
         gauge_out = dict(times=np.array([]), points=[], pressures=[])
 

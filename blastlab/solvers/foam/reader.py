@@ -472,6 +472,15 @@ def _extra_mismatch(xrows, times, ncol_need):
     return None
 
 
+#: OUT-4a: the scalar gauge extras, (blastProbes field file, dict key)
+GAUGE_SCALARS = (('overpressure', 'overpressures'), ('impulse', 'impulses'),
+                 ('T', 'temperatures'))
+#: the per-probe trace keys a gauge result carries beside `pressures`
+#: (T44 speeds / rhos, then the OUT-4a extras), in TSV column order
+GAUGE_KEYS = ('speeds', 'rhos', 'overpressures', 'impulses', 'temperatures',
+              'dyn_pressures')
+
+
 def read_probes(case_unc, name='gauges', field='p'):
     """blastProbes output -> dict(points, times, pressures) or None.
 
@@ -479,7 +488,9 @@ def read_probes(case_unc, name='gauges', field='p'):
     with p's, the dict gains `speeds` (|U| per probe), `velocities` (the
     (n, 3) U vectors per probe, HD1-13: a wall load needs the component
     INTO the wall, not |U|) and `rhos`; consumers that only know
-    `pressures` see exactly the shape they always did.
+    `pressures` see exactly the shape they always did. OUT-4a: likewise
+    `overpressures`, `impulses`, `temperatures` and `dyn_pressures` (|q|)
+    plus `dyn_pressure_vecs`, when the case recorded them.
 
     P2-14 item 7 (owner 2026-09-27): "align" means the TIME COLUMN equals
     p's, row for row - not merely the row count. An extra whose times do
@@ -536,6 +547,24 @@ def read_probes(case_unc, name='gauges', field='p'):
                          for i in range(n_probes)]
         out['velocities'] = [ua[:, 1 + 3 * i:4 + 3 * i].copy()
                              for i in range(n_probes)]
+    # OUT-4a: the case's gauge extras (writer.probe_fields), under the same
+    # time-column rule. An absent file adds nothing.
+    for fname, key in GAUGE_SCALARS:
+        _px, xrows = _merge_chunks(base, tdirs, fname, _parse_probes_file)
+        if fits(fname, xrows, ncol):
+            xa = np.array([r[:ncol] for r in xrows])
+            out[key] = [xa[:, i + 1] for i in range(n_probes)]
+    _pq, qrows = _merge_chunks(base, tdirs, 'dynamicP', _parse_probes_vec)
+    if fits('dynamicP', qrows, 1 + 3 * n_probes):
+        # blastFoam's dynamicP is the vector 0.5 rho U |U|; its magnitude
+        # is the dynamic pressure q = 0.5 rho |U|^2 (blastFoam User Guide
+        # v6.0, sec. 15.9, eq. 15.1, p. 125). The vector is kept too, the
+        # way `velocities` is (owner Q5).
+        qa = np.array([r[:1 + 3 * n_probes] for r in qrows])
+        out['dyn_pressure_vecs'] = [qa[:, 1 + 3 * i:4 + 3 * i].copy()
+                                    for i in range(n_probes)]
+        out['dyn_pressures'] = [np.sqrt((v ** 2).sum(axis=1))
+                                for v in out['dyn_pressure_vecs']]
     if dropped:
         out['warnings'] = dropped
     return out
