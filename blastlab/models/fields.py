@@ -34,6 +34,9 @@ from .case import (VTK_CELLS, VTK_DECIMATE_DEFAULT, VTK_DECIMATE_WARNING,
                    VTK_GAUGE_LOCKED, VTK_POST_FIELDS, Case1D, Case2D, Case3D,
                    normalize_vtk, normalize_vtk_gauges, vtk_fields_for,
                    vtk_gauge_extras_for)
+# re-exported for the two cards (gui.forms, ui.setup_spec): the spin box's
+# top, which validation enforces
+from .case import VTK_DECIMATE_MAX  # noqa: F401
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -230,7 +233,8 @@ VTK_DECIMATE_TIP = ('Volumes decimation k: the volume files keep every k-th '
                     'base-cell layer on each axis (about 1/k^3 of the cells). '
                     'Values are copied, never averaged, and the solve is '
                     'unchanged - only the exported files are smaller.')
-VTK_DECIMATE_MAX = 16
+#: VTK_DECIMATE_MAX (the box's top) lives in models.case, where
+#: validation reads it
 VTK_DECIMATE_NOTE = VTK_DECIMATE_WARNING[0].upper() + VTK_DECIMATE_WARNING[1:] \
     + '.'
 #: the plane table's column kinds (batch plan D7)

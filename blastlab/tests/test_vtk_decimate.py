@@ -200,6 +200,16 @@ def test_decimate():
     want9 = [c for c, b in enumerate(base) if b == (0, 0, 0)]
     check('k beyond the grid keeps the first layer only (8 fine cells)',
           k9.n_cells == len(want9) == 8, str(k9.n_cells))
+    # verify(OUT-4c): an origin one base cell early on x puts every cell
+    # in x-layer 1.., so k = 9 keeps nothing - refused, never an empty file
+    early = (ORIGIN[0] - H, ORIGIN[1], ORIGIN[2])
+    try:
+        vx.decimate(src, 9, early, H)
+        check('a decimation that keeps no cell is refused', False,
+              'returned an empty grid')
+    except ValueError as exc:
+        check('a decimation that keeps no cell is refused',
+              'keeps no cell' in str(exc), str(exc))
     for bad in (0, -2, 1.5, True, '2'):
         try:
             vx.decimate(src, bad, ORIGIN, H)

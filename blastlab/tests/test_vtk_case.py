@@ -644,6 +644,9 @@ def test_decimate():
                    'Unknown vtk_surfaces keys'))
     ok3 = rep3(vtk_volumes=v_on(decimate=2))
     check('3D k = 2 validates clean', not ok3.errors, str(ok3.errors))
+    top = rep3(vtk_volumes=v_on(decimate=mcase.VTK_DECIMATE_MAX))
+    check(f'3D k = {mcase.VTK_DECIMATE_MAX} (the card\'s top) validates '
+          f'clean', not top.errors, str(top.errors))
     n = said(ok3, 'VTK volumes: decimated', ('notes',))
     check('   with the owner\'s warning in its note',
           len(n) == 1 and mcase.VTK_DECIMATE_WARNING in n[0]
@@ -664,6 +667,11 @@ def test_decimate():
          'the decimation must be a whole number >= 1'),
         ('k = NaN', rep3(vtk_volumes=v_on(decimate=float('nan'))),
          'the decimation must be a whole number >= 1'),
+        # verify(OUT-4c): above the card's spin range the Qt box shows the
+        # value clamped, so a loaded k past it must be refused, not run
+        (f'k = {mcase.VTK_DECIMATE_MAX + 1} (above the card\'s range)',
+         rep3(vtk_volumes=v_on(decimate=mcase.VTK_DECIMATE_MAX + 1)),
+         f'the decimation must be at most {mcase.VTK_DECIMATE_MAX}'),
         ('k = 2 in 2D', rep2(vtk_volumes=v_on(decimate=2)),
          'decimation is 3D only'),
         ('k = 2 in 1D', rep1(vtk_volumes=v_on(decimate=2)),

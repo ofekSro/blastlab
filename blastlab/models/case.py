@@ -62,6 +62,10 @@ VTK_VOLUME_KEYS = ('on', 'mode', 'value', 'fields')
 #: and only when k != 1, so a case without it saves byte-identical
 VTK_VOLUME_OPTIONAL = ('decimate',)
 VTK_DECIMATE_DEFAULT = 1
+#: the card's spin-box range (Qt QSpinBox / Tk ttk.Spinbox); validation
+#: refuses a larger k, so a loaded value the box cannot show is named
+#: rather than run silently (1/16^3 of the cells is already a sketch)
+VTK_DECIMATE_MAX = 16
 #: the owner's warning line (Q4), on the card and in the validation note
 VTK_DECIMATE_WARNING = ('decimated files are for viewing only; peaks may be '
                         'missed')

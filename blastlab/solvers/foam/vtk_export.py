@@ -499,6 +499,13 @@ def decimate(vd, k, origin, dx_base):
                                       axis=0) / s_sz[:, None]
     layer = np.floor((cen - origin) / dx_base).astype(np.int64)
     keep = np.all(layer % k == 0, axis=1)
+    if not keep.any():
+        # never an empty file in silence: a base grid that does not
+        # match the mesh, or k past the base-cell count on an axis while
+        # its first layer is carved out (a chamber wall)
+        raise ValueError(f'decimation by {k} keeps no cell of {n} (base '
+                         f'cell {dx_base:g} m from {origin.tolist()}) - '
+                         f'lower k, or check the base grid')
     entry_keep = np.repeat(keep, sizes + 1)
     used = np.zeros(len(pts), dtype=bool)
     used[conn[is_id & entry_keep]] = True
