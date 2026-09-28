@@ -130,9 +130,45 @@ report):
 Printed (information): the distinct Time_Of_Peak count in R3pre's files
 (expected 1 - the F6 symptom).
 
+OUT-4c C3 (the same batch plan, step C3; owner Q4: subsample per axis,
+3D volumes only): two runs of the base case (one obstacle, one gauge)
+with volumes p rho U pMax, Time every 0.1 ms, no surfaces:
+
+  R4  k = 1   vtk_volumes without `decimate` (every cell).
+  R5  k = 2   the same with `decimate: 2`.
+
+PRE-REGISTERED RULES for 4c (committed before the first R4/R5 run, never
+changed afterwards; on any failure: stop and report):
+
+ C-R0 the base grid of the prediction: the case's plan
+      (core.refine.plan_levels, the call writer.plan_case makes) gives
+      dx_base > 0 - the blockMesh cell, 0.0176 m here, because the charge
+      refinement is global - and a base grid starting at 0 on x, y and z.
+ C-R1 the solve is untouched: R5 vs R4, for every gauge, peak,
+      positive-phase impulse and arrival (gauge_summary summarize_trace)
+      |d| = 0, and the same solver step count (manifest n_steps).
+ C-R2 every file under gauges\\ (the gauge TSV) byte-identical, R5 vs R4.
+ C-R3 the same volume files: the list of names under vtk\\volumes\\ is
+      identical (same write times, same count; tolerance 0).
+ C-R4 per volume file, R5's cell and point counts equal the prediction
+      made here from R4's file of the same time, independently of
+      vtk_export.decimate: a cell is kept iff floor(c / dx_base) (C-R0's
+      dx_base) is even on x, y and z, c = the mean of the cell's distinct
+      points (a
+      polyhedron's from its face stream); points = the distinct points of
+      the kept cells.
+ C-R5 per volume file, R5's values equal R4's at the kept cells, in R4's
+      order: every cell-data array (same names, types, order), tolerance
+      0 (bytes); each kept cell's point coordinates equal R4's; the TIME
+      field equal.
+ C-R6 vtk\\manifest.json records the decimation: `decimate` ==
+      {"volumes": 2} for R5 and {"volumes": 1} for R4.
+
+Printed (information): R5 / R4 cell and byte ratios.
+
 Needs WSL with blastFoam and an idle VM (`wsl -d Ubuntu -- pgrep -a
 blastFoam` empty - checked here, the script refuses otherwise).
-Run:  cd blastlab/tests && python -u _e2e_out4_gauges.py [--only 4a|4b|f6]
+Run:  cd blastlab/tests && python -u _e2e_out4_gauges.py [--only 4a|4b|f6|4c]
 """
 import json
 import os
@@ -164,6 +200,11 @@ SURF2 = dict(SURF0, fields=SURF0['fields'] + ['impulse', 'impulseMax'],
              obstacle_fields=SURF0['obstacle_fields'] + [
                  'impulse', 'timeOfArrival', 'impulseMax', 'obstacleID'])
 VOL2 = dict(VOL0, fields=VOL0['fields'] + ['impulse', 'impulseMax'])
+#: OUT-4c C3: R4 (k = 1) and R5 (k = 2); C-R4's base cell [m], set by
+#: rule_c0 from the case's plan
+VOL4 = dict(VOL0, fields=VOL0['fields'] + ['pMax'])
+VOL5 = dict(VOL4, decimate=2)
+DX_BASE = []
 
 
 def check(name, ok, detail=''):
@@ -675,11 +716,167 @@ def main():
         else None
     if only == 'f6':
         return main_f6(runs)
+    if only == '4c':
+        return main_4c(runs)
     if only != '4b':
         rc = main_4a(runs)
         if rc or only == '4a':
             return rc
     return main_4b(runs)
+
+
+def cell_streams(vd):
+    """Per cell: (point ids in stream order, the stream with sizes only) -
+    a plain walk of CELLS, polyhedra (type 42) by their face stream."""
+    conn = np.asarray(vd.block('CELLS').values).tolist()
+    types = np.asarray(vd.block('CELL_TYPES').values).tolist()
+    out, pos = [], 0
+    for t in types:
+        m = conn[pos]
+        e = conn[pos + 1:pos + 1 + m]
+        pos += 1 + m
+        if t == 42:
+            ids, shape, j = [], [e[0]], 1
+            for _ in range(e[0]):
+                ids += e[j + 1:j + 1 + e[j]]
+                shape.append(e[j])
+                j += 1 + e[j]
+        else:
+            ids, shape = e, [m]
+        out.append((ids, shape))
+    return out
+
+
+def rule_c0(c):
+    from blastlab.core.refine import plan_levels
+    from blastlab.solvers.foam.materials import MATERIALS
+    print('\nC-R0: the base grid the prediction assumes', flush=True)
+    plan = plan_levels(c, rho0=MATERIALS[c.material].rho0)
+    starts = [float(plan.base[f'{a}_face'][0]) for a in 'xyz']
+    dx = float(plan.dx_base)
+    check('C-R0 plan dx_base > 0 and the base grid starts at 0',
+          dx > 0 and starts == [0.0] * 3,
+          f'dx_base {dx!r} m, starts {starts}, base cells '
+          f'{[len(plan.base[f"{a}_face"]) - 1 for a in "xyz"]}')
+    DX_BASE[:] = [dx]
+
+
+def rule_c1_c2(R4, R5):
+    from blastlab.output.gauge_summary import summarize_trace
+    print('\nC-R1 / C-R2: the solve is untouched (R5 vs R4)', flush=True)
+    g4, g5 = R4['res'].gauges, R5['res'].gauges
+    check('C-R1 the same gauges', len(g4['pressures']) == len(g5['pressures'])
+          > 0, f"{len(g4['pressures'])} vs {len(g5['pressures'])}")
+    for k, (p4, p5) in enumerate(zip(g4['pressures'], g5['pressures'])):
+        s4 = summarize_trace(g4['times'], p4)
+        s5 = summarize_trace(g5['times'], p5)
+        for key in ('peak_kpa', 'pos_impulse', 'arrival_ms'):
+            check(f'C-R1 gauge {k + 1} {key}: |d| = 0', s4[key] == s5[key],
+                  f'R4 {s4[key]!r}, R5 {s5[key]!r}')
+    n4, n5 = R4['m'].get('n_steps'), R5['m'].get('n_steps')
+    check('C-R1 the same solver step count', bool(n4) and n4 == n5,
+          f'R4 {n4}, R5 {n5}')
+    f4, f5 = base.files(R4['folder'], 'gauges'), base.files(R5['folder'],
+                                                            'gauges')
+    diff = sorted(k for k in set(f4) | set(f5) if f4.get(k) != f5.get(k))
+    check('C-R2 every file under gauges\\ byte-identical', bool(f4)
+          and not diff, f'{sorted(f4)}, differ {diff}')
+
+
+def rule_c3_to_c6(R4, R5):
+    from blastlab.output import legacy_vtk as lv
+    print('\nC-R3..C-R6: the volume files', flush=True)
+    d4 = os.path.join(R4['folder'], 'vtk', 'volumes')
+    d5 = os.path.join(R5['folder'], 'vtk', 'volumes')
+    n4 = sorted(n for n in os.listdir(d4) if n.endswith('.vtk'))
+    n5 = sorted(n for n in os.listdir(d5) if n.endswith('.vtk'))
+    check('C-R3 the same volume file names', bool(n4) and n4 == n5,
+          f'R4 {len(n4)}, R5 {len(n5)}')
+    bad4, bad5, tot = [], [], [0, 0, 0, 0]
+    for name in sorted(set(n4) & set(n5)):
+        a = lv.read(os.path.join(d4, name))
+        b = lv.read(os.path.join(d5, name))
+        pa = np.asarray(a.block('POINTS').values)
+        cells = cell_streams(a)
+        keep = []
+        for i, (ids, _shape) in enumerate(cells):
+            cen = pa[sorted(set(ids))].astype(np.float64).mean(axis=0)
+            if all(int(np.floor(v / DX_BASE[0])) % 2 == 0 for v in cen):
+                keep.append(i)
+        want_pts = len({p for i in keep for p in cells[i][0]})
+        if b.n_cells != len(keep) or b.n_points != want_pts:
+            bad4.append(f'{name}: cells {b.n_cells}/{len(keep)}, points '
+                        f'{b.n_points}/{want_pts}')
+        tot[0] += a.n_cells
+        tot[1] += b.n_cells
+        tot[2] += os.path.getsize(os.path.join(d4, name))
+        tot[3] += os.path.getsize(os.path.join(d5, name))
+        why = []
+        if [(x.name, x.vtk_type, x.kind) for x in a.cell_data] != \
+                [(x.name, x.vtk_type, x.kind) for x in b.cell_data]:
+            why.append('array list')
+        else:
+            for x, y in zip(a.cell_data, b.cell_data):
+                if b.n_cells != len(keep) or np.asarray(x.values)[keep] \
+                        .tobytes() != np.asarray(y.values).tobytes():
+                    why.append(x.name)
+        pb = np.asarray(b.block('POINTS').values)
+        bc = cell_streams(b)
+        if len(bc) != len(keep) or not all(
+                cells[i][1] == s[1] and np.asarray(pa[cells[i][0]]).tobytes()
+                == np.asarray(pb[s[0]]).tobytes()
+                for i, s in zip(keep, bc)):
+            why.append('geometry')
+        ta = [x.values.tobytes() for x in a.field_data if x.name == 'TIME']
+        tb = [x.values.tobytes() for x in b.field_data if x.name == 'TIME']
+        if not ta or ta != tb:
+            why.append('TIME')
+        if why:
+            bad5.append(f'{name}: {why}')
+    check('C-R4 every R5 file: cell and point counts equal the prediction',
+          bool(n5) and not bad4, str(bad4[:3]))
+    check('C-R5 every R5 file: values, point coordinates and TIME equal '
+          'R4\'s at the kept cells (tolerance 0)', bool(n5) and not bad5,
+          str(bad5[:3]))
+    if tot[0] and tot[2]:
+        print(f'    (info) cells R5/R4 {tot[1]}/{tot[0]} = '
+              f'{tot[1] / tot[0]:.4f}; bytes {tot[3] / tot[2]:.4f}',
+              flush=True)
+    for tag, R, k in (('R4', R4, 1), ('R5', R5, 2)):
+        vm = base.load_json(os.path.join(R['folder'], 'vtk',
+                                         'manifest.json'))
+        check(f'C-R6 {tag}: manifest decimate == {{"volumes": {k}}}',
+              vm.get('decimate') == {'volumes': k}, str(vm.get('decimate')))
+
+
+def main_4c(runs):
+    c4 = base.case(vtk_volumes=VOL4)
+    c5 = base.case(vtk_volumes=VOL5)
+    rule_c0(c5)
+    if FAIL:
+        print(f'FAILED before the runs: {FAIL}')
+        return 1
+    R4 = base.run_stage(runs, 'E2E_OUT4_R4', c4)
+    R5 = base.run_stage(runs, 'E2E_OUT4_R5', c5)
+    for tag, r in (('R4', R4), ('R5', R5)):
+        check(f'{tag}: finished without an error, not stopped early',
+              r['error'] is None and r['res'] is not None
+              and not r['res'].stopped_early, (r['error'] or '')[-300:])
+    if FAIL or base.FAIL:
+        FAIL.extend(base.FAIL)
+        print(f'FAILED before the rules: {FAIL}')
+        return 1
+    print(f'    steps: R4 {R4["m"].get("n_steps")}, R5 '
+          f'{R5["m"].get("n_steps")}', flush=True)
+    rule_c1_c2(R4, R5)
+    rule_c3_to_c6(R4, R5)
+    FAIL.extend(base.FAIL)
+    print('\n' + '=' * 52)
+    if FAIL:
+        print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')
+        return 1
+    print(f'E2E OUT-4c DECIMATION: PASS ({len(RAN)} checks)')
+    return 0
 
 
 def main_4b(runs):
