@@ -833,6 +833,31 @@ Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4c and §7a; owner Q4.
   pass, harness V groups 10/10 and 9/9 (`docs/qa/2026-09-28-out-4c/`).
 - **Commits:** `9176385`..`c650cb5` and the commit of this entry.
 
+## 0l. 2026-09-28/29 — batch `gui-foundation` (GUI-1, GUI-2, GUI-4)
+
+Plan: `docs/batches/2026-09-28-gui-foundation.md`; spec `docs/gui-redesign-plan.md`
+§2, §2.5, §3. Reports: `…gui-foundation.implement.md` (verification: all three
+VERIFIED, no fixes needed).
+
+- **What:** `GUI-1` — the Qt palette rewritten to the redesign (warm black, orange
+  `#ff6a2b` accent, cyan `#4cc9f0` gauges; every old key kept, 21 new), light palette
+  with six values darkened to pass 4.5:1 (decision D1); Space Grotesk (variable),
+  IBM Plex Sans and Mono bundled under `blastlab/ui/fonts/` with their OFL, loaded
+  from the package with a Segoe UI / Consolas fallback; no white text on orange
+  anywhere. `GUI-2` — the stepped-front mark drawn with QPainter at 64/32/16
+  (`theme.logo_pixmap`), the app icon (16…256) on the window, QApplication and taskbar
+  (AppUserModelID `blastlab`), the BLASTLAB wordmark in place of the ELSL gif in the Qt
+  window; Tk and `logo.gif` untouched. `GUI-4` — `ui/components.py`: ToggleSwitch,
+  StatTile, TreeRow, DockTabs, Banner, HandoffCard; Segmented restyled.
+- **Tests:** new `test_ui_theme` (keys, contrast table, fonts, fallback),
+  `test_ui_logo` (pixel colours at 64/32/16, icon sizes), `test_ui_components`; all
+  PASS. `test_regression` byte-identical; the Qt fast gates green; no committed
+  assertion changed. Real-platform screenshots in `docs/qa/2026-09-28-gui-foundation/`.
+- **Deviations from /todo:** no simplifier pass (UI code, no calculations) and the full
+  QA + UX agents deferred to the end of the GUI track, as the owner asked.
+- **Open, non-blocking:** `docs/gui-redesign-decisions.md` D1-D6.
+- **Commits:** `f553014`, `3dda85e`, `2f64601`, `d9191b9` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70
