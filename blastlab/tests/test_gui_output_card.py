@@ -302,6 +302,16 @@ def main():
     def tip_of(text):
         return getattr(getattr(labels.get(text), '_blastlab_tip', None),
                        'text', '')
+    # OUT-4b B1 (owner Q1): timeOfArrival is the time of PEAK pressure
+    # (blastFoam User Guide v6.0, sec. 15.12), so the row says so
+    check('B1: the timeOfArrival row reads "Time of peak", no "Arrival time"',
+          'Time of peak' in labels and 'Arrival time' not in labels,
+          str(sorted(labels)))
+    check('B1: its tooltip says maximum, not the first arrival, and names '
+          'Time_Of_Peak and timeOfArrival',
+          all(s in tip_of('Time of peak') for s in (
+              'maximum', 'not the first arrival', 'Time_Of_Peak',
+              'timeOfArrival')), tip_of('Time of peak'))
     def walk(w):
         yield w
         for ch in w.winfo_children():

@@ -607,6 +607,16 @@ def main():
     check('decision 4: its tooltip says minus ambient, the array name and '
           'pMax', all(s in tip for s in ('minus ambient', '101.325 kPa',
                                           'Peak_Overpressure', 'pMax')), tip)
+    # OUT-4b B1 (owner Q1): timeOfArrival is the time of PEAK pressure
+    # (blastFoam User Guide v6.0, sec. 15.12), so the row says so
+    tp = labels.get('Time of peak')
+    tip = tp.toolTip() if tp is not None else ''
+    check('B1: the timeOfArrival row reads "Time of peak", no "Arrival time"',
+          tp is not None and 'Arrival time' not in labels, str(sorted(labels)))
+    check('B1: its tooltip says maximum, not the first arrival, and names '
+          'Time_Of_Peak and timeOfArrival',
+          all(s in tip for s in ('maximum', 'not the first arrival',
+                                 'Time_Of_Peak', 'timeOfArrival')), tip)
     # the confusing-wording list: no internal ids, what the rows mean
     caps = [f.label_text('vtk_planes'), f.label_text('vtk_fields')]
     check('no user-facing "OUT-4" in the captions or header tooltips',

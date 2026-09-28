@@ -53,10 +53,13 @@ VTK_SURFACE_KEYS = ('on', 'mode', 'value', 'fields', 'obstacle_fields',
 #: in every family (owner decision 5, docs/batches/2026-09-27-out-2-
 #: surface-layout.md, after the Viper samples' `pressure` /
 #: `Peak_Ovepressure`, spelled "Overpressure"). `pMax` is written as the
-#: peak OVERPRESSURE, pMax - ambient (owner decision 4).
+#: peak OVERPRESSURE, pMax - ambient (owner decision 4). OUT-4b (owner
+#: Q1, 2026-09-27): blastFoam's timeOfArrival is the time of PEAK pressure
+#: (blastFoam User Guide v6.0, sec. 15.12, p. 126), so it is written as
+#: `Time_Of_Peak`, not `Arrival_Time`.
 VTK_ARRAY_NAMES = {'p': 'pressure', 'pMax': 'Peak_Overpressure',
                    'impulse': 'Impulse', 'overpressure': 'Overpressure',
-                   'timeOfArrival': 'Arrival_Time', 'rho': 'density',
+                   'timeOfArrival': 'Time_Of_Peak', 'rho': 'density',
                    'U': 'velocity', 'T': 'temperature',
                    'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
                    'dynamicP': 'Dynamic_Pressure'}

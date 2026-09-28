@@ -139,7 +139,7 @@ def anim_file_with_format(anim_file, fmt):
 #: gives the long name and the blastFoam field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
-    'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
+    'pMax': 'Peak overpressure', 'timeOfArrival': 'Time of peak',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
     'dynamicP': 'Dynamic pressure',
@@ -161,7 +161,12 @@ VTK_QUANTITY_TIPS = {
             '[J/m3]',
     'alpha.expl': 'Products (volume fraction of detonation products, '
                   '0..1)',
-    'timeOfArrival': 'Arrival time (first arrival)',
+    # OUT-4b (owner Q1, 2026-09-27): timeOfArrival "records the time when
+    # the maximum pressure is reached" (blastFoam User Guide v6.0,
+    # sec. 15.12, p. 126; timeOfArrival.C execute()) - not first arrival
+    'timeOfArrival': 'Time of peak (the time the pressure in each cell '
+                     'reached its maximum - not the first arrival; written '
+                     'to the files as Time_Of_Peak) [s]',
     # OUT-4a (owner Q5 interim): blastFoam's dynamicP is the vector
     # 0.5 rho U |U|; its magnitude is the standard dynamic pressure
     # (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1, p. 125)

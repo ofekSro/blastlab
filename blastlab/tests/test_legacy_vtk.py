@@ -229,7 +229,9 @@ def test_every_readable_name():
     assert set(VTK_ARRAY_NAMES) == set(VTK_FIELDS)
     assert VTK_ARRAY_NAMES == {
         'p': 'pressure', 'pMax': 'Peak_Overpressure', 'impulse': 'Impulse',
-        'overpressure': 'Overpressure', 'timeOfArrival': 'Arrival_Time',
+        # OUT-4b B1: owner decision Q1 (2026-09-27) renames Arrival_Time -
+        # blastFoam's timeOfArrival is the time of peak (guide sec. 15.12)
+        'overpressure': 'Overpressure', 'timeOfArrival': 'Time_Of_Peak',
         'rho': 'density', 'U': 'velocity', 'T': 'temperature',
         'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
         # OUT-4a A2: a spec addition (batch plan), not a change to pass
