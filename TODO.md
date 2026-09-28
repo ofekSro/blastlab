@@ -32,12 +32,12 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 |---|---|---|---|
 | `GUI-1` | ✅ done 2026-09-29 (DONE.md §0l) · **Design tokens and fonts** — warm-black palette + light, orange accent, cyan gauges; Space Grotesk / IBM Plex Sans / IBM Plex Mono bundled (OFL). Plan §2 | M | 1 |
 | `GUI-2` | ✅ done 2026-09-29 (DONE.md §0l) · **Logo and app icon** — the stepped front on an 8 × 8 grid, drawn with QPainter at 16/32/64; BLASTLAB wordmark; window + taskbar icon. Plan §3 | S | 2 |
-| `GUI-3` | **Window frame** — top bar with 01 Setup → 02 Run → 03 Results + Chain, solver chip, case menu (Open / Save / Save as / Recent / Dark), status bar, title with progress, Shift+Esc stop. No sidebar. Plan §4 | L | 3 |
+| `GUI-3` | ✅ done 2026-09-29 (DONE.md §0m) · **Window frame** — top bar with 01 Setup → 02 Run → 03 Results + Chain, solver chip, case menu (Open / Save / Save as / Recent / Dark), status bar, title with progress, Shift+Esc stop. No sidebar. Plan §4 | L | 3 |
 | `GUI-4` | ✅ done 2026-09-29 (DONE.md §0l) · **Shared components** — toggle switch, stat tile, tree row, dock tabs, banner. Plan §2.5 | M | 4 |
 | `GUI-5` | **01 Setup** — numbered model tree (7 nodes) + properties of the selected node only + live-number strip, Z rings, gauge table with Z; dependent settings open only when switched on. Plan §5 | L | 5 |
 | `GUI-6` | **02 Run** — controls / progress strip with ETA / live view / log dock / live-gauge list sorted by Z; Stop confirms after 30 s; finish banner + Windows notification. Plan §6 | L | 6 |
 | `GUI-7` | **03 Results** — results list + "how it was computed"; views Field (= Fields + Animation) · Gauges · 3D; table with Z and Copy; impulse in kPa·ms on screen only; exports grouped. No KB columns, no run overlay. Plan §7 | L | 7 |
-| `GUI-8` | **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
+| `GUI-8` | ✅ done 2026-09-29 (DONE.md §0m) · **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
 | `GUI-9` | **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
 | `GUI-10` | **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
 

@@ -858,6 +858,31 @@ VERIFIED, no fixes needed).
 - **Open, non-blocking:** `docs/gui-redesign-decisions.md` D1-D6.
 - **Commits:** `f553014`, `3dda85e`, `2f64601`, `d9191b9` and the commit of this entry.
 
+## 0m. 2026-09-29 — batch `gui-frame` (GUI-8, GUI-3)
+
+Plan: `docs/batches/2026-09-29-gui-frame.md`; spec `docs/gui-redesign-plan.md` §4, §8.3.
+Report: `…gui-frame.implement.md`. Verification: GUI-8 VERIFIED, GUI-3 FIXED.
+
+- **What:** `GUI-8` — the Chain runs 1D → 3D: `ChainPanel.run()` no longer refuses
+  {1, 3} as non-consecutive and wires `handoff_1d_to_3d.txt` into a 3D stage with
+  `init_mode 'profile1d'` (the engine already supported it). `GUI-3` — the sidebar is
+  gone: new `ui/topbar.py` with the workflow pills 01 Setup → 02 Run → 03 Results,
+  the Chain link, the case menu (Open, Save in place, Save as, Recent, Dark mode), the
+  solver chip (native / blastFoam, WSL status, Re-detect) and the dimension control;
+  a 28 px status bar; the window title carries the case, `●` when dirty, the run's %
+  and `Chain k/n`; **Esc no longer stops a run, Shift+Esc does** (UX-7).
+- **Tests:** `test_ui_chain` 78 (C6b wiring, C12 a tiny native 1D → 3D chain end to end,
+  first 3D frame non-ambient); new `test_ui_frame` 50; the fast matrix green;
+  `test_regression` byte-identical; `_e2e_ui_embed` 24/24 with the 3D viewer never
+  misplaced (and a 514-sample Win32 measurement, 0 wrong); `_e2e_hd13_gui` PASS after
+  the verifier's fix. Layout-pin assertions updated per plan §9: parity P6
+  (Esc → Shift+Esc) and P3, `test_ui_logo` wording, chain C2, harness B01.
+- **Verifier fix:** `35d8cb4` — a status message hides the shortcuts hint while it
+  shows (D13), so the HD 1.3 summary is not clipped by the narrower status bar.
+- **Open, non-blocking:** decisions D7-D13; `_e2e_ui_view3d.py` fails on the home PC
+  identically before the batch (re-run on the office machine).
+- **Commits:** `fbbc698`, `25a031d`, `067123d`, `35d8cb4` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70
