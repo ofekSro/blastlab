@@ -679,7 +679,9 @@ def _log_banner_1d(hooks, case, spec):
 #: P1-5: the per-step function objects whose fields blastFoam re-reads at
 #: a restart. They are accumulators, so the restart CONTINUES them - which
 #: is why an inconsistent one is fatal rather than ignorable.
-_FO_FIELDS = ('pMax', 'impulse')
+#: OUT-4b: `impulseMax` (the Peak_Impulse fieldMinMax, writer.py) is one
+#: too, written only when a VTK family asks for it.
+_FO_FIELDS = ('pMax', 'impulse', 'impulseMax')
 
 
 def _disable_fo_accumulators(spec, case, hooks):

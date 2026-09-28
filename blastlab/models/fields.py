@@ -30,9 +30,9 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, Case1D, Case2D, Case3D,
-                   normalize_vtk, normalize_vtk_gauges, vtk_fields_for,
-                   vtk_gauge_extras_for)
+from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, VTK_POST_FIELDS, Case1D,
+                   Case2D, Case3D, normalize_vtk, normalize_vtk_gauges,
+                   vtk_fields_for, vtk_gauge_extras_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -139,10 +139,11 @@ def anim_file_with_format(anim_file, fmt):
 #: gives the long name and the blastFoam field
 VTK_QUANTITY_LABELS = {
     'p': 'Pressure', 'overpressure': 'Overpressure', 'impulse': 'Impulse',
-    'pMax': 'Peak overpressure', 'timeOfArrival': 'Arrival time',
+    'pMax': 'Peak overpressure', 'timeOfArrival': 'Time of peak',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
-    'dynamicP': 'Dynamic pressure',
+    'dynamicP': 'Dynamic pressure', 'impulseMax': 'Peak impulse',
+    'obstacleID': 'Obstacle ID',
 }
 #: the long names, for the row tooltips. blastFoam's pMax is the running
 #: per-cell maximum of the ABSOLUTE pressure p: fieldMinMax on p with no
@@ -161,17 +162,37 @@ VTK_QUANTITY_TIPS = {
             '[J/m3]',
     'alpha.expl': 'Products (volume fraction of detonation products, '
                   '0..1)',
-    'timeOfArrival': 'Arrival time (first arrival)',
+    # OUT-4b (owner Q1, 2026-09-27): timeOfArrival "records the time when
+    # the maximum pressure is reached" (blastFoam User Guide v6.0,
+    # sec. 15.12, p. 126; timeOfArrival.C execute()) - not first arrival
+    'timeOfArrival': 'Time of peak (the time the pressure in each cell '
+                     'reached its maximum - not the first arrival; written '
+                     'to the files as Time_Of_Peak) [s]',
     # OUT-4a (owner Q5 interim): blastFoam's dynamicP is the vector
     # 0.5 rho U |U|; its magnitude is the standard dynamic pressure
     # (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1, p. 125)
     'dynamicP': 'Dynamic pressure (q = 1/2 rho |U|^2, the magnitude of '
-                'blastFoam\'s dynamicP) [Pa]'}
+                'blastFoam\'s dynamicP) [Pa]',
+    # OUT-4b (owner Q2): fieldMinMax on the impulse field (blastFoam User
+    # Guide v6.0, sec. 15.2, p. 123); the impulse is the net overpressure
+    # impulse from the run's start (sec. 15.11, p. 126)
+    'impulseMax': 'Peak impulse (the running maximum over time of the net '
+                  'impulse in each cell, integral of (p - 101.325 kPa) dt; '
+                  'written to the files as Peak_Impulse) [Pa s]',
+    # OUT-4b (owner Q3): tagged on Windows, no mesh change
+    'obstacleID': 'Obstacle ID (the row of the Obstacles table, 1..N, each '
+                  'wall face belongs to; written to the obstacle files as '
+                  'Obstacle_ID, needs one more obstacle field ticked)'}
 
 
 def vtk_quantity_tip(field):
-    """A matrix row's tooltip: its long name and the blastFoam field."""
+    """A matrix row's tooltip: its long name and the blastFoam field -
+    or, for a pseudo-field the Windows export makes itself (OUT-4b
+    obstacleID, models.case.VTK_POST_FIELDS), that blastFoam has no such
+    field, so nobody looks for it in the case."""
     name = VTK_QUANTITY_TIPS.get(field, VTK_QUANTITY_LABELS.get(field, field))
+    if field in VTK_POST_FIELDS:
+        return f'{name} - made by the export on Windows, not a blastFoam field'
     return f'{name} - blastFoam field {field}'
 
 

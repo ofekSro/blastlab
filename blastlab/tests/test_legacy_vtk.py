@@ -229,11 +229,17 @@ def test_every_readable_name():
     assert set(VTK_ARRAY_NAMES) == set(VTK_FIELDS)
     assert VTK_ARRAY_NAMES == {
         'p': 'pressure', 'pMax': 'Peak_Overpressure', 'impulse': 'Impulse',
-        'overpressure': 'Overpressure', 'timeOfArrival': 'Arrival_Time',
+        # OUT-4b B1: owner decision Q1 (2026-09-27) renames Arrival_Time -
+        # blastFoam's timeOfArrival is the time of peak (guide sec. 15.12)
+        'overpressure': 'Overpressure', 'timeOfArrival': 'Time_Of_Peak',
         'rho': 'density', 'U': 'velocity', 'T': 'temperature',
         'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
         # OUT-4a A2: a spec addition (batch plan), not a change to pass
-        'dynamicP': 'Dynamic_Pressure'}
+        'dynamicP': 'Dynamic_Pressure',
+        # OUT-4b B2 (owner Q2): a spec addition, not a change to pass
+        'impulseMax': 'Peak_Impulse',
+        # OUT-4b B3 (owner Q3): a spec addition, not a change to pass
+        'obstacleID': 'Obstacle_ID'}
     arrs = [lv.Array(f, np.ones(2), 'float', 'field') for f in VTK_FIELDS]
     out = vx.readable_arrays(arrs)
     assert [a.name for a in out] == [VTK_ARRAY_NAMES[f] for f in VTK_FIELDS]
@@ -284,6 +290,32 @@ def test_peak_overpressure_at_t0():
     assert np.allclose(out[0].values, 0.0)
     out = vx.readable_arrays([lv.Array('pMax', pmax)])
     assert np.allclose(out[0].values, [900.0, 50.0, 0.0])
+
+
+def test_peak_impulse_max_rule():
+    """OUT-4b B2 (owner Q2): impulseMax is written as Peak_Impulse, and
+    the running max includes the current impulse when it is in the file
+    (the pMax addendum); without it the value is written as is - no
+    floor, the net impulse may be negative."""
+    from blastlab.solvers.foam import vtk_export as vx
+    imax0 = np.array([0.0, 0.0, -3.0])
+    imp = np.array([5.0, -2.0, -4.0])
+    out = vx.readable_arrays([lv.Array('impulseMax', imax0),
+                              lv.Array('impulse', imp)])
+    assert [a.name for a in out] == ['Peak_Impulse', 'Impulse']
+    assert np.array_equal(out[0].values, [5.0, 0.0, -3.0])
+    assert np.array_equal(out[1].values, imp)       # impulse untouched
+    # later: impulseMax >= impulse, the value is impulseMax itself
+    imax = np.array([7.0, 1.0, -1.0])
+    out = vx.readable_arrays([lv.Array('impulse', imp),
+                              lv.Array('impulseMax', imax)])
+    assert np.array_equal(out[1].values, imax)
+    # no impulse in the file (or another length): as written
+    out = vx.readable_arrays([lv.Array('impulseMax', imax0)])
+    assert np.array_equal(out[0].values, imax0)
+    out = vx.readable_arrays([lv.Array('impulseMax', imax0),
+                              lv.Array('impulse', np.ones(2))])
+    assert np.array_equal(out[0].values, imax0)
 
 
 # ── refusals ─────────────────────────────────────────────────────────────
@@ -417,7 +449,8 @@ TESTS = [test_round_trip_merge, test_point_data_stays_point_data,
          test_vectors_and_keyword_order, test_binary_is_big_endian,
          test_volume_rewrite, test_every_readable_name,
          test_dynamic_pressure_magnitude,
-         test_peak_overpressure_at_t0, test_geometry_mismatch_refused, test_strict_parser,
+         test_peak_overpressure_at_t0, test_peak_impulse_max_rule,
+         test_geometry_mismatch_refused, test_strict_parser,
          test_atomic_write_keeps_old_file, test_viper_reference_structure]
 
 

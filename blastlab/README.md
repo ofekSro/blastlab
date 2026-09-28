@@ -201,7 +201,23 @@ native mode, and a native run ignores the keys.
   written, like Viper's `Peak_Overpressure` (owner decision 4,
   2026-09-27). `pMax` starts at 0, so the written value is
   max(pMax, p) - ambient when `p` is in the same file, else
-  max(pMax - ambient, 0) - never -101 kPa at t = 0. Case keys: `vtk_surfaces` {on, mode, value, fields,
+  max(pMax - ambient, 0) - never -101 kPa at t = 0. **Time of peak**
+  (`OUT-4b`, owner decision Q1) is blastFoam's `timeOfArrival`, which
+  records the time the maximum pressure is reached (guide sec. 15.12,
+  p. 126) - not the first arrival - so it is written as `Time_Of_Peak`.
+  **Peak impulse** (`impulseMax`, 2D/3D, sections / obstacles / volumes;
+  owner decision Q2) is a second fieldMinMax on the `impulse` field
+  (guide sec. 15.2, p. 123), emitted only when ticked: the per-cell
+  running maximum of the net impulse, written as `Peak_Impulse` in every
+  file (max(impulseMax, impulse) when both are in the file). It is off on
+  a resumed AMR leg, like pMax / impulse. **Obstacle ID** (`obstacleID`,
+  the Obstacles column only; owner decision Q3) is made on Windows, not
+  by blastFoam: each face of an obstacles file is tagged with the
+  1-based row of the Obstacles table whose snapped box it lies on
+  (`vtk_export.obstacle_ids`; a face on two touching boxes takes the
+  lower number, a face on none keeps that sample in WSL), written as the
+  int array `Obstacle_ID`; no mesh or patch change. It needs one more
+  obstacle field ticked. Case keys: `vtk_surfaces` {on, mode, value, fields,
   obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
   family that is off is written only when it still has a field ticked,
   as `on: false` with its ticks, so a reload restores the card; the
@@ -242,8 +258,9 @@ native mode, and a native run ignores the keys.
   renamed. Every file carries the sample time [s] as `FIELD FieldData 1`
   / `TIME 1 1 float`. The array names are the same in every family:
   `pressure`, `Peak_Overpressure`, `Impulse`, `Overpressure`,
-  `Arrival_Time`, `density`, `velocity`, `temperature`,
-  `Products_Fraction`, `Energy`, `Dynamic_Pressure` (a scalar, OUT-4a)
+  `Time_Of_Peak`, `density`, `velocity`, `temperature`,
+  `Products_Fraction`, `Energy`, `Dynamic_Pressure` (a scalar, OUT-4a),
+  `Peak_Impulse` and, on the obstacles, `Obstacle_ID` (OUT-4b)
   (foamToVTK's `cellID` is kept). Each file
   is written atomically and read back with a strict parser
   (`output/legacy_vtk.py`) before the WSL source may be deleted; a

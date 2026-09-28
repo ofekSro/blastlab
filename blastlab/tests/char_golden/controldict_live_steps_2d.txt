@@ -47,6 +47,13 @@ functions
         libs            ("libblastFunctionObjects.so");
         times (0.1175454199);
     }
+    arrival
+    {
+        type            timeOfArrival;
+        libs            ("libblastFunctionObjects.so");
+        writeControl    writeTime;
+        pName           p;
+    }
     impulse
     {
         type            impulse;
@@ -62,13 +69,6 @@ functions
         writeControl    writeTime;
         fields (p);
         minMax          max;
-    }
-    arrival
-    {
-        type            timeOfArrival;
-        libs            ("libblastFunctionObjects.so");
-        writeControl    writeTime;
-        pName           p;
     }
     overpressure
     {

@@ -36,7 +36,8 @@ from ...core.bc import normalize_bc
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
-from ...models.case import vtk_family, vtk_fields_for, vtk_gauge_fields
+from ...models.case import (VTK_POST_FIELDS, vtk_family, vtk_fields_for,
+                            vtk_gauge_fields)
 from . import env
 from .dicts import (AMR_ALLOWABLE_IMBALANCE, AMR_BALANCE_INTERVAL,
                     AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
@@ -852,9 +853,9 @@ def _controldict_function_objects(spec):
     """The blastFoam function objects of the controlDict `functions`
     entry (blastFoam User Guide v6.0, sec. 15, pp. 122-126), in file
     order: conservedQuantities (sec. 15.4, p. 124), writeTimeList
-    (sec. 15.3, p. 124), impulse (sec. 15.11, p. 126), fieldMinMax
-    (sec. 15.2, p. 123), timeOfArrival (sec. 15.12, p. 126), overpressure
-    (sec. 15.10, p. 126). blastProbes (sec. 15.1) is rendered last, by
+    (sec. 15.3, p. 124), timeOfArrival (sec. 15.12, p. 126; before pMax,
+    OUT-4b F6), impulse (sec. 15.11, p. 126), fieldMinMax (sec. 15.2,
+    p. 123), overpressure (sec. 15.10, p. 126). blastProbes (sec. 15.1) is rendered last, by
     `_controldict_probes`."""
     blast_libs = Raw('("libblastFunctionObjects.so")')
     functions = {}
@@ -900,6 +901,23 @@ def _controldict_function_objects(spec):
         'libs': blast_libs,
         'times': [spec.t_start + spec.end_time],
     }
+    # N5-9: the third of the three standard blast outputs - timeOfArrival,
+    # which "records the time when the maximum pressure is reached"
+    # (blastFoam User Guide v6.0, sec. 15.12, p. 126), i.e. the time of
+    # PEAK (written as Time_Of_Peak, owner Q1). OUT-4b F6 (owner,
+    # 2026-09-28): it must run BEFORE the pMax fieldMinMax. It registers
+    # `pMax` itself and sets the time only where p > pMax
+    # (timeOfArrival.C lookupOrCreate / execute()); the fieldMinMax shares
+    # that field, so when it ran first it had already raised pMax to p and
+    # the time never moved off t_start (measured on 13 runs). pMax is the
+    # same either way: both take max(pMax, p).
+    if spec.dim >= 2:
+        functions['arrival'] = {
+            'type': 'timeOfArrival',
+            'libs': blast_libs,
+            'writeControl': 'writeTime',
+            'pName': 'p',
+        }
     if spec.dim >= 2 and spec.fo_accumulators:
         # Per-step peak-pressure / impulse accumulation on the foam side
         # (matches the native solvers' per-step tracking; the backend's
@@ -919,20 +937,31 @@ def _controldict_function_objects(spec):
             'fields': ['p'],
             'minMax': 'max',
         }
-    # N5-9: the third of the three standard blast outputs. peak (pMax)
-    # and impulse were already here; arrival time was not, and it is
-    # what the gauge summary reconstructs in Python from the traces.
-    # `overpressure` is p - pRef as a field, which is what the probes
-    # and the impulse FO are really about - guide 16.5 notes that
+        # OUT-4b (owner Q2): Peak_Impulse, the per-cell running max of the
+        # net impulse - a SEPARATE fieldMinMax on `impulse`, so the pMax
+        # entry above (and every golden) is untouched; emitted only when a
+        # VTK family asks for it. blastFoam User Guide v6.0, sec. 15.2
+        # (p. 123): keys `fields`, `minMax` (default max); the result is
+        # `impulseMax` (fieldMinMax.H computedName). It sits after
+        # `impulse`, so the max includes this step's impulse.
+        # `executeAtStart yes`: fieldMinMax switches it off by default
+        # (fieldMinMax.C constructor; OF-9 functionObject.C:133 reads the
+        # key), and without it `impulseMax` does not exist when the VTK
+        # surfaces sample the start time - the t = 0 file would lack it.
+        if wants_peak_impulse(spec):
+            functions['impulseMax'] = {
+                'type': 'fieldMinMax',
+                'libs': blast_libs,
+                'writeControl': 'writeTime',
+                'executeAtStart': True,
+                'fields': ['impulse'],
+                'minMax': 'max',
+            }
+    # N5-9: `overpressure` is p - pRef as a field, which is what the
+    # probes and the impulse FO are really about - guide 16.5 notes that
     # calculateImpulse detects an overpressure file and then zeroes its
     # own pRef, and burstingWindow_workshop samples it directly.
     if spec.dim >= 2:
-        functions['arrival'] = {
-            'type': 'timeOfArrival',
-            'libs': blast_libs,
-            'writeControl': 'writeTime',
-            'pName': 'p',
-        }
         functions['overpressure'] = {
             'type': 'overpressure',
             'libs': blast_libs,
@@ -973,6 +1002,22 @@ def wants_dynamic_pressure(spec):
     if spec.dim == 3 and 'dynamicP' in (surf.get('fields') or ()):
         return True
     return ('dynamicP' in (surf.get('obstacle_fields') or ())
+            and ('obstacles', 'wall') in spec.patches)
+
+
+def wants_peak_impulse(spec):
+    """OUT-4b: does a VTK family of this 2D/3D spec write `impulseMax` -
+    the volumes, the 3D sections, or the obstacle walls (with the
+    obstacles patch)? Never on a resumed AMR leg (`fo_accumulators` off,
+    P1-5): it is an accumulator like pMax / impulse."""
+    if spec.dim < 2 or not spec.fo_accumulators:
+        return False
+    if 'impulseMax' in ((spec.vtk_volumes or {}).get('fields') or ()):
+        return True
+    surf = spec.vtk_surfaces or {}
+    if spec.dim == 3 and 'impulseMax' in (surf.get('fields') or ()):
+        return True
+    return ('impulseMax' in (surf.get('obstacle_fields') or ())
             and ('obstacles', 'wall') in spec.patches)
 
 
@@ -1135,15 +1180,17 @@ VTK_SECTIONS = 'vtkSections'
 VTK_OBSTACLES = 'vtkObstacles'
 #: the function objects that accumulate per step: their fields exist
 #: only while `fo_accumulators` is on (P1-5, a resumed AMR leg)
-_FO_ACCUMULATED = ('pMax', 'impulse')
+_FO_ACCUMULATED = ('pMax', 'impulse', 'impulseMax')
 
 
 def vtk_surface_fields(spec, names):
     """`names` minus what this spec does not write: a field the
     dimension lacks (validation refuses those) and, on a resumed AMR leg
-    (`fo_accumulators` off), pMax / impulse (D4)."""
+    (`fo_accumulators` off), pMax / impulse / impulseMax (D4). OUT-4b:
+    never a field the Windows export makes itself (obstacleID) -
+    blastFoam has nothing of that name to sample."""
     have = vtk_fields_for(spec.dim)
-    return [f for f in names if f in have
+    return [f for f in names if f in have and f not in VTK_POST_FIELDS
             and (spec.fo_accumulators or f not in _FO_ACCUMULATED)]
 
 

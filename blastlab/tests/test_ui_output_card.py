@@ -222,16 +222,18 @@ def main():
         cols = sorted({c for _f, c in grid.boxes})
         check(f'{d}D: {len(rows)} quantity rows (D4)',
               sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
-              # OUT-4a: + the Dynamic pressure row
-              and len(rows) == (7 if d == 1 else 11), str(rows))
+              # OUT-4a: + the Dynamic pressure row; OUT-4b: + Peak
+              # impulse and Obstacle ID (2D/3D)
+              and len(rows) == (7 if d == 1 else 13), str(rows))
         # OUT-4a: the Gauges column has live boxes too (the extras)
         check(f'{d}D: live columns {want_cols[d]}',
               cols == sorted(want_cols[d]), str(cols))
         extras = F.vtk_gauge_extras_for(d)
         check(f'{d}D: a tick box in every destination cell, plus the '
               f'gauge extras {extras}',
-              len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1)
-              + len(extras)
+              len(grid.boxes) == sum(
+                  len(set(F.VTK_CELLS[r]) & set(want_cols[d]) - {'gauges'})
+                  for r in rows) + len(extras)
               and {f_ for f_, c in grid.boxes if c == 'gauges'}
               == set(extras), str(sorted(grid.boxes)))
         want_gauge = ({'T', 'dynamicP'} if d == 1 else
@@ -374,6 +376,18 @@ def main():
     check('a click on a cell edits that column only',
           m['obstacles'] == ['p', 'pMax', 'T'] and m['sections'] == ['pMax'],
           str(m))
+    # OUT-4b B3 (owner Q3): Obstacle ID is an Obstacles box alone, and
+    # its tick lands in obstacle_fields
+    check('B3: Obstacle ID has an Obstacles box and no other',
+          {c for r, c in grid.boxes if r == 'obstacleID'} == {'obstacles'},
+          str(sorted(c for r, c in grid.boxes if r == 'obstacleID')))
+    grid.boxes[('obstacleID', 'obstacles')].click()
+    pump(5)
+    check('B3: its tick is saved in obstacle_fields, last',
+          case_to_dict(f.get_case())['vtk_surfaces']['obstacle_fields']
+          == ['p', 'pMax', 'T', 'obstacleID'])
+    grid.boxes[('obstacleID', 'obstacles')].click()
+    pump(5)
     f.widgets['vtk_s_on'].click()
     pump(5)
     check('unticking the family keeps its ticks',
@@ -607,6 +621,25 @@ def main():
     check('decision 4: its tooltip says minus ambient, the array name and '
           'pMax', all(s in tip for s in ('minus ambient', '101.325 kPa',
                                           'Peak_Overpressure', 'pMax')), tip)
+    # OUT-4b B1 (owner Q1): timeOfArrival is the time of PEAK pressure
+    # (blastFoam User Guide v6.0, sec. 15.12), so the row says so
+    tp = labels.get('Time of peak')
+    tip = tp.toolTip() if tp is not None else ''
+    check('B1: the timeOfArrival row reads "Time of peak", no "Arrival time"',
+          tp is not None and 'Arrival time' not in labels, str(sorted(labels)))
+    check('B1: its tooltip says maximum, not the first arrival, and names '
+          'Time_Of_Peak and timeOfArrival',
+          all(s in tip for s in ('maximum', 'not the first arrival',
+                                 'Time_Of_Peak', 'timeOfArrival')), tip)
+    # OUT-4b B3 (verify): obstacleID is made by the export, never sampled
+    # - its tooltip must not send anyone looking for a blastFoam field
+    oid = labels.get('Obstacle ID')
+    tip = oid.toolTip() if oid is not None else ''
+    check('B3: the Obstacle ID tooltip names Obstacle_ID and says it is '
+          'not a blastFoam field',
+          oid is not None and 'Obstacle_ID' in tip
+          and 'not a blastFoam field' in tip
+          and 'blastFoam field obstacleID' not in tip, tip)
     # the confusing-wording list: no internal ids, what the rows mean
     caps = [f.label_text('vtk_planes'), f.label_text('vtk_fields')]
     check('no user-facing "OUT-4" in the captions or header tooltips',

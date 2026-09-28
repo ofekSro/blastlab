@@ -397,15 +397,18 @@ def test_gauges():
     """OUT-4a A2: the per-cell availability table and `vtk_gauges`."""
     print('\nC: OUT-4a gauge extras (vtk_gauges, VTK_CELLS)')
     from blastlab.models import fields as mf
-    check('dynamicP appended last to VTK_FIELDS, array Dynamic_Pressure',
-          mcase.VTK_FIELDS[-1] == 'dynamicP'
-          and mcase.VTK_FIELDS[:-1] == (
+    # OUT-4b extends the tuple after dynamicP (appended, never reordered)
+    check('dynamicP appended to VTK_FIELDS after the OUT-2 ten, array '
+          'Dynamic_Pressure',
+          mcase.VTK_FIELDS[10] == 'dynamicP'
+          and mcase.VTK_FIELDS[:10] == (
               'p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
               'rho', 'U', 'T', 'alpha.expl', 'rhoE')
           and mcase.VTK_ARRAY_NAMES['dynamicP'] == 'Dynamic_Pressure')
-    check('VTK_CELLS: every field in every file family',
+    # OUT-4b: obstacleID (the obstacles column alone) is checked in E
+    check('VTK_CELLS: every sampled field in every file family',
           all(set(mcase.VTK_CELLS[f]) >= {'sections', 'obstacles', 'volumes'}
-              for f in mcase.VTK_FIELDS))
+              for f in mcase.VTK_FIELDS if f not in mcase.VTK_POST_FIELDS))
     gauge_cells = {f for f in mcase.VTK_FIELDS
                    if 'gauges' in mcase.VTK_CELLS[f]}
     check('VTK_CELLS: gauge cells are p rho U T overpressure impulse q',
@@ -497,6 +500,117 @@ def test_gauges():
           and not said(nat, 'VTK', ('errors',)), str(nat.errors))
 
 
+def test_peak_impulse():
+    """OUT-4b B2 (owner Q2): `impulseMax` -> Peak_Impulse, sections,
+    obstacles and volumes, 2D/3D only."""
+    print('\nD: OUT-4b peak impulse (impulseMax)')
+    from blastlab.models import fields as mf
+    check('impulseMax appended after dynamicP, array Peak_Impulse, a '
+          '2D/3D field',
+          mcase.VTK_FIELDS[11] == 'impulseMax'
+          and mcase.VTK_ARRAY_NAMES['impulseMax'] == 'Peak_Impulse'
+          and 'impulseMax' in mcase.VTK_FO_FIELDS
+          and 'impulseMax' not in mcase.vtk_fields_for(1)
+          and 'impulseMax' in mcase.vtk_fields_for(2))
+    check('VTK_CELLS: impulseMax in sections, obstacles, volumes, not gauges',
+          mcase.VTK_CELLS['impulseMax'] == ('sections', 'obstacles',
+                                            'volumes'))
+    m = mf.vtk_matrix({'gauges': ['impulseMax'], 'volumes': ['impulseMax'],
+                       'sections': ['impulseMax'],
+                       'obstacles': ['impulseMax']}, 3)
+    check('vtk_matrix: impulseMax kept in the families, dropped at gauges',
+          m['gauges'] == [] and m['sections'] == m['obstacles']
+          == m['volumes'] == ['impulseMax'], str(m))
+    c3 = Case3D(solver='blastfoam', vtk_volumes=v_on(
+        fields=['p', 'impulseMax']))
+    raw, back = roundtrip(c3)
+    check('3D round trip keeps impulseMax',
+          raw['vtk_volumes']['fields'] == ['p', 'impulseMax']
+          and back.vtk_volumes['fields'] == ['p', 'impulseMax'],
+          str(raw.get('vtk_volumes')))
+    ok3 = rep3(obstacles=[(1.2, 1.4, 0.2, 1.3, 0.0, 0.6)],
+               vtk_surfaces=s_on(fields=['impulseMax'],
+                                 obstacle_fields=['p', 'impulseMax']),
+               vtk_volumes=v_on(fields=['p', 'impulseMax']))
+    check('3D impulseMax in every family: no error', not ok3.errors,
+          str(ok3.errors))
+    ok2 = rep2(vtk_surfaces=s_on(fields=[], obstacle_fields=['impulseMax']),
+               vtk_volumes=v_on(fields=['impulseMax']))
+    check('2D impulseMax on obstacles and volumes: no error',
+          not ok2.errors, str(ok2.errors))
+    refusals = (
+        ('impulseMax in 1D volumes',
+         rep1(vtk_volumes=v_on(fields=['impulseMax'])),
+         "VTK volumes: 'impulseMax' is not written in 1D"),
+        ('impulseMax at the gauges',
+         rep3(vtk_gauges={'fields': ['impulseMax']}),
+         "VTK gauges: 'impulseMax' has no gauge cell"),
+    )
+    for what, rep, words in refusals:
+        check(f'refused: {what}', said(rep, words, ('errors',)),
+              str(rep.errors))
+
+
+def test_obstacle_id():
+    """OUT-4b B3 (owner Q3): `obstacleID` -> Obstacle_ID, the obstacles
+    column alone, made on Windows (never sampled by blastFoam)."""
+    print('\nE: OUT-4b obstacle IDs (obstacleID)')
+    from blastlab.models import fields as mf
+    check('obstacleID appended last, array Obstacle_ID, a 2D/3D '
+          'export-made field',
+          mcase.VTK_FIELDS[12:] == ('obstacleID',)
+          and mcase.VTK_ARRAY_NAMES['obstacleID'] == 'Obstacle_ID'
+          and mcase.VTK_POST_FIELDS == ('obstacleID',)
+          and 'obstacleID' not in mcase.vtk_fields_for(1)
+          and 'obstacleID' in mcase.vtk_fields_for(2))
+    check('VTK_CELLS: obstacleID in the obstacles column alone',
+          mcase.VTK_CELLS['obstacleID'] == ('obstacles',))
+    check('VTK_CELLS: every other field keeps every file family',
+          all(set(mcase.VTK_CELLS[f]) >= {'sections', 'obstacles', 'volumes'}
+              for f in mcase.VTK_FIELDS if f != 'obstacleID'))
+    m = mf.vtk_matrix({c: ['p', 'obstacleID'] for c in
+                       ('gauges', 'sections', 'obstacles', 'volumes')}, 3)
+    check('vtk_matrix keeps obstacleID in obstacles only',
+          m == {'gauges': [], 'sections': ['p'],
+                'obstacles': ['p', 'obstacleID'], 'volumes': ['p']}, str(m))
+    obst = [(1.2, 1.4, 0.2, 1.3, 0.0, 0.6)]
+    ok3 = rep3(obstacles=obst, vtk_surfaces=s_on(
+        obstacle_fields=['p', 'obstacleID']))
+    check('3D p + obstacleID on the obstacles: no error', not ok3.errors,
+          str(ok3.errors))
+    ok2 = rep2(vtk_surfaces=s_on(fields=[], planes=[],
+                                 obstacle_fields=['p', 'obstacleID']))
+    check('2D p + obstacleID on the obstacles: no error', not ok2.errors,
+          str(ok2.errors))
+    c3 = Case3D(solver='blastfoam', obstacles=obst, vtk_surfaces=s_on(
+        obstacle_fields=['p', 'obstacleID']))
+    raw, back = roundtrip(c3)
+    check('3D round trip keeps obstacleID',
+          back.vtk_surfaces['obstacle_fields'] == ['p', 'obstacleID'],
+          str(raw.get('vtk_surfaces')))
+    refusals = (
+        ('obstacleID on the sections',
+         rep3(vtk_surfaces=s_on(fields=['p', 'obstacleID'])),
+         "VTK sections: 'obstacleID' has no sections cell"),
+        ('obstacleID in the volumes',
+         rep3(vtk_volumes=v_on(fields=['p', 'obstacleID'])),
+         "VTK volumes: 'obstacleID' has no volumes cell"),
+        ('obstacleID in 1D volumes',
+         rep1(vtk_volumes=v_on(fields=['obstacleID'])),
+         "VTK volumes: 'obstacleID' has no volumes cell"),
+        ('obstacleID at the gauges',
+         rep3(vtk_gauges={'fields': ['obstacleID']}),
+         "VTK gauges: 'obstacleID' has no gauge cell"),
+        ('obstacleID alone on the obstacles',
+         rep3(obstacles=obst, vtk_surfaces=s_on(
+             obstacle_fields=['obstacleID'])),
+         'Obstacle ID needs at least one more obstacle field'),
+    )
+    for what, rep, words in refusals:
+        check(f'refused: {what}', said(rep, words, ('errors',)),
+              str(rep.errors))
+
+
 def main():
     from blastlab.core import hardware
     from blastlab.solvers.foam import env
@@ -515,6 +629,8 @@ def main():
         hardware.prime_host(ram_gb=256, source=hardware.MEASURED)
         test_validation()
         test_gauges()
+        test_peak_impulse()
+        test_obstacle_id()
     finally:
         for a, v in zip(hw_attrs, old):
             setattr(env, a, v)
