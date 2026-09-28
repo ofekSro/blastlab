@@ -1,0 +1,21 @@
+{
+ "scenario": "V06",
+ "tab": "setup",
+ "mode": "dark",
+ "state": "1d_gauges_on",
+ "bbox": [
+  7,
+  0,
+  1289,
+  872
+ ],
+ "capture": "printwindow",
+ "luminance": 38.895098326868855,
+ "geometry": "1280x840+0+0",
+ "dialogs_since_last": [],
+ "run_log_tail": [
+  ""
+ ],
+ "action": "",
+ "t": 1790593734.8653176
+}

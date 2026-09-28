@@ -32,7 +32,7 @@ fixed and approved — the disk.
 | `OUT-2` | ✅ **VTK output options** — done and accepted by the owner in ParaView 2026-09-27 (DONE.md §0d, Viper-style layout, P14 closed). Plan §3 | 2 |
 | `OUT-5` | ✅ **Reclaim the 481 GB WSL disk** — done 2026-09-27 (DONE.md §0f): vhdx 481 → 8.6 GB. Delete the backup tar after 2026-10-27 (D5). Plan §6 | 3 |
 | `OUT-3` | ✅ **Only the newest fields kept in WSL** — done 2026-09-27 (DONE.md §0h); parked Q1-Q7 in the batch plan §6. Plan §4 | 4 |
-| `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5 | 5 |
+| `OUT-4` | **The rest of the Viper matrix**: gauge quantities, dynamic pressure, peak impulse, per-obstacle ids, decimation. Mandatory. Plan §5; batch plan `docs/batches/2026-09-28-out-4-viper-matrix.md`. **4a (gauge quantities, dynamic pressure) done 2026-09-28 (DONE.md §0i)**; open: 4b (Peak_Impulse, Obstacle_ID, Time_Of_Peak relabel), 4c (decimation) | 5 |
 
 ---
 
