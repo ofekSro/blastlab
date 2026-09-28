@@ -33,7 +33,8 @@ import time as _time
 import numpy as np
 
 from ...core.constants import P_AIR
-from ...models.case import VTK_ARRAY_NAMES, VTK_FIELDS, vtk_fields_for
+from ...models.case import (VTK_ARRAY_NAMES, VTK_DECIMATE_WARNING,
+                            VTK_FIELDS, vtk_fields_for)
 from ...output import legacy_vtk, vtk_series
 from .runloop import _CASE_POSIX, _is_time, _root_whole, rm_scripts
 from .writer import VTK_OBSTACLES, VTK_SECTIONS
@@ -415,6 +416,124 @@ def polygon_faces(vd):
     return out
 
 
+#: the VTK cell type of a polyhedron (foamToVTK -poly, VTK_FLAGS): its
+#: CELLS entry is a face stream [n_faces, n_pts, ids..., n_pts, ids...]
+_POLYHEDRON = 42
+
+
+def decimation_of(fam):
+    """OUT-4c (owner Q4): the decimation k of a normalised volumes family,
+    1 when it is absent or not a whole number >= 1 (validation refuses
+    that)."""
+    k = (fam or {}).get('decimate', 1)
+    if isinstance(k, bool) or not isinstance(k, (int, float)) \
+            or k != int(k) or k < 1:
+        return 1
+    return int(k)
+
+
+def decimate(vd, k, origin, dx_base):
+    """OUT-4c (owner Q4, 2026-09-27): subsample the volume `vd` (an
+    UNSTRUCTURED_GRID, foamToVTK's) per axis - keep the cells whose
+    centroid lies in every k-th BASE-cell layer on each axis, i.e.
+    floor((c - origin) / dx_base) % k == 0 for x, y and z, then re-index
+    the points. Values are copied, never averaged, so a peak in a dropped
+    cell is not shown: the files are for viewing only.
+
+    AMR-safe: a refined cell lies inside its base cell, so it goes with
+    it, and no cellSet per time is needed. `origin` (3,) [m] is the base
+    grid's first face, `dx_base` [m] its cell. The centroid is the mean of
+    the cell's distinct points (inside a convex cell). k = 1 returns `vd`
+    itself; `vd` is never modified. ValueError on a bad k, grid or
+    dataset. Pure: no WSL (plan OUT-4c C2)."""
+    if isinstance(k, bool) or not isinstance(k, (int, np.integer)) or k < 1:
+        raise ValueError(f'decimation must be a whole number >= 1, not {k!r}')
+    if k == 1:
+        return vd
+    if vd.dataset != 'UNSTRUCTURED_GRID':
+        raise ValueError(f'only an UNSTRUCTURED_GRID volume is decimated, '
+                         f'not {vd.dataset}')
+    origin = np.asarray(origin, dtype=np.float64).reshape(-1)
+    dx_base = float(dx_base)
+    if origin.shape != (3,) or not np.all(np.isfinite(origin)) \
+            or not (np.isfinite(dx_base) and dx_base > 0):
+        raise ValueError(f'decimation needs a 3D origin and a base cell > 0 '
+                         f'(origin {origin.tolist()}, dx_base {dx_base!r})')
+    pts_b, cells, types = (vd.block(kw) for kw in
+                           ('POINTS', 'CELLS', 'CELL_TYPES'))
+    if pts_b is None or cells is None or types is None:
+        raise ValueError('the volume has no POINTS / CELLS / CELL_TYPES')
+    pts = np.asarray(pts_b.values, dtype=np.float64).reshape(-1, 3)
+    conn = np.asarray(cells.values, dtype=np.int64)
+    ctype = np.asarray(types.values)
+    n = int(cells.args[0])
+    c = conn.tolist()
+    starts = np.empty(n, dtype=np.int64)
+    pos = 0
+    for i in range(n):
+        starts[i] = pos
+        pos += 1 + c[pos]
+    sizes = conn[starts]
+    # which CELLS entries are point ids (not a cell size or a face size)
+    is_id = np.ones(conn.size, dtype=bool)
+    is_id[starts] = False
+    cen = np.empty((n, 3))
+    poly = ctype == _POLYHEDRON
+    for i in np.flatnonzero(poly):
+        s = int(starts[i]) + 1
+        n_faces, j, ids = c[s], s + 1, []
+        is_id[s] = False
+        for _ in range(n_faces):
+            is_id[j] = False
+            ids += c[j + 1:j + 1 + c[j]]
+            j += 1 + c[j]
+        cen[i] = pts[np.unique(ids)].mean(axis=0)
+    simple = ~poly
+    if simple.any():
+        s_st, s_sz = starts[simple], sizes[simple]
+        if s_sz.min() < 1:
+            raise ValueError('a cell with no point')
+        off = np.concatenate([[0], np.cumsum(s_sz)[:-1]])
+        idx = np.repeat(s_st + 1 - off, s_sz) + np.arange(int(s_sz.sum()))
+        cen[simple] = np.add.reduceat(pts[conn[idx]], off,
+                                      axis=0) / s_sz[:, None]
+    layer = np.floor((cen - origin) / dx_base).astype(np.int64)
+    keep = np.all(layer % k == 0, axis=1)
+    if not keep.any():
+        # never an empty file in silence: a base grid that does not
+        # match the mesh, or k past the base-cell count on an axis while
+        # its first layer is carved out (a chamber wall)
+        raise ValueError(f'decimation by {k} keeps no cell of {n} (base '
+                         f'cell {dx_base:g} m from {origin.tolist()}) - '
+                         f'lower k, or check the base grid')
+    entry_keep = np.repeat(keep, sizes + 1)
+    used = np.zeros(len(pts), dtype=bool)
+    used[conn[is_id & entry_keep]] = True
+    new_index = np.cumsum(used) - 1
+    new_conn = conn[entry_keep]
+    ids_new = is_id[entry_keep]
+    new_conn[ids_new] = new_index[new_conn[ids_new]]
+    n_keep, n_pts = int(keep.sum()), int(used.sum())
+    geometry = []
+    for b in vd.geometry:
+        if b.keyword == 'POINTS':
+            b = legacy_vtk.Block('POINTS', (n_pts, b.args[1]),
+                                 np.asarray(b.values)[used])
+        elif b.keyword == 'CELLS':
+            b = legacy_vtk.Block('CELLS', (n_keep, new_conn.size), new_conn)
+        elif b.keyword == 'CELL_TYPES':
+            b = legacy_vtk.Block('CELL_TYPES', (n_keep,), ctype[keep])
+        geometry.append(b)
+
+    def cut(arrays, mask):
+        return [legacy_vtk.Array(a.name, np.asarray(a.values)[mask],
+                                 a.vtk_type, a.kind) for a in arrays]
+    return legacy_vtk.VtkData(vd.dataset, geometry, list(vd.field_data),
+                              cut(vd.cell_data, keep),
+                              cut(vd.point_data, used), title=vd.title,
+                              version=vd.version, binary=vd.binary)
+
+
 def export_file(vd, t, p_ambient=P_AIR, title=None):
     """`vd` as it is written: readable arrays (cell and point data kept
     apart, as the source holds them) and the sample time `t` [s] inside
@@ -780,6 +899,10 @@ class VtkExport:
         have = vtk_fields_for(dim)
         self.vol_fields = [f for f in (self.vol or {}).get('fields', ())
                            if f in have]
+        #: OUT-4c (owner Q4): the volume files keep one base-cell layer
+        #: in k per axis (`decimate`), 3D only (validation refuses it
+        #: elsewhere; 1 here whatever the case says)
+        self.decimate = decimation_of(self.vol) if dim == 3 else 1
         surf = self.surf or {}
         self.surf_fields = {
             VTK_SECTIONS: (list(surf.get('fields', ())) if dim == 3
@@ -847,6 +970,10 @@ class VtkExport:
                       f'{self.vtk_dir}'
                       + (f' - WSL deletes off ({NO_DELETE_ENV})'
                          if self.no_delete else ''))
+            if self.volumes_on and self.decimate > 1:
+                hooks.log(f'  [blastfoam] VTK volumes decimated: one base-cell '
+                          f'layer in {self.decimate} per axis is written '
+                          f'({VTK_DECIMATE_WARNING})')
         if self.purge_fields:
             if self.keep_time_dirs:
                 # owner decision P9 (OUT-2), carried over (OUT-3 E3, Q1)
@@ -968,14 +1095,18 @@ class VtkExport:
         # `p_ambient` (additive): the array name of each chosen field in
         # the files, and the ambient Peak_Overpressure is taken over
         # (owner decisions 4-5)
-        return dict(fields=fields, cadence=cadence, families=fams,
-                    not_converted=nc,
-                    deleted_in_wsl=sorted(self.deleted, key=_time_key),
-                    replay_incomplete=self.replay_incomplete,
-                    scratch=getattr(self.spec, 'case_posix', None),
-                    arrays={f: VTK_ARRAY_NAMES.get(f, f)
-                            for f in sorted(chosen)},
-                    p_ambient=self.p_ambient)
+        out = dict(fields=fields, cadence=cadence, families=fams,
+                   not_converted=nc,
+                   deleted_in_wsl=sorted(self.deleted, key=_time_key),
+                   replay_incomplete=self.replay_incomplete,
+                   scratch=getattr(self.spec, 'case_posix', None),
+                   arrays={f: VTK_ARRAY_NAMES.get(f, f)
+                           for f in sorted(chosen)},
+                   p_ambient=self.p_ambient)
+        if self.vol:
+            # OUT-4c (additive): the volumes' decimation k (1 = every cell)
+            out['decimate'] = {VOLUMES: self.decimate}
+        return out
 
     def _add_file(self, rel, kind, surface, t):
         self.files[rel] = (kind, t)
@@ -1215,7 +1346,8 @@ class VtkExport:
     def _transfer_volume(self, src, rel, t):
         """vtk\\<rel> from foamToVTK's file `src`: staged, arrays renamed,
         TIME added (foamToVTK writes none - read on this build), written
-        and verified. None, or why not."""
+        and verified; OUT-4c: decimated first when the family asks
+        (`decimate`, owner Q4). None, or why not."""
         dst = self._dest(rel)
         stage, why = self._stage(src, os.path.dirname(dst))
         if why:
@@ -1227,6 +1359,15 @@ class VtkExport:
                 # field order (pressure first, as the surfaces), cellID last
                 vd.cell_data.sort(key=lambda a: _field_order((a.name,)))
                 vd.point_data.sort(key=lambda a: _field_order((a.name,)))
+            except ValueError as exc:
+                return f'not a readable VTK file: {exc}'
+            if self.decimate > 1:
+                try:
+                    vd = decimate(vd, self.decimate, *self._base_grid())
+                except (ValueError, TypeError, KeyError, IndexError,
+                        AttributeError) as exc:
+                    return f'decimation failed: {exc}'
+            try:
                 export_file(vd, t, self.p_ambient,
                             self._title('volumes', t))
             except ValueError as exc:
@@ -1234,6 +1375,16 @@ class VtkExport:
             return self._write_verified(vd, rel)
         finally:
             _remove(stage)
+
+    def _base_grid(self):
+        """OUT-4c: (origin, dx_base) of the blockMesh base grid the
+        decimation layers count on - its first face per axis [m] and its
+        cell [m] (CaseSpec.grid_base / dx_base; a uniform case's grid)."""
+        spec = self.spec
+        g = getattr(spec, 'grid_base', None) or spec.grid
+        origin = tuple(float(g[f'{a}_face'][0]) for a in 'xyz')
+        dx = float(getattr(spec, 'dx_base', 0.0) or 0.0) or float(spec.dx)
+        return origin, dx
 
     def _gave_up(self, family, t, final):
         """After a failed attempt: stop trying for now? The final sweep

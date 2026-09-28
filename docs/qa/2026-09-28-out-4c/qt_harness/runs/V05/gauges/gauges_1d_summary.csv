@@ -1,0 +1,2 @@
+gauge,peak_overpressure_kPa,arrival_ms,time_of_peak_ms,positive_phase_duration_ms,positive_phase_impulse_Pa_s,net_impulse_Pa_s,positive_phase_complete
+G1  r = 1.000 m,195.6,0.824,0.894,0.686,48.41,25.50,yes

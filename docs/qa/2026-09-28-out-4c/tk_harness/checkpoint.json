@@ -1,0 +1,226 @@
+{
+ "done": {
+  "V01": {
+   "status": "done",
+   "t": 1790623862.3238935,
+   "shots": [
+    "001_V01_setup_1d_off_dark.png",
+    "002_V01_setup_1d_time_dark.png",
+    "003_V01_setup_1d_step_dark.png"
+   ],
+   "err": null,
+   "wall_s": 8.4
+  },
+  "V02": {
+   "status": "done",
+   "t": 1790623871.3431888,
+   "shots": [
+    "004_V02_setup_2d_no_obstacles_dark.png",
+    "005_V02_setup_2d_with_obstacle_dark.png"
+   ],
+   "err": null,
+   "wall_s": 7.7
+  },
+  "V03": {
+   "status": "done",
+   "t": 1790623885.5996869,
+   "shots": [
+    "006_V03_setup_3d_off_dark.png",
+    "007_V03_setup_3d_plane_q1_refused_dark.png",
+    "008_V03_setup_3d_step_plane_dark.png",
+    "009_V03_setup_3d_matrix_dark.png"
+   ],
+   "err": null,
+   "wall_s": 12.8
+  },
+  "V04": {
+   "status": "done",
+   "t": 1790623896.510969,
+   "shots": [
+    "010_V04_setup_native_no_card_dark.png",
+    "011_V04_setup_foam_again_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.5
+  },
+  "V05": {
+   "status": "done",
+   "t": 1790623907.7552269,
+   "shots": [
+    "012_V05_setup_3d_keep_off_dark.png",
+    "013_V05_setup_3d_keep_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.9
+  },
+  "V06": {
+   "status": "done",
+   "t": 1790623918.3223155,
+   "shots": [
+    "014_V06_setup_1d_gauges_off_dark.png",
+    "015_V06_setup_1d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.2
+  },
+  "V07": {
+   "status": "done",
+   "t": 1790623929.1905117,
+   "shots": [
+    "016_V07_setup_2d_gauges_off_dark.png",
+    "017_V07_setup_2d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.5
+  },
+  "V08": {
+   "status": "done",
+   "t": 1790623940.2943466,
+   "shots": [
+    "018_V08_setup_3d_gauges_off_dark.png",
+    "019_V08_setup_3d_gauges_on_dark.png"
+   ],
+   "err": null,
+   "wall_s": 9.7
+  },
+  "V09": {
+   "status": "done",
+   "t": 1790623953.5249372,
+   "shots": [
+    "020_V09_setup_3d_decimate_2_dark.png"
+   ],
+   "err": null,
+   "wall_s": 11.9
+  }
+ },
+ "shot_counter": 20,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1790623844.6557627,
+   "argv": [
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-28-out-4c\\tk_harness",
+    "--only",
+    "V",
+    "--budget",
+    "900"
+   ],
+   "end": 1790623959.9997993,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "V01": {
+   "wall_s": 8.4,
+   "max_gap_ms": 1128,
+   "p99_gap_ms": 570,
+   "big_gaps": [
+    [
+     1128,
+     ""
+    ],
+    [
+     967,
+     "set_case"
+    ],
+    [
+     570,
+     "set_case"
+    ]
+   ]
+  },
+  "V02": {
+   "wall_s": 7.7,
+   "max_gap_ms": 753,
+   "p99_gap_ms": 137,
+   "big_gaps": [
+    [
+     753,
+     "set_case"
+    ]
+   ]
+  },
+  "V03": {
+   "wall_s": 12.8,
+   "max_gap_ms": 1467,
+   "p99_gap_ms": 241,
+   "big_gaps": [
+    [
+     1467,
+     "set_case"
+    ],
+    [
+     431,
+     ""
+    ]
+   ]
+  },
+  "V04": {
+   "wall_s": 9.5,
+   "max_gap_ms": 298,
+   "p99_gap_ms": 209,
+   "big_gaps": [
+    [
+     298,
+     "set_case"
+    ]
+   ]
+  },
+  "V05": {
+   "wall_s": 9.9,
+   "max_gap_ms": 257,
+   "p99_gap_ms": 201,
+   "big_gaps": [
+    [
+     257,
+     "set_case"
+    ]
+   ]
+  },
+  "V06": {
+   "wall_s": 9.2,
+   "max_gap_ms": 252,
+   "p99_gap_ms": 67,
+   "big_gaps": [
+    [
+     252,
+     "set_case"
+    ]
+   ]
+  },
+  "V07": {
+   "wall_s": 9.5,
+   "max_gap_ms": 298,
+   "p99_gap_ms": 131,
+   "big_gaps": [
+    [
+     298,
+     "set_case"
+    ]
+   ]
+  },
+  "V08": {
+   "wall_s": 9.7,
+   "max_gap_ms": 319,
+   "p99_gap_ms": 225,
+   "big_gaps": [
+    [
+     319,
+     "set_case"
+    ]
+   ]
+  },
+  "V09": {
+   "wall_s": 11.9,
+   "max_gap_ms": 276,
+   "p99_gap_ms": 183,
+   "big_gaps": [
+    [
+     276,
+     "set_case"
+    ]
+   ]
+  }
+ }
+}

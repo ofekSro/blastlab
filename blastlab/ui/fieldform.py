@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (QBoxLayout, QButtonGroup, QCheckBox,
                                QComboBox, QFormLayout, QGraphicsOpacityEffect,
                                QGridLayout, QHBoxLayout,
                                QHeaderView, QLabel, QLineEdit, QRadioButton,
-                               QScrollArea, QSizePolicy, QStackedWidget,
+                               QScrollArea, QSizePolicy, QSpinBox,
+                               QStackedWidget,
                                QTreeWidget, QTreeWidgetItem, QVBoxLayout,
                                QWidget)
 
@@ -441,6 +442,7 @@ class FieldForm(QWidget):
         self.labels = {}             # name -> QLabel (None for bool rows)
         self.cards = {}              # title -> Card
         self.notes = {}              # card title -> its note QLabel
+        self.row_notes = {}          # name -> the QLabel under its row
         self._specs = {}             # name -> F
         self._card_of = {}           # name -> card title
         self._notifying = False
@@ -735,6 +737,13 @@ class FieldForm(QWidget):
                 self.labels[f.name] = lbl
             self.rows[f.name] = (grid, r)
             self._card_of[f.name] = spec.title
+            if f.note and pairs == 1:
+                # OUT-4c: a muted line under the row (the decimation
+                # warning), shown and hidden with it
+                nl = label(f.note, 'small', wrap=True)
+                grid.addWidget(nl, line, 0, 1, 2)
+                self.row_notes[f.name] = nl
+                line += 1
         if not noted:
             add_note(line)
 
@@ -774,6 +783,17 @@ class FieldForm(QWidget):
         elif f.kind == 'matrix':
             var = MatrixVar(f.name, self.dim, f.default)
             w = MatrixGrid(var, self.dim, f.values, f.cols)
+        elif f.kind == 'spin':
+            # OUT-4c: a whole number in [values[0], values[1]]; the Var
+            # keeps its str surface (a loaded value outside the range
+            # stays in the Var for validation to name, the box clamps)
+            var = Var(f.name, _fmt(f.default))
+            w = QSpinBox()
+            w.setRange(int(f.values[0]), int(f.values[1]))
+            w.setValue(int(f.default))
+            w.valueChanged.connect(lambda n, v=var: v._adopt(str(n)))
+            var._push = lambda val, w=w: _silently(w.setValue, w,
+                                                   _spin_value(val, w))
         else:                                   # text | float | int
             var = Var(f.name, _fmt(f.default))
             w = QLineEdit(var.get())
@@ -860,7 +880,8 @@ class FieldForm(QWidget):
             return
         grid, row = entry
         on = bool(on)
-        for w in (self.labels.get(name), self.widgets.get(name)):
+        for w in (self.labels.get(name), self.widgets.get(name),
+                  self.row_notes.get(name)):
             if w is not None:
                 w.setVisible(on)
         # a hidden widget contributes no height, but the grid would keep
@@ -920,6 +941,19 @@ def _silently(setter, widget, value):
         setter(value)
     finally:
         widget.blockSignals(False)
+
+
+def _spin_value(text, box):
+    """The spin box's value for Var text `text`: the whole number it
+    holds, clamped to the box's range; the box's minimum when it is not
+    a whole number."""
+    try:
+        n = float(text)
+    except (TypeError, ValueError):
+        return box.minimum()
+    if n != n or not n.is_integer():
+        return box.minimum()
+    return max(box.minimum(), min(box.maximum(), int(n)))
 
 
 def _fmt(value):

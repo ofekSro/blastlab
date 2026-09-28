@@ -611,6 +611,85 @@ def test_obstacle_id():
               str(rep.errors))
 
 
+def test_decimate():
+    """OUT-4c C1 (owner Q4): `vtk_volumes.decimate`, the per-axis
+    subsampling k of the volume files - omitted at k = 1, 3D only."""
+    print('\nF: OUT-4c volume decimation (vtk_volumes.decimate)')
+    check('decimate is optional, after the volume keys, default 1',
+          mcase.VTK_VOLUME_OPTIONAL == ('decimate',)
+          and mcase.VTK_VOLUME_KEYS == ('on', 'mode', 'value', 'fields')
+          and mcase.VTK_DECIMATE_DEFAULT == 1)
+    for k1 in (1, 1.0):
+        c = Case3D(solver='blastfoam', vtk_volumes=v_on(decimate=k1))
+        check(f'k = {k1!r} saves byte-identical to no key at all',
+              saved_bytes(c) == saved_bytes(Case3D(solver='blastfoam',
+                                                   vtk_volumes=v_on())))
+        check(f'   and normalize_vtk drops it (k = {k1!r})',
+              'decimate' not in mcase.normalize_vtk(v_on(decimate=k1),
+                                                    'vtk_volumes'))
+    raw, back = roundtrip(Case3D(solver='blastfoam',
+                                 vtk_volumes=v_on(decimate=2)))
+    check('k = 2: written last, after the volume keys, and read back',
+          list(raw['vtk_volumes']) == list(mcase.VTK_VOLUME_KEYS)
+          + ['decimate'] and raw['vtk_volumes']['decimate'] == 2
+          and back.vtk_volumes == v_on(decimate=2)
+          and mcase.vtk_family(back, 'vtk_volumes')['decimate'] == 2,
+          str(raw.get('vtk_volumes')))
+    got = mcase.normalize_vtk(v_on(decimate=3.0), 'vtk_volumes')
+    check('a whole float k becomes an int', got['decimate'] == 3
+          and type(got['decimate']) is int, str(got))
+    check('a surfaces family refuses decimate (Unknown vtk_surfaces keys)',
+          _refused(lambda: mcase.normalize_vtk(s_on(decimate=2),
+                                               'vtk_surfaces'),
+                   'Unknown vtk_surfaces keys'))
+    ok3 = rep3(vtk_volumes=v_on(decimate=2))
+    check('3D k = 2 validates clean', not ok3.errors, str(ok3.errors))
+    top = rep3(vtk_volumes=v_on(decimate=mcase.VTK_DECIMATE_MAX))
+    check(f'3D k = {mcase.VTK_DECIMATE_MAX} (the card\'s top) validates '
+          f'clean', not top.errors, str(top.errors))
+    n = said(ok3, 'VTK volumes: decimated', ('notes',))
+    check('   with the owner\'s warning in its note',
+          len(n) == 1 and mcase.VTK_DECIMATE_WARNING in n[0]
+          and 'one base-cell layer in 2' in n[0]
+          and 'about 1/8 of the cells' in n[0], str(n))
+    check('   the base cases say nothing about decimation',
+          not said(rep3(vtk_volumes=v_on()), 'decimat'))
+    refusals = (
+        ('k = 0', rep3(vtk_volumes=v_on(decimate=0)),
+         'the decimation must be a whole number >= 1'),
+        ('k = -1', rep3(vtk_volumes=v_on(decimate=-1)),
+         'the decimation must be a whole number >= 1'),
+        ('k = 2.5', rep3(vtk_volumes=v_on(decimate=2.5)),
+         'the decimation must be a whole number >= 1'),
+        ('k = "two"', rep3(vtk_volumes=v_on(decimate='two')),
+         'the decimation must be a whole number >= 1'),
+        ('k = True', rep3(vtk_volumes=v_on(decimate=True)),
+         'the decimation must be a whole number >= 1'),
+        ('k = NaN', rep3(vtk_volumes=v_on(decimate=float('nan'))),
+         'the decimation must be a whole number >= 1'),
+        # verify(OUT-4c): above the card's spin range the Qt box shows the
+        # value clamped, so a loaded k past it must be refused, not run
+        (f'k = {mcase.VTK_DECIMATE_MAX + 1} (above the card\'s range)',
+         rep3(vtk_volumes=v_on(decimate=mcase.VTK_DECIMATE_MAX + 1)),
+         f'the decimation must be at most {mcase.VTK_DECIMATE_MAX}'),
+        ('k = 2 in 2D', rep2(vtk_volumes=v_on(decimate=2)),
+         'decimation is 3D only'),
+        ('k = 2 in 1D', rep1(vtk_volumes=v_on(decimate=2)),
+         'decimation is 3D only'),
+    )
+    for what, rep, words in refusals:
+        check(f'refused: {what}', said(rep, words, ('errors',)),
+              str(rep.errors))
+
+
+def _refused(fn, words):
+    try:
+        fn()
+    except ValueError as exc:
+        return words in str(exc)
+    return False
+
+
 def main():
     from blastlab.core import hardware
     from blastlab.solvers.foam import env
@@ -631,6 +710,7 @@ def main():
         test_gauges()
         test_peak_impulse()
         test_obstacle_id()
+        test_decimate()
     finally:
         for a, v in zip(hw_attrs, old):
             setattr(env, a, v)

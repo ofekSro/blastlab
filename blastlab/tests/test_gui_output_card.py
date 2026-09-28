@@ -70,6 +70,71 @@ def entry_on(f, name):
     return str(f._vtk_entries[name].cget('state')) == 'normal'
 
 
+def decimation():
+    """OUT-4c C1 (owner Q4): the Volumes decimation spin box, 3D only,
+    with the owner's warning line under it."""
+    print('\nK13: the Volumes decimation box (OUT-4c)')
+    from tkinter import ttk
+    for d in (1, 2):
+        f = form(d)
+        check(f'{d}D: no decimation box (3D only)',
+              'vtk_v_decimate' not in f.v
+              and not hasattr(f, '_vtk_decimate'))
+        f.destroy()
+    f = form(3)
+    spin = f._vtk_decimate
+    note = f._vtk_decimate_note
+    check('3D: a ttk spin box 1..16 holding 1, on the card, with its tip',
+          isinstance(spin, ttk.Spinbox) and f.v['vtk_v_decimate'].get() == '1'
+          and float(spin.cget('from')) == 1
+          and float(spin.cget('to')) == F.VTK_DECIMATE_MAX
+          and spin.winfo_manager() == 'grid'
+          and getattr(getattr(spin, '_blastlab_tip', None), 'text', '')
+          == F.VTK_DECIMATE_TIP)
+    check('   the owner\'s warning line under it',
+          str(note.cget('text')) == F.VTK_DECIMATE_NOTE
+          and 'viewing only; peaks may be missed' in F.VTK_DECIMATE_NOTE
+          and int(note.grid_info()['row'])
+          == int(spin.grid_info()['row']) + 1)
+    check('   typing takes digits only (validatecommand)',
+          str(spin.cget('validate')) == 'key'
+          and bool(str(spin.cget('validatecommand')))
+          and f._decimate_ok('12') and f._decimate_ok('')
+          and not f._decimate_ok('1.5') and not f._decimate_ok('-1'))
+    f.v['vtk_v_on'].set(True)
+    check('k = 1: no decimate key in the case or its JSON',
+          'decimate' not in f.get_case().vtk_volumes
+          and 'decimate' not in case_to_dict(f.get_case())['vtk_volumes'])
+    f.v['vtk_v_decimate'].set('2')
+    case = f.get_case()
+    text = json.dumps(case_to_dict(case), sort_keys=True)
+    check('k = 2: the case carries decimate 2, and validates clean',
+          case.vtk_volumes.get('decimate') == 2
+          and json.loads(text)['vtk_volumes']['decimate'] == 2
+          and not validate_case(case).errors, str(case.vtk_volumes))
+    g = form(3)
+    g.set_case(case_from_dict(json.loads(text)))
+    check('save / reload restores k = 2',
+          g.v['vtk_v_decimate'].get() == '2'
+          and json.dumps(case_to_dict(g.get_case()), sort_keys=True) == text)
+    g.destroy()
+    f.v['vtk_v_decimate'].set('')
+    raised = ''
+    try:
+        f.get_case()
+    except ValueError as exc:
+        raised = str(exc)
+    check('an empty box on an active family is reported and marked',
+          'keep 1 layer in k' in raised and 'vtk_v_decimate' in f._bad,
+          raised)
+    f.set_mode('native')
+    ROOT.update_idletasks()
+    check('native: hidden with the card, no vtk_volumes key',
+          not card_shown(f) and 'vtk_volumes' not in case_to_dict(
+              f.get_case()))
+    f.destroy()
+
+
 def main():
     print('\nK1: the same field names as the Qt form')
     for d in (1, 2, 3):
@@ -437,6 +502,7 @@ def main():
               and 'keep_all_fields' not in case_to_dict(f.get_case()))
         f.destroy()
 
+    decimation()
     ROOT.destroy()
     print('\n' + '=' * 52)
     if FAIL:

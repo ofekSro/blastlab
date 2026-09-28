@@ -217,8 +217,16 @@ native mode, and a native run ignores the keys.
   (`vtk_export.obstacle_ids`; a face on two touching boxes takes the
   lower number, a face on none keeps that sample in WSL), written as the
   int array `Obstacle_ID`; no mesh or patch change. It needs one more
-  obstacle field ticked. Case keys: `vtk_surfaces` {on, mode, value, fields,
-  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields}. A
+  obstacle field ticked. **Decimation** (`OUT-4c`, 3D volumes only;
+  owner decision Q4): the Volumes box "Keep 1 layer in k" (1..16, default
+  1) subsamples the volume files per axis - the cells whose centroid lies
+  in every k-th base-cell layer on x, y and z are kept, their values
+  copied, never averaged (`vtk_export.decimate`, on the Windows copy of
+  each foamToVTK file; the solve and WSL are untouched, AMR-safe). About
+  1/k^3 of the cells remain. Decimated files are for viewing only; peaks
+  may be missed. Case keys: `vtk_surfaces` {on, mode, value, fields,
+  obstacle_fields, planes}, `vtk_volumes` {on, mode, value, fields} plus
+  `decimate` when k != 1. A
   family that is off is written only when it still has a field ticked,
   as `on: false` with its ticks, so a reload restores the card; the
   solver ignores it (owner decision P15).
@@ -243,7 +251,7 @@ native mode, and a native run ignores the keys.
 
   | Path | Content |
   |---|---|
-  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete`, `arrays` (field -> array name), `p_ambient` |
+  | `vtk\manifest.json` | fields, cadence, per family count / times / series / **files (the full list)**, `not_converted` (with why), `deleted_in_wsl`, `replay_incomplete`, `arrays` (field -> array name), `p_ambient`, `decimate` ({volumes: k} when volumes are on) |
   | `vtk\volumes\t_<time>.vtk`, `vtk\volumes.vtk.series` | one file per write, every chosen field, cell data only |
   | `vtk\slice_x_0.20\t_<time>.vtk`, `vtk\slice_x_0.20.vtk.series` | one series per section plane, one file per sample holding every chosen field |
   | `vtk\obstacles\t_<time>.vtk`, `vtk\obstacles.vtk.series` | the obstacle walls, one file per sample holding every chosen field |

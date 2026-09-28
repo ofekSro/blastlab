@@ -196,6 +196,63 @@ def gauge_extras():
           and not rep.errors, str(rep.errors))
 
 
+def decimation():
+    """OUT-4c C1 (owner Q4): the Volumes decimation spin box, 3D only,
+    with the owner's warning line under it."""
+    print('\nC13: the Volumes decimation box (OUT-4c)')
+    from PySide6.QtWidgets import QSpinBox
+    for d in (1, 2):
+        f = form(d)
+        check(f'{d}D: no decimation box (3D only)',
+              'vtk_v_decimate' not in f.v and not f.row_notes)
+    f = form(3)
+    w = f.widgets.get('vtk_v_decimate')
+    note = f.row_notes.get('vtk_v_decimate')
+    check('3D: a spin box 1..16 holding 1, on the card, with its tip',
+          isinstance(w, QSpinBox) and w.minimum() == 1
+          and w.maximum() == F.VTK_DECIMATE_MAX and w.value() == 1
+          and f.v['vtk_v_decimate'].get() == '1'
+          and 'vtk_v_decimate' in card_names(f) and w.isVisible()
+          and w.toolTip() == F.VTK_DECIMATE_TIP)
+    check('   the owner\'s warning line under it, visible',
+          note is not None and note.text() == F.VTK_DECIMATE_NOTE
+          and 'viewing only; peaks may be missed' in note.text()
+          and note.isVisible() and note.y() > w.y())
+    f.widgets['vtk_v_on'].click()
+    pump(5)
+    check('k = 1: no decimate key in the case or its JSON',
+          'decimate' not in f.get_case().vtk_volumes
+          and 'decimate' not in case_to_dict(f.get_case())['vtk_volumes'])
+    w.setValue(2)
+    pump(5)
+    case = f.get_case()
+    text = json.dumps(case_to_dict(case), sort_keys=True)
+    check('k = 2 (spin box): the case carries decimate 2, validates clean '
+          'with the warning in its note',
+          f.v['vtk_v_decimate'].get() == '2'
+          and case.vtk_volumes.get('decimate') == 2
+          and json.loads(text)['vtk_volumes']['decimate'] == 2
+          and not validate_case(case).errors
+          and any(F.VTK_DECIMATE_WARNING in n
+                  for n in validate_case(case).notes), str(case.vtk_volumes))
+    g = form(3)
+    g.set_case(case_from_dict(json.loads(text)))
+    pump(5)
+    check('save / reload restores k = 2 in the box',
+          g.widgets['vtk_v_decimate'].value() == 2
+          and json.dumps(case_to_dict(g.get_case()), sort_keys=True) == text)
+    w.setValue(0)                    # below the range: clamped by the box
+    w.setValue(99)                   # above it: clamped too
+    pump(5)
+    check('the box clamps to 1..16', w.value() == F.VTK_DECIMATE_MAX
+          and f.v['vtk_v_decimate'].get() == str(F.VTK_DECIMATE_MAX))
+    f.set_mode('native')
+    pump(10)
+    check('native: hidden with the card, no vtk_volumes key',
+          not f.card_visible(TITLE) and not w.isVisible()
+          and 'vtk_volumes' not in case_to_dict(f.get_case()))
+
+
 def main():
     print('\nC1: the families and the matrix of each dimension')
     want_fams = {1: ['vtk_v_on'], 2: ['vtk_v_on', 'vtk_s_on'],
@@ -681,6 +738,7 @@ def main():
     locked_column_is_muted()
     keep_all_box()
     gauge_extras()
+    decimation()
 
     print('\n' + '=' * 52)
     if FAIL:

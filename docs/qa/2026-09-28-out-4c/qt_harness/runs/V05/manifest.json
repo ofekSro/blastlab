@@ -1,0 +1,111 @@
+{
+  "model": "V05",
+  "runs_dir": "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-28-out-4c\\qt_harness\\runs",
+  "created": "2026-09-28T22:28:44",
+  "finished": "2026-09-28T22:28:46",
+  "solver": "blastfoam",
+  "dim": 1,
+  "case_file": "MODEL.json",
+  "git_commit": "c650cb5",
+  "stop_reason": "shock arrived at outer boundary (p_last = 1.014e+05 Pa)",
+  "n_cells": null,
+  "n_procs": null,
+  "n_steps": 1106,
+  "wsl_scratch": null,
+  "outputs": [
+    {
+      "path": "MODEL.json",
+      "bytes": 691
+    },
+    {
+      "path": "profile.txt",
+      "bytes": 31921
+    },
+    {
+      "path": "report.html",
+      "bytes": 218117
+    },
+    {
+      "path": "run.log",
+      "bytes": 1273
+    },
+    {
+      "path": "fields/t0p155ms_p.csv",
+      "bytes": 8787
+    },
+    {
+      "path": "fields/t0p155ms_rho.csv",
+      "bytes": 8792
+    },
+    {
+      "path": "fields/t0p539ms_p.csv",
+      "bytes": 8787
+    },
+    {
+      "path": "fields/t0p539ms_rho.csv",
+      "bytes": 8792
+    },
+    {
+      "path": "fields/t1p162ms_p.csv",
+      "bytes": 8787
+    },
+    {
+      "path": "fields/t1p162ms_rho.csv",
+      "bytes": 8792
+    },
+    {
+      "path": "fields/t1p949ms_p.csv",
+      "bytes": 8787
+    },
+    {
+      "path": "fields/t1p949ms_rho.csv",
+      "bytes": 8792
+    },
+    {
+      "path": "fields/t2p815ms_final_p.csv",
+      "bytes": 8787
+    },
+    {
+      "path": "fields/t2p815ms_final_rho.csv",
+      "bytes": 8792
+    },
+    {
+      "path": "figures/blast_1d_gauges.png",
+      "bytes": 46115
+    },
+    {
+      "path": "figures/blast_1d_results.png",
+      "bytes": 178047
+    },
+    {
+      "path": "gauges/gauges_1d.txt",
+      "bytes": 29914
+    },
+    {
+      "path": "gauges/gauges_1d_summary.csv",
+      "bytes": 209
+    }
+  ],
+  "missing": [
+    {
+      "name": "animation",
+      "why": "replay frames were not recorded"
+    }
+  ],
+  "vtk": {
+    "dir": "vtk",
+    "counts": {
+      "volumes": 2
+    },
+    "files": 4,
+    "bytes": 588,
+    "not_converted": []
+  },
+  "wsl_fields": {
+    "mode": "off",
+    "deleted": 0,
+    "first": null,
+    "last": null
+  },
+  "failed": []
+}

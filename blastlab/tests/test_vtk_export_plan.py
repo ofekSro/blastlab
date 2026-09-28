@@ -1439,7 +1439,75 @@ TESTS_E = [test_e_obstacle_ids_two_boxes,
            test_e_obstacle_ids_refuse_a_stray_face, test_e_obstacle_ids_2d,
            test_e_export_writes_obstacle_id,
            test_e_export_untagged_face_is_not_written]
-TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D + TESTS_E
+
+
+# ── F: OUT-4c volume decimation (owner Q4) ───────────────────────────────
+def test_f_export_decimates_volumes():
+    """The executor: `decimate: 2` on the volumes keeps the cells of the
+    even base-cell layers - of the fake volume's two unit hexahedra along
+    x (base cell 1 m from 0), the first alone, its values untouched; the
+    surfaces are not decimated; the manifest records k. Without the key
+    the manifest says 1 and both cells are written."""
+    for k, want in ((2, [0]), (1, [0, 1])):
+        tree = Tree()
+        try:
+            if k > 1:
+                tree.spec.vtk_volumes['decimate'] = k
+            tree.spec.dx_base, tree.spec.dx = 1.0, 0.5
+            tree.spec.grid_base = dict(x_face=[0.0, 1.0, 2.0],
+                                       y_face=[0.0, 1.0], z_face=[0.0, 1.0])
+            ex = tree.export()
+            ex.run({t: 0 for t in T}, final=True)
+            _raw, arrays = foam_volume_binary(t=float(T[1]), name=RUN)
+            vd = lv.read(tree.model(f'volumes/t_{T[1]}.vtk'))
+            ids = next(a for a in vd.cell_data if a.name == 'cellID')
+            p = next(a for a in vd.cell_data if a.name == 'pressure')
+            assert vd.n_cells == len(want) and ids.values.tolist() == want, \
+                (k, vd.n_cells, ids.values)
+            assert vd.n_points == 8 * len(want) - 4 * (len(want) - 1), \
+                vd.n_points
+            assert p.values.tobytes() == arrays['p'][want].astype(
+                np.float32).tobytes()
+            s = lv.read(tree.model(f'slice_z_0.35/t_{SAMPLES[1]}.vtk'))
+            assert s.n_cells == 9                   # surfaces untouched
+            m = _manifest(tree)
+            assert m['decimate'] == {'volumes': k}, m.get('decimate')
+            assert not m['not_converted'], m['not_converted']
+            assert any('decimated' in ln for ln in tree.lines) == (k > 1)
+        finally:
+            tree.close()
+
+
+def test_f_decimation_needs_the_base_grid():
+    """A spec without a base grid fails the volume (kept in WSL,
+    not_converted, 'decimation failed') - never written whole."""
+    tree = Tree(surfaces=False)
+    try:
+        tree.spec.vtk_volumes['decimate'] = 2
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert not os.path.exists(tree.model(f'volumes/t_{T[1]}.vtk'))
+        nc = _manifest(tree)['not_converted']
+        assert nc and all('decimation failed' in e['why'] for e in nc), nc
+        assert tree.deleted_times() == [], tree.deleted_times()
+    finally:
+        tree.close()
+
+
+def test_f_no_volume_family_no_decimate_key():
+    """Surfaces alone: the manifest has no `decimate` key."""
+    tree = Tree(volumes=False)
+    try:
+        tree.export().run({t: 0 for t in T}, final=True)
+        assert 'decimate' not in _manifest(tree)
+    finally:
+        tree.close()
+
+
+TESTS_F = [test_f_export_decimates_volumes,
+           test_f_decimation_needs_the_base_grid,
+           test_f_no_volume_family_no_decimate_key]
+TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D + TESTS_E + TESTS_F
 
 
 def main():

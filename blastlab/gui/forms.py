@@ -835,6 +835,8 @@ class CaseForm(ctk.CTkFrame):
                 ent = _entry(body, self._var(name, f'{default:g}'))
                 self._vtk_entries[name] = ent
                 r = _row(body, r, label, ent)
+            if fam == 'v' and self.dim == 3:
+                r = self._build_vtk_decimate(body, r)
             self.v[f'vtk_{fam}_on'].trace_add(
                 'write', lambda *a, fam=fam: self._vtk_ticked(fam))
             mode.trace_add('write', lambda *a: self._sync_vtk())
@@ -884,6 +886,28 @@ class CaseForm(ctk.CTkFrame):
         self._vtk_grid = _MatrixGrid(right, matrix, self.dim)
         self._vtk_grid.grid(row=1, column=0, sticky='we')
         self._sync_vtk()
+
+    def _build_vtk_decimate(self, body, r):
+        """OUT-4c (owner Q4, 2026-09-27): the Volumes decimation box, 3D
+        only (the Qt twin: setup_spec._vtk_card), a whole-number spin box
+        that takes digits only, and the owner's warning line under it."""
+        lo, hi = fields.VTK_DECIMATE_DEFAULT, fields.VTK_DECIMATE_MAX
+        var = self._var('vtk_v_decimate', fields.VTK_DECIMATE_DEFAULT)
+        self._decimate_ok = lambda s: s == '' or s.isdigit()
+        digits = (self.register(self._decimate_ok), '%P')
+        spin = ttk.Spinbox(body, from_=lo, to=hi, increment=1,
+                           textvariable=var, width=6, validate='key',
+                           validatecommand=digits, font=theme.F_BODY)
+        theme.tooltip(spin, fields.VTK_DECIMATE_TIP)
+        self._vtk_decimate = spin
+        r = _row(body, r, fields.VTK_DECIMATE_LABEL, spin)
+        self._vtk_decimate_note = ctk.CTkLabel(
+            body, text=fields.VTK_DECIMATE_NOTE, font=theme.F_SMALL,
+            text_color=c('muted'), anchor='w', justify='left',
+            wraplength=LABEL_WRAP + INPUT_MIN)
+        self._vtk_decimate_note.grid(row=r, column=0, columnspan=2,
+                                     sticky='w', pady=(0, 2))
+        return r + 1
 
     def _vtk_place(self, side):
         """The VTK card's two panes side by side (`side`), or the matrix

@@ -1,0 +1,36 @@
+{
+  "radius_m": 2.0,
+  "charge_kg": 0.2,
+  "cell_size_m": 0.01,
+  "eos": "idealGas",
+  "bc_outer": "terminate",
+  "cfl": 0.5,
+  "t_end": 0.0,
+  "n_snapshots": 5,
+  "gauge_radii": [
+    1.0
+  ],
+  "gauge_file": "gauges/gauges_1d.txt",
+  "profile_file": "profile.txt",
+  "solver": "blastfoam",
+  "material": "TNT",
+  "activation": "linear",
+  "det_delays": null,
+  "det_radii": null,
+  "afterburn": "none",
+  "order": 1,
+  "probe_adjust": true,
+  "adaptive_write": true,
+  "n_procs": 0,
+  "vtk_volumes": {
+    "on": true,
+    "mode": "time",
+    "value": 0.0005,
+    "fields": [
+      "p"
+    ]
+  },
+  "schema": "blastlab-case",
+  "version": 13,
+  "dim": 1
+}
