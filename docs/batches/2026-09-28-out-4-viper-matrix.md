@@ -320,6 +320,11 @@ Also green: `test_legacy_vtk.py` (11/11), `test_case_validate.py`.
   the arrival SAMPLE INDEX from p_over and from p (gauge_summary's criterion);
   A-R6c takes the probe row whose time equals the file time printed at the probe
   file's precision (6 significant digits). Thresholds unchanged.
+- **Run 3 (after `825d553`): PASS, 29/29.** A-R1 |d| = 0 (peak 106962.675 kPa,
+  impulse 6865.5066, arrival 0.0169987 ms, 972 steps both); A-R2 worst 675 Pa
+  (within its bound); A-R3a 0.14 %; A-R3b 1 sample; A-R3c sample 43 = 43;
+  A-R4a worst 1.3e-5; A-R4b 111 = 111; A-R5 T(0) = 288.002 K; A-R6a counts equal
+  (39/39/39/10); A-R6b 127/127 files; A-R6c rel 1.8e-6.
 
 ## 7. Remaining backlog after OUT-4
 
