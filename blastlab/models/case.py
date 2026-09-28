@@ -24,9 +24,13 @@ TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 #: OUT-4a: `dynamicP` (blastFoam's dynamicPressure function object,
 #: blastFoam User Guide v6.0, sec. 15.9, p. 125) is APPENDED - vtk_matrix
 #: canonicalises in this order, so reordering would change saved JSON.
+#: OUT-4b (owner Q2): `impulseMax`, the per-cell running max of the net
+#: impulse (fieldMinMax on impulse, guide sec. 15.2, p. 123), appended.
 VTK_FIELDS = ('p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
-              'rho', 'U', 'T', 'alpha.expl', 'rhoE', 'dynamicP')
-VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival')
+              'rho', 'U', 'T', 'alpha.expl', 'rhoE', 'dynamicP',
+              'impulseMax')
+VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival',
+                 'impulseMax')
 #: OUT-4a: the matrix columns each field has a cell in (plan sec. 3.2,
 #: sec. 9). Every field is written to every file family; at the gauges
 #: (blastProbes, guide sec. 15.1) only what a trace means: p/rho/U (always
@@ -62,7 +66,8 @@ VTK_ARRAY_NAMES = {'p': 'pressure', 'pMax': 'Peak_Overpressure',
                    'timeOfArrival': 'Time_Of_Peak', 'rho': 'density',
                    'U': 'velocity', 'T': 'temperature',
                    'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
-                   'dynamicP': 'Dynamic_Pressure'}
+                   'dynamicP': 'Dynamic_Pressure',
+                   'impulseMax': 'Peak_Impulse'}
 
 
 def vtk_fields_for(dim):

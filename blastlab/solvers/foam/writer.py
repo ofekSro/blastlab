@@ -919,6 +919,26 @@ def _controldict_function_objects(spec):
             'fields': ['p'],
             'minMax': 'max',
         }
+        # OUT-4b (owner Q2): Peak_Impulse, the per-cell running max of the
+        # net impulse - a SEPARATE fieldMinMax on `impulse`, so the pMax
+        # entry above (and every golden) is untouched; emitted only when a
+        # VTK family asks for it. blastFoam User Guide v6.0, sec. 15.2
+        # (p. 123): keys `fields`, `minMax` (default max); the result is
+        # `impulseMax` (fieldMinMax.H computedName). It sits after
+        # `impulse`, so the max includes this step's impulse.
+        # `executeAtStart yes`: fieldMinMax switches it off by default
+        # (fieldMinMax.C constructor; OF-9 functionObject.C:133 reads the
+        # key), and without it `impulseMax` does not exist when the VTK
+        # surfaces sample the start time - the t = 0 file would lack it.
+        if wants_peak_impulse(spec):
+            functions['impulseMax'] = {
+                'type': 'fieldMinMax',
+                'libs': blast_libs,
+                'writeControl': 'writeTime',
+                'executeAtStart': True,
+                'fields': ['impulse'],
+                'minMax': 'max',
+            }
     # N5-9: the third of the three standard blast outputs. peak (pMax)
     # and impulse were already here; arrival time was not, and it is
     # what the gauge summary reconstructs in Python from the traces.
@@ -973,6 +993,22 @@ def wants_dynamic_pressure(spec):
     if spec.dim == 3 and 'dynamicP' in (surf.get('fields') or ()):
         return True
     return ('dynamicP' in (surf.get('obstacle_fields') or ())
+            and ('obstacles', 'wall') in spec.patches)
+
+
+def wants_peak_impulse(spec):
+    """OUT-4b: does a VTK family of this 2D/3D spec write `impulseMax` -
+    the volumes, the 3D sections, or the obstacle walls (with the
+    obstacles patch)? Never on a resumed AMR leg (`fo_accumulators` off,
+    P1-5): it is an accumulator like pMax / impulse."""
+    if spec.dim < 2 or not spec.fo_accumulators:
+        return False
+    if 'impulseMax' in ((spec.vtk_volumes or {}).get('fields') or ()):
+        return True
+    surf = spec.vtk_surfaces or {}
+    if spec.dim == 3 and 'impulseMax' in (surf.get('fields') or ()):
+        return True
+    return ('impulseMax' in (surf.get('obstacle_fields') or ())
             and ('obstacles', 'wall') in spec.patches)
 
 
@@ -1135,13 +1171,13 @@ VTK_SECTIONS = 'vtkSections'
 VTK_OBSTACLES = 'vtkObstacles'
 #: the function objects that accumulate per step: their fields exist
 #: only while `fo_accumulators` is on (P1-5, a resumed AMR leg)
-_FO_ACCUMULATED = ('pMax', 'impulse')
+_FO_ACCUMULATED = ('pMax', 'impulse', 'impulseMax')
 
 
 def vtk_surface_fields(spec, names):
     """`names` minus what this spec does not write: a field the
     dimension lacks (validation refuses those) and, on a resumed AMR leg
-    (`fo_accumulators` off), pMax / impulse (D4)."""
+    (`fo_accumulators` off), pMax / impulse / impulseMax (D4)."""
     have = vtk_fields_for(spec.dim)
     return [f for f in names if f in have
             and (spec.fo_accumulators or f not in _FO_ACCUMULATED)]

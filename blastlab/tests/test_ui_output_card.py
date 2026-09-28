@@ -222,16 +222,18 @@ def main():
         cols = sorted({c for _f, c in grid.boxes})
         check(f'{d}D: {len(rows)} quantity rows (D4)',
               sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
-              # OUT-4a: + the Dynamic pressure row
-              and len(rows) == (7 if d == 1 else 11), str(rows))
+              # OUT-4a: + the Dynamic pressure row; OUT-4b: + Peak
+              # impulse (2D/3D)
+              and len(rows) == (7 if d == 1 else 12), str(rows))
         # OUT-4a: the Gauges column has live boxes too (the extras)
         check(f'{d}D: live columns {want_cols[d]}',
               cols == sorted(want_cols[d]), str(cols))
         extras = F.vtk_gauge_extras_for(d)
         check(f'{d}D: a tick box in every destination cell, plus the '
               f'gauge extras {extras}',
-              len(grid.boxes) == len(rows) * (len(want_cols[d]) - 1)
-              + len(extras)
+              len(grid.boxes) == sum(
+                  len(set(F.VTK_CELLS[r]) & set(want_cols[d]) - {'gauges'})
+                  for r in rows) + len(extras)
               and {f_ for f_, c in grid.boxes if c == 'gauges'}
               == set(extras), str(sorted(grid.boxes)))
         want_gauge = ({'T', 'dynamicP'} if d == 1 else

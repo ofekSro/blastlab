@@ -302,12 +302,23 @@ def readable_arrays(arrays, p_ambient=P_AIR):
     blastFoam's pMax starts at 0, so at t = 0 a bare pMax - p_ambient
     reads -p_ambient everywhere. Owner decision (2026-09-27): the running
     max includes the current pressure - max(pMax, p) - p_ambient when `p`
-    of the same length is among `arrays`, else max(pMax - p_ambient, 0)."""
+    of the same length is among `arrays`, else max(pMax - p_ambient, 0).
+
+    OUT-4b (owner Q2): `impulseMax` -> Peak_Impulse gets the same
+    addendum - the running max includes the current value,
+    max(impulseMax, impulse) when `impulse` of the same length is among
+    `arrays`; else as written (no floor: the net impulse may be
+    negative)."""
     p_now = next((np.asarray(a.values, dtype=np.float64) for a in arrays
                   if a.name == 'p'), None)
+    i_now = next((np.asarray(a.values, dtype=np.float64) for a in arrays
+                  if a.name == 'impulse'), None)
     out = []
     for a in arrays:
         vals = a.values
+        if (a.name == 'impulseMax' and i_now is not None
+                and i_now.shape == np.shape(vals)):
+            vals = np.maximum(np.asarray(vals, dtype=np.float64), i_now)
         if a.name == 'pMax':
             # decision 4: peak OVERPRESSURE, over the ambient the gauges
             # use (core.constants.P_AIR; writer.py's pRef, gauge_summary)

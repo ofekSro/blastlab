@@ -1555,6 +1555,102 @@ def gauge_checks():
           in norm(fo_block(written, 'gauges')), str(lines))
 
 
+def peak_impulse_checks():
+    """OUT-4b B2 (owner Q2): the Peak_Impulse fieldMinMax on `impulse`,
+    line by line against blastFoam User Guide v6.0 sec. 15.2 (p. 123):
+    `fields`, `minMax`; emitted only when a family asks for impulseMax,
+    after `impulse`, before the samplers; the pMax entry untouched."""
+    from blastlab.solvers.foam import writer as W
+    from blastlab.solvers.foam import backend as B
+    print('\n  OUT-4b: peak impulse (impulseMax)')
+    base = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05, charge=4.0,
+                center=(0.5, 1.0, 1.0),
+                obstacles=[(1.2, 1.5, 0.6, 1.4, 0.0, 1.2)],
+                gauges=[(1.8, 1.0, 1.0)], n_snapshots=3,
+                solver='blastfoam', material='TNT')
+    surf = {'on': True, 'mode': 'time', 'value': 0.0005,
+            'fields': ['p', 'impulseMax'],
+            'obstacle_fields': ['p', 'impulseMax'], 'planes': []}
+    vol = {'on': True, 'mode': 'step', 'value': 25,
+           'fields': ['p', 'impulseMax']}
+    plain = render_case(Case3D(**base))
+    ctl0 = plain.files['system/controlDict']
+    check('impulseMax: no object in the plain case',
+          'impulseMax' not in fo_names(ctl0))
+    for label, kw in (('sections + obstacles', dict(vtk_surfaces=surf)),
+                      ('volumes', dict(vtk_volumes=vol)),
+                      ('obstacles only', dict(vtk_surfaces=dict(
+                          surf, fields=['p'])))):
+        sp = render_case(Case3D(**base, **kw))
+        ctl = sp.files['system/controlDict']
+        names = fo_names(ctl)
+        blk = norm(fo_block(ctl, 'impulseMax')) if 'impulseMax' in names \
+            else ''
+        check(f'impulseMax ({label}): emitted after impulse and pMax, '
+              f'before the samplers',
+              'impulseMax' in names
+              and names.index('impulse') < names.index('impulseMax')
+              and names.index('pMax') < names.index('impulseMax')
+              and all(names.index('impulseMax') < names.index(n)
+                      for n in ('gauges', W.VTK_SECTIONS, W.VTK_OBSTACLES)
+                      if n in names), str(names))
+        for want in ('type fieldMinMax;',
+                     'libs ("libblastFunctionObjects.so");',
+                     'writeControl writeTime;', 'executeAtStart yes;',
+                     'fields (impulse);', 'minMax max;'):
+            check(f'impulseMax ({label}): {want}', want in blk, blk)
+        check(f'impulseMax ({label}): the pMax entry is untouched',
+              fo_block(ctl, 'pMax') == fo_block(ctl0, 'pMax'))
+        # the same case without impulseMax, minus this one block
+        without = {k: (dict(v, fields=[f for f in v['fields']
+                                       if f != 'impulseMax'],
+                            obstacle_fields=[f for f in v['obstacle_fields']
+                                             if f != 'impulseMax'])
+                       if k == 'vtk_surfaces' else
+                       dict(v, fields=[f for f in v['fields']
+                                       if f != 'impulseMax']))
+                   for k, v in kw.items()}
+        ref = render_case(Case3D(**base, **without)).files[
+            'system/controlDict']
+        stripped = ctl.replace(fo_block(ctl, 'impulseMax') + '\n', '')
+        for fam in (W.VTK_SECTIONS, W.VTK_OBSTACLES):
+            if fam in names:
+                stripped = stripped.replace(
+                    fo_block(ctl, fam), fo_block(ref, fam))
+        check(f'impulseMax ({label}): remove it and its field and the '
+              f'controlDict is the one without impulseMax', stripped == ref)
+    ss = render_case(Case3D(**base, vtk_surfaces=surf))
+    for fam, want in ((W.VTK_SECTIONS, 'fields (p impulseMax);'),
+                      (W.VTK_OBSTACLES, 'fields (p impulseMax);')):
+        check(f'impulseMax: {fam} samples it',
+              want in norm(fo_block(ss.files['system/controlDict'], fam)))
+    # 2D obstacles
+    c2 = dict(Lx=4.0, Ly=4.0, cell_size_m=0.02, charge=1.0,
+              center=(0.0, 1.0), obstacles=[(2.0, 2.4, 0.0, 1.6)],
+              gauges=[(1.0, 1.0)], solver='blastfoam', material='TNT')
+    s2 = render_case(Case2D(**c2, vtk_surfaces=dict(
+        surf, fields=[], obstacle_fields=['impulseMax'])))
+    check('impulseMax 2D obstacles: emitted',
+          'impulseMax' in fo_names(s2.files['system/controlDict']))
+    # no obstacles patch and no other family: nothing asks for it
+    no_obs = render_case(Case3D(**dict(base, obstacles=[]),
+                                vtk_surfaces=dict(surf, fields=['p'])))
+    check('impulseMax on obstacles without obstacles: no object',
+          'impulseMax' not in fo_names(no_obs.files['system/controlDict']))
+    # a resumed AMR leg: dropped like pMax / impulse (_FO_ACCUMULATED)
+    check('impulseMax is an accumulator (writer and backend lists)',
+          'impulseMax' in W._FO_ACCUMULATED and 'impulseMax' in B._FO_FIELDS)
+    case_fo = Case3D(**base, vtk_surfaces=surf, vtk_volumes=vol)
+    spec_fo = render_case(case_fo)
+    spec_fo.fo_accumulators = False
+    rc = W._controldict(spec_fo, case_fo)
+    check('impulseMax, fo_accumulators off: no object, and the sections '
+          'and obstacles sample p only',
+          'impulseMax' not in fo_names(rc)
+          and 'fields (p);' in norm(fo_block(rc, W.VTK_SECTIONS))
+          and 'fields (p);' in norm(fo_block(rc, W.VTK_OBSTACLES)))
+
+
 def specs_time_name():
     """A profile stage whose t0 needs more digits than timePrecision."""
     import numpy as np
@@ -1600,6 +1696,7 @@ def main():
     fresh_dir_checks()
     vtk_checks()
     gauge_checks()
+    peak_impulse_checks()
     golden(specs, update)
     print()
     if FAIL:

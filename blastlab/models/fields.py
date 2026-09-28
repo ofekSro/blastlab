@@ -142,7 +142,7 @@ VTK_QUANTITY_LABELS = {
     'pMax': 'Peak overpressure', 'timeOfArrival': 'Time of peak',
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
-    'dynamicP': 'Dynamic pressure',
+    'dynamicP': 'Dynamic pressure', 'impulseMax': 'Peak impulse',
 }
 #: the long names, for the row tooltips. blastFoam's pMax is the running
 #: per-cell maximum of the ABSOLUTE pressure p: fieldMinMax on p with no
@@ -171,7 +171,13 @@ VTK_QUANTITY_TIPS = {
     # 0.5 rho U |U|; its magnitude is the standard dynamic pressure
     # (blastFoam User Guide v6.0, sec. 15.9, eq. 15.1, p. 125)
     'dynamicP': 'Dynamic pressure (q = 1/2 rho |U|^2, the magnitude of '
-                'blastFoam\'s dynamicP) [Pa]'}
+                'blastFoam\'s dynamicP) [Pa]',
+    # OUT-4b (owner Q2): fieldMinMax on the impulse field (blastFoam User
+    # Guide v6.0, sec. 15.2, p. 123); the impulse is the net overpressure
+    # impulse from the run's start (sec. 15.11, p. 126)
+    'impulseMax': 'Peak impulse (the running maximum over time of the net '
+                  'impulse in each cell, integral of (p - 101.325 kPa) dt; '
+                  'written to the files as Peak_Impulse) [Pa s]'}
 
 
 def vtk_quantity_tip(field):
