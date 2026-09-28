@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chain</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070708}
+a{color:#ff8a55}a:hover{color:#ffab85}
+.i{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; display: flex; flex-direction: column; overflow: hidden; background: #0b0b0c; color: #f2efe9; font-family: 'IBM Plex Sans', system-ui, sans-serif">
+
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 0 0 12px; background: #202024; font-size: 12px; color: #d9d4cc">
+<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" style="shape-rendering: crispEdges"><g style="fill: #ff6a2b"><rect x="2" y="4" width="3" height="2"></rect><rect x="5" y="5" width="2" height="3"></rect><rect x="7" y="7" width="2" height="2"></rect><rect x="8" y="9" width="3" height="2"></rect><rect x="10" y="11" width="2" height="3"></rect></g><rect x="1.5" y="1.5" width="13" height="13" style="fill: none; stroke: #e7eaee; stroke-width: 1"></rect></svg>
+<span>wall_A_chain · Chain · BlastLab</span>
+<span style="flex-grow: 1"></span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">–</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">□</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">×</span>
+</div>
+
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 26px; padding: 0 20px; border-bottom: 1px solid #1f1f23">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+<path d="M7.5 4V28M10.5 4V28M13.5 4V28M16.5 4V28M19.5 4V28M22.5 4V28M25.5 4V28M4 7.5H28M4 10.5H28M4 13.5H28M4 16.5H28M4 19.5H28M4 22.5H28M4 25.5H28" style="fill: none; stroke: #26262a; stroke-width: 1"></path>
+<g style="fill: #ff6a2b; opacity: 0.35"><rect x="4" y="13" width="3" height="3"></rect><rect x="7" y="13" width="3" height="3"></rect><rect x="10" y="16" width="3" height="3"></rect><rect x="13" y="16" width="3" height="3"></rect><rect x="13" y="19" width="3" height="3"></rect><rect x="16" y="22" width="3" height="3"></rect><rect x="16" y="25" width="3" height="3"></rect></g>
+<g style="fill: #ff6a2b"><rect x="4" y="10" width="3" height="3"></rect><rect x="7" y="10" width="3" height="3"></rect><rect x="10" y="10" width="3" height="3"></rect><rect x="10" y="13" width="3" height="3"></rect><rect x="13" y="13" width="3" height="3"></rect><rect x="16" y="13" width="3" height="3"></rect><rect x="16" y="16" width="3" height="3"></rect><rect x="16" y="19" width="3" height="3"></rect><rect x="19" y="19" width="3" height="3"></rect><rect x="19" y="22" width="3" height="3"></rect><rect x="19" y="25" width="3" height="3"></rect></g>
+<rect x="3" y="3" width="26" height="26" style="fill: none; stroke: #f2efe9; stroke-width: 2"></rect>
+</svg>
+<span style="font: 700 16px 'Space Grotesk', sans-serif; letter-spacing: 0.08em">BLAST<span style="color: #ff6a2b">LAB</span></span>
+</div>
+<nav aria-label="Workflow" style="display: flex; align-items: center; gap: 6px">
+<a href="BC_Combined.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">01</span>Setup</a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="Run.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">02</span>Run</a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="Results.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">03</span>Results</a>
+<span style="width: 1px; height: 22px; margin: 0 6px; background: #29292e"></span>
+<a href="#chain" aria-current="page" style="display: flex; height: 40px; align-items: center; padding: 0 16px; border-radius: 20px; background: #f2efe9; color: #0b0b0c; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif">Chain 1D → 2D → 3D</a>
+</nav>
+<span style="flex-grow: 1"></span>
+<span style="display: flex; align-items: baseline; gap: 10px"><span style="font: 600 17px 'Space Grotesk', sans-serif">wall_A_chain</span><span style="font-size: 12.5px; color: #f5d061">● unsaved</span></span>
+</header>
+
+<section aria-label="Stages" style="flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 20px 16px; border-bottom: 1px solid #1f1f23">
+<div style="display: flex; align-items: center; gap: 14px">
+<span style="font-size: 12.5px; color: #a8a39b">Route</span>
+<div role="group" aria-label="Route" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #29292e; border-radius: 10px; background: #0b0b0c">
+<sc-for list="{{ routes }}" as="r" hint-placeholder-count="4">
+<button onClick="{{ r.pick }}" aria-pressed="{{ r.pressed }}" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: {{ r.bg }}; color: {{ r.fg }}; font: 600 13px 'Space Grotesk', sans-serif; cursor: pointer">{{ r.label }}</button>
+</sc-for>
+</div>
+<span style="font-size: 12px; color: #8f8a82">New stages take the charge, material and solver from 01 Setup.</span>
+</div>
+<div style="display: flex; align-items: stretch">
+<sc-for list="{{ stages }}" as="st" hint-placeholder-count="3">
+<div style="display: flex; align-items: stretch">
+<button onClick="{{ st.pick }}" aria-pressed="{{ st.pressed }}" style="width: 308px; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid {{ st.border }}; border-radius: 12px; background: {{ st.bg }}; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="display: flex; align-items: center; gap: 10px; width: 100%">
+<span style="font: 600 12px 'Space Grotesk', sans-serif; color: {{ st.numColor }}">{{ st.num }}</span>
+<span style="flex: 1; font: 600 16px 'Space Grotesk', sans-serif">{{ st.title }}</span>
+<span style="padding: 2px 8px; border-radius: 10px; background: #1c1c1f; font-size: 11.5px; color: #cfcac2">{{ st.solver }}</span>
+</span>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; color: #cfcac2">{{ st.key }}</span>
+<span style="display: flex; align-items: center; gap: 8px; width: 100%; font-size: 12px; color: #7ddc9a">
+<span style="width: 7px; height: 7px; border-radius: 4px; background: #7ddc9a"></span>case OK
+<span style="flex-grow: 1"></span>
+<span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">{{ st.folder }}</span>
+</span>
+</button>
+<sc-if value="{{ st.hasNext }}" hint-placeholder-val="{{ true }}">
+<div style="width: {{ st.linkWidth }}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 6px">
+<svg viewBox="0 0 106 14" width="100%" height="14" preserveAspectRatio="none" aria-hidden="true"><path d="M2 7H98M92 2L99 7L92 12" style="fill: none; stroke: #ff6a2b; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round"></path></svg>
+<span style="font: 10.5px 'IBM Plex Mono', monospace; color: #ffb896; text-align: center; word-break: break-all">{{ st.handoff }}</span>
+<sc-if value="{{ st.isNew }}" hint-placeholder-val="{{ false }}"><span style="padding: 1px 6px; border-radius: 4px; background: #2a1a12; font-size: 10.5px; color: #ff8a55">new hand-off</span></sc-if>
+</div>
+</sc-if>
+</div>
+</sc-for>
+<span style="flex-grow: 1"></span>
+<div style="width: 176px; display: flex; flex-direction: column; justify-content: center; gap: 8px">
+<button style="height: 56px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 12px; background: #ff6a2b; color: #1a0d06; font: 700 17px 'Space Grotesk', sans-serif; cursor: pointer">
+<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 5l12 7-12 7z" style="fill: #1a0d06"></path></svg>
+Run chain
+</button>
+<span style="font-size: 12px; line-height: 1.4; color: #a8a39b; text-align: center">{{ runLine }}</span>
+</div>
+</div>
+</section>
+
+<div style="flex: 1; min-height: 0; display: flex">
+
+<aside aria-label="Stage tree" style="width: 272px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 14px 12px; border-right: 1px solid #1f1f23; background: #0e0e10">
+<span style="padding: 0 8px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">STAGE {{ selDim }} · {{ selTitleCaps }}</span>
+<sc-for list="{{ tree }}" as="n" hint-placeholder-count="6">
+<div style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 3px 10px; border-radius: 9px; background: {{ n.bg }}">
+<span style="font: 600 12.5px 'Space Grotesk', sans-serif; color: {{ n.numColor }}">{{ n.num }}</span>
+<span style="flex: 1; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 14px; font-weight: 500">{{ n.label }}</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">{{ n.sub }}</span></span>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-label="complete" style="color: #7ddc9a"><path d="M5 12l5 5L20 7"></path></svg>
+</div>
+</sc-for>
+<span style="flex-grow: 1"></span>
+<div style="display: flex; gap: 6px">
+<button style="flex: 1.3; height: 36px; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #cfcac2; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Copy from 01 Setup</button>
+<button style="flex: 1; height: 36px; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #cfcac2; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Load case…</button>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #24302a; border-radius: 10px; background: #121814; color: #cfe9d7; font-size: 13px">
+<svg class="i" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="color: #7ddc9a"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg>
+{{ selCheck }}
+</div>
+</aside>
+
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column; background: #0d0d0f">
+<div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #1c1c20">
+<span style="font: 600 15px 'Space Grotesk', sans-serif">{{ selTitle }}</span>
+<span style="font-size: 12.5px; color: #8f8a82">{{ selPlane }}</span>
+<span style="flex-grow: 1"></span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #cfcac2">{{ selNumbers }}</span>
+</div>
+<div style="flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center">
+<sc-if value="{{ is1 }}" hint-placeholder-val="{{ false }}">
+<svg viewBox="0 0 520 220" width="560" height="237" role="img" aria-label="1D spherical stage: the radius from the charge centre to 1.5 m; the stage ends when the wave reaches the outer radius and writes the hand-off profile">
+<path d="M40 120H480" style="fill: none; stroke: #f2efe9; stroke-width: 1.5"></path>
+<path d="M480 90V150" style="fill: none; stroke: #8f8a82; stroke-width: 2; stroke-dasharray: 1.5 4; stroke-linecap: round"></path>
+<circle cx="40" cy="120" r="6" style="fill: #ff6a2b"></circle>
+<path d="M40 60A60 60 0 0 1 100 120M40 30A90 90 0 0 1 130 120" style="fill: none; stroke: #ff6a2b; stroke-width: 1.2; stroke-dasharray: 3 3; opacity: 0.6"></path>
+<text x="40" y="146" style="font: 11px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0</text>
+<text x="186.7" y="146" style="font: 11px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0.5</text>
+<text x="333.3" y="146" style="font: 11px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">1.0</text>
+<text x="480" y="146" style="font: 11px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">1.5</text>
+<text x="260" y="176" style="font: 11.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">r [m], spherical, from the charge centre</text>
+<text x="480" y="80" style="font: 11px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">Outer: ends the stage</text>
+<rect x="336" y="192" width="176" height="22" rx="5" style="fill: #1d1511; stroke: #5a3522"></rect>
+<text x="424" y="207" style="font: 10.5px 'IBM Plex Mono', monospace; fill: #ffb896; text-anchor: middle">→ handoff_1d_to_2d.txt</text>
+</svg>
+</sc-if>
+<sc-if value="{{ is2 }}" hint-placeholder-val="{{ true }}">
+<svg viewBox="0 0 360 360" width="380" height="380" role="img" aria-label="2D axisymmetric stage: 4 by 4 metre domain; the 1D profile is remapped onto the axis at z 2 m; wall at r 3 m; gauges in front of it">
+<rect x="44" y="44" width="280" height="280" style="fill: #141416"></rect>
+<path d="M114 44V324M184 44V324M254 44V324M44 114H324M44 184H324M44 254H324" style="fill: none; stroke: #1f1f23; stroke-width: 0.8"></path>
+<path d="M44 79A105 105 0 0 1 44 289" style="opacity: {{ field2dOpacity }}; fill: rgba(255,106,43,0.1); stroke: #ff6a2b; stroke-width: 1.2; stroke-dasharray: 4 3"></path>
+<text x="100" y="120" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #ffb896">{{ field2dNote }}</text>
+<rect x="254" y="149" width="14" height="175" style="fill: #cfcac2"></rect>
+<path d="M44 44H324" style="fill: none; stroke: #8f8a82; stroke-width: 1.1; stroke-dasharray: 5 4"></path>
+<path d="M324 44V324" style="fill: none; stroke: #8f8a82; stroke-width: 1.5; stroke-dasharray: 1.2 3; stroke-linecap: round"></path>
+<path d="M44 44V324" style="fill: none; stroke: #8f8a82; stroke-width: 1.1; stroke-dasharray: 7 2.5 1.5 2.5"></path>
+<path d="M44 324H324" style="fill: none; stroke: #f2efe9; stroke-width: 2"></path>
+<circle cx="44" cy="184" r="4" style="fill: #ff6a2b"></circle>
+<rect x="247" y="285" width="7" height="7" transform="rotate(45 250.5 288.5)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<rect x="247" y="215.5" width="7" height="7" transform="rotate(45 250.5 219)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<text x="44" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0</text>
+<text x="184" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">2</text>
+<text x="324" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">4</text>
+<text x="37" y="187" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">2</text>
+<text x="184" y="352" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">r [m]</text>
+<text x="15" y="184" transform="rotate(-90 15 184)" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">z [m]</text>
+</svg>
+</sc-if>
+<sc-if value="{{ is3 }}" hint-placeholder-val="{{ false }}">
+<svg viewBox="0 0 460 330" width="500" height="359" role="img" aria-label="3D stage: a 6 by 6 by 4 metre box with a building block; the 2D profile is swept around the burst axis to start the 3D field">
+<path d="M80 250L230 300L400 240L250 190Z" style="fill: #141416; stroke: #3a3a40"></path>
+<path d="M80 250V110M230 300V160M400 240V100M250 190V50" style="fill: none; stroke: #3a3a40"></path>
+<path d="M80 110L230 160L400 100L250 50Z" style="fill: none; stroke: #3a3a40; stroke-dasharray: 5 4"></path>
+<path d="M270 226L318 242L350 231L302 215Z" style="fill: #3a3a40"></path>
+<path d="M270 226V176L302 165V215M318 242V192L350 181V231M270 176L318 192L350 181L302 165Z" style="fill: #cfcac2; stroke: #8f8a82; stroke-width: 0.8"></path>
+<path d="M270 176L318 192V242L270 226Z" style="fill: #a8a39b"></path>
+<ellipse cx="190" cy="226" rx="70" ry="24" style="fill: rgba(255,106,43,0.1); stroke: #ff6a2b; stroke-width: 1.2; stroke-dasharray: 4 3"></ellipse>
+<path d="M190 226V172" style="fill: none; stroke: #ff6a2b; stroke-width: 1; stroke-dasharray: 2 3"></path>
+<circle cx="190" cy="172" r="4.5" style="fill: #ff6a2b"></circle>
+<text x="198" y="168" style="font: 10px 'IBM Plex Sans', sans-serif; fill: #ffb896">{{ burstNote }}</text>
+<text x="110" y="268" style="font: 10px 'IBM Plex Sans', sans-serif; fill: #ffb896">{{ sweepNote }}</text>
+<text x="330" y="168" style="font: 10px 'IBM Plex Sans', sans-serif; fill: #cfcac2">Building 1</text>
+<text x="150" y="292" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82">6 m</text>
+<text x="330" y="286" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82">6 m</text>
+<text x="60" y="184" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82">4 m</text>
+</svg>
+</sc-if>
+</div>
+</main>
+
+<aside aria-label="Stage properties" style="width: 340px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 16px 18px; border-left: 1px solid #1f1f23; background: #0e0e10">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">STAGE {{ selDim }}</span>
+<h1 style="margin: 0; font: 600 22px 'Space Grotesk', sans-serif">{{ selTitle }}</h1>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12.5px; color: #a8a39b">Solver for this stage</span>
+<div role="group" aria-label="Solver for this stage" style="display: flex; gap: 3px; padding: 3px; border: 1px solid #2c2c31; border-radius: 9px; background: #0b0b0c">
+<button aria-pressed="{{ nativeOn }}" style="flex: 1; height: 32px; border: 0; border-radius: 7px; background: {{ nativeBg }}; color: {{ nativeFg }}; font: 500 13px 'IBM Plex Sans', sans-serif; cursor: pointer">native</button>
+<button aria-pressed="{{ foamOn }}" style="flex: 1; height: 32px; border: 0; border-radius: 7px; background: {{ foamBg }}; color: {{ foamFg }}; font: 500 13px 'IBM Plex Sans', sans-serif; cursor: pointer">blastFoam</button>
+</div>
+<span style="font-size: 11.5px; color: #8f8a82">Preset from the solver switch; override per stage.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #3a2a20; border-radius: 10px; background: #1d1511">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #ff8a55">HAND-OFF IN</span>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; color: #f2efe9">{{ inFile }}</span>
+<span style="font-size: 12.5px; line-height: 1.5; color: #e2d6cc">{{ inText }}</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #242428; border-radius: 10px; background: #111113">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">HAND-OFF OUT</span>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; color: #f2efe9">{{ outFile }}</span>
+<span style="font-size: 12.5px; line-height: 1.5; color: #cfcac2">{{ outText }}</span>
+</div>
+
+<span style="flex-grow: 1"></span>
+<p style="margin: 0; font-size: 12px; line-height: 1.5; color: #8f8a82">Every stage is checked live, like 01 Setup. The files go to C:\BLASTLAB_RUNS\wall_A_chain\ (1d, 2d, 3d, and the hand-offs at its root). If that folder already exists, the app asks before overwriting.</p>
+</aside>
+</div>
+
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 0 20px; border-top: 1px solid #1f1f23; font-size: 12px; color: #a8a39b">
+<span style="display: flex; align-items: center; gap: 7px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #7ddc9a"></span>WSL ready · 14 cores · 63 GB VM</span>
+<span style="flex-grow: 1"></span>
+<span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">v1.0.0</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const ROUTES = [
+      { key: '123', label: '1D → 2D → 3D', dims: [1, 2, 3] },
+      { key: '13', label: '1D → 3D', dims: [1, 3] },
+      { key: '12', label: '1D → 2D', dims: [1, 2] },
+      { key: '23', label: '2D → 3D', dims: [2, 3] }
+    ];
+    const route = ROUTES.find((r) => r.key === (s.route || '123'));
+    const dims = route.dims;
+    const sel = dims.indexOf(s.sel) >= 0 ? s.sel : (dims.indexOf(2) >= 0 ? 2 : dims[dims.length - 1]);
+    const HANDOFF = { '1-2': 'handoff_1d_to_2d.txt', '1-3': 'handoff_1d_to_3d.txt', '2-3': 'handoff_2d_to_3d.npz' };
+    const NONE_IN = 'Starts from the charge itself.';
+    const LAST_OUT = 'Last stage: its results open in 03 Results, as one result with a tab per stage.';
+    const meta = (d, prev, next) => {
+      const out = next ? HANDOFF[d + '-' + next] : 'none';
+      if (d === 1) return {
+        title: '1D spherical', solver: 'native', key: '1.0 kg TNT · R 1.5 m · 1 mm', folder: '\\1d',
+        plane: 'r from the charge centre', numbers: '1,500 cells · 1 rank',
+        tree: [['01', 'Threat', '1.0 kg TNT'], ['02', 'Domain & mesh', 'R 1.5 m · 1 mm'], ['03', 'Boundaries', 'Outer ends the stage'], ['04', 'Solver', 'native · MUSCL'], ['05', 'Output', 'profile at the end']],
+        inFile: 'none', inText: NONE_IN, outFile: out,
+        outText: next === 3 ? 'The profile when the wave reaches Outer (1.5 m). The 3D stage places it around the burst point.' : 'The profile when the wave reaches Outer (1.5 m). The 2D stage starts from it.',
+        check: 'Stage OK · 2 notes' };
+      if (d === 2) return {
+        title: '2D axisymmetric', solver: 'blastFoam', key: prev ? '4 × 4 m · 25 mm · from 1D' : '4 × 4 m · 25 mm · 1 kg TNT', folder: '\\2d',
+        plane: 'r–z plane, charge on the axis', numbers: '368,449 cells · 7 ranks · 1.0 GB',
+        tree: [prev ? ['01', 'Initialization', 'from the 1D profile'] : ['01', 'Threat', '1.0 kg TNT · z 2.0 m'], ['02', 'Domain & mesh', '4 × 4 m · 25 mm'], ['03', 'Boundaries', 'Outer ends the run'], ['04', 'Structure', 'Wall 1'], ['05', 'Gauges', next ? '2 · G2 triggers' : '2'], ['06', 'Solver', 'linear · CFL 0.4'], ['07', 'Output', next ? 'hand-off .npz' : 'gauges · VTK']],
+        inFile: prev ? HANDOFF['1-2'] : 'none',
+        inText: prev ? 'Remapped onto the axis. The burst height, z 2.0 m, is taken from this stage’s form.' : NONE_IN,
+        outFile: out, outText: next ? 'Written when the wave reaches G2 (trigger gauge, remap), or at the end of the run.' : LAST_OUT,
+        check: 'Stage OK · 4 notes' };
+      const from1 = prev === 1;
+      return {
+        title: '3D', solver: 'blastFoam', key: '6 × 6 × 4 m · 50 mm · from ' + (prev ? prev + 'D' : 'charge'), folder: '\\3d',
+        plane: 'the full box, with Building 1', numbers: '1,152,000 cells · 3.1 GB',
+        tree: [['01', 'Initialization', prev ? 'from the ' + prev + 'D profile' : '1.0 kg TNT'], ['02', 'Domain & mesh', '6 × 6 × 4 m · 50 mm'], ['03', 'Boundaries', '6 sides'], ['04', 'Structure', 'Building 1'], ['05', 'Gauges', '8 on the facade'], ['06', 'Solver', 'linear'], ['07', 'Output', 'VTK every 1 ms']],
+        inFile: prev ? HANDOFF[prev + '-3'] : 'none',
+        inText: from1 ? 'The 1D profile is placed around the burst point. With no 2D stage, the burst height is set in this stage’s form.' : 'Swept around the burst axis to start the 3D field. The burst height comes from the 2D profile.',
+        outFile: 'none', outText: LAST_OUT, check: 'Stage OK · 3 notes' };
+    };
+    const infoOf = (d) => {
+      const i = dims.indexOf(d);
+      return meta(d, i > 0 ? dims[i - 1] : 0, i < dims.length - 1 ? dims[i + 1] : 0);
+    };
+    const stages = dims.map((d, i) => {
+      const m = infoOf(d);
+      const next = i < dims.length - 1 ? dims[i + 1] : 0;
+      const isSel = d === sel;
+      return {
+        num: '0' + (i + 1), title: m.title, solver: m.solver, key: m.key, folder: m.folder,
+        hasNext: !!next, handoff: next ? HANDOFF[d + '-' + next] : '', isNew: d === 1 && next === 3,
+        linkWidth: dims.length === 2 ? '200px' : '118px',
+        pick: () => this.setState({ sel: d }), pressed: isSel ? 'true' : 'false',
+        border: isSel ? '#ff6a2b' : '#242428', bg: isSel ? '#1d1511' : '#111113', numColor: isSel ? '#ff8a55' : '#6f6a63'
+      };
+    });
+    const m = infoOf(sel);
+    const prevOfSel = dims.indexOf(sel) > 0 ? dims[dims.indexOf(sel) - 1] : 0;
+    const foam = m.solver === 'blastFoam';
+    return {
+      routes: ROUTES.map((r) => ({ label: r.label, pick: () => this.setState({ route: r.key }), pressed: r.key === route.key ? 'true' : 'false',
+        bg: r.key === route.key ? '#f2efe9' : 'transparent', fg: r.key === route.key ? '#0b0b0c' : '#a8a39b' })),
+      stages: stages,
+      runLine: dims.length + ' stages · into \\wall_A_chain\\',
+      tree: m.tree.map(([num, label, sub], i) => ({ num, label, sub, bg: i === 0 ? '#1d1511' : 'transparent', numColor: i === 0 ? '#ff8a55' : '#6f6a63' })),
+      selDim: '0' + (dims.indexOf(sel) + 1), selTitle: m.title, selTitleCaps: m.title.toUpperCase(), selPlane: m.plane, selNumbers: m.numbers,
+      selCheck: m.check, inFile: m.inFile, inText: m.inText, outFile: m.outFile, outText: m.outText,
+      is1: sel === 1, is2: sel === 2, is3: sel === 3,
+      field2dNote: prevOfSel ? '1D field, r ≤ 1.5 m' : '',
+      field2dOpacity: prevOfSel ? '1' : '0',
+      burstNote: prevOfSel === 1 ? 'burst height from this stage’s form' : (prevOfSel === 2 ? 'burst height from the 2D profile' : 'burst point from this stage’s form'),
+      sweepNote: prevOfSel === 1 ? '1D field placed around the burst point' : (prevOfSel === 2 ? '2D field swept around the axis' : 'starts from the charge'),
+      nativeOn: foam ? 'false' : 'true', foamOn: foam ? 'true' : 'false',
+      nativeBg: foam ? 'transparent' : '#2a2a2f', nativeFg: foam ? '#a8a39b' : '#f2efe9',
+      foamBg: foam ? '#2a2a2f' : 'transparent', foamFg: foam ? '#f2efe9' : '#a8a39b'
+    };
+  }
+}
+</script>
+</body>
+</html>

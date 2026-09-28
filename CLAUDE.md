@@ -245,7 +245,9 @@ is still matplotlib via `output/plots.py`.
 ## 6. Working conventions
 
 - **`TODO.md` is the single work-management file.** Everything open lives
-  there, ordered P0 -> P4, with two exceptions above P0: **`OUT`** (owner
+  there, ordered P0 -> P4, with three exceptions above P0: **`GUI`** (owner
+  directive 2026-09-28: the redesigned Qt GUI - spec `docs/gui-redesign-plan.md`),
+  **`OUT`** (owner
   directive 2026-09-26: mandatory model folder, Viper-style VTK output card,
   then the WSL disk rebuild - the plan is `docs/model-folder-and-vtk-plan.md`)
   and below it **`HD1`** (owner directive 20.09: the structural effect of an

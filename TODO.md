@@ -13,8 +13,33 @@ that code comments cite.
 Every item carries a stable id (`P2-3`, `N5-11`, `HD1-3`) — **cite it in commits
 and in discussion.**
 
-**Two exceptions sit above P0, in this order: `OUT`, then `HD1`.** Both are owner
-directives (2026-09-26 and 2026-09-20) and are not part of the P ranking.
+**Three exceptions sit above P0, in this order: `GUI`, `OUT`, then `HD1`.** All are
+owner directives (2026-09-28, 2026-09-26 and 2026-09-20) and are not part of the P
+ranking.
+
+---
+
+## GUI · ⭐ Highest priority (owner, 2026-09-28) — the redesigned Qt GUI
+
+**The whole specification, approved screen by screen on 2026-09-28, is
+[docs/gui-redesign-plan.md](docs/gui-redesign-plan.md)**, with the design boards in
+[docs/design/gui-redesign/boards/](docs/design/gui-redesign/boards/). This entry only
+orders it; every rule, value and acceptance criterion lives there. Qt only
+(`blastlab/ui/`): the Tk app, the solvers, the defaults and every file format stay as
+they are. Owner: *"implement everything"*, then run the QA and UX agents on the result.
+
+| Id | What | Size | Order |
+|---|---|---|---|
+| `GUI-1` | **Design tokens and fonts** — warm-black palette + light, orange accent, cyan gauges; Space Grotesk / IBM Plex Sans / IBM Plex Mono bundled (OFL). Plan §2 | M | 1 |
+| `GUI-2` | **Logo and app icon** — the stepped front on an 8 × 8 grid, drawn with QPainter at 16/32/64; BLASTLAB wordmark; window + taskbar icon. Plan §3 | S | 2 |
+| `GUI-3` | **Window frame** — top bar with 01 Setup → 02 Run → 03 Results + Chain, solver chip, case menu (Open / Save / Save as / Recent / Dark), status bar, title with progress, Shift+Esc stop. No sidebar. Plan §4 | L | 3 |
+| `GUI-4` | **Shared components** — toggle switch, stat tile, tree row, dock tabs, banner. Plan §2.5 | M | 4 |
+| `GUI-5` | **01 Setup** — numbered model tree (7 nodes) + properties of the selected node only + live-number strip, Z rings, gauge table with Z; dependent settings open only when switched on. Plan §5 | L | 5 |
+| `GUI-6` | **02 Run** — controls / progress strip with ETA / live view / log dock / live-gauge list sorted by Z; Stop confirms after 30 s; finish banner + Windows notification. Plan §6 | L | 6 |
+| `GUI-7` | **03 Results** — results list + "how it was computed"; views Field (= Fields + Animation) · Gauges · 3D; table with Z and Copy; impulse in kPa·ms on screen only; exports grouped. No KB columns, no run overlay. Plan §7 | L | 7 |
+| `GUI-8` | **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
+| `GUI-9` | **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
+| `GUI-10` | **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
 
 ---
 

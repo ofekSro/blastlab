@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Results, chain</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070708}
+a{color:#ff8a55}a:hover{color:#ffab85}
+.i{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; display: flex; flex-direction: column; overflow: hidden; background: #0b0b0c; color: #f2efe9; font-family: 'IBM Plex Sans', system-ui, sans-serif">
+
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 0 0 12px; background: #202024; font-size: 12px; color: #d9d4cc">
+<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" style="shape-rendering: crispEdges"><g style="fill: #ff6a2b"><rect x="2" y="4" width="3" height="2"></rect><rect x="5" y="5" width="2" height="3"></rect><rect x="7" y="7" width="2" height="2"></rect><rect x="8" y="9" width="3" height="2"></rect><rect x="10" y="11" width="2" height="3"></rect></g><rect x="1.5" y="1.5" width="13" height="13" style="fill: none; stroke: #e7eaee; stroke-width: 1"></rect></svg>
+<span>wall_A_chain · Results · BlastLab</span>
+<span style="flex-grow: 1"></span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">–</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">□</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">×</span>
+</div>
+
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 26px; padding: 0 20px; border-bottom: 1px solid #1f1f23">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+<path d="M7.5 4V28M10.5 4V28M13.5 4V28M16.5 4V28M19.5 4V28M22.5 4V28M25.5 4V28M4 7.5H28M4 10.5H28M4 13.5H28M4 16.5H28M4 19.5H28M4 22.5H28M4 25.5H28" style="fill: none; stroke: #26262a; stroke-width: 1"></path>
+<g style="fill: #ff6a2b; opacity: 0.35"><rect x="4" y="13" width="3" height="3"></rect><rect x="7" y="13" width="3" height="3"></rect><rect x="10" y="16" width="3" height="3"></rect><rect x="13" y="16" width="3" height="3"></rect><rect x="13" y="19" width="3" height="3"></rect><rect x="16" y="22" width="3" height="3"></rect><rect x="16" y="25" width="3" height="3"></rect></g>
+<g style="fill: #ff6a2b"><rect x="4" y="10" width="3" height="3"></rect><rect x="7" y="10" width="3" height="3"></rect><rect x="10" y="10" width="3" height="3"></rect><rect x="10" y="13" width="3" height="3"></rect><rect x="13" y="13" width="3" height="3"></rect><rect x="16" y="13" width="3" height="3"></rect><rect x="16" y="16" width="3" height="3"></rect><rect x="16" y="19" width="3" height="3"></rect><rect x="19" y="19" width="3" height="3"></rect><rect x="19" y="22" width="3" height="3"></rect><rect x="19" y="25" width="3" height="3"></rect></g>
+<rect x="3" y="3" width="26" height="26" style="fill: none; stroke: #f2efe9; stroke-width: 2"></rect>
+</svg>
+<span style="font: 700 16px 'Space Grotesk', sans-serif; letter-spacing: 0.08em">BLAST<span style="color: #ff6a2b">LAB</span></span>
+</div>
+<nav aria-label="Workflow" style="display: flex; align-items: center; gap: 6px">
+<a href="BC_Combined.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">01</span>Setup</a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="Run_Finished.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">02</span>Run</a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="#results" aria-current="page" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 16px; border-radius: 20px; background: #f2efe9; color: #0b0b0c; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">03</span>Results</a>
+<span style="width: 1px; height: 22px; margin: 0 6px; background: #29292e"></span>
+<a href="#chain" style="display: flex; height: 40px; align-items: center; padding: 0 10px; color: #a8a39b; text-decoration: none; font-size: 13.5px">Chain 1D → 2D → 3D</a>
+</nav>
+<span style="flex-grow: 1"></span>
+<span style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #29292e; border-radius: 16px; font-size: 12.5px; color: #cfcac2">
+<span style="width: 7px; height: 7px; border-radius: 4px; background: #7ddc9a"></span>
+3 results this session
+</span>
+</header>
+
+<div style="flex: 1; min-height: 0; display: flex">
+
+<aside aria-label="Results and method" style="width: 280px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 16px 14px; border-right: 1px solid #1f1f23; background: #0e0e10">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="padding: 0 6px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">RESULTS</span>
+<button aria-pressed="true" style="display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border: 0; border-radius: 9px; background: #1d1511; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="display: flex; align-items: center; gap: 8px"><span style="font: 600 14px 'Space Grotesk', sans-serif">wall_A_chain</span><span style="padding: 1px 6px; border-radius: 4px; background: #2a2a2f; font-size: 10.5px; color: #cfcac2">chain</span></span>
+<span style="font-size: 12px; color: #c9b3a6">1D → 2D → 3D · 3 stages · 41 min</span>
+</button>
+<button aria-pressed="false" style="display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 14px 'Space Grotesk', sans-serif">wall_A_native</span>
+<span style="font-size: 12px; color: #8f8a82">2D axisym. · native · 48 s</span>
+</button>
+<button aria-pressed="false" style="display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 14px 'Space Grotesk', sans-serif">free_field_1D</span>
+<span style="font-size: 12px; color: #8f8a82">1D spherical · native · 9 s</span>
+</button>
+<div style="display: flex; gap: 6px; padding-top: 6px">
+<button style="flex: 1; height: 34px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #cfcac2; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load a run…</button>
+<button aria-label="Remove wall_A from the list" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #a8a39b; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 9px; padding: 14px; border: 1px solid #242428; border-radius: 10px; background: #111113">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">HOW IT WAS COMPUTED</span>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Solver</span><span>blastFoam 6.2.0</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Charge</span><span>1.0 kg TNT · z 2.0 m</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Detonation</span><span>linear</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Afterburn</span><span>none</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Mesh</span><span style="font-family: 'IBM Plex Mono', monospace">25 mm · 6.59 at charge</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Parallel</span><span>7 MPI ranks</span></div>
+<div style="display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px"><span style="color: #a8a39b">Ended</span><span>reached Outer, 6.31 ms</span></div>
+<div style="display: flex; gap: 6px; padding-top: 4px">
+<button style="flex: 1; height: 32px; border: 1px solid #2c2c31; border-radius: 7px; background: transparent; color: #cfcac2; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Show case</button>
+<button style="flex: 1.4; height: 32px; border: 1px solid #2c2c31; border-radius: 7px; background: transparent; color: #cfcac2; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Load into 01 Setup</button>
+</div>
+</div>
+<span style="flex-grow: 1"></span>
+<span style="font: 11.5px 'IBM Plex Mono', monospace; line-height: 1.45; color: #8f8a82">C:\BLASTLAB_RUNS\wall_A\</span>
+</aside>
+
+<main style="flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px">
+<div style="display: flex; align-items: center; gap: 12px">
+<div role="tablist" aria-label="Chain stage" style="display: flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #5a3522; border-radius: 10px; background: #1d1511">
+<span style="padding: 0 8px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: #ff8a55">STAGE</span>
+<button role="tab" aria-selected="false" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: #c9b3a6; font: 600 13px 'Space Grotesk', sans-serif; cursor: pointer">1D</button>
+<button role="tab" aria-selected="true" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: #ff6a2b; color: #1a0d06; font: 600 13px 'Space Grotesk', sans-serif; cursor: pointer">2D</button>
+<button role="tab" aria-selected="false" style="height: 32px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: #c9b3a6; font: 600 13px 'Space Grotesk', sans-serif; cursor: pointer">3D</button>
+</div>
+<div role="tablist" aria-label="Result view" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #29292e; border-radius: 10px; background: #0b0b0c">
+<button role="tab" aria-selected="{{ fieldSel }}" onClick="{{ showField }}" style="height: 32px; padding: 0 16px; border: 0; border-radius: 7px; background: {{ fieldBg }}; color: {{ fieldFg }}; font: 600 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Field</button>
+<button role="tab" aria-selected="{{ gaugesSel }}" onClick="{{ showGauges }}" style="height: 32px; padding: 0 16px; border: 0; border-radius: 7px; background: {{ gaugesBg }}; color: {{ gaugesFg }}; font: 600 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Gauges</button>
+<button role="tab" aria-selected="{{ d3Sel }}" onClick="{{ show3d }}" style="height: 32px; padding: 0 16px; border: 0; border-radius: 7px; background: {{ d3Bg }}; color: {{ d3Fg }}; font: 600 13px 'IBM Plex Sans', sans-serif; cursor: pointer">3D</button>
+</div>
+<span style="flex-grow: 1"></span>
+<span style="font-size: 12px; color: #8f8a82">Mockup: sample values</span>
+</div>
+
+<sc-if value="{{ gaugesView }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="position: relative; display: flex; flex-direction: column; padding: 10px 12px 6px; border: 1px solid #242428; border-radius: 12px; background: #0e0e10">
+<div style="display: flex; align-items: baseline; gap: 10px; padding: 0 4px">
+<span style="font: 600 15px 'Space Grotesk', sans-serif">Overpressure at the gauges</span>
+<span style="font-size: 12px; color: #8f8a82">selected gauge in colour, the others grey · shaded: positive phase</span>
+</div>
+<svg viewBox="0 0 780 290" width="100%" height="290" role="img" aria-label="Overpressure against time for six gauges; the selected gauge is drawn in colour with its positive phase shaded">
+<path d="M60 20V250M60 250H760" style="fill: none; stroke: #2c2c31; stroke-width: 1"></path>
+<path d="M60 173.3H760M60 96.6H760M60 20H760" style="fill: none; stroke: #1c1c20; stroke-width: 1"></path>
+<path d="M60 250H760" style="fill: none; stroke: #3a3a40; stroke-width: 1; stroke-dasharray: 3 3"></path>
+<text x="52" y="253" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">0</text>
+<text x="52" y="176" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">100</text>
+<text x="52" y="100" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">200</text>
+<text x="52" y="23" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">300</text>
+<text x="16" y="135" transform="rotate(-90 16 135)" style="font: 10.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">overpressure [kPa]</text>
+<text x="60" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0</text>
+<text x="167.7" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">1</text>
+<text x="275.4" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">2</text>
+<text x="383.1" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">3</text>
+<text x="490.8" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">4</text>
+<text x="598.5" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">5</text>
+<text x="706.2" y="268" style="font: 10px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">6</text>
+<text x="410" y="284" style="font: 10.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">time [ms]</text>
+<path d="M294.8 250V22.9C320 120 380 200 469.3 250Z" style="fill: #4cc9f0; opacity: {{ shadeG6 }}"></path>
+<path d="M375.6 250V128.8C395 185 450 225 585.6 250Z" style="fill: #4cc9f0; opacity: {{ shadeG5 }}"></path>
+<path d="M500.5 250V87.4C520 160 570 220 641.6 250Z" style="fill: #4cc9f0; opacity: {{ shadeG3 }}"></path>
+<path d="M507 250V72.8C527 155 575 220 644.8 250Z" style="fill: #4cc9f0; opacity: {{ shadeG2 }}"></path>
+<path d="M564 250V108.9C582 175 630 228 697.6 250Z" style="fill: #4cc9f0; opacity: {{ shadeG1 }}"></path>
+<path d="M661 250V218.6C680 228 710 235 739.6 238.5V250Z" style="fill: #4cc9f0; opacity: {{ shadeG4 }}"></path>
+<path d="M60 250H294.8V22.9C320 120 380 200 469.3 250C500 262 530 264 555.4 263.8C600 263 650 255 706 250L739.6 249" style="fill: none; stroke: {{ strokeG6 }}; stroke-width: {{ widthG6 }}; stroke-linejoin: round"></path>
+<path d="M60 250H375.6V128.8C395 185 450 225 585.6 250C610 256 630 259 652.4 259.2C690 259 720 256 739.6 254" style="fill: none; stroke: {{ strokeG5 }}; stroke-width: {{ widthG5 }}; stroke-linejoin: round"></path>
+<path d="M60 250H500.5V87.4C520 160 570 220 641.6 250C665 257 690 260.5 706.2 260.7C720 260.5 732 259 739.6 258" style="fill: none; stroke: {{ strokeG3 }}; stroke-width: {{ widthG3 }}; stroke-linejoin: round"></path>
+<path d="M60 250H507V72.8C527 155 575 220 644.8 250C668 258 690 261.3 706.2 261.5C720 261.3 732 259.5 739.6 258.5" style="fill: none; stroke: {{ strokeG2 }}; stroke-width: {{ widthG2 }}; stroke-linejoin: round"></path>
+<path d="M60 250H564V108.9C582 175 630 228 697.6 250C712 253 728 255 739.6 255" style="fill: none; stroke: {{ strokeG1 }}; stroke-width: {{ widthG1 }}; stroke-linejoin: round"></path>
+<path d="M60 250H661V218.6C680 228 710 235 739.6 238.5" style="fill: none; stroke: {{ strokeG4 }}; stroke-width: {{ widthG4 }}; stroke-linejoin: round"></path>
+</svg>
+<div style="position: absolute; top: 44px; left: 90px; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid #1f4a5a; border-radius: 8px; background: #0b0f12">
+<span style="font: 600 13px 'IBM Plex Mono', monospace; color: #4cc9f0">{{ selName }} · Z {{ selZ }}</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #e2ded7">peak {{ selPeak }} kPa at {{ selTpk }} ms</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #e2ded7">pos. impulse {{ selImp }} kPa·ms</span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; border: 1px solid #242428; border-radius: 12px; background: #0e0e10; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 12px 0 14px; border-bottom: 1px solid #1c1c20">
+<span style="font: 600 14px 'Space Grotesk', sans-serif">Summary</span>
+<span style="font-size: 12px; color: #8f8a82">tap a row to plot it · net impulse includes the negative phase</span>
+<span style="flex-grow: 1"></span>
+<button style="height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border: 1px solid #2c2c31; border-radius: 7px; background: transparent; color: #cfcac2; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path></svg>Copy table <span style="font: 11px 'IBM Plex Mono', monospace; color: #8f8a82">Ctrl+C</span></button>
+</div>
+<table style="width: 100%; border-collapse: collapse; font-size: 13px">
+<thead>
+<tr style="color: #8f8a82; font-size: 11.5px">
+<th scope="col" style="padding: 8px 14px; font-weight: 500; text-align: left">Gauge</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Z [m/kg^1/3]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Peak [kPa]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Arrival [ms]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">t peak [ms]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Pos. phase [ms]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Pos. impulse [kPa·ms]</th>
+<th scope="col" style="padding: 8px 10px; font-weight: 500; text-align: right">Net impulse [kPa·ms]</th>
+<th scope="col" style="padding: 8px 14px; font-weight: 500; text-align: left">Phase ended</th>
+</tr>
+</thead>
+<tbody style="font-family: 'IBM Plex Mono', monospace">
+<sc-for list="{{ rows }}" as="g" hint-placeholder-count="6">
+<tr onClick="{{ g.pick }}" style="border-top: 1px solid #1c1c20; background: {{ g.bg }}; cursor: pointer">
+<td style="padding: 8px 14px"><button onClick="{{ g.pick }}" aria-pressed="{{ g.pressed }}" style="padding: 0; border: 0; background: transparent; color: #4cc9f0; font: 600 13px 'IBM Plex Mono', monospace; cursor: pointer">{{ g.name }}</button></td>
+<td style="padding: 8px 10px; text-align: right; color: #ffb896">{{ g.z }}</td>
+<td style="padding: 8px 10px; text-align: right; font-weight: 600">{{ g.peak }}</td>
+<td style="padding: 8px 10px; text-align: right">{{ g.arr }}</td>
+<td style="padding: 8px 10px; text-align: right">{{ g.tpk }}</td>
+<td style="padding: 8px 10px; text-align: right">{{ g.pos }}</td>
+<td style="padding: 8px 10px; text-align: right">{{ g.imp }}</td>
+<td style="padding: 8px 10px; text-align: right; color: #cfcac2">{{ g.net }}</td>
+<td style="padding: 8px 14px; font-family: 'IBM Plex Sans', sans-serif; color: {{ g.endColor }}">{{ g.ended }}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ fieldView }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; border: 1px solid #242428; border-radius: 12px; background: #0e0e10; overflow: hidden">
+<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid #1c1c20">
+<div role="group" aria-label="Field" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #29292e; border-radius: 9px; background: #0b0b0c">
+<button aria-pressed="true" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: #2a2a2f; color: #f2efe9; font: 600 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Overpressure</button>
+<button aria-pressed="false" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Density</button>
+<button aria-pressed="false" style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Speed</button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 12.5px; color: #a8a39b">Colours</span>
+<div role="group" aria-label="Colour scale" style="display: flex; gap: 2px; padding: 3px; border: 1px solid #29292e; border-radius: 9px; background: #0b0b0c">
+<button onClick="{{ pickRun }}" aria-pressed="{{ runPressed }}" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: {{ runBg }}; color: {{ runFg }}; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">whole run</button>
+<button onClick="{{ pickFrame }}" aria-pressed="{{ framePressed }}" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: {{ frameBg }}; color: {{ frameFg }}; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">each frame</button>
+<button onClick="{{ pickManual }}" aria-pressed="{{ manualPressed }}" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: {{ manualBg }}; color: {{ manualFg }}; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">manual</button>
+</div>
+</div>
+<sc-if value="{{ manualScale }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 6px">
+<label for="f-min" style="font-size: 12px; color: #8f8a82">Min</label>
+<input id="f-min" value="1" style="width: 56px; height: 30px; box-sizing: border-box; padding: 0 8px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<label for="f-max" style="font-size: 12px; color: #8f8a82">Max</label>
+<input id="f-max" value="300" style="width: 56px; height: 30px; box-sizing: border-box; padding: 0 8px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #8f8a82">kPa</span>
+</div>
+</sc-if>
+<span style="flex-grow: 1"></span>
+<button aria-pressed="false" style="height: 28px; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Show mesh</button>
+</div>
+
+<div style="flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; background: #0d0d0f">
+<svg viewBox="0 0 400 360" width="440" height="396" role="img" aria-label="Overpressure field at t 4.90 ms: incident front over the wall top, the wave reflected from Wall 1, the ground reflection; a cursor readout at r 2.41, z 1.12 m">
+<rect x="44" y="44" width="280" height="280" style="fill: #1b1433"></rect>
+<path d="M44 100A84 84 0 0 1 44 268" style="fill: none; stroke: #7e2a6b; stroke-width: 3; opacity: 0.7"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296L254 149Z" style="fill: #f97316; opacity: 0.55"></path>
+<g style="fill: none; stroke: #f97316; stroke-width: 12; opacity: 0.4; stroke-linecap: round">
+<path d="M236.5 44A238 238 0 0 1 279.4 149"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296"></path>
+<path d="M254 296A238 238 0 0 1 236.5 324"></path>
+<path d="M44 226A238 238 0 0 1 236.5 324"></path>
+</g>
+<g style="fill: none; stroke: #fde68a; stroke-width: 2.5; stroke-linecap: round">
+<path d="M236.5 44A238 238 0 0 1 279.4 149"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296"></path>
+<path d="M254 296A238 238 0 0 1 236.5 324"></path>
+<path d="M44 226A238 238 0 0 1 236.5 324"></path>
+</g>
+<rect x="254" y="149" width="14" height="175" style="fill: #cfcac2"></rect>
+<rect x="247" y="285" width="7" height="7" transform="rotate(45 250.5 288.5)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<rect x="247" y="215.5" width="7" height="7" transform="rotate(45 250.5 219)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<path d="M44 324H324" style="fill: none; stroke: #f2efe9; stroke-width: 1.5"></path>
+<path d="M175 250V324M44 250H175" style="fill: none; stroke: #cfcac2; stroke-width: 0.6; stroke-dasharray: 2 2"></path>
+<circle cx="175" cy="250" r="2.4" style="fill: none; stroke: #f2efe9; stroke-width: 1"></circle>
+<rect x="110" y="256" width="96" height="28" rx="3" style="fill: #0b0b0c; stroke: #333338; stroke-width: 0.6"></rect>
+<text x="116" y="267" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #f2efe9">r 1.87  z 1.06 m</text>
+<text x="116" y="278" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #ffb896">overpressure 21 kPa</text>
+<text x="44" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0</text>
+<text x="184" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">2</text>
+<text x="324" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">4</text>
+<text x="37" y="327" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">0</text>
+<text x="37" y="187" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">2</text>
+<text x="37" y="47" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">4</text>
+<text x="184" y="352" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">r [m]</text>
+<text x="15" y="184" transform="rotate(-90 15 184)" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">z [m]</text>
+<rect x="344" y="64" width="12" height="40" style="fill: #fff3b0"></rect>
+<rect x="344" y="104" width="12" height="40" style="fill: #fbbf24"></rect>
+<rect x="344" y="144" width="12" height="40" style="fill: #f97316"></rect>
+<rect x="344" y="184" width="12" height="40" style="fill: #c2410c"></rect>
+<rect x="344" y="224" width="12" height="40" style="fill: #7e2a6b"></rect>
+<rect x="344" y="264" width="12" height="40" style="fill: #1b1433"></rect>
+<text x="360" y="67" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">300</text>
+<text x="360" y="187" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">30</text>
+<text x="360" y="307" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">3</text>
+<text x="350" y="56" style="font: 7.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">kPa, log</text>
+</svg>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-top: 1px solid #1c1c20">
+<button onClick="{{ togglePlay }}" aria-label="{{ playLabel }}" style="width: 40px; height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 20px; background: #ff6a2b; cursor: pointer">
+<sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" style="fill: #1a0d06"></rect><rect x="14" y="5" width="4" height="14" rx="1" style="fill: #1a0d06"></rect></svg></sc-if>
+<sc-if value="{{ paused }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M8 5l12 7-12 7z" style="fill: #1a0d06"></path></svg></sc-if>
+</button>
+<span style="font: 600 15px 'Space Grotesk', sans-serif; min-width: 76px">4.90 <span style="font-size: 12px; color: #a8a39b">ms</span></span>
+<div style="flex: 1; position: relative; height: 26px">
+<span style="position: absolute; top: 11px; left: 0; right: 0; height: 4px; border-radius: 2px; background: #29292e"></span>
+<span style="position: absolute; top: 11px; left: 0; width: 77.7%; height: 4px; border-radius: 2px; background: #ff6a2b"></span>
+<span style="position: absolute; top: 5px; left: 77.7%; width: 16px; height: 16px; margin-left: -8px; border-radius: 8px; background: #f2efe9"></span>
+<span style="position: absolute; top: 18px; left: 34.5%; width: 2px; height: 8px; background: #4cc9f0"></span>
+<span style="position: absolute; top: 18px; left: 65.7%; width: 2px; height: 8px; background: #4cc9f0"></span>
+</div>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #8f8a82">6.31 ms · 61 frames</span>
+<select aria-label="Replay speed" style="height: 32px; padding: 0 6px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Sans', sans-serif"><option>1×</option><option>0.5×</option><option>2×</option></select>
+<button style="height: 32px; padding: 0 12px; border: 1px solid #2c2c31; border-radius: 7px; background: transparent; color: #cfcac2; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">This frame .png</button>
+</div>
+</div>
+<span style="font-size: 11.5px; color: #8f8a82">Cyan ticks on the time bar: arrival at G6 and G2. The colour choice here is also the one the animation export uses.</span>
+</sc-if>
+
+<sc-if value="{{ view3d }}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1px dashed #333338; border-radius: 12px; background: #0e0e10; color: #a8a39b; text-align: center">
+<svg class="i" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg>
+<span style="font: 600 16px 'Space Grotesk', sans-serif; color: #f2efe9">3D viewer</span>
+<span style="max-width: 420px; font-size: 13px; line-height: 1.5">The pyvista viewer embeds here, as today. Its look is not part of this redesign.</span>
+</div>
+</sc-if>
+
+</main>
+
+<aside aria-label="Export" style="width: 320px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 16px 18px; border-left: 1px solid #1f1f23; background: #0e0e10">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">EXPORT</span>
+<span style="font-size: 12.5px; line-height: 1.45; color: #a8a39b">Into the model folder, or anywhere you choose.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12.5px; font-weight: 600; color: #cfcac2">Data</span>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">Summary</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.csv</span></button>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">Gauge traces</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.tsv</span></button>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">Field snapshot</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.csv</span></button>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">Profile, for a Chain</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.npz</span></button>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">VTK for ParaView</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.vtk</span></button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 12.5px; font-weight: 600; color: #cfcac2">Figures</span>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">All plots</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.png</span></button>
+<button style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #242428; border-radius: 8px; background: #111113; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer"><span style="flex: 1">Report</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">.html</span></button>
+<div aria-busy="true" style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid #3a2a20; border-radius: 8px; background: #1d1511">
+<div style="display: flex; align-items: center; gap: 10px; font-size: 13px"><span style="flex: 1; color: #f2efe9">Animation</span><span style="font: 11.5px 'IBM Plex Mono', monospace; color: #ffb896">writing… 42 %</span></div>
+<span style="height: 4px; border-radius: 2px; background: #3a2a20; overflow: hidden"><span style="display: block; width: 42%; height: 4px; background: #ff6a2b"></span></span>
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="res-title" style="font-size: 12.5px; color: #a8a39b">Title on figures (optional)</label>
+<input id="res-title" placeholder="added above the automatic title" style="height: 36px; box-sizing: border-box; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 8px; background: #0b0b0c; color: #f2efe9; font: 13px 'IBM Plex Sans', sans-serif">
+</div>
+
+<span style="flex-grow: 1"></span>
+<button style="height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #2c2c31; border-radius: 10px; background: transparent; color: #f2efe9; font: 500 13.5px 'IBM Plex Sans', sans-serif; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg>Open the 3D viewer</button>
+</aside>
+</div>
+
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 0 20px; border-top: 1px solid #1f1f23; font-size: 12px; color: #a8a39b">
+<span>Saved summary.csv to C:\BLASTLAB_RUNS\wall_A\</span>
+<span style="flex-grow: 1"></span>
+<span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">Ctrl+C copy table · v1.0.0</span>
+</footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const sel = s.sel || 'G2';
+    const data = [
+      { name: 'G6', z: '2.00', peak: '296', arr: '2.18', tpk: '2.21', pos: '1.62', imp: '118', net: '71', ended: 'yes' },
+      { name: 'G5', z: '2.50', peak: '158', arr: '2.93', tpk: '2.96', pos: '1.95', imp: '89', net: '52', ended: 'yes' },
+      { name: 'G3', z: '2.96', peak: '212', arr: '4.09', tpk: '4.12', pos: '1.31', imp: '104', net: '63', ended: 'yes' },
+      { name: 'G2', z: '2.99', peak: '231', arr: '4.15', tpk: '4.18', pos: '1.28', imp: '112', net: '66', ended: 'yes' },
+      { name: 'G1', z: '3.31', peak: '184', arr: '4.68', tpk: '4.71', pos: '1.24', imp: '93', net: '55', ended: 'yes' },
+      { name: 'G4', z: '3.62', peak: '41', arr: '5.58', tpk: '5.62', pos: '—', imp: '18', net: '18', ended: 'no, record ended' }
+    ];
+    const rows = data.map((g) => ({
+      ...g,
+      pick: () => this.setState({ sel: g.name }),
+      pressed: g.name === sel ? 'true' : 'false',
+      bg: g.name === sel ? '#0f1a1f' : 'transparent',
+      endColor: g.ended === 'yes' ? '#a8a39b' : '#f5d061'
+    }));
+    const cur = data.find((g) => g.name === sel) || data[3];
+    const out = {
+      rows: rows,
+      selName: cur.name, selZ: cur.z, selPeak: cur.peak, selTpk: cur.tpk, selImp: cur.imp
+    };
+    ['G1', 'G2', 'G3', 'G4', 'G5', 'G6'].forEach((n) => {
+      const on = n === sel;
+      out['stroke' + n] = on ? '#4cc9f0' : '#4a4a50';
+      out['width' + n] = on ? '2.4' : '1.2';
+      out['shade' + n] = on ? '0.16' : '0';
+    });
+    const view = s.view || 'gauges';
+    const scale = s.scale || 'run';
+    const playing = !!s.play;
+    const segOn = (on) => [on ? '#2a2a2f' : 'transparent', on ? '#f2efe9' : '#a8a39b'];
+    [['field', 'field'], ['gauges', 'gauges'], ['3d', 'd3']].forEach(([v, k]) => {
+      const [bg, fg] = segOn(view === v);
+      out[k + 'Bg'] = bg; out[k + 'Fg'] = fg; out[k + 'Sel'] = view === v ? 'true' : 'false';
+    });
+    out.fieldView = view === 'field';
+    out.gaugesView = view === 'gauges';
+    out.view3d = view === '3d';
+    out.showField = () => this.setState({ view: 'field' });
+    out.showGauges = () => this.setState({ view: 'gauges' });
+    out.show3d = () => this.setState({ view: '3d' });
+    [['run', 'run'], ['frame', 'frame'], ['manual', 'manual']].forEach(([v, k]) => {
+      const [bg, fg] = segOn(scale === v);
+      out[k + 'Bg'] = bg; out[k + 'Fg'] = fg; out[k + 'Pressed'] = scale === v ? 'true' : 'false';
+    });
+    out.pickRun = () => this.setState({ scale: 'run' });
+    out.pickFrame = () => this.setState({ scale: 'frame' });
+    out.pickManual = () => this.setState({ scale: 'manual' });
+    out.manualScale = scale === 'manual';
+    out.playing = playing;
+    out.paused = !playing;
+    out.togglePlay = () => this.setState({ play: !playing });
+    out.playLabel = playing ? 'Pause' : 'Play';
+    return out;
+  }
+}
+</script>
+</body>
+</html>
