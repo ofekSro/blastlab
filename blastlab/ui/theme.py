@@ -214,7 +214,6 @@ def qss(mode_name):
     QFrame#card {{ background: {p['card']}; border: 1px solid {p['border2']};
                    border-radius: {CARD_RADIUS}px; }}
     QFrame#chip {{ background: {p['card2']}; border-radius: 8px; }}
-    QFrame#sidebar {{ background: {p['bg']}; }}
     QLabel {{ background: transparent; }}
     /* the app-wide QWidget font rule overrides programmatic QFont
        family/size (measured), so the display family is set here too */

@@ -118,8 +118,7 @@ class MainWindow(QMainWindow):
         self._stack = QStackedWidget()
         column.addWidget(self._stack, 1)
         outer.addWidget(self._build_statusbar())
-        self._status_timer.timeout.connect(
-            lambda: (self._status.setText(''), self._status.setToolTip('')))
+        self._status_timer.timeout.connect(self._clear_status)
         self._case_menu = self._build_case_menu()
         self._chip_menu = self._build_chip_menu()
 
@@ -1084,7 +1083,18 @@ class MainWindow(QMainWindow):
         self._status.setText(text[:200])
         self._status.setToolTip(text)   # the whole text, past the cap
         self._status.setStyleSheet(f'color: {theme.cur(colour)};')
+        # the message outranks the shortcuts hint: hide it so the summary
+        # keeps the full label width it had before the 28 px status bar
+        # (pinned by _e2e_hd13_gui: 'the summary fits inside the label');
+        # _clear_status restores it with the message (decision D13)
+        self._keys_lbl.setVisible(False)
         self._status_timer.start()
+
+    def _clear_status(self):
+        """The 12 s timer: clear the message, restore the shortcuts."""
+        self._status.setText('')
+        self._status.setToolTip('')
+        self._keys_lbl.setVisible(True)
 
     def _log_threadsafe(self, text):
         """Log sink for worker threads (cleanup, viewer link)."""

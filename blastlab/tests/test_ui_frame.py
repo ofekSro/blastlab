@@ -356,8 +356,15 @@ def main():
           and win._status.styleSheet() == f'color: {theme.cur("warn")};'
           and win._status_timer.isActive(),
           f'{win._status.text()!r} {win._status.styleSheet()!r}')
-    win._status.setText('')
+    check('the message outranks the shortcuts hint (decision D13): '
+          'the keys label yields its width',
+          not win._keys_lbl.isVisible())
     win._status_timer.stop()
+    win._clear_status()
+    pump(20)
+    check('and the timer clear restores it',
+          win._keys_lbl.isVisible() and win._status.text() == ''
+          and win._status.toolTip() == '')
 
     print('\nF8: dimension control and dark mode')
     win.topbar.dim_seg.changed.emit('3D')
