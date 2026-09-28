@@ -372,6 +372,17 @@ every §3 suite green (`test_vtk_series` once hit a transient Windows
   value in [0, t_file]; at each gauge cell Time_Of_Peak = the probe time
   of peak p within 2e-5 relative; Peak_Overpressure, Peak_Impulse and
   Impulse identical to R3pre (tolerance 0).
+- **F6 fixed in `e592f48`** (arrival before pMax; 17 foam + 4 char goldens
+  re-pinned, checked by script to be a pure block reorder). **F6 e2e run 1
+  (rules `769df4a`): PASS, 21/21.** F-R1 |d| = 0 (peak 114695.675 kPa,
+  impulse 7108.7627, arrival 0.0169987 ms), p arrays and times identical,
+  981 steps both; F-R2 Time_Of_Peak 263 distinct values on the obstacles
+  (2.34e-5 .. 2.41e-4 s) and 446 in the volumes, all within [0, t_file];
+  F-R3 gauge cell 3.42649e-5 s vs probe peak 3.42649e-5 s, rel 1.2e-6;
+  F-R4 Peak_Overpressure, Peak_Impulse, Impulse identical. R3pre (old
+  order) shows the symptom: 1 distinct Time_Of_Peak value. Gates after the
+  fix: all sec. 3 suites, the 16 Tk test_gui_*, test_regression
+  byte-identical - PASS.
 
 ## 7. Remaining backlog after OUT-4
 
