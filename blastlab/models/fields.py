@@ -143,6 +143,7 @@ VTK_QUANTITY_LABELS = {
     'rho': 'Density', 'U': 'Velocity', 'T': 'Temperature',
     'alpha.expl': 'Products', 'rhoE': 'Energy',
     'dynamicP': 'Dynamic pressure', 'impulseMax': 'Peak impulse',
+    'obstacleID': 'Obstacle ID',
 }
 #: the long names, for the row tooltips. blastFoam's pMax is the running
 #: per-cell maximum of the ABSOLUTE pressure p: fieldMinMax on p with no
@@ -177,7 +178,11 @@ VTK_QUANTITY_TIPS = {
     # impulse from the run's start (sec. 15.11, p. 126)
     'impulseMax': 'Peak impulse (the running maximum over time of the net '
                   'impulse in each cell, integral of (p - 101.325 kPa) dt; '
-                  'written to the files as Peak_Impulse) [Pa s]'}
+                  'written to the files as Peak_Impulse) [Pa s]',
+    # OUT-4b (owner Q3): tagged on Windows, no mesh change
+    'obstacleID': 'Obstacle ID (the row of the Obstacles table, 1..N, each '
+                  'wall face belongs to; written to the obstacle files as '
+                  'Obstacle_ID, needs one more obstacle field ticked)'}
 
 
 def vtk_quantity_tip(field):

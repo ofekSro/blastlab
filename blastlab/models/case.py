@@ -26,19 +26,28 @@ TRIGGER_ACTIONS = ('terminate', 'remap', 'remap+terminate')
 #: canonicalises in this order, so reordering would change saved JSON.
 #: OUT-4b (owner Q2): `impulseMax`, the per-cell running max of the net
 #: impulse (fieldMinMax on impulse, guide sec. 15.2, p. 123), appended.
+#: OUT-4b (owner Q3): `obstacleID`, a pseudo-field of the obstacles
+#: column alone, appended last.
 VTK_FIELDS = ('p', 'overpressure', 'impulse', 'pMax', 'timeOfArrival',
               'rho', 'U', 'T', 'alpha.expl', 'rhoE', 'dynamicP',
-              'impulseMax')
+              'impulseMax', 'obstacleID')
 VTK_FO_FIELDS = ('overpressure', 'impulse', 'pMax', 'timeOfArrival',
                  'impulseMax')
+#: OUT-4b (owner Q3): fields the Windows export makes itself, never
+#: sampled by blastFoam - `obstacleID`, each obstacle wall face tagged by
+#: its box (solvers/foam/vtk_export.obstacle_ids). 2D/3D only, like the
+#: obstacles themselves.
+VTK_POST_FIELDS = ('obstacleID',)
 #: OUT-4a: the matrix columns each field has a cell in (plan sec. 3.2,
 #: sec. 9). Every field is written to every file family; at the gauges
 #: (blastProbes, guide sec. 15.1) only what a trace means: p/rho/U (always
 #: recorded, locked) and the four extras T, overpressure, impulse, q.
+#: OUT-4b: obstacleID has the obstacles cell alone (Viper's row).
 _FAMILIES = ('sections', 'obstacles', 'volumes')
-VTK_CELLS = {f: (('gauges',) if f in ('p', 'overpressure', 'impulse', 'rho',
-                                      'U', 'T', 'dynamicP') else ())
-             + _FAMILIES for f in VTK_FIELDS}
+_ONLY_CELLS = {'obstacleID': ('obstacles',)}
+VTK_CELLS = {f: _ONLY_CELLS.get(f, (('gauges',) if f in (
+                 'p', 'overpressure', 'impulse', 'rho', 'U', 'T',
+                 'dynamicP') else ()) + _FAMILIES) for f in VTK_FIELDS}
 #: the gauge fields every blastFoam run records (wallload and the plots
 #: consume them): shown ticked and locked, never listed in `vtk_gauges`
 VTK_GAUGE_LOCKED = ('p', 'rho', 'U')
@@ -67,13 +76,13 @@ VTK_ARRAY_NAMES = {'p': 'pressure', 'pMax': 'Peak_Overpressure',
                    'U': 'velocity', 'T': 'temperature',
                    'alpha.expl': 'Products_Fraction', 'rhoE': 'Energy',
                    'dynamicP': 'Dynamic_Pressure',
-                   'impulseMax': 'Peak_Impulse'}
+                   'impulseMax': 'Peak_Impulse', 'obstacleID': 'Obstacle_ID'}
 
 
 def vtk_fields_for(dim):
     """The VTK fields a case of dimension `dim` has (D4)."""
     return tuple(f for f in VTK_FIELDS
-                 if dim >= 2 or f not in VTK_FO_FIELDS)
+                 if dim >= 2 or f not in VTK_FO_FIELDS + VTK_POST_FIELDS)
 
 
 def vtk_gauge_extras_for(dim):

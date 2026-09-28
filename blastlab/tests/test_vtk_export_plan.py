@@ -1280,7 +1280,166 @@ TESTS_D = [test_d_no_family_purges, test_d_without_the_flag_nothing,
            test_d_auto_resume_keeps_the_record,
            test_d_volumes_still_need_the_copy, test_d_protected_survive,
            test_d_decomposed_amr, test_d_decomposed_purge_untouched]
-TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D
+# ── E: OUT-4b obstacle IDs (owner Q3) ─────────────────────────────────────
+def _quad(axis, at, a0, a1, b0, b1):
+    """The four corners of an axis-aligned face at `axis` = `at`,
+    spanning [a0, a1] x [b0, b1] on the two other axes (in xyz order)."""
+    others = [i for i in range(3) if i != axis]
+    out = []
+    for a, b in ((a0, b0), (a1, b0), (a1, b1), (a0, b1)):
+        p = [0.0, 0.0, 0.0]
+        p[axis], p[others[0]], p[others[1]] = at, a, b
+        out.append(tuple(p))
+    return out
+
+
+def two_box_surface():
+    """Boxes A = [0,2]x[0,1]x[0,1] and B = [2,3]x[0,1]x[0,1], touching
+    at x = 2 with their tops coplanar (z = 1), on the ground (z = 0 is
+    not a wall): their exposed unit faces, with one top face straddling
+    the seam, x in [1, 3] - its centroid (2, 0.5, 1) lies on both boxes.
+    Returns (points, polys, the expected ID per face)."""
+    faces = [(_quad(2, 1.0, 0, 1, 0, 1), 1),        # A top
+             (_quad(2, 1.0, 1, 3, 0, 1), 1),        # straddling top: tie
+             (_quad(1, 0.0, 0, 1, 0, 1), 1), (_quad(1, 0.0, 1, 2, 0, 1), 1),
+             (_quad(1, 0.0, 2, 3, 0, 1), 2),        # y = 0 side
+             (_quad(1, 1.0, 0, 1, 0, 1), 1), (_quad(1, 1.0, 1, 2, 0, 1), 1),
+             (_quad(1, 1.0, 2, 3, 0, 1), 2),        # y = 1 side
+             (_quad(0, 0.0, 0, 1, 0, 1), 1),        # A's x = 0 end
+             (_quad(0, 3.0, 0, 1, 0, 1), 2)]        # B's x = 3 end
+    pts, polys = [], []
+    for corners, _id in faces:
+        polys.append(list(range(len(pts), len(pts) + 4)))
+        pts += corners
+    return np.array(pts), polys, [i for _c, i in faces]
+
+
+BOXES_AB = [(0.0, 2.0, 0.0, 1.0, 0.0, 1.0), (2.0, 3.0, 0.0, 1.0, 0.0, 1.0)]
+
+
+def test_e_obstacle_ids_two_boxes():
+    pts, polys, want = two_box_surface()
+    ids = vx.obstacle_ids(pts, polys, BOXES_AB, 1e-6)
+    assert ids.dtype == np.int32 and ids.tolist() == want, ids
+    # counts per ID, every face tagged (none 0)
+    assert np.bincount(ids).tolist() == [0, 7, 3], np.bincount(ids)
+    # the coplanar tie goes to the LOWER index, whichever box comes first
+    swapped = vx.obstacle_ids(pts, polys, BOXES_AB[::-1], 1e-6)
+    assert swapped[1] == 1 and swapped[0] == 2, swapped
+    # float32 points (as the VTK files hold them) still tag within tol
+    ids32 = vx.obstacle_ids(pts.astype(np.float32) + np.float32(3e-7),
+                            polys, BOXES_AB, 1e-5)
+    assert ids32.tolist() == want
+
+
+def test_e_obstacle_ids_refuse_a_stray_face():
+    pts, polys, _want = two_box_surface()
+    stray = np.vstack([pts, _quad(2, 5.0, 0, 1, 0, 1)])
+    for bad_pts, bad_polys, why in (
+            (stray, polys + [[len(pts), len(pts) + 1, len(pts) + 2,
+                              len(pts) + 3]], 'lie on no obstacle box'),
+            (pts, polys, 'no obstacle box')):
+        boxes = BOXES_AB if why != 'no obstacle box' else []
+        try:
+            vx.obstacle_ids(bad_pts, bad_polys, boxes, 1e-6)
+        except ValueError as exc:
+            assert why in str(exc), exc
+        else:
+            raise AssertionError(f'accepted: {why}')
+    # a face INSIDE a box (not on its surface) is refused too
+    inner = np.array(_quad(2, 0.5, 0.2, 0.8, 0.2, 0.8))
+    try:
+        vx.obstacle_ids(inner, [[0, 1, 2, 3]], BOXES_AB, 1e-6)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('a face inside a box was tagged')
+
+
+def test_e_obstacle_ids_2d():
+    """2D: boxes (x0, x1, y0, y1); planar by (x, y), axisymmetric by
+    (r, y) with r = hypot(x, z), the wedge's radius."""
+    box = [(0.5, 1.0, 0.0, 2.0)]
+    zh = 0.05
+    planar = [[(1.0, 0.5, -zh), (1.0, 0.7, -zh), (1.0, 0.7, zh),
+               (1.0, 0.5, zh)],                     # the x = 1.0 wall
+              [(0.5, 2.0, -zh), (0.6, 2.0, -zh), (0.6, 2.0, zh),
+               (0.5, 2.0, zh)]]                     # the y = 2.0 top
+    pts = np.array([p for f in planar for p in f])
+    polys = [[0, 1, 2, 3], [4, 5, 6, 7]]
+    assert vx.obstacle_ids(pts, polys, box, 1e-6).tolist() == [1, 1]
+    a = np.radians(2.5)
+    c, s = np.cos(a), np.sin(a)
+    wedge = [[(r * c, y, sg * r * s) for r, y, sg in
+              ((1.0, 0.5, -1), (1.0, 0.7, -1), (1.0, 0.7, 1), (1.0, 0.5, 1))],
+             [(r * c, 2.0, sg * r * s) for r, sg in
+              ((0.5, -1), (0.6, -1), (0.6, 1), (0.5, 1))]]
+    wp = np.array([p for f in wedge for p in f])
+    assert vx.obstacle_ids(wp, polys, box, 1e-6, axisym=True).tolist() \
+        == [1, 1]
+    try:            # read as planar, the r = 1.0 wall sits at x = r cos a
+        vx.obstacle_ids(wp, polys, box, 1e-6)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('a wedge face tagged without axisym')
+
+
+def test_e_export_writes_obstacle_id():
+    """The executor: `obstacleID` among the obstacle fields adds an int
+    Obstacle_ID cell array to every obstacles file, after the sampled
+    fields; the sections are untouched. The fake obstacles patch is the
+    3 x 3 quad patch at z = 0.3, x in [2.0, 2.3] (SHIFT) - the tops of
+    two touching boxes split at x = 2.2."""
+    tree = Tree()
+    try:
+        tree.spec.vtk_surfaces['obstacle_fields'] = ['p', 'obstacleID']
+        tree.spec.obstacles = [(2.0, 2.2, 0.0, 0.3, 0.0, 0.3),
+                               (2.2, 2.3, 0.0, 0.3, 0.0, 0.3)]
+        tree.spec.dx = 0.1
+        tree.spec.patches = [('obstacles', 'wall')]
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        for t in SAMPLES:
+            vd = lv.read(tree.model(f'obstacles/t_{t}.vtk'))
+            assert [a.name for a in vd.cell_data] == ['pressure',
+                                                      'Obstacle_ID'], t
+            ids = vd.cell_data[1]
+            assert ids.vtk_type == 'int' and ids.kind == 'scalars'
+            # columns x = 2.05, 2.15 -> box 1; x = 2.25 -> box 2
+            assert ids.values.tolist() == [1, 1, 2] * 3, ids.values
+        vd = lv.read(tree.model(f'slice_z_0.35/t_{SAMPLES[1]}.vtk'))
+        assert 'Obstacle_ID' not in vd.arrays()
+        assert _manifest(tree)['arrays']['obstacleID'] == 'Obstacle_ID'
+        assert not _manifest(tree)['not_converted']
+    finally:
+        tree.close()
+
+
+def test_e_export_untagged_face_is_not_written():
+    """A face on no box fails the sample (kept in WSL, not_converted) -
+    never written with a made-up ID."""
+    tree = Tree()
+    try:
+        tree.spec.vtk_surfaces['obstacle_fields'] = ['p', 'obstacleID']
+        tree.spec.obstacles = [(2.0, 2.2, 0.0, 0.3, 0.0, 0.3)]
+        tree.spec.dx = 0.1
+        tree.spec.patches = [('obstacles', 'wall')]
+        ex = tree.export()
+        ex.run({t: 0 for t in T}, final=True)
+        assert not os.path.exists(tree.model(f'obstacles/t_{SAMPLES[0]}.vtk'))
+        nc = _manifest(tree)['not_converted']
+        assert {e['family'] for e in nc} == {'obstacles'}, nc
+        assert 'lie on no obstacle box' in nc[0]['why'], nc[0]
+    finally:
+        tree.close()
+
+
+TESTS_E = [test_e_obstacle_ids_two_boxes,
+           test_e_obstacle_ids_refuse_a_stray_face, test_e_obstacle_ids_2d,
+           test_e_export_writes_obstacle_id,
+           test_e_export_untagged_face_is_not_written]
+TESTS = TESTS_A + TESTS_B + TESTS_C + TESTS_D + TESTS_E
 
 
 def main():

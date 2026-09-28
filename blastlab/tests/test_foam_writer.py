@@ -1651,6 +1651,36 @@ def peak_impulse_checks():
           and 'fields (p);' in norm(fo_block(rc, W.VTK_OBSTACLES)))
 
 
+def obstacle_id_checks():
+    """OUT-4b B3 (owner Q3): obstacleID is made on Windows - blastFoam
+    never samples it, and no mesh, BC or patch changes (plan F5)."""
+    from blastlab.solvers.foam import writer as W
+    print('\n  OUT-4b: obstacle IDs (obstacleID)')
+    for dim, cls, base in (
+            (3, Case3D, dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.05,
+                             charge=4.0, center=(0.5, 1.0, 1.0),
+                             obstacles=[(1.2, 1.5, 0.6, 1.4, 0.0, 1.2),
+                                        (1.6, 1.8, 0.2, 0.5, 0.0, 0.4)],
+                             gauges=[(1.8, 1.0, 1.0)], n_snapshots=3,
+                             solver='blastfoam', material='TNT')),
+            (2, Case2D, dict(Lx=4.0, Ly=4.0, cell_size_m=0.02, charge=1.0,
+                             center=(0.0, 1.0),
+                             obstacles=[(2.0, 2.4, 0.0, 1.6)],
+                             gauges=[(1.0, 1.0)], solver='blastfoam',
+                             material='TNT'))):
+        surf = {'on': True, 'mode': 'time', 'value': 0.0005, 'fields': [],
+                'obstacle_fields': ['p', 'obstacleID'], 'planes': []}
+        tagged = render_case(cls(**base, vtk_surfaces=surf))
+        plain = render_case(cls(**base, vtk_surfaces=dict(
+            surf, obstacle_fields=['p'])))
+        check(f'obstacleID {dim}D: not sampled - vtkObstacles fields (p)',
+              'fields (p);' in norm(fo_block(
+                  tagged.files['system/controlDict'], W.VTK_OBSTACLES)))
+        check(f'obstacleID {dim}D: every file byte-identical to p alone '
+              f'(no mesh, BC or patch change)',
+              tagged.files == plain.files)
+
+
 def specs_time_name():
     """A profile stage whose t0 needs more digits than timePrecision."""
     import numpy as np
@@ -1697,6 +1727,7 @@ def main():
     vtk_checks()
     gauge_checks()
     peak_impulse_checks()
+    obstacle_id_checks()
     golden(specs, update)
     print()
     if FAIL:

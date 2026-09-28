@@ -223,8 +223,8 @@ def main():
         check(f'{d}D: {len(rows)} quantity rows (D4)',
               sorted({f_ for f_, _c in grid.boxes}) == sorted(rows)
               # OUT-4a: + the Dynamic pressure row; OUT-4b: + Peak
-              # impulse (2D/3D)
-              and len(rows) == (7 if d == 1 else 12), str(rows))
+              # impulse and Obstacle ID (2D/3D)
+              and len(rows) == (7 if d == 1 else 13), str(rows))
         # OUT-4a: the Gauges column has live boxes too (the extras)
         check(f'{d}D: live columns {want_cols[d]}',
               cols == sorted(want_cols[d]), str(cols))
@@ -376,6 +376,18 @@ def main():
     check('a click on a cell edits that column only',
           m['obstacles'] == ['p', 'pMax', 'T'] and m['sections'] == ['pMax'],
           str(m))
+    # OUT-4b B3 (owner Q3): Obstacle ID is an Obstacles box alone, and
+    # its tick lands in obstacle_fields
+    check('B3: Obstacle ID has an Obstacles box and no other',
+          {c for r, c in grid.boxes if r == 'obstacleID'} == {'obstacles'},
+          str(sorted(c for r, c in grid.boxes if r == 'obstacleID')))
+    grid.boxes[('obstacleID', 'obstacles')].click()
+    pump(5)
+    check('B3: its tick is saved in obstacle_fields, last',
+          case_to_dict(f.get_case())['vtk_surfaces']['obstacle_fields']
+          == ['p', 'pMax', 'T', 'obstacleID'])
+    grid.boxes[('obstacleID', 'obstacles')].click()
+    pump(5)
     f.widgets['vtk_s_on'].click()
     pump(5)
     check('unticking the family keeps its ticks',

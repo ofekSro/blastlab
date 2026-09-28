@@ -48,6 +48,7 @@ from ..models.case import VTK_MODES as _VTK_MODES
 from ..models.case import vtk_family as _vtk_family
 from ..models.case import vtk_fields_for as _vtk_fields_for
 from ..models.case import VTK_CELLS as _VTK_CELLS
+from ..models.case import VTK_POST_FIELDS as _VTK_POST_FIELDS
 from ..models.case import VTK_GAUGE_LOCKED as _VTK_GAUGE_LOCKED
 from ..models.case import normalize_vtk_gauges as _normalize_vtk_gauges
 from ..models.case import vtk_gauge_extras_for as _vtk_gauge_extras_for
@@ -520,10 +521,16 @@ def _validate_vtk_cadence(label, fam, err):
     return True
 
 
-def _validate_vtk_fields(label, names, dim, err):
-    """Every name a field the dimension has (D4)."""
+def _validate_vtk_fields(label, names, dim, err, col=None):
+    """Every name a field the dimension has (D4), with a cell in matrix
+    column `col` (VTK_CELLS; OUT-4b: obstacleID is an obstacles field
+    alone)."""
     have = _vtk_fields_for(dim)
     for f in names:
+        if col and f in _VTK_CELLS and col not in _VTK_CELLS[f]:
+            err(f"{label}: '{f}' has no {col} cell - it is written to the "
+                f"{' and '.join(_VTK_CELLS[f])} files only")
+            continue
         if f in have:
             continue
         if f in _VTK_FIELDS:
@@ -654,9 +661,17 @@ def _validate_vtk(case, rep, ctx):
     if surf:
         label = _VTK_LABELS['vtk_surfaces']
         _validate_vtk_cadence(label, surf, err)
-        _validate_vtk_fields('VTK sections', surf['fields'], case.dim, err)
+        _validate_vtk_fields('VTK sections', surf['fields'], case.dim, err,
+                             'sections')
         _validate_vtk_fields('VTK obstacles', surf['obstacle_fields'],
-                             case.dim, err)
+                             case.dim, err, 'obstacles')
+        # OUT-4b: Obstacle_ID tags the faces of a sampled obstacles file -
+        # alone, blastFoam writes no file to tag
+        if surf['obstacle_fields'] and all(
+                f in _VTK_POST_FIELDS for f in surf['obstacle_fields']):
+            err("VTK obstacles: Obstacle ID needs at least one more "
+                "obstacle field (e.g. Pressure) - it tags the faces of "
+                "the obstacle files")
         has_obst = bool(getattr(case, 'obstacles', None))
         if case.dim == 2:
             if surf['planes']:
@@ -682,7 +697,7 @@ def _validate_vtk(case, rep, ctx):
     if vol:
         label = _VTK_LABELS['vtk_volumes']
         good = _validate_vtk_cadence(label, vol, err)
-        _validate_vtk_fields(label, vol['fields'], case.dim, err)
+        _validate_vtk_fields(label, vol['fields'], case.dim, err, 'volumes')
         if not vol['fields']:
             err(f"{label}: no field selected - nothing to write")
         if int(getattr(case, 'write_budget', 0) or 0) > 0:

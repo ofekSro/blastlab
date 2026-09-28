@@ -36,7 +36,8 @@ from ...core.bc import normalize_bc
 from ...core.grid import make_grid_1d
 from ...core.refine import effective_dx as _effective_dx
 from ...core.refine import exp_cells as _exp_cells
-from ...models.case import vtk_family, vtk_fields_for, vtk_gauge_fields
+from ...models.case import (VTK_POST_FIELDS, vtk_family, vtk_fields_for,
+                            vtk_gauge_fields)
 from . import env
 from .dicts import (AMR_ALLOWABLE_IMBALANCE, AMR_BALANCE_INTERVAL,
                     AMR_LOAD_BALANCE, FLUX_SCHEME, LOHNER_EPS, P_OPEN_BC,
@@ -1177,9 +1178,11 @@ _FO_ACCUMULATED = ('pMax', 'impulse', 'impulseMax')
 def vtk_surface_fields(spec, names):
     """`names` minus what this spec does not write: a field the
     dimension lacks (validation refuses those) and, on a resumed AMR leg
-    (`fo_accumulators` off), pMax / impulse / impulseMax (D4)."""
+    (`fo_accumulators` off), pMax / impulse / impulseMax (D4). OUT-4b:
+    never a field the Windows export makes itself (obstacleID) -
+    blastFoam has nothing of that name to sample."""
     have = vtk_fields_for(spec.dim)
-    return [f for f in names if f in have
+    return [f for f in names if f in have and f not in VTK_POST_FIELDS
             and (spec.fo_accumulators or f not in _FO_ACCUMULATED)]
 
 

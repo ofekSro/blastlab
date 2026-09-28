@@ -350,6 +350,71 @@ def readable_arrays(arrays, p_ambient=P_AIR):
     return out
 
 
+def obstacle_ids(points, polys, boxes, tol, axisym=False):
+    """OUT-4b (owner Q3): the 1-based obstacle each face of the obstacles
+    wall belongs to, as an int32 array - the first of `boxes` (the
+    Obstacles table order) whose surface holds the face centroid, so a
+    face on two coplanar touching boxes goes to the lower index. Pure;
+    no mesh, patch or golden change (plan F5: one patch per obstacle
+    would need createPatch).
+
+    `points` (n, 3) [m]; `polys` one sequence of point indices per face;
+    `boxes` the SNAPPED boxes (CaseSpec.obstacles): (x0, x1, y0, y1, z0,
+    z1) in 3D, (x0, x1, y0, y1) in 2D, where the face is placed by its
+    (x, y) - or, `axisym`, by (r, y) with r = hypot(x, z) per point, the
+    wedge's radius. On the surface = inside the box grown by `tol` [m]
+    and within `tol` of one of its face planes. ValueError when a face
+    lies on no box: an untagged face is never written as 0."""
+    pts = np.asarray(points, dtype=np.float64).reshape(-1, 3)
+    boxes = [tuple(float(v) for v in b) for b in boxes]
+    if not boxes:
+        raise ValueError('no obstacle box to tag the faces with')
+    if len({len(b) for b in boxes}) != 1 or len(boxes[0]) not in (4, 6):
+        raise ValueError(f'obstacle boxes must all be 2D (4) or 3D (6) '
+                         f'values: {boxes!r}')
+    if len(boxes[0]) == 4:
+        u = np.hypot(pts[:, 0], pts[:, 2]) if axisym else pts[:, 0]
+        pts = np.column_stack([u, pts[:, 1]])
+    faces = [np.asarray(f, dtype=np.int64) for f in polys]
+    if not faces:
+        return np.zeros(0, dtype=np.int32)
+    sizes = np.array([len(f) for f in faces])
+    if sizes.min() < 1:
+        raise ValueError('a face with no point')
+    starts = np.concatenate([[0], np.cumsum(sizes)[:-1]])
+    cen = np.add.reduceat(pts[np.concatenate(faces)], starts,
+                          axis=0) / sizes[:, None]
+    ids = np.zeros(len(faces), dtype=np.int32)
+    for i, b in enumerate(boxes, start=1):
+        lo, hi = np.array(b[0::2]), np.array(b[1::2])
+        inside = np.all((cen >= lo - tol) & (cen <= hi + tol), axis=1)
+        on = np.any((np.abs(cen - lo) <= tol) | (np.abs(cen - hi) <= tol),
+                    axis=1)
+        ids[(ids == 0) & inside & on] = i
+    bad = np.flatnonzero(ids == 0)
+    if bad.size:
+        raise ValueError(f'{bad.size} obstacle face(s) lie on no obstacle '
+                         f'box, the first at {cen[bad[0]].tolist()}')
+    return ids
+
+
+def polygon_faces(vd):
+    """The faces of a POLYDATA surface as point-index arrays (its
+    POLYGONS block); ValueError for anything else."""
+    blk = vd.block('POLYGONS') if vd.dataset == 'POLYDATA' else None
+    if blk is None or any(vd.block(k) is not None for k in
+                          ('VERTICES', 'LINES', 'TRIANGLE_STRIPS')):
+        raise ValueError('the obstacles surface is not a POLYGONS-only '
+                         'POLYDATA - its faces cannot be tagged')
+    conn = np.asarray(blk.values, dtype=np.int64)
+    out, i = [], 0
+    while i < len(conn):
+        n = int(conn[i])
+        out.append(conn[i + 1:i + 1 + n])
+        i += 1 + n
+    return out
+
+
 def export_file(vd, t, p_ambient=P_AIR, title=None):
     """`vd` as it is written: readable arrays (cell and point data kept
     apart, as the source holds them) and the sample time `t` [s] inside
@@ -720,6 +785,8 @@ class VtkExport:
             VTK_SECTIONS: (list(surf.get('fields', ())) if dim == 3
                            else []),
             VTK_OBSTACLES: list(surf.get('obstacle_fields', ()))}
+        #: OUT-4b (owner Q3): tag each obstacle file's faces (Obstacle_ID)
+        self.tag_obstacles = 'obstacleID' in self.surf_fields[VTK_OBSTACLES]
         self._protect = {}              # name -> the reasons it is kept
         self.reconstructed = set()
         self.converted, self.copied, self.deleted = set(), set(), set()
@@ -1351,7 +1418,12 @@ class VtkExport:
                 except ValueError as exc:
                     return f'{name}: not a readable VTK file: {exc}'
             try:
-                vd = export_file(legacy_vtk.merge(loaded), t, self.p_ambient,
+                merged = legacy_vtk.merge(loaded)
+                if kind == OBSTACLES and self.tag_obstacles:
+                    merged.cell_data.append(legacy_vtk.Array(
+                        'obstacleID', self._obstacle_ids(merged), 'int',
+                        'scalars'))
+                vd = export_file(merged, t, self.p_ambient,
                                  self._title(surface, t))
             except ValueError as exc:
                 return str(exc)
@@ -1359,6 +1431,15 @@ class VtkExport:
         finally:
             for s in stages:
                 _remove(s)
+
+    def _obstacle_ids(self, vd):
+        """OUT-4b: `obstacle_ids` of one merged obstacles file, against
+        the spec's snapped boxes, to 1 % of the finest cell."""
+        spec = self.spec
+        cell = float(getattr(spec, 'dx_charge', None) or spec.dx)
+        axisym = ('wedge', 'wedge') in (getattr(spec, 'patches', None) or ())
+        return obstacle_ids(vd.block('POINTS').values, polygon_faces(vd),
+                            spec.obstacles, 0.01 * cell, axisym=axisym)
 
     # ── 5: the index, then the delete ──
     def _write_index(self):

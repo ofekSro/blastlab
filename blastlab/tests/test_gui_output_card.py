@@ -94,7 +94,10 @@ def main():
         extras = F.vtk_gauge_extras_for(d)
         check(f'{d}D: a box per quantity and destination column, plus the '
               f'gauge extras {extras}',
-              set(cells) == {(r, c) for r in rows for c in dest}
+              # OUT-4b: a cell only where VTK_CELLS has one (obstacleID:
+              # the obstacles column alone)
+              set(cells) == {(r, c) for r in rows for c in dest
+                             if c in F.VTK_CELLS[r]}
               | {(x, 'gauges') for x in extras}
               and set(extras) == ({'T', 'dynamicP'} if d == 1 else
                                   {'T', 'dynamicP', 'overpressure',
@@ -160,6 +163,16 @@ def main():
     f.v['vtk_s_on'].set(True)
     check('unticking and ticking again keeps the edited column',
           f.v['vtk_fields'].get()['obstacles'] == ['p', 'pMax', 'T'])
+    # OUT-4b B3 (owner Q3): Obstacle ID is an Obstacles cell alone, and
+    # its tick lands in obstacle_fields
+    cells = f.v['vtk_fields'].cells
+    check('B3: Obstacle ID has an Obstacles cell and no other',
+          {c for r, c in cells if r == 'obstacleID'} == {'obstacles'})
+    cells[('obstacleID', 'obstacles')].set(True)
+    check('B3: its tick is saved in obstacle_fields, last',
+          case_to_dict(f.get_case())['vtk_surfaces']['obstacle_fields']
+          == ['p', 'pMax', 'T', 'obstacleID'])
+    cells[('obstacleID', 'obstacles')].set(False)
     # owner decision P15: an off family keeps its ticks through a save
     f.v['vtk_s_on'].set(False)
     text = json.dumps(case_to_dict(f.get_case()), sort_keys=True)

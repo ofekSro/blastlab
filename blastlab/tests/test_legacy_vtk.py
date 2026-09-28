@@ -237,7 +237,9 @@ def test_every_readable_name():
         # OUT-4a A2: a spec addition (batch plan), not a change to pass
         'dynamicP': 'Dynamic_Pressure',
         # OUT-4b B2 (owner Q2): a spec addition, not a change to pass
-        'impulseMax': 'Peak_Impulse'}
+        'impulseMax': 'Peak_Impulse',
+        # OUT-4b B3 (owner Q3): a spec addition, not a change to pass
+        'obstacleID': 'Obstacle_ID'}
     arrs = [lv.Array(f, np.ones(2), 'float', 'field') for f in VTK_FIELDS]
     out = vx.readable_arrays(arrs)
     assert [a.name for a in out] == [VTK_ARRAY_NAMES[f] for f in VTK_FIELDS]
