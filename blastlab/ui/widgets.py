@@ -31,6 +31,19 @@ def label(text='', kind='body', wrap=False, align=None):
     return lbl
 
 
+def icon_colour(kind):
+    """Icon tint for a button kind. Primary buttons sit on the orange
+    accent, where white fails 4.5:1 - they use `on_accent` (plan §2.1:
+    never white on orange). Danger: on_accent in dark, white in light
+    (the contrast script in tests/test_ui_theme.py flags white only on
+    the dark danger)."""
+    if kind == 'primary':
+        return 'on_accent'
+    if kind == 'danger':
+        return 'on_accent' if theme.mode() == 'dark' else 'white'
+    return None
+
+
 def button(text, icon=None, kind='default', width=None, height=None,
            tooltip=None, on_click=None, icon_size=15):
     """QPushButton styled as 'default' | 'primary' | 'danger' | 'nav' |
@@ -39,7 +52,7 @@ def button(text, icon=None, kind='default', width=None, height=None,
     if kind != 'default':
         b.setObjectName(kind)
     if icon:
-        colour = 'white' if kind in ('primary', 'danger') else None
+        colour = icon_colour(kind)
         b.setIcon(theme.icon(icon, icon_size, color=colour))
         b.setIconSize(QSize(icon_size, icon_size))
         b._blastlab_icon = (icon, icon_size, colour)
@@ -61,7 +74,7 @@ def set_button_kind(b, kind):
     ic = getattr(b, '_blastlab_icon', None)
     if ic is not None:
         name, size, _colour = ic
-        colour = 'white' if kind in ('primary', 'danger') else None
+        colour = icon_colour(kind)
         b.setIcon(theme.icon(name, size, color=colour))
         b._blastlab_icon = (name, size, colour)
     theme.repolish(b)
@@ -74,6 +87,11 @@ def refresh_icons(root):
         ic = getattr(b, '_blastlab_icon', None)
         if ic is not None:
             name, size, colour = ic
+            if b.objectName() in ('primary', 'danger'):
+                # the tint is mode-dependent (danger: on_accent in
+                # dark, white in light) - recompute, don't replay
+                colour = icon_colour(b.objectName())
+                b._blastlab_icon = (name, size, colour)
             b.setIcon(theme.icon(name, size, color=colour))
 
 

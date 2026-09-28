@@ -1323,7 +1323,7 @@ class View3DHost(QWidget):
         self._playing = bool(playing)
         self.play_btn.setText('Pause' if self._playing else 'Play')
         self.play_btn.setIcon(theme.icon('pause' if self._playing else 'play',
-                                         12, color='white'))
+                                         12, color='on_accent'))
 
     def _apply_all_controls(self):
         """Replay the control state into a freshly built scene."""

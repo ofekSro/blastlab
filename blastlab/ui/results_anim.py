@@ -376,16 +376,17 @@ class AnimView(QWidget):
             return
         self._playing = True
         self.play_btn.setText('Pause')
-        self.play_btn.setIcon(theme.icon('pause', 13, color='white'))
-        self.play_btn._blastlab_icon = ('pause', 13, 'white')
+        # on_accent, never white, on the orange primary button (GUI-1)
+        self.play_btn.setIcon(theme.icon('pause', 13, color='on_accent'))
+        self.play_btn._blastlab_icon = ('pause', 13, 'on_accent')
         self.timer.start()
 
     def stop_play(self):
         self._playing = False
         self.timer.stop()
         self.play_btn.setText('Play')
-        self.play_btn.setIcon(theme.icon('play', 13, color='white'))
-        self.play_btn._blastlab_icon = ('play', 13, 'white')
+        self.play_btn.setIcon(theme.icon('play', 13, color='on_accent'))
+        self.play_btn._blastlab_icon = ('play', 13, 'on_accent')
 
     def playing(self):
         return self._playing

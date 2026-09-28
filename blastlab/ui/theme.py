@@ -1,37 +1,72 @@
-"""Design system of the Qt front-end: the palette shared with the Tk app,
-fonts and spacing, a Fusion QPalette + a small style sheet per mode, and
-the app's icons drawn with QPainter (no asset files).
+"""Design system of the Qt front-end: the GUI redesign's own warm-black
+palette (docs/gui-redesign-plan.md §2 - the Tk app keeps its own palette
+in gui/theme.py, untouched), bundled fonts, spacing, a Fusion QPalette +
+a small style sheet per mode, and the app's icons drawn with QPainter
+(no asset files).
 
 `apply(app, mode)` switches the whole application; widgets that hold
 mode-dependent state (pyqtgraph panes, icon buttons) connect to
 `signals.changed` and re-theme themselves.
 """
 
+import os
+
 from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import (QBrush, QColor, QFont, QIcon, QPainter,
-                           QPainterPath, QPalette, QPen, QPixmap, QPolygonF)
+from PySide6.QtGui import (QBrush, QColor, QFont, QFontDatabase, QIcon,
+                           QPainter, QPainterPath, QPalette, QPen, QPixmap,
+                           QPolygonF)
 
-# ── palette (identical to gui/theme.py so both front-ends look alike) ───
+# ── palette (GUI-1: docs/gui-redesign-plan.md §2.1 / §2.2) ──────────────
+# `error` / `danger_hover` have no §2.1 value: derived from the `danger`
+# family (error = danger; hover one step lighter in dark, darker in
+# light). `tile` is the same value as `card2`, both keys kept (§2.1).
 DARK = dict(
-    bg='#1a1a1a', card='#2b2b2b', card2='#333333', border='#3a3a3a',
-    entry='#222222', accent='#4f9eff', accent_hover='#3f8ce6',
-    text='#e8e8e8', muted='#9aa4b2', view='#141414',
-    danger='#e5484d', danger_hover='#c93a3f',
-    error='#ff6b6b', warn='#ffb86b', ok='#69db7c',
-    seg='#3a3f46',
+    bg='#0b0b0c', panel='#0e0e10', card='#111113', card2='#141416',
+    tile='#141416', view='#0d0d0f', hover='#1c1c1f', seg='#2a2a2f',
+    border='#1f1f23', border2='#242428', entry='#0b0b0c',
+    entry_border='#2c2c31', text='#f2efe9', text2='#cfcac2',
+    muted='#a8a39b', faint='#8f8a82', num_dim='#6f6a63',
+    accent='#ff6a2b', accent_hover='#ff7f47', on_accent='#1a0d06',
+    accent_text='#ff8a55', accent_soft='#ffb896', accent_bg='#1d1511',
+    accent_border='#5a3522', gauge='#4cc9f0', gauge_bg='#0f1a1f',
+    ok='#7ddc9a', ok_bg='#121814', ok_border='#24302a', warn='#f5d061',
+    danger='#ff5c7a', danger_hover='#ff7490', error='#ff5c7a',
+    stop_bg='#26141a', stop_border='#6b2a37', stop_text='#ff9aac',
+    title_bar='#202024',
 )
+# Light mode per plan §2.2, keys it omits derived with the same roles.
+# Six of the §2.2 proposed values failed the 4.5:1 contrast gate the
+# same section imposes and were darkened until they pass (measured by
+# tests/test_ui_theme.py): faint #7a7e85->#696c72,
+# accent_text #c7430f->#c5420f, gauge #0e7fa6->#0d7599,
+# ok #2f9e44->#257d36, warn #b07d00->#926800, danger #d6336c->#cb3067.
 LIGHT = dict(
-    bg='#f2f4f7', card='#ffffff', card2='#e9edf2', border='#dde2e9',
-    entry='#f2f4f7', accent='#3b8bef', accent_hover='#2f7cdd',
-    text='#1f2430', muted='#5f6b7a', view='#141414',
-    danger='#d13438', danger_hover='#b02a2f',
-    error='#d6336c', warn='#c77700', ok='#2f9e44',
-    seg='#ced6e0',
+    bg='#f4f3f0', panel='#faf9f7', card='#ffffff', card2='#f1efeb',
+    tile='#f1efeb', view='#ecebe7', hover='#e9e6e1', seg='#dcd8d1',
+    border='#e2ded7', border2='#d8d3cb', entry='#ffffff',
+    entry_border='#cdc7be', text='#1f2430', text2='#3a3f4a',
+    muted='#5f6368', faint='#696c72', num_dim='#9b958c',
+    accent='#ff6a2b', accent_hover='#e85d20', on_accent='#1a0d06',
+    accent_text='#c5420f', accent_soft='#b4461c', accent_bg='#fbe9df',
+    accent_border='#e0b394', gauge='#0d7599', gauge_bg='#e3f1f7',
+    ok='#257d36', ok_bg='#e7f3ea', ok_border='#c4dccb', warn='#926800',
+    danger='#cb3067', danger_hover='#b52a5b', error='#cb3067',
+    stop_bg='#fbe4e9', stop_border='#e3aab8', stop_text='#b02a48',
+    title_bar='#dedad3',
 )
 
-# ── typography / spacing ─────────────────────────────────────────────────
-FONT = 'Segoe UI'
-MONO = 'Consolas'
+# ── typography / spacing (plan §2.3: OFL fonts bundled under fonts/) ────
+FONT = 'IBM Plex Sans'
+MONO = 'IBM Plex Mono'
+DISPLAY = 'Space Grotesk'
+#: fallbacks when a bundled TTF is missing - the app must never crash
+#: over a font (plan §2.3)
+FONT_FALLBACK = 'Segoe UI'
+MONO_FALLBACK = 'Consolas'
+#: where the bundled TTFs live - the package directory, never
+#: %WINDIR%\Fonts (plan §11: the Store-Python sandbox)
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'fonts')
 PAD = 16          # outer padding between cards / panel edges
 GAP = 8           # inner padding between rows/controls
 RADIUS = 10       # buttons and inputs
@@ -66,27 +101,77 @@ def qcolor(key):
     return QColor(cur(key))
 
 
+def _body_font(size):
+    f = QFont()
+    f.setFamilies([FONT, FONT_FALLBACK])
+    f.setPointSize(size)
+    return f
+
+
+def _display_font(size, weight=QFont.DemiBold):
+    """Space Grotesk (600-700), falling back to Segoe UI (plan §2.3)."""
+    f = QFont()
+    f.setFamilies([DISPLAY, FONT, FONT_FALLBACK])
+    f.setPointSize(size)
+    f.setWeight(weight)
+    return f
+
+
 def font(kind='body'):
-    """QFont for 'h1' | 'h2' | 'body' | 'small' | 'mono' | 'chip'."""
+    """QFont for 'h1' | 'h2' | 'display' | 'body' | 'small' |
+    'small_bold' | 'chip' | 'mono' (plan §2.3: h1/h2/display are the
+    Space Grotesk display family, body is IBM Plex Sans, mono is IBM
+    Plex Mono, each with a system fallback)."""
     if kind == 'h1':
-        f = QFont(FONT, 20)
-        f.setBold(True)
+        f = _display_font(20, QFont.Bold)
     elif kind == 'h2':
-        f = QFont(FONT, 14)
-        f.setBold(True)
+        f = _display_font(14, QFont.Bold)
+    elif kind == 'display':
+        # stat-tile values, step titles: SG 600, 21-26 px (plan §2.5)
+        f = _display_font(16, QFont.DemiBold)
     elif kind == 'small':
-        f = QFont(FONT, 11)
+        f = _body_font(11)
     elif kind == 'small_bold':
-        f = QFont(FONT, 11)
+        f = _body_font(11)
         f.setBold(True)
     elif kind == 'chip':
-        f = QFont(FONT, 12)
+        f = _body_font(12)
         f.setBold(True)
     elif kind == 'mono':
-        f = QFont(MONO, 12)
+        f = QFont()
+        f.setFamilies([MONO, MONO_FALLBACK])
+        f.setPointSize(12)
     else:
-        f = QFont(FONT, 13)
+        f = _body_font(13)
     return f
+
+
+# ── bundled fonts (plan §2.3) ────────────────────────────────────────────
+_fonts_loaded = False
+
+
+def _load_fonts():
+    """Register every bundled TTF under `FONT_DIR` once per process.
+
+    Called from `apply()`, so every entry path (the app, the tests, the
+    QA harness) gets the families. A missing directory or a bad file is
+    silently survived: the QFont fallbacks take over (plan §2.3 - never
+    crash over a font)."""
+    global _fonts_loaded
+    if _fonts_loaded:
+        return
+    _fonts_loaded = True
+    try:
+        for base, _dirs, files in os.walk(FONT_DIR):
+            for name in files:
+                if name.lower().endswith('.ttf'):
+                    try:
+                        QFontDatabase.addApplicationFont(
+                            os.path.join(base, name))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 
 # ── QPalette + style sheet ───────────────────────────────────────────────
@@ -98,7 +183,9 @@ def make_palette(mode_name):
         QPalette.Base: p['entry'], QPalette.AlternateBase: p['card2'],
         QPalette.Text: p['text'], QPalette.Button: p['card2'],
         QPalette.ButtonText: p['text'], QPalette.Highlight: p['accent'],
-        QPalette.HighlightedText: '#ffffff', QPalette.ToolTipBase: p['card2'],
+        # never white on the orange Highlight (plan §2.1: on_accent)
+        QPalette.HighlightedText: p['on_accent'],
+        QPalette.ToolTipBase: p['card2'],
         QPalette.ToolTipText: p['text'], QPalette.PlaceholderText: p['muted'],
         QPalette.Link: p['accent'], QPalette.Mid: p['border'],
         QPalette.Dark: p['border'], QPalette.Light: p['card'],
@@ -116,11 +203,15 @@ def make_palette(mode_name):
 
 def qss(mode_name):
     p = DARK if mode_name == 'dark' else LIGHT
+    # Danger buttons: white fails 4.5:1 on the dark danger #ff5c7a
+    # (2.97:1) and passes on the light #cb3067 (5.78:1) - measured by
+    # tests/test_ui_theme.py, so the dark mode uses on_accent dark text.
+    danger_fg = p['on_accent'] if mode_name == 'dark' else 'white'
     return f"""
     QWidget {{ font-family: "{FONT}"; font-size: 13pt; }}
     QToolTip {{ background: {p['card2']}; color: {p['text']};
                 border: 1px solid {p['border']}; padding: 4px 6px; }}
-    QFrame#card {{ background: {p['card']}; border: 1px solid {p['border']};
+    QFrame#card {{ background: {p['card']}; border: 1px solid {p['border2']};
                    border-radius: {CARD_RADIUS}px; }}
     QFrame#chip {{ background: {p['card2']}; border-radius: 8px; }}
     QFrame#sidebar {{ background: {p['bg']}; }}
@@ -129,18 +220,19 @@ def qss(mode_name):
     QLabel#h2 {{ font-size: 14pt; font-weight: bold; color: {p['text']}; }}
     QLabel#muted {{ color: {p['muted']}; }}
     QLabel#small {{ color: {p['muted']}; font-size: 11pt; }}
-    QLabel#view {{ background: {DARK['view']}; color: {DARK['muted']};
+    QLabel#view {{ background: {p['view']}; color: {p['muted']};
                    border-radius: 6px; }}
     QPushButton {{ background: {p['card2']}; color: {p['text']};
                    border: none; border-radius: {RADIUS}px;
                    padding: 6px 14px; min-height: 24px; }}
     QPushButton:hover {{ background: {p['border']}; }}
     QPushButton:disabled {{ color: {p['muted']}; background: {p['card2']}; }}
-    QPushButton#primary {{ background: {p['accent']}; color: white; }}
+    QPushButton#primary {{ background: {p['accent']};
+                           color: {p['on_accent']}; }}
     QPushButton#primary:hover {{ background: {p['accent_hover']}; }}
     QPushButton#primary:disabled {{ background: {p['card2']};
                                     color: {p['muted']}; }}
-    QPushButton#danger {{ background: {p['danger']}; color: white; }}
+    QPushButton#danger {{ background: {p['danger']}; color: {danger_fg}; }}
     QPushButton#danger:hover {{ background: {p['danger_hover']}; }}
     QPushButton#danger:disabled {{ background: {p['card2']};
                                    color: {p['muted']}; }}
@@ -158,15 +250,17 @@ def qss(mode_name):
     QToolButton#seg {{ background: {p['seg']}; color: {p['text']};
                        border: none; padding: 4px 12px; }}
     QToolButton#seg:hover {{ background: {p['border']}; }}
-    QToolButton#seg:checked {{ background: {p['accent']}; color: white; }}
+    QToolButton#seg:checked {{ background: {p['accent']};
+                               color: {p['on_accent']}; }}
     QToolButton#seg[pos="first"] {{ border-top-left-radius: {RADIUS}px;
                                     border-bottom-left-radius: {RADIUS}px; }}
     QToolButton#seg[pos="last"] {{ border-top-right-radius: {RADIUS}px;
                                    border-bottom-right-radius: {RADIUS}px; }}
     QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit,
     QTextEdit {{ background: {p['entry']}; color: {p['text']};
-                 border: 1px solid {p['border']}; border-radius: 8px;
-                 padding: 3px 6px; selection-background-color: {p['accent']}; }}
+                 border: 1px solid {p['entry_border']}; border-radius: 8px;
+                 padding: 3px 6px; selection-background-color: {p['accent']};
+                 selection-color: {p['on_accent']}; }}
     QLineEdit:disabled {{ color: {p['muted']}; }}
     /* a field the validator refused: `error` is the Run tab's refresh box,
        `bad` is what the Setup form's mark_fields() sets */
@@ -175,7 +269,8 @@ def qss(mode_name):
     QLineEdit:focus, QComboBox:focus {{ border: 1px solid {p['accent']}; }}
     QComboBox::drop-down {{ border: none; width: 22px; }}
     QComboBox QAbstractItemView {{ background: {p['card2']}; color: {p['text']};
-                                   selection-background-color: {p['accent']}; }}
+                                   selection-background-color: {p['accent']};
+                                   selection-color: {p['on_accent']}; }}
     QPlainTextEdit#log {{ font-family: "{MONO}"; font-size: 12pt;
                           border: none; }}
     QCheckBox, QRadioButton {{ color: {p['text']}; spacing: 6px; }}
@@ -206,13 +301,15 @@ def qss(mode_name):
     QSplitter::handle:horizontal {{ width: 8px; }}
     QTableWidget, QTableView, QTreeView {{ background: {p['entry']};
         color: {p['text']}; border: none; gridline-color: {p['border']};
-        selection-background-color: {p['accent']}; selection-color: white; }}
+        selection-background-color: {p['accent']};
+        selection-color: {p['on_accent']}; }}
     QHeaderView::section {{ background: {p['card2']}; color: {p['muted']};
         border: none; padding: 4px 6px; font-weight: bold; font-size: 11pt; }}
     QStatusBar {{ color: {p['muted']}; }}
     QMenu {{ background: {p['card2']}; color: {p['text']};
              border: 1px solid {p['border']}; }}
-    QMenu::item:selected {{ background: {p['accent']}; color: white; }}
+    QMenu::item:selected {{ background: {p['accent']};
+                            color: {p['on_accent']}; }}
     """
 
 
@@ -220,6 +317,7 @@ def apply(app, mode_name='dark'):
     """Switch the application to `mode_name` ('dark' | 'light')."""
     global _mode
     _mode = 'light' if str(mode_name).lower() == 'light' else 'dark'
+    _load_fonts()
     app.setStyle('Fusion')
     app.setPalette(make_palette(_mode))
     app.setStyleSheet(qss(_mode))
@@ -460,25 +558,35 @@ def _glyph(name, size, colour):
     return tinted
 
 
+def _resolve_colour(colour):
+    """A palette key becomes the current mode's hex; anything else is
+    passed to QColor as-is (so 'white' and '#rrggbb' still work)."""
+    if colour is not None and colour in pal():
+        return cur(colour)
+    return colour
+
+
 def icon(name, size=16, color=None):
     """A cached QIcon of the named glyph. Default colouring follows the
     text colour of the current mode (muted when disabled); pass `color`
-    to force one (e.g. 'white' for icons sitting on accent buttons)."""
+    to force one - a palette key (e.g. 'on_accent' for icons sitting on
+    accent buttons) or any QColor name."""
     key = (name, size, color, _mode)
     ic = _ICON_CACHE.get(key)
     if ic is None:
         ic = QIcon()
-        normal = _glyph(name, size, color or cur('text'))
+        normal = _glyph(name, size, _resolve_colour(color) or cur('text'))
         ic.addPixmap(normal, QIcon.Normal)
         ic.addPixmap(normal, QIcon.Active)
-        ic.addPixmap(_glyph(name, size, color or cur('muted')),
+        ic.addPixmap(_glyph(name, size,
+                            _resolve_colour(color) or cur('muted')),
                      QIcon.Disabled)
         _ICON_CACHE[key] = ic
     return ic
 
 
 def pixmap(name, size=16, color=None):
-    return _glyph(name, size, color or cur('text'))
+    return _glyph(name, size, _resolve_colour(color) or cur('text'))
 
 
 # ── matplotlib figure theming ────────────────────────────────────────────
