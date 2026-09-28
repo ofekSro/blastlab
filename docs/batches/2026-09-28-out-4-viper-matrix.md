@@ -404,8 +404,13 @@ the Tk card had it).
   both); C-R2 gauges\ byte-identical; C-R3 10 = 10 volume files; C-R4
   counts = prediction in all 10; C-R5 values, coordinates, TIME equal
   (tolerance 0); C-R6 manifest k = 1 / 2. Cells kept 47690 / 382960 =
-  0.1245 (the obstacle's cells lie outside the domain's mesh), bytes
+  0.1245 (the obstacle's cells are carved out of the mesh), bytes
   0.25.
+- **C4 gates:** all sec. 3 suites plus test_vtk_decimate, the 16 Tk
+  test_gui_*, test_regression byte-identical, test_foam_writer goldens
+  unchanged - PASS; `_qa_ui_harness.py --only V` (V01-V10) and
+  `_qa_gui_harness.py --only V` (V01-V09) exit 0; `_e2e_vtk_3d.py` PASS
+  41/41. README output section updated.
 
 ## 7. Remaining backlog after OUT-4
 
