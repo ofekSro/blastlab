@@ -790,6 +790,27 @@ Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4a; owner decisions Q1-Q
   a bare-string `fields` value (`ea6d444`). GUI QA Qt V06-V09, Tk V06-V08 all pass.
 - **Commits:** `f3c60b3`..`769c238` and the commit of this entry.
 
+## 0j. 2026-09-28 — batch `out-4b-peaks-ids` (OUT-4, part b)
+
+Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4b and §7a; owner Q1-Q3 + F6.
+
+- **What:** the `timeOfArrival` row is relabelled **Time of peak** / `Time_Of_Peak`
+  (case key unchanged). `Peak_Impulse` = max(impulseMax, impulse) in sections, obstacles
+  and volumes (2D/3D; its own fieldMinMax, `executeAtStart yes`). `Obstacle_ID` (int, 1..N
+  in table order) tags obstacle faces on Windows by snapped box, no mesh change (F5); a
+  face on no box leaves that sample unconverted. No `Arrival_Time`: the 10 %-of-peak
+  threshold needs each cell's final peak, so it cannot be exact during the run.
+- **F6 (owner: fix):** `Time_Of_Peak` was a single uniform value in every 2D/3D run -
+  timeOfArrival shares the `pMax` field and ran after the pMax fieldMinMax, so `p > pMax`
+  was never true. `arrival` now precedes impulse/pMax (`e592f48`); 17 foam + 4 char
+  goldens re-pinned, each a pure block move (script-checked).
+- **Tests:** `test_regression` byte-identical. e2e 14/14 (B-R1..R4, `e4ac578` before the
+  run) and F6 21/21 (F-R1..R4, `769df4a` before the fix): solve identical on peak,
+  impulse and arrival, 981 steps; Time_Of_Peak 263/446 distinct values, matching the
+  probe's time of peak to 1.2e-6. Verifier fix `33087ff` (Obstacle ID tooltip);
+  `_e2e_vtk_3d` 41/41. GUI QA Qt + Tk pass (`docs/qa/2026-09-28-out-4b/`).
+- **Commits:** `994abea`..`a3299f0` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70
