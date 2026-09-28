@@ -384,6 +384,29 @@ every §3 suite green (`test_vtk_series` once hit a transient Windows
   fix: all sec. 3 suites, the 16 Tk test_gui_*, test_regression
   byte-identical - PASS.
 
+**4c (2026-09-28, branch `out-4c-decimation` from `d1402bf`).** Baseline:
+every sec. 3 suite and the Tk test_gui_* green before the first edit
+(test_gui_solver_mode was caught mid-edit by the new form key; green once
+the Tk card had it).
+- **C1** `9176385`: `vtk_volumes.decimate` (after VTK_VOLUME_KEYS, only
+  when k != 1), validation (whole number >= 1; > 1 is 3D only; a note with
+  the owner's warning), the Qt QSpinBox / Tk ttk.Spinbox 1..16 on the 3D
+  Volumes family with the warning line under it; char case-form goldens
+  re-pinned (only the new form key added).
+- **C2** `6ee0479`: `vtk_export.decimate` on the Windows copy of each
+  volume file; manifest `decimate: {volumes: k}`.
+- **C3 e2e (`_e2e_out4_gauges.py --only 4c`, rules committed in
+  `6139d96` before the run): run 1 PASS, 15/15.** C-R0 dx_base 0.017647 m
+  (34 base cells per axis: the charge refinement is global, so not the
+  case's 0.04 m - the rule text was corrected to that in a dry check,
+  before the rules commit and before any run); C-R1 |d| = 0 (peak
+  106962.675 kPa, impulse 6865.5066, arrival 0.0169987 ms, 972 steps
+  both); C-R2 gauges\ byte-identical; C-R3 10 = 10 volume files; C-R4
+  counts = prediction in all 10; C-R5 values, coordinates, TIME equal
+  (tolerance 0); C-R6 manifest k = 1 / 2. Cells kept 47690 / 382960 =
+  0.1245 (the obstacle's cells lie outside the domain's mesh), bytes
+  0.25.
+
 ## 7. Remaining backlog after OUT-4
 
 The OUT track is then complete except OUT-1's pending `gui-qa-tester` screenshots and
