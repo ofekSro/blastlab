@@ -589,6 +589,135 @@ def pixmap(name, size=16, color=None):
     return _glyph(name, size, _resolve_colour(color) or cur('text'))
 
 
+# ── the BlastLab mark and app icon (GUI-2, plan §3, board Logo_Final) ───
+# A front stepping across a regular 8 x 8 grid, with a faint wake behind
+# it. Drawn from the board's rectangle lists at three hand-tuned sizes
+# (64 / 32 / 16); a design is never scaled below 24 px - below that the
+# pixel-drawn 16 takes over. Multi-colour, so it does NOT go through
+# `_glyph()` (that pipeline tints single-colour glyphs).
+
+#: 64 design: 5x5 cells with a 0.5 inset, radius 1, at these origins
+_MARK64_FRONT = [(8, 20), (14, 20), (20, 20), (20, 26), (26, 26),
+                 (32, 26), (32, 32), (32, 38), (38, 38), (38, 44),
+                 (38, 50)]
+_MARK64_WAKE = [(8, 26), (14, 26), (20, 32), (26, 32), (26, 38),
+                (32, 44), (32, 50)]
+#: 32 design: 3x3 cells, no inset
+_MARK32_FRONT = [(4, 10), (7, 10), (10, 10), (10, 13), (13, 13),
+                 (16, 13), (16, 16), (16, 19), (19, 19), (19, 22),
+                 (19, 25)]
+_MARK32_WAKE = [(4, 13), (7, 13), (10, 16), (13, 16), (13, 19),
+                (16, 22), (16, 25)]
+#: 16 design: frame and five steps only (x, y, w, h)
+_MARK16_STEPS = [(2, 4, 3, 2), (5, 5, 2, 3), (7, 7, 2, 2), (8, 9, 3, 2),
+                 (10, 11, 2, 3)]
+
+
+def _draw_mark(p, design, dark, grid=None):
+    """Paint the mark in design coordinates (the painter is pre-scaled).
+    Board Logo_Final: front #ff6a2b dark / #e0501a light, frame #e7eaee
+    / #1f2430, wake at 35 % (30 % light) opacity."""
+    front = QColor('#ff6a2b' if dark else '#e0501a')
+    frame = QColor('#e7eaee' if dark else '#1f2430')
+    wake_opacity = 0.35 if dark else 0.30
+    p.setPen(Qt.NoPen)
+    if design == 16:            # no grid, no wake - crisp edges
+        p.setBrush(QBrush(front))
+        for x, y, w, h in _MARK16_STEPS:
+            p.drawRect(QRectF(x, y, w, h))
+        pen = QPen(frame, 1)
+        pen.setJoinStyle(Qt.MiterJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawRect(QRectF(1.5, 1.5, 13, 13))
+        return
+    if design == 32:
+        grid_pen = QPen(QColor(grid or ('#2c3137' if dark else '#d3d8df')), 1)
+        p.setPen(grid_pen)
+        for k in range(7):
+            v = 7.5 + 3 * k
+            p.drawLine(QPointF(v, 4), QPointF(v, 28))
+            p.drawLine(QPointF(4, v), QPointF(28, v))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(front))
+        p.setOpacity(wake_opacity)
+        for x, y in _MARK32_WAKE:
+            p.drawRect(QRectF(x, y, 3, 3))
+        p.setOpacity(1.0)
+        for x, y in _MARK32_FRONT:
+            p.drawRect(QRectF(x, y, 3, 3))
+        pen = QPen(frame, 2)
+        pen.setJoinStyle(Qt.MiterJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawRect(QRectF(3, 3, 26, 26))
+        return
+    # 64 (and larger, scaled up)
+    grid_pen = QPen(QColor(grid or ('#353a41' if dark else '#d3d8df')), 0.75)
+    p.setPen(grid_pen)
+    for k in range(7):
+        v = 14 + 6 * k
+        p.drawLine(QPointF(v, 8), QPointF(v, 56))
+        p.drawLine(QPointF(8, v), QPointF(56, v))
+    p.setPen(Qt.NoPen)
+    p.setBrush(QBrush(front))
+    p.setOpacity(wake_opacity)
+    for x, y in _MARK64_WAKE:
+        p.drawRoundedRect(QRectF(x + 0.5, y + 0.5, 5, 5), 1, 1)
+    p.setOpacity(1.0)
+    for x, y in _MARK64_FRONT:
+        p.drawRoundedRect(QRectF(x + 0.5, y + 0.5, 5, 5), 1, 1)
+    p.setPen(QPen(frame, 2.5))
+    p.setBrush(Qt.NoBrush)
+    p.drawRoundedRect(QRectF(8, 8, 48, 48), 3, 3)
+
+
+def logo_pixmap(size, mode=None, _grid=None):
+    """The BlastLab mark at `size` device pixels (DPR 1, so the pixel
+    test reads device pixels). `mode` defaults to the current one."""
+    dark = (mode or _mode) != 'light'
+    size = int(size)
+    design = 64 if size >= 48 else (32 if size >= 24 else 16)
+    pm = QPixmap(size, size)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    # the 16 design is drawn to the pixel (board: crispEdges)
+    p.setRenderHint(QPainter.Antialiasing, size != 16)
+    s = size / design
+    p.scale(s, s)
+    try:
+        _draw_mark(p, design, dark, grid=_grid)
+    finally:
+        p.end()
+    return pm
+
+
+def app_icon():
+    """The app icon: the mark on a #1f1c1b rounded square (radius
+    ~20/88, mark ~68/88 of the tile - board Logo_Final, APP ICON).
+    One QIcon with 16/24/32/48/64/128/256 pixmaps, to be set on the
+    QApplication and the main window (plan §3)."""
+    ic = QIcon()
+    for s in (16, 24, 32, 48, 64, 128, 256):
+        pm = QPixmap(s, s)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(QColor('#1f1c1b')))
+        r = s * 20.0 / 88.0
+        p.drawRoundedRect(QRectF(0, 0, s, s), r, r)
+        p.end()
+        mark_size = max(1, round(s * 68.0 / 88.0))
+        mark = logo_pixmap(mark_size, 'dark', _grid='#3a3634')
+        q = QPainter(pm)
+        off = (s - mark_size) / 2.0
+        q.drawPixmap(QPointF(off, off), mark)
+        q.end()
+        ic.addPixmap(pm)
+    return ic
+
+
 # ── matplotlib figure theming ────────────────────────────────────────────
 def style_figure(fig):
     """Recolour a Figure's chrome in place to match the current mode.

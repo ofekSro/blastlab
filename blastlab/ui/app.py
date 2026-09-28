@@ -7,7 +7,7 @@ import sys
 import threading
 
 from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QIcon, QKeySequence, QPixmap, QShortcut
+from PySide6.QtGui import QFont, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QCheckBox, QFrame, QHBoxLayout,
                                QLabel, QMainWindow, QSizePolicy,
                                QStackedWidget, QVBoxLayout, QWidget)
@@ -36,9 +36,6 @@ from .view3d_host import View3DHost
 from .viewer_link import ViewerLink
 from .widgets import Segmented, button, label, refresh_icons
 
-_LOGO = os.path.join(os.path.dirname(os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__)))), 'logo.gif')
-
 CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
 
 #: The GIL switch interval while an HD 1.3 assessment runs on its thread
@@ -60,8 +57,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f'blastlab {__version__}')
         self.resize(1280, 840)
         self.setMinimumSize(1100, 720)
-        if os.path.exists(_LOGO):
-            self.setWindowIcon(QIcon(QPixmap(_LOGO)))
+        # GUI-2: the QPainter-drawn app icon (plan §3); the ELSL gif
+        # logo stays with the Tk app (gui/app.py)
+        self.setWindowIcon(theme.app_icon())
 
         self.bridge = ThreadBridge(self)
         self._hd13_busy = False     # an HD 1.3 assessment is on its thread
@@ -188,14 +186,31 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(12, PAD, 12, 12)
         lay.setSpacing(3)
 
-        if os.path.exists(_LOGO):
-            pm = QPixmap(_LOGO)
-            logo = QLabel()
-            logo.setPixmap(pm.scaledToWidth(184, Qt.SmoothTransformation))
-            logo.setAlignment(Qt.AlignHCenter)
-            lay.addWidget(logo)
-        else:
-            lay.addWidget(label('blastlab', 'h1', align=Qt.AlignHCenter))
+        # GUI-2: mark + BLASTLAB wordmark (board Logo_Final, "IN THE
+        # APP": Space Grotesk Bold, caps, tracking +8 %, LAB in the
+        # accent text colour). GUI-3 moves this into the top bar.
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(8)
+        head.addStretch(1)
+        self._logo_mark = QLabel()
+        self._logo_mark.setPixmap(theme.logo_pixmap(30))
+        head.addWidget(self._logo_mark)
+        wordmark_font = theme.font('h2')
+        wordmark_font.setLetterSpacing(QFont.PercentageSpacing, 108)
+        word = QHBoxLayout()
+        word.setContentsMargins(0, 0, 0, 0)
+        word.setSpacing(0)
+        self._logo_blast = QLabel('BLAST')
+        self._logo_lab = QLabel('LAB')
+        for w in (self._logo_blast, self._logo_lab):
+            w.setFont(wordmark_font)
+            word.addWidget(w)
+        self._logo_lab.setStyleSheet(
+            f'color: {theme.cur("accent_text")};')
+        head.addLayout(word)
+        head.addStretch(1)
+        lay.addLayout(head)
         lay.addWidget(label(f'v{__version__}', 'small',
                             align=Qt.AlignHCenter))
         lay.addSpacing(PAD - 4)
@@ -261,6 +276,10 @@ class MainWindow(QMainWindow):
 
     def _retheme(self, _mode=None):
         refresh_icons(self)
+        # the mark and the LAB tint are mode-dependent (GUI-2)
+        self._logo_mark.setPixmap(theme.logo_pixmap(30))
+        self._logo_lab.setStyleSheet(
+            f'color: {theme.cur("accent_text")};')
         self._show(self.current_tab() or 'setup')
 
     # ── T34: app-level solver mode ───────────────────────────────────────
@@ -937,6 +956,17 @@ def main(case_file=None):
     app.setApplicationName('blastlab')
     st = app_settings.load()
     theme.apply(app, st.get('appearance', 'dark'))
+    # GUI-2 (plan §3): the drawn icon on the application, and an
+    # explicit AppUserModelID so the Windows taskbar shows it (grouped
+    # as blastlab, not as Python)
+    app.setWindowIcon(theme.app_icon())
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.shell32.\
+                SetCurrentProcessExplicitAppUserModelID('blastlab')
+        except Exception:
+            pass
     win = MainWindow(case_file=case_file)
     win.show()
     return app.exec()
