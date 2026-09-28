@@ -216,8 +216,12 @@ def qss(mode_name):
     QFrame#chip {{ background: {p['card2']}; border-radius: 8px; }}
     QFrame#sidebar {{ background: {p['bg']}; }}
     QLabel {{ background: transparent; }}
-    QLabel#h1 {{ font-size: 20pt; font-weight: bold; color: {p['text']}; }}
-    QLabel#h2 {{ font-size: 14pt; font-weight: bold; color: {p['text']}; }}
+    /* the app-wide QWidget font rule overrides programmatic QFont
+       family/size (measured), so the display family is set here too */
+    QLabel#h1 {{ font-family: "{DISPLAY}"; font-size: 20pt;
+                 font-weight: bold; color: {p['text']}; }}
+    QLabel#h2 {{ font-family: "{DISPLAY}"; font-size: 14pt;
+                 font-weight: bold; color: {p['text']}; }}
     QLabel#muted {{ color: {p['muted']}; }}
     QLabel#small {{ color: {p['muted']}; font-size: 11pt; }}
     QLabel#view {{ background: {p['view']}; color: {p['muted']};
@@ -247,11 +251,11 @@ def qss(mode_name):
     QPushButton#link {{ background: transparent; color: {p['accent']};
                         padding: 0px 4px; min-height: 16px; }}
     QPushButton#link:hover {{ background: {p['card']}; }}
-    QToolButton#seg {{ background: {p['seg']}; color: {p['text']};
+    QToolButton#seg {{ background: transparent; color: {p['muted']};
                        border: none; padding: 4px 12px; }}
-    QToolButton#seg:hover {{ background: {p['border']}; }}
-    QToolButton#seg:checked {{ background: {p['accent']};
-                               color: {p['on_accent']}; }}
+    QToolButton#seg:hover {{ background: {p['hover']}; }}
+    QToolButton#seg:checked {{ background: {p['seg']};
+                               color: {p['text']}; }}
     QToolButton#seg[pos="first"] {{ border-top-left-radius: {RADIUS}px;
                                     border-bottom-left-radius: {RADIUS}px; }}
     QToolButton#seg[pos="last"] {{ border-top-right-radius: {RADIUS}px;
@@ -308,6 +312,26 @@ def qss(mode_name):
     QStatusBar {{ color: {p['muted']}; }}
     QMenu {{ background: {p['card2']}; color: {p['text']};
              border: 1px solid {p['border']}; }}
+    /* GUI-4 shared components (ui/components.py, plan §2.5) */
+    QFrame#tile {{ background: {p['tile']}; border: none;
+                   border-radius: 10px; }}
+    QFrame#tile[variant="accent"] {{ background: {p['accent_bg']}; }}
+    QFrame#treerow {{ background: transparent; border: none;
+                      border-radius: 9px; }}
+    QFrame#treerow:hover {{ background: {p['hover']}; }}
+    QFrame#treerow[selected="true"] {{ background: {p['accent_bg']}; }}
+    QToolButton#docktab {{ background: transparent; border: none;
+                           border-bottom: 2px solid transparent;
+                           padding: 0px 14px; color: {p['muted']};
+                           font-size: 13px; font-weight: 600; }}
+    QToolButton#docktab:checked {{ color: {p['text']};
+                                   border-bottom: 2px solid {p['accent']}; }}
+    QFrame#banner {{ background: {p['ok_bg']};
+                     border: 1px solid {p['ok_border']};
+                     border-radius: 10px; }}
+    QFrame#handoff {{ background: {p['accent_bg']};
+                      border: 1px solid {p['accent_border']};
+                      border-radius: 10px; }}
     QMenu::item:selected {{ background: {p['accent']};
                             color: {p['on_accent']}; }}
     """

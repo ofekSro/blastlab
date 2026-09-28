@@ -206,8 +206,7 @@ class MainWindow(QMainWindow):
         for w in (self._logo_blast, self._logo_lab):
             w.setFont(wordmark_font)
             word.addWidget(w)
-        self._logo_lab.setStyleSheet(
-            f'color: {theme.cur("accent_text")};')
+        self._tint_wordmark()
         head.addLayout(word)
         head.addStretch(1)
         lay.addLayout(head)
@@ -274,12 +273,24 @@ class MainWindow(QMainWindow):
     def _toggle_mode(self, checked):
         theme.apply(QApplication.instance(), 'dark' if checked else 'light')
 
+    def _tint_wordmark(self):
+        """Wordmark style (board Logo_Final: Space Grotesk Bold, caps,
+        LAB in accent_text). Family and size go through the per-widget
+        style sheet - the app-wide QSS font rule overrides a plain
+        setFont; the +8 % tracking stays on the QFont (QSS cannot
+        letter-space)."""
+        base = ('font-family: "Space Grotesk"; font-size: 17px; '
+                'font-weight: 700;')
+        self._logo_blast.setStyleSheet(
+            base + f' color: {theme.cur("text")};')
+        self._logo_lab.setStyleSheet(
+            base + f' color: {theme.cur("accent_text")};')
+
     def _retheme(self, _mode=None):
         refresh_icons(self)
-        # the mark and the LAB tint are mode-dependent (GUI-2)
+        # the mark and the wordmark tint are mode-dependent (GUI-2)
         self._logo_mark.setPixmap(theme.logo_pixmap(30))
-        self._logo_lab.setStyleSheet(
-            f'color: {theme.cur("accent_text")};')
+        self._tint_wordmark()
         self._show(self.current_tab() or 'setup')
 
     # ── T34: app-level solver mode ───────────────────────────────────────
