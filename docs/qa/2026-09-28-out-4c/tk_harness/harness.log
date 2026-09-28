@@ -1,0 +1,90 @@
+[22:30:44] [boot] foreign WSL solvers at kickoff: []
+[22:30:53] [boot] App built in 5360 ms
+[22:30:53] [V01] === BEGIN V01 ===
+[22:30:56] [V01] ok: the 1D card is shown in blastFoam mode
+[22:30:56] [V01] ok: Time by default: the steps box is disabled
+[22:30:57] [V01] SHOT 001_V01_setup_1d_off_dark.png (printwindow, lum 39)
+[22:30:58] [V01] ok: the first tick fills p, rho, U
+[22:30:58] [V01] NOTE: 1D VTK strip: blastFoam ready in WSL (Ubuntu) | VTK volumes: one write every 0.001 s, up to 294 writes (~0.5 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~10,000 cells at dx = 0.001 m
+[22:30:59] [V01] SHOT 002_V01_setup_1d_time_dark.png (printwindow, lum 40)
+[22:31:00] [V01] ok: Step disables the seconds box instead
+[22:31:01] [V01] SHOT 003_V01_setup_1d_step_dark.png (printwindow, lum 39)
+[22:31:02] [V01] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V01.png
+[22:31:02] [V01] === END V01: done (8s, max gap 1128 ms) ===
+[22:31:03] [V02] === BEGIN V02 ===
+[22:31:06] [V02] NOTE: 2D obstacles, none drawn: VTK obstacles: the case has no obstacles - nothing to sample | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[22:31:06] [V02] ok: no obstacles: the strip says "nothing to sample"
+[22:31:07] [V02] SHOT 004_V02_setup_2d_no_obstacles_dark.png (printwindow, lum 41)
+[22:31:08] [V02] ok: with an obstacle the refusal is gone
+[22:31:09] [V02] SHOT 005_V02_setup_2d_with_obstacle_dark.png (printwindow, lum 41)
+[22:31:11] [V02] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V02.png
+[22:31:11] [V02] === END V02: done (8s, max gap 753 ms) ===
+[22:31:12] [V03] === BEGIN V03 ===
+[22:31:16] [V03] ok: three destination columns plus the Gauges column (Q2, OUT-4a)
+[22:31:16] [V03] SHOT 006_V03_setup_3d_off_dark.png (printwindow, lum 41)
+[22:31:18] [V03] ok: the first ticks fill the Viper defaults
+[22:31:18] [V03] ok: Step on the surfaces disables their seconds box only
+[22:31:19] [V03] ok: a plane `q, 1` is refused with a reason
+[22:31:20] [V03] SHOT 007_V03_setup_3d_plane_q1_refused_dark.png (printwindow, lum 41)
+[22:31:21] [V03] ok: a plane `y, 1.4` is accepted
+[22:31:21] [V03] NOTE: 3D VTK strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK obstacles: the case has no obstacles - only the sections are written | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~456,533 cells at dx = 0.0192663 m
+[22:31:22] [V03] SHOT 008_V03_setup_3d_step_plane_dark.png (printwindow, lum 41)
+[22:31:24] [V03] SHOT 009_V03_setup_3d_matrix_dark.png (printwindow, lum 40)
+[22:31:25] [V03] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V03.png
+[22:31:25] [V03] === END V03: done (13s, max gap 1467 ms) ===
+[22:31:26] [V04] === BEGIN V04 ===
+[22:31:30] [V04] ok: native: the VTK card is hidden
+[22:31:31] [V04] SHOT 010_V04_setup_native_no_card_dark.png (printwindow, lum 37)
+[22:31:31] [V04] ok: the native case has no vtk_ key
+[22:31:33] [V04] ok: back to blastFoam: the card and the tick are back
+[22:31:34] [V04] SHOT 011_V04_setup_foam_again_dark.png (printwindow, lum 41)
+[22:31:36] [V04] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V04.png
+[22:31:36] [V04] === END V04: done (10s, max gap 298 ms) ===
+[22:31:37] [V05] === BEGIN V05 ===
+[22:31:40] [V05] ok: 3D: the box is on the card, unticked
+[22:31:40] [V05] SHOT 012_V05_setup_3d_keep_off_dark.png (printwindow, lum 41)
+[22:31:41] [V05] NOTE: 3D keep-all strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | Keep all fields in WSL: every write stays in WSL and the scratch is kept after the run; disk estimate ~4.2 GB (up to 60 writes at ~155 B per cell per write) | ~456,533 cells at dx = 0.0192663 m
+[22:31:41] [V05] ok: 3D: the strip explains the box (disk estimate)
+[22:31:41] [V05] ok: 3D: the case carries it
+[22:31:42] [V05] SHOT 013_V05_setup_3d_keep_on_dark.png (printwindow, lum 41)
+[22:31:44] [V05] ok: native: the box is hidden with the card, not in the case
+[22:31:47] [V05] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V05.png
+[22:31:47] [V05] === END V05: done (10s, max gap 257 ms) ===
+[22:31:48] [V06] === BEGIN V06 ===
+[22:31:51] [V06] ok: 1D: p/rho/U locked and ticked; live gauge cells ['T', 'dynamicP']
+[22:31:52] [V06] SHOT 014_V06_setup_1d_gauges_off_dark.png (printwindow, lum 39)
+[22:31:52] [V06] ok: 1D: the ticks reach vtk_gauges
+[22:31:52] [V06] ok: 1D: no VTK gauges message on the strip
+[22:31:53] [V06] SHOT 015_V06_setup_1d_gauges_on_dark.png (printwindow, lum 39)
+[22:31:55] [V06] ok: 1D native: no vtk_gauges key
+[22:31:58] [V06] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V06.png
+[22:31:58] [V06] === END V06: done (9s, max gap 252 ms) ===
+[22:31:59] [V07] === BEGIN V07 ===
+[22:32:01] [V07] ok: 2D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[22:32:02] [V07] SHOT 016_V07_setup_2d_gauges_off_dark.png (printwindow, lum 40)
+[22:32:03] [V07] ok: 2D: the ticks reach vtk_gauges
+[22:32:03] [V07] ok: 2D: no VTK gauges message on the strip
+[22:32:04] [V07] SHOT 017_V07_setup_2d_gauges_on_dark.png (printwindow, lum 41)
+[22:32:05] [V07] ok: 2D native: no vtk_gauges key
+[22:32:09] [V07] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V07.png
+[22:32:09] [V07] === END V07: done (10s, max gap 298 ms) ===
+[22:32:10] [V08] === BEGIN V08 ===
+[22:32:12] [V08] ok: 3D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[22:32:13] [V08] SHOT 018_V08_setup_3d_gauges_off_dark.png (printwindow, lum 40)
+[22:32:14] [V08] ok: 3D: the ticks reach vtk_gauges
+[22:32:14] [V08] ok: 3D: no VTK gauges message on the strip
+[22:32:15] [V08] SHOT 019_V08_setup_3d_gauges_on_dark.png (printwindow, lum 40)
+[22:32:16] [V08] ok: 3D native: no vtk_gauges key
+[22:32:20] [V08] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V08.png
+[22:32:20] [V08] === END V08: done (10s, max gap 319 ms) ===
+[22:32:21] [V09] === BEGIN V09 ===
+[22:32:23] [V09] ok: 2D: no decimation box (3D only)
+[22:32:25] [V09] ok: 3D: the box shows 1, the warning line is under it
+[22:32:26] [V09] ok: 3D: k = 2 reaches vtk_volumes.decimate
+[22:32:26] [V09] NOTE: 3D decimate strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | VTK volumes: decimated - one base-cell layer in 2 is kept on each axis (about 1/8 of the cells); decimated files are for viewing only; peaks may be missed | ~456,533 cells at dx = 0.0192663 m
+[22:32:28] [V09] SHOT 020_V09_setup_3d_decimate_2_dark.png (printwindow, lum 41)
+[22:32:28] [V09] ok: 3D: k = 1 writes no decimate key
+[22:32:30] [V09] ok: native: the box and its warning are hidden with the card
+[22:32:33] [V09] SHEET C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-09-28-out-4c\tk_harness\sheets\contact_V09.png
+[22:32:33] [V09] === END V09: done (12s, max gap 276 ms) ===
+[22:32:39] [V09] exit 0; pending: []

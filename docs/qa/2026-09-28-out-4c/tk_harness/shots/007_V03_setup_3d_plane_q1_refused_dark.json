@@ -1,0 +1,21 @@
+{
+ "scenario": "V03",
+ "tab": "setup",
+ "mode": "dark",
+ "state": "3d_plane_q1_refused",
+ "bbox": [
+  7,
+  0,
+  1289,
+  872
+ ],
+ "capture": "printwindow",
+ "luminance": 40.90833828307261,
+ "geometry": "1280x840+0+0",
+ "dialogs_since_last": [],
+ "run_log_tail": [
+  ""
+ ],
+ "action": "",
+ "t": 1790623880.8842053
+}

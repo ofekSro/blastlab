@@ -1,0 +1,21 @@
+{
+ "scenario": "V09",
+ "tab": "setup",
+ "mode": "dark",
+ "state": "3d_decimate_2",
+ "bbox": [
+  7,
+  0,
+  1289,
+  872
+ ],
+ "capture": "printwindow",
+ "luminance": 40.875517039030186,
+ "geometry": "1280x840+0+0",
+ "dialogs_since_last": [],
+ "run_log_tail": [
+  ""
+ ],
+ "action": "",
+ "t": 1790623948.2343333
+}

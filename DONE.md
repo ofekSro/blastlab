@@ -813,6 +813,28 @@ Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4b and §7a; owner Q1-Q3
 
 ---
 
+## 0k. 2026-09-28 — batch `out-4c-decimation` (OUT-4, part c; OUT track closed)
+
+Plan: `docs/batches/2026-09-28-out-4-viper-matrix.md` §4c and §7a; owner Q4.
+
+- **What:** case key `vtk_volumes.decimate` (whole k, 1..16, 3D only; written only when
+  k != 1, so k = 1 cases save byte-identical; k > 1 adds the note "Decimated files are for
+  viewing only; peaks may be missed."). Qt + Tk spin box on the Volumes row.
+  `vtk_export.decimate` subsamples the Windows copy of each volume file per axis (every
+  k-th base-cell layer by centroid, polyhedra kept, values copied, no averaging); solve
+  and WSL untouched; `manifest.json` records `decimate: {volumes: k}`; a failed or empty
+  decimation leaves the file unconverted and keeps the WSL copy.
+- **Tests:** `test_regression` byte-identical, foam goldens unchanged (2 char case-form
+  goldens gain the new key only). e2e 15/15 (C-R0..R6, `6139d96` before the run): solve
+  identical (|d| = 0 on peak, impulse, arrival, 972 steps), gauge TSVs byte-identical,
+  counts equal the prediction in 10/10 files, kept values equal at tolerance 0; k = 2
+  keeps 12.5 % of cells. New `test_vtk_decimate` 22/22. Verifier fix `c650cb5` (k > 16
+  refused by validation; empty decimation raises). `_e2e_vtk_3d` 41/41. GUI QA Qt + Tk
+  pass, harness V groups 10/10 and 9/9 (`docs/qa/2026-09-28-out-4c/`).
+- **Commits:** `9176385`..`c650cb5` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

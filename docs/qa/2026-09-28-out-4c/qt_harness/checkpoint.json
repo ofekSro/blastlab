@@ -1,0 +1,207 @@
+{
+ "done": {
+  "V01": {
+   "status": "done",
+   "t": 1790623668.9779446,
+   "shots": [
+    "001_V01_setup_1d_off_dark.png",
+    "002_V01_setup_1d_off_card_dark.png",
+    "003_V01_setup_1d_time_dark.png",
+    "004_V01_setup_1d_time_card_dark.png",
+    "005_V01_setup_1d_step_dark.png",
+    "006_V01_setup_1d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  },
+  "V02": {
+   "status": "done",
+   "t": 1790623685.5081847,
+   "shots": [
+    "007_V02_setup_2d_no_obstacles_dark.png",
+    "008_V02_setup_2d_no_obstacles_card_dark.png",
+    "009_V02_setup_2d_with_obstacle_dark.png",
+    "010_V02_setup_2d_with_obstacle_card_dark.png",
+    "011_V02_setup_2d_step_dark.png",
+    "012_V02_setup_2d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 8.9
+  },
+  "V03": {
+   "status": "done",
+   "t": 1790623702.5107539,
+   "shots": [
+    "013_V03_setup_3d_off_dark.png",
+    "014_V03_setup_3d_off_card_dark.png",
+    "015_V03_setup_3d_time_dark.png",
+    "016_V03_setup_3d_time_card_dark.png",
+    "017_V03_setup_3d_plane_q1_refused_card_dark.png",
+    "018_V03_setup_3d_step_plane_dark.png",
+    "019_V03_setup_3d_step_plane_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.2
+  },
+  "V04": {
+   "status": "done",
+   "t": 1790623717.062764,
+   "shots": [
+    "020_V04_setup_native_no_card_dark.png",
+    "021_V04_setup_foam_again_dark.png",
+    "022_V04_setup_foam_again_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 6.5
+  },
+  "V05": {
+   "status": "done",
+   "t": 1790623726.8476677,
+   "shots": [],
+   "err": "",
+   "wall_s": 1.9
+  },
+  "V06": {
+   "status": "done",
+   "t": 1790623746.0285537,
+   "shots": [
+    "023_V06_setup_1d_keep_off_dark.png",
+    "024_V06_setup_1d_keep_off_card_dark.png",
+    "025_V06_setup_1d_keep_on_dark.png",
+    "026_V06_setup_1d_keep_on_card_dark.png",
+    "027_V06_setup_3d_keep_off_dark.png",
+    "028_V06_setup_3d_keep_off_card_dark.png",
+    "029_V06_setup_3d_keep_on_dark.png",
+    "030_V06_setup_3d_keep_on_card_dark.png",
+    "031_V06_setup_native_keep_hidden_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.7
+  },
+  "V07": {
+   "status": "done",
+   "t": 1790623761.2186399,
+   "shots": [
+    "032_V07_setup_1d_gauges_off_dark.png",
+    "033_V07_setup_1d_gauges_off_card_dark.png",
+    "034_V07_setup_1d_gauges_on_dark.png",
+    "035_V07_setup_1d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 6.9
+  },
+  "V08": {
+   "status": "done",
+   "t": 1790623775.844717,
+   "shots": [
+    "036_V08_setup_2d_gauges_off_dark.png",
+    "037_V08_setup_2d_gauges_off_card_dark.png",
+    "038_V08_setup_2d_gauges_on_dark.png",
+    "039_V08_setup_2d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.0
+  },
+  "V09": {
+   "status": "done",
+   "t": 1790623790.58676,
+   "shots": [
+    "040_V09_setup_3d_gauges_off_dark.png",
+    "041_V09_setup_3d_gauges_off_card_dark.png",
+    "042_V09_setup_3d_gauges_on_dark.png",
+    "043_V09_setup_3d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.1
+  },
+  "V10": {
+   "status": "done",
+   "t": 1790623805.1645594,
+   "shots": [
+    "044_V10_setup_3d_decimate_2_dark.png",
+    "045_V10_setup_3d_decimate_2_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  }
+ },
+ "shot_counter": 45,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1790623656.0362744,
+   "argv": [
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-09-28-out-4c\\qt_harness",
+    "--only",
+    "V",
+    "--budget",
+    "900"
+   ],
+   "end": 1790623813.57466,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "V01": {
+   "wall_s": 7.2,
+   "max_gap_ms": 89,
+   "p99_gap_ms": 64,
+   "big_gaps": []
+  },
+  "V02": {
+   "wall_s": 8.9,
+   "max_gap_ms": 94,
+   "p99_gap_ms": 92,
+   "big_gaps": []
+  },
+  "V03": {
+   "wall_s": 9.2,
+   "max_gap_ms": 87,
+   "p99_gap_ms": 58,
+   "big_gaps": []
+  },
+  "V04": {
+   "wall_s": 6.5,
+   "max_gap_ms": 145,
+   "p99_gap_ms": 130,
+   "big_gaps": []
+  },
+  "V05": {
+   "wall_s": 1.9,
+   "max_gap_ms": 0,
+   "p99_gap_ms": 0,
+   "big_gaps": []
+  },
+  "V06": {
+   "wall_s": 11.7,
+   "max_gap_ms": 153,
+   "p99_gap_ms": 72,
+   "big_gaps": []
+  },
+  "V07": {
+   "wall_s": 6.9,
+   "max_gap_ms": 125,
+   "p99_gap_ms": 71,
+   "big_gaps": []
+  },
+  "V08": {
+   "wall_s": 7.0,
+   "max_gap_ms": 102,
+   "p99_gap_ms": 96,
+   "big_gaps": []
+  },
+  "V09": {
+   "wall_s": 7.1,
+   "max_gap_ms": 145,
+   "p99_gap_ms": 115,
+   "big_gaps": []
+  },
+  "V10": {
+   "wall_s": 7.2,
+   "max_gap_ms": 132,
+   "p99_gap_ms": 95,
+   "big_gaps": []
+  }
+ }
+}
