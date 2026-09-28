@@ -1,15 +1,16 @@
-"""blastlab Qt main window: left sidebar (Setup | Run | Results | Chain)
-+ content stack, built with PySide6. A port of gui/app.py."""
+"""blastlab Qt main window: the 64 px top bar (workflow pills, case
+menu, solver chip, dimension control), the content stack and the 28 px
+status bar (GUI-3, plan §4; board BC_Combined). A port of gui/app.py."""
 
 import json
 import os
 import sys
 import threading
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QFont, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QApplication, QCheckBox, QFrame, QHBoxLayout,
-                               QLabel, QMainWindow, QSizePolicy,
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QShortcut
+from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout,
+                               QMainWindow, QMenu, QSizePolicy,
                                QStackedWidget, QVBoxLayout, QWidget)
 
 from .. import __version__
@@ -31,10 +32,11 @@ from .results_panel import ResultsPanel
 from .run_controller import RunController
 from .run_panel import RunPanel
 from .setup_panel import SetupPanel
-from .theme import GAP, PAD
+from .theme import PAD
+from .topbar import TopBar, dot_pixmap
 from .view3d_host import View3DHost
 from .viewer_link import ViewerLink
-from .widgets import Segmented, button, label, refresh_icons
+from .widgets import label, refresh_icons
 
 CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
 
@@ -54,7 +56,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, case_file=None, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f'blastlab {__version__}')
+        self.setWindowTitle('untitled · BlastLab')
         self.resize(1280, 840)
         self.setMinimumSize(1100, 720)
         # GUI-2: the QPainter-drawn app icon (plan §3); the ELSL gif
@@ -87,31 +89,44 @@ class MainWindow(QMainWindow):
         # machine's and not stale
         foam_env.prime_from_settings(st)
 
+        # GUI-3 (plan §4): the dirty flag and the title's run state
+        self._dirty = False
+        self._running_ui = False
+        self._run_pct = None
+        self._chain_k = 0
+        self._chain_n = 0
+
         central = QWidget()
         self.setCentralWidget(central)
-        outer = QHBoxLayout(central)
+        outer = QVBoxLayout(central)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
-        outer.addWidget(self._build_sidebar())
+        # the top bar replaces the 216 px sidebar (GUI-3, no sidebar)
+        self.topbar = TopBar()
+        self.topbar.navigate.connect(self._show)
+        self.topbar.dim_selected.connect(lambda d: self.setup.set_dim(d))
+        self.topbar.case_clicked.connect(self._show_case_menu)
+        self.topbar.chip_clicked.connect(self._show_chip_menu)
+        outer.addWidget(self.topbar)
+        #: the pills, for the QA harness (B04) and the hover checks
+        self._nav_btns = self.topbar.nav_btns
 
         column = QVBoxLayout()
-        column.setContentsMargins(0, PAD, PAD, 6)
+        column.setContentsMargins(PAD, 10, PAD, 8)
         column.setSpacing(6)
         outer.addLayout(column, 1)
         self._stack = QStackedWidget()
         column.addWidget(self._stack, 1)
-        # one status line for the whole window: exports, loads and solver
-        # warnings used to land only in the Run tab's log
-        self._status = label('', 'small')
-        self._status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        column.addWidget(self._status)
+        outer.addWidget(self._build_statusbar())
         self._status_timer.timeout.connect(
             lambda: (self._status.setText(''), self._status.setToolTip('')))
+        self._case_menu = self._build_case_menu()
+        self._chip_menu = self._build_chip_menu()
 
         self.viewer_link = ViewerLink(self, log_fn=self._log_threadsafe)
         self.view3d = View3DHost(self.viewer_link, 'run',
                                  log_fn=self._log_threadsafe)
-        self.setup = SetupPanel(on_change=self._schedule_validate,
+        self.setup = SetupPanel(on_change=self._setup_changed,
                                 mode=self.solver_mode,
                                 viewer_link=self.viewer_link,
                                 log_fn=self._log_threadsafe)
@@ -172,91 +187,120 @@ class MainWindow(QMainWindow):
         if case_file:
             self._open_case(case_file)
 
-    # ── sidebar / navigation ─────────────────────────────────────────────
-    def _build_sidebar(self):
-        side = QFrame()
-        side.setObjectName('sidebar')
-        # Stays 216. Widening it to 232 to fit 'blastFoam' took those
-        # 16 px straight out of the Setup form, whose two columns need
-        # 612 px of viewport and then got 604 - so the fix for a 7 px
-        # label collapsed the whole form to one column. The solver
-        # switch uses the small font instead.
-        side.setFixedWidth(216)
-        lay = QVBoxLayout(side)
-        lay.setContentsMargins(12, PAD, 12, 12)
-        lay.setSpacing(3)
-
-        # GUI-2: mark + BLASTLAB wordmark (board Logo_Final, "IN THE
-        # APP": Space Grotesk Bold, caps, tracking +8 %, LAB in the
-        # accent text colour). GUI-3 moves this into the top bar.
-        head = QHBoxLayout()
-        head.setContentsMargins(0, 0, 0, 0)
-        head.setSpacing(8)
-        head.addStretch(1)
-        self._logo_mark = QLabel()
-        self._logo_mark.setPixmap(theme.logo_pixmap(30))
-        head.addWidget(self._logo_mark)
-        wordmark_font = theme.font('h2')
-        wordmark_font.setLetterSpacing(QFont.PercentageSpacing, 108)
-        word = QHBoxLayout()
-        word.setContentsMargins(0, 0, 0, 0)
-        word.setSpacing(0)
-        self._logo_blast = QLabel('BLAST')
-        self._logo_lab = QLabel('LAB')
-        for w in (self._logo_blast, self._logo_lab):
-            w.setFont(wordmark_font)
-            word.addWidget(w)
-        self._tint_wordmark()
-        head.addLayout(word)
-        head.addStretch(1)
-        lay.addLayout(head)
-        lay.addWidget(label(f'v{__version__}', 'small',
-                            align=Qt.AlignHCenter))
-        lay.addSpacing(PAD - 4)
-
-        self._nav_btns = {}
-        for key, text, ic in (('setup', 'Setup', 'sliders'),
-                              ('run', 'Run', 'play'),
-                              ('results', 'Results', 'chart'),
-                              ('chain', 'Chain', 'chain')):
-            b = button(text, ic, 'nav', height=40, icon_size=17,
-                       on_click=lambda k=key: self._show(k))
-            lay.addWidget(b)
-            self._nav_btns[key] = b
-        lay.addStretch(1)
-
-        # bottom block: case files, solver, appearance, credit
-        for text, ic, cmd in (('Open case…', 'folder', self._open_case),
-                              ('Save case…', 'save', self._save_case)):
-            lay.addWidget(button(text, ic, 'quiet', height=36,
-                                 on_click=lambda f=cmd: f()))
-        lay.addSpacing(10)
-        # T34: the solver is chosen here, once, for the whole app
-        self._solver_label = label('Solver', 'small')
-        lay.addWidget(self._solver_label)
-        self._solver_seg = Segmented([mode_mod.label(m) for m in mode_mod.MODES],
-                                     height=30, small=True)
-        self._solver_seg.set(mode_mod.label(self.solver_mode.get()))
-        self._solver_seg.changed.connect(
-            lambda text: self.solver_mode.set(mode_mod.from_label(text)))
-        lay.addWidget(self._solver_seg)
-        self._solver_hint = label('', 'small', wrap=True)
-        lay.addWidget(self._solver_hint)
-        self._wsl_hint = label('', 'small', wrap=True)
+    # ── frame: status bar, menus, navigation (GUI-3, plan §4) ───────────
+    def _build_statusbar(self):
+        """The 28 px status bar (board BC_Combined footer, lines
+        392-396): WSL dot + text · the dirty context · the app-wide
+        status line (`self._status` - name, `notify()` semantics, timer
+        and tooltip behaviour unchanged) · the shortcuts + version."""
+        bar = QFrame()
+        bar.setObjectName('statusbar')
+        bar.setFixedHeight(28)
+        lay = QHBoxLayout(bar)
+        lay.setContentsMargins(16, 0, 16, 0)
+        lay.setSpacing(12)
+        self._wsl_dot = label('')
+        self._wsl_dot.setFixedWidth(9)
+        self._wsl_dot.setVisible(False)
+        lay.addWidget(self._wsl_dot)
+        self._wsl_hint = label('', 'small')
+        self._wsl_hint.setMinimumWidth(10)     # may compress, never clip
         lay.addWidget(self._wsl_hint)
-        # N17/T48: the hardware behind the rank/cap decisions, and a way
-        # to re-probe it without restarting
-        self._wsl_redetect = button('Re-detect', kind='link', height=20,
-                                    on_click=self._redetect_hw)
-        self._wsl_redetect.setFont(theme.font('small'))
-        lay.addWidget(self._wsl_redetect, alignment=Qt.AlignLeft)
-        lay.addSpacing(8)
-        self._mode_switch = QCheckBox('Dark mode')
-        self._mode_switch.setChecked(theme.mode() == 'dark')
-        self._mode_switch.toggled.connect(self._toggle_mode)
-        lay.addWidget(self._mode_switch)
-        lay.addWidget(label('By Ofek Rotem', 'small', align=Qt.AlignHCenter))
-        return side
+        # `<case>.json has unsaved changes` (plan §4). Its own label, so
+        # `self._status` keeps its pinned notify()/timer semantics
+        # (test_ui_char_hd13_run) - decision D10.
+        self._dirty_lbl = label('', 'small')
+        self._dirty_lbl.setMinimumWidth(10)
+        lay.addWidget(self._dirty_lbl)
+        # one status line for the whole window: exports, loads and solver
+        # warnings used to land only in the Run tab's log
+        self._status = label('', 'small')
+        self._status.setMinimumWidth(10)
+        self._status.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        lay.addWidget(self._status, 1)
+        self._keys_lbl = label(f'Ctrl+S save · F5 run · Shift+Esc stop '
+                               f'· v{__version__}')
+        self._keys_lbl.setMinimumWidth(10)
+        lay.addWidget(self._keys_lbl)
+        self._style_statusbar()
+        return bar
+
+    def _style_statusbar(self):
+        """Mode-dependent colours the QSS cannot carry (re-run on a
+        theme switch)."""
+        self._keys_lbl.setStyleSheet(
+            f'font-family: "{theme.MONO}"; font-size: 11px; '
+            f'color: {theme.cur("faint")};')
+        self._dirty_lbl.setStyleSheet(f'color: {theme.cur("muted")};')
+
+    def _build_case_menu(self):
+        """The case-name button's menu (plan §4, UX-8). The `\\t` texts
+        show the keys without binding them - the QShortcuts of
+        `_bind_accelerators` are the only bindings."""
+        m = QMenu(self)
+        m.addAction('Open…\tCtrl+O', lambda: self._open_case())
+        m.addAction('Save\tCtrl+S', self._save_case_inplace)
+        m.addAction('Save as…\tCtrl+Shift+S', self._save_case)
+        self._recent_menu = m.addMenu('Recent')
+        self._recent_menu.aboutToShow.connect(self._fill_recent_menu)
+        m.addSeparator()
+        self._dark_action = QAction('Dark mode', self)
+        self._dark_action.setCheckable(True)
+        self._dark_action.setChecked(theme.mode() == 'dark')
+        self._dark_action.toggled.connect(self._toggle_mode)
+        m.addAction(self._dark_action)
+        m.addSeparator()
+        credit = m.addAction('By Ofek Rotem')
+        credit.setEnabled(False)                # decision D11
+        return m
+
+    def _fill_recent_menu(self):
+        self._recent_menu.clear()
+        rec = app_settings.load().get('recent_cases') or []
+        if not rec:
+            none = self._recent_menu.addAction('No recent cases')
+            none.setEnabled(False)
+            return
+        for p in rec[:self.RECENT_MAX]:
+            # a missing file goes through _open_case's FileNotFound path
+            self._recent_menu.addAction(os.path.basename(p),
+                                        lambda p=p: self._open_case(p))
+
+    def _show_case_menu(self):
+        b = self.topbar.case_btn
+        self._case_menu.popup(b.mapToGlobal(b.rect().bottomLeft()))
+
+    def _build_chip_menu(self):
+        """The solver chip's menu = the old sidebar switch (T34):
+        exclusive native / blastFoam, the hardware line (N17/T48) and
+        Re-detect."""
+        m = QMenu(self)
+        group = QActionGroup(m)
+        group.setExclusive(True)
+        self._chip_actions = {}
+        for mode in mode_mod.MODES:
+            act = QAction(mode_mod.label(mode), m)
+            act.setCheckable(True)
+            act.setActionGroup(group)
+            act.triggered.connect(
+                lambda _c=False, mm=mode: self.solver_mode.set(mm))
+            m.addAction(act)
+            self._chip_actions[mode] = act
+        self._chip_actions[self.solver_mode.get()].setChecked(True)
+        m.addSeparator()
+        self._chip_info = m.addAction('')
+        self._chip_info.setEnabled(False)
+        m.addAction('Re-detect', self._redetect_hw)
+        m.aboutToShow.connect(self._fill_chip_info)
+        return m
+
+    def _fill_chip_info(self):
+        suffix = self._hw_suffix().strip(' ·')
+        self._chip_info.setText(suffix or 'hardware unknown')
+
+    def _show_chip_menu(self):
+        b = self.topbar.chip
+        self._chip_menu.popup(b.mapToGlobal(b.rect().bottomLeft()))
 
     def _show(self, key):
         self._stack.setCurrentWidget(self._panels[key])
@@ -273,24 +317,10 @@ class MainWindow(QMainWindow):
     def _toggle_mode(self, checked):
         theme.apply(QApplication.instance(), 'dark' if checked else 'light')
 
-    def _tint_wordmark(self):
-        """Wordmark style (board Logo_Final: Space Grotesk Bold, caps,
-        LAB in accent_text). Family and size go through the per-widget
-        style sheet - the app-wide QSS font rule overrides a plain
-        setFont; the +8 % tracking stays on the QFont (QSS cannot
-        letter-space)."""
-        base = ('font-family: "Space Grotesk"; font-size: 17px; '
-                'font-weight: 700;')
-        self._logo_blast.setStyleSheet(
-            base + f' color: {theme.cur("text")};')
-        self._logo_lab.setStyleSheet(
-            base + f' color: {theme.cur("accent_text")};')
-
     def _retheme(self, _mode=None):
+        # the top bar re-tints itself on theme.signals.changed (GUI-3)
         refresh_icons(self)
-        # the mark and the wordmark tint are mode-dependent (GUI-2)
-        self._logo_mark.setPixmap(theme.logo_pixmap(30))
-        self._tint_wordmark()
+        self._style_statusbar()
         self._show(self.current_tab() or 'setup')
 
     # ── T34: app-level solver mode ───────────────────────────────────────
@@ -304,19 +334,24 @@ class MainWindow(QMainWindow):
         self.solver_mode.set(mode)
 
     def _on_solver_mode(self, m):
-        self._solver_seg.set(mode_mod.label(m))
-        self._solver_hint.setText(mode_mod.EXPLAIN[m])
+        # the chip is the old sidebar switch (GUI-3): sync the menu's
+        # checked action, the chip text and the tooltip - silent, so
+        # set_solver() cannot loop through the menu
+        for mode, act in self._chip_actions.items():
+            act.setChecked(mode == m)
+        self.topbar.chip.setToolTip(mode_mod.EXPLAIN[m])
         self._wsl_timer.stop()
         if m == 'blastfoam':
             # warm the cached WSL availability check off-thread and show
-            # its outcome under the selector
+            # its outcome on the chip and the status bar
             foam_env.ensure_check_started()
             self._probe_hw_async()
             self._poll_wsl()
         else:
+            self.topbar.set_chip(mode_mod.label(m), None)
             self._wsl_hint.setText('')
             self._wsl_hint.setToolTip('')
-        self._wsl_redetect.setVisible(m == 'blastfoam')
+            self._wsl_dot.setVisible(False)
         self._schedule_validate()
 
     def _hw_suffix(self):
@@ -373,6 +408,10 @@ class MainWindow(QMainWindow):
         self._probe_hw_async()
 
     def _poll_wsl(self):
+        # blastfoam mode only: the probe thread posts this back and
+        # must not overwrite the 'native' chip after a mode switch
+        if self.solver_mode.get() != 'blastfoam':
+            return
         try:
             st = foam_env.status()
             state, detail = (st if isinstance(st, tuple) else (st, ''))[:2]
@@ -394,13 +433,31 @@ class MainWindow(QMainWindow):
         self._wsl_hint.setToolTip(
             detail if state == 'fail'
             else (self._hw_tooltip() if state == 'ok' else ''))
+        # the chip mirrors it: dot ok / warn / danger (plan §4)
+        blast_dim = getattr(getattr(self, 'setup', None), 'dim', 2) != 0
+        chip_text, dot = {
+            'checking': ('checking', 'warn'),
+            'ok': ('WSL ready', colour if colour in ('ok', 'warn')
+                   else 'ok'),
+            'fail': ('WSL unavailable', 'danger'),
+        }.get(state, ('WSL at run start', 'warn'))
+        self.topbar.set_chip(f'{mode_mod.label("blastfoam")} · '
+                             f'{chip_text}', dot)
+        self._wsl_dot.setPixmap(dot_pixmap(colour if colour != 'muted'
+                                           else 'faint'))
+        self._wsl_dot.setVisible(blast_dim)
         if state == 'checking':
             self._wsl_timer.start()
 
     # ── G9: keyboard + persisted window state ────────────────────────────
     def _bind_accelerators(self):
-        for seq, fn in (('Ctrl+O', self._open_case), ('Ctrl+S', self._save_case),
-                        ('F5', self._run_single), ('Esc', self._stop)):
+        # plan §4 / UX-7: Shift+Esc stops - plain Esc is deliberately
+        # NOT bound; Ctrl+S saves in place, Ctrl+Shift+S is Save as
+        for seq, fn in (('Ctrl+O', self._open_case),
+                        ('Ctrl+S', self._save_case_inplace),
+                        ('Ctrl+Shift+S', self._save_case),
+                        ('F5', self._run_single),
+                        ('Shift+Esc', self._stop)):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(lambda f=fn: f())
 
@@ -492,6 +549,11 @@ class MainWindow(QMainWindow):
         # model it came from, replacing the last name (GUI QA C1: the next
         # Run offered to overwrite the PREVIOUS model)
         self.run_panel.set_run_name(model_for_case_file(path), replace=True)
+        # a set_case from Open does not mark dirty (plan §4)
+        self._push_recent(path)
+        self._set_dirty(False)
+        self.topbar.set_case_name(self._case_stem())
+        self._update_title()
         self._show('setup')
         self._schedule_validate()
 
@@ -507,7 +569,16 @@ class MainWindow(QMainWindow):
         if getattr(case, 'dim', 0) == 3 and pyvista_available():
             QTimer.singleShot(400, self.viewer_link.prewarm)
 
+    @staticmethod
+    def _case_writer(case):
+        # P1-18: the 0-D form's DeflagrationCase is an HD 1.3 file
+        # (schema 'blastlab-hd13'), which Open reads back; the blast
+        # writer used to stamp it 'blastlab-case' and Open refused it
+        return (hd13_case.save_case if getattr(case, 'dim', None) == 0
+                else save_case)
+
     def _save_case(self):
+        """Save as… (Ctrl+Shift+S): always through the file dialog."""
         try:
             case = self.setup.get_case()
         except ValueError as exc:
@@ -517,13 +588,87 @@ class MainWindow(QMainWindow):
                                  default_suffix='json')
         if not path:
             return
-        if getattr(case, 'dim', None) == 0:
-            # P1-18: the 0-D form's DeflagrationCase is an HD 1.3 file
-            # (schema 'blastlab-hd13'), which Open reads back; the blast
-            # writer used to stamp it 'blastlab-case' and Open refused it
-            hd13_case.save_case(case, path)
+        self._case_writer(case)(case, path)
+        self._case_path = path
+        self._push_recent(path)
+        self._set_dirty(False)
+        self.topbar.set_case_name(self._case_stem())
+        self._update_title()
+
+    def _save_case_inplace(self):
+        """Save (Ctrl+S): in place when the case has a path, no dialog;
+        else Save as - never a silent write to a guessed path (plan §4)."""
+        if not self._case_path:
+            self._save_case()
+            return
+        try:
+            case = self.setup.get_case()
+        except ValueError as exc:
+            self.show_error('Save case', str(exc))
+            return
+        try:
+            self._case_writer(case)(case, self._case_path)
+        except OSError as exc:
+            self.show_error('Save case',
+                            f'Could not write {self._case_path}: {exc}')
+            return
+        self._set_dirty(False)
+
+    #: Recent-menu length cap (plan §4)
+    RECENT_MAX = 8
+
+    def _push_recent(self, path):
+        """`recent_cases` in the settings file: most recent first, no
+        duplicates, at most RECENT_MAX. No DEFAULTS entry is needed -
+        `settings.load()` keeps unknown keys (decision D9)."""
+        path = os.path.abspath(path)
+        try:
+            st = app_settings.load()
+            rec = [p for p in (st.get('recent_cases') or [])
+                   if os.path.normcase(str(p)) != os.path.normcase(path)]
+            rec.insert(0, path)
+            app_settings.update(recent_cases=rec[:self.RECENT_MAX])
+        except Exception:
+            pass
+
+    # ── dirty flag + window title (GUI-3, plan §4) ───────────────────────
+    def _setup_changed(self):
+        """Setup's on_change: the debounced validation plus the dirty
+        flag (piggybacked where the validation is scheduled)."""
+        self._set_dirty(True)
+        self._schedule_validate()
+
+    def _set_dirty(self, dirty):
+        """The ● unsaved state: the top-bar marker, the status-bar
+        context line and the title. Cleared on open / save / save-as
+        and at the startup baseline."""
+        self._dirty = bool(dirty)
+        self.topbar.set_dirty(self._dirty)
+        if self._dirty:
+            name = (os.path.basename(self._case_path) if self._case_path
+                    else 'this case')
+            self._dirty_lbl.setText(f'{name} has unsaved changes')
         else:
-            save_case(case, path)
+            self._dirty_lbl.setText('')
+        self._update_title()
+
+    def _case_stem(self):
+        if not self._case_path:
+            return 'untitled'
+        return os.path.splitext(os.path.basename(self._case_path))[0]
+
+    def _update_title(self):
+        """`<case> · BlastLab`; `<pct> % · ` while a run goes (UX-19),
+        `Chain k/n · ` during a chain; ● marks the dirty state
+        (decision D8). QWinTaskbarProgress is gone in Qt 6 - the title
+        is enough (plan §4)."""
+        parts = ''
+        if self._running_ui and self._chain_n > 1:
+            parts += f'Chain {self._chain_k}/{self._chain_n} · '
+        if self._running_ui and self._run_pct is not None:
+            parts += f'{self._run_pct} % · '
+        mark = '● ' if self._dirty else ''
+        self.setWindowTitle(f'{parts}{mark}{self._case_stem()} · BlastLab')
 
     # ── live validation ──────────────────────────────────────────────────
     def _schedule_validate(self):
@@ -536,6 +681,9 @@ class MainWindow(QMainWindow):
             lines = [ln for ln in str(exc).splitlines() if ln.strip()]
             self.setup.show_report(errors=lines)
             self.run_panel.set_validation(False, len(lines))
+            # Setup pill ✓ = the last debounced validation was clean
+            # (decision D7)
+            self.topbar.set_done('setup', False)
             self.setup.update_preview(None)
             return
         if getattr(case, 'dim', None) == 0:
@@ -546,6 +694,7 @@ class MainWindow(QMainWindow):
             rep = validate_hd13(case)
             self.setup.show_report(rep.errors, rep.warnings, rep.notes)
             self.run_panel.set_validation(not rep.errors, len(rep.errors))
+            self.topbar.set_done('setup', not rep.errors)
             self.setup.update_preview(case)
             return
         if getattr(case, 'solver', 'native') == 'blastfoam':
@@ -566,6 +715,7 @@ class MainWindow(QMainWindow):
             extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
         self.run_panel.set_validation(not rep.errors, len(rep.errors))
+        self.topbar.set_done('setup', not rep.errors)
         self.setup.update_preview(case)
 
     # ── running ──────────────────────────────────────────────────────────
@@ -632,12 +782,13 @@ class MainWindow(QMainWindow):
     def _dim_changed(self, dim):
         """Hide, never grey, the controls a dimension does not have - the
         app-wide rule (CLAUDE.md Sec. 4). A 0-D case has no solver
-        backend, so the whole solver block goes."""
+        backend, so the solver chip and the WSL line go (HD1-11c)."""
         blast = int(dim) != 0
-        for w in (self._solver_label, self._solver_seg, self._solver_hint,
-                  self._wsl_hint, self._wsl_redetect):
-            w.setVisible(blast and not (w is self._wsl_hint
-                                        and not w.text()))
+        self.topbar.set_chip_visible(blast)
+        self._wsl_hint.setVisible(blast)
+        self._wsl_dot.setVisible(blast and bool(self._wsl_hint.text()))
+        # two-way dimension sync (silent - the Segmented convention)
+        self.topbar.set_dim(int(dim))
         if blast:
             self._on_solver_mode(self.solver_mode.get())
 
@@ -830,6 +981,10 @@ class MainWindow(QMainWindow):
 
     def on_run_started(self, info):
         self.run_panel.on_run_started(info)
+        # k of the title's `Chain k/n · ` = runs started since
+        # start_stages (plan §4)
+        self._chain_k += 1
+        self._update_title()
 
     def on_view3d_available(self, is3d):
         self.run_panel.enable_view3d(is3d)
@@ -839,6 +994,10 @@ class MainWindow(QMainWindow):
 
     def on_progress(self, p):
         self.run_panel.on_progress(p)
+        pct = int(round(100 * max(0.0, min(1.0, p.frac))))
+        if pct != self._run_pct:        # whole-percent changes only
+            self._run_pct = pct
+            self._update_title()
 
     def on_paused(self, paused):
         self.run_panel.set_paused(paused)
@@ -872,10 +1031,20 @@ class MainWindow(QMainWindow):
         # a second start while a run is live would orphan the drain loop
         # and drop the finished result
         self.chain.set_running(running)
+        # title progress state (plan §4): restored when the run ends
+        self._running_ui = bool(running)
+        self._run_pct = None
+        if running:
+            self._chain_k = 0
+            self._chain_n = len(getattr(self.ctrl, '_stage_dims', None)
+                                or [])
+        self._update_title()
 
     def on_result(self, k, dim, label_, res):
         self._results.append((label_, dim, res))
         self.results.add_result(label_, dim, res)
+        # Run pill ✓ = a result landed this session (decision D7)
+        self.topbar.set_done('run', True)
         self.notify(f'Result ready: {label_}')
 
     def on_finished(self, stopped_early, errored):

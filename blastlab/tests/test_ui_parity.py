@@ -196,7 +196,17 @@ def main():
     check('the default 1280x840 still gets two columns',
           not vis[0].single_column(),
           f'avail {vis[0]._avail_width()} needs {2 * COL_MIN + 8}')
+    # GUI-3: the 216 px sidebar is gone and its width went to the form,
+    # so the declared 1100x720 minimum now KEEPS two columns (avail 638
+    # >= 612, measured); the collapse behaviour is exercised below it
     win.resize(1100, 720)
+    pump(200)
+    check('the 1100x720 minimum keeps two columns (GUI-3)',
+          not vis[0].single_column(), f'avail {vis[0]._avail_width()}')
+    # the collapse machinery itself is still pinned: lift the window
+    # minimum IN THE TEST ONLY so a genuinely narrow window exists
+    win.setMinimumSize(900, 600)
+    win.resize(1000, 700)
     pump(200)
     check('narrow: one column', vis[0].single_column(),
           f'avail {vis[0]._avail_width()}')
@@ -270,6 +280,7 @@ def main():
           not form.single_column()
           and not form._holders[1].isHidden())
     check('still with the values', form.v['Lx'].get() == '7.25')
+    win.setMinimumSize(1100, 720)       # the app's own minimum, back
 
     print('\nP5: tooltips on everything that is greyed or abbreviated')
     win._show('results')
@@ -289,11 +300,15 @@ def main():
     check('and a disabled one says WHY, not just what',
           off and all(btns[k].toolTip() for k in off), str(off))
 
-    print('\nP6: the four accelerators are bound')
+    print('\nP6: the five accelerators are bound, and Esc is not')
+    # GUI-3 / UX-7: the stop key is Shift+Esc now (plain Esc unbound),
+    # Ctrl+S saves in place and Ctrl+Shift+S is Save as (plan §4)
     from PySide6.QtGui import QShortcut
     keys = {sc.key().toString() for sc in win.findChildren(QShortcut)}
-    for want in ('Ctrl+O', 'Ctrl+S', 'F5', 'Esc'):
+    for want in ('Ctrl+O', 'Ctrl+S', 'Ctrl+Shift+S', 'F5', 'Shift+Esc'):
         check(f'{want} is bound', want in keys, str(sorted(keys)))
+    check("plain 'Esc' is NOT bound", 'Esc' not in keys,
+          str(sorted(keys)))
 
     check('nothing raised during the whole sweep', not crashes,
           str(crashes[:1]))

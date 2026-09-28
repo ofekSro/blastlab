@@ -830,7 +830,8 @@ def b01_coldstart(qa):
     qa.note(f'window title: {qa.win.windowTitle()!r}')
     qa.note('validation strip on the default 2D case: '
             + ' | '.join(qa.strip_text()))
-    qa.check(qa.win._mode_switch.isChecked(), 'Dark mode switch is on')
+    # GUI-3: the sidebar checkbox became the case menu's Dark-mode action
+    qa.check(qa.win._dark_action.isChecked(), 'Dark mode action is on')
     qa.check(bool(qa.win.windowTitle().strip()),
              'the window has a title', 'S3')
     qa.cpu_idle(8)

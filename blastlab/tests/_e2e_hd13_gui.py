@@ -107,18 +107,19 @@ def main():
     win.setup.set_dim(0)
     pump(400)
     check('the panel reports dim 0', win.setup.dim == 0)
-    check('the segment shows 0D', win.setup.dim_seg.get() == '0D',
-          str(win.setup.dim_seg.get()))
+    # GUI-3: the dimension control lives in the top bar now
+    check('the segment shows 0D', win.topbar.dim_seg.get() == '0D · HD 1.3',
+          str(win.topbar.dim_seg.get()))
     check('the 0-D form is the visible one',
           win.setup.form is win.setup.forms[0]
           and win.setup.forms[0].isVisible())
 
-    print('\n  the solver switch is gone, per Win32')
-    seg = win._solver_seg
+    print('\n  the solver switch (the chip, GUI-3) is gone, per Win32')
+    seg = win.topbar.chip
     seg.setAttribute(__import__('PySide6.QtCore', fromlist=['Qt']).Qt
                      .WA_NativeWindow, True)
     pump(200)
-    check('Qt hides the solver segment at 0D', not seg.isVisible())
+    check('Qt hides the solver chip at 0D', not seg.isVisible())
     if sys.platform.startswith('win'):
         vis = win32_visible(seg)
         check('and Win32 agrees it is not on screen', vis in (False, None),

@@ -11,7 +11,8 @@
      offscreen has a non-null window icon;
  L5  the ELSL logo.gif is gone from the Qt window (no reference in
      blastlab/ui/), still present at the repo root for the Tk app, and
-     the sidebar shows the BLASTLAB wordmark.
+     the top bar shows the BLASTLAB wordmark (GUI-3: the sidebar is
+     gone; the mark and wordmark moved into the top bar).
 
 Plain script, offscreen, no pytest: `python test_ui_logo.py`.
 """
@@ -105,7 +106,7 @@ def l4_icon():
     check('MainWindow icon is not null', not win.windowIcon().isNull())
     from PySide6.QtWidgets import QLabel
     texts = [w.text() for w in win.findChildren(QLabel)]
-    check('sidebar shows the BLASTLAB wordmark',
+    check('the top bar shows the BLASTLAB wordmark',
           'BLAST' in texts and 'LAB' in texts)
     win.close()
     pump(50)

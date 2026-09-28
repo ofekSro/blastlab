@@ -12,7 +12,7 @@ from . import theme
 from .case_form import CaseForm
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .theme import GAP, PAD
-from .widgets import Card, Segmented, label
+from .widgets import Card, label
 
 #: a long report (AMR + zones + foam notes can be eight lines) used to
 #: grow the card until the form above it had a third of its height, so
@@ -52,18 +52,8 @@ class SetupPanel(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(PAD - 4)
 
-        head = QHBoxLayout()
-        head.addWidget(label('Case Setup', 'h1'))
-        head.addStretch(1)
-        # '0D' rather than 'HD1.3' so `_dim_selected` keeps parsing the
-        # leading digit, and so the four sit in one series: a deflagration
-        # chamber really is the zero-dimensional member of the family.
-        self.dim_seg = Segmented(['0D', '1D', '2D', '3D'], height=34)
-        self.dim_seg.setFixedWidth(240)
-        self.dim_seg.changed.connect(self._dim_selected)
-        head.addWidget(self.dim_seg)
-        root.addLayout(head)
-
+        # GUI-3: the dimension control lives in the window's top bar now
+        # (plan §4); it drives set_dim() and syncs back from dim_changed.
         body = QHBoxLayout()
         body.setSpacing(GAP)
         root.addLayout(body, 1)
@@ -146,7 +136,6 @@ class SetupPanel(QWidget):
         for f in self._forms.values():
             self._stack.addWidget(f)
         self._dim = 2
-        self.dim_seg.set('2D')
         self._stack.setCurrentWidget(self._forms[2])
         self._mode.subscribe(self._mode_changed)
         self.show_report()
@@ -169,15 +158,11 @@ class SetupPanel(QWidget):
     def dim(self):
         return self._dim
 
-    def _dim_selected(self, value):
-        self.set_dim(int(str(value)[0]))
-
     def set_dim(self, dim):
         dim = int(dim)
         if dim not in self._forms:
             return
         self._dim = dim
-        self.dim_seg.set(f'{dim}D')
         self._stack.setCurrentWidget(self._forms[dim])
         self.dim_changed.emit(dim)
         self._changed()

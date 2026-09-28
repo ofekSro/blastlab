@@ -334,6 +334,42 @@ def qss(mode_name):
                       border-radius: 10px; }}
     QMenu::item:selected {{ background: {p['accent']};
                             color: {p['on_accent']}; }}
+    QMenu::item:disabled {{ color: {p['muted']}; }}
+    /* GUI-3 window frame (ui/topbar.py + the status bar, plan §4;
+       board BC_Combined lines 20-54 / 392-396). Sizes in px because the
+       board writes px; the app-wide QWidget font rule would otherwise
+       override any programmatic QFont (D6). */
+    QFrame#topbar {{ background: {p['bg']}; border: none;
+                     border-bottom: 1px solid {p['border']}; }}
+    QFrame#statusbar {{ background: {p['bg']}; border: none;
+                        border-top: 1px solid {p['border']}; }}
+    QPushButton#pill {{ background: transparent; color: {p['muted']};
+                        border: none; border-radius: 20px;
+                        padding: 0px 10px;
+                        font-family: "{DISPLAY}"; font-size: 14px;
+                        font-weight: 600; }}
+    QPushButton#pill:hover {{ background: {p['hover']}; }}
+    QPushButton#pill[active="true"] {{ background: {p['text']};
+                                       color: {p['bg']}; }}
+    QPushButton#chainlink {{ background: transparent; color: {p['muted']};
+                             border: none; border-radius: 8px;
+                             padding: 0px 8px; font-size: 13px; }}
+    QPushButton#chainlink:hover {{ background: {p['hover']}; }}
+    QPushButton#chainlink[active="true"] {{ color: {p['text']}; }}
+    QPushButton#casebtn {{ background: transparent; color: {p['text']};
+                           border: none; border-radius: 8px;
+                           padding: 0px 6px;
+                           font-family: "{DISPLAY}"; font-size: 17px;
+                           font-weight: 600; }}
+    QPushButton#casebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#chipbtn {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['seg']};
+                           border-radius: 16px; padding: 0px 10px;
+                           font-size: 12px; }}
+    QPushButton#chipbtn:hover {{ background: {p['hover']}; }}
+    /* the bar's dimension segments at the board's 12.5 px (the app-wide
+       font rule would render them 13 pt and push the bar past 1100) */
+    QFrame#topbar QToolButton#seg {{ font-size: 12px; }}
     """
 
 

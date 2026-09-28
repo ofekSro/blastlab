@@ -119,8 +119,8 @@ class ChainPanel(QWidget):
                 lambda lbl, d=d: self.set_stage_solver(
                     d, mode_mod.from_label(lbl)))
             row.addWidget(seg)
-            row.addWidget(label('preset from the sidebar - override per '
-                                'stage', 'small'))
+            row.addWidget(label('preset from the solver chip - override '
+                                'per stage', 'small'))
             row.addStretch(1)
             col.add_layout(row)
             # N5-4: the hand-off refusal, said where the choice is made.
