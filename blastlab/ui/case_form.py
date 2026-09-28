@@ -26,10 +26,10 @@ from .fieldform import FieldForm
 
 class CaseForm(FieldForm):
     def __init__(self, dim, on_change=None, mode=mode_mod.DEFAULT,
-                 parent=None):
+                 parent=None, placement='columns'):
         self._mode = mode_mod.normalize(mode)
         super().__init__(dim, on_change=on_change, mode=self._mode,
-                         parent=parent)
+                         parent=parent, placement=placement)
         # the reactive rules, registered once the widgets exist. A 0-D
         # deflagration case has no solver mode and no geometry, so it has
         # none of them; the one rule it does have is that a uniform

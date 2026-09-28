@@ -429,10 +429,28 @@ class FilePicker(QWidget):
 
 # ── the form ─────────────────────────────────────────────────────────────
 class FieldForm(QWidget):
-    """Two columns of titled cards built from `setup_spec.cards(dim)`."""
+    """Titled cards built from `setup_spec.cards(dim)`.
 
-    def __init__(self, dim, on_change=None, mode='blastfoam', parent=None):
+    `placement` decides only WHERE the built cards are laid, never what
+    they parse (GUI-5, plan §11):
+      'columns' (default) - two columns plus the spanning cards below,
+          collapsing to one column when narrow. The Chain editor and
+          every standalone form use it.
+      'nodes' - one page per model-tree node (`setup_nodes`), stacked in
+          one column; `show_node()` shows one page. The Setup screen's
+          properties column uses it. The spanning VTK card always stacks
+          its panes and a multi-pair grid (the boundaries) lays one pair
+          per line, so the cards fit a narrow column.
+    The registries (`v`, `points`, `rows`, `widgets`, `labels`, `cards`)
+    and everything that reads them are the same in both."""
+
+    def __init__(self, dim, on_change=None, mode='blastfoam', parent=None,
+                 placement='columns'):
         super().__init__(parent)
+        if placement not in ('columns', 'nodes'):
+            raise ValueError(f'placement must be columns or nodes, '
+                             f'not {placement!r}')
+        self.placement = placement
         self.dim = int(dim)
         self._on_change = on_change or (lambda: None)
         self.v = {}                  # name -> Var / BoolVar
@@ -445,12 +463,97 @@ class FieldForm(QWidget):
         self.row_notes = {}          # name -> the QLabel under its row
         self._specs = {}             # name -> F
         self._card_of = {}           # name -> card title
+        self._row_groups = {}        # name -> group a hook adds (GUI-5)
+        self.pages = {}              # node id -> page ('nodes' only)
+        self._node = None
         self._notifying = False
         self._pending = []
         self._bad = set()
-        self._build()
+        if placement == 'nodes':
+            self._build_nodes()
+        else:
+            self._build()
 
     # ── construction ─────────────────────────────────────────────────────
+    def _build_nodes(self):
+        """'nodes' placement: the cards are built in spec order (so every
+        registry fills exactly as in 'columns') and then laid on one page
+        per tree node, in tree order. Pages that are not shown are hidden
+        widgets, so they add nothing to the form's minimum size - unlike
+        a QStackedWidget, whose minimum is its largest page."""
+        from . import setup_nodes
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self._cols, self._holders = [], []
+        self._span_panes = []
+        self._card_order = []
+        for spec in cards(self.dim):
+            card = Card(spec.title, pad=CARD_PAD, parent=self)
+            self.cards[spec.title] = card
+            card._blastlab_scope = spec.scope
+            self._card_order.append(
+                (card, spec.col, 1 if spec.field_rows else 0))
+            self._fill_card(card, spec)
+        pages =[(n.id, titles) for n, titles in setup_nodes.nodes(self.dim)]
+        # a card no node shows (HIDDEN_CARDS_0) still passes its values
+        # through load -> save; it lives on a page that is never shown
+        rest = [t for t in self.cards
+                if t not in {x for _i, ts in pages for x in ts}]
+        if rest:
+            pages.append(('_unlisted', tuple(rest)))
+        for node_id, titles in pages:
+            page = QWidget(self)
+            lay = QVBoxLayout(page)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setSpacing(theme.PAD - 4)
+            for t in titles:
+                lay.addWidget(self.cards[t], 0)
+            page.setVisible(False)
+            outer.addWidget(page)
+            self.pages[node_id] = page
+        outer.addStretch(1)
+        self._single = True
+        self._watched = None
+        first = next((i for i, _t in pages if i != '_unlisted'), None)
+        if first is not None:
+            self.show_node(first)
+
+    def show_node(self, node_id):
+        """'nodes' placement: show the page of `node_id` and hide the
+        others. False for an unknown id (and always in 'columns')."""
+        if node_id not in self.pages or node_id == '_unlisted':
+            return False
+        for nid, page in self.pages.items():
+            page.setVisible(nid == node_id)
+        self._node = node_id
+        self._relayout()
+        self.updateGeometry()
+        return True
+
+    def current_node(self):
+        return self._node
+
+    def node_visible(self, node_id):
+        """True when at least one card of `node_id` is shown by the
+        solver scope - a node with none is hidden in the tree, never
+        greyed (plan §5.1)."""
+        from . import setup_nodes
+        return any(self.card_visible(t)
+                   for t in setup_nodes.node_cards(self.dim, node_id))
+
+    def add_to_page(self, node_id, widget):
+        """Append a widget the form does not own (the Derived card) to a
+        node's page."""
+        self.pages[node_id].layout().addWidget(widget)
+        return widget
+
+    def set_row_group(self, name, group):
+        """Put row `name` in sub-group `group` for `apply_scope`, as a
+        spec `group=` would (a hook's own group: GUI-5 trigger switch,
+        profile row). Does not re-apply the scope."""
+        self._row_groups[name] = group
+
     def _build(self):
         # the two columns side by side, and under them the cards that
         # span both (setup_spec.SPAN - the VTK card, owner decision P13)
@@ -551,7 +654,12 @@ class FieldForm(QWidget):
         The three dimension forms share a QStackedWidget, whose minimum
         is the LARGEST of its pages whether they are visible or not - so
         collapsing only the page on screen changed nothing, and all
-        three have to move together."""
+        three have to move together.
+
+        'nodes' placement has no columns to fit (and its spanning card
+        is always stacked)."""
+        if self.placement != 'columns':
+            return
         avail = self._avail_width()
         single = avail < 2 * COL_MIN + GAP
         self._apply_single(single)
@@ -609,7 +717,9 @@ class FieldForm(QWidget):
         return False
 
     def _apply_single(self, single):
-        if single == self._single:
+        # columns-only bookkeeping: a 'nodes' form has no holders, and its
+        # cards must never be taken out of their pages
+        if self.placement != 'columns' or single == self._single:
             return
         self._single = single
         # a card hidden by the solver scope must stay hidden: adding a
@@ -672,6 +782,9 @@ class FieldForm(QWidget):
             panes.setSpacing(theme.PAD)
             panes.addWidget(left, 1, Qt.AlignTop)
             panes.addWidget(right, 1, Qt.AlignTop)
+            if self.placement == 'nodes':
+                # the properties column never holds both panes (GUI-5)
+                panes.setDirection(QBoxLayout.TopToBottom)
             card.add_layout(panes)
             self._span_panes.append((panes, left, right))
             self._fill_grid(_grid(left), spec,
@@ -687,8 +800,10 @@ class FieldForm(QWidget):
     def _fill_grid(self, grid, spec, rows, note=True):
         """Lay `rows` of card `spec` into `grid`: caption + input pairs,
         wide rows (a table, the matrix) across both grid columns, and the
-        card's note above the first wide row (or at the end)."""
-        pairs = max(1, spec.grid)
+        card's note above the first wide row (or at the end). In 'nodes'
+        placement every card is one pair per line: the properties column
+        cannot hold the boundary grid's two (measured 409 px)."""
+        pairs = 1 if self.placement == 'nodes' else max(1, spec.grid)
         for c in range(pairs):
             grid.setColumnMinimumWidth(c * 2, LABEL_WRAP if pairs == 1
                                        else 0)
@@ -870,8 +985,9 @@ class FieldForm(QWidget):
             card.setVisible(scope in (None, mode) and title not in emptied)
         for name, f in self._specs.items():
             on = f.scope in (None, mode) and name not in HIDDEN_ROWS
-            if on and f.group is not None:
-                on = bool(groups.get(f.group, True))
+            group = f.group or self._row_groups.get(name)
+            if on and group is not None:
+                on = bool(groups.get(group, True))
             self._set_row_visible(name, on)
 
     def _set_row_visible(self, name, on):
