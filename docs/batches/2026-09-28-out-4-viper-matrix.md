@@ -326,6 +326,41 @@ Also green: `test_legacy_vtk.py` (11/11), `test_case_validate.py`.
   A-R4a worst 1.3e-5; A-R4b 111 = 111; A-R5 T(0) = 288.002 K; A-R6a counts equal
   (39/39/39/10); A-R6b 127/127 files; A-R6c rel 1.8e-6.
 
+**4b (2026-09-28, branch `out-4b-peaks-ids` from `b32279e`).** Baseline:
+every §3 suite green (`test_vtk_series` once hit a transient Windows
+`PermissionError` in `test_rewrite_keeps_earlier`; green on three reruns).
+- **Q1 Arrival_Time feasibility: NOT added.** The owner's definition (first
+  time p exceeds 10 % of the cell's PEAK overpressure, as gauge_summary) is
+  not causal: the threshold depends on the final peak, so no per-step
+  running state can fix the crossing time exactly (a later, larger
+  reflected shock raises the threshold after the first shock already
+  crossed the old one). blastFoam 6.2 has no function object for it (the
+  list in `src/functionObjects/`: blastProbes, fieldMinMax, impulse,
+  overpressure, timeOfArrival, dynamicPressure, ...), and a Python
+  derivation from the written files is limited to their cadence - not
+  exact. A fixed absolute threshold would be causal, but only through an
+  OF-9 `coded` function object (run-time compilation) and it is not the
+  owner's definition. So only the relabel (B1) was done.
+- **F6 (new, needs the owner): `Time_Of_Peak` is all t_start in every
+  default 2D/3D run.** `timeOfArrival.C` shares the registered `pMax`
+  field with the `pMax` fieldMinMax (`lookupOrCreate`) and updates the
+  time only when `p > pMax`. The writer emits `pMax` BEFORE `arrival`,
+  so each step fieldMinMax has already raised pMax to p and the test is
+  never true. Measured: every `timeOfArrival` in `/root/blastlab_runs`
+  (13 runs, newest write) is `uniform 0`, or `uniform 0.000187338` on two
+  3D runs (one value over the whole field, presumably a leg's start time -
+  not checked), and R2 below writes
+  Time_Of_Peak = 0.0 on every obstacle face. With `fo_accumulators` off
+  (no pMax FO) it would work. Fix = emit `arrival` before `pMax` - that
+  reorders the default controlDict and re-pins every writer golden, so it
+  is not done here.
+- **B4 e2e (`_e2e_out4_gauges.py --only 4b`, rules committed in `e4ac578`
+  before the run): run 1 PASS, 14/14.** B-R1 |d| = 0 (peak 114695.675 kPa,
+  impulse 7108.7627, arrival 0.0169987 ms; p arrays identical, 981 steps
+  both); B-R2 a/b/c pass over 130 files (obstacles, two planes, volumes);
+  B-R3 rel 4.4e-7; B-R4 counts 624 / 576 = predicted in all 40 obstacles
+  files.
+
 ## 7. Remaining backlog after OUT-4
 
 The OUT track is then complete except OUT-1's pending `gui-qa-tester` screenshots and
