@@ -442,6 +442,13 @@ def test_gauges():
     except ValueError as exc:
         check('an unknown key inside vtk_gauges is refused',
               'Unknown vtk_gauges keys' in str(exc), str(exc))
+    d['vtk_gauges'] = {'fields': 'impulse'}       # a string, not a list
+    try:
+        case_from_dict(d)
+        check('a bare string in vtk_gauges.fields is refused', False)
+    except ValueError as exc:
+        check('a bare string in vtk_gauges.fields is refused',
+              'must be a list' in str(exc), str(exc))
     # the form mapping: ticks in the Gauges column <-> vtk_gauges
     vals = mf.fields_from_case(back)
     check('fields_from_case puts the extras in the Gauges column',

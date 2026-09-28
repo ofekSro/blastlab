@@ -89,7 +89,12 @@ def normalize_vtk_gauges(d):
     unknown = set(d) - {'fields'}
     if unknown:
         raise ValueError(f"Unknown vtk_gauges keys: {sorted(unknown)}")
-    return {'fields': [str(f) for f in (d.get('fields') or [])]}
+    names = d.get('fields') or []
+    if not isinstance(names, (list, tuple)):
+        # a bare string would iterate as letters ("impulse" -> 'i', 'm'...)
+        raise ValueError(f"vtk_gauges.fields must be a list, not "
+                         f"{type(names).__name__}")
+    return {'fields': [str(f) for f in names]}
 
 
 def vtk_gauge_fields(case):
