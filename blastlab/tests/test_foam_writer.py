@@ -1651,6 +1651,21 @@ def peak_impulse_checks():
           and 'fields (p);' in norm(fo_block(rc, W.VTK_OBSTACLES)))
 
 
+def time_of_peak_order_checks(specs):
+    """OUT-4b F6 (owner, 2026-09-28): timeOfArrival shares the registered
+    pMax with the pMax fieldMinMax and sets the time only where p > pMax
+    (timeOfArrival.C execute()), so `arrival` must come BEFORE `pMax`."""
+    print('\n  OUT-4b F6: arrival before pMax')
+    for name, spec in sorted(specs.items()):
+        if spec.dim < 2:
+            continue
+        names = fo_names(spec.files['system/controlDict'])
+        check(f'F6 {name}: arrival before pMax and impulse',
+              'arrival' in names and all(
+                  names.index('arrival') < names.index(n)
+                  for n in ('pMax', 'impulse') if n in names), str(names))
+
+
 def obstacle_id_checks():
     """OUT-4b B3 (owner Q3): obstacleID is made on Windows - blastFoam
     never samples it, and no mesh, BC or patch changes (plan F5)."""
@@ -1728,6 +1743,7 @@ def main():
     gauge_checks()
     peak_impulse_checks()
     obstacle_id_checks()
+    time_of_peak_order_checks(specs)
     golden(specs, update)
     print()
     if FAIL:
