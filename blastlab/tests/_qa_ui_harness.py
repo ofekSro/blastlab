@@ -3614,6 +3614,53 @@ def v09_vtk_gauges_3d(qa):
     _vtk_gauge_extras(qa, 3)
 
 
+@scenario('V10', 'V', est=50)
+def v10_vtk_decimate(qa):
+    """OUT-4c (owner Q4): the Volumes decimation spin box - 3D only, the
+    owner's warning line under it, k = 2 reaches the case and validates
+    with the warning in its note, k = 1 writes no key, native hides it."""
+    from blastlab.core.case import Case2D, Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    qa.goto('setup')
+    qa.set_case(Case2D(solver='blastfoam'))
+    qa.check('vtk_v_decimate' not in _form(qa).v,
+             '2D: no decimation box (3D only)', 'S2')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _form(qa)
+    box = form.widgets['vtk_v_decimate']
+    note = form.row_notes.get('vtk_v_decimate')
+    qa.check(box.isVisible() and box.value() == 1 and note is not None
+             and note.isVisible() and note.text() == mfields.VTK_DECIMATE_NOTE,
+             '3D: the box shows 1, the warning line is under it', 'S2',
+             evidence=f'value {box.value()}, note {note and note.text()!r}')
+    qa.action = '3D: tick Volumes, set k = 2'
+    form.widgets['vtk_v_on'].click()
+    box.setValue(2)
+    qa.pump(0.8)
+    case = qa.win.setup.get_case()
+    qa.check(case_to_dict(case)['vtk_volumes'].get('decimate') == 2,
+             '3D: k = 2 reaches vtk_volumes.decimate', 'S1',
+             evidence=str(case.vtk_volumes))
+    rows = qa.win.setup.report_rows()
+    errs = [t for sev, t in rows if sev == 'error' and 'VTK' in t]
+    warn = [t for _sev, t in rows if mfields.VTK_DECIMATE_WARNING in t]
+    qa.check(not errs and bool(warn),
+             '3D: validates, the note carries the warning', 'S2',
+             evidence=f'{errs} {warn}')
+    _vtk_shots(qa, '3d_decimate_2')
+    box.setValue(1)
+    qa.pump(0.5)
+    qa.check('decimate' not in case_to_dict(
+        qa.win.setup.get_case())['vtk_volumes'],
+        '3D: k = 1 writes no decimate key', 'S1')
+    qa.solver('native')
+    qa.check(not box.isVisible() and not note.isVisible(),
+             'native: the box and its warning are hidden with the card', 'S1')
+    qa.solver('blastfoam')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
 # ═══════════════════════════════════════════════════════════════════════
 #  Group H - light mode over everything that draws
 # ═══════════════════════════════════════════════════════════════════════

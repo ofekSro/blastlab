@@ -48,6 +48,7 @@ from ..models.case import VTK_MODES as _VTK_MODES
 from ..models.case import vtk_family as _vtk_family
 from ..models.case import vtk_fields_for as _vtk_fields_for
 from ..models.case import VTK_CELLS as _VTK_CELLS
+from ..models.case import VTK_DECIMATE_WARNING
 from ..models.case import VTK_POST_FIELDS as _VTK_POST_FIELDS
 from ..models.case import VTK_GAUGE_LOCKED as _VTK_GAUGE_LOCKED
 from ..models.case import normalize_vtk_gauges as _normalize_vtk_gauges
@@ -595,6 +596,26 @@ def _validate_vtk_planes(case, rep, ctx, fam):
             seen[key] = seen[name] = what
 
 
+def _validate_vtk_decimate(label, vol, dim, err, note):
+    """OUT-4c (owner Q4, 2026-09-27): the volumes' decimation k - a whole
+    number >= 1, and > 1 only in 3D. k > 1 gets the owner's warning."""
+    k = vol.get('decimate', 1)
+    if (isinstance(k, bool) or not isinstance(k, (int, float))
+            or not math.isfinite(k) or k != int(k) or k < 1):
+        err(f"{label}: the decimation must be a whole number >= 1 (1 = "
+            f"every cell), not {k!r}")
+        return
+    k = int(k)
+    if k == 1:
+        return
+    if dim != 3:
+        err(f"{label}: decimation is 3D only - the {dim}D domain is written "
+            f"whole (set it to 1)")
+        return
+    note(f"{label}: decimated - one base-cell layer in {k} is kept on each "
+         f"axis (about 1/{k ** 3} of the cells); {VTK_DECIMATE_WARNING}")
+
+
 def _validate_vtk_gauges(case, rep, ctx):
     """OUT-4a: the extra gauge fields (`vtk_gauges`). Each must have a
     gauge cell in VTK_CELLS, must not be one of the locked p/rho/U, and
@@ -743,6 +764,7 @@ def _validate_vtk(case, rep, ctx):
                  f"step interval on a large case can mean thousands of "
                  f"full-field writes. Every write is also ingested for the "
                  f"live view")
+        _validate_vtk_decimate(label, vol, case.dim, err, note)
 
 
 #: the writer's adaptive write band tops out here (solvers/foam/writer.py

@@ -3202,6 +3202,46 @@ def v08_vtk_gauges_3d(qa):
     _vtk_gauge_extras(qa, 3)
 
 
+@scenario('V09', 'V', est=40)
+def v09_vtk_decimate(qa):
+    """OUT-4c (owner Q4): the Tk Volumes decimation spin box (the twin of
+    the Qt harness's V10) - 3D only, the owner's warning line under it,
+    k = 2 reaches the case, k = 1 writes no key, native hides it."""
+    from blastlab.core.case import Case2D, Case3D, case_to_dict
+    from blastlab.models import fields as mfields
+    qa.goto('setup')
+    qa.set_case(Case2D(solver='blastfoam'))
+    qa.check('vtk_v_decimate' not in _vtk_see(qa).v,
+             '2D: no decimation box (3D only)', 'S2')
+    qa.set_case(Case3D(solver='blastfoam'))
+    form = _vtk_see(qa)
+    spin, note = form._vtk_decimate, form._vtk_decimate_note
+    qa.check(spin.winfo_manager() == 'grid'
+             and form.v['vtk_v_decimate'].get() == '1'
+             and str(note.cget('text')) == mfields.VTK_DECIMATE_NOTE,
+             '3D: the box shows 1, the warning line is under it', 'S2')
+    qa.field('vtk_v_on', True)
+    qa.field('vtk_v_decimate', '2')
+    case = qa.app.setup.get_case()
+    qa.check(case_to_dict(case)['vtk_volumes'].get('decimate') == 2,
+             '3D: k = 2 reaches vtk_volumes.decimate', 'S1',
+             evidence=str(case.vtk_volumes))
+    strip = qa.strip_text()
+    qa.note('3D decimate strip: ' + ' | '.join(strip))
+    _vtk_see(qa)
+    qa.shot('3d_decimate_2')
+    qa.field('vtk_v_decimate', '1')
+    qa.check('decimate' not in case_to_dict(
+        qa.app.setup.get_case())['vtk_volumes'],
+        '3D: k = 1 writes no decimate key', 'S1')
+    qa.solver('native')
+    qa.check(form._vtk_card.winfo_manager() == '',
+             'native: the box and its warning are hidden with the card', 'S1')
+    qa.solver('blastfoam')
+    qa.scroll_form(0.0)
+    qa.set_case(Case3D())
+
+
 # ─────────────────────────────────────────────────────────────────────────
 # GROUP H - theme toggle mid-session (G6 theme half)
 # ─────────────────────────────────────────────────────────────────────────

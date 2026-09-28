@@ -57,6 +57,14 @@ VTK_GAUGE_LOCKED = ('p', 'rho', 'U')
 VTK_MODES = ('time', 'step')
 #: the keys of each family, in the order they are written
 VTK_VOLUME_KEYS = ('on', 'mode', 'value', 'fields')
+#: OUT-4c (owner Q4, 2026-09-27): the volumes' decimation k - keep every
+#: k-th base-cell layer per axis, 3D only. Written after VTK_VOLUME_KEYS
+#: and only when k != 1, so a case without it saves byte-identical
+VTK_VOLUME_OPTIONAL = ('decimate',)
+VTK_DECIMATE_DEFAULT = 1
+#: the owner's warning line (Q4), on the card and in the validation note
+VTK_DECIMATE_WARNING = ('decimated files are for viewing only; peaks may be '
+                        'missed')
 #: Q2 (owner, 2026-09-26): sections and obstacles keep separate field
 #: lists - `fields` for the section planes, `obstacle_fields` for the
 #: obstacle walls
@@ -149,7 +157,8 @@ def normalize_vtk(d, key):
         return None
     if not isinstance(d, dict):
         raise ValueError(f"{key} must be an object, not {type(d).__name__}")
-    keys = VTK_SURFACE_KEYS if key == 'vtk_surfaces' else VTK_VOLUME_KEYS
+    keys = (VTK_SURFACE_KEYS if key == 'vtk_surfaces'
+            else VTK_VOLUME_KEYS + VTK_VOLUME_OPTIONAL)
     unknown = set(d) - set(keys)
     if unknown:
         raise ValueError(f"Unknown {key} keys: {sorted(unknown)}")
@@ -165,7 +174,20 @@ def normalize_vtk(d, key):
         out['planes'] = [[str(p[0]), _num(p[1])]
                          if isinstance(p, (list, tuple)) and len(p) == 2
                          else p for p in (d.get('planes') or [])]
+    elif 'decimate' in d:
+        # OUT-4c: an int when whole; k = 1 (the default) is dropped
+        k = _num(d['decimate'])
+        if isinstance(k, float) and k.is_integer():
+            k = int(k)
+        if not _is_default_decimate(k):
+            out['decimate'] = k
     return out
+
+
+def _is_default_decimate(k):
+    """True for k = 1 (1 or 1.0, never True)."""
+    return (not isinstance(k, bool) and isinstance(k, (int, float))
+            and k == VTK_DECIMATE_DEFAULT)
 
 
 def vtk_written(d):
@@ -560,6 +582,10 @@ def case_to_dict(case):
     for key in ('vtk_surfaces', 'vtk_volumes'):
         if key in d and not vtk_written(d[key]):
             d.pop(key)
+    # OUT-4c: the default decimation (k = 1) is not written either
+    vol = d.get('vtk_volumes')
+    if isinstance(vol, dict) and _is_default_decimate(vol.get('decimate')):
+        vol.pop('decimate')
     # OUT-4a: the gauge extras, the same way - omitted when none is ticked
     g = d.get('vtk_gauges')
     if not (isinstance(g, dict) and g.get('fields')):

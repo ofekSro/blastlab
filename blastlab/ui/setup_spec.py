@@ -23,7 +23,10 @@ from ..core.constants import ANIM_SCALE_LABELS
 from ..core.refine import AMR_ESTIMATORS, MAX_AMR_LEVEL
 from ..models.case import vtk_fields_for
 from ..models.fields import (KEEP_ALL_CAPTION, KEEP_ALL_TIP,
-                             VTK_COLUMNS, VTK_FAMILIES, VTK_MATRIX_CAPTION,
+                             VTK_COLUMNS, VTK_DECIMATE_DEFAULT,
+                             VTK_DECIMATE_LABEL, VTK_DECIMATE_MAX,
+                             VTK_DECIMATE_NOTE, VTK_DECIMATE_TIP,
+                             VTK_FAMILIES, VTK_MATRIX_CAPTION,
                              VTK_PLANES_CAPTION, VTK_SECONDS_NOTE,
                              VTK_STEPS_DEFAULT, VTK_TIME_DEFAULT)
 from ..solvers.foam.materials import MATERIAL_NAMES
@@ -42,7 +45,9 @@ class F:
 
     kind:   'text' | 'float' | 'int' | 'choice' | 'bool' | 'file' | 'points'
             | 'radio' (one of `values`) | 'matrix' (OUT-2: rows `values`
-            x columns `cols`, a tick box per cell)
+            x columns `cols`, a tick box per cell) | 'spin' (OUT-4c: a
+            whole-number spin box, `values` = (min, max))
+    note:   a muted line under the row (OUT-4c: the decimation warning)
     scope:  None (both solvers) | 'native' | 'blastfoam'
     group:  a sub-group whose visibility a hook toggles ('amr', 'cref')
     dyn:    the caption is rewritten at runtime (axisymmetric r/z)
@@ -65,6 +70,7 @@ class F:
     file: dict = None             # 'file': dialog title + filters
     kinds: tuple = ()             # 'points': per-column parser
     tip: str = ''                 # the input's tooltip (OUT-3)
+    note: str = ''                # a line under the row (OUT-4c)
 
 
 @dataclass(frozen=True)
@@ -243,6 +249,13 @@ def _vtk_card(dim):
             F(f'vtk_{fam}_steps', 'Every [steps]\n(solver steps)', 'int',
               VTK_STEPS_DEFAULT),
         ]
+        if fam == 'v' and dim == 3:
+            # OUT-4c (owner Q4): subsample the volume files per axis, 3D
+            # only, with the owner's warning line under the box
+            rows.append(F('vtk_v_decimate', VTK_DECIMATE_LABEL, 'spin',
+                          VTK_DECIMATE_DEFAULT,
+                          values=(VTK_DECIMATE_DEFAULT, VTK_DECIMATE_MAX),
+                          tip=VTK_DECIMATE_TIP, note=VTK_DECIMATE_NOTE))
     if dim == 3:
         # decision 7: the live-slice plane is always a section, when the
         # surfaces family is on

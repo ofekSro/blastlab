@@ -30,9 +30,10 @@ import os
 
 from ..core.bc import normalize_bc, normalize_bcs
 from ..core.constants import ANIM_SCALE_LABELS, P_AIR, anim_scale_from_label
-from .case import (VTK_CELLS, VTK_GAUGE_LOCKED, VTK_POST_FIELDS, Case1D,
-                   Case2D, Case3D, normalize_vtk, normalize_vtk_gauges,
-                   vtk_fields_for, vtk_gauge_extras_for)
+from .case import (VTK_CELLS, VTK_DECIMATE_DEFAULT, VTK_DECIMATE_WARNING,
+                   VTK_GAUGE_LOCKED, VTK_POST_FIELDS, Case1D, Case2D, Case3D,
+                   normalize_vtk, normalize_vtk_gauges, vtk_fields_for,
+                   vtk_gauge_extras_for)
 
 
 #: What the form shows / sends for the AMR knobs when AMR is off or the
@@ -221,6 +222,17 @@ VTK_TIME_DEFAULT = 0.001
 VTK_STEPS_DEFAULT = 25
 #: the card's line under the cadence boxes (P22)
 VTK_SECONDS_NOTE = 'Files and ParaView show time in seconds.'
+#: OUT-4c (owner Q4, 2026-09-27): the Volumes family's decimation box, 3D
+#: only - keep one base-cell layer in k on each axis (1 = every cell) -
+#: and the owner's warning line under it (models.case.VTK_DECIMATE_WARNING)
+VTK_DECIMATE_LABEL = 'Keep 1 layer in k\n(per axis, 1 = all)'
+VTK_DECIMATE_TIP = ('Volumes decimation k: the volume files keep every k-th '
+                    'base-cell layer on each axis (about 1/k^3 of the cells). '
+                    'Values are copied, never averaged, and the solve is '
+                    'unchanged - only the exported files are smaller.')
+VTK_DECIMATE_MAX = 16
+VTK_DECIMATE_NOTE = VTK_DECIMATE_WARNING[0].upper() + VTK_DECIMATE_WARNING[1:] \
+    + '.'
 #: the plane table's column kinds (batch plan D7)
 VTK_PLANE_AXES = ('x', 'y', 'z')
 
@@ -347,9 +359,15 @@ def _vtk_from_fields(dim, v, number, whole):
                                        v.get(f'vtk_{fam}_time'),
                                        VTK_TIME_DEFAULT))
         if fam == 'v':
-            out['vtk_volumes'] = normalize_vtk(
-                dict(on=on, mode=mode, value=value,
-                     fields=matrix['volumes']), 'vtk_volumes')
+            vol = dict(on=on, mode=mode, value=value,
+                       fields=matrix['volumes'])
+            if dim == 3 and 'vtk_v_decimate' in v:
+                # OUT-4c: 3D only; k = 1 is dropped by normalize_vtk
+                vol['decimate'] = (
+                    whole('vtk_v_decimate', 'VTK Volumes keep 1 layer in k')
+                    if on else _quiet(parse_int, v.get('vtk_v_decimate'),
+                                      VTK_DECIMATE_DEFAULT))
+            out['vtk_volumes'] = normalize_vtk(vol, 'vtk_volumes')
         else:
             planes = ([[str(p[0]), float(p[1])]
                        for p in v.get('vtk_planes') or []]
@@ -391,6 +409,12 @@ def _vtk_fields_of_case(case, dim) -> dict:
                 every_s = d['value']
         out[f'vtk_{fam}_time'] = f'{every_s:g}'
         out[f'vtk_{fam}_steps'] = f'{steps:g}'
+        if fam == 'v' and dim == 3:
+            # OUT-4c: the decimation box (a bad k is shown as given, for
+            # validation to name; absent = 1)
+            k = (d or {}).get('decimate', VTK_DECIMATE_DEFAULT)
+            out['vtk_v_decimate'] = (f'{k:g}' if isinstance(k, (int, float))
+                                     and not isinstance(k, bool) else str(k))
         if d and fam == 'v':
             matrix['volumes'] = d['fields']
         elif d:

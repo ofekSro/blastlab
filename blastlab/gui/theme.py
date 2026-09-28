@@ -454,6 +454,12 @@ def apply_ttk_style(root=None):
            background=[('selected', pal['accent'])],
            foreground=[('selected', '#ffffff')])
     st.map('Treeview.Heading', background=[('active', pal['card2'])])
+    # OUT-4c: the VTK card's decimation spin box, in the entry colours
+    st.configure('TSpinbox', fieldbackground=pal['entry'],
+                 foreground=pal['text'], background=pal['card2'],
+                 arrowcolor=pal['muted'], bordercolor=pal['border'],
+                 lightcolor=pal['entry'], darkcolor=pal['entry'],
+                 insertcolor=pal['text'], relief='flat', padding=(6, 4))
     st.configure('TPanedwindow', background=pal['bg'])
     st.configure('Sash', sashthickness=8, gripcount=0)
 
