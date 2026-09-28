@@ -361,6 +361,18 @@ every §3 suite green (`test_vtk_series` once hit a transient Windows
   B-R3 rel 4.4e-7; B-R4 counts 624 / 576 = predicted in all 40 obstacles
   files.
 
+- **Owner decision F6 (2026-09-28): fix it inside 4b.** The writer emits
+  `arrival` (timeOfArrival) before `pMax`; the writer goldens are re-pinned
+  (a pure block reorder). Rules F-R1..F-R4, pre-registered in
+  `_e2e_out4_gauges.py` (`--only f6`) in the commit that records this
+  decision, before the fix and before any run: R3 (fixed) vs R3pre (the
+  pre-fix order, a test-only spy) - solve untouched (peak, positive-phase
+  impulse, arrival |d| = 0, p arrays and times identical, same step
+  count); Time_Of_Peak not uniform, not 0 on every obstacle face, every
+  value in [0, t_file]; at each gauge cell Time_Of_Peak = the probe time
+  of peak p within 2e-5 relative; Peak_Overpressure, Peak_Impulse and
+  Impulse identical to R3pre (tolerance 0).
+
 ## 7. Remaining backlog after OUT-4
 
 The OUT track is then complete except OUT-1's pending `gui-qa-tester` screenshots and

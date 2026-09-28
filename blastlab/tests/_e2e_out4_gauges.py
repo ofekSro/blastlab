@@ -94,9 +94,45 @@ changed afterwards; on any failure: stop and report):
 Also printed (information, not a rule): the distinct Time_Of_Peak values
 in R2's last obstacles file (the B1 relabel; see the batch report).
 
+OUT-4b F6 (owner approved the fix inside 4b, 2026-09-28): the writer emits
+the timeOfArrival function object (`arrival`) BEFORE `pMax`, so its
+`p > pMax` test sees the previous step's max (timeOfArrival.C execute()
+shares the registered pMax with the fieldMinMax). Two runs of R2's case
+with pMax and timeOfArrival added to the volumes (VOL3):
+
+  R3pre PRE-FIX ORDER  the controlDict with `arrival` moved back after
+                       pMax / impulseMax, just before `overpressure` - the
+                       order of every writer golden before the fix (a spy on
+                       writer._controldict_function_objects, test-only).
+  R3    FIXED          the writer as committed.
+
+PRE-REGISTERED RULES for F6 (committed before the first R3 run and before
+the fix itself; never changed afterwards; on any failure: stop and
+report):
+
+ F-R1 the solve is untouched: R3 vs R3pre, for every gauge, peak,
+      positive-phase impulse and arrival (gauge_summary) |d| = 0; the p
+      arrays and the time columns identical (np.array_equal); the same
+      solver step count (manifest n_steps).
+ F-R2 in R3's last obstacles file and last volume file: Time_Of_Peak is
+      not uniform (more than one distinct value); on the obstacle faces it
+      is not 0 everywhere; every value lies in [0, t_file] (t_file the
+      file's own sample time, tolerance 0 on the float32 values against
+      float32(t_file)).
+ F-R3 at each gauge's cell in R3's last volume file (the A-R6c cell rule),
+      Time_Of_Peak equals the probe time of the maximum of that gauge's
+      p trace up to that file's time, within 2e-5 relative (the probe
+      file prints 6 significant digits, the VTK value is float32).
+ F-R4 pMax is unchanged by the reorder: Peak_Overpressure in R3's and
+      R3pre's last obstacles and last volume files identical (tolerance
+      0), and Peak_Impulse and Impulse identical likewise.
+
+Printed (information): the distinct Time_Of_Peak count in R3pre's files
+(expected 1 - the F6 symptom).
+
 Needs WSL with blastFoam and an idle VM (`wsl -d Ubuntu -- pgrep -a
 blastFoam` empty - checked here, the script refuses otherwise).
-Run:  cd blastlab/tests && python -u _e2e_out4_gauges.py [--only 4a|4b]
+Run:  cd blastlab/tests && python -u _e2e_out4_gauges.py [--only 4a|4b|f6]
 """
 import json
 import os
@@ -451,6 +487,170 @@ def rule_b4(R2):
                   f'value(s), min {u.min()!r}, max {u.max()!r}', flush=True)
 
 
+# ── OUT-4b F6: timeOfArrival before pMax ─────────────────────────────────
+VOL3 = dict(VOL0, fields=VOL0['fields'] + ['impulse', 'pMax',
+                                           'timeOfArrival', 'impulseMax'])
+#: set while R3pre runs: the pre-fix function-object order
+PREFIX = []
+
+
+def spy_prefix_order():
+    """R3pre: `arrival` moved back just before `overpressure` - after
+    pMax / impulseMax, the order every writer golden had before F6."""
+    from blastlab.solvers.foam import writer
+    real = writer._controldict_function_objects
+
+    def fos(spec):
+        d = real(spec)
+        if not PREFIX or 'arrival' not in d:
+            return d
+        arr = d.pop('arrival')
+        out = {}
+        for k, v in d.items():
+            if k == 'overpressure':
+                out['arrival'] = arr
+            out[k] = v
+        out.setdefault('arrival', arr)
+        return out
+    writer._controldict_function_objects = fos
+
+
+def _last(folder, series):
+    names = series_counts(folder).get(series) or []
+    return sorted(names, key=lambda n: float(n[2:-4]))[-1] if names else None
+
+
+def rule_f1(R3pre, R3):
+    from blastlab.output.gauge_summary import summarize_trace
+    print('\nF-R1: the solve is untouched (R3 vs R3pre)', flush=True)
+    g0, g1 = R3pre['res'].gauges, R3['res'].gauges
+    check('F-R1 the same gauges', len(g0['pressures']) == len(g1['pressures'])
+          > 0)
+    for k, (p0, p1) in enumerate(zip(g0['pressures'], g1['pressures'])):
+        s0 = summarize_trace(g0['times'], p0)
+        s1 = summarize_trace(g1['times'], p1)
+        for key in ('peak_kpa', 'pos_impulse', 'arrival_ms'):
+            check(f'F-R1 gauge {k + 1} {key}: |d| = 0', s0[key] == s1[key],
+                  f'R3pre {s0[key]!r}, R3 {s1[key]!r}')
+        check(f'F-R1 gauge {k + 1}: p arrays and times identical',
+              np.array_equal(p0, p1)
+              and np.array_equal(g0['times'], g1['times']))
+    n0, n1 = R3pre['m'].get('n_steps'), R3['m'].get('n_steps')
+    check('F-R1 the same step count', n0 is not None and n0 == n1,
+          f'R3pre {n0}, R3 {n1}')
+
+
+def rule_f2(R3):
+    from blastlab.output import legacy_vtk as lv
+    print('\nF-R2: Time_Of_Peak is a real field in R3', flush=True)
+    for series in ('obstacles', 'volumes'):
+        last = _last(R3['folder'], series)
+        if last is None:
+            check(f'F-R2 a last {series} file', False)
+            continue
+        vd = lv.read(os.path.join(R3['folder'], 'vtk', series, last))
+        tp = _array(vd, 'Time_Of_Peak')
+        if tp is None:
+            check(f'F-R2 Time_Of_Peak in {series}/{last}', False)
+            continue
+        v = np.asarray(tp.values)
+        t32 = np.float32(float(last[2:-4]))
+        u = np.unique(v)
+        check(f'F-R2 {series}/{last}: not uniform', u.size > 1,
+              f'{u.size} distinct, min {u.min()!r} max {u.max()!r}')
+        if series == 'obstacles':
+            check(f'F-R2 {series}/{last}: not 0 on every face',
+                  bool(np.any(v != 0)))
+        check(f'F-R2 {series}/{last}: every value in [0, t_file = {t32!r}]',
+              bool(np.all(v >= 0) and np.all(v <= t32)),
+              f'min {v.min()!r} max {v.max()!r}')
+
+
+def rule_f3(R3):
+    from blastlab.output import legacy_vtk as lv
+    print('\nF-R3: Time_Of_Peak at the gauge cells vs the p traces',
+          flush=True)
+    last = _last(R3['folder'], 'volumes')
+    if last is None:
+        check('F-R3 a last volume file', False)
+        return
+    t_file = float(last[2:-4])
+    vd = lv.read(os.path.join(R3['folder'], 'vtk', 'volumes', last))
+    tp = _array(vd, 'Time_Of_Peak')
+    if tp is None:
+        check(f'F-R3 Time_Of_Peak in volumes/{last}', False)
+        return
+    cen = centroids(vd)
+    g = R3['res'].gauges
+    t = np.asarray(g['times'], float)
+    upto = t <= float(f'{t_file:.6g}')
+    for k, pt in enumerate(R3['c'].gauges):
+        p = np.asarray(g['pressures'][k], float)
+        want = float(t[upto][int(np.argmax(p[upto]))])
+        d = np.linalg.norm(cen - np.asarray(pt, float), axis=1)
+        tied = np.flatnonzero(d <= d.min() + 1e-9)
+        vals = [float(tp.values[c]) for c in tied]
+        rels = [abs(v - want) / want for v in vals]
+        check(f'F-R3 gauge {k + 1}: Time_Of_Peak at its cell = the probe '
+              f'time of peak p within 2e-5', min(rels) <= 2e-5,
+              f'cells {tied.tolist()} values {vals}, probe {want!r}, '
+              f'rel {min(rels):.3g}')
+
+
+def rule_f4(R3pre, R3):
+    from blastlab.output import legacy_vtk as lv
+    print('\nF-R4: pMax / impulse unchanged by the reorder', flush=True)
+    for series in ('obstacles', 'volumes'):
+        a, b = _last(R3pre['folder'], series), _last(R3['folder'], series)
+        if a is None or a != b:
+            check(f'F-R4 {series}: the same last file', False, f'{a} vs {b}')
+            continue
+        va = lv.read(os.path.join(R3pre['folder'], 'vtk', series, a))
+        vb = lv.read(os.path.join(R3['folder'], 'vtk', series, b))
+        for name in ('Peak_Overpressure', 'Peak_Impulse', 'Impulse'):
+            x, y = _array(va, name), _array(vb, name)
+            check(f'F-R4 {series}/{a}: {name} identical',
+                  x is not None and y is not None
+                  and np.array_equal(x.values, y.values))
+        tp = _array(va, 'Time_Of_Peak')
+        if tp is not None:
+            print(f'    (info) R3pre {series}/{a}: Time_Of_Peak '
+                  f'{np.unique(tp.values).size} distinct value(s)',
+                  flush=True)
+
+
+def main_f6(runs):
+    spy_prefix_order()
+    c3 = case2(vtk_surfaces=SURF2, vtk_volumes=VOL3,
+               vtk_gauges={'fields': ['impulse']})
+    PREFIX.append(True)
+    try:
+        R3pre = base.run_stage(runs, 'E2E_OUT4_R3pre', c3)
+    finally:
+        PREFIX.clear()
+    R3 = base.run_stage(runs, 'E2E_OUT4_R3', c3)
+    R3pre['c'] = R3['c'] = c3
+    for tag, r in (('R3pre', R3pre), ('R3', R3)):
+        check(f'{tag}: finished without an error, not stopped early',
+              r['error'] is None and r['res'] is not None
+              and not r['res'].stopped_early, (r['error'] or '')[-300:])
+    if FAIL or base.FAIL:
+        FAIL.extend(base.FAIL)
+        print(f'FAILED before the rules: {FAIL}')
+        return 1
+    rule_f1(R3pre, R3)
+    rule_f2(R3)
+    rule_f3(R3)
+    rule_f4(R3pre, R3)
+    FAIL.extend(base.FAIL)
+    print('\n' + '=' * 52)
+    if FAIL:
+        print(f'FAILED: {len(FAIL)} of {len(RAN)} check(s): {FAIL}')
+        return 1
+    print(f'E2E OUT-4b F6 TIME OF PEAK: PASS ({len(RAN)} checks)')
+    return 0
+
+
 def main():
     from blastlab.ui.testing import private_settings
     private_settings()                      # auto_cleanup off (CLAUDE.md 8.2)
@@ -473,6 +673,8 @@ def main():
     print(f'runs folder (kept as evidence): {runs}', flush=True)
     only = sys.argv[sys.argv.index('--only') + 1] if '--only' in sys.argv \
         else None
+    if only == 'f6':
+        return main_f6(runs)
     if only != '4b':
         rc = main_4a(runs)
         if rc or only == '4a':
