@@ -316,6 +316,10 @@ Also green: `test_legacy_vtk.py` (11/11), `test_case_validate.py`.
     1e-9; the nearest row is 0.000999467. The value comparison never ran.
   Owner decision needed: re-register A-R3c (compare sample indices) and A-R6c
   (match the row to the probe file's printed precision), then rerun.
+- **Re-registered (owner, 2026-09-28), committed before run 3:** A-R3c compares
+  the arrival SAMPLE INDEX from p_over and from p (gauge_summary's criterion);
+  A-R6c takes the probe row whose time equals the file time printed at the probe
+  file's precision (6 significant digits). Thresholds unchanged.
 
 ## 7. Remaining backlog after OUT-4
 

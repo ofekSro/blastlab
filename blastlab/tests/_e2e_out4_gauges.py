@@ -32,6 +32,10 @@ never changed afterwards; on any failure: stop and report):
       c. the arrival read from the overpressure trace (first sample with
          p_over > 0.10 x 101325 Pa) equals the arrival read from p
          (gauge_summary, first p > 1.10 x 101325 Pa).
+         RE-REGISTERED (owner, 2026-09-28, before the rerun): the two are
+         compared as SAMPLE INDICES, not float times - run 2 picked the
+         same sample on both sides, but gauge_summary's ms round trip
+         made the times differ in the last bit.
  A-R4 the q trace against 0.5 rho |U|^2 from the probed rho and U:
       a. relative error <= 1e-4 wherever q >= 1 % of its peak;
       b. the time of peak q identical (same sample).
@@ -47,6 +51,10 @@ never changed afterwards; on any failure: stop and report):
          point; on a tie (centroid distances equal to 1e-9 m) the rule
          passes if any tied cell matches. The probe row is the one whose
          time equals the file's time to 1e-9 relative.
+         RE-REGISTERED (owner, 2026-09-28, before the rerun): the probe
+         row is the one whose time equals the file's time printed at the
+         probe file's precision (blastProbes writePrecision, 6 significant
+         digits: `float(f'{t:.6g}')`); threshold unchanged (1e-4).
 
 Both runs are also checked to finish without an error, and R0 to record
 no extra gauge key.
@@ -145,10 +153,17 @@ def rule_a2_to_a5(R1):
         check(f'A-R3b {tag}: time of that max within 2 samples', di <= 2,
               f'{di} samples (t {t[np.argmax(imp)]:.6g} vs '
               f'{t[np.argmax(py)]:.6g} s)')
-        arr_p = summarize_trace(t, p)['arrival_ms'] * 1e-3
-        arr_o = first_above(t, ovp, ARRIVAL_FRAC * P_AIR)
-        check(f'A-R3c {tag}: arrival from p_over equals arrival from p',
-              arr_p == arr_o, f'p {arr_p!r} s, p_over {arr_o!r} s')
+        # re-registered 2026-09-28 (owner): sample indices, not float times
+        hit_p = np.flatnonzero(p > (1.0 + ARRIVAL_FRAC) * P_AIR)
+        hit_o = np.flatnonzero(ovp > ARRIVAL_FRAC * P_AIR)
+        i_p = int(hit_p[0]) if hit_p.size else -1
+        i_o = int(hit_o[0]) if hit_o.size else -2
+        arr_ms = summarize_trace(t, p)['arrival_ms']
+        check(f'A-R3c {tag}: arrival sample from p_over equals the one from '
+              f'p (gauge_summary)',
+              i_p == i_o and i_p >= 0 and t[i_p] * 1e3 == arr_ms,
+              f'p sample {i_p}, p_over sample {i_o}, gauge_summary '
+              f'{arr_ms!r} ms')
         q = np.asarray(g['dyn_pressures'][k], float)
         rho = np.asarray(g['rhos'][k], float)
         spd = np.asarray(g['speeds'][k], float)
@@ -221,7 +236,8 @@ def rule_a6(R0, R1):
     cen = centroids(vd)
     g = R1['res'].gauges
     t = np.asarray(g['times'], float)
-    rows = np.flatnonzero(np.abs(t - t_file) <= 1e-9 * max(abs(t_file), 1e-30))
+    # re-registered 2026-09-28 (owner): the probe file's printed precision
+    rows = np.flatnonzero(t == float(f'{t_file:.6g}'))
     check(f'A-R6c a probe row at the last volume time {t_file!r} s',
           rows.size >= 1, f'nearest {t[np.argmin(np.abs(t - t_file))]!r}')
     if not rows.size:
