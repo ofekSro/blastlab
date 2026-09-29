@@ -399,6 +399,12 @@ class FieldsView(QWidget):
                 fig = plots.figure_results_1d(
                     res.snapshots, c.eos, c.charge_kg, c.radius_m,
                     title_extra=self._title_extra)
+                # on screen only: the builder's one-shot tight_layout is
+                # for its own 10-inch page, and in the Results centre
+                # (468 px at 1100 x 720) the tick labels and the title
+                # fell outside the canvas. Laid out again at every draw,
+                # at the canvas's size (GUI-7 verification)
+                fig.set_layout_engine('tight')
             else:
                 fig = plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,

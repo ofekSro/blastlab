@@ -1146,6 +1146,22 @@ def s6_field(link):
             check('1D: profiles only, the controls row hidden',
                   opts == ['profiles'] and p.fields.field() == 'profiles'
                   and fv.ctl.isHidden() and p.fields.page() == 'figure')
+            # verification: at 1100 px the builder's one-shot layout put
+            # the tick labels outside the canvas
+            p.resize(1100, 720)
+            pump(80)
+            cv = p.fields.canvas._canvas
+            cv.draw()
+            fig = p.fields.canvas.figure
+            r = cv.get_renderer()
+            out = [t.get_text() for a in fig.axes
+                   for t in a.get_yticklabels() + [a.yaxis.label]
+                   if t.get_text() and t.get_visible()
+                   and t.get_window_extent(renderer=r).x0 < -0.5]
+            check('1D at 1100 px: every tick label and y label inside the '
+                  'canvas', not out, ascii(out[:4]))
+            p.resize(1600, 1000)
+            pump(40)
             continue
         got = []
         for base in fv.field_seg.values():
