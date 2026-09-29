@@ -54,4 +54,61 @@ the same commit as these rules: `views`.
 
 ## Results
 
-(Added after the runs, in a later commit.)
+The rules above were committed first (`416dc25`). Everything below was
+measured after that commit, on this 8 GB PC (1920 × 1080 screen), with a
+foreign `python -m blastlab` (PID 29568) left running, idle.
+
+### R-VIEWER: PASS (0 ms for every action)
+
+Two full runs of the sampler, both 0 ms for all seven actions. The first
+ran at `416dc25` (T5 + T6 code), the second at `7e623ba` (the T7 fixes,
+among them the panel's re-fit on `LayoutRequest`, D117). The numbers
+below are the second run (`viewer_measure_7b.json`). The self-test read
+149.9 ms / 60 px.
+
+| Action | Samples | With a window | Longest wrong | Worst | Longest mismatch |
+|---|---|---|---|---|---|
+| open3d | 1104 | 1054 | 0.0 ms | 0 px | 0.0 ms |
+| views (Field → Gauges → 3D) | 3197 | 1053 | 0.0 ms | 0 px | 0.0 ms |
+| select | 2264 | 2264 | 0.0 ms | 0 px | 0.0 ms |
+| busy | 2112 | 2112 | 0.0 ms | 0 px | 0.0 ms |
+| stage | 2127 | 2127 | 0.0 ms | 0 px | 27.2 ms |
+| tabs | 3207 | 1057 | 0.0 ms | 0 px | 0.0 ms |
+| theme | 11706 | 11706 | 0.0 ms | 0 px | 0.0 ms |
+
+`stage`'s mismatch is `shrink_ahead` making the window smaller than its
+card on purpose (D93); it is never outside the card. The first run
+(`416dc25`) had ≥ 1057 samples with a window for each action.
+
+### R-VIEWER-RESIZE (F13): the judged pair FAILS by 1.9 ms
+
+`resize` = 1600 → 1100 → 1600, three repeats. Median of the longest
+wrong-place stretch per run (`viewer_resize_7b.json`):
+
+| Pair | Base `c8a04d2` | HEAD | HEAD − base | Rule (≤ +5 ms) |
+|---|---|---|---|---|
+| **1 (judged)** | 18.5 ms | 25.4 ms (`416dc25`) | +6.9 ms | **FAIL** |
+| 2 | 17.5 ms | 18.1 ms (`416dc25`) | +0.6 ms | pass |
+| 3 | 30.3 ms | 24.1 ms (`416dc25`) | −6.2 ms | pass |
+| 4 | 22.8 ms | 21.8 ms (`7e623ba`) | −1.0 ms | pass |
+| 5 | 17.5 ms | 30.8 ms (`7e623ba`) | +13.3 ms | fail |
+
+- The pre-registered rule judges one back-to-back pair: pair 1, run
+  straight after the first full sampler run. It fails: HEAD's median is
+  25.4 ms against the 23.5 ms allowed.
+- Pairs 2-5 are diagnostics, run afterwards, and do not replace pair 1.
+  The single-run medians move by up to 13 ms from run to run at the same
+  commit (base: 17.5-30.3 ms). Pooled over the 15 repeats of each side,
+  the median is 19.6 ms at base and 24.1 ms at HEAD (+4.5 ms). The
+  longest single stretch is 32.0 ms at base and 31.3 ms at HEAD.
+- The full runs read 21.2 ms (`416dc25`) and 29.4 ms (`7e623ba`).
+- The lag is F13's: the window stands up to 472 px past its card (500 at
+  base) on the shrink step, for 17-32 ms, at base as at HEAD. Nothing in
+  7b touches `view3d_host.py`, and on a resize the Field and Gauges pages
+  are hidden stack pages (not laid out).
+- **Action (plan §11):** reported, not fixed. The fix belongs to F13 and
+  F5 (`view3d_host.py`, the CLAUDE.md 8.7 zone): shrink the child window
+  ahead of a window resize, as `shrink_ahead` does for the banner and the
+  stage strip. A resize rule that judges one pair of three-repeat medians
+  cannot tell ±5 ms from this noise. More repeats per side (say 15) would
+  make it a fair gate.
