@@ -1026,6 +1026,39 @@ def r5_gauges(win):
     check('and off again when the segment goes back',
           win.ctrl._live_gauges is False)
     win._show('run')
+    # D69 (the plan's fallback after T9's R-COST): the column must be
+    # visible - a minimised window does not collect
+    win.showMinimized()
+    pump(50)
+    off = win.ctrl._live_gauges
+    win.showNormal()
+    pump(50)
+    check('minimised: not collecting; restored: collecting again (D69)',
+          off is False and win.ctrl._live_gauges is True,
+          f'{off} {win.ctrl._live_gauges}')
+
+    # a refresh that changes no row's state re-styles nothing (T9 R-COST:
+    # re-polishing every row on every refresh was most of the cost)
+    rp.set_gauge_case(case)
+    rp.set_gauge_payload(pay2)
+    col.flush()
+    pump(RG.REFRESH_MS + 50)
+    styled = []
+    widgets = [col.card, col.card.peak] + [
+        x for w in col.row_widgets() for x in (w, w.num, w.dist, w.peak)]
+    real = {id(w): w.setStyleSheet for w in widgets}
+    for w in widgets:
+        w.setStyleSheet = (lambda s, _w=w: styled.append(_w)
+                           or real[id(_w)](s))
+    try:
+        rp.set_gauge_payload(dict(pay2))
+        col.flush()
+        pump(RG.REFRESH_MS + 50)
+    finally:
+        for w in widgets:
+            del w.setStyleSheet
+    check('a same-state refresh re-styles no widget (only texts and data)',
+          styled == [] and RG.REFRESH_MS == 500, f'{len(styled)} restyled')
 
     # the hidden Gauges page is fed on demand, with the newest payload
     rp.set_gauge_payload(pay2)

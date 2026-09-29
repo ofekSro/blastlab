@@ -60,9 +60,10 @@ LIST_HEAD_H = 28
 #: pixel column, the enlarged trace not much more than its width
 SPARK_POINTS = 2 * SPARK_W
 TRACE_POINTS = 800
-#: the list is re-summarised at most this often while a run streams;
+#: the list is re-summarised at most this often while a run streams
+#: (2 Hz: the batch plan's fallback after T9's R-COST, decision D69);
 #: the newest payload is always the one drawn (latest wins)
-REFRESH_MS = 250
+REFRESH_MS = 500
 
 
 # ── the rows (toolkit-free) ──────────────────────────────────────────────
@@ -313,32 +314,44 @@ class _GaugeRow(QFrame):
         lay.setStretchFactor(self.peak, 1)
         self._selected = False
         self._waiting = True
+        self._peak_kpa = None
         self._peak_text = WAITING
+        self.recolour()
 
     def set_row(self, row, span):
+        """Texts and the sparkline only; the style sheets are re-applied
+        only when the waiting state changes (re-polishing every row on
+        every refresh was most of the collection cost, T9 R-COST)."""
         self.dist.setText(fmt_dist(row['z'] if row['z'] is not None
                                    else row['r']))
+        changed = row['waiting'] != self._waiting
         self._waiting = row['waiting']
+        self._peak_kpa = None if row['waiting'] else row['peak_kpa']
         self._peak_text = row['peak_text']
-        if row['waiting']:
-            self.peak.setText(WAITING)
-        else:
-            unit = theme.cur('faint')
-            self.peak.setText(f'{row["peak_kpa"]:,.0f} <span style="color: '
-                              f'{unit};">kPa</span>')
+        self._set_peak_html()
         x, y = _decimate(row['t_ms'], row['kpa'], cap=SPARK_POINTS) \
             if row['t_ms'].size else (row['t_ms'], row['kpa'])
         self.spark.set_data(x, y, span)
-        self.recolour()
+        if changed:
+            self.recolour()
+
+    def _set_peak_html(self):
+        if self._peak_kpa is None:
+            text = WAITING
+        else:
+            text = (f'{self._peak_kpa:,.0f} <span style="color: '
+                    f'{theme.cur("faint")};">kPa</span>')
+        if self.peak.text() != text:
+            self.peak.setText(text)
 
     def peak_text(self):
         """The PEAK cell as read: `296 kPa` or `waiting`."""
-        return WAITING if self._waiting else \
-            self.peak.text().split(' <')[0] + ' kPa'
+        return self._peak_text
 
     def set_selected(self, on):
-        self._selected = bool(on)
-        self.recolour()
+        if bool(on) != self._selected:
+            self._selected = bool(on)
+            self.recolour()
 
     def recolour(self):
         p = theme.pal()
@@ -351,6 +364,7 @@ class _GaugeRow(QFrame):
         self.peak.setStyleSheet(_css(12.5, None,
                                      'faint' if self._waiting else 'text',
                                      theme.MONO))
+        self._set_peak_html()           # the unit's colour is in the HTML
         self.spark.update()
 
     def mouseReleaseEvent(self, event):
@@ -409,6 +423,9 @@ class _SelectedCard(QFrame):
         self._live = False
 
     def set_row(self, row, z_on, live):
+        """Texts, the trace and its marks; the peak label is re-styled
+        only when the waiting state changes (see _GaugeRow.set_row)."""
+        was = self._row is None or self._row['waiting']
         self._row, self._live = row, bool(live)
         self.num.setText(f'G{row["number"]}')
         lead = (f'Z {fmt_dist(row["z"])}' if z_on
@@ -434,7 +451,13 @@ class _SelectedCard(QFrame):
             self.peak_lbl.setText(f'{row["t_peak_ms"]:.2f} ms')
             self.peak_lbl.setPos(row['t_peak_ms'], row['peak_kpa'])
         self.now_line.setVisible(self._live and bool(t.size))
-        self.recolour()
+        if row['waiting'] != was:
+            self._style_peak()
+
+    def _style_peak(self):
+        waiting = self._row is None or self._row['waiting']
+        self.peak.setStyleSheet(_css(12, None, 'faint' if waiting else 'text',
+                                     theme.MONO))
 
     def _set_range(self, t, y):
         """Time from 0 to the newest sample, overpressure from min(0, the
@@ -468,9 +491,7 @@ class _SelectedCard(QFrame):
                            f'border-radius: 10px; }}')
         self.num.setStyleSheet(_css(13, 600, 'gauge', theme.MONO))
         self.meta.setStyleSheet(_css(12, None, 'faint'))
-        waiting = self._row is None or self._row['waiting']
-        self.peak.setStyleSheet(_css(12, None, 'faint' if waiting else 'text',
-                                     theme.MONO))
+        self._style_peak()
         self.plot_w.setBackground(p['gauge_bg'])
         for ax in ('left', 'bottom'):
             a = self.plot.getAxis(ax)

@@ -7,7 +7,7 @@ import os
 import sys
 import threading
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QEvent, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout,
                                QMainWindow, QMenu, QSizePolicy,
@@ -1116,17 +1116,24 @@ class MainWindow(QMainWindow):
         self.run_panel.set_gauge_payload(payload)
 
     def _sync_gauge_collection(self):
-        """GUI-6b collection rule (decision D60): live gauge traces are
-        collected while the Run screen is the current screen (its gauge
-        column is on screen) or the view's Gauges segment is selected,
-        and not otherwise - a native run copies every series on each live
-        frame, a foam run re-reads blastProbes. Display only: the solver's
-        own gauge record does not depend on it."""
+        """GUI-6b collection rule (decisions D60, D69): live gauge traces
+        are collected while the Run screen's gauge column is visible - the
+        Run screen is current and the window is not minimised - or the
+        view's Gauges segment is selected, and not otherwise: a native run
+        copies every series on each live frame, a foam run re-reads
+        blastProbes. Display only: the solver's own gauge record does not
+        depend on it (T9: the arrays are identical either way)."""
         ctrl = getattr(self, 'ctrl', None)
         if ctrl is None:
             return
-        ctrl.set_live_gauges(self.current_tab() == 'run'
-                             or self.run_panel.watching_gauges())
+        column = self.current_tab() == 'run' and not self.isMinimized()
+        ctrl.set_live_gauges(column or self.run_panel.watching_gauges())
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        # minimised or restored: the gauge column left or came back
+        if event.type() == QEvent.WindowStateChange:
+            self._sync_gauge_collection()
 
     def _gauges_wanted(self, on):
         """The live gauge view was opened or left."""
