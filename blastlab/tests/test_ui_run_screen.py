@@ -31,7 +31,10 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      its own (run time, highest peak from summarize_gauges), `✓ Done`
      in the title, `Run again`; a stopped run gets the banner only, an
      errored or result-less one nothing; the next start clears it all;
-     close leaves no tray icon.
+     close leaves no tray icon;
+ R7  the chain hook (6b; GUI-9 builds the strip): `chain_slot` hidden at
+     zero height for a single run, set_chain_strip shows a widget above
+     the progress strip and None hides it again; `Chain 2/3 · …`.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1160,6 +1163,51 @@ def r6_finish(win):
           f'{avail} {got}')
 
 
+def r7_chain_hook(win):
+    from PySide6.QtWidgets import QLabel
+    from blastlab.solvers.hooks import Progress
+    rp = win.run_panel
+    print('\nR7: the chain hook')
+    win._show('run')
+    win.resize(1600, 1000)
+    saved = (win.ctrl._stage_dims, win._run_cases)
+    try:
+        win.ctrl._stage_dims = [2]
+        win.on_running(True)
+        pump(50)
+        check('a single run leaves chain_slot hidden, height 0',
+              rp.chain_slot.isHidden() and rp.chain_slot.height() == 0
+              and rp.chain_strip() is None, str(rp.chain_slot.height()))
+        win.on_running(False)
+        lbl = QLabel('CHAIN · wall_A · 01 1D ✓ 9 s → 02 2D 78 %')
+        rp.set_chain_strip(lbl)
+        pump(50)
+        check('set_chain_strip(widget) shows it above the progress strip',
+              rp.chain_slot.isVisibleTo(rp) and rp.chain_strip() is lbl
+              and lbl.isVisibleTo(rp) and rp.chain_slot.height() > 0
+              and rp.chain_slot.geometry().bottom()
+              < rp.strip.geometry().top(),
+              f'{rp.chain_slot.geometry()} {rp.strip.geometry()}')
+        rp.set_chain_strip(None)
+        pump(50)
+        check('set_chain_strip(None) empties and hides it again (height 0)',
+              rp.chain_slot.isHidden() and rp.chain_slot.height() == 0
+              and rp.chain_strip() is None and lbl.parent() is None,
+              str(rp.chain_slot.height()))
+        # the title of a 3-stage chain, stage 2 at 78 % (F6's format)
+        win.ctrl._stage_dims = [1, 2, 3]
+        win.on_running(True)
+        win._chain_k = 2
+        win.on_progress(Progress(step=1, t=1e-4, dt=1e-7, p_max=2e5,
+                                 frac=0.78))
+        check('a 3-stage chain still titles `Chain 2/3 · 78 % · …`',
+              win.windowTitle().startswith('Chain 2/3 · 78 % · '),
+              win.windowTitle())
+        win.on_running(False)
+    finally:
+        win.ctrl._stage_dims, win._run_cases = saved
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1174,6 +1222,7 @@ def main():
         r4_dock(win)
         r5_gauges(win)
         r6_finish(win)
+        r7_chain_hook(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # a notification's tray icon left over is removed at close

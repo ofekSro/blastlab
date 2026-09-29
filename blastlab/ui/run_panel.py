@@ -55,6 +55,9 @@ PATH_BLANK = '<Runs folder>' + os.sep + '<Model>' + os.sep
 TILE_MIN = 112
 PROGRESS_MIN = 220
 
+#: Qt's QWIDGETSIZE_MAX (not exported by PySide6): "no maximum"
+QWIDGETSIZE_MAX = (1 << 24) - 1
+
 #: the chip keys the QA harness and the e2e suites read (chip_texts)
 CHIP_KEYS = ('step', 't [ms]', 'dt [s]', 'p max [kPa]', 'cells')
 #: the elapsed line refreshes this often while a run or an HD 1.3
@@ -614,11 +617,14 @@ class RunPanel(QWidget):
         cl.setContentsMargins(0, 0, 0, 0)
         cl.setSpacing(GAP)
         # GUI-9 puts the chain's stage strip here (board Run_Chain lines
-        # 60-70); hidden and empty until then
+        # 60-70) through set_chain_strip; hidden, empty and zero-height
+        # until then
         self.chain_slot = QWidget()
         self.chain_slot.setObjectName('chainslot')
         csl = QHBoxLayout(self.chain_slot)
         csl.setContentsMargins(0, 0, 0, 0)
+        csl.setSpacing(0)
+        self.chain_slot.setFixedHeight(0)
         self.chain_slot.setVisible(False)
         cl.addWidget(self.chain_slot)
 
@@ -760,6 +766,32 @@ class RunPanel(QWidget):
         if self.dock_frame.height() != want \
                 or self.dock_frame.minimumHeight() != want:
             self.dock_frame.setFixedHeight(want)
+
+    # ── the chain hook (T8; GUI-9 builds the strip) ──────────────────────
+    def set_chain_strip(self, widget=None):
+        """Put `widget` - GUI-9's stage strip - in `chain_slot`, above the
+        progress strip, and show it; None empties the slot and hides it
+        at zero height. A widget taken out is unparented (and so
+        hidden). Anything appearing above the view moves the embedded
+        3D viewer: GUI-9 re-measures it (CLAUDE.md 8.7)."""
+        lay = self.chain_slot.layout()
+        while lay.count():
+            w = lay.takeAt(0).widget()
+            if w is not None and w is not widget:
+                w.setParent(None)
+        if widget is None:
+            self.chain_slot.setFixedHeight(0)
+            self.chain_slot.hide()
+            return
+        lay.addWidget(widget)
+        self.chain_slot.setMinimumHeight(0)
+        self.chain_slot.setMaximumHeight(QWIDGETSIZE_MAX)
+        self.chain_slot.show()
+
+    def chain_strip(self):
+        """The widget in `chain_slot`, or None."""
+        lay = self.chain_slot.layout()
+        return lay.itemAt(0).widget() if lay.count() else None
 
     def column_widths(self):
         """(controls, centre, gauges) in px, as laid out (tests)."""
