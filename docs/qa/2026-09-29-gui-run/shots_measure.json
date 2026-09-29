@@ -1,0 +1,1551 @@
+{
+ "dark_pass_pid": 11536,
+ "light_pass_pid": 34844,
+ "cell_size_m": 0.0125,
+ "note": "Two passes. The first pass (dark then light) lost its light run to MemoryError: Unable to allocate 8.00 MiB at step 143 (this 8 GB PC had ~140-230 MB of physical memory free, other applications); its time line read \"Failed after 10 s\". The light states were retaken alone (SHOT_MODES=light) with no error; the light PNGs are from that pass.",
+ "idle-dark-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   270
+  ],
+  "strip_rows": 2,
+  "strip_h": 170,
+  "progress_tile": [
+   432,
+   82
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "—",
+  "time_line": "",
+  "paused": "",
+  "chips": {
+   "step": "—",
+   "t [ms]": "—",
+   "dt [s]": "—",
+   "p max [kPa]": "—",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "idle-dark-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   608
+  ],
+  "strip_rows": 1,
+  "strip_h": 82,
+  "progress_tile": [
+   394,
+   82
+  ],
+  "tiles": {
+   "time": [
+    171,
+    82
+   ],
+   "step": [
+    172,
+    82
+   ],
+   "pmax": [
+    171,
+    82
+   ]
+  },
+  "pct": "—",
+  "time_line": "",
+  "paused": "",
+  "chips": {
+   "step": "—",
+   "t [ms]": "—",
+   "dt [s]": "—",
+   "p max [kPa]": "—",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "run-dark-reached-47%": true,
+ "run-dark-s-to-47%": 29.5,
+ "running-dark-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "48 %",
+  "time_line": "30 s elapsed · about 33 s left",
+  "paused": "",
+  "chips": {
+   "step": "416",
+   "t [ms]": "0.428",
+   "dt [s]": "1.61e-06",
+   "p max [kPa]": "1,150",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": "#26141a",
+  "run_bg": null
+ },
+ "running-dark-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "49 %",
+  "time_line": "31 s elapsed · about 32 s left",
+  "paused": "",
+  "chips": {
+   "step": "428",
+   "t [ms]": "0.448",
+   "dt [s]": "1.66e-06",
+   "p max [kPa]": "1,092",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": "#26141a",
+  "run_bg": null
+ },
+ "step-open-dark-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": [
+   176,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [
+   32,
+   32,
+   32,
+   32,
+   32,
+   32
+  ],
+  "setup_link": [
+   240,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "51 %",
+  "time_line": "32 s elapsed · about 32 s left",
+  "paused": "",
+  "chips": {
+   "step": "440",
+   "t [ms]": "0.468",
+   "dt [s]": "1.73e-06",
+   "p max [kPa]": "1,038",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": "#26141a",
+  "run_bg": null,
+  "ctrl_scroll_max": 175
+ },
+ "step-open-dark-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [
+   32,
+   32,
+   32,
+   32,
+   32,
+   32
+  ],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "33 s elapsed · about 31 s left",
+  "paused": "",
+  "chips": {
+   "step": "453",
+   "t [ms]": "0.491",
+   "dt [s]": "1.80e-06",
+   "p max [kPa]": "983.2",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": "#26141a",
+  "run_bg": null,
+  "ctrl_scroll_max": 0
+ },
+ "stopped-dark-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "Stopped after 59 s",
+  "paused": "",
+  "chips": {
+   "step": "455",
+   "t [ms]": "0.495",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "974.8",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "stopped-dark-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "Stopped after 59 s",
+  "paused": "",
+  "chips": {
+   "step": "455",
+   "t [ms]": "0.495",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "974.8",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "0d-busy-dark-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   250,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   359
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {},
+  "pct": "—",
+  "time_line": "HD 1.3 assessment · 3 s elapsed",
+  "paused": "",
+  "chips": {
+   "step": "455",
+   "t [ms]": "0.495",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "974.8",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#141416"
+ },
+ "0d-busy-dark-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   250,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   932,
+   81
+  ],
+  "tiles": {},
+  "pct": "—",
+  "time_line": "HD 1.3 assessment · 4 s elapsed",
+  "paused": "",
+  "chips": {
+   "step": "455",
+   "t [ms]": "0.495",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "974.8",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_rf17znqx\\runs\\wall_A\\",
+  "panel_bg": "#19191d",
+  "progress_bg": "#1d1511",
+  "stop_bg": null,
+  "run_bg": "#141416"
+ },
+ "idle-light-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   270
+  ],
+  "strip_rows": 2,
+  "strip_h": 170,
+  "progress_tile": [
+   432,
+   82
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "—",
+  "time_line": "",
+  "paused": "",
+  "chips": {
+   "step": "—",
+   "t [ms]": "—",
+   "dt [s]": "—",
+   "p max [kPa]": "—",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "idle-light-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   608
+  ],
+  "strip_rows": 1,
+  "strip_h": 82,
+  "progress_tile": [
+   394,
+   82
+  ],
+  "tiles": {
+   "time": [
+    171,
+    82
+   ],
+   "step": [
+    172,
+    82
+   ],
+   "pmax": [
+    171,
+    82
+   ]
+  },
+  "pct": "—",
+  "time_line": "",
+  "paused": "",
+  "chips": {
+   "step": "—",
+   "t [ms]": "—",
+   "dt [s]": "—",
+   "p max [kPa]": "—",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "run-light-reached-47%": true,
+ "run-light-s-to-47%": 28.1,
+ "running-light-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "48 %",
+  "time_line": "29 s elapsed · about 31 s left",
+  "paused": "",
+  "chips": {
+   "step": "417",
+   "t [ms]": "0.430",
+   "dt [s]": "1.61e-06",
+   "p max [kPa]": "1,145",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": "#fbe4e9",
+  "run_bg": null
+ },
+ "running-light-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "50 %",
+  "time_line": "30 s elapsed · about 31 s left",
+  "paused": "",
+  "chips": {
+   "step": "429",
+   "t [ms]": "0.449",
+   "dt [s]": "1.67e-06",
+   "p max [kPa]": "1,088",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": "#fbe4e9",
+  "run_bg": null
+ },
+ "step-open-light-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": [
+   176,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [
+   32,
+   32,
+   32,
+   32,
+   32,
+   32
+  ],
+  "setup_link": [
+   240,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "51 %",
+  "time_line": "31 s elapsed · about 30 s left",
+  "paused": "",
+  "chips": {
+   "step": "441",
+   "t [ms]": "0.470",
+   "dt [s]": "1.73e-06",
+   "p max [kPa]": "1,034",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": "#fbe4e9",
+  "run_bg": null,
+  "ctrl_scroll_max": 175
+ },
+ "step-open-light-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": [
+   186,
+   48
+  ],
+  "run": null,
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [
+   32,
+   32,
+   32,
+   32,
+   32,
+   32
+  ],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "32 s elapsed · about 29 s left",
+  "paused": "",
+  "chips": {
+   "step": "454",
+   "t [ms]": "0.493",
+   "dt [s]": "1.80e-06",
+   "p max [kPa]": "978.9",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": "#fbe4e9",
+  "run_bg": null,
+  "ctrl_scroll_max": 0
+ },
+ "stopped-light-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   271
+  ],
+  "strip_rows": 2,
+  "strip_h": 169,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {
+   "time": [
+    139,
+    80
+   ],
+   "step": [
+    138,
+    80
+   ],
+   "pmax": [
+    139,
+    80
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "Stopped after 58 s",
+  "paused": "",
+  "chips": {
+   "step": "456",
+   "t [ms]": "0.496",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "971.1",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "stopped-light-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   186,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   394,
+   81
+  ],
+  "tiles": {
+   "time": [
+    171,
+    81
+   ],
+   "step": [
+    172,
+    81
+   ],
+   "pmax": [
+    171,
+    81
+   ]
+  },
+  "pct": "52 %",
+  "time_line": "Stopped after 58 s",
+  "paused": "",
+  "chips": {
+   "step": "456",
+   "t [ms]": "0.496",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "971.1",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK · 144 k cells",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#ff6a2b"
+ },
+ "0d-busy-light-1100x720": {
+  "window": [
+   1100,
+   720
+  ],
+  "columns": [
+   280,
+   432,
+   340
+  ],
+  "stop": null,
+  "run": [
+   250,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 110,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   432,
+   359
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   432,
+   81
+  ],
+  "tiles": {},
+  "pct": "—",
+  "time_line": "HD 1.3 assessment · 3 s elapsed",
+  "paused": "",
+  "chips": {
+   "step": "456",
+   "t [ms]": "0.496",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "971.1",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#f1efeb"
+ },
+ "0d-busy-light-1600x1000": {
+  "window": [
+   1600,
+   1000
+  ],
+  "columns": [
+   280,
+   932,
+   340
+  ],
+  "stop": null,
+  "run": [
+   250,
+   48
+  ],
+  "run_text": "Run",
+  "view3d": [
+   56,
+   48
+  ],
+  "browse": [
+   34,
+   34
+  ],
+  "runs_dir_h": 34,
+  "exec_h": [],
+  "setup_link": [
+   250,
+   42
+  ],
+  "dock_h": 140,
+  "dock_tab_h": 40,
+  "dock_tabs": [
+   "Log",
+   "Messages",
+   "Earlier runs   0"
+  ],
+  "view": [
+   932,
+   609
+  ],
+  "strip_rows": 1,
+  "strip_h": 81,
+  "progress_tile": [
+   932,
+   81
+  ],
+  "tiles": {},
+  "pct": "—",
+  "time_line": "HD 1.3 assessment · 4 s elapsed",
+  "paused": "",
+  "chips": {
+   "step": "456",
+   "t [ms]": "0.496",
+   "dt [s]": "1.81e-06",
+   "p max [kPa]": "971.1",
+   "cells": "—"
+  },
+  "setup_link_text": "Setup: Case OK",
+  "path": "C:\\Users\\OFEKRO~1\\AppData\\Local\\Temp\\blastlab_ui_nouoaslf\\runs\\wall_A\\",
+  "panel_bg": "#e7e4de",
+  "progress_bg": "#fbe9df",
+  "stop_bg": null,
+  "run_bg": "#f1efeb"
+ },
+ "light_pass_errors": []
+}
