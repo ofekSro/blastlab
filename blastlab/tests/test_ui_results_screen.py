@@ -1397,6 +1397,30 @@ def s6_field(link):
         inside.append(vbr.contains(box))
     check('at each corner cell the readout opens inward, inside the map',
           all(inside), str(inside))
+    # and along the middle row, where a rule by the view's midpoint put
+    # it past the right edge of a narrow map (the real-platform shot)
+    def sweep():
+        box = p.fields.plot.vb.sceneBoundingRect()
+        out, text_w = [], 0.0
+        for ci in range(0, nx, max(1, nx // 25)):
+            fv.hover_scene(centre(ci, ny // 2))
+            item = fv._hover['fields']
+            text_w = item.sceneBoundingRect().width()
+            if not box.contains(item.sceneBoundingRect()):
+                out.append(ci)
+        return out, box.width(), text_w
+    cut, w, tw = sweep()
+    check('along the middle row the readout is never cut off', not cut,
+          str(cut[:6]))
+    for size in ((1100, 720), (900, 600)):
+        p.resize(*size)
+        pump(80)
+        cut, w, tw = sweep()
+        check(f'nor on the narrow map at {size[0]} x {size[1]} (it slides '
+              f'to stay inside)', not cut and w > tw,
+              f'cut at {cut[:6]}; map {w:.0f} px, readout {tw:.0f} px')
+    p.resize(1600, 1000)
+    pump(80)
     p.fields.plot.scene().sigMouseMoved.emit(centre(i, j))
     check('the pointer (the scene signal) drives it',
           fv.hover_visible() and fv.hover_text().endswith('kg/m³'))

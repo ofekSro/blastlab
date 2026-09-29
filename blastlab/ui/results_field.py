@@ -1013,12 +1013,23 @@ class FieldView(QWidget):
                      f'font-size: 11px;"><span style="color: {p["text"]};">'
                      f'{line1}</span><br><span style="color: '
                      f'{p["accent_soft"]};">{line2}</span></div>')
-        # it opens away from the nearer edges, so it is never cut off by
-        # the plot (at 1100 x 720 a readout at the right half of the map
-        # read `overpressure 1944 kP`)
-        (x0, x1), (y0, y1) = plot.vb.viewRange()
-        item.setAnchor((1.0 if x > (x0 + x1) / 2.0 else 0.0,
-                        -0.1 if y > (y0 + y1) / 2.0 else 1.1))
+        # kept inside the map, so the plot never cuts it off (at 1100 x
+        # 720 it read `overpressure 1944 kP`): right of and above the
+        # pointer when that fits, else slid left / put below, as a
+        # tooltip is. The text is in px; so is the scene
+        sp = QPointF(pos)
+        # 2 px in from the edges: the readout's frame is drawn outside
+        # its text box
+        box = plot.vb.sceneBoundingRect().adjusted(2, 2, -2, -2)
+        text = item.textItem.boundingRect()
+        w, h = max(text.width(), 1.0), max(text.height(), 1.0)
+        left = min(sp.x(), box.right() - w)
+        left = max(left, box.left())
+        top = sp.y() - 1.1 * h
+        if top < box.top():
+            top = sp.y() + 0.1 * h
+        top = max(min(top, box.bottom() - h), box.top())
+        item.setAnchor(((sp.x() - left) / w, (sp.y() - top) / h))
         item.setPos(x, y)
         item.show()
         # a TextItem undoes the view's scaling only once it has painted,
