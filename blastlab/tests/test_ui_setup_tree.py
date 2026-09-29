@@ -475,6 +475,26 @@ def t3_trigger():
               f.trigger_combo.count() == 3
               and f.trigger_combo.currentText() == TRIGGER_CHOOSE
               and f.v['trigger_gauge'].get() == '')
+        # D27: on with nothing chosen means NO trigger in the case - the
+        # dropdown says so in red rather than looking finished
+        check(f'{d}D: on with nothing chosen: pending, dropdown red, '
+              f'and the case has no trigger',
+              f.trigger_pending()
+              and f.trigger_combo.property('bad') == 'true'
+              and f.get_case().trigger_gauge is None)
+        i = f.trigger_combo.findData('2')
+        f.trigger_combo.setCurrentIndex(i)
+        f.trigger_combo.activated.emit(i)
+        check(f'{d}D: picking G2 clears the red and writes 2',
+              not f.trigger_pending()
+              and f.trigger_combo.property('bad') == 'false'
+              and f.get_case().trigger_gauge == 2)
+        f.v['trigger_gauge'].set('')
+        f.trigger_switch.click()
+        f.trigger_switch.click()
+        check(f'{d}D: off: never red',
+              not f.trigger_switch.isChecked()
+              and f.trigger_combo.property('bad') == 'false')
     f = form(2, 'blastfoam', 'nodes')
     check('the off line names the side that ends the run (board)',
           f._trig['off'].text()

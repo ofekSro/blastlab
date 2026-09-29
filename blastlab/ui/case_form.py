@@ -287,6 +287,7 @@ class CaseForm(FieldForm):
         data = self._trig['combo'].itemData(index)
         if data:
             self._trigger_write(str(data))
+        self._paint_trigger_combo()
 
     def _trigger_var_changed(self):
         """The Var changed from outside the switch (set_case, a script,
@@ -342,6 +343,7 @@ class CaseForm(FieldForm):
             combo.setCurrentIndex(cur)
         finally:
             combo.blockSignals(False)
+        self._paint_trigger_combo()
 
     def _sync_trigger_widgets(self):
         """Show the dropdown and the remap note with the switch; the off
@@ -363,16 +365,31 @@ class CaseForm(FieldForm):
             f'Off: the run ends at the {" or ".join(sides)} side or at '
             f'the end time.' if sides else
             'Off: the run ends at the end time.')
+        self._paint_trigger_combo()
+
+    def trigger_pending(self):
+        """True while the switch is on but no gauge is chosen: the case
+        then has no trigger (`trigger_gauge` blank, decision D17), so the
+        dropdown is outlined red until a gauge is picked (D27)."""
+        return bool(self._trig and self._trig['on']
+                    and not self.v['trigger_gauge'].get().strip())
+
+    def _paint_trigger_combo(self):
+        """The trigger dropdown is red with the `trigger_gauge` box it
+        stands in for, and while the switch is on with nothing chosen."""
+        if self._trig is None:
+            return
+        combo = self._trig['combo']
+        want = ('true' if 'trigger_gauge' in self._bad
+                or self.trigger_pending() else 'false')
+        if combo.property('bad') != want:
+            combo.setProperty('bad', want)
+            theme.repolish(combo)
 
     def mark_fields(self, names):
-        """As FieldForm.mark_fields; the trigger dropdown is red with the
-        `trigger_gauge` box it stands in for."""
+        """As FieldForm.mark_fields, and the trigger dropdown with it."""
         super().mark_fields(names)
-        if self._trig is not None:
-            combo = self._trig['combo']
-            combo.setProperty('bad', 'true' if 'trigger_gauge'
-                              in set(names or ()) else 'false')
-            theme.repolish(combo)
+        self._paint_trigger_combo()
 
     # ── 2D geometry ──────────────────────────────────────────────────────
     def _sync_geometry(self):
