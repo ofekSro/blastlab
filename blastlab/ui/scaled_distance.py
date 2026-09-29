@@ -23,7 +23,9 @@ the Setup screen shows beside it, the charge radius, is read from the
 validation report, never recomputed.
 
 One source for GUI-5a (the Derived card) and GUI-5b (the strip tile,
-the gauge table, the rings).
+the gauge table, the rings). The gauge table's Where column (the
+nearest obstacle face within 0.5 m) is here too: plain geometry of the
+case as entered, display only.
 """
 
 import math
@@ -100,6 +102,67 @@ def gauges(case):
     them."""
     return [(i, distance(case, g), scaled_distance(case, g))
             for i, g in enumerate(gauge_points(case), start=1)]
+
+
+# ── Where: the nearest obstacle face (GUI-5b, plan §5.3) ─────────────────
+#: a gauge names the nearest obstacle face only when it is this close [m]
+#: (plan §5.3: "only when within 0.5 m")
+WHERE_MAX = 0.5
+
+
+def obstacle_boxes(case):
+    """The obstacles as (lo, hi) pairs per axis, in the gauge
+    coordinates: 2D (x0, x1, y0, y1) -> ((x0, x1), (y0, y1)); 3D adds
+    (z0, z1). 1D has none."""
+    if getattr(case, 'dim', None) not in (2, 3):
+        return []
+    n = case.dim
+    return [tuple((float(o[2 * k]), float(o[2 * k + 1])) for k in range(n))
+            for o in (case.obstacles or [])]
+
+
+def where(case, point):
+    """(wall number, gap [m], inside) for the obstacle nearest to
+    `point`, or None when none is within WHERE_MAX. The gap is the
+    distance from the point to the box (0 on a face or inside); walls are
+    numbered 1-based as the tree names them (`Wall n`)."""
+    best = None
+    for i, box in enumerate(obstacle_boxes(case), start=1):
+        d = [max(lo - float(p), 0.0, float(p) - hi)
+             for p, (lo, hi) in zip(point, box)]
+        gap = math.sqrt(sum(x * x for x in d))
+        inside = all(lo < float(p) < hi for p, (lo, hi) in zip(point, box))
+        if best is None or gap < best[1]:
+            best = (i, gap, inside)
+    if best is None or best[1] > WHERE_MAX:
+        return None
+    return best
+
+
+def where_text(case, point):
+    """The Where cell: `5 cm in front of Wall 1`, `on the face of Wall 1`,
+    `inside Wall 1`, or '' (no obstacle within WHERE_MAX)."""
+    w = where(case, point)
+    if w is None:
+        return ''
+    i, gap, inside = w
+    if inside:
+        return f'inside Wall {i}'
+    cm = int(round(gap * 100.0))
+    if cm == 0:
+        return f'on the face of Wall {i}'
+    return f'{cm} cm in front of Wall {i}'
+
+
+def walls_in_front(case):
+    """The walls some gauge stands in front of (not inside), sorted -
+    the 05 Gauges tree summary names them."""
+    out = set()
+    for g in gauge_points(case):
+        w = where(case, g)
+        if w is not None and not w[2]:
+            out.add(w[0])
+    return sorted(out)
 
 
 def nearest_gauge(case):

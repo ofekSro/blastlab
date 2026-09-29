@@ -304,6 +304,41 @@ class DockTabs(QWidget):
             self.stack.setCurrentWidget(widget)
         return widget
 
+    def set_label(self, name, text, icon=None):
+        """Re-label tab `name` (e.g. with a count) without changing its
+        key; `icon` a QIcon shown beside the text, or None."""
+        if str(name) not in self._tabs:
+            return
+        b, _w = self._tabs[str(name)]
+        b.setText(str(text))
+        if icon is not None:
+            b.setIcon(icon)
+            b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+    def set_tooltip(self, name, text):
+        if str(name) in self._tabs:
+            self._tabs[str(name)][0].setToolTip(str(text))
+
+    def label(self, name):
+        """The tab's text as shown (tests)."""
+        return self._tabs[str(name)][0].text()
+
+    def set_tab_visible(self, name, on):
+        """Hide (never grey) a tab that does not apply; a hidden current
+        tab hands over to the first visible one."""
+        if str(name) not in self._tabs:
+            return
+        b, _w = self._tabs[str(name)]
+        b.setVisible(bool(on))
+        if not on and b.isChecked():
+            for other, (ob, _ow) in self._tabs.items():
+                if not ob.isHidden():
+                    self._activate(other)
+                    break
+
+    def tab_visible(self, name):
+        return not self._tabs[str(name)][0].isHidden()
+
     def _activate(self, name):
         b, widget = self._tabs[name]
         b.setChecked(True)

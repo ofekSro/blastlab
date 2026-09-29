@@ -441,6 +441,24 @@ def qss(mode_name):
     QPushButton#viewtool:checked {{ background: {p['accent_bg']};
                                     color: {p['accent_soft']};
                                     border: 1px solid {p['accent_border']}; }}
+    /* the dock Gauges · Checks · Log (board lines 217-265) */
+    QFrame#setupdock {{ background: {p['panel']};
+                        border: 1px solid {p['border']};
+                        border-radius: 10px; }}
+    QFrame#dockrule {{ background: {p['border']}; border: none; }}
+    QFrame#setupdock QStackedWidget, QFrame#setupdock QScrollArea {{
+        background: transparent; }}
+    QTableWidget#gaugetable {{ background: transparent; border: none;
+        font-size: 13px; selection-background-color: {p['gauge_bg']};
+        selection-color: {p['text']}; }}
+    QTableWidget#gaugetable::item {{ border-top: 1px solid {p['border']};
+                                     padding: 0px 12px; }}
+    QTableWidget#gaugetable QHeaderView::section {{
+        background: transparent; color: {p['faint']}; border: none;
+        padding: 6px 12px; font-size: 11px; font-weight: 500; }}
+    QFrame#setupdock QPlainTextEdit#log {{ background: transparent;
+        font-size: 11px; padding: 6px 10px; }}
+    QLabel#checktext {{ font-size: 13px; }}
     QLabel#viewcaption {{ font-size: 12px; color: {p['faint']}; }}
     QLabel#viewcaption[hover="true"] {{ font-family: "{MONO}";
                                         font-size: 11px;

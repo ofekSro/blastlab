@@ -37,6 +37,11 @@ class _MplPreview(MplCanvas):
         fig = Figure(figsize=(5, 5))
         self._ax = fig.add_subplot()
         self.set_figure(fig)
+        # re-fit the margins when the canvas changes size, not only once
+        # per case: the Setup centre (GUI-5b) resizes the canvas under a
+        # drawn case, and the one-off tight_layout then cut the axis
+        # labels off (measured at 1100 x 720: 'r [m]' half below it)
+        fig.canvas.mpl_connect('resize_event', self._refit)
         self._last = None
         #: GUI-5b: `overlay(ax, case)` draws on top of the shared drawing
         #: after `preview_draw` returns (the Setup panel's Z rings and
@@ -63,6 +68,15 @@ class _MplPreview(MplCanvas):
             pass                      # a degenerate case must not raise
         self.draw()
         return note
+
+    def _refit(self, _event=None):
+        if self._last is None:
+            return
+        try:
+            self.figure.tight_layout()
+        except Exception:
+            pass                      # a degenerate case must not raise
+        self.draw()
 
     def redraw_overlay(self):
         """Re-draw only the overlay (a new selection, the rings toggle):

@@ -7,31 +7,45 @@ dimension, as before, so get_case / set_case are unchanged; only where
 their cards are laid moved (plan §11). The dimension control lives in
 the window's top bar (GUI-3)."""
 
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
-                               QScrollArea, QSizePolicy, QStackedWidget,
-                               QVBoxLayout, QWidget)
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout,
+                               QHBoxLayout, QHeaderView, QLabel,
+                               QPlainTextEdit, QPushButton, QScrollArea,
+                               QSizePolicy, QStackedWidget, QTableWidget,
+                               QTableWidgetItem, QVBoxLayout, QWidget)
 
 from ..core import mode as mode_mod
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
+from .components import DockTabs
 from .model_overlay import ModelOverlay, hover_text, plane_caption
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_strip import LiveStrip
-from .setup_tree import SetupTree, _letter_space
+from .setup_tree import TREE_MIN, SetupTree, _letter_space
 from .theme import GAP, PAD
 from .widgets import Card, label
 
-#: a long report (AMR + zones + foam notes can be eight lines) used to
-#: grow the card until the form above it had a third of its height, so
-#: the report area is a fixed height and scrolls.
-#:
-#: 104 came from the Tk widget's metrics and was too small here: it left
-#: a 54 px viewport, about two wrapped lines, while a plain blastFoam 2D
-#: case already reports six rows needing 367 px. 132 shows five or six
-#: lines, which covers the ordinary case without eating the form.
-STATUS_MAX_H = 132
+#: the dock under the model view (board line 217: 212 px, tabs 40 px +
+#: a 1 px rule). On a short window it gives way down to DOCK_MIN
+#: (DOCK_FRACTION of the panel's height) so the model keeps its room.
+DOCK_H = 212
+DOCK_MIN = 150
+DOCK_FRACTION = 0.28
+DOCK_TABS_H = 41
+
+#: a long report (AMR + zones + foam notes can be eight lines) must not
+#: grow over the model view, so the report area has a cap and scrolls.
+#: Since GUI-5b the report is the dock's Checks tab and the cap is the
+#: tab page: the dock minus its tab strip and its 1 px bottom border.
+#: (Before: a 132 px card under the preview; 104, from the Tk widget,
+#: had left a 54 px viewport for a 367 px report.)
+STATUS_MAX_H = DOCK_H - DOCK_TABS_H - 1
+
+#: the Checks tab lays its rows in two columns (board line 258) once its
+#: viewport is this wide, else one
+CHECKS_TWO_COL = 560
 
 #: the properties column (plan §5). It is a minimum: a node whose cards
 #: cannot fit (the 3D VTK matrix with its full-word headers, P13; the 0-D
@@ -50,6 +64,14 @@ _ROW_STYLE = {'error': ('error', 'error'), 'warn': ('warning', 'warn'),
 
 #: the point list a tree child row and the + buttons lead to
 _CHILD_LIST = {'gauges': 'gauges', 'structure': 'obstacles'}
+
+#: the gauge table's columns (board lines 228-235): name, up to three
+#: coordinates (hidden per dimension), R, Z, Where
+_GAUGE_COLS = ('gauge', 'c1', 'c2', 'c3', 'R', 'Z', 'where')
+
+#: the dock tab a selected node brings up (board script: pickThreat ->
+#: Checks, pickGauges -> Gauges); other nodes leave the dock alone
+_DOCK_FOR_NODE = {'gauges': 'Gauges', 'threat': 'Checks'}
 
 
 class _PreviewStack(QStackedWidget):
@@ -192,6 +214,9 @@ class SetupPanel(QWidget):
     #: actions as the Run tab and the F5 key)
     run_requested = Signal()
     init_requested = Signal()
+    #: one line for the dock's Log tab; emitted from whatever thread
+    #: logged it and delivered queued on the GUI thread
+    _log_line = Signal(str)
 
     def __init__(self, on_change=None, mode=None, viewer_link=None,
                  log_fn=print, parent=None):
@@ -200,8 +225,12 @@ class SetupPanel(QWidget):
         # the app-level solver mode (T34); a private one when the panel is
         # built standalone (tests)
         self._mode = mode if mode is not None else mode_mod.SolverMode()
-        self._log = log_fn
+        # the window's sink still gets every line; the dock's Log tab a
+        # copy (GUI-5b)
+        self._log_sink = log_fn
+        self._log = self._log_through
         self._last_case = None
+        self._table_case = None      # the case the gauge table shows
         self._report = []            # (severity, message) as shown
         self._node = None            # the selected tree node
 
@@ -215,7 +244,7 @@ class SetupPanel(QWidget):
         self.tree.child_clicked.connect(self._child_clicked)
         self.tree.add_gauge.connect(lambda: self.add_point('gauges'))
         self.tree.add_obstacle.connect(lambda: self.add_point('structure'))
-        self.tree.pill_clicked.connect(self._flash_checks)
+        self.tree.pill_clicked.connect(self.show_checks)
         body.addWidget(self.tree)
 
         # ── centre: the live numbers, the preview, the report ────────────
@@ -281,40 +310,34 @@ class SetupPanel(QWidget):
         self.preview3d = None
         if viewer_link is not None and pyvista_available():
             from .view3d_host import View3DHost
-            self.view3d = View3DHost(viewer_link, 'setup', log_fn=log_fn)
+            self.view3d = View3DHost(viewer_link, 'setup',
+                                     log_fn=self._log)
             self.view3d.set_controls_collapsed(True)
             self._prev_stack.addWidget(self.view3d)
-            self.preview3d = Preview3DBridge(self.view3d, log_fn=log_fn)
+            self.preview3d = Preview3DBridge(self.view3d, log_fn=self._log)
         self._prev_stack.setCurrentWidget(self._prev_msg)
         centre.addWidget(prev, 1)
 
-        # the validation report stays visible at the bottom of the centre
-        # (GUI-5b turns it into the dock's Checks tab)
-        self._status_card = Card(pad=12)
-        self._status_card.setSizePolicy(QSizePolicy.Preferred,
-                                        QSizePolicy.Fixed)
-        self._status_scroll = QScrollArea()
-        self._status_scroll.setWidgetResizable(True)
-        self._status_scroll.setFrameShape(QScrollArea.NoFrame)
-        # a MAXIMUM alone was not enough. The card is vertically Fixed,
-        # so it took the scroll area's own small sizeHint instead of the
-        # cap: measured 54 px of viewport against a 367 px report, i.e.
-        # 85 % of what validation had to say was hidden behind a 175 px
-        # scrollbar. Pin the height so the space is actually reserved.
-        self._status_scroll.setMinimumHeight(STATUS_MAX_H)
-        self._status_scroll.setMaximumHeight(STATUS_MAX_H)
-        self._status_scroll.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarAlwaysOff)
-        self._status_scroll.setVerticalScrollBarPolicy(
-            Qt.ScrollBarAsNeeded)
-        self._status_body = QWidget()
-        self._status_lay = QVBoxLayout(self._status_body)
-        self._status_lay.setContentsMargins(0, 0, 0, 0)
-        self._status_lay.setSpacing(1)
-        self._status_lay.addStretch(1)
-        self._status_scroll.setWidget(self._status_body)
-        self._status_card.add(self._status_scroll)
-        centre.addWidget(self._status_card)
+        # GUI-5b: the dock Gauges · Checks · Log (board lines 217-265).
+        # Checks is the validation report that sat in its own card here
+        # until 5b; `show_report` / `report_rows` keep their semantics.
+        self.dock_frame = QFrame()
+        self.dock_frame.setObjectName('setupdock')
+        self.dock_frame.setFixedHeight(DOCK_H)
+        dl = QVBoxLayout(self.dock_frame)
+        dl.setContentsMargins(1, 0, 1, 1)
+        dl.setSpacing(0)
+        self.dock = DockTabs()
+        rule = QFrame()
+        rule.setObjectName('dockrule')
+        rule.setFixedHeight(1)
+        self.dock.layout().insertWidget(1, rule)
+        dl.addWidget(self.dock)
+        self.dock.add('Gauges', self._build_gauge_table())
+        self.dock.add('Checks', self._build_checks())
+        self.dock.add('Log', self._build_log())
+        self.dock.set('Checks')
+        centre.addWidget(self.dock_frame)
         holder = QWidget()
         holder.setLayout(centre)
         body.addWidget(holder, 1)
@@ -402,6 +425,8 @@ class SetupPanel(QWidget):
             f.setVisible(d == dim)
         # the last dimension's numbers must not describe this one
         self.strip.clear(dim)
+        # 0-D has no gauge table (hide, never grey)
+        self.dock.set_tab_visible('Gauges', dim != 0)
         self._rebuild_tree()
         self.dim_changed.emit(dim)
         self._changed()
@@ -480,6 +505,9 @@ class SetupPanel(QWidget):
         if self._overlay.node != node_id:
             self._overlay.node = node_id
             self._redraw_overlay()
+        # the dock follows a selection the user made (plan §5.3)
+        if emit and node_id in _DOCK_FOR_NODE:
+            self.dock.set(_DOCK_FOR_NODE[node_id])
         self._set_heading()
         self._scroll.verticalScrollBar().setValue(0)
         self._fit_props()
@@ -565,6 +593,9 @@ class SetupPanel(QWidget):
                 self._derived[self._dim].show_values(case, rep)
             # the live numbers: every one read off this report (GUI-5b)
             self.strip.show_values(case, rep)
+            if self._dim:
+                self._table_case = case
+                self._fill_gauges(case)
         self._sync_children()
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
@@ -603,6 +634,8 @@ class SetupPanel(QWidget):
         w = max(PROPS_W, need)
         if self._props.width() != w or self._props.minimumWidth() != w:
             self._props.setFixedWidth(w)
+        # a wider properties page leaves the centre less room
+        self._fit_dock_labels()
 
     def props_width(self):
         return self._props.width()
@@ -617,6 +650,11 @@ class SetupPanel(QWidget):
         # the heading's number colour is baked into its rich text
         self._set_heading()
         self.fit_btn.setIcon(theme.icon('fit', 15, color='muted'))
+        # the dock's colours are baked into its rows and items
+        self._label_checks()
+        self._render_checks()
+        if self._table_case is not None:
+            self._fill_gauges(self._table_case)
         QTimer.singleShot(0, self, self._fit_props)
 
     # ── validation report ────────────────────────────────────────────────
@@ -629,37 +667,321 @@ class SetupPanel(QWidget):
                                       len(notes)))
         # the Run tab's gate: an invalid case does not start
         self.strip.set_run_enabled(not errors)
+        # the Checks tab carries the counts, errors · warnings · notes
+        # (board line 222), and the state on its icon
+        state = 'error' if errors else 'warn' if warnings else 'ok'
+        self._checks_state = (state, len(errors), len(warnings), len(notes))
+        self._label_checks()
         if not rows:
             rows = [('ok', 'Case OK')]
         self._report = list(rows)
-        lay = self._status_lay
-        while lay.count() > 1:                  # keep the trailing stretch
-            item = lay.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-        for i, (severity, message) in enumerate(rows):
+        self._render_checks()
+
+    def _label_checks(self):
+        """Both dock tabs' labels: `Gauges   2` and `Checks   E · W · N`
+        (board lines 219-222) with the state icon - or, when the centre
+        is too narrow for them, `Gauges` / `Checks` with the counts in
+        the tooltips, so the tab strip never holds the window wide."""
+        state, ne, nw, nn = self._checks_state
+        icon, colour = {'error': ('error', 'danger'),
+                        'warn': ('warning', 'warn')}.get(state,
+                                                         ('check', 'ok'))
+        counts = f'{ne} · {nw} · {nn}'
+        compact = self._dock_compact
+        self.dock.set_label('Checks', 'Checks' if compact
+                            else f'Checks   {counts}',
+                            icon=theme.icon(icon, 14, color=colour))
+        self.dock.set_label('Gauges', 'Gauges' if compact
+                            else f'Gauges   {self._n_gauges}')
+        self.dock.set_tooltip('Checks', f'{ne} errors · {nw} warnings · '
+                                        f'{nn} notes')
+        self.dock.set_tooltip('Gauges', f'{self._n_gauges} gauges')
+
+    def _fit_dock_labels(self):
+        """Long tab labels when the centre can hold them, else compact:
+        judged against the width the centre would get with the tree at
+        its minimum, never against the centre's own (circular) width."""
+        if not self.isVisible():
+            return
+        room = (self.width() - TREE_MIN - self._props.width() - 2 * GAP
+                - 4)                    # the dock frame's margins + border
+        was = self._dock_compact
+        self._dock_compact = False
+        self._label_checks()
+        if self.dock.minimumSizeHint().width() > room:
+            self._dock_compact = True
+        if self._dock_compact or was:
+            self._label_checks()
+
+    def _render_checks(self):
+        """One row per report message, error -> warn -> note, laid by
+        `_lay_checks` in one or two columns."""
+        for w in self._check_rows:
+            self._status_lay.removeWidget(w)
+            w.setParent(None)
+            w.deleteLater()
+        self._check_rows = []
+        for severity, message in self._report:
             icon_name, colour = _ROW_STYLE[severity]
             row = QWidget()
             row.setProperty('severity', severity)
             rl = QHBoxLayout(row)
             rl.setContentsMargins(0, 0, 0, 0)
-            rl.setSpacing(6)
+            rl.setSpacing(8)
             pic = label('')
-            pic.setFixedWidth(18)
-            pic.setPixmap(theme.pixmap(icon_name, 13,
-                                       color=theme.DARK[colour]))
+            pic.setFixedWidth(16)
+            pic.setPixmap(theme.pixmap(icon_name, 14,
+                                       color=theme.cur(colour)))
             rl.addWidget(pic, 0, Qt.AlignTop)
             text = label(str(message), 'body', wrap=True)
+            text.setObjectName('checktext')
             text.setStyleSheet(f'color: {theme.cur(colour)};')
+            text.setTextInteractionFlags(Qt.TextSelectableByMouse)
             rl.addWidget(text, 1)
-            lay.insertWidget(i, row)
+            self._check_rows.append(row)
+        self._checks_cols = None
+        self._lay_checks()
+
+    def _lay_checks(self):
+        """Two columns when the tab is wide (board line 258), else one;
+        row-major, so the reading order stays error -> warn -> note."""
+        cols = (2 if self._status_scroll.viewport().width() >= CHECKS_TWO_COL
+                else 1)
+        if cols == self._checks_cols:
+            return
+        self._checks_cols = cols
+        g = self._status_lay
+        for w in self._check_rows:
+            g.removeWidget(w)
+        for r in range(g.rowCount()):
+            g.setRowStretch(r, 0)
+        for k, w in enumerate(self._check_rows):
+            g.addWidget(w, k // cols, k % cols)
+        for c in range(2):
+            g.setColumnStretch(c, 1 if c < cols else 0)
+        g.setRowStretch((len(self._check_rows) + cols - 1) // cols, 1)
 
     def report_rows(self):
         """(severity, message) per row, as shown - the QA harness reads
         the report through this instead of walking widgets."""
         return list(self._report)
+
+    def show_checks(self):
+        """The case pill (plan §5.1): the dock's Checks tab, at the top."""
+        self.dock.set('Checks')
+        self._status_scroll.verticalScrollBar().setValue(0)
+
+    # ── the dock (GUI-5b, board lines 217-265) ───────────────────────────
+    def _build_gauge_table(self):
+        """The Gauges tab: Gauge · r · z · R from charge · Z · Where."""
+        page = QWidget()
+        pl = QVBoxLayout(page)
+        pl.setContentsMargins(0, 0, 0, 0)
+        pl.setSpacing(0)
+        t = QTableWidget(0, len(_GAUGE_COLS))
+        t.setObjectName('gaugetable')
+        t.verticalHeader().setVisible(False)
+        t.verticalHeader().setDefaultSectionSize(34)
+        t.setShowGrid(False)
+        t.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        t.setSelectionBehavior(QAbstractItemView.SelectRows)
+        t.setSelectionMode(QAbstractItemView.SingleSelection)
+        t.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        h = t.horizontalHeader()
+        h.setHighlightSections(False)
+        h.setSectionResizeMode(QHeaderView.ResizeToContents)
+        h.setStretchLastSection(True)
+        h.setDefaultAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # clicking a row selects the gauge in 05 (plan §5.1's child rule)
+        t.cellClicked.connect(lambda r, _c: self._child_clicked('gauges', r))
+        t.viewport().installEventFilter(self)
+        self._gauge_axes = 2
+        self._fitting_gauges = False
+        self.gauge_table = t
+        # wrapped: an unwrapped hint set the dock's minimum at 280 px and
+        # held a narrow window wide (measured, 3D 07 Output at 1000 px)
+        self._gauge_empty = label('No gauges yet - add one with + Gauge.',
+                                  'muted', wrap=True, align=Qt.AlignCenter)
+        pl.addWidget(t, 1)
+        pl.addWidget(self._gauge_empty, 1)
+        self._gauge_empty.setVisible(False)
+        return page
+
+    def _fill_gauges(self, case):
+        """The table from the parsed case: positions as entered, R and Z
+        from `scaled_distance` (Z hidden where it is), Where from its
+        nearest-face helper."""
+        t = self.gauge_table
+        dim = case.dim
+        axes = (('r',) if dim == 1 else
+                ('r', 'z') if case.geometry == 'axisymmetric' else
+                ('x', 'y')) if dim < 3 else ('x', 'y', 'z')
+        heads = ['Gauge'] + [f'{a} [m]' for a in axes] + [''] * (3 - len(axes))
+        heads += ['R from charge [m]', scaled_distance.LABEL, 'Where']
+        for c, text in enumerate(heads):
+            item = QTableWidgetItem(text)
+            item.setTextAlignment((Qt.AlignLeft if c in (0, 6)
+                                   else Qt.AlignRight) | Qt.AlignVCenter)
+            t.setHorizontalHeaderItem(c, item)
+        z_on = scaled_distance.z_shown(case)
+        self._gauge_axes = len(axes)
+        for c in range(1, 4):
+            t.setColumnHidden(c, c > len(axes))
+        t.setColumnHidden(5, not z_on)
+        t.setColumnHidden(6, dim == 1)          # 1D has no obstacles
+        pts = scaled_distance.gauge_points(case)
+        rows = scaled_distance.gauges(case)
+        t.setRowCount(len(pts))
+        mono = QFont(theme.MONO)
+        mono.setPixelSize(13)
+        for r, (p, (num, R, Z)) in enumerate(zip(pts, rows)):
+            cells = ([(f'G{num}', 'gauge')]
+                     + [(f'{v:.2f}', 'text') for v in p]
+                     + [('', 'text')] * (3 - len(p))
+                     + [(f'{R:.2f}', 'text2'),
+                        ('' if Z is None else f'{Z:.2f}', 'accent_soft'),
+                        (scaled_distance.where_text(case, p), 'muted')])
+            for c, (text, colour) in enumerate(cells):
+                item = QTableWidgetItem(text)
+                item.setForeground(theme.qcolor(colour))
+                if c != 6:
+                    f = QFont(mono)
+                    if c == 0:
+                        f.setWeight(QFont.Weight.DemiBold)
+                    item.setFont(f)
+                item.setTextAlignment((Qt.AlignLeft if c in (0, 6)
+                                       else Qt.AlignRight) | Qt.AlignVCenter)
+                if c == 6 and text:
+                    item.setToolTip(text)
+                t.setItem(r, c, item)
+        t.setVisible(bool(pts))
+        self._gauge_empty.setVisible(not pts)
+        self._n_gauges = len(pts)
+        self._label_checks()
+        self._fit_gauge_cols()
+
+    def _fit_gauge_cols(self):
+        """The board's table needs ~620 px; the centre is 432 at the
+        1100 x 720 minimum. Give way in two steps rather than hide R, Z
+        or Where behind a scroll: the R header shortens to `R [m]`, then
+        the coordinate columns go (the tree's gauge rows show them) -
+        decision D36."""
+        t = self.gauge_table
+        if self._table_case is None or self._fitting_gauges:
+            return
+        self._fitting_gauges = True
+        try:
+            h = t.horizontalHeader()
+            avail = t.viewport().width()
+
+            def need():
+                return sum(max(t.sizeHintForColumn(c), h.sectionSizeHint(c))
+                           for c in range(t.columnCount())
+                           if not t.isColumnHidden(c))
+
+            r_head = t.horizontalHeaderItem(4)
+            r_head.setText('R from charge [m]')
+            for c in range(1, 4):
+                t.setColumnHidden(c, c > self._gauge_axes)
+            if need() > avail:
+                r_head.setText('R [m]')
+            if need() > avail:
+                for c in range(1, 4):
+                    t.setColumnHidden(c, True)
+            r_head.setToolTip('R from charge [m]: the distance from the '
+                              'burst point to the gauge')
+        finally:
+            self._fitting_gauges = False
+
+    def gauge_rows(self):
+        """[[cell text per visible column]] of the gauge table (tests)."""
+        t = self.gauge_table
+        cols = [c for c in range(t.columnCount()) if not t.isColumnHidden(c)]
+        return [[t.item(r, c).text() for c in cols]
+                for r in range(t.rowCount())]
+
+    def gauge_headers(self):
+        t = self.gauge_table
+        return [t.horizontalHeaderItem(c).text()
+                for c in range(t.columnCount()) if not t.isColumnHidden(c)]
+
+    def _build_checks(self):
+        """The Checks tab: the validation report, capped and scrolling."""
+        self._status_scroll = QScrollArea()
+        self._status_scroll.setWidgetResizable(True)
+        self._status_scroll.setFrameShape(QScrollArea.NoFrame)
+        self._status_scroll.setMaximumHeight(STATUS_MAX_H)
+        self._status_scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarAlwaysOff)
+        self._status_scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarAsNeeded)
+        self._status_body = QWidget()
+        self._status_lay = QGridLayout(self._status_body)
+        self._status_lay.setContentsMargins(16, 12, 16, 12)
+        self._status_lay.setHorizontalSpacing(24)
+        self._status_lay.setVerticalSpacing(8)
+        self._status_scroll.setWidget(self._status_body)
+        self._check_rows = []
+        self._checks_cols = None
+        self._checks_state = ('ok', 0, 0, 0)
+        self._n_gauges = 0
+        self._dock_compact = False
+        self._status_scroll.viewport().installEventFilter(self)
+        return self._status_scroll
+
+    def _build_log(self):
+        """The Log tab: what the panel's log_fn was given (the 3D preview
+        and viewer link messages), newest last."""
+        self._log_view = QPlainTextEdit()
+        self._log_view.setObjectName('log')
+        self._log_view.setReadOnly(True)
+        self._log_view.setMaximumBlockCount(2000)
+        self._log_view.setFrameShape(QFrame.NoFrame)
+        self._log_line.connect(self._append_log)
+        return self._log_view
+
+    def _log_through(self, text):
+        """The panel's log_fn: the window's sink first (unchanged), then a
+        copy to the Log tab through a queued signal - the viewer link
+        logs from its own thread."""
+        try:
+            self._log_sink(text)
+        finally:
+            try:
+                self._log_line.emit(str(text))
+            except RuntimeError:
+                pass                     # the panel is already gone
+
+    def _append_log(self, text):
+        self._log_view.appendPlainText(str(text))
+
+    def log_lines(self):
+        """The Log tab's lines (tests)."""
+        return self._log_view.toPlainText().splitlines()
+
+    def set_dock_tab(self, name):
+        self.dock.set(name)
+
+    def dock_tab(self):
+        return self.dock.get()
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            checks = getattr(self, '_status_scroll', None)
+            table = getattr(self, 'gauge_table', None)
+            if checks is not None and obj is checks.viewport():
+                self._lay_checks()
+            elif table is not None and obj is table.viewport():
+                self._fit_gauge_cols()
+        return super().eventFilter(obj, event)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        # the dock gives way on a short window (DOCK_MIN..DOCK_H)
+        h = max(DOCK_MIN, min(DOCK_H, int(self.height() * DOCK_FRACTION)))
+        if self.dock_frame.height() != h:
+            self.dock_frame.setFixedHeight(h)
+        self._fit_dock_labels()
 
     def derived(self, dim=None):
         """The Derived card of `dim` (default: the active one), or None
@@ -669,19 +991,6 @@ class SetupPanel(QWidget):
     def pill(self):
         """(state, text) of the tree's case pill (tests)."""
         return self.tree.pill.property('state'), self.tree.pill.text()
-
-    def _flash_checks(self):
-        """The pill until GUI-5b's dock exists: bring the report card to
-        the eye - scroll it to the top and outline it for a moment."""
-        self._status_scroll.verticalScrollBar().setValue(0)
-        card = self._status_card
-        card.setProperty('flash', 'true')
-        theme.repolish(card)
-
-        def unflash():
-            card.setProperty('flash', 'false')
-            theme.repolish(card)
-        QTimer.singleShot(900, card, unflash)
 
     # ── preview ──────────────────────────────────────────────────────────
     def update_preview(self, case):

@@ -349,7 +349,9 @@ def t2_panel():
             'domain': '4 × 4 m · 25 mm',
             'bounds': 'the run ends at Outer',
             'structure': '1 obstacle',
-            'gauges': '2 gauges',
+            # GUI-5b: the board's wording (line 89) now that the Where
+            # helper exists; 5a pinned the interim '2 gauges' (D26)
+            'gauges': '2 · in front of Wall 1',
             'solver': 'linear · no afterburn · CFL 0.4',
             'output': f'{default_ext()} · VTK off'}
     got = {k: t.summary(k) for k in want}

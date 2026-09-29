@@ -15,7 +15,7 @@ the two).
 
 from dataclasses import dataclass
 
-from . import setup_spec
+from . import scaled_distance, setup_spec
 
 
 @dataclass(frozen=True)
@@ -238,9 +238,14 @@ def summaries(case):
     # 04 Structure
     out['structure'] = ('' if dim == 1 else
                         _count(len(case.obstacles or []), 'obstacle'))
-    # 05 Gauges (GUI-5b adds "in front of Wall n" from its Where helper)
+    # 05 Gauges: `2 · in front of Wall 1` when a gauge stands within
+    # 0.5 m of a wall face (board line 89; the Where helper), else
+    # `2 gauges`
     pts = case.gauge_radii if dim == 1 else case.gauges
-    g = _count(len(pts or []), 'gauge')
+    walls = scaled_distance.walls_in_front(case)
+    g = (f'{len(pts)} · in front of '
+         + ', '.join(f'Wall {i}' for i in walls) if walls
+         else _count(len(pts or []), 'gauge'))
     tg = getattr(case, 'trigger_gauge', None)
     out['gauges'] = g + (f' · trigger G{tg}' if tg is not None else '')
     # 06 Solver

@@ -465,9 +465,188 @@ def s2_model_view():
     sp.close()
 
 
+def s3_dock():
+    import threading
+    from blastlab.ui import setup_nodes
+    from blastlab.ui.setup_panel import DOCK_H, DOCK_MIN, STATUS_MAX_H
+
+    print('\nS3a: the Where helper (nearest obstacle face within 0.5 m)')
+    case = sample_case()
+    check("G1 (2.95, 0.50): '5 cm in front of Wall 1'",
+          sd.where_text(case, (2.95, 0.5)) == '5 cm in front of Wall 1',
+          sd.where_text(case, (2.95, 0.5)))
+    check("0.6 m from the face: nothing",
+          sd.where_text(case, (2.4, 0.5)) == '')
+    check("exactly 0.5 m: still named (plan: within 0.5 m)",
+          sd.where_text(case, (2.5, 0.5)) == '50 cm in front of Wall 1',
+          sd.where_text(case, (2.5, 0.5)))
+    check("on the face / inside",
+          sd.where_text(case, (3.0, 1.0)) == 'on the face of Wall 1'
+          and sd.where_text(case, (3.1, 1.0)) == 'inside Wall 1')
+    check("above the wall top, 20 cm off its corner edge",
+          sd.where_text(case, (3.1, 2.7)) == '20 cm in front of Wall 1',
+          sd.where_text(case, (3.1, 2.7)))
+    two = sample_case(obstacles=[(3.0, 3.2, 0.0, 2.5),
+                                 (1.0, 1.2, 0.0, 1.0)])
+    check("two walls: the nearer one is named (Wall 2)",
+          sd.where_text(two, (1.3, 0.5)) == '10 cm in front of Wall 2',
+          sd.where_text(two, (1.3, 0.5)))
+    c3 = Case3D(obstacles=[(2.0, 2.2, 0.0, 1.0, 0.0, 3.0)],
+                gauges=[(1.9, 0.5, 1.0)])
+    check("3D boxes: '10 cm in front of Wall 1'",
+          sd.where_text(c3, (1.9, 0.5, 1.0)) == '10 cm in front of Wall 1')
+    check("1D has no obstacles", sd.obstacle_boxes(Case1D()) == [])
+    check("05 summary, board line 89: '2 · in front of Wall 1'",
+          setup_nodes.summaries(case)['gauges'] == '2 · in front of Wall 1',
+          setup_nodes.summaries(case)['gauges'])
+    check("no wall near: '2 gauges'",
+          setup_nodes.summaries(sample_case(obstacles=[]))['gauges']
+          == '2 gauges')
+    check("with a trigger: '… · trigger G2'",
+          setup_nodes.summaries(sample_case(trigger_gauge=2))['gauges']
+          == '2 · in front of Wall 1 · trigger G2')
+
+    print('\nS3b: the Gauges tab - the board table, Z via the helper')
+    sp = panel()
+    case, rep = load(sp, sample_case())
+    sp.set_dock_tab('Gauges')
+    pump(30)
+    rows = sd.gauges(case)
+    check('headers: Gauge · r · z · R from charge · Z · Where',
+          sp.gauge_headers() == ['Gauge', 'r [m]', 'z [m]',
+                                 'R from charge [m]', 'Z [m/kg^1/3]',
+                                 'Where'], str(sp.gauge_headers()))
+    want = [[f'G{n}', f'{p[0]:.2f}', f'{p[1]:.2f}', f'{R:.2f}', f'{Z:.2f}',
+             sd.where_text(case, p)]
+            for p, (n, R, Z) in zip(case.gauges, rows)]
+    check('rows equal the helper, formatted', sp.gauge_rows() == want,
+          str(sp.gauge_rows()))
+    check('the sample case: Z 3.31 / 2.99, both 5 cm in front of Wall 1',
+          [r[4] for r in sp.gauge_rows()] == ['3.31', '2.99']
+          and all(r[5] == '5 cm in front of Wall 1'
+                  for r in sp.gauge_rows()), str(sp.gauge_rows()))
+    check("the tab carries the count: 'Gauges   2'",
+          sp.dock.label('Gauges') == 'Gauges   2', sp.dock.label('Gauges'))
+    sp.gauge_table.cellClicked.emit(1, 0)
+    pump(20)
+    pl = sp.form.points['gauges']
+    check('clicking G2 in the table selects 05 and G2 in its list',
+          sp.selected_node() == 'gauges'
+          and pl.tree.indexOfTopLevelItem(pl.tree.currentItem()) == 1)
+    load(sp, sample_case(geometry='planar', center=(1.0, 2.0)))
+    check('planar: x / y, no Z column',
+          sp.gauge_headers() == ['Gauge', 'x [m]', 'y [m]',
+                                 'R from charge [m]', 'Where'],
+          str(sp.gauge_headers()))
+    load(sp, sample_case(gauges=[]))
+    check("no gauges: the table gives way to a hint, 'Gauges   0'",
+          not sp.gauge_table.isVisibleTo(sp)
+          and sp._gauge_empty.isVisibleTo(sp)
+          and sp.dock.label('Gauges') == 'Gauges   0')
+    load(sp, Case1D(charge_kg=1.0, gauge_radii=[2.0, 3.0]))
+    check('1D: r only, no Where (no obstacles)',
+          sp.gauge_headers() == ['Gauge', 'r [m]', 'R from charge [m]',
+                                 'Z [m/kg^1/3]']
+          and sp.gauge_rows()[0] == ['G1', '2.00', '2.00', '2.00'],
+          str(sp.gauge_rows()))
+    c3, _r = load(sp, Case3D(charge=8.0, gauges=[(1.0, 2.0, 3.0)],
+                             center=(1.0, 2.0, 1.0)))
+    check('3D: x / y / z, Z = R / 2 for 8 kg',
+          sp.gauge_headers()[1:4] == ['x [m]', 'y [m]', 'z [m]']
+          and sp.gauge_rows()[0][4:6] == ['2.00', '1.00'],
+          str(sp.gauge_rows()))
+
+    print('\nS3c: the Checks tab keeps show_report / report_rows')
+    sp.set_dim(2)
+    sp.set_dock_tab('Checks')
+    sp.show_report(['e1', 'e2'], ['w1'], ['n1', 'n2', 'n3'])
+    pump(20)
+    check('one row per message, error -> warn -> note',
+          [s for s, _m in sp.report_rows()]
+          == ['error'] * 2 + ['warn'] + ['note'] * 3
+          and len(sp._check_rows) == 6)
+    check("the tab carries the counts: 'Checks   2 · 1 · 3'",
+          sp.dock.label('Checks') == 'Checks   2 · 1 · 3',
+          sp.dock.label('Checks'))
+    check('1600 px: two columns, read row by row (board line 258)',
+          sp._checks_cols == 2
+          and sp._status_lay.getItemPosition(
+              sp._status_lay.indexOf(sp._check_rows[1]))[:2] == (0, 1),
+          str(sp._checks_cols))
+    sp.show_report([f'error {i}' for i in range(14)])
+    pump(30)
+    check('a long report is capped and scrolls',
+          sp._status_scroll.height() <= STATUS_MAX_H
+          and sp._status_scroll.verticalScrollBar().maximum() > 0,
+          f'{sp._status_scroll.height()} / {STATUS_MAX_H}')
+    sp.show_report()
+    check("empty: 'Case OK', 'Checks   0 · 0 · 0'",
+          sp.report_rows() == [('ok', 'Case OK')]
+          and sp.dock.label('Checks') == 'Checks   0 · 0 · 0')
+
+    print('\nS3d: the dock follows the selection')
+    sp.select_node('gauges')
+    check('05 Gauges -> the Gauges tab', sp.dock_tab() == 'Gauges')
+    sp.select_node('domain')
+    check('02 leaves the dock alone', sp.dock_tab() == 'Gauges')
+    sp.select_node('threat')
+    check('01 Threat -> Checks (board script)', sp.dock_tab() == 'Checks')
+    sp.set_dock_tab('Log')
+    sp.tree.pill.click()
+    pump(10)
+    check('the case pill -> Checks', sp.dock_tab() == 'Checks')
+    sp.set_dock_tab('Gauges')
+    sp.set_dim(0)
+    pump(20)
+    check('0-D: no Gauges tab, the dock falls back to Checks',
+          not sp.dock.tab_visible('Gauges') and sp.dock_tab() == 'Checks')
+    sp.set_dim(2)
+    check('back to 2D: Gauges again', sp.dock.tab_visible('Gauges'))
+
+    print('\nS3e: the Log tab is the panel\'s log_fn feed')
+    got = []
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui.setup_panel import SetupPanel
+    lp = SetupPanel(mode=mode_mod.SolverMode(), log_fn=got.append)
+    lp._log('  [3D preview unavailable: test]')
+    th = threading.Thread(target=lp._log, args=('from a worker thread',))
+    th.start()
+    th.join()
+    pump(30)
+    check('the window sink still gets every line',
+          got == ['  [3D preview unavailable: test]',
+                  'from a worker thread'], str(got))
+    check('and the Log tab a copy, a worker thread\'s line included',
+          lp.log_lines() == ['  [3D preview unavailable: test]',
+                             'from a worker thread'], str(lp.log_lines()))
+    lp.close()
+
+    print('\nS3f: the dock is the board\'s 212 px, less on a short window')
+    check('1600 x 960: 212 px', sp.dock_frame.height() == DOCK_H,
+          str(sp.dock_frame.height()))
+    sp.resize(1100, 610)
+    pump(60)
+    check('a 610 px panel: between DOCK_MIN and 212',
+          DOCK_MIN <= sp.dock_frame.height() < DOCK_H,
+          str(sp.dock_frame.height()))
+    load(sp, sample_case())
+    sp.select_node('gauges')
+    pump(40)
+    check('narrow: R, Z and Where stay on screen (coordinates give way)',
+          sp.gauge_headers() in (
+              ['Gauge', 'r [m]', 'z [m]', 'R [m]', 'Z [m/kg^1/3]', 'Where'],
+              ['Gauge', 'R [m]', 'Z [m/kg^1/3]', 'Where'])
+          and [r[-2] for r in sp.gauge_rows()] == ['3.31', '2.99'],
+          str(sp.gauge_headers()))
+    check('narrow: the checks fall back to one column',
+          sp._checks_cols == 1, str(sp._checks_cols))
+    sp.close()
+
+
 def main():
     s1_strip()
     s2_model_view()
+    s3_dock()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:
