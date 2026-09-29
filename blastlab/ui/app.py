@@ -613,6 +613,8 @@ class MainWindow(QMainWindow):
             model = os.path.basename(os.path.dirname(os.path.abspath(path)))
         self.run_panel.set_run_name(model, replace=True)
         self._case_path = None
+        # a case was opened: `✓ Done` belonged to the last run (D68)
+        self._done_mark = False
         self._set_dirty(True)
         self.topbar.set_case_name(self._case_stem())
         self._update_title()

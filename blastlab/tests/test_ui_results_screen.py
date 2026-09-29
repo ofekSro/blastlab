@@ -399,10 +399,15 @@ def s2_load_into_setup(win, res, home):
     dialogs.ask_yes_no = lambda *a, **k: asked.append((a, k)) or False
     dialogs.save_file = lambda *a, **k: saved.append(a) or ''
     try:
+        win._done_mark = True               # a run ended on its own (D68)
+        win._update_title()
         rs.method.load_btn.click()
         pump(100)
         check('Load into 01 Setup shows Setup',
               win.current_tab() == 'setup', str(win.current_tab()))
+        check('a case was opened: the title drops the last run\'s ✓ Done '
+              '(D68)', '✓ Done' not in win.windowTitle()
+              and not win._done_mark, win.windowTitle())
         loaded = win.setup.get_case()
         check('Setup holds the case of MODEL.json',
               loaded == load_case(model))
