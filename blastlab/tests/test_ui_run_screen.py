@@ -875,6 +875,16 @@ def r5_gauges(win):
           and col.list_frame.height() <= RG.LIST_HEAD_H + 4 * RG.ROW_H + 6,
           f'head {head.bottom()} rows {col.scroll.geometry().top()} '
           f'frame {col.list_frame.height()}')
+    win.resize(1600, 1000)
+    pump(200)
+    check('1600 x 1000: the enlarged card keeps its content height (the '
+          'spare goes under the list)',
+          col.card.height() <= col.card.sizeHint().height() + 1
+          and col.list_frame.geometry().top() - col.card.geometry().bottom()
+          <= 16, f'card {col.card.height()} hint '
+                 f'{col.card.sizeHint().height()}')
+    win.resize(1100, 720)
+    pump(200)
     # the rendered text width (a fixed-width label's sizeHint reports
     # the fixed width, so it cannot tell)
     check('the list header is not clipped',

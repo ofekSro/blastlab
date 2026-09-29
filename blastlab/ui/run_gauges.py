@@ -506,6 +506,10 @@ class GaugeColumn(QWidget):
         top.addWidget(self.sub)
         lay.addLayout(top)
         self.card = _SelectedCard()
+        # its content height, never more: the spare height of a tall
+        # column goes to the spacer under the list (T9 screenshot: the
+        # card grew to 225 px with its header floating)
+        self.card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         lay.addWidget(self.card)
         # the list: a header, then one 40 px row per gauge, scrolling
         # when there are more than fit (board lines 290-331)
