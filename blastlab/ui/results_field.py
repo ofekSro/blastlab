@@ -1013,6 +1013,12 @@ class FieldView(QWidget):
                      f'font-size: 11px;"><span style="color: {p["text"]};">'
                      f'{line1}</span><br><span style="color: '
                      f'{p["accent_soft"]};">{line2}</span></div>')
+        # it opens away from the nearer edges, so it is never cut off by
+        # the plot (at 1100 x 720 a readout at the right half of the map
+        # read `overpressure 1944 kP`)
+        (x0, x1), (y0, y1) = plot.vb.viewRange()
+        item.setAnchor((1.0 if x > (x0 + x1) / 2.0 else 0.0,
+                        -0.1 if y > (y0 + y1) / 2.0 else 1.1))
         item.setPos(x, y)
         item.show()
         # a TextItem undoes the view's scaling only once it has painted,

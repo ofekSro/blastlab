@@ -1348,6 +1348,17 @@ def s6_field(link):
     check('outside the domain it hides',
           fv.hover_scene(out_pos) is None and not fv.hover_visible()
           and fv.hover_text() == '')
+    # verification: the readout opened to the right and above whatever
+    # the pointer was, so near the right edge it was cut off
+    vbr = p.fields.plot.vb.sceneBoundingRect()
+    nx, ny = img.shape
+    inside = []
+    for ci, cj in ((0, 0), (nx - 1, 0), (0, ny - 1), (nx - 1, ny - 1)):
+        fv.hover_scene(centre(ci, cj))
+        box = fv._hover['fields'].sceneBoundingRect()
+        inside.append(vbr.contains(box))
+    check('at each corner cell the readout opens inward, inside the map',
+          all(inside), str(inside))
     p.fields.plot.scene().sigMouseMoved.emit(centre(i, j))
     check('the pointer (the scene signal) drives it',
           fv.hover_visible() and fv.hover_text().endswith('kg/m³'))
