@@ -494,11 +494,95 @@ def t3_trigger():
           bool(f.v['vtk_fields'].get().get('volumes')))
 
 
+def t4_derived():
+    from blastlab.core.case import validate_case
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui import scaled_distance as sd
+    from blastlab.ui.setup_panel import SetupPanel
+
+    print('\nT4a: the Z helper, pinned (UFC 3-340-02 para. 2-13.1)')
+    case = sample_case()
+    rows = sd.gauges(case)
+    check('sample case: Z(G1) = 3.31, Z(G2) = 2.99 (R = Z for 1 kg)',
+          [round(z, 2) for _n, _r, z in rows] == [3.31, 2.99]
+          and all(abs(r - z) < 1e-12 for _n, r, z in rows),
+          str(rows))
+    c3 = Case3D(charge=8.0, center=(0.0, 0.0, 0.0), gauges=[(2.0, 0, 0)])
+    check('3D, W = 8 kg at the origin, gauge (2, 0, 0): Z = 1.00',
+          round(sd.gauges(c3)[0][2], 2) == 1.0, str(sd.gauges(c3)))
+    c1 = Case1D(charge_kg=1.0, gauge_radii=[2.0, 3.0])
+    check('1D: Z = r / W^(1/3)',
+          [round(z, 6) for _n, _r, z in sd.gauges(c1)] == [2.0, 3.0])
+    planar = sample_case()
+    planar.geometry = 'planar'
+    check('planar 2D: Z hidden (None)', not sd.z_shown(planar)
+          and all(z is None for _n, _r, z in sd.gauges(planar)))
+    prof = sample_case()
+    prof.init_mode = 'profile1d'
+    check("init_mode 'profile1d': Z hidden (None)",
+          all(z is None for _n, _r, z in sd.gauges(prof)))
+    zero = sample_case()
+    zero.charge = 0.0
+    check('W <= 0: Z hidden', not sd.z_shown(zero))
+    anfo = sample_case()
+    anfo.material = 'ANFO'
+    check('ANFO: W is used as entered - Z changes with W, not material',
+          sd.gauges(anfo) == sd.gauges(case))
+    heavy = sample_case()
+    heavy.charge = 8.0
+    check('and it does change with W (8 kg halves Z)',
+          abs(sd.gauges(heavy)[0][2] - sd.gauges(case)[0][2] / 2) < 1e-12)
+    check("the label everywhere is 'Z [m/kg^1/3]'",
+          sd.LABEL == 'Z [m/kg^1/3]')
+    check('nearest gauge = the min-Z one (G2)',
+          sd.nearest_gauge(case)[0] == 2)
+
+    print('\nT4b: the Derived card on 01 Threat')
+    sp = SetupPanel(mode=mode_mod.SolverMode())
+    sp.resize(1400, 860)
+    sp.show()
+    pump(60)
+    sp.set_case(case)
+    got = sp.get_case()
+    rep = validate_case(got)
+    card = sp.derived()
+    check('before any report: the radius row is blank',
+          card.value('radius') == '')
+    sp.refresh(got, rep)
+    pump(20)
+    want = f'{rep.r_exp * 1e3:.1f} mm'
+    check("charge radius = the report's r_exp, formatted",
+          card.value('radius') == want, f'{card.value("radius")} '
+          f'vs report {want}')
+    check("height of burst '2.00 m' (the burst z as entered)",
+          card.value('hob') == '2.00 m', card.value('hob'))
+    check("nearest gauge 'G2 · Z 2.99'",
+          card.value('nearest') == 'G2 · Z 2.99', card.value('nearest'))
+    sp.select_node('threat')
+    pump(20)
+    check('the card sits on the 01 Threat page',
+          card.isVisibleTo(sp._props))
+    sp.select_node('domain')
+    pump(20)
+    check('and only there', not card.isVisibleTo(sp._props))
+    check('the properties column stays 340 px with it',
+          sp.props_width() == 340, str(sp.props_width()))
+    sp.form.v['geometry'].set('planar')
+    pl = sp.get_case()
+    sp.refresh(pl, validate_case(pl))
+    check("planar: Z hidden -> nearest by R ('G2 · R ...')",
+          card.value('nearest').startswith('G2 · R '),
+          card.value('nearest'))
+    check('0D has no Derived card', sp.derived(0) is None)
+    sp.close()
+
+
 def main():
     t1_registry()
     t1_placement()
     t2_panel()
     t3_trigger()
+    t4_derived()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

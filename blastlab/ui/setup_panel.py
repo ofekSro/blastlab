@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel,
 
 from ..core import mode as mode_mod
 from ..viz3d import MISSING_MSG, pyvista_available
-from . import setup_nodes, theme
+from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_tree import SetupTree, _letter_space
@@ -68,6 +68,69 @@ class _PreviewStack(QStackedWidget):
         w = self.currentWidget()
         return (w.minimumSizeHint() if w is not None
                 else super().minimumSizeHint())
+
+
+class DerivedCard(Card):
+    """The read-only Derived card on 01 Threat (plan §5.2, board lines
+    326-331): charge radius, height of burst, nearest gauge with its Z.
+    Display only. The radius is the validation report's own `r_exp` -
+    never a second formula here; Z comes from `scaled_distance`."""
+
+    ROWS = (('radius', 'Charge radius'), ('hob', 'Height of burst'),
+            ('nearest', 'Nearest gauge'))
+
+    def __init__(self, dim, parent=None):
+        super().__init__(pad=14, parent=parent)
+        self.dim = int(dim)
+        lay = self.body_layout
+        lay.setSpacing(9)
+        eyebrow = QLabel('DERIVED')
+        eyebrow.setObjectName('eyebrow')
+        _letter_space(eyebrow)
+        lay.addWidget(eyebrow)
+        self._vals, self._rows = {}, {}
+        for key, text in self.ROWS:
+            row = QWidget()
+            rl = QHBoxLayout(row)
+            rl.setContentsMargins(0, 0, 0, 0)
+            rl.setSpacing(GAP)
+            k = QLabel(text)
+            k.setObjectName('derivedkey')
+            v = QLabel('')
+            v.setObjectName('derivedval')
+            v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            rl.addWidget(k)
+            rl.addStretch(1)
+            rl.addWidget(v)
+            lay.addWidget(row)
+            self._vals[key], self._rows[key] = v, row
+        # a 1D charge is a free-air sphere: there is no ground to be above
+        self._rows['hob'].setVisible(self.dim != 1)
+
+    def value(self, key):
+        return self._vals[key].text()
+
+    def update(self, case, rep):
+        """From the case the debounced validation parsed and its report;
+        the rows keep their last values while the form does not parse."""
+        if case is None or getattr(case, 'dim', None) != self.dim:
+            return
+        r_exp = getattr(rep, 'r_exp', None) if rep is not None else None
+        # blank until validation has sized the charge (and in profile
+        # mode, where it places none: r_exp = 0)
+        self._vals['radius'].setText(f'{r_exp * 1e3:.1f} mm' if r_exp
+                                     else '')
+        if self.dim > 1:
+            up = case.center[1] if self.dim == 2 else case.center[2]
+            self._vals['hob'].setText(f'{float(up):.2f} m')
+        near = scaled_distance.nearest_gauge(case)
+        if near is None:
+            text = ''
+        elif near[2] is not None:
+            text = f'G{near[0]} · Z {near[2]:.2f}'
+        else:
+            text = f'G{near[0]} · R {near[1]:.2f} m'
+        self._vals['nearest'].setText(text)
 
 
 def _dim_label(form):
@@ -232,6 +295,10 @@ class SetupPanel(QWidget):
             # widget adds nothing (a QStackedWidget would add its largest)
             f.setVisible(d == 2)
         cl.addStretch(1)
+        # the Derived card closes the 01 Threat page of each blast form
+        self._derived = {d: self._forms[d].add_to_page('threat',
+                                                       DerivedCard(d))
+                         for d in (1, 2, 3)}
         if 'geometry' in self._forms[2].v:
             self._forms[2].on_field('geometry', self._sync_header)
         self._dim = 2
@@ -420,6 +487,8 @@ class SetupPanel(QWidget):
         if case is not None and getattr(case, 'dim', None) == self._dim:
             for node_id, text in setup_nodes.summaries(case).items():
                 self.tree.set_summary(node_id, text)
+            if self._dim in self._derived:
+                self._derived[self._dim].update(case, rep)
         self._sync_children()
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
@@ -512,6 +581,11 @@ class SetupPanel(QWidget):
         """(severity, message) per row, as shown - the QA harness reads
         the report through this instead of walking widgets."""
         return list(self._report)
+
+    def derived(self, dim=None):
+        """The Derived card of `dim` (default: the active one), or None
+        (0-D has none)."""
+        return self._derived.get(self._dim if dim is None else int(dim))
 
     def pill(self):
         """(state, text) of the tree's case pill (tests)."""
