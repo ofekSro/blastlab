@@ -7,7 +7,11 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      Max only with the auto switch off; Step through collapsed, opened by
      an Initialise, its six buttons emit today's commands; the resolved
      model-folder line; the Setup link; 0-D hides (never greys) what an
-     HD 1.3 assessment does not have.
+     HD 1.3 assessment does not have;
+ R2  the run clock (fake `now`): fmt_duration, `10 s elapsed` below 5 %,
+     elapsed + the linear ETA from 5 %, held time excluded, Done /
+     Stopped / Ended, HD 1.3 busy (indeterminate bar, `HD 1.3
+     assessment`), chip_texts() with U4's strings, dt in STEP's caption.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -228,6 +232,142 @@ def r1_layout(win):
           str([k for k, w in hideable.items() if w.isHidden()]))
 
 
+class FakeClock:
+    """A settable monotonic clock for RunClock.now."""
+
+    def __init__(self, t=0.0):
+        self.t = float(t)
+
+    def __call__(self):
+        return self.t
+
+
+def r2_clock(win):
+    from blastlab.solvers.hooks import Progress
+    from blastlab.ui.run_clock import RunClock, fmt_duration
+    rp = win.run_panel
+    print('\nR2: the run clock, elapsed and ETA, the tiles')
+    got = [fmt_duration(s) for s in (0, 12, 59.6, 60, 258, 331, 3720)]
+    want = ['0 s', '12 s', '1 min 0 s', '1 min 0 s', '4 min 18 s',
+            '5 min 31 s', '1 h 02 min']
+    check('fmt_duration 0, 12, 59.6, 60, 258, 331, 3720 s', got == want,
+          str(got))
+
+    fake = FakeClock()
+    real_now = win._run_clock.now
+    win._run_clock.now = fake
+    win.ctrl._stage_dims = [2]
+    try:
+        fake.t = 0.0
+        win.on_running(True)
+        check('the 1 s refresh runs while a run is live',
+              rp._tick.isActive() and rp._tick.interval() == 1000)
+        fake.t = 10.0
+        win.on_progress(Progress(step=40, t=1e-4, dt=2.5e-7, p_max=2e5,
+                                 frac=0.04))
+        check('4 % at 10 s: `10 s elapsed`, no estimate yet',
+              rp.time_text() == '10 s elapsed', rp.time_text())
+        check('the percent reads 4 %', rp.pct_text() == '4 %',
+              rp.pct_text())
+        fake.t = 258.0
+        win.on_progress(Progress(step=11284, t=4.9e-3, dt=4.1e-7,
+                                 p_max=2.31e5, frac=0.78))
+        eta = fmt_duration(258.0 * (1 - 0.78) / 0.78)
+        want = f'4 min 18 s elapsed · about {eta} left'
+        check('78 % at 258 s: elapsed and the linear ETA',
+              rp.time_text() == want and eta == '1 min 13 s',
+              f'{rp.time_text()!r} vs {want!r}')
+        check('the tile strip shows 78 %', rp.pct_text() == '78 %')
+        win.on_paused(True)
+        check('held: `held at step N · … elapsed`, no ETA',
+              rp.time_text() == 'held at step 11284 · 4 min 18 s elapsed',
+              rp.time_text())
+        fake.t = 400.0
+        win.on_paused(False)
+        check('released: held time is not run time',
+              abs(win._run_clock.run_s() - 258.0) < 1e-9,
+              str(win._run_clock.run_s()))
+        fake.t = 450.0
+        win.on_running(False)
+        win.on_finished(False, False)
+        check('a run with no result reads `Ended after …`',
+              rp.time_text() == 'Ended after 5 min 8 s', rp.time_text())
+        check('the refresh stops when idle', not rp._tick.isActive())
+        win._run_got_result = True
+        win.on_finished(False, False)
+        check('a finished run reads `Done in …`',
+              rp.time_text() == 'Done in 5 min 8 s', rp.time_text())
+        win.on_finished(True, False)
+        check('a stopped one `Stopped after …`',
+              rp.time_text() == 'Stopped after 5 min 8 s', rp.time_text())
+        # Initialise: the run starts held
+        fake.t = 1000.0
+        win._start_paused = True
+        win.on_running(True)
+        win._start_paused = False
+        fake.t = 1100.0
+        check('an Initialise start begins held (run time 0 after 100 s)',
+              win._run_clock.held() and win._run_clock.run_s() == 0.0,
+              f'{win._run_clock.held()} {win._run_clock.run_s()}')
+        win.on_running(False)
+    finally:
+        win._run_clock.now = real_now
+        win.ctrl._stage_dims = []
+
+    c = RunClock(now=fake)
+    fake.t = 0.0
+    c.start()
+    fake.t = 100.0
+    c.hold(True)
+    fake.t = 400.0
+    c.hold(False)
+    fake.t = 410.0
+    check('hold 100 → 400 s, read at 410 s: run_s() is 110',
+          abs(c.run_s() - 110.0) < 1e-9, str(c.run_s()))
+    check('eta_s is None below 5 % and while held',
+          c.eta_s(0.049) is None
+          and (c.hold(True) or c.eta_s(0.5) is None))
+    c.hold(False)
+    fake.t = 500.0
+    c.stage()
+    fake.t = 520.0
+    check('a stage restarts stage_s (ETA per stage), run_s goes on',
+          abs(c.stage_s() - 20.0) < 1e-9 and c.run_s() > 110.0,
+          f'{c.stage_s()} {c.run_s()}')
+
+    # ── HD 1.3 busy ──────────────────────────────────────────────────────
+    bar = rp.progress
+    bar.setRange(0, 1000)
+    bar.setValue(420)
+    win._set_hd13_busy(True)
+    try:
+        check('HD 1.3 busy: the bar is indeterminate (0, 0)',
+              (bar.minimum(), bar.maximum()) == (0, 0))
+        check('the line starts with `HD 1.3 assessment`, percent —',
+              rp.time_text().startswith('HD 1.3 assessment')
+              and rp.pct_text() == '—',
+              f'{rp.time_text()!r} {rp.pct_text()!r}')
+    finally:
+        win._set_hd13_busy(False)
+    check('after it the old range and value are back',
+          (bar.minimum(), bar.maximum(), bar.value()) == (0, 1000, 420),
+          f'{bar.minimum()} {bar.maximum()} {bar.value()}')
+
+    # ── the tiles keep U4's strings ──────────────────────────────────────
+    rp.on_progress(Progress(step=1234, t=1.5e-3, dt=2.5e-7, p_max=345678.0,
+                            frac=0.37))
+    chips = rp.chip_texts()
+    check("chip_texts() keeps U4's five keys and strings",
+          chips == {'step': '1234', 't [ms]': '1.500', 'dt [s]': '2.50e-07',
+                    'p max [kPa]': '345.7', 'cells': '—'}, str(chips))
+    check("the STEP tile's caption reads `dt 2.50e-07 s`",
+          rp._tile_step.caption.text() == 'dt 2.50e-07 s',
+          rp._tile_step.caption.text())
+    check('TIME is captioned simulated, P MAX in the field now',
+          rp._tile_time.caption.text() == 'simulated'
+          and rp._tile_pmax.caption.text() == 'in the field now')
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -237,6 +377,7 @@ def main():
     pump(200)
     try:
         r1_layout(win)
+        r2_clock(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         win.close()

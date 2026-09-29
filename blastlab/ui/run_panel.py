@@ -23,6 +23,7 @@ from . import theme
 from .components import Collapsible, DockTabs, StatTile, ToggleSwitch
 from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
+from .run_clock import RunClock, fmt_duration
 from .setup_strip import fmt_count
 from .setup_tree import _letter_space
 from .theme import GAP
@@ -54,6 +55,10 @@ PROGRESS_MIN = 220
 
 #: the chip keys the QA harness and the e2e suites read (chip_texts)
 CHIP_KEYS = ('step', 't [ms]', 'dt [s]', 'p max [kPa]', 'cells')
+#: the elapsed line refreshes this often while a run or an HD 1.3
+#: assessment is live - a blastFoam cold start sends no progress for
+#: minutes, and the time must still move (off while idle: B02 idle CPU)
+TICK_MS = 1000
 
 
 def _two_state_icon(name, size, normal, disabled='muted'):
@@ -169,6 +174,10 @@ class _RunStrip(QFrame):
         self.caps.setObjectName('progresscaps')
         _letter_space(self.caps)
         head.addWidget(self.caps, 0, Qt.AlignBaseline)
+        # `78 %` in Space Grotesk 22 (board line 161); `—` while unknown
+        self.pct_lbl = QLabel('—')
+        self.pct_lbl.setObjectName('progresspct')
+        head.addWidget(self.pct_lbl, 0, Qt.AlignBaseline)
         head.addStretch(1)
         self.paused_lbl = QLabel('')
         self.paused_lbl.setObjectName('pausedlbl')
@@ -181,6 +190,13 @@ class _RunStrip(QFrame):
         self.progress.setTextVisible(False)
         self.progress.setFixedHeight(6)
         pl.addWidget(self.progress)
+        # `4 min 18 s elapsed · about 1 min 15 s left` (board line 164)
+        self.time_lbl = QLabel('')
+        self.time_lbl.setObjectName('progresstime')
+        self.time_lbl.setMinimumWidth(0)
+        self.time_lbl.setSizePolicy(QSizePolicy.Ignored,
+                                    QSizePolicy.Preferred)
+        pl.addWidget(self.time_lbl)
         self.progress_tile.setMinimumWidth(PROGRESS_MIN)
 
         # ── the stat tiles ───────────────────────────────────────────────
@@ -269,9 +285,12 @@ class RunPanel(QWidget):
     #: and must keep reaching stdout and the transcript unchanged.
     _AMR_MARK = '[blastfoam] AMR t = '
 
-    def __init__(self, view3d_host=None, parent=None):
+    def __init__(self, view3d_host=None, clock=None, parent=None):
         super().__init__(parent)
         self.view3d = view3d_host
+        #: run time with held time excluded (ui/run_clock.py); the window
+        #: drives it and reads it for the Stop confirmation
+        self.clock = clock if clock is not None else RunClock()
         body = QHBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(GAP)
@@ -301,6 +320,12 @@ class RunPanel(QWidget):
         self._run_again = False     # a run has finished this session
         self._dim = 2
         self._shape = None
+        self._frac = None           # the stage's progress fraction
+        self._ended = None          # how the last run / assessment ended
+        self._pct_before_busy = '—'
+        self._tick = QTimer(self)
+        self._tick.setInterval(TICK_MS)
+        self._tick.timeout.connect(self._render_time)
         self._readout = dict.fromkeys(CHIP_KEYS, '—')
         self._reset_readouts_text()
         self._sync_run_text()
@@ -909,6 +934,9 @@ class RunPanel(QWidget):
         self.set_paused(False)
         if running:
             self.progress.setValue(0)
+            self._frac = None
+            self._ended = None
+            self.strip.pct_lbl.setText('0 %')
             self._clear_log()
             # Everything below belongs to the PREVIOUS run: the readouts
             # and the live plot used to keep its step/time/field until the
@@ -922,7 +950,11 @@ class RunPanel(QWidget):
         else:
             # live attach only during a run; Results tab covers afterwards
             self.view3d_btn.setEnabled(False)
+            # how it ended arrives with on_finished (mark_ended)
+            self._ended = 'ended'
         self._sync_run_text()
+        self._sync_tick()
+        self._render_time()
 
     def set_run_again(self, on=True):
         """A run has finished this session: the idle button reads `Run
@@ -1012,12 +1044,22 @@ class RunPanel(QWidget):
         busy = bool(busy)
         if busy and not self._busy:
             self._bar_value = self.progress.value()
+            self._pct_before_busy = self.strip.pct_lbl.text()
+        was = self._busy
         self._busy = busy
         if busy:
             self.progress.setRange(0, 0)        # (0, 0) = indeterminate
+            # no fraction to show (plan §6, last bullet)
+            self.strip.pct_lbl.setText('—')
+            self._ended = None
         else:
             self.progress.setRange(0, 1000)
             self.progress.setValue(self._bar_value)
+            self.strip.pct_lbl.setText(self._pct_before_busy)
+            if was:
+                self._ended = 'hd13'
+        self._sync_tick()
+        self._render_time()
         # same gate as set_running / set_validation
         start_ok = (not self._running) and (not busy) and self._case_ok
         self.run_btn.setEnabled(start_ok)
@@ -1042,6 +1084,58 @@ class RunPanel(QWidget):
             ('PAUSED at step '
              f'{self._last_step}' if self._last_step is not None
              else 'PAUSED') if paused else '')
+        self._render_time()
+
+    # ── the run clock's line (T2, plan §6, UX-19) ────────────────────────
+    def _sync_tick(self):
+        """The 1 s refresh runs only while a run or an assessment is
+        live, and stops when idle."""
+        if self._running or self._busy:
+            if not self._tick.isActive():
+                self._tick.start()
+        else:
+            self._tick.stop()
+
+    def mark_ended(self, how):
+        """How the run that just stopped ended: 'done' | 'stopped' |
+        'failed' | 'ended' (no result and no Stop: say only that it
+        ended)."""
+        self._ended = how
+        self._render_time()
+
+    def time_text(self):
+        """The line under the bar: elapsed and the ETA while running,
+        the held step, how the last run ended - all run time from the
+        clock, held time excluded."""
+        c = self.clock
+        el = fmt_duration(c.run_s())
+        if self._busy:
+            return f'HD 1.3 assessment · {el} elapsed'
+        if self._running:
+            if c.held():
+                where = ('held' if self._last_step is None
+                         else f'held at step {self._last_step}')
+                return f'{where} · {el} elapsed'
+            eta = c.eta_s(self._frac) if self._frac is not None else None
+            if eta is None:
+                return f'{el} elapsed'
+            return f'{el} elapsed · about {fmt_duration(eta)} left'
+        return {'done': f'Done in {el}',
+                'stopped': f'Stopped after {el}',
+                'failed': f'Failed after {el}',
+                'ended': f'Ended after {el}',
+                'hd13': f'HD 1.3 assessment · done in {el}'}.get(
+                    self._ended, '')
+
+    def _render_time(self):
+        text = self.time_text()
+        if self.strip.time_lbl.text() != text:
+            self.strip.time_lbl.setText(text)
+            self.strip.time_lbl.setToolTip(text)
+
+    def pct_text(self):
+        """The percent as shown: `78 %`, or `—` (tests)."""
+        return self.strip.pct_lbl.text()
 
     def enable_view3d(self, enabled):
         self.view3d_btn.setEnabled(bool(enabled))
@@ -1077,9 +1171,13 @@ class RunPanel(QWidget):
         progress messages to ~10 Hz, so the final one is usually dropped
         and the last frac this panel ever saw is short of 1.0."""
         self.progress.setValue(1000)
+        self.strip.pct_lbl.setText('100 %')
 
     def on_progress(self, p):
-        self.progress.setValue(int(round(1000 * max(0.0, min(1.0, p.frac)))))
+        frac = max(0.0, min(1.0, p.frac))
+        self.progress.setValue(int(round(1000 * frac)))
+        self._frac = frac
+        self.strip.pct_lbl.setText(f'{int(round(100 * frac))} %')
         self._last_step = p.step
         self._readout.update({
             'step': str(p.step),
@@ -1090,8 +1188,11 @@ class RunPanel(QWidget):
             'p max [kPa]': f'{p.p_max / 1e3:,.4g}'})
         self._last_dt = float(p.dt)     # turns a step cadence into a time
         self._render_readouts()
+        self._render_time()
 
     def on_run_started(self, info):
+        # a chain stage: the fraction (and so the ETA) restarts
+        self._frac = None
         self._last_field = None
         self._mesh_geom = None
         self._mesh_levels = None

@@ -546,6 +546,9 @@ def qss(mode_name):
                 else p['accent_soft']}; }}
     QLabel#pausedlbl {{ font-size: 11px; font-weight: 600;
                         color: {p['warn']}; }}
+    QLabel#progresspct {{ font-family: "{DISPLAY}"; font-size: 22px;
+                          font-weight: 600; color: {p['text']}; }}
+    QLabel#progresstime {{ font-size: 12px; color: {p['text2']}; }}
     QProgressBar#runbar {{ background: {p['accent_border']}; border: none;
         border-radius: 3px; max-height: 6px; }}
     QProgressBar#runbar::chunk {{ background: {p['accent']};

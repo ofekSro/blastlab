@@ -133,6 +133,11 @@ class MainWindow(QMainWindow):
                                 viewer_link=self.viewer_link,
                                 log_fn=self._log_threadsafe)
         self.run_panel = RunPanel(view3d_host=self.view3d)
+        # GUI-6: run time with held time excluded (ui/run_clock.py) -
+        # the elapsed line, the ETA and the 30 s Stop rule read it
+        self._run_clock = self.run_panel.clock
+        self._run_got_result = False    # a result landed in this run
+        self._stop_asked = False        # the user pressed Stop in this run
         self.results = ResultsPanel(viewer_link=self.viewer_link,
                                     log_fn=self._result_msg,
                                     mode=self.solver_mode,
@@ -876,6 +881,11 @@ class MainWindow(QMainWindow):
         entry. The status line after a run is `_hd13_done`'s business.
         """
         self._hd13_busy = bool(busy)
+        # GUI-6: the progress strip's clock counts the assessment
+        if busy:
+            self._run_clock.start()
+        else:
+            self._run_clock.stop()
         self.run_panel.set_busy(busy)
         if busy:
             self._switch_interval = sys.getswitchinterval()
@@ -986,6 +996,8 @@ class MainWindow(QMainWindow):
         self._run_single(paused=True)
 
     def _stop(self):
+        if self.ctrl.running:
+            self._stop_asked = True
         self.ctrl.stop()
 
     def _apply_refresh(self):
@@ -1004,6 +1016,8 @@ class MainWindow(QMainWindow):
             self.notify(line, 'warn')
 
     def on_run_started(self, info):
+        # a (chain) stage: its ETA restarts, the run time goes on
+        self._run_clock.stage()
         self.run_panel.on_run_started(info)
         # k of the title's `Chain k/n · ` = runs started since
         # start_stages (plan §4)
@@ -1024,6 +1038,8 @@ class MainWindow(QMainWindow):
             self._update_title()
 
     def on_paused(self, paused):
+        # held time is not run time (decision D50)
+        self._run_clock.hold(paused)
         self.run_panel.set_paused(paused)
 
     def on_frame(self, field, t, levels=None):
@@ -1051,6 +1067,15 @@ class MainWindow(QMainWindow):
             self.run_panel.say_no_gauges()
 
     def on_running(self, running):
+        if running:
+            self._run_clock.start()
+            self._run_got_result = False
+            self._stop_asked = False
+            if self._start_paused:
+                # Initialise: the run starts held at step 0
+                self._run_clock.hold(True)
+        else:
+            self._run_clock.stop()
         self.run_panel.set_running(
             running, paused=bool(running) and self._start_paused)
         # a second start while a run is live would orphan the drain loop
@@ -1066,6 +1091,7 @@ class MainWindow(QMainWindow):
         self._update_title()
 
     def on_result(self, k, dim, label_, res):
+        self._run_got_result = True
         self._results.append((label_, dim, res))
         self.results.add_result(label_, dim, res)
         # Run pill ✓ = a result landed this session (decision D7)
@@ -1077,6 +1103,18 @@ class MainWindow(QMainWindow):
             # the last progress message is often throttled away, so a
             # completed run would otherwise rest below 100%
             self.run_panel.mark_complete()
+        # the elapsed line says how the run ended (a Stop before the
+        # first result leaves no result to call stopped: say so anyway)
+        if errored:
+            how = 'failed'
+        elif stopped_early or (self._stop_asked
+                               and not self._run_got_result):
+            how = 'stopped'
+        elif self._run_got_result:
+            how = 'done'
+        else:
+            how = 'ended'
+        self.run_panel.mark_ended(how)
 
     def _resume_foam_run(self, path):
         """Resume a stopped blastFoam run. The dimension comes from the
