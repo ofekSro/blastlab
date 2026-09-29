@@ -1076,10 +1076,13 @@ def s5_gauges(win, link):
           'scrolls', g9.plot_w.height() > g9.table.height()
           and g9.table.verticalScrollBar().maximum() > 0,
           f'plot {g9.plot_w.height()} table {g9.table.height()}')
+    # (verification: this read `maximum() >= 0`, which is always true)
     check('the headers wrap onto two lines there, and the table scrolls '
           'sideways rather than clip', g9.headers_wrapped()
-          and g9.table.horizontalScrollBar().maximum() >= 0
-          and not clipped(p9), str(clipped(p9)[:3]))
+          and g9.table.horizontalScrollBar().maximum() > 0
+          and not clipped(p9),
+          f'hbar {g9.table.horizontalScrollBar().maximum()} '
+          f'{clipped(p9)[:3]}')
     p9.shutdown()
     p9.deleteLater()
     pump(20)
