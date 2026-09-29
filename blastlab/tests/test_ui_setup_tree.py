@@ -607,6 +607,14 @@ def t4_derived():
     pump(20)
     check('the card sits on the 01 Threat page',
           card.isVisibleTo(sp._props))
+    try:
+        from blastlab.ui import theme as _theme
+        _theme.repolish(card)             # calls QWidget.update()
+        repaint_ok = True
+    except TypeError as exc:
+        repaint_ok = str(exc)
+    check('the card does not shadow QWidget.update (repolish works)',
+          repaint_ok is True, str(repaint_ok))
     page = sp.form.pages['threat'].layout()
     check('right under the charge inputs (board line 326)',
           page.indexOf(card) == 1

@@ -110,9 +110,11 @@ class DerivedCard(Card):
     def value(self, key):
         return self._vals[key].text()
 
-    def update(self, case, rep):
+    def show_values(self, case, rep):
         """From the case the debounced validation parsed and its report;
-        the rows keep their last values while the form does not parse."""
+        the rows keep their last values while the form does not parse.
+        (Not named `update`: that would shadow QWidget.update(), which
+        theme.repolish and Qt-side code call with no argument.)"""
         if case is None or getattr(case, 'dim', None) != self.dim:
             return
         r_exp = getattr(rep, 'r_exp', None) if rep is not None else None
@@ -488,7 +490,7 @@ class SetupPanel(QWidget):
             for node_id, text in setup_nodes.summaries(case).items():
                 self.tree.set_summary(node_id, text)
             if self._dim in self._derived:
-                self._derived[self._dim].update(case, rep)
+                self._derived[self._dim].show_values(case, rep)
         self._sync_children()
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
