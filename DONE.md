@@ -978,6 +978,40 @@ T3, T4, T6 FIXED).
 
 ---
 
+## 0q. 2026-09-29 — batch `gui-results` (GUI-7, parts a and b; F14)
+
+Plan: `docs/batches/2026-09-29-gui-results.md`; reports `…gui-results-a.implement.md`,
+`…gui-results-b.implement.md`, `…gui-results.verify.md` (T0, T1, T3, T4, T7 VERIFIED;
+T2, T5, T6 FIXED).
+
+- **What:** 03 Results in three columns. A results list with `latest` / `chain` badges
+  and a caption; "How it was computed" read only from the result's meta and record
+  files, with Show case and **Load into 01 Setup** (loads without a path, so Ctrl+S can
+  never overwrite `MODEL.json`); a hidden `stage_slot` for GUI-9. Views **Field**
+  (the old Fields and Animation in one: field, colour scale whole run / each frame /
+  manual driving the animation export as before, hover readout, time bar with Play,
+  arrival tick, speed, This frame .png) · **Gauges** (one pyqtgraph plot, the selected
+  gauge cyan with its positive phase shaded, a table with Z and impulse in kPa·ms on
+  screen only, sorted by Z, Copy table / Ctrl+C inside the table) · 3D. Exports grouped
+  Data / Figures with a busy strip and no double start; the VTK error dialog now on the
+  GUI thread. F14 made harmless (`fieldform` forgets destroyed viewports). F15 (stale
+  colour bars) fixed. No KB columns, no run overlay (owner).
+- **Tests:** an export golden recorded at base first (`test_ui_char_results_exports`,
+  26 exports) — green after every task; real exports of 1D and 2D runs byte-identical
+  to a base worktree; `test_regression` byte-identical; new `test_ui_results_screen`
+  (186), `test_ui_fieldform_viewport`, `_e2e_ui_results`, the committed Win32 sampler
+  `_e2e_ui_viewer_place.py` (R-VIEWER 0 ms on 7 actions). The pre-registered
+  R-VIEWER-RESIZE failed its judged pair (18.5 → 25.4 ms, limit 23.5) — F13, pre-existing,
+  `view3d_host.py` untouched; reported, not fixed. The `ui_results_meta.json` gauges
+  entry migrated under a curve-by-curve hash proof.
+- **Verifier fixes:** `10ed2ca` (list hid the newest row; light caption contrast),
+  `db5657c` (title kept `✓ Done` after Load), `e5de7ed`, `d7b614d`, `fbb5ef5`, `f7cb4fc`
+  (hover readout inside the map), `b4cad6e` (1D profiles cropped at 1100 × 720).
+- **Open, non-blocking:** D76-D130, F13-F17.
+- **Commits:** `bb065fc`..`8b5bfea`, `10ed2ca`..`9233a98` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
