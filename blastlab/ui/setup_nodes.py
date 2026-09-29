@@ -153,3 +153,113 @@ def card_order(dim):
     out = [t for _n, titles in nodes(dim) for t in titles]
     out += [s.title for s in setup_spec.cards(dim) if s.title not in out]
     return out
+
+
+# ── the one-line summaries under each tree row (plan §5.1) ───────────────
+#: 2D axisymmetric side names, as the board says them ("the run ends at
+#: Outer"); planar and 3D keep the side keys, which is what the
+#: Boundaries card itself shows
+AXISYM_SIDES = {'x_lo': 'Axis', 'x_hi': 'Outer', 'y_lo': 'Ground',
+                'y_hi': 'Top'}
+
+
+def _n1(v):
+    """A value as the board writes it: one decimal at least ('1.0',
+    '2.0'), more when it has them ('0.75', '2.95')."""
+    v = float(v)
+    s = f'{v:.1f}'
+    return s if abs(float(s) - v) < 1e-9 else f'{v:g}'
+
+
+def _count(n, word):
+    return f'no {word}s' if not n else f'{n} {word}{"" if n == 1 else "s"}'
+
+
+def _mm(cell_m):
+    return f'{float(cell_m) * 1000.0:.3g} mm'
+
+
+def terminate_sides(case):
+    """The side names that end the run ('Outer', 'x_hi', ...)."""
+    if case.dim == 1:
+        return ['Outer'] if case.bc_outer == 'terminate' else []
+    axisym = case.dim == 2 and case.geometry == 'axisymmetric'
+    return [AXISYM_SIDES.get(s, s) if axisym else s
+            for s, kind in (case.bcs or {}).items() if kind == 'terminate']
+
+
+def summaries(case):
+    """{node id: summary line} for a parsed case (a Case1D/2D/3D or a
+    DeflagrationCase). Display only: every number is the case's own
+    value, formatted, never recomputed."""
+    dim = getattr(case, 'dim', None)
+    if dim == 0:
+        by_title = {
+            'Material': str(case.propellant),
+            'Charge and chamber': (f'{_n1(case.charge_kg)} kg · '
+                                   f'{_n1(case.volume_m3)} m³'),
+            'Ignition': str(case.scenario_kind),
+            'Run': f'{case.t_end:g} s · {case.n_out} samples',
+            'Outputs': str(case.name or ''),
+        }
+        return {n.id: by_title.get(ts[0], '') for n, ts in nodes(0)}
+    foam = getattr(case, 'solver', 'native') == 'blastfoam'
+    out = {}
+    # 01 Threat
+    if dim == 1:
+        out['threat'] = f'{_n1(case.charge_kg)} kg {case.material}'
+    elif case.init_mode != 'charge':
+        out['threat'] = f'starts from a {case.init_mode[-2:].upper()} ' \
+                        f'profile'
+    else:
+        planar = dim == 2 and case.geometry == 'planar'
+        up = ('y', case.center[1]) if dim == 2 and planar else \
+             ('z', case.center[1] if dim == 2 else case.center[2])
+        text = (f'{_n1(case.charge)} kg{"/m" if planar else ""} '
+                f'{case.material} · {up[0]} {_n1(up[1])} m')
+        extra = len(getattr(case, 'charges', None) or []) if foam else 0
+        out['threat'] = text + (f' · +{extra}' if extra else '')
+    # 02 Domain & mesh
+    if dim == 1:
+        dom = f'R {_n1(case.radius_m)} m · {_mm(case.cell_size_m)}'
+    else:
+        sides = [case.Lx, case.Ly] + ([case.Lz] if dim == 3 else [])
+        dom = (' × '.join(f'{float(s):g}' for s in sides)
+               + f' m · {_mm(case.cell_size_m)}')
+        if foam and case.amr_levels:
+            dom += f' · AMR {case.amr_levels}'
+        if foam and case.refine_zones:
+            dom += f' · {_count(len(case.refine_zones), "zone")}'
+    out['domain'] = dom
+    # 03 Boundaries
+    ends = terminate_sides(case)
+    out['bounds'] = ('the run ends at ' + ', '.join(ends) if ends
+                     else 'no side ends the run')
+    # 04 Structure
+    out['structure'] = ('' if dim == 1 else
+                        _count(len(case.obstacles or []), 'obstacle'))
+    # 05 Gauges (GUI-5b adds "in front of Wall n" from its Where helper)
+    pts = case.gauge_radii if dim == 1 else case.gauges
+    g = _count(len(pts or []), 'gauge')
+    tg = getattr(case, 'trigger_gauge', None)
+    out['gauges'] = g + (f' · trigger G{tg}' if tg is not None else '')
+    # 06 Solver
+    if foam:
+        burn = ('no afterburn' if case.afterburn == 'none'
+                else f'{case.afterburn} afterburn')
+        out['solver'] = f'{case.activation} · {burn} · CFL {case.cfl:g}'
+    else:
+        out['solver'] = f'{case.eos} · order {case.order} · CFL {case.cfl:g}'
+    # 07 Output
+    bits = []
+    if dim > 1:
+        # the extension the run will write - the run's own rule
+        from ..services.model_folder import anim_ext
+        bits.append(anim_ext(getattr(case, 'anim_file', None)))
+    if foam:
+        on = any(isinstance(getattr(case, k, None), dict)
+                 and getattr(case, k).get('on')
+                 for k in ('vtk_volumes', 'vtk_surfaces'))
+        bits.append('VTK on' if on else 'VTK off')
+    out['output'] = ' · '.join(bits)
+    return out

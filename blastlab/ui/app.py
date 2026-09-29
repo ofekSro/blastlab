@@ -684,6 +684,8 @@ class MainWindow(QMainWindow):
             # (decision D7)
             self.topbar.set_done('setup', False)
             self.setup.update_preview(None)
+            # GUI-5: the tree's marks and children (no case to summarise)
+            self.setup.refresh(None, None)
             return
         if getattr(case, 'dim', None) == 0:
             # HD 1.3: a different validator, the SAME ValidationReport, so
@@ -695,6 +697,7 @@ class MainWindow(QMainWindow):
             self.run_panel.set_validation(not rep.errors, len(rep.errors))
             self.topbar.set_done('setup', not rep.errors)
             self.setup.update_preview(case)
+            self.setup.refresh(case, rep)
             return
         if getattr(case, 'solver', 'native') == 'blastfoam':
             foam_env.ensure_check_started()
@@ -716,6 +719,9 @@ class MainWindow(QMainWindow):
         self.run_panel.set_validation(not rep.errors, len(rep.errors))
         self.topbar.set_done('setup', not rep.errors)
         self.setup.update_preview(case)
+        # GUI-5: the model tree's summaries, marks and children, and the
+        # Derived card, from the same case and report
+        self.setup.refresh(case, rep)
 
     # ── running ──────────────────────────────────────────────────────────
     def _run_single(self, paused=False):

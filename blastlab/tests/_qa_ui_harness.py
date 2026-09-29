@@ -3240,14 +3240,21 @@ def m05_hd13_folder(qa):
 VTK_CARD = 'VTK output (ParaView)'
 
 
-def _vtk_card(qa):
-    """Scroll the Setup form so the VTK card is on screen; return it."""
-    card = _form(qa).cards[VTK_CARD]
+def _show_card(qa, title):
+    """Bring a Setup card on screen. GUI-5: a card shows only while its
+    model-tree node is selected, so select the node (07 Output for the
+    VTK card) and scroll the properties column to it."""
     try:
-        qa.win.setup._scroll.ensureWidgetVisible(card, 0, 0)
+        qa.win.setup.show_card(title)
     except Exception:
         pass
     qa.pump(0.4)
+
+
+def _vtk_card(qa):
+    """Scroll the Setup form so the VTK card is on screen; return it."""
+    card = _form(qa).cards[VTK_CARD]
+    _show_card(qa, VTK_CARD)
     return card
 
 
@@ -3397,15 +3404,8 @@ def v04_vtk_native(qa):
     form = _form(qa)
     qa.check(not form.card_visible(VTK_CARD),
              'native: the VTK card is hidden', 'S1')
-    # where the card sat: Outputs, then straight on to the Trigger card
-    # (the bottom of the scroll range is the stack's blank tail - the
-    # QStackedWidget takes its tallest page's height)
-    try:
-        qa.win.setup._scroll.ensureWidgetVisible(form.cards['Trigger gauge'],
-                                                 0, 0)
-    except Exception:
-        pass
-    qa.pump(0.4)
+    # where the card sat: 07 Output now shows only the Outputs card
+    _show_card(qa, 'Outputs')
     qa.shot('native_no_card')
     saved = case_to_dict(qa.win.setup.get_case())
     path = os.path.join(qa.dirs['cache'], 'v04_native.json')

@@ -190,9 +190,169 @@ def t1_placement():
           not c.pages and c.show_node('threat') is False)
 
 
+def sample_case():
+    """The boards' sample case (plan §1): 2D axisymmetric, blastFoam,
+    1 kg TNT at z = 2 m, 4 x 4 m, cell 0.025 m, Wall 1 at r 3.0-3.2 m,
+    gauges G1 (2.95, 0.50) and G2 (2.95, 1.50); the form's boundaries."""
+    return Case2D(solver='blastfoam', geometry='axisymmetric', Lx=4.0,
+                  Ly=4.0, cell_size_m=0.025, charge=1.0, center=(0.0, 2.0),
+                  bcs=dict(setup_spec.BC_DEFAULTS[2]),
+                  obstacles=[(3.0, 3.2, 0.0, 2.5)],
+                  gauges=[(2.95, 0.5), (2.95, 1.5)])
+
+
+def t2_panel():
+    from PySide6.QtWidgets import QApplication
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui.setup_panel import PROPS_W, SetupPanel
+    from blastlab.ui.setup_tree import TREE_W
+
+    print('\nT2a: selecting a node shows only its cards')
+    mode = mode_mod.SolverMode()
+    sp = SetupPanel(mode=mode)
+    sp.resize(1400, 860)
+    sp.show()
+    pump(80)
+    check('the three columns: tree 280, properties 340',
+          sp.tree.width() == TREE_W and sp.props_width() == PROPS_W,
+          f'{sp.tree.width()} / {sp.props_width()}')
+    for m in MODES:
+        mode.set(m)
+        pump(30)
+        for d in (0, 1, 2, 3):
+            sp.set_dim(d)
+            pump(30)
+            f = sp.form
+            for node, titles in setup_nodes.nodes(d):
+                want = [t for t in titles if f.card_visible(t)]
+                in_tree = node.id in sp.visible_nodes()
+                if not want:
+                    check(f'{m} {d}D {node.number}: a node with no card '
+                          f'is hidden, never greyed', not in_tree)
+                    continue
+                ok = sp.select_node(node.id)
+                pump(10)
+                check(f'{m} {d}D {node.number} {node.title}: only its '
+                      f'cards', ok and in_tree
+                      and sp.shown_cards() == want
+                      and sp.selected_node() == node.id,
+                      f'{sp.shown_cards()} vs {want}')
+    mode.set('blastfoam')
+    sp.set_dim(1)
+    check('1D: no 04 Structure in the tree',
+          'structure' not in sp.visible_nodes(), str(sp.visible_nodes()))
+    mode.set('native')
+    pump(20)
+    check('native 1D: 07 Output is hidden (its only card is VTK)',
+          'output' not in sp.visible_nodes(), str(sp.visible_nodes()))
+    mode.set('blastfoam')
+    sp.set_dim(2)
+    sp.select_node('gauges')
+    sp.set_dim(3)
+    check('05 Gauges stays selected from 2D to 3D',
+          sp.selected_node() == 'gauges')
+    sp.set_dim(0)
+    check('0D starts on its first card node, 01',
+          sp.selected_node() == setup_nodes.nodes(0)[0][0].id)
+    sp.set_dim(2)
+
+    print('\nT2b: the pill tracks show_report; the report order stays')
+    sp.show_report([], [], ['n1', 'n2', 'n3', 'n4'])
+    check("0 errors / 0 warnings / 4 notes -> 'Case OK · 4 notes'",
+          sp.pill() == ('ok', 'Case OK · 4 notes'), str(sp.pill()))
+    sp.show_report(['e1', 'e2'])
+    check("2 errors -> '2 errors' in danger",
+          sp.pill() == ('error', '2 errors'), str(sp.pill()))
+    sp.show_report(['e1'], ['w1', 'w2'], ['n1'])
+    check('report_rows keeps error, warn, note order',
+          [r[0] for r in sp.report_rows()] == ['error', 'warn', 'warn',
+                                               'note'])
+    sp.show_report()
+    check("an empty report: 'Case OK' row and pill",
+          sp.report_rows() == [('ok', 'Case OK')]
+          and sp.pill() == ('ok', 'Case OK'))
+    sp.show_report([], ['w'], [])
+    check('a warning keeps Case OK and says so',
+          sp.pill() == ('warn', 'Case OK · 1 warning'), str(sp.pill()))
+
+    print('\nT2c: children, + Gauge / + Obstacle, summaries, marks')
+    sp.set_case(sample_case())
+    case = sp.get_case()
+    from blastlab.core.case import validate_case
+    rep = validate_case(case)
+    sp.refresh(case, rep)
+    pump(30)
+    t = sp.tree
+    check('one child row per gauge (G1 · 2.95, 0.50)',
+          t.children('gauges') == [('G1', '2.95, 0.50'),
+                                   ('G2', '2.95, 1.50')],
+          str(t.children('gauges')))
+    check('one child row per obstacle (Wall 1 · r 3.0–3.2)',
+          t.children('structure') == [('Wall 1', 'r 3.0–3.2')],
+          str(t.children('structure')))
+    sp.select_node('threat')
+    t.child_row('gauges', 1).clicked.emit()
+    pump(30)
+    pl = sp.form.points['gauges']
+    check('clicking G2 selects 05 Gauges and its row in the list',
+          sp.selected_node() == 'gauges'
+          and pl.tree.indexOfTopLevelItem(pl.tree.currentItem()) == 1)
+    t.child_row('structure', 0).clicked.emit()
+    pump(30)
+    check('clicking Wall 1 selects 04 Structure',
+          sp.selected_node() == 'structure')
+    sp.activateWindow()
+    sp.select_node('threat')
+    t.add_gauge_btn.click()
+    pump(40)
+    check('+ Gauge selects 05 and focuses the gauge entry',
+          sp.selected_node() == 'gauges'
+          and QApplication.focusWidget() is sp.form.points['gauges'].entry,
+          type(QApplication.focusWidget()).__name__)
+    t.add_obstacle_btn.click()
+    pump(40)
+    check('+ Obstacle selects 04 and focuses the obstacle entry',
+          sp.selected_node() == 'structure'
+          and QApplication.focusWidget()
+          is sp.form.points['obstacles'].entry)
+    from blastlab.output.animation import default_ext
+    want = {'threat': '1.0 kg TNT · z 2.0 m',
+            'domain': '4 × 4 m · 25 mm',
+            'bounds': 'the run ends at Outer',
+            'structure': '1 obstacle',
+            'gauges': '2 gauges',
+            'solver': 'linear · no afterburn · CFL 0.4',
+            'output': f'{default_ext()} · VTK off'}
+    got = {k: t.summary(k) for k in want}
+    check('the board summaries, from the parsed case', got == want,
+          str({k: v for k, v in got.items() if v != want[k]}))
+    check('every node ✓ on a clean case',
+          all(t.rows[k].mark.text() == '✓' for k in want))
+    sp.form.v['cell'].set('abc')
+    try:
+        sp.get_case()
+    except ValueError:
+        pass
+    sp.refresh(None, None)
+    check('a bad field puts ✗ on its node only',
+          t.rows['domain'].mark.text() == '✗'
+          and t.rows['threat'].mark.text() == '✓')
+    check('and the summary is kept from the last good case',
+          t.summary('domain') == '4 × 4 m · 25 mm')
+    sp.form.v['cell'].set('0.025')
+    sp.get_case()
+    sp.refresh(sp.get_case(), None)
+    check('fixed: ✓ again', t.rows['domain'].mark.text() == '✓')
+    check('scroll_form scrolls the properties column',
+          isinstance(sp.scroll_form(1.0), int)
+          and sp._scroll.isAncestorOf(sp.form))
+    sp.close()
+
+
 def main():
     t1_registry()
     t1_placement()
+    t2_panel()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

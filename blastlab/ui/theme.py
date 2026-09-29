@@ -369,6 +369,42 @@ def qss(mode_name):
     /* the bar's dimension segments at the board's 12.5 px (the app-wide
        font rule would render them 13 pt and push the bar past 1100) */
     QFrame#topbar QToolButton#seg {{ font-size: 12px; }}
+    /* GUI-5 Setup (board BC_Combined lines 58-121, 268-388): the tree
+       and properties columns, px sizes as the board writes them (D6) */
+    QFrame#setuptree, QFrame#setupprops {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#eyebrow {{ font-size: 11px; font-weight: 600;
+                      color: {p['faint']}; }}
+    QLabel#propstitle {{ font-family: "{DISPLAY}"; font-size: 22px;
+                         font-weight: 600; color: {p['text']}; }}
+    QLabel#propscaption {{ font-size: 12px; color: {p['muted']}; }}
+    QFrame#treechild {{ background: transparent; border: none;
+                        border-radius: 7px; }}
+    QFrame#treechild:hover {{ background: {p['hover']}; }}
+    QLabel#childname {{ font-size: 13px; color: {p['text2']}; }}
+    QLabel#childval {{ font-family: "{MONO}"; font-size: 11px;
+                       color: {p['faint']}; }}
+    QLabel#treemark_gauge {{ font-size: 12px; font-weight: 700;
+                             color: {p['gauge']}; }}
+    QLabel#treemark_obstacle {{ font-size: 12px; color: {p['text2']}; }}
+    QPushButton#treeadd {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['entry_border']};
+                           border-radius: 8px; padding: 0px 8px;
+                           font-size: 13px; font-weight: 500; }}
+    QPushButton#treeadd:hover {{ background: {p['hover']}; }}
+    QPushButton#casepill {{ text-align: left; padding: 0px 12px;
+                            border-radius: 10px; font-size: 13px;
+                            font-weight: 500; background: {p['ok_bg']};
+                            border: 1px solid {p['ok_border']};
+                            color: {p['ok']}; }}
+    QPushButton#casepill[state="warn"] {{ color: {p['warn']}; }}
+    QPushButton#casepill[state="error"] {{ background: {p['stop_bg']};
+                                          border: 1px solid {p['stop_border']};
+                                          color: {p['danger']}; }}
+    QLabel#derivedkey {{ font-size: 13px; color: {p['muted']}; }}
+    QLabel#derivedval {{ font-family: "{MONO}"; font-size: 13px;
+                         color: {p['text']}; }}
+    QFrame#card[flash="true"] {{ border: 1px solid {p['accent']}; }}
     """
 
 

@@ -223,6 +223,10 @@ class View3DHost(QWidget):
         self._float_lbl = QLabel(self.FLOATING)
         self._float_lbl.setObjectName('muted')
         self._float_lbl.setAlignment(Qt.AlignCenter)
+        # wrapped like the placeholder: unwrapped, this one line was the
+        # whole host's minimum width (338 px of 368, measured) and pushed
+        # the GUI-5 Setup centre past a 1100 px window
+        self._float_lbl.setWordWrap(True)
         fl.addWidget(self._float_lbl)
         fl.addWidget(button('Re-attach', 'detach', width=120,
                             on_click=lambda: self.set_floating(False)),
