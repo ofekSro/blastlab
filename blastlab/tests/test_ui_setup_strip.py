@@ -255,10 +255,21 @@ def s1_strip():
     check('Run F5 -> _run_single, Initialise -> _init_model',
           calls == [('run', False), ('init',)], str(calls))
     s = win.setup.strip
-    rep = validate_case(win.setup.get_case())
+    # the window starts the WSL hardware probe; when it lands between the
+    # window's _validate and this validate_case the two reports plan
+    # different ranks (7 unknown vs 2 on a 4-core VM - seen in verify).
+    # Compare a pair taken with the same hardware on both sides.
+    for _ in range(5):
+        hw = env.hardware()
+        win._validate()
+        rep = validate_case(win.setup.get_case())
+        if env.hardware() == hw:
+            break
+        pump(500)
     check('after the real _validate the tiles hold that report',
           s.shown('cells')[0] == f'{rep.n_cells / 1e3:.0f} k'
-          and s.shown('ranks')[0] == str(rep.run_plan.ranks))
+          and s.shown('ranks')[0] == str(rep.run_plan.ranks),
+          f'{s.shown("ranks")} vs {rep.run_plan.ranks}')
     check('1600 px: one row, the board\'s 148 px Run column',
           s.rows() == 1 and s.run_col.width() == 148,
           f'{s.rows()} rows, run {s.run_col.width()}')
