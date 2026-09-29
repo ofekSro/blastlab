@@ -95,6 +95,9 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         self._chain_k = 0
         self._chain_n = 0
+        # GUI-6: the start in progress was an Initialise (held at step 0);
+        # the controller's on_running(True) carries no such flag
+        self._start_paused = False
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -160,6 +163,8 @@ class MainWindow(QMainWindow):
         self.run_panel.refresh_changed.connect(self._apply_refresh)
         self.run_panel.gauges_wanted.connect(self._gauges_wanted)
         self.run_panel.runs_dir_changed.connect(self._save_runs_dir)
+        # GUI-6: the Run screen's `Setup: Case OK` link goes back to Setup
+        self.run_panel.setup_requested.connect(lambda: self._show('setup'))
 
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
@@ -720,7 +725,9 @@ class MainWindow(QMainWindow):
                          f'display cells)')
             extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
-        self.run_panel.set_validation(not rep.errors, len(rep.errors))
+        # GUI-6: the Run screen's Setup link shows the report's cell count
+        self.run_panel.set_validation(not rep.errors, len(rep.errors),
+                                      n_cells=rep.n_cells)
         self.topbar.set_done('setup', not rep.errors)
         self.setup.update_preview(case)
         # GUI-5: the model tree's summaries, marks and children, and the
@@ -749,9 +756,15 @@ class MainWindow(QMainWindow):
         model = self._model_target()
         if model is None:
             return
-        if self.ctrl.start_stages([(case.dim, case)], paused=paused,
-                                  run_name=model.model, model=model,
-                                  reports=[rep]):
+        # read by on_running(True): an Initialise opens Step through
+        self._start_paused = bool(paused)
+        try:
+            started = self.ctrl.start_stages(
+                [(case.dim, case)], paused=paused, run_name=model.model,
+                model=model, reports=[rep])
+        finally:
+            self._start_paused = False
+        if started:
             self._show('run')
 
     def model_check(self):
@@ -798,6 +811,8 @@ class MainWindow(QMainWindow):
         self._wsl_dot.setVisible(blast and bool(self._wsl_hint.text()))
         # two-way dimension sync (silent - the Segmented convention)
         self.topbar.set_dim(int(dim))
+        # GUI-6: the Run screen hides what a 0-D assessment does not have
+        self.run_panel.set_dim(int(dim))
         if blast:
             self._on_solver_mode(self.solver_mode.get())
 
@@ -1036,7 +1051,8 @@ class MainWindow(QMainWindow):
             self.run_panel.say_no_gauges()
 
     def on_running(self, running):
-        self.run_panel.set_running(running)
+        self.run_panel.set_running(
+            running, paused=bool(running) and self._start_paused)
         # a second start while a run is live would orphan the drain loop
         # and drop the finished result
         self.chain.set_running(running)

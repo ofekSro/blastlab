@@ -463,6 +463,94 @@ def qss(mode_name):
     QLabel#viewcaption[hover="true"] {{ font-family: "{MONO}";
                                         font-size: 11px;
                                         color: {p['text2']}; }}
+    /* GUI-6 02 Run (board Run lines 62-256). Every board height is
+       pinned here: a QSS min-height beats setFixedHeight (D41). */
+    QFrame#runctl, QFrame#rungauges {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#runfield {{ font-size: 12px; color: {p['muted']}; }}
+    QLineEdit#runbox {{ font-family: "{MONO}"; font-size: 12px;
+                        min-height: 26px; max-height: 26px; }}
+    QLabel#runpath {{ font-family: "{MONO}"; font-size: 11px;
+                      color: {p['faint']}; }}
+    QPushButton#squarebtn {{ background: transparent;
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px; min-height: 32px; max-height: 32px; }}
+    QPushButton#squarebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#runbig[runtab="true"] {{ color: {p['on_accent']};
+        font-family: "{DISPLAY}"; font-size: 16px; font-weight: 700;
+        padding: 0px 10px; min-height: 48px; max-height: 48px; }}
+    QPushButton#runbig[runtab="true"]:disabled {{ color: {p['muted']}; }}
+    QPushButton#danger[stop="true"] {{ background: {p['stop_bg']};
+        border: 1px solid {p['stop_border']}; border-radius: 10px;
+        padding: 0px; min-height: 46px; max-height: 46px; }}
+    QPushButton#danger[stop="true"]:hover {{
+        border: 1px solid {p['stop_text']}; }}
+    QLabel#stoptext {{ font-family: "{DISPLAY}"; font-size: 16px;
+                       font-weight: 700; color: {p['stop_text']}; }}
+    QLabel#stopkey {{ font-family: "{MONO}"; font-size: 11px;
+        font-weight: 500; color: {p['stop_text']};
+        background: {'rgba(255, 255, 255, 20)' if mode_name == 'dark'
+                     else 'rgba(0, 0, 0, 16)'};
+        border-radius: 4px; padding: 1px 5px; }}
+    QPushButton#run3d {{ background: transparent;
+        border: 1px solid {p['entry_border']}; border-radius: 10px;
+        padding: 0px; min-height: 46px; max-height: 46px; }}
+    QPushButton#run3d:hover {{ background: {p['hover']}; }}
+    QFrame#collapsible, QFrame#runcard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 10px; }}
+    QPushButton#collapsehead {{ background: transparent; border: none;
+        padding: 0px; min-height: 22px; max-height: 22px; }}
+    QPushButton#collapsehead:hover {{ background: transparent; }}
+    QLabel#runcardtitle {{ font-size: 14px; font-weight: 600;
+                           color: {p['text']}; }}
+    QLabel#runhint {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#rununit {{ font-family: "{MONO}"; font-size: 12px;
+                      color: {p['faint']}; }}
+    QLineEdit#runsmall, QComboBox#runsmall {{ font-family: "{MONO}";
+        font-size: 12px; min-height: 24px; max-height: 24px; }}
+    QComboBox#runsmall {{ font-family: "{FONT}"; }}
+    QPushButton#runquiet {{ background: transparent; color: {p['text']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 8px; min-height: 32px; max-height: 32px;
+        font-size: 13px; font-weight: 500; }}
+    QPushButton#runquiet:hover {{ background: {p['hover']}; }}
+    QPushButton#runquiet:disabled {{ color: {p['muted']}; }}
+    QPushButton#execbtn {{ background: {p['hover']}; color: {p['text']};
+        border: none; border-radius: 7px; padding: 0px 4px;
+        min-height: 32px; max-height: 32px; font-size: 12px;
+        font-weight: 500; }}
+    QPushButton#execbtn[mono="true"] {{ font-family: "{MONO}"; }}
+    QPushButton#execbtn:hover {{ background: {p['seg']}; }}
+    QPushButton#execbtn:disabled {{ background: {p['hover']};
+                                    color: {p['muted']}; }}
+    QPushButton#setuplink {{ text-align: left; background: {p['ok_bg']};
+        border: 1px solid {p['ok_border']}; border-radius: 10px;
+        padding: 0px; min-height: 40px; max-height: 40px; }}
+    QPushButton#setuplink:hover {{ border: 1px solid {p['ok']}; }}
+    QPushButton#setuplink[state="error"] {{ background: {p['stop_bg']};
+        border: 1px solid {p['stop_border']}; }}
+    QPushButton#setuplink[state="error"]:hover {{
+        border: 1px solid {p['stop_text']}; }}
+    QFrame#runseg {{ background: {p['bg']};
+        border: 1px solid {p['seg']}; border-radius: 9px; }}
+    QFrame#runseg QToolButton#seg {{ font-size: 12px; border-radius: 6px; }}
+    QFrame#runview {{ background: {p['view']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#rundock {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#rundock QStackedWidget {{ background: transparent; }}
+    QFrame#rundock QPlainTextEdit#log {{ background: transparent;
+        font-size: 12px; padding: 6px 10px; color: {p['text2']}; }}
+    QLabel#progresscaps {{ font-size: 10px; font-weight: 600;
+        color: {p['accent_text'] if mode_name == 'dark'
+                else p['accent_soft']}; }}
+    QLabel#pausedlbl {{ font-size: 11px; font-weight: 600;
+                        color: {p['warn']}; }}
+    QProgressBar#runbar {{ background: {p['accent_border']}; border: none;
+        border-radius: 3px; max-height: 6px; }}
+    QProgressBar#runbar::chunk {{ background: {p['accent']};
+                                  border-radius: 3px; }}
+    QLabel#gaugenote {{ font-size: 12px; color: {p['muted']}; }}
     """
 
 

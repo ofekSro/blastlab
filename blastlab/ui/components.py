@@ -1,6 +1,7 @@
 """GUI-4: the shared components of the GUI redesign (plan §2.5, boards
 BC_Combined / Run_Finished / Chain): ToggleSwitch, StatTile, TreeRow,
-DockTabs, Banner and HandoffCard.
+DockTabs, Banner and HandoffCard; GUI-6 added Collapsible (board Run,
+Step through) and `DockTabs.add_corner`.
 
 New module on purpose - nothing that imports `widgets` today is
 disturbed, and nothing in the app consumes these yet (GUI-3/5/6/7
@@ -11,7 +12,7 @@ itself on `theme.signals.changed`.
 """
 
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTransform
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame,
                                QHBoxLayout, QLabel, QPushButton,
                                QSizePolicy, QStackedWidget, QToolButton,
@@ -357,6 +358,111 @@ class DockTabs(QWidget):
 
     def names(self):
         return list(self._tabs)
+
+    def add_corner(self, widget):
+        """Put `widget` at the right end of the tab strip, after the
+        stretch (board Run line 252: Copy / Save log… beside the tabs).
+        Returns the widget."""
+        self._strip.addWidget(widget, 0, Qt.AlignVCenter)
+        return widget
+
+
+# ── Collapsible section ──────────────────────────────────────────────────
+class _CollapseHeader(QPushButton):
+    """The header row of a `Collapsible`: chevron · title · hint, three
+    labels inside one checkable QPushButton, so clicks, focus, Space and
+    the checked state stay the button's."""
+
+    def __init__(self, title, hint, parent=None):
+        super().__init__(parent)
+        self.setObjectName('collapsehead')
+        self.setCheckable(True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName(str(title))
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+        self.chevron = QLabel()
+        self.title = QLabel(str(title))
+        self.hint = QLabel(str(hint))
+        for w in (self.chevron, self.title, self.hint):
+            w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        lay.addWidget(self.chevron)
+        lay.addWidget(self.title, 1)
+        lay.addWidget(self.hint)
+
+    def sizeHint(self):
+        return self.layout().sizeHint()
+
+    def minimumSizeHint(self):
+        return self.layout().minimumSize()
+
+
+class Collapsible(QFrame):
+    """A card whose body opens and closes under a header row (board Run
+    lines 100-122, *Step through*): a chevron that turns 90° when open,
+    the title, and a `hint` shown at the right while closed. Closed by
+    default; `toggled(bool)` fires on every change, user or code."""
+
+    toggled = Signal(bool)
+
+    def __init__(self, title, hint='', parent=None):
+        super().__init__(parent)
+        self.setObjectName('collapsible')
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(12, 12, 12, 12)
+        lay.setSpacing(10)
+        self.header = _CollapseHeader(title, hint)
+        self.header.toggled.connect(self._apply)
+        lay.addWidget(self.header)
+        self.body = QWidget()
+        self.body.setObjectName('collapsebody')
+        self.body_layout = QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(0, 0, 0, 0)
+        self.body_layout.setSpacing(8)
+        lay.addWidget(self.body)
+        self.body.setVisible(False)
+        self.header.hint.setVisible(bool(hint))
+        _on_theme(self, self._recolour)
+
+    def _recolour(self, _mode=None):
+        h = self.header
+        h.title.setStyleSheet(_css(14, 600, 'text'))
+        h.hint.setStyleSheet(_css(12, 400, 'faint'))
+        pm = theme.pixmap('chevron_right', 15, color='text')
+        if self.is_open():
+            dpr = pm.devicePixelRatio()
+            pm = pm.transformed(QTransform().rotate(90))
+            pm.setDevicePixelRatio(dpr)
+        h.chevron.setPixmap(pm)
+
+    def _apply(self, on):
+        self.body.setVisible(bool(on))
+        self.header.hint.setVisible(not on and bool(self.header.hint.text()))
+        self._recolour()
+        self.toggled.emit(bool(on))
+
+    def add(self, widget, stretch=0):
+        self.body_layout.addWidget(widget, stretch)
+        return widget
+
+    def add_layout(self, lay):
+        self.body_layout.addLayout(lay)
+        return lay
+
+    def set_open(self, on):
+        """Open or close the body (emits `toggled` when it changes)."""
+        if bool(on) != self.header.isChecked():
+            self.header.setChecked(bool(on))
+
+    def is_open(self):
+        return self.header.isChecked()
+
+    def hint_text(self):
+        """The hint as shown ('' while open), for tests."""
+        h = self.header.hint
+        return h.text() if not h.isHidden() else ''
 
 
 # ── Banner and hand-off card ─────────────────────────────────────────────

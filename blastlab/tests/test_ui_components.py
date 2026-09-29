@@ -13,7 +13,10 @@
  C4  DockTabs - set() is silent, a user click emits `changed` and
      switches the stacked page, exactly one tab underlined;
  C5  Banner / HandoffCard - text set is text shown; the banner action
-     fires its callback.
+     fires its callback;
+ C6  Collapsible (GUI-6) - closed by default with its hint, a header
+     click / Space toggles it and emits `toggled`; DockTabs.add_corner
+     puts a widget right of the tabs (C4).
 
 Plain script, offscreen, no pytest: `python test_ui_components.py`.
 """
@@ -35,12 +38,14 @@ app = ensure_qapp()
 
 from PySide6.QtCore import Qt                              # noqa: E402
 from PySide6.QtTest import QTest                           # noqa: E402
-from PySide6.QtWidgets import QCheckBox, QLabel            # noqa: E402
+from PySide6.QtWidgets import (QCheckBox, QLabel,          # noqa: E402
+                               QPushButton)
 
 from blastlab.ui import theme                              # noqa: E402
-from blastlab.ui.components import (Banner, DockTabs,      # noqa: E402
-                                    HandoffCard, StatTile,
-                                    ToggleSwitch, TreeRow)
+from blastlab.ui.components import (Banner, Collapsible,   # noqa: E402
+                                    DockTabs, HandoffCard,
+                                    StatTile, ToggleSwitch,
+                                    TreeRow)
 
 FAIL = []
 
@@ -168,7 +173,47 @@ def c4_docktabs():
     checked = [n for n, (b, _w) in tabs._tabs.items() if b.isChecked()]
     check('exactly one underline active', checked == ['Log'],
           str(checked))
+    # GUI-6: a corner widget sits at the right end of the strip, after
+    # the tabs, and is not a tab
+    corner = tabs.add_corner(QPushButton('Copy'))
+    pump(30)
+    check('add_corner returns the widget and keeps it off the tab list',
+          corner.parentWidget() is tabs and 'Copy' not in tabs.names(),
+          str(tabs.names()))
+    right_of_tabs = all(corner.x() > b.x() + b.width() - 1
+                        for b, _w in tabs._tabs.values())
+    check('the corner widget is right of every tab', right_of_tabs,
+          f'{corner.x()} vs {[b.x() for b, _w in tabs._tabs.values()]}')
     tabs.close()
+
+
+def c6_collapsible():
+    print('\nC6: Collapsible (GUI-6)')
+    col = Collapsible('Step through', 'Exec 1 … 1000')
+    inner = col.add(QPushButton('+1'))
+    col.resize(260, 200)
+    col.show()
+    pump(30)
+    got = []
+    col.toggled.connect(got.append)
+    check('closed by default, body hidden, hint shown',
+          not col.is_open() and not inner.isVisibleTo(col)
+          and col.hint_text() == 'Exec 1 … 1000', col.hint_text())
+    QTest.mouseClick(col.header, Qt.LeftButton)
+    pump(20)
+    check('a header click opens it, emits toggled(True), hides the hint',
+          col.is_open() and inner.isVisibleTo(col) and got == [True]
+          and col.hint_text() == '', f'{got} {col.hint_text()!r}')
+    col.header.setFocus()
+    QTest.keyClick(col.header, Qt.Key_Space)
+    pump(20)
+    check('Space on the focused header closes it again',
+          not col.is_open() and got == [True, False], str(got))
+    col.set_open(True)
+    col.set_open(True)
+    check('set_open(True) opens it once (no repeat signal)',
+          col.is_open() and got == [True, False, True], str(got))
+    col.close()
 
 
 def c5_banner_handoff():
@@ -202,7 +247,7 @@ def c5_banner_handoff():
 
 def main():
     for fn in (c1_toggle, c2_tile, c3_treerow, c4_docktabs,
-               c5_banner_handoff):
+               c5_banner_handoff, c6_collapsible):
         fn()
     # components must not drag VTK or pyplot into the process
     bad = [m for m in sys.modules

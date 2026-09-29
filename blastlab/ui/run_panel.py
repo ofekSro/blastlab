@@ -1,29 +1,250 @@
-"""Run tab: start/stop controls, progress readouts, stepped execution,
-the scrolled log and the live view (2D slice in pyqtgraph | the 3D
-viewer host). A port of gui/run_panel.py; the controller feeds it
-through the same on_* methods."""
+"""02 Run (GUI-6, plan §6, boards Run / Run_Finished): three columns -
+the run controls (280 px) · the centre (progress strip, view toolbar,
+the live view, the dock) · the live gauges (340 px).
+
+It began as a port of gui/run_panel.py and the controller still feeds it
+through the same on_* methods; the public API of that one-column panel
+(signals, attributes, methods) is kept with its meaning unchanged, only
+where the widgets sit moved."""
 
 import os
 
 import numpy as np
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QHBoxLayout, QLabel,
-                               QLineEdit, QPlainTextEdit, QProgressBar,
-                               QSplitter, QStackedWidget, QVBoxLayout,
-                               QWidget)
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QIcon, QTextCursor
+from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
+                               QLabel, QLineEdit, QPlainTextEdit,
+                               QProgressBar, QPushButton, QSizePolicy,
+                               QStackedWidget, QVBoxLayout, QWidget)
 
 from ..core import refine
+from ..services.model_folder import folder_for
 from . import theme
-from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane
+from .components import Collapsible, DockTabs, StatTile, ToggleSwitch
+from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
-from .theme import GAP, PAD
-from .widgets import (Card, Chip, Segmented, WrapRow, button, hbox, label,
-                      set_button_kind)
+from .setup_strip import fmt_count
+from .setup_tree import _letter_space
+from .theme import GAP
+from .widgets import ScrollColumn, Segmented, set_button_kind
 
 #: the Runs folder's Browse button (the Tk folder icon says the same)
 BROWSE_TIP = ('Choose the Runs folder: the folder that holds one '
               'sub-folder per model.')
+
+#: the side columns (board Run lines 62 and 259). Each gives way down to
+#: its *_MIN only when the window cannot hold all three columns - the
+#: rule of the Setup tree (decision D19).
+CTRL_W, CTRL_MIN = 280, 248
+GAUGE_W, GAUGE_MIN = 340, 300
+#: the dock under the view (board line 246: 142 px with its 38 px tab
+#: strip). On a short window it gives way to DOCK_MIN (DOCK_FRACTION of
+#: the panel's height), so the view keeps its room.
+DOCK_H, DOCK_MIN, DOCK_FRACTION = 140, 110, 0.18
+#: the resolved model-folder line is recomputed this long after the last
+#: keystroke (it lists the Runs folder to match the model's spelling)
+PATH_DEBOUNCE_MS = 200
+#: shown in the path line while either box is blank
+PATH_BLANK = '<Runs folder>' + os.sep + '<Model>' + os.sep
+#: the progress strip goes onto two rows below this many px per tile
+#: (Progress keeps PROGRESS_MIN): measured against the widest readouts
+#: a run shows (`88,888 kPa`, `1,234,567` cells) in Space Grotesk 21 px
+TILE_MIN = 112
+PROGRESS_MIN = 220
+
+#: the chip keys the QA harness and the e2e suites read (chip_texts)
+CHIP_KEYS = ('step', 't [ms]', 'dt [s]', 'p max [kPa]', 'cells')
+
+
+def _two_state_icon(name, size, normal, disabled='muted'):
+    """A glyph icon tinted `normal`, `disabled` when the button is off
+    (theme.icon tints both states alike when a colour is forced)."""
+    ic = QIcon()
+    ic.addPixmap(theme.pixmap(name, size, color=normal), QIcon.Normal)
+    ic.addPixmap(theme.pixmap(name, size, color=disabled), QIcon.Disabled)
+    return ic
+
+
+class _StopButton(QPushButton):
+    """The board's Stop (Run line 85): a stop mark, `Stop` in the display
+    face and a mono `Shift+Esc` key cap - three labels inside one
+    QPushButton, so clicks, focus and the disabled state stay the
+    button's. `set_button_kind(.., 'danger')` still names it `danger`
+    (test_ui_run_panel U3); the `stop` property picks the board look."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setProperty('stop', True)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName('Stop')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(9)
+        self.mark = QLabel()
+        self.text_lbl = QLabel('Stop')
+        self.text_lbl.setObjectName('stoptext')
+        self.key = QLabel('Shift+Esc')
+        self.key.setObjectName('stopkey')
+        lay.addStretch(1)
+        for w in (self.mark, self.text_lbl, self.key):
+            w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            w.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lay.addWidget(w, 0, Qt.AlignVCenter)
+        lay.addStretch(1)
+        self.retint()
+
+    def retint(self, _mode=None):
+        self.mark.setPixmap(theme.pixmap('stop', 13, color='stop_text'))
+
+    def sizeHint(self):
+        return QSize(self.layout().sizeHint().width(), 48)
+
+    def minimumSizeHint(self):
+        return QSize(self.layout().minimumSize().width(), 48)
+
+
+class _SetupLink(QPushButton):
+    """`✓ Setup: Case OK · 368 k cells` at the foot of the controls (board
+    line 149): a flat button of labels; the verdict label is the panel's
+    `_valid_lbl`, whose pinned texts are unchanged."""
+
+    def __init__(self, valid_lbl, parent=None):
+        super().__init__(parent)
+        self.setObjectName('setuplink')
+        self.setCursor(Qt.PointingHandCursor)
+        self.setAccessibleName('Back to Setup')
+        self.setToolTip('Back to 01 Setup')
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(12, 0, 12, 0)
+        lay.setSpacing(6)
+        self.icon_lbl = QLabel()
+        self.prefix = QLabel('Setup:')
+        self.valid = valid_lbl
+        self.cells = QLabel('')
+        for w in (self.icon_lbl, self.prefix, self.valid, self.cells):
+            w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            lay.addWidget(w, 0, Qt.AlignVCenter)
+        lay.addSpacing(4)
+        lay.insertSpacing(1, 4)
+        lay.addStretch(1)
+
+    def sizeHint(self):
+        return QSize(self.layout().sizeHint().width(), 42)
+
+    def minimumSizeHint(self):
+        return QSize(self.layout().minimumSize().width(), 42)
+
+
+class _RunStrip(QFrame):
+    """The progress strip (board Run lines 157-181): the Progress tile
+    (`accent_bg`) and the TIME · STEP · P MAX (· CELLS) stat tiles. One
+    row when the centre holds it; otherwise Progress (and CELLS) on the
+    first row and the three readouts on the second - the D29 pattern."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('runstrip')
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(GAP)
+        self._row0 = QHBoxLayout()
+        self._row1 = QHBoxLayout()
+        for r in (self._row0, self._row1):
+            r.setContentsMargins(0, 0, 0, 0)
+            r.setSpacing(GAP)
+            outer.addLayout(r)
+
+        # ── the Progress tile ────────────────────────────────────────────
+        self.progress_tile = QFrame()
+        self.progress_tile.setObjectName('tile')
+        self.progress_tile.setProperty('variant', 'accent')
+        pl = QVBoxLayout(self.progress_tile)
+        pl.setContentsMargins(14, 10, 14, 10)
+        pl.setSpacing(6)
+        head = QHBoxLayout()
+        head.setContentsMargins(0, 0, 0, 0)
+        head.setSpacing(10)
+        self.caps = QLabel('PROGRESS')
+        self.caps.setObjectName('progresscaps')
+        _letter_space(self.caps)
+        head.addWidget(self.caps, 0, Qt.AlignBaseline)
+        head.addStretch(1)
+        self.paused_lbl = QLabel('')
+        self.paused_lbl.setObjectName('pausedlbl')
+        head.addWidget(self.paused_lbl, 0, Qt.AlignBaseline)
+        pl.addLayout(head)
+        self.progress = QProgressBar()
+        self.progress.setObjectName('runbar')
+        self.progress.setRange(0, 1000)
+        self.progress.setValue(0)
+        self.progress.setTextVisible(False)
+        self.progress.setFixedHeight(6)
+        pl.addWidget(self.progress)
+        self.progress_tile.setMinimumWidth(PROGRESS_MIN)
+
+        # ── the stat tiles ───────────────────────────────────────────────
+        self.tiles = {}
+        for key, title, cap in (('time', 'Time', 'simulated'),
+                                ('step', 'Step', 'dt — s'),
+                                ('pmax', 'P max', 'in the field now'),
+                                ('cells', 'Cells', 'AMR mesh, live plane')):
+            t = StatTile(title)
+            t.caption.setText(cap)
+            for lbl in (t.value, t.caption):
+                # a long readout elides rather than hold the strip wide
+                lbl.setMinimumWidth(0)
+                lbl.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+            self.tiles[key] = t
+        self._rows = None
+        self.arrange(force=True)
+
+    def _shown_tiles(self):
+        return [self.tiles[k] for k in ('time', 'step', 'pmax', 'cells')
+                if not self.tiles[k].isHidden()]
+
+    def _one_row_fits(self, width):
+        n = len(self._shown_tiles())
+        return PROGRESS_MIN + n * (TILE_MIN + GAP) <= width
+
+    def rows(self):
+        """1 or 2 (tests, the viewer sampler)."""
+        return self._rows
+
+    def arrange(self, force=False):
+        width = self.contentsRect().width() or 10 ** 6
+        rows = 1 if self._one_row_fits(width) else 2
+        if rows == self._rows and not force:
+            return
+        self._rows = rows
+        hidden = {id(w): w.isHidden() for w in
+                  [self.progress_tile, *self.tiles.values()]}
+        for lay in (self._row0, self._row1):
+            while lay.count():
+                lay.takeAt(0)
+        t = self.tiles
+        if rows == 1:
+            self._row0.addWidget(self.progress_tile, 23)
+            for k in ('time', 'step', 'pmax', 'cells'):
+                self._row0.addWidget(t[k], 10)
+        else:
+            # Progress (and the AMR cells) on top, the readouts below
+            self._row0.addWidget(self.progress_tile, 23)
+            self._row0.addWidget(t['cells'], 10)
+            for k in ('time', 'step', 'pmax'):
+                self._row1.addWidget(t[k], 10)
+        for w in [self.progress_tile, *self.tiles.values()]:
+            w.setVisible(not hidden[id(w)])
+        self.updateGeometry()
+
+    def minimumSizeHint(self):
+        # never hold the centre wide: arrange() wraps as the width drops
+        hint = super().minimumSizeHint()
+        return QSize(PROGRESS_MIN, hint.height())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.arrange()
 
 
 class RunPanel(QWidget):
@@ -38,12 +259,8 @@ class RunPanel(QWidget):
     gauges_wanted = Signal(bool)
     #: the Runs folder box was edited or browsed (saved to settings)
     runs_dir_changed = Signal()
-
-    #: share of the Run-tab width given to the log; the live/3D pane
-    #: keeps the rest (>= 60 %, the QA-17 target)
-    LOG_FRAC = 0.34
-    LOG_MIN = 240
-    VIEW_MIN = 420
+    #: the Setup link at the foot of the controls was clicked
+    setup_requested = Signal()
 
     #: a dynamic-AMR run logs one of these per written time - 60+ lines
     #: for half a millisecond of simulation, which buried every other
@@ -55,219 +272,16 @@ class RunPanel(QWidget):
     def __init__(self, view3d_host=None, parent=None):
         super().__init__(parent)
         self.view3d = view3d_host
-        root = QVBoxLayout(self)
-        root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(PAD - 4)
-        root.addWidget(label('Run', 'h1'))
-
-        # ── control card ─────────────────────────────────────────────────
-        ctl = Card()
-        root.addWidget(ctl)
-        bar = hbox()
-        ctl.add_layout(bar)
-        self.run_btn = button('Run', 'play', 'primary', width=110, height=38,
-                              on_click=self.run_requested.emit)
-        self.stop_btn = button('Stop', 'stop', 'default', width=100,
-                               height=38, on_click=self.stop_requested.emit)
-        self.stop_btn.setEnabled(False)
-        self.view3d_btn = button('3D View', 'cube', 'default', width=110,
-                                 height=38,
-                                 on_click=self.view3d_requested.emit)
-        self.view3d_btn.setEnabled(False)
-        for b in (self.run_btn, self.stop_btn, self.view3d_btn):
-            bar.addWidget(b)
-        bar.addSpacing(PAD - GAP)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 1000)
-        self.progress.setValue(0)
-        self.progress.setTextVisible(False)
-        self.progress.setMinimumWidth(120)
-        self.progress.setFixedHeight(8)
-        # takes the slack so the readouts on the right keep their width
-        bar.addWidget(self.progress, 1)
-        # stepped execution used to be visible only as a "[interrupted]"
-        # line in the log; say it where the run state is read
-        self._paused_lbl = label('', 'small')
-        self._paused_lbl.setStyleSheet(f'color: {theme.cur("warn")};')
-        bar.addWidget(self._paused_lbl)
-        # the Setup strip is on another tab, so the Run tab used to give
-        # no hint that the case was invalid until a modal appeared
-        self._valid_lbl = label('', 'small')
-        bar.addWidget(self._valid_lbl)
-        bar.addSpacing(PAD - GAP)
-        self._chip_step = Chip('step')
-        self._chip_t = Chip('t [ms]')
-        self._chip_dt = Chip('dt [s]')
-        # kPa like every plot and colorbar (the chip used to be the one
-        # readout in Pa, a 1000x mismatch against the live view beside it)
-        self._chip_pmax = Chip('p max [kPa]')
-        # dynamic AMR moves the cell count every write; it was only ever
-        # visible as a log line (QA-32). Shown on the first frame that
-        # carries a level map, so a static run keeps its four chips.
-        self._chip_cells = Chip('cells')
-        self._chip_cells.setToolTip('Cells of the dynamic (AMR) mesh on the '
-                                    'live plane - a 3D run counts the slice, '
-                                    'not the whole mesh.')
-        self._chip_cells.hide()
-        # the chips share this row with Run / Stop / 3D View / Name /
-        # validation, and at 1100 px there is not enough for all of it:
-        # 'p max [kPa]' came out 20 px short of its own caption. Let the
-        # chips wrap rather than squeeze.
-        self.chip_row = WrapRow()
-        for chip in (self._chip_step, self._chip_t, self._chip_dt,
-                     self._chip_pmax):
-            self.chip_row.add(chip)
-        # the AMR chip stays hidden until a frame carries a level map
-        self.chip_row.add(self._chip_cells, hidden=True)
-        bar.addWidget(self.chip_row, 1)
-
-        # ── the model folder (OUT-1): <Runs folder>\<Model>\ receives
-        # every file of a run; both boxes are required before Run ──────
-        mbar = hbox()
-        ctl.add_layout(mbar)
-        mbar.addWidget(label('Runs folder', 'muted'))
-        self.runs_dir = QLineEdit()
-        self.runs_dir.setMinimumWidth(220)
-        self.runs_dir.setPlaceholderText(r'e.g. C:\Users\me\BLASTLAB_RUNS')
-        self.runs_dir.setToolTip(
-            'Required. The folder that holds one sub-folder per model; a '
-            'run writes every file it produces into <Runs folder>\\<Model>. '
-            'Remembered between sessions.')
-        self.runs_dir.editingFinished.connect(self.runs_dir_changed.emit)
-        mbar.addWidget(self.runs_dir, 1)
-        self.runs_browse = button('Browse…', 'folder', height=30,
-                                  on_click=self._browse_runs_dir)
-        self.runs_browse.setToolTip(BROWSE_TIP)
-        mbar.addWidget(self.runs_browse)
-        mbar.addSpacing(PAD - GAP)
-        # results used to be labelled by dim + a counter only, so three
-        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
-        mbar.addWidget(label('Model', 'muted'))
-        self.run_name = QLineEdit()
-        self.run_name.setFixedWidth(180)
-        self.run_name.setPlaceholderText('MODEL')
-        self.run_name.setToolTip(
-            'Required. The model folder <Runs folder>\\<Model> that '
-            'receives every file of this run (a valid Windows folder name, '
-            'at most 100 characters). It also names the run in the Results '
-            'picker.')
-        mbar.addWidget(self.run_name)
-
-        # ── stepped execution row (VIPER-style) ──────────────────────────
-        ebar = hbox()
-        ctl.add_layout(ebar)
-        # no fixed widths, and a row that wraps: 'Exec 1000' does not fit
-        # 72 px and 'Interrupt' does not fit 88 with its icon, so these
-        # read 'ec 100' and 'Interrup' on screen. Same defect as the
-        # Results export row (N2-10); same cure.
-        self.exec_row = WrapRow()
-        self.init_btn = self.exec_row.add(
-            button('Initialise Model', 'flag', height=32,
-                   on_click=self.init_requested.emit))
-        self._exec_btns = []
-
-        def exec_btn(text, cmd, icon=None):
-            b = self.exec_row.add(
-                button(text, icon, height=32,
-                       on_click=lambda c=cmd: self.exec_requested.emit(c)))
-            b.setEnabled(False)
-            self._exec_btns.append(b)
-            return b
-
-        for n in (1, 10, 100, 1000):
-            exec_btn(f'Exec {n}', n)
-        exec_btn('END', 'run', icon='end')
-        exec_btn('Interrupt', 'pause', icon='pause')
-        ebar.addWidget(self.exec_row, 1)
-        # live-view refresh rate (2D slice + 3D view); blank = automatic
-        ebar.addWidget(label('Refresh every', 'muted'))
-        self.refresh_val = QLineEdit()
-        self.refresh_val.setFixedWidth(64)
-        self.refresh_val.setToolTip('How often the live view redraws; '
-                                    'leave blank (or 0) for automatic.')
-        self.refresh_val.editingFinished.connect(self.refresh_changed.emit)
-        ebar.addWidget(self.refresh_val)
-        self.refresh_mode = QComboBox()
-        self.refresh_mode.addItems(['seconds', 'steps'])
-        self.refresh_mode.setFixedWidth(104)
-        self.refresh_mode.currentTextChanged.connect(
-            lambda _t: self.refresh_changed.emit())
-        ebar.addWidget(self.refresh_mode)
-
-        # ── body: log | live view ────────────────────────────────────────
-        self._body = QSplitter(Qt.Horizontal)
-        self._body.setChildrenCollapsible(False)
-        root.addWidget(self._body, 1)
-        logcard = Card('Log', pad=12)
-        logcard.setMinimumWidth(self.LOG_MIN)
-        self.log = QPlainTextEdit()
-        self.log.setObjectName('log')
-        self.log.setReadOnly(True)
-        self.log.setFont(theme.font('mono'))
-        self.log.setLineWrapMode(QPlainTextEdit.WidgetWidth)
-        self.log.setMaximumBlockCount(50000)
-        logcard.add(self.log, 1)
-        self._body.addWidget(logcard)
-
-        right = Card(pad=12)
-        right.setMinimumWidth(self.VIEW_MIN)
-        # this row carries the view switch, Show mesh and the whole
-        # Min/Max colour range, which does not fit the live-view card at
-        # 1100 px: 'Show mesh' came out 5 px short of its own caption.
-        # WrapRow breaks it instead of squeezing, and each caption stays
-        # glued to its field.
-        self.view_row = WrapRow()
-        right.add(self.view_row)
-        self._view_seg = Segmented(['Live slice', 'Gauges', '3D view'])
-        self._view_seg.setFixedWidth(300)
-        self._view_seg.changed.connect(self._view_selected)
-        self.view_row.add(self._view_seg)
-        # cell edges over the live slice (true cells of a refined run)
-        self.show_mesh = QCheckBox('Show mesh')
-        self.show_mesh.toggled.connect(lambda _c: self._rebuild_overlay())
-        self.view_row.add(self.show_mesh)
-        # manual colour range for the 2D live pane, mirroring the 3D
-        # viewer's Min/Max: a late weak frame used to rescale the whole
-        # picture, so nothing could be compared across a run (G7)
-        self.auto_clim = QCheckBox('Auto')
-        self.auto_clim.setChecked(True)
-        self.auto_clim.toggled.connect(lambda _c: self._clim_changed())
-        self.view_row.add(self.auto_clim)
-        self.clim_min = QLineEdit('0')
-        self.clim_max = QLineEdit('')
-        self._clim_entries = [self.clim_min, self.clim_max]
-        for lbl, ent, tail in (('Min', self.clim_min, None),
-                               ('Max', self.clim_max, 'kPa')):
-            ent.setFixedWidth(64)
-            ent.setFont(theme.font('small'))
-            ent.editingFinished.connect(self._clim_changed)
-            pair = QWidget()
-            pl = hbox(pair)
-            pl.addWidget(label(lbl, 'small'))
-            pl.addWidget(ent)
-            if tail:
-                pl.addWidget(label(tail, 'small'))
-            self.view_row.add(pair)
-        self._sync_clim_state()
-        self._stack = QStackedWidget()
-        right.add(self._stack, 1)
-        self.pane = LiveSlicePane()
-        self._stack.addWidget(self.pane)
-        self.gauges = LiveGaugePane()
-        self._stack.addWidget(self.gauges)
-        if self.view3d is None:
-            self.view3d = _NoViewer()
-        self._stack.addWidget(self.view3d)
-        self._view_seg.set('Live slice')
-        self._stack.setCurrentWidget(self.pane)
-        self._body.addWidget(right)
-        self._body.setStretchFactor(0, 34)
-        self._body.setStretchFactor(1, 66)
+        body = QHBoxLayout(self)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(GAP)
+        self._ctrl = self._build_controls()
+        body.addWidget(self._ctrl)
+        self._centre = self._build_centre()
+        body.addWidget(self._centre, 1)
+        self._gauge_col = self._build_gauge_column()
+        body.addWidget(self._gauge_col)
         self._set_tab_order()
-        self._sash_user = False
-        self._sash_placed = False
-        self._body.splitterMoved.connect(lambda *_: setattr(
-            self, '_sash_user', True))
 
         self._solid = None
         self._mesh_geom = None      # (x_face, y_face, mesh_src) of the run
@@ -283,7 +297,452 @@ class RunPanel(QWidget):
         self._busy = False          # a non-solve job (HD 1.3) is working
         self._bar_value = 0         # the bar's value before it went busy
         self._case_ok = True        # latest validation verdict (Setup tab)
+        self._n_cells = None        # cells of the latest validation report
+        self._run_again = False     # a run has finished this session
+        self._dim = 2
         self._shape = None
+        self._readout = dict.fromkeys(CHIP_KEYS, '—')
+        self._reset_readouts_text()
+        self._sync_run_text()
+        self._sync_clim_state()
+        self._update_path()
+        theme.signals.changed.connect(self._retheme)
+        self._retheme()
+
+    # ── the controls column (board lines 62-153) ─────────────────────────
+    def _build_controls(self):
+        frame = QFrame()
+        frame.setObjectName('runctl')
+        frame.setFixedWidth(CTRL_W)
+        fl = QVBoxLayout(frame)
+        fl.setContentsMargins(1, 1, 1, 1)
+        fl.setSpacing(0)
+        col = ScrollColumn(spacing=18)
+        # 14 + 12: the Live view card's refresh row (label, box, unit)
+        # needs 238 px, and the vertical scroll bar takes 10 of the
+        # column's 278 once Step through is open (measured)
+        col.layout_.setContentsMargins(14, 15, 12, 15)
+        self._ctrl_scroll = col
+        fl.addWidget(col)
+
+        # ── where the files go (OUT-1: <Runs folder>\<Model>\ receives
+        # every file of a run; both boxes are required before Run) ──────
+        files = QWidget()
+        wl = QVBoxLayout(files)
+        wl.setContentsMargins(0, 0, 0, 0)
+        wl.setSpacing(5)
+        caps = QLabel('WHERE THE FILES GO')
+        caps.setObjectName('eyebrow')
+        _letter_space(caps)
+        wl.addWidget(caps)
+        wl.addSpacing(5)
+        wl.addWidget(self._field_label('Runs folder'))
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        self.runs_dir = QLineEdit()
+        self.runs_dir.setObjectName('runbox')
+        self.runs_dir.setMinimumWidth(0)
+        self.runs_dir.setPlaceholderText(r'e.g. C:\Users\me\BLASTLAB_RUNS')
+        self.runs_dir.setToolTip(
+            'Required. The folder that holds one sub-folder per model; a '
+            'run writes every file it produces into <Runs folder>\\<Model>. '
+            'Remembered between sessions.')
+        self.runs_dir.editingFinished.connect(self.runs_dir_changed.emit)
+        row.addWidget(self.runs_dir, 1)
+        self.runs_browse = QPushButton('')
+        self.runs_browse.setObjectName('squarebtn')
+        self.runs_browse.setFixedSize(34, 34)
+        self.runs_browse.setCursor(Qt.PointingHandCursor)
+        self.runs_browse.setAccessibleName('Browse for the Runs folder')
+        self.runs_browse.setToolTip(BROWSE_TIP)
+        self.runs_browse.clicked.connect(lambda *_: self._browse_runs_dir())
+        row.addWidget(self.runs_browse)
+        wl.addLayout(row)
+        wl.addSpacing(5)
+        wl.addWidget(self._field_label('Model'))
+        # results used to be labelled by dim + a counter only, so three
+        # runs of different cases read "Run 1 - 2D", "Run 2 - 2D" ... (N9)
+        self.run_name = QLineEdit()
+        self.run_name.setObjectName('runbox')
+        self.run_name.setMinimumWidth(0)
+        self.run_name.setPlaceholderText('MODEL')
+        self.run_name.setToolTip(
+            'Required. The model folder <Runs folder>\\<Model> that '
+            'receives every file of this run (a valid Windows folder name, '
+            'at most 100 characters). It also names the run in the Results '
+            'picker.')
+        wl.addWidget(self.run_name)
+        wl.addSpacing(5)
+        # the resolved folder, display only (board line 77-80)
+        prow = QHBoxLayout()
+        prow.setContentsMargins(0, 0, 0, 0)
+        prow.setSpacing(6)
+        self._path_mark = QLabel()
+        prow.addWidget(self._path_mark, 0, Qt.AlignTop)
+        self._path_lbl = QLabel('')
+        self._path_lbl.setObjectName('runpath')
+        self._path_lbl.setWordWrap(True)
+        self._path_lbl.setMinimumWidth(0)
+        self._path_lbl.setSizePolicy(QSizePolicy.Ignored,
+                                     QSizePolicy.Preferred)
+        self._path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        prow.addWidget(self._path_lbl, 1)
+        wl.addLayout(prow)
+        self._path_text = PATH_BLANK
+        self._path_timer = QTimer(self)
+        self._path_timer.setSingleShot(True)
+        self._path_timer.setInterval(PATH_DEBOUNCE_MS)
+        self._path_timer.timeout.connect(self._update_path)
+        for box in (self.runs_dir, self.run_name):
+            box.textChanged.connect(lambda _t: self._path_timer.start())
+        col.add(files)
+
+        # ── Stop / Run and the 3D square (board lines 83-98) ────────────
+        act = QWidget()
+        al = QHBoxLayout(act)
+        al.setContentsMargins(0, 0, 0, 0)
+        al.setSpacing(8)
+        self.stop_btn = _StopButton()
+        self.stop_btn.setToolTip('Stop the run (Shift+Esc)')
+        self.stop_btn.clicked.connect(lambda *_: self.stop_requested.emit())
+        self.stop_btn.setEnabled(False)
+        self.stop_btn.setVisible(False)
+        al.addWidget(self.stop_btn, 1)
+        self.run_btn = QPushButton('Run')
+        self.run_btn.setObjectName('runbig')
+        self.run_btn.setProperty('runtab', True)
+        self.run_btn.setCursor(Qt.PointingHandCursor)
+        self.run_btn.setIconSize(QSize(14, 14))
+        self.run_btn.setToolTip('Run the case (F5)')
+        self.run_btn.clicked.connect(lambda *_: self.run_requested.emit())
+        al.addWidget(self.run_btn, 1)
+        self.view3d_btn = QPushButton('')
+        self.view3d_btn.setObjectName('run3d')
+        self.view3d_btn.setFixedWidth(56)
+        self.view3d_btn.setIconSize(QSize(19, 19))
+        self.view3d_btn.setCursor(Qt.PointingHandCursor)
+        self.view3d_btn.setAccessibleName('Open the 3D view')
+        self.view3d_btn.setToolTip('Open the 3D view')
+        self.view3d_btn.clicked.connect(
+            lambda *_: self.view3d_requested.emit())
+        self.view3d_btn.setEnabled(False)
+        al.addWidget(self.view3d_btn)
+        col.add(act)
+
+        # ── Step through: today's Exec row, collapsed (board 100-122) ───
+        self.step_card = Collapsible('Step through', 'Exec 1 … 1000')
+        cap = QLabel('Initialise, then advance the solver a few steps at '
+                     'a time.')
+        cap.setObjectName('runhint')
+        cap.setWordWrap(True)
+        self.step_card.add(cap)
+        self.init_btn = QPushButton('Initialise model')
+        self.init_btn.setObjectName('runquiet')
+        self.init_btn.setCursor(Qt.PointingHandCursor)
+        self.init_btn.setToolTip('Start the run held at step 0, so the '
+                                 'initial field is visible; the buttons '
+                                 'below advance it')
+        self.init_btn.clicked.connect(lambda *_: self.init_requested.emit())
+        self.step_card.add(self.init_btn)
+        self._exec_btns = []
+
+        def exec_btn(text, cmd, mono):
+            b = QPushButton(text)
+            b.setObjectName('execbtn')
+            b.setProperty('mono', bool(mono))
+            b.setCursor(Qt.PointingHandCursor)
+            b.setMinimumWidth(0)
+            b.clicked.connect(lambda *_, c=cmd: self.exec_requested.emit(c))
+            b.setEnabled(False)
+            self._exec_btns.append(b)
+            return b
+
+        grid = QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(6)
+        for i, n in enumerate((1, 10, 100, 1000)):
+            grid.addWidget(exec_btn(f'+{n}', n, True), 0, i)
+            grid.setColumnStretch(i, 1)
+        self.step_card.add_layout(grid)
+        pair = QHBoxLayout()
+        pair.setContentsMargins(0, 0, 0, 0)
+        pair.setSpacing(6)
+        pair.addWidget(exec_btn('To the end', 'run', False), 1)
+        pair.addWidget(exec_btn('Pause', 'pause', False), 1)
+        self.step_card.add_layout(pair)
+        self._exec_btns[4].setToolTip('Run on to the end')
+        self._exec_btns[5].setToolTip('Hold the run at the current step')
+        col.add(self.step_card)
+
+        # ── Live view (board lines 124-146) ─────────────────────────────
+        self.live_card = QFrame()
+        self.live_card.setObjectName('runcard')
+        ll = QVBoxLayout(self.live_card)
+        ll.setContentsMargins(12, 12, 12, 12)
+        ll.setSpacing(12)
+        title = QLabel('Live view')
+        title.setObjectName('runcardtitle')
+        ll.addWidget(title)
+        rrow = QHBoxLayout()
+        rrow.setContentsMargins(0, 0, 0, 0)
+        rrow.setSpacing(6)
+        rlbl = self._field_label('Refresh every', wrap=True)
+        rrow.addWidget(rlbl, 1)
+        # live-view refresh rate (2D slice + 3D view); blank = automatic
+        self.refresh_val = QLineEdit()
+        self.refresh_val.setObjectName('runsmall')
+        self.refresh_val.setPlaceholderText('auto')
+        self.refresh_val.setMinimumWidth(40)
+        self.refresh_val.setMaximumWidth(60)
+        self.refresh_val.setToolTip('How often the live view redraws; '
+                                    'leave blank (or 0) for automatic.')
+        self.refresh_val.editingFinished.connect(self.refresh_changed.emit)
+        rrow.addWidget(self.refresh_val)
+        self.refresh_mode = QComboBox()
+        self.refresh_mode.setObjectName('runsmall')
+        self.refresh_mode.addItems(['seconds', 'steps'])
+        self.refresh_mode.setAccessibleName('Refresh unit')
+        self.refresh_mode.currentTextChanged.connect(
+            lambda _t: self.refresh_changed.emit())
+        rrow.addWidget(self.refresh_mode)
+        ll.addLayout(rrow)
+        arow = QHBoxLayout()
+        arow.setContentsMargins(0, 0, 0, 0)
+        arow.setSpacing(10)
+        arow.addWidget(self._field_label('Colour range: auto', wrap=True), 1)
+        # manual colour range for the 2D live pane, mirroring the 3D
+        # viewer's Min/Max: a late weak frame used to rescale the whole
+        # picture, so nothing could be compared across a run (G7)
+        self.auto_clim = ToggleSwitch()
+        self.auto_clim.setAccessibleName('Automatic colour range')
+        self.auto_clim.setChecked(True)
+        self.auto_clim.toggled.connect(lambda _c: self._clim_changed())
+        arow.addWidget(self.auto_clim)
+        ll.addLayout(arow)
+        # Min / Max [kPa] only while the switch is off (plan §6)
+        self.clim_row = QWidget()
+        cl = QHBoxLayout(self.clim_row)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(6)
+        self.clim_min = QLineEdit('0')
+        self.clim_max = QLineEdit('')
+        self._clim_entries = [self.clim_min, self.clim_max]
+        for text, ent in (('Min', self.clim_min), ('Max', self.clim_max)):
+            ent.setObjectName('runsmall')
+            ent.setMinimumWidth(44)
+            ent.editingFinished.connect(self._clim_changed)
+            lbl = QLabel(text)
+            lbl.setObjectName('runhint')
+            cl.addWidget(lbl)
+            cl.addWidget(ent, 1)
+        unit = QLabel('kPa')
+        unit.setObjectName('rununit')
+        cl.addWidget(unit)
+        ll.addWidget(self.clim_row)
+        col.add(self.live_card)
+
+        col.add_stretch()
+        # ── the way back to Setup (board line 149) ──────────────────────
+        # the Setup strip is on another screen, so the Run screen used to
+        # give no hint that the case was invalid until a modal appeared
+        self._valid_lbl = QLabel('')
+        self.setup_link = _SetupLink(self._valid_lbl)
+        self.setup_link.clicked.connect(
+            lambda *_: self.setup_requested.emit())
+        col.add(self.setup_link)
+        return frame
+
+    @staticmethod
+    def _field_label(text, wrap=False):
+        lbl = QLabel(text)
+        lbl.setObjectName('runfield')
+        # a row caption may wrap rather than hold the column wide
+        lbl.setWordWrap(wrap)
+        return lbl
+
+    # ── the centre column (board lines 155-257) ──────────────────────────
+    def _build_centre(self):
+        centre = QWidget()
+        centre.setMinimumWidth(0)
+        cl = QVBoxLayout(centre)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(GAP)
+        # GUI-9 puts the chain's stage strip here (board Run_Chain lines
+        # 60-70); hidden and empty until then
+        self.chain_slot = QWidget()
+        self.chain_slot.setObjectName('chainslot')
+        csl = QHBoxLayout(self.chain_slot)
+        csl.setContentsMargins(0, 0, 0, 0)
+        self.chain_slot.setVisible(False)
+        cl.addWidget(self.chain_slot)
+
+        self.strip = _RunStrip()
+        self.progress = self.strip.progress
+        # stepped execution used to be visible only as a "[interrupted]"
+        # line in the log; say it where the run state is read
+        self._paused_lbl = self.strip.paused_lbl
+        t = self.strip.tiles
+        self._tile_time, self._tile_step = t['time'], t['step']
+        self._tile_pmax, self._tile_cells = t['pmax'], t['cells']
+        # dynamic AMR moves the cell count every write; it was only ever
+        # visible as a log line (QA-32). Shown on the first frame that
+        # carries a level map, so a static run keeps three readouts.
+        self._tile_cells.setToolTip('Cells of the dynamic (AMR) mesh on the '
+                                    'live plane - a 3D run counts the '
+                                    'slice, not the whole mesh.')
+        self._tile_cells.hide()
+        self.strip.arrange(force=True)
+        cl.addWidget(self.strip)
+
+        # the view toolbar: a row ABOVE the view, not floated over it -
+        # the native 3D child window paints over any Qt sibling laid on
+        # top of it (CLAUDE.md 8.7)
+        bar = QHBoxLayout()
+        bar.setContentsMargins(0, 0, 0, 0)
+        bar.setSpacing(GAP)
+        segframe = QFrame()
+        segframe.setObjectName('runseg')
+        sl = QHBoxLayout(segframe)
+        sl.setContentsMargins(3, 3, 3, 3)
+        sl.setSpacing(0)
+        self._view_seg = Segmented(['Live slice', 'Gauges', '3D view'],
+                                   height=28, small=True)
+        self._view_seg.changed.connect(self._view_selected)
+        sl.addWidget(self._view_seg)
+        bar.addWidget(segframe)
+        bar.addStretch(1)
+        # cell edges over the live slice (true cells of a refined run)
+        self.show_mesh = QPushButton('Show mesh')
+        self.show_mesh.setObjectName('viewtool')
+        self.show_mesh.setCheckable(True)
+        self.show_mesh.setCursor(Qt.PointingHandCursor)
+        self.show_mesh.setToolTip('Draw the cell edges over the live slice')
+        self.show_mesh.toggled.connect(lambda _c: self._rebuild_overlay())
+        bar.addWidget(self.show_mesh, 0, Qt.AlignVCenter)
+        cl.addLayout(bar)
+
+        view = QFrame()
+        view.setObjectName('runview')
+        vl = QVBoxLayout(view)
+        vl.setContentsMargins(8, 8, 8, 8)
+        vl.setSpacing(0)
+        self._stack = QStackedWidget()
+        vl.addWidget(self._stack, 1)
+        self.pane = LiveSlicePane()
+        self._stack.addWidget(self.pane)
+        self.gauges = LiveGaugePane()
+        self._stack.addWidget(self.gauges)
+        if self.view3d is None:
+            self.view3d = _NoViewer()
+        self._stack.addWidget(self.view3d)
+        self._view_seg.set('Live slice')
+        self._stack.setCurrentWidget(self.pane)
+        self._view_frame = view
+        cl.addWidget(view, 1)
+
+        # the dock: the run log (T4 adds Messages and Earlier runs)
+        self.dock_frame = QFrame()
+        self.dock_frame.setObjectName('rundock')
+        self.dock_frame.setFixedHeight(DOCK_H)
+        dl = QVBoxLayout(self.dock_frame)
+        dl.setContentsMargins(1, 0, 1, 1)
+        dl.setSpacing(0)
+        self.dock = DockTabs()
+        rule = QFrame()
+        rule.setObjectName('dockrule')
+        rule.setFixedHeight(1)
+        self.dock.layout().insertWidget(1, rule)
+        dl.addWidget(self.dock)
+        self.log = QPlainTextEdit()
+        self.log.setObjectName('log')
+        self.log.setReadOnly(True)
+        self.log.setFont(theme.font('mono'))
+        self.log.setLineWrapMode(QPlainTextEdit.WidgetWidth)
+        self.log.setMaximumBlockCount(50000)
+        self.dock.add('Log', self.log)
+        cl.addWidget(self.dock_frame)
+        return centre
+
+    # ── the live-gauge column (board lines 259-335; the list is 6b) ─────
+    def _build_gauge_column(self):
+        frame = QFrame()
+        frame.setObjectName('rungauges')
+        frame.setFixedWidth(GAUGE_W)
+        gl = QVBoxLayout(frame)
+        gl.setContentsMargins(18, 16, 18, 16)
+        gl.setSpacing(4)
+        caps = QLabel('LIVE GAUGES')
+        caps.setObjectName('eyebrow')
+        _letter_space(caps)
+        gl.addWidget(caps)
+        self._gauge_note = QLabel(
+            'The live list of gauges, sorted by Z, arrives with the next '
+            'build (GUI-6b). Until then, choose Gauges above the view to '
+            'watch every trace while the run goes.')
+        self._gauge_note.setObjectName('gaugenote')
+        self._gauge_note.setWordWrap(True)
+        gl.addWidget(self._gauge_note)
+        gl.addStretch(1)
+        return frame
+
+    # ── layout: column widths and the dock height ────────────────────────
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit()
+
+    def _fit(self):
+        self._fit_columns()
+        self._fit_dock()
+
+    def _fit_columns(self):
+        """280 / centre / 340, the side columns giving way (controls to
+        248, gauges to 300, in proportion) only when the window cannot
+        hold the centre's minimum between them."""
+        w = self.width()
+        if w <= 1:
+            return
+        centre_min = self._centre.minimumSizeHint().width()
+        short = CTRL_W + GAUGE_W + 2 * GAP + centre_min - w
+        ctrl, gauge = CTRL_W, GAUGE_W
+        if short > 0:
+            room_c, room_g = CTRL_W - CTRL_MIN, GAUGE_W - GAUGE_MIN
+            take_c = min(room_c, round(short * room_c / (room_c + room_g)))
+            take_g = min(room_g, short - take_c)
+            ctrl, gauge = CTRL_W - take_c, GAUGE_W - take_g
+        if self._ctrl.width() != ctrl or self._ctrl.minimumWidth() != ctrl:
+            self._ctrl.setFixedWidth(ctrl)
+        if self._gauge_col.width() != gauge \
+                or self._gauge_col.minimumWidth() != gauge:
+            self._gauge_col.setFixedWidth(gauge)
+
+    def _fit_dock(self):
+        h = self.height()
+        if h <= 1:
+            return
+        want = max(DOCK_MIN, min(DOCK_H, int(h * DOCK_FRACTION)))
+        if self.dock_frame.height() != want \
+                or self.dock_frame.minimumHeight() != want:
+            self.dock_frame.setFixedHeight(want)
+
+    def column_widths(self):
+        """(controls, centre, gauges) in px, as laid out (tests)."""
+        return (self._ctrl.width(), self._centre.width(),
+                self._gauge_col.width())
+
+    # ── theme ────────────────────────────────────────────────────────────
+    def _retheme(self, _mode=None):
+        self.runs_browse.setIcon(theme.icon('folder', 15, color='text2'))
+        self.run_btn.setIcon(_two_state_icon('play', 14, 'on_accent'))
+        self.view3d_btn.setIcon(_two_state_icon('cube', 19, 'text2'))
+        self.stop_btn.retint()
+        self._path_mark.setPixmap(theme.pixmap('chevron_right', 13,
+                                               color='faint'))
+        self._style_setup_link()
 
     # ── run name ─────────────────────────────────────────────────────────
     def set_run_name(self, name, replace=False):
@@ -309,40 +768,56 @@ class RunPanel(QWidget):
             self.runs_dir.setText(os.path.normpath(path))
             self.runs_dir_changed.emit()
 
+    def _update_path(self):
+        """The resolved model folder under the boxes (display only; the
+        Run pre-flight `MainWindow._model_target` is what decides)."""
+        runs, model = self.current_runs_dir(), self.current_run_name()
+        if runs and model:
+            text = folder_for(runs, model).rstrip('\\/') + os.sep
+        else:
+            text = PATH_BLANK
+        self._path_text = text
+        # break after the separators, so a long path wraps in the column
+        self._path_lbl.setText(text.replace(os.sep, os.sep + '\u200b'))
+        self._path_lbl.setToolTip(text)
+
+    def path_text(self):
+        """The resolved-folder line as the user reads it (tests)."""
+        return self._path_text
+
     # ── readouts, for the QA harness and the e2e suites ──────────────────
     def chip_texts(self):
-        """The stat chips as {label: value}, so a test reads what the
-        user reads instead of walking widgets."""
-        return {c.caption: c.value.text() for c in
-                (self._chip_step, self._chip_t, self._chip_dt,
-                 self._chip_pmax, self._chip_cells)}
+        """The readouts as {key: value} - the same five keys and value
+        strings the stat chips had ('1234', '1.500', '2.50e-07',
+        '345.7', '14'), so a test reads what the user reads instead of
+        walking widgets."""
+        return dict(self._readout)
 
     def paused_text(self):
         """What the run state says about a stepped run being held."""
         return self._paused_lbl.text()
 
-    # ── body sash ────────────────────────────────────────────────────────
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._place_sash()
+    def _render_readouts(self):
+        """The tiles from `_readout`: the value with its unit after it in
+        a smaller muted face (board lines 168, 178), dt in STEP's
+        caption."""
+        r = self._readout
+        muted = theme.cur('muted')
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._place_sash()
+        def with_unit(value, unit):
+            if value == '—':
+                return value
+            return (f'{value} <span style="font-size: 13px; color: '
+                    f'{muted};">{unit}</span>')
 
-    def _place_sash(self):
-        """Park the sash so the live pane keeps >= 60 % of the width
-        until the user drags it (QA-17)."""
-        if self._sash_user:
-            return
-        w = self._body.width()
-        if w <= 1:
-            return
-        want = max(self.LOG_MIN, min(int(w * self.LOG_FRAC),
-                                     w - self.VIEW_MIN))
-        sizes = self._body.sizes()
-        if not sizes or abs(sizes[0] - want) > 4:
-            self._body.setSizes([want, max(1, w - want)])
+        self._tile_time.set(with_unit(r['t [ms]'], 'ms'))
+        self._tile_step.set(r['step'], f'dt {r["dt [s]"]} s')
+        self._tile_pmax.set(with_unit(r['p max [kPa]'], 'kPa'))
+        self._tile_cells.set(r['cells'])
+
+    def _reset_readouts_text(self):
+        self._readout = dict.fromkeys(CHIP_KEYS, '—')
+        self._render_readouts()
 
     # ── live-view sub-tab switching ──────────────────────────────────────
     #: which widget each segment shows
@@ -371,27 +846,21 @@ class RunPanel(QWidget):
         return self._stack.currentWidget() is self.gauges
 
     def _set_tab_order(self):
-        """Walk Tab the way the tab reads, not the way it was built.
+        """Walk Tab the way the screen reads: the controls column top to
+        bottom, then the view's toolbar, then the dock - the log last.
 
-        Qt's default is construction order, which is right almost
-        everywhere in this app - the forms are built top to bottom. This
-        panel is the exception, because its two bars and its two body
-        columns are built in an order that has nothing to do with where
-        they end up: measured, Tab went Run (left) -> Name (middle) ->
-        Initialise (left) -> Refresh (far right) -> the log (left) ->
-        the view controls (middle), bouncing across the window six
-        times.
-
-        The log stays in the chain rather than being taken out of it: it
-        is read-only, but a keyboard user still needs to reach it to
-        scroll and copy. It just goes last, after every control.
+        Qt's default is construction order, which put the log before the
+        view controls here once (measured on the old one-column panel:
+        Tab bounced across the window six times). The log stays in the
+        chain rather than being taken out of it: it is read-only, but a
+        keyboard user still needs to reach it to scroll and copy.
         """
-        chain = [self.run_btn, self.stop_btn, self.view3d_btn,
-                 self.runs_dir, self.runs_browse, self.run_name,
-                 self.init_btn, *self._exec_btns,
-                 self.refresh_val, self.refresh_mode,
-                 self._view_seg, self.show_mesh, self.auto_clim,
-                 self.clim_min, self.clim_max, self.log]
+        chain = [self.runs_dir, self.runs_browse, self.run_name,
+                 self.stop_btn, self.run_btn, self.view3d_btn,
+                 self.step_card.header, self.init_btn, *self._exec_btns,
+                 self.refresh_val, self.refresh_mode, self.auto_clim,
+                 self.clim_min, self.clim_max, self.setup_link,
+                 self._view_seg, self.show_mesh, self.log]
         for first, second in zip(chain, chain[1:]):
             QWidget.setTabOrder(first, second)
 
@@ -399,8 +868,26 @@ class RunPanel(QWidget):
         return '3D view' if self._stack.currentWidget() is self.view3d \
             else 'Live slice'
 
+    # ── 0-D (HD 1.3) ─────────────────────────────────────────────────────
+    def set_dim(self, dim):
+        """Hide, never grey (plan §9), what an HD 1.3 assessment does not
+        have: Step through, the Live view card, the 3D button and the
+        Time / Step / p max tiles. Runs folder, Model, Run and the log
+        stay."""
+        self._dim = int(dim)
+        blast = self._dim != 0
+        for w in (self.step_card, self.live_card, self.view3d_btn,
+                  self._tile_time, self._tile_step, self._tile_pmax):
+            w.setVisible(blast)
+        if not blast:
+            self._tile_cells.hide()
+        self.strip.arrange(force=True)
+
     # ── event handlers (called from the controller) ──────────────────────
-    def set_running(self, running):
+    def set_running(self, running, paused=False):
+        """A run started (`paused`: held at step 0 by Initialise) or
+        ended. Stop and Run swap places by visibility AND enablement, so
+        a disabled Stop never reads as armed."""
         self._running = bool(running)
         if running:
             # the cadence belongs to the run: a native run after a foam
@@ -412,8 +899,10 @@ class RunPanel(QWidget):
         start_ok = (not running) and (not self._busy) and self._case_ok
         self.run_btn.setEnabled(start_ok)
         self.init_btn.setEnabled(start_ok)
-        # a disabled Stop used to stay danger-red, reading as armed
+        self.run_btn.setVisible(not running)
         self.stop_btn.setEnabled(bool(running))
+        self.stop_btn.setVisible(bool(running))
+        # a disabled Stop used to stay danger-red, reading as armed
         set_button_kind(self.stop_btn, 'danger' if running else 'default')
         for b in self._exec_btns:
             b.setEnabled(bool(running))
@@ -421,24 +910,38 @@ class RunPanel(QWidget):
         if running:
             self.progress.setValue(0)
             self._clear_log()
-            # Everything below belongs to the PREVIOUS run: the chips and
-            # the live plot used to keep its step/time/field until the new
-            # run's first frame, which on a blastFoam cold start is minutes
-            # of a stale picture (and, after Initialise Model, a t = 0 plot
-            # beside the last run's step count).
+            # Everything below belongs to the PREVIOUS run: the readouts
+            # and the live plot used to keep its step/time/field until the
+            # new run's first frame, which on a blastFoam cold start is
+            # minutes of a stale picture (and, after Initialise Model, a
+            # t = 0 plot beside the last run's step count).
             self._reset_readouts()
+            if paused:
+                # Initialise: the Exec buttons are what comes next
+                self.step_card.set_open(True)
         else:
             # live attach only during a run; Results tab covers afterwards
             self.view3d_btn.setEnabled(False)
+        self._sync_run_text()
+
+    def set_run_again(self, on=True):
+        """A run has finished this session: the idle button reads `Run
+        again` from now on (board Run_Finished line 94; decision row)."""
+        self._run_again = bool(on)
+        self._sync_run_text()
+
+    def _sync_run_text(self):
+        self.run_btn.setText('Run again' if self._run_again else 'Run')
+        self.run_btn.setAccessibleName(self.run_btn.text())
 
     def _reset_readouts(self):
-        """Chips back to '-', live plot to a waiting placeholder, 3D view
-        dropped: nothing on the Run tab may still describe the last run."""
+        """Readouts back to '-', live plot to a waiting placeholder, 3D
+        view dropped: nothing on the Run screen may still describe the
+        last run."""
         self._last_step = None
-        self._chip_cells.hide()
-        for chip in (self._chip_step, self._chip_t, self._chip_dt,
-                     self._chip_pmax, self._chip_cells):
-            chip.set('—')
+        self._tile_cells.hide()
+        self.strip.arrange(force=True)
+        self._reset_readouts_text()
         self._solid = None
         self._mesh_geom = None
         self._mesh_levels = None
@@ -457,28 +960,53 @@ class RunPanel(QWidget):
         """The case has no gauges, so the view has nothing to wait for."""
         self.gauges.reset(NO_GAUGES)
 
-    def set_validation(self, ok, n_errors=0, text=None):
-        """Mirror the Setup validation strip on the Run tab and gate the
-        start buttons, so an invalid case is visible here instead of only
-        as a modal after pressing Run. `text` overrides the wording."""
+    def set_validation(self, ok, n_errors=0, text=None, n_cells=None):
+        """Mirror the Setup validation on the Run screen's Setup link and
+        gate the start buttons, so an invalid case is visible here
+        instead of only as a modal after pressing Run. `text` overrides
+        the wording; `n_cells` is the report's cell count (hidden when
+        None)."""
         self._case_ok = bool(ok)
         if ok:
             self._valid_lbl.setText(text or 'Case OK')
-            self._valid_lbl.setStyleSheet(f'color: {theme.cur("ok")};')
         else:
             n = max(int(n_errors), 1)
             self._valid_lbl.setText(
                 text or f'{n} error{"s" if n != 1 else ""} - see Setup')
-            self._valid_lbl.setStyleSheet(f'color: {theme.cur("error")};')
+        self._n_cells = int(n_cells) if n_cells else None
+        self.setup_link.cells.setText(
+            f'· {fmt_count(self._n_cells)} cells' if self._n_cells else '')
+        self.setup_link.cells.setVisible(self._n_cells is not None)
+        self._style_setup_link()
         if not (self._running or self._busy):
             self.run_btn.setEnabled(bool(ok))
             self.init_btn.setEnabled(bool(ok))
+
+    def setup_link_text(self):
+        """The link as read: `Setup: Case OK · 368 k cells` (tests)."""
+        bits = [self.setup_link.prefix.text(), self._valid_lbl.text()]
+        if not self.setup_link.cells.isHidden():
+            bits.append(self.setup_link.cells.text())
+        return ' '.join(b for b in bits if b)
+
+    def _style_setup_link(self):
+        """ok_bg / ok_border when the case is OK, stop_* when it has
+        errors (board line 149); the text stays >= 4.5:1 (D23)."""
+        link = self.setup_link
+        link.setProperty('state', 'ok' if self._case_ok else 'error')
+        theme.repolish(link)
+        fg = theme.cur('text2' if self._case_ok else 'stop_text')
+        for lbl in (link.prefix, self._valid_lbl, link.cells):
+            lbl.setStyleSheet(f'color: {fg}; font-size: 13px;')
+        icon, colour = (('check', 'ok') if self._case_ok
+                        else ('error', 'danger'))
+        link.icon_lbl.setPixmap(theme.pixmap(icon, 16, color=colour))
 
     def set_busy(self, busy):
         """Mark a non-solve job (the HD 1.3 assessment) as working or done.
 
         Busy: Run and Initialise Model off, the bar indeterminate. Nothing
-        else changes - the log, chips and live view still describe the
+        else changes - the log, readouts and live view still describe the
         last solve - and the bar gets its old value back afterwards.
         """
         busy = bool(busy)
@@ -553,11 +1081,15 @@ class RunPanel(QWidget):
     def on_progress(self, p):
         self.progress.setValue(int(round(1000 * max(0.0, min(1.0, p.frac)))))
         self._last_step = p.step
-        self._chip_step.set(str(p.step))
-        self._chip_t.set(f'{p.t*1e3:.3f}')
-        self._chip_dt.set(f'{p.dt:.2e}')
+        self._readout.update({
+            'step': str(p.step),
+            't [ms]': f'{p.t*1e3:.3f}',
+            'dt [s]': f'{p.dt:.2e}',
+            # kPa like every plot and colorbar (the chip used to be the
+            # one readout in Pa, a 1000x mismatch against the live view)
+            'p max [kPa]': f'{p.p_max / 1e3:,.4g}'})
         self._last_dt = float(p.dt)     # turns a step cadence into a time
-        self._chip_pmax.set(f'{p.p_max / 1e3:,.4g}')
+        self._render_readouts()
 
     def on_run_started(self, info):
         self._last_field = None
@@ -582,8 +1114,10 @@ class RunPanel(QWidget):
 
     # ── live colour range (2D pane) ──────────────────────────────────────
     def _sync_clim_state(self):
+        manual = not self.auto_clim.isChecked()
+        self.clim_row.setVisible(manual)
         for ent in self._clim_entries:
-            ent.setEnabled(not self.auto_clim.isChecked())
+            ent.setEnabled(manual)
 
     def live_clim(self):
         """(vmin, vmax) in kPa for the live pane, or None for autoscale.
@@ -639,7 +1173,7 @@ class RunPanel(QWidget):
         return ''
 
     def _rebuild_overlay(self):
-        """Add/remove the cell-edge overlay per the checkbox."""
+        """Add/remove the cell-edge overlay per the Show mesh button."""
         if self.pane.image is None or self._mesh_geom is None:
             return
         if not self.show_mesh.isChecked():
@@ -671,8 +1205,11 @@ class RunPanel(QWidget):
                 2.0, -(disp - lv.astype(np.float64)) * lv.ndim).sum())))
         except (ValueError, TypeError, AttributeError):
             return
-        self._chip_cells.show()
-        self._chip_cells.set(f'{n:,}')
+        if self._tile_cells.isHidden():
+            self._tile_cells.show()
+            self.strip.arrange(force=True)
+        self._readout['cells'] = f'{n:,}'
+        self._render_readouts()
 
     def on_frame(self, field, t, levels=None):
         # Frames are coalesced in a single slot shared across chain stages,
