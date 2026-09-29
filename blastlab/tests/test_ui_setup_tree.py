@@ -16,6 +16,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(HERE, '..', '..')))
 
 from blastlab.ui.testing import ensure_qapp, pump          # noqa: E402
 
+# the check names carry '✓' / '✗' / '·', outside cp1252 - the encoding of
+# a redirected stdout here; never let a print kill the suite over a glyph
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+
 app = ensure_qapp()
 
 from blastlab.core.case import Case1D, Case2D, Case3D      # noqa: E402
