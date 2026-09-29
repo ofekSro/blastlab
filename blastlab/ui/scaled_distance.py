@@ -121,11 +121,32 @@ def obstacle_boxes(case):
             for o in (case.obstacles or [])]
 
 
+def _shadowed(box, a, b):
+    """True when the straight segment a -> b passes through the inside of
+    `box` ((lo, hi) per axis). Grazing a face or an edge does not count."""
+    t0, t1 = 0.0, 1.0
+    for (lo, hi), p, q in zip(box, a, b):
+        p, q = float(p), float(q)
+        d = q - p
+        if abs(d) < 1e-12:
+            if not lo < p < hi:
+                return False
+            continue
+        ta, tb = sorted(((lo - p) / d, (hi - p) / d))
+        t0, t1 = max(t0, ta), min(t1, tb)
+        if t1 - t0 <= 1e-9:
+            return False
+    return True
+
+
 def where(case, point):
-    """(wall number, gap [m], inside) for the obstacle nearest to
+    """(wall number, gap [m], inside, behind) for the obstacle nearest to
     `point`, or None when none is within WHERE_MAX. The gap is the
-    distance from the point to the box (0 on a face or inside); walls are
-    numbered 1-based as the tree names them (`Wall n`)."""
+    distance from the point to the box (0 on a face or inside); `behind`
+    is True when the straight line from the burst point to `point`
+    passes through that obstacle - the gauge is on its far side, in its
+    shadow. Walls are numbered 1-based as the tree names them
+    (`Wall n`)."""
     best = None
     for i, box in enumerate(obstacle_boxes(case), start=1):
         d = [max(lo - float(p), 0.0, float(p) - hi)
@@ -133,34 +154,37 @@ def where(case, point):
         gap = math.sqrt(sum(x * x for x in d))
         inside = all(lo < float(p) < hi for p, (lo, hi) in zip(point, box))
         if best is None or gap < best[1]:
-            best = (i, gap, inside)
+            best = (i, gap, inside, box)
     if best is None or best[1] > WHERE_MAX:
         return None
-    return best
+    i, gap, inside, box = best
+    behind = not inside and _shadowed(box, burst_point(case), point)
+    return i, gap, inside, behind
 
 
 def where_text(case, point):
-    """The Where cell: `5 cm in front of Wall 1`, `on the face of Wall 1`,
-    `inside Wall 1`, or '' (no obstacle within WHERE_MAX)."""
+    """The Where cell: `5 cm in front of Wall 1`, `5 cm behind Wall 1`
+    (the wall stands between the burst and the gauge), `on the face of
+    Wall 1`, `inside Wall 1`, or '' (no obstacle within WHERE_MAX)."""
     w = where(case, point)
     if w is None:
         return ''
-    i, gap, inside = w
+    i, gap, inside, behind = w
     if inside:
         return f'inside Wall {i}'
     cm = int(round(gap * 100.0))
     if cm == 0:
         return f'on the face of Wall {i}'
-    return f'{cm} cm in front of Wall {i}'
+    return f'{cm} cm {"behind" if behind else "in front of"} Wall {i}'
 
 
 def walls_in_front(case):
-    """The walls some gauge stands in front of (not inside), sorted -
-    the 05 Gauges tree summary names them."""
+    """The walls some gauge stands in front of (not inside it, not
+    behind it), sorted - the 05 Gauges tree summary names them."""
     out = set()
     for g in gauge_points(case):
         w = where(case, g)
-        if w is not None and not w[2]:
+        if w is not None and not w[2] and not w[3]:
             out.add(w[0])
     return sorted(out)
 

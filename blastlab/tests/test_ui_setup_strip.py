@@ -522,10 +522,22 @@ def s3_dock():
     check("above the wall top, 20 cm off its corner edge",
           sd.where_text(case, (3.1, 2.7)) == '20 cm in front of Wall 1',
           sd.where_text(case, (3.1, 2.7)))
+    # the shadow side: the wall stands between the burst (0, 2) and the
+    # gauge, so "in front of" would be wrong (found in verify)
+    check("behind the wall (r 3.3, the line from the burst crosses it)",
+          sd.where_text(case, (3.3, 0.5)) == '10 cm behind Wall 1',
+          sd.where_text(case, (3.3, 0.5)))
+    check("a gauge only behind a wall: no 'in front of' in the summary",
+          setup_nodes.summaries(sample_case(gauges=[(3.3, 0.5)]))['gauges']
+          == '1 gauge',
+          setup_nodes.summaries(sample_case(gauges=[(3.3, 0.5)]))['gauges'])
     two = sample_case(obstacles=[(3.0, 3.2, 0.0, 2.5),
                                  (1.0, 1.2, 0.0, 1.0)])
+    # r 1.3 is past Wall 2's far face (r 1.2) and the line from the
+    # burst (0, 2) crosses Wall 2 at z ~0.85: the gauge is behind it
     check("two walls: the nearer one is named (Wall 2)",
-          sd.where_text(two, (1.3, 0.5)) == '10 cm in front of Wall 2',
+          sd.where_text(two, (1.3, 0.5)) == '10 cm behind Wall 2'
+          and sd.where_text(two, (0.9, 0.5)) == '10 cm in front of Wall 2',
           sd.where_text(two, (1.3, 0.5)))
     c3 = Case3D(obstacles=[(2.0, 2.2, 0.0, 1.0, 0.0, 3.0)],
                 gauges=[(1.9, 0.5, 1.0)])
