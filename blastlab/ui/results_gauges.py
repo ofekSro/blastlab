@@ -36,7 +36,7 @@ keeps the stretch.
 import numpy as np
 import pyqtgraph as pg
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QBrush, QColor, QKeySequence
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFrame,
                                QHBoxLayout, QHeaderView, QLabel,
                                QPushButton, QSizePolicy, QStackedWidget,
@@ -173,8 +173,10 @@ def z_values(res, dim):
 
 class _Table(QTableWidget):
     """The summary table. Ctrl+C with the table focused copies the whole
-    table (the view's QShortcut); this catches the key when the item
-    view's own copy (the current cell's text) would take it first."""
+    table: the key is caught here, before the item view's own copy (the
+    current cell's text). Only a focused table sees it, so Ctrl+C in any
+    text box keeps its own copy, and no QShortcut is added to the window
+    (test_ui_frame F5 pins the window's five keys; D105)."""
 
     copy_requested = Signal()
 
@@ -351,11 +353,8 @@ class GaugesView(QWidget):
         # MAX_ROWS_SHOWN and no more
         self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.table.currentCellChanged.connect(self._current_moved)
+        # Ctrl+C while the table has focus (never window-wide)
         self.table.copy_requested.connect(self.copy_table)
-        # never window-wide: Ctrl+C in any text box keeps its own copy
-        self.copy_shortcut = QShortcut(QKeySequence.Copy, self.table)
-        self.copy_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
-        self.copy_shortcut.activated.connect(self.copy_table)
         tl.addWidget(self.table)
         root.addWidget(tcard, 0)
         self._cap_height()
@@ -616,6 +615,13 @@ class GaugesView(QWidget):
     def selected(self):
         """The selected gauge's G number, or None."""
         return self._sel
+
+    def arrival(self, number):
+        """`summarize_trace`'s arrival [ms] of G`number`, NaN when it has
+        none or there is no such gauge (the Field view's tick, T6)."""
+        if number is None or not 1 <= number <= len(self._summary):
+            return float('nan')
+        return self._summary[number - 1]['arrival_ms']
 
     def select(self, number):
         """Select G`number`: recolour the curves, move the shading and the

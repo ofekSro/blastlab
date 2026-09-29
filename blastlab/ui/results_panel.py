@@ -8,16 +8,18 @@ centre (the view tabs over the sub-views) · export (320 px). The side
 columns give way (to 248 and 288 px) only when the window cannot hold
 the centre's minimum between them, as on the Run screen (D19).
 
-Screen and file differ here by design. On screen the Fields view is ONE
-large panel with selectors, because a persistent pyqtgraph image makes a
-field change a single array upload. The `PNGs` and `Report` exports keep
+Screen and file differ here by design. On screen the Field view is ONE
+large panel with its controls, because a persistent pyqtgraph image makes
+a field change a single array upload. The `PNGs` and `Report` exports keep
 writing the full multi-panel grid that `output/plots.py` builds, and
 their tooltips say so.
 
-The sub-views live in their own modules (`results_fields`,
-`results_gauges`, `results_anim`), the list in `results_list`, the
-method card's rows in `results_method` and the writing in `exports`, so
-each is testable without building a window.
+The views are Field · Gauges · 3D (GUI-7 T6: Field replaces the old Fields
+and Animation tabs; `show_view` still takes those two names). The views
+live in their own modules (`results_field` over the two drawing engines
+`results_fields` and `results_anim`, `results_gauges`), the list in
+`results_list`, the method card's rows in `results_method` and the
+writing in `exports`, so each is testable without building a window.
 """
 
 import os
@@ -34,6 +36,7 @@ from . import dialogs, exports, theme
 from .bridge import ThreadBridge
 from .export_column import DATA, FIGURES, ExportColumn, profile_suffix
 from .results_anim import AnimView
+from .results_field import FieldView
 from .results_fields import FieldsView
 from .results_gauges import GaugesView
 from .results_list import ElidedLabel, ResultsList
@@ -67,7 +70,7 @@ EXPORT_BUTTONS = tuple((text, suffix, kind)
 EXPORT_HELP = {
     'profile': 'Save the final state for a later stage to start from.',
     'gif': 'Write the recorded frames as a video, using the colour '
-           'scale set in the Animation view.',
+           'scale set in the Field view.',
     'vtk': 'Convert the blastFoam case to VTK for ParaView.',
     'summary': 'Per-gauge peak, arrival, phase and impulse as CSV.',
     'tsv': 'The raw gauge time histories.',
@@ -80,7 +83,10 @@ EXPORT_HELP = {
             'single panel on screen.',
 }
 
-VIEWS = ('Fields', 'Gauges', 'Animation', '3D')
+VIEWS = ('Field', 'Gauges', '3D')
+#: the old tab names, still accepted by show_view (the QA harness, the
+#: R- and E-checks): both are the Field view now
+VIEW_ALIASES = {'Fields': 'Field', 'Animation': 'Field'}
 
 
 class ResultEntry:
@@ -420,14 +426,17 @@ class ResultsPanel(QWidget):
         # selected_gauge() / select_gauge() (T6's time-bar tick reads it)
         self.gauges.gauge_selected.connect(self._gauge_selected)
         self.anim = AnimView()
+        # Field = the two engines above under one set of controls (T6)
+        self.field_view = FieldView(self.fields, self.anim,
+                                    bridge=self._bridge, log=log_fn)
         self.view3d = (View3DHost(viewer_link, 'results', log_fn=log_fn)
                        if viewer_link is not None else QWidget())
-        self._views = {'Fields': self.fields, 'Gauges': self.gauges,
-                       'Animation': self.anim, '3D': self.view3d}
+        self._views = {'Field': self.field_view, 'Gauges': self.gauges,
+                       '3D': self.view3d}
         for w in self._views.values():
             self.stack.addWidget(w)
-        self.view_seg.set('Fields')
-        self.stack.setCurrentWidget(self.fields)
+        self.view_seg.set('Field')
+        self.stack.setCurrentWidget(self.field_view)
         self._view_frame = view
         cl.addWidget(view, 1)
         return centre
@@ -590,7 +599,7 @@ class ResultsPanel(QWidget):
         if ent is None:
             self._log('Remove: select a result first.')
             return
-        self.anim.stop_play()
+        self.field_view.stop_play()
         self._entries.remove(ent)
         self._repopulate()
         if self._entries:
@@ -604,6 +613,7 @@ class ResultsPanel(QWidget):
         self.fields.clear()
         self.gauges.clear()
         self.anim.placeholder(self.anim.NO_RESULT)
+        self.field_view.set_result(None)
         if isinstance(self.view3d, View3DHost):
             self.view3d.cancel_feed()
         self._sync_export_buttons(None)
@@ -617,7 +627,9 @@ class ResultsPanel(QWidget):
             self._fit_columns()
 
     def show_view(self, name):
-        """Switch sub-view programmatically (the QA harness uses this)."""
+        """Switch sub-view programmatically (the QA harness uses this).
+        'Fields' and 'Animation' are the Field view."""
+        name = VIEW_ALIASES.get(name, name)
         self.view_seg.set(name)
         self._view_selected(name)
 
@@ -635,12 +647,13 @@ class ResultsPanel(QWidget):
         # frame it is showing - retyping a title must not jump the
         # replay back to the start
         view = self.view()
-        if view == 'Fields':
+        if view == 'Field':
+            # both engines: the map's title and the replay's, whichever
+            # page the Field view shows
             self.fields.redraw()
+            self.anim.show_frame(self.anim.frame())
         elif view == 'Gauges':
             self.gauges.redraw()
-        elif view == 'Animation':
-            self.anim.show_frame(self.anim.frame())
 
     # ── the selected gauge (T5), one for every view ──────────────────────
     def selected_gauge(self):
@@ -653,8 +666,16 @@ class ResultsPanel(QWidget):
         """Select G`number` (as a row click in Gauges does)."""
         self.gauges.select(number)
 
-    def _gauge_selected(self, _number):
-        """Hook for the views that follow the selection (T6)."""
+    def _gauge_selected(self, _number=None):
+        """The Field view's time-bar tick follows the selected gauge."""
+        n = self.gauges.selected()
+        self.field_view.set_arrival(n, self.gauges.arrival(n))
+
+    def set_colour_scale(self, scale, clim=None):
+        """The Field view's colour scale ('run' | 'frame' | 'manual', with
+        `clim` for the field on screen), as its control sets it: the
+        replay, the snapshot maps and the Animation export follow."""
+        self.field_view.set_scale(scale, clim)
 
     def _mesh_changed(self):
         self.anim.set_show_mesh(self.fields.show_mesh.isChecked())
@@ -668,15 +689,19 @@ class ResultsPanel(QWidget):
             # stayed enabled and did nothing when pressed
             self._sync_export_buttons(None)
             return
-        self.anim.stop_play()
+        self.field_view.stop_play()
         self._sync_export_buttons(ent)
         extra = self.title_extra()
         for v in (self.fields, self.gauges, self.anim):
             v.set_title_extra(extra)
+        # the run's recorded colour scale first, so each map draws once
+        self.field_view.adopt_scale(ent)
         self.fields.set_result(ent)
         self.gauges.set_result(ent)
         self.anim.set_result(
             ent, show_mesh=self.fields.show_mesh.isChecked())
+        self.field_view.set_result(ent)
+        self._gauge_selected()
 
     # ── how it was computed (UX-15) ──────────────────────────────────────
     def _render_method(self, ent):
@@ -907,7 +932,7 @@ class ResultsPanel(QWidget):
         threading.Thread(target=work, daemon=True).start()
 
     def shutdown(self):
-        self.anim.stop_play()
+        self.field_view.stop_play()
         if isinstance(self.view3d, View3DHost):
             self.view3d.shutdown()
         if self._case_viewer is not None:

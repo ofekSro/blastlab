@@ -72,6 +72,27 @@ def drive(p, title=None, mesh=False, scale=None, clim=None):
     pump(5)
 
 
+def drive_visible(p, title=None, mesh=False, scale=None, clim=None):
+    """The same state as `drive()`, set through the Field view's VISIBLE
+    controls (GUI-7 T6): the title box, a click on Show mesh, a click on
+    the Colours control and the Min / Max boxes (typed, then Enter).
+    `scale=None` keeps the result's recorded scale. A 1D result shows its
+    profiles and no Field controls; the same clicks and edits are sent to
+    them there (the range is then the overpressure one, the export's)."""
+    from blastlab.ui.results_field import SCALE_LABEL
+    fv = p.field_view
+    p.title_box.setText(title or '')
+    if fv.show_mesh.isChecked() != bool(mesh):
+        fv.show_mesh.click()
+    if scale is not None:
+        fv.scale_seg._btns[SCALE_LABEL[scale]].click()
+    if clim is not None:
+        fv.min_edit.setText(f'{float(clim[0]):g}')
+        fv.max_edit.setText(f'{float(clim[1]):g}')
+        fv.max_edit.editingFinished.emit()
+    pump(5)
+
+
 def plan():
     """(case key, kind, variant, drive kwargs) for every export pinned."""
     from blastlab.ui.exports import KINDS
@@ -153,6 +174,24 @@ def test_panel_exports():
     cc.check_json(GOLDEN, _GOT)
 
 
+def test_panel_exports_visible():
+    """GUI-7 T6: the same exports with the state set through the visible
+    controls give the SAME golden, recorded at base (never rewritten
+    from this driver)."""
+    ensure_qapp()
+    got = collect(drive_visible)
+    assert not _ERRORS, 'uncaught exception(s):\n' + '\n'.join(_ERRORS)
+    want = cc._read_text(GOLDEN)
+    text = cc.dumps(got)
+    if text != want:
+        import difflib
+        diff = ''.join(list(difflib.unified_diff(
+            want.splitlines(True), text.splitlines(True),
+            'golden/' + GOLDEN, 'drive_visible'))[:60])
+        raise AssertionError(f'drive_visible differs from the golden:\n'
+                             f'{diff}')
+
+
 def test_same_bytes_as_exports_qt():
     """The data files written through the panel are the ones
     `test_char_exports` pins through `ui.exports.export` (so the two
@@ -170,8 +209,11 @@ def test_same_bytes_as_exports_qt():
 
 def main():
     sys.excepthook = _hook
-    return cc.run_main('CHAR UI RESULTS EXPORTS',
-                       [test_panel_exports, test_same_bytes_as_exports_qt])
+    tests = [test_panel_exports, test_same_bytes_as_exports_qt]
+    if '--update' not in sys.argv[1:]:
+        # never a writer: it must reproduce the golden `drive` wrote
+        tests.insert(1, test_panel_exports_visible)
+    return cc.run_main('CHAR UI RESULTS EXPORTS', tests)
 
 
 if __name__ == '__main__':

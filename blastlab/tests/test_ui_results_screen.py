@@ -906,7 +906,7 @@ def s5_gauges(win, link):
           'move', g.selected() == 1 and selected_ok(1) and heard == [1]
           and g.readout_text()[0] == 'G1 · Z 3.31',
           f'{g.selected()} {heard} {g.readout_text()}')
-    p.show_view('Fields')
+    p.show_view('Field')
     pump(20)
     p.show_view('Gauges')
     pump(20)
@@ -951,9 +951,12 @@ def s5_gauges(win, link):
     check('Ctrl+C in the title box leaves the table alone',
           clip.text() == 'sentinel', repr(clip.text()[:60]))
     p.title_box.setText('')
-    check('the shortcut is widget-scoped, never window-wide',
-          g.copy_shortcut.context() == Qt.WidgetWithChildrenShortcut
-          and g.copy_shortcut.parent() is g.table)
+    from PySide6.QtGui import QKeySequence, QShortcut
+    copy = QKeySequence(QKeySequence.Copy).toString()
+    check('Ctrl+C is the focused table\'s own key: no QShortcut for it in '
+          'the panel (never window-wide; test_ui_frame F5 pins the window)',
+          not [s for s in p.findChildren(QShortcut)
+               if s.key().toString() == copy])
 
     print('\nS5d: Z hidden - planar and a profile start')
     for name, res in (('planar 2D', with_gauges(fake_2d())),
@@ -1031,7 +1034,7 @@ def s5_gauges(win, link):
     while rs.entries():
         rs.sel.setCurrentIndex(0)
         rs.remove_current()
-    rs.show_view('Fields')
+    rs.show_view('Field')
     pump(30)
     p9 = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
     p9.resize(900, 600)
@@ -1051,6 +1054,394 @@ def s5_gauges(win, link):
     p9.shutdown()
     p9.deleteLater()
     pump(20)
+
+
+# ── S6 ───────────────────────────────────────────────────────────────────
+def s6_field(link):
+    import numpy as np
+    import pyqtgraph as pg
+    from matplotlib.collections import QuadMesh
+    from PySide6.QtCore import QPointF
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QPushButton
+    import test_char_exports as ce
+    from test_gui_results_fields import fake_2d, fake_3d
+    from test_ui_results import frames_on, with_gauges
+    from blastlab.core.constants import ANIM_SCALE_LABELS, P_AIR
+    from blastlab.models.meta import frames_of
+    from blastlab.ui import dialogs
+    from blastlab.ui import results_field as RF
+    from blastlab.ui import results_panel as RP
+    from blastlab.ui.exports import name_prefix, summary_rows
+    from blastlab.ui.results_fields import field_options
+    print('\nS6a: Field replaces Fields and Animation')
+    log = []
+    p = RP.ResultsPanel(viewer_link=link, log_fn=log.append)
+    p.resize(1600, 1000)
+    p.show()
+    pump(40)
+    fv = p.field_view
+    check('VIEWS == (Field, Gauges, 3D) and the tab strip has three tabs',
+          RP.VIEWS == ('Field', 'Gauges', '3D')
+          and p.view_seg.values() == ['Field', 'Gauges', '3D']
+          and p.view() == 'Field', str(p.view_seg.values()))
+    p.show_view('Gauges')
+    p.show_view('Animation')
+    ok_anim = p.view() == 'Field'
+    p.show_view('Gauges')
+    p.show_view('Fields')
+    check('show_view(Animation) and show_view(Fields) select Field',
+          ok_anim and p.view() == 'Field'
+          and p.stack.currentWidget() is fv)
+    check('the engines\' own control rows are hidden (legacy state)',
+          p.fields.controls.isHidden() and p.anim.controls.isHidden())
+    check('Show mesh is a checkable button in the Field row, the same '
+          'widget the engine and the export read',
+          isinstance(p.fields.show_mesh, QPushButton)
+          and p.fields.show_mesh.isCheckable()
+          and fv.show_mesh is p.fields.show_mesh
+          and fv.show_mesh.parent() is not p.fields.controls)
+
+    print('\nS6b: the composed Field / Plane choices = field_options')
+    r2 = ce.result('2d')
+    fixtures = (('2D with frames', 2, r2), ('2D, no frames', 2, fake_2d()),
+                ('3D', 3, fake_3d()), ('1D', 1, ce.result('1d')))
+    for name, dim, res in fixtures:
+        p.add_result(name, dim, res)
+        pump(60)
+        opts = field_options(res, dim)
+        if dim == 1:
+            check('1D: profiles only, the controls row hidden',
+                  opts == ['profiles'] and p.fields.field() == 'profiles'
+                  and fv.ctl.isHidden() and p.fields.page() == 'figure')
+            continue
+        got = []
+        for base in fv.field_seg.values():
+            fv.field_seg._btns[base].click()
+            pump(10)
+            planes = (RF.PLANES if dim == 3 and base != 'Isosurface'
+                      else (None,))
+            for plane in planes:
+                if plane:
+                    fv.plane_seg._btns[plane].click()
+                    pump(10)
+                got.append(p.fields.field())
+        check(f'{name}: the choices give exactly field_options (set and '
+              f'bijection)', sorted(set(got)) == sorted(opts)
+              and len(got) == len(set(got)) == len(opts), str(got))
+        fv.field_seg._btns[fv.field_seg.values()[0]].click()
+        pump(10)
+
+    print('\nS6c: the time bar')
+    ent = p.add_result('frames', 2, r2)
+    pump(60)
+    frames = frames_of(r2.meta)
+    n = len(frames['pressures'])
+    fms = [float(t) * 1e3 for t in frames['times']]
+    tb = fv.timebar
+    check('overpressure with frames: the recorded frames, max n-1',
+          fv.mode() == 'frames' and fv.page() == 'replay'
+          and tb.slider.maximum() == n - 1
+          and tb.length_lbl.text() == f'{fms[-1]:.2f} ms · {n} frames',
+          tb.length_lbl.text())
+    calls = []
+    real = p.anim.show_frame
+    p.anim.show_frame = lambda k: (calls.append(k), real(k))[1]
+    try:
+        tb.slider.setValue(3)
+        pump(10)
+        tb.slider.setValue(5)
+        pump(10)
+        check('each move of the time bar draws the frame once (R5\'s rule)',
+              calls == [3, 5] and p.anim.frame() == 5, str(calls))
+    finally:
+        p.anim.show_frame = real
+    check('the time is the frame\'s', fv.time_text() == f'{fms[5]:.2f} ms',
+          fv.time_text())
+    fv.field_seg._btns['Density'].click()
+    pump(30)
+    labels = list(r2.snapshots)
+    st = [RF.snapshot_ms(s) for s in labels]
+    k_s = int(np.argmin([abs(t - fms[5]) for t in st]))
+    check('Density: the snapshots, `… · N snapshots`, the nearest one to '
+          'the frame\'s time', fv.mode() == 'snapshots'
+          and fv.page() == 'map'
+          and tb.length_lbl.text().endswith(f'· {len(labels)} snapshots')
+          and p.fields.snap_sel.currentIndex() == k_s,
+          f'{tb.length_lbl.text()} {p.fields.snap_sel.currentIndex()} '
+          f'want {k_s}')
+    tb.slider.setValue(len(labels) - 1)
+    pump(20)
+    check('the time bar steps the snapshots',
+          p.fields.snapshot() == labels[-1])
+    fv.field_seg._btns['Overpressure'].click()
+    pump(30)
+    k_f = int(np.argmin([abs(t - st[-1]) for t in fms]))
+    check('back on overpressure: the frame nearest the snapshot\'s time',
+          fv.mode() == 'frames' and p.anim.frame() == k_f
+          and tb.slider.value() == k_f, f'{p.anim.frame()} want {k_f}')
+    fv.start_play()
+    p.anim._tick()
+    pump(10)
+    check('Play runs the replay; the time bar follows its ticks',
+          fv.playing() and p.anim.playing()
+          and tb.slider.value() == p.anim.frame()
+          and tb.play_btn.toolTip() == 'Pause')
+    fv.stop_play()
+    check('and stops', not fv.playing() and tb.play_btn.toolTip() == 'Play')
+    tb.speed.setCurrentIndex(RF.SPEED_SHOWN.index('2×'))
+    check('the speed box drives the replay\'s speed',
+          p.anim.speed_sel.currentText() == '2x')
+    p.anim.speed_sel.setCurrentText('4x')
+    check('and follows it', tb.speed.currentText() == '4×')
+    p.anim.speed_sel.setCurrentText('1x')
+    fv.field_seg._btns['Density'].click()
+    pump(20)
+    fv.start_play()
+    k0 = p.fields.snap_sel.currentIndex()
+    fv._snap_tick()
+    pump(10)
+    check('the snapshots play on the same tick and speed rules',
+          fv._snap_timer.isActive()
+          and fv._snap_timer.interval() == p.anim.timer.interval()
+          and p.fields.snap_sel.currentIndex()
+          == (k0 + p.anim.frame_step()) % len(labels))
+    fv.stop_play()
+    for base, why in (('Peak', 'whole'), ('Impulse', 'whole')):
+        fv.field_seg._btns[base].click()
+        pump(20)
+        check(f'{base}: no time bar, and the caption says why',
+              tb.isHidden() and fv.mode() is None
+              and RF.NO_BAR[why] in fv.caption.text())
+    fv.field_seg._btns['Overpressure'].click()
+    pump(20)
+    check('the controls: Play 40 px round, speed and This frame 32 px',
+          tb.play_btn.height() == 40 and tb.play_btn.width() == 40
+          and tb.speed.height() == 32 and tb.frame_btn.height() == 32,
+          f'{tb.play_btn.size()} {tb.speed.height()} '
+          f'{tb.frame_btn.height()}')
+
+    print('\nS6d: the colour scale drives the export')
+    fv.scale_seg._btns['manual'].click()
+    pump(20)
+    check('manual shows Min / Max with the field\'s unit (kPa)',
+          not fv.manual_grp.isHidden() and fv.unit_lbl.text() == 'kPa')
+    for box, text in ((fv.min_edit, '0'), (fv.max_edit, '50')):
+        box.clear()
+        QTest.keyClicks(box, text)
+        QTest.keyClick(box, Qt.Key_Return)
+    pump(20)
+    want = {'show_mesh': p.fields.show_mesh.isChecked(), 'title_extra': None,
+            'anim_scale': 'manual', 'anim_clim': (0.0, 50.0)}
+    check('manual (0, 50) through the visible control: export_opts',
+          p.export_opts() == want, str(p.export_opts()))
+    check('and the replay uses it', p.anim.image.levels == (0.0, 50.0),
+          str(p.anim.image.levels))
+    p.anim.scale_sel.setCurrentText(ANIM_SCALE_LABELS['frame'])
+    pump(20)
+    check('the engine\'s selector moves the visible control (both ways)',
+          fv.scale_seg.get() == 'each frame' and fv.manual_grp.isHidden())
+    p.set_colour_scale('manual')
+    pump(20)
+    check('back to manual keeps the typed overpressure range',
+          fv.min_edit.text() == '0' and fv.max_edit.text() == '50'
+          and p.export_opts()['anim_clim'] == (0.0, 50.0))
+
+    print('\nS6e: the snapshot maps\' scale')
+    fk = p.add_result('flat', 2, fake_2d())
+    pump(40)
+    fv.field_seg._btns['Density'].click()
+    pump(20)
+    p.set_colour_scale('frame')
+    pump(20)
+    check('each frame: today\'s set_data levels (R3\'s (1.2, 2.2))',
+          p.fields.image.levels == (1.2, 2.2), str(p.fields.image.levels))
+    p.sel.setCurrentIndex(p.entries().index(ent))
+    pump(40)
+    fv.field_seg._btns['Density'].click()
+    pump(20)
+    p.set_colour_scale('run')
+    pump(20)
+    solid = r2.meta['solid']
+    vals = [np.where(solid, np.nan, np.asarray(s['rho'], dtype=np.float64))
+            for s in r2.snapshots.values()]
+    lo = min(float(np.nanmin(v)) for v in vals)
+    hi = max(float(np.nanmax(v)) for v in vals)
+    check('whole run on density: (min, max) over the snapshots, solid '
+          'cells out', p.fields.image.levels == (lo, hi)
+          and p.fields.scale_used() == 'run',
+          f'{p.fields.image.levels} want {(lo, hi)}')
+    # the overpressure range typed in S6d is the export's
+    clim_before = p.anim.clim()
+    p.set_colour_scale('manual', (1.0, 3.0))
+    pump(20)
+    check('a manual density range: on the map, not in the export',
+          p.fields.image.levels == (1.0, 3.0)
+          and fv.unit_lbl.text() == 'kg/m³'
+          and clim_before == (0.0, 50.0)
+          and p.export_opts()['anim_clim'] == clim_before
+          and p.anim.min_box.text() != '1', str(p.export_opts()))
+    fv.field_seg._btns['Speed'].click()
+    pump(20)
+    speed_boxes = (fv.min_edit.text(), fv.max_edit.text())
+    fv.field_seg._btns['Density'].click()
+    pump(20)
+    check('ranges are remembered per field',
+          speed_boxes == ('', '') and fv.min_edit.text() == '1'
+          and fv.manual_range('Density') == (1.0, 3.0)
+          and fv.manual_range('Overpressure') == clim_before)
+
+    print('\nS6f: the hover readout')
+    img = p.fields.image
+    xf, yf = img.xf, img.yf
+
+    def centre(i, j):
+        return p.fields.plot.vb.mapViewToScene(QPointF(
+            (xf[i] + xf[i + 1]) / 2, (yf[j] + yf[j + 1]) / 2))
+    fluid = np.argwhere(~solid)[len(np.argwhere(~solid)) // 2]
+    i, j = int(fluid[0]), int(fluid[1])
+    v = fv.hover_scene(centre(i, j))
+    shown = img.shown[i, j]
+    check('over a cell centre: the displayed cell\'s value, formatted',
+          v == shown and fv.hover_text().split('\n')[1]
+          == f'density {shown:.4g} kg/m³' and fv.hover_visible(),
+          fv.hover_text())
+    check('the axis names follow the page\'s labels (r, z)',
+          fv.hover_text().startswith('r ') and ' · z ' in fv.hover_text())
+    si, sj = (int(x) for x in np.argwhere(solid)[0])
+    check('a solid cell reads solid', fv.hover_scene(centre(si, sj))
+          == 'solid' and fv.hover_text().endswith('\nsolid'))
+    out_pos = p.fields.plot.vb.mapViewToScene(QPointF(xf[-1] + 1.0,
+                                                      yf[-1] + 1.0))
+    check('outside the domain it hides',
+          fv.hover_scene(out_pos) is None and not fv.hover_visible()
+          and fv.hover_text() == '')
+    p.fields.plot.scene().sigMouseMoved.emit(centre(i, j))
+    check('the pointer (the scene signal) drives it',
+          fv.hover_visible() and fv.hover_text().endswith('kg/m³'))
+    fv.field_seg._btns['Overpressure'].click()
+    pump(20)
+    aim = p.anim.image
+    v = fv.hover_scene(p.anim.plot.vb.mapViewToScene(QPointF(
+        (aim.xf[i] + aim.xf[i + 1]) / 2, (aim.yf[j] + aim.yf[j + 1]) / 2)),
+        'anim')
+    check('on the replay too, in kPa', v == aim.shown[i, j]
+          and fv.hover_text().endswith(f'overpressure {v:.4g} kPa'),
+          fv.hover_text())
+
+    print('\nS6g: the arrival tick')
+    rows = summary_rows(r2)
+    g1 = p.selected_gauge()
+    k1 = int(np.argmin([abs(t - rows[g1 - 1]['arrival_ms']) for t in fms]))
+    check('the tick sits at the frame nearest the selected gauge\'s '
+          'arrival', tb.slider.ticks() == [k1]
+          and f'arrival at G{g1}.' in fv.caption.text(),
+          f'{tb.slider.ticks()} want {k1}; {fv.caption.text()}')
+    g2 = 2 if g1 == 1 else 1
+    p.select_gauge(g2)
+    k2 = int(np.argmin([abs(t - rows[g2 - 1]['arrival_ms']) for t in fms]))
+    check('selecting another gauge in Gauges moves it',
+          tb.slider.ticks() == [k2]
+          and f'arrival at G{g2}.' in fv.caption.text(), str(k2))
+    fv.field_seg._btns['Density'].click()
+    pump(20)
+    k3 = RF.nearest(st, rows[g2 - 1]['arrival_ms'])
+    check('on the snapshots, at the nearest snapshot',
+          tb.slider.ticks() == [k3])
+    fv.field_seg._btns['Overpressure'].click()
+    pump(20)
+    flat = frames_on(fake_2d())
+    flat.gauges = dict(times=np.linspace(0, 1e-3, 20), points=[(0.3, 0.3)],
+                       pressures=[np.full(20, P_AIR)])
+    p.add_result('no arrival', 2, flat)
+    pump(40)
+    check('no arrival (NaN): no tick, and the caption says nothing of it',
+          fv.timebar.slider.ticks() == []
+          and 'Cyan tick' not in fv.caption.text())
+
+    print('\nS6h: This frame .png')
+    p.sel.setCurrentIndex(p.entries().index(ent))
+    pump(40)
+    out = os.path.join(TMP, 'frame')
+    os.makedirs(out, exist_ok=True)
+    asked = []
+
+    def save_file(title, filters='', parent=None, start='',
+                  default_suffix=None):
+        asked.append((title, start, default_suffix))
+        return os.path.join(out, os.path.basename(start))
+    real_save = dialogs.save_file
+    dialogs.save_file = save_file
+    try:
+        p.set_colour_scale('manual', (0.0, 50.0))
+        tb.slider.setValue(4)
+        pump(20)
+        target = fv.save_frame_png(threaded=False)
+        fig = fv.last_frame_figure
+        # one panel; matplotlib's colour bar is an axis of its own
+        panels = [a for a in fig.axes if a.get_label() != '<colorbar>'
+                  and any(isinstance(c, QuadMesh) for c in a.collections)]
+        qm = [c for c in panels[0].collections
+              if isinstance(c, QuadMesh)][0]
+        want_name = (f'{name_prefix(r2)}field_overpressure_'
+                     f'{fms[4]:.3f}ms.png')
+        check('a frame: one PNG > 5 kB, one panel, named after the field '
+              'and the time', os.path.getsize(target) > 5000
+              and len(panels) == 1
+              and os.path.basename(target) == want_name
+              and asked[-1][0] == 'Save this frame'
+              and asked[-1][2] == '.png', f'{target} {len(panels)}')
+        check('manual: the QuadMesh clim is the range on screen',
+              tuple(qm.get_clim()) == (0.0, 50.0)
+              == tuple(p.anim.image.levels), str(qm.get_clim()))
+        fv.field_seg._btns['Density'].click()
+        pump(20)
+        p.set_colour_scale('run')
+        pump(20)
+        target = fv.save_frame_png(threaded=False)
+        qm = [c for a in fv.last_frame_figure.axes for c in a.collections
+              if isinstance(c, QuadMesh)
+              and a.get_label() != '<colorbar>'][0]
+        check('a snapshot map, whole run: its on-screen range',
+              os.path.getsize(target) > 5000
+              and tuple(qm.get_clim()) == tuple(p.fields.image.levels)
+              and 'field_density_' in os.path.basename(target),
+              str(qm.get_clim()))
+        before = len(os.listdir(out))
+        p.set_colour_scale('frame')
+        tb.slider.setValue(tb.slider.maximum())      # a new file name
+        pump(20)
+        target = fv.save_frame_png()          # threaded, the busy strip
+        busy = tb.busy() and tb.frame_btn.isHidden()
+        for _ in range(200):
+            pump(20)
+            if not tb.busy():
+                break
+        check('threaded: the busy strip while it writes, then the button',
+              busy and not tb.busy() and not tb.frame_btn.isHidden()
+              and os.path.exists(target) and len(os.listdir(out)) > before)
+        dialogs.save_file = lambda *a, **k: ''
+        check('a cancelled dialog writes nothing and shows no strip',
+              fv.save_frame_png() == '' and not tb.busy())
+    finally:
+        dialogs.save_file = real_save
+
+    print('\nS6i: F15 - one colour bar after a second 2D result')
+    fv.field_seg._btns['Overpressure'].click()
+    p.add_result('another', 2, fake_2d())
+    pump(30)
+    p.add_result('and another', 2, fake_2d())
+    pump(30)
+    fv.field_seg._btns['Density'].click()
+    pump(30)
+    bars = [it for it in p.fields.glw.scene().items()
+            if isinstance(it, pg.ColorBarItem)]
+    check('the Field map\'s scene holds exactly one colour bar (F15)',
+          len(bars) == 1, str(len(bars)))
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+    del fk
 
 
 def main():
@@ -1079,6 +1470,7 @@ def main():
         s3_busy(link)
         s3_view3d_and_title(link)
         s5_gauges(win, link)
+        s6_field(link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]
               if crashes else '')

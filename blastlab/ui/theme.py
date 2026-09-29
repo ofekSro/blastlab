@@ -683,6 +683,57 @@ def qss(mode_name):
         background: {p['card']}; color: {p['faint']}; border: none;
         border-bottom: 1px solid {p['border']}; padding: 4px 8px;
         font-family: "{FONT}"; font-size: 11.5px; font-weight: 500; }}
+    /* the Field view (ui/results_field.py, board lines 191-286) */
+    QFrame#fieldcard {{ background: {p['panel']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QWidget#fieldctl {{ background: transparent;
+        border-bottom: 1px solid {p['border']}; }}
+    QFrame#fieldseg {{ background: {p['bg']}; border: 1px solid {p['seg']};
+        border-radius: 9px; min-height: 34px; max-height: 34px; }}
+    QFrame#fieldseg QToolButton#seg {{ font-size: 12.5px; font-weight: 500;
+        border-radius: 6px; padding: 0px 8px;
+        min-height: 28px; max-height: 28px; }}
+    QLabel#fieldkey {{ font-size: 12.5px; color: {p['muted']};
+                       background: transparent; }}
+    QLabel#fieldunit {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['faint']}; background: transparent; }}
+    QLineEdit#fieldrange {{ font-family: "{MONO}"; font-size: 12.5px;
+        min-height: 22px; max-height: 22px; }}
+    QPushButton#fieldmesh {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 6px;
+        padding: 0px 10px; min-height: 28px; max-height: 28px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#fieldmesh:hover {{ background: {p['hover']}; }}
+    QPushButton#fieldmesh:checked {{ background: {p['accent_bg']};
+        color: {p['accent_soft']}; border-color: {p['accent_border']}; }}
+    QFrame#timebar {{ background: transparent;
+        border-top: 1px solid {p['border']}; }}
+    QPushButton#playround {{ background: {p['accent']}; border: none;
+        border-radius: 20px; min-width: 40px; max-width: 40px;
+        min-height: 40px; max-height: 40px; padding: 0px; }}
+    QPushButton#playround:hover {{ background: {p['accent_hover']}; }}
+    QLabel#timenow {{ font-family: "{DISPLAY}"; font-size: 15px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QLabel#timelen {{ font-family: "{MONO}"; font-size: 12px;
+                      color: {p['faint']}; background: transparent; }}
+    QSlider#timeslider::groove:horizontal {{ background: {p['seg']};
+        height: 4px; border-radius: 2px; }}
+    QSlider#timeslider::sub-page:horizontal {{ background: {p['accent']};
+        border-radius: 2px; }}
+    QSlider#timeslider::handle:horizontal {{ background: {p['text']};
+        width: 16px; height: 16px; margin: -6px 0px; border-radius: 8px; }}
+    QComboBox#timespeed {{ font-size: 12.5px; min-height: 24px;
+                           max-height: 24px; }}
+    QPushButton#framebtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 12px; min-height: 30px; max-height: 30px;
+        font-size: 12.5px; font-weight: 500; }}
+    QPushButton#framebtn:hover {{ background: {p['hover']}; }}
+    QFrame#framebusy {{ background: {p['accent_bg']};
+        border: 1px solid {p['accent_border']}; border-radius: 7px;
+        min-height: 30px; max-height: 32px; }}
+    QLabel#fieldcaption {{ font-size: 11.5px; color: {p['faint']};
+                           background: transparent; }}
     """
 
 

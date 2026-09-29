@@ -1,4 +1,6 @@
-"""The Results tab's Animation view: replay the frames a run recorded.
+"""The Results tab's replay of the frames a run recorded. Since GUI-7 T6 it
+is an engine of the Field view (`results_field.FieldView`), which hides
+its own controls and drives them from the time bar and the colour control.
 
 The colour scale is a control here, not a hidden default. It applies to
 the replay on screen AND to what the Animation export writes, and it
@@ -11,7 +13,7 @@ moves the slider, whose signal would move the frame again. The
 programmatic set is wrapped in blockSignals and guarded by `_playing`.
 """
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import QComboBox, QLineEdit, QSlider, QWidget
 import pyqtgraph as pg
 
@@ -66,7 +68,18 @@ def plane_geometry(meta):
 
 
 class AnimView(QWidget):
+    """The replay engine. GUI-7 T6: under the Field view its own control
+    rows (`controls`: Play, the slider, the speed, the colour scale and
+    its range) are hidden and driven by the Field view's time bar and
+    colour control; `frame_shown` and `playing_changed` keep those in
+    step with a replay driven from here (the timer, a test, the QA
+    harness)."""
+
     NO_RESULT = NO_RESULT
+    #: the frame index just drawn (show_frame)
+    frame_shown = Signal(int)
+    #: the replay started (True) or stopped (False)
+    playing_changed = Signal(bool)
 
     def __init__(self, on_change=None, parent=None):
         super().__init__(parent)
@@ -85,6 +98,9 @@ class AnimView(QWidget):
         self._show_mesh = False
 
         root = vbox(self)
+        #: the engine's own control rows: hidden under the Field view
+        self.controls = QWidget()
+        croot = vbox(self.controls)
         bar = hbox()
         self.play_btn = button('Play', 'play', 'primary', width=92,
                                height=32, on_click=self.toggle_play)
@@ -107,7 +123,7 @@ class AnimView(QWidget):
         self.speed_sel.currentIndexChanged.connect(
             lambda *_: self._speed_changed())
         bar.addWidget(self.speed_sel)
-        root.addLayout(bar)
+        croot.addLayout(bar)
 
         # the colour scale, for the replay and for the export
         bar2 = hbox()
@@ -129,7 +145,8 @@ class AnimView(QWidget):
             box.editingFinished.connect(self._scale_changed)
             bar2.addWidget(box)
         bar2.addStretch(1)
-        root.addLayout(bar2)
+        croot.addLayout(bar2)
+        root.addWidget(self.controls)
 
         self.glw = pg.GraphicsLayoutWidget()
         self.plot = self.glw.addPlot(row=0, col=0)
@@ -343,6 +360,7 @@ class AnimView(QWidget):
         self.plot.setTitle(title, color=theme.cur('text'), size='10pt')
         self._title = title
         self._frame = k
+        self.frame_shown.emit(k)
 
     def frame(self):
         return getattr(self, '_frame', 0)
@@ -380,13 +398,17 @@ class AnimView(QWidget):
         self.play_btn.setIcon(theme.icon('pause', 13, color='on_accent'))
         self.play_btn._blastlab_icon = ('pause', 13, 'on_accent')
         self.timer.start()
+        self.playing_changed.emit(True)
 
     def stop_play(self):
+        was = self._playing
         self._playing = False
         self.timer.stop()
         self.play_btn.setText('Play')
         self.play_btn.setIcon(theme.icon('play', 13, color='on_accent'))
         self.play_btn._blastlab_icon = ('play', 13, 'on_accent')
+        if was:
+            self.playing_changed.emit(False)
 
     def playing(self):
         return self._playing
