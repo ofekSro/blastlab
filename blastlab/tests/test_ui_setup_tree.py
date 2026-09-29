@@ -115,13 +115,17 @@ def t1_placement():
                   and a._card_of == b._card_of
                   and {k: v.get() for k, v in a.v.items()}
                   == {k: v.get() for k, v in b.v.items()})
+            # the three rows the Setup screen's dependent rules own (T3:
+            # the trigger switch, Profile file only in profile mode)
+            own = {'profile_in', 'trigger_gauge', 'trigger_action'}
             check(f'{d}D {mode}: same scope visibility, row by row',
-                  {n: a.row_visible(n) for n in a.widgets}
-                  == {n: b.row_visible(n) for n in b.widgets}
+                  {n: a.row_visible(n) for n in a.widgets if n not in own}
+                  == {n: b.row_visible(n) for n in b.widgets
+                      if n not in own}
                   and {t: a.card_visible(t) for t in a.cards}
                   == {t: b.card_visible(t) for t in b.cards},
-                  str([n for n in a.widgets
-                       if a.row_visible(n) != b.row_visible(n)]))
+                  str([n for n in a.widgets if n not in own
+                       and a.row_visible(n) != b.row_visible(n)]))
             if d:
                 ok, why = same_case(a.get_case(), b.get_case())
                 check(f'{d}D {mode}: the fresh forms build the same Case',
@@ -349,10 +353,152 @@ def t2_panel():
     sp.close()
 
 
+def t3_trigger():
+    from blastlab.core.case import validate_case
+    from blastlab.ui.case_form import TRIGGER_CHOOSE
+    print('\nT3a: the trigger switch writes what the old field wrote')
+    pts = {2: [(2.95, 0.5), (2.95, 1.5)],
+           3: [(1.0, 0.5, 0.5), (1.2, 0.75, 0.75)]}
+    for d in (2, 3):
+        for mode in MODES:
+            new = form(d, mode, 'nodes')
+            old = form(d, mode, 'columns')
+            for f in (new, old):
+                f.points['gauges'].set(pts[d])
+            new.refresh_trigger_choices()
+            sw, combo = new.trigger_switch, new.trigger_combo
+            tag = f'{d}D {mode}'
+            old.v['trigger_gauge'].set('')
+            ok, why = same_case(new.get_case(), old.get_case())
+            check(f'{tag}: off by default, rows hidden, the Case equals '
+                  f'the old field blanked',
+                  not sw.isChecked() and ok
+                  and not new.row_visible('trigger_action')
+                  and not new.row_visible('trigger_gauge')
+                  and new.get_case().trigger_gauge is None, why)
+            sw.click()
+            pump(5)
+            check(f'{tag}: on shows Gauge and On arrival, G1 chosen',
+                  sw.isChecked() and new.row_visible('trigger_action')
+                  and not combo.isHidden()
+                  and new.v['trigger_gauge'].get() == '1'
+                  and combo.currentData() == '1'
+                  and combo.currentText().startswith('G1 · '),
+                  combo.currentText())
+            i = combo.findData('2')
+            combo.setCurrentIndex(i)
+            combo.activated.emit(i)
+            old.v['trigger_gauge'].set('2')
+            ok, why = same_case(new.get_case(), old.get_case())
+            check(f'{tag}: picking G2 builds the Case typing 2 builds',
+                  ok and new.get_case().trigger_gauge == 2, why)
+            want = ('G2 · r 2.95, z 1.50' if d == 2
+                    else 'G2 · 1.20, 0.75, 0.75')
+            check(f'{tag}: the entry reads {want!r}',
+                  combo.currentText() == want, combo.currentText())
+            sw.click()
+            old.v['trigger_gauge'].set('')
+            ok, why = same_case(new.get_case(), old.get_case())
+            check(f'{tag}: off again blanks it', ok
+                  and new.v['trigger_gauge'].get() == ''
+                  and not new.row_visible('trigger_action'), why)
+            sw.click()
+            check(f'{tag}: on again brings back G2',
+                  new.v['trigger_gauge'].get() == '2')
+            new.deleteLater()
+            old.deleteLater()
+
+    print('\nT3b: loading a case sets the switch')
+    for d, cls in ((2, Case2D), (3, Case3D)):
+        g = pts[d]
+        f = form(d, 'blastfoam', 'nodes')
+        f.set_case(cls(solver='blastfoam', gauges=g, trigger_gauge=1))
+        pump(5)
+        check(f'{d}D: trigger_gauge=1 -> on, dropdown on G1',
+              f.trigger_switch.isChecked()
+              and f.trigger_combo.currentData() == '1')
+        f.set_case(cls(solver='blastfoam', gauges=g))
+        pump(5)
+        check(f'{d}D: blank -> off, rows hidden',
+              not f.trigger_switch.isChecked()
+              and not f.row_visible('trigger_action')
+              and not f.trigger_combo.isVisibleTo(f))
+        src = cls(solver='blastfoam', gauges=g, trigger_gauge=5)
+        f.set_case(src)
+        pump(5)
+        c = form(d, 'blastfoam', 'columns')
+        c.set_case(src)
+        ok, why = same_case(f.get_case(), c.get_case())
+        check(f'{d}D: G5 of 2 gauges is kept and shown as '
+              f'"G5 (no such gauge)"',
+              f.trigger_switch.isChecked()
+              and f.trigger_combo.currentText() == 'G5 (no such gauge)'
+              and f.get_case().trigger_gauge == 5 and ok,
+              f.trigger_combo.currentText())
+        errs = validate_case(f.get_case()).errors
+        check(f'{d}D: and validation still names it',
+              any('Trigger gauge 5' in e for e in errs), str(errs))
+        f.set_case(cls(solver='blastfoam', gauges=[]))
+        f.trigger_switch.click()
+        check(f'{d}D: on with no gauges: blank, the dropdown says so',
+              f.v['trigger_gauge'].get() == ''
+              and f.trigger_combo.currentData() == ''
+              and f.trigger_combo.currentText() != TRIGGER_CHOOSE)
+        f.points['gauges'].set(g)
+        f.refresh_trigger_choices()
+        check(f'{d}D: a gauge added later is offered, nothing written',
+              f.trigger_combo.count() == 3
+              and f.trigger_combo.currentText() == TRIGGER_CHOOSE
+              and f.v['trigger_gauge'].get() == '')
+    f = form(2, 'blastfoam', 'nodes')
+    check('the off line names the side that ends the run (board)',
+          f._trig['off'].text()
+          == 'Off: the run ends at the Outer side or at the end time.',
+          f._trig['off'].text())
+    check("1D has no switch (no trigger card, T63)",
+          form(1, 'blastfoam', 'nodes').trigger_switch is None)
+    check("3D's On arrival still drops remap (S1)",
+          all('remap' not in a for a in
+              setup_spec.by_name(3)['trigger_action'].values))
+    check("a standalone 'columns' form has no switch (Chain, golden)",
+          form(2, 'blastfoam', 'columns').trigger_switch is None)
+
+    print('\nT3c: Profile file only in profile mode')
+    for d in (2, 3):
+        f = form(d, 'blastfoam', 'nodes')
+        check(f"{d}D: 'charge' hides Profile file",
+              not f.row_visible('profile_in'))
+        f.v['profile_in'].set(r'C:\data\blast_profile.txt')
+        f.v['init_mode'].set('profile1d')
+        check(f"{d}D: 'profile1d' shows it", f.row_visible('profile_in'))
+        f.v['init_mode'].set('charge')
+        check(f'{d}D: hidden again', not f.row_visible('profile_in'))
+        f.v['init_mode'].set('profile1d')
+        check(f'{d}D: the typed path survived the there-and-back',
+              f.v['profile_in'].get() == r'C:\data\blast_profile.txt')
+    c = form(2, 'blastfoam', 'columns')
+    check("a 'columns' form keeps the row (unchanged; golden)",
+          c.row_visible('profile_in'))
+
+    print('\nT3d: restated rules still hold in nodes placement')
+    f = form(2, 'blastfoam', 'nodes')
+    check('AMR off: coefficients hidden, charge refinement shown',
+          not f.row_visible('amr_refine') and f.row_visible('charge_refine'))
+    f.v['amr_levels'].set('2')
+    check('AMR on: coefficients shown, charge refinement hidden',
+          f.row_visible('amr_refine') and not f.row_visible('charge_refine'))
+    check('video min/max hidden unless manual',
+          not f.row_visible('anim_clim_min'))
+    f.v['vtk_v_on'].set(True)
+    check('the first VTK tick fills its family defaults',
+          bool(f.v['vtk_fields'].get().get('volumes')))
+
+
 def main():
     t1_registry()
     t1_placement()
     t2_panel()
+    t3_trigger()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

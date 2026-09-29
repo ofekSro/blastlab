@@ -421,6 +421,8 @@ class SetupPanel(QWidget):
             for node_id, text in setup_nodes.summaries(case).items():
                 self.tree.set_summary(node_id, text)
         self._sync_children()
+        # the trigger dropdown offers the gauges as they are now
+        f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self._dim, n) for n in f.bad}
         for n, _t in setup_nodes.nodes(self._dim):
             self.tree.set_status(n.id, 'error' if n.id in bad else 'ok')

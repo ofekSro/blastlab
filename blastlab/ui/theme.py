@@ -401,6 +401,8 @@ def qss(mode_name):
     QPushButton#casepill[state="error"] {{ background: {p['stop_bg']};
                                           border: 1px solid {p['stop_border']};
                                           color: {p['danger']}; }}
+    QLabel#trigtitle {{ font-size: 14px; font-weight: 600;
+                        color: {p['text']}; }}
     QLabel#derivedkey {{ font-size: 13px; color: {p['muted']}; }}
     QLabel#derivedval {{ font-family: "{MONO}"; font-size: 13px;
                          color: {p['text']}; }}
