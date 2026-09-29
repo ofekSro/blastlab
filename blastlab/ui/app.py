@@ -22,7 +22,7 @@ from ..core.case import (load_case, long_run_note, save_case,
 from ..core.mode import SolverMode
 from ..models import hd13_case
 from ..models.case import load_any_case
-from ..services.model_folder import model_for_case_file
+from ..services.model_folder import CASE_FILE, model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
 from . import dialogs, theme
@@ -157,6 +157,7 @@ class MainWindow(QMainWindow):
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run,
                                     bridge=self.bridge)
+        self.results.load_case_requested.connect(self._load_case_from_result)
         self.chain = ChainPanel(on_run_chain=self._run_chain,
                                 mode=self.solver_mode,
                                 log_fn=self._log_threadsafe,
@@ -544,34 +545,36 @@ class MainWindow(QMainWindow):
         except ValueError:
             return None
 
+    def _read_case_file(self, path, title='Open case'):
+        """The case in `path` (`load_any_case`), or None after an error
+        dialog titled `title` saying why it could not be read."""
+        try:
+            # a blast case, or an HD 1.3 one for the 0-D form (QA F2)
+            return load_any_case(path)
+        except FileNotFoundError:
+            self.show_error(title, f'File not found: {path}')
+        except json.JSONDecodeError as exc:
+            self.show_error(title, f'This file is not valid JSON '
+                                   f'(line {exc.lineno}, column '
+                                   f'{exc.colno}).')
+        except (KeyError, TypeError) as exc:
+            self.show_error(title, f'Not a blastlab case file: '
+                                   f'unsupported or missing field {exc}.')
+        except OSError as exc:
+            self.show_error(title, f'Could not read the file: '
+                                   f'{exc.strerror or exc}')
+        except Exception as exc:
+            msg = str(exc)
+            self.show_error(title, msg if 'case file' in msg.lower()
+                            else f'Not a blastlab case file: {msg}')
+        return None
+
     def _open_case(self, path=None):
         path = path or dialogs.open_file('Open case', CASE_FILTER, self)
         if not path:
             return
-        try:
-            # a blast case, or an HD 1.3 one for the 0-D form (QA F2)
-            case = load_any_case(path)
-        except FileNotFoundError:
-            self.show_error('Open case', f'File not found: {path}')
-            return
-        except json.JSONDecodeError as exc:
-            self.show_error('Open case', f'This file is not valid JSON '
-                                         f'(line {exc.lineno}, column '
-                                         f'{exc.colno}).')
-            return
-        except (KeyError, TypeError) as exc:
-            self.show_error('Open case', f'Not a blastlab case file: '
-                                         f'unsupported or missing field '
-                                         f'{exc}.')
-            return
-        except OSError as exc:
-            self.show_error('Open case', f'Could not read the file: '
-                                         f'{exc.strerror or exc}')
-            return
-        except Exception as exc:
-            msg = str(exc)
-            self.show_error('Open case', msg if 'case file' in msg.lower()
-                            else f'Not a blastlab case file: {msg}')
+        case = self._read_case_file(path)
+        if case is None:
             return
         self._case_path = path
         self.setup.set_case(case)
@@ -588,6 +591,34 @@ class MainWindow(QMainWindow):
         self._update_title()
         self._show('setup')
         self._schedule_validate()
+
+    def _load_case_from_result(self, path):
+        """Results → Load into 01 Setup (UX-15): the case a result was
+        run from (its model folder's MODEL.json, or a loaded run's
+        case.json) as a NEW, unsaved case. The path is dropped, so Ctrl+S
+        goes to Save as and never writes into the model folder's record
+        of the run (batch risk 5)."""
+        case = self._read_case_file(path, 'Load into 01 Setup')
+        if case is None:
+            return False
+        if self._dirty and not dialogs.ask_yes_no(
+                'Load into 01 Setup',
+                f'Replace the unsaved changes in {self._case_stem()}?',
+                self, yes='Replace', no='Keep editing'):
+            return False
+        self.setup.set_case(case)
+        if os.path.basename(path) == CASE_FILE:
+            model = model_for_case_file(path)
+        else:                       # <run dir>\case.json: the run's name
+            model = os.path.basename(os.path.dirname(os.path.abspath(path)))
+        self.run_panel.set_run_name(model, replace=True)
+        self._case_path = None
+        self._set_dirty(True)
+        self.topbar.set_case_name(self._case_stem())
+        self._update_title()
+        self._show('setup')
+        self._schedule_validate()
+        return True
 
     def _maybe_prewarm_viewer(self, case):
         """Start the viewer child early for a 3D case, so its pyvista

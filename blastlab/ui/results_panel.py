@@ -1,5 +1,12 @@
-"""The Results tab: browse the snapshots and gauges of finished runs,
-replay recorded frames, drive the 3D viewer, and export.
+"""The Results tab (03 Results, board Results): browse the snapshots and
+gauges of finished runs, replay recorded frames, drive the 3D viewer,
+and export.
+
+Three columns (docs/gui-redesign-plan.md section 7, batch
+2026-09-29-gui-results): results + how it was computed (280 px) · the
+centre (the view tabs over the sub-views) · export (320 px). The side
+columns give way (to 248 and 288 px) only when the window cannot hold
+the centre's minimum between them, as on the Run screen (D19).
 
 Screen and file differ here by design. On screen the Fields view is ONE
 large panel with selectors, because a persistent pyqtgraph image makes a
@@ -8,30 +15,44 @@ writing the full multi-panel grid that `output/plots.py` builds, and
 their tooltips say so.
 
 The sub-views live in their own modules (`results_fields`,
-`results_gauges`, `results_anim`) and the writing in `exports`, so each
-is testable without building a window.
+`results_gauges`, `results_anim`), the list in `results_list`, the
+method card's rows in `results_method` and the writing in `exports`, so
+each is testable without building a window.
 """
 
 import os
 import threading
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QLineEdit, QStackedWidget,
-                               QWidget)
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (QApplication, QBoxLayout, QDialog, QFrame,
+                               QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QPlainTextEdit, QPushButton, QStackedWidget,
+                               QVBoxLayout, QWidget)
 
 from ..viz3d import MISSING_MSG, pyvista_available
-from . import dialogs, exports
+from . import dialogs, exports, theme
 from .bridge import ThreadBridge
 from .results_anim import AnimView
 from .results_fields import FieldsView
 from .results_gauges import GaugesView
+from .results_list import ElidedLabel, ResultsList
+from .results_method import NO_CASE_TIP, case_source, method_rows
+from .setup_tree import _letter_space
 from .view3d_host import View3DHost
-from .widgets import (Card, Segmented, WrapRow, button, hbox, label,
-                      vbox)
+from .widgets import ScrollColumn, Segmented, WrapRow, button
 
 #: longest label the picker shows in full; anything longer is elided
 #: there and kept whole in the item's tooltip
 PICKER_MAX = 34
+
+#: the side columns (board Results lines 57 and 298) and how far they
+#: give way on a narrow window (the Run screen's rule, D19)
+LEFT_W, LEFT_MIN = 280, 248
+RIGHT_W, RIGHT_MIN = 320, 288
+#: the centre's padding (board line 96: 14 px top/bottom, 18 px sides)
+CENTRE_PAD = (18, 14, 18, 14)
+#: Qt's QWIDGETSIZE_MAX, to undo a setFixedHeight
+QWIDGETSIZE_MAX = (1 << 24) - 1
 
 #: (text, icon, kind) for the export row, in the order they sit
 EXPORT_BUTTONS = (('Profile', 'curve', 'profile'),
@@ -68,11 +89,16 @@ VIEWS = ('Fields', 'Gauges', 'Animation', '3D')
 
 
 class ResultEntry:
-    def __init__(self, label, dim, result):
+    """One result in the list. `kind` is 'run', or 'chain' for a chain
+    shown as one result with its `stages` (GUI-9 sets both)."""
+
+    def __init__(self, label, dim, result, kind='run', stages=None):
         self.label = label
         self.display = label
         self.dim = dim
         self.result = result
+        self.kind = kind
+        self.stages = stages
 
 
 def elide_middle(text, width=PICKER_MAX):
@@ -86,7 +112,180 @@ def elide_middle(text, width=PICKER_MAX):
     return text[:head] + '…' + text[len(text) - tail:]
 
 
+class _ViewStack(QStackedWidget):
+    """The views, sized by the page on screen (setup_panel._PreviewStack's
+    rule, D25): a plain QStackedWidget takes its LARGEST page as its
+    minimum, so the 3D host would hold the centre at 376 px under every
+    other view and push the side columns narrower than they need be."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.currentChanged.connect(lambda _i: self.updateGeometry())
+
+    def sizeHint(self):
+        w = self.currentWidget()
+        return w.sizeHint() if w is not None else super().sizeHint()
+
+    def minimumSizeHint(self):
+        w = self.currentWidget()
+        return (w.minimumSizeHint() if w is not None
+                else super().minimumSizeHint())
+
+
+class CaseViewer(QDialog):
+    """`Case as run · <name>`: the case file's text, read-only, with its
+    path and a Copy button. Not modal, so no unattended driver can hang
+    on it (batch risk 9)."""
+
+    def __init__(self, path, name, parent=None):
+        super().__init__(parent)
+        self.setModal(False)
+        self.setWindowTitle(f'Case as run · {name}')
+        self.resize(640, 560)
+        with open(path, 'rb') as f:
+            self._text = f.read().decode('utf-8', 'replace')
+        self.path = path
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 14, 14, 14)
+        lay.setSpacing(8)
+        where = ElidedLabel(path)
+        where.setObjectName('runpath')
+        lay.addWidget(where)
+        self.view = QPlainTextEdit()
+        self.view.setObjectName('caseview')
+        self.view.setReadOnly(True)
+        self.view.setLineWrapMode(QPlainTextEdit.NoWrap)
+        self.view.setPlainText(self._text)
+        lay.addWidget(self.view, 1)
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addStretch(1)
+        self.copy_btn = QPushButton('Copy')
+        self.copy_btn.setObjectName('runquiet')
+        self.copy_btn.setToolTip('Copy the whole case file')
+        self.copy_btn.clicked.connect(lambda *_: self.copy())
+        row.addWidget(self.copy_btn)
+        close = QPushButton('Close')
+        close.setObjectName('runquiet')
+        close.clicked.connect(lambda *_: self.close())
+        row.addWidget(close)
+        lay.addLayout(row)
+
+    def text(self):
+        """The file's bytes decoded as UTF-8, exactly as copied."""
+        return self._text
+
+    def copy(self):
+        QApplication.clipboard().setText(self._text)
+
+
+class MethodCard(QFrame):
+    """HOW IT WAS COMPUTED (UX-15, board lines 78-91): the rows of
+    `results_method.method_rows`, then Show case / Load into 01 Setup."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setObjectName('runcard')
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(14, 14, 14, 14)
+        lay.setSpacing(9)
+        caps = QLabel('HOW IT WAS COMPUTED')
+        caps.setObjectName('eyebrow')
+        _letter_space(caps)
+        self._caps = caps
+        lay.addWidget(caps)
+        self._grid = QGridLayout()
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setHorizontalSpacing(8)
+        self._grid.setVerticalSpacing(7)
+        self._grid.setColumnStretch(1, 1)
+        lay.addLayout(self._grid)
+        self._row_widgets = []
+        self.none = QLabel('Select a result to see how it was computed.')
+        self.none.setObjectName('methodkey')
+        self.none.setWordWrap(True)
+        lay.addWidget(self.none)
+        # side by side (board line 87), one above the other when the
+        # column has given way and the two no longer fit in a row
+        btns = QBoxLayout(QBoxLayout.LeftToRight)
+        btns.setContentsMargins(0, 4, 0, 0)
+        btns.setSpacing(6)
+        self.show_btn = QPushButton('Show case')
+        self.show_btn.setObjectName('resquiet')
+        self.show_btn.setCursor(Qt.PointingHandCursor)
+        btns.addWidget(self.show_btn, 10)
+        self.load_btn = QPushButton('Load into 01 Setup')
+        self.load_btn.setObjectName('resquiet')
+        self.load_btn.setCursor(Qt.PointingHandCursor)
+        btns.addWidget(self.load_btn, 14)
+        self._btns = btns
+        lay.addLayout(btns)
+        self._rows = []
+
+    def _pair_need(self):
+        return (self.show_btn.sizeHint().width()
+                + self.load_btn.sizeHint().width() + self._btns.spacing())
+
+    def minimumSizeHint(self):
+        """The widest single button (or the caps), not the pair: the
+        buttons stack when the pair does not fit."""
+        s = super().minimumSizeHint()
+        m = self.layout().contentsMargins()
+        w = max(self.show_btn.sizeHint().width(),
+                self.load_btn.sizeHint().width(),
+                self._caps.sizeHint().width())
+        return QSize(w + m.left() + m.right(), s.height())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._arrange()
+
+    def _arrange(self):
+        m = self.layout().contentsMargins()
+        room = self.width() - m.left() - m.right()
+        d = (QBoxLayout.LeftToRight if room >= self._pair_need()
+             else QBoxLayout.TopToBottom)
+        if self._btns.direction() != d:
+            self._btns.setDirection(d)
+            self.updateGeometry()
+
+    def buttons_stacked(self):
+        return self._btns.direction() == QBoxLayout.TopToBottom
+
+    def set_rows(self, rows):
+        """[(label, value)] as `method_rows` gives them."""
+        for w in self._row_widgets:
+            self._grid.removeWidget(w)
+            w.setParent(None)
+            w.deleteLater()
+        self._row_widgets = []
+        self._rows = list(rows)
+        for k, (key, val) in enumerate(self._rows):
+            kl = QLabel(key)
+            kl.setObjectName('methodkey')
+            vl = ElidedLabel(val, Qt.ElideRight)
+            vl.setObjectName('methodval')
+            vl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self._grid.addWidget(kl, k, 0)
+            self._grid.addWidget(vl, k, 1)
+            self._row_widgets += [kl, vl]
+        self.none.setVisible(not self._rows)
+
+    def rows(self):
+        return list(self._rows)
+
+    def value_label(self, key):
+        """The value widget of row `key`, or None (tests)."""
+        for k, (name, _v) in enumerate(self._rows):
+            if name == key:
+                return self._row_widgets[2 * k + 1]
+        return None
+
+
 class ResultsPanel(QWidget):
+    #: Load into 01 Setup: the case file's path (MainWindow loads it)
+    load_case_requested = Signal(str)
+
     def __init__(self, viewer_link=None, log_fn=print, mode=None,
                  on_resume=None, bridge=None, parent=None):
         super().__init__(parent)
@@ -98,74 +297,124 @@ class ResultsPanel(QWidget):
         # calling straight through, which is only safe in tests
         self._bridge = bridge if bridge is not None else ThreadBridge(self)
         self._run_browser = None
+        self._case_viewer = None
         # a standalone panel (tests) shows everything; the app narrows
         # this the moment the solver mode arrives
         self._solver_mode = 'blastfoam'
 
-        root = vbox(self, margins=(0, 0, 0, 0))
-        root.addWidget(label('Results', 'h1'))
+        body = QHBoxLayout(self)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(0)
+        self._left = self._build_left()
+        body.addWidget(self._left)
+        self._centre = self._build_centre(viewer_link, log_fn)
+        body.addWidget(self._centre, 1)
+        self._right = self._build_right()
+        body.addWidget(self._right)
 
-        top = Card()
-        root.addWidget(top)
-        bar = hbox()
-        bar.addWidget(label('Result', 'muted'))
-        self.sel = QComboBox()
-        self.sel.setMinimumWidth(250)
+        # every sub-view starts on its own "nothing yet" message rather
+        # than on empty axes, which read as a result containing nothing
+        self.clear_views()
+        self._render_method(None)
+        self._sync_export_buttons(None)
+        if mode is not None:
+            mode.subscribe(self.set_solver_mode)
+            self.set_solver_mode(mode.get())
+
+    # ── the left column: results + how it was computed (board 57-94) ─────
+    def _build_left(self):
+        frame = QFrame()
+        frame.setObjectName('resleft')
+        frame.setFixedWidth(LEFT_W)
+        fl = QVBoxLayout(frame)
+        fl.setContentsMargins(1, 1, 1, 1)
+        fl.setSpacing(0)
+        col = ScrollColumn(spacing=16)
+        col.layout_.setContentsMargins(14, 16, 12, 16)
+        col.setFocusPolicy(Qt.NoFocus)
+        self._left_scroll = col
+        fl.addWidget(col)
+
+        self.sel = ResultsList()
         self.sel.currentIndexChanged.connect(lambda *_: self.refresh())
-        bar.addWidget(self.sel)
-        # no fixed width: 104 was 4 px short of the label plus its icon
-        self._remove_btn = button('Remove', 'minus', height=32,
-                                  on_click=self.remove_current)
-        bar.addWidget(self._remove_btn)
-        self._view3d_btn = button('3D Viewer', 'cube', 'primary', width=124,
-                                  height=32, on_click=self.open_3d)
-        bar.addWidget(self._view3d_btn)
-        self._foam_runs_btn = button('Foam runs…', 'folder', width=140,
-                                     height=32,
-                                     on_click=self.open_run_browser)
-        bar.addWidget(self._foam_runs_btn)
-        bar.addStretch(1)
-        top.add_layout(bar)
+        col.add(self.sel, 1)
+        row = QHBoxLayout()
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(6)
+        self._foam_runs_btn = QPushButton('Load a run…')
+        self._foam_runs_btn.setObjectName('resbtn')
+        self._foam_runs_btn.setIcon(theme.icon('folder', 14))
+        self._foam_runs_btn.setIconSize(QSize(14, 14))
+        self._foam_runs_btn._blastlab_icon = ('folder', 14, None)
+        self._foam_runs_btn.setCursor(Qt.PointingHandCursor)
+        self._foam_runs_btn.setMinimumWidth(0)
+        self._foam_runs_btn.setToolTip(
+            'Load a finished blastFoam run from the runs folder in WSL '
+            '(the run browser)')
+        self._foam_runs_btn.clicked.connect(
+            lambda *_: self.open_run_browser())
+        row.addWidget(self._foam_runs_btn, 1)
+        self._remove_btn = QPushButton('✕')
+        self._remove_btn.setObjectName('ressquare')
+        self._remove_btn.setFixedSize(34, 34)
+        self._remove_btn.setCursor(Qt.PointingHandCursor)
+        self._remove_btn.setAccessibleName('Remove the selected result')
+        self._remove_btn.clicked.connect(lambda *_: self.remove_current())
+        row.addWidget(self._remove_btn)
+        col.add_layout(row)
 
-        bar2 = hbox()
-        bar2.addWidget(label('Export', 'muted'))
-        # no fixed widths: four of these eight labels need 116-155 px and
-        # were pinned to 106, so they read 'Animatio', 'Summary C',
-        # 'Gauges TS' and 'Field CSV' at every window size. WrapRow lets
-        # each keep its own width and breaks to a second line instead.
-        self._export_row = WrapRow()
-        self._export_btns = {}
-        for text, glyph, kind in EXPORT_BUTTONS:
-            b = self._export_row.add(
-                button(text, glyph, height=32,
-                       on_click=lambda k=kind: self.export(k)))
-            self._export_btns[kind] = b
-        bar2.addWidget(self._export_row, 1)
-        top.add_layout(bar2)
+        self.method = MethodCard()
+        self.method.show_btn.clicked.connect(lambda *_: self.show_case())
+        self.method.load_btn.clicked.connect(lambda *_: self._load_case())
+        col.add(self.method)
+        self._path_lbl = ElidedLabel('')
+        self._path_lbl.setObjectName('runpath')
+        self._path_lbl.hide()
+        col.add(self._path_lbl)
+        return frame
 
-        # A line of the user's own ABOVE the automatic title, on every
-        # figure this tab shows or exports. It belongs to this
-        # presentation of a result, not to the case.
-        bar3 = hbox()
-        bar3.addWidget(label('Title', 'muted'))
-        self.title_box = QLineEdit()
-        self.title_box.setMinimumWidth(420)
-        self.title_box.setPlaceholderText(
-            'optional - added above the automatic title')
-        self.title_box.textChanged.connect(lambda *_: self._title_changed())
-        bar3.addWidget(self.title_box)
-        bar3.addStretch(1)
-        top.add_layout(bar3)
+    # ── the centre: stage hook, view tabs, the views (board 96-296) ──────
+    def _build_centre(self, viewer_link, log_fn):
+        centre = QWidget()
+        centre.setMinimumWidth(0)
+        cl = QVBoxLayout(centre)
+        cl.setContentsMargins(*CENTRE_PAD)
+        cl.setSpacing(12)
+        # GUI-9 puts a chain's STAGE 1D | 2D | 3D strip here (board
+        # Results_Chain lines 98-103) through set_stage_strip; hidden,
+        # empty and zero-height until then (RunPanel.chain_slot's rule)
+        self.stage_slot = QWidget()
+        self.stage_slot.setObjectName('stageslot')
+        ssl = QHBoxLayout(self.stage_slot)
+        ssl.setContentsMargins(0, 0, 0, 0)
+        ssl.setSpacing(0)
+        self.stage_slot.setFixedHeight(0)
+        self.stage_slot.setVisible(False)
+        cl.addWidget(self.stage_slot)
 
-        views = Card(pad=12)
-        root.addWidget(views, 1)
-        self.view_seg = Segmented(list(VIEWS))
-        self.view_seg.setMaximumWidth(420)
+        bar = QHBoxLayout()
+        bar.setContentsMargins(0, 0, 0, 0)
+        bar.setSpacing(12)
+        segframe = QFrame()
+        segframe.setObjectName('resseg')
+        sl = QHBoxLayout(segframe)
+        sl.setContentsMargins(3, 2, 3, 2)
+        sl.setSpacing(0)
+        self.view_seg = Segmented(list(VIEWS), height=32, small=True)
         self.view_seg.changed.connect(self._view_selected)
-        views.add(self.view_seg)
+        sl.addWidget(self.view_seg)
+        self._seg_frame = segframe
+        bar.addWidget(segframe)
+        bar.addStretch(1)
+        cl.addLayout(bar)
 
-        self.stack = QStackedWidget()
-        views.add(self.stack, 1)
+        view = QFrame()
+        view.setObjectName('resview')
+        vl = QVBoxLayout(view)
+        vl.setContentsMargins(10, 10, 10, 10)
+        vl.setSpacing(0)
+        self.stack = _ViewStack()
+        vl.addWidget(self.stack, 1)
         self.fields = FieldsView(on_change=self._mesh_changed)
         self.gauges = GaugesView()
         self.anim = AnimView()
@@ -177,14 +426,134 @@ class ResultsPanel(QWidget):
             self.stack.addWidget(w)
         self.view_seg.set('Fields')
         self.stack.setCurrentWidget(self.fields)
-        # every sub-view starts on its own "nothing yet" message rather
-        # than on empty axes, which read as a result containing nothing
-        self.clear_views()
+        self._view_frame = view
+        cl.addWidget(view, 1)
+        return centre
 
-        self._sync_export_buttons(None)
-        if mode is not None:
-            mode.subscribe(self.set_solver_mode)
-            self.set_solver_mode(mode.get())
+    # ── the right column: export (board 298-331) ─────────────────────────
+    def _build_right(self):
+        frame = QFrame()
+        frame.setObjectName('resright')
+        frame.setFixedWidth(RIGHT_W)
+        fl = QVBoxLayout(frame)
+        fl.setContentsMargins(1, 1, 1, 1)
+        fl.setSpacing(0)
+        col = ScrollColumn(spacing=16)
+        col.layout_.setContentsMargins(18, 16, 14, 16)
+        col.setFocusPolicy(Qt.NoFocus)
+        self._right_scroll = col
+        fl.addWidget(col)
+
+        head = QWidget()
+        hl = QVBoxLayout(head)
+        hl.setContentsMargins(0, 0, 0, 0)
+        hl.setSpacing(4)
+        caps = QLabel('EXPORT')
+        caps.setObjectName('eyebrow')
+        _letter_space(caps)
+        hl.addWidget(caps)
+        cap = QLabel('Into the model folder, or anywhere you choose.')
+        cap.setObjectName('runfield')
+        cap.setWordWrap(True)
+        hl.addWidget(cap)
+        col.add(head)
+
+        # no fixed widths: WrapRow lets each keep its own width and
+        # breaks to another line instead of cutting a label
+        self._export_row = WrapRow()
+        self._export_btns = {}
+        for text, glyph, kind in EXPORT_BUTTONS:
+            b = self._export_row.add(
+                button(text, glyph, height=32,
+                       on_click=lambda k=kind: self.export(k)))
+            self._export_btns[kind] = b
+        col.add(self._export_row)
+
+        # A line of the user's own ABOVE the automatic title, on every
+        # figure this tab shows or exports. It belongs to this
+        # presentation of a result, not to the case.
+        tbox = QWidget()
+        tl = QVBoxLayout(tbox)
+        tl.setContentsMargins(0, 0, 0, 0)
+        tl.setSpacing(6)
+        tcap = QLabel('Title on figures (optional)')
+        tcap.setObjectName('runfield')
+        tl.addWidget(tcap)
+        self.title_box = QLineEdit()
+        self.title_box.setObjectName('restitle')
+        self.title_box.setMinimumWidth(0)
+        self.title_box.setPlaceholderText('added above the automatic title')
+        self.title_box.textChanged.connect(lambda *_: self._title_changed())
+        tl.addWidget(self.title_box)
+        col.add(tbox)
+        col.add_stretch()
+
+        self._view3d_btn = button('3D Viewer', 'cube', height=34,
+                                  on_click=self.open_3d, icon_size=17)
+        col.add(self._view3d_btn)
+        return frame
+
+    # ── layout: the side columns give way on a narrow window ─────────────
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_columns()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_columns()
+
+    def _fit_columns(self):
+        """280 / centre / 320, the side columns giving way (to 248 and
+        288, in proportion) only when the window cannot hold the centre's
+        minimum between them (RunPanel._fit_columns' rule)."""
+        w = self.width()
+        if w <= 1:
+            return
+        centre_min = self._centre.minimumSizeHint().width()
+        short = LEFT_W + RIGHT_W + centre_min - w
+        left, right = LEFT_W, RIGHT_W
+        if short > 0:
+            room_l, room_r = LEFT_W - LEFT_MIN, RIGHT_W - RIGHT_MIN
+            take_l = min(room_l, round(short * room_l / (room_l + room_r)))
+            take_r = min(room_r, short - take_l)
+            left, right = LEFT_W - take_l, RIGHT_W - take_r
+        if self._left.width() != left or self._left.minimumWidth() != left:
+            self._left.setFixedWidth(left)
+        if self._right.width() != right \
+                or self._right.minimumWidth() != right:
+            self._right.setFixedWidth(right)
+
+    def column_widths(self):
+        """(left, centre, right) in px, as laid out (tests)."""
+        return (self._left.width(), self._centre.width(),
+                self._right.width())
+
+    # ── the stage hook (GUI-9 builds the strip) ──────────────────────────
+    def set_stage_strip(self, widget=None):
+        """Put `widget` - GUI-9's STAGE 1D | 2D | 3D strip - in
+        `stage_slot`, above the view tabs, and show it; None empties the
+        slot and hides it at zero height. A widget taken out is
+        unparented (and so hidden). Anything appearing above the view
+        moves the embedded 3D viewer: GUI-9 re-measures it (CLAUDE.md
+        8.7)."""
+        lay = self.stage_slot.layout()
+        while lay.count():
+            w = lay.takeAt(0).widget()
+            if w is not None and w is not widget:
+                w.setParent(None)
+        if widget is None:
+            self.stage_slot.setFixedHeight(0)
+            self.stage_slot.hide()
+            return
+        lay.addWidget(widget)
+        self.stage_slot.setMinimumHeight(0)
+        self.stage_slot.setMaximumHeight(QWIDGETSIZE_MAX)
+        self.stage_slot.show()
+
+    def stage_strip(self):
+        """The widget in `stage_slot`, or None."""
+        lay = self.stage_slot.layout()
+        return lay.itemAt(0).widget() if lay.count() else None
 
     # ── entries ──────────────────────────────────────────────────────────
     def _unique_label(self, text):
@@ -201,7 +570,7 @@ class ResultsPanel(QWidget):
         return f'{text} #{n}'
 
     def _repopulate(self, keep=None):
-        """Rebuild the picker, the entry itself in each item's data so
+        """Rebuild the list, the entry itself in each item's data so
         `current()` never has to match on text."""
         taken = set()
         self.sel.blockSignals(True)
@@ -251,6 +620,7 @@ class ResultsPanel(QWidget):
             self.refresh()
         else:
             self.clear_views()
+            self._render_method(None)
         self._log(f'Removed result: {ent.label}')
 
     def clear_views(self):
@@ -266,6 +636,8 @@ class ResultsPanel(QWidget):
         w = self._views.get(value)
         if w is not None:
             self.stack.setCurrentWidget(w)
+            # the stack is sized by its page (_ViewStack)
+            self._fit_columns()
 
     def show_view(self, name):
         """Switch sub-view programmatically (the QA harness uses this)."""
@@ -298,6 +670,7 @@ class ResultsPanel(QWidget):
 
     def refresh(self):
         ent = self.current()
+        self._render_method(ent)
         if ent is None:
             # a picker that matches nothing used to leave the export row
             # exactly as the previous result had left it, so every button
@@ -314,6 +687,60 @@ class ResultsPanel(QWidget):
         self.anim.set_result(
             ent, show_mesh=self.fields.show_mesh.isChecked())
 
+    # ── how it was computed (UX-15) ──────────────────────────────────────
+    def _render_method(self, ent):
+        res = getattr(ent, 'result', None)
+        self.method.set_rows(method_rows(res, ent.dim) if ent else [])
+        src = case_source(ent) if ent is not None else None
+        tip = (NO_CASE_TIP if ent is not None
+               else 'Select a result first.')
+        for b, good in ((self.method.show_btn,
+                         'Show the case file this result was run from, '
+                         'read-only'),
+                        (self.method.load_btn,
+                         'Load this case into 01 Setup as a new, unsaved '
+                         'case (the model folder is never written)')):
+            b.setEnabled(src is not None)
+            b.setToolTip(good if src is not None else tip)
+        home = ((getattr(res, 'meta', None) or {}).get('model_dir')
+                if res is not None else None)
+        self._path_lbl.setText(str(home or ''))
+        self._path_lbl.set_tip(str(home) if home else None)
+        self._path_lbl.setVisible(bool(home))
+        self._remove_btn.setToolTip(
+            f'Remove {ent.label} from the list' if ent is not None
+            else 'Select a result first.')
+
+    def method_rows(self):
+        """The rows the method card shows (tests)."""
+        return self.method.rows()
+
+    def show_case(self):
+        """Open the non-modal `Case as run` viewer for the selected
+        result. Returns it, or None when there is no case file."""
+        ent = self.current()
+        path = case_source(ent) if ent is not None else None
+        if not path:
+            return None
+        try:
+            viewer = CaseViewer(path, ent.label, self)
+        except OSError as exc:
+            self._log(f'Show case: could not read {path}: {exc}')
+            return None
+        if self._case_viewer is not None:
+            self._case_viewer.close()
+            self._case_viewer.deleteLater()
+        self._case_viewer = viewer
+        viewer.show()
+        return viewer
+
+    def _load_case(self):
+        ent = self.current()
+        path = case_source(ent) if ent is not None else None
+        if path:
+            self.load_case_requested.emit(path)
+
+    # ── solver mode and the export row ───────────────────────────────────
     def set_solver_mode(self, m):
         """Hide the blastFoam-only launchers in native mode. Per-result
         gating of the VTK button is unchanged - configuring a hidden
@@ -426,3 +853,5 @@ class ResultsPanel(QWidget):
         self.anim.stop_play()
         if isinstance(self.view3d, View3DHost):
             self.view3d.shutdown()
+        if self._case_viewer is not None:
+            self._case_viewer.close()

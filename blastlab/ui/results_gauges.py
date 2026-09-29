@@ -206,6 +206,12 @@ class GaugesView(QWidget):
         row = (self.table.rowHeight(0) if n
                else self.table.verticalHeader().defaultSectionSize())
         frame = 2 * self.table.frameWidth() + 2
+        # a table narrower than its columns scrolls sideways, and that
+        # bar takes its height from the rows (GUI-7: the Results centre
+        # sits between two side columns, 412 px wide at 1100 x 720)
+        hdr = self.table.horizontalHeader()
+        if hdr.length() > self.table.viewport().width():
+            frame += self.table.horizontalScrollBar().sizeHint().height()
         floor = head + row + frame                    # header + one row
         want = head + max(1, min(n, MAX_ROWS_SHOWN)) * row + frame
         h = self.height()

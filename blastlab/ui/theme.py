@@ -576,6 +576,51 @@ def qss(mode_name):
     QProgressBar#runbar::chunk {{ background: {p['accent']};
                                   border-radius: 3px; }}
     QLabel#gaugenote {{ font-size: 12px; color: {p['muted']}; }}
+    /* GUI-7 03 Results (board Results lines 57-331). Board heights are
+       pinned here: a QSS min-height beats setFixedHeight (D41). */
+    QFrame#resleft, QFrame#resright {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#resrow {{ background: transparent; border: none;
+                     border-radius: 9px; min-height: 44px; }}
+    QFrame#resrow:hover {{ background: {p['hover']}; }}
+    QFrame#resrow[selected="true"] {{ background: {p['accent_bg']}; }}
+    QLabel#resname {{ font-family: "{DISPLAY}"; font-size: 14px;
+                      font-weight: 600; color: {p['text']}; }}
+    QLabel#rescaption {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#reslatest {{ background: {p['accent_bg']};
+        color: {p['accent_soft']}; border: 1px solid {p['accent_border']};
+        border-radius: 4px; padding: 0px 5px; font-size: 11px; }}
+    QLabel#reschain {{ background: {p['gauge_bg']}; color: {p['gauge']};
+        border-radius: 4px; padding: 0px 5px; font-size: 11px; }}
+    QPushButton#resbtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 10px; min-height: 32px; max-height: 32px;
+        font-size: 13px; font-weight: 500; }}
+    QPushButton#resbtn:hover, QPushButton#ressquare:hover {{
+        background: {p['hover']}; }}
+    QPushButton#resbtn:disabled {{ color: {p['muted']}; }}
+    QPushButton#resquiet {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 6px; min-height: 30px; max-height: 30px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#resquiet:hover {{ background: {p['hover']}; }}
+    QPushButton#resquiet:disabled {{ color: {p['muted']}; }}
+    QPushButton#ressquare {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px; min-height: 32px; max-height: 32px;
+        min-width: 32px; max-width: 32px; font-size: 14px; }}
+    QLabel#methodkey {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#methodval {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['text']}; }}
+    QFrame#resseg {{ background: {p['bg']}; border: 1px solid {p['seg']};
+        border-radius: 10px; min-height: 36px; max-height: 36px; }}
+    QFrame#resseg QToolButton#seg {{ font-size: 13px; font-weight: 600;
+        border-radius: 7px; padding: 0px 16px;
+        min-height: 32px; max-height: 32px; }}
+    QFrame#resview {{ background: {p['view']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLineEdit#restitle {{ min-height: 28px; max-height: 28px; }}
+    QPlainTextEdit#caseview {{ font-family: "{MONO}"; font-size: 12px; }}
     """
 
 

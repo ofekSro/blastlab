@@ -24,7 +24,7 @@ from ..models.meta import charge_label, slice_geometry
 from ..output import plots
 from . import pg_plots, theme
 from .mpl_canvas import MplCanvas
-from .widgets import hbox, label, vbox
+from .widgets import WrapRow, hbox, label, vbox
 
 #: the field selector's entries per dimension. 'profiles' and
 #: 'isosurface' are the two that go to the matplotlib page.
@@ -143,26 +143,33 @@ class FieldsView(QWidget):
         self._key = None            # (label, xf.shape, yf.shape, sl repr)
 
         root = vbox(self)
-        bar = hbox()
-        bar.addWidget(label('Snapshot', 'muted'))
+        # the selectors wrap onto a second line rather than hold the
+        # Results centre at 657 px between its two side columns (GUI-7:
+        # placement only - the widgets and what they drive are unchanged)
+        bar = WrapRow(spacing=theme.PAD)
+        snap = QWidget()
+        sl = hbox(snap)
+        sl.addWidget(label('Snapshot', 'muted'))
         self.snap_sel = QComboBox()
         self.snap_sel.setMinimumWidth(180)
         self.snap_sel.currentIndexChanged.connect(lambda *_: self.redraw())
-        bar.addWidget(self.snap_sel)
-        bar.addSpacing(theme.PAD)
-        bar.addWidget(label('Field', 'muted'))
+        sl.addWidget(self.snap_sel)
+        bar.add(snap)
+        fld = QWidget()
+        fl = hbox(fld)
+        fl.addWidget(label('Field', 'muted'))
         self.field_sel = QComboBox()
         self.field_sel.setMinimumWidth(190)
         self.field_sel.currentIndexChanged.connect(lambda *_: self.redraw())
-        bar.addWidget(self.field_sel)
-        bar.addSpacing(theme.PAD)
+        fl.addWidget(self.field_sel)
+        bar.add(fld)
         # cell edges over the field: the true cells of a refined
         # blastFoam run, every face otherwise
         self.show_mesh = QCheckBox('Show mesh')
         self.show_mesh.toggled.connect(lambda *_: self._mesh_toggled())
-        bar.addWidget(self.show_mesh)
-        bar.addStretch(1)
-        root.addLayout(bar)
+        bar.add(self.show_mesh)
+        self._bar = bar
+        root.addWidget(bar)
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
