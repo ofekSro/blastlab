@@ -105,3 +105,19 @@ unbroken wrong stretch 0 ms** - GUI-3's bar.
 The same run first walked every dimension × solver mode × node on the real
 platform: no empty properties page anywhere, no dead column (`layout` in the
 JSON; centre 493-612 px at 1280 × 840).
+
+## Verify pass (2026-09-29, after the fix(verify) commits)
+
+Same machine, real platform, throwaway settings (`ui.testing.private_settings`).
+
+- **28 px buttons (D41).** Before the fix, at 1600 × 1000: Initialise 148 × 17 and
+  Z rings / Mesh / Fit 18 px tall (Fit 28 × 18). After: 28 / 28 / 28 / 28 and
+  Run 148 × 46. At 1100 × 720 the wrapped strip is 145 px (was 134).
+- **Where behind a wall (D39).** `verify-2d-gauges-behind-1600x1000-dark.png`:
+  the sample case plus G3 (3.30, 0.50) behind Wall 1 reads `10 cm behind Wall 1`.
+  G1 / G2 are unchanged. `verify-2d-threat-1600x1000-dark.png`: 01 Threat,
+  Initialise at 28 px.
+- **3D viewer placement re-measured** (the toolbar above the host is 10 px
+  taller). Same sampler plus a Z-rings toggle on the 3D page,
+  `verify_viewer_measure.json`: **1530 samples (1252 with a viewer window),
+  0 wrong, longest wrong stretch 0 ms.**
