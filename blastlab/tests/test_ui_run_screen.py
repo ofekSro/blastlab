@@ -16,7 +16,11 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      30 s with `Stop the run` / `Keep running`, the text (model, percent,
      run time, the blastFoam sentence, a chain's stage), no stop when the
      run ended meanwhile, held time excluded; Shift+Esc and the button go
-     the same way, plain Esc does nothing.
+     the same way, plain Esc does nothing;
+ R4  the dock: a new run keeps the last run's log as an earlier run
+     (log_text() is the current run's), Earlier runs shows and copies it,
+     Save log… writes the shown text as UTF-8 (a cancel writes nothing),
+     notify() lands in Messages, the history caps at 20.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -542,6 +546,132 @@ def r3_stop(win):
          win._run_cases) = saved
 
 
+def r4_dock(win):
+    from PySide6.QtWidgets import QApplication
+    from blastlab.ui import dialogs
+    from blastlab.ui import run_dock as RD
+    rp = win.run_panel
+    dock = rp.dock
+    print('\nR4: the dock - Log · Messages · Earlier runs')
+    check('three tabs, Copy and Save log… at the right',
+          dock.tabs.names() == ['Log', 'Messages', 'Earlier runs']
+          and dock.copy_btn.text() == 'Copy'
+          and dock.save_btn.text() == 'Save log…',
+          str(dock.tabs.names()))
+    check('the Log page is the panel log (objectName log)',
+          rp.log is dock.log and rp.log.objectName() == 'log')
+    rp.log.clear()
+    runs = tempfile.mkdtemp(prefix='blastlab_runs_r4_')
+    f1 = os.path.join(runs, 'run1')
+    rp.set_running(True, model='run1', folder=f1)
+    rp.on_log('a')
+    rp.on_log('b')
+    rp.set_running(False)
+    rp.mark_ended('done')
+    rp.set_running(True, model='run2', folder=os.path.join(runs, 'run2'))
+    hist = rp.log_history()
+    check("run 2 starts: log_text() is '' (U14 holds)",
+          rp.log_text() == '', repr(rp.log_text()))
+    check("one entry, text 'a\\nb', named after run 1",
+          len(hist) == 1 and hist[0]['text'] == 'a\nb'
+          and hist[0]['model'] == 'run1' and hist[0]['folder'] == f1
+          and hist[0]['how'] == 'done', str(hist[:1]))
+    row = dock.earlier_list.item(0).text() if dock.earlier_list.count() \
+        else ''
+    check('the row reads `run1 · started HH:MM · finished · 2 lines`',
+          row.startswith('run1 · started ')
+          and row.endswith(' · finished · 2 lines'), row)
+    check("its tooltip is the model folder's run.log",
+          dock.earlier_list.item(0).toolTip()
+          == os.path.join(f1, 'run.log'),
+          dock.earlier_list.item(0).toolTip())
+    rp.show_earlier(0)
+    pump(30)
+    check("selecting it shows 'a\\nb'",
+          dock.tabs.get() == 'Earlier runs'
+          and dock.earlier_text() == 'a\nb', repr(dock.earlier_text()))
+    QApplication.clipboard().setText('')
+    dock.copy_btn.click()
+    check("Copy puts exactly 'a\\nb' on the clipboard",
+          QApplication.clipboard().text() == 'a\nb',
+          repr(QApplication.clipboard().text()))
+
+    # ── Save log… ────────────────────────────────────────────────────────
+    dock.tabs.set('Log')
+    for line in ('dt = 0.25 µs', 'G1 → 296 kPa', 'last'):
+        rp.on_log(line)
+    real_save = dialogs.save_file
+    out = os.path.join(tempfile.mkdtemp(prefix='blastlab_savelog_'),
+                       'saved.log')
+    calls = []
+
+    def fake_save(title, filters='', parent=None, start='', **kw):
+        calls.append(dict(title=title, filters=filters, start=start))
+        return out
+
+    dialogs.save_file = fake_save
+    try:
+        dock.save_btn.click()
+    finally:
+        dialogs.save_file = real_save
+    shown = rp.log_text()
+    with open(out, 'rb') as f:
+        data = f.read()
+    check('Save log… writes the shown text, UTF-8, \\n newlines',
+          data == shown.encode('utf-8') and b'\r\n' not in data
+          and 'µs' in shown and '→' in shown, repr(data[:60]))
+    c = calls[0] if calls else {}
+    check('the dialog: `Save log`, the Log filter, run-<model>-HHMMSS.log '
+          'in the model folder',
+          c.get('title') == 'Save log' and c.get('filters') == RD.LOG_FILTER
+          and os.path.dirname(c.get('start', '')) == os.path.join(runs,
+                                                                  'run2')
+          and os.path.basename(c.get('start', '')).startswith('run-run2-')
+          and c.get('start', '').endswith('.log'), str(c))
+    dialogs.save_file = lambda *a, **k: ''
+    before = set(os.listdir(os.path.dirname(out)))
+    try:
+        dock.save_btn.click()
+    finally:
+        dialogs.save_file = real_save
+    check('a cancelled save writes nothing',
+          set(os.listdir(os.path.dirname(out))) == before)
+    rp.set_running(False)
+    rp.mark_ended('stopped')
+
+    # ── Messages ─────────────────────────────────────────────────────────
+    win._status_timer.stop()
+    win.notify('x', 'warn')
+    msgs = rp.messages_text().splitlines()
+    check('notify(x, warn) adds a Messages row `HH:MM:SS  warn  x`',
+          bool(msgs) and msgs[-1].endswith('  warn  x')
+          and len(msgs[-1].split('  ')[0]) == 8, repr(msgs[-1:]))
+    check('and the status line and its 12 s timer behave as before',
+          win._status.text() == 'x' and win._status_timer.isActive())
+    dock.tabs.set('Messages')
+    QApplication.clipboard().setText('')
+    dock.copy()
+    check('Copy on Messages copies the Messages text',
+          QApplication.clipboard().text() == rp.messages_text())
+    dock.tabs.set('Log')
+
+    # ── the cap ──────────────────────────────────────────────────────────
+    for i in range(21):
+        rp.set_running(True, model=f'cap{i}', folder=None)
+        rp.on_log(f'line {i}')
+        rp.set_running(False)
+    rp.set_running(True, model='cap-last', folder=None)
+    hist = rp.log_history()
+    check('21 more runs: the history caps at 20, newest first',
+          len(hist) == RD.HISTORY_MAX == 20
+          and hist[0]['model'] == 'cap20' and hist[-1]['model'] == 'cap1',
+          f'{len(hist)} {hist[0]["model"]} {hist[-1]["model"]}')
+    check('the tab reads `Earlier runs   20`',
+          dock.tabs.label('Earlier runs') == 'Earlier runs   20',
+          dock.tabs.label('Earlier runs'))
+    rp.set_running(False)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -553,6 +683,7 @@ def main():
         r1_layout(win)
         r2_clock(win)
         r3_stop(win)
+        r4_dock(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         win.close()

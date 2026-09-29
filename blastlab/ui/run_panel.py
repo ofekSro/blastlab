@@ -13,17 +13,18 @@ import numpy as np
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QIcon, QTextCursor
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
-                               QLabel, QLineEdit, QPlainTextEdit,
-                               QProgressBar, QPushButton, QSizePolicy,
-                               QStackedWidget, QVBoxLayout, QWidget)
+                               QLabel, QLineEdit, QProgressBar, QPushButton,
+                               QSizePolicy, QStackedWidget, QVBoxLayout,
+                               QWidget)
 
 from ..core import refine
 from ..services.model_folder import folder_for
 from . import theme
-from .components import Collapsible, DockTabs, StatTile, ToggleSwitch
+from .components import Collapsible, StatTile, ToggleSwitch
 from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .run_clock import RunClock, fmt_duration
+from .run_dock import RunDock
 from .setup_strip import fmt_count
 from .setup_tree import _letter_space
 from .theme import GAP
@@ -668,27 +669,13 @@ class RunPanel(QWidget):
         self._view_frame = view
         cl.addWidget(view, 1)
 
-        # the dock: the run log (T4 adds Messages and Earlier runs)
-        self.dock_frame = QFrame()
-        self.dock_frame.setObjectName('rundock')
-        self.dock_frame.setFixedHeight(DOCK_H)
-        dl = QVBoxLayout(self.dock_frame)
-        dl.setContentsMargins(1, 0, 1, 1)
-        dl.setSpacing(0)
-        self.dock = DockTabs()
-        rule = QFrame()
-        rule.setObjectName('dockrule')
-        rule.setFixedHeight(1)
-        self.dock.layout().insertWidget(1, rule)
-        dl.addWidget(self.dock)
-        self.log = QPlainTextEdit()
-        self.log.setObjectName('log')
-        self.log.setReadOnly(True)
-        self.log.setFont(theme.font('mono'))
-        self.log.setLineWrapMode(QPlainTextEdit.WidgetWidth)
-        self.log.setMaximumBlockCount(50000)
-        self.dock.add('Log', self.log)
-        cl.addWidget(self.dock_frame)
+        # the dock Log · Messages · Earlier runs, Copy / Save log…
+        # (ui/run_dock.py, UX-18); `log` is its Log page, as before
+        self.dock = RunDock()
+        self.dock_frame = self.dock
+        self.dock.setFixedHeight(DOCK_H)
+        self.log = self.dock.log
+        cl.addWidget(self.dock)
         return centre
 
     # ── the live-gauge column (board lines 259-335; the list is 6b) ─────
@@ -911,10 +898,12 @@ class RunPanel(QWidget):
         self.strip.arrange(force=True)
 
     # ── event handlers (called from the controller) ──────────────────────
-    def set_running(self, running, paused=False):
+    def set_running(self, running, paused=False, model=None, folder=None):
         """A run started (`paused`: held at step 0 by Initialise) or
         ended. Stop and Run swap places by visibility AND enablement, so
-        a disabled Stop never reads as armed."""
+        a disabled Stop never reads as armed. At a start the Log pane's
+        text is kept as an earlier run (named `model`, in `folder`;
+        default: the Run screen's boxes) and the pane cleared."""
         self._running = bool(running)
         if running:
             # the cadence belongs to the run: a native run after a foam
@@ -939,7 +928,8 @@ class RunPanel(QWidget):
             self._frac = None
             self._ended = None
             self.strip.pct_lbl.setText('0 %')
-            self._clear_log()
+            self._amr_run = 0
+            self._start_record(model, folder)
             # Everything below belongs to the PREVIOUS run: the readouts
             # and the live plot used to keep its step/time/field until the
             # new run's first frame, which on a blastFoam cold start is
@@ -954,6 +944,7 @@ class RunPanel(QWidget):
             self.view3d_btn.setEnabled(False)
             # how it ended arrives with on_finished (mark_ended)
             self._ended = 'ended'
+            self.dock.record_end()
         self._sync_run_text()
         self._sync_tick()
         self._render_time()
@@ -1103,6 +1094,7 @@ class RunPanel(QWidget):
         'failed' | 'ended' (no result and no Stop: say only that it
         ended)."""
         self._ended = how
+        self.dock.record_end(how)
         self._render_time()
 
     def time_text(self):
@@ -1162,7 +1154,30 @@ class RunPanel(QWidget):
             self.log.verticalScrollBar().maximum())
 
     def log_text(self):
+        """The current run's log (earlier runs are in log_history())."""
         return self.log.toPlainText()
+
+    # ── the dock: earlier runs and messages (T4, UX-18) ──────────────────
+    def _start_record(self, model, folder):
+        model = model or self.current_run_name()
+        if folder is None and model and self.current_runs_dir():
+            folder = folder_for(self.current_runs_dir(), model)
+        self.dock.record_start(model, folder)
+
+    def log_history(self):
+        """This session's earlier runs, newest first: [dict(model,
+        started, ended, how, text, folder)]."""
+        return self.dock.history()
+
+    def show_earlier(self, i):
+        self.dock.show_earlier(i)
+
+    def messages_text(self):
+        return self.dock.messages_text()
+
+    def add_message(self, level, text):
+        """One notify() line for the Messages page."""
+        self.dock.add_message(level, text)
 
     def _clear_log(self):
         self._amr_run = 0

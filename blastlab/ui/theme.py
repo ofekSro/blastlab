@@ -539,8 +539,27 @@ def qss(mode_name):
     QFrame#rundock {{ background: {p['panel']};
         border: 1px solid {p['border']}; border-radius: 10px; }}
     QFrame#rundock QStackedWidget {{ background: transparent; }}
-    QFrame#rundock QPlainTextEdit#log {{ background: transparent;
-        font-size: 12px; padding: 6px 10px; color: {p['text2']}; }}
+    QFrame#rundock QPlainTextEdit#log,
+    QFrame#rundock QPlainTextEdit#runmsgs,
+    QFrame#rundock QPlainTextEdit#earlierlog {{ background: transparent;
+        font-family: "{MONO}"; font-size: 12px; padding: 6px 10px;
+        border: none; color: {p['text2']}; }}
+    /* the Run dock's tabs 12 px a side (the board's 14 leaves the tab
+       strip 4 px wider than the 432 px centre at 1100 x 720 once the
+       label reads `Earlier runs   20` - measured) */
+    QFrame#rundock QToolButton#docktab {{ padding: 0px 12px; }}
+    QPushButton#docktool {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 6px;
+        padding: 0px 8px; min-height: 26px; max-height: 26px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#docktool:hover {{ background: {p['hover']};
+                                  color: {p['text']}; }}
+    QListWidget#earlierlist {{ background: transparent; border: none;
+        border-right: 1px solid {p['border']}; font-size: 12px;
+        color: {p['text2']}; padding: 4px 0px; }}
+    QListWidget#earlierlist::item {{ padding: 3px 10px; }}
+    QListWidget#earlierlist::item:selected {{ background: {p['accent_bg']};
+                                              color: {p['text']}; }}
     QLabel#progresscaps {{ font-size: 10px; font-weight: 600;
         color: {p['accent_text'] if mode_name == 'dark'
                 else p['accent_soft']}; }}

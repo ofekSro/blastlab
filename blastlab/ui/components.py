@@ -359,10 +359,12 @@ class DockTabs(QWidget):
     def names(self):
         return list(self._tabs)
 
-    def add_corner(self, widget):
+    def add_corner(self, widget, gap=0):
         """Put `widget` at the right end of the tab strip, after the
-        stretch (board Run line 252: Copy / Save log… beside the tabs).
-        Returns the widget."""
+        stretch (board Run line 252: Copy / Save log… beside the tabs),
+        `gap` px after the previous corner widget. Returns the widget."""
+        if gap:
+            self._strip.addSpacing(int(gap))
         self._strip.addWidget(widget, 0, Qt.AlignVCenter)
         return widget
 

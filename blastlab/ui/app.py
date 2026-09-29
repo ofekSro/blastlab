@@ -1126,8 +1126,12 @@ class MainWindow(QMainWindow):
                 self._run_clock.hold(True)
         else:
             self._run_clock.stop()
+        # the dock keeps the last run's log under this run's name
+        model = getattr(self.ctrl, '_model', None)
         self.run_panel.set_running(
-            running, paused=bool(running) and self._start_paused)
+            running, paused=bool(running) and self._start_paused,
+            model=getattr(self.ctrl, '_run_name', None) or None,
+            folder=getattr(model, 'folder', None))
         # a second start while a run is live would orphan the drain loop
         # and drop the finished result
         self.chain.set_running(running)
@@ -1195,6 +1199,9 @@ class MainWindow(QMainWindow):
         if not text:
             return
         colour = {'error': 'error', 'warn': 'warn'}.get(level, 'muted')
+        # GUI-6 (UX-18): the Run dock's Messages page keeps the history
+        # the 12 s status line loses
+        self.run_panel.add_message(level, text)
         self._status.setText(text[:200])
         self._status.setToolTip(text)   # the whole text, past the cap
         self._status.setStyleSheet(f'color: {theme.cur(colour)};')
