@@ -1,0 +1,116 @@
+{
+ "list G number": {
+  "fg": "gauge",
+  "bg": "card",
+  "dark": 9.81,
+  "light": 5.22
+ },
+ "selected row / card G number": {
+  "fg": "gauge",
+  "bg": "gauge_bg",
+  "dark": 9.19,
+  "light": 4.52
+ },
+ "list Z value": {
+  "fg": "accent_soft",
+  "bg": "card",
+  "dark": 11.27,
+  "light": 5.48
+ },
+ "selected row Z value": {
+  "fg": "accent_soft",
+  "bg": "gauge_bg",
+  "dark": 10.56,
+  "light": 4.75
+ },
+ "list peak value": {
+  "fg": "text",
+  "bg": "card",
+  "dark": 16.43,
+  "light": 15.52
+ },
+ "list unit, waiting, header caps": {
+  "fg": "faint",
+  "bg": "card",
+  "dark": 5.5,
+  "light": 5.26
+ },
+ "selected row: unit, waiting": {
+  "fg": "faint",
+  "bg": "gauge_bg",
+  "dark": 5.16,
+  "light": 4.56
+ },
+ "card meta (Z \u00b7 Wall \u00b7 selected)": {
+  "fg": "faint",
+  "bg": "gauge_bg",
+  "dark": 5.16,
+  "light": 4.56
+ },
+ "card peak": {
+  "fg": "text",
+  "bg": "gauge_bg",
+  "dark": 15.4,
+  "light": 13.44
+ },
+ "card peak time label, trace": {
+  "fg": "gauge",
+  "bg": "gauge_bg",
+  "dark": 9.19,
+  "light": 4.52
+ },
+ "card now label, as 6b built it": {
+  "fg": "accent_text",
+  "bg": "gauge_bg",
+  "dark": 7.59,
+  "light": 4.37
+ },
+ "column caption": {
+  "fg": "muted",
+  "bg": "panel",
+  "dark": 7.69,
+  "light": 5.75
+ },
+ "LIVE GAUGES caps": {
+  "fg": "faint",
+  "bg": "panel",
+  "dark": 5.63,
+  "light": 5.0
+ },
+ "footnote": {
+  "fg": "muted",
+  "bg": "card2",
+  "dark": 7.34,
+  "light": 5.27
+ },
+ "no-gauges text": {
+  "fg": "muted",
+  "bg": "panel",
+  "dark": 7.69,
+  "light": 5.75
+ },
+ "banner message": {
+  "fg": "text",
+  "bg": "ok_bg",
+  "dark": 15.69,
+  "light": 13.6
+ },
+ "banner check mark (graphic, 3:1)": {
+  "fg": "ok",
+  "bg": "ok_bg",
+  "dark": 10.78,
+  "light": 4.53
+ },
+ "card now label after the fix": {
+  "fg": "accent_text / accent_soft",
+  "bg": "gauge_bg",
+  "dark": 7.59,
+  "light": 4.75
+ },
+ "banner action": {
+  "fg": "#08140c / #ffffff",
+  "bg": "ok",
+  "dark": 11.27,
+  "light": 5.17
+ }
+}
