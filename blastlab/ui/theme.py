@@ -732,7 +732,7 @@ def qss(mode_name):
     QFrame#framebusy {{ background: {p['accent_bg']};
         border: 1px solid {p['accent_border']}; border-radius: 7px;
         min-height: 30px; max-height: 32px; }}
-    QLabel#fieldcaption {{ font-size: 11.5px; color: {p['faint']};
+    QLabel#fieldcaption {{ font-size: 11.5px; color: {p['muted']};
                            background: transparent; }}
     """
 

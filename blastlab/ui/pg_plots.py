@@ -196,9 +196,16 @@ class ScalarImage:
         the field selector moves, so this must not rebuild the bar."""
         if self.bar is None:
             return
-        for axis in ('right', 'left'):
+        # a vertical ColorBarItem carries its label on the 'left' axis;
+        # labelling 'right' as well drew it twice, either side of the
+        # numbers (F15's doubled label)
+        for axis, on in (('left', True), ('right', False)):
             try:
-                self.bar.getAxis(axis).setLabel(str(text))
+                ax = self.bar.getAxis(axis)
+                if on:
+                    ax.setLabel(str(text))
+                else:
+                    ax.showLabel(False)
             except Exception:
                 pass
 

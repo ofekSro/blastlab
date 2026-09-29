@@ -25,7 +25,7 @@ writing in `exports`, so each is testable without building a window.
 import os
 import threading
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QDialog, QFrame,
                                QGridLayout, QHBoxLayout, QLabel,
                                QPlainTextEdit, QPushButton, QStackedWidget,
@@ -467,6 +467,17 @@ class ResultsPanel(QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._fit_columns()
+
+    def event(self, e):
+        ok = super().event(e)
+        if e.type() == QEvent.LayoutRequest:
+            # the centre's minimum changed without a resize (a result, a
+            # view, a control row that wraps once styled): the side
+            # columns give way or come back. Fitted only on a resize and
+            # a view switch, they stayed 10 px narrow at 1100 x 720 after
+            # a 3D result (D117). A fit that changes nothing is a no-op.
+            self._fit_columns()
+        return ok
 
     def _fit_columns(self):
         """280 / centre / 320, the side columns giving way (to 248 and

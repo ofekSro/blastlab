@@ -33,7 +33,7 @@ import threading
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer
+from PySide6.QtCore import QEvent, QPointF, QRectF, QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QDoubleValidator, QPainter
 from PySide6.QtWidgets import (QComboBox, QFrame, QHBoxLayout, QLabel,
                                QLineEdit, QProgressBar, QPushButton,
@@ -178,6 +178,14 @@ class _Row(WrapRow):
     def refresh(self):
         """Re-plan after a group was shown or hidden."""
         self._relayout(force=True)
+
+    def event(self, e):
+        # a child's size hint changes without a resize of the row (the
+        # segment buttons grow once their style sheet is applied): the
+        # lines are planned again, or a stale plan squeezes them
+        if e.type() == QEvent.LayoutRequest:
+            self._relayout()
+        return super().event(e)
 
 
 def _group(*widgets, name=None):
@@ -545,6 +553,10 @@ class FieldView(QWidget):
             new.changed.connect(self._pick_base)
             lay = self.field_grp.layout()
             lay.replaceWidget(self.field_seg, new)
+            # out of sight now: deleteLater waits for the event loop,
+            # and the old row drew under the new one until then
+            self.field_seg.hide()
+            self.field_seg.setParent(None)
             self.field_seg.deleteLater()
             self.field_seg = new
             self.row.refresh()
@@ -1003,6 +1015,10 @@ class FieldView(QWidget):
                      f'{p["accent_soft"]};">{line2}</span></div>')
         item.setPos(x, y)
         item.show()
+        # a TextItem undoes the view's scaling only once it has painted,
+        # and one that starts hidden is scaled with the data (metres) and
+        # lands far off screen, so it never paints: set it now
+        item.updateTransform(force=True)
         self._hover_text = f'{line1}\n{line2}'
         return v
 

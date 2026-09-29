@@ -46,7 +46,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QFrame,
 from ..output import gauge_summary, plots
 from . import scaled_distance as sd
 from . import theme
-from .run_gauges import match_gauges
+from .results_list import ElidedLabel
+from .run_gauges import _mix, match_gauges
 from .widgets import Segmented, WrapRow, hbox, label
 
 #: the table, left to right. 'gauge' and 'z' are this view's; the rest
@@ -115,6 +116,9 @@ COPY_TIP = ('Copy the table as tab-separated text with its headers '
 #: is lightened just enough; the light value is derived the same way.
 GREY = {'dark': '#626268', 'light': '#89898f'}
 SELECTED_W, OTHER_W = 2.4, 1.2
+#: light mode's selected-row fill: `gauge_bg` this far toward `card`
+#: (#eef7fa; `warn` 4.60:1 on it, 4.33 on `gauge_bg` itself)
+SELECTED_MIX_LIGHT = 0.4
 #: the positive phase's shading: `gauge` at 16 % (board line 131)
 SHADE_ALPHA = 0.16
 
@@ -208,6 +212,7 @@ class GaugesView(QWidget):
         self._order = []            # G numbers, top to bottom
         self._sel = None            # the selected G number
         self._wrapped = False
+        self._need1 = 0             # px the one-line table needs
         self._syncing = False
         self.curves = {}            # G number -> PlotDataItem
 
@@ -228,12 +233,9 @@ class GaugesView(QWidget):
         self.head_lbl.setObjectName('gaugehead')
         self.head_lbl.setToolTip(PLOT_TIP)
         head.addWidget(self.head_lbl, 0, Qt.AlignBaseline)
-        self.head_caption = QLabel(PLOT_CAPTION)
+        # elided at the right on a narrow window, whole in the tooltip
+        self.head_caption = ElidedLabel(PLOT_CAPTION, Qt.ElideRight)
         self.head_caption.setObjectName('gaugecaption')
-        self.head_caption.setMinimumWidth(0)
-        self.head_caption.setSizePolicy(QSizePolicy.Ignored,
-                                        QSizePolicy.Preferred)
-        self.head_caption.setToolTip(PLOT_CAPTION)
         head.addWidget(self.head_caption, 1, Qt.AlignBaseline)
         # the selector and its caption live in one widget, shown and
         # hidden together (UX-05)
@@ -257,6 +259,10 @@ class GaugesView(QWidget):
         self.plot = self.plot_w.getPlotItem()
         self.plot.setLabel('bottom', 'time [ms]')
         self.plot.setLabel('left', plots.GAUGE_FIELDS['p'][1])
+        # the axes carry their units in the label: pyqtgraph's own SI
+        # rescaling would read `time [ms] (x0.001)` under 0..350
+        for name in ('bottom', 'left'):
+            self.plot.getAxis(name).enableAutoSIPrefix(False)
         self.plot.showGrid(x=False, y=True, alpha=0.25)
         self.plot_stack.addWidget(self.plot_w)             # 0: the plot
         self.hint = label('', 'muted', wrap=True, align=Qt.AlignCenter)
@@ -302,12 +308,8 @@ class GaugesView(QWidget):
         ttl = QLabel('Summary')
         ttl.setObjectName('gaugesumtitle')
         th.addWidget(ttl)
-        self.table_caption = QLabel(TABLE_CAPTION)
+        self.table_caption = ElidedLabel(TABLE_CAPTION, Qt.ElideRight)
         self.table_caption.setObjectName('gaugecaption')
-        self.table_caption.setMinimumWidth(0)
-        self.table_caption.setSizePolicy(QSizePolicy.Ignored,
-                                         QSizePolicy.Preferred)
-        self.table_caption.setToolTip(TABLE_CAPTION)
         th.addWidget(self.table_caption, 1)
         self.copy_btn = QPushButton('Copy table')
         self.copy_btn.setObjectName('gaugecopy')
@@ -355,6 +357,11 @@ class GaugesView(QWidget):
         self.table.currentCellChanged.connect(self._current_moved)
         # Ctrl+C while the table has focus (never window-wide)
         self.table.copy_requested.connect(self.copy_table)
+        # the cap follows the header's real height (one or two lines) and
+        # the sideways scroll bar coming and going
+        head.geometriesChanged.connect(self._cap_height)
+        self.table.horizontalScrollBar().rangeChanged.connect(
+            lambda *_: self._cap_height())
         tl.addWidget(self.table)
         root.addWidget(tcard, 0)
         self._cap_height()
@@ -418,6 +425,9 @@ class GaugesView(QWidget):
                 new.changed.connect(self._field_changed)
                 lay = self._bar.layout()
                 lay.replaceWidget(self.field_seg, new)
+                # out of sight now (deleteLater waits for the event loop)
+                self.field_seg.hide()
+                self.field_seg.setParent(None)
                 self.field_seg.deleteLater()
                 self.field_seg = new
             if self._field not in fields:
@@ -519,16 +529,21 @@ class GaugesView(QWidget):
                     item.setToolTip(str(row[0]))
                 self.table.setItem(r, c, item)
         self._paint_rows()
+        self._measure_one_line()
         self._fit_headers()
         self._cap_height()
 
     def _paint_rows(self):
-        """Cell colours (board 174-183) and the selected row's fill."""
+        """Cell colours (board 174-183) and the selected row's fill:
+        `gauge_bg`, lightened toward `card` in light mode, where `warn`
+        on `gauge_bg` is 4.33:1 (D121)."""
         p = theme.pal()
         colours = {0: p['gauge'], 1: p['accent_soft'], 7: p['text2']}
+        fill = (p['gauge_bg'] if theme.mode() == 'dark'
+                else _mix(p['gauge_bg'], p['card'], SELECTED_MIX_LIGHT))
         for r, n in enumerate(self._order):
             sel = (n == self._sel)
-            bg = QBrush(QColor(p['gauge_bg'])) if sel else QBrush()
+            bg = QBrush(QColor(fill)) if sel else QBrush()
             ended = self._strings[n - 1][-1]
             for c in range(len(COLUMNS)):
                 item = self.table.item(r, c)
@@ -544,31 +559,32 @@ class GaugesView(QWidget):
                 f.setBold(c in (0, 2))
                 item.setFont(f)
 
+    def _set_headers(self, labels):
+        self.table.setHorizontalHeaderLabels(list(labels))
+        for i, col in enumerate(COLUMNS):
+            it = self.table.horizontalHeaderItem(i)
+            it.setToolTip(HEADER_HELP[col])
+            if i in (0, len(COLUMNS) - 1):
+                it.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+    def _measure_one_line(self):
+        """The width the one-line headers and the cells need: Qt's own
+        section and column hints, so the style sheet's fonts and padding
+        are counted (a font-metrics estimate was wider than the truth)."""
+        self._set_headers(HEADERS)
+        self._wrapped = False
+        head = self.table.horizontalHeader()
+        self._need1 = sum(max(head.sectionSizeHint(c),
+                              self.table.sizeHintForColumn(c))
+                          for c in self.visible_columns())
+
     def _fit_headers(self):
         """One-line headers when they fit the table, else two lines; the
         table scrolls sideways rather than clip what still does not fit."""
-        fm = self.table.horizontalHeader().fontMetrics()
-        cfm = self.table.fontMetrics()
-        need = 0
-        for c in range(len(COLUMNS)):
-            if self.table.isColumnHidden(c):
-                continue
-            w = fm.horizontalAdvance(HEADERS[c])
-            for r in range(self.table.rowCount()):
-                item = self.table.item(r, c)
-                if item is not None:
-                    w = max(w, cfm.horizontalAdvance(item.text()))
-            need += w + 20
-        wrap = need > self.table.viewport().width() > 0
+        wrap = self._need1 > self.table.viewport().width() > 0
         if wrap != self._wrapped:
             self._wrapped = wrap
-            self.table.setHorizontalHeaderLabels(
-                list(HEADERS_WRAPPED if wrap else HEADERS))
-            for i, col in enumerate(COLUMNS):
-                it = self.table.horizontalHeaderItem(i)
-                it.setToolTip(HEADER_HELP[col])
-                if i in (0, len(COLUMNS) - 1):
-                    it.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            self._set_headers(HEADERS_WRAPPED if wrap else HEADERS)
 
     def headers_wrapped(self):
         return self._wrapped
@@ -577,7 +593,11 @@ class GaugesView(QWidget):
         """Hold the table to header + at most MAX_ROWS_SHOWN rows AND at
         most TABLE_MAX_SHARE of the panel, so a run with twenty gauges
         scrolls instead of squeezing the traces out."""
-        head = self.table.horizontalHeader().sizeHint().height()
+        hdr = self.table.horizontalHeader()
+        # the header as laid out when it is (two lines once wrapped): its
+        # hint alone left the last row 1 px short on the real platform
+        head = max(hdr.sizeHint().height(),
+                   hdr.height() if hdr.isVisible() else 0)
         n = self.table.rowCount()
         row = (self.table.rowHeight(0) if n
                else self.table.verticalHeader().defaultSectionSize())
@@ -585,9 +605,10 @@ class GaugesView(QWidget):
         # a table narrower than its columns scrolls sideways, and that
         # bar takes its height from the rows (GUI-7: the Results centre
         # sits between two side columns, 412 px wide at 1100 x 720)
-        hdr = self.table.horizontalHeader()
         if hdr.length() > self.table.viewport().width():
-            frame += self.table.horizontalScrollBar().sizeHint().height()
+            sb = self.table.horizontalScrollBar()
+            frame += max(sb.sizeHint().height(),
+                         sb.height() if sb.isVisible() else 0)
         floor = head + row + frame                    # header + one row
         want = head + max(1, min(n, MAX_ROWS_SHOWN)) * row + frame
         h = self.height()
