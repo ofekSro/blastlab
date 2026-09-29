@@ -976,6 +976,28 @@ def r5_gauges(win):
           and abs(by_no[2]['z'] - want_z[3]) < 1e-12
           and abs(by_no[3]['z'] - want_z[4]) < 1e-12,
           str({k: (r['entered'], r['z']) for k, r in by_no.items()}))
+    # verify: blastFoam's live 3D payload is `radii` = the probes' x only
+    # (solvers/foam/backend._gauges_from_probes); Z must still be the
+    # entered gauge's, not x / W^(1/3). Two gauges share x = 1.5.
+    from blastlab.core.case import Case3D
+    from blastlab.core.constants import P_AIR
+    c3 = Case3D(Lx=3.0, Ly=3.0, Lz=3.0, cell_size_m=0.05, charge=2.0,
+                center=(0.5, 1.5, 0.5), solver='blastfoam',
+                gauges=[(1.5, 1.5, 0.5), (1.5, 2.5, 1.5), (2.5, 1.5, 0.5)])
+    foam = dict(times=np.linspace(0.0, 5e-3, 50),
+                radii=[g[0] for g in c3.gauges],
+                pressures=[np.full(50, P_AIR) for _ in c3.gauges])
+    ftab = {r['number']: r for r in RG.rows(c3, foam)}
+    check('blastFoam 3D live payload (x only): each row is its entered '
+          "gauge, in order, with Setup's Z",
+          all(ftab[k]['entered'] == k and abs(
+              ftab[k]['z'] - sd.scaled_distance(c3, c3.gauges[k - 1]))
+              < 1e-12 for k in (1, 2, 3)),
+          str({k: (r['entered'], r['z']) for k, r in ftab.items()}))
+    lone = RG.rows(c3, dict(foam, radii=[0.1], pressures=foam['pressures'][:1]))
+    check('an x matching no gauge gives no R or Z (not one from x alone)',
+          lone[0]['entered'] is None and lone[0]['z'] is None
+          and lone[0]['r'] is None, str(lone[0]['z']))
     far = RG.rows(case, flat_payload([(0.5, 3.5)]))
     check('nothing entered within one cell: the payload position is used',
           far[0]['entered'] is None and abs(far[0]['z'] - sd.scaled_distance(

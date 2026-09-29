@@ -104,7 +104,13 @@ def _match(case, positions):
     """The entered gauge (0-based) each payload position belongs to, or
     None. The solver snaps a gauge to its cell centre, at most half a
     cell away per axis, so the nearest entered gauge within one cell is
-    unambiguous; each entered gauge is taken once."""
+    unambiguous; each entered gauge is taken once.
+
+    blastFoam's live payload of a 3D run carries `radii` - the probes' x
+    only (`solvers/foam/backend._gauges_from_probes`) - so a
+    one-coordinate position against multi-coordinate gauges is matched
+    on x, in entered order (the probes are written in that order), and
+    ties go to the first gauge not yet taken."""
     entered = _entered(case)
     try:
         tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
@@ -114,9 +120,14 @@ def _match(case, positions):
     for pos in positions:
         best = None
         for j, g in enumerate(entered):
-            if j in used or pos is None or len(g) != len(pos):
+            if j in used or pos is None:
                 continue
-            d = math.dist(g, pos)
+            if len(g) == len(pos):
+                d = math.dist(g, pos)
+            elif len(pos) == 1 and len(g) > 1:
+                d = abs(g[0] - pos[0])      # blastFoam live: x only
+            else:
+                continue
             if best is None or d < best[1]:
                 best = (j, d)
         if best is not None and best[1] <= tol + 1e-9:
@@ -141,6 +152,10 @@ def _geometry(case, point):
     if case is None or point is None:
         return None, None, ''
     try:
+        if len(sd.burst_point(case)) != len(point):
+            # an unmatched blastFoam live position (x only) in a 2D/3D
+            # case: no R or Z rather than one computed from x alone
+            return None, None, ''
         r = sd.distance(case, point)
         z = sd.scaled_distance(case, point)
         w = sd.where(case, point)
