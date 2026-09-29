@@ -17,6 +17,7 @@ from ..viz3d import MISSING_MSG, pyvista_available
 from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
+from .setup_strip import LiveStrip
 from .setup_tree import SetupTree, _letter_space
 from .theme import GAP, PAD
 from .widgets import Card, label
@@ -169,6 +170,10 @@ class SetupPanel(QWidget):
 
     dim_changed = Signal(int)
     node_selected = Signal(str)
+    #: the strip's Run F5 / Initialise (MainWindow wires them to the same
+    #: actions as the Run tab and the F5 key)
+    run_requested = Signal()
+    init_requested = Signal()
 
     def __init__(self, on_change=None, mode=None, viewer_link=None,
                  log_fn=print, parent=None):
@@ -195,10 +200,16 @@ class SetupPanel(QWidget):
         self.tree.pill_clicked.connect(self._flash_checks)
         body.addWidget(self.tree)
 
-        # ── centre: the preview over the validation report ───────────────
+        # ── centre: the live numbers, the preview, the report ────────────
         centre = QVBoxLayout()
         centre.setContentsMargins(0, 0, 0, 0)
         centre.setSpacing(GAP)
+        # GUI-5b: the live-number strip (board lines 125-159), filled by
+        # refresh() from the report the debounced validation produced
+        self.strip = LiveStrip()
+        self.strip.run_clicked.connect(self.run_requested.emit)
+        self.strip.init_clicked.connect(self.init_requested.emit)
+        centre.addWidget(self.strip)
         prev = Card('Model Preview', pad=12)
         pv = prev.body_layout
         self.show_mesh = QCheckBox('Show mesh')
@@ -335,6 +346,8 @@ class SetupPanel(QWidget):
         self._dim = dim
         for d, f in self._forms.items():
             f.setVisible(d == dim)
+        # the last dimension's numbers must not describe this one
+        self.strip.clear(dim)
         self._rebuild_tree()
         self.dim_changed.emit(dim)
         self._changed()
@@ -491,6 +504,8 @@ class SetupPanel(QWidget):
                 self.tree.set_summary(node_id, text)
             if self._dim in self._derived:
                 self._derived[self._dim].show_values(case, rep)
+            # the live numbers: every one read off this report (GUI-5b)
+            self.strip.show_values(case, rep)
         self._sync_children()
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
@@ -552,6 +567,8 @@ class SetupPanel(QWidget):
         # the tree's pill is fed from the same report (plan §5.1)
         self.tree.set_pill(*pill_text(len(errors), len(warnings),
                                       len(notes)))
+        # the Run tab's gate: an invalid case does not start
+        self.strip.set_run_enabled(not errors)
         if not rows:
             rows = [('ok', 'Case OK')]
         self._report = list(rows)

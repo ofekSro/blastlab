@@ -409,6 +409,28 @@ def qss(mode_name):
     QLabel#derivedval {{ font-family: "{MONO}"; font-size: 13px;
                          color: {p['text']}; }}
     QFrame#card[flash="true"] {{ border: 1px solid {p['accent']}; }}
+    /* GUI-5b Setup centre (board BC_Combined lines 125-265): the Run
+       column of the live-number strip */
+    QPushButton#runbig {{ background: {p['accent']}; border: none;
+                          border-radius: 10px; padding: 0px;
+                          min-height: 0px; }}
+    QPushButton#runbig:hover {{ background: {p['accent_hover']}; }}
+    QPushButton#runbig:disabled {{ background: {p['card2']}; }}
+    QLabel#runbigtext {{ font-family: "{DISPLAY}"; font-size: 18px;
+                         font-weight: 700; color: {p['on_accent']}; }}
+    QLabel#runbigkey {{ font-family: "{MONO}"; font-size: 11px;
+                        font-weight: 500; color: {p['on_accent']};
+                        background: rgba(0, 0, 0, 40); border-radius: 4px;
+                        padding: 1px 5px; }}
+    QLabel#runbigtext:disabled, QLabel#runbigkey:disabled {{
+        color: {p['muted']}; }}
+    QPushButton#initbtn {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['entry_border']};
+                           border-radius: 8px; padding: 0px 8px;
+                           min-height: 0px; font-size: 12px;
+                           font-weight: 500; }}
+    QPushButton#initbtn:hover {{ background: {p['hover']}; }}
+    QPushButton#initbtn:disabled {{ color: {p['muted']}; }}
     """
 
 

@@ -149,6 +149,10 @@ class MainWindow(QMainWindow):
         self.ctrl = RunController(handlers=self, view3d=self.view3d,
                                   parent=self)
         self.run_panel.run_requested.connect(lambda: self._run_single())
+        # GUI-5b: the Setup strip's Run F5 / Initialise are the same
+        # actions as the Run tab's buttons and the F5 key
+        self.setup.run_requested.connect(lambda: self._run_single())
+        self.setup.init_requested.connect(lambda: self._init_model())
         self.run_panel.stop_requested.connect(self._stop)
         self.run_panel.view3d_requested.connect(self._open_view3d)
         self.run_panel.init_requested.connect(self._init_model)
