@@ -99,7 +99,10 @@ class ModelOverlay:
     def __init__(self):
         self.rings = True
         self.node = None
-        self._artists = []
+        # the artists per axis: the 1D and the 2D preview share this
+        # state, and a replay of one (a theme switch replays both) must
+        # not take the other's overlay off it
+        self._artists = {}
 
     # ── bookkeeping ──────────────────────────────────────────────────────
     def _keep(self, artist, kind):
@@ -108,16 +111,18 @@ class ModelOverlay:
             artist.set_in_layout(False)
         except Exception:
             pass
-        self._artists.append(artist)
+        self._artists.setdefault(id(artist.axes), []).append(artist)
         return artist
 
-    def clear(self):
-        for a in self._artists:
-            try:
-                a.remove()
-            except (ValueError, NotImplementedError, AttributeError):
-                pass                    # already gone with an ax.clear()
-        self._artists = []
+    def clear(self, ax=None):
+        """Remove the overlay from `ax`, or from every axis when None."""
+        keys = list(self._artists) if ax is None else [id(ax)]
+        for key in keys:
+            for a in self._artists.pop(key, []):
+                try:
+                    a.remove()
+                except (ValueError, NotImplementedError, AttributeError):
+                    pass                # already gone with an ax.clear()
 
     @staticmethod
     def found(ax, kind=None):
@@ -130,7 +135,7 @@ class ModelOverlay:
     def apply(self, ax, case):
         """Draw the rings and the selection highlight for `case` on `ax`
         (called right after `preview_draw` has drawn the case)."""
-        self.clear()
+        self.clear(ax)
         if case is None or getattr(case, 'dim', None) not in (1, 2):
             return
         if self.rings and scaled_distance.z_shown(case):

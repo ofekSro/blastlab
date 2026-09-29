@@ -382,6 +382,17 @@ def s2_model_view():
           and [round(r, 6) for r in radii]
           == [round(sd.ring_radius(c1, z), 6) for z in (1, 2, 3)],
           str(radii))
+    # the 1D and 2D previews share the overlay state, and a theme switch
+    # replays both (2D last): the 1D view on screen must keep its own
+    # rings, not lose them to the hidden 2D axis (found in verify)
+    for mode in ('light', 'dark'):
+        theme.apply(app, mode)
+        pump(20)
+    check('a theme switch on 1D keeps the 1D rings (2D replayed after it)',
+          len(ModelOverlay.found(ax1, 'zring')) == 3
+          and sp.preview_kind() == '1d',
+          f'1D {len(ModelOverlay.found(ax1, "zring"))}, '
+          f'2D {len(ModelOverlay.found(ax, "zring"))}')
 
     print('\nS2b: the selected node is highlighted (chargeHi / gaugeHi)')
     case = show(sample_case())
