@@ -1,0 +1,142 @@
+{
+ "dark-1100x720": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 480,
+  "row_heights": [
+   44
+  ],
+  "selected_row_bg": "#1d1511",
+  "accent_bg": "#1d1511",
+  "unselected_row_bg": "#0e0e10",
+  "selected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #ff8a55;",
+  "unselected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #6f6a63;",
+  "accent_text": "#ff8a55",
+  "num_dim": "#6f6a63",
+  "pill_text": "Case OK · 1 warning · 6 notes",
+  "pill_state": "warn",
+  "pill_bg": "#121814",
+  "ok_bg": "#121814",
+  "pill_border": "#24302a",
+  "ok_border": "#24302a",
+  "derived": [
+   "52.7 mm",
+   "2.00 m",
+   "G2 · Z 2.99"
+  ],
+  "summaries": {
+   "threat": "1.0 kg TNT · z 2.0 m",
+   "domain": "4 × 4 m · 25 mm",
+   "bounds": "the run ends at Outer",
+   "structure": "1 obstacle",
+   "gauges": "2 gauges",
+   "solver": "linear · no afterburn · CFL 0.4",
+   "output": ".mp4 · VTK off"
+  }
+ },
+ "dark-1600x1000": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 980,
+  "row_heights": [
+   44
+  ],
+  "selected_row_bg": "#1d1511",
+  "accent_bg": "#1d1511",
+  "unselected_row_bg": "#0e0e10",
+  "selected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #ff8a55;",
+  "unselected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #6f6a63;",
+  "accent_text": "#ff8a55",
+  "num_dim": "#6f6a63",
+  "pill_text": "Case OK · 1 warning · 6 notes",
+  "pill_state": "warn",
+  "pill_bg": "#121814",
+  "ok_bg": "#121814",
+  "pill_border": "#24302a",
+  "ok_border": "#24302a",
+  "derived": [
+   "52.7 mm",
+   "2.00 m",
+   "G2 · Z 2.99"
+  ],
+  "summaries": {
+   "threat": "1.0 kg TNT · z 2.0 m",
+   "domain": "4 × 4 m · 25 mm",
+   "bounds": "the run ends at Outer",
+   "structure": "1 obstacle",
+   "gauges": "2 gauges",
+   "solver": "linear · no afterburn · CFL 0.4",
+   "output": ".mp4 · VTK off"
+  }
+ },
+ "light-1100x720": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 480,
+  "row_heights": [
+   44
+  ],
+  "selected_row_bg": "#fbe9df",
+  "accent_bg": "#fbe9df",
+  "unselected_row_bg": "#faf9f7",
+  "selected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #c5420f;",
+  "unselected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #9b958c;",
+  "accent_text": "#c5420f",
+  "num_dim": "#9b958c",
+  "pill_text": "Case OK · 6 notes",
+  "pill_state": "ok",
+  "pill_bg": "#e7f3ea",
+  "ok_bg": "#e7f3ea",
+  "pill_border": "#c4dccb",
+  "ok_border": "#c4dccb",
+  "derived": [
+   "52.7 mm",
+   "2.00 m",
+   "G2 · Z 2.99"
+  ],
+  "summaries": {
+   "threat": "1.0 kg TNT · z 2.0 m",
+   "domain": "4 × 4 m · 25 mm",
+   "bounds": "the run ends at Outer",
+   "structure": "1 obstacle",
+   "gauges": "2 gauges",
+   "solver": "linear · no afterburn · CFL 0.4",
+   "output": ".mp4 · VTK off"
+  }
+ },
+ "light-1600x1000": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 980,
+  "row_heights": [
+   44
+  ],
+  "selected_row_bg": "#fbe9df",
+  "accent_bg": "#fbe9df",
+  "unselected_row_bg": "#faf9f7",
+  "selected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #c5420f;",
+  "unselected_number_css": "font-size: 12px; font-family: \"Space Grotesk\"; font-weight: 600; color: #9b958c;",
+  "accent_text": "#c5420f",
+  "num_dim": "#9b958c",
+  "pill_text": "Case OK · 6 notes",
+  "pill_state": "ok",
+  "pill_bg": "#e7f3ea",
+  "ok_bg": "#e7f3ea",
+  "pill_border": "#c4dccb",
+  "ok_border": "#c4dccb",
+  "derived": [
+   "52.7 mm",
+   "2.00 m",
+   "G2 · Z 2.99"
+  ],
+  "summaries": {
+   "threat": "1.0 kg TNT · z 2.0 m",
+   "domain": "4 × 4 m · 25 mm",
+   "bounds": "the run ends at Outer",
+   "structure": "1 obstacle",
+   "gauges": "2 gauges",
+   "solver": "linear · no afterburn · CFL 0.4",
+   "output": ".mp4 · VTK off"
+  }
+ }
+}

@@ -1,0 +1,216 @@
+{
+ "layout": [
+  {
+   "mode": "native",
+   "dim": 0,
+   "nodes": [
+    "hd01",
+    "hd02",
+    "hd03",
+    "hd04",
+    "hd05",
+    "hd06",
+    "hd07",
+    "hd08",
+    "hd09",
+    "hd10"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "hd01": 340,
+    "hd02": 340,
+    "hd03": 340,
+    "hd04": 340,
+    "hd05": 340,
+    "hd06": 340,
+    "hd07": 388,
+    "hd08": 340,
+    "hd09": 340,
+    "hd10": 340
+   },
+   "centre_w": 612,
+   "empty_pages": []
+  },
+  {
+   "mode": "native",
+   "dim": 1,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "gauges",
+    "solver"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "gauges": 340,
+    "solver": 340
+   },
+   "centre_w": 612,
+   "empty_pages": []
+  },
+  {
+   "mode": "native",
+   "dim": 2,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "structure",
+    "gauges",
+    "solver",
+    "output"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "structure": 340,
+    "gauges": 340,
+    "solver": 340,
+    "output": 340
+   },
+   "centre_w": 612,
+   "empty_pages": []
+  },
+  {
+   "mode": "native",
+   "dim": 3,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "structure",
+    "gauges",
+    "solver",
+    "output"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "structure": 340,
+    "gauges": 340,
+    "solver": 340,
+    "output": 340
+   },
+   "centre_w": 612,
+   "empty_pages": []
+  },
+  {
+   "mode": "blastfoam",
+   "dim": 0,
+   "nodes": [
+    "hd01",
+    "hd02",
+    "hd03",
+    "hd04",
+    "hd05",
+    "hd06",
+    "hd07",
+    "hd08",
+    "hd09",
+    "hd10"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "hd01": 340,
+    "hd02": 340,
+    "hd03": 340,
+    "hd04": 340,
+    "hd05": 340,
+    "hd06": 340,
+    "hd07": 388,
+    "hd08": 340,
+    "hd09": 340,
+    "hd10": 340
+   },
+   "centre_w": 612,
+   "empty_pages": []
+  },
+  {
+   "mode": "blastfoam",
+   "dim": 1,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "gauges",
+    "solver",
+    "output"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "gauges": 340,
+    "solver": 340,
+    "output": 354
+   },
+   "centre_w": 598,
+   "empty_pages": []
+  },
+  {
+   "mode": "blastfoam",
+   "dim": 2,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "structure",
+    "gauges",
+    "solver",
+    "output"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "structure": 340,
+    "gauges": 340,
+    "solver": 340,
+    "output": 432
+   },
+   "centre_w": 520,
+   "empty_pages": []
+  },
+  {
+   "mode": "blastfoam",
+   "dim": 3,
+   "nodes": [
+    "threat",
+    "domain",
+    "bounds",
+    "structure",
+    "gauges",
+    "solver",
+    "output"
+   ],
+   "tree_w": 280,
+   "props_w": {
+    "threat": 340,
+    "domain": 340,
+    "bounds": 340,
+    "structure": 340,
+    "gauges": 340,
+    "solver": 340,
+    "output": 459
+   },
+   "centre_w": 493,
+   "empty_pages": []
+  }
+ ],
+ "viewer_alive": true,
+ "samples": 1083,
+ "samples_with_viewer_window": 801,
+ "wrong": 0,
+ "longest_wrong_ms": 0,
+ "worst": ""
+}
