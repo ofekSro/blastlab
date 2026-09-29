@@ -20,7 +20,12 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
  R4  the dock: a new run keeps the last run's log as an earlier run
      (log_text() is the current run's), Earlier runs shows and copies it,
      Save log… writes the shown text as UTF-8 (a cancel writes nothing),
-     notify() lands in Messages, the history caps at 20.
+     notify() lands in Messages, the history caps at 20;
+ R5  the live-gauge column (6b): Z of the entered gauge each snapped
+     series belongs to, sorted by Z, `waiting` before arrival and
+     summarize_trace's peak after it; planar sorts by R; a dropped gauge;
+     the click and the trigger default; the now line; the collection
+     rule; the last stage's full traces.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -746,6 +751,262 @@ def r4_dock(win):
     rp.set_running(False)
 
 
+def sample_case(**kw):
+    """The boards' sample case (batch T6): 2D axisymmetric native, 1 kg
+    TNT at z 2, 4 x 4 m, cell 25 mm, Wall 1 r 3.0-3.2 z 0-1.5, gauges G1
+    (2.95, 0.50), G2 (2.95, 1.50), G3 (1.5, 0.5), G4 (3.30, 0.50) - G4
+    behind the wall."""
+    from blastlab.core.case import Case2D
+    args = dict(solver='native', geometry='axisymmetric', Lx=4.0, Ly=4.0,
+                cell_size_m=0.025, charge=1.0, center=(0.0, 2.0),
+                obstacles=[(3.0, 3.2, 0.0, 1.5)],
+                gauges=[(2.95, 0.5), (2.95, 1.5), (1.5, 0.5), (3.3, 0.5)],
+                gauge_file=None, n_snapshots=2, record_frames=0,
+                anim_file=None)
+    args.update(kw)
+    return Case2D(**args)
+
+
+def snapped(pt, dx):
+    """The cell centre the solver snaps `pt` to (within half a cell)."""
+    import math
+    return tuple((math.floor(v / dx) + 0.5) * dx for v in pt)
+
+
+def flat_payload(points, n=200, t_end=5e-3):
+    """A live payload in the solver's shape (lists, absolute Pa): every
+    series at ambient."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    times = list(np.linspace(0.0, t_end, n))
+    return dict(times=times, points=[tuple(p) for p in points],
+                pressures=[[P_AIR] * n for _ in points])
+
+
+def rise(n=200, at=120, peak_pa=231e3):
+    """An absolute-pressure series: ambient, then a jump to +peak at
+    sample `at` and an exponential decay."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    p = np.full(n, P_AIR)
+    k = np.arange(n - at)
+    p[at:] = P_AIR + peak_pa * np.exp(-k / 15.0)
+    return list(p)
+
+
+def theme_pal(key):
+    from blastlab.ui import theme
+    return theme.cur(key)
+
+
+def r5_gauges(win):
+    import numpy as np
+    from blastlab.core.case import Case2D
+    from blastlab.models.result import Result
+    from blastlab.output.gauge_summary import summarize_trace
+    from blastlab.ui import run_gauges as RG
+    from blastlab.ui import scaled_distance as sd
+    from blastlab.ui.live_gauges import NO_GAUGES
+    rp = win.run_panel
+    col = rp.gauge_col
+    print('\nR5: the live-gauge column - sorted by Z, waiting, peak so far')
+    case = sample_case()
+    dx = case.cell_size_m
+    pts = [snapped(g, dx) for g in case.gauges]
+    check('the payload points are snapped (off the entered ones)',
+          all(p != tuple(g) for p, g in zip(pts, case.gauges))
+          and all(max(abs(a - b) for a, b in zip(p, g)) <= dx / 2 + 1e-12
+                  for p, g in zip(pts, case.gauges)), str(pts))
+    pay = flat_payload(pts)
+    table = RG.rows(case, pay)
+    want_z = {k + 1: sd.scaled_distance(case, g)
+              for k, g in enumerate(case.gauges)}
+    check('Z of each row is scaled_distance of its ENTERED gauge',
+          all(abs(r['z'] - want_z[r['number']]) < 1e-12 for r in table),
+          str([(r['number'], round(r['z'], 4)) for r in table]))
+    check('G1 3.31, G2 2.99 as Setup shows them',
+          RG.fmt_dist(want_z[1]) == '3.31' and RG.fmt_dist(want_z[2])
+          == '2.99' and {r['number']: RG.fmt_dist(r['z']) for r in table}
+          .get(2) == '2.99', str({r['number']: r['z'] for r in table}))
+    zs = [r['z'] for r in table]
+    check('the rows are in ascending Z', zs == sorted(zs)
+          and [r['number'] for r in table]
+          == sorted(want_z, key=lambda k: want_z[k]),
+          str([r['number'] for r in table]))
+    check('before any rise every row reads waiting',
+          all(r['peak_text'] == 'waiting' and r['waiting'] for r in table))
+    check('G4 (r 3.30, behind the wall) is named with Wall 1',
+          {r['number']: r['where'] for r in table}[4] == 'Wall 1')
+
+    # the column, fed through the panel as the controller does
+    rp.set_gauge_case(case)
+    rp.set_gauge_payload(pay)
+    col.flush()
+    pump(20)
+    shown = [w.number for w in col.row_widgets()]
+    check('the column lists the rows in the same order',
+          shown == [r['number'] for r in table], str(shown))
+    check('every row widget reads waiting',
+          all(w.peak_text() == 'waiting' for w in col.row_widgets()))
+    check('the header is GAUGE · Z · TRACE · PEAK, the caption sorted by Z',
+          col.header_text() == 'GAUGE · Z · TRACE · PEAK'
+          and col.sub.text() == '4 gauges, sorted by Z. Click a row to '
+          'enlarge it.', f'{col.header_text()!r} {col.sub.text()!r}')
+
+    # a rise at G2 only
+    g2 = rise()
+    pay2 = dict(pay, pressures=[pay['pressures'][0], g2,
+                                pay['pressures'][2], pay['pressures'][3]])
+    s2 = summarize_trace(pay2['times'], g2)
+    want = f"{s2['peak_kpa']:,.0f} kPa"
+    rp.set_gauge_payload(pay2)
+    col.flush()
+    pump(20)
+    got = {w.number: w.peak_text() for w in col.row_widgets()}
+    check("after a rise at G2 only, G2 reads summarize_trace's peak",
+          got[2] == want and want == '231 kPa', f'{got[2]!r} vs {want!r}')
+    check('and the others still read waiting',
+          all(got[k] == 'waiting' for k in (1, 3, 4)), str(got))
+    check('the sparkline has the trace (decimated, <= 2 points a pixel)',
+          0 < col.row_widget(2).spark.n_points() <= 2 * RG.SPARK_W + 1,
+          str(col.row_widget(2).spark.n_points()))
+
+    # default selection: no trigger -> the lowest Z; a click enlarges
+    check('no trigger gauge: the lowest-Z row is enlarged',
+          col.selected_number() == table[0]['number'],
+          f'{col.selected_number()} vs {table[0]["number"]}')
+    w2 = col.row_widget(2)
+    QTest.mouseClick(w2, Qt.LeftButton)
+    pump(20)
+    num, meta, peak = col.card_texts()
+    check('a click on G2 moves the enlarged card to it',
+          col.selected_number() == 2 and num == 'G2'
+          and meta == f'Z {RG.fmt_dist(want_z[2])} · Wall 1 · selected'
+          and peak == f'peak {want}', f'{num} | {meta} | {peak}')
+    check('the selected row has the gauge_bg fill',
+          theme_pal('gauge_bg') in w2.styleSheet(), w2.styleSheet()[:60])
+    rp.set_gauge_payload(pay2)
+    col.flush()
+    check('and the click persists over the next payload',
+          col.selected_number() == 2)
+    trig = sample_case(trigger_gauge=4)
+    rp.set_running(True)
+    rp.set_gauge_case(trig)
+    rp.set_gauge_payload(pay2)
+    col.flush()
+    pump(20)
+    check('with a trigger gauge (G4) it is the default enlarged row',
+          col.selected_number() == 4 and col.card_texts()[0] == 'G4',
+          str(col.selected_number()))
+    check('the now line is visible while running', col.now_visible())
+    rp.set_running(False)
+    pump(20)
+    check('and hidden after set_running(False)', not col.now_visible())
+
+    # a dropped gauge: 3 series for 4 entered gauges
+    drop = flat_payload([pts[0], pts[2], pts[3]])
+    table = RG.rows(case, drop)
+    by_no = {r['number']: r for r in table}
+    check('a dropped gauge: G1…G3 in payload order',
+          sorted(by_no) == [1, 2, 3], str(sorted(by_no)))
+    check('each Z belongs to the matched entered gauge (G2 is entered 3)',
+          by_no[2]['entered'] == 3
+          and abs(by_no[2]['z'] - want_z[3]) < 1e-12
+          and abs(by_no[3]['z'] - want_z[4]) < 1e-12,
+          str({k: (r['entered'], r['z']) for k, r in by_no.items()}))
+    far = RG.rows(case, flat_payload([(0.5, 3.5)]))
+    check('nothing entered within one cell: the payload position is used',
+          far[0]['entered'] is None and abs(far[0]['z'] - sd.scaled_distance(
+              case, (0.5, 3.5))) < 1e-12, str(far[0]['entered']))
+
+    # planar 2D: R, not Z
+    planar = Case2D(geometry='planar', Lx=2.0, Ly=1.2, cell_size_m=0.03,
+                    charge=8.0, center=(0.4, 0.0),
+                    gauges=[(1.6, 0.2), (1.0, 0.4)], gauge_file=None,
+                    n_snapshots=2, record_frames=0, anim_file=None)
+    ptab = RG.rows(planar, flat_payload([snapped(g, 0.03)
+                                         for g in planar.gauges]))
+    rs = [r['r'] for r in ptab]
+    check('planar 2D: no Z, rows sorted by R',
+          all(r['z'] is None for r in ptab) and rs == sorted(rs)
+          and [r['number'] for r in ptab] == [2, 1], str(rs))
+    rp.set_gauge_case(planar)
+    pump(20)
+    check('and the header reads R, the card R … m',
+          col.header_text() == 'GAUGE · R · TRACE · PEAK'
+          and 'sorted by R' in col.sub.text()
+          and col.card_texts()[1].startswith('R ')
+          and 'Z' not in col.header_text(), col.header_text())
+
+    # no gauges
+    rp.set_gauge_case(sample_case(gauges=[]))
+    pump(20)
+    check('no gauges: the column says NO_GAUGES, no card, no list',
+          col.empty.isVisibleTo(col) and col.empty.text() == NO_GAUGES
+          and col.card.isHidden() and col.list_frame.isHidden())
+
+    # the collection rule (decision D60)
+    win._show('run')
+    rp.show_slice_tab()
+    pump(20)
+    check('Run screen current: collecting (the column is on screen)',
+          win.ctrl._live_gauges is True)
+    win._show('setup')
+    pump(20)
+    check('Setup current, slice selected: not collecting',
+          win.ctrl._live_gauges is False)
+    rp.show_gauges_tab()
+    pump(20)
+    check('Setup current, Gauges selected: collecting (G3 as written)',
+          win.ctrl._live_gauges is True)
+    rp.show_slice_tab()
+    pump(20)
+    check('and off again when the segment goes back',
+          win.ctrl._live_gauges is False)
+    win._show('run')
+
+    # the hidden Gauges page is fed on demand, with the newest payload
+    rp.set_gauge_payload(pay2)
+    check('the Gauges page is not redrawn while hidden (it is owed)',
+          rp._pending_gauges is pay2)
+    rp.show_gauges_tab()
+    pump(20)
+    check('and gets the newest payload when shown',
+          rp._pending_gauges is None
+          and rp.gauges.n_points() == len(pay2['times']))
+    rp.show_slice_tab()
+
+    # the last stage's full traces arrive with on_result during a run
+    import test_gui_results_fields as F
+    res = F.fake_2d()
+    full = dict(times=np.asarray(pay2['times']),
+                points=[tuple(p) for p in pts],
+                pressures=[np.asarray(x) for x in pay2['pressures']])
+    res = Result(res.snapshots, full, res.meta, 'end time reached', False)
+    win._run_cases = [case]
+    win.ctrl._stage_dims = [2]
+    try:
+        win.on_running(True)
+        check("a run start lists the run case's gauges, all waiting",
+              col.case() is case and not col.has_data()
+              and all(r['waiting'] for r in col.table()))
+        win.on_result(0, 2, 'R5 - 2D', res)
+        win.on_running(False)
+        pump(20)
+        got = {r['number']: r['peak_text'] for r in col.table()}
+        check("the last stage's Result.gauges fill the column",
+              col.has_data() and got[2] == want, str(got))
+        check('the finished column has no now line', not col.now_visible())
+    finally:
+        win.ctrl._stage_dims = []
+    win.on_finished(False, False)
+    before = col.table()
+    win.on_result(0, 2, 'R5 again - 2D', F.fake_2d())
+    check('an on_result outside a run (tests feed them) changes nothing',
+          [r['peak_text'] for r in col.table()]
+          == [r['peak_text'] for r in before])
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -758,6 +1019,7 @@ def main():
         r2_clock(win)
         r3_stop(win)
         r4_dock(win)
+        r5_gauges(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         win.close()

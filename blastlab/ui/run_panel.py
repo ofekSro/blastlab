@@ -25,6 +25,7 @@ from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .run_clock import RunClock, fmt_duration
 from .run_dock import RunDock
+from .run_gauges import GaugeColumn
 from .setup_strip import fmt_count
 from .setup_tree import _letter_space
 from .theme import GAP
@@ -301,6 +302,7 @@ class RunPanel(QWidget):
         #: run time with held time excluded (ui/run_clock.py); the window
         #: drives it and reads it for the Stop confirmation
         self.clock = clock if clock is not None else RunClock()
+        self._pending_gauges = None  # a payload the hidden Gauges page owes
         body = QHBoxLayout(self)
         body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(GAP)
@@ -690,26 +692,19 @@ class RunPanel(QWidget):
         cl.addWidget(self.dock)
         return centre
 
-    # ── the live-gauge column (board lines 259-335; the list is 6b) ─────
+    # ── the live-gauge column (board lines 259-335, ui/run_gauges.py) ────
     def _build_gauge_column(self):
         frame = QFrame()
         frame.setObjectName('rungauges')
         frame.setFixedWidth(GAUGE_W)
         gl = QVBoxLayout(frame)
         gl.setContentsMargins(18, 16, 18, 16)
-        gl.setSpacing(4)
-        caps = QLabel('LIVE GAUGES')
-        caps.setObjectName('eyebrow')
-        _letter_space(caps)
-        gl.addWidget(caps)
-        self._gauge_note = QLabel(
-            'The live list of gauges, sorted by Z, arrives with the next '
-            'build (GUI-6b). Until then, choose Gauges above the view to '
-            'watch every trace while the run goes.')
-        self._gauge_note.setObjectName('gaugenote')
-        self._gauge_note.setWordWrap(True)
-        gl.addWidget(self._gauge_note)
-        gl.addStretch(1)
+        gl.setSpacing(0)
+        self.gauge_col = GaugeColumn()
+        gl.addWidget(self.gauge_col, 1)
+        # the column follows the Setup case until a run starts; from then
+        # on it describes the run (its case, its series) until the next
+        self._col_from_run = False
         return frame
 
     # ── layout: column widths and the dock height ────────────────────────
@@ -853,6 +848,9 @@ class RunPanel(QWidget):
 
     def _view_selected(self, value):
         self._stack.setCurrentWidget(self._view_widget(value))
+        if value == 'Gauges' and self._pending_gauges is not None:
+            self.gauges.set_payload(self._pending_gauges)
+            self._pending_gauges = None
         # the solver only does the work while someone is watching
         self.gauges_wanted.emit(value == 'Gauges')
 
@@ -943,6 +941,9 @@ class RunPanel(QWidget):
             self.strip.pct_lbl.setText('0 %')
             self._amr_run = 0
             self._start_record(model, folder)
+            # the live-gauge column: no series yet, the now line on
+            self._col_from_run = True
+            self.gauge_col.start_run()
             # Everything below belongs to the PREVIOUS run: the readouts
             # and the live plot used to keep its step/time/field until the
             # new run's first frame, which on a blastFoam cold start is
@@ -958,6 +959,8 @@ class RunPanel(QWidget):
             # how it ended arrives with on_finished (mark_ended)
             self._ended = 'ended'
             self.dock.record_end()
+            # the finished column: the full traces, no now line
+            self.gauge_col.set_live(False)
         self._sync_run_text()
         self._sync_tick()
         self._render_time()
@@ -986,13 +989,39 @@ class RunPanel(QWidget):
         self._shape = None
         self.pane.show_placeholder()
         self.gauges.reset()
+        self._pending_gauges = None
         try:
             self.view3d.reset()
         except Exception:
             pass
 
     def set_gauge_payload(self, payload):
-        self.gauges.set_payload(payload)
+        """The series so far, for the live-gauge column and the view's
+        Gauges page. The page is drawn only while it is on screen; the
+        newest payload waits for it otherwise (it holds every earlier
+        one), so a hidden pyqtgraph plot is not redrawn every frame now
+        that the column keeps collection on (decision D60)."""
+        self.gauge_col.set_payload(payload)
+        if self.watching_gauges():
+            self.gauges.set_payload(payload)
+            self._pending_gauges = None
+        else:
+            self._pending_gauges = payload
+
+    def set_gauge_case(self, case):
+        """The case of the stage now running: the column's Z, wall names
+        and trigger gauge (the app's `_run_cases`)."""
+        self.gauge_col.set_case(case)
+
+    def set_setup_case(self, case):
+        """The Setup screen's case: shown by the column (all `waiting`)
+        until the first run of the session starts."""
+        if not self._col_from_run:
+            self.gauge_col.set_case(case)
+
+    def set_final_gauges(self, gauges):
+        """The last stage's Result.gauges: the full traces."""
+        self.gauge_col.set_payload(gauges, final=True)
 
     def say_no_gauges(self):
         """The case has no gauges, so the view has nothing to wait for."""

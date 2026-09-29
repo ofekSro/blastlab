@@ -329,6 +329,8 @@ class MainWindow(QMainWindow):
         for k, b in self._nav_btns.items():
             b.setProperty('active', 'true' if k == key else 'false')
             theme.repolish(b)
+        # GUI-6b: the Run screen's live-gauge column is on screen
+        self._sync_gauge_collection()
 
     def current_tab(self):
         for k, p in self._panels.items():
@@ -717,6 +719,7 @@ class MainWindow(QMainWindow):
             from ..core.assessment import validate as validate_hd13
             rep = validate_hd13(case)
             self.setup.show_report(rep.errors, rep.warnings, rep.notes)
+            self.run_panel.set_setup_case(case)
             self.run_panel.set_validation(not rep.errors, len(rep.errors))
             self.topbar.set_done('setup', not rep.errors)
             self.setup.update_preview(case)
@@ -739,6 +742,8 @@ class MainWindow(QMainWindow):
                          f'display cells)')
             extra.append(line)
         self.setup.show_report(rep.errors, rep.warnings, rep.notes + extra)
+        # GUI-6b: until the first run the gauge column lists these gauges
+        self.run_panel.set_setup_case(case)
         # GUI-6: the Run screen's Setup link shows the report's cell count
         self.run_panel.set_validation(not rep.errors, len(rep.errors),
                                       n_cells=rep.n_cells)
@@ -1073,6 +1078,8 @@ class MainWindow(QMainWindow):
         # start_stages (plan §4)
         self._chain_k += 1
         self._update_title()
+        # GUI-6b: the gauge column's Z and walls are this stage's case
+        self.run_panel.set_gauge_case(self._running_case())
 
     def on_view3d_available(self, is3d):
         self.run_panel.enable_view3d(is3d)
@@ -1098,9 +1105,22 @@ class MainWindow(QMainWindow):
     def on_gauges(self, payload):
         self.run_panel.set_gauge_payload(payload)
 
+    def _sync_gauge_collection(self):
+        """GUI-6b collection rule (decision D60): live gauge traces are
+        collected while the Run screen is the current screen (its gauge
+        column is on screen) or the view's Gauges segment is selected,
+        and not otherwise - a native run copies every series on each live
+        frame, a foam run re-reads blastProbes. Display only: the solver's
+        own gauge record does not depend on it."""
+        ctrl = getattr(self, 'ctrl', None)
+        if ctrl is None:
+            return
+        ctrl.set_live_gauges(self.current_tab() == 'run'
+                             or self.run_panel.watching_gauges())
+
     def _gauges_wanted(self, on):
         """The live gauge view was opened or left."""
-        self.ctrl.set_live_gauges(on)
+        self._sync_gauge_collection()
         if not on:
             return
         # a case with no gauges would otherwise sit on "waiting for the
@@ -1132,6 +1152,11 @@ class MainWindow(QMainWindow):
             running, paused=bool(running) and self._start_paused,
             model=getattr(self.ctrl, '_run_name', None) or None,
             folder=getattr(model, 'folder', None))
+        if running:
+            # the gauge column shows the first stage's gauges, waiting
+            self.run_panel.set_gauge_case(
+                self._run_cases[0] if self._run_cases else
+                self.current_case())
         # a second start while a run is live would orphan the drain loop
         # and drop the finished result
         self.chain.set_running(running)
@@ -1145,6 +1170,11 @@ class MainWindow(QMainWindow):
         self._update_title()
 
     def on_result(self, k, dim, label_, res):
+        if self._running_ui and k == len(
+                getattr(self.ctrl, '_stage_dims', None) or []) - 1:
+            # GUI-6b: the last stage's full traces in the gauge column
+            # (only for a live run: tests feed on_result by hand)
+            self.run_panel.set_final_gauges(getattr(res, 'gauges', None))
         self._run_got_result = True
         self._results.append((label_, dim, res))
         self.results.add_result(label_, dim, res)
