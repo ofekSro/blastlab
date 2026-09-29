@@ -467,16 +467,20 @@ class GaugesView(QWidget):
 
     def _draw_curves(self, res):
         self._drop_curves()
+        failed = None
         try:
             data = traces(res.gauges, self._field)
-        except Exception:
-            data = []
+        except Exception as exc:
+            # said on the page, not passed off as "no gauges" (GUI-7
+            # verification: a bug here read as a result without gauges)
+            data, failed = [], exc
         ylabel = plots.GAUGE_FIELDS[self._field][1]
         self.plot.setLabel('left', ylabel)
         self.head_lbl.setText(f'{field_name(self._field)} at the gauges')
         self.plot.setTitle(self._title_extra)
         if not data:
-            self.hint.setText(self.NO_GAUGES)
+            self.hint.setText(self.NO_GAUGES if failed is None else
+                              f'Could not draw the gauges: {failed}')
             self.plot_stack.setCurrentIndex(1)
             return
         for k, (x, y) in enumerate(data, start=1):

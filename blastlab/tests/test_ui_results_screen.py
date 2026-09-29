@@ -1029,6 +1029,23 @@ def s5_gauges(win, link):
           and g.head_lbl.text() == 'Speed at the gauges', g.ylabel())
     check('the header tooltip says the file is the grid',
           'grid' in g.head_lbl.toolTip())
+    # verification: a failure to build the curves read "This result has
+    # no gauges." - it now says it could not draw them, and why
+    real_traces = RG.traces
+
+    def boom(*_a, **_k):
+        raise ValueError('boom')
+    RG.traces = boom
+    try:
+        g.redraw()
+    finally:
+        RG.traces = real_traces
+    check('a failure to draw the curves says so (not "no gauges")',
+          g.page() == 'empty'
+          and g.hint.text() == 'Could not draw the gauges: boom',
+          g.hint.text())
+    g.redraw()
+    check('and the next draw is back', g.page() == 'plot')
     r1 = ce.result('1d')
     p.add_result('1d', 1, r1)
     pump(40)
