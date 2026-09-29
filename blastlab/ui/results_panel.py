@@ -416,6 +416,9 @@ class ResultsPanel(QWidget):
         vl.addWidget(self.stack, 1)
         self.fields = FieldsView(on_change=self._mesh_changed)
         self.gauges = GaugesView()
+        # the selected gauge is the Gauges view's, shared through
+        # selected_gauge() / select_gauge() (T6's time-bar tick reads it)
+        self.gauges.gauge_selected.connect(self._gauge_selected)
         self.anim = AnimView()
         self.view3d = (View3DHost(viewer_link, 'results', log_fn=log_fn)
                        if viewer_link is not None else QWidget())
@@ -638,6 +641,20 @@ class ResultsPanel(QWidget):
             self.gauges.redraw()
         elif view == 'Animation':
             self.anim.show_frame(self.anim.frame())
+
+    # ── the selected gauge (T5), one for every view ──────────────────────
+    def selected_gauge(self):
+        """The G number of the selected gauge, or None. It persists across
+        the view tabs and goes back to its default (the trigger gauge,
+        else the first row) on a result change."""
+        return self.gauges.selected()
+
+    def select_gauge(self, number):
+        """Select G`number` (as a row click in Gauges does)."""
+        self.gauges.select(number)
+
+    def _gauge_selected(self, _number):
+        """Hook for the views that follow the selection (T6)."""
 
     def _mesh_changed(self):
         self.anim.set_show_mesh(self.fields.show_mesh.isChecked())

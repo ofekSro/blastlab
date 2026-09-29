@@ -138,6 +138,15 @@ def _match(case, positions):
     return out
 
 
+def match_gauges(case, gauge_out):
+    """The entered gauge (0-based) each position of `gauge_out` (a live
+    payload or a finished Result's `gauges`) belongs to, or None - the
+    D61 / D73 rules of `_match`. The Results screen's gauge table uses it
+    too (GUI-7 T5), so both screens read a gauge's Z from the same
+    entered position."""
+    return _match(case, _positions(gauge_out or {}))
+
+
 def z_mode(case):
     """True when the column shows and sorts by Z; False for R (planar
     2D, a profile start: `scaled_distance.z_shown`)."""

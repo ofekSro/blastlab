@@ -2123,9 +2123,10 @@ def e03_gauges_table(qa):
     qa.note(f'summary rows: {rows}')
     qa.check(bool(rows), 'the summary table has a row per gauge', 'S2')
     # N2-09: the table must not starve the traces it sits above
-    qa.check(rs.gauges.canvas.height() > rs.gauges.table.height(),
+    # GUI-7 T5: the traces are one pyqtgraph plot (plot_w)
+    qa.check(rs.gauges.plot_w.height() > rs.gauges.table.height(),
              f'the traces keep more height than the table '
-             f'({rs.gauges.canvas.height()} vs '
+             f'({rs.gauges.plot_w.height()} vs '
              f'{rs.gauges.table.height()} px)', 'S2')
     # no scripted path: `default_path` already answers pick_dir with the
     # exports directory and save_file with a name inside it, which is

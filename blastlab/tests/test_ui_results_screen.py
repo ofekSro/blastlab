@@ -24,6 +24,17 @@ board Results; batch docs/batches/2026-09-29-gui-results.md).
      3D viewer disabled with its why-not for 1D, 2D, a 3D result with no
      snapshots and without pyvista, enabled for a 3D result with
      snapshots; the title box retitles the figures (E09).
+ S5  the Gauges view: every curve is (times x 1e3, GAUGE_FIELDS' transform)
+     exactly; Z = scaled_distance of the entered gauge (the sample
+     geometry: G1 3.31, G2 2.99), rows by Z; every numeric cell is
+     table_rows' string by gauge number; the selected curve in `gauge` at
+     2.4 px, the others grey, the positive phase shaded over [arrival,
+     arrival + duration] and moved by a row click, none for |U|; the
+     readout; the default selection (trigger, else first row) and the
+     panel API; Copy table and Ctrl+C (table-scoped) put the text built
+     here on the clipboard, nine columns with Z, eight without; planar and
+     a profile start hide Z; 1D Z = r / W^(1/3); the plot keeps the
+     stretch at 1100 x 720 and 900 x 600, twelve gauges scroll.
 
 Plain script, offscreen, throwaway settings, no window on screen:
     cd blastlab/tests && python test_ui_results_screen.py
@@ -756,6 +767,292 @@ def s3_view3d_and_title(link):
     pump(20)
 
 
+# ── S5 ───────────────────────────────────────────────────────────────────
+def sample_2d(trigger=None, from_profile=False):
+    """The sample geometry (plan section 10, GUI-5): 1 kg at z 2 on the
+    axis, gauges G1 (2.95, 0.50) and G2 (2.95, 1.50) as entered; the
+    solver snapped them half a 5 cm cell away. Z: G1 3.31, G2 2.99."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    from blastlab.solvers.hooks import Result
+    from test_gui_results_fields import fake_2d
+    res = fake_2d()
+    t = np.linspace(0.0, 8e-3, 400)
+    traces = []
+    for k, (t0, pk) in enumerate(((4.7e-3, 184e3), (4.15e-3, 231e3))):
+        s = np.clip((t - t0) / 1.3e-3, 0.0, None)
+        p = np.where(t >= t0, P_AIR + pk * (1 - s) * np.exp(-2 * s), P_AIR)
+        traces.append(p)
+    res.gauges = dict(times=t, points=[(2.975, 0.525), (2.975, 1.525)],
+                      pressures=traces)
+    res.meta.update(geometry='axisymmetric', charge=1.0,
+                    charge_center=(0.0, 2.0), dx=0.05,
+                    gauges=[(2.95, 0.50), (2.95, 1.50)],
+                    from_profile=from_profile, trigger_gauge=trigger)
+    return Result(res.snapshots, res.gauges, res.meta, res.stop_reason,
+                  False)
+
+
+def sample_case():
+    from blastlab.models.case import Case2D
+    return Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0,
+                  cell_size_m=0.05, charge=1.0, center=(0.0, 2.0),
+                  gauges=[(2.95, 0.50), (2.95, 1.50)])
+
+
+def want_text(g, strings, zs, order):
+    """The clipboard text built here: the visible headers, then one line
+    per row in on-screen order, `table_rows` strings and Z (.2f)."""
+    from blastlab.ui import results_gauges as RG
+    heads = [h for i, h in enumerate(RG.HEADERS) if zs or i != 1]
+    lines = ['\t'.join(heads)]
+    for n in order:
+        row = strings[n - 1]
+        cells = [f'G{n}'] + ([f'{zs[n]:.2f}'] if zs else []) + list(row[1:])
+        lines.append('\t'.join(cells))
+    return '\n'.join(lines)
+
+
+def s5_gauges(win, link):
+    import numpy as np
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication
+    import test_char_exports as ce
+    from test_gui_results_fields import fake_2d
+    from test_ui_results import with_gauges
+    from blastlab.output import gauge_summary, plots
+    from blastlab.ui import results_gauges as RG
+    from blastlab.ui import scaled_distance as sd
+    from blastlab.ui import theme
+    from blastlab.ui.exports import summary_rows
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS5: Gauges - one plot, the selection, the table, Copy')
+    p = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p.resize(1600, 1000)
+    p.show()
+    p.show_view('Gauges')
+    g = p.gauges
+    tr = plots.GAUGE_FIELDS['p'][2]
+
+    for name, res, case in (('char 2D', ce.result('2d'), None),
+                            ('sample', sample_2d(), sample_case())):
+        p.add_result(name, 2, res)
+        pump(60)
+        t = res.gauges['times']
+        curves = g.traces()
+        check(f'{name}: one curve per gauge, each (times*1e3, '
+              f'GAUGE_FIELDS[p](p_k)) exactly',
+              sorted(curves) == list(range(1, len(res.gauges['pressures'])
+                                           + 1))
+              and all(np.array_equal(curves[k + 1][0], t * 1e3)
+                      and np.array_equal(curves[k + 1][1], tr(pk))
+                      for k, pk in enumerate(res.gauges['pressures'])))
+        if case is None:
+            from test_char_native_api import CASES
+            case = CASES['2d']
+        zs = {k: sd.scaled_distance(case, pt)
+              for k, pt in enumerate(case.gauges, start=1)}
+        strings = gauge_summary.table_rows(summary_rows(res))
+        order = sorted(zs, key=lambda n: (zs[n], n))
+        check(f'{name}: rows sorted by Z, ties by number',
+              g.order() == order, f'{g.order()} vs {order}')
+        shown = {int(r[0][1:]): r for r in g.cells()}
+        check(f'{name}: Z = scaled_distance(case, entered gauge), .2f',
+              all(shown[n][1] == f'{zs[n]:.2f}' for n in zs),
+              str({n: (shown[n][1], round(zs[n], 4)) for n in zs}))
+        check(f'{name}: every numeric cell is table_rows\' string, by '
+              f'gauge number',
+              all(shown[n][2:] == list(strings[n - 1][1:]) for n in zs))
+        check(f'{name}: the Gauge cell is G<n>, its tooltip the old label',
+              all(g.table.item(r, 0).text() == f'G{n}'
+                  and g.table.item(r, 0).toolTip() == strings[n - 1][0]
+                  for r, n in enumerate(g.order())))
+    zs_txt = [c[1] for c in g.cells()]
+    check('sample: G2 2.99 above G1 3.31 (plan section 10)',
+          g.order() == [2, 1] and zs_txt == ['2.99', '3.31'], str(zs_txt))
+
+    print('\nS5b: selection, positive phase, readout')
+    grey = RG.GREY[theme.mode()]
+    gauge = theme.cur('gauge')
+    rows = summary_rows(p.current().result)
+    strings = gauge_summary.table_rows(rows)
+    check('the default is the first row (no trigger gauge)',
+          g.selected() == 2 and p.selected_gauge() == 2)
+
+    def selected_ok(n):
+        other = 1 if n == 2 else 2
+        a, d = rows[n - 1]['arrival_ms'], rows[n - 1]['pos_duration_ms']
+        span = g.fill_span()
+        return (g.pen_of(n) == (gauge, RG.SELECTED_W)
+                and g.pen_of(other) == (grey, RG.OTHER_W)
+                and span is not None and abs(span[0] - a) < 1e-9
+                and abs(span[1] - (a + d)) < 1e-9)
+    check('selected curve: gauge at 2.4 px, the other grey at 1.2; the '
+          'fill spans [arrival, arrival + positive phase]', selected_ok(2),
+          f'{g.pen_of(1)} {g.pen_of(2)} {g.fill_span()}')
+    row = strings[1]
+    check('the readout is the table\'s own strings',
+          g.readout_text() == ['G2 · Z 2.99',
+                               f'peak {row[1]} kPa at {row[3]} ms',
+                               f'pos. impulse {row[5]} kPa·ms'],
+          str(g.readout_text()))
+    heard = []
+    g.gauge_selected.connect(heard.append)
+    rect = g.table.visualRect(g.table.model().index(1, 3))
+    QTest.mouseClick(g.table.viewport(), Qt.LeftButton, Qt.NoModifier,
+                     rect.center())
+    pump(30)
+    check('a click on the second row selects G1: pens, fill and readout '
+          'move', g.selected() == 1 and selected_ok(1) and heard == [1]
+          and g.readout_text()[0] == 'G1 · Z 3.31',
+          f'{g.selected()} {heard} {g.readout_text()}')
+    p.show_view('Fields')
+    pump(20)
+    p.show_view('Gauges')
+    pump(20)
+    check('the selection persists across the view tabs',
+          p.selected_gauge() == 1)
+    p.select_gauge(2)
+    check('select_gauge(n) is the API', g.selected() == 2
+          and selected_ok(2))
+    p.add_result('trigger', 2, sample_2d(trigger=1))
+    pump(40)
+    check('a result change resets it: the trigger gauge when set',
+          p.selected_gauge() == 1 and selected_ok(1))
+
+    print('\nS5c: Copy table, Ctrl+C')
+    clip = QApplication.clipboard()
+    # R = sqrt(2.95^2 + 1.5^2) and sqrt(2.95^2 + 0.5^2), W = 1 kg
+    zmap = {1: 3.309456, 2: 2.992073}
+    zs = {n: sd.scaled_distance(sample_case(), pt) for n, pt in
+          enumerate(sample_case().gauges, start=1)}
+    check('the test\'s Z: G1 3.31, G2 2.99',
+          all(abs(zs[n] - zmap[n]) < 1e-5 for n in zs), str(zs))
+    want = want_text(g, strings, zs, [2, 1])
+    clip.setText('sentinel')
+    g.copy_btn.click()
+    pump(10)
+    got = clip.text()
+    check('Copy table: tab-separated, headers first, on-screen order, no '
+          'trailing newline', got == want, repr(got[:120]))
+    check('nine columns with Z',
+          all(len(line.split('\t')) == 9 for line in got.split('\n')))
+    clip.setText('sentinel')
+    g.table.setFocus()
+    QTest.keyClick(g.table, Qt.Key_C, Qt.ControlModifier)
+    pump(10)
+    check('Ctrl+C with the table focused copies the same text',
+          clip.text() == want, repr(clip.text()[:60]))
+    clip.setText('sentinel')
+    p.title_box.setText('abc')
+    p.title_box.setFocus()
+    QTest.keyClick(p.title_box, Qt.Key_C, Qt.ControlModifier)
+    pump(10)
+    check('Ctrl+C in the title box leaves the table alone',
+          clip.text() == 'sentinel', repr(clip.text()[:60]))
+    p.title_box.setText('')
+    check('the shortcut is widget-scoped, never window-wide',
+          g.copy_shortcut.context() == Qt.WidgetWithChildrenShortcut
+          and g.copy_shortcut.parent() is g.table)
+
+    print('\nS5d: Z hidden - planar and a profile start')
+    for name, res in (('planar 2D', with_gauges(fake_2d())),
+                      ('profile start', sample_2d(from_profile='1d'))):
+        p.add_result(name, 2, res)
+        pump(40)
+        strings = gauge_summary.table_rows(summary_rows(res))
+        n = len(strings)
+        check(f'{name}: the Z column is hidden, rows by number',
+              g.table.isColumnHidden(1) and g.order() == list(
+                  range(1, n + 1)) and not g.z_shown())
+        clip.setText('sentinel')
+        g.copy_table()
+        got = clip.text()
+        check(f'{name}: eight columns copied, built here',
+              got == want_text(g, strings, None, list(range(1, n + 1)))
+              and all(len(line.split('\t')) == 8
+                      for line in got.split('\n')), repr(got[:80]))
+        check(f'{name}: the readout has no Z',
+              g.readout_text()[0] == f'G{g.selected()}')
+
+    print('\nS5e: other traces, 1D')
+    p.add_result('three traces', 2,
+                 with_gauges(fake_2d(), fields=('p', '|U|', 'rho')))
+    pump(40)
+    check('p: the fill is on', g.fill_span() is not None)
+    g.field_seg.changed.emit('|U|')
+    pump(30)
+    ok_u = all(np.array_equal(
+        g.traces()[k + 1][1], plots.GAUGE_FIELDS['|U|'][2](s))
+        for k, s in enumerate(p.current().result.gauges['speeds']))
+    check('|U|: the curves are the speeds, the y-label the builder\'s, '
+          'and there is no fill',
+          ok_u and g.fill_span() is None
+          and g.ylabel() == plots.GAUGE_FIELDS['|U|'][1]
+          and g.head_lbl.text() == 'Speed at the gauges', g.ylabel())
+    check('the header tooltip says the file is the grid',
+          'grid' in g.head_lbl.toolTip())
+    r1 = ce.result('1d')
+    p.add_result('1d', 1, r1)
+    pump(40)
+    radii = r1.gauges['radii']
+    w13 = r1.meta['charge_kg'] ** (1.0 / 3.0)
+    shown = {int(r[0][1:]): r for r in g.cells()}
+    check('1D: one plot, no selector, Z = r / W^(1/3)',
+          not g.selector_visible() and g.page() == 'plot'
+          and all(shown[k + 1][1] == f'{r / w13:.2f}'
+                  for k, r in enumerate(radii)),
+          str([r[1] for r in g.cells()]))
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+
+    print('\nS5f: the plot keeps the stretch')
+    rs = win.results
+    win._show('results')
+    win.resize(1100, 720)
+    rs.add_result('three', 2, with_gauges(fake_2d()))
+    rs.show_view('Gauges')
+    pump(150)
+    gg = rs.gauges
+    check('1100 x 720: every row on screen and the plot taller than the '
+          'table', gg.table.verticalScrollBar().maximum() == 0
+          and gg.plot_w.height() > gg.table.height(),
+          f'plot {gg.plot_w.height()} table {gg.table.height()}')
+    rs.add_result('twelve', 2, with_gauges(fake_2d(), n=12))
+    pump(150)
+    check('twelve gauges scroll and the plot still wins',
+          gg.table.verticalScrollBar().maximum() > 0
+          and gg.plot_w.height() > gg.table.height(),
+          f'plot {gg.plot_w.height()} table {gg.table.height()}')
+    from test_ui_parity import clipped
+    bad = clipped(win)
+    check('1100 x 720: nothing clipped on Gauges', not bad, str(bad[:4]))
+    while rs.entries():
+        rs.sel.setCurrentIndex(0)
+        rs.remove_current()
+    rs.show_view('Fields')
+    pump(30)
+    p9 = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p9.resize(900, 600)
+    p9.show()
+    p9.add_result('twelve', 2, with_gauges(fake_2d(), n=12))
+    p9.show_view('Gauges')
+    pump(150)
+    g9 = p9.gauges
+    check('the panel at 900 x 600: the plot taller than the table, which '
+          'scrolls', g9.plot_w.height() > g9.table.height()
+          and g9.table.verticalScrollBar().maximum() > 0,
+          f'plot {g9.plot_w.height()} table {g9.table.height()}')
+    check('the headers wrap onto two lines there, and the table scrolls '
+          'sideways rather than clip', g9.headers_wrapped()
+          and g9.table.horizontalScrollBar().maximum() >= 0
+          and not clipped(p9), str(clipped(p9)[:3]))
+    p9.shutdown()
+    p9.deleteLater()
+    pump(20)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     from blastlab.ui.results_panel import ResultsPanel
@@ -781,6 +1078,7 @@ def main():
         s3_layout(win, link)
         s3_busy(link)
         s3_view3d_and_title(link)
+        s5_gauges(win, link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]
               if crashes else '')

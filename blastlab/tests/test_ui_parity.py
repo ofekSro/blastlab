@@ -301,10 +301,11 @@ def main():
     win._show('results')
     pump(150)
     heads = win.results.gauges.table
-    check('all eight summary headers explain themselves',
+    # GUI-7 T5: nine with Z (board Results line 162)
+    check('all nine summary headers (Z included) explain themselves',
           all(heads.horizontalHeaderItem(i).toolTip()
               for i in range(heads.columnCount()))
-          and heads.columnCount() == len(RG.HEADERS))
+          and heads.columnCount() == len(RG.HEADERS) == 9)
     btns = win.results._export_btns
     check('all eight export buttons have a tooltip',
           len(btns) == 8 and all(b.toolTip() for b in btns.values()),

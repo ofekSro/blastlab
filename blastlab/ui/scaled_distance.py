@@ -29,9 +29,51 @@ case as entered, display only.
 """
 
 import math
+from types import SimpleNamespace
 
 #: the column / tile label everywhere (plan §5.3)
 LABEL = 'Z [m/kg^1/3]'
+
+
+def case_from_meta(meta, dim, gauge_out=None):
+    """A case-like view of a finished result, for its Z on the Results
+    screen (GUI-7 T5): display only, no new formula - the functions below
+    read it exactly as they read a Case.
+
+    Read from `meta`: `charge` (2D/3D) or `charge_kg` (1D),
+    `charge_center`, `geometry` (2D), `from_profile` and `gauges` (the
+    positions as entered). A 1D meta keeps no gauge list, so the radii of
+    the result's own `gauge_out` stand in for it. `dx` (when present) is
+    the snapping tolerance of `run_gauges.match_gauges`.
+
+    None when any of those is missing: Z is then hidden, never guessed."""
+    meta = meta or {}
+    try:
+        if dim == 1:
+            radii = (gauge_out or {}).get('radii')
+            if 'charge_kg' not in meta or radii is None:
+                return None
+            return SimpleNamespace(
+                dim=1, charge_kg=meta['charge_kg'], init_mode='charge',
+                gauge_radii=[float(r) for r in radii], cell_size_m=0.0,
+                trigger_gauge=meta.get('trigger_gauge'))
+        if dim not in (2, 3):
+            return None
+        need = ('charge', 'charge_center', 'from_profile', 'gauges')
+        if dim == 2:
+            need += ('geometry',)
+        if any(k not in meta for k in need):
+            return None
+        return SimpleNamespace(
+            dim=dim, charge=meta['charge'],
+            center=tuple(meta['charge_center']),
+            geometry=meta.get('geometry'),
+            init_mode='profile' if meta['from_profile'] else 'charge',
+            gauges=[tuple(g) for g in (meta['gauges'] or [])],
+            cell_size_m=float(meta.get('dx') or 0.0),
+            trigger_gauge=meta.get('trigger_gauge'))
+    except (TypeError, ValueError):
+        return None
 
 
 def charge_mass(case):

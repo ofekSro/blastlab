@@ -650,6 +650,39 @@ def qss(mode_name):
     QPushButton#res3d:hover {{ background: {p['hover']}; }}
     QPushButton#res3d:disabled {{ color: {p['muted']}; }}
     QPlainTextEdit#caseview {{ font-family: "{MONO}"; font-size: 12px; }}
+    /* the Gauges view (ui/results_gauges.py, board lines 107-189) */
+    QFrame#gaugeplotcard {{ background: {p['tile']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QLabel#gaugehead {{ font-family: "{DISPLAY}"; font-size: 15px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QLabel#gaugecaption {{ font-size: 12px; color: {p['faint']};
+                           background: transparent; }}
+    QLabel#gaugereadsel {{ font-family: "{MONO}"; font-size: 13px;
+        font-weight: 600; color: {p['gauge']}; background: transparent; }}
+    QLabel#gaugeread {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['text']}; background: transparent; }}
+    QFrame#gaugetablecard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QWidget#gaugetablehead {{ background: transparent;
+        border-bottom: 1px solid {p['border']};
+        min-height: 30px; }}
+    QLabel#gaugesumtitle {{ font-family: "{DISPLAY}"; font-size: 14px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QPushButton#gaugecopy {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 62px 0px 12px; min-height: 28px; max-height: 28px;
+        font-size: 12.5px; font-weight: 500; text-align: left; }}
+    QPushButton#gaugecopy:hover {{ background: {p['hover']}; }}
+    QPushButton#gaugecopy:disabled {{ color: {p['muted']}; }}
+    QLabel#gaugecopykey {{ font-family: "{MONO}"; font-size: 11px;
+                           color: {p['faint']}; background: transparent; }}
+    QTableWidget#gaugetable {{ background: {p['card']}; border: none;
+        font-family: "{MONO}"; font-size: 12.5px; gridline-color:
+        {p['border']}; }}
+    QTableWidget#gaugetable QHeaderView::section {{
+        background: {p['card']}; color: {p['faint']}; border: none;
+        border-bottom: 1px solid {p['border']}; padding: 4px 8px;
+        font-family: "{FONT}"; font-size: 11.5px; font-weight: 500; }}
     """
 
 

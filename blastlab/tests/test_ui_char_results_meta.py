@@ -13,14 +13,16 @@ or empty frames) through the REAL `ui.results_panel.ResultsPanel`:
     `results_fields.select_field` (arrays by exact-byte hash), the page
     the view shows, its title and hint, and the figure of the matplotlib
     page (1D profiles, 3D isosurface);
-  * Gauges: the figure and the summary table;
+  * Gauges: the data of every curve on the plot (GUI-7 T5; it was the
+    matplotlib figure, migrated under a proof that the numbers are the
+    same - batch 2026-09-29-gui-results, 7b report) and the summary table;
   * Animation: `results_anim.plane_geometry`, the colour-scale widgets as
     set from the recorded scale, and title / scale used / clip / range at
     the first, middle and last frame;
   * missing keys: for the 1D/2D/3D native and blastFoam-shaped results,
     each meta key removed in turn - what `select_field` (every field, last
     snapshot), `plane_geometry`, `AnimView.set_result`, the 1D profile
-    figure and the Gauges figure do (a description hash, or the exact
+    figure and the Gauges curves do (a description hash, or the exact
     exception).
 
 Script only - it builds Qt widgets (conftest.py keeps `test_ui_*.py` out
@@ -64,11 +66,20 @@ def fields_view(p, ent):
     return out
 
 
+def gauge_traces(g):
+    """GUI-7 T5: the gauges are one pyqtgraph plot on screen (the
+    matplotlib grid is export-only now), so what is pinned is each
+    curve's data - the sha1 of column_stack((x, y)) as float64, the same
+    hash `cm.figure` took of each matplotlib line's xy data."""
+    import numpy as np
+    return [cm.digest(np.column_stack(xy).astype(np.float64))['sha1']
+            for _n, xy in sorted(g.traces().items())]
+
+
 def gauges_view(p):
     g = p.gauges
     g.redraw()
-    return dict(figure=cm.figure(g.canvas.figure), rows=g.rows(),
-                field=g.field())
+    return dict(traces=gauge_traces(g), rows=g.rows(), field=g.field())
 
 
 def anim_view(p, ent):
@@ -119,7 +130,7 @@ def missing_keys(p, name, dim, res):
         p.gauges.clear()
         p.gauges.set_result(ent)
         row['gauges'] = cm.short({'ok': dict(
-            figure=cm.figure(p.gauges.canvas.figure), rows=p.gauges.rows())})
+            traces=gauge_traces(p.gauges), rows=p.gauges.rows())})
         p.anim.placeholder('')
         row['anim'] = cm.short(cm.outcome(p.anim.set_result, ent))
         row['anim shown'] = cm.short({'ok': dict(
