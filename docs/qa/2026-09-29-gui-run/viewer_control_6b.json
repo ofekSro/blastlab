@@ -1,0 +1,847 @@
+{
+ "rule": "measurements-6b.md R-VIEWER control run (attribution, not the gate)",
+ "case": "tests/cases/native_3d_small.json at cell 0.075 m (native, 64 k cells)",
+ "n_samples": 8163,
+ "n_with_viewer": 7377,
+ "n_wrong": 146,
+ "longest_wrong_ms": 49.08379986509681,
+ "PASS": false,
+ "by_phase": {
+  "start": {
+   "n": 75,
+   "vis": 0,
+   "wrong": 0
+  },
+  "A1 run start, 3D view shown (auto-attach)": {
+   "n": 1084,
+   "vis": 373,
+   "wrong": 5
+  },
+  "A2 finished: the banner above the host, playback": {
+   "n": 901,
+   "vis": 901,
+   "wrong": 0
+  },
+  "D0 banner hidden (as a next start does), viewer shown": {
+   "n": 340,
+   "vis": 340,
+   "wrong": 0
+  },
+  "D0 banner shown again": {
+   "n": 348,
+   "vis": 348,
+   "wrong": 7
+  },
+  "D1 banner hidden (as a next start does), viewer shown": {
+   "n": 338,
+   "vis": 338,
+   "wrong": 0
+  },
+  "D1 banner shown again": {
+   "n": 348,
+   "vis": 348,
+   "wrong": 7
+  },
+  "D2 banner hidden (as a next start does), viewer shown": {
+   "n": 339,
+   "vis": 339,
+   "wrong": 0
+  },
+  "D2 banner shown again": {
+   "n": 527,
+   "vis": 527,
+   "wrong": 7
+  },
+  "E0 control: resize 1100 x 720, NO banner": {
+   "n": 459,
+   "vis": 459,
+   "wrong": 10
+  },
+  "E0 control: resize 1600 x 1000, NO banner": {
+   "n": 459,
+   "vis": 459,
+   "wrong": 17
+  },
+  "E1 control: resize 1100 x 720, NO banner": {
+   "n": 460,
+   "vis": 460,
+   "wrong": 10
+  },
+  "E1 control: resize 1600 x 1000, NO banner": {
+   "n": 653,
+   "vis": 653,
+   "wrong": 23
+  },
+  "F0 resize 1100 x 720 WITH the banner": {
+   "n": 462,
+   "vis": 462,
+   "wrong": 11
+  },
+  "F0 resize 1600 x 1000 WITH the banner": {
+   "n": 457,
+   "vis": 457,
+   "wrong": 16
+  },
+  "F1 resize 1100 x 720 WITH the banner": {
+   "n": 458,
+   "vis": 458,
+   "wrong": 17
+  },
+  "F1 resize 1600 x 1000 WITH the banner": {
+   "n": 455,
+   "vis": 455,
+   "wrong": 16
+  }
+ },
+ "phases": [
+  [
+   "A1 run start, 3D view shown (auto-attach)",
+   1160905.961,
+   false,
+   1
+  ],
+  [
+   "A2 finished: the banner above the host, playback",
+   1160912.6,
+   true,
+   1
+  ],
+  [
+   "D0 banner hidden (as a next start does), viewer shown",
+   1160916.602,
+   true,
+   1
+  ],
+  [
+   "D0 banner shown again",
+   1160918.099,
+   false,
+   1
+  ],
+  [
+   "D1 banner hidden (as a next start does), viewer shown",
+   1160919.661,
+   true,
+   1
+  ],
+  [
+   "D1 banner shown again",
+   1160921.165,
+   false,
+   1
+  ],
+  [
+   "D2 banner hidden (as a next start does), viewer shown",
+   1160922.725,
+   true,
+   1
+  ],
+  [
+   "D2 banner shown again",
+   1160924.228,
+   false,
+   1
+  ],
+  [
+   "E0 control: resize 1100 x 720, NO banner",
+   1160926.598,
+   false,
+   1
+  ],
+  [
+   "E0 control: resize 1600 x 1000, NO banner",
+   1160928.648,
+   false,
+   2
+  ],
+  [
+   "E1 control: resize 1100 x 720, NO banner",
+   1160930.712,
+   false,
+   1
+  ],
+  [
+   "E1 control: resize 1600 x 1000, NO banner",
+   1160932.774,
+   false,
+   2
+  ],
+  [
+   "F0 resize 1100 x 720 WITH the banner",
+   1160935.71,
+   true,
+   1
+  ],
+  [
+   "F0 resize 1600 x 1000 WITH the banner",
+   1160937.771,
+   true,
+   2
+  ],
+  [
+   "F1 resize 1100 x 720 WITH the banner",
+   1160939.834,
+   true,
+   1
+  ],
+  [
+   "F1 resize 1600 x 1000 WITH the banner",
+   1160941.882,
+   true,
+   2
+  ],
+  [
+   "end",
+   1160943.93,
+   true,
+   1
+  ]
+ ],
+ "first_wrong": [
+  {
+   "t": 6.840988900046796,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 6.8550741001963615,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 6.859580100048333,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 6.864070700015873,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 6.868585400050506,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  }
+ ],
+ "stretches": [
+  {
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "t0": 6.840988900046796,
+   "t1": 6.868585400050506,
+   "n": 5,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 31.6
+  },
+  {
+   "phase": "D0 banner shown again",
+   "t0": 12.493015900021419,
+   "t1": 12.51936550019309,
+   "n": 7,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 30.3
+  },
+  {
+   "phase": "D1 banner shown again",
+   "t0": 15.559961199993268,
+   "t1": 15.586089299991727,
+   "n": 7,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 30.1
+  },
+  {
+   "phase": "D2 banner shown again",
+   "t0": 18.62626320007257,
+   "t1": 18.65341140003875,
+   "n": 7,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 31.1
+  },
+  {
+   "phase": "E0 control: resize 1100 x 720, NO banner",
+   "t0": 21.00438840012066,
+   "t1": 21.017813900019974,
+   "n": 4,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    476,
+    280
+   ],
+   "rh": [
+    547,
+    247,
+    1223,
+    838
+   ],
+   "rc": [
+    547,
+    247,
+    747,
+    558
+   ],
+   "ms": 17.4
+  },
+  {
+   "phase": "E0 control: resize 1100 x 720, NO banner",
+   "t0": 21.047907800180838,
+   "t1": 21.06997220008634,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    -184,
+    58
+   ],
+   "rh": [
+    351,
+    335,
+    551,
+    646
+   ],
+   "rc": [
+    351,
+    335,
+    735,
+    588
+   ],
+   "ms": 26.1
+  },
+  {
+   "phase": "E0 control: resize 1600 x 1000, NO banner",
+   "t0": 23.0973585001193,
+   "t1": 23.119847900001332,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    30
+   ],
+   "rh": [
+    548,
+    335,
+    1248,
+    868
+   ],
+   "rc": [
+    548,
+    335,
+    1248,
+    838
+   ],
+   "ms": 26.5
+  },
+  {
+   "phase": "E0 control: resize 1600 x 1000, NO banner",
+   "t0": 23.142461100127548,
+   "t1": 23.187544899992645,
+   "n": 11,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    24,
+    -88
+   ],
+   "rh": [
+    559,
+    247,
+    1259,
+    750
+   ],
+   "rc": [
+    559,
+    247,
+    1235,
+    838
+   ],
+   "ms": 49.1
+  },
+  {
+   "phase": "E1 control: resize 1100 x 720, NO banner",
+   "t0": 25.12026960006915,
+   "t1": 25.133776700124145,
+   "n": 4,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    476,
+    280
+   ],
+   "rh": [
+    547,
+    247,
+    1223,
+    838
+   ],
+   "rc": [
+    547,
+    247,
+    747,
+    558
+   ],
+   "ms": 17.5
+  },
+  {
+   "phase": "E1 control: resize 1100 x 720, NO banner",
+   "t0": 25.163818100001663,
+   "t1": 25.18535659997724,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    -184,
+    58
+   ],
+   "rh": [
+    351,
+    335,
+    551,
+    646
+   ],
+   "rc": [
+    351,
+    335,
+    735,
+    588
+   ],
+   "ms": 25.5
+  },
+  {
+   "phase": "E1 control: resize 1600 x 1000, NO banner",
+   "t0": 27.22967420006171,
+   "t1": 27.25129840010777,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    30
+   ],
+   "rh": [
+    548,
+    335,
+    1248,
+    868
+   ],
+   "rc": [
+    548,
+    335,
+    1248,
+    838
+   ],
+   "ms": 25.6
+  },
+  {
+   "phase": "E1 control: resize 1600 x 1000, NO banner",
+   "t0": 27.276853800052777,
+   "t1": 27.316997500136495,
+   "n": 10,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    24,
+    -88
+   ],
+   "rh": [
+    559,
+    247,
+    1259,
+    750
+   ],
+   "rc": [
+    559,
+    247,
+    1235,
+    838
+   ],
+   "ms": 44.1
+  },
+  {
+   "phase": "E1 control: resize 1600 x 1000, NO banner",
+   "t0": 29.228724600048736,
+   "t1": 29.254102100152522,
+   "n": 7,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 29.4
+  },
+  {
+   "phase": "F0 resize 1100 x 720 WITH the banner",
+   "t0": 30.116300699999556,
+   "t1": 30.137765699997544,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    476,
+    298
+   ],
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ],
+   "ms": 25.5
+  },
+  {
+   "phase": "F0 resize 1100 x 720 WITH the banner",
+   "t0": 30.165946500143036,
+   "t1": 30.18397800019011,
+   "n": 5,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    -184,
+    58
+   ],
+   "rh": [
+    351,
+    423,
+    551,
+    646
+   ],
+   "rc": [
+    351,
+    423,
+    735,
+    588
+   ],
+   "ms": 22.0
+  },
+  {
+   "phase": "F0 resize 1600 x 1000 WITH the banner",
+   "t0": 32.229289000155404,
+   "t1": 32.25183010008186,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    30
+   ],
+   "rh": [
+    527,
+    405,
+    1275,
+    868
+   ],
+   "rc": [
+    527,
+    405,
+    1275,
+    838
+   ],
+   "ms": 26.5
+  },
+  {
+   "phase": "F0 resize 1600 x 1000 WITH the banner",
+   "t0": 32.27894400013611,
+   "t1": 32.31954110017978,
+   "n": 10,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    72,
+    -88
+   ],
+   "rh": [
+    559,
+    317,
+    1307,
+    750
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 44.6
+  },
+  {
+   "phase": "F1 resize 1100 x 720 WITH the banner",
+   "t0": 34.23909470019862,
+   "t1": 34.26969820004888,
+   "n": 8,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    476,
+    298
+   ],
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ],
+   "ms": 34.6
+  },
+  {
+   "phase": "F1 resize 1100 x 720 WITH the banner",
+   "t0": 34.281798700103536,
+   "t1": 34.31778799998574,
+   "n": 9,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    -184,
+    58
+   ],
+   "rh": [
+    351,
+    423,
+    551,
+    646
+   ],
+   "rc": [
+    351,
+    423,
+    735,
+    588
+   ],
+   "ms": 40.0
+  },
+  {
+   "phase": "F1 resize 1600 x 1000 WITH the banner",
+   "t0": 36.32937839999795,
+   "t1": 36.351935600163415,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    30
+   ],
+   "rh": [
+    527,
+    405,
+    1275,
+    868
+   ],
+   "rc": [
+    527,
+    405,
+    1275,
+    838
+   ],
+   "ms": 26.6
+  },
+  {
+   "phase": "F1 resize 1600 x 1000 WITH the banner",
+   "t0": 36.37897800002247,
+   "t1": 36.41945470008068,
+   "n": 10,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    72,
+    -88
+   ],
+   "rh": [
+    559,
+    317,
+    1307,
+    750
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 44.5
+  }
+ ],
+ "notes": 1,
+ "viewer_pid": 44492
+}

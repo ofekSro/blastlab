@@ -34,7 +34,10 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      close leaves no tray icon;
  R7  the chain hook (6b; GUI-9 builds the strip): `chain_slot` hidden at
      zero height for a single run, set_chain_strip shows a widget above
-     the progress strip and None hides it again; `Chain 2/3 · …`.
+     the progress strip and None hides it again; `Chain 2/3 · …`;
+ R8  the banner and the embedded 3D viewer (T9): show_finish shrinks the
+     viewer's window by the banner's height first, only while the 3D view
+     is on screen and the banner was hidden.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1294,6 +1297,52 @@ def r7_chain_hook(win):
         win.ctrl._stage_dims, win._run_cases = saved
 
 
+def r8_banner_viewer(win):
+    """T9's Win32 sampler found the embedded viewer 70 px taller than its
+    card for ~30 ms whenever the banner appeared above it; show_finish
+    now shrinks the window first (View3DHost.shrink_ahead). The geometry
+    itself is measured on the real platform (measurements-6b.md); here,
+    that the call is made, with the right height, only when it applies."""
+    from blastlab.ui.theme import GAP
+    rp = win.run_panel
+    host = rp.view3d
+    print('\nR8: the banner shrinks the embedded viewer first')
+    calls = []
+    real = host.shrink_ahead
+    host.shrink_ahead = calls.append
+    win.resize(1600, 1000)
+    win._show('run')
+    try:
+        rp.banner.hide()
+        rp.show_3d_tab()
+        pump(50)
+        rp.show_finish('m', 'end time reached', None)
+        want = rp.banner.heightForWidth(rp._centre.width()) + GAP
+        check('3D view on screen: show_finish shrinks the viewer by the '
+              "banner's height + GAP, before the banner shows",
+              calls == [want] and rp.banner.isVisibleTo(rp), str(calls))
+        calls.clear()
+        rp.show_finish('m', 'end time reached', None)
+        check('a banner already shown does not shrink it again',
+              calls == [])
+        rp.banner.hide()
+        rp.show_slice_tab()
+        pump(20)
+        rp.show_finish('m', 'end time reached', None)
+        check('the live slice on screen: no call', calls == [])
+    finally:
+        host.shrink_ahead = real
+        rp.banner.hide()
+        rp.show_slice_tab()
+    try:
+        host.shrink_ahead(70)
+        ok = True
+    except Exception as exc:        # noqa: BLE001 - reported
+        ok = exc
+    check('shrink_ahead is a no-op without a native window (offscreen)',
+          ok is True, str(ok))
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1309,6 +1358,7 @@ def main():
         r5_gauges(win)
         r6_finish(win)
         r7_chain_hook(win)
+        r8_banner_viewer(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # a notification's tray icon left over is removed at close

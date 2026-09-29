@@ -1019,9 +1019,27 @@ class RunPanel(QWidget):
         if folder:
             text += f" Files in {str(folder).rstrip('/' + os.sep)}{os.sep}"
         self.banner.set(text)
+        if self.banner.isHidden():
+            self._shrink_viewer_for_banner()
         self.banner.show()
         self._end_reason = reason
         self._render_time()
+
+    def _shrink_viewer_for_banner(self):
+        """The banner takes its height (and one GAP) from the view. With
+        the embedded 3D viewer on screen, shrink its window first, so it
+        never stands out of its card while the layout catches up
+        (CLAUDE.md 8.7; T9 measured 30 ms and 70 px without this)."""
+        host = self.view3d
+        shrink = getattr(host, 'shrink_ahead', None)
+        if shrink is None or self._stack.currentWidget() is not host \
+                or not host.isVisible():
+            return
+        w = self._centre.width()
+        dh = (self.banner.heightForWidth(w)
+              if self.banner.hasHeightForWidth()
+              else self.banner.sizeHint().height())
+        shrink(max(dh, self.banner.minimumSizeHint().height()) + GAP)
 
     def banner_text(self):
         """The banner's message as read, or '' while it is hidden."""

@@ -596,6 +596,23 @@ class View3DHost(QWidget):
         except Exception:
             pass
 
+    def shrink_ahead(self, dh):
+        """Make the embedded window `dh` px shorter NOW, ahead of a layout
+        change the caller knows will shrink its card by that much.
+
+        GUI-6b: the finish banner appears above the Run view and takes its
+        height from it. The card shrinks in Qt's next layout pass, and the
+        window used to follow ~30 ms later, standing 70 px out of its card
+        meanwhile (T9, Win32 sampler). Shrinking first leaves the window
+        inside the card throughout; the resize sync then sets the exact
+        size. Native embedding only, a no-op otherwise.
+        """
+        c = self._container
+        if not self._native or not self._hwnd or c is None or dh <= 0:
+            return
+        self._pin_foreign(QRect(0, 0, c.width(),
+                                max(1, c.height() - int(dh))))
+
     def _watch_foreign_moves(self):
         """Correct the move itself, in the frame it happens."""
         fw = self._foreign
