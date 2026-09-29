@@ -427,8 +427,23 @@ class QA:
         form = self.win.setup._forms[dim or self.win.setup.dim]
         self.action = f'{name}={value}'
         self._log_mark = len(self.run_log())
+        if form is self.win.setup.form:
+            self.show_field(name)
         form.v[name].set(str(value))
         self.pump(0.45)
+
+    def show_field(self, name):
+        """GUI-5: a Setup field is on screen only while its model-tree
+        node is selected, so select that node first, as a user must -
+        otherwise the scenario's screenshots show another node's page.
+        Selecting never touches a value or the solver scope."""
+        from blastlab.ui import setup_nodes
+        setup = self.win.setup
+        node = setup_nodes.node_of_field(setup.dim, name)
+        if node is not None and node != setup.selected_node():
+            if not setup.select_node(node):
+                self.note(f'(the node {node!r} of {name!r} is hidden in '
+                          f'this solver mode)')
 
     def click(self, btn, label=''):
         """Press a button the way a user does, and refuse a dead one."""
@@ -1219,9 +1234,19 @@ def _form(qa):
     return qa.win.setup.form
 
 
+def _show_list(qa, plist):
+    """Select the model-tree node of a Setup point list (GUI-5), so the
+    list is on screen while a scenario edits it."""
+    name = next((k for k, p in _form(qa).points.items() if p is plist),
+                None)
+    if name is not None:
+        qa.show_field(name)
+
+
 def _add_row(qa, plist, text):
     """Type a row into a point list's entry and press its + button."""
     qa.action = f'add row {text!r}'
+    _show_list(qa, plist)
     plist.entry.setText(text)
     ok = plist.add()
     qa.pump(0.5)
@@ -1232,6 +1257,7 @@ def _set_rows(qa, plist, rows, settle=0.8):
     """`PointList.set()` does not fire on_change by design (set_case
     drives it), so a scenario that edits rows has to revalidate the way
     a user's +/- click would."""
+    _show_list(qa, plist)
     plist.set(rows)
     plist._on_change()
     qa.pump(settle)
