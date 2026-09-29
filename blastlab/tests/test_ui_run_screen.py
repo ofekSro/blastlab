@@ -1432,6 +1432,10 @@ def main():
         r8_banner_viewer(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
+        # the recorder above is for Qt slots only: an exception out of a
+        # check function must still print its traceback (it used to exit
+        # 1 with no word of where)
+        sys.excepthook = sys.__excepthook__
         # a notification's tray icon left over is removed at close
         from PySide6.QtWidgets import QSystemTrayIcon
         from blastlab.ui import dialogs

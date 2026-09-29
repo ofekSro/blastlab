@@ -978,8 +978,13 @@ def b06_keyboard(qa):
         # GUI-3 / UX-7: the stop key is Shift+Esc; plain Esc is unbound
         # and must not stop the run (GUI-6 brought this scenario over)
         alive = qa.worker_alive()
+        mark = len(qa.run_log())
         qa.key('Esc')
-        qa.check(qa.worker_alive() or not alive,
+        # a stop takes seconds to end the worker, longer than key()'s
+        # pump, so "still alive" alone cannot tell; ctrl.stop() logs
+        # `[stop requested` at once - plain Esc must not have
+        qa.check((qa.worker_alive() or not alive)
+                 and '[stop requested' not in qa.run_log()[mark:],
                  'plain Esc does NOT stop the run (Shift+Esc does)', 'S2')
         qa.key('Shift+Esc')
         qa.check(qa.until(lambda: not qa.worker_alive(), 120),
