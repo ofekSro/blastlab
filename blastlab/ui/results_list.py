@@ -132,6 +132,23 @@ class ResultRow(QFrame):
         super().mouseReleaseEvent(event)
 
 
+class _ListScroll(QScrollArea):
+    """The list's scroll area. Its size hint is the height of all its
+    rows (`_cap` sets it), so the column's layout gives it that height
+    when there is room and shrinks it toward its two-row minimum only when
+    there is not. A plain QScrollArea hints a fixed small height, which
+    held the list at two rows with the column half empty and the newest
+    (selected) result scrolled out of sight (GUI-7 verification)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._want = None
+
+    def sizeHint(self):                              # noqa: N802 (Qt)
+        s = super().sizeHint()
+        return s if self._want is None else QSize(s.width(), self._want)
+
+
 class ResultsList(QWidget):
     """The list of results, newest last, with the QComboBox surface of
     the picker it replaces. `currentIndexChanged(int)` fires as the
@@ -152,7 +169,7 @@ class ResultsList(QWidget):
         self.caps.setObjectName('eyebrow')
         self.caps.setContentsMargins(6, 0, 0, 2)
         root.addWidget(self.caps)
-        self.scroll = QScrollArea()
+        self.scroll = _ListScroll()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -163,6 +180,8 @@ class ResultsList(QWidget):
         self._lay.setSpacing(4)
         self._lay.addStretch(1)
         self.scroll.setWidget(body)
+        self.scroll.verticalScrollBar().rangeChanged.connect(
+            lambda *_: self._reveal())
         root.addWidget(self.scroll, 1)
         self.empty = QLabel('No results yet. A finished run lands here.')
         self.empty.setObjectName('rescaption')
@@ -275,6 +294,10 @@ class ResultsList(QWidget):
         for k, row in enumerate(self._rows):
             if row.selected() != (k == self._index):
                 row.set_selected(k == self._index)
+        # the row may not be laid out yet (just added): once more after
+        # this event-loop pass, and on every change of the scroll range
+        self._reveal()
+        QTimer.singleShot(0, self, self._reveal)
 
     def _row_clicked(self, row):
         if row in self._rows:
@@ -301,7 +324,18 @@ class ResultsList(QWidget):
             + 2 * self.scroll.frameWidth()
         self.scroll.setMaximumHeight(want)
         self.scroll.setMinimumHeight(min(want, two))
+        if self.scroll._want != want:
+            self.scroll._want = want
+            self.scroll.updateGeometry()
+
+    def _reveal(self):
+        """Scroll the selected row into view (a new result is added last
+        and selected; when the list scrolls it must not stay below the
+        fold)."""
+        if 0 <= self._index < len(self._rows):
+            self.scroll.ensureWidgetVisible(self._rows[self._index], 0, 0)
 
     def showEvent(self, event):
         super().showEvent(event)
         self._cap()
+        QTimer.singleShot(0, self, self._reveal)

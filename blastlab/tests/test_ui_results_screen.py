@@ -233,10 +233,39 @@ def s2_list(p):
           rows[0].caption.full_text() == '2D planar', rows[0].caption.full_text())
     check('no chain badge on a single run',
           all(r.chain.isHidden() for r in rows))
+    # GUI-7 verification: the list held two rows with the column half
+    # empty, the newest (selected) one scrolled out of sight
+    from PySide6.QtGui import QPalette
+    from blastlab.ui import theme
+
+    def in_view(row):
+        vp = p.sel.scroll.viewport()
+        return vp.rect().contains(row.mapTo(vp, row.rect().center()))
+    check('three rows with room to spare: every row shown, no scrolling',
+          p.sel.scroll.verticalScrollBar().maximum() == 0
+          and all(in_view(r) for r in rows),
+          f'vbar {p.sel.scroll.verticalScrollBar().maximum()}')
+    check('the selected row\'s caption is muted (faint is 4.47:1 on '
+          'accent_bg in light mode)',
+          rows[2].caption.palette().color(QPalette.WindowText).name()
+          == theme.cur('muted')
+          and rows[0].caption.palette().color(QPalette.WindowText).name()
+          == theme.cur('faint'))
     rows[0].clicked.emit(rows[0])
     pump(20)
     check('a click on a row selects it', p.current() is a
           and rows[0].selected())
+    many = [p.add_result(f'more {k}', 2, fake_2d()) for k in range(14)]
+    pump(60)
+    newest = p.sel.rows()[-1]
+    check('more rows than fit: the list scrolls, and the newest (selected) '
+          'row is in view', p.sel.scroll.verticalScrollBar().maximum() > 0
+          and p.current() is many[-1] and in_view(newest),
+          f'vbar {p.sel.scroll.verticalScrollBar().maximum()}')
+    p.sel.setCurrentIndex(0)
+    pump(30)
+    check('and selecting the first scrolls it back into view',
+          in_view(p.sel.rows()[0]))
     while p.entries():
         p.sel.setCurrentIndex(0)
         p.remove_current()

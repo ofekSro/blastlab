@@ -587,6 +587,10 @@ def qss(mode_name):
     QLabel#resname {{ font-family: "{DISPLAY}"; font-size: 14px;
                       font-weight: 600; color: {p['text']}; }}
     QLabel#rescaption {{ font-size: 12px; color: {p['faint']}; }}
+    /* on the selected row's accent_bg, faint is 4.47:1 in light mode;
+       muted is 5.13 light, 7.17 dark (GUI-7 verification) */
+    QFrame#resrow[selected="true"] QLabel#rescaption {{
+        color: {p['muted']}; }}
     QLabel#reslatest {{ background: {p['accent_bg']};
         color: {p['accent_soft']}; border: 1px solid {p['accent_border']};
         border-radius: 4px; padding: 0px 5px; font-size: 11px; }}
