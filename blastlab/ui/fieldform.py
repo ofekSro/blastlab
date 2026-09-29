@@ -14,6 +14,7 @@ writes `cx` from inside the `geometry` trace, and without this the write
 either re-enters or is lost.
 """
 
+import shiboken6
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (QBoxLayout, QButtonGroup, QCheckBox,
                                QComboBox, QFormLayout, QGraphicsOpacityEffect,
@@ -625,12 +626,33 @@ class FieldForm(QWidget):
         return vp.width() if vp is not None else self.width()
 
     def _watch_viewport(self):
+        """Watch the nearest scroll viewport for resizes, moving the
+        filter when the form now lives under another scroll area.
+
+        F14 (docs/gui-redesign-decisions.md): a viewport deleted with its
+        scroll area while this form lives on must never be called - its
+        wrapper raised `Internal C++ object ... already deleted` from
+        `removeEventFilter`. A dead one is dropped here, and
+        `_forget_viewport` drops it the moment Qt destroys it."""
+        if self._watched is not None and not shiboken6.isValid(
+                self._watched):
+            self._watched = None
         vp = self._viewport()
         if vp is not None and vp is not self._watched:
             if self._watched is not None:
                 self._watched.removeEventFilter(self)
+                self._watched.destroyed.disconnect(self._forget_viewport)
             vp.installEventFilter(self)
+            vp.destroyed.connect(self._forget_viewport)
             self._watched = vp
+
+    def _forget_viewport(self, obj=None):
+        """The watched viewport is being destroyed (F14): forget it, so
+        nothing calls it again. Another object's `destroyed` is ignored."""
+        if self._watched is not None and (
+                obj is None or obj is self._watched
+                or not shiboken6.isValid(self._watched)):
+            self._watched = None
 
     def eventFilter(self, obj, event):
         if obj is self._watched and event.type() == QEvent.Resize:
