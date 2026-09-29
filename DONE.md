@@ -943,6 +943,41 @@ Plan: `docs/batches/2026-09-29-gui-setup-b.md` (the 5a plan's hand-off); report
 
 ---
 
+## 0p. 2026-09-29 — batch `gui-run` (GUI-6, parts a and b)
+
+Plan: `docs/batches/2026-09-29-gui-run.md`; reports `…gui-run-a.implement.md`,
+`…gui-run-b.implement.md`, `…gui-run.verify.md` (T1, T2, T5, T7, T8, T9 VERIFIED;
+T3, T4, T6 FIXED).
+
+- **What:** 02 Run in three columns. Controls: where the files go (the resolved model
+  folder), Stop (Shift+Esc) / Run again, 3D, *Step through* folded (Initialise,
+  +1 … +1000, To the end, Pause), Live view with the auto colour-range switch (Min/Max
+  only when off), a link back to Setup. A progress strip with `% · elapsed · about X
+  left` (after 5 %; `ui/run_clock.py`, paused time excluded). The dock Log · Messages ·
+  Earlier runs with Copy and Save log (the previous run's log is kept). A live-gauge
+  column (`ui/run_gauges.py`): the selected gauge enlarged with peak and now line, a
+  list sorted by Z with sparklines, peak so far or `waiting`. Stop asks after 30 s of
+  run time (blastFoam: "you can resume it later"). At the end: a green banner,
+  `✓ Done` in the title, a Windows notification (`dialogs.notify_desktop`, tray icon
+  created on demand and removed). A hidden `chain_slot` for GUI-9.
+- **Tests:** `test_ui_run_screen` (168); new real-run e2e `_e2e_ui_run_finish.py` (19,
+  the toast captured on screen); `test_regression` byte-identical; gauge arrays
+  identical with the new collection rule, cost 1.07 (rule ≤ 1.10, pre-registered; the
+  first design measured 1.15 and was changed per the plan's fallback, D69); the 3D
+  viewer 0 ms wrong under the banner. Allowed layout-pin changes: run_panel U-checks,
+  `_e2e_ui_native_warn`, harness B06 (plain Esc) and F07 (count error dialogs only).
+- **Verifier fixes:** `8eadde1` (blastFoam 3D live payload carries x only — the column
+  matched nothing and showed wrong Z; D73), `5b0a5f5` (Save log to an unwritable path
+  raised), `61bfd56` (B06 could never fail; a test swallowed its tracebacks).
+- **Known:** commit `b31df5d` (T2) carries a stale GUI-5 message; the real one is in its
+  git note. Open, non-blocking: D42-D75, F9-F14 (F13 viewer resize lag ~44 ms,
+  pre-existing; F14 an intermittent `removeEventFilter` on a deleted viewport in
+  `fieldform.py`).
+- **Commits:** `6362cec`..`90d2718`, `90d2718`..`3c885fd`, `8eadde1`..`2609024` and the
+  commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
