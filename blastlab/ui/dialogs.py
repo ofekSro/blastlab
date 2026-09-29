@@ -20,11 +20,25 @@ def warn(title, text, parent=None):
     QMessageBox.warning(parent, title, str(text))
 
 
-def ask_yes_no(title, text, parent=None):
-    btn = QMessageBox.question(parent, title, str(text),
-                               QMessageBox.Yes | QMessageBox.No,
-                               QMessageBox.No)
-    return btn == QMessageBox.Yes
+def ask_yes_no(title, text, parent=None, yes=None, no=None):
+    """True for yes. `yes` / `no` relabel the two buttons (the Stop
+    confirmation: `Stop the run` / `Keep running`); either way *no* is
+    the default and the Escape answer, so a stray Enter never says
+    yes. With neither label given it is the plain Yes / No box, as
+    every existing call has it."""
+    if yes is None and no is None:
+        btn = QMessageBox.question(parent, title, str(text),
+                                   QMessageBox.Yes | QMessageBox.No,
+                                   QMessageBox.No)
+        return btn == QMessageBox.Yes
+    box = QMessageBox(QMessageBox.Question, title, str(text),
+                      QMessageBox.NoButton, parent)
+    yes_btn = box.addButton(str(yes or 'Yes'), QMessageBox.YesRole)
+    no_btn = box.addButton(str(no or 'No'), QMessageBox.NoRole)
+    box.setDefaultButton(no_btn)
+    box.setEscapeButton(no_btn)
+    box.exec()
+    return box.clickedButton() is yes_btn
 
 
 def open_file(title, filters='All files (*.*)', parent=None, start=''):

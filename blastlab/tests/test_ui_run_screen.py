@@ -11,7 +11,12 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
  R2  the run clock (fake `now`): fmt_duration, `10 s elapsed` below 5 %,
      elapsed + the linear ETA from 5 %, held time excluded, Done /
      Stopped / Ended, HD 1.3 busy (indeterminate bar, `HD 1.3
-     assessment`), chip_texts() with U4's strings, dt in STEP's caption.
+     assessment`), chip_texts() with U4's strings, dt in STEP's caption;
+ R3  Stop (fake clock, patched `running`): at once under 30 s, asks from
+     30 s with `Stop the run` / `Keep running`, the text (model, percent,
+     run time, the blastFoam sentence, a chain's stage), no stop when the
+     run ended meanwhile, held time excluded; Shift+Esc and the button go
+     the same way, plain Esc does nothing.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -368,6 +373,175 @@ def r2_clock(win):
           and rp._tile_pmax.caption.text() == 'in the field now')
 
 
+def r3_stop(win):
+    from types import SimpleNamespace
+    from unittest.mock import PropertyMock, patch
+    from PySide6.QtGui import QShortcut
+    from blastlab.ui import dialogs
+    from blastlab.ui.app import STOP_CONFIRM_S
+    from blastlab.ui.run_clock import fmt_duration
+    from blastlab.ui.run_controller import RunController
+    rp = win.run_panel
+    print('\nR3: Stop confirms after 30 s of run time')
+    check('STOP_CONFIRM_S is 30 s', STOP_CONFIRM_S == 30.0)
+    fake = FakeClock()
+    clock = win._run_clock
+    real_now, real_stop, real_ask = clock.now, win.ctrl.stop, \
+        dialogs.ask_yes_no
+    stops, asks, answers = [], [], []
+
+    def ask(title, text, parent=None, **kw):
+        asks.append(dict(title=title, text=text, **kw))
+        ans = answers.pop(0) if answers else False
+        if callable(ans):
+            return ans()
+        return ans
+
+    def reset():
+        stops.clear()
+        asks.clear()
+        answers.clear()
+
+    running = patch.object(RunController, 'running',
+                           new_callable=PropertyMock, return_value=True)
+    pm = running.start()
+    clock.now = fake
+    win.ctrl.stop = lambda: stops.append(1)
+    dialogs.ask_yes_no = ask
+    saved = (win.ctrl._run_name, win._run_pct, win._chain_k, win._chain_n,
+             win._run_cases)
+    try:
+        win.ctrl._run_name = 'wall_A'
+        win._run_pct = 78
+        win._chain_k, win._chain_n = 1, 1
+        win._run_cases = [SimpleNamespace(solver='native')]
+        fake.t = 0.0
+        clock.start()
+
+        fake.t = 29.9
+        reset()
+        win._stop()
+        check('29.9 s: no question, stop at once',
+              asks == [] and stops == [1], f'{asks} {stops}')
+
+        fake.t = 30.0
+        reset()
+        win._stop()
+        check('30.0 s: it asks once, and Keep running does not stop',
+              len(asks) == 1 and stops == [], f'{len(asks)} {stops}')
+        a = asks[0] if asks else {}
+        check("title `Stop the run`, labels `Stop the run` / `Keep running`",
+              a.get('title') == 'Stop the run'
+              and a.get('yes') == 'Stop the run'
+              and a.get('no') == 'Keep running', str(a))
+
+        fake.t = 258.0
+        reset()
+        answers.append(True)
+        win._stop()
+        text = asks[0]['text'] if asks else ''
+        check('258 s: the text names `wall_A at 78 %` and `4 min 18 s`',
+              'Stop wall_A at 78 %?' in text
+              and f'running for {fmt_duration(258)}.' in text
+              and fmt_duration(258) == '4 min 18 s', repr(text))
+        check('Stop the run: stop is called once', stops == [1],
+              str(stops))
+        check('no blastFoam sentence for a native stage',
+              'blastFoam keeps' not in text, repr(text))
+
+        reset()
+
+        def ended_meanwhile():
+            pm.return_value = False
+            return True
+
+        answers.append(ended_meanwhile)
+        win._stop()
+        pm.return_value = True
+        check('the run ended while the dialog was open: stop not called',
+              len(asks) == 1 and stops == [], f'{len(asks)} {stops}')
+
+        # held time is excluded: hold 10 -> 500 s, press at 505 s
+        fake.t = 0.0
+        clock.start()
+        fake.t = 10.0
+        clock.hold(True)
+        fake.t = 500.0
+        clock.hold(False)
+        fake.t = 505.0
+        reset()
+        win._stop()
+        check('held 10 → 500 s, pressed at 505 s: 15 s of run time, '
+              'stops at once', asks == [] and stops == [1]
+              and abs(clock.run_s() - 15.0) < 1e-9,
+              f'{asks} {stops} {clock.run_s()}')
+
+        # the blastFoam sentence, and a chain's stage
+        fake.t = 0.0
+        clock.start()
+        fake.t = 60.0
+        win._run_cases = [SimpleNamespace(solver='native'),
+                          SimpleNamespace(solver='blastfoam'),
+                          SimpleNamespace(solver='native')]
+        win._chain_k, win._chain_n = 2, 3
+        reset()
+        win._stop()
+        text = asks[0]['text'] if asks else ''
+        check('a chain reads `Stop wall_A (stage 2 of 3) at 78 %?`',
+              text.startswith('Stop wall_A (stage 2 of 3) at 78 %?'),
+              repr(text))
+        check('a blastFoam stage adds the resume sentence',
+              text.endswith(' blastFoam keeps what it has written, so you '
+                            'can resume it later from the runs list.'),
+              repr(text))
+        win._chain_k, win._chain_n = 1, 1
+        win._run_cases = [SimpleNamespace(solver='native')]
+
+        # the keys: Shift+Esc asks at 30 s, plain Esc does nothing
+        keys = {sc.key().toString() for sc in win.findChildren(QShortcut)}
+        check("no QShortcut has the key `Esc`", 'Esc' not in keys,
+              str(sorted(keys)))
+        reset()
+        for sc in win.findChildren(QShortcut):
+            if sc.key().toString() == 'Shift+Esc':
+                sc.activated.emit()
+        pump(20)
+        check('the Shift+Esc shortcut reaches the same path (asks at 60 s)',
+              len(asks) == 1 and stops == [], f'{len(asks)} {stops}')
+        reset()
+        win._show('run')
+        win.activateWindow()
+        QTest.keyClick(win, Qt.Key_Escape)
+        pump(20)
+        check('plain Esc: neither the dialog nor stop',
+              asks == [] and stops == [], f'{asks} {stops}')
+        # the control: the same delivery with Shift held does reach it,
+        # so the Esc check above is not vacuous
+        QTest.keyClick(win, Qt.Key_Escape, Qt.ShiftModifier)
+        pump(20)
+        check('a real Shift+Esc key click asks (the control for Esc)',
+              len(asks) == 1 and stops == [], f'{len(asks)} {stops}')
+        reset()
+        reset()
+        rp.set_running(True)
+        rp.stop_btn.click()
+        pump(20)
+        check('stop_btn.click() behaves as Shift+Esc (asks at 60 s)',
+              len(asks) == 1 and stops == [], f'{len(asks)} {stops}')
+        rp.set_running(False)
+        check('the Stop tooltip names Shift+Esc and the 30 s rule',
+              'Shift+Esc' in rp.stop_btn.toolTip()
+              and '30 s' in rp.stop_btn.toolTip(), rp.stop_btn.toolTip())
+    finally:
+        running.stop()
+        clock.now = real_now
+        clock.stop()
+        win.ctrl.stop = real_stop
+        dialogs.ask_yes_no = real_ask
+        (win.ctrl._run_name, win._run_pct, win._chain_k, win._chain_n,
+         win._run_cases) = saved
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -378,6 +552,7 @@ def main():
     try:
         r1_layout(win)
         r2_clock(win)
+        r3_stop(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         win.close()

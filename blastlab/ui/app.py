@@ -29,6 +29,7 @@ from . import dialogs, theme
 from .bridge import ThreadBridge
 from .chain_panel import ChainPanel
 from .results_panel import ResultsPanel
+from .run_clock import fmt_duration
 from .run_controller import RunController
 from .run_panel import RunPanel
 from .setup_panel import SetupPanel
@@ -48,6 +49,10 @@ CASE_FILTER = 'blastlab case (*.json);;All files (*.*)'
 #: for ~3 % on the assessment's wall clock (measured, UX_REVIEW finding 1).
 #: Scheduling only - no number the assessment returns can depend on it.
 _HD13_SWITCH_INTERVAL = 0.0005
+
+#: Stop asks first once a run has had this much run time - held time
+#: excluded (plan §6, UX-7; decision D50). Shorter runs stop at once.
+STOP_CONFIRM_S = 30.0
 
 
 class MainWindow(QMainWindow):
@@ -138,6 +143,10 @@ class MainWindow(QMainWindow):
         self._run_clock = self.run_panel.clock
         self._run_got_result = False    # a result landed in this run
         self._stop_asked = False        # the user pressed Stop in this run
+        #: the case of each stage of the run in progress (one for a single
+        #: run, the stage cases of a chain); the Stop question reads the
+        #: running stage's solver from it
+        self._run_cases = []
         self.results = ResultsPanel(viewer_link=self.viewer_link,
                                     log_fn=self._result_msg,
                                     mode=self.solver_mode,
@@ -763,6 +772,7 @@ class MainWindow(QMainWindow):
             return
         # read by on_running(True): an Initialise opens Step through
         self._start_paused = bool(paused)
+        self._run_cases = [case]
         try:
             started = self.ctrl.start_stages(
                 [(case.dim, case)], paused=paused, run_name=model.model,
@@ -984,6 +994,7 @@ class MainWindow(QMainWindow):
         reports = [validate_case(c, pending_inputs=k > 0)
                    for k, c in enumerate(cases)]
         self.notify(f'Chain: {len(dim_cases)} stage(s) into {model.folder}')
+        self._run_cases = list(cases)
         if self.ctrl.start_stages(dim_cases, run_name=model.model,
                                   model=model, reports=reports):
             self._show('run')
@@ -996,9 +1007,48 @@ class MainWindow(QMainWindow):
         self._run_single(paused=True)
 
     def _stop(self):
+        """Stop: the Run screen's button, Shift+Esc and the QA harness
+        all come here. Plain Esc is not bound (UX-7).
+
+        With no run live, or under STOP_CONFIRM_S of run time (held time
+        excluded), it stops at once exactly as before - test_ui_frame F5
+        pins that Shift+Esc reaches `ctrl.stop` with nothing running.
+        From 30 s on it asks first (plan §6); on *Stop the run* it stops
+        only if the run is still going (it may have ended meanwhile)."""
+        if self.ctrl.running \
+                and self._run_clock.run_s() >= STOP_CONFIRM_S:
+            if not dialogs.ask_yes_no('Stop the run', self._stop_question(),
+                                      self, yes='Stop the run',
+                                      no='Keep running'):
+                return
+            if not self.ctrl.running:
+                return
         if self.ctrl.running:
             self._stop_asked = True
         self.ctrl.stop()
+
+    def _running_case(self):
+        """The case of the stage now running, or None."""
+        cases = self._run_cases or []
+        k = max(self._chain_k, 1) - 1
+        return cases[k] if k < len(cases) else None
+
+    def _stop_question(self):
+        """`Stop <model> (stage k of n) at 78 %?` + the run time (board
+        Run lines 348-350). The resume sentence only for a blastFoam
+        stage: `model_folder.release_decision` keeps the WSL scratch of a
+        run that ended early, and the run browser resumes it."""
+        model = self.ctrl._run_name or self._case_stem()
+        stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n})'
+                 if self._chain_n > 1 else '')
+        at = f' at {self._run_pct} %' if self._run_pct is not None else ''
+        text = (f'Stop {model}{stage}{at}?\n\nIt has been running for '
+                f'{fmt_duration(self._run_clock.run_s())}.')
+        case = self._running_case()
+        if getattr(case, 'solver', None) == 'blastfoam':
+            text += (' blastFoam keeps what it has written, so you can '
+                     'resume it later from the runs list.')
+        return text
 
     def _apply_refresh(self):
         val, mode = self.run_panel.refresh_policy_text()
@@ -1135,6 +1185,7 @@ class MainWindow(QMainWindow):
         model = self._model_target('Resume')
         if model is None:
             return False
+        self._run_cases = [case]
         return self.ctrl.resume_foam_run(path, dim, run_name=model.model,
                                          model=model, case=case)
 

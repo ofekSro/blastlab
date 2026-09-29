@@ -973,9 +973,15 @@ def b06_keyboard(qa):
     qa.check(started or was_running, 'F5 starts a run (G9 accelerator)',
              'S3')
     if started:
+        # GUI-3 / UX-7: the stop key is Shift+Esc; plain Esc is unbound
+        # and must not stop the run (GUI-6 brought this scenario over)
+        alive = qa.worker_alive()
         qa.key('Esc')
+        qa.check(qa.worker_alive() or not alive,
+                 'plain Esc does NOT stop the run (Shift+Esc does)', 'S2')
+        qa.key('Shift+Esc')
         qa.check(qa.until(lambda: not qa.worker_alive(), 120),
-                 'Esc stops the run that F5 started', 'S2')
+                 'Shift+Esc stops the run that F5 started', 'S2')
 
     # Tab order: walk the focus chain and say where it goes, which is the
     # thing that was measured and fixed on the Run tab
@@ -1028,6 +1034,22 @@ def _nlines(path):
             return sum(1 for _ in f)
     except OSError:
         return 0
+
+
+def _ndialogs(path, fns):
+    """How many recorded dialogs in dialogs.jsonl are one of `fns`."""
+    n = 0
+    try:
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                try:
+                    if json.loads(line).get('fn') in fns:
+                        n += 1
+                except ValueError:
+                    continue
+    except OSError:
+        return 0
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -2702,7 +2724,10 @@ def f07_stop_during_meshing(qa):
     qa.goto('run')
     rp = qa.win.run_panel
     n_res = len(qa.win.results.entries())
-    d0 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    # GUI-6: only failure dialogs count - a Stop more than 30 s into the
+    # run records the Stop confirmation, which is not a failure
+    failures = ('show_error', 'warn')
+    d0 = _ndialogs(os.path.join(qa.out, 'dialogs.jsonl'), failures)
     qa.click(rp.run_btn, 'Run')
     qa.check(qa.wait_log('blockMesh', 200),
              'the blockMesh stage line appeared', 'S2')
@@ -2713,7 +2738,7 @@ def f07_stop_during_meshing(qa):
     dt = time.perf_counter() - t0
     qa.note(f'stop during meshing -> the run ended in {dt:.1f} s')
     qa.check(dt < 15, f'a stop during meshing returns in {dt:.1f} s', 'S2')
-    d1 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    d1 = _ndialogs(os.path.join(qa.out, 'dialogs.jsonl'), failures)
     qa.check(d1 == d0,
              'no "Run failed" dialog for a deliberate stop', 'S2')
     qa.check(len(qa.win.results.entries()) == n_res,

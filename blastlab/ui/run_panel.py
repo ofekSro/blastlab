@@ -429,7 +429,9 @@ class RunPanel(QWidget):
         al.setContentsMargins(0, 0, 0, 0)
         al.setSpacing(8)
         self.stop_btn = _StopButton()
-        self.stop_btn.setToolTip('Stop the run (Shift+Esc)')
+        self.stop_btn.setToolTip('Stop the run (Shift+Esc). After 30 s of '
+                                 'run time it asks first; time spent held '
+                                 'does not count.')
         self.stop_btn.clicked.connect(lambda *_: self.stop_requested.emit())
         self.stop_btn.setEnabled(False)
         self.stop_btn.setVisible(False)
