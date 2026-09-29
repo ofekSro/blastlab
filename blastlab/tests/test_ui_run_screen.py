@@ -727,6 +727,20 @@ def r4_dock(win):
         dialogs.save_file = real_save
     check('a cancelled save writes nothing',
           set(os.listdir(os.path.dirname(out))) == before)
+    # verify: an unwritable target says so through the dialog path
+    # instead of raising out of the click
+    errs = []
+    real_err = dialogs.show_error
+    dialogs.save_file = lambda *a, **k: os.path.join(
+        os.path.dirname(out), 'no such folder', 'x.log')
+    dialogs.show_error = lambda title, text, parent=None: errs.append(title)
+    try:
+        got = dock.save()
+    finally:
+        dialogs.save_file = real_save
+        dialogs.show_error = real_err
+    check('an unwritable path: one `Save log` error dialog, no exception',
+          got is None and errs == ['Save log'], str(errs))
     rp.set_running(False)
     rp.mark_ended('stopped')
 

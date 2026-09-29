@@ -263,6 +263,13 @@ class RunDock(QFrame):
         path = dialogs.save_file('Save log', LOG_FILTER, self, start=start)
         if not path:
             return None
-        with open(path, 'wb') as f:
-            f.write(self.shown_text().encode('utf-8'))
+        try:
+            with open(path, 'wb') as f:
+                f.write(self.shown_text().encode('utf-8'))
+        except OSError as exc:
+            # a read-only folder or a locked file: say so, as every other
+            # export does, instead of an exception out of a click
+            dialogs.show_error('Save log', f'Could not write {path}:\n{exc}',
+                               self)
+            return None
         return path
