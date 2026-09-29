@@ -455,6 +455,33 @@ def s2_stage_hook(p):
     check('None hides it again at 0 px',
           p.stage_slot.isHidden() and p.stage_slot.height() == 0
           and p.stage_strip() is None and lbl.parent() is None)
+    # T4 (sampler: 29 ms / 44 px without it): with the 3D view on screen
+    # the viewer's window is shrunk by the strip's height first (D70)
+    calls = []
+    real = p.view3d.shrink_ahead
+    p.view3d.shrink_ahead = calls.append
+    try:
+        p.set_stage_strip(QLabel('y'))          # Fields on screen
+        pump(20)
+        p.set_stage_strip(None)
+        pump(20)
+        check('the strip over Fields shrinks no viewer', calls == [])
+        p.show_view('3D')
+        pump(40)
+        strip = QLabel('STAGE')
+        strip.setFixedHeight(32)
+        p.set_stage_strip(strip)
+        pump(40)
+        want = 32 + p._centre.layout().spacing()
+        check('over the 3D view: shrink_ahead(strip + spacing) first, once',
+              calls == [want] and p.stage_slot.height() == 32,
+              f'{calls} want [{want}] slot {p.stage_slot.height()}')
+        p.set_stage_strip(None)
+        pump(20)
+        check('and taking it away shrinks nothing', calls == [want])
+    finally:
+        p.view3d.shrink_ahead = real
+        p.show_view('Fields')
     while p.entries():
         p.sel.setCurrentIndex(0)
         p.remove_current()

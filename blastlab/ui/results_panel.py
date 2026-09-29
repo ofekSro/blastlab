@@ -332,7 +332,7 @@ class ResultsPanel(QWidget):
 
         self.sel = ResultsList()
         self.sel.currentIndexChanged.connect(lambda *_: self.refresh())
-        col.add(self.sel, 1)
+        col.add(self.sel)
         row = QHBoxLayout()
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(6)
@@ -355,13 +355,17 @@ class ResultsPanel(QWidget):
         self._remove_btn.setCursor(Qt.PointingHandCursor)
         self._remove_btn.setAccessibleName('Remove the selected result')
         self._remove_btn.clicked.connect(lambda *_: self.remove_current())
-        row.addWidget(self._remove_btn)
+        # at the right end, also when Load a run… is hidden (native mode)
+        row.addWidget(self._remove_btn, 0, Qt.AlignRight)
         col.add_layout(row)
 
         self.method = MethodCard()
         self.method.show_btn.clicked.connect(lambda *_: self.show_case())
         self.method.load_btn.clicked.connect(lambda *_: self._load_case())
         col.add(self.method)
+        # the spare height goes under the method card (board line 92); the
+        # list takes only what its rows need (ResultsList caps itself)
+        col.add_stretch()
         self._path_lbl = ElidedLabel('')
         self._path_lbl.setObjectName('runpath')
         self._path_lbl.hide()
@@ -487,6 +491,7 @@ class ResultsPanel(QWidget):
         moves the embedded 3D viewer: GUI-9 re-measures it (CLAUDE.md
         8.7)."""
         lay = self.stage_slot.layout()
+        was_hidden = self.stage_slot.isHidden()
         while lay.count():
             w = lay.takeAt(0).widget()
             if w is not None and w is not widget:
@@ -495,10 +500,29 @@ class ResultsPanel(QWidget):
             self.stage_slot.setFixedHeight(0)
             self.stage_slot.hide()
             return
+        if was_hidden:
+            # the strip takes its height from the view: with the embedded
+            # 3D viewer on screen, shrink its window first (D70's
+            # shrink_ahead), so it never stands below its card while the
+            # layout catches up (T4 sampler: 29 ms and 44 px without it)
+            self._shrink_viewer(
+                max(widget.sizeHint().height(),
+                    widget.minimumSizeHint().height())
+                + self._centre.layout().spacing())
         lay.addWidget(widget)
         self.stage_slot.setMinimumHeight(0)
         self.stage_slot.setMaximumHeight(QWIDGETSIZE_MAX)
         self.stage_slot.show()
+
+    def _shrink_viewer(self, dh):
+        """Shrink the embedded viewer's window by `dh` px now, when it is
+        on screen - ahead of a layout change above it (CLAUDE.md 8.7)."""
+        host = self.view3d
+        shrink = getattr(host, 'shrink_ahead', None)
+        if shrink is None or self.stack.currentWidget() is not host \
+                or not host.isVisible():
+            return
+        shrink(dh)
 
     def stage_strip(self):
         """The widget in `stage_slot`, or None."""

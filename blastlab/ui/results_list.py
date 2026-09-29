@@ -12,7 +12,7 @@ column, the full label in the tooltip), a `latest` badge on the newest, a
 Batch 2026-09-29-gui-results T2.
 """
 
-from PySide6.QtCore import QEvent, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
@@ -283,3 +283,25 @@ class ResultsList(QWidget):
     def _sync_empty(self):
         self.empty.setVisible(not self._items)
         self.scroll.setVisible(bool(self._items))
+        self._cap()
+        # the rows' fonts reach them on their first polish
+        QTimer.singleShot(0, self, self._cap)
+
+    def _cap(self):
+        """The list is as tall as its rows and no taller (the spare
+        height of the column goes under the method card, board line 92);
+        with more rows than fit it keeps two and scrolls."""
+        n = len(self._rows)
+        if not n:
+            return
+        sp = self._lay.spacing()
+        heights = [max(r.sizeHint().height(), ROW_MIN_H) for r in self._rows]
+        want = sum(heights) + sp * (n - 1) + 2 * self.scroll.frameWidth()
+        two = sum(heights[:2]) + sp * (min(n, 2) - 1) \
+            + 2 * self.scroll.frameWidth()
+        self.scroll.setMaximumHeight(want)
+        self.scroll.setMinimumHeight(min(want, two))
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._cap()
