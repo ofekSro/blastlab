@@ -216,9 +216,18 @@ class _RunStrip(QFrame):
         self._rows = None
         self.arrange(force=True)
 
+    @staticmethod
+    def _hidden(w):
+        """Hidden on purpose (set_dim, the AMR cells rule). A parentless
+        widget that was never shown also reports isHidden(); that is not
+        a choice to keep, or the Progress tile would stay hidden for
+        good once arrange() re-applied it."""
+        return w.testAttribute(Qt.WA_WState_ExplicitShowHide) \
+            and w.isHidden()
+
     def _shown_tiles(self):
         return [self.tiles[k] for k in ('time', 'step', 'pmax', 'cells')
-                if not self.tiles[k].isHidden()]
+                if not self._hidden(self.tiles[k])]
 
     def _one_row_fits(self, width):
         n = len(self._shown_tiles())
@@ -234,7 +243,7 @@ class _RunStrip(QFrame):
         if rows == self._rows and not force:
             return
         self._rows = rows
-        hidden = {id(w): w.isHidden() for w in
+        hidden = {id(w): self._hidden(w) for w in
                   [self.progress_tile, *self.tiles.values()]}
         for lay in (self._row0, self._row1):
             while lay.count():

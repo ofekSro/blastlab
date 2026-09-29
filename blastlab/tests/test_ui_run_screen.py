@@ -77,12 +77,33 @@ def r1_layout(win):
     check('1600 x 1000: controls 280, gauges 340 (±1 px)',
           abs(c - 280) <= 1 and abs(g - 340) <= 1, f'{c} / {m} / {g}')
     check('and the centre takes the rest', m > 800, str(m))
+    # T5 found the Progress tile never on screen: arrange() re-applied
+    # the isHidden() of a parentless, never-shown frame
+    s = rp.strip
+    check('the Progress tile (bar, percent, time line) is on screen',
+          s.progress_tile.isVisibleTo(rp) and rp.progress.isVisibleTo(rp)
+          and s.time_lbl.isVisibleTo(rp) and s.pct_lbl.isVisibleTo(rp))
+    check('1600 x 1000: the strip is one row, Progress 2.3 x a tile '
+          '(board flex)', s.rows() == 1
+          and abs(s.progress_tile.width() / rp._tile_time.width() - 2.3)
+          < 0.1, f'{s.rows()} {s.progress_tile.width()} '
+                 f'{rp._tile_time.width()}')
 
     win.resize(1100, 720)
     pump(300)
     c, m, g = rp.column_widths()
     check('1100 x 720: the side columns keep 280 / 340',
           (c, g) == (280, 340), f'{c} / {m} / {g}')
+    check('1100 x 720: two rows, Progress on top of the three tiles',
+          s.rows() == 2 and s.progress_tile.isVisibleTo(rp)
+          and s.progress_tile.geometry().bottom()
+          < rp._tile_time.geometry().top(),
+          f'{s.rows()} {s.progress_tile.geometry()} '
+          f'{rp._tile_time.geometry()}')
+    check('and the view keeps >= 240 px of height (U15, risk 6)',
+          rp._view_frame.height() >= 240
+          and rp._view_frame.width() == rp._centre.width(),
+          f'{rp._view_frame.width()} x {rp._view_frame.height()}')
     rp.step_card.set_open(True)
     pump(200)
     bad = clipped(win)
