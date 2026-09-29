@@ -915,6 +915,34 @@ recorded as F5 in `docs/gui-redesign-decisions.md`).
 
 ---
 
+## 0o. 2026-09-29 — batch `gui-setup-b` (GUI-5, part b; GUI-5 closed)
+
+Plan: `docs/batches/2026-09-29-gui-setup-b.md` (the 5a plan's hand-off); report
+`…gui-setup-b.implement.md`. Verification: T1-T3 FIXED, T4 VERIFIED.
+
+- **What:** the Setup centre. A live-number strip (`ui/setup_strip.py`: Charge, Cells,
+  MPI ranks, Memory, Z at gauges; Run F5 and Initialise), every number taken from the
+  report and run plan `_validate` already produced; tiles hide when the report has no
+  such number. Model-view overlays (`ui/model_overlay.py`): Z rings at 1-3, charge and
+  gauge highlights with R labels, hover readout `r · z · R · Z`, toolbar Z rings / Mesh /
+  Fit, wheel zoom; gauges cyan. The dock Gauges · Checks · Log replaces the report card
+  and follows the selected node; the gauge table has Z and Where (nearest obstacle face
+  within 0.5 m, "in front of" or "behind" by the burst line); the 05 summary reads
+  `2 · in front of Wall 1`.
+- **Tests:** new `test_ui_setup_strip` (tiles equal report fields across 8 case kinds;
+  ring radii, R labels, hover; dock and Where); the fast matrix (33 suites) green;
+  `test_regression` byte-identical; harness B/C/V 20 scenarios, no findings; viewer
+  never misplaced (1530 samples). Layout pins changed: tree T2c summary text,
+  `STATUS_MAX_H` 132 → 170.
+- **Verifier fixes:** `2c20503` (a probe race in a strip test), `f975da3` (28 px
+  Initialise and toolbar buttons were 17-18 px under QSS), `e7f97f9` (overlay artists
+  shared between the 1D and 2D previews), `0ae5e50` (a gauge behind a wall read
+  "in front of" — now "behind", D39), `75655a7` (shots).
+- **Open, non-blocking:** D29-D41 (D40: the AMR Memory tile shows t = 0).
+- **Commits:** `b20461b`..`129a2e7`, `2c20503`..`75655a7` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
