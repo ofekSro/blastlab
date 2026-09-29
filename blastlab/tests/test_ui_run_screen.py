@@ -950,6 +950,17 @@ def r5_gauges(win):
           col.selected_number() == 4 and col.card_texts()[0] == 'G4',
           str(col.selected_number()))
     check('the now line is visible while running', col.now_visible())
+    # T9 contrast script: light accent_text on gauge_bg is 4.37:1
+    from blastlab.ui import theme as TH
+    got = {}
+    for mode in ('light', 'dark'):
+        TH.apply(app, mode)
+        pump(20)
+        got[mode] = contrast(col.card.now_line.label.color.name(),
+                             TH.cur('gauge_bg'))
+    check("the now label reads >= 4.5:1 on gauge_bg in both modes",
+          min(got.values()) >= 4.5, str({k: round(v, 2)
+                                         for k, v in got.items()}))
     rp.set_running(False)
     pump(20)
     check('and hidden after set_running(False)', not col.now_visible())

@@ -504,7 +504,10 @@ class _SelectedCard(QFrame):
         self.peak_lbl.setColor(gauge)
         self.now_line.setPen(pg.mkPen(p['accent'], width=1,
                                       style=Qt.DashLine))
-        self.now_line.label.setColor(p['accent_text'])
+        # the board's accent_text in dark (7.59:1 on gauge_bg); light
+        # accent_text is 4.37:1 there, so accent_soft (4.75), as D38
+        self.now_line.label.setColor(p['accent_text'] if theme.mode() ==
+                                     'dark' else p['accent_soft'])
 
 
 class GaugeColumn(QWidget):
