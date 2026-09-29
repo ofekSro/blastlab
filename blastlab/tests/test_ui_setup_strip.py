@@ -390,6 +390,14 @@ def s2_model_view():
           and rl == ['R 3.31', 'R 2.99'], str(rl))
     check('and no charge highlight',
           not ModelOverlay.found(ax, 'chargetag'))
+    show(Case1D(solver='blastfoam', charge_kg=1.0,
+                gauge_radii=[1.0, 2.0, 3.0]))
+    ax1 = sp.preview1d.ax
+    check('1D: one halo per gauge, no R lines (all on the one ray)',
+          len(ModelOverlay.found(ax1, 'halo')) == 3
+          and not ModelOverlay.found(ax1, 'gline')
+          and not ModelOverlay.found(ax1, 'rlabel'))
+    case = show(sample_case())
     sp.select_node('domain')
     pump(10)
     check('another node: rings only',

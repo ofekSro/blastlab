@@ -194,12 +194,17 @@ class ModelOverlay:
         x0, y0 = _burst_xy(case)
         cyan = theme.cur('gauge')
         for k, (gx, gy, R) in enumerate(_gauge_xy(case), start=1):
-            (ln,) = ax.plot([x0, gx], [y0, gy], color=cyan, lw=0.8,
-                            ls=(0, (2, 3)), alpha=0.6, zorder=4.4)
-            self._keep(ln, f'gline:{k}')
             (halo,) = ax.plot([gx], [gy], marker='o', ms=18, color=cyan,
                               alpha=0.16, mew=0, ls='none', zorder=4.4)
             self._keep(halo, f'halo:{k}')
+            if case.dim == 1:
+                # in the sector every gauge lies on the one ray from the
+                # charge and R is its radius: lines and labels would only
+                # pile up at the apex (seen on the 1D screenshot)
+                continue
+            (ln,) = ax.plot([x0, gx], [y0, gy], color=cyan, lw=0.8,
+                            ls=(0, (2, 3)), alpha=0.6, zorder=4.4)
+            self._keep(ln, f'gline:{k}')
             t = ax.text((x0 + gx) / 2, (y0 + gy) / 2, f'R {R:.2f}',
                         fontsize=7, family='monospace', color=cyan,
                         ha='center', va='bottom', zorder=4.5, clip_on=True)

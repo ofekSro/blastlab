@@ -756,7 +756,9 @@ class SetupPanel(QWidget):
         for r in range(g.rowCount()):
             g.setRowStretch(r, 0)
         for k, w in enumerate(self._check_rows):
-            g.addWidget(w, k // cols, k % cols)
+            # top-aligned: a one-line row beside a wrapped one must not
+            # float to the middle of its cell (measured on the shots)
+            g.addWidget(w, k // cols, k % cols, Qt.AlignTop)
         for c in range(2):
             g.setColumnStretch(c, 1 if c < cols else 0)
         g.setRowStretch((len(self._check_rows) + cols - 1) // cols, 1)
@@ -790,7 +792,10 @@ class SetupPanel(QWidget):
         h = t.horizontalHeader()
         h.setHighlightSections(False)
         h.setSectionResizeMode(QHeaderView.ResizeToContents)
-        h.setStretchLastSection(True)
+        # Where takes the slack; with Where hidden (1D) the numbers keep
+        # their own widths instead of Z stretching across the tab
+        h.setStretchLastSection(False)
+        h.setSectionResizeMode(len(_GAUGE_COLS) - 1, QHeaderView.Stretch)
         h.setDefaultAlignment(Qt.AlignRight | Qt.AlignVCenter)
         # clicking a row selects the gauge in 05 (plan §5.1's child rule)
         t.cellClicked.connect(lambda r, _c: self._child_clicked('gauges', r))

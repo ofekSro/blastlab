@@ -299,6 +299,14 @@ class LiveStrip(QFrame):
         self._arrange(force=True)
 
     def _rerender(self, _mode=None):
+        # light mode: the Z tile's caps in `accent_text` on `accent_bg`
+        # measure 4.28:1, under the plan's 4.5 (§2.2); `accent_soft`
+        # gives 4.65. Dark keeps the board's `accent_text` (7.72). Runs
+        # after StatTile's own recolour (connected before this slot).
+        if theme.mode() == 'light':
+            self.tiles['z'].caps.setStyleSheet(
+                f'font-size: 10px; font-weight: 600; '
+                f'color: {theme.cur("accent_soft")};')
         for name, t in self.tiles.items():
             d = self._data.get(name)
             t.setVisible(d is not None)
