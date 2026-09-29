@@ -883,6 +883,36 @@ Report: `…gui-frame.implement.md`. Verification: GUI-8 VERIFIED, GUI-3 FIXED.
   identically before the batch (re-run on the office machine).
 - **Commits:** `fbbc698`, `25a031d`, `067123d`, `35d8cb4` and the commit of this entry.
 
+## 0n. 2026-09-29 — batch `gui-setup` (GUI-5, part a)
+
+Plan: `docs/batches/2026-09-29-gui-setup.md` (splits GUI-5 into 5a and 5b; this is 5a);
+spec `docs/gui-redesign-plan.md` §5. Report `…gui-setup.implement.md`. Verification:
+T1, T3, T4, T5 FIXED; T2 PARTIAL (a 27 ms viewer resize lag, pre-existing mechanism,
+recorded as F5 in `docs/gui-redesign-decisions.md`).
+
+- **What:** 01 Setup in three columns — a numbered model tree (01 Threat … 07 Output,
+  gauges and obstacles as child rows, ✓/✗, + Gauge / + Obstacle, the Case OK pill), the
+  preview in the centre, and the selected node's cards only on the right.
+  `FieldForm(placement='nodes')` splits placement, not parsing (`ui/setup_nodes.py`,
+  `ui/setup_tree.py`); the Chain editor keeps `'columns'`. The trigger becomes a switch
+  *End the run at a gauge* with a gauge dropdown, writing the same `trigger_gauge`
+  values; Profile file only in a profile mode; a Derived card (charge radius from the
+  report's `r_exp`, height of burst, nearest gauge with Z). `ui/scaled_distance.py`,
+  display only: Z = R / W^1/3 (UFC 3-340-02 para. 2-13.1), None for planar, profile,
+  0D.
+- **Tests:** new `test_ui_setup_tree` (238); `test_regression` byte-identical;
+  `test_ui_setup_form`, all char goldens and `test_ui_output_card` unchanged and green;
+  18 committed and edge-case JSONs load → save byte-identically, HEAD = base; the
+  viewer never top-level or outside the window over 8,988 samples. Parity P3/P4 became a
+  no-clip sweep of every node (layout pins, plan §9).
+- **Verifier fixes:** `7f19bb4` (test under cp1252 stdout), `684f572` (the trigger switch
+  on with no gauge chosen was silent — now a red dropdown, D27), `953d608`
+  (`DerivedCard.update` shadowed `QWidget.update`), `9b7172f` (harness screenshots
+  from the right node).
+- **Open, non-blocking:** decisions D14-D28 and findings F1-F8 in
+  `docs/gui-redesign-decisions.md` (F1: an agent ran a broad `taskkill` once).
+- **Commits:** `887072c`..`c76d6e0`, `7f19bb4`..`9b7172f` and the commit of this entry.
+
 ---
 
 ## 1. The timeline — T0–T70
