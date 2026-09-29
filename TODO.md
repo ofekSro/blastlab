@@ -28,6 +28,20 @@ orders it; every rule, value and acceptance criterion lives there. Qt only
 (`blastlab/ui/`): the Tk app, the solvers, the defaults and every file format stay as
 they are. Owner: *"implement everything"*, then run the QA and UX agents on the result.
 
+> **▶ RESUME HERE — the first thing to do from this list (owner, 2026-09-29).** Work
+> stopped on branch `gui-redesign` after GUI-7, at the owner's request. Next, in order:
+> 1. **GUI-9** — the batch plan is written and committed, not started:
+>    [docs/batches/2026-09-29-gui-chain.md](docs/batches/2026-09-29-gui-chain.md)
+>    (9a: T0-T3, then 9b: T4-T6). Run it with `/todo batch docs/batches/2026-09-29-gui-chain.md`.
+> 2. **GUI-10** — the QA pass, then `gui-qa-tester` + `gui-ux-reviewer` on the whole GUI
+>    (owner's request).
+> 3. Owner review of the non-blocking defaults taken overnight:
+>    [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) (D1-D130, found
+>    issues F1-F18; F1: an agent once ran a broad `taskkill`).
+>
+> Run agents on Opus 5.5 (`model: "opus"`) if Fable 5 credits run out, as happened on
+> 2026-09-29. The home PC has 8 GB RAM: heavy suites one at a time.
+
 | Id | What | Size | Order |
 |---|---|---|---|
 | `GUI-1` | ✅ done 2026-09-29 (DONE.md §0l) · **Design tokens and fonts** — warm-black palette + light, orange accent, cyan gauges; Space Grotesk / IBM Plex Sans / IBM Plex Mono bundled (OFL). Plan §2 | M | 1 |
@@ -38,7 +52,7 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | `GUI-6` | ✅ done 2026-09-29 (DONE.md §0p) · **02 Run** — controls / progress strip with ETA / live view / log dock / live-gauge list sorted by Z; Stop confirms after 30 s; finish banner + Windows notification. Plan §6 | L | 6 |
 | `GUI-7` | ✅ done 2026-09-29 (DONE.md §0q) · **03 Results** — results list + "how it was computed"; views Field (= Fields + Animation) · Gauges · 3D; table with Z and Copy; impulse in kPa·ms on screen only; exports grouped. No KB columns, no run overlay. Plan §7 | L | 7 |
 | `GUI-8` | ✅ done 2026-09-29 (DONE.md §0m) · **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
-| `GUI-9` | **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
+| `GUI-9` | ▶ **next** — plan ready: `docs/batches/2026-09-29-gui-chain.md` · **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
 | `GUI-10` | **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
 
 ---
