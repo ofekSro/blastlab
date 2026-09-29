@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
 from ..core.constants import P_AIR
-from ..output.gauge_summary import summarize_trace
+from ..output.gauge_summary import summarize_gauges, summarize_trace
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
@@ -201,6 +201,21 @@ def _row(case, number, entered, point, t_ms, kpa, s):
                 t_peak_ms=s['t_peak_ms'], arrival_ms=s['arrival_ms'],
                 waiting=waiting,
                 peak_text=WAITING if waiting else fmt_peak(s['peak_kpa']))
+
+
+def highest_peak(gauges):
+    """(G number, peak_kpa, t_peak_ms) of the highest peak among the
+    gauges with an arrival - `summarize_gauges` of a Result's `gauges`,
+    numbered in their order - or None (no gauges, or no arrival)."""
+    if not gauges:
+        return None
+    best = None
+    for k, row in enumerate(summarize_gauges(gauges), start=1):
+        if not np.isfinite(row['arrival_ms']):
+            continue
+        if best is None or row['peak_kpa'] > best[1]:
+            best = (k, row['peak_kpa'], row['t_peak_ms'])
+    return best
 
 
 def default_row(case, table):

@@ -186,7 +186,9 @@ class QA:
                 return ans
             return wrapped
 
-        for name in ('show_error', 'show_info', 'warn'):
+        # notify_desktop (GUI-6b): QA runs record the toast rather than
+        # raising a real one
+        for name in ('show_error', 'show_info', 'warn', 'notify_desktop'):
             setattr(dialogs, name, recorder(name, 'info'))
         setattr(dialogs, 'ask_yes_no', recorder('ask_yes_no', 'ask'))
         for name in ('open_file', 'save_file', 'pick_dir'):

@@ -25,7 +25,13 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      series belongs to, sorted by Z, `waiting` before arrival and
      summarize_trace's peak after it; planar sorts by R; a dropped gauge;
      the click and the trigger default; the now line; the collection
-     rule; the last stage's full traces.
+     rule; the last stage's full traces;
+ R6  the end of a run (6b): the finish banner (stop_reason verbatim, the
+     model folder), one desktop notification for a run that ended on
+     its own (run time, highest peak from summarize_gauges), `✓ Done`
+     in the title, `Run again`; a stopped run gets the banner only, an
+     errored or result-less one nothing; the next start clears it all;
+     close leaves no tray icon.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1007,6 +1013,153 @@ def r5_gauges(win):
           == [r['peak_text'] for r in before])
 
 
+def r6_finish(win):
+    from types import SimpleNamespace
+    from blastlab.models.result import Result
+    from blastlab.output.gauge_summary import summarize_gauges
+    from blastlab.ui import dialogs
+    from blastlab.ui.run_clock import fmt_duration
+    import numpy as np
+    import test_gui_results_fields as F
+    rp = win.run_panel
+    print('\nR6: the end of a run - banner, notification, Done')
+    calls = []
+    real_notify = dialogs.notify_desktop
+
+    def rec(title, text, on_click=None, parent=None):
+        calls.append(dict(title=title, text=text, on_click=on_click))
+        return True
+
+    fake = FakeClock()
+    clock = win._run_clock
+    real_now = clock.now
+    runs = tempfile.mkdtemp(prefix='blastlab_runs_r6_')
+    folder = os.path.join(runs, 'wall_A')
+    saved = (win.ctrl._run_name, win.ctrl._model, win.ctrl._stage_dims,
+             win._run_cases)
+    base = F.fake_2d()
+    t = np.linspace(0.0, 8e-3, 400)
+
+    def result(peaks, reason='shock arrived at a terminate boundary (x_hi)',
+               early=False):
+        pts = [(1.0 + k, 0.5) for k in range(len(peaks))]
+        pres = [np.asarray(rise(400, at, pk)) for at, pk in peaks]
+        g = dict(times=t, points=pts, pressures=pres)
+        return Result(base.snapshots, g, base.meta, reason, early)
+
+    def fake_run(res, stopped=False, errored=False, end_at=331.0):
+        fake.t = 0.0
+        win.on_running(True)
+        if res is not None:
+            win.on_result(0, 2, 'wall_A - 2D', res)
+        fake.t = end_at
+        win.on_running(False)
+        win.on_finished(stopped, errored)
+        pump(20)
+
+    dialogs.notify_desktop = rec
+    clock.now = fake
+    try:
+        win.ctrl._run_name = 'wall_A'
+        win.ctrl._model = SimpleNamespace(folder=folder)
+        win.ctrl._stage_dims = [2]
+        win._run_cases = [sample_case()]
+        win._show('run')
+
+        res = result([(250, 120e3), (180, 296e3), (300, 80e3)])
+        fake_run(res)
+        want = (f'Result ready: wall_A · {res.stop_reason}. Files in '
+                f'{folder}{os.sep}')
+        check('ended on its own: the banner is shown with the stop reason '
+              'verbatim and the model folder',
+              rp.banner.isVisibleTo(rp) and rp.banner_text() == want,
+              repr(rp.banner_text()))
+        rows = summarize_gauges(res.gauges)
+        k = max(range(len(rows)), key=lambda i: rows[i]['peak_kpa'])
+        text = (f'wall_A finished in {fmt_duration(331.0)}. Highest peak: '
+                f'G{k + 1}, {rows[k]["peak_kpa"]:,.0f} kPa at '
+                f'{rows[k]["t_peak_ms"]:.2f} ms.')
+        check('one notification: the run time and summarize_gauges\'s '
+              'highest peak',
+              len(calls) == 1 and calls[0]['title'] == 'BlastLab'
+              and calls[0]['text'] == text and 'G2, 296 kPa' in text,
+              repr(calls[0]['text'] if calls else None))
+        check('the title starts with `✓ Done · `',
+              win.windowTitle().startswith('✓ Done · '), win.windowTitle())
+        check('the time line appends how it ended',
+              rp.time_text() == f'Done in {fmt_duration(331.0)} · '
+              f'{res.stop_reason}', rp.time_text())
+        check('the idle button reads Run again',
+              rp.run_btn.text() == 'Run again' and rp.run_btn.isVisibleTo(rp))
+        rp.banner.action.click()
+        pump(30)
+        sel = win.results.sel
+        check('Open in 03 Results → shows Results, the newest selected',
+              win.current_tab() == 'results'
+              and sel.currentIndex() == sel.count() - 1, str(sel.count()))
+        n_before = len(calls)
+        calls[0]['on_click']()
+        pump(30)
+        check('a click on the notification raises the window on Results',
+              win.current_tab() == 'results' and len(calls) == n_before)
+        win._show('run')
+
+        # the next start clears the banner and the Done mark
+        fake.t = 0.0
+        win.on_running(True)
+        pump(20)
+        check('the next start hides the banner and clears ✓ Done',
+              rp.banner.isHidden() and rp.banner_text() == ''
+              and not win.windowTitle().startswith('✓'),
+              win.windowTitle())
+        win.on_running(False)
+        win.on_finished(False, False)
+
+        # stopped by the user: the banner, nothing else
+        calls.clear()
+        stopped = result([(180, 296e3)], 'stopped by user', early=True)
+        fake_run(stopped, stopped=True, end_at=62.0)
+        check('stopped: the banner, reading `· stopped by user.`',
+              rp.banner.isVisibleTo(rp)
+              and ' · stopped by user. Files in ' in rp.banner_text()
+              and rp.time_text().endswith('stopped by user'),
+              f'{rp.banner_text()!r} {rp.time_text()!r}')
+        check('stopped: no notification and no ✓ Done',
+              calls == [] and not win.windowTitle().startswith('✓'),
+              f'{len(calls)} {win.windowTitle()}')
+
+        # errored: nothing (the error dialog path is unchanged)
+        fake_run(result([(180, 296e3)]), errored=True)
+        check('errored: no banner and no notification',
+              rp.banner.isHidden() and calls == []
+              and rp.time_text().startswith('Failed after'),
+              rp.time_text())
+
+        # no result at all (StoppedBeforeStart): nothing
+        fake_run(None)
+        check('no result: no banner, no notification',
+              rp.banner.isHidden() and calls == [])
+
+        # no gauges: the sentence is left out
+        fake_run(result([]))
+        check('no gauges: the notification has no Highest peak',
+              len(calls) == 1 and calls[0]['text']
+              == f'wall_A finished in {fmt_duration(331.0)}.',
+              repr(calls[0]['text'] if calls else None))
+    finally:
+        dialogs.notify_desktop = real_notify
+        clock.now = real_now
+        (win.ctrl._run_name, win.ctrl._model, win.ctrl._stage_dims,
+         win._run_cases) = saved
+
+    from PySide6.QtWidgets import QSystemTrayIcon
+    avail = QSystemTrayIcon.isSystemTrayAvailable()
+    got = dialogs.notify_desktop('BlastLab', 'x')
+    check('offscreen (no system tray) notify_desktop does nothing',
+          avail or (got is False and dialogs._tray is None),
+          f'{avail} {got}')
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1020,10 +1173,16 @@ def main():
         r3_stop(win)
         r4_dock(win)
         r5_gauges(win)
+        r6_finish(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
+        # a notification's tray icon left over is removed at close
+        from PySide6.QtWidgets import QSystemTrayIcon
+        from blastlab.ui import dialogs
+        dialogs._tray = QSystemTrayIcon()
         win.close()
         pump(100)
+        check('closeEvent leaves no tray icon (R6)', dialogs._tray is None)
     bad = [m for m in sys.modules
            if m.split('.')[0] in ('vtk', 'vtkmodules', 'pyvista', 'pyvistaqt')
            or m == 'matplotlib.pyplot']

@@ -31,6 +31,7 @@ from .chain_panel import ChainPanel
 from .results_panel import ResultsPanel
 from .run_clock import fmt_duration
 from .run_controller import RunController
+from .run_gauges import highest_peak
 from .run_panel import RunPanel
 from .setup_panel import SetupPanel
 from .theme import PAD
@@ -142,6 +143,10 @@ class MainWindow(QMainWindow):
         # the elapsed line, the ETA and the 30 s Stop rule read it
         self._run_clock = self.run_panel.clock
         self._run_got_result = False    # a result landed in this run
+        self._last_result = None        # the newest Result of this run
+        # `✓ Done · ` in the title after a run that ended on its own,
+        # until the next run or Open case (decision D68)
+        self._done_mark = False
         self._stop_asked = False        # the user pressed Stop in this run
         #: the case of each stage of the run in progress (one for a single
         #: run, the stage cases of a chain); the Stop question reads the
@@ -179,6 +184,8 @@ class MainWindow(QMainWindow):
         self.run_panel.runs_dir_changed.connect(self._save_runs_dir)
         # GUI-6: the Run screen's `Setup: Case OK` link goes back to Setup
         self.run_panel.setup_requested.connect(lambda: self._show('setup'))
+        # GUI-6b: the finish banner's `Open in 03 Results →`
+        self.run_panel.results_requested.connect(self._open_results)
 
         # N8: sweep old/large WSL run dirs per the persisted settings,
         # off-thread (WSL round trips must never block the window)
@@ -575,6 +582,7 @@ class MainWindow(QMainWindow):
         self.run_panel.set_run_name(model_for_case_file(path), replace=True)
         # a set_case from Open does not mark dirty (plan §4)
         self._push_recent(path)
+        self._done_mark = False
         self._set_dirty(False)
         self.topbar.set_case_name(self._case_stem())
         self._update_title()
@@ -691,6 +699,8 @@ class MainWindow(QMainWindow):
             parts += f'Chain {self._chain_k}/{self._chain_n} · '
         if self._running_ui and self._run_pct is not None:
             parts += f'{self._run_pct} % · '
+        if self._done_mark and not self._running_ui:
+            parts += '✓ Done · '        # GUI-6b (board Run_Finished)
         mark = '● ' if self._dirty else ''
         self.setWindowTitle(f'{parts}{mark}{self._case_stem()} · BlastLab')
 
@@ -1140,7 +1150,11 @@ class MainWindow(QMainWindow):
         if running:
             self._run_clock.start()
             self._run_got_result = False
+            self._last_result = None
             self._stop_asked = False
+            self._done_mark = False
+            # the last run's notification icon goes (plan §6)
+            dialogs.clear_tray()
             if self._start_paused:
                 # Initialise: the run starts held at step 0
                 self._run_clock.hold(True)
@@ -1175,6 +1189,8 @@ class MainWindow(QMainWindow):
             # GUI-6b: the last stage's full traces in the gauge column
             # (only for a live run: tests feed on_result by hand)
             self.run_panel.set_final_gauges(getattr(res, 'gauges', None))
+        if self._running_ui:
+            self._last_result = res
         self._run_got_result = True
         self._results.append((label_, dim, res))
         self.results.add_result(label_, dim, res)
@@ -1199,6 +1215,61 @@ class MainWindow(QMainWindow):
         else:
             how = 'ended'
         self.run_panel.mark_ended(how)
+        self._finish_notice(how)
+
+    def _finish_notice(self, how):
+        """GUI-6b (plan §6, When a run ends). An errored run keeps
+        today's dialog path, and a run with no result (StoppedBeforeStart)
+        gets nothing. Otherwise the banner names the model, how it ended
+        (the last result's stop_reason, verbatim) and the model folder.
+        A run that ended on its own - not stopped, not failed - also
+        gets `✓ Done` in the title and one Windows notification: the run
+        time and the highest peak of its gauges (decision D67)."""
+        res = self._last_result
+        if how not in ('done', 'stopped') or res is None:
+            return
+        model = getattr(self.ctrl, '_run_name', '') or self._case_stem()
+        folder = getattr(getattr(self.ctrl, '_model', None), 'folder', None)
+        self.run_panel.show_finish(model, getattr(res, 'stop_reason', ''),
+                                   folder)
+        self.run_panel.set_run_again(True)
+        if how != 'done':
+            return
+        self._done_mark = True
+        self._update_title()
+        dialogs.notify_desktop('BlastLab', self._finish_text(model, res),
+                               on_click=self._raise_on_results, parent=self)
+
+    def _finish_text(self, model, res):
+        """`<model> finished in 5 min 31 s. Highest peak: G6, 296 kPa at
+        2.21 ms.` - the run time (held time excluded) and
+        run_gauges.highest_peak of the last result's gauges; no gauge
+        with an arrival leaves the second sentence out."""
+        text = (f'{model} finished in '
+                f'{fmt_duration(self._run_clock.run_s())}.')
+        top = highest_peak(getattr(res, 'gauges', None))
+        if top is not None:
+            n, kpa, t_ms = top
+            text += f' Highest peak: G{n}, {kpa:,.0f} kPa at {t_ms:.2f} ms.'
+        return text
+
+    def _open_results(self):
+        """03 Results with the newest result selected."""
+        self._show('results')
+        sel = self.results.sel
+        n = sel.count()
+        if n and sel.currentIndex() != n - 1:
+            sel.setCurrentIndex(n - 1)
+
+    def _raise_on_results(self):
+        """A click on the notification: the window back on Results. From
+        a toast Windows may only flash the taskbar button (its
+        foreground lock); that is accepted (batch risk 7)."""
+        if self.isMinimized():
+            self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        self._open_results()
 
     def _resume_foam_run(self, path):
         """Resume a stopped blastFoam run. The dimension comes from the
@@ -1275,6 +1346,8 @@ class MainWindow(QMainWindow):
         self._wsl_timer.stop()
         self._validate_timer.stop()
         self._status_timer.stop()
+        # the notification's tray icon never outlives the window
+        dialogs.clear_tray()
         self.ctrl.shutdown()
         # release the embedded window first, then stop the child: the
         # reverse order leaves Qt holding a dangling HWND

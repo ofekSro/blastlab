@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
 from ..core import refine
 from ..services.model_folder import folder_for
 from . import theme
-from .components import Collapsible, StatTile, ToggleSwitch
+from .components import Banner, Collapsible, StatTile, ToggleSwitch
 from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .run_clock import RunClock, fmt_duration
@@ -288,6 +288,8 @@ class RunPanel(QWidget):
     runs_dir_changed = Signal()
     #: the Setup link at the foot of the controls was clicked
     setup_requested = Signal()
+    #: the finish banner's `Open in 03 Results →` was clicked
+    results_requested = Signal()
 
     #: a dynamic-AMR run logs one of these per written time - 60+ lines
     #: for half a millisecond of simulation, which buried every other
@@ -334,6 +336,7 @@ class RunPanel(QWidget):
         self._shape = None
         self._frac = None           # the stage's progress fraction
         self._ended = None          # how the last run / assessment ended
+        self._end_reason = ''       # the last result's stop_reason (T7)
         self._pct_before_busy = '—'
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
@@ -637,6 +640,14 @@ class RunPanel(QWidget):
         self.strip.arrange(force=True)
         cl.addWidget(self.strip)
 
+        # the finish banner (board Run_Finished lines 183-189), between
+        # the strip and the view toolbar; shown by show_finish, hidden at
+        # the next start
+        self.banner = Banner('', 'Open in 03 Results →',
+                             on_action=self.results_requested.emit)
+        self.banner.setVisible(False)
+        cl.addWidget(self.banner)
+
         # the view toolbar: a row ABOVE the view, not floated over it -
         # the native 3D child window paints over any Qt sibling laid on
         # top of it (CLAUDE.md 8.7)
@@ -938,6 +949,8 @@ class RunPanel(QWidget):
             self.progress.setValue(0)
             self._frac = None
             self._ended = None
+            self._end_reason = ''
+            self.banner.hide()
             self.strip.pct_lbl.setText('0 %')
             self._amr_run = 0
             self._start_record(model, folder)
@@ -964,6 +977,23 @@ class RunPanel(QWidget):
         self._sync_run_text()
         self._sync_tick()
         self._render_time()
+
+    def show_finish(self, model, reason, folder=None):
+        """The finish banner (plan §6): `Result ready: <model> · <how it
+        ended>. Files in <folder>\\`. `reason` is the last result's
+        stop_reason verbatim (decision D66); the time line appends it."""
+        reason = str(reason or '').strip() or 'finished'
+        text = f'Result ready: {model} · {reason}.'
+        if folder:
+            text += f" Files in {str(folder).rstrip('/' + os.sep)}{os.sep}"
+        self.banner.set(text)
+        self.banner.show()
+        self._end_reason = reason
+        self._render_time()
+
+    def banner_text(self):
+        """The banner's message as read, or '' while it is hidden."""
+        return '' if self.banner.isHidden() else self.banner.message.text()
 
     def set_run_again(self, on=True):
         """A run has finished this session: the idle button reads `Run
@@ -1158,12 +1188,17 @@ class RunPanel(QWidget):
             if eta is None:
                 return f'{el} elapsed'
             return f'{el} elapsed · about {fmt_duration(eta)} left'
-        return {'done': f'Done in {el}',
+        line = {'done': f'Done in {el}',
                 'stopped': f'Stopped after {el}',
                 'failed': f'Failed after {el}',
                 'ended': f'Ended after {el}',
                 'hd13': f'HD 1.3 assessment · done in {el}'}.get(
                     self._ended, '')
+        # T7: how the run ended, as the banner says it
+        if line and self._end_reason and self._ended in ('done',
+                                                         'stopped'):
+            line += f' · {self._end_reason}'
+        return line
 
     def _render_time(self):
         text = self.time_text()
