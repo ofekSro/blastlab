@@ -10,7 +10,7 @@ where the widgets sit moved."""
 import os
 
 import numpy as np
-from PySide6.QtCore import QSize, Qt, QTimer, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QIcon, QTextCursor
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QProgressBar, QPushButton,
@@ -652,6 +652,14 @@ class RunPanel(QWidget):
         self.banner = Banner('', 'Open in 03 Results →',
                              on_action=self.results_requested.emit)
         self.banner.setVisible(False)
+        # two unwrapped, elided lines (_render_banner): never wider than
+        # the centre column, never clipped
+        msg = self.banner.message
+        msg.setWordWrap(False)
+        msg.setMinimumWidth(0)
+        msg.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        msg.installEventFilter(self)
+        self._banner_lines = ('', '')
         cl.addWidget(self.banner)
 
         # the view toolbar: a row ABOVE the view, not floated over it -
@@ -1015,35 +1023,66 @@ class RunPanel(QWidget):
         ended>. Files in <folder>\\`. `reason` is the last result's
         stop_reason verbatim (decision D66); the time line appends it."""
         reason = str(reason or '').strip() or 'finished'
-        text = f'Result ready: {model} · {reason}.'
-        if folder:
-            text += f" Files in {str(folder).rstrip('/' + os.sep)}{os.sep}"
-        self.banner.set(text)
+        head = f'Result ready: {model} · {reason}.'
+        where = (f"Files in {str(folder).rstrip('/' + os.sep)}{os.sep}"
+                 if folder else '')
+        self._banner_lines = (head, where)
+        full = f'{head} {where}' if where else head
+        self.banner.message.setToolTip(full)
+        self._render_banner()
         if self.banner.isHidden():
             self._shrink_viewer_for_banner()
         self.banner.show()
         self._end_reason = reason
         self._render_time()
 
+    def _render_banner(self):
+        """Two lines that never wrap: the result and how it ended (elided
+        at the right), then the folder (elided in the middle), each to
+        the label's width; the whole text is the tooltip. A word-wrapped
+        label cannot break a path, so the path set the centre column's
+        minimum width and was clipped at 1100 x 720 (T9 screenshots)."""
+        msg = self.banner.message
+        head, where = self._banner_lines
+        msg.ensurePolished()
+        fm, w = msg.fontMetrics(), max(1, msg.contentsRect().width())
+        lines = [fm.elidedText(head, Qt.ElideRight, w)]
+        if where:
+            lines.append(fm.elidedText(where, Qt.ElideMiddle, w))
+        text = '\n'.join(lines)
+        if msg.text() != text:
+            msg.setText(text)
+
+    def eventFilter(self, obj, event):
+        if obj is self.banner.message and event.type() == QEvent.Resize:
+            self._render_banner()
+        return super().eventFilter(obj, event)
+
+    def _banner_dh(self):
+        """The height the banner takes from the view when it shows: its
+        own two lines and one layout GAP."""
+        b = self.banner
+        return max(b.sizeHint().height(), b.minimumSizeHint().height()) + GAP
+
     def _shrink_viewer_for_banner(self):
-        """The banner takes its height (and one GAP) from the view. With
-        the embedded 3D viewer on screen, shrink its window first, so it
-        never stands out of its card while the layout catches up
-        (CLAUDE.md 8.7; T9 measured 30 ms and 70 px without this)."""
+        """The banner takes its height from the view. With the embedded
+        3D viewer on screen, shrink its window first, so it never stands
+        out of its card while the layout catches up (CLAUDE.md 8.7; T9
+        measured 30 ms and 70 px without this)."""
         host = self.view3d
         shrink = getattr(host, 'shrink_ahead', None)
         if shrink is None or self._stack.currentWidget() is not host \
                 or not host.isVisible():
             return
-        w = self._centre.width()
-        dh = (self.banner.heightForWidth(w)
-              if self.banner.hasHeightForWidth()
-              else self.banner.sizeHint().height())
-        shrink(max(dh, self.banner.minimumSizeHint().height()) + GAP)
+        shrink(self._banner_dh())
 
     def banner_text(self):
-        """The banner's message as read, or '' while it is hidden."""
-        return '' if self.banner.isHidden() else self.banner.message.text()
+        """The banner's whole message, or '' while it is hidden (the
+        label may show it elided; the tooltip has it whole)."""
+        if self.banner.isHidden():
+            return ''
+        head, where = self._banner_lines
+        return f'{head} {where}' if where else head
 
     def set_run_again(self, on=True):
         """A run has finished this session: the idle button reads `Run

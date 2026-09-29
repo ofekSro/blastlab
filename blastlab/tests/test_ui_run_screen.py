@@ -1166,6 +1166,28 @@ def r6_finish(win):
               'verbatim and the model folder',
               rp.banner.isVisibleTo(rp) and rp.banner_text() == want,
               repr(rp.banner_text()))
+        # T9's screenshots: a word-wrapped path was clipped at 1100 x 720
+        # and held the centre wide, narrowing both side columns
+        win.resize(1100, 720)
+        pump(150)
+        msg = rp.banner.message
+        fm = msg.fontMetrics()
+        lines = msg.text().split('\n')
+        check('1100 x 720: the banner is two unwrapped lines that fit, the '
+              'whole text in the tooltip',
+              len(lines) == 2 and lines[1].startswith('Files in ')
+              and all(fm.horizontalAdvance(ln) <= msg.contentsRect().width()
+                      for ln in lines)
+              and msg.toolTip() == want, repr(lines))
+        check('and the side columns keep 280 / 340 with the banner up',
+              rp.column_widths()[0] == 280 and rp.column_widths()[2] == 340,
+              str(rp.column_widths()))
+        win.resize(1600, 1000)
+        pump(150)
+        check('1600 x 1000: the first line is whole',
+              msg.text().split('\n')[0]
+              == f'Result ready: wall_A · {res.stop_reason}.',
+              repr(msg.text()))
         rows = summarize_gauges(res.gauges)
         k = max(range(len(rows)), key=lambda i: rows[i]['peak_kpa'])
         text = (f'wall_A finished in {fmt_duration(331.0)}. Highest peak: '
@@ -1317,10 +1339,12 @@ def r8_banner_viewer(win):
         rp.show_3d_tab()
         pump(50)
         rp.show_finish('m', 'end time reached', None)
-        want = rp.banner.heightForWidth(rp._centre.width()) + GAP
+        pump(50)
+        want = rp.banner.height() + GAP     # what the layout gave it
         check('3D view on screen: show_finish shrinks the viewer by the '
               "banner's height + GAP, before the banner shows",
-              calls == [want] and rp.banner.isVisibleTo(rp), str(calls))
+              len(calls) == 1 and abs(calls[0] - want) <= 2
+              and rp.banner.isVisibleTo(rp), f'{calls} vs {want}')
         calls.clear()
         rp.show_finish('m', 'end time reached', None)
         check('a banner already shown does not shrink it again',
