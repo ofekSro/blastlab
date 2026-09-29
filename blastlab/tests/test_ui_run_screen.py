@@ -857,6 +857,28 @@ def r5_gauges(win):
           shown == [r['number'] for r in table], str(shown))
     check('every row widget reads waiting',
           all(w.peak_text() == 'waiting' for w in col.row_widgets()))
+    # T9's screenshot: the list showed one row (the scroll area stayed at
+    # its minimum), the header clipped to `GAUGI`, and a waiting gauge's
+    # flat trace autoranged to +-1e-305 kPa
+    win._show('run')
+    pump(50)
+    check('at %d x %d the list shows all 4 rows (no scrolling needed)'
+          % (win.width(), win.height()),
+          col.scroll.height() >= 4 * RG.ROW_H
+          and col.scroll.verticalScrollBar().maximum() == 0,
+          f'{col.scroll.height()} px, bar max '
+          f'{col.scroll.verticalScrollBar().maximum()}')
+    # the rendered text width (a fixed-width label's sizeHint reports
+    # the fixed width, so it cannot tell)
+    check('the list header is not clipped',
+          all(lbl.fontMetrics().horizontalAdvance(lbl.text())
+              <= lbl.width() for lbl in col.head_lbls[:3]),
+          str([(lbl.text(),
+                lbl.fontMetrics().horizontalAdvance(lbl.text()),
+                lbl.width()) for lbl in col.head_lbls[:3]]))
+    lo, hi = col.card.y_range()
+    check('a waiting (flat) trace gets a sane 1 kPa axis, not 1e-305',
+          lo <= 0.0 and hi - lo >= 1.0, f'{lo:.3g} .. {hi:.3g}')
     check('the header is GAUGE · Z · TRACE · PEAK, the caption sorted by Z',
           col.header_text() == 'GAUGE · Z · TRACE · PEAK'
           and col.sub.text() == '4 gauges, sorted by Z. Click a row to '

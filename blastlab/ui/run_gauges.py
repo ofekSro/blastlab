@@ -52,6 +52,8 @@ FOOTNOTE = ('When the run ends, its full traces, impulse and arrival times '
 #: the sparkline (board line 297) and the list row (line 293)
 SPARK_W, SPARK_H = 90, 24
 ROW_H = 40
+#: the GAUGE column (the header's caps need 36 px at 10.5 px)
+NUM_W = 38
 #: points kept for drawing: a sparkline cannot show more than two per
 #: pixel column, the enlarged trace not much more than its width
 SPARK_POINTS = 2 * SPARK_W
@@ -297,7 +299,7 @@ class _GaugeRow(QFrame):
         lay.setContentsMargins(10, 0, 10, 0)
         lay.setSpacing(8)
         self.num = QLabel(f'G{number}')
-        self.num.setFixedWidth(30)
+        self.num.setFixedWidth(NUM_W)
         self.dist = QLabel('—')
         self.dist.setFixedWidth(40)
         self.spark = Sparkline()
@@ -421,6 +423,7 @@ class _SelectedCard(QFrame):
             self.now_line.setValue(float(t[-1]))
         else:
             self.curve.setData([], [])
+        self._set_range(t, y)
         if row['waiting'] or not t.size:
             self.peak_dot.setData([], [])
             self.peak_lbl.setText('')
@@ -430,6 +433,25 @@ class _SelectedCard(QFrame):
             self.peak_lbl.setPos(row['t_peak_ms'], row['peak_kpa'])
         self.now_line.setVisible(self._live and bool(t.size))
         self.recolour()
+
+    def _set_range(self, t, y):
+        """Time from 0 to the newest sample, overpressure from min(0, the
+        lowest) to the highest. Set, not autoranged: a waiting gauge's
+        flat trace autoranged to +-1e-305 kPa (T9 screenshot)."""
+        ok = np.isfinite(y) if y.size else np.zeros(0, bool)
+        t_end = float(t[-1]) if t.size else 0.0
+        lo = min(0.0, float(y[ok].min())) if ok.any() else 0.0
+        hi = float(y[ok].max()) if ok.any() else 0.0
+        if not hi > lo + 1e-6:
+            hi = lo + 1.0                       # flat: a 1 kPa window
+        self.plot.disableAutoRange()
+        self.plot.setXRange(0.0, t_end if t_end > 0.0 else 1.0,
+                            padding=0.02)
+        self.plot.setYRange(lo, hi, padding=0.1)
+
+    def y_range(self):
+        """(lo, hi) of the trace's vertical axis (tests)."""
+        return tuple(self.plot.viewRange()[1])
 
     def set_live(self, live):
         self._live = bool(live)
@@ -494,7 +516,7 @@ class GaugeColumn(QWidget):
         head.setContentsMargins(10, 0, 10, 0)
         head.setSpacing(8)
         self.head_lbls = []
-        for text, w in (('GAUGE', 30), ('Z', 40), ('TRACE', SPARK_W),
+        for text, w in (('GAUGE', NUM_W), ('Z', 40), ('TRACE', SPARK_W),
                         ('PEAK', None)):
             lbl = QLabel(text)
             if w:
@@ -511,8 +533,10 @@ class GaugeColumn(QWidget):
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.scroll.setSizeAdjustPolicy(QScrollArea.AdjustToContents)
-        self.scroll.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        # it grows to hold every row (its maximum is set per row count in
+        # _rebuild) and gives way down to one row, then scrolls
+        self.scroll.setSizePolicy(QSizePolicy.Preferred,
+                                  QSizePolicy.Expanding)
         self.scroll.setMinimumHeight(ROW_H)
         # no Tab stop (the rows are mouse targets; D58's rule for the
         # controls column's scroll area)
@@ -698,7 +722,8 @@ class GaugeColumn(QWidget):
             self._widgets[number] = w
         self._rows_lay.addStretch(1)
         self._order = order
-        self.scroll.updateGeometry()
+        self.scroll.setMaximumHeight(len(order) * ROW_H
+                                     + 2 * self.scroll.frameWidth())
 
     def _show_selected(self):
         row = self._selected_row()
