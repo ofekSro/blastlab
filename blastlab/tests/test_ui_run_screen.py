@@ -284,6 +284,26 @@ def r1_layout(win):
           str([k for k, w in hideable.items() if w.isHidden()]))
 
 
+def contrast(fg, bg):
+    """WCAG contrast ratio of two '#rrggbb' colours (plan §2.2; the
+    formula of test_ui_theme, which cannot be imported: it moves
+    theme.FONT_DIR at import)."""
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255.0 for i in (1, 3, 5)]
+        c = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+             for v in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+    a, b = lum(fg), lum(bg)
+    return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+
+
+def theme_qss_rule(name):
+    """The app style sheet's rule for `QLabel#<name>` (its body)."""
+    qss = app.styleSheet()
+    i = qss.find(f'#{name} ')
+    return qss[i:qss.find('}', i)] if i >= 0 else ''
+
+
 class FakeClock:
     """A settable monotonic clock for RunClock.now."""
 
@@ -334,8 +354,19 @@ def r2_clock(win):
         check('held: `held at step N · … elapsed`, no ETA',
               rp.time_text() == 'held at step 11284 · 4 min 18 s elapsed',
               rp.time_text())
+        # T5: the PAUSED badge sits on `bg`, not on the tile's accent_bg
+        # (light warn on accent_bg is 4.24:1)
+        from blastlab.ui.theme import DARK, LIGHT
+        check('the PAUSED badge shows while held, warn on bg >= 4.5:1',
+              rp._paused_lbl.isVisibleTo(rp)
+              and rp._paused_lbl.text() == 'PAUSED at step 11284'
+              and 'background' in theme_qss_rule('pausedlbl')
+              and min(contrast(p['warn'], p['bg']) for p in (DARK, LIGHT))
+              >= 4.5)
         fake.t = 400.0
         win.on_paused(False)
+        check('and hides when released', rp._paused_lbl.isHidden()
+              and rp._paused_lbl.text() == '')
         check('released: held time is not run time',
               abs(win._run_clock.run_s() - 258.0) < 1e-9,
               str(win._run_clock.run_s()))

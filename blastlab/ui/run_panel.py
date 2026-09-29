@@ -1090,6 +1090,8 @@ class RunPanel(QWidget):
             ('PAUSED at step '
              f'{self._last_step}' if self._last_step is not None
              else 'PAUSED') if paused else '')
+        # the badge has a fill, so an empty one must not show
+        self._paused_lbl.setVisible(bool(paused))
         self._render_time()
 
     # ── the run clock's line (T2, plan §6, UX-19) ────────────────────────

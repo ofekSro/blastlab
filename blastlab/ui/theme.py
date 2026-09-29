@@ -563,8 +563,11 @@ def qss(mode_name):
     QLabel#progresscaps {{ font-size: 10px; font-weight: 600;
         color: {p['accent_text'] if mode_name == 'dark'
                 else p['accent_soft']}; }}
+    /* a `bg` badge: light `warn` on the Progress tile's accent_bg is
+       4.24:1, under the 4.5 rule; on `bg` it passes (test_ui_theme) */
     QLabel#pausedlbl {{ font-size: 11px; font-weight: 600;
-                        color: {p['warn']}; }}
+                        color: {p['warn']}; background: {p['bg']};
+                        border-radius: 4px; padding: 1px 6px; }}
     QLabel#progresspct {{ font-family: "{DISPLAY}"; font-size: 22px;
                           font-weight: 600; color: {p['text']}; }}
     QLabel#progresstime {{ font-size: 12px; color: {p['text2']}; }}
