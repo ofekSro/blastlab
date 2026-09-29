@@ -427,16 +427,16 @@ def qss(mode_name):
     QPushButton#initbtn {{ background: transparent; color: {p['text2']};
                            border: 1px solid {p['entry_border']};
                            border-radius: 8px; padding: 0px 8px;
-                           min-height: 0px; font-size: 12px;
-                           font-weight: 500; }}
+                           min-height: 26px; max-height: 26px;
+                           font-size: 12px; font-weight: 500; }}
     QPushButton#initbtn:hover {{ background: {p['hover']}; }}
     QPushButton#initbtn:disabled {{ color: {p['muted']}; }}
     /* the model view's toolbar (board lines 163-167): Z rings, Mesh, Fit */
     QPushButton#viewtool {{ background: transparent; color: {p['muted']};
                             border: 1px solid {p['entry_border']};
                             border-radius: 6px; padding: 0px 10px;
-                            min-height: 0px; font-size: 12px;
-                            font-weight: 500; }}
+                            min-height: 26px; max-height: 26px;
+                            font-size: 12px; font-weight: 500; }}
     QPushButton#viewtool:hover {{ background: {p['hover']}; }}
     QPushButton#viewtool:checked {{ background: {p['accent_bg']};
                                     color: {p['accent_soft']};

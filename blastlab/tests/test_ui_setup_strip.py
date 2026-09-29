@@ -336,6 +336,12 @@ def s2_model_view():
     check('the toolbar: Z rings on by default, Mesh, Fit',
           sp.z_rings.isChecked() and sp.z_rings.isVisibleTo(sp)
           and sp.show_mesh.isVisibleTo(sp) and sp.fit_btn.isVisibleTo(sp))
+    # board lines 157 and 164-166: 28 px. A QSS `min-height: 0px` once
+    # overrode setFixedHeight(28) and left them 17-18 px (found in verify)
+    hs = [b.height() for b in (sp.z_rings, sp.show_mesh, sp.fit_btn,
+                               sp.strip.init_btn)]
+    check('toolbar buttons and Initialise are the board\'s 28 px',
+          hs == [28, 28, 28, 28] and sp.fit_btn.width() == 28, str(hs))
     check('the plane caption (board line 162)',
           sp.view_caption() == 'r–z plane · charge on the axis',
           sp.view_caption())
