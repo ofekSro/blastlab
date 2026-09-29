@@ -868,6 +868,13 @@ def r5_gauges(win):
           and col.scroll.verticalScrollBar().maximum() == 0,
           f'{col.scroll.height()} px, bar max '
           f'{col.scroll.verticalScrollBar().maximum()}')
+    head = col.list_head.geometry()
+    check('the list header sits right on its rows (no floating gap), and '
+          'the frame ends at the last row',
+          0 <= col.scroll.geometry().top() - head.bottom() <= 2
+          and col.list_frame.height() <= RG.LIST_HEAD_H + 4 * RG.ROW_H + 6,
+          f'head {head.bottom()} rows {col.scroll.geometry().top()} '
+          f'frame {col.list_frame.height()}')
     # the rendered text width (a fixed-width label's sizeHint reports
     # the fixed width, so it cannot tell)
     check('the list header is not clipped',
@@ -968,6 +975,20 @@ def r5_gauges(win):
           and 'sorted by R' in col.sub.text()
           and col.card_texts()[1].startswith('R ')
           and 'Z' not in col.header_text(), col.header_text())
+
+    # many gauges at 1100 x 720: the list scrolls, nothing leaves the column
+    many = sample_case(gauges=[(0.5 + 0.25 * k, 0.5) for k in range(12)])
+    rp.set_gauge_case(many)
+    pump(50)
+    check('12 gauges at 1100 x 720: the list scrolls, the card and the '
+          'footnote stay inside the column',
+          col.scroll.verticalScrollBar().maximum() > 0
+          and col.card.isVisibleTo(col)
+          and col.foot.geometry().bottom() <= col.height()
+          and col.scroll.height() >= RG.ROW_H,
+          f'bar {col.scroll.verticalScrollBar().maximum()} list '
+          f'{col.scroll.height()} foot {col.foot.geometry().bottom()} / '
+          f'{col.height()}')
 
     # no gauges
     rp.set_gauge_case(sample_case(gauges=[]))

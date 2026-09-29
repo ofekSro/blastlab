@@ -52,8 +52,10 @@ FOOTNOTE = ('When the run ends, its full traces, impulse and arrival times '
 #: the sparkline (board line 297) and the list row (line 293)
 SPARK_W, SPARK_H = 90, 24
 ROW_H = 40
-#: the GAUGE column (the header's caps need 36 px at 10.5 px)
+#: the GAUGE column (the header's caps need 34 px at 10.5 px)
 NUM_W = 38
+#: the list's header row (board line 291)
+LIST_HEAD_H = 28
 #: points kept for drawing: a sparkline cannot show more than two per
 #: pixel column, the enlarged trace not much more than its width
 SPARK_POINTS = 2 * SPARK_W
@@ -526,9 +528,10 @@ class GaugeColumn(QWidget):
             head.addWidget(lbl, 0 if w else 1)
             self.head_lbls.append(lbl)
         hw = QWidget()
-        hw.setFixedHeight(28)
+        hw.setFixedHeight(LIST_HEAD_H)
         hw.setLayout(head)
         ll.addWidget(hw)
+        self.list_head = hw
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
@@ -722,8 +725,15 @@ class GaugeColumn(QWidget):
             self._widgets[number] = w
         self._rows_lay.addStretch(1)
         self._order = order
-        self.scroll.setMaximumHeight(len(order) * ROW_H
-                                     + 2 * self.scroll.frameWidth())
+        rows_h = len(order) * ROW_H + 2 * self.scroll.frameWidth()
+        self.scroll.setMaximumHeight(rows_h)
+        # the frame too, or it takes the column's stretch and its header
+        # floats in the middle of empty space (T9 screenshot); the extra
+        # height goes to the spacer under it instead
+        m = self.list_frame.contentsMargins()
+        self.list_frame.setMaximumHeight(
+            LIST_HEAD_H + rows_h + m.top() + m.bottom()
+            + 2 * self.list_frame.frameWidth())
 
     def _show_selected(self):
         row = self._selected_row()
