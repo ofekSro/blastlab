@@ -8,7 +8,7 @@ their cards are laid moved (plan §11). The dimension control lives in
 the window's top bar (GUI-3)."""
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import (QCheckBox, QFrame, QHBoxLayout, QLabel,
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QScrollArea, QSizePolicy, QStackedWidget,
                                QVBoxLayout, QWidget)
 
@@ -16,6 +16,7 @@ from ..core import mode as mode_mod
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
+from .model_overlay import ModelOverlay, hover_text, plane_caption
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_strip import LiveStrip
 from .setup_tree import SetupTree, _letter_space
@@ -136,6 +137,23 @@ class DerivedCard(Card):
         self._vals['nearest'].setText(text)
 
 
+def _tool_button(text, checkable=False, tip=None):
+    """A 28 px toolbar button of the model view (board lines 164-166)."""
+    b = QPushButton(text)
+    b.setObjectName('viewtool')
+    b.setCheckable(checkable)
+    b.setFixedHeight(28)
+    b.setCursor(Qt.PointingHandCursor)
+    if tip:
+        b.setToolTip(tip)
+    return b
+
+
+#: one wheel notch zooms the 1D/2D model view by this factor about the
+#: pointer (Fit undoes it)
+WHEEL_ZOOM = 0.8
+
+
 def _dim_label(form):
     """The tree header's `MODEL · <dim>` text."""
     if form.dim == 0:
@@ -210,11 +228,41 @@ class SetupPanel(QWidget):
         self.strip.run_clicked.connect(self.run_requested.emit)
         self.strip.init_clicked.connect(self.init_requested.emit)
         centre.addWidget(self.strip)
-        prev = Card('Model Preview', pad=12)
+        prev = Card(pad=12)
+        self._view_card = prev
         pv = prev.body_layout
-        self.show_mesh = QCheckBox('Show mesh')
+        # GUI-5b: the model view's toolbar (board lines 162-167) - the
+        # plane caption (the hover readout while the pointer is over the
+        # model), then Z rings / Mesh / Fit
+        bar = QHBoxLayout()
+        bar.setContentsMargins(0, 0, 0, 0)
+        bar.setSpacing(6)
+        self._view_caption = QLabel('')
+        self._view_caption.setObjectName('viewcaption')
+        self._view_caption.setMinimumWidth(10)
+        self._view_caption.setSizePolicy(QSizePolicy.Ignored,
+                                         QSizePolicy.Preferred)
+        bar.addWidget(self._view_caption, 1)
+        self.z_rings = _tool_button('Z rings', checkable=True,
+                                    tip='Dashed rings at Z = 1, 2, 3 '
+                                        'around the burst point '
+                                        '(Z = R / W^1/3)')
+        self.z_rings.setChecked(True)
+        self.z_rings.toggled.connect(self._rings_toggled)
+        #: kept under its old name: the harness, the embed e2e and the
+        #: 3D preview call setChecked / isChecked / toggled on it
+        self.show_mesh = _tool_button('Mesh', checkable=True,
+                                      tip='Show the cells the run will use')
         self.show_mesh.toggled.connect(self._mesh_toggled)
-        pv.addWidget(self.show_mesh)
+        self.fit_btn = _tool_button('', tip='Fit the whole domain')
+        self.fit_btn.setFixedWidth(28)
+        self.fit_btn.setAccessibleName('Fit to view')
+        self.fit_btn.setIcon(theme.icon('fit', 15, color='muted'))
+        self.fit_btn.clicked.connect(lambda *_: self.fit_view())
+        for b in (self.z_rings, self.show_mesh, self.fit_btn):
+            bar.addWidget(b)
+        pv.addLayout(bar)
+        self._overlay = ModelOverlay()
         self._prev_stack = _PreviewStack()
         pv.addWidget(self._prev_stack, 1)
         self._prev_msg = label(self.PREV_HINT, 'muted', wrap=True,
@@ -222,8 +270,13 @@ class SetupPanel(QWidget):
         self._prev_stack.addWidget(self._prev_msg)
         self.preview1d = Preview1D()
         self.preview2d = Preview2D()
-        self._prev_stack.addWidget(self.preview1d)
-        self._prev_stack.addWidget(self.preview2d)
+        for p in (self.preview1d, self.preview2d):
+            self._prev_stack.addWidget(p)
+            p.overlay = self._overlay.apply
+            canvas = p.figure.canvas
+            canvas.mpl_connect('motion_notify_event', self._hover)
+            canvas.mpl_connect('figure_leave_event', self._unhover)
+            canvas.mpl_connect('scroll_event', self._wheel)
         self.view3d = None
         self.preview3d = None
         if viewer_link is not None and pyvista_available():
@@ -319,6 +372,7 @@ class SetupPanel(QWidget):
         theme.signals.changed.connect(self._retheme)
         self._rebuild_tree()
         self.show_report()
+        self._sync_toolbar()
 
     # ── solver mode / dimension ──────────────────────────────────────────
     @property
@@ -421,6 +475,11 @@ class SetupPanel(QWidget):
         f.show_node(node_id)
         self._node = node_id
         self.tree.set_selected(node_id)
+        # the model view highlights the selected node (board chargeHi /
+        # gaugeHi)
+        if self._overlay.node != node_id:
+            self._overlay.node = node_id
+            self._redraw_overlay()
         self._set_heading()
         self._scroll.verticalScrollBar().setValue(0)
         self._fit_props()
@@ -557,6 +616,7 @@ class SetupPanel(QWidget):
     def _retheme(self, _mode=None):
         # the heading's number colour is baked into its rich text
         self._set_heading()
+        self.fit_btn.setIcon(theme.icon('fit', 15, color='muted'))
         QTimer.singleShot(0, self, self._fit_props)
 
     # ── validation report ────────────────────────────────────────────────
@@ -634,6 +694,7 @@ class SetupPanel(QWidget):
             return
         self._last_case = case
         show_mesh = self.show_mesh.isChecked()
+        before = self._prev_stack.currentWidget()
         if case.dim == 1:
             # T59: the spherical sector blastFoam actually meshes, with
             # the charge radius inside it
@@ -646,16 +707,105 @@ class SetupPanel(QWidget):
             if self.preview3d is None:
                 self._prev_msg.setText(MISSING_MSG)
                 self._prev_stack.setCurrentWidget(self._prev_msg)
-                return
-            self.preview3d.show_case(case, show_mesh=show_mesh)
-            self._prev_stack.setCurrentWidget(self.view3d)
+            else:
+                self.preview3d.show_case(case, show_mesh=show_mesh)
+                self._prev_stack.setCurrentWidget(self.view3d)
         else:
             self._prev_msg.setText(self.PREV_HINT)
             self._prev_stack.setCurrentWidget(self._prev_msg)
+        if self._prev_stack.currentWidget() is not before:
+            # a readout of the page that went away must not linger
+            self._view_caption.setProperty('hover', 'false')
+            theme.repolish(self._view_caption)
+        self._sync_toolbar()
 
     def _mesh_toggled(self, _on=None):
         if self._last_case is not None:
             self.update_preview(self._last_case)
+
+    # ── the model view's toolbar and overlay (GUI-5b) ────────────────────
+    def _mpl_preview(self):
+        """The 1D/2D matplotlib preview on screen, or None."""
+        w = self._prev_stack.currentWidget()
+        return w if w in (self.preview1d, self.preview2d) else None
+
+    def _sync_toolbar(self):
+        """Hide, never grey: Z rings only where rings can be drawn (a 1D
+        or 2D preview whose case shows Z - the 3D child viewer's scene is
+        out of scope, D32); Mesh and Fit wherever a preview is on screen;
+        the plane caption for the case on screen."""
+        kind = self.preview_kind()
+        case = self._last_case
+        self.z_rings.setVisible(kind in ('1d', '2d') and case is not None
+                                and scaled_distance.z_shown(case))
+        for b in (self.show_mesh, self.fit_btn):
+            b.setVisible(kind != 'hint')
+        if not self._view_caption.property('hover') == 'true':
+            self._view_caption.setText(
+                plane_caption(case) if kind != 'hint' else '')
+
+    def _redraw_overlay(self):
+        p = self._mpl_preview()
+        if p is not None:
+            p.redraw_overlay()
+
+    def _rings_toggled(self, on):
+        self._overlay.rings = bool(on)
+        self._redraw_overlay()
+
+    def fit_view(self):
+        """Fit: the whole domain again - the 1D/2D drawing replayed at its
+        own limits, or the 3D viewer's camera reset."""
+        p = self._mpl_preview()
+        if p is not None:
+            p.fit()
+        elif self.preview_kind() == '3d':
+            self.view3d._ctrl('reset_view')
+
+    def overlay(self):
+        """The model view's overlay state (tests)."""
+        return self._overlay
+
+    def view_caption(self):
+        return self._view_caption.text()
+
+    def _hover(self, event):
+        """`r · z · R · Z` under the pointer (board: the hover readout),
+        in the toolbar's caption slot while the pointer is on the model."""
+        p = self._mpl_preview()
+        if p is None or event.inaxes is None or p.last_case is None:
+            self._unhover()
+            return
+        text = hover_text(p.last_case, event.xdata, event.ydata)
+        if not text:
+            self._unhover()
+            return
+        lbl = self._view_caption
+        if lbl.property('hover') != 'true':
+            lbl.setProperty('hover', 'true')
+            theme.repolish(lbl)
+        lbl.setText(text)
+
+    def _unhover(self, _event=None):
+        lbl = self._view_caption
+        if lbl.property('hover') == 'true':
+            lbl.setProperty('hover', 'false')
+            theme.repolish(lbl)
+        self._sync_toolbar()
+
+    def _wheel(self, event):
+        """A wheel notch zooms the 1D/2D view about the pointer; Fit
+        goes back to the whole domain."""
+        ax = event.inaxes
+        if ax is None or event.xdata is None:
+            return
+        k = WHEEL_ZOOM if event.button == 'up' else 1.0 / WHEEL_ZOOM
+        x, y = event.xdata, event.ydata
+        x0, x1 = ax.get_xlim()
+        y0, y1 = ax.get_ylim()
+        ax.set_xlim(x - (x - x0) * k, x + (x1 - x) * k)
+        ax.set_ylim(y - (y - y0) * k, y + (y1 - y) * k)
+        ax.figure.canvas.draw_idle()
 
     def preview_kind(self):
         """'1d' | '2d' | '3d' | 'hint' - which preview is on screen."""

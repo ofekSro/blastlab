@@ -201,7 +201,8 @@ class _RunButton(QPushButton):
         lay.addStretch(1)
         for w in (self.mark, self.text_lbl, self.key):
             w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
-            lay.addWidget(w)
+            w.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+            lay.addWidget(w, 0, Qt.AlignVCenter)
         lay.addStretch(1)
         self._paint_mark()
         theme.signals.changed.connect(self._paint_mark)
@@ -249,6 +250,11 @@ class LiveStrip(QFrame):
             t.caption.setSizePolicy(QSizePolicy.Ignored,
                                     QSizePolicy.Preferred)
             t.caption.installEventFilter(self)
+            # a 10 px caps label's space is ~2 px: 'MPI RANKS' read as one
+            # word (measured on the first screenshot)
+            f = t.caps.font()
+            f.setWordSpacing(3)
+            t.caps.setFont(f)
             t.setVisible(False)
             self.tiles[name] = t
         self.run_col = QWidget()

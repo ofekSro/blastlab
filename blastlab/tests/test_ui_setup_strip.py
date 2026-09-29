@@ -276,8 +276,198 @@ def s1_strip():
     pump(40)
 
 
+def _mouse(canvas, ax, name, x, y, button=None):
+    """Feed matplotlib a synthetic event at data point (x, y)."""
+    from matplotlib.backend_bases import MouseEvent
+    px, py = ax.transData.transform((x, y))
+    ev = MouseEvent(name, canvas, px, py, button=button)
+    canvas.callbacks.process(name, ev)
+
+
+def _ring_radius(line, centre):
+    import numpy as np
+    x, y = line.get_data()
+    r = np.hypot(np.asarray(x) - centre[0], np.asarray(y) - centre[1])
+    return float(r.min()), float(r.max())
+
+
+def s2_model_view():
+    from blastlab.ui import theme
+    from blastlab.ui.model_overlay import ModelOverlay
+    print('\nS2a: Z rings at Z = 1, 2, 3 (radius Z W^1/3)')
+    sp = panel()
+
+    def show(case):
+        got, rep = load(sp, case)
+        sp.update_preview(got)
+        pump(20)
+        return got
+
+    case = show(sample_case())
+    ax = sp.preview2d.ax
+    rings = sorted(ModelOverlay.found(ax, 'zring'),
+                   key=lambda a: a.get_gid())
+    radii = [_ring_radius(r, (0.0, 2.0)) for r in rings]
+    want = [sd.ring_radius(case, z) for z in (1, 2, 3)]
+    check('three dashed rings around the burst (0, 2)',
+          len(rings) == 3 and all(abs(lo - w) < 1e-9 and abs(hi - w) < 1e-9
+                                  for (lo, hi), w in zip(radii, want)),
+          str(radii))
+    check('1 kg: the rings sit at R = 1.00, 2.00, 3.00 m',
+          [round(w, 2) for w in want] == [1.0, 2.0, 3.0], str(want))
+    check('labelled Z 1 / Z 2 / Z 3',
+          sorted(t.get_text().strip() for t in
+                 ModelOverlay.found(ax, 'zlabel'))
+          == ['Z 1', 'Z 2', 'Z 3'])
+    check('dashed, in the accent colour',
+          all(r.get_linestyle() == '--' and r.get_color()
+              == theme.cur('accent') for r in rings))
+    check('the toolbar: Z rings on by default, Mesh, Fit',
+          sp.z_rings.isChecked() and sp.z_rings.isVisibleTo(sp)
+          and sp.show_mesh.isVisibleTo(sp) and sp.fit_btn.isVisibleTo(sp))
+    check('the plane caption (board line 162)',
+          sp.view_caption() == 'r–z plane · charge on the axis',
+          sp.view_caption())
+    sp.z_rings.setChecked(False)
+    pump(5)
+    check('Z rings off: no ring', not ModelOverlay.found(ax, 'zring'))
+    sp.z_rings.setChecked(True)
+    pump(5)
+    check('on again: three', len(ModelOverlay.found(ax, 'zring')) == 3)
+    n0 = len(ModelOverlay.found(ax))
+    for _ in range(3):
+        sp.update_preview(sp.get_case())
+    theme.apply(app, 'light')
+    pump(20)
+    theme.apply(app, 'dark')
+    pump(20)
+    check('replays and theme switches never leak overlay artists',
+          len(ModelOverlay.found(ax)) == n0,
+          f'{n0} -> {len(ModelOverlay.found(ax))}')
+    heavy = show(sample_case(charge=8.0))
+    radii = sorted(_ring_radius(r, (0.0, 2.0))[0]
+                   for r in ModelOverlay.found(ax, 'zring'))
+    check('8 kg doubles them (2, 4, 6 m)',
+          [round(r, 6) for r in radii] == [2.0, 4.0, 6.0], str(radii))
+    show(sample_case(geometry='planar', center=(1.0, 2.0)))
+    check('planar: no ring, and the Z rings button is hidden',
+          not ModelOverlay.found(ax, 'zring')
+          and not sp.z_rings.isVisibleTo(sp))
+    show(sample_case(init_mode='profile1d', profile_file_in='x.txt'))
+    check('profile start: no ring', not ModelOverlay.found(ax, 'zring'))
+    c1 = show(Case1D(solver='blastfoam', charge_kg=8.0,
+                     gauge_radii=[2.0, 3.0]))
+    ax1 = sp.preview1d.ax
+    radii = sorted(_ring_radius(r, (0.0, 0.0))[1]
+                   for r in ModelOverlay.found(ax1, 'zring'))
+    check('1D: arcs in the sector at Z W^1/3 (8 kg: 2, 4, 6 m)',
+          sp.preview_kind() == '1d'
+          and [round(r, 6) for r in radii]
+          == [round(sd.ring_radius(c1, z), 6) for z in (1, 2, 3)],
+          str(radii))
+
+    print('\nS2b: the selected node is highlighted (chargeHi / gaugeHi)')
+    case = show(sample_case())
+    sp.select_node('threat')
+    pump(10)
+    tags = [t.get_text() for t in ModelOverlay.found(ax, 'chargetag')]
+    check('01 Threat: two rings and the charge tag',
+          len([a for a in ModelOverlay.found(ax, 'charge')
+                   if a.get_gid() == 'overlay:charge']) == 2
+          and tags == ['Charge · 1 kg TNT'], str(tags))
+    check('and no gauge highlight', not ModelOverlay.found(ax, 'halo'))
+    sp.select_node('gauges')
+    pump(10)
+    rl = [t.get_text() for t in sorted(ModelOverlay.found(ax, 'rlabel'),
+                                       key=lambda a: a.get_gid())]
+    check('05 Gauges: one halo and one dashed line per gauge',
+          len(ModelOverlay.found(ax, 'halo')) == 2
+          and len(ModelOverlay.found(ax, 'gline')) == 2
+          and all(h.get_color() == theme.cur('gauge')
+                  for h in ModelOverlay.found(ax, 'halo')))
+    check('R labels equal the helper: R 3.31, R 2.99',
+          rl == [f'R {r:.2f}' for _n, r, _z in sd.gauges(case)]
+          and rl == ['R 3.31', 'R 2.99'], str(rl))
+    check('and no charge highlight',
+          not ModelOverlay.found(ax, 'chargetag'))
+    sp.select_node('domain')
+    pump(10)
+    check('another node: rings only',
+          {a.get_gid().split(':')[1] for a in ModelOverlay.found(ax)}
+          == {'zring', 'zlabel'})
+    marks = [ln for ln in ax.lines if ln.get_marker() == 'o'
+             and not (ln.get_gid() or '')]
+    check('the preview draws the gauges in gauge cyan (plan §2.1)',
+          marks and all(ln.get_color() == theme.cur('gauge')
+                        for ln in marks), str([m.get_color()
+                                              for m in marks]))
+
+    print('\nS2c: the hover readout r · z · R · Z')
+    canvas = sp.preview2d.figure.canvas
+    _mouse(canvas, ax, 'motion_notify_event', 2.95, 0.5)
+    check("over G1: 'r 2.95 · z 0.50 · R 3.31 · Z 3.31'",
+          sp.view_caption() == 'r 2.95 · z 0.50 · R 3.31 · Z 3.31',
+          sp.view_caption())
+    from matplotlib.backend_bases import LocationEvent
+    canvas.callbacks.process('figure_leave_event',
+                             LocationEvent('figure_leave_event', canvas,
+                                           0, 0))
+    check('leaving the model restores the plane caption',
+          sp.view_caption() == 'r–z plane · charge on the axis',
+          sp.view_caption())
+    show(sample_case(geometry='planar', center=(1.0, 2.0)))
+    _mouse(canvas, ax, 'motion_notify_event', 2.0, 2.0)
+    check("planar: 'x · y · R', no Z",
+          sp.view_caption() == 'x 2.00 · y 2.00 · R 1.00',
+          sp.view_caption())
+    show(Case1D(solver='blastfoam', charge_kg=1.0, gauge_radii=[2.0]))
+    _mouse(sp.preview1d.figure.canvas, sp.preview1d.ax,
+           'motion_notify_event', 3.0, 0.0)
+    check("1D: 'r · R · Z'",
+          sp.view_caption() == 'r 3.00 · R 3.00 · Z 3.00',
+          sp.view_caption())
+
+    print('\nS2d: Mesh and Fit')
+    show(sample_case())
+    check('Mesh is the old show_mesh, now a checkable toolbar button',
+          sp.show_mesh.isCheckable() and sp.show_mesh.text() == 'Mesh')
+    sp.show_mesh.setChecked(True)
+    pump(10)
+    check('Mesh on replays the preview with the mesh',
+          sp.preview2d._last[1] is True)
+    sp.show_mesh.setChecked(False)
+    pump(10)
+    check('and off without', sp.preview2d._last[1] is False)
+    lim = ax.get_xlim()
+    _mouse(canvas, ax, 'scroll_event', 2.0, 2.0, button='up')
+    zoomed = ax.get_xlim()
+    check('a wheel notch zooms about the pointer',
+          zoomed[1] - zoomed[0] < lim[1] - lim[0], f'{lim} -> {zoomed}')
+    sp.fit_btn.click()
+    pump(10)
+    check('Fit goes back to the whole domain',
+          all(abs(a - b) < 1e-9 for a, b in zip(ax.get_xlim(), lim)),
+          f'{ax.get_xlim()} vs {lim}')
+    check('Fit keeps the overlay', len(ModelOverlay.found(ax, 'zring'))
+          == 3)
+    sp.set_case(Case3D(solver='blastfoam', gauges=[(1.0, 1.0, 1.0)]))
+    sp.update_preview(sp.get_case())
+    pump(10)
+    check('3D: no Z rings button (the child viewer is out of scope)',
+          not sp.z_rings.isVisibleTo(sp))
+    sp.set_dim(0)
+    sp.update_preview(sp.get_case())
+    pump(10)
+    check('0-D: no model-view tool at all',
+          not any(b.isVisibleTo(sp) for b in
+                  (sp.z_rings, sp.show_mesh, sp.fit_btn))
+          and sp.view_caption() == '')
+    sp.close()
+
+
 def main():
     s1_strip()
+    s2_model_view()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

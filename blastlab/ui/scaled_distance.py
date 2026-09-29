@@ -89,6 +89,12 @@ def scaled_distance(case, point):
     return distance(case, point) / charge_mass(case) ** (1.0 / 3.0)
 
 
+def ring_radius(case, z):
+    """R [m] at which the scaled distance is `z`: R = Z · W^(1/3), W as
+    entered (the model view's dashed Z rings, GUI-5b)."""
+    return float(z) * charge_mass(case) ** (1.0 / 3.0)
+
+
 def gauges(case):
     """[(number, R, Z or None)] per gauge, 1-based as the case numbers
     them."""

@@ -20,8 +20,11 @@ from .mpl_canvas import MplCanvas
 
 
 def _pal():
+    # the palette's `accent` is what preview_draw paints the gauges in;
+    # the redesign draws gauges in `gauge` cyan everywhere (plan §2.1,
+    # GUI-5b) - told apart from the orange charge by hue and lightness
     return preview_draw.palette(dark=theme.mode() == 'dark',
-                                accent=theme.cur('accent'),
+                                accent=theme.cur('gauge'),
                                 muted=theme.cur('muted'))
 
 
@@ -35,14 +38,24 @@ class _MplPreview(MplCanvas):
         self._ax = fig.add_subplot()
         self.set_figure(fig)
         self._last = None
+        #: GUI-5b: `overlay(ax, case)` draws on top of the shared drawing
+        #: after `preview_draw` returns (the Setup panel's Z rings and
+        #: selection highlight); None draws nothing extra
+        self.overlay = None
 
     @property
     def ax(self):
         return self._ax
 
+    @property
+    def last_case(self):
+        return self._last[0] if self._last is not None else None
+
     def show_case(self, case, show_mesh=False):
         self._last = (case, bool(show_mesh))
         note = self._draw(self._ax, case, show_mesh=show_mesh, pal=_pal())
+        if self.overlay is not None:
+            self.overlay(self._ax, case)
         theme.style_figure(self.figure)
         try:
             self.figure.tight_layout()
@@ -50,6 +63,20 @@ class _MplPreview(MplCanvas):
             pass                      # a degenerate case must not raise
         self.draw()
         return note
+
+    def redraw_overlay(self):
+        """Re-draw only the overlay (a new selection, the rings toggle):
+        the case drawing stays, the overlay's own artists are swapped."""
+        if self._last is None or self.overlay is None:
+            return
+        self.overlay(self._ax, self._last[0])
+        self.draw()
+
+    def fit(self):
+        """Back to the whole domain: replay the drawing, whose limits are
+        the domain plus a margin."""
+        if self._last is not None:
+            self.show_case(*self._last)
 
     def retheme(self):
         """A dark/light switch changes the boundary and mesh colours, so

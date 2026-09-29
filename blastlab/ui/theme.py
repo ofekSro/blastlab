@@ -431,6 +431,20 @@ def qss(mode_name):
                            font-weight: 500; }}
     QPushButton#initbtn:hover {{ background: {p['hover']}; }}
     QPushButton#initbtn:disabled {{ color: {p['muted']}; }}
+    /* the model view's toolbar (board lines 163-167): Z rings, Mesh, Fit */
+    QPushButton#viewtool {{ background: transparent; color: {p['muted']};
+                            border: 1px solid {p['entry_border']};
+                            border-radius: 6px; padding: 0px 10px;
+                            min-height: 0px; font-size: 12px;
+                            font-weight: 500; }}
+    QPushButton#viewtool:hover {{ background: {p['hover']}; }}
+    QPushButton#viewtool:checked {{ background: {p['accent_bg']};
+                                    color: {p['accent_soft']};
+                                    border: 1px solid {p['accent_border']}; }}
+    QLabel#viewcaption {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#viewcaption[hover="true"] {{ font-family: "{MONO}";
+                                        font-size: 11px;
+                                        color: {p['text2']}; }}
     """
 
 
@@ -643,6 +657,12 @@ def _shape(name, p, S, lw):
     elif name == 'step_fwd':
         rrect(72, 26, 82, 74, 3)
         poly((20, 26), (20, 74), (64, 50))
+    elif name == 'fit':                      # four corners (board line 166)
+        for pts in (((16, 38), (16, 16), (38, 16)),
+                    ((62, 16), (84, 16), (84, 38)),
+                    ((16, 62), (16, 84), (38, 84)),
+                    ((62, 84), (84, 84), (84, 62))):
+            line(*pts, w=lw * 0.95)
     elif name == 'loop':
         pn = QPen(white, lw)
         pn.setCapStyle(Qt.RoundCap)
