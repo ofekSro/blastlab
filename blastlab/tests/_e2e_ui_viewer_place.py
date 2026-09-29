@@ -27,8 +27,10 @@ longest mismatch stretch, and whether the window stayed a child of its
 card.
 
   --surface results|run|setup   which embedded viewer (default results)
-  --actions a,b,...             open3d, select, busy, stage, tabs, theme,
-                                resize (default: all that apply); an
+  --actions a,b,...             open3d, views (the Results view tabs,
+                                every one in turn, 3D last), select,
+                                busy, stage, tabs, theme, resize
+                                (default: all that apply); an
                                 action the code under test lacks (a base
                                 worktree) is reported as unavailable
   --repeat N                    repeats per action (default 3)
@@ -59,7 +61,8 @@ WATCH_MS = 700
 #: the sampling period (<= 2 ms, plan T4)
 PERIOD_S = 0.0015
 
-ACTIONS = ('open3d', 'select', 'busy', 'stage', 'tabs', 'theme', 'resize')
+ACTIONS = ('open3d', 'views', 'select', 'busy', 'stage', 'tabs', 'theme',
+           'resize')
 
 
 class _RECT(ctypes.Structure):
@@ -370,6 +373,13 @@ def main():
                 away()
                 settle(300)
                 return [lambda: rs._view3d_btn.click()]
+            if name == 'views':
+                # GUI-7b: Field -> Gauges -> 3D (at base, the four old
+                # tabs); the viewer is back on screen at the last step
+                if args.surface != 'results':
+                    return None
+                names = [v for v in rs._views if v != '3D'] + ['3D']
+                return [lambda v=v: rs.show_view(v) for v in names]
             if name == 'select':
                 if args.surface != 'results':
                     return None
