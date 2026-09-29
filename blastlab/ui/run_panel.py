@@ -357,6 +357,9 @@ class RunPanel(QWidget):
         # needs 238 px, and the vertical scroll bar takes 10 of the
         # column's 278 once Step through is open (measured)
         col.layout_.setContentsMargins(14, 15, 12, 15)
+        # no Tab stop of its own (it was one after the log): Tab through
+        # its controls still scrolls it, QScrollArea.focusNextPrevChild
+        col.setFocusPolicy(Qt.NoFocus)
         self._ctrl_scroll = col
         fl.addWidget(col)
 
@@ -883,7 +886,8 @@ class RunPanel(QWidget):
                  self.step_card.header, self.init_btn, *self._exec_btns,
                  self.refresh_val, self.refresh_mode, self.auto_clim,
                  self.clim_min, self.clim_max, self.setup_link,
-                 self._view_seg, self.show_mesh, self.log]
+                 self._view_seg, self.show_mesh,
+                 *self.dock.focus_widgets(), self.log]
         for first, second in zip(chain, chain[1:]):
             QWidget.setTabOrder(first, second)
 

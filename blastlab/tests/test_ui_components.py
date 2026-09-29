@@ -184,6 +184,10 @@ def c4_docktabs():
                         for b, _w in tabs._tabs.values())
     check('the corner widget is right of every tab', right_of_tabs,
           f'{corner.x()} vs {[b.x() for b, _w in tabs._tabs.values()]}')
+    check('button(name) is that tab\'s button',
+          tabs.button('Log') is b_log
+          and [tabs.button(n).text() for n in tabs.names()]
+          == ['Gauges', 'Checks', 'Log'])
     tabs.close()
 
 

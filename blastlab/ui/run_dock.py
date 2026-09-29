@@ -109,6 +109,14 @@ class RunDock(QFrame):
         self._label_earlier()
         theme.signals.changed.connect(self._retheme)
 
+    def focus_widgets(self):
+        """The dock's Tab stops in reading order - the tabs, Copy, Save
+        log…, the other pages - without the Log, which the Run panel
+        puts last."""
+        return ([self.tabs.button(n) for n in self.tabs.names()]
+                + [self.copy_btn, self.save_btn, self.messages,
+                   self.earlier_list, self.earlier_view])
+
     # ── runs: the Log pane's text kept per run ───────────────────────────
     def record_start(self, model, folder):
         """A run starts: keep what the Log showed (if anything) as an

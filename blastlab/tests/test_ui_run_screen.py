@@ -44,6 +44,7 @@ app = ensure_qapp()
 
 from PySide6.QtCore import Qt                                 # noqa: E402
 from PySide6.QtTest import QTest                              # noqa: E402
+from PySide6.QtWidgets import QToolButton                     # noqa: E402
 
 FAIL = []
 RAN = []
@@ -204,6 +205,27 @@ def r1_layout(win):
           == ['+1', '+10', '+100', '+1000', 'To the end', 'Pause'],
           str([b.text() for b in rp._exec_btns]))
     rp.exec_requested.disconnect(got.append)
+    # the tab order (T1), walked through Qt's own focus chain while the
+    # run is live and Step through open: the controls top to bottom,
+    # the view toolbar, the dock's tabs, Copy, Save log…, the log last
+    want = ([rp.runs_dir, rp.runs_browse, rp.run_name, rp.stop_btn,
+             rp.step_card.header, *rp._exec_btns, rp.refresh_val,
+             rp.refresh_mode, rp.auto_clim, rp.setup_link]
+            + rp._view_seg.findChildren(QToolButton)
+            + [rp.show_mesh]
+            + [rp.dock.tabs.button(n) for n in rp.dock.tabs.names()]
+            + [rp.dock.copy_btn, rp.dock.save_btn, rp.log])
+    walked, w = [], rp.runs_dir
+    for _ in range(5000):
+        if rp.isAncestorOf(w) and w.isVisibleTo(win) and w.isEnabled() \
+                and (w.focusPolicy() & Qt.TabFocus):
+            walked.append(w)
+        w = w.nextInFocusChain()
+        if w is rp.runs_dir:
+            break
+    check('Tab walks the controls, the view toolbar, the dock, the log '
+          'last', walked == want,
+          ' -> '.join(type(x).__name__ for x in walked))
     win.on_running(False)
     rp.step_card.set_open(False)
     pump(30)

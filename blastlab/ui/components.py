@@ -359,6 +359,10 @@ class DockTabs(QWidget):
     def names(self):
         return list(self._tabs)
 
+    def button(self, name):
+        """The tab's own button (a focus chain, tests)."""
+        return self._tabs[str(name)][0]
+
     def add_corner(self, widget, gap=0):
         """Put `widget` at the right end of the tab strip, after the
         stretch (board Run line 252: Copy / Save log… beside the tabs),
