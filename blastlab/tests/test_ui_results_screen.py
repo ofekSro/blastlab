@@ -13,6 +13,17 @@ board Results; batch docs/batches/2026-09-29-gui-results.md).
      the file's text; Load into 01 Setup loads a new, unsaved case and
      never writes the model folder's MODEL.json, asking only when Setup is
      dirty; the stage hook.
+ S3  the export column: Data / Figures in board order, the suffixes
+     (profile .txt / .npz by dimension, the animation's default_ext()),
+     40 px buttons, Open the 3D viewer at 42 px; no label cut and nothing
+     clipped at 1100 x 720 (both modes) and on the 900 x 600 panel; VTK
+     hidden in native mode; the busy strip (a blocking run_export): up
+     only once a target is chosen, no double start (logged), another
+     kind still starts, Remove still works, both back when done,
+     `_export_done` and the VTK error dialog on the GUI thread; Open the
+     3D viewer disabled with its why-not for 1D, 2D, a 3D result with no
+     snapshots and without pyvista, enabled for a 3D result with
+     snapshots; the title box retitles the figures (E09).
 
 Plain script, offscreen, throwaway settings, no window on screen:
     cd blastlab/tests && python test_ui_results_screen.py
@@ -450,6 +461,274 @@ def s2_stage_hook(p):
     pump(20)
 
 
+# ── S3 ───────────────────────────────────────────────────────────────────
+def s3_layout(win, link):
+    from test_gui_results_fields import fake_2d
+    from test_ui_parity import clipped
+    from test_ui_results import fake_1d
+    from blastlab.output.animation import default_ext
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS3a: the export column')
+    rs = win.results
+    col = rs.export_col
+    check('Data = summary, tsv, fieldcsv, profile, vtk; Figures = pngs, '
+          'report, gif', col.order() == {
+              'Data': ('summary', 'tsv', 'fieldcsv', 'profile', 'vtk'),
+              'Figures': ('pngs', 'report', 'gif')}, str(col.order()))
+    check('_export_btns maps the same 8 kinds to the new buttons',
+          sorted(rs._export_btns) == sorted(
+              ['summary', 'tsv', 'fieldcsv', 'profile', 'vtk', 'pngs',
+               'report', 'gif'])
+          and all(rs._export_btns[k] is col.items[k].button
+                  for k in rs._export_btns))
+    win.set_solver('blastfoam')
+    win._show('results')
+    win.resize(1600, 1000)
+    pump(120)
+    ys = [col.items[k].mapTo(col, col.items[k].rect().topLeft()).y()
+          for k in col.order()['Data'] + col.order()['Figures']]
+    check('and they sit in that order, top to bottom', ys == sorted(ys),
+          str(ys))
+    heights = {k: it.button.height() for k, it in col.items.items()}
+    check('each export button is 40 px', set(heights.values()) == {40},
+          str(heights))
+    check('Open the 3D viewer is 42 px, at the foot',
+          rs._view3d_btn.height() == 42
+          and rs._view3d_btn.text() == 'Open the 3D viewer',
+          str(rs._view3d_btn.height()))
+    e1 = rs.add_result('one', 1, fake_1d())
+    pump(30)
+    check('Profile suffix .txt for a 1D result',
+          col.items['profile'].suffix.text() == '.txt')
+    e2 = rs.add_result('two', 2, fake_2d())
+    pump(30)
+    check('and .npz for a 2D result',
+          col.items['profile'].suffix.text() == '.npz')
+    check('the Animation suffix is default_ext()',
+          col.items['gif'].suffix.text() == default_ext(),
+          col.items['gif'].suffix.text())
+    check('the title box: placeholder `added above the automatic title`',
+          rs.title_box.placeholderText() == 'added above the automatic '
+                                            'title')
+    for mode in ('native', 'blastfoam'):
+        win.set_solver(mode)
+        win.resize(1100, 720)
+        pump(150)
+        cut = [it.text() for it in col.items.values()
+               if not it.isHidden() and not it.label_fits()]
+        bad = clipped(win)
+        check(f'1100 x 720, {mode}: no export label cut, nothing clipped',
+              not cut and not bad, f'{cut} {bad[:3]}')
+    win.set_solver('native')
+    pump(30)
+    check('native: the VTK export and its button are hidden',
+          col.items['vtk'].isHidden() and rs._export_btns['vtk'].isHidden())
+    win.set_solver('blastfoam')
+    pump(30)
+    check('blastFoam: both back',
+          not col.items['vtk'].isHidden()
+          and not rs._export_btns['vtk'].isHidden())
+    for ent in (e1, e2):
+        rs.sel.setCurrentIndex(rs.entries().index(ent))
+        rs.remove_current()
+    pump(20)
+    p = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p.resize(900, 600)
+    p.show()
+    p.add_result('two', 2, fake_2d())
+    pump(120)
+    cut = [it.text() for it in p.export_col.items.values()
+           if not it.label_fits()]
+    check('the panel at 900 x 600: no export label cut, nothing clipped',
+          not cut and not clipped(p), f'{cut} {clipped(p)[:3]}')
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+
+
+def s3_busy(link):
+    import threading
+    from PySide6.QtCore import QThread
+    from PySide6.QtWidgets import QApplication
+    from test_gui_results_fields import fake_2d
+    from test_ui_results import with_gauges
+    from blastlab.ui import dialogs
+    from blastlab.ui import exports as UE
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS3b: busy, and no double start (UX-13)')
+    log = []
+    p = ResultsPanel(viewer_link=link, log_fn=log.append)
+    p.resize(1280, 840)
+    p.show()
+    ent = p.add_result('gauged', 2, with_gauges(fake_2d()))
+    pump(50)
+    out = os.path.join(TMP, 'busy')
+    os.makedirs(out, exist_ok=True)
+    gate = threading.Event()
+    started = []
+    threads = []
+
+    def blocking(kind, *_a, **_k):
+        started.append(kind)
+        gate.wait(20)
+        return 'written'
+
+    def save_file(title, filters='', parent=None, start='',
+                  default_suffix=None):
+        return os.path.join(out, os.path.basename(start) or 'x')
+
+    real = (UE.run_export, dialogs.save_file, dialogs.pick_dir)
+    real_done = p._export_done
+
+    def done(kind):
+        threads.append(QThread.currentThread() is app.thread())
+        real_done(kind)
+    p._export_done = done
+    UE.run_export = blocking
+    dialogs.save_file = save_file
+    dialogs.pick_dir = lambda *a, **k: out
+    items = p.export_col.items
+    try:
+        ret = p.export('summary')
+        pump(80)
+        check('export(summary) starts one writer and shows its busy strip',
+              ret and started == ['summary']
+              and not items['summary'].strip.isHidden()
+              and items['summary'].button.isHidden()
+              and p.busy_kinds() == {'summary'}, f'{ret!r} {started}')
+        check('the strip: the name, writing…, an indeterminate bar',
+              items['summary'].busy_name.text() == 'Summary'
+              and items['summary'].busy_text.text() == 'writing…'
+              and items['summary'].bar.maximum() == 0
+              and items['summary'].strip.height() >= 40,
+              str(items['summary'].strip.height()))
+        del log[:]
+        again = p.export('summary')
+        pump(80)
+        check('a second export(summary) returns \'\' and adds no writer',
+              again == '' and started == ['summary'], str(started))
+        check('and logs that it is already being written',
+              log == ['Summary is already being written.'], str(log))
+        ret2 = p.export('tsv')
+        pump(80)
+        check('export(tsv) still starts',
+              ret2 and started == ['summary', 'tsv']
+              and not items['tsv'].strip.isHidden(), str(started))
+        p.remove_current()
+        pump(30)
+        check('Remove still works while writing', p.entries() == [])
+        p.add_result('gauged', 2, ent.result)
+        pump(30)
+        gate.set()
+        for _ in range(60):
+            pump(20)
+            if not p.busy_kinds():
+                break
+        check('after the writers finish both buttons are back and enabled',
+              not p.busy_kinds()
+              and not items['summary'].button.isHidden()
+              and not items['tsv'].button.isHidden()
+              and items['summary'].strip.isHidden()
+              and p.export_enabled('summary') and p.export_enabled('tsv'))
+        check('_export_done ran on the GUI thread',
+              threads == [True, True], str(threads))
+        # a cancelled dialog shows nothing
+        dialogs.save_file = lambda *a, **k: ''
+        started.clear()
+        ret3 = p.export('summary')
+        pump(40)
+        check('a cancelled dialog shows no strip and starts nothing',
+              ret3 == '' and not started and not p.busy_kinds()
+              and items['summary'].strip.isHidden())
+    finally:
+        gate.set()
+        UE.run_export, dialogs.save_file, dialogs.pick_dir = real
+        p._export_done = real_done
+    check('ui.exports.run_export restored',
+          UE.run_export is real[0])
+    # the VTK failure dialog is posted to the GUI thread (was shown from
+    # the worker)
+    shown = []
+    real_err = dialogs.show_error
+    dialogs.show_error = lambda *a, **k: shown.append(
+        (a[:2], QThread.currentThread() is app.thread()))
+    try:
+        t = threading.Thread(target=p._post_error, args=('VTK export',
+                                                          'boom'))
+        t.start()
+        t.join()
+        pump(40)
+    finally:
+        dialogs.show_error = real_err
+    check('on_error from a worker shows its dialog on the GUI thread',
+          shown == [(('VTK export', 'boom'), True)], str(shown))
+    QApplication.processEvents()
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+
+
+def s3_view3d_and_title(link):
+    from test_gui_results_fields import fake_2d, fake_3d
+    from test_ui_results import fake_1d
+    from blastlab.ui import results_panel as RP
+    from blastlab.viz3d import MISSING_MSG
+    print('\nS3c: Open the 3D viewer, the title box')
+    log = []
+    p = RP.ResultsPanel(viewer_link=link, log_fn=log.append)
+    p.resize(1280, 840)
+    p.show()
+    pump(30)
+    b = p._view3d_btn
+    check('no result: disabled, `Select a result first.`',
+          not b.isEnabled() and b.toolTip() == 'Select a result first.')
+    for name, dim, res in (('1D', 1, fake_1d()), ('2D', 2, fake_2d())):
+        p.add_result(name, dim, res)
+        pump(20)
+        check(f'{name}: disabled, `3D results only.`',
+              not b.isEnabled() and b.toolTip() == '3D results only.',
+              b.toolTip())
+    empty3 = fake_3d()
+    empty3.snapshots = {}
+    p.add_result('3D, no snapshots', 3, empty3)
+    pump(20)
+    check('3D with no snapshots: disabled, `This result has no snapshots.`',
+          not b.isEnabled()
+          and b.toolTip() == 'This result has no snapshots.', b.toolTip())
+    real = RP.pyvista_available
+    RP.pyvista_available = lambda: False
+    try:
+        p.add_result('3D, no pyvista', 3, fake_3d())
+        pump(20)
+        check('3D without pyvista: disabled with MISSING_MSG',
+              not b.isEnabled() and b.toolTip() == MISSING_MSG)
+    finally:
+        RP.pyvista_available = real
+    p.add_result('3D', 3, fake_3d())
+    pump(20)
+    check('3D with snapshots under the FakeLink: enabled',
+          b.isEnabled() == real(), f'pyvista {real()}')
+    p.sel.setCurrentIndex(0)
+    pump(20)
+    del log[:]
+    p.open_3d()
+    check('open_3d() keeps its log line for a 1D result',
+          log == ['3D Viewer: select a 3D result.'], str(log))
+    p.sel.setCurrentIndex(1)
+    pump(20)
+    p.title_box.setText('QA title')
+    pump(60)
+    check('the title box rides into the panel and the figure (E09)',
+          'QA title' in (p.title_extra() or '')
+          and 'QA title' in (p.fields.title() or ''),
+          repr(p.fields.title()))
+    p.title_box.setText('')
+    pump(20)
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     from blastlab.ui.results_panel import ResultsPanel
@@ -472,6 +751,9 @@ def main():
         res, home = s2_method(p)
         s2_load_into_setup(win, res, home)
         s2_stage_hook(p)
+        s3_layout(win, link)
+        s3_busy(link)
+        s3_view3d_and_title(link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]
               if crashes else '')

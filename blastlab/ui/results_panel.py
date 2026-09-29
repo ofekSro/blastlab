@@ -25,13 +25,14 @@ import threading
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QDialog, QFrame,
-                               QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QGridLayout, QHBoxLayout, QLabel,
                                QPlainTextEdit, QPushButton, QStackedWidget,
                                QVBoxLayout, QWidget)
 
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import dialogs, exports, theme
 from .bridge import ThreadBridge
+from .export_column import DATA, FIGURES, ExportColumn, profile_suffix
 from .results_anim import AnimView
 from .results_fields import FieldsView
 from .results_gauges import GaugesView
@@ -39,7 +40,7 @@ from .results_list import ElidedLabel, ResultsList
 from .results_method import NO_CASE_TIP, case_source, method_rows
 from .setup_tree import _letter_space
 from .view3d_host import View3DHost
-from .widgets import ScrollColumn, Segmented, WrapRow, button
+from .widgets import ScrollColumn, Segmented
 
 #: longest label the picker shows in full; anything longer is elided
 #: there and kept whole in the item's tooltip
@@ -54,17 +55,11 @@ CENTRE_PAD = (18, 14, 18, 14)
 #: Qt's QWIDGETSIZE_MAX, to undo a setFixedHeight
 QWIDGETSIZE_MAX = (1 << 24) - 1
 
-#: (text, icon, kind) for the export row, in the order they sit
-EXPORT_BUTTONS = (('Profile', 'curve', 'profile'),
-                  # the kind stays 'gif'; the writer follows whatever
-                  # extension the dialog returns
-                  ('Animation', 'film', 'gif'),
-                  ('VTK', 'cube', 'vtk'),
-                  ('Summary CSV', 'table', 'summary'),
-                  ('Gauges TSV', 'table', 'tsv'),
-                  ('Field CSV', 'table', 'fieldcsv'),
-                  ('Report', 'image', 'report'),
-                  ('PNGs', 'image', 'pngs'))
+#: (text, suffix, kind) for the export column, in the order they sit
+#: (Data, then Figures). The kind stays 'gif' for the animation; the
+#: writer follows whatever extension the dialog returns.
+EXPORT_BUTTONS = tuple((text, suffix, kind)
+                       for kind, text, suffix in DATA + FIGURES)
 
 #: what each export writes, said once so the buttons are not a guess.
 #: 'pngs' and 'report' are explicit that the file is NOT what is on
@@ -430,68 +425,23 @@ class ResultsPanel(QWidget):
         cl.addWidget(view, 1)
         return centre
 
-    # ── the right column: export (board 298-331) ─────────────────────────
+    # ── the right column: export (board 298-331, ui/export_column.py) ────
     def _build_right(self):
-        frame = QFrame()
-        frame.setObjectName('resright')
-        frame.setFixedWidth(RIGHT_W)
-        fl = QVBoxLayout(frame)
-        fl.setContentsMargins(1, 1, 1, 1)
-        fl.setSpacing(0)
-        col = ScrollColumn(spacing=16)
-        col.layout_.setContentsMargins(18, 16, 14, 16)
-        col.setFocusPolicy(Qt.NoFocus)
-        self._right_scroll = col
-        fl.addWidget(col)
-
-        head = QWidget()
-        hl = QVBoxLayout(head)
-        hl.setContentsMargins(0, 0, 0, 0)
-        hl.setSpacing(4)
-        caps = QLabel('EXPORT')
-        caps.setObjectName('eyebrow')
-        _letter_space(caps)
-        hl.addWidget(caps)
-        cap = QLabel('Into the model folder, or anywhere you choose.')
-        cap.setObjectName('runfield')
-        cap.setWordWrap(True)
-        hl.addWidget(cap)
-        col.add(head)
-
-        # no fixed widths: WrapRow lets each keep its own width and
-        # breaks to another line instead of cutting a label
-        self._export_row = WrapRow()
-        self._export_btns = {}
-        for text, glyph, kind in EXPORT_BUTTONS:
-            b = self._export_row.add(
-                button(text, glyph, height=32,
-                       on_click=lambda k=kind: self.export(k)))
-            self._export_btns[kind] = b
-        col.add(self._export_row)
-
+        col = ExportColumn(on_export=lambda k: self.export(k))
+        col.setFixedWidth(RIGHT_W)
+        self.export_col = col
+        self._right_scroll = col.scroll
+        self._export_btns = col.buttons
         # A line of the user's own ABOVE the automatic title, on every
         # figure this tab shows or exports. It belongs to this
         # presentation of a result, not to the case.
-        tbox = QWidget()
-        tl = QVBoxLayout(tbox)
-        tl.setContentsMargins(0, 0, 0, 0)
-        tl.setSpacing(6)
-        tcap = QLabel('Title on figures (optional)')
-        tcap.setObjectName('runfield')
-        tl.addWidget(tcap)
-        self.title_box = QLineEdit()
-        self.title_box.setObjectName('restitle')
-        self.title_box.setMinimumWidth(0)
-        self.title_box.setPlaceholderText('added above the automatic title')
+        self.title_box = col.title_box
         self.title_box.textChanged.connect(lambda *_: self._title_changed())
-        tl.addWidget(self.title_box)
-        col.add(tbox)
-        col.add_stretch()
-
-        self._view3d_btn = button('3D Viewer', 'cube', height=34,
-                                  on_click=self.open_3d, icon_size=17)
-        col.add(self._view3d_btn)
-        return frame
+        self._view3d_btn = col.view3d_btn
+        self._view3d_btn.clicked.connect(lambda *_: self.open_3d())
+        #: kinds being written now: their buttons are busy strips (UX-13)
+        self._busy = set()
+        return col
 
     # ── layout: the side columns give way on a narrow window ─────────────
     def showEvent(self, event):
@@ -749,7 +699,7 @@ class ResultsPanel(QWidget):
         self._solver_mode = m
         foam = (m == 'blastfoam')
         self._foam_runs_btn.setVisible(foam)
-        self._export_btns['vtk'].setVisible(foam)
+        self.export_col.items['vtk'].set_mode_hidden(not foam)
 
     def _sync_export_buttons(self, ent):
         """Only offer an export that can actually run for this result.
@@ -764,6 +714,26 @@ class ResultsPanel(QWidget):
             tip = exports.vtk_tip(ent) if kind == 'vtk' else ''
             b.setToolTip(tip or (EXPORT_HELP.get(kind, '') if good
                                  else exports.why_not(kind, ent)))
+        self.export_col.items['profile'].set_suffix(
+            profile_suffix(ent.dim if ent is not None else None))
+        good, tip = self._view3d_state(ent)
+        self._view3d_btn.setEnabled(good)
+        self._view3d_btn.setToolTip(tip)
+
+    def _view3d_state(self, ent):
+        """(enabled, tooltip) of Open the 3D viewer: a 3D result with
+        snapshots, pyvista present and a viewer link; else why not."""
+        if ent is None:
+            return False, 'Select a result first.'
+        if ent.dim != 3:
+            return False, '3D results only.'
+        if not pyvista_available():
+            return False, MISSING_MSG
+        if not ent.result.snapshots:
+            return False, 'This result has no snapshots.'
+        if not isinstance(self.view3d, View3DHost):
+            return False, 'No viewer link in this panel.'
+        return True, 'Show this result in the embedded 3D viewer'
 
     def export_enabled(self, kind):
         return self._export_btns[kind].isEnabled()
@@ -776,9 +746,55 @@ class ResultsPanel(QWidget):
         return opts
 
     def export(self, kind, threaded=True):
-        return exports.export(
+        """Write export `kind` of the selected result. Threaded (the
+        buttons), its button becomes a busy strip once a target is chosen
+        and until the writer is done; the same kind cannot start twice
+        meanwhile, other kinds can, and Remove still works (the worker
+        holds its own references). Returns the target, or ''."""
+        if kind in self._busy:
+            item = self.export_col.items.get(kind)
+            self._log(f'{item.text() if item else kind} is already being '
+                      f'written.')
+            return ''
+        done = ((lambda _ret, k=kind: self._bridge.post(self._export_done,
+                                                        k))
+                if threaded else None)
+        target = exports.export(
             kind, self.current(), self.export_opts(), log=self._log,
-            parent=self, on_error=dialogs.show_error, threaded=threaded)
+            parent=self, on_error=self._post_error, threaded=threaded,
+            on_done=done)
+        # after pick_target returned a path: a cancelled dialog shows
+        # nothing. The done call is queued to this thread, so it cannot
+        # overtake this line.
+        if target and threaded:
+            self._set_busy(kind, True)
+        return target
+
+    def _set_busy(self, kind, on):
+        item = self.export_col.items.get(kind)
+        if on:
+            self._busy.add(kind)
+        else:
+            self._busy.discard(kind)
+        if item is not None:
+            item.set_busy(on)
+
+    def busy_kinds(self):
+        return set(self._busy)
+
+    def _export_done(self, kind):
+        """On the GUI thread (posted by the worker): the button back, its
+        enablement re-read for the result now selected."""
+        self._set_busy(kind, False)
+        self._sync_export_buttons(self.current())
+
+    def _post_error(self, title, text):
+        """`run_export`'s on_error, called on the worker (a VTK failure):
+        the dialog is shown on the GUI thread."""
+        self._bridge.post(self._show_error, title, text)
+
+    def _show_error(self, title, text):
+        dialogs.show_error(title, text, self)
 
     # ── the embedded 3D viewer ───────────────────────────────────────────
     def open_3d(self):

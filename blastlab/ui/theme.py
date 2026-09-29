@@ -620,6 +620,35 @@ def qss(mode_name):
     QFrame#resview {{ background: {p['view']};
         border: 1px solid {p['border']}; border-radius: 10px; }}
     QLineEdit#restitle {{ min-height: 28px; max-height: 28px; }}
+    /* the export column (ui/export_column.py, board lines 298-331) */
+    QLabel#expcaption {{ font-size: 12px; color: {p['muted']}; }}
+    QLabel#expgroup {{ font-size: 12px; font-weight: 600;
+                       color: {p['text2']}; }}
+    QPushButton#expbtn {{ text-align: left; background: {p['card']};
+        color: {p['text']}; border: 1px solid {p['border2']};
+        border-radius: 8px; padding: 0px 12px; font-size: 13px;
+        font-weight: 500; min-height: 38px; max-height: 38px; }}
+    QPushButton#expbtn:hover {{ background: {p['hover']}; }}
+    QPushButton#expbtn:disabled {{ color: {p['muted']}; }}
+    QLabel#expsuffix {{ font-family: "{MONO}"; font-size: 11px;
+                        color: {p['faint']}; background: transparent; }}
+    QFrame#expbusy {{ background: {p['accent_bg']};
+        border: 1px solid {p['accent_border']}; border-radius: 8px;
+        min-height: 38px; }}
+    QLabel#expbusyname {{ font-size: 13px; color: {p['text']};
+                          background: transparent; }}
+    QLabel#expbusytext {{ font-family: "{MONO}"; font-size: 11px;
+        color: {p['accent_soft']}; background: transparent; }}
+    QProgressBar#expbar {{ background: {p['accent_border']}; border: none;
+        border-radius: 2px; min-height: 4px; max-height: 4px; }}
+    QProgressBar#expbar::chunk {{ background: {p['accent']};
+                                  border-radius: 2px; }}
+    QPushButton#res3d {{ background: transparent; color: {p['text']};
+        border: 1px solid {p['entry_border']}; border-radius: 10px;
+        padding: 0px 10px; font-size: 13px; font-weight: 500;
+        min-height: 40px; max-height: 40px; }}
+    QPushButton#res3d:hover {{ background: {p['hover']}; }}
+    QPushButton#res3d:disabled {{ color: {p['muted']}; }}
     QPlainTextEdit#caseview {{ font-family: "{MONO}"; font-size: 12px; }}
     """
 

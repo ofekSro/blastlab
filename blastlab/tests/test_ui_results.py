@@ -154,21 +154,20 @@ def main():
     check('and every button says why',
           all(p._export_btns[k].toolTip() == 'Select a result first.'
               for k in p._export_btns))
-    # four of these labels need 116-155 px and were pinned to 106, so
-    # they read 'Animatio', 'Summary C', 'Gauges TS', 'Field CSV'
-    cut = [b.text() for b in p._export_btns.values()
-           if b.fontMetrics().horizontalAdvance(b.text())
-           > b.width() - 15 - 6 - 24]
+    # four of these labels needed 116-155 px and were pinned to 106, so
+    # they read 'Animatio', 'Summary C', 'Gauges TS', 'Field CSV'. GUI-7
+    # moved them into the export column: each label must fit beside its
+    # suffix inside its own button (ExportButton.label_fits)
+    items = p.export_col.items
+    cut = [it.text() for it in items.values() if not it.label_fits()]
     check('no export label is cut off by its own button', not cut,
           str(cut))
     p.resize(900, 600)
     pump(60)
-    cut = [b.text() for b in p._export_btns.values()
-           if b.fontMetrics().horizontalAdvance(b.text())
-           > b.width() - 15 - 6 - 24]
-    check('nor at 900x600, where the row wraps instead of shrinking',
-          not cut and p._export_row.rows() > 1,
-          f'{cut} in {p._export_row.rows()} row(s)')
+    cut = [it.text() for it in items.values() if not it.label_fits()]
+    check('nor at 900x600, in the export column',
+          not cut and all(it.button.width() > 0 for it in items.values()),
+          f'{cut} widths {[it.button.width() for it in items.values()]}')
     p.resize(1280, 840)
     pump(60)
     a = p.add_result('run', 2, fake_2d())
