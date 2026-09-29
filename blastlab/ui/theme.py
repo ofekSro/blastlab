@@ -392,15 +392,17 @@ def qss(mode_name):
                            border-radius: 8px; padding: 0px 8px;
                            font-size: 13px; font-weight: 500; }}
     QPushButton#treeadd:hover {{ background: {p['hover']}; }}
+    /* the case pill: the state colour is on its icon (setup_tree); the
+       text stays >= 4.5:1 in both modes (ok/warn on ok_bg measured
+       4.38 in light, danger on stop_bg 4.18 - too low for text) */
     QPushButton#casepill {{ text-align: left; padding: 0px 12px;
                             border-radius: 10px; font-size: 13px;
                             font-weight: 500; background: {p['ok_bg']};
                             border: 1px solid {p['ok_border']};
-                            color: {p['ok']}; }}
-    QPushButton#casepill[state="warn"] {{ color: {p['warn']}; }}
+                            color: {p['text2']}; }}
     QPushButton#casepill[state="error"] {{ background: {p['stop_bg']};
                                           border: 1px solid {p['stop_border']};
-                                          color: {p['danger']}; }}
+                                          color: {p['stop_text']}; }}
     QLabel#trigtitle {{ font-size: 14px; font-weight: 600;
                         color: {p['text']}; }}
     QLabel#derivedkey {{ font-size: 13px; color: {p['muted']}; }}

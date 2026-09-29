@@ -278,6 +278,24 @@ def t2_panel():
     sp.show_report([], ['w'], [])
     check('a warning keeps Case OK and says so',
           sp.pill() == ('warn', 'Case OK · 1 warning'), str(sp.pill()))
+    from blastlab.ui import theme
+
+    def ratio(a, b):
+        def lum(h):
+            c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+            c = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4
+                 for x in c]
+            return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+        hi, lo = sorted((lum(a), lum(b)), reverse=True)
+        return (hi + 0.05) / (lo + 0.05)
+    worst = min(ratio(p['text2'], p['ok_bg']) for p in (theme.DARK,
+                                                        theme.LIGHT))
+    worst_e = min(ratio(p['stop_text'], p['stop_bg'])
+                  for p in (theme.DARK, theme.LIGHT))
+    check('the pill text reaches 4.5:1 in both modes (plan §2.2)',
+          worst >= 4.5 and worst_e >= 4.5, f'{worst:.2f} / {worst_e:.2f}')
+    check('the state colour rides on the pill icon',
+          not sp.tree.pill.icon().isNull())
 
     print('\nT2c: children, + Gauge / + Obstacle, summaries, marks')
     sp.set_case(sample_case())
@@ -562,6 +580,11 @@ def t4_derived():
     pump(20)
     check('the card sits on the 01 Threat page',
           card.isVisibleTo(sp._props))
+    page = sp.form.pages['threat'].layout()
+    check('right under the charge inputs (board line 326)',
+          page.indexOf(card) == 1
+          and page.itemAt(0).widget() is sp.form.cards['Initialization'],
+          str(page.indexOf(card)))
     sp.select_node('domain')
     pump(20)
     check('and only there', not card.isVisibleTo(sp._props))

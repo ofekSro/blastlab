@@ -23,6 +23,10 @@ from .components import TreeRow
 TREE_W = 280
 TREE_MIN = 224
 
+#: the case pill's icon per state: (theme glyph, palette key)
+_PILL_ICON = {'ok': ('check', 'ok'), 'warn': ('warning', 'warn'),
+              'error': ('error', 'danger')}
+
 
 class _ChildRow(QFrame):
     """A gauge or obstacle under its node (board lines 83-99): a marker
@@ -110,6 +114,8 @@ class SetupTree(QFrame):
         self.pill.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.pill.clicked.connect(lambda *_: self.pill_clicked.emit())
         outer.addWidget(self.pill)
+        self._pill_icon()
+        theme.signals.changed.connect(self._pill_icon)
 
         self.rows = {}              # node id -> TreeRow
         self._kids = {}             # node id -> (QWidget holder, [rows])
@@ -243,10 +249,18 @@ class SetupTree(QFrame):
     # ── the pill and the add buttons ─────────────────────────────────────
     def set_pill(self, state, text):
         """`state` 'ok' | 'warn' | 'error' (plan §5.1: ok_bg/ok_border,
-        danger when invalid)."""
+        danger when invalid). The state colour is the icon's (board line
+        117: a 16 px mark in `ok`); the text keeps 4.5:1."""
         self.pill.setText(text)
         self.pill.setProperty('state', state)
+        self._pill_icon()
         theme.repolish(self.pill)
+
+    def _pill_icon(self, _mode=None):
+        state = self.pill.property('state') or 'ok'
+        name, colour = _PILL_ICON.get(state, _PILL_ICON['ok'])
+        self.pill.setIcon(theme.icon(name, 16, color=colour))
+        self.pill.setIconSize(QSize(16, 16))
 
     def set_adds_visible(self, gauge, obstacle):
         self.add_gauge_btn.setVisible(bool(gauge))

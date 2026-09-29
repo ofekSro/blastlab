@@ -542,10 +542,10 @@ class FieldForm(QWidget):
         return any(self.card_visible(t)
                    for t in setup_nodes.node_cards(self.dim, node_id))
 
-    def add_to_page(self, node_id, widget):
-        """Append a widget the form does not own (the Derived card) to a
-        node's page."""
-        self.pages[node_id].layout().addWidget(widget)
+    def add_to_page(self, node_id, widget, index=-1):
+        """Put a widget the form does not own (the Derived card) on a
+        node's page, at `index` among its cards (-1: last)."""
+        self.pages[node_id].layout().insertWidget(index, widget)
         return widget
 
     def set_row_group(self, name, group):

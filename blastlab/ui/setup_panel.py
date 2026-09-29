@@ -295,10 +295,10 @@ class SetupPanel(QWidget):
             # widget adds nothing (a QStackedWidget would add its largest)
             f.setVisible(d == 2)
         cl.addStretch(1)
-        # the Derived card closes the 01 Threat page of each blast form
-        self._derived = {d: self._forms[d].add_to_page('threat',
-                                                       DerivedCard(d))
-                         for d in (1, 2, 3)}
+        # the Derived card sits under the charge inputs on the 01 Threat
+        # page of each blast form (board line 326), above the point lists
+        self._derived = {d: self._forms[d].add_to_page(
+            'threat', DerivedCard(d), index=1) for d in (1, 2, 3)}
         if 'geometry' in self._forms[2].v:
             self._forms[2].on_field('geometry', self._sync_header)
         self._dim = 2
