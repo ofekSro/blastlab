@@ -1,0 +1,499 @@
+{
+ "platform": "windows",
+ "errors": [],
+ "scenes": {
+  "dark-1100x720-chain-route123-stage2": {
+   "clipped": []
+  },
+  "dark-1100x720-chain-route13-stage3": {
+   "clipped": []
+  },
+  "dark-1100x720-chain-stage2-error": {
+   "clipped": []
+  },
+  "dark-1100x720-chain-stage2-gauges": {
+   "clipped": []
+  },
+  "dark-1100x720-run-stage2-running": {
+   "clipped": [],
+   "strip_w": 432,
+   "strip_h": 74,
+   "two_rows": true,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    105,
+    125
+   ],
+   "pills_whole": true,
+   "caption_elided": true,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D 78 %",
+    "03 3D waiting",
+    "Stage 2 of 3 · the 3D stage starts from handoff_2d_to_3d.npz"
+   ],
+   "slot_h": 74,
+   "centre_w": 432
+  },
+  "dark-1100x720-run-done": {
+   "clipped": [],
+   "strip_w": 432,
+   "strip_h": 74,
+   "two_rows": true,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    88,
+    108,
+    108
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D ✓ 19 min 51 s",
+    "03 3D ✓ 21 min 0 s",
+    "Chain done in 41 min 0 s"
+   ],
+   "slot_h": 74,
+   "centre_w": 432
+  },
+  "dark-1100x720-results-stage1": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 1,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "dark-1100x720-results-stage2": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 2,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "dark-1100x720-results-stage3": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 3,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "dark-1600x1000-chain-route123-stage2": {
+   "clipped": []
+  },
+  "dark-1600x1000-chain-route13-stage3": {
+   "clipped": []
+  },
+  "dark-1600x1000-chain-stage2-error": {
+   "clipped": []
+  },
+  "dark-1600x1000-chain-stage2-gauges": {
+   "clipped": []
+  },
+  "dark-1600x1000-run-stage2-running": {
+   "clipped": [],
+   "strip_w": 932,
+   "strip_h": 50,
+   "two_rows": false,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    105,
+    125
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D 78 %",
+    "03 3D waiting",
+    "Stage 2 of 3 · the 3D stage starts from handoff_2d_to_3d.npz"
+   ],
+   "slot_h": 50,
+   "centre_w": 932
+  },
+  "dark-1600x1000-run-done": {
+   "clipped": [],
+   "strip_w": 932,
+   "strip_h": 50,
+   "two_rows": false,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    168,
+    161
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D ✓ 19 min 51 s",
+    "03 3D ✓ 21 min 0 s",
+    "Chain done in 41 min 0 s"
+   ],
+   "slot_h": 50,
+   "centre_w": 932
+  },
+  "dark-1600x1000-results-stage1": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 1,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "dark-1600x1000-results-stage2": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 2,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "dark-1600x1000-results-stage3": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 3,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1100x720-chain-route123-stage2": {
+   "clipped": []
+  },
+  "light-1100x720-chain-route13-stage3": {
+   "clipped": []
+  },
+  "light-1100x720-chain-stage2-error": {
+   "clipped": []
+  },
+  "light-1100x720-chain-stage2-gauges": {
+   "clipped": []
+  },
+  "light-1100x720-run-stage2-running": {
+   "clipped": [],
+   "strip_w": 432,
+   "strip_h": 74,
+   "two_rows": true,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    105,
+    125
+   ],
+   "pills_whole": true,
+   "caption_elided": true,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D 78 %",
+    "03 3D waiting",
+    "Stage 2 of 3 · the 3D stage starts from handoff_2d_to_3d.npz"
+   ],
+   "slot_h": 74,
+   "centre_w": 432
+  },
+  "light-1100x720-run-done": {
+   "clipped": [],
+   "strip_w": 432,
+   "strip_h": 74,
+   "two_rows": true,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    88,
+    108,
+    108
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D ✓ 19 min 51 s",
+    "03 3D ✓ 21 min 0 s",
+    "Chain done in 41 min 0 s"
+   ],
+   "slot_h": 74,
+   "centre_w": 432
+  },
+  "light-1100x720-results-stage1": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 1,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1100x720-results-stage2": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 2,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1100x720-results-stage3": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 3,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1600x1000-chain-route123-stage2": {
+   "clipped": []
+  },
+  "light-1600x1000-chain-route13-stage3": {
+   "clipped": []
+  },
+  "light-1600x1000-chain-stage2-error": {
+   "clipped": []
+  },
+  "light-1600x1000-chain-stage2-gauges": {
+   "clipped": []
+  },
+  "light-1600x1000-run-stage2-running": {
+   "clipped": [],
+   "strip_w": 932,
+   "strip_h": 50,
+   "two_rows": false,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    105,
+    125
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D 78 %",
+    "03 3D waiting",
+    "Stage 2 of 3 · the 3D stage starts from handoff_2d_to_3d.npz"
+   ],
+   "slot_h": 50,
+   "centre_w": 932
+  },
+  "light-1600x1000-run-done": {
+   "clipped": [],
+   "strip_w": 932,
+   "strip_h": 50,
+   "two_rows": false,
+   "pill_h": [
+    30,
+    30,
+    30
+   ],
+   "pill_w": [
+    111,
+    168,
+    161
+   ],
+   "pills_whole": true,
+   "caption_elided": false,
+   "caption_tip_whole": true,
+   "texts": [
+    "01 1D ✓ 9 s",
+    "02 2D ✓ 19 min 51 s",
+    "03 3D ✓ 21 min 0 s",
+    "Chain done in 41 min 0 s"
+   ],
+   "slot_h": 50,
+   "centre_w": 932
+  },
+  "light-1600x1000-results-stage1": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 1,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1600x1000-results-stage2": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 2,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  },
+  "light-1600x1000-results-stage3": {
+   "clipped": [],
+   "slot_h": 38,
+   "group_h": 38,
+   "group_w": 203,
+   "tab_h": [
+    32,
+    32,
+    32
+   ],
+   "texts": [
+    "1D",
+    "2D",
+    "3D"
+   ],
+   "selected": 3,
+   "above_view_tabs": true,
+   "caption": "1D → 2D → 3D · 3 stages · 41 min 0 s"
+  }
+ },
+ "when": "2026-10-03 14:35"
+}

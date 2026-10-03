@@ -64,4 +64,51 @@ viewer child, by handle.
 
 ## Results
 
-*(filled in after the runs; see below)*
+Run 2026-10-03 on the 8 GB home PC, Qt platform `windows`, 1920 × 1080
+screen, one sampler process at a time (free commit 13.8 GB, free physical
+about 1.5 GB). HEAD = `5ebd616` (the rules' commit `771a00e` plus the strip's
+fit fix); base = `4b28007` in a `git worktree`, its own committed sampler.
+Every run's self-test saw the displaced window (148.2-149.2 ms, 60 px), so
+none is void. No viewer window ever left its card as a parent (`not child` 0
+everywhere). The numbers: `viewer_measure_9b.json` (all five runs, every
+repeat, and the verdicts).
+
+**R-VIEWER — PASS on every action.**
+
+| Surface | Action | Samples | With a window | Longest wrong | Longest mismatch | Verdict |
+|---|---|---|---|---|---|---|
+| results | `stage` | 2109 | 2109 | 0 ms | 29.7 ms | PASS |
+| results | `tabs` | 3180 | 1050 | 0 ms | 0 ms | PASS |
+| results | `theme` | 12263 | 12263 | 0 ms | 0 ms | PASS |
+| results | `chainsel` (new) | 2276 | 2276 | 0 ms | 13.3 ms | PASS |
+| results | `stagetabs` (new) | 2337 | 2337 | 0 ms | 0 ms | PASS |
+| run | `tabs` | 3181 | 1047 | 0 ms | 0 ms | PASS |
+| run | `theme` | 12157 | 12157 | 0 ms | 0 ms | PASS |
+| run | `chainstrip` (new) | 3175 | 3175 | 0 ms | 30.3 ms | PASS |
+| setup | `chaintab` (new) | 2154 | 1046 | 0 ms | 0 ms | PASS |
+
+A *mismatch* is a window smaller than its card, never outside it: what
+`shrink_ahead` makes on purpose when a strip appears above the view
+(`stage`, `chainsel`, `chainstrip`), until the layout catches up. `tabs` and
+`chaintab` have about a third of their samples with a window because the
+viewer is hidden while another screen is shown.
+
+**R-VIEWER-RESIZE (F13) — PASS on both surfaces.** Longest wrong stretch per
+repeat (ms) and the median the rule compares:
+
+| Surface | HEAD, widget shown | HEAD median | Base `4b28007` `resize` | Base median | Limit (base + 5) | Verdict |
+|---|---|---|---|---|---|---|
+| results | `chainresize` 4.0, 25.2, 23.5 | 23.5 | 27.9, 27.6, 26.1 | 27.6 | 32.6 | PASS |
+| run | `stripresize` 45.2, 27.5, 25.7 | 27.5 | 25.4, 26.5, 44.8 | 26.5 | 31.5 | PASS |
+
+Neither result is over its rule, so the rule's A/B (the widget hidden at
+HEAD) was not required. The same runs did measure plain `resize` at HEAD
+after the new actions: results 31.0, 21.3, 21.6 (median 21.6) with the
+chain still selected (its tabs shown), run 45.4, 26.0, 45.1 (median 45.1)
+with no strip. The run surface's per-repeat values are bimodal at HEAD and
+at base alike (about 26 or about 45 ms; base's longest is 44.8): the
+known F13 shape (22-49 ms since GUI-6), not something the strip adds - with
+the strip shown the median is the low mode. Worst offsets 472 px (results)
+and 476 px (run) at HEAD and at base: the shrink step of a 1600 → 1100
+resize, F13 as recorded. `view3d_host.py` is not edited in this batch; F13
+stays open (GUI-10 / the small batch after it).
