@@ -1012,6 +1012,41 @@ T2, T5, T6 FIXED).
 
 ---
 
+## 0r. 2026-10-03 — batch `gui-chain` (GUI-9, parts a and b)
+
+Plan: `docs/batches/2026-09-29-gui-chain.md`; reports `…gui-chain-a.implement.md`,
+`…gui-chain-a.verify.md`, `…gui-chain-b.implement.md`, `…gui-chain-b.verify.md`
+(T0, T1, T3, T6 VERIFIED; T2, T4, T5 FIXED). Screenshots and measurements in
+`docs/qa/2026-09-29-gui-chain/`.
+
+- **What:** the Chain screen. Four route buttons (1D→2D→3D, 1D→3D, 1D→2D, 2D→3D)
+  replace the stage checkboxes; the wiring moved verbatim from `ChainPanel.run()` into
+  the toolkit-free `ui/chain_route.py`. A pipeline of stage cards with the hand-off file
+  on each arrow (`chain_pipeline.py`); the selected stage edited in the Setup layout
+  (`chain_stage.py`, forms on `'nodes'`) with per-stage live checks equal to `run()`'s
+  refusals, Copy from 01 Setup, Load case…, new stages seeded from the Setup case. In
+  02 Run a chain strip, one pill per stage with its time and the hand-off caption
+  (`chain_strip.py`, in the existing `chain_slot`; `run_controller.py` untouched); the
+  title reads `Chain 2/3 · 78 %`. In 03 Results a chain with a model is one entry with
+  STAGE tabs; per-stage views and exports byte-equal to a plain entry's.
+- **Tests:** a launch golden recorded at base first (`test_ui_char_chain_wiring`,
+  16 scenarios: 4 routes × 2 variants, 8 refusals) — green after every task;
+  `test_regression` byte-identical; `test_ui_chain` C13 per route; new
+  `test_ui_chain_screen` (187); `_e2e_ui_chain_screen.py` on the real platform (23).
+  Viewer sampler: R-VIEWER 0 ms on all 9 actions incl. the four new ones;
+  R-VIEWER-RESIZE within its pre-registered limit on both surfaces (F13 stays open).
+- **Verifier fixes:** `45760ce` (a broken Setup source was swallowed as "Setup has
+  errors"), `80d2c03`, `2f58395` (F25: a stage started with the previous stage's 100 %),
+  `1a83437` (a chain removed while running came back at the next stage).
+- **Not run here:** `_e2e_ui_chain_foam.py` — the 3D blastFoam stage outlived 1800 s on
+  the home PC (25/31; the 6 failures all follow from it). Run it on the office machine.
+- **History:** T0's commit first carried GUI-7's message (F19); reworded by rebase
+  before push, tree unchanged.
+- **Open, non-blocking:** D131-D170, F20-F27.
+- **Commits:** `3e9ed58`..`024e799` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
