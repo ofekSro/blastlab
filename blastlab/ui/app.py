@@ -28,6 +28,7 @@ from ..viz3d import pyvista_available
 from . import chain_route, dialogs, theme
 from .bridge import ThreadBridge
 from .chain_panel import ChainPanel
+from .chain_strip import ChainStrip
 from .results_panel import ResultsPanel
 from .run_clock import fmt_duration
 from .run_controller import RunController
@@ -101,6 +102,10 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         self._chain_k = 0
         self._chain_n = 0
+        # GUI-9: the running chain's 02 Run strip (None for a single run)
+        # and its one 03 Results entry (None until its first result)
+        self._chain_strip = None
+        self._chain_entry = None
         # GUI-6: the start in progress was an Initialise (held at step 0);
         # the controller's on_running(True) carries no such flag
         self._start_paused = False
@@ -956,6 +961,10 @@ class MainWindow(QMainWindow):
         # GUI-6: the progress strip's clock counts the assessment
         if busy:
             self._run_clock.start()
+            # GUI-9: an assessment is a run start too - the last chain's
+            # strip goes (it would describe a run that is not this one)
+            self._chain_strip = None
+            self.run_panel.set_chain_strip(None)
         else:
             self._run_clock.stop()
         self.run_panel.set_busy(busy)
@@ -1135,6 +1144,8 @@ class MainWindow(QMainWindow):
         # start_stages (plan §4)
         self._chain_k += 1
         self._update_title()
+        if self._chain_strip is not None:
+            self._chain_strip.stage_started(self._chain_k - 1)
         # GUI-6b: the gauge column's Z and walls are this stage's case
         self.run_panel.set_gauge_case(self._running_case())
 
@@ -1150,6 +1161,8 @@ class MainWindow(QMainWindow):
         if pct != self._run_pct:        # whole-percent changes only
             self._run_pct = pct
             self._update_title()
+            if self._chain_strip is not None:
+                self._chain_strip.set_pct(self._chain_k - 1, pct)
 
     def on_paused(self, paused):
         # held time is not run time (decision D50)
@@ -1235,7 +1248,26 @@ class MainWindow(QMainWindow):
             self._chain_k = 0
             self._chain_n = len(getattr(self.ctrl, '_stage_dims', None)
                                 or [])
+            self._chain_entry = None
+            self._show_chain_strip()
         self._update_title()
+
+    def _show_chain_strip(self):
+        """GUI-9 T4 (plan §6): a run of more than one stage gets a fresh
+        chain strip in 02 Run's chain slot; a single run empties it. The
+        last chain's strip stays after its end until this next start."""
+        dims = list(getattr(self.ctrl, '_stage_dims', None) or [])
+        if len(dims) < 2:
+            self._chain_strip = None
+            self.run_panel.set_chain_strip(None)
+            return
+        strip = ChainStrip()
+        strip.set_chain(getattr(self.ctrl, '_run_name', '') or '', dims)
+        # one row or two for the centre's width now, so it appears at
+        # its final height (the viewer is shrunk ahead by that much)
+        strip.arrange(self.run_panel.column_widths()[1])
+        self._chain_strip = strip
+        self.run_panel.set_chain_strip(strip)
 
     def on_result(self, k, dim, label_, res):
         if self._running_ui and k == len(
@@ -1245,6 +1277,12 @@ class MainWindow(QMainWindow):
             self.run_panel.set_final_gauges(getattr(res, 'gauges', None))
         if self._running_ui:
             self._last_result = res
+            if self._chain_strip is not None:
+                # the stage's run time, held time excluded (D50), its
+                # folder writes included (D59)
+                self._chain_strip.stage_done(
+                    k, self._run_clock.stage_s(),
+                    'stopped' if res.stopped_early else 'done')
         self._run_got_result = True
         self._results.append((label_, dim, res))
         self.results.add_result(label_, dim, res)
@@ -1269,6 +1307,8 @@ class MainWindow(QMainWindow):
         else:
             how = 'ended'
         self.run_panel.mark_ended(how)
+        if self._chain_strip is not None:
+            self._chain_strip.finish(how, self._run_clock.run_s())
         self._finish_notice(how)
 
     def _finish_notice(self, how):

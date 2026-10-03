@@ -22,6 +22,12 @@ board Chain; batch docs/batches/2026-09-29-gui-chain.md).
      debounce (one check for two edits; the Setup's interval), Run chain
      stays enabled and run() refuses naming the stage.
  S6  Copy from 01 Setup, Load case… and seeding on a MainWindow.
+ S7  (9b, T4) the 02 Run chain strip, driven through the window's run
+     callbacks with a fake clock: the pills and the caption at every step
+     of a 3-stage chain, a stop and a failure, the title, a single run
+     hiding the slot, the strip's height constant across every state at
+     1100 x 720 and 1600 x 1000, nothing clipped, and the viewer shrunk
+     ahead only when the 3D view is on screen.
 
 Plain script, offscreen, throwaway settings, no window on screen:
     cd blastlab/tests && python test_ui_chain_screen.py
@@ -718,6 +724,250 @@ def s6_copy_load():
         pump(100)
 
 
+# ── S7 (9b) ──────────────────────────────────────────────────────────────
+class FakeClock:
+    """A settable monotonic clock for RunClock.now."""
+
+    def __init__(self, t=0.0):
+        self.t = float(t)
+
+    def __call__(self):
+        return self.t
+
+
+def fake_1d():
+    """A small 1D result (test_ui_results.fake_1d's shape)."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    from blastlab.solvers.hooks import Result
+    r = np.linspace(0.01, 2.0, 60)
+    snap = dict(r=r, p=P_AIR + 200e3 * np.exp(-r), rho=np.full_like(r, 1.2),
+                u=np.zeros_like(r))
+    return Result({'t = 0.100 ms (final)': snap},
+                  dict(times=np.linspace(0, 2e-3, 30), radii=[0.5, 1.0],
+                       pressures=[P_AIR + 100e3 * np.ones(30),
+                                  P_AIR + 50e3 * np.ones(30)]),
+                  dict(eos='JWL', charge_kg=1.0, radius_m=2.0,
+                       final_profile=np.column_stack(
+                           [r, snap['p'], snap['rho'], snap['u']])),
+                  'end time reached', False)
+
+
+def fakes():
+    """{dim: a small Result} for stages 1, 2, 3."""
+    from test_gui_results_fields import fake_2d, fake_3d
+    return {1: fake_1d(), 2: fake_2d(), 3: fake_3d()}
+
+
+def stopped(res):
+    from blastlab.solvers.hooks import Result
+    return Result(res.snapshots, res.gauges, dict(res.meta),
+                  'stopped by the user', True)
+
+
+INFO1D = dict(dim=1, radius_m=2.0, gauges=[])
+
+
+def s7_strip():
+    from PySide6.QtCore import QPoint, QRect
+    from blastlab.solvers.hooks import Progress
+    from blastlab.ui import dialogs
+    from blastlab.ui.app import MainWindow
+    from blastlab.ui.chain_strip import H_ONE, H_TWO, ChainStrip
+    from blastlab.ui.theme import GAP
+    from test_ui_parity import clipped
+    print('\nS7: the 02 Run chain strip (9b T4)')
+    real_notify = dialogs.notify_desktop
+    notes = []
+    dialogs.notify_desktop = lambda *a, **k: notes.append(a)
+    win = MainWindow()
+    fake = FakeClock()
+    win._run_clock.now = fake
+    rp = win.run_panel
+    res = fakes()
+
+    def prog(frac):
+        return Progress(step=1, t=1e-4, dt=1e-7, p_max=2e5, frac=frac)
+
+    def start(dims, name='M'):
+        win.ctrl._stage_dims = list(dims)
+        win.ctrl._run_name = name
+        fake.t = 0.0
+        win.on_running(True)
+        pump(30)
+        return rp.chain_strip()
+
+    try:
+        win.show()
+        win._show('run')
+        for size in ((1600, 1000), (1100, 720)):
+            tag = f'{size[0]} x {size[1]}'
+            win.resize(*size)
+            pump(150)
+            strip = start([1, 2, 3])
+            heights = [strip.height() if strip is not None else -1]
+            check(f'{tag}: a 3-stage chain puts a ChainStrip in the slot',
+                  isinstance(strip, ChainStrip)
+                  and rp.chain_slot.isVisibleTo(rp)
+                  and strip.texts()[:3] == ['01 1D waiting', '02 2D waiting',
+                                            '03 3D waiting'],
+                  str(strip.texts() if strip else None))
+            check(f'{tag}: the eyebrow reads CHAIN · M',
+                  strip.eyebrow.full_text() == 'CHAIN · M',
+                  strip.eyebrow.full_text())
+            win.on_run_started(INFO1D)
+            pump(20)
+            heights.append(strip.height())
+            check(f'{tag}: stage 1 starts: 01 1D 0 %, 02 2D waiting, '
+                  '03 3D waiting',
+                  strip.texts() == ['01 1D 0 %', '02 2D waiting',
+                                    '03 3D waiting', 'Stage 1 of 3 · the 2D '
+                                    'stage starts from handoff_1d_to_2d.txt'],
+                  str(strip.texts()))
+            fake.t = 9.0
+            win.on_result(0, 1, 'M - 1D', res[1])
+            win.on_run_started(INFO1D)
+            fake.t = 20.0
+            win.on_progress(prog(0.78))
+            pump(20)
+            heights.append(strip.height())
+            check(f'{tag}: stage 1 done at a fake 9 s, stage 2 at 78 %',
+                  strip.texts() == ['01 1D ✓ 9 s', '02 2D 78 %',
+                                    '03 3D waiting', 'Stage 2 of 3 · the 3D '
+                                    'stage starts from handoff_2d_to_3d.npz'],
+                  str(strip.texts()))
+            check(f'{tag}: the title reads Chain 2/3 · 78 % · (F6)',
+                  win.windowTitle().startswith('Chain 2/3 · 78 % · '),
+                  win.windowTitle())
+            check(f'{tag}: the arrow after a done stage is lit, the next not',
+                  strip.arrows[0].lit() and not strip.arrows[1].lit())
+            if size == (1100, 720):
+                cut = clipped(win)
+                check('1100 x 720: nothing clipped with the strip shown',
+                      not cut, str(cut[:3]))
+                boxes = [QRect(p.mapTo(strip, QPoint(0, 0)), p.size())
+                         for p in strip.pills]
+                pills_in = all(strip.rect().contains(b) for b in boxes) \
+                    and not any(p.value.elided() for p in strip.pills)
+                check('1100 x 720: every pill is whole, inside the strip',
+                      pills_in, f'{boxes} strip {strip.size()}')
+                cap = strip.caption
+                check('1100 x 720: the caption fits or elides with its whole '
+                      'text as the tooltip',
+                      not cap.elided() or cap.toolTip() == cap.full_text(),
+                      f'{cap.text()!r} tip {cap.toolTip()!r}')
+                check(f'1100 x 720: the strip is in two rows '
+                      f'({rp.column_widths()[1]} px centre)',
+                      strip.two_rows() and strip.height() == H_TWO,
+                      f'{strip.two_rows()} {strip.height()}')
+            else:
+                check('1600 x 1000: one row, 50 px',
+                      not strip.two_rows() and strip.height() == H_ONE,
+                      f'{strip.two_rows()} {strip.height()}')
+            fake.t = 30.0
+            win.on_result(1, 2, 'M - 2D', res[2])
+            win.on_run_started(INFO1D)
+            pump(20)
+            heights.append(strip.height())
+            check(f'{tag}: the last stage running says so',
+                  strip.texts()[2:] == ['03 3D 0 %',
+                                        'Stage 3 of 3 · the last stage'],
+                  str(strip.texts()))
+            fake.t = 40.0
+            win.on_result(2, 3, 'M - 3D', res[3])
+            win.on_running(False)
+            win.on_finished(False, False)
+            pump(20)
+            heights.append(strip.height())
+            check(f'{tag}: after the end three ✓ pills and Chain done in …',
+                  strip.texts() == ['01 1D ✓ 9 s', '02 2D ✓ 21 s',
+                                    '03 3D ✓ 10 s', 'Chain done in 40 s'],
+                  str(strip.texts()))
+            check(f'{tag}: the strip stays after the end, beside the banner',
+                  rp.chain_strip() is strip and rp.chain_slot.isVisibleTo(rp))
+            check(f'{tag}: its height never changed on a stage change',
+                  len(set(heights)) == 1, str(heights))
+
+        # a stop in stage 2 (the stage lands a stopped result)
+        win.resize(1600, 1000)
+        pump(100)
+        strip = start([1, 2, 3])
+        win.on_run_started(INFO1D)
+        fake.t = 5.0
+        win.on_result(0, 1, 'M - 1D', res[1])
+        win.on_run_started(INFO1D)
+        fake.t = 8.0
+        win.on_result(1, 2, 'M - 2D (stopped)', stopped(res[2]))
+        win.on_running(False)
+        win.on_finished(True, False)
+        pump(20)
+        check('a stop in stage 2: 02 2D stopped, 03 3D not run, the caption',
+              strip.texts() == ['01 1D ✓ 5 s', '02 2D stopped',
+                                '03 3D not run',
+                                'Chain stopped at stage 2 of 3'],
+              str(strip.texts()))
+        check('a fresh strip per chain (the last one replaced)',
+              rp.chain_strip() is strip)
+        # an error in stage 2 (no result for it)
+        strip = start([1, 2, 3])
+        win.on_run_started(INFO1D)
+        win.on_result(0, 1, 'M - 1D', res[1])
+        win.on_run_started(INFO1D)
+        win.on_running(False)
+        win.on_finished(False, True)
+        pump(20)
+        check('an error in stage 2: 02 2D failed, 03 3D not run, the caption',
+              strip.texts()[1:] == ['02 2D failed', '03 3D not run',
+                                    'Chain failed at stage 2 of 3'],
+              str(strip.texts()))
+        # a single run: the slot hidden at 0 px (R7)
+        start([2])
+        pump(30)
+        check('a single run empties the slot, hidden at 0 px (R7 holds)',
+              rp.chain_strip() is None and rp.chain_slot.isHidden()
+              and rp.chain_slot.height() == 0, str(rp.chain_slot.height()))
+        win.on_running(False)
+
+        # the viewer is shrunk ahead only with the 3D view on screen (D93)
+        host = rp.view3d
+        calls = []
+        real = host.shrink_ahead
+        host.shrink_ahead = calls.append
+        try:
+            rp.show_3d_tab()
+            pump(30)
+            s = ChainStrip()
+            s.set_chain('M', [1, 2])
+            s.arrange(rp.column_widths()[1])
+            rp.set_chain_strip(s)
+            pump(30)
+            check('3D view on screen: set_chain_strip calls shrink_ahead once '
+                  "with the strip's height + GAP",
+                  calls == [s.height_now() + GAP]
+                  and rp.chain_slot.height() == s.height_now(),
+                  f'{calls} slot {rp.chain_slot.height()}')
+            rp.set_chain_strip(s)
+            check('the same strip again (slot already shown): no call',
+                  len(calls) == 1, str(calls))
+            rp.set_chain_strip(None)
+            rp.show_slice_tab()
+            pump(30)
+            calls.clear()
+            rp.set_chain_strip(s)
+            check('the live slice on screen: no call', calls == [],
+                  str(calls))
+            rp.set_chain_strip(None)
+        finally:
+            host.shrink_ahead = real
+        check('no desktop notification escaped the patch',
+              all(isinstance(n, tuple) for n in notes))
+    finally:
+        dialogs.notify_desktop = real_notify
+        win.ctrl._stage_dims = []
+        win.close()
+        pump(100)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -735,6 +985,7 @@ def main():
         win.close()
         pump(100)
         s6_copy_load()
+        s7_strip()
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]
               if crashes else '')

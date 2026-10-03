@@ -783,6 +783,7 @@ class RunPanel(QWidget):
         hidden). Anything appearing above the view moves the embedded
         3D viewer: GUI-9 re-measures it (CLAUDE.md 8.7)."""
         lay = self.chain_slot.layout()
+        was_hidden = self.chain_slot.isHidden()
         while lay.count():
             w = lay.takeAt(0).widget()
             if w is not None and w is not widget:
@@ -791,10 +792,29 @@ class RunPanel(QWidget):
             self.chain_slot.setFixedHeight(0)
             self.chain_slot.hide()
             return
+        if was_hidden:
+            # GUI-9 T4: the strip takes its height (and one GAP) from the
+            # view; with the embedded 3D viewer on screen, shrink its
+            # window first, so it never stands below its card while the
+            # layout catches up (D93's pattern, results_panel's stage
+            # slot)
+            self._shrink_viewer(
+                max(widget.sizeHint().height(),
+                    widget.minimumSizeHint().height()) + GAP)
         lay.addWidget(widget)
         self.chain_slot.setMinimumHeight(0)
         self.chain_slot.setMaximumHeight(QWIDGETSIZE_MAX)
         self.chain_slot.show()
+
+    def _shrink_viewer(self, dh):
+        """Shrink the embedded viewer's window by `dh` px now, when it is
+        on screen - ahead of a layout change above it (CLAUDE.md 8.7)."""
+        host = self.view3d
+        shrink = getattr(host, 'shrink_ahead', None)
+        if shrink is None or self._stack.currentWidget() is not host \
+                or not host.isVisible():
+            return
+        shrink(dh)
 
     def chain_strip(self):
         """The widget in `chain_slot`, or None."""

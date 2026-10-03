@@ -827,6 +827,38 @@ def qss(mode_name):
     QFrame#handoffplain {{ background: {p['card']};
                            border: 1px solid {p['border2']};
                            border-radius: 10px; }}
+    /* GUI-9 T4: the 02 Run chain strip (ui/chain_strip.py, board
+       Run_Chain lines 60-70). On `panel`, not the board's tint: warn
+       and faint stay >= 4.5:1 on it in light mode. Pill heights are
+       set in code (no generic QFrame min-height rule beats them). */
+    QFrame#chainstrip {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#chaineyebrow {{ font-size: 11px; font-weight: 600;
+                           color: {p['accent_text']}; }}
+    QLabel#stripcaption {{ font-size: 12px; color: {p['muted']}; }}
+    QFrame#chainpill {{ background: transparent;
+        border: 1px solid {p['border2']}; border-radius: 15px; }}
+    QFrame#chainpill[state="done"] {{ background: {p['ok_bg']};
+        border: 1px solid {p['ok_border']}; }}
+    QFrame#chainpill[state="running"] {{ background: {tint};
+        border: 1px solid {p['accent']}; }}
+    QFrame#chainpill[state="stopped"] {{ border: 1px solid {p['warn']}; }}
+    QFrame#chainpill[state="failed"] {{ border: 1px solid {p['danger']}; }}
+    QLabel#chainpillnum {{ font-family: "{DISPLAY}"; font-size: 11.5px;
+                           font-weight: 600; color: {p['muted']}; }}
+    QLabel#chainpillnum[state="running"] {{ color: {p['accent_text']}; }}
+    QLabel#chainpillnum[state="waiting"],
+    QLabel#chainpillnum[state="notrun"] {{ color: {p['faint']}; }}
+    QLabel#chainpillname {{ font-size: 13px; color: {p['text']}; }}
+    QLabel#chainpillname[state="waiting"],
+    QLabel#chainpillname[state="notrun"] {{ color: {p['faint']}; }}
+    QLabel#chainpillval {{ font-family: "{MONO}"; font-size: 11.5px;
+                           color: {p['faint']}; }}
+    QLabel#chainpillval[state="done"] {{ color: {p['ok']}; }}
+    QLabel#chainpillval[state="running"] {{ color: {p['accent_soft']};
+                                            font-weight: 600; }}
+    QLabel#chainpillval[state="stopped"] {{ color: {p['warn']}; }}
+    QLabel#chainpillval[state="failed"] {{ color: {p['danger']}; }}
     """
 
 
