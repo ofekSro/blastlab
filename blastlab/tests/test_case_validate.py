@@ -374,6 +374,7 @@ def main():
     axisym_pin_note_checks()
     thin_obstacle_warn_checks()
     write_budget_checks()
+    gauge_in_obstacle_checks()
 
     if FAIL:
         print(f"\nCASE VALIDATE: FAIL ({len(FAIL)}): {', '.join(FAIL)}")
@@ -518,6 +519,59 @@ def axisym_pin_note_checks():
     rep = validate_case(Case2D(geometry='planar', center=(2.0, 2.0)))
     check('planar keeps its burst x, no note',
           not any('is ignored' in n for n in rep.notes), str(rep.notes))
+
+
+def gauge_in_obstacle_checks():
+    """UXR-2 / D201 (GUI-11 T8): a gauge strictly inside an obstacle box
+    is dropped by both solvers, so Setup warns - exactly one new warning,
+    and the case stays valid. A gauge on the face or outside the box gets
+    none (open-box test, as scaled_distance.where's `inside`)."""
+    print()
+    print("gauge inside an obstacle: warned, not refused")
+
+    def new_warnings(rep, ref):
+        return [w for w in rep.warnings if w not in ref.warnings]
+
+    for solver in ('native', 'blastfoam'):
+        two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0,
+                   cell_size_m=0.05, charge=1.0, center=(0.0, 1.0),
+                   obstacles=[(1.2, 1.6, 0.0, 1.0)], solver=solver)
+        ref = validate_case(Case2D(gauges=[], **two))
+        rep = validate_case(Case2D(gauges=[(1.4, 0.3)], **two))
+        got = new_warnings(rep, ref)
+        check(f'2D {solver}: a gauge inside Wall 1 gets exactly the new '
+              f'warning', got == ['Gauge (1.4, 0.3) inside an obstacle - '
+                                  'will be dropped'], str(got))
+        check(f'2D {solver}: it is a warning, not an error',
+              rep.errors == ref.errors, str(rep.errors))
+        for pt, where in (((1.2, 0.3), 'on the face'),
+                          ((1.4, 1.0), 'on the top face'),
+                          ((1.0, 0.3), 'in front of it'),
+                          ((1.4, 1.5), 'above it')):
+            got = new_warnings(validate_case(Case2D(gauges=[pt], **two)),
+                               ref)
+            check(f'2D {solver}: a gauge {where} gets none', got == [],
+                  str(got))
+
+        three = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=1.0,
+                     center=(1.0, 1.0, 1.0),
+                     obstacles=[(1.5, 1.8, 0.5, 1.5, 0.0, 1.0)],
+                     solver=solver)
+        ref = validate_case(Case3D(gauges=[], **three))
+        rep = validate_case(Case3D(gauges=[(1.6, 1.0, 0.5)], **three))
+        got = new_warnings(rep, ref)
+        check(f'3D {solver}: a gauge inside Wall 1 gets exactly the new '
+              f'warning', got == ['Gauge (1.6, 1.0, 0.5) inside an '
+                                  'obstacle - will be dropped'], str(got))
+        check(f'3D {solver}: it is a warning, not an error',
+              rep.errors == ref.errors, str(rep.errors))
+        for pt, where in (((1.5, 1.0, 0.5), 'on the face'),
+                          ((1.6, 1.0, 1.0), 'on the top face'),
+                          ((1.9, 1.0, 0.5), 'behind it')):
+            got = new_warnings(validate_case(Case3D(gauges=[pt], **three)),
+                               ref)
+            check(f'3D {solver}: a gauge {where} gets none', got == [],
+                  str(got))
 
 
 def thin_obstacle_warn_checks():

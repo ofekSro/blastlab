@@ -1619,6 +1619,56 @@ def r11_hd13_flow(win):
           and not rp.hd13_note.isVisibleTo(rp))
 
 
+def r5b_dropped(win):
+    """UXR-2 / D201 (GUI-11 T8): G2 entered inside Wall 1 is dropped by
+    the solver; the live column labels the two series G1 and G3 (as
+    entered) and its caption names G2. The row keys stay D61's payload
+    numbers."""
+    from blastlab.ui import run_gauges as RG
+    rp = win.run_panel
+    col = rp.gauge_col
+    print('\nR5b: a gauge the solver dropped (inside Wall 1)')
+    case = sample_case(gauges=[(2.95, 0.5), (3.1, 0.5), (2.95, 1.5)])
+    dx = case.cell_size_m
+    rp.set_gauge_case(case)
+    pump(20)
+    check('before a payload: G1 G2 G3 by Z, no note',
+          sorted(col.row_labels()) == ['G1', 'G2', 'G3']
+          and 'dropped' not in col.caption_text(),
+          f'{col.row_labels()} {col.caption_text()!r}')
+    pay = flat_payload([snapped(case.gauges[0], dx),
+                        snapped(case.gauges[2], dx)])
+    col.set_payload(pay, final=True)
+    col.flush()
+    pump(20)
+    check('two rows, labelled G3 (Z 2.99) then G1 (Z 3.31)',
+          col.row_labels() == ['G3', 'G1'], str(col.row_labels()))
+    check('the keys are still the payload numbers (D61)',
+          [w.number for w in col.row_widgets()] == [2, 1]
+          and [r['entered'] for r in col.table()] == [3, 1],
+          str([(r['number'], r['entered']) for r in col.table()]))
+    check('the caption names G2 and the wall',
+          col.caption_text() == '2 gauges, sorted by Z. Click a row to '
+          'enlarge it. G2 dropped by the solver (inside Wall 1).',
+          col.caption_text())
+    check('the enlarged card says G3', col.card_texts()[0] == 'G3',
+          str(col.card_texts()))
+    labels, dropped = RG.numbering(case, pay)
+    check('numbering(): G1, G3 and G2 inside Wall 1',
+          labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
+          f'{labels} {dropped}')
+    full = sample_case()
+    pay4 = flat_payload([snapped(g, full.cell_size_m) for g in full.gauges])
+    rp.set_gauge_case(full)
+    col.set_payload(pay4, final=True)
+    col.flush()
+    pump(20)
+    check('nothing dropped: each label is G<payload number>, no note',
+          all(w.num.text() == f'G{w.number}' for w in col.row_widgets())
+          and 'dropped' not in col.caption_text(),
+          f'{col.row_labels()} {col.caption_text()!r}')
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1632,6 +1682,7 @@ def main():
         r3_stop(win)
         r4_dock(win)
         r5_gauges(win)
+        r5b_dropped(win)
         r6_finish(win)
         r7_chain_hook(win)
         r8_banner_viewer(win)

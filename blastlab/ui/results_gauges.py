@@ -47,7 +47,7 @@ from ..output import gauge_summary, plots
 from . import scaled_distance as sd
 from . import theme
 from .results_list import ElidedLabel
-from .run_gauges import _mix, match_gauges
+from .run_gauges import _mix, dropped_text, match_gauges, numbering
 from .widgets import Segmented, WrapRow, hbox, label
 
 #: the table, left to right. 'gauge' and 'z' are this view's; the rest
@@ -66,9 +66,10 @@ HEADERS_WRAPPED = ('Gauge', 'Z\n[m/kg^1/3]', 'Peak\n[kPa]', 'Arrival\n[ms]',
                    'Pos. impulse\n[kPa·ms]', 'Net impulse\n[kPa·ms]',
                    'Phase\nended')
 HEADER_HELP = {
-    'gauge': 'Gauge number, in the order the solver reports them. The '
-             'tooltip of each cell says where you asked for it and, when '
-             'the solver had to snap it, the cell centre it reads.',
+    'gauge': 'Gauge number as entered in Setup; a gauge the solver dropped '
+             'is named in the caption above. The tooltip of each cell '
+             'says where you asked for it and, when the solver had to '
+             'snap it, the cell centre it reads.',
     'z': 'Scaled distance Z = R / W^(1/3) of the gauge as entered, W the '
          'charge mass as entered (UFC 3-340-02, para. 2-13.1). Hidden for '
          'planar 2D and for a run started from a profile.',
@@ -175,6 +176,24 @@ def z_values(res, dim):
     return out
 
 
+def labels_and_dropped(res, dim):
+    """({G number: `G<n>` as shown}, [(entered number, reason)]) for the
+    gauges of `res`: the entered gauge's number when the solver dropped
+    one (`run_gauges.numbering`, D201), so Results and Setup number a
+    gauge alike. The obstacles and the domain come from the meta, for
+    the reason (`inside Wall 1`). Empty when the meta cannot say."""
+    case = sd.case_from_meta(res.meta, dim, res.gauges)
+    if case is None:
+        return {}, []
+    meta = res.meta or {}
+    case.obstacles = [tuple(o) for o in (meta.get('obstacles') or [])]
+    for k in ('Lx', 'Ly', 'Lz'):
+        if meta.get(k) is not None:
+            setattr(case, k, meta[k])
+    labels, dropped = numbering(case, res.gauges)
+    return {k: lbl for k, lbl in enumerate(labels, start=1)}, dropped
+
+
 class _Table(QTableWidget):
     """The summary table. Ctrl+C with the table focused copies the whole
     table: the key is caught here, before the item view's own copy (the
@@ -209,6 +228,7 @@ class GaugesView(QWidget):
         self._summary = []          # summary_rows(res), gauge order
         self._strings = []          # table_rows of those, gauge order
         self._z = None              # {number: Z} or None (hidden)
+        self._labels = {}           # {number: `G<n>` shown} (D201)
         self._order = []            # G numbers, top to bottom
         self._sel = None            # the selected G number
         self._wrapped = False
@@ -385,6 +405,8 @@ class GaugesView(QWidget):
     def clear(self):
         self._ent = None
         self._summary, self._strings, self._z = [], [], None
+        self._labels = {}
+        self.table_caption.setText(TABLE_CAPTION)
         self._order, self._sel = [], None
         self._drop_curves()
         self.hint.setText(self.NO_RESULT)
@@ -451,6 +473,15 @@ class GaugesView(QWidget):
             self._z = z_values(res, ent.dim)
         except Exception:
             self._z = None
+        try:
+            self._labels, dropped = labels_and_dropped(res, ent.dim)
+        except Exception:
+            self._labels, dropped = {}, []
+        # D201: a dropped gauge is named first, so an elided caption
+        # still says it (the whole text is the tooltip)
+        note = dropped_text(dropped)
+        self.table_caption.setText(f'{note} · {TABLE_CAPTION}' if note
+                                   else TABLE_CAPTION)
         self._draw_curves(res)
         self.fill_summary(res)
         if self._sel not in self._order:
@@ -510,6 +541,16 @@ class GaugesView(QWidget):
         z = None if self._z is None else self._z.get(number)
         return '' if z is None else f'{z:.2f}'
 
+    def label(self, number):
+        """`G<n>` as shown for G`number`: the entered gauge's number after
+        a dropped gauge, else `number` itself (D201)."""
+        return self._labels.get(number, f'G{number}')
+
+    def caption_text(self):
+        """The Summary card's caption, whole (D201 names a dropped gauge
+        in it)."""
+        return self.table_caption.full_text()
+
     def fill_summary(self, res):
         """The rows, sorted by Z (ties by number, D61) - by number when Z
         is hidden. Every numeric cell is `table_rows`' own string."""
@@ -523,7 +564,7 @@ class GaugesView(QWidget):
         self.table.setRowCount(len(numbers))
         for r, n in enumerate(numbers):
             row = self._strings[n - 1]
-            cells = [f'G{n}', self._z_text(n)] + list(row[1:])
+            cells = [self.label(n), self._z_text(n)] + list(row[1:])
             for c, text in enumerate(cells):
                 item = QTableWidgetItem(str(text))
                 item.setTextAlignment(Qt.AlignVCenter | (
@@ -720,7 +761,8 @@ class GaugesView(QWidget):
 
         def s(text):
             return text if text else '—'
-        self.readout[0].setText(f'G{number} · Z {z}' if z else f'G{number}')
+        g = self.label(number)
+        self.readout[0].setText(f'{g} · Z {z}' if z else g)
         self.readout[1].setText(f'peak {s(row[1])} kPa at {s(row[3])} ms')
         self.readout[2].setText(f'pos. impulse {s(row[5])} kPa·ms')
         # the texts' widths changed: re-plan the lines

@@ -1562,6 +1562,8 @@ def _validate_closing(case, rep, ctx):
         pt = g if isinstance(g, (list, tuple)) else (g,)
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             warn(f"Gauge {tuple(pt)} outside domain - will be dropped")
+        elif _in_obstacle_open(pt, case.obstacles):
+            warn(f"Gauge {tuple(pt)} inside an obstacle - will be dropped")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
@@ -1574,6 +1576,27 @@ def _validate_closing(case, rep, ctx):
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
+
+
+def _in_obstacle_open(pt, obstacles):
+    """True when gauge `pt` lies strictly inside an obstacle box (open
+    box, the test of ui/scaled_distance.where's `inside`). Both solvers
+    drop such a gauge: native when its nearest cell centre is solid
+    (solvers/solver2d.py, solver3d.py, gauge setup), blastFoam before
+    writing the probes (solvers/foam/writer.py, `_in_obstacle2` /
+    `_in_obstacle`, on the face-snapped boxes). A gauge on a face or
+    within half a cell of one may be dropped too; that zone is not
+    predicted here (UXR-2, D201)."""
+    n = len(pt)
+    if n < 2:
+        return False
+    for box in obstacles or []:
+        if len(box) < 2 * n:
+            continue
+        if all(float(lo) < float(v) < float(hi)
+               for v, lo, hi in zip(pt, box[0::2], box[1::2])):
+            return True
+    return False
 
 
 def _warn_thin_obstacle(rep, box, lo, hi, dxb, foam):

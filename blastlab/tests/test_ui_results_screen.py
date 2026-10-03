@@ -847,6 +847,61 @@ def want_text(g, strings, zs, order):
     return '\n'.join(lines)
 
 
+def sample_dropped():
+    """The sample result with THREE entered gauges, the second inside
+    Wall 1 (r 1.0-1.4 m, z 0-1.2 m): the solver dropped it, so the
+    payload holds two series - G1 and G3 as entered (UXR-2, D201)."""
+    res = sample_2d()
+    res.meta.update(gauges=[(2.95, 0.50), (1.2, 0.6), (2.95, 1.50)],
+                    obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0)
+    return res
+
+
+def s5g_dropped(link):
+    """UXR-2 / D201 (GUI-11 T8): a dropped gauge keeps the later gauges'
+    entered numbers on screen, and the caption names it; rows() (D98),
+    the headers and every export are unchanged."""
+    from blastlab.output import gauge_summary
+    from blastlab.ui import results_gauges as RG
+    from blastlab.ui.exports import summary_rows
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS5g: a gauge the solver dropped (inside Wall 1)')
+    p = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p.resize(1600, 1000)
+    p.show()
+    p.show_view('Gauges')
+    g = p.gauges
+    res = sample_dropped()
+    p.add_result('dropped', 2, res)
+    pump(60)
+    labels = [c[0] for c in g.cells()]
+    check('two rows, labelled G3 (Z 2.99) then G1 (Z 3.31): the entered '
+          'numbers', labels == ['G3', 'G1']
+          and [c[1] for c in g.cells()] == ['2.99', '3.31'],
+          str(g.cells()))
+    check('the caption names G2 first, then the usual caption',
+          g.caption_text() == 'G2 dropped by the solver (inside Wall 1) · '
+          + RG.TABLE_CAPTION, g.caption_text())
+    check('rows() is table_rows(summary_rows(res)), unchanged (D98)',
+          g.rows() == [tuple(r) for r in gauge_summary.table_rows(
+              summary_rows(res))], str(g.rows()))
+    check('the headers are unchanged', g.headers() == list(RG.HEADERS),
+          str(g.headers()))
+    check('the keys stay the payload numbers; the readout says G3',
+          g.order() == [2, 1] and g.selected() == 2
+          and g.readout_text()[0] == 'G3 · Z 2.99',
+          f'{g.order()} {g.selected()} {g.readout_text()}')
+    p.add_result('sample', 2, sample_2d())
+    pump(40)
+    check('a result without a dropped gauge: G2 / G1 and the plain '
+          'caption again', [c[0] for c in g.cells()] == ['G2', 'G1']
+          and g.caption_text() == RG.TABLE_CAPTION,
+          f'{g.cells()} {g.caption_text()}')
+    p.shutdown()
+    p.deleteLater()
+    pump(20)
+
+
 def s5_gauges(win, link):
     import numpy as np
     from PySide6.QtTest import QTest
@@ -1575,6 +1630,7 @@ def main():
         s3_busy(link)
         s3_view3d_and_title(link)
         s5_gauges(win, link)
+        s5g_dropped(link)
         s6_field(link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]

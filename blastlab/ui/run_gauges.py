@@ -8,8 +8,10 @@ Data, never re-derived (plan §6: "Reuse live_gauges.py data"):
 - the payload is the one `RunPanel.set_gauge_payload` already receives
   (`times`, `pressures` in absolute Pa, `points` or `radii`), or a
   finished Result's `gauges`, which has the same shape;
-- rows are numbered G1…Gn in payload order - how the solver and Results
-  number them after a dropped gauge;
+- rows are keyed G1…Gn in payload order (D61), and LABELLED with the
+  entered gauge's number, so a gauge the solver dropped (inside a wall,
+  outside the domain) does not renumber the later ones; the caption names
+  the dropped gauge (D201, amends D61);
 - overpressure is `(p - P_AIR) / 1e3` kPa, as `LiveGaugePane` draws it;
 - arrival and the peak so far come from
   `output.gauge_summary.summarize_trace` on the series so far - the
@@ -147,6 +149,84 @@ def match_gauges(case, gauge_out):
     return _match(case, _positions(gauge_out or {}))
 
 
+def _drop_reason(case, point):
+    """Why an entered gauge has no series, from the case's geometry:
+    `inside Wall 1`, `on the face of Wall 1` (within a cell: the native
+    nearest-cell rule, blastFoam's face-snapped boxes), `outside the
+    domain`, or '' when the geometry does not say."""
+    try:
+        boxes = sd.obstacle_boxes(case)
+    except (AttributeError, TypeError, ValueError):
+        boxes = []
+    try:
+        tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
+    except (TypeError, ValueError):
+        tol = 0.0
+    p = [float(v) for v in point]
+    for i, box in enumerate(boxes, start=1):
+        if len(box) != len(p):
+            continue
+        if all(lo < v < hi for v, (lo, hi) in zip(p, box)):
+            return f'inside Wall {i}'
+    for i, box in enumerate(boxes, start=1):
+        if len(box) == len(p) and all(lo - tol <= v <= hi + tol
+                                      for v, (lo, hi) in zip(p, box)):
+            return f'on the face of Wall {i}'
+    dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(p)]]
+    try:
+        if all(d is not None for d in dims) and any(
+                not 0.0 <= v <= float(d) for v, d in zip(p, dims)):
+            return 'outside the domain'
+    except (TypeError, ValueError):
+        pass
+    return ''
+
+
+def _numbering(case, match, n_series):
+    """(labels, dropped) for `n_series` series matched to the entered
+    gauges by `match` (D201, amends D61):
+
+        labels      `G<n>` per series, n the ENTERED gauge's number when
+                    the solver dropped a gauge, else the series' own
+                    number (payload order, D61 - then the two agree)
+        dropped     [(entered number, reason)] of the entered gauges
+                    with no series
+
+    A drop is named only when the count adds up: the series are short by
+    exactly the unmatched entered gauges, so a matching miss is never
+    called a drop. A series matching none keeps its payload number."""
+    entered = _entered(case)
+    plain = [f'G{k + 1}' for k in range(n_series)]
+    if n_series >= len(entered):
+        return plain, []
+    taken = {j for j in match[:n_series] if j is not None}
+    missing = [j for j in range(len(entered)) if j not in taken]
+    if len(missing) != len(entered) - n_series:
+        return plain, []
+    labels = [f'G{j + 1}' if j is not None else f'G{k + 1}'
+              for k, j in enumerate(match[:n_series])]
+    return labels, [(j + 1, _drop_reason(case, entered[j]))
+                    for j in missing]
+
+
+def numbering(case, gauge_out):
+    """`_numbering` of a live payload or a finished Result's `gauges`."""
+    gauge_out = gauge_out or {}
+    series = gauge_out.get('pressures')
+    n = 0 if series is None else len(series)
+    pos = _positions(gauge_out)
+    pos = (pos + [None] * max(0, n - len(pos)))[:n]
+    return _numbering(case, _match(case, pos), n)
+
+
+def dropped_text(dropped):
+    """`G2 dropped by the solver (inside Wall 1)`, one per dropped gauge,
+    joined by ` · `; '' when none."""
+    return ' · '.join(
+        f'G{n} dropped by the solver' + (f' ({why})' if why else '')
+        for n, why in dropped)
+
+
 def z_mode(case):
     """True when the column shows and sorts by Z; False for R (planar
     2D, a profile start: `scaled_distance.z_shown`)."""
@@ -178,7 +258,9 @@ def rows(case, payload=None):
     when Z is hidden:
 
         number      G number, payload order (entered order before any
-                    payload)
+                    payload) - the row's key
+        label       `G<n>` as shown: the entered number when the solver
+                    dropped a gauge (`_numbering`, D201), else `number`
         entered     the matched entered gauge, 1-based, or None
         r, z        R [m], Z [m/kg^1/3] (None when hidden or unknown)
         where       `Wall 1` within 0.5 m (scaled_distance.where), or ''
@@ -196,6 +278,7 @@ def rows(case, payload=None):
         pos = pos + [None] * max(0, len(series) - len(pos))
         match = _match(case, pos[:len(series)])
         entered = _entered(case)
+        labels, _dropped = _numbering(case, match, len(series))
         for k, raw in enumerate(series):
             j = match[k]
             point = entered[j] if j is not None else pos[k]
@@ -204,7 +287,7 @@ def rows(case, payload=None):
             s = summarize_trace(times[:n], p[:n])
             out.append(_row(case, k + 1, None if j is None else j + 1,
                             point, times[:n] * 1e3,
-                            (p[:n] - P_AIR) / 1e3, s))
+                            (p[:n] - P_AIR) / 1e3, s, labels[k]))
     else:
         for k, g in enumerate(_entered(case)):
             out.append(_row(case, k + 1, k + 1, g, np.zeros(0),
@@ -220,12 +303,13 @@ def rows(case, payload=None):
     return sorted(out, key=key)
 
 
-def _row(case, number, entered, point, t_ms, kpa, s):
+def _row(case, number, entered, point, t_ms, kpa, s, label=None):
     r, z, where = _geometry(case, point)
     nan = float('nan')
     s = s or dict(peak_kpa=nan, t_peak_ms=nan, arrival_ms=nan)
     waiting = not np.isfinite(s['arrival_ms'])
-    return dict(number=number, entered=entered, point=point, r=r, z=z,
+    return dict(number=number, label=label or f'G{number}',
+                entered=entered, point=point, r=r, z=z,
                 where=where, t_ms=t_ms, kpa=kpa, peak_kpa=s['peak_kpa'],
                 t_peak_ms=s['t_peak_ms'], arrival_ms=s['arrival_ms'],
                 waiting=waiting,
@@ -346,6 +430,8 @@ class _GaugeRow(QFrame):
         """Texts and the sparkline only; the style sheets are re-applied
         only when the waiting state changes (re-polishing every row on
         every refresh was most of the collection cost, T9 R-COST)."""
+        if self.num.text() != row['label']:
+            self.num.setText(row['label'])          # the entered number
         self.dist.setText(fmt_dist(row['z'] if row['z'] is not None
                                    else row['r']))
         changed = row['waiting'] != self._waiting
@@ -451,7 +537,7 @@ class _SelectedCard(QFrame):
         only when the waiting state changes (see _GaugeRow.set_row)."""
         was = self._row is None or self._row['waiting']
         self._row, self._live = row, bool(live)
-        self.num.setText(f'G{row["number"]}')
+        self.num.setText(row['label'])
         lead = (f'Z {fmt_dist(row["z"])}' if z_on
                 else f'R {fmt_dist(row["r"])} m')
         bits = [lead] + ([row['where']] if row['where'] else []) \
@@ -708,6 +794,15 @@ class GaugeColumn(QWidget):
     def header_text(self):
         return ' · '.join(lbl.text() for lbl in self.head_lbls)
 
+    def caption_text(self):
+        """The line above the card: the count, the sort, and a dropped
+        gauge's name (D201)."""
+        return self.sub.text()
+
+    def row_labels(self):
+        """The GAUGE cells in display order (`G1`, `G3`, ...)."""
+        return [w.num.text() for w in self.row_widgets()]
+
     def select(self, number):
         """Enlarge G`number` (a row click); it persists for the run."""
         for row in self._table:
@@ -742,8 +837,13 @@ class GaugeColumn(QWidget):
         self.empty.setVisible(not has)
         axis = 'Z' if z_on else 'R'
         self.head_lbls[1].setText(axis)
-        self.sub.setText(f'{n} gauge{"" if n == 1 else "s"}, sorted by '
-                         f'{axis}. Click a row to enlarge it.' if has else '')
+        # D201: a gauge the solver dropped is named, so the entered
+        # numbers on the rows do not read as a gap
+        note = (dropped_text(numbering(self._case, self._payload)[1])
+                if self._payload else '')
+        self.sub.setText((f'{n} gauge{"" if n == 1 else "s"}, sorted by '
+                          f'{axis}. Click a row to enlarge it.'
+                          + (f' {note}.' if note else '')) if has else '')
         self.sub.setVisible(has)
         order = [row['number'] for row in self._table]
         if order != self._order:
