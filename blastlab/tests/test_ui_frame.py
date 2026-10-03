@@ -23,6 +23,8 @@ BC_Combined lines 20-54 / 392-396).
      name elides, the whole name in its tooltip (GUI-10, F29)
  F10 the longest chip at 1100 px squeezes no control: the unsaved marker
      drops its word only then (verify10b, F37 / D198)
+ F11 Save as reports a write failure (no crash dialog) and starts in the
+     case folder / the newest Recent's / the Runs folder (GUI-11, D204)
 
 Plain script, offscreen, no pytest: `python test_ui_frame.py`.
 """
@@ -493,6 +495,75 @@ def main():
           bar.dirty_lbl.text() == DIRTY_LONG
           and bar.dirty_lbl.toolTip() == '', repr(bar.dirty_lbl.text()))
     host.close()
+
+    print('\nF11: Save as reports a write failure and starts in a useful '
+          'folder (GUI-11 T3, UXR-5 / D204)')
+    from blastlab.ui import crashlog
+    crashlog.install()      # an escaping OSError would land here
+    win.resize(1280, 840)
+    pump(60)
+    locked_dir = tempfile.mkdtemp(prefix='blastlab_ro_')
+    locked = os.path.join(locked_dir, 'locked.json')
+    with open(locked, 'w', encoding='utf-8') as f:
+        f.write('{}')
+    # Windows ignores a folder's read-only flag for new files, so the
+    # target itself is read-only: the write raises PermissionError
+    os.chmod(locked, 0o444)
+    win._case_path = p3
+    win.topbar.set_case_name(win._case_stem())
+    win.setup.forms[2].v['Lx'].set('7.5')
+    pump(40)
+    rec_before = list(app_settings.load().get('recent_cases') or [])
+    crash_before = crashlog.last_crash
+    shown = []
+    win.show_error = lambda t, m: shown.append((t, m))
+    asked = []
+    real_save_file = dialogs.save_file
+
+    def fake_save_file(*a, **k):
+        asked.append(k.get('start', a[3] if len(a) > 3 else None))
+        return locked
+    dialogs.save_file = fake_save_file
+    try:
+        for sc in win.findChildren(QShortcut):
+            if sc.key().toString() == 'Ctrl+Shift+S':
+                sc.activated.emit()
+        pump(40)
+    finally:
+        dialogs.save_file = real_save_file
+        os.chmod(locked, 0o666)
+    check('a read-only target: one show_error titled Save case',
+          len(shown) == 1 and shown[0][0] == 'Save case'
+          and shown[0][1].startswith(f'Could not write {locked}: '),
+          str(shown))
+    check('no crashlog entry (the OSError did not escape)',
+          crashlog.last_crash is crash_before,
+          str(crashlog.last_crash and crashlog.last_crash['message']))
+    check('the window is still dirty, its path and Recent unchanged',
+          win._dirty and win._case_path == p3
+          and (app_settings.load().get('recent_cases') or []) == rec_before,
+          f'dirty={win._dirty} path={win._case_path!r}')
+    check('the dialog starts in the case folder, named <stem>.json',
+          asked == [os.path.join(os.path.dirname(os.path.abspath(p3)),
+                                 'parity.json')], str(asked))
+    win._case_path = None
+    win.run_panel.set_run_name('QA_MODEL', replace=True)
+    newest = (app_settings.load().get('recent_cases') or [None])[0]
+    check('untitled: the newest Recent entry\'s folder, <Model>.json',
+          newest and win._save_as_start() == os.path.join(
+              os.path.dirname(os.path.abspath(newest)), 'QA_MODEL.json'),
+          f'{win._save_as_start()!r} newest={newest!r}')
+    app_settings.update(recent_cases=[])
+    runs = win.run_panel.current_runs_dir()
+    check('untitled, no Recent: the Runs folder',
+          os.path.isdir(runs) and win._save_as_start()
+          == os.path.join(runs, 'QA_MODEL.json'),
+          f'{win._save_as_start()!r} runs={runs!r}')
+    app_settings.update(recent_cases=rec_before)
+    win.show_error = real_err
+    win._case_path = p3
+    win._set_dirty(False)
+    win.topbar.set_case_name(win._case_stem())
 
     win.close()
     pump(80)

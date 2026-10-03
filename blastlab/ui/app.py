@@ -674,15 +674,41 @@ class MainWindow(QMainWindow):
             self.show_error('Save case', str(exc))
             return
         path = dialogs.save_file('Save case', 'blastlab case (*.json)', self,
+                                 start=self._save_as_start(),
                                  default_suffix='json')
         if not path:
             return
-        self._case_writer(case)(case, path)
+        # a read-only folder, a OneDrive lock or a full disk is an
+        # ordinary failure, reported as Save does - never the crash
+        # dialog; the path, the dirty flag and Recent stay (UXR-5, D204)
+        try:
+            self._case_writer(case)(case, path)
+        except OSError as exc:
+            self.show_error('Save case', f'Could not write {path}: {exc}')
+            return
         self._case_path = path
         self._push_recent(path)
         self._set_dirty(False)
         self.topbar.set_case_name(self._case_stem())
         self._update_title()
+
+    def _save_as_start(self):
+        """Where Save as… opens (UXR-5, D204): the case's own folder, else
+        the folder of the newest Recent entry, else the Runs folder - the
+        first that exists. The name is `<case stem>.json`, or `<Model
+        box>.json` for an untitled case (`untitled.json` with no model)."""
+        folders = []
+        if self._case_path:
+            folders.append(os.path.dirname(os.path.abspath(self._case_path)))
+        rec = app_settings.load().get('recent_cases') or []
+        if rec:
+            folders.append(os.path.dirname(os.path.abspath(str(rec[0]))))
+        folders.append(self.run_panel.current_runs_dir())
+        folder = next((f for f in folders if f and os.path.isdir(f)), '')
+        stem = (self._case_stem() if self._case_path
+                else self.run_panel.current_run_name() or 'untitled')
+        name = stem + '.json'
+        return os.path.join(folder, name) if folder else name
 
     def _save_case_inplace(self):
         """Save (Ctrl+S): in place when the case has a path, no dialog;
