@@ -520,11 +520,14 @@ class Banner(QFrame):
 
 class HandoffCard(QFrame):
     """The chain hand-off card (board Chain): tinted `accent_bg`,
-    `accent_border`, caps title + mono file line + caption."""
+    `accent_border`, caps title + mono file line + caption. GUI-9:
+    `tinted=False` is the board's neutral HAND-OFF OUT card (line 209:
+    `card` with a `border2` frame, the title in `faint`)."""
 
-    def __init__(self, title='HAND-OFF', parent=None):
+    def __init__(self, title='HAND-OFF', parent=None, tinted=True):
         super().__init__(parent)
-        self.setObjectName('handoff')
+        self.tinted = bool(tinted)
+        self.setObjectName('handoff' if self.tinted else 'handoffplain')
         lay = QVBoxLayout(self)
         lay.setContentsMargins(14, 14, 14, 14)
         lay.setSpacing(8)
@@ -544,7 +547,8 @@ class HandoffCard(QFrame):
         _on_theme(self, self._recolour)
 
     def _recolour(self, _mode=None):
-        self.title.setStyleSheet(_css(11, 600, 'accent_text'))
+        self.title.setStyleSheet(_css(11, 600, 'accent_text'
+                                      if self.tinted else 'faint'))
         self.file.setStyleSheet(_css(12, colour='text',
                                      family=theme.MONO))
         self.caption.setStyleSheet(_css(12, colour='text2'))

@@ -266,6 +266,14 @@ class SetupTree(QFrame):
         self.add_gauge_btn.setVisible(bool(gauge))
         self.add_obstacle_btn.setVisible(bool(obstacle))
 
+    def add_footer(self, widget):
+        """Put `widget` above the pill, under the + buttons (GUI-9: the
+        Chain's stage tree puts Copy from 01 Setup and Load case… there,
+        board Chain lines 110-113, with the + buttons hidden)."""
+        lay = self.layout()
+        lay.insertWidget(lay.indexOf(self.pill), widget)
+        return widget
+
 
 def _add_button(text, fn):
     b = QPushButton(f'+  {text}')

@@ -163,7 +163,17 @@ class MainWindow(QMainWindow):
                                 log_fn=self._log_threadsafe,
                                 model_source=lambda: (
                                     self.run_panel.current_runs_dir(),
-                                    self.run_panel.current_run_name()))
+                                    self.run_panel.current_run_name()),
+                                # GUI-9: new stages start from 01 Setup;
+                                # Load case… reads as Open case does
+                                setup_source=self.current_case,
+                                case_reader=lambda path: (
+                                    self._read_case_file(path, 'Load case')))
+        # a Run-tab model change restarts the Chain's live checks (the
+        # Run chain line and the folder note name the model)
+        for box in (self.run_panel.runs_dir, self.run_panel.run_name):
+            box.textChanged.connect(
+                lambda _t: self.chain.schedule_checks())
         # GUI-9: the top bar's Chain link names the route
         self.chain.route_changed.connect(
             lambda key: self.topbar.set_chain_label(

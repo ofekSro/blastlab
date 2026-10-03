@@ -344,13 +344,18 @@ def main():
           sorted(panel.forms) == [1, 2, 3]
           and panel.forms[2].dim == 2)
     check('stage 1 is on top', panel.stage() == 1)
-    panel.stage_seg.changed.emit('Stage 3D')
+    # GUI-9 (plan §9 layout pin): the stage switcher became the pipeline's
+    # stage cards - a click on card 3 / card 1 selected
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    QTest.mouseClick(panel.cards[3], Qt.LeftButton)
     pump(20)
     check('the switcher moves between them', panel.stage() == 3)
     panel.focus_stage(1)
     pump(20)
     check('and focus_stage moves it back', panel.stage() == 1
-          and panel.stage_seg.get() == 'Stage 1D')
+          and panel.cards[1].selected()
+          and not panel.cards[3].selected())
 
     # C2 (the empty refusal) is gone with the checkboxes (GUI-9, plan §9
     # layout pin): no route can be empty; C13 pins the invalid routes.

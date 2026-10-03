@@ -59,6 +59,7 @@ class CaseForm(FieldForm):
                  parent=None, placement='columns'):
         self._mode = mode_mod.normalize(mode)
         self._trig = None            # the trigger switch widgets ('nodes')
+        self._fed = False            # a Chain stage fed by the one before
         super().__init__(dim, on_change=on_change, mode=self._mode,
                          parent=parent, placement=placement)
         # the reactive rules, registered once the widgets exist. A 0-D
@@ -85,6 +86,9 @@ class CaseForm(FieldForm):
             if 'profile_in' in self.v:
                 self.set_row_group('profile_in', 'prof')
                 self.on_field('init_mode', self._apply_mode)
+            if 'init_mode' in self.v:
+                # GUI-9: a fed Chain stage hides it (set_fed)
+                self.set_row_group('init_mode', 'unfed')
         if 'amr_levels' in self.v:
             self.on_field('amr_levels', self._apply_mode)
         if 'anim_scale' in self.v:
@@ -151,8 +155,27 @@ class CaseForm(FieldForm):
                                       # rows join these groups there)
                                       'trig': self._trigger_on(),
                                       'trig_raw': False,
-                                      'prof': self._profile_mode()})
+                                      'prof': (self._profile_mode()
+                                               and not self._fed),
+                                      'unfed': not self._fed})
         self._sync_trigger_widgets()
+
+    # ── GUI-9: a Chain stage fed by the stage before it ─────────────────
+    @property
+    def fed(self):
+        return self._fed
+
+    def set_fed(self, fed):
+        """A Chain stage fed by the one before it: the chain wires
+        `init_mode` and `profile_file_in` at run time, so the Initialize
+        from and Profile file rows are hidden (never greyed) - their
+        values are kept and `get_case()` is unchanged by it. 'nodes'
+        forms only; the Setup's forms are never fed (decision D-row)."""
+        fed = bool(fed) and self.placement == 'nodes'
+        if fed == self._fed:
+            return
+        self._fed = fed
+        self._apply_mode()
 
     def _profile_mode(self):
         """True while the case starts from a saved profile - the Profile

@@ -187,14 +187,15 @@ def _dim_label(form):
     return 'MODEL · 3D'
 
 
-def pill_text(errors, warnings, notes):
+def pill_text(errors, warnings, notes, ok_text='Case OK'):
     """(state, text) of the tree's case pill from report counts (plan
-    §5.1): `N errors` when invalid, else `Case OK` plus the counts."""
+    §5.1): `N errors` when invalid, else `Case OK` plus the counts. The
+    Chain's stage tree says `Stage OK` (GUI-9, board Chain line 116)."""
     def n(k, word):
         return f'{k} {word}{"" if k == 1 else "s"}'
     if errors:
         return 'error', n(errors, 'error')
-    bits = ['Case OK']
+    bits = [ok_text]
     if warnings:
         bits.append(n(warnings, 'warning'))
     if notes:

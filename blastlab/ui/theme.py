@@ -201,12 +201,33 @@ def make_palette(mode_name):
     return q
 
 
+def _blend(a, b, t):
+    """`a` blended toward `b` by t (0..1), '#rrggbb'."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return '#' + ''.join(f'{round(x + (y - x) * t):02x}'
+                         for x, y in zip(ca, cb))
+
+
+def chain_tint(mode_name=None):
+    """GUI-9: the fill of the selected stage card and of the tinted
+    hand-off card. `accent_bg`, except in light mode, where accent_text,
+    ok, warn, danger and faint fall to 4.24-4.47:1 on it; there it is
+    blended halfway toward `card` (#fdf4ef: all of them >= 4.6)."""
+    mode_name = mode_name or _mode
+    p = DARK if mode_name == 'dark' else LIGHT
+    if mode_name == 'dark':
+        return p['accent_bg']
+    return _blend(p['accent_bg'], p['card'], 0.5)
+
+
 def qss(mode_name):
     p = DARK if mode_name == 'dark' else LIGHT
     # Danger buttons: white fails 4.5:1 on the dark danger #ff5c7a
     # (2.97:1) and passes on the light #cb3067 (5.78:1) - measured by
     # tests/test_ui_theme.py, so the dark mode uses on_accent dark text.
     danger_fg = p['on_accent'] if mode_name == 'dark' else 'white'
+    tint = chain_tint(mode_name)
     return f"""
     QWidget {{ font-family: "{FONT}"; font-size: 13pt; }}
     QToolTip {{ background: {p['card2']}; color: {p['text']};
@@ -328,7 +349,7 @@ def qss(mode_name):
     QFrame#banner {{ background: {p['ok_bg']};
                      border: 1px solid {p['ok_border']};
                      border-radius: 10px; }}
-    QFrame#handoff {{ background: {p['accent_bg']};
+    QFrame#handoff {{ background: {tint};
                       border: 1px solid {p['accent_border']};
                       border-radius: 10px; }}
     QMenu::item:selected {{ background: {p['accent']};
@@ -738,6 +759,69 @@ def qss(mode_name):
         min-height: 30px; max-height: 32px; }}
     QLabel#fieldcaption {{ font-size: 11.5px; color: {p['muted']};
                            background: transparent; }}
+    /* GUI-9 Chain (board Chain lines 52-217). Every board height is
+       pinned here (D41): route buttons 32 in a 38 px group, Run chain
+       56, Copy / Load 36. */
+    QFrame#chaintop {{ background: transparent; border: none;
+                       border-bottom: 1px solid {p['border']}; }}
+    QLabel#chainfield {{ font-size: 12.5px; color: {p['muted']}; }}
+    QLabel#chaincaption {{ font-size: 12px; color: {p['faint']}; }}
+    QFrame#chainroutes {{ background: {p['bg']};
+        border: 1px solid {p['seg']}; border-radius: 10px;
+        min-height: 38px; max-height: 38px; }}
+    QPushButton#chainroute {{ background: transparent; color: {p['muted']};
+        border: none; border-radius: 7px; padding: 0px 14px;
+        min-height: 32px; max-height: 32px;
+        font-family: "{DISPLAY}"; font-size: 13px; font-weight: 600; }}
+    QPushButton#chainroute:hover {{ background: {p['hover']}; }}
+    QPushButton#chainroute:checked {{ background: {p['text']};
+                                      color: {p['bg']}; }}
+    QFrame#stagecard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QFrame#stagecard:hover {{ border: 1px solid {p['entry_border']}; }}
+    QFrame#stagecard[selected="true"] {{ background: {tint};
+        border: 1px solid {p['accent']}; }}
+    QLabel#stagenum {{ font-family: "{DISPLAY}"; font-size: 12px;
+                       font-weight: 600; color: {p['num_dim']}; }}
+    QLabel#stagenum[selected="true"] {{ color: {p['accent_text']}; }}
+    QLabel#stagetitle {{ font-family: "{DISPLAY}"; font-size: 16px;
+                         font-weight: 600; color: {p['text']}; }}
+    QLabel#stagechip {{ background: {p['hover']}; border-radius: 10px;
+        padding: 2px 8px; font-size: 11.5px; color: {p['text2']}; }}
+    QLabel#stagekey {{ font-family: "{MONO}"; font-size: 12.5px;
+                       color: {p['text2']}; }}
+    QLabel#stagestate {{ font-size: 12px; color: {p['ok']}; }}
+    QLabel#stagestate[state="warn"] {{ color: {p['warn']}; }}
+    QLabel#stagestate[state="error"] {{ color: {p['danger']}; }}
+    QLabel#stagefolder {{ font-family: "{MONO}"; font-size: 11.5px;
+                          color: {p['faint']}; }}
+    QLabel#handofflabel {{ font-family: "{MONO}"; font-size: 10.5px;
+                           color: {p['accent_soft']}; }}
+    QPushButton#chainrun {{ background: {p['accent']};
+        color: {p['on_accent']}; border: none; border-radius: 12px;
+        padding: 0px; min-height: 56px; max-height: 56px;
+        font-family: "{DISPLAY}"; font-size: 17px; font-weight: 700; }}
+    QPushButton#chainrun:hover {{ background: {p['accent_hover']}; }}
+    QPushButton#chainrun:disabled {{ background: {p['card2']};
+                                     color: {p['muted']}; }}
+    QLabel#chainrunline {{ font-size: 12px; color: {p['muted']}; }}
+    QPushButton#stagebtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 6px; min-height: 36px; max-height: 36px;
+        font-size: 12.5px; font-weight: 500; }}
+    QPushButton#stagebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#stagebtn:disabled {{ color: {p['muted']}; }}
+    QLabel#stageviewtitle {{ font-family: "{DISPLAY}"; font-size: 15px;
+                             font-weight: 600; color: {p['text']}; }}
+    QLabel#stagenumbers {{ font-family: "{MONO}"; font-size: 12px;
+                           color: {p['text2']}; }}
+    QLabel#stagefield {{ font-size: 12.5px; color: {p['muted']}; }}
+    QLabel#stagesub {{ font-size: 11.5px; color: {p['faint']}; }}
+    QLabel#stagenote {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#stagehint {{ font-size: 13px; color: {p['muted']}; }}
+    QFrame#handoffplain {{ background: {p['card']};
+                           border: 1px solid {p['border2']};
+                           border-radius: 10px; }}
     """
 
 
