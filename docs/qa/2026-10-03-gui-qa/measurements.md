@@ -40,4 +40,39 @@ Real platform, the committed `_e2e_ui_viewer_place.py`, HEAD after 10a, `--repea
 
 ## Results
 
-(Added after the runs.)
+Run 2026-10-03, 21:02-21:15, at **`8585aa6`** (the 10b HEAD after F29, D190,
+F34 and the F08 harness fix), real platform (`windows`), one sampler at a
+time, 1.0 GB free physical memory and 13.9 GB free commit before the
+first. Each sampler's self-test saw the deliberate 60 px / 150 ms
+displacement (149.8-149.9 ms, 60 px), so it can see a wrong place. Each
+stopped its own viewer child. The numbers are in
+[`viewer_measure_gui10.json`](viewer_measure_gui10.json).
+
+Changes near a viewer since 10a's HEAD: F29 (the top bar's spacing and
+the case button, above every screen), D190 (the tree's hover colour,
+QSS only) and F34 (the Run strip tiles' value face; their height is
+held, so nothing below them moves). `git diff fab0ebc..HEAD --
+blastlab/ui/view3d_host.py` is empty.
+
+**R10-PLACE** (longest wrong-place stretch, samples with a viewer window):
+
+| Surface | Action | Repeats (ms) | With window | Verdict |
+|---|---|---|---|---|
+| results | tabs | 0, 0, 0, 0, 0 | 1751 | PASS |
+| results | theme | 0, 0, 0, 0, 0 | 20481 | PASS |
+| run | tabs | 0, 0, 0, 0, 0 | 1751 | PASS |
+| run | theme | 0, 0, 0, 0, 0 | 20251 | PASS |
+| setup | chaintab | 0, 0, 0, 0, 0 | 1773 | PASS |
+
+**R10-RESIZE** (longest wrong stretch per repeat, 1600 ↔ 1100):
+
+| Surface | Repeats (ms) | Median | Max | Worst offset | Verdict |
+|---|---|---|---|---|---|
+| results | 9.8, 26.0, 14.8, 15.3, 28.4 | 15.3 | 28.4 | 472 px | PASS (≤ 50, ≤ 80) |
+| run | 44.0, 45.2, 44.8, 42.2, 44.7 | 44.7 | 45.2 | 476 px | PASS (≤ 50, ≤ 80) |
+| setup | 30.3, 30.4, 26.9, 27.6, 40.9 | 30.3 | 40.9 | 468 px | PASS (≤ 50, ≤ 80) |
+
+**Verdict: R10 passes on every surface, so GUI-10 did not regress F13.**
+No A/B at `fab0ebc` was needed. F13 itself stays open: the resize
+stretches (up to 45 ms, about 470 px) are the pre-existing lag the
+future viewer-host batch is to bring to ≤ 17 ms.
