@@ -25,8 +25,11 @@ _END = r"[^\s\\/'\"<>|*?(),;\[\]{}]*"
 #: a Windows drive path: inner folders may hold spaces (`C:\Users\Ofek
 #: Rotem\...`), the last segment stops at whitespace; a UNC path; a POSIX
 #: path of two or more segments that does not start mid-word (`1/3` and
-#: `kPa/ms` stay text)
-_PATH = re.compile(r"[A-Za-z]:[\\/](?:[^\\/\n'\"<>|*?]+[\\/])*" + _END
+#: `kPa/ms` stay text). The inner folders end with the separator the path
+#: started with and hold no `:` (verify10a): otherwise "C:\runs\M1 is
+#: missing, ratio 1/3" ran on to the `/` and "missing" vs "written"
+#: compared as `same`.
+_PATH = re.compile(r"[A-Za-z]:([\\/])(?:[^\\/\n'\"<>|*?:]+\1)*" + _END
                    + r"|\\\\[^\s'\"]+"
                    + r"|(?<![\w.])/(?:[^\s/'\"]+/)+" + _END)
 _DIGITS = re.compile(r'\d+')

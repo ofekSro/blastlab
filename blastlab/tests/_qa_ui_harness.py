@@ -4575,7 +4575,7 @@ def main():
 
     qa = QA(out, args)
     qa.solver_seed = args.solver or None
-    only =[g for g in args.only.split(',') if g]
+    only = [g for g in args.only.split(',') if g]
     skip = [s for s in args.skip.split(',') if s]
     for r in (s for s in args.redo.split(',') if s):
         qa.ckpt['done'].pop(r, None)
