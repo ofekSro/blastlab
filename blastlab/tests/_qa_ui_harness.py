@@ -106,7 +106,14 @@ class QA:
         self.paths = []
         self.app = None              # QApplication
         self.win = None              # MainWindow
+        #: (run generation, log length) taken at the last click (GUI-10,
+        #: F22); the generation counts RunDock.record_start calls, the
+        #: one place a run start clears the log
         self._log_mark = None
+        self._log_gen = 0
+        #: the solver mode neutral() puts back after every scenario
+        #: (GUI-10, D174): --solver, else the mode the app started in
+        self.solver_seed = None
         self._t_scn = time.perf_counter()
         self._warn_seen = set()
         self._in_callback = False
@@ -387,6 +394,9 @@ class QA:
         if not painted:
             self.note('the window never reported itself visible')
         self._watch_bridge()
+        self._watch_log_clear()
+        if not self.solver_seed:
+            self.solver_seed = self.win.solver_mode.get()
         self.log(f'window up: {self.win.width()}x{self.win.height()} '
                  f'(built {self.build_ms:.0f} ms, shown '
                  f'{self.first_paint_ms:.0f} ms)')
@@ -413,6 +423,28 @@ class QA:
         ThreadBridge._qa_real_run = real
         ThreadBridge._qa_wrapped = True
 
+    def _watch_log_clear(self):
+        """Count run starts (GUI-10, F22). `RunDock.record_start` is the
+        one place a run start clears the Log pane, so a mark taken before
+        the click is stale once the count has moved - whatever the new
+        log's length."""
+        from blastlab.ui.run_dock import RunDock
+        qa = self
+        if getattr(RunDock, '_qa_wrapped', False):
+            return
+        real = RunDock.record_start
+
+        def record_start(dock, *a, **kw):
+            qa._log_gen += 1
+            return real(dock, *a, **kw)
+        RunDock.record_start = record_start
+        RunDock._qa_real_record_start = real
+        RunDock._qa_wrapped = True
+
+    def mark_log(self):
+        """The mark wait_log searches after: (run generation, length)."""
+        self._log_mark = (self._log_gen, len(self.run_log()))
+        return self._log_mark
     # ── navigation / widget pokes ───────────────────────────────────────
     def goto(self, tab):
         self.action = f'goto {tab}'
@@ -428,7 +460,7 @@ class QA:
     def field(self, name, value, dim=None):
         form = self.win.setup._forms[dim or self.win.setup.dim]
         self.action = f'{name}={value}'
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         if form is self.win.setup.form:
             self.show_field(name)
         form.v[name].set(str(value))
@@ -450,7 +482,7 @@ class QA:
     def click(self, btn, label=''):
         """Press a button the way a user does, and refuse a dead one."""
         self.action = f'click {label or btn.text() or btn.objectName()}'
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         if not btn.isEnabled():
             self.finding('S2', 'dead-control',
                          f'{self.action} is disabled')
@@ -489,12 +521,18 @@ class QA:
         the mark taken when the button was pressed - and then the slice
         is empty forever and the wait always times out. A log shorter
         than its own mark has been cleared, so everything in it is new.
+
+        Length alone is not enough (GUI-10, F22): the new run's log can
+        already be LONGER than the mark at the first look, with the line
+        sitting before it. So the mark carries the run generation too; a
+        run started since the mark makes the whole log new.
         """
         def seen():
             log = self.run_log()
-            mark = self._log_mark or 0
-            if len(log) < mark:
-                self._log_mark = mark = 0
+            gen, mark = self._log_mark or (self._log_gen, 0)
+            if gen != self._log_gen or len(log) < mark:
+                self._log_mark = (self._log_gen, 0)
+                mark = 0
             return text in log[mark:]
         return self.until(seen, timeout)
 
@@ -569,7 +607,7 @@ class QA:
         from PySide6.QtGui import QKeySequence
         from PySide6.QtTest import QTest
         self.action = f'key {sequence}'
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         seq = QKeySequence(sequence)
         if not seq.count():
             return False
@@ -699,7 +737,7 @@ class QA:
         self._dialogs_since_shot = []
         self.answers = []
         self.paths = []
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         self._t_scn = time.perf_counter()
         self.log('--- begin ---')
 
@@ -736,6 +774,12 @@ class QA:
             self.reset_window()
             self.goto('setup')
             self.win.setup.set_dim(2)
+            # GUI-10 (D174): every scenario starts in the invocation's
+            # solver, whatever the one before it left (C05 / C07 leave
+            # blastFoam, and the app persists it)
+            if self.solver_seed and \
+                    self.win.solver_mode.get() != self.solver_seed:
+                self.solver(self.solver_seed)
             self.pump(0.3)
         except Exception as exc:
             self.log(f'(neutral failed: {exc})')
@@ -807,8 +851,58 @@ def install_warning_capture(qa):
         qa._warn_seen.add(key)
         # Qt says "QWidget::setMinimumSize: negative size" and the like;
         # those are layout bugs, not noise
-        qa.finding('S3', 'qt-message', text[:300])
+        evidence = (_font_engine_evidence(qa) if 'QFontEngine' in text
+                    else None)
+        qa.finding('S3', 'qt-message', text[:300], evidence=evidence)
     qInstallMessageHandler(qt_handler)
+
+
+def _free_physical_mb():
+    """Free physical memory in MB (Win32 GlobalMemoryStatusEx), or None."""
+    import ctypes
+
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [('dwLength', ctypes.c_ulong),
+                    ('dwMemoryLoad', ctypes.c_ulong),
+                    ('ullTotalPhys', ctypes.c_ulonglong),
+                    ('ullAvailPhys', ctypes.c_ulonglong),
+                    ('ullTotalPageFile', ctypes.c_ulonglong),
+                    ('ullAvailPageFile', ctypes.c_ulonglong),
+                    ('ullTotalVirtual', ctypes.c_ulonglong),
+                    ('ullAvailVirtual', ctypes.c_ulonglong),
+                    ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
+    try:
+        st = MEMORYSTATUSEX()
+        st.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+            return None
+        return round(st.ullAvailPhys / 2**20)
+    except Exception:
+        return None
+
+
+def _font_engine_evidence(qa):
+    """F26 (GUI-10): what a `QFontEngine` message needs to be classified -
+    the platform, the app and focus fonts, the action, free memory. The
+    finding keeps its S3; nothing is hidden."""
+    ev = dict(action=qa.action, free_physical_mb=_free_physical_mb())
+    if threading.current_thread() is not threading.main_thread():
+        # a message from a worker: no widget may be read from here
+        ev['thread'] = threading.current_thread().name
+        return ev
+    try:
+        app = qa.app
+        ev['platform'] = app.platformName()
+        ev['app_font'] = app.font().family()
+        w = app.focusWidget()
+        ev['focus_widget'] = (f'{type(w).__name__} {w.objectName()!r}'
+                              if w is not None else None)
+        ev['focus_font'] = (f'{w.font().family()} '
+                            f'{w.font().pointSizeF():g} pt'
+                            if w is not None else None)
+    except Exception as exc:
+        ev['error'] = f'{type(exc).__name__}: {exc}'
+    return ev
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -845,6 +939,12 @@ def b01_coldstart(qa):
             f'{qa.first_paint_ms:.0f} ms')
     qa.shot('coldstart')
     qa.note(f'window title: {qa.win.windowTitle()!r}')
+    # the top bar's unsaved marker; its `●` is also what F24's cp1252
+    # stdout died on (GUI-10)
+    tb = qa.win.topbar
+    qa.note(f'case button {tb.case_btn.text()!r}, unsaved marker '
+            f'{tb.dirty_lbl.text()!r} '
+            f'{"shown" if tb.dirty_lbl.isVisible() else "hidden"}')
     qa.note('validation strip on the default 2D case: '
             + ' | '.join(qa.strip_text()))
     # GUI-3: the sidebar checkbox became the case menu's Dark-mode action
@@ -1844,14 +1944,42 @@ def ensure_results(qa, names=('native1d', 'native2d', 'native3d')):
 
 
 def select_result(qa, label):
-    sel = qa.win.results.sel
-    for i in range(sel.count()):
-        if sel.itemText(i) == label or label in sel.itemText(i):
-            sel.setCurrentIndex(i)
+    """Select a result by its label, as a user picks it in the list.
+
+    GUI-10 (D177): a chain is ONE row with STAGE tabs (GUI-9), so a stage
+    label (`QA_CHAIN - 3D`) selects the chain's row and then its stage
+    tab. An exact entry or stage label wins; then the old loose match on
+    the row text (`QA native2d` finds `QA native2d #2`)."""
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    sel = rs.sel
+    ents = rs.entries()
+
+    def pick(i, stage_dim=None):
+        sel.setCurrentIndex(i)
+        qa.pump(0.8)
+        if stage_dim is not None:
+            rs.select_stage(stage_dim)
             qa.pump(0.8)
-            return True
+        return True
+
+    for i, e in enumerate(ents):
+        if e.label == label:
+            return pick(i)
+        if isinstance(e, ChainEntry):
+            for s in e.stages:
+                if s.label == label:
+                    return pick(i, s.dim)
+    for i in range(sel.count()):
+        if label in sel.itemText(i):
+            return pick(i)
+    every = []
+    for e in ents:
+        every.append(e.label)
+        if isinstance(e, ChainEntry):
+            every.extend(f'  stage {s.label}' for s in e.stages)
     qa.check(False, f'no result labelled {label!r} to select', 'S2',
-             evidence=str([sel.itemText(i) for i in range(sel.count())]))
+             evidence=str(every))
     return False
 
 
@@ -3062,6 +3190,30 @@ def g02_chain_run(qa):
     qa.goto('results')
     qa.shot('results_picker')
     _cache_result(qa, 'chain3d', dim=3)
+    # GUI-10 (D177): a chain stage is found by its own label, which
+    # selects the chain's row and its STAGE tab. The labels are the
+    # newest chain's (`QA_CHAIN - 3D` in a fresh process; a second chain
+    # in the same list is uniquified to `… #2`).
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    chains = [e for e in rs.entries() if isinstance(e, ChainEntry)]
+    stages = {s.dim: s.label for s in chains[-1].stages} if chains else {}
+    qa.check(stages.get(3, '').startswith('QA_CHAIN - 3D')
+             and stages.get(1, '').startswith('QA_CHAIN - 1D'),
+             'the chain is one Results entry with QA_CHAIN - 1D … 3D '
+             'stages', 'S2', evidence=str(stages))
+    for dim in (3, 1):
+        label = stages.get(dim, f'QA_CHAIN - {dim}D')
+        if select_result(qa, label):
+            cur = rs.current()
+            qa.check(rs.stage() == dim and cur is not None
+                     and cur.label == label,
+                     f'select_result({label!r}) shows that stage '
+                     f'(stage {rs.stage()}, '
+                     f'{getattr(cur, "label", None)!r})', 'S2')
+            qa.shot(f'chain_stage{dim}d')
+    if 3 in stages:
+        select_result(qa, stages[3])
 
 
 @scenario('G03', 'G', est=120)
@@ -4023,6 +4175,14 @@ def main():
                          "('native' | 'blastfoam')")
     args = ap.parse_args()
 
+    # GUI-10 (F24): a redirected stdout is cp1252 on this PC and the log
+    # lines carry the title's `●`; never die printing a log line
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
+
     if args.out:
         out = args.out
     elif args.resume and latest_out():
@@ -4053,7 +4213,8 @@ def main():
     sys.path.insert(0, REPO)
 
     qa = QA(out, args)
-    only = [g for g in args.only.split(',') if g]
+    qa.solver_seed = args.solver or None
+    only =[g for g in args.only.split(',') if g]
     skip = [s for s in args.skip.split(',') if s]
     for r in (s for s in args.redo.split(',') if s):
         qa.ckpt['done'].pop(r, None)
