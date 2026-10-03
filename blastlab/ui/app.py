@@ -857,7 +857,9 @@ class MainWindow(QMainWindow):
     # ── running ──────────────────────────────────────────────────────────
     def _run_single(self, paused=False):
         if self._hd13_busy:
-            # F5 and Initialise Model reach here with Run greyed
+            # F5 reaches here with every Run button greyed: say why
+            # nothing starts (GUI-11 T5, UXR-8, D206)
+            self.notify('An HD 1.3 assessment is running.', 'info')
             return
         try:
             case = self.setup.get_case()
@@ -989,6 +991,8 @@ class MainWindow(QMainWindow):
         self._set_hd13_busy(True)
         threading.Thread(target=work, name='hd13-assessment',
                          daemon=True).start()
+        # the assessment is followed on 02 Run, as a run is (D206)
+        self._show('run')
 
     def _set_hd13_busy(self, busy):
         """GUI thread: enter or leave the HD 1.3 busy state.
@@ -1009,6 +1013,10 @@ class MainWindow(QMainWindow):
         else:
             self._run_clock.stop()
         self.run_panel.set_busy(busy)
+        # Setup's Run F5 / Initialise and Run chain grey while it works:
+        # state greys, like Run during a run (GUI-11 T5, P2-18, D206)
+        self.setup.strip.set_busy(busy)
+        self.chain.set_busy(busy)
         if busy:
             self._switch_interval = sys.getswitchinterval()
             sys.setswitchinterval(min(self._switch_interval,
@@ -1019,6 +1027,10 @@ class MainWindow(QMainWindow):
             self._status_timer.stop()
         else:
             sys.setswitchinterval(self._switch_interval)
+            # a busy-time message (F5 while busy) ends with the busy
+            # state; `_hd13_done` says how it went, as before (D206)
+            self._status_timer.stop()
+            self._keys_lbl.setVisible(True)
 
     def _hd13_done(self, out, err, loads=None):
         """GUI thread: the worker of `_run_hd13` has finished.

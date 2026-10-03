@@ -42,6 +42,8 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      context menu's Copy give the path without U+200B; no QShortcut.
  R10 (GUI-10, F34) at 1100 x 720 a scientific P MAX keeps its unit: the
      tile's value face steps down, the tile keeps its height.
+ R11 (GUI-11 T5, F12 / D206) the 0-D run flow: 02 Run, the greys, the
+     note in place of the toolbar and the view, F5 while busy, `—` after.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1527,6 +1529,96 @@ def r10_pmax_fit(win):
     pump(200)
 
 
+def r11_hd13_flow(win):
+    """GUI-11 T5 (UXR-8 + F12 + QA S3-3, D206): the 0-D run flow, with
+    `assessment.run` blocked on an Event. Run on 0-D goes to 02 Run;
+    Setup's Run F5 and Run chain grey while it works; the toolbar and
+    the view hide behind one note; the last run's banner goes; F5 while
+    busy says why; after it the tile reads `—` and Run F5 is back."""
+    import threading
+    import time
+    import char_common as cc
+    from PySide6.QtGui import QShortcut
+    from blastlab.core import assessment
+    from blastlab.ui.run_panel import HD13_NOTE
+    print('\nR11: the 0-D run flow (GUI-11 T5, F12)')
+    rp = win.run_panel
+    gate = threading.Event()
+    real_run = assessment.run
+
+    def blocked(case):
+        gate.wait(60)
+        raise RuntimeError('released by the test')
+    errors = []
+    assessment.run = blocked
+    win.show_error = lambda t, m: errors.append((t, m))
+    try:
+        win._show('setup')
+        win.setup.set_dim(0)
+        pump(100)
+        win.setup.forms[0].set_case(cc.hd13_starter_case())
+        use_model(win, 'GUI11_HD13')
+        pump(400)
+        check('0-D: the toolbar row and the view are hidden, the note shown',
+              not rp._view_bar.isVisibleTo(rp)
+              and not rp._view_frame.isVisibleTo(rp)
+              and rp.hd13_note.isVisibleTo(rp)
+              and rp.hd13_note.text() == HD13_NOTE)
+        rp.show_finish('PREVIOUS', 'finished', None)
+        rp.strip.pct_lbl.setText('100 %')
+        check('(a previous run left its banner and its percent)',
+              not rp.banner.isHidden() and rp.pct_text() == '100 %')
+        win._run_single()
+        pump(100)
+        check('after Run on 0-D the window is on 02 Run',
+              win._hd13_busy and win.current_tab() == 'run',
+              f'busy={win._hd13_busy} tab={win.current_tab()}')
+        check("Setup's Run F5 and Initialise are disabled while busy",
+              not win.setup.strip.run_btn.isEnabled()
+              and not win.setup.strip.init_btn.isEnabled())
+        check('Run chain is disabled while busy',
+              not win.chain.run_btn.isEnabled())
+        check('the toolbar row and runview hidden, the note visible',
+              not rp._view_bar.isVisibleTo(rp)
+              and not rp._view_frame.isVisibleTo(rp)
+              and rp.hd13_note.isVisibleTo(rp))
+        check("the previous run's finish banner is hidden",
+              rp.banner.isHidden())
+        win._validate()             # a live check meanwhile keeps the grey
+        pump(50)
+        check('a validation while busy keeps Run F5 grey',
+              not win.setup.strip.run_btn.isEnabled())
+        f5 = [sc for sc in win.findChildren(QShortcut)
+              if sc.key().toString() == 'F5']
+        f5[0].activated.emit()
+        pump(20)
+        check('F5 while busy says so on the status line',
+              win._status.text() == 'An HD 1.3 assessment is running.',
+              repr(win._status.text()))
+        gate.set()
+        t0 = time.monotonic()
+        while win._hd13_busy and time.monotonic() - t0 < 60:
+            pump(50)
+        pump(100)
+        check('after release the progress tile reads —',
+              not win._hd13_busy and rp.pct_text() == '—',
+              repr(rp.pct_text()))
+        check('Run F5 and Run chain are enabled again',
+              win.setup.strip.run_btn.isEnabled()
+              and win.chain.run_btn.isEnabled())
+        check('(the blocked run ended in its error dialog)',
+              errors and errors[-1][0] == 'HD 1.3 assessment', str(errors))
+    finally:
+        gate.set()
+        assessment.run = real_run
+        del win.show_error
+        win.setup.set_dim(2)
+        pump(150)
+    check('back on 2D the toolbar and the view are visible, no note',
+          rp._view_bar.isVisibleTo(rp) and rp._view_frame.isVisibleTo(rp)
+          and not rp.hd13_note.isVisibleTo(rp))
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1545,6 +1637,7 @@ def main():
         r8_banner_viewer(win)
         r9_copy_path(win)
         r10_pmax_fit(win)
+        r11_hd13_flow(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a

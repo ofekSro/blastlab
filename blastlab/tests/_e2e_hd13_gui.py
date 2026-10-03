@@ -149,6 +149,9 @@ def main():
     QtNS = __import__('PySide6.QtCore', fromlist=['Qt']).Qt
     struct_card = form.cards['Structure']
     heat_card = form.cards['Heat']
+    # GUI-5 (D18): the properties column shows only the selected node's
+    # cards, so the control card's node is selected first (GUI-11, F39)
+    win.setup.show_card('Heat')
     for c in (struct_card, heat_card):
         c.setAttribute(QtNS.WA_NativeWindow, True)
     pump(200)

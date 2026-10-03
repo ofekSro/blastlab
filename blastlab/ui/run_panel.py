@@ -56,6 +56,11 @@ PATH_BLANK = '<Runs folder>' + os.sep + '<Model>' + os.sep
 TILE_MIN = 112
 PROGRESS_MIN = 220
 
+#: what a 0-D case shows where the view toolbar and the live view were
+#: (GUI-11 T5, F12 owner-approved as GUI-11 d, D206)
+HD13_NOTE = ('An HD 1.3 assessment has no field to show. When it ends, its '
+             'report and load files are listed in the log below.')
+
 #: Qt's QWIDGETSIZE_MAX (not exported by PySide6): "no maximum"
 QWIDGETSIZE_MAX = (1 << 24) - 1
 
@@ -342,7 +347,6 @@ class RunPanel(QWidget):
         self._frac = None           # the stage's progress fraction
         self._ended = None          # how the last run / assessment ended
         self._end_reason = ''       # the last result's stop_reason (T7)
-        self._pct_before_busy = '—'
         self._tick = QTimer(self)
         self._tick.setInterval(TICK_MS)
         self._tick.timeout.connect(self._render_time)
@@ -669,8 +673,10 @@ class RunPanel(QWidget):
 
         # the view toolbar: a row ABOVE the view, not floated over it -
         # the native 3D child window paints over any Qt sibling laid on
-        # top of it (CLAUDE.md 8.7)
-        bar = QHBoxLayout()
+        # top of it (CLAUDE.md 8.7). In a widget of its own, so a 0-D case
+        # can hide the row (GUI-11 T5, F12)
+        self._view_bar = QWidget()
+        bar = QHBoxLayout(self._view_bar)
         bar.setContentsMargins(0, 0, 0, 0)
         bar.setSpacing(GAP)
         segframe = QFrame()
@@ -692,7 +698,7 @@ class RunPanel(QWidget):
         self.show_mesh.setToolTip('Draw the cell edges over the live slice')
         self.show_mesh.toggled.connect(lambda _c: self._rebuild_overlay())
         bar.addWidget(self.show_mesh, 0, Qt.AlignVCenter)
-        cl.addLayout(bar)
+        cl.addWidget(self._view_bar)
 
         view = QFrame()
         view.setObjectName('runview')
@@ -712,6 +718,15 @@ class RunPanel(QWidget):
         self._stack.setCurrentWidget(self.pane)
         self._view_frame = view
         cl.addWidget(view, 1)
+        # 0-D: an HD 1.3 assessment has no field, so the toolbar and the
+        # view give their place to one note (GUI-11 T5, F12, D206)
+        self.hd13_note = QLabel(HD13_NOTE)
+        self.hd13_note.setObjectName('muted')
+        self.hd13_note.setWordWrap(True)
+        self.hd13_note.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.hd13_note.setContentsMargins(4, 8, 4, 8)
+        self.hd13_note.setVisible(False)
+        cl.addWidget(self.hd13_note, 1)
 
         # the dock Log · Messages · Earlier runs, Copy / Save log…
         # (ui/run_dock.py, UX-18); `log` is its Log page, as before
@@ -973,13 +988,16 @@ class RunPanel(QWidget):
     def set_dim(self, dim):
         """Hide, never grey (plan §9), what an HD 1.3 assessment does not
         have: Step through, the Live view card, the 3D button and the
-        Time / Step / p max tiles. Runs folder, Model, Run and the log
-        stay."""
+        Time / Step / p max tiles; and (GUI-11 T5, F12) the view toolbar
+        and the live view, which one 0-D note replaces. Runs folder,
+        Model, Run and the log stay."""
         self._dim = int(dim)
         blast = self._dim != 0
         for w in (self.step_card, self.live_card, self.view3d_btn,
-                  self._tile_time, self._tile_step, self._tile_pmax):
+                  self._tile_time, self._tile_step, self._tile_pmax,
+                  self._view_bar, self._view_frame):
             w.setVisible(blast)
+        self.hd13_note.setVisible(not blast)
         if not blast:
             self._tile_cells.hide()
         self.strip.arrange(force=True)
@@ -1216,14 +1234,15 @@ class RunPanel(QWidget):
     def set_busy(self, busy):
         """Mark a non-solve job (the HD 1.3 assessment) as working or done.
 
-        Busy: Run and Initialise Model off, the bar indeterminate. Nothing
-        else changes - the log, readouts and live view still describe the
-        last solve - and the bar gets its old value back afterwards.
+        Busy: Run and Initialise Model off, the bar indeterminate, the
+        last run's finish banner hidden. The log and the readouts still
+        describe the last solve, and the bar gets its old value back
+        afterwards; the percent tile reads `—` during and after (an
+        assessment has no fraction; GUI-11 T5, D206).
         """
         busy = bool(busy)
         if busy and not self._busy:
             self._bar_value = self.progress.value()
-            self._pct_before_busy = self.strip.pct_lbl.text()
         was = self._busy
         self._busy = busy
         if busy:
@@ -1231,10 +1250,15 @@ class RunPanel(QWidget):
             # no fraction to show (plan §6, last bullet)
             self.strip.pct_lbl.setText('—')
             self._ended = None
+            # an assessment is a run start (D166): the last run's finish
+            # banner goes (GUI-11 T5, D206)
+            self.banner.hide()
         else:
             self.progress.setRange(0, 1000)
             self.progress.setValue(self._bar_value)
-            self.strip.pct_lbl.setText(self._pct_before_busy)
+            # the assessment had no fraction; the tile must not go back
+            # to the last blast run's percent (GUI-11 T5, UXR-8, D206)
+            self.strip.pct_lbl.setText('—')
             if was:
                 self._ended = 'hd13'
         self._sync_tick()

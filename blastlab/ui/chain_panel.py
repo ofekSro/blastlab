@@ -145,6 +145,7 @@ class ChainPanel(QWidget):
         #: (path) -> case or None after its own error dialog (Load case…)
         self._case_reader = case_reader or self._read_case
         self._running = False       # a run is live somewhere in the app
+        self._busy = False          # an HD 1.3 assessment is working
         self._log = log_fn
         self.error_sink = error_sink or self._default_sink
         # every stage starts on the app-level solver and can be
@@ -327,7 +328,8 @@ class ChainPanel(QWidget):
         """The ONE owner of the Run button's enabled state. Two owners
         (set_running and the compat check) would fight, and whichever
         ran last would win."""
-        self.run_btn.setEnabled(not self._running and not self._compat_bad)
+        self.run_btn.setEnabled(not self._running and not self._busy
+                                and not self._compat_bad)
 
     # ── per-stage solver ─────────────────────────────────────────────────
     def set_stage_solver(self, d, m):
@@ -745,4 +747,12 @@ class ChainPanel(QWidget):
         flag is what `run()` consults, so the greyed button is the
         visible half of the guard and not the whole of it."""
         self._running = bool(running)
+        self._sync_run_btn()
+
+    def set_busy(self, busy):
+        """An HD 1.3 assessment is working (it runs on its own thread, not
+        the controller): Run chain greys until it ends - a state grey,
+        like Run during a run (GUI-11 T5, P2-18, D206). A direct `run()`
+        still reaches the window's own refusal (`_model_target`)."""
+        self._busy = bool(busy)
         self._sync_run_btn()

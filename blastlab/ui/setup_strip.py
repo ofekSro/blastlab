@@ -257,6 +257,9 @@ class LiveStrip(QFrame):
             t.caps.setFont(f)
             t.setVisible(False)
             self.tiles[name] = t
+        # Run F5 / Initialise: the last report has no errors, and no HD
+        # 1.3 assessment is working (set_run_enabled, set_busy)
+        self._case_ok, self._busy = True, False
         self.run_col = QWidget()
         rc = QVBoxLayout(self.run_col)
         rc.setContentsMargins(0, 0, 0, 0)
@@ -338,8 +341,20 @@ class LiveStrip(QFrame):
                 getattr(t.caption, '_full', t.caption.text()))
 
     def set_run_enabled(self, ok):
-        self.run_btn.setEnabled(bool(ok))
-        self.init_btn.setEnabled(bool(ok))
+        self._case_ok = bool(ok)
+        self._sync_run()
+
+    def set_busy(self, busy):
+        """An HD 1.3 assessment is working: Run F5 and Initialise grey
+        while it runs - a state grey, like Run during a run (GUI-11 T5,
+        D206) - whatever the live checks say meanwhile."""
+        self._busy = bool(busy)
+        self._sync_run()
+
+    def _sync_run(self):
+        ok = self._case_ok and not self._busy
+        self.run_btn.setEnabled(ok)
+        self.init_btn.setEnabled(ok)
 
     # ── layout: one row, or wrapped ──────────────────────────────────────
     def _items(self):
