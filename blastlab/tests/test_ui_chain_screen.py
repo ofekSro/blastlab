@@ -1024,6 +1024,17 @@ def s7_strip():
                                             'p max [kPa]'))
                   and tiles[:3] == ('—', '—', '—')
                   and tiles[3] == 'dt — s', f'{r} {tiles}')
+            # F28 (GUI-11 T7): held at stage 2's first gate, the PAUSED
+            # badge and the time line name no stage-1 step either
+            win.on_paused(True)
+            pump(20)
+            check('F28: held at stage 2\'s start, the badge reads PAUSED '
+                  'and the time line held, with no stage-1 step',
+                  rp.paused_text() == 'PAUSED'
+                  and rp.time_text().startswith('held · ')
+                  and '201' not in rp.time_text(),
+                  f'{rp.paused_text()!r} {rp.time_text()!r}')
+            win.on_paused(False)
             check('F27: the live pane restarted for the stage, not on its '
                   'placeholder', rp.pane._stack.currentIndex() == 1
                   and rp.pane.plot is not None)

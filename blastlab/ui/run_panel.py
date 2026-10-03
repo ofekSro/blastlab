@@ -1436,6 +1436,9 @@ class RunPanel(QWidget):
         # (GUI-10, F27 / D182). Only the texts: the live plot restarts
         # below and the 3D view is kept (_reset_readouts would drop both).
         self._reset_readouts_text()
+        # a stage held at its first gate: the PAUSED badge and the time
+        # line name no step of the last stage (F28, GUI-11 T7)
+        self._last_step = None
         self._last_field = None
         self._mesh_geom = None
         self._mesh_levels = None
