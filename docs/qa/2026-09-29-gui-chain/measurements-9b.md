@@ -112,3 +112,30 @@ the strip shown the median is the low mode. Worst offsets 472 px (results)
 and 476 px (run) at HEAD and at base: the shrink step of a 1600 → 1100
 resize, F13 as recorded. `view3d_host.py` is not edited in this batch; F13
 stays open (GUI-10 / the small batch after it).
+
+## Verifier re-run (9b verify, 2026-10-03)
+
+The rules above are unchanged since `771a00e` (`git diff 771a00e..HEAD` on
+this file adds only the Results sections), and every sampled run is
+recorded at `5ebd616`, after that commit. Two departures from the
+"Order of runs" paragraph, neither a changed rule: the run surface ran
+without `stage` (the R-VIEWER paragraph already makes it results-only,
+D168), and its plain `resize` ran before `stripresize`, after `chainstrip`
+had emptied the slot (the order of `viewer_measure_9b.json`'s actions), so
+"run median 45.1 with no strip" above is right.
+
+Re-run by the verifier with the same committed sampler at HEAD (`1a83437`,
+the two review fixes in; real platform, one process at a time, each
+viewer child closed with its window):
+
+| Surface | Action | Samples (with a window) | Longest wrong | Median | Rule | Verdict |
+|---|---|---|---|---|---|---|
+| run | `chainstrip` | 3222 (3222) | 0 ms | 0 ms | R-VIEWER 0 ms, ≥ 500 | PASS |
+| run | `stripresize` | 2321 (2321) | 29.7 ms | 27.4 ms | ≤ 31.5 ms | PASS |
+| results | `chainsel` | 2328 (2328) | 0 ms | 0 ms | R-VIEWER | PASS |
+| results | `stagetabs` | 2399 (2399) | 0 ms | 0 ms | R-VIEWER | PASS |
+| results | `chainresize` | 2259 (2259) | 26.4 ms | 24.2 ms | ≤ 32.6 ms | PASS |
+| setup | `chaintab` | 2169 (1055) | 0 ms | 0 ms | R-VIEWER | PASS |
+
+Self-tests 148.5 / 148.9 / 151.2 ms at 60 px (none void); `not child` 0
+everywhere; worst offsets 476 px (run) and 472 px (results), as above.

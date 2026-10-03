@@ -1,0 +1,420 @@
+{
+ "rules": "docs/qa/2026-09-29-gui-chain/measurements-9b.md (pre-registered, committed in 771a00e)",
+ "who": "GUI-9b verifier re-run, 2026-10-03",
+ "runs": {
+  "verify_run": {
+   "commit": "1a83437",
+   "surface": "run",
+   "platform": "windows",
+   "repeat": 3,
+   "tol_px": 2,
+   "watch_ms": 700,
+   "viewer_pid": 28744,
+   "actions": {
+    "chainstrip": {
+     "repeats": [
+      {
+       "samples": 1074,
+       "with_window": 1074,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 21.9,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 1066,
+       "with_window": 1066,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 23.7,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 1082,
+       "with_window": 1082,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 23.0,
+       "max_gap_ms": 2.6
+      }
+     ],
+     "samples": 3222,
+     "with_window": 3222,
+     "not_child": 0,
+     "longest_wrong_ms": 0.0,
+     "median_longest_wrong_ms": 0.0,
+     "worst_offset_px": 0,
+     "longest_mismatch_ms": 23.7
+    },
+    "stripresize": {
+     "repeats": [
+      {
+       "samples": 766,
+       "with_window": 766,
+       "not_child": 0,
+       "longest_wrong_ms": 25.7,
+       "worst_offset_px": 476,
+       "worst_past": [
+        0,
+        0,
+        476,
+        280
+       ],
+       "longest_mismatch_ms": 44.9,
+       "max_gap_ms": 3.5
+      },
+      {
+       "samples": 777,
+       "with_window": 777,
+       "not_child": 0,
+       "longest_wrong_ms": 27.4,
+       "worst_offset_px": 476,
+       "worst_past": [
+        0,
+        0,
+        476,
+        280
+       ],
+       "longest_mismatch_ms": 44.5,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 778,
+       "with_window": 778,
+       "not_child": 0,
+       "longest_wrong_ms": 29.7,
+       "worst_offset_px": 476,
+       "worst_past": [
+        0,
+        0,
+        476,
+        280
+       ],
+       "longest_mismatch_ms": 44.6,
+       "max_gap_ms": 2.6
+      }
+     ],
+     "samples": 2321,
+     "with_window": 2321,
+     "not_child": 0,
+     "longest_wrong_ms": 29.7,
+     "median_longest_wrong_ms": 27.4,
+     "worst_offset_px": 476,
+     "longest_mismatch_ms": 44.9
+    }
+   },
+   "self_test": {
+    "samples": 429,
+    "with_window": 429,
+    "not_child": 0,
+    "longest_wrong_ms": 148.5,
+    "worst_offset_px": 60,
+    "worst_past": [
+     0,
+     0,
+     60,
+     0
+    ],
+    "longest_mismatch_ms": 148.5,
+    "max_gap_ms": 2.5
+   }
+  },
+  "verify_results": {
+   "commit": "1a83437",
+   "surface": "results",
+   "platform": "windows",
+   "repeat": 3,
+   "tol_px": 2,
+   "watch_ms": 700,
+   "viewer_pid": 13064,
+   "actions": {
+    "chainsel": {
+     "repeats": [
+      {
+       "samples": 772,
+       "with_window": 772,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 22.1,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 777,
+       "with_window": 777,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 25.7,
+       "max_gap_ms": 2.6
+      },
+      {
+       "samples": 779,
+       "with_window": 779,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 24.3,
+       "max_gap_ms": 2.5
+      }
+     ],
+     "samples": 2328,
+     "with_window": 2328,
+     "not_child": 0,
+     "longest_wrong_ms": 0.0,
+     "median_longest_wrong_ms": 0.0,
+     "worst_offset_px": 0,
+     "longest_mismatch_ms": 25.7
+    },
+    "stagetabs": {
+     "repeats": [
+      {
+       "samples": 789,
+       "with_window": 789,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 800,
+       "with_window": 800,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.7
+      },
+      {
+       "samples": 810,
+       "with_window": 810,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.5
+      }
+     ],
+     "samples": 2399,
+     "with_window": 2399,
+     "not_child": 0,
+     "longest_wrong_ms": 0.0,
+     "median_longest_wrong_ms": 0.0,
+     "worst_offset_px": 0,
+     "longest_mismatch_ms": 0.0
+    },
+    "chainresize": {
+     "repeats": [
+      {
+       "samples": 743,
+       "with_window": 743,
+       "not_child": 0,
+       "longest_wrong_ms": 17.4,
+       "worst_offset_px": 472,
+       "worst_past": [
+        0,
+        0,
+        472,
+        280
+       ],
+       "longest_mismatch_ms": 28.7,
+       "max_gap_ms": 2.6
+      },
+      {
+       "samples": 754,
+       "with_window": 754,
+       "not_child": 0,
+       "longest_wrong_ms": 26.4,
+       "worst_offset_px": 472,
+       "worst_past": [
+        14,
+        0,
+        472,
+        280
+       ],
+       "longest_mismatch_ms": 29.1,
+       "max_gap_ms": 2.6
+      },
+      {
+       "samples": 762,
+       "with_window": 762,
+       "not_child": 0,
+       "longest_wrong_ms": 24.2,
+       "worst_offset_px": 472,
+       "worst_past": [
+        0,
+        0,
+        472,
+        280
+       ],
+       "longest_mismatch_ms": 29.1,
+       "max_gap_ms": 2.6
+      }
+     ],
+     "samples": 2259,
+     "with_window": 2259,
+     "not_child": 0,
+     "longest_wrong_ms": 26.4,
+     "median_longest_wrong_ms": 24.2,
+     "worst_offset_px": 472,
+     "longest_mismatch_ms": 29.1
+    }
+   },
+   "self_test": {
+    "samples": 437,
+    "with_window": 437,
+    "not_child": 0,
+    "longest_wrong_ms": 148.9,
+    "worst_offset_px": 60,
+    "worst_past": [
+     0,
+     0,
+     60,
+     0
+    ],
+    "longest_mismatch_ms": 148.9,
+    "max_gap_ms": 2.6
+   }
+  },
+  "verify_setup": {
+   "commit": "1a83437",
+   "surface": "setup",
+   "platform": "windows",
+   "repeat": 3,
+   "tol_px": 2,
+   "watch_ms": 700,
+   "viewer_pid": 29092,
+   "actions": {
+    "chaintab": {
+     "repeats": [
+      {
+       "samples": 736,
+       "with_window": 350,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.5
+      },
+      {
+       "samples": 717,
+       "with_window": 354,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.6
+      },
+      {
+       "samples": 716,
+       "with_window": 351,
+       "not_child": 0,
+       "longest_wrong_ms": 0.0,
+       "worst_offset_px": 0,
+       "worst_past": [
+        0,
+        0,
+        0,
+        0
+       ],
+       "longest_mismatch_ms": 0.0,
+       "max_gap_ms": 2.5
+      }
+     ],
+     "samples": 2169,
+     "with_window": 1055,
+     "not_child": 0,
+     "longest_wrong_ms": 0.0,
+     "median_longest_wrong_ms": 0.0,
+     "worst_offset_px": 0,
+     "longest_mismatch_ms": 0.0
+    }
+   },
+   "self_test": {
+    "samples": 431,
+    "with_window": 431,
+    "not_child": 0,
+    "longest_wrong_ms": 151.2,
+    "worst_offset_px": 60,
+    "worst_past": [
+     0,
+     0,
+     60,
+     0
+    ],
+    "longest_mismatch_ms": 151.2,
+    "max_gap_ms": 3.2
+   }
+  }
+ }
+}
