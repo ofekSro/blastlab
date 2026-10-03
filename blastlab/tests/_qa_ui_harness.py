@@ -513,6 +513,12 @@ class QA:
             self.finding('S2', 'dead-control',
                          f'{self.action} is disabled')
             return False
+        # GUI-10 (F33): click() fires on an invisible button too, and a
+        # user cannot press what is not on screen
+        if not btn.isVisible():
+            self.finding('S2', 'hidden-control',
+                         f'{self.action} is not on screen')
+            return False
         btn.click()
         if settle:
             self.pump(settle)
@@ -2130,6 +2136,12 @@ def d03_stepped(qa):
     qa.set_case(C['N2D'])
     qa.goto('run')
     rp = qa.win.run_panel
+    # GUI-6: Initialise and Exec sit in the Step through card, closed
+    # by default; open it as a user must (F33: press() refuses a hidden
+    # button)
+    if not rp.step_card.is_open():
+        qa.press(rp.step_card.header, 'Step through')
+    qa.check(rp.step_card.is_open(), 'the Step through card opens', 'S2')
     qa.click(rp.init_btn, 'Initialise Model')
     qa.pump(1.5)
     qa.shot('initialised')
@@ -4085,8 +4097,12 @@ def i01_rapid_tabs(qa):
         qa.pump(0.1)
     qa.action = ''
     qa.goto('run')
-    qa.check(qa.win.ctrl.running or not qa.win.ctrl.running,
-             'the window survived the switching', 'S1')
+    # F32: was `running or not running`, always true
+    qa.check(qa.win.isVisible() and qa.win.current_tab() == 'run'
+             and qa.win.run_panel.isVisible(),
+             'the window survived the switching', 'S1',
+             evidence=f'visible {qa.win.isVisible()}, '
+                      f'tab {qa.win.current_tab()!r}')
     qa.check(qa.run_wait(900), 'and the run still finished', 'S1')
     for k in ('setup', 'run', 'results', 'chain'):
         qa.goto(k)
