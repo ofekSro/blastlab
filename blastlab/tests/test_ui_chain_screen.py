@@ -34,6 +34,8 @@ board Chain; batch docs/batches/2026-09-29-gui-chain.md).
      same image as a plain entry of the same Result; every text export
      and the report equal a plain entry's (`describe_dir`); two chains of
      one model; a plain result hides the slot; Remove takes the chain.
+ S9  (GUI-10, F23) a Checks row with a path: Ctrl+C and the context
+     menu's Copy give the message without U+200B.
 
 Plain script, offscreen, throwaway settings, no window on screen:
     cd blastlab/tests && python test_ui_chain_screen.py
@@ -1317,6 +1319,45 @@ def s8_exports():
     pump(20)
 
 
+def s9_copy_checks(win):
+    """GUI-10 (F23, D181): a Checks row wraps a path after each separator
+    (ZWSP, D154), but a copy is the message itself: Ctrl+C and the
+    context menu's Copy strip U+200B; the text shown is unchanged."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QApplication, QLabel
+    from blastlab.ui.widgets import ZWSP
+    print('\nS9: copying a Checks row with a path (F23)')
+    win._show('chain')
+    pump(50)
+    ed = win.chain.editor()
+    msg = (r'Stage 2: the hand-off C:\Users\Someone\a long runs folder'
+           r'\MODEL\handoff_1d_to_2d.txt is missing (see C:/x/y/z)')
+    ed._rows = [('warn', msg)]
+    ed._render_checks()
+    pump(30)
+    lbl = next(w for w in ed._check_rows[0].findChildren(QLabel)
+               if w.objectName() == 'checktext')
+    check('the row shows the message with a ZWSP after each separator',
+          lbl.text() == msg.replace('\\', '\\' + ZWSP).replace(
+              '/', '/' + ZWSP), repr(lbl.text()[:50]))
+    clip = QApplication.clipboard()
+    clip.setText('before')
+    lbl.setSelection(0, len(lbl.text()))
+    QTest.keyClick(lbl, Qt.Key_C, Qt.ControlModifier)
+    pump(20)
+    check('select all + Ctrl+C copies the message exactly, no U+200B',
+          clip.text() == msg, repr(clip.text()[:50]))
+    clip.setText('before')
+    menu = lbl._clean_copy.menu()
+    next(a for a in menu.actions() if a.text() == 'Copy').trigger()
+    menu.deleteLater()
+    check("the context menu's Copy gives the same text",
+          clip.text() == msg, repr(clip.text()[:50]))
+    win.chain.schedule_checks()         # the real rows back
+    pump(400)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1331,6 +1372,7 @@ def main():
         s3_cards(win)
         s4_editor(win)
         s5_live(win)
+        s9_copy_checks(win)
         win.close()
         pump(100)
         s6_copy_load()

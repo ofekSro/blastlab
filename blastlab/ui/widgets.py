@@ -2,10 +2,12 @@
 chips, scroll columns and small factories, all styled through the
 object names `theme.qss` knows about."""
 
-from PySide6.QtCore import QSize, Qt, Signal    # noqa: F401
-from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QSizePolicy,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal  # noqa: F401
+from PySide6.QtGui import QKeySequence
+from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame,
+                               QHBoxLayout, QLabel, QMenu, QPushButton,
+                               QScrollArea, QSizePolicy, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from . import theme
 from .theme import GAP, PAD
@@ -93,6 +95,62 @@ def refresh_icons(root):
                 colour = icon_colour(b.objectName())
                 b._blastlab_icon = (name, size, colour)
             b.setIcon(theme.icon(name, size, color=colour))
+
+
+# ── copying a wrapped path (GUI-10, F23) ─────────────────────────────────
+#: the zero-width space a selectable label puts after a path separator so
+#: an unbroken path can wrap; it must never reach the clipboard
+ZWSP = '\u200b'
+
+
+class _CleanCopy(QObject):
+    """Ctrl+C and a Copy / Select all context menu for a selectable
+    label, copying its selection without ZWSP. An event filter, never a
+    QShortcut (test_ui_frame F5 pins the window's five)."""
+
+    def __init__(self, label):
+        super().__init__(label)
+        self._label = label
+        label.installEventFilter(self)
+        label.setContextMenuPolicy(Qt.CustomContextMenu)
+        label.customContextMenuRequested.connect(self._popup)
+
+    def copy(self):
+        text = self._label.selectedText()
+        if text:
+            QApplication.clipboard().setText(text.replace(ZWSP, ''))
+
+    def select_all(self):
+        self._label.setSelection(0, len(self._label.text()))
+
+    def menu(self):
+        """The context menu (built per request; the caller shows it)."""
+        m = QMenu(self._label)
+        copy = m.addAction('Copy', self.copy)
+        copy.setEnabled(self._label.hasSelectedText())
+        m.addAction('Select all', self.select_all)
+        return m
+
+    def _popup(self, pos):
+        m = self.menu()
+        m.setAttribute(Qt.WA_DeleteOnClose)
+        m.popup(self._label.mapToGlobal(pos))
+
+    def eventFilter(self, obj, event):
+        if obj is self._label and event.type() == QEvent.KeyPress \
+                and event.matches(QKeySequence.Copy):
+            self.copy()
+            event.accept()
+            return True
+        return False
+
+
+def clean_copy(label):
+    """Make copying `label`'s selection strip ZWSP (the text shown, its
+    wrap and its tooltip are unchanged). Returns the helper, also kept as
+    `label._clean_copy`."""
+    label._clean_copy = _CleanCopy(label)
+    return label._clean_copy
 
 
 def hbox(parent=None, spacing=GAP, margins=(0, 0, 0, 0)):

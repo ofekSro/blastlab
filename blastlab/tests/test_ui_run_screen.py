@@ -37,7 +37,9 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      the progress strip and None hides it again; `Chain 2/3 · …`;
  R8  the banner and the embedded 3D viewer (T9): show_finish shrinks the
      viewer's window by the banner's height first, only while the 3D view
-     is on screen and the banner was hidden.
+     is on screen and the banner was hidden;
+ R9  (GUI-10, F23) copying the wrapped model-folder path: Ctrl+C and the
+     context menu's Copy give the path without U+200B; no QShortcut.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1414,6 +1416,71 @@ def r8_banner_viewer(win):
           ok is True, str(ok))
 
 
+def r9_copy_path(win):
+    """GUI-10 (F23, D181): the resolved-folder line wraps after each
+    separator with a zero-width space, but what is copied is the path:
+    Ctrl+C and the context menu's Copy strip U+200B; the text shown is
+    unchanged and no QShortcut is added."""
+    from PySide6.QtGui import QShortcut
+    from PySide6.QtWidgets import QApplication
+    from blastlab.ui import run_panel as RP
+    from blastlab.ui.widgets import ZWSP
+    print('\nR9: copying the wrapped model-folder path (F23)')
+    rp = win.run_panel
+    deep = tempfile.mkdtemp(prefix='blastlab_r9_')
+    runs = os.path.join(deep, 'a very long runs folder', 'second level',
+                        'third level of the runs folder')
+    os.makedirs(runs, exist_ok=True)
+    n_short = len(win.findChildren(QShortcut))
+    rp.set_runs_dir(runs)
+    rp.run_name.setText('A_LONG_MODEL_NAME_FOR_THE_COPY_TEST')
+    pump(RP.PATH_DEBOUNCE_MS + 150)
+    lbl = rp._path_lbl
+    want = rp.path_text()
+    check('the label shows the path with a ZWSP after each separator',
+          lbl.text() == want.replace(os.sep, os.sep + ZWSP)
+          and ZWSP in lbl.text(), repr(lbl.text()[:60]))
+    clip = QApplication.clipboard()
+    clip.setText('before')
+    lbl.setSelection(0, len(lbl.text()))
+    QTest.keyClick(lbl, Qt.Key_C, Qt.ControlModifier)
+    pump(20)
+    got = clip.text()
+    check('select all + Ctrl+C copies path_text() exactly, no U+200B',
+          got == want and ZWSP not in got, repr(got[:60]))
+    clip.setText('before')
+    menu = lbl._clean_copy.menu()
+    names = [a.text() for a in menu.actions() if a.text()]
+    check('the context menu holds Copy and Select all',
+          names == ['Copy', 'Select all'], str(names))
+    next(a for a in menu.actions() if a.text() == 'Copy').trigger()
+    got = clip.text()
+    check("the context menu's Copy gives the same text",
+          got == want, repr(got[:60]))
+    menu.deleteLater()
+    lbl.setSelection(0, 0)
+    clip.setText('before')
+    menu = lbl._clean_copy.menu()
+    copy = next(a for a in menu.actions() if a.text() == 'Copy')
+    check('with nothing selected the menu\'s Copy is disabled',
+          not copy.isEnabled())
+    next(a for a in menu.actions() if a.text() == 'Select all').trigger()
+    menu.deleteLater()
+    menu = lbl._clean_copy.menu()
+    next(a for a in menu.actions() if a.text() == 'Copy').trigger()
+    check('Select all, then Copy, copies the whole path',
+          clip.text() == want, repr(clip.text()[:60]))
+    menu.deleteLater()
+    check('the label is still a custom-menu, mouse-selectable label',
+          lbl.contextMenuPolicy() == Qt.CustomContextMenu
+          and bool(lbl.textInteractionFlags() & Qt.TextSelectableByMouse))
+    check('no QShortcut was added (test_ui_frame F5 pins five)',
+          len(win.findChildren(QShortcut)) == n_short,
+          f'{n_short} -> {len(win.findChildren(QShortcut))}')
+    use_model(win, 'R1')
+    pump(RP.PATH_DEBOUNCE_MS + 150)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1430,6 +1497,7 @@ def main():
         r6_finish(win)
         r7_chain_hook(win)
         r8_banner_viewer(win)
+        r9_copy_path(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a

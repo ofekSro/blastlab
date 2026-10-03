@@ -31,7 +31,7 @@ from .setup_panel import (PROPS_PAD, PROPS_W, WHEEL_ZOOM, DerivedCard,
                           _tool_button, pill_text)
 from .setup_tree import TREE_MIN, SetupTree, _letter_space
 from .theme import GAP
-from .widgets import Card, Segmented, label
+from .widgets import ZWSP, Card, Segmented, clean_copy, label
 
 #: the stage tree's width (board Chain line 100)
 TREE_W = 272
@@ -306,12 +306,14 @@ class StageEditor(QWidget):
             rl.addWidget(pic, 0, Qt.AlignTop)
             # a path in a message may wrap after a separator: unbroken it
             # would set the page's minimum and widen the column (D19)
-            shown = str(message).replace('\\', '\\​') \
-                .replace('/', '/​')
+            shown = str(message).replace('\\', '\\' + ZWSP) \
+                .replace('/', '/' + ZWSP)
             text = label(shown, 'body', wrap=True)
             text.setObjectName('checktext')
             text.setStyleSheet(f'color: {theme.cur(colour)};')
             text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            # a copied message carries no ZWSP (GUI-10, F23)
+            clean_copy(text)
             rl.addWidget(text, 1)
             self._checks_box.addWidget(row)
             self._check_rows.append(row)

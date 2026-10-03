@@ -29,7 +29,8 @@ from .run_gauges import GaugeColumn
 from .setup_strip import fmt_count
 from .setup_tree import _letter_space
 from .theme import GAP
-from .widgets import ScrollColumn, Segmented, set_button_kind
+from .widgets import (ZWSP, ScrollColumn, Segmented, clean_copy,
+                      set_button_kind)
 
 #: the Runs folder's Browse button (the Tk folder icon says the same)
 BROWSE_TIP = ('Choose the Runs folder: the folder that holds one '
@@ -433,6 +434,9 @@ class RunPanel(QWidget):
         self._path_lbl.setSizePolicy(QSizePolicy.Ignored,
                                      QSizePolicy.Preferred)
         self._path_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # the shown text wraps after each separator (ZWSP); a copy is the
+        # path itself (GUI-10, F23)
+        clean_copy(self._path_lbl)
         prow.addWidget(self._path_lbl, 1)
         wl.addLayout(prow)
         self._path_text = PATH_BLANK
@@ -870,7 +874,7 @@ class RunPanel(QWidget):
             text = PATH_BLANK
         self._path_text = text
         # break after the separators, so a long path wraps in the column
-        self._path_lbl.setText(text.replace(os.sep, os.sep + '\u200b'))
+        self._path_lbl.setText(text.replace(os.sep, os.sep + ZWSP))
         self._path_lbl.setToolTip(text)
 
     def path_text(self):
