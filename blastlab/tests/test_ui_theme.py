@@ -81,6 +81,9 @@ GATE_PAIRS = ([(t, b) for t in ('text', 'text2', 'muted', 'faint')
 #: fill (number, title, caption, the ✓ / ! / ✗ marks), all >= 4.5
 SELECTED_ROW_ROLES = ('accent_text', 'text', 'faint', 'ok', 'warn',
                       'danger')
+#: GUI-10 (D190): every role an unselected tree row or child row draws
+TREE_HOVER_ROLES = ('num_dim', 'text', 'text2', 'faint', 'ok', 'warn',
+                    'danger', 'gauge')
 #: num_dim before GUI-10, for the printed old -> new line
 NUM_DIM_BEFORE = {'dark': '#6f6a63', 'light': '#9b958c'}
 
@@ -205,8 +208,9 @@ def t5_contrast():
 def t6_selected_row():
     """GUI-10 (F8, D180): the selected model-tree row's fill is the
     QSS rule's own (`treerow[selected="true"]`), and every role drawn on
-    it reaches 4.5:1. Hover rows are printed for the report, not gated
-    (D180: the global `hover` key is unchanged)."""
+    it reaches 4.5:1. D190: a hovered tree row (node or child) is on the
+    tree's own `tree_hover` fill, gated the same way; the global `hover`
+    key is unchanged and only printed."""
     import re
     print('\nT6: the selected tree row (every role >= 4.5)')
     for name, pal in (('dark', theme.DARK), ('light', theme.LIGHT)):
@@ -226,10 +230,27 @@ def t6_selected_row():
                 worst = (r, role)
         check(f'{name}: every role on the selected row >= 4.5',
               worst[0] >= 4.5, f'worst {worst[1]} = {worst[0]:.2f}')
-        print(f'    (hover, not gated: '
+        print(f'    (global hover, not gated: '
               + ', '.join(f'{role} {contrast(pal[role], pal["hover"]):.2f}'
                           for role in ('num_dim', 'text', 'faint', 'ok',
                                        'warn', 'danger')) + ')')
+        # GUI-10 (D190): the tree rows' own hover fill, in the QSS of both
+        # the node rows and the child rows, gated like the selection
+        hov = theme.tree_hover(name)
+        rules = [re.search(rf'QFrame#{obj}:hover\s*\{{\s*background:\s*'
+                           r'(#[0-9a-fA-F]{6})', theme.qss(name))
+                 for obj in ('treerow', 'treechild')]
+        got = [m.group(1) if m else None for m in rules]
+        check(f'{name}: tree rows hover on tree_hover ({hov}), the global '
+              f'hover {pal["hover"]} unchanged', got == [hov, hov], str(got))
+        worst = None
+        for role in TREE_HOVER_ROLES:
+            r = contrast(pal[role], hov)
+            print(f'    {role:12s} on hover {hov}  {r:6.2f}')
+            if worst is None or r < worst[0]:
+                worst = (r, role)
+        check(f'{name}: every role on a hovered tree row >= 4.5',
+              worst[0] >= 4.5, f'worst {worst[1]} = {worst[0]:.2f}')
 
 
 def main():

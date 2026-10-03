@@ -225,6 +225,21 @@ def chain_tint(mode_name=None):
     return _blend(p['accent_bg'], p['card'], 0.5)
 
 
+#: GUI-10 (D190): how far the tree rows' hover is blended from `hover`
+#: toward `panel` - the smallest step at which every role drawn on a
+#: row (num_dim, text, text2, faint, ok, warn, danger, gauge) reaches
+#: 4.5:1 (dark: num_dim 4.06 -> 4.50; light: warn 4.01 -> 4.50)
+TREE_HOVER_BLEND = {'dark': 0.76, 'light': 0.66}
+
+
+def tree_hover(mode_name=None):
+    """The model tree's own row hover fill; the global `hover` key, used
+    by every other control, is unchanged (D190)."""
+    mode_name = mode_name or _mode
+    p = DARK if mode_name == 'dark' else LIGHT
+    return _blend(p['hover'], p['panel'], TREE_HOVER_BLEND[mode_name])
+
+
 def qss(mode_name):
     p = DARK if mode_name == 'dark' else LIGHT
     # Danger buttons: white fails 4.5:1 on the dark danger #ff5c7a
@@ -232,6 +247,7 @@ def qss(mode_name):
     # tests/test_ui_theme.py, so the dark mode uses on_accent dark text.
     danger_fg = p['on_accent'] if mode_name == 'dark' else 'white'
     tint = chain_tint(mode_name)
+    tree_hov = tree_hover(mode_name)
     # GUI-9b: an orange edge that must read as a graphic (>= 3:1) - the
     # running chain pill; `accent` is 2.72:1 on the light panel, so the
     # darker accent_text there (D152's arrow rule)
@@ -346,7 +362,7 @@ def qss(mode_name):
     QFrame#tile[variant="accent"] {{ background: {p['accent_bg']}; }}
     QFrame#treerow {{ background: transparent; border: none;
                       border-radius: 9px; }}
-    QFrame#treerow:hover {{ background: {p['hover']}; }}
+    QFrame#treerow:hover {{ background: {tree_hov}; }}
     /* GUI-10 (F8 / D180): the chain tint, as on the selected stage card -
        on light accent_bg the number (accent_text 4.28) and the caption
        (faint 4.47) fell under 4.5:1; dark is accent_bg, unchanged */
@@ -414,7 +430,7 @@ def qss(mode_name):
     QLabel#propscaption {{ font-size: 12px; color: {p['muted']}; }}
     QFrame#treechild {{ background: transparent; border: none;
                         border-radius: 7px; }}
-    QFrame#treechild:hover {{ background: {p['hover']}; }}
+    QFrame#treechild:hover {{ background: {tree_hov}; }}
     QLabel#childname {{ font-size: 13px; color: {p['text2']}; }}
     QLabel#childval {{ font-family: "{MONO}"; font-size: 11px;
                        color: {p['faint']}; }}
