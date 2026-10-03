@@ -40,7 +40,9 @@ Real platform, the committed `_e2e_ui_viewer_place.py`, HEAD after 10a, `--repea
 
 ## Results
 
-Run 2026-10-03, 21:02-21:15, at **`8585aa6`** (the 10b HEAD after F29, D190,
+Run 2026-10-03, 21:02-21:05 (verify10b: this read "21:15", a typo; the
+three raw sampler outputs are stamped 21:03, 21:04 and 21:05, and these
+results were committed at 21:06), at **`8585aa6`** (the 10b HEAD after F29, D190,
 F34 and the F08 harness fix), real platform (`windows`), one sampler at a
 time, 1.0 GB free physical memory and 13.9 GB free commit before the
 first. Each sampler's self-test saw the deliberate 60 px / 150 ms
