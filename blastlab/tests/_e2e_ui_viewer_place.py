@@ -32,7 +32,19 @@ card.
                                 busy, stage, tabs, theme, resize
                                 (default: all that apply); an
                                 action the code under test lacks (a base
-                                worktree) is reported as unavailable
+                                worktree) is reported as unavailable.
+                                GUI-9 (batch 2026-09-29-gui-chain T6, the
+                                rules in docs/qa/2026-09-29-gui-chain/
+                                measurements-9b.md): chainsel (results:
+                                a chain whose 3D stage is selected <-> a
+                                plain 3D entry, the STAGE tabs appear and
+                                go), stagetabs (results: the tabs 3D ->
+                                1D -> 3D), chainstrip (run: the chain
+                                strip shown / stage_started(1) / hidden),
+                                chaintab (setup: Chain -> Setup),
+                                chainresize (results, a chain selected)
+                                and stripresize (run, the strip shown):
+                                `resize` with the new widget on screen
   --repeat N                    repeats per action (default 3)
   --out file.json               where to write the numbers
 
@@ -62,7 +74,8 @@ WATCH_MS = 700
 PERIOD_S = 0.0015
 
 ACTIONS = ('open3d', 'views', 'select', 'busy', 'stage', 'tabs', 'theme',
-           'resize')
+           'resize', 'chainsel', 'stagetabs', 'chainstrip', 'chaintab',
+           'chainresize', 'stripresize')
 
 
 class _RECT(ctypes.Structure):
@@ -241,6 +254,15 @@ def tiny_3d():
     return get_solver(3, 'native')(case, RunHooks())
 
 
+def tiny_1d():
+    """GUI-9: the Phase 0 1D case, for a chain's first stage."""
+    sys.path.insert(0, HERE)
+    from test_char_native_api import CASES
+    from blastlab.solvers import get_solver
+    from blastlab.solvers.hooks import RunHooks
+    return get_solver(1, 'native')(CASES['1d'], RunHooks())
+
+
 def model_folder(res, root):
     """A copy of the result's meta pointing at a model folder with a
     MODEL.json and a manifest, so its method card has more rows."""
@@ -303,6 +325,19 @@ def main():
     ent_b = rs.add_result('viewer B (3D)', 3, res)
     ent_a = rs.add_result('viewer A (3D)', 3, res_a)
     settle(200)
+    actions = [a.strip() for a in args.actions.split(',') if a]
+    # GUI-9: a 1 -> 3 chain entry (a tiny native 1D result + this 3D
+    # result) for the chain actions; entry A stays the one selected, as
+    # without it. Code without chains (a base worktree): none.
+    chain = None
+    if args.surface == 'results' and hasattr(rs, 'start_chain') and any(
+            a in ('chainsel', 'stagetabs', 'chainresize') for a in actions):
+        print('solving the tiny native 1D case ...', flush=True)
+        chain = rs.start_chain('viewer chain', [1, 3])
+        rs.add_stage(chain, 'viewer chain - 1D', 1, tiny_1d())
+        rs.add_stage(chain, 'viewer chain - 3D', 3, res)
+        rs.sel.setCurrentIndex(rs.entries().index(ent_a))
+        settle(200)
 
     if args.surface == 'results':
         win._show('results')
@@ -411,9 +446,63 @@ def main():
             if name == 'resize':
                 return [lambda: win.resize(1100, 720),
                         lambda: win.resize(1600, 1000)]
+            # ── GUI-9 (T6): the chain's new widgets above the viewer ──
+            if name in ('chainsel', 'stagetabs', 'chainresize'):
+                if args.surface != 'results' or chain is None:
+                    return None
+                ia = rs.entries().index(ent_a)
+                ic = rs.entries().index(chain)
+                if name == 'chainsel':
+                    # from the plain entry A (no tabs) to the chain on its
+                    # 3D stage (the tabs appear) and back (they go)
+                    if rs.sel.currentIndex() != ia:
+                        rs.sel.setCurrentIndex(ia)
+                        settle(600)
+                    chain.index = len(chain.stages) - 1
+                    return [lambda: rs.sel.setCurrentIndex(ic),
+                            lambda: rs.sel.setCurrentIndex(ia)]
+                # the chain selected on its 3D stage, the tabs shown
+                if rs.sel.currentIndex() != ic:
+                    rs.sel.setCurrentIndex(ic)
+                    settle(600)
+                if rs.select_stage(3):
+                    settle(300)
+                if name == 'stagetabs':
+                    tabs = rs.stage_tabs
+                    return [lambda: tabs.button(1).click(),
+                            lambda: tabs.button(3).click()]
+                return [lambda: win.resize(1100, 720),
+                        lambda: win.resize(1600, 1000)]
+            if name in ('chainstrip', 'stripresize'):
+                if args.surface != 'run':
+                    return None
+                try:
+                    from blastlab.ui.chain_strip import ChainStrip
+                except ImportError:
+                    return None
+                rp = win.run_panel
+                strip = ChainStrip()
+                strip.set_chain('viewer', [1, 2, 3])
+                strip.arrange(rp.column_widths()[1])
+                if name == 'chainstrip':
+                    if rp.chain_strip() is not None:
+                        rp.set_chain_strip(None)
+                        settle(600)
+                    return [lambda: rp.set_chain_strip(strip),
+                            lambda: strip.stage_started(1),
+                            lambda: rp.set_chain_strip(None)]
+                rp.set_chain_strip(strip)
+                settle(600)
+                return [lambda: win.resize(1100, 720),
+                        lambda: win.resize(1600, 1000)]
+            if name == 'chaintab':
+                if args.surface != 'setup':
+                    return None
+                return [lambda: win._show('chain'),
+                        lambda: win._show('setup')]
             return None
 
-        for name in [a.strip() for a in args.actions.split(',') if a]:
+        for name in actions:
             reps = []
             for _k in range(max(1, args.repeat)):
                 show_surface()

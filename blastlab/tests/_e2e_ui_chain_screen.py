@@ -1,8 +1,8 @@
 """GUI-9: a native 1D -> 2D chain from the new Chain screen, end to end.
 
-Batch docs/batches/2026-09-29-gui-chain.md, T3 (the 9a form; part 9b
-adds the Run strip and the one Results entry with stage tabs). Every
-step goes through what a user clicks:
+Batch docs/batches/2026-09-29-gui-chain.md, T3 (the 9a form) and T6 (9b:
+the Run strip and the one Results entry with stage tabs). Every step
+goes through what a user clicks:
 
   1. a tiny 2D case opened in 01 Setup (`_open_case`, the test_ui_chain
      C11 2D case saved to a scratch JSON);
@@ -14,7 +14,15 @@ step goes through what a user clicks:
      stage 2 turns card 2 to `● 1 error`, and back once fixed;
   5. **Run chain** clicked (`QTest.mouseClick`); the chain finishes;
   6. the model folder is test_ui_chain C11's layout (`.blastlab-model`,
-     `1d`, `2d`, `handoff_1d_to_2d.txt`, `manifest.json`).
+     `1d`, `2d`, `handoff_1d_to_2d.txt`, `manifest.json`);
+  7. (9b) the 02 Run strip, sampled at every progress message and every
+     pump of the run, passes through `02 2D NN %` with `01 1D ✓ …` before
+     it, and the title through `Chain 2/2 · `; at the end both pills are
+     ✓ and the caption reads `Chain done in …`;
+  8. (9b) 03 Results holds ONE entry, kind `chain`, its `chain` badge
+     shown, the tabs `1D | 2D`; each tab's Field page draws; the 2D
+     stage's Summary .csv equals (sha256) a plain entry's export of the
+     same Result.
 
 Real platform by default (QT_QPA_PLATFORM unset); `--offscreen` for a
 CI-style run. Throwaway settings, `use_model`, no WSL. `--shots DIR`
@@ -57,6 +65,27 @@ def _arg(flag):
         i = sys.argv.index(flag)
         return sys.argv[i + 1] if i + 1 < len(sys.argv) else None
     return None
+
+
+def export_sha(panel, kind, tmp, tag):
+    """sha256 of the file `panel.export(kind)` writes for its current
+    entry (the save dialog patched to a scratch folder), or None."""
+    import hashlib
+    from blastlab.ui import dialogs
+    out = os.path.join(tmp, f'export_{tag}')
+    os.makedirs(out, exist_ok=True)
+    real = dialogs.save_file
+    dialogs.save_file = (lambda title, filters='', parent=None, start='',
+                         default_suffix=None:
+                         os.path.join(out, os.path.basename(start) or 'x'))
+    try:
+        target = panel.export(kind, threaded=False)
+    finally:
+        dialogs.save_file = real
+    if not target or not os.path.isfile(target):
+        return None
+    with open(target, 'rb') as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 
 def main():
@@ -172,14 +201,37 @@ def main():
         print('\nE5: Run chain clicked')
         refusals = []
         ch.error_sink = lambda t, lines: refusals.append(list(lines))
+        # 9b: the strip and the title, sampled at every progress message
+        # (the handler is the window's own, called by the controller)
+        samples = []
+
+        def sample():
+            s = win.run_panel.chain_strip()
+            samples.append((s.texts() if s is not None else None,
+                            win.windowTitle()))
+
+        real_progress = win.on_progress
+
+        def on_progress(p):
+            real_progress(p)
+            sample()
+        win.on_progress = on_progress
         QTest.mouseClick(ch.run_btn, Qt.LeftButton)
         pump(300)
         check('the chain started', win.ctrl.running and not refusals,
               str(refusals))
         t0 = time.time()
+        shot_mid = False
         while win.ctrl.running and time.time() - t0 < 600:
-            pump(100)
+            pump(20)
+            sample()
+            texts = samples[-1][0] or []
+            if not shot_mid and len(texts) > 1 and texts[1].startswith(
+                    '02 2D') and texts[1].endswith('%'):
+                shot('run_stage2')
+                shot_mid = True
         print(f'    chain took {time.time() - t0:.1f} s')
+        win.on_progress = real_progress
         check('and finished without an error dialog',
               not win.ctrl.running and not shown, str(shown))
         shot('done')
@@ -192,6 +244,52 @@ def main():
         names = [lbl for lbl, _d, _r in win._results]
         check('the stage results are named after the model',
               names == ['CHAIN_E2E - 1D', 'CHAIN_E2E - 2D'], str(names))
+
+        print('\nE7 (9b): the 02 Run chain strip during and after the run')
+        import re
+        stage2 = [t for t, _title in samples
+                  if t and len(t) > 2 and re.fullmatch(r'02 2D \d+ %', t[1])]
+        check('the strip passed through 02 2D NN % with 01 1D ✓ before it',
+              any(re.fullmatch(r'01 1D ✓ .+', t[0]) for t in stage2),
+              ascii(stage2[:2] or samples[-3:]))
+        check('the title passed through Chain 2/2 · ',
+              any(title.startswith('Chain 2/2 · ') for _t, title in samples),
+              ascii(sorted({title[:20] for _t, title in samples})))
+        end = win.run_panel.chain_strip()
+        texts = end.texts() if end is not None else []
+        check('after the end: two ✓ pills and Chain done in …',
+              len(texts) == 3 and texts[0].startswith('01 1D ✓ ')
+              and texts[1].startswith('02 2D ✓ ')
+              and texts[2].startswith('Chain done in '), ascii(texts))
+        print(f'    {len(samples)} samples; at the end {ascii(texts)}')
+
+        print('\nE8 (9b): one Results entry with STAGE tabs')
+        rs = win.results
+        QTest.mouseClick(win.topbar.nav_btns['results'], Qt.LeftButton)
+        pump(400)
+        ents = rs.entries()
+        check('one entry, kind chain, its chain badge shown',
+              len(ents) == 1 and ents[0].kind == 'chain'
+              and not rs.sel.row(0).chain.isHidden(),
+              str([(e.label, e.kind) for e in ents]))
+        check('the tabs read 1D | 2D', rs.stage_tabs.texts() == ['1D', '2D']
+              and rs.stage_strip() is rs.stage_tabs
+              and rs.stage_tabs.isVisible(), str(rs.stage_tabs.texts()))
+        for d in (1, 2):
+            QTest.mouseClick(rs.stage_tabs.button(d), Qt.LeftButton)
+            pump(400)
+            page = rs.fields.page()
+            check(f'the {d}D tab: its stage, its Field page draws',
+                  rs.stage() == d and page in ('image', 'figure'), page)
+            shot(f'results_{d}d')
+        got = export_sha(rs, 'summary', tmp, 'chain')
+        from blastlab.ui.results_panel import ResultsPanel
+        plain = ResultsPanel()
+        plain.add_result(rs.current().label, 2, rs.current().result)
+        want = export_sha(plain, 'summary', tmp, 'plain')
+        check('the 2D stage\'s Summary .csv equals a plain entry\'s (sha256)',
+              got is not None and got == want, f'{got} vs {want}')
+        plain.deleteLater()
     finally:
         check('nothing raised', not crashes,
               crashes[0][-400:] if crashes else '')
