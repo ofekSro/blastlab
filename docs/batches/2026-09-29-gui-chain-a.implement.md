@@ -55,16 +55,22 @@
 
 ## Commits (`e58d21e..`)
 
-- `e57672f` T0: the test and the golden, alone, first. **Its message is
-  GUI-7's T0 message** (a same-named file left in the shared scratch dir;
-  F19). The real message is attached as a git note (`git log --notes -1
-  e57672f`). Not amended.
-- `795a846` T1: routes, `chain_route`, the top-bar link, the pins.
-- `d97e48a` T2: the Chain screen.
-- `a5c423d` T3: the real-platform fixes (board heights, wrapped paths) and
+*After this report was written, T0's wrong message (F19) was fixed by a
+rebase reword; the tree is byte-identical (`c67b2de`), only the hashes
+changed: `e57672f` → `3e9ed58`, `795a846` → `56c8014`, `d97e48a` →
+`a789bbb`, `a5c423d` → `15fe5f9`, `d35cadf` (this report) → `aa9b417`.
+The hashes below are the new ones.*
+
+- `3e9ed58` T0: the test and the golden, alone, first. Its message was
+  first GUI-7's T0 message (a same-named file left in the shared scratch
+  dir; F19), since reworded to the right one. The git note that carried
+  the real message stays on the old, now orphaned `e57672f`.
+- `56c8014` T1: routes, `chain_route`, the top-bar link, the pins.
+- `a789bbb` T2: the Chain screen.
+- `15fe5f9` T3: the real-platform fixes (board heights, wrapped paths) and
   the 9a e2e.
-- this report's commit: report, measurements, screenshots, decisions
-  D131-D154, F18-F22.
+- `aa9b417` this report's commit: report, measurements, screenshots,
+  decisions D131-D154, F18-F22.
 
 Every message (except F19's) was written to a new `gui9a_msg_*` file in the
 scratch dir and committed with `git commit -F`, staging by explicit path.
@@ -72,7 +78,7 @@ The six foreign paths were never staged.
 
 ---
 
-## T0 · Pin what a chain launches · DONE · `e57672f`
+## T0 · Pin what a chain launches · DONE · `3e9ed58`
 
 - New `blastlab/tests/test_ui_char_chain_wiring.py` and its golden
   `char_golden/ui_chain_wiring.json` (16 scenarios).
@@ -95,7 +101,7 @@ Criteria: PASS at base (`--update` wrote it, then `CHAR UI CHAIN WIRING:
 PASS`), and after T1, T2 and T3 byte-for-byte. Run: `cd blastlab/tests &&
 python test_ui_char_chain_wiring.py`.
 
-## T1 · Routes replace the checkboxes; the wiring in one pure module · DONE · `795a846`
+## T1 · Routes replace the checkboxes; the wiring in one pure module · DONE · `56c8014`
 
 - New `blastlab/ui/chain_route.py`, toolkit-free:
   - `ROUTES` (board order), `route_dims` / `route_key` / `route_label`
@@ -156,7 +162,7 @@ Tests: `test_ui_chain` C13 (new), `test_ui_chain_screen` S1 (new).
   `_e2e_ui_chain_foam.py` (`use[d]` → `set_route('123')`); their result
   checks are 9b's (T5).
 
-## T2 · The Chain screen · DONE · `d97e48a`
+## T2 · The Chain screen · DONE · `a789bbb`
 
 - New `blastlab/ui/chain_pipeline.py`: `RouteBar`, `StageCard` (number,
   title, solver chip, elided mono key line, live state, folder),
@@ -206,7 +212,7 @@ python test_ui_chain_screen.py` → `UI CHAIN SCREEN: PASS (123 checks)`.
 | S6: a touched stage is not re-seeded when Setup changes; an untouched one is | PASS |
 | `test_ui_chain`, `char_chain_wiring`, `setup_form`, `setup_tree`, `setup_strip`, `components`, `char_case_form`, `parity`, `frame` green; Setup suites unchanged | PASS (and `theme`, `no_vtk`, `no_pyplot`) |
 
-## T3 · 9a verification · DONE · `a5c423d` + this commit
+## T3 · 9a verification · DONE · `15fe5f9` + `aa9b417`
 
 **The fast matrix, one suite at a time** (from `blastlab/tests`, after T2;
 the T3 fixes re-ran the chain, parity, frame, setup, theme and regression
@@ -262,7 +268,7 @@ stage 2 on 05 Gauges, the trigger hand-off, a 3D stage) and 4 e2e shots in
 `docs/qa/2026-09-29-gui-chain/`; `measurements-9a.md` has the widths and
 heights against the board and the contrast of 44 text pairs per mode.
 `clipped(win)` was empty in all 24. What the first real-platform pass found
-and this batch fixed (`a5c423d`):
+and this batch fixed (`15fe5f9`):
 
 - the route group was 40, Copy / Load 38 and the stage pill **26** px
   (D41's mechanism) → 38 / 36 / 40, pinned in the QSS, asserted in S2
