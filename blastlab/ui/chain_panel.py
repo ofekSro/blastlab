@@ -552,11 +552,15 @@ class ChainPanel(QWidget):
 
     # ── seeding, Copy from 01 Setup, Load case… (plan §8.1, UX-16) ───────
     def _setup_case(self):
+        """The 01 Setup case, or None: no source (a standalone panel) or
+        a form that does not parse (ValueError, as `get_case()` says it).
+        Anything else is a bug and propagates to the crash log - a broad
+        except here would show it as `01 Setup has errors`."""
         if self._setup_source is None:
             return None
         try:
             return self._setup_source()
-        except Exception:
+        except ValueError:
             return None
 
     def _seed(self):

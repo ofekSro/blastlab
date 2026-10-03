@@ -685,6 +685,32 @@ def s6_copy_load():
         dialogs.open_file = lambda *a, **k: ''
         check('a cancelled dialog loads nothing', ch.load_case(1) is False
               and len(errors) == 1)
+
+        # verify (GUI-9): only a Setup that does not parse (ValueError)
+        # reads as "01 Setup has errors"; any other failure of the source
+        # is a bug and must reach the crash log, not be swallowed
+        from blastlab.ui.chain_panel import ChainPanel
+
+        def bad_parse():
+            raise ValueError("'Lx' is not a number: 'abc'")
+
+        def broken():
+            raise RuntimeError('a bug in the Setup source')
+        lone = ChainPanel(setup_source=bad_parse)
+        lone._refresh_copy()
+        off = lone.editors[1].copy_btn
+        check('a Setup source that does not parse: Copy off, the why-not',
+              not off.isEnabled() and off.toolTip() == COPY_BAD,
+              ascii(off.toolTip()))
+        lone._setup_source = broken
+        try:
+            lone._refresh_copy()
+            raised = False
+        except RuntimeError:
+            raised = True
+        check('any other failure of the Setup source is not swallowed',
+              raised)
+        lone.deleteLater()
     finally:
         (dialogs.ask_yes_no, dialogs.open_file,
          dialogs.show_error) = real
