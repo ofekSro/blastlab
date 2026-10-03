@@ -85,7 +85,7 @@ def real_chain_run():
         win.show()
         pump(100)
         ch = win.chain
-        ch.use[3].setChecked(False)
+        ch.set_route('12')          # GUI-9: was use[3].setChecked(False)
         ch.set_stage_case(1, Case1D(radius_m=1.0, charge_kg=0.5,
                                     cell_size_m=0.01, n_snapshots=1,
                                     t_end=3e-4, gauge_radii=[0.5]))
@@ -173,7 +173,7 @@ def real_chain_run_13():
         win.show()
         pump(100)
         ch = win.chain
-        ch.use[2].setChecked(False)
+        ch.set_route('13')          # GUI-9: was use[2].setChecked(False)
         # hand off at t = 0.05 ms: the shock sits at r ~ 0.24 m then
         # (measured), inside the 0.6 m box - a later hand-off leaves
         # only the under-pressured core inside the 3D domain
@@ -235,6 +235,83 @@ def real_chain_run_13():
         dialogs.show_error, dialogs.ask_yes_no = real
 
 
+def c13_routes(panel, launched, errs, ws, ws_root):
+    """GUI-9 T1 (plan §10 "the four routes wire the right hand-offs",
+    one fast test per route): the route buttons, what each route hands
+    on, and the routes that do not exist."""
+    from PySide6.QtWidgets import QPushButton
+    from blastlab.services.chain import stage_errors
+    from blastlab.ui import chain_route
+
+    print('\nC13: the four routes (GUI-9)')
+    for key, _label, dims in chain_route.ROUTES:
+        panel.set_route(key)
+        pump(10)
+        check(f'{key}: checked() is the route\'s stages',
+              panel.checked() == list(dims) and panel.route() == key,
+              f'{panel.checked()}')
+        # each form's own values, before the wiring touches a copy
+        own = {d: panel.forms[d].get_case() for d in dims}
+        errs.clear()
+        launched.clear()
+        ok = panel.run()
+        check(f'{key}: run() starts it, nothing refused',
+              ok is True and not errs.calls, str(errs.lines)[:160])
+        got = launched[0] if launched else []
+        check(f'{key}: the stages are handed on in route order',
+              [d for d, _c in got] == list(dims),
+              str([d for d, _c in got]))
+        cases = dict(got)
+        if [d for d, _c in got] != list(dims):
+            continue
+        for a, b in zip(dims, dims[1:]):
+            path = os.path.join(ws, chain_route.handoff_name(a, b))
+            want = 'profile1d' if a == 1 else 'profile2d'
+            check(f'{key}: {a}D -> {b}D through {os.path.basename(path)}',
+                  cases[a].profile_file == path
+                  and cases[b].profile_file_in == path
+                  and cases[b].init_mode == want,
+                  f'{cases[a].profile_file} / {cases[b].profile_file_in} '
+                  f'/ {cases[b].init_mode}')
+        first, last = dims[0], dims[-1]
+        check(f'{key}: the first stage starts from its own form, the last '
+              f'writes its own profile',
+              getattr(cases[first], 'init_mode', None)
+              == getattr(own[first], 'init_mode', None)
+              and getattr(cases[last], 'profile_file', None)
+              == getattr(own[last], 'profile_file', None),
+              f'{getattr(cases[first], "init_mode", None)} / '
+              f'{getattr(cases[last], "profile_file", None)}')
+        check(f'{key}: every stage on a pinned write schedule (N2-13)',
+              all(c.adaptive_write is False for c in cases.values()))
+        check(f'{key}: stage_errors is empty for the wired route',
+              stage_errors(list(dims), cases) == [],
+              str(stage_errors(list(dims), cases))[:160])
+        check(f'{key}: nothing on disk', os.listdir(ws_root) == [],
+              str(os.listdir(ws_root)))
+
+    panel.set_route('13')
+    btns = [b for b in panel.findChildren(QPushButton)
+            if b.objectName() == 'chainroute']
+    for bad in ('', '1', '32'):
+        try:
+            panel.set_route(bad)
+            raised = False
+        except ValueError:
+            raised = True
+        check(f'set_route({bad!r}) raises ValueError and changes nothing',
+              raised and panel.route() == '13'
+              and [b.isChecked() for b in btns]
+              == [k == '13' for k, _l, _d in chain_route.ROUTES],
+              f'{raised} {panel.route()}')
+    check('exactly four route buttons, exactly one checked',
+          len(btns) == 4 and sum(b.isChecked() for b in btns) == 1
+          and [b.text() for b in btns]
+          == [label_ for _k, label_, _d in chain_route.ROUTES],
+          ascii([b.text() for b in btns]))
+    panel.set_route('123')
+
+
 def main():
     ensure_qapp()
     from blastlab.ui.chain_panel import HINT, ChainPanel
@@ -259,7 +336,10 @@ def main():
     check('OUT-1: no workspace box - the Run tab\'s model folder is it',
           not hasattr(panel, 'ws_box') and 'model folder' in HINT
           and 'handoff_1d_to_2d.txt' in HINT, HINT[:80])
-    check('all three stages start checked', panel.checked() == [1, 2, 3])
+    # GUI-9 (plan §9 layout pin): the three checkboxes became routes
+    check('the route starts on 1D -> 2D -> 3D, all three stages',
+          panel.route() == '123' and panel.checked() == [1, 2, 3],
+          f'{panel.route()} {panel.checked()}')
     check('and each has its own form',
           sorted(panel.forms) == [1, 2, 3]
           and panel.forms[2].dim == 2)
@@ -272,24 +352,13 @@ def main():
     check('and focus_stage moves it back', panel.stage() == 1
           and panel.stage_seg.get() == 'Stage 1D')
 
-    print('\nC2: the empty refusal')
-    # GUI-8 (plan sec. 8.3): {1, 3} is a supported route now (C6b), so
-    # the old 'Stages must be consecutive' refusal has no reachable case
-    # left and is gone.
-    for d in (1, 2, 3):
-        panel.use[d].setChecked(False)
-    errs.clear()
-    check('no stages selected -> refused',
-          panel.run() is False
-          and errs.lines == ['No stages selected.'], str(errs.lines))
-    check('and the status line says it too',
-          'No stages selected' in panel.status.text())
-    check('the model folder was NOT created by a refused run',
-          not os.path.exists(ws))
+    # C2 (the empty refusal) is gone with the checkboxes (GUI-9, plan §9
+    # layout pin): no route can be empty; C13 pins the invalid routes.
+    # 'The model folder was NOT created by a refused run' is asserted on
+    # the C3 refusal below.
 
     print('\nC2b: OUT-1 - the model folder is refused before anything')
-    for d in (1, 2, 3):
-        panel.use[d].setChecked(True)
+    panel.set_route('123')
     for runs, model, want in (('', 'CHAIN', 'Runs folder is empty'),
                               (ws_root, '', 'Model name: '),
                               (os.path.join(ws_root, 'no'), 'CHAIN',
@@ -308,8 +377,7 @@ def main():
           str(os.listdir(ws_root)))
 
     print('\nC3: a bad field names its own stage and shows it')
-    for d in (1, 2, 3):
-        panel.use[d].setChecked(True)
+    panel.set_route('123')
     panel.focus_stage(1)
     panel.forms[2].v['Lx'].set('abc')
     pump(20)
@@ -323,6 +391,8 @@ def main():
     check('the log carries it as well',
           any('Stage 2 (2D)' in s for s in log), str(log[-2:]))
     check('still no model folder', not os.path.exists(ws))
+    check('the model folder was NOT created by a refused run',
+          not os.path.exists(ws))
     panel.forms[2].v['Lx'].set('4')
     pump(20)
 
@@ -366,7 +436,7 @@ def main():
           'each stage its own MODEL.json', not os.path.exists(ws))
 
     print('\nC6: a shorter chain wires only what it has')
-    panel.use[3].setChecked(False)
+    panel.set_route('12')
     launched.clear()
     errs.clear()
     check('1 -> 2 accepted', panel.run() is True, str(errs.lines))
@@ -374,8 +444,7 @@ def main():
     check('the 2D stage no longer writes a profile for a 3D stage',
           two[2].profile_file != p2 and two[2].profile_file_in == p1,
           f'{two[2].profile_file} / {two[2].profile_file_in}')
-    panel.use[3].setChecked(True)
-    panel.use[1].setChecked(False)
+    panel.set_route('23')
     launched.clear()
     errs.clear()
     check('2 -> 3 accepted', panel.run() is True, str(errs.lines))
@@ -384,10 +453,10 @@ def main():
           late[2].init_mode != 'profile1d'
           and late[3].profile_file_in == p2,
           f'{late[2].init_mode} / {late[3].profile_file_in}')
-    panel.use[1].setChecked(True)
+    panel.set_route('123')
 
     print('\nC6b: the 1D -> 3D route (GUI-8, plan sec. 8.3)')
-    panel.use[2].setChecked(False)
+    panel.set_route('13')
     pump(20)
     launched.clear()
     errs.clear()
@@ -430,7 +499,7 @@ def main():
           str(errs.lines)[:120])
     panel.set_stage_solver(1, mode_mod.DEFAULT)
     panel.set_stage_solver(3, mode_mod.DEFAULT)
-    panel.use[2].setChecked(True)
+    panel.set_route('123')
     pump(20)
 
     print('\nC7: the per-stage solver')
@@ -477,19 +546,21 @@ def main():
     panel.error_sink = exploding
     panel.status.setText('')
     n_log = len(log)
-    for d in (1, 2, 3):
-        panel.use[d].setChecked(False)
+    # GUI-9 (plan §9): the refusal that exercises it is the empty Model
+    # box now - no route can be empty; the four assertions are unchanged
+    source[:] = [ws_root, '']
     check('a refusal still returns False when the dialog blows up',
           panel.run() is False)
     check('and the reason reached the status line first',
-          'No stages selected' in panel.status.text(),
+          'Model name' in panel.status.text(),
           panel.status.text())
-    check('and the log', any('No stages selected' in s
+    check('and the log', any('Model name' in s
                              for s in log[n_log:]), str(log[n_log:]))
     check('the dialog failure is noted, not swallowed silently',
           any('dialog failed' in s for s in log[n_log:]),
           str(log[n_log:]))
     panel.error_sink = errs
+    source[:] = [ws_root, 'CHAIN']
 
     print('\nC9: Run chain follows the Run button')
     panel.set_running(True)
@@ -504,8 +575,8 @@ def main():
     # (gamma_air - 1) / omega = 33 %. stage_errors refuses it, but a
     # refusal that only lands on Run chain is one the user meets having
     # already filled three forms - hence the live per-stage message.
+    panel.set_route('123')
     for d in (1, 2, 3):
-        panel.use[d].setChecked(True)          # C8 left them all off
         panel.set_stage_solver(d, 'blastfoam')
     panel.status.setText('')
     pump(0.05)
@@ -537,12 +608,12 @@ def main():
           str(log[n_log:][:2]))
 
     # switching off the stage in between must re-evaluate 1 -> 3
-    panel.use[2].setChecked(False)
+    panel.set_route('13')
     pump(0.05)
-    check('dropping the middle stage moves it to 1 -> 3',
+    check('the route 1D -> 3D moves it to 1 -> 3',
           bool(panel._compat[3].text()) and not panel._compat[2].text(),
           str({d: panel._compat[d].text()[:30] for d in (1, 2, 3)}))
-    panel.use[2].setChecked(True)
+    panel.set_route('123')
 
     panel.set_stage_solver(1, 'blastfoam')
     pump(0.05)
@@ -563,6 +634,8 @@ def main():
     pump(0.05)
     check('and clearing the conflict re-arms it once',
           panel.run_btn.isEnabled())
+
+    c13_routes(panel, launched, errs, ws, ws_root)
 
     shutil.rmtree(ws_root, ignore_errors=True)
 

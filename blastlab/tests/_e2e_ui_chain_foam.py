@@ -111,8 +111,8 @@ def main():
     }
 
     print('\nC1: three stages, all on blastFoam')
+    ch.set_route('123')         # GUI-9: was use[d].setChecked(True)
     for d, case in stages.items():
-        ch.use[d].setChecked(True)
         ch.set_stage_case(d, case)
         pump(200)
         check(f'stage {d} took the case on blastFoam',

@@ -2924,8 +2924,7 @@ def _chain_forms(qa, model='QA_CHAIN'):
                                 n_snapshots=1, gauges=[],
                                 gauge_file=None, anim_file=None,
                                 record_frames=0))
-    for d in (1, 2, 3):
-        ch.use[d].setChecked(True)
+    ch.set_route('123')         # GUI-9: the routes replaced the checkboxes
     qa.pump(0.5)
     return ch
 
@@ -2951,13 +2950,24 @@ def g01_chain_validation(qa):
                  evidence=str(refusals[-1] if refusals else []))
         qa.note(f'{tag}: {refusals[-1] if refusals else []}')
 
-    for d in (1, 2, 3):
-        ch.use[d].setChecked(False)
-    refuse('no stage checked')
-    ch.use[1].setChecked(True)
-    ch.use[3].setChecked(True)
-    refuse('a gap in the chain (1 and 3)')
-    ch.use[2].setChecked(True)
+    # GUI-9 (F18): 'no stage checked' and 'a gap in the chain (1 and
+    # 3)' had no checkboxes left to drive, and {1, 3} is a route since
+    # GUI-8. The route control offers exactly the four routes, and a
+    # route that does not exist is refused with the route unchanged.
+    from blastlab.ui import chain_route
+    qa.check(sorted(ch.route_btns) == sorted(k for k, _l, _d
+                                             in chain_route.ROUTES)
+             and len(ch.route_btns) == 4,
+             'the route control offers exactly the four routes', 'S2',
+             evidence=str(sorted(ch.route_btns)))
+    try:
+        ch.set_route('')
+        raised = False
+    except ValueError:
+        raised = True
+    qa.check(raised and ch.route() == '123',
+             'an empty route is refused, the route unchanged', 'S2',
+             evidence=f'{raised} {ch.route()}')
     ch.forms[2].v['geometry'].set('planar')
     qa.pump(0.3)
     refuse('a planar stage 2 with a 3D stage after it')
@@ -3236,7 +3246,7 @@ def m04_chain_folder(qa):
     the chain manifest at its root."""
     qa.goto('chain')
     ch = _chain_forms(qa, 'M04')
-    ch.use[3].setChecked(False)
+    ch.set_route('12')          # GUI-9: was use[3].setChecked(False)
     qa.pump(0.4)
     qa.shot('chain_two_stages')
     started = ch.run()

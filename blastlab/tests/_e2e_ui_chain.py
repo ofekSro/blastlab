@@ -49,7 +49,7 @@ def main():
     win.show()
     pump(200)
     ch = win.chain
-    ch.use[3].setChecked(False)
+    ch.set_route('12')          # GUI-9: was use[3].setChecked(False)
     ch.set_stage_case(1, Case1D(radius_m=1.5, charge_kg=1.0,
                                 cell_size_m=0.004, n_snapshots=2,
                                 gauge_radii=[], gauge_file=None))

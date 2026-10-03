@@ -22,19 +22,21 @@ check here, by the window (`on_run_chain`), which asks before it
 overwrites an existing model.
 """
 
-from PySide6.QtWidgets import QCheckBox, QStackedWidget, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout,
+                               QPushButton, QStackedWidget, QWidget)
 
 from ..core import mode as mode_mod
 from ..core import chain
 from ..core.chain import stage_errors
 from ..services import model_folder
-from . import dialogs
+from . import chain_route, dialogs
 from .case_form import CaseForm
 from . import theme
 from .widgets import (Card, ScrollColumn, Segmented, button, hbox, label,
                       vbox)
 
-HINT = ('The chain runs the checked stages in order, into the model folder '
+HINT = ('The chain runs the route\'s stages in order, into the model folder '
         'set on the Run tab (Runs folder and Model): each stage writes '
         '<MODEL>\\1d, 2d or 3d. The profile hand-offs are wired '
         'automatically at the model root: 1D writes handoff_1d_to_2d.txt, '
@@ -52,6 +54,9 @@ STAGE_LABELS = {1: 'Stage 1D', 2: 'Stage 2D', 3: 'Stage 3D'}
 
 
 class ChainPanel(QWidget):
+    #: the route key ('123', '13', '12', '23') after every change
+    route_changed = Signal(str)
+
     def __init__(self, on_run_chain=None, mode=None, log_fn=print,
                  error_sink=None, model_source=None, parent=None):
         super().__init__(parent)
@@ -74,14 +79,30 @@ class ChainPanel(QWidget):
         top = Card()
         root.addWidget(top)
         bar = hbox()
-        bar.addWidget(label('Stages', 'muted'))
-        self.use = {}
-        for d in (1, 2, 3):
-            box = QCheckBox(f'{d}D')
-            box.setChecked(True)
-            box.toggled.connect(lambda _c: self._refresh_compat())
-            self.use[d] = box
-            bar.addWidget(box)
+        bar.addWidget(label('Route', 'muted'))
+        # GUI-9 (plan §8.1): four routes replace the three stage
+        # checkboxes, so no combination the engine cannot wire can be
+        # chosen (board Chain lines 55-59)
+        self._route = chain_route.DEFAULT_ROUTE
+        self.route_group = QFrame()
+        self.route_group.setObjectName('chainroutes')
+        self.route_group.setToolTip(HINT)
+        rl = QHBoxLayout(self.route_group)
+        rl.setContentsMargins(3, 3, 3, 3)
+        rl.setSpacing(2)
+        self._route_grp = QButtonGroup(self)
+        self._route_grp.setExclusive(True)
+        self.route_btns = {}
+        for key, text, _dims in chain_route.ROUTES:
+            b = QPushButton(text)
+            b.setObjectName('chainroute')
+            b.setCheckable(True)
+            b.setChecked(key == self._route)
+            b.clicked.connect(lambda _c=False, k=key: self.set_route(k))
+            self._route_grp.addButton(b)
+            rl.addWidget(b)
+            self.route_btns[key] = b
+        bar.addWidget(self.route_group)
         bar.addStretch(1)
         self.run_btn = button('Run chain', 'play', 'primary', width=136,
                               height=36, on_click=self.run)
@@ -230,8 +251,29 @@ class ChainPanel(QWidget):
                 self.stack.setCurrentWidget(self._pages[d])
                 return
 
+    # ── the route (GUI-9, plan §8.1) ─────────────────────────────────────
+    def route(self):
+        """The route's key: '123', '13', '12' or '23'."""
+        return self._route
+
+    def set_route(self, key):
+        """Choose route `key`; ValueError for anything that is not a
+        route, with the route and the buttons left as they were."""
+        key = str(key)
+        chain_route.route_dims(key)              # ValueError first
+        changed = key != self._route
+        self._route = key
+        for k, b in self.route_btns.items():
+            if b.isChecked() != (k == key):
+                b.setChecked(k == key)
+        self._refresh_compat()
+        if changed:
+            self.route_changed.emit(key)
+
     def checked(self):
-        return [d for d in (1, 2, 3) if self.use[d].isChecked()]
+        """The route's stages, in order (the compat check and the QA
+        harness read the stage list through this)."""
+        return list(chain_route.route_dims(self._route))
 
     # ── running ──────────────────────────────────────────────────────────
     def run(self):
@@ -251,6 +293,7 @@ class ChainPanel(QWidget):
             return self._refuse(['A run is already in progress.'])
         stages = self.checked()
         if not stages:
+            # a defence only: since GUI-9 no route can be empty
             return self._refuse(['No stages selected.'])
         # GUI-8 (plan sec. 8.3): no consecutive-stages guard any more.
         # The only non-consecutive subset of {1, 2, 3} is {1, 3}, and
@@ -266,8 +309,6 @@ class ChainPanel(QWidget):
             runs_dir=str(runs_dir).strip(), model=str(model).strip(),
             folder=model_folder.folder_for(runs_dir, model))
         hand = model_folder.handoff_paths(target, stages)
-        p1, p2 = hand.get((1, 2)), hand.get((2, 3))
-        p13 = hand.get((1, 3))
 
         cases = {}
         for d in stages:
@@ -282,40 +323,13 @@ class ChainPanel(QWidget):
                                      for ln in str(exc).splitlines()
                                      if ln.strip()])
 
-        # N2-13: a chain must be reproducible, so every stage runs on a
-        # PINNED write schedule. The adaptive-writeInterval controller
-        # rewrites writeInterval mid-run from what the ingest has managed
-        # to keep up with - wall clock - so with it on the set of write
-        # times differs between identical runs, and the arrival-pinned
-        # hand-off lands on a different write each time (measured: stage
-        # ends spread +/-7% / 2.3x over five identical chains).
-        for case in cases.values():
-            case.adaptive_write = False
-
-        # the hand-offs live at the model root (plan sec. 2.2); a single
-        # stage has none and writes its own profile into the folder
-        if 1 in cases and 2 in cases:
-            cases[1].profile_file = p1
-            cases[2].init_mode = 'profile1d'
-            cases[2].profile_file_in = p1
-        if 2 in cases:
-            if cases[2].geometry != 'axisymmetric' and 3 in cases:
-                self.focus_stage(2)
-                return self._refuse(['Stage 2 (2D): must be axisymmetric '
-                                     'to feed the 3D stage.'])
-            if 3 in cases:
-                cases[2].profile_file = p2
-        if 3 in cases and 2 in cases:
-            cases[3].init_mode = 'profile2d'
-            cases[3].profile_file_in = p2
-        # GUI-8 (plan sec. 8.3): 1D -> 3D without a 2D stage. The engine
-        # already supports it - solve_3d / the foam writer remap a 1D
-        # profile (core/profiles.remap_profile_1d_to_3d); the 3D burst
-        # height comes from the 3D form.
-        if 1 in cases and 3 in cases and 2 not in cases:
-            cases[1].profile_file = p13
-            cases[3].init_mode = 'profile1d'
-            cases[3].profile_file_in = p13
+        # GUI-9: the wiring (pinned write schedule N2-13, the hand-offs at
+        # the model root, the axisymmetric rule, GUI-8's 1D -> 3D) lives
+        # in chain_route.wire, shared with the live per-stage checks
+        cases, refusal = chain_route.wire(stages, cases, hand)
+        if refusal:
+            self.focus_stage(2)
+            return self._refuse([refusal])
 
         # after the wiring, so the checks see what will actually run
         errors = stage_errors(stages, cases)

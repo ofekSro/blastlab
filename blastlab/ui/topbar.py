@@ -182,6 +182,11 @@ class TopBar(QFrame):
     def is_done(self, key):
         return bool(self._done.get(key))
 
+    def set_chain_label(self, text):
+        """The Chain link's text: it follows the Chain screen's route
+        (GUI-9, board Chain line 46: `Chain 1D → 2D → 3D`)."""
+        self.nav_btns['chain'].setText(str(text))
+
     # ── case name ────────────────────────────────────────────────────────
     def set_case_name(self, name):
         self.case_btn.setText(str(name or 'untitled'))

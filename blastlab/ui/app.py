@@ -25,7 +25,7 @@ from ..models.case import load_any_case
 from ..services.model_folder import CASE_FILE, model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
-from . import dialogs, theme
+from . import chain_route, dialogs, theme
 from .bridge import ThreadBridge
 from .chain_panel import ChainPanel
 from .results_panel import ResultsPanel
@@ -164,6 +164,10 @@ class MainWindow(QMainWindow):
                                 model_source=lambda: (
                                     self.run_panel.current_runs_dir(),
                                     self.run_panel.current_run_name()))
+        # GUI-9: the top bar's Chain link names the route
+        self.chain.route_changed.connect(
+            lambda key: self.topbar.set_chain_label(
+                'Chain ' + chain_route.route_label(key)))
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
