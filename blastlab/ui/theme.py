@@ -25,7 +25,9 @@ DARK = dict(
     tile='#141416', view='#0d0d0f', hover='#1c1c1f', seg='#2a2a2f',
     border='#1f1f23', border2='#242428', entry='#0b0b0c',
     entry_border='#2c2c31', text='#f2efe9', text2='#cfcac2',
-    muted='#a8a39b', faint='#8f8a82', num_dim='#6f6a63',
+    # num_dim #6f6a63 -> #817b73 (GUI-10, F8 / D180): >= 4.5:1 on bg,
+    # panel and card, lightened along its own hue (D1's method)
+    muted='#a8a39b', faint='#8f8a82', num_dim='#817b73',
     accent='#ff6a2b', accent_hover='#ff7f47', on_accent='#1a0d06',
     accent_text='#ff8a55', accent_soft='#ffb896', accent_bg='#1d1511',
     accent_border='#5a3522', gauge='#4cc9f0', gauge_bg='#0f1a1f',
@@ -40,12 +42,14 @@ DARK = dict(
 # tests/test_ui_theme.py): faint #7a7e85->#696c72,
 # accent_text #c7430f->#c5420f, gauge #0e7fa6->#0d7599,
 # ok #2f9e44->#257d36, warn #b07d00->#926800, danger #d6336c->#cb3067.
+# GUI-10 (F8 / D180), the same method: num_dim #9b958c->#746e65 (>= 4.5:1
+# on bg, panel and card; it is text - the tree and stage numbers).
 LIGHT = dict(
     bg='#f4f3f0', panel='#faf9f7', card='#ffffff', card2='#f1efeb',
     tile='#f1efeb', view='#ecebe7', hover='#e9e6e1', seg='#dcd8d1',
     border='#e2ded7', border2='#d8d3cb', entry='#ffffff',
     entry_border='#cdc7be', text='#1f2430', text2='#3a3f4a',
-    muted='#5f6368', faint='#696c72', num_dim='#9b958c',
+    muted='#5f6368', faint='#696c72', num_dim='#746e65',
     accent='#ff6a2b', accent_hover='#e85d20', on_accent='#1a0d06',
     accent_text='#c5420f', accent_soft='#b4461c', accent_bg='#fbe9df',
     accent_border='#e0b394', gauge='#0d7599', gauge_bg='#e3f1f7',
@@ -343,7 +347,10 @@ def qss(mode_name):
     QFrame#treerow {{ background: transparent; border: none;
                       border-radius: 9px; }}
     QFrame#treerow:hover {{ background: {p['hover']}; }}
-    QFrame#treerow[selected="true"] {{ background: {p['accent_bg']}; }}
+    /* GUI-10 (F8 / D180): the chain tint, as on the selected stage card -
+       on light accent_bg the number (accent_text 4.28) and the caption
+       (faint 4.47) fell under 4.5:1; dark is accent_bg, unchanged */
+    QFrame#treerow[selected="true"] {{ background: {tint}; }}
     QToolButton#docktab {{ background: transparent; border: none;
                            border-bottom: 2px solid transparent;
                            padding: 0px 14px; color: {p['muted']};
@@ -415,16 +422,24 @@ def qss(mode_name):
     QPushButton#treeadd {{ background: transparent; color: {p['text2']};
                            border: 1px solid {p['entry_border']};
                            border-radius: 8px; padding: 0px 8px;
-                           font-size: 13px; font-weight: 500; }}
+                           font-size: 13px; font-weight: 500;
+                           min-height: 34px; max-height: 34px; }}
     QPushButton#treeadd:hover {{ background: {p['hover']}; }}
     /* the case pill: the state colour is on its icon (setup_tree); the
        text stays >= 4.5:1 in both modes (ok/warn on ok_bg measured
        4.38 in light, danger on stop_bg 4.18 - too low for text) */
+    /* GUI-10 (F21 / D179): the board heights, pinned here because the
+       generic QPushButton min-height beats setFixedHeight (D41, D153):
+       the QSS height is the content box, + the 1 px border x 2 = the
+       board's 42 (BC_Combined line 116) for the pill and 36 for + Gauge /
+       + Obstacle (lines 113-114, rule above); the Chain's own pill
+       (#casepill[chain="true"], 40) wins by specificity */
     QPushButton#casepill {{ text-align: left; padding: 0px 12px;
                             border-radius: 10px; font-size: 13px;
                             font-weight: 500; background: {p['ok_bg']};
                             border: 1px solid {p['ok_border']};
-                            color: {p['text2']}; }}
+                            color: {p['text2']};
+                            min-height: 40px; max-height: 40px; }}
     QPushButton#casepill[state="error"] {{ background: {p['stop_bg']};
                                           border: 1px solid {p['stop_border']};
                                           color: {p['stop_text']}; }}
@@ -814,8 +829,8 @@ def qss(mode_name):
         padding: 0px 6px; min-height: 34px; max-height: 34px;
         font-size: 12.5px; font-weight: 500; }}
     /* the stage tree's pill (board line 114: 40 px). The QSS heights are
-       the content box: + the 1 px border = 40. Setup's own pill is not
-       touched here (F21). */
+       the content box: + the 1 px border = 40. Setup's own pill (42) is
+       pinned in the #casepill rule since GUI-10 (F21). */
     QPushButton#casepill[chain="true"] {{ min-height: 38px;
                                           max-height: 38px; }}
     QPushButton#stagebtn:hover {{ background: {p['hover']}; }}

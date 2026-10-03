@@ -5,8 +5,12 @@ field is reachable through exactly one node (plan §10), and the 'nodes'
 placement changes where cards are laid, never what they parse or which
 rows the solver scope shows.
 
+T5 - (GUI-10, F21) the case pill and + buttons at the board heights;
+real platform only (`--real`), skipped offscreen.
+
 Headless: offscreen Qt, no window shown, no solver run.
 Run:  cd blastlab/tests && python test_ui_setup_tree.py
+      python test_ui_setup_tree.py --real     (T5 on the real platform)
 """
 import os
 import sys
@@ -23,7 +27,10 @@ try:
 except Exception:
     pass
 
-app = ensure_qapp()
+#: GUI-10 (F21): `--real` runs only T5, the height check, on the real
+#: platform (a window shows briefly); the default run is offscreen
+REAL = '--real' in sys.argv[1:]
+app = ensure_qapp(offscreen=not REAL)
 
 from blastlab.core.case import Case1D, Case2D, Case3D      # noqa: E402
 from blastlab.ui import setup_nodes, setup_spec            # noqa: E402
@@ -637,12 +644,62 @@ def t4_derived():
     sp.close()
 
 
+def t5_heights():
+    """GUI-10 (F21, D179): the board heights at 1100 x 720 in both
+    modes - Setup's case pill 42 (BC_Combined line 116), + Gauge /
+    + Obstacle 36 (lines 113-114), the Chain stage pill still 40 (D153),
+    all pinned in the QSS. Geometry is measured on the real platform only
+    (CLAUDE.md §8.7), so offscreen this check is skipped, and says so:
+    run `python test_ui_setup_tree.py --real` for it."""
+    print('\nT5: Setup heights at 1100 x 720 (F21)')
+    if app.platformName() == 'offscreen':
+        print('  [SKIP] heights are measured on the real platform only: '
+              'python test_ui_setup_tree.py --real')
+        return
+    from PySide6.QtWidgets import QPushButton
+    from blastlab.ui import theme
+    from blastlab.ui.app import MainWindow
+    win = MainWindow()
+    try:
+        win.resize(1100, 720)
+        win.show()
+        pump(400)
+        for mode in ('dark', 'light'):
+            theme.apply(app, mode)
+            win._show('setup')
+            pump(400)
+            t = win.setup.tree
+            check(f'{mode}: Setup case pill 42 px', t.pill.height() == 42,
+                  str(t.pill.height()))
+            check(f'{mode}: + Gauge and + Obstacle 36 px',
+                  t.add_gauge_btn.height() == 36
+                  and t.add_obstacle_btn.height() == 36,
+                  f'{t.add_gauge_btn.height()} / '
+                  f'{t.add_obstacle_btn.height()}')
+            win._show('chain')
+            pump(500)
+            pills = [b for b in win.chain.findChildren(QPushButton)
+                     if b.objectName() == 'casepill' and b.isVisible()
+                     and b.property('chain') == 'true']
+            check(f'{mode}: the Chain stage pill still 40 px',
+                  bool(pills) and all(b.height() == 40 for b in pills),
+                  str([b.height() for b in pills]))
+    finally:
+        theme.apply(app, 'dark')
+        win.close()
+        pump(100)
+
+
 def main():
-    t1_registry()
-    t1_placement()
-    t2_panel()
-    t3_trigger()
-    t4_derived()
+    if REAL:
+        t5_heights()
+    else:
+        t1_registry()
+        t1_placement()
+        t2_panel()
+        t3_trigger()
+        t4_derived()
+        t5_heights()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

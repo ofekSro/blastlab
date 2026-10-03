@@ -13,7 +13,10 @@ Checks, in order:
      the plan §2.1 additions - and every value is a full '#rrggbb';
  T5  the WCAG contrast gate: every text role of the plan §2.2 list
      reaches 4.5:1 on its backgrounds, in both modes, with the whole
-     ratio table printed for the task report.
+     ratio table printed for the task report (GUI-10 added `num_dim` on
+     bg / panel / card, F8);
+ T6  (GUI-10, F8) the selected model-tree row: its fill is `chain_tint`
+     and the number, title, caption and marks reach 4.5:1 on it.
 
 Plain script, offscreen, no pytest: `python test_ui_theme.py`.
 """
@@ -69,7 +72,17 @@ GATE_PAIRS = ([(t, b) for t in ('text', 'text2', 'muted', 'faint')
               + [('accent_soft', b) for b in ('bg', 'card')]
               + [('on_accent', 'accent'), ('stop_text', 'stop_bg'),
                  ('gauge', 'gauge_bg'), ('gauge', 'bg'), ('ok', 'ok_bg'),
-                 ('warn', 'bg'), ('danger', 'bg')])
+                 ('warn', 'bg'), ('danger', 'bg')]
+              # GUI-10 (F8, D180): the tree's node numbers and the stage
+              # card's number are text on these three
+              + [('num_dim', b) for b in ('bg', 'panel', 'card')])
+
+#: GUI-10 (F8, D180): the roles a SELECTED model-tree row draws on its
+#: fill (number, title, caption, the ✓ / ! / ✗ marks), all >= 4.5
+SELECTED_ROW_ROLES = ('accent_text', 'text', 'faint', 'ok', 'warn',
+                      'danger')
+#: num_dim before GUI-10, for the printed old -> new line
+NUM_DIM_BEFORE = {'dark': '#6f6a63', 'light': '#9b958c'}
 
 #: every key the palette must carry: the pre-redesign set plus §2.1
 OLD_KEYS = {'bg', 'card', 'card2', 'border', 'entry', 'accent',
@@ -182,6 +195,41 @@ def t5_contrast():
         need = oa if name == 'dark' else wd
         check(f'{name}: danger-button text >= 4.5', need >= 4.5,
               f'{need:.2f}')
+        old = NUM_DIM_BEFORE[name]
+        print(f'    num_dim {old} -> {pal["num_dim"]}: '
+              + ', '.join(f'{b} {contrast(old, pal[b]):.2f} -> '
+                          f'{contrast(pal["num_dim"], pal[b]):.2f}'
+                          for b in ('bg', 'panel', 'card')))
+
+
+def t6_selected_row():
+    """GUI-10 (F8, D180): the selected model-tree row's fill is the
+    QSS rule's own (`treerow[selected="true"]`), and every role drawn on
+    it reaches 4.5:1. Hover rows are printed for the report, not gated
+    (D180: the global `hover` key is unchanged)."""
+    import re
+    print('\nT6: the selected tree row (every role >= 4.5)')
+    for name, pal in (('dark', theme.DARK), ('light', theme.LIGHT)):
+        m = re.search(r'QFrame#treerow\[selected="true"\]\s*\{\s*'
+                      r'background:\s*(#[0-9a-fA-F]{6})', theme.qss(name))
+        fill = m.group(1) if m else None
+        check(f'{name}: the selected-row fill is chain_tint '
+              f'({theme.chain_tint(name)})',
+              fill == theme.chain_tint(name), str(fill))
+        if fill is None:
+            continue
+        worst = None
+        for role in SELECTED_ROW_ROLES:
+            r = contrast(pal[role], fill)
+            print(f'    {role:12s} on {fill}  {r:6.2f}')
+            if worst is None or r < worst[0]:
+                worst = (r, role)
+        check(f'{name}: every role on the selected row >= 4.5',
+              worst[0] >= 4.5, f'worst {worst[1]} = {worst[0]:.2f}')
+        print(f'    (hover, not gated: '
+              + ', '.join(f'{role} {contrast(pal[role], pal["hover"]):.2f}'
+                          for role in ('num_dim', 'text', 'faint', 'ok',
+                                       'warn', 'danger')) + ')')
 
 
 def main():
@@ -190,6 +238,7 @@ def main():
     t3_weights()
     t4_keys()
     t5_contrast()
+    t6_selected_row()
     print(f'\nTHEME: {"PASS" if not FAIL else "FAIL " + str(FAIL)}')
     return 1 if FAIL else 0
 
