@@ -18,8 +18,11 @@ TRAY_LIFE_MS = 60_000
 #: how long Windows is asked to show the notification
 TOAST_MS = 10_000
 
-#: a Windows path in a message: a drive or UNC start, up to the next space
-_PATH_TOKEN = re.compile(r'(?:[A-Za-z]:[\\/]|\\\\)\S*')
+#: a Windows path in a message: a drive or UNC start, up to the next space,
+#: with the opening quote or bracket that may precede it - an OSError's
+#: text quotes its path (`Permission denied: 'C:\\...'`), and a quoted path
+#: must start its line with its quote or Qt breaks it mid-path (verify11a)
+_PATH_TOKEN = re.compile(r'''['"(]?(?:[A-Za-z]:[\\/]|\\\\)\S*''')
 #: a message box may widen to keep a path on one line up to this share of
 #: the available screen width (P2-18, D207) ...
 PATH_SCREEN_SHARE = 0.70

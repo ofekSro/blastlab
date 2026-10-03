@@ -644,8 +644,20 @@ def main():
           '…' in box2.text() and lbl2.toolTip() == f'Missing {huge}'
           and lbl2.minimumWidth() < lbl2.fontMetrics().horizontalAdvance(
               huge), f'{box2.text()[:30]!r} min {lbl2.minimumWidth()}')
+    # verify11a: an OSError's text quotes its path; the quoted path starts
+    # its own line with its quote (the real platform broke it mid-path)
+    p = 'C:\\runs\\lab.json'
+    err = f'Could not write {p}: [Errno 13] Permission denied: {p!r}'
+    box3 = QMessageBox(QMessageBox.Critical, 'Save case', err,
+                       QMessageBox.Ok, win)
+    dialogs._keep_paths(box3)
+    check('a quoted path starts its own line with its quote',
+          box3.text() == (f'Could not write\n{p}: [Errno 13] Permission '
+                          f'denied:\n{p!r}')
+          and box3.text().replace('\n', ' ') == err, repr(box3.text()))
     box.deleteLater()
     box2.deleteLater()
+    box3.deleteLater()
     short = 'x' * TIP_WRAP_CHARS
     long_tip = 'word & <tag> ' * 10 + '\nnext line'
     check('wrap_tip: a short tip is unchanged, a long one is rich text '
