@@ -211,7 +211,8 @@ class _RunStrip(QFrame):
                                 ('step', 'Step', 'dt — s'),
                                 ('pmax', 'P max', 'in the field now'),
                                 ('cells', 'Cells', 'AMR mesh, live plane')):
-            t = StatTile(title)
+            # F34: a scientific p max (`2.799e+06 kPa`) keeps its unit
+            t = StatTile(title, fit=True)
             t.caption.setText(cap)
             for lbl in (t.value, t.caption):
                 # a long readout elides rather than hold the strip wide

@@ -12,7 +12,8 @@ itself on `theme.signals.changed`.
 """
 
 from PySide6.QtCore import QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen, QTransform
+from PySide6.QtGui import (QBrush, QColor, QFont, QPainter, QPen,
+                           QTextDocument, QTransform)
 from PySide6.QtWidgets import (QButtonGroup, QCheckBox, QFrame,
                                QHBoxLayout, QLabel, QPushButton,
                                QSizePolicy, QStackedWidget, QToolButton,
@@ -135,12 +136,19 @@ class StatTile(QFrame):
     """A live-number tile (board BC_Combined, the strip): caps label
     (10.5 px, letter-spaced), value in Space Grotesk 21 px via
     `theme.font('display')`, a caption line, and an optional thin bar
-    (memory). `variant='accent'` is the tinted Z tile (`accent_bg`)."""
+    (memory). `variant='accent'` is the tinted Z tile (`accent_bg`).
+    `fit=True`: the value's face steps down from 21 px (to FIT_MIN_PX)
+    until the readout fits the tile, its height kept at the 21 px line
+    (GUI-10, F34: `2.799e+06 kPa` lost its unit at 1100 px)."""
 
-    def __init__(self, title, variant=None, bar=False, parent=None):
+    FIT_MIN_PX = 14
+
+    def __init__(self, title, variant=None, bar=False, parent=None,
+                 fit=False):
         super().__init__(parent)
         self.setObjectName('tile')
         self.variant = variant
+        self._fit, self._px = bool(fit), 21
         if variant:
             self.setProperty('variant', variant)
         lay = QVBoxLayout(self)
@@ -152,6 +160,9 @@ class StatTile(QFrame):
         self.caps.setFont(caps_font)
         self.value = QLabel('—')
         self.value.setFont(_px_font(21, 600, display=True))
+        if self._fit:
+            # a smaller face never shortens the tile (nothing below moves)
+            self.value.setMinimumHeight(self.value.sizeHint().height())
         self.caption = QLabel('')
         self.caption.setFont(_px_font(11.5))
         self.bar = _TileBar(self) if bar else None
@@ -166,7 +177,7 @@ class StatTile(QFrame):
         caps = 'accent_text' if self.variant == 'accent' else 'faint'
         cap = 'accent_soft' if self.variant == 'accent' else 'muted'
         self.caps.setStyleSheet(_css(10, 600, caps))
-        self.value.setStyleSheet(_css(21, 600, 'text',
+        self.value.setStyleSheet(_css(self._px, 600, 'text',
                                       family=theme.DISPLAY))
         self.caption.setStyleSheet(_css(11, colour=cap))
 
@@ -176,6 +187,30 @@ class StatTile(QFrame):
             self.caption.setText(str(caption))
         if frac is not None and self.bar is not None:
             self.bar.set_frac(frac)
+        self._fit_value()
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        self._fit_value()
+
+    def _fit_value(self):
+        room = self.value.width()
+        if not self._fit or room <= 0:
+            return
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        f = QFont(self.value.font())
+        px = 21
+        while px > self.FIT_MIN_PX:
+            f.setPixelSize(px)
+            doc.setDefaultFont(f)
+            doc.setHtml(self.value.text())       # the unit's <span> too
+            if doc.idealWidth() <= room:
+                break
+            px -= 1
+        if px != self._px:
+            self._px = px
+            self._recolour()
 
 
 # ── Tree row ─────────────────────────────────────────────────────────────

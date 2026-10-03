@@ -40,6 +40,8 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      is on screen and the banner was hidden;
  R9  (GUI-10, F23) copying the wrapped model-folder path: Ctrl+C and the
      context menu's Copy give the path without U+200B; no QShortcut.
+ R10 (GUI-10, F34) at 1100 x 720 a scientific P MAX keeps its unit: the
+     tile's value face steps down, the tile keeps its height.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1481,6 +1483,50 @@ def r9_copy_path(win):
     pump(RP.PATH_DEBOUNCE_MS + 150)
 
 
+def r10_pmax_fit(win):
+    """GUI-10 (F34): at 1100 x 720 a scientific P MAX (`2.799e+06 kPa`,
+    any p max from 10 MPa on) lost its unit in the 115 px tile. The
+    strip's tiles step their value face down until the readout fits; a
+    short value stays at 21 px, and the tile's height does not change."""
+    from PySide6.QtGui import QFont, QTextDocument
+    print('\nR10: a long P MAX keeps its unit at 1100 x 720 (F34)')
+    rp = win.run_panel
+    size = (win.width(), win.height())
+    win._show('run')
+    win.resize(1100, 720)
+    pump(250)
+
+    def readout(pmax):
+        rp._readout.update({'t [ms]': '1.828', 'step': '1355',
+                            'dt [s]': '1.93e-06', 'p max [kPa]': pmax})
+        rp._render_readouts()
+        pump(150)
+        lbl = rp._tile_pmax.value
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        doc.setDefaultFont(QFont(lbl.font()))
+        doc.setHtml(lbl.text())
+        return (lbl.font().pixelSize(), doc.idealWidth(), lbl.width(),
+                rp._tile_pmax.height(), lbl.text())
+
+    px0, need0, has0, h0, _t = readout('345.7')
+    check('a short P MAX stays at 21 px and fits',
+          px0 == 21 and need0 <= has0, f'{px0} px, {need0:.0f} in {has0}')
+    px, need, has, h, text = readout('2.799e+06')
+    check('2.799e+06 kPa fits its tile, unit included',
+          need <= has and 'kPa' in text, f'{px} px, {need:.0f} in {has}')
+    check('by a smaller face, not a taller tile',
+          px < 21 and h == h0, f'{px} px, height {h0} -> {h}')
+    check('the readout string is unchanged (U4)',
+          rp.chip_texts()['p max [kPa]'] == '2.799e+06',
+          rp.chip_texts()['p max [kPa]'])
+    px1, _n, _h, _hh, _t = readout('345.7')
+    check('and back to 21 px for a short value', px1 == 21, f'{px1} px')
+    rp._reset_readouts_text()
+    win.resize(*size)
+    pump(200)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1498,6 +1544,7 @@ def main():
         r7_chain_hook(win)
         r8_banner_viewer(win)
         r9_copy_path(win)
+        r10_pmax_fit(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a
