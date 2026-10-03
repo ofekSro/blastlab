@@ -227,6 +227,10 @@ the defaults and reviewed the list in bulk). Work items go to `TODO.md` GUI-11.
 | F17 | Wide 1D figure title | A shorter on-screen title; exported figures byte-identical. GUI-11 (f). |
 | P2-18, P2-24 | Still reproduce (GUI-10 T9) | A small batch: GUI-11 (g). |
 
+| # | Batch | Question | Default taken |
+|---|---|---|---|
+| D199 | session (after GUI-10) | D187 said to `git mv` the old `docs/UX_REVIEW.md` to `docs/history/` and write a fresh one in its place. But code comments and tests cite it by section and finding (`ui/app.py` lines 51 and 910, `test_char_write_failure.py`, `test_gui_char_write_failure.py`, `test_ui_char_write_failure.py`, `test_ui_char_hd13_run.py`), as do `ENGINEERING_QUESTIONS.md`, `DONE.md` and the redesign plan. A fresh file at that path would make every one of them point at the wrong text. | The old review stays where it is; the redesign review is written to `docs/UX_REVIEW-redesign.md` and cites old findings as `UX_REVIEW.md` §n. D187 is superseded. |
+
 ## Found along the way — not caused by the redesign, not fixed
 
 | # | Found in | What | Suggested |
