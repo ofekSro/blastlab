@@ -1235,6 +1235,23 @@ def s8_results():
               f'{n0} -> {len(rs.entries())} {logs[-1:]}')
         check('a result fed by hand outside a run stays a plain entry',
               rs.entries()[-1].kind == 'run')
+        # a chain started with no model (scripts only: the Chain screen
+        # refuses an empty Model box) keeps per-stage entries (D161;
+        # test_ui_char_write_failure pins them)
+        n0 = len(rs.entries())
+        win.ctrl._stage_dims = [1, 2]
+        win.ctrl._run_name = ''
+        win.on_running(True)
+        for k, d in enumerate((1, 2)):
+            win.on_run_started(INFO1D)
+            win.on_result(k, d, f'Run 9 - {d}D', res[d])
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(30)
+        new = [(e.label, e.kind) for e in rs.entries()[n0:]]
+        check('a chain with no model stays per stage (D161)',
+              new == [('Run 9 - 1D', 'run'), ('Run 9 - 2D', 'run')]
+              and rs.stage_slot.isHidden(), str(new))
     finally:
         dialogs.notify_desktop = real_notify
         win.ctrl._stage_dims = []

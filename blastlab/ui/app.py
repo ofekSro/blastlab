@@ -1288,14 +1288,15 @@ class MainWindow(QMainWindow):
                     'stopped' if res.stopped_early else 'done')
         self._run_got_result = True
         self._results.append((label_, dim, res))
-        if self._running_ui and self._chain_n > 1:
+        model = getattr(self.ctrl, '_run_name', '') or ''
+        if self._running_ui and self._chain_n > 1 and model:
             # GUI-9 T5 (plan §7): a live chain is ONE Results entry with a
-            # tab per stage; its first result creates it. A result fed by
-            # hand outside a run stays a plain entry. `_results` stays per
-            # stage.
+            # tab per stage, labelled with its model; its first result
+            # creates it. A result fed by hand outside a run, and a chain
+            # started with no model (scripts only - the Chain screen always
+            # has one; test_ui_char_write_failure pins it), stay per stage
+            # (D161). `_results` stays per stage.
             if self._chain_entry is None:
-                model = (getattr(self.ctrl, '_run_name', '')
-                         or label_.split(' - ')[0])
                 self._chain_entry = self.results.start_chain(
                     model, getattr(self.ctrl, '_stage_dims', None) or [dim])
             self.results.add_stage(self._chain_entry, label_, dim, res)
