@@ -19,6 +19,8 @@ it never moves mid-run (CLAUDE.md 8.7). Colours through object-name QSS
 rules (D6); the arrows are painted.
 """
 
+import re
+
 from PySide6.QtCore import QPointF, QSize, Qt
 from PySide6.QtGui import QPainter, QPen
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QSizePolicy,
@@ -90,10 +92,19 @@ class _StripArrow(QWidget):
         p.end()
 
 
+def compact_duration(text):
+    """`20 min 41 s` -> `20 min` (the strip's narrow form); anything else
+    unchanged (`9 s`, `1 h 02 min`, `78 %`, `waiting`)."""
+    m = re.fullmatch(r'(\d+ min) \d+ s', text)
+    return m.group(1) if m else text
+
+
 class StagePill(QFrame):
     """`01 1D ✓ 9 s` / `02 2D 78 %` / `03 3D waiting`: the stage's
-    position, its dimension and its value. The value elides (whole text
-    in its tooltip) rather than hold the strip wider than its slot."""
+    position, its dimension and its value. Narrow (`set_fit`, the strip
+    decides): level 1 drops the seconds of a minutes-long duration, level
+    2 also the position; past that a long value elides. `text()` and the
+    tooltip are always the whole pill."""
 
     def __init__(self, pos, dim, parent=None):
         super().__init__(parent)
@@ -109,11 +120,14 @@ class StagePill(QFrame):
         self.name.setObjectName('chainpillname')
         self.value = ElidedLabel('', Qt.ElideRight)
         self.value.setObjectName('chainpillval')
-        # its natural width when there is room, down to nothing when not
+        # its natural width when there is room, less when not (a short
+        # value never: the minimum set in _show_value)
         self.value.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         for w in (self.num, self.name, self.value):
             lay.addWidget(w, 0, Qt.AlignVCenter)
         self._state = None
+        self._value = ''            # the whole value, whatever is shown
+        self._fit = 0
         self.set_state('waiting')
 
     def set_state(self, state, value=None):
@@ -124,22 +138,66 @@ class StagePill(QFrame):
         name = f'{self.dim}D ✓' if state == 'done' else f'{self.dim}D'
         if self.name.text() != name:
             self.name.setText(name)
-        text = value if value is not None else _STATE_WORD.get(state, '')
-        if self.value.full_text() != text:
-            self.value.setText(text)
+        self._value = value if value is not None \
+            else _STATE_WORD.get(state, '')
         if state != self._state:
             self._state = state
             for w in (self, self.num, self.name, self.value):
                 w.setProperty('state', state)
                 theme.repolish(w)
+        self._show_value()
+
+    def set_fit(self, level):
+        """0 the whole pill, 1 a minutes-long duration without its
+        seconds, 2 also without the position number."""
+        level = max(0, min(2, int(level)))
+        if level != self._fit:
+            self._fit = level
+            self.num.setVisible(level < 2)
+            self._show_value()
+
+    def _shown_value(self, level=None):
+        level = self._fit if level is None else level
+        return compact_duration(self._value) if level >= 1 else self._value
+
+    def _show_value(self):
+        text = self._shown_value()
+        if self.value.full_text() != text:
+            self.value.setText(text)
+        # past level 2 a long value gives way (elided, as a narrow stage
+        # card's title does, D151); a short one (`9 s`, `78 %`) never
+        self.value.ensurePolished()
+        fm = self.value.fontMetrics()
+        self.value.setMinimumWidth(min(fm.horizontalAdvance(text) + 1,
+                                       fm.horizontalAdvance('00 %') + 1))
+        self.setToolTip(self.text())
 
     def state(self):
         return self._state
 
+    def value_text(self):
+        """The whole value (`78 %`, `20 min 41 s`, `waiting`)."""
+        return self._value
+
     def text(self):
-        """The whole pill as one line: `01 1D ✓ 9 s`."""
+        """The whole pill as one line: `01 1D ✓ 9 s` (whatever is shown)."""
         return ' '.join(t for t in (self.num.text(), self.name.text(),
-                                    self.value.full_text()) if t)
+                                    self._value) if t)
+
+    def natural(self, level):
+        """The pill's width at fit `level`, from the font metrics (never
+        from its geometry, so the strip's fit cannot oscillate)."""
+        for w in (self.num, self.name, self.value):
+            w.ensurePolished()
+        m = self.layout().contentsMargins()
+        sp = self.layout().spacing()
+        parts = [self.name.fontMetrics().horizontalAdvance(self.name.text()),
+                 self.value.fontMetrics().horizontalAdvance(
+                     self._shown_value(level))]
+        if level < 2:
+            parts.append(self.num.fontMetrics().horizontalAdvance(
+                self.num.text()))
+        return m.left() + m.right() + sp * (len(parts) - 1) + sum(parts) + 2
 
     def widest(self):
         """The pill's width with its widest possible value (the row
@@ -240,6 +298,33 @@ class ChainStrip(QFrame):
             self._place()
             self.setFixedHeight(self.height_now())
             self.updateGeometry()
+        self._fit_pills(width)
+
+    def _fit_pills(self, width=None):
+        """In the two-row form the pills have the whole row; when they do
+        not fit it at their natural width (three done pills of minutes
+        each at 1100 x 720), the narrowest fit level that does (see
+        StagePill.set_fit) applies to every pill. Widths only - the
+        strip's height is not touched. One row is never narrowed: it is
+        chosen only when the widest values fit."""
+        width = self.width() if width is None else width
+        if not self.pills or width <= 0:
+            return
+        level = 0
+        if self._two:
+            avail = width - 2 * PAD_H - 2
+            gaps = self._lay_b.spacing() * (len(self.pills)
+                                            + len(self.arrows) - 1)
+            fixed = gaps + sum(a.width() for a in self.arrows)
+            while level < 2 and fixed + sum(
+                    p.natural(level) for p in self.pills) > avail:
+                level += 1
+        for p in self.pills:
+            p.set_fit(level)
+
+    def fit_level(self):
+        """The pills' fit level now (tests)."""
+        return self.pills[0]._fit if self.pills else 0
 
     def _place(self):
         """Put the widgets in the rows of the current form."""
@@ -301,7 +386,10 @@ class ChainStrip(QFrame):
     def set_pct(self, k, pct):
         """The running stage's progress, a whole percent."""
         if 0 <= k < len(self.pills) and self.pills[k].state() == 'running':
-            self.pills[k].set_state('running', f'{int(pct)} %')
+            text = f'{int(pct)} %'
+            if self.pills[k].value_text() != text:
+                self.pills[k].set_state('running', text)
+                self._fit_pills()
 
     def stage_done(self, k, seconds, how='done'):
         """Stage `k` landed its result after `seconds` of run time (held
@@ -342,8 +430,11 @@ class ChainStrip(QFrame):
         self._sync_arrows()
 
     def _sync_arrows(self):
+        """After every state change: the arrows' colour, and the pills'
+        fit for their new texts (widths only)."""
         for i, a in enumerate(self.arrows):
             a.set_lit(self.pills[i].state() == 'done')
+        self._fit_pills()
 
     def _set_caption(self, text):
         self.caption.setText(text)

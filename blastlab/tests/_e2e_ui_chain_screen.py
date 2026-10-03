@@ -129,7 +129,8 @@ def main():
     def shot(name):
         if shots:
             pump(150)
-            win.grab().save(os.path.join(shots, f'e2e9a_{name}.png'))
+            # 9b: its own prefix, so the 9a shots beside it are kept
+            win.grab().save(os.path.join(shots, f'e2e9b_{name}.png'))
 
     try:
         win.set_solver('native')

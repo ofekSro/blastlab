@@ -926,6 +926,45 @@ def s7_strip():
               strip.texts()[1:] == ['02 2D failed', '03 3D not run',
                                     'Chain failed at stage 2 of 3'],
               str(strip.texts()))
+        # minutes-long stages at 1100 x 720 (the real-platform shots: three
+        # done pills do not fit 404 px): a long value gives way, a short
+        # one never, nothing leaves the strip, each pill's tooltip is whole
+        win.resize(1100, 720)
+        pump(150)
+        strip = start([1, 2, 3])
+        for k, t in enumerate((9.0, 1209.0, 2469.0)):
+            win.on_run_started(INFO1D)
+            fake.t = t
+            win.on_result(k, k + 1, f'M - {k + 1}D', res[k + 1])
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(50)
+        boxes = [QRect(p.mapTo(strip, QPoint(0, 0)), p.size())
+                 for p in strip.pills]
+        shown = [p.value.text() for p in strip.pills]
+        check('1100 x 720, 20-min stages: the pills fit the strip by '
+              'dropping the seconds and the numbers, nothing elided, each '
+              'pill\'s tooltip its whole text',
+              all(strip.rect().contains(b) for b in boxes)
+              and shown == ['9 s', '20 min', '21 min']
+              and not any(p.value.elided() for p in strip.pills)
+              and strip.fit_level() == 2
+              and all(p.num.isHidden() for p in strip.pills)
+              and all(p.toolTip() == p.text() for p in strip.pills)
+              and strip.texts()[:3] == ['01 1D ✓ 9 s', '02 2D ✓ 20 min 0 s',
+                                        '03 3D ✓ 21 min 0 s']
+              and strip.height() == H_TWO and not clipped(win),
+              f'{boxes} {shown} fit {strip.fit_level()}')
+        win.resize(1600, 1000)
+        pump(150)
+        check('back at 1600 x 1000: one row, the whole pills again',
+              not strip.two_rows() and strip.fit_level() == 0
+              and [p.value.text() for p in strip.pills]
+              == ['9 s', '20 min 0 s', '21 min 0 s']
+              and not any(p.num.isHidden() for p in strip.pills),
+              f'{[p.value.text() for p in strip.pills]}')
+        win.resize(1600, 1000)
+        pump(100)
         # the title's whole-percent dedupe must not hold a pill at 0 %: a
         # fast stage 2 whose first percent equals stage 1's last (the 9b
         # e2e saw `02 2D 0 %` through a whole stage)
