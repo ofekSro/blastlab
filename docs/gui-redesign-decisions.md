@@ -206,6 +206,27 @@ next day. **Nothing here blocked the work.** Each item says what was done; answe
 | D197 | qa (10b, F34 `38a9673`) | F34: P MAX at 1100 px. | `StatTile(fit=True)`, on the Run strip only. The value's face steps down 21 → 14 px until the readout and its unit fit, and the label keeps the 21 px line's height, so the strip never changes height. Not taken: per-tile stretch factors (they depend on the font) and eliding a number. The readout string is unchanged (U4, D52). |
 | D198 | verify (10b, F37 `0c39004`) | The top bar is still short at 1100 px when the case name is at its minimum. | The verifier's default, narrower than D191's open question: the unsaved marker drops its word (`●`, with "Unsaved changes" as its tooltip) **only** when the bar cannot hold every control at its size hint with the name at 40 px. In every other state it stays `● unsaved`. Nothing is lost: the status bar says `<case> has unsaved changes`, and the title carries `●`. On the real platform this happens only with ✓ ✓, unsaved, and the chip at `WSL at run start` or `WSL unavailable` (32 states measured). The name then gets about 20 px more (`wall…`). The `ElidedButton`'s accessible name is now the whole name. D191's question (also shorten the marker whenever the name is elided) stays with the owner. |
 
+## Owner review, 2026-10-03
+
+The session put each open call to the owner with a recommendation; the owner answered
+**"approve all"**. The rows not named below remain approved as taken (the owner asked for
+the defaults and reviewed the list in bulk). Work items go to `TODO.md` GUI-11.
+
+| # | Call | Owner's answer |
+|---|---|---|
+| D137 | Run chain with a stage error | Keep enabled; the click names the stage and brings it forward. |
+| D138 | A native Setup seeds TNT, not C4 | Keep: the native solver only knows TNT. |
+| D156 | Live list is a superset for planar → 3D | Keep. |
+| D161 | Only a chain with a model groups | Keep. |
+| D157, D164, D165, D169, D170 | Chain strip placement, fit, look; the two verify fixes | Keep. |
+| D191 / D198 | Narrow top bar | Shorten `● unsaved` to `●` (tooltip) **whenever the case name is elided**, not only when a control would be squeezed. GUI-11 (a). |
+| D192 | Faint dark tree hover | Make the dark hover visible; dark `num_dim` at 4.06:1 while hovered is accepted. GUI-11 (b). |
+| F28 | Previous stage's progress at a held stage start | Fix the one line in `solvers/worker.py`, own commit, `test_regression` + the Tk suites. GUI-11 (c). |
+| F12 | Run screen at 0-D | Hide the view toolbar, show a 0-D note. GUI-11 (d). |
+| F16 | AMR values of a hidden row | Keep the case file's value; solver defaults untouched. GUI-11 (e). |
+| F17 | Wide 1D figure title | A shorter on-screen title; exported figures byte-identical. GUI-11 (f). |
+| P2-18, P2-24 | Still reproduce (GUI-10 T9) | A small batch: GUI-11 (g). |
+
 ## Found along the way — not caused by the redesign, not fixed
 
 | # | Found in | What | Suggested |

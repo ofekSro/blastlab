@@ -29,14 +29,16 @@ orders it; every rule, value and acceptance criterion lives there. Qt only
 they are. Owner: *"implement everything"*, then run the QA and UX agents on the result.
 
 > **▶ RESUME HERE — the first thing to do from this list.** Branch `gui-redesign`;
-> GUI-1..9 done (GUI-9 on 2026-10-03). Next, in order:
-> 1. **GUI-10** — the QA pass, then `gui-qa-tester` + `gui-ux-reviewer` on the whole GUI
->    (owner's request). Fold in F13, F21-F24, F26, F27 from the decisions file.
-> 2. **Office machine:** run `blastlab/tests/_e2e_ui_chain_foam.py` (the blastFoam
->    1→2→3 chain; the home PC's 3D stage outlived 1800 s). `pgrep -a blastFoam` empty first.
-> 3. Owner review of the non-blocking defaults:
->    [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) (D1-D170, found
->    issues F1-F27; F1: an agent once ran a broad `taskkill`).
+> GUI-1..10 done (GUI-9, GUI-10 on 2026-10-03). Next, in order:
+> 1. **`gui-qa-tester` + `gui-ux-reviewer`** on the whole GUI (owner's request).
+> 2. **GUI-11** — the owner-approved polish plus what those two find.
+> 3. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` (the blastFoam 1→2→3
+>    chain; the home PC's 3D stage outlived 1800 s), harness F07 (over the home VM's cell
+>    cap), `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
+>
+> The owner reviewed the open calls on 2026-10-03 ("approve all"):
+> [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) § Owner review.
+> F1: an agent once ran a broad `taskkill`.
 >
 > Run agents on Opus 5.5 (`model: "opus"`) if Fable 5 credits run out, as happened on
 > 2026-09-29. The home PC has 8 GB RAM: heavy suites one at a time.
@@ -52,7 +54,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | `GUI-7` | ✅ done 2026-09-29 (DONE.md §0q) · **03 Results** — results list + "how it was computed"; views Field (= Fields + Animation) · Gauges · 3D; table with Z and Copy; impulse in kPa·ms on screen only; exports grouped. No KB columns, no run overlay. Plan §7 | L | 7 |
 | `GUI-8` | ✅ done 2026-09-29 (DONE.md §0m) · **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
 | `GUI-9` | ✅ done 2026-10-03 (DONE.md §0r) · **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
-| `GUI-10` | ▶ **next** · **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
+| `GUI-10` | ✅ done 2026-10-03 (DONE.md §0s) · **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
+| `GUI-11` | **Polish, owner-approved 2026-10-03** (`docs/gui-redesign-decisions.md`, owner-review rows) — (a) D191: `● unsaved` shortens to `●` (tooltip) whenever the case name is elided (D198 does it only when a control would be squeezed); F38: the harness clip check sees tool-button elision, then K02 `--window` again; F36: harness F02/F10 expect the VTK export disabled with its reason; (b) D192: tree-row hover visible in dark, dark `num_dim` at 4.06:1 on hover accepted; (c) F28: clear the previous stage's progress at a stage start, one line in `solvers/worker.py` — own commit, `test_regression` + the Tk suites; (d) F12: at 0-D hide the Run view toolbar, show a 0-D note; (e) F16: keep a case file's hidden-row value (`amr_refine` / `amr_unrefine`), solver defaults untouched; (f) F17: a shorter on-screen 1D figure title, exports byte-identical; (g) P2-18 and P2-24; (h) whatever the `gui-qa-tester` / `gui-ux-reviewer` pass after GUI-10 finds | M | 11 |
 
 ---
 

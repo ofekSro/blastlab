@@ -1047,6 +1047,38 @@ Plan: `docs/batches/2026-09-29-gui-chain.md`; reports `…gui-chain-a.implement.
 
 ---
 
+## 0s. 2026-10-03 — batch `gui-qa` (GUI-10, parts a and b)
+
+Plan: `docs/batches/2026-10-03-gui-qa.md`; reports `…gui-qa-a.implement.md`,
+`…gui-qa-a.verify.md`, `…gui-qa-b.implement.md`, `…gui-qa-b.verify.md`. Findings,
+measurements and screenshots in `docs/qa/2026-10-03-gui-qa/` (`findings.md`).
+
+- **What:** the QA harness drives the new frame (pills, dimension control, solver chip,
+  Dark-mode action, each click checked), B06 real-platform aware, `wait_log` by run
+  generation (F22), utf-8 output (F24), chain stages selectable by label, `press()`
+  refuses a hidden control (F33), new scenarios K01 (frame), K02 (nothing clipped at
+  1100 × 720, both modes), K03 (light mode) — 81 scenarios — and `_qa_findings_diff.py`.
+  UI fixes: Setup pill / + buttons at the board's heights (F21), tree-number contrast
+  (F8), clean path copy without U+200B (F23), chain-stage readouts reset (F27), top bar
+  at 1100 px (F29, F37: spacing, an elided case name with its tooltip and accessible
+  name, a compact `●` marker when a control would be squeezed), tree-row hover at
+  ≥ 4.5:1 (D190), P MAX fits its tile (F34).
+- **Passes:** base `0605522` (pre-redesign) 66 scenarios, 1 finding; HEAD 69, after the
+  fixes no new finding beyond the intended changes; real platform 10/10; F group in WSL
+  12/12, all findings dispositioned (pre-existing P2-22, F36; F07 needs the office
+  machine). R10 (viewer placement 0 ms, resize median ≤ 50 ms) passed on every surface;
+  F13 stays open for a viewer-host batch. P2-21 gone; P2-18, P2-24 still reproduce.
+- **Tests:** every `test_ui_*` suite one at a time, the real-platform e2e scripts;
+  `test_regression` byte-identical; `test_ui_char_chain_wiring` green; frozen paths
+  (`gui/`, `core/`, `solvers/`, `output/`, `view3d_host.py`, `run_controller.py`) 0 lines.
+- **Verifier fixes:** `a99872b` (findings diff read a path past a later slash, F31),
+  `0c39004` (F37: 0-D segment squeezed by the longest chip).
+- **Owner review (2026-10-03):** all open calls approved with the session's
+  recommendations; the work items are TODO GUI-11.
+- **Commits:** `950a34a`..`3b029ca` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
