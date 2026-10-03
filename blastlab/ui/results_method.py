@@ -258,3 +258,25 @@ def result_caption(entry):
     if s is not None:
         parts.append(fmt_duration(s))
     return ' · '.join(parts)
+
+
+def chain_caption(entry):
+    """A chain's list caption (GUI-9 T5, board Results_Chain line 62):
+    `1D → 2D → 3D · 3 stages · 41 min 0 s`; `2 of 3 stages` while fewer
+    landed (a stopped chain, or one still running). The duration is the
+    last landed stage manifest's `finished` - the first stage manifest's
+    `created` (both from the stages' own `records()`), left out without
+    both."""
+    route = [int(d) for d in (getattr(entry, 'route', None) or ())]
+    stages = list(getattr(entry, 'stages', None) or [])
+    parts = [' → '.join(f'{d}D' for d in route)] if route else []
+    n, total = len(stages), len(route) or len(stages)
+    parts.append(f'{n} stages' if n == total else f'{n} of {total} stages')
+    if stages:
+        _c, first = records(getattr(stages[0], 'result', None))
+        _c, last = records(getattr(stages[-1], 'result', None))
+        a = _stamp((first or {}).get('created'))
+        b = _stamp((last or {}).get('finished'))
+        if a is not None and b is not None and b >= a:
+            parts.append(fmt_duration((b - a).total_seconds()))
+    return ' · '.join(parts)

@@ -1161,8 +1161,11 @@ class MainWindow(QMainWindow):
         if pct != self._run_pct:        # whole-percent changes only
             self._run_pct = pct
             self._update_title()
-            if self._chain_strip is not None:
-                self._chain_strip.set_pct(self._chain_k - 1, pct)
+        if self._chain_strip is not None:
+            # not behind the title's dedupe: a stage whose first percent
+            # equals the last stage's (100 % -> 100 %) still moves its
+            # pill off `0 %` (the pill skips an unchanged text itself)
+            self._chain_strip.set_pct(self._chain_k - 1, pct)
 
     def on_paused(self, paused):
         # held time is not run time (decision D50)
@@ -1285,7 +1288,19 @@ class MainWindow(QMainWindow):
                     'stopped' if res.stopped_early else 'done')
         self._run_got_result = True
         self._results.append((label_, dim, res))
-        self.results.add_result(label_, dim, res)
+        if self._running_ui and self._chain_n > 1:
+            # GUI-9 T5 (plan §7): a live chain is ONE Results entry with a
+            # tab per stage; its first result creates it. A result fed by
+            # hand outside a run stays a plain entry. `_results` stays per
+            # stage.
+            if self._chain_entry is None:
+                model = (getattr(self.ctrl, '_run_name', '')
+                         or label_.split(' - ')[0])
+                self._chain_entry = self.results.start_chain(
+                    model, getattr(self.ctrl, '_stage_dims', None) or [dim])
+            self.results.add_stage(self._chain_entry, label_, dim, res)
+        else:
+            self.results.add_result(label_, dim, res)
         # Run pill ✓ = a result landed this session (decision D7)
         self.topbar.set_done('run', True)
         self.notify(f'Result ready: {label_}')

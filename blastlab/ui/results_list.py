@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
 from . import theme
-from .results_method import result_caption
+from .results_method import chain_caption, result_caption
 
 #: the rows' minimum height (plan section 2.4, D41: pinned in the QSS)
 ROW_MIN_H = 44
@@ -281,9 +281,11 @@ class ResultsList(QWidget):
         row.name.set_tip(tip)
         row.setToolTip(tip or '')
         data = it['data']
-        row.chain.setVisible(getattr(data, 'kind', None) == 'chain')
-        row.caption.setText(result_caption(data) if data is not None
-                            else '')
+        chain = getattr(data, 'kind', None) == 'chain'
+        row.chain.setVisible(chain)
+        # GUI-9 T5: a chain's caption is its route, stages and duration
+        row.caption.setText('' if data is None else chain_caption(data)
+                            if chain else result_caption(data))
 
     def _badge_latest(self):
         last = len(self._rows) - 1

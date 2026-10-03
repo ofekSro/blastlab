@@ -147,6 +147,17 @@ def real_chain_run():
         names = [lbl for lbl, _d, _r in win._results]
         check('the results are named after the model',
               names == ['CHAIN_RUN - 1D', 'CHAIN_RUN - 2D'], str(names))
+        # GUI-9 T5 (plan §7): the chain is ONE Results entry with a stage
+        # per dimension, labelled as the per-stage entries were
+        ents = win.results.entries()
+        check('the Results list holds one chain entry, stages [1, 2] '
+              'labelled CHAIN_RUN - 1D, CHAIN_RUN - 2D',
+              len(ents) == 1 and ents[0].kind == 'chain'
+              and [s.dim for s in ents[0].stages] == [1, 2]
+              and [s.label for s in ents[0].stages]
+              == ['CHAIN_RUN - 1D', 'CHAIN_RUN - 2D'],
+              str([(e.label, e.kind, [(s.label, s.dim) for s in
+                                      (e.stages or [])]) for e in ents]))
         win.close()
         pump(50)
     finally:

@@ -228,6 +228,10 @@ def qss(mode_name):
     # tests/test_ui_theme.py, so the dark mode uses on_accent dark text.
     danger_fg = p['on_accent'] if mode_name == 'dark' else 'white'
     tint = chain_tint(mode_name)
+    # GUI-9b: an orange edge that must read as a graphic (>= 3:1) - the
+    # running chain pill; `accent` is 2.72:1 on the light panel, so the
+    # darker accent_text there (D152's arrow rule)
+    edge = p['accent'] if mode_name == 'dark' else p['accent_text']
     return f"""
     QWidget {{ font-family: "{FONT}"; font-size: 13pt; }}
     QToolTip {{ background: {p['card2']}; color: {p['text']};
@@ -841,7 +845,7 @@ def qss(mode_name):
     QFrame#chainpill[state="done"] {{ background: {p['ok_bg']};
         border: 1px solid {p['ok_border']}; }}
     QFrame#chainpill[state="running"] {{ background: {tint};
-        border: 1px solid {p['accent']}; }}
+        border: 1px solid {edge}; }}
     QFrame#chainpill[state="stopped"] {{ border: 1px solid {p['warn']}; }}
     QFrame#chainpill[state="failed"] {{ border: 1px solid {p['danger']}; }}
     QLabel#chainpillnum {{ font-family: "{DISPLAY}"; font-size: 11.5px;
@@ -859,6 +863,22 @@ def qss(mode_name):
                                             font-weight: 600; }}
     QLabel#chainpillval[state="stopped"] {{ color: {p['warn']}; }}
     QLabel#chainpillval[state="failed"] {{ color: {p['danger']}; }}
+    /* GUI-9 T5: a chain's STAGE tabs in 03 Results (ui/results_stages.py,
+       board Results_Chain lines 98-103): 32 px tabs in a 38 px group (QSS
+       heights are the content box, D153). On the chain tint (D152: on the
+       light accent_bg, accent_text is 4.28:1). */
+    QFrame#stagetabs {{ background: {tint};
+        border: 1px solid {p['accent_border']}; border-radius: 10px;
+        min-height: 36px; max-height: 36px; }}
+    QLabel#stagetabeyebrow {{ font-size: 11px; font-weight: 600;
+                              color: {p['accent_text']}; }}
+    QPushButton#stagetab {{ background: transparent; color: {p['muted']};
+        border: none; border-radius: 7px; padding: 0px 14px;
+        min-height: 32px; max-height: 32px;
+        font-family: "{DISPLAY}"; font-size: 13px; font-weight: 600; }}
+    QPushButton#stagetab:hover {{ background: {p['hover']}; }}
+    QPushButton#stagetab:checked {{ background: {p['accent']};
+                                    color: {p['on_accent']}; }}
     """
 
 

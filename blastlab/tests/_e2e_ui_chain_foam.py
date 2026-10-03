@@ -167,12 +167,26 @@ def main():
           p2 is not None and os.path.getsize(p2) > 100,
           str(saved))
 
-    print('\nC4: three results, and each stage continued the last')
-    entries = win.results.entries()
-    check('three entries in the picker', len(entries) == 3,
-          str([e.label for e in entries]))
-    check('one per dimension', sorted(e.dim for e in entries) == [1, 2, 3],
-          str(sorted(e.dim for e in entries)))
+    print('\nC4: one chain result of three stages, each continuing the last')
+    # GUI-9 T5 (plan §7): one chain entry with a stage per dimension
+    # (was: three entries in the picker, one per dimension)
+    chains = win.results.entries()
+    check('one chain entry in the picker', len(chains) == 1
+          and chains[0].kind == 'chain',
+          str([(e.label, e.kind) for e in chains]))
+    entries = list(chains[0].stages or []) if chains else []
+    check('with three stages, one per dimension',
+          [e.dim for e in entries] == [1, 2, 3],
+          str([(e.label, e.dim) for e in entries]))
+    win._show('results')
+    pump(80)
+    for ent in entries:
+        win.results.select_stage(ent.dim)
+        pump(80)
+        page = win.results.fields.page()
+        check(f'stage {ent.dim}D draws in Field',
+              win.results.current() is ent and page in ('image', 'figure'),
+              page)
     times = {}
     for ent in entries:
         # `gauges['times']` is a numpy array, so `x or []` raises on the

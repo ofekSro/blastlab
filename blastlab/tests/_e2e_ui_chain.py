@@ -90,20 +90,26 @@ def main():
     check('and the 2D stage was told to read it',
           '2D' in log and ('profile' in log.lower()), '')
 
-    print('\nX4: both results arrived in the Results tab')
+    print('\nX4: the chain arrived in the Results tab as one entry')
+    # GUI-9 T5 (plan §7): one chain entry with a stage per dimension
+    # (was: two entries, one per dimension)
     entries = win.results.entries()
-    check('two entries', len(entries) == 2,
-          str([e.label for e in entries]))
-    check('one per dimension', sorted(e.dim for e in entries) == [1, 2],
-          str([e.dim for e in entries]))
+    check('one chain entry', len(entries) == 1
+          and entries[0].kind == 'chain',
+          str([(e.label, e.kind) for e in entries]))
+    stages = list(entries[0].stages or []) if entries else []
+    check('with two stages, one per dimension',
+          [s.dim for s in stages] == [1, 2],
+          str([(s.label, s.dim) for s in stages]))
     win._show('results')
     pump(80)
-    for ent in entries:
-        win.results.sel.setCurrentIndex(entries.index(ent))
+    for st in stages:
+        win.results.select_stage(st.dim)
         pump(80)
         page = win.results.fields.page()
-        check(f'{ent.dim}D draws in Fields',
-              page in ('image', 'figure'), page)
+        check(f'stage {st.dim}D draws in Field',
+              win.results.current() is st and page in ('image', 'figure'),
+              page)
 
     print('\nX5: the chain can be reproduced from what it left behind')
     # OUT-1: each stage's MODEL.json in <MODEL>\1d, 2d (was stageN_case.json)

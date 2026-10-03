@@ -41,6 +41,7 @@ from .results_fields import FieldsView
 from .results_gauges import GaugesView
 from .results_list import ElidedLabel, ResultsList
 from .results_method import NO_CASE_TIP, case_source, method_rows
+from .results_stages import StageTabs
 from .setup_tree import _letter_space
 from .view3d_host import View3DHost
 from .widgets import ScrollColumn, Segmented
@@ -100,6 +101,41 @@ class ResultEntry:
         self.result = result
         self.kind = kind
         self.stages = stages
+
+
+class ChainEntry(ResultEntry):
+    """A chain as ONE result (GUI-9 T5, plan §7). `label` is the model
+    (unique among the entries: `M`, `M #2`), `route` the planned dims,
+    `stages` one plain `ResultEntry` per LANDED stage, labelled exactly as
+    the per-stage entries were (`M - 1D`, uniquified across every entry
+    and stage), `index` the selected stage. `dim` and `result` are the
+    selected stage's, so code reading `entries()[-1].dim / .result` (the
+    QA harness's `_cache_result`) sees the stage on screen."""
+
+    def __init__(self, label, route):
+        # not ResultEntry.__init__: `dim` and `result` are properties
+        self.label = label
+        self.display = label
+        self.kind = 'chain'
+        self.route = tuple(int(d) for d in route)
+        self.stages = []
+        self.index = -1
+
+    def stage(self):
+        """The selected stage's own entry, or None."""
+        if 0 <= self.index < len(self.stages):
+            return self.stages[self.index]
+        return None
+
+    @property
+    def dim(self):
+        s = self.stage()
+        return s.dim if s is not None else None
+
+    @property
+    def result(self):
+        s = self.stage()
+        return s.result if s is not None else None
 
 
 def elide_middle(text, width=PICKER_MAX):
@@ -396,6 +432,9 @@ class ResultsPanel(QWidget):
         self.stage_slot.setFixedHeight(0)
         self.stage_slot.setVisible(False)
         cl.addWidget(self.stage_slot)
+        # GUI-9 T5: the one STAGE tab strip a selected chain shows there
+        self.stage_tabs = StageTabs()
+        self.stage_tabs.picked.connect(self.select_stage)
 
         bar = QHBoxLayout()
         bar.setContentsMargins(0, 0, 0, 0)
@@ -557,8 +596,13 @@ class ResultsPanel(QWidget):
         """Number a duplicate. The picker matched entries by their text,
         so two identical labels made the second unreachable - selecting
         it always returned the first, which is exactly what loading the
-        same foam run twice did."""
-        taken = {e.label for e in self._entries}
+        same foam run twice did. A chain's stage labels count too (GUI-9:
+        the Field view's memo keys on the label)."""
+        taken = set()
+        for e in self._entries:
+            taken.add(e.label)
+            if isinstance(e, ChainEntry):
+                taken.update(s.label for s in e.stages)
         if text not in taken:
             return text
         n = 2
@@ -597,16 +641,78 @@ class ResultsPanel(QWidget):
         self.refresh()
         return ent
 
+    def start_chain(self, model, dims):
+        """A chain's one entry (GUI-9 T5), labelled after its model
+        (unique among the entries). It joins the list with its first
+        stage (`add_stage`)."""
+        return ChainEntry(self._unique_label(str(model)), dims)
+
+    def add_stage(self, chain, text, dim, result):
+        """A chain stage landed: a plain entry labelled `text` (uniquified
+        as `add_result` does) joins `chain` and is selected, with the
+        chain's row - as a new per-stage entry was before."""
+        stage = ResultEntry(self._unique_label(text), dim, result)
+        chain.stages.append(stage)
+        chain.index = len(chain.stages) - 1
+        if chain not in self._entries:
+            self._entries.append(chain)
+        self._repopulate(keep=chain)
+        self.refresh()
+        return stage
+
     def entries(self):
         return list(self._entries)
 
     def current(self):
-        return self.sel.currentData()
+        """The selected result: a plain entry, or a chain's SELECTED
+        STAGE's own entry (GUI-9 T5) - so the views, the method card, the
+        exports, Load into 01 Setup, Show case and Open the 3D viewer see
+        exactly the entry a per-stage result was (export bytes and report
+        titles unchanged). The list row's data stays the ChainEntry."""
+        ent = self.sel.currentData()
+        return ent.stage() if isinstance(ent, ChainEntry) else ent
+
+    def stage(self):
+        """The selected chain stage's dimension, or None for a plain
+        result."""
+        ent = self.sel.currentData()
+        if isinstance(ent, ChainEntry) and ent.stage() is not None:
+            return ent.stage().dim
+        return None
+
+    def select_stage(self, dim):
+        """Show stage `dim` of the selected chain (a STAGE tab click).
+        False when no chain is selected or it has no such stage."""
+        ent = self.sel.currentData()
+        if not isinstance(ent, ChainEntry):
+            return False
+        for i, s in enumerate(ent.stages):
+            if s.dim == int(dim):
+                if i != ent.index:
+                    ent.index = i
+                    self.refresh()
+                return True
+        return False
+
+    def _sync_stage_tabs(self):
+        """The STAGE tabs in `stage_slot` while a chain is selected, the
+        slot empty for anything else. One instance, so switching between
+        two chains does not re-show the slot (the viewer stays put)."""
+        ent = self.sel.currentData()
+        if isinstance(ent, ChainEntry) and ent.stage() is not None:
+            self.stage_tabs.set_stages([s.dim for s in ent.stages],
+                                       ent.stage().dim)
+            if self.stage_strip() is not self.stage_tabs:
+                self.set_stage_strip(self.stage_tabs)
+                self.stage_tabs.show()
+        elif self.stage_strip() is not None:
+            self.set_stage_strip(None)
 
     def remove_current(self):
-        """Drop the selected result. They used to accumulate for a whole
-        session with no way to free their frames."""
-        ent = self.current()
+        """Drop the selected result - a chain as a whole (GUI-9 T5). They
+        used to accumulate for a whole session with no way to free their
+        frames."""
+        ent = self.sel.currentData()
         if ent is None:
             self._log('Remove: select a result first.')
             return
@@ -616,6 +722,7 @@ class ResultsPanel(QWidget):
         if self._entries:
             self.refresh()
         else:
+            self._sync_stage_tabs()
             self.clear_views()
             self._render_method(None)
         self._log(f'Removed result: {ent.label}')
@@ -692,6 +799,9 @@ class ResultsPanel(QWidget):
         self.anim.set_show_mesh(self.fields.show_mesh.isChecked())
 
     def refresh(self):
+        # a chain's STAGE tabs first: the slot above the view settles
+        # before the views draw (GUI-9 T5)
+        self._sync_stage_tabs()
         ent = self.current()
         self._render_method(ent)
         if ent is None:
@@ -734,8 +844,10 @@ class ResultsPanel(QWidget):
         self._path_lbl.setText(str(home or ''))
         self._path_lbl.set_tip(str(home) if home else None)
         self._path_lbl.setVisible(bool(home))
+        # Remove takes the list row: a chain as a whole (GUI-9 T5)
+        row = self.sel.currentData() if ent is not None else None
         self._remove_btn.setToolTip(
-            f'Remove {ent.label} from the list' if ent is not None
+            f'Remove {(row or ent).label} from the list' if ent is not None
             else 'Select a result first.')
 
     def method_rows(self):

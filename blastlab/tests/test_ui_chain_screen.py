@@ -28,6 +28,12 @@ board Chain; batch docs/batches/2026-09-29-gui-chain.md).
      hiding the slot, the strip's height constant across every state at
      1100 x 720 and 1600 x 1000, nothing clipped, and the viewer shrunk
      ahead only when the 3D view is on screen.
+ S8  (9b, T5) 03 Results: a chain is ONE entry with STAGE tabs - the
+     window's handlers group a live chain; stage labels as before; the
+     tabs; `current()` is the stage's own entry; the Field view draws the
+     same image as a plain entry of the same Result; every text export
+     and the report equal a plain entry's (`describe_dir`); two chains of
+     one model; a plain result hides the slot; Remove takes the chain.
 
 Plain script, offscreen, throwaway settings, no window on screen:
     cd blastlab/tests && python test_ui_chain_screen.py
@@ -920,6 +926,20 @@ def s7_strip():
               strip.texts()[1:] == ['02 2D failed', '03 3D not run',
                                     'Chain failed at stage 2 of 3'],
               str(strip.texts()))
+        # the title's whole-percent dedupe must not hold a pill at 0 %: a
+        # fast stage 2 whose first percent equals stage 1's last (the 9b
+        # e2e saw `02 2D 0 %` through a whole stage)
+        strip = start([1, 2])
+        win.on_run_started(INFO1D)
+        win.on_progress(prog(1.0))
+        win.on_result(0, 1, 'M - 1D', res[1])
+        win.on_run_started(INFO1D)
+        win.on_progress(prog(1.0))
+        pump(20)
+        check('stage 2 at the percent stage 1 ended on still shows it',
+              strip.texts()[1] == '02 2D 100 %', str(strip.texts()))
+        win.on_running(False)
+        win.on_finished(False, False)
         # a single run: the slot hidden at 0 px (R7)
         start([2])
         pump(30)
@@ -968,6 +988,249 @@ def s7_strip():
         pump(100)
 
 
+# ── S8 (9b) ──────────────────────────────────────────────────────────────
+def with_manifest(res, folder, created, finished):
+    """`res` pointing at a stage folder whose manifest holds the two
+    stamps (results_method.records reads it)."""
+    import json
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, 'manifest.json'), 'w',
+              encoding='utf-8') as f:
+        json.dump({'solver': 'native', 'created': created,
+                   'finished': finished}, f)
+    res.meta['model_dir'] = folder
+    return res
+
+
+def field_array(p):
+    """What the Field view's map shows: (title, the image array)."""
+    import numpy as np
+    img = p.fields.image
+    return (p.fields.title(),
+            None if img is None else np.array(img.img.image, copy=True))
+
+
+def same_image(a, b):
+    import numpy as np
+    return (a[0] == b[0] and a[1] is not None and b[1] is not None
+            and a[1].shape == b[1].shape and np.array_equal(a[1], b[1]))
+
+
+def export_files(p, kind):
+    """`p.export(kind)` of its current entry, unthreaded, into a temp
+    folder (test_char_exports.qt_export's dialogs); the files described."""
+    import test_char_exports as ce
+    from blastlab.ui import dialogs
+    out = tempfile.mkdtemp(prefix='blastlab_s8_exp_', dir=TMP)
+    real = dialogs.save_file, dialogs.pick_dir
+
+    def save_file(title, filters='All files (*.*)', parent=None, start='',
+                  default_suffix=None):
+        return os.path.join(out, os.path.basename(start) or 'x')
+
+    dialogs.save_file = save_file
+    dialogs.pick_dir = lambda *a, **k: out
+    try:
+        with ce.Opened():
+            ret = p.export(kind, threaded=False)
+        return bool(ret), ce.describe_dir(out)
+    finally:
+        dialogs.save_file, dialogs.pick_dir = real
+
+
+def s8_results():
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from blastlab.ui import dialogs
+    from blastlab.ui.app import MainWindow
+    from blastlab.ui.results_panel import ChainEntry, ResultsPanel
+    print('\nS8: 03 Results - a chain is one entry with STAGE tabs (9b T5)')
+    real_notify = dialogs.notify_desktop
+    dialogs.notify_desktop = lambda *a, **k: None
+    win = MainWindow()
+    fake = FakeClock()
+    win._run_clock.now = fake
+    rs = win.results
+    home = os.path.join(TMP, 's8', 'M')
+
+    def chain_run(res, stamps):
+        win.ctrl._stage_dims = [1, 2, 3]
+        win.ctrl._run_name = 'M'
+        fake.t = 0.0
+        win.on_running(True)
+        for k, d in enumerate((1, 2, 3)):
+            win.on_run_started(INFO1D)
+            fake.t += 5.0
+            with_manifest(res[d], os.path.join(home + stamps['tag'],
+                                                f'{d}d'),
+                          *stamps[d])
+            win.on_result(k, d, f'M - {d}D', res[d])
+            pump(20)
+            if k == 0:
+                yield
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(30)
+
+    try:
+        win.resize(1600, 1000)
+        win.show()
+        win._show('results')
+        pump(100)
+        res = fakes()
+        stamps = {'tag': '', 1: ('2026-09-29T10:00:00', '2026-09-29T10:00:09'),
+                  2: ('2026-09-29T10:00:10', '2026-09-29T10:20:00'),
+                  3: ('2026-09-29T10:20:01', '2026-09-29T10:41:00')}
+        run = chain_run(res, stamps)
+        next(run)                                   # stage 1 landed
+        row = rs.sel.row(0)
+        check('mid-run: one entry, the caption says 1 of 3 stages',
+              len(rs.entries()) == 1 and row.caption.full_text()
+              == '1D → 2D → 3D · 1 of 3 stages · 9 s',
+              row.caption.full_text())
+        for _ in run:
+            pass
+        ents = rs.entries()
+        ch = ents[0] if ents else None
+        check('one entry, kind chain, labelled after the model',
+              len(ents) == 1 and isinstance(ch, ChainEntry)
+              and ch.kind == 'chain' and ch.label == 'M',
+              str([(e.label, e.kind) for e in ents]))
+        check('its stages carry the per-stage labels of before',
+              [s.label for s in ch.stages] == ['M - 1D', 'M - 2D', 'M - 3D'],
+              str([s.label for s in ch.stages]))
+        check('win._results stays per stage (C11 names)',
+              [lbl for lbl, _d, _r in win._results]
+              == ['M - 1D', 'M - 2D', 'M - 3D'],
+              str([lbl for lbl, _d, _r in win._results]))
+        tabs = rs.stage_tabs
+        check('the tabs read 1D | 2D | 3D with 3D selected, in the slot',
+              tabs.texts() == ['1D', '2D', '3D'] and tabs.selected() == 3
+              and rs.stage_strip() is tabs and tabs.isVisibleTo(rs)
+              and rs.stage_slot.height() == 38,
+              f'{tabs.texts()} {tabs.selected()} {rs.stage_slot.height()}')
+        check('entries()[0].dim == 3 and .result is the 3D stage\'s',
+              ch.dim == 3 and ch.result is res[3] and rs.stage() == 3)
+        row = rs.sel.row(0)                 # the list is rebuilt per stage
+        check('the row: the chain badge, latest, and the caption',
+              not row.chain.isHidden() and not row.latest.isHidden()
+              and row.caption.full_text()
+              == '1D → 2D → 3D · 3 stages · 41 min 0 s',
+              row.caption.full_text())
+        check('the tabs sit above the view tabs',
+              rs.stage_slot.geometry().bottom() < rs._seg_frame.y())
+
+        rs.select_stage(2)
+        pump(30)
+        check('select_stage(2): current() is M - 2D, the tab follows',
+              rs.current().label == 'M - 2D' and tabs.selected() == 2
+              and ch.dim == 2, rs.current().label)
+        chain_img = field_array(rs)
+        plain = ResultsPanel()
+        plain.resize(rs.size())
+        plain.add_result('M - 2D', 2, res[2])
+        pump(30)
+        check('its Field image equals a plain entry\'s of the same Result',
+              same_image(chain_img, field_array(plain)),
+              f'{chain_img[0]!r}')
+        plain.deleteLater()
+        QTest.mouseClick(tabs.button(1), Qt.LeftButton)
+        pump(30)
+        check('a tab click selects the stage (1D), views refreshed',
+              rs.current().label == 'M - 1D' and rs.stage() == 1
+              and rs.fields.page() in ('image', 'figure'),
+              f'{rs.current().label} {rs.fields.page()}')
+
+        # a second chain of the same model, its 2D field its own
+        res2 = fakes()
+        # the final snapshot (the one shown) holds other numbers
+        snap = list(res2[2].snapshots.values())[-1]
+        snap['p'] = snap['p'] + 2e3
+        stamps2 = dict(stamps, tag='_2')
+        shows = []
+        real_set = rs.set_stage_strip
+        rs.set_stage_strip = lambda w=None: (shows.append(w),
+                                             real_set(w))[1]
+        try:
+            for _ in chain_run(res2, stamps2):
+                pass
+            ents = rs.entries()
+            check('two chains of one model: M, M #2; stages M - 2D #2',
+                  [e.label for e in ents] == ['M', 'M #2']
+                  and [s.label for s in ents[1].stages]
+                  == ['M - 1D #2', 'M - 2D #2', 'M - 3D #2'],
+                  str([(e.label, [s.label for s in e.stages])
+                       for e in ents]))
+            rs.select_stage(2)
+            pump(30)
+            second = field_array(rs)
+            rs.sel.setCurrentIndex(0)
+            pump(30)
+            rs.select_stage(2)
+            pump(30)
+            first = field_array(rs)
+            check('the second chain\'s 2D Field is its own data',
+                  second[1] is not None and first[1] is not None
+                  and not same_image(first, second))
+            check('switching between two chains never re-shows the slot',
+                  shows == [], str(shows))
+        finally:
+            rs.set_stage_strip = real_set
+
+        rs.add_result('plain', 2, fakes()[2])
+        pump(30)
+        check('a plain result selected after a chain: stage_slot hidden '
+              'at 0 px', rs.stage_slot.isHidden()
+              and rs.stage_slot.height() == 0 and rs.stage() is None,
+              str(rs.stage_slot.height()))
+        logs = []
+        rs._log = logs.append
+        rs.sel.setCurrentIndex(1)
+        pump(20)
+        n0 = len(rs.entries())
+        rs.remove_current()
+        pump(20)
+        check('Remove of a chain removes its one row',
+              len(rs.entries()) == n0 - 1 and rs.sel.count() == n0 - 1
+              and logs[-1:] == ['Removed result: M #2'],
+              f'{n0} -> {len(rs.entries())} {logs[-1:]}')
+        check('a result fed by hand outside a run stays a plain entry',
+              rs.entries()[-1].kind == 'run')
+    finally:
+        dialogs.notify_desktop = real_notify
+        win.ctrl._stage_dims = []
+        win.close()
+        pump(100)
+    s8_exports()
+
+
+def s8_exports():
+    """Every text export and the report of a chain's stage equal a plain
+    entry's of the same Result (plan T5: export bytes cannot change)."""
+    import test_char_exports as ce
+    from blastlab.ui.results_panel import ResultsPanel
+    r1, r2 = ce.result('1d'), ce.result('2d')
+    pc, pp = ResultsPanel(), ResultsPanel()
+    for p in (pc, pp):
+        p.resize(1000, 700)
+    ch = pc.start_chain('M', [1, 2])
+    pc.add_stage(ch, 'M - 1D', 1, r1)
+    pc.add_stage(ch, 'M - 2D', 2, r2)
+    pp.add_result('M - 2D', 2, r2)
+    pump(30)
+    check('S8 exports: the chain\'s current() is its 2D stage',
+          pc.current().label == 'M - 2D' and pc.current().result is r2)
+    for kind in ('summary', 'tsv', 'fieldcsv', 'profile', 'report'):
+        got_c = export_files(pc, kind)
+        got_p = export_files(pp, kind)
+        check(f'{kind}: the chain stage writes what a plain entry writes',
+              got_c[0] and got_c == got_p and got_c[1],
+              f'{sorted(got_c[1])} vs {sorted(got_p[1])}')
+    pc.deleteLater()
+    pp.deleteLater()
+    pump(20)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -986,6 +1249,7 @@ def main():
         pump(100)
         s6_copy_load()
         s7_strip()
+        s8_results()
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]
               if crashes else '')
