@@ -3018,6 +3018,11 @@ def f08_stop_during_solve(qa):
                     f'{browser.status.text()!r}')
         browser.close()
         qa.pump(0.5)
+    # GUI-10 (F35): the refused Delete warns and never asks, so its
+    # scripted No was left queued, and since GUI-6 a Stop more than 30 s
+    # into a run asks first (D54): that No kept the run going. Replace
+    # it with the answer a user pressing Stop gives: Stop the run.
+    qa.script_answers(True)
     t0 = time.perf_counter()
     qa.click(rp.stop_btn, 'Stop')
     qa.check(qa.run_wait(300), 'the run stopped', 'S1')
