@@ -1,0 +1,243 @@
+{
+ "platform": "windows",
+ "sizes": {
+  "1100x720": {
+   "window": [
+    1100,
+    720
+   ],
+   "panel": [
+    1068,
+    610
+   ],
+   "tree": [
+    272,
+    440
+   ],
+   "props": [
+    340,
+    440
+   ],
+   "centre": [
+    440,
+    440
+   ],
+   "cards": [
+    [
+     248,
+     95
+    ],
+    [
+     248,
+     95
+    ],
+    [
+     248,
+     95
+    ]
+   ],
+   "arrows": [
+    [
+     64,
+     95
+    ],
+    [
+     64,
+     95
+    ]
+   ],
+   "route_group": [
+    381,
+    38
+   ],
+   "route_buttons": [
+    [
+     120,
+     32
+    ],
+    [
+     82,
+     32
+    ],
+    [
+     82,
+     32
+    ],
+    [
+     85,
+     32
+    ]
+   ],
+   "run_chain": [
+    176,
+    56
+   ],
+   "copy": [
+    136,
+    36
+   ],
+   "load": [
+    104,
+    36
+   ],
+   "pill": [
+    246,
+    40
+   ],
+   "tools": [
+    [
+     52,
+     28
+    ],
+    [
+     28,
+     28
+    ]
+   ],
+   "tree_row": [
+    236,
+    44
+   ],
+   "hand_in": [
+    312,
+    106
+   ],
+   "hand_out": [
+    312,
+    106
+   ]
+  },
+  "1600x1000": {
+   "window": [
+    1600,
+    1000
+   ],
+   "panel": [
+    1568,
+    890
+   ],
+   "tree": [
+    272,
+    720
+   ],
+   "props": [
+    340,
+    720
+   ],
+   "centre": [
+    940,
+    720
+   ],
+   "cards": [
+    [
+     308,
+     95
+    ],
+    [
+     308,
+     95
+    ],
+    [
+     308,
+     95
+    ]
+   ],
+   "arrows": [
+    [
+     118,
+     95
+    ],
+    [
+     118,
+     95
+    ]
+   ],
+   "route_group": [
+    381,
+    38
+   ],
+   "route_buttons": [
+    [
+     120,
+     32
+    ],
+    [
+     82,
+     32
+    ],
+    [
+     82,
+     32
+    ],
+    [
+     85,
+     32
+    ]
+   ],
+   "run_chain": [
+    176,
+    56
+   ],
+   "copy": [
+    136,
+    36
+   ],
+   "load": [
+    104,
+    36
+   ],
+   "pill": [
+    246,
+    40
+   ],
+   "tools": [
+    [
+     52,
+     28
+    ],
+    [
+     28,
+     28
+    ]
+   ],
+   "tree_row": [
+    246,
+    44
+   ],
+   "hand_in": [
+    322,
+    106
+   ],
+   "hand_out": [
+    322,
+    106
+   ]
+  }
+ },
+ "clipped": {
+  "dark 1100x720 route123-stage2": [],
+  "dark 1100x720 route13-stage3": [],
+  "dark 1100x720 stage2-error": [],
+  "dark 1100x720 stage2-gauges": [],
+  "dark 1100x720 stage2-trigger-handoff": [],
+  "dark 1100x720 stage3-3d": [],
+  "dark 1600x1000 route123-stage2": [],
+  "dark 1600x1000 route13-stage3": [],
+  "dark 1600x1000 stage2-error": [],
+  "dark 1600x1000 stage2-gauges": [],
+  "dark 1600x1000 stage2-trigger-handoff": [],
+  "dark 1600x1000 stage3-3d": [],
+  "light 1100x720 route123-stage2": [],
+  "light 1100x720 route13-stage3": [],
+  "light 1100x720 stage2-error": [],
+  "light 1100x720 stage2-gauges": [],
+  "light 1100x720 stage2-trigger-handoff": [],
+  "light 1100x720 stage3-3d": [],
+  "light 1600x1000 route123-stage2": [],
+  "light 1600x1000 route13-stage3": [],
+  "light 1600x1000 stage2-error": [],
+  "light 1600x1000 stage2-gauges": [],
+  "light 1600x1000 stage2-trigger-handoff": [],
+  "light 1600x1000 stage3-3d": []
+ }
+}
