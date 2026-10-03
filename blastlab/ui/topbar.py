@@ -32,6 +32,9 @@ DIM_LABELS = ('0D · HD 1.3', '1D', '2D', '3D')
 
 BAR_H = 64
 
+#: the unsaved marker, and its form when the bar is out of room (D198)
+DIRTY_LONG, DIRTY_SHORT = '● unsaved', '●'
+
 
 def dot_pixmap(colour_key, d=7):
     """A small round status dot tinted with palette key `colour_key`."""
@@ -55,12 +58,15 @@ class ElidedButton(QPushButton):
     def __init__(self, text='', parent=None):
         super().__init__(text, parent)
         self._full = str(text)
+        # verify10b: a screen reader reads the whole name, not `w…`
+        self.setAccessibleName(self._full)
 
     def full_text(self):
         return self._full
 
     def set_full_text(self, text):
         self._full = str(text)
+        self.setAccessibleName(self._full)
         self._elide()
         self.updateGeometry()
 
@@ -180,7 +186,7 @@ class TopBar(QFrame):
         self.case_btn.clicked.connect(lambda _c=False:
                                       self.case_clicked.emit())
         lay.addWidget(self.case_btn)
-        self.dirty_lbl = QLabel('● unsaved')
+        self.dirty_lbl = QLabel(DIRTY_LONG)
         self.dirty_lbl.setVisible(False)
         lay.addWidget(self.dirty_lbl)
 
@@ -248,6 +254,52 @@ class TopBar(QFrame):
 
     def set_dirty(self, dirty):
         self.dirty_lbl.setVisible(bool(dirty))
+        self._fit_marker()
+
+    # ── room (verify10b, F37 / D198) ─────────────────────────────────────
+    def _fit_marker(self):
+        """With Setup ✓, Run ✓, `● unsaved` and a long blastFoam chip
+        (`WSL at run start`, `WSL unavailable`), the bar at 1100 px is up
+        to 22 px short even with the case name at its 40 px minimum, and
+        the layout took it from the dimension control (`0D · HD 1.3` drew
+        as `0D …1.3`). Then, and only then, the marker drops its word:
+        `●`, with the word in its tooltip. The status bar still says
+        `<case> has unsaved changes`, and the title carries `●`."""
+        lay = self.layout()
+        if lay is None or not hasattr(self, 'dim_seg'):     # in __init__
+            return
+        m = lay.contentsMargins()
+        need, n = m.left() + m.right(), 0
+        for i in range(lay.count()):
+            it = lay.itemAt(i)
+            w = it.widget()
+            if it.spacerItem() is not None or (
+                    w is not None and not w.isVisibleTo(self)):
+                continue
+            n += 1
+            if w is self.case_btn:
+                need += w.minimumWidth()
+            elif w is self.dirty_lbl:
+                need += w.fontMetrics().horizontalAdvance(DIRTY_LONG) + 1
+            else:
+                need += it.sizeHint().width()
+        need += lay.spacing() * max(0, n - 1)
+        short = need > self.width()
+        text = DIRTY_SHORT if short else DIRTY_LONG
+        if self.dirty_lbl.text() != text:
+            self.dirty_lbl.setText(text)
+            self.dirty_lbl.setToolTip('Unsaved changes' if short else '')
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        self._fit_marker()
+
+    def event(self, ev):
+        # a child's size hint changed (a ✓, the chip, the Chain label)
+        handled = super().event(ev)
+        if ev.type() == QEvent.LayoutRequest:
+            self._fit_marker()
+        return handled
 
     # ── solver chip ──────────────────────────────────────────────────────
     def set_chip(self, text, dot=None):

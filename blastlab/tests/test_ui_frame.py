@@ -21,6 +21,8 @@ BC_Combined lines 20-54 / 392-396).
  F8  the dimension control syncs both ways; the dark-mode action works
  F9  at 1100 px in blastFoam mode the chip keeps its text and the case
      name elides, the whole name in its tooltip (GUI-10, F29)
+ F10 the longest chip at 1100 px squeezes no control: the unsaved marker
+     drops its word only then (verify10b, F37 / D198)
 
 Plain script, offscreen, no pytest: `python test_ui_frame.py`.
 """
@@ -426,6 +428,71 @@ def main():
     check('and whole, with no tooltip, when there is room',
           cb.text() == long_name and cb.toolTip() == '',
           f'{cb.text()!r} {cb.toolTip()!r}')
+    check('a screen reader gets the whole name (verify10b)',
+          cb.accessibleName() == long_name, repr(cb.accessibleName()))
+
+    print('\nF10: the longest chip at 1100 px squeezes no control; the '
+          'marker drops its word only then (verify10b, F37 / D198)')
+    from blastlab.ui.topbar import DIRTY_LONG, DIRTY_SHORT, TopBar
+
+    def squeezed(bar):
+        return [b.text() for b in bar.dim_seg._btns.values()
+                if b.minimumWidth() != b.maximumWidth()
+                and b.width() < b.sizeHint().width()]
+
+    tb.set_chip('blastFoam · WSL unavailable', 'danger')
+    win.resize(1100, 720)
+    pump(150)
+    check('in the window: the dimension control keeps every label whole',
+          not squeezed(tb), str(squeezed(tb)))
+    check('and the chip keeps its text',
+          tb.chip.width() >= tb.chip.sizeHint().width(),
+          f'{tb.chip.width()} / {tb.chip.sizeHint().width()}')
+    win.resize(1600, 1000)
+    pump(150)
+    check('at 1600 px the marker is ● unsaved',
+          tb.dirty_lbl.text() == DIRTY_LONG, repr(tb.dirty_lbl.text()))
+    # the offscreen glyphs are narrower than the real platform's, where
+    # the window's bar was 22 px short; so a bar in a plain host is made
+    # short here by half of what dropping the word saves
+    host = QWidget()
+    bar = TopBar(host)
+    bar.set_chip('blastFoam · WSL unavailable', 'danger')
+    bar.set_done('setup', True)
+    bar.set_done('run', True)
+    bar.set_case_name(long_name)
+    bar.set_dirty(True)
+    host.resize(1400, 64)
+    bar.setGeometry(0, 0, 1400, 64)
+    host.show()
+    pump(150)
+    lay = bar.layout()
+    full = lay.minimumSize().width()
+    fm = bar.dirty_lbl.fontMetrics()
+    save = (fm.horizontalAdvance(DIRTY_LONG)
+            - fm.horizontalAdvance(DIRTY_SHORT))
+    bar.setGeometry(0, 0, full - save // 2, 64)
+    pump(150)
+    given = [f'{(lay.itemAt(i).widget() or lay.itemAt(i)).__class__.__name__}'
+             f' {lay.itemAt(i).geometry().width()}'
+             f'<{lay.itemAt(i).sizeHint().width()}'
+             for i in range(lay.count())
+             if lay.itemAt(i).spacerItem() is None
+             and lay.itemAt(i).widget() is not bar.case_btn
+             and lay.itemAt(i).geometry().width()
+             < lay.itemAt(i).sizeHint().width()]
+    check(f'a bar {save // 2} px short: only the case name gives way',
+          not given and not squeezed(bar), f'{given} {squeezed(bar)}')
+    check('its marker reads ●, the word in its tooltip',
+          bar.dirty_lbl.text() == DIRTY_SHORT
+          and bar.dirty_lbl.toolTip() == 'Unsaved changes',
+          f'{bar.dirty_lbl.text()!r} {bar.dirty_lbl.toolTip()!r}')
+    bar.setGeometry(0, 0, 1400, 64)
+    pump(150)
+    check('with room again it is ● unsaved, no tooltip',
+          bar.dirty_lbl.text() == DIRTY_LONG
+          and bar.dirty_lbl.toolTip() == '', repr(bar.dirty_lbl.text()))
+    host.close()
 
     win.close()
     pump(80)
