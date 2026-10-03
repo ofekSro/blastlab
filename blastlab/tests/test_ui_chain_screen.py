@@ -1244,6 +1244,27 @@ def s8_results():
               f'{n0} -> {len(rs.entries())} {logs[-1:]}')
         check('a result fed by hand outside a run stays a plain entry',
               rs.entries()[-1].kind == 'run')
+        # a chain removed while it still runs (verify): its next stage
+        # starts a new entry, as a per-stage entry did - the removed
+        # stage does not come back
+        n0 = len(rs.entries())
+        win.ctrl._stage_dims = [1, 2, 3]
+        win.ctrl._run_name = 'R'
+        win.on_running(True)
+        win.on_run_started(INFO1D)
+        win.on_result(0, 1, 'R - 1D', res[1])
+        pump(20)
+        rs.sel.setCurrentIndex(len(rs.entries()) - 1)
+        rs.remove_current()
+        win.on_run_started(INFO1D)
+        win.on_result(1, 2, 'R - 2D', res[2])
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(30)
+        new = [(e.label, [s.label for s in (e.stages or [])])
+               for e in rs.entries()[n0:]]
+        check('a chain removed mid-run is not resurrected; its next stage '
+              'is a new chain entry', new == [('R', ['R - 2D'])], str(new))
         # a chain started with no model (scripts only: the Chain screen
         # refuses an empty Model box) keeps per-stage entries (D161;
         # test_ui_char_write_failure pins them)

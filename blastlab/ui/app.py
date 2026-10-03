@@ -1300,7 +1300,11 @@ class MainWindow(QMainWindow):
             # started with no model (scripts only - the Chain screen always
             # has one; test_ui_char_write_failure pins it), stay per stage
             # (D161). `_results` stays per stage.
-            if self._chain_entry is None:
+            # a chain the user removed while it ran starts a new entry
+            # with this stage, as a per-stage entry did (it must not come
+            # back with the stages already removed)
+            if self._chain_entry is None or \
+                    self._chain_entry not in self.results.entries():
                 self._chain_entry = self.results.start_chain(
                     model, getattr(self.ctrl, '_stage_dims', None) or [dim])
             self.results.add_stage(self._chain_entry, label_, dim, res)
