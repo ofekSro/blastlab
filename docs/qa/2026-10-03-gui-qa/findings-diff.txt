@@ -1,0 +1,14 @@
+# python blastlab/tests/_qa_findings_diff.py ~\blastlab_qa\gui10-base\findings.jsonl ~\blastlab_qa\gui10-head\findings.jsonl
+# base = 0605522 (worktree, its own harness + the F33 hidden-control check, offscreen,
+#        --solver native, F group out, 5 segments so every run is native, 66 IDs)
+# head = 3a09351 (F33 d59ff50, F29 894f70e, D190 3a09351 in; offscreen, --solver native, F group out, 69 IDs)
+# output verbatim; the annotations are in findings.md
+G01: new 1 · gone 0 · same 0
+    new  S3 qt-message: QFontEngineFT: Failed to create FreeType font engine
+K02: new 4 · gone 0 · same 0
+    new  S2 check: run banner (dark, 1100x720): nothing clipped
+    new  S2 check: run banner (light, 1100x720): nothing clipped
+    new  S2 check: run finished, banner shown (dark, 1100x720): nothing clipped
+    new  S2 check: run finished, banner shown (light, 1100x720): nothing clipped
+Q03: new 0 · gone 0 · same 1
+TOTAL: new 5 · gone 0 · same 1
