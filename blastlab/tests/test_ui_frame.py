@@ -19,6 +19,8 @@ BC_Combined lines 20-54 / 392-396).
  F7  the status bar: WSL text, the shortcuts + version line, notify()
      semantics unchanged
  F8  the dimension control syncs both ways; the dark-mode action works
+ F9  at 1100 px in blastFoam mode the chip keeps its text and the case
+     name elides, the whole name in its tooltip (GUI-10, F29)
 
 Plain script, offscreen, no pytest: `python test_ui_frame.py`.
 """
@@ -391,6 +393,39 @@ def main():
     win._dark_action.toggle()
     pump(120)
     check('and back', theme.mode() == was, theme.mode())
+
+    print('\nF9: at 1100 px the chip keeps its text and the case name '
+          'elides (F29)')
+    from PySide6.QtWidgets import QWidget
+    tb = win.topbar
+    long_name = 'wall_A_blastfoam'      # fits the button's 200 px max
+    tb.set_chip('blastFoam · WSL ready', 'ok')
+    tb.set_dirty(True)
+    tb.set_done('setup', True)
+    tb.set_done('run', True)
+    tb.set_case_name(long_name)
+    win.resize(1100, 720)
+    pump(150)
+    over = [type(c).__name__ for c in tb.findChildren(QWidget)
+            if c.isVisible() and c.width() > 0
+            and c.mapTo(win, c.rect().topLeft()).x() + c.width()
+            - win.width() > 1]
+    check('nothing in the bar sticks out', not over, str(over))
+    check('the chip is never narrower than its text',
+          tb.chip.width() >= tb.chip.sizeHint().width()
+          and tb.chip.text() == 'blastFoam · WSL ready',
+          f'{tb.chip.width()} / {tb.chip.sizeHint().width()}')
+    cb = tb.case_btn
+    check('the case name is elided, the whole name in its tooltip',
+          cb.text().endswith('…') and cb.toolTip() == long_name
+          and tb.case_name() == long_name
+          and cb.fontMetrics().horizontalAdvance(cb.text())
+          <= cb.width(), f'{cb.text()!r} {cb.toolTip()!r} {cb.width()}')
+    win.resize(1600, 1000)
+    pump(150)
+    check('and whole, with no tooltip, when there is room',
+          cb.text() == long_name and cb.toolTip() == '',
+          f'{cb.text()!r} {cb.toolTip()!r}')
 
     win.close()
     pump(80)

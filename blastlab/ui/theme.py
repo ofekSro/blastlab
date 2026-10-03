@@ -374,9 +374,11 @@ def qss(mode_name):
                      border-bottom: 1px solid {p['border']}; }}
     QFrame#statusbar {{ background: {p['bg']}; border: none;
                         border-top: 1px solid {p['border']}; }}
+    /* F29 (GUI-10): pill padding 10 -> 8 and the Chain link's 8 -> 6, so
+       blastFoam mode's chip fits the bar at 1100 px (ui/topbar.py) */
     QPushButton#pill {{ background: transparent; color: {p['muted']};
                         border: none; border-radius: 20px;
-                        padding: 0px 10px;
+                        padding: 0px 8px;
                         font-family: "{DISPLAY}"; font-size: 14px;
                         font-weight: 600; }}
     QPushButton#pill:hover {{ background: {p['hover']}; }}
@@ -384,7 +386,7 @@ def qss(mode_name):
                                        color: {p['bg']}; }}
     QPushButton#chainlink {{ background: transparent; color: {p['muted']};
                              border: none; border-radius: 8px;
-                             padding: 0px 8px; font-size: 13px; }}
+                             padding: 0px 6px; font-size: 13px; }}
     QPushButton#chainlink:hover {{ background: {p['hover']}; }}
     QPushButton#chainlink[active="true"] {{ color: {p['text']}; }}
     QPushButton#casebtn {{ background: transparent; color: {p['text']};

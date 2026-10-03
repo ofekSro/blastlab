@@ -14,9 +14,10 @@ through QSS object-name rules (`#pill`, `#chainlink`, `#casebtn`,
 overrides programmatic QFont family/size (foundation report, D6).
 """
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
+                               QSizePolicy, QStyle, QStyleOptionButton,
                                QWidget)
 
 from . import theme
@@ -45,6 +46,53 @@ def dot_pixmap(colour_key, d=7):
     return pm
 
 
+class ElidedButton(QPushButton):
+    """A push button whose text elides at the right when the layout gives
+    it less than the whole text needs; the whole text is then its tooltip
+    (GUI-10, F29: the case name at 1100 px in blastFoam mode). The size
+    hint is always the whole text's, so the layout gives it all it can."""
+
+    def __init__(self, text='', parent=None):
+        super().__init__(text, parent)
+        self._full = str(text)
+
+    def full_text(self):
+        return self._full
+
+    def set_full_text(self, text):
+        self._full = str(text)
+        self._elide()
+        self.updateGeometry()
+
+    def sizeHint(self):
+        # QPushButton::sizeHint for a text-only button, on the whole text
+        opt = QStyleOptionButton()
+        self.initStyleOption(opt)
+        opt.text = self._full
+        sz = self.fontMetrics().size(Qt.TextShowMnemonic, self._full)
+        return self.style().sizeFromContents(
+            QStyle.CT_PushButton, opt,
+            QSize(sz.width(), max(sz.height(), 14)), self)
+
+    def _elide(self):
+        fm = self.fontMetrics()
+        pad = self.sizeHint().width() - fm.horizontalAdvance(self._full)
+        shown = fm.elidedText(self._full, Qt.ElideRight,
+                              max(0, self.width() - pad))
+        if shown != self.text():
+            self.setText(shown)
+        self.setToolTip('' if shown == self._full else self._full)
+
+    def resizeEvent(self, ev):
+        super().resizeEvent(ev)
+        self._elide()
+
+    def changeEvent(self, ev):
+        super().changeEvent(ev)
+        if ev.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._elide()
+
+
 class TopBar(QFrame):
     """The frame's top bar. Signals only; the window wires behaviour."""
 
@@ -61,10 +109,12 @@ class TopBar(QFrame):
         self.setObjectName('topbar')
         self.setFixedHeight(BAR_H)
         # tighter than the 1440 px board (gap 26): the bar must fit the
-        # 1100 px minimum window without clipping any button text
+        # 1100 px minimum window without clipping any button text. F29
+        # (GUI-10): 6 -> 4 px gaps and 10 -> 6 px margins for blastFoam
+        # mode's longer chip; the case name gives way last (ElidedButton)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 0, 10, 0)
-        lay.setSpacing(6)
+        lay.setContentsMargins(6, 0, 6, 0)
+        lay.setSpacing(4)
 
         # mark + wordmark (GUI-2; moved here from the sidebar head)
         self._logo_mark = QLabel()
@@ -82,7 +132,6 @@ class TopBar(QFrame):
             word.addWidget(w)
         self._tint_wordmark()
         lay.addLayout(word)
-        lay.addSpacing(2)
 
         # workflow pills with the board's chevrons between them
         self.nav_btns = {}
@@ -122,7 +171,7 @@ class TopBar(QFrame):
         lay.addStretch(1)
 
         # case name + unsaved marker
-        self.case_btn = QPushButton('untitled')
+        self.case_btn = ElidedButton('untitled')
         self.case_btn.setObjectName('casebtn')
         self.case_btn.setFixedHeight(32)
         self.case_btn.setCursor(Qt.PointingHandCursor)
@@ -140,7 +189,9 @@ class TopBar(QFrame):
         self.chip.setObjectName('chipbtn')
         self.chip.setFixedHeight(32)
         self.chip.setCursor(Qt.PointingHandCursor)
-        self.chip.setMinimumWidth(40)
+        # F29: the chip is never narrower than its text (the case name
+        # gives way instead)
+        self.chip.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.chip.setIconSize(QSize(7, 7))
         self.chip.clicked.connect(lambda _c=False: self.chip_clicked.emit())
         lay.addWidget(self.chip)
@@ -189,7 +240,11 @@ class TopBar(QFrame):
 
     # ── case name ────────────────────────────────────────────────────────
     def set_case_name(self, name):
-        self.case_btn.setText(str(name or 'untitled'))
+        self.case_btn.set_full_text(str(name or 'untitled'))
+
+    def case_name(self):
+        """The whole case name (the button may show it elided, F29)."""
+        return self.case_btn.full_text()
 
     def set_dirty(self, dirty):
         self.dirty_lbl.setVisible(bool(dirty))
