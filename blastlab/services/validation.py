@@ -1580,13 +1580,17 @@ def _validate_closing(case, rep, ctx):
 
 def _in_obstacle_open(pt, obstacles):
     """True when gauge `pt` lies strictly inside an obstacle box (open
-    box, the test of ui/scaled_distance.where's `inside`). Both solvers
-    drop such a gauge: native when its nearest cell centre is solid
-    (solvers/solver2d.py, solver3d.py, gauge setup), blastFoam before
-    writing the probes (solvers/foam/writer.py, `_in_obstacle2` /
-    `_in_obstacle`, on the face-snapped boxes). A gauge on a face or
-    within half a cell of one may be dropped too; that zone is not
-    predicted here (UXR-2, D201)."""
+    box, the test of ui/scaled_distance.where's `inside`). blastFoam
+    always drops such a gauge, before writing the probes
+    (solvers/foam/writer.py, `_in_obstacle2` / `_in_obstacle`, closed
+    test on the boxes snapped OUTWARD onto base-cell faces). The native
+    solver drops it when its nearest cell centre is solid
+    (solvers/solver2d.py, solver3d.py, gauge setup; core/bc.py
+    solid_mask_*): always, except within half a cell of a face that does
+    not lie on a cell face, where the nearest centre can be outside the
+    box and the gauge is kept (verify 11b, F44). A gauge on a face or
+    just outside one may be dropped too; neither zone is predicted here
+    (UXR-2, D201)."""
     n = len(pt)
     if n < 2:
         return False
