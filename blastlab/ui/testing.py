@@ -124,9 +124,37 @@ def disable_cleanup(path=None):
     return path
 
 
+#: (kind, text) of every Close / Open discard question the test hook
+#: answered (GUI-11 T2, D202)
+DISCARD_ASKED = []
+#: the real `dialogs.ask_discard`, kept when the hook replaces it
+REAL_ASK_DISCARD = None
+
+
+def answer_discard():
+    """Replace `dialogs.ask_discard` with a recorder that answers
+    'proceed' (stop / quit / discard), so a suite or the harness that
+    closes a dirty or running window keeps today's behaviour and never
+    blocks on a modal (D202). Idempotent. The calls go to
+    DISCARD_ASKED."""
+    global REAL_ASK_DISCARD
+    from . import dialogs
+    if getattr(dialogs.ask_discard, '_test_hook', False):
+        return
+
+    def recorder(kind, text, parent=None, title='BlastLab'):
+        DISCARD_ASKED.append((kind, str(text)))
+        return 'proceed'
+
+    recorder._test_hook = True
+    REAL_ASK_DISCARD = dialogs.ask_discard
+    dialogs.ask_discard = recorder
+
+
 def ensure_qapp(offscreen=True):
     """The process-wide QApplication, created on the offscreen platform
-    unless QT_QPA_PLATFORM is already set (or offscreen=False)."""
+    unless QT_QPA_PLATFORM is already set (or offscreen=False). Close /
+    Open discard questions are answered 'proceed' (`answer_discard`)."""
     if offscreen:
         os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
         # the offscreen platform has no system font database; without a
@@ -137,6 +165,7 @@ def ensure_qapp(offscreen=True):
             os.environ.setdefault('QT_QPA_FONTDIR', fonts)
     os.environ.setdefault('MPLBACKEND', 'Agg')
     private_settings()
+    answer_discard()
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance()
     if app is None:

@@ -50,6 +50,40 @@ def ask_yes_no(title, text, parent=None, yes=None, no=None):
     return box.clickedButton() is yes_btn
 
 
+def ask_discard(kind, text, parent=None, title='BlastLab'):
+    """The one question before Close, Open or Recent drops a live run or
+    unsaved edits (GUI-11 T2, UXR-1, D202). `kind`:
+
+    - 'run': `Stop and quit` / `Keep running`;
+    - 'hd13': `Quit` / `Keep running`;
+    - 'dirty': `Save` / `Discard` / `Cancel`.
+
+    Returns 'proceed' (stop and quit, quit, discard), 'save' or
+    'cancel'. Keeping the run, and Cancel, are the Escape answers, so a
+    stray Escape never loses anything. `testing.ensure_qapp()` replaces
+    this function with a recorder that answers 'proceed'."""
+    box = QMessageBox(QMessageBox.Question if kind == 'dirty'
+                      else QMessageBox.Warning, title, str(text),
+                      QMessageBox.NoButton, parent)
+    if kind == 'dirty':
+        save = box.addButton('Save', QMessageBox.AcceptRole)
+        discard = box.addButton('Discard', QMessageBox.DestructiveRole)
+        cancel = box.addButton('Cancel', QMessageBox.RejectRole)
+        box.setDefaultButton(save)
+        box.setEscapeButton(cancel)
+        box.exec()
+        hit = box.clickedButton()
+        return ('save' if hit is save else
+                'proceed' if hit is discard else 'cancel')
+    go = box.addButton('Stop and quit' if kind == 'run' else 'Quit',
+                       QMessageBox.DestructiveRole)
+    keep = box.addButton('Keep running', QMessageBox.RejectRole)
+    box.setDefaultButton(keep)
+    box.setEscapeButton(keep)
+    box.exec()
+    return 'proceed' if box.clickedButton() is go else 'cancel'
+
+
 def open_file(title, filters='All files (*.*)', parent=None, start=''):
     """Path or '' (the Qt filter syntax: 'blastlab case (*.json)')."""
     path, _f = QFileDialog.getOpenFileName(parent, title, start, filters)

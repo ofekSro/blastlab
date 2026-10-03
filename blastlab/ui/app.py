@@ -72,6 +72,7 @@ class MainWindow(QMainWindow):
 
         self.bridge = ThreadBridge(self)
         self._hd13_busy = False     # an HD 1.3 assessment is on its thread
+        self._hd13_model = ''       # the model it writes (Close names it)
         self._switch_interval = sys.getswitchinterval()
         self._case = None
         self._case_path = None
@@ -589,6 +590,10 @@ class MainWindow(QMainWindow):
         return None
 
     def _open_case(self, path=None):
+        # Open (menu, Ctrl+O) and every Recent entry ask about unsaved
+        # edits BEFORE the file dialog or the read (UXR-1, D202)
+        if not self._confirm_discard('open'):
+            return
         path = path or dialogs.open_file('Open case', CASE_FILTER, self)
         if not path:
             return
@@ -929,6 +934,8 @@ class MainWindow(QMainWindow):
         model = self._model_target()
         if model is None:
             return
+        # the Close question names the model being written (D202)
+        self._hd13_model = model.model
 
         def work():
             out = err = loads = None
@@ -1104,16 +1111,17 @@ class MainWindow(QMainWindow):
         k = max(self._chain_k, 1) - 1
         return cases[k] if k < len(cases) else None
 
-    def _stop_question(self):
+    def _stop_question(self, tail=''):
         """`Stop <model> (stage k of n) at 78 %?` + the run time (board
         Run lines 348-350). The resume sentence only for a blastFoam
         stage: `model_folder.release_decision` keeps the WSL scratch of a
-        run that ended early, and the run browser resumes it."""
+        run that ended early, and the run browser resumes it. `tail` goes
+        before the question mark (`' and quit'` on Close, D202)."""
         model = self.ctrl._run_name or self._case_stem()
         stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n})'
                  if self._chain_n > 1 else '')
         at = f' at {self._run_pct} %' if self._run_pct is not None else ''
-        text = (f'Stop {model}{stage}{at}?\n\nIt has been running for '
+        text = (f'Stop {model}{stage}{at}{tail}?\n\nIt has been running for '
                 f'{fmt_duration(self._run_clock.run_s())}.')
         case = self._running_case()
         if getattr(case, 'solver', None) == 'blastfoam':
@@ -1459,7 +1467,46 @@ class MainWindow(QMainWindow):
         self.bridge.post(self.notify, text, level)
 
     # ── shutdown ─────────────────────────────────────────────────────────
+    def _confirm_discard(self, action):
+        """GUI thread: True to go on with `action` ('close' | 'open'),
+        False when the user kept the run or the edits (UXR-1, D202).
+
+        Close asks about a live run (`Stop <model> at N % and quit?`, the
+        `_stop_question` text) or a busy HD 1.3 assessment first; Open
+        does not, because Open leaves a run alone. Then, with unsaved
+        edits, Save / Discard / Cancel; Save that ends without a write
+        (Save as cancelled, a write error) cancels the action. Every
+        question goes through `dialogs.ask_discard`."""
+        closing = action == 'close'
+        title = 'Quit BlastLab' if closing else 'Open case'
+        if closing and self.ctrl.running:
+            text = self._stop_question(' and quit')
+            if dialogs.ask_discard('run', text, self,
+                                   title=title) != 'proceed':
+                return False
+        elif closing and self._hd13_busy:
+            model = self._hd13_model or self._case_stem()
+            text = (f'An HD 1.3 assessment is still writing {model}. '
+                    f'Quit anyway?')
+            if dialogs.ask_discard('hd13', text, self,
+                                   title=title) != 'proceed':
+                return False
+        if not self._dirty:
+            return True
+        name = (os.path.basename(self._case_path) if self._case_path
+                else self._case_stem())
+        answer = dialogs.ask_discard('dirty',
+                                     f'Save the changes to {name}?', self,
+                                     title=title)
+        if answer == 'save':
+            self._save_case_inplace()
+            return not self._dirty
+        return answer == 'proceed'
+
     def closeEvent(self, event):
+        if not self._confirm_discard('close'):
+            event.ignore()
+            return
         self._save_ui_state()
         self._wsl_timer.stop()
         self._validate_timer.stop()

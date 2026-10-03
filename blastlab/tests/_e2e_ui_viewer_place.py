@@ -307,6 +307,10 @@ def main():
         print('SKIP: pyvista is not installed (no viewer child)')
         return 0
     from blastlab.ui.app import MainWindow
+    # GUI-11 T2 (D202): the `dim` action dirties Setup, so the close
+    # would ask Save / Discard / Cancel; answer it as before (discard)
+    from blastlab.ui.testing import answer_discard
+    answer_discard()
 
     def settle(ms=300):
         t0 = time.perf_counter()
