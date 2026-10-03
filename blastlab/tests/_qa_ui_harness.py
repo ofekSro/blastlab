@@ -446,16 +446,35 @@ class QA:
         self._log_mark = (self._log_gen, len(self.run_log()))
         return self._log_mark
     # ── navigation / widget pokes ───────────────────────────────────────
-    def goto(self, tab):
-        self.action = f'goto {tab}'
-        self.win._show(tab)
+    # GUI-10 (D173): the frame is driven the way a user drives it - the
+    # pills and the Chain link, the dimension segments, the solver chip's
+    # menu actions, the case menu's Dark-mode action - and every helper
+    # checks that its click worked, so a dead control cannot pass.
+    def goto(self, tab, settle=0.4):
+        """Click the top bar's pill (or the Chain link) of `tab`."""
+        btn = self.win._nav_btns[tab]
         self.tab = tab
-        self.pump(0.4)
+        if not self.press(btn, f'pill {tab}', settle):
+            return
+        self.action = f'goto {tab}'
+        self.check(self.win.current_tab() == tab,
+                   f'the {tab} pill shows its screen', 'S1',
+                   evidence=str(self.win.current_tab()))
+        self.check(btn.property('active') == 'true',
+                   f'and the {tab} pill is the active one', 'S2',
+                   evidence=str({k: b.property('active') for k, b
+                                 in self.win._nav_btns.items()}))
 
     def dim(self, d):
-        self.action = f'dim {d}'
-        self.win.setup.set_dim(int(d))
-        self.pump(0.5)
+        """Click the top bar's dimension segment of `d` (0-3)."""
+        from blastlab.ui.topbar import DIM_LABELS
+        label = next(lbl for lbl in DIM_LABELS if int(lbl[0]) == int(d))
+        btn = self.win.topbar.dim_seg._btns[label]
+        if self.press(btn, f'dim {label}', 0.5):
+            self.action = f'dim {d}'
+            self.check(self.win.setup.dim == int(d),
+                       f'the {label} segment sets the dimension', 'S1',
+                       evidence=str(self.win.setup.dim))
 
     def field(self, name, value, dim=None):
         form = self.win.setup._forms[dim or self.win.setup.dim]
@@ -480,29 +499,48 @@ class QA:
                           f'this solver mode)')
 
     def click(self, btn, label=''):
-        """Press a button the way a user does, and refuse a dead one."""
-        self.action = f'click {label or btn.text() or btn.objectName()}'
+        """Press a button the way a user does, and refuse a dead one.
+        The log mark is taken first, for wait_log."""
         self.mark_log()
+        return self.press(btn, label)
+
+    def press(self, btn, label='', settle=0.45):
+        """click() without moving the log mark: navigation between a
+        click and its wait_log must not hide the lines it waits for."""
+        self.action = f'click {label or btn.text() or btn.objectName()}'
         if not btn.isEnabled():
             self.finding('S2', 'dead-control',
                          f'{self.action} is disabled')
             return False
         btn.click()
-        self.pump(0.45)
+        if settle:
+            self.pump(settle)
         return True
 
     def set_mode(self, mode):
-        from PySide6.QtWidgets import QApplication
+        """The case menu's Dark-mode action. If it already reads `mode`
+        while the theme does not, the action is out of sync: an app
+        finding, not something to work around here."""
         from blastlab.ui import theme
         self.action = f'appearance {mode}'
-        theme.apply(QApplication.instance(), mode)
+        act = self.win._dark_action
+        was = act.isChecked()
+        act.setChecked(mode == 'dark')
         self.mode = mode
         self.pump(0.6)
+        self.check(theme.mode() == mode,
+                   f'the Dark-mode action gives the {mode} theme', 'S2',
+                   evidence=f'action was {was}, is {act.isChecked()}, '
+                            f'theme {theme.mode()}')
 
     def solver(self, mode):
+        """The solver chip's menu action of `mode`."""
         self.action = f'solver {mode}'
-        self.win.solver_mode.set(mode)
+        self.win._chip_actions[mode].trigger()
         self.pump(0.6)
+        self.check(self.win.solver_mode.get() == mode,
+                   f'the chip\'s {mode} action switches the solver', 'S1',
+                   evidence=str(self.win.solver_mode.get()))
 
     def run_log(self):
         try:
@@ -773,7 +811,7 @@ class QA:
             self.set_mode('dark')
             self.reset_window()
             self.goto('setup')
-            self.win.setup.set_dim(2)
+            self.dim(2)
             # GUI-10 (D174): every scenario starts in the invocation's
             # solver, whatever the one before it left (C05 / C07 leave
             # blastFoam, and the app persists it)
@@ -934,7 +972,7 @@ def s00_smoke(qa):
 
 @scenario('B01', 'B', est=40)
 def b01_coldstart(qa):
-    """Cold start: title, sidebar, default 2D case + validation strip."""
+    """Cold start: title, top bar, default 2D case + validation strip."""
     qa.note(f'App construction {qa.build_ms:.0f} ms, first paint '
             f'{qa.first_paint_ms:.0f} ms')
     qa.shot('coldstart')
@@ -1062,12 +1100,50 @@ def b06_keyboard(qa):
     F5 starts a REAL solver, so the F5/Esc pair is closed inside the
     scenario - a worker left running leaks into the next one and
     neutral() reports it as an S1.
+
+    GUI-10 (F10, D175): window-context QShortcuts never fire on the
+    offscreen platform, so offscreen the shortcut half is a note and only
+    the Tab order runs. Run B06 with --window for the shortcuts.
     """
-    for seq in ('Ctrl+O', 'Ctrl+S'):
+    if qa.app.platformName() == 'offscreen':
+        qa.note('shortcuts are real-platform only: run B06 with --window')
+    else:
+        _b06_shortcuts(qa)
+
+    # Tab order: walk the focus chain and say where it goes, which is the
+    # thing that was measured and fixed on the Run tab
+    qa.goto('run')
+    rp = qa.win.run_panel
+    rp.run_btn.setFocus()
+    qa.pump(0.3)
+    qa.shot('focus_run_btn')
+    order = []
+    for _ in range(6):
+        qa.key('Tab')
+        w = qa.win.focusWidget()
+        order.append(type(w).__name__ if w is not None else 'None')
+    qa.note('Tab from Run: ' + ' -> '.join(order))
+    qa.shot('focus_after_tab')
+    qa.goto('setup')
+
+
+def _b06_shortcuts(qa):
+    """B06's real-platform half: Ctrl+O / Ctrl+S reach their dialogs, F5
+    starts a run, plain Esc does not stop it, Shift+Esc does."""
+    dlg = os.path.join(qa.out, 'dialogs.jsonl')
+    had_path = bool(qa.win._case_path)
+    for seq, fn in (('Ctrl+O', 'open_file'), ('Ctrl+S', 'save_file')):
+        n0 = _ndialogs(dlg, (fn,))
         qa.key(seq)
-    n = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
-    qa.note(f'Ctrl+O / Ctrl+S: dialogs recorded so far = {n} '
-            f'(an Open dialog would have appeared as one)')
+        got = _ndialogs(dlg, (fn,)) - n0
+        if fn == 'save_file' and had_path:
+            # a case with a path saves in place, with no dialog (plan §4)
+            qa.note('Ctrl+S: the case has a path, so it saved in place')
+            continue
+        qa.check(got >= 1, f'{seq} reaches its {fn} dialog', 'S2',
+                 evidence=f'{got} new {fn} dialog(s)')
+    n = _nlines(dlg)
+    qa.note(f'Ctrl+O / Ctrl+S: dialogs recorded so far = {n}')
 
     was_running = qa.worker_alive()
     qa.key('F5')
@@ -1089,22 +1165,6 @@ def b06_keyboard(qa):
         qa.key('Shift+Esc')
         qa.check(qa.until(lambda: not qa.worker_alive(), 120),
                  'Shift+Esc stops the run that F5 started', 'S2')
-
-    # Tab order: walk the focus chain and say where it goes, which is the
-    # thing that was measured and fixed on the Run tab
-    qa.goto('run')
-    rp = qa.win.run_panel
-    rp.run_btn.setFocus()
-    qa.pump(0.3)
-    qa.shot('focus_run_btn')
-    order = []
-    for _ in range(6):
-        qa.key('Tab')
-        w = qa.win.focusWidget()
-        order.append(type(w).__name__ if w is not None else 'None')
-    qa.note('Tab from Run: ' + ' -> '.join(order))
-    qa.shot('focus_after_tab')
-    qa.goto('setup')
 
 
 @scenario('B07', 'B', est=120)
@@ -2186,7 +2246,8 @@ def e01_picker_and_1d(qa):
     qa.check(rs.fields.page() == 'figure',
              'a 1D result draws profiles, not a map '
              f'(page {rs.fields.page()!r})', 'S2')
-    for view in ('Gauges', 'Animation', '3D'):
+    # GUI-10: Fields and Animation are one Field view since GUI-7
+    for view in ('Gauges', '3D'):
         rs.show_view(view)
         qa.pump(0.8)
         qa.shot(f'1d_{view.lower()}')
@@ -3426,8 +3487,8 @@ def m05_hd13_folder(qa):
     from blastlab.core import assessment
     from blastlab.ui.testing import use_model
     qa.goto('setup')
-    qa.win.setup.set_dim(0)
-    qa.pump(0.6)
+    qa.dim(0)
+    qa.pump(0.1)
     qa.win.setup.forms[0].set_case(assessment.DeflagrationCase(
         name='QA M05', charge_kg=5.0, volume_m3=1.0, vent_area_m2=0.02,
         scenario_kind='flame_spread', n_cohorts=4, spread_time=4.0,
@@ -3450,8 +3511,7 @@ def m05_hd13_folder(qa):
     qa.check(os.path.isdir(loads) and any(
         n.endswith('.csv') for n in os.listdir(loads)),
              'hd13_loads\\ holds the SBEDS CSVs', 'S1')
-    qa.win.setup.set_dim(2)
-    qa.pump(0.5)
+    qa.dim(2)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -3951,7 +4011,7 @@ def h03_results_light(qa):
     for label in ('QA native2d', 'QA native3d'):
         if not select_result(qa, label):
             continue
-        for view in ('Fields', 'Gauges', 'Animation'):
+        for view in ('Field', 'Gauges', '3D'):
             rs.show_view(view)
             qa.pump(0.8)
             qa.shot(f'{label[-2:]}_{view.lower()}')
@@ -3993,11 +4053,11 @@ def i01_rapid_tabs(qa):
     qa.action = 'rapid tabs'
     while time.perf_counter() - t0 < 12:
         k = rnd.choice(['setup', 'run', 'results', 'chain'])
-        qa.win._show(k)
-        qa.tab = k
+        # GUI-10: the pill's click path (goto), not the window's _show
+        qa.goto(k, settle=0)
+        qa.action = 'rapid tabs'
         if k == 'results' and rnd.random() < 0.5:
-            qa.win.results.show_view(rnd.choice(
-                ['Fields', 'Gauges', 'Animation', '3D']))
+            qa.win.results.show_view(rnd.choice(['Field', 'Gauges', '3D']))
         if k == 'run' and rnd.random() < 0.5:
             (rp.show_3d_tab if rnd.random() < 0.5
              else rp.show_slice_tab)()
@@ -4171,7 +4231,8 @@ def main():
     ap.add_argument('--window', action='store_true',
                     help='run on the real desktop instead of offscreen')
     ap.add_argument('--solver', default='',
-                    help="seed the sidebar solver mode the app starts in "
+                    help="seed the solver mode the app starts in, and the "
+                         "one neutral() restores after every scenario "
                          "('native' | 'blastfoam')")
     args = ap.parse_args()
 
