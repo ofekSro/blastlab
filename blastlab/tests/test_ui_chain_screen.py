@@ -973,6 +973,15 @@ def s7_strip():
         win.on_progress(prog(1.0))
         win.on_result(0, 1, 'M - 1D', res[1])
         win.on_run_started(INFO1D)
+        pump(20)
+        # F25 (fixed in verify): the last stage's 100 % does not stand in
+        # the title, the Run tile or the Stop question at a stage start
+        check('F25: at stage 2\'s start the title, tile and Stop question '
+              'carry no stale 100 %',
+              win.windowTitle().startswith('Chain 2/2 · ')
+              and '%' not in win.windowTitle() and rp.pct_text() == '0 %'
+              and ' at ' not in win._stop_question().split('?')[0],
+              f'{win.windowTitle()!r} {rp.pct_text()!r}')
         win.on_progress(prog(1.0))
         pump(20)
         check('stage 2 at the percent stage 1 ended on still shows it',

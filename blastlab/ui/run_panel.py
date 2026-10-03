@@ -1396,8 +1396,12 @@ class RunPanel(QWidget):
         self._render_time()
 
     def on_run_started(self, info):
-        # a chain stage: the fraction (and so the ETA) restarts
+        # a chain stage: the fraction (and so the ETA) restarts, and the
+        # bar and the percent tile with it - the last stage's 100 % must
+        # not stand until this stage's first progress (F25)
         self._frac = None
+        self.progress.setValue(0)
+        self.strip.pct_lbl.setText('0 %')
         self._last_field = None
         self._mesh_geom = None
         self._mesh_levels = None

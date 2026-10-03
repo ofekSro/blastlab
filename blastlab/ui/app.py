@@ -1143,6 +1143,10 @@ class MainWindow(QMainWindow):
         # k of the title's `Chain k/n · ` = runs started since
         # start_stages (plan §4)
         self._chain_k += 1
+        # a new stage has no percent yet: the last stage's (often 100 %)
+        # must not stand in the title or the Stop question until this
+        # stage's first progress (F25)
+        self._run_pct = None
         self._update_title()
         if self._chain_strip is not None:
             self._chain_strip.stage_started(self._chain_k - 1)
