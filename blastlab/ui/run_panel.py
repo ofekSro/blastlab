@@ -1406,6 +1406,11 @@ class RunPanel(QWidget):
         self._frac = None
         self.progress.setValue(0)
         self.strip.pct_lbl.setText('0 %')
+        # ... and STEP / TIME / dt / P MAX read `—` until this stage's own
+        # first progress, which the worker queues after this message
+        # (GUI-10, F27 / D182). Only the texts: the live plot restarts
+        # below and the 3D view is kept (_reset_readouts would drop both).
+        self._reset_readouts_text()
         self._last_field = None
         self._mesh_geom = None
         self._mesh_levels = None

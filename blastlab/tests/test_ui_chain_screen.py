@@ -27,7 +27,10 @@ board Chain; batch docs/batches/2026-09-29-gui-chain.md).
      of a 3-stage chain, a stop and a failure, the title, a single run
      hiding the slot, the strip's height constant across every state at
      1100 x 720 and 1600 x 1000, nothing clipped, and the viewer shrunk
-     ahead only when the 3D view is on screen.
+     ahead only when the 3D view is on screen. GUI-10 (F27): at a stage
+     start STEP / TIME / dt / P MAX read `—` until its first progress,
+     the live pane restarts and the 3D host is not reset; the worker
+     queues run_started before the stage's first progress.
  S8  (9b, T5) 03 Results: a chain is ONE entry with STAGE tabs - the
      window's handlers group a live chain; stage labels as before; the
      tabs; `current()` is the stage's own entry; the Field view draws the
@@ -990,6 +993,79 @@ def s7_strip():
               strip.texts()[1] == '02 2D 100 %', str(strip.texts()))
         win.on_running(False)
         win.on_finished(False, False)
+        # F27 (GUI-10, D182): at a stage start STEP / TIME / dt / P MAX read
+        # `—` until the stage's first progress; the live plot is restarted
+        # (not dropped to its placeholder) and the 3D view is kept
+        host = rp.view3d
+        resets = []
+        real_reset = host.reset
+        host.reset = lambda *a, **k: resets.append(1)
+        try:
+            start([1, 2])
+            win.on_run_started(INFO1D)
+            win.on_progress(Progress(step=201, t=2.5e-4, dt=1.45e-6,
+                                     p_max=3.1e5, frac=0.6))
+            pump(20)
+            tiles = (rp._tile_step.value.text(), rp._tile_time.value.text(),
+                     rp._tile_pmax.value.text())
+            check('F27: stage 1 progress shows in the tiles',
+                  tiles[0] == '201' and tiles[1].startswith('0.250')
+                  and tiles[2].startswith('310'), str(tiles))
+            resets.clear()
+            win.on_result(0, 1, 'M - 1D', res[1])
+            win.on_run_started(INFO1D)
+            pump(20)
+            r = rp.chip_texts()
+            tiles = (rp._tile_step.value.text(), rp._tile_time.value.text(),
+                     rp._tile_pmax.value.text(),
+                     rp._tile_step.caption.text())
+            check('F27: at stage 2\'s start STEP, TIME, dt and P MAX read —',
+                  all(r[k] == '—' for k in ('step', 't [ms]', 'dt [s]',
+                                            'p max [kPa]'))
+                  and tiles[:3] == ('—', '—', '—')
+                  and tiles[3] == 'dt — s', f'{r} {tiles}')
+            check('F27: the live pane restarted for the stage, not on its '
+                  'placeholder', rp.pane._stack.currentIndex() == 1
+                  and rp.pane.plot is not None)
+            check('F27: the 3D host was not reset (its feed is kept)',
+                  resets == [], str(resets))
+            win.on_progress(Progress(step=12, t=3.0e-4, dt=2.0e-7,
+                                     p_max=1.5e5, frac=0.1))
+            pump(20)
+            check('F27: after a stage-2 progress the tiles show its values',
+                  rp._tile_step.value.text() == '12'
+                  and rp.chip_texts()['dt [s]'] == '2.00e-07',
+                  f'{rp._tile_step.value.text()} {rp.chip_texts()}')
+            win.on_running(False)
+            win.on_finished(False, False)
+        finally:
+            host.reset = real_reset
+        # F27: the worker posts a stage's run_started before any progress
+        # of that stage (one FIFO queue, one solver thread: the solvers
+        # call hooks.run_started before their first step), so the `—`
+        # lasts until that stage's own first progress
+        import queue
+        import threading
+        from blastlab.solvers.worker import GuiHooks
+        q = queue.Queue()
+        hk = GuiHooks(q, threading.Event())
+        hk.progress(Progress(step=201, t=2.5e-4, dt=1.45e-6, p_max=3.1e5,
+                             frac=1.0))
+        hk.flush_progress()                     # stage 1 ends (worker.run)
+        hk.run_started(dict(INFO1D))            # stage 2
+        hk._last_progress = 0.0                 # past the 10 Hz throttle
+        hk.progress(Progress(step=3, t=1e-6, dt=1e-7, p_max=1e5, frac=0.01))
+        msgs = []
+        while not q.empty():
+            msgs.append(q.get_nowait())
+        order = [(m[0], getattr(m[1], 'step', None) if len(m) > 1 else None)
+                 for m in msgs]
+        k = [m[0] for m in msgs].index('run_started')
+        check('F27: run_started is queued before the stage\'s first '
+              'progress, after the last stage\'s',
+              all(s == 201 for t, s in order[:k] if t == 'progress')
+              and [s for t, s in order[k + 1:] if t == 'progress'] == [3],
+              str(order))
         # a single run: the slot hidden at 0 px (R7)
         start([2])
         pump(30)
