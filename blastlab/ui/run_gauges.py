@@ -182,7 +182,26 @@ def _drop_reason(case, point):
     return ''
 
 
-def _numbering(case, match, n_series):
+def _x_only_tie(case, entered, missing, positions):
+    """True when an unmatched entered gauge was as good a candidate as
+    the one `_match` took for some x-only position (blastFoam's live 3D
+    payload, `radii`): with x alone the solver's drop cannot be told
+    from its neighbour at the same x, so naming it would be a guess."""
+    try:
+        tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
+    except (TypeError, ValueError):
+        tol = 0.0
+    for pos in positions or []:
+        if pos is None or len(pos) != 1:
+            continue
+        for j in missing:
+            if len(entered[j]) > 1 and \
+                    abs(entered[j][0] - pos[0]) <= tol + 1e-9:
+                return True
+    return False
+
+
+def _numbering(case, match, n_series, positions=None):
     """(labels, dropped) for `n_series` series matched to the entered
     gauges by `match` (D201, amends D61):
 
@@ -194,7 +213,9 @@ def _numbering(case, match, n_series):
 
     A drop is named only when the count adds up: the series are short by
     exactly the unmatched entered gauges, so a matching miss is never
-    called a drop. A series matching none keeps its payload number."""
+    called a drop. A series matching none keeps its payload number. Nor
+    is one named when x-only `positions` (the blastFoam live 3D payload)
+    tie a dropped gauge with a kept one (`_x_only_tie`)."""
     entered = _entered(case)
     plain = [f'G{k + 1}' for k in range(n_series)]
     if n_series >= len(entered):
@@ -202,6 +223,8 @@ def _numbering(case, match, n_series):
     taken = {j for j in match[:n_series] if j is not None}
     missing = [j for j in range(len(entered)) if j not in taken]
     if len(missing) != len(entered) - n_series:
+        return plain, []
+    if _x_only_tie(case, entered, missing, positions):
         return plain, []
     labels = [f'G{j + 1}' if j is not None else f'G{k + 1}'
               for k, j in enumerate(match[:n_series])]
@@ -216,7 +239,7 @@ def numbering(case, gauge_out):
     n = 0 if series is None else len(series)
     pos = _positions(gauge_out)
     pos = (pos + [None] * max(0, n - len(pos)))[:n]
-    return _numbering(case, _match(case, pos), n)
+    return _numbering(case, _match(case, pos), n, pos)
 
 
 def dropped_text(dropped):
@@ -278,7 +301,8 @@ def rows(case, payload=None):
         pos = pos + [None] * max(0, len(series) - len(pos))
         match = _match(case, pos[:len(series)])
         entered = _entered(case)
-        labels, _dropped = _numbering(case, match, len(series))
+        labels, _dropped = _numbering(case, match, len(series),
+                                      pos[:len(series)])
         for k, raw in enumerate(series):
             j = match[k]
             point = entered[j] if j is not None else pos[k]

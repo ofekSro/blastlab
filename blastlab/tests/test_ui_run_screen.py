@@ -1667,6 +1667,25 @@ def r5b_dropped(win):
           all(w.num.text() == f'G{w.number}' for w in col.row_widgets())
           and 'dropped' not in col.caption_text(),
           f'{col.row_labels()} {col.caption_text()!r}')
+    # blastFoam's live 3D payload carries x only (`radii`, D73): a kept
+    # gauge at the dropped one's x cannot be told from it, so no drop is
+    # named rather than the wrong one (verify 11b)
+    from blastlab.models.case import Case3D
+    c3 = Case3D(Lx=3.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=1.0,
+                center=(0.3, 1.0, 1.0),
+                obstacles=[(1.2, 1.8, 0.0, 1.0, 0.0, 1.0)],
+                gauges=[(0.8, 1.0, 1.0), (1.5, 0.5, 0.5), (1.5, 1.5, 1.5)])
+    xo = dict(times=pay['times'], radii=[0.8, 1.5],
+              pressures=pay['pressures'])
+    labels, dropped = RG.numbering(c3, xo)
+    check('x-only payload, G3 at the dropped G2\'s x: no drop named, '
+          'payload labels', labels == ['G1', 'G2'] and dropped == [],
+          f'{labels} {dropped}')
+    c3.gauges[2] = (2.5, 1.5, 1.5)
+    labels, dropped = RG.numbering(c3, dict(xo, radii=[0.8, 2.5]))
+    check('x-only payload, no x tie: G1, G3 and G2 inside Wall 1',
+          labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
+          f'{labels} {dropped}')
 
 
 def main():

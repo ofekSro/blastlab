@@ -382,6 +382,7 @@ class FieldView(QWidget):
         self._times = []            # ms per timeline position (or None)
         self._ranges = {}           # base label -> (lo text, hi text)
         self._gauge = None          # the selected gauge (T5)
+        self._gauge_label = None    # its `G<n>` as Gauges shows it
         self._arrival = float('nan')
         self._syncing = False
         self._keep_time = False
@@ -939,9 +940,13 @@ class FieldView(QWidget):
         b.setAccessibleName('Pause' if on else 'Play')
 
     # ── the arrival tick (the selected gauge, T5) ────────────────────────
-    def set_arrival(self, number, arrival_ms):
-        """The selected gauge and its arrival [ms] (NaN: none)."""
+    def set_arrival(self, number, arrival_ms, label=None):
+        """The selected gauge and its arrival [ms] (NaN: none). `label`
+        is its `G<n>` as the Gauges table shows it (the entered number
+        after a dropped gauge, D201); None: `G<number>`."""
         self._gauge = number
+        self._gauge_label = label or (None if number is None
+                                      else f'G{number}')
         try:
             self._arrival = float(arrival_ms)
         except (TypeError, ValueError):
@@ -965,7 +970,7 @@ class FieldView(QWidget):
             bits.append(NO_BAR[self._why])
         if self.tick_index() is not None and self._gauge is not None:
             bits.append(f'Cyan tick on the time bar: arrival at '
-                        f'G{self._gauge}.')
+                        f'{self._gauge_label}.')
         if self._ent is not None and self._ent.dim != 1:
             bits.append(COLOUR_NOTE)
         self.caption.setText(' '.join(bits))

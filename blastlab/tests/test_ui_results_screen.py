@@ -891,8 +891,19 @@ def s5g_dropped(link):
           g.order() == [2, 1] and g.selected() == 2
           and g.readout_text()[0] == 'G3 · Z 2.99',
           f'{g.order()} {g.selected()} {g.readout_text()}')
+    # verify 11b: the Field view's arrival tick names it as Gauges does
+    fv = p.field_view
+    check('the Field caption\'s arrival tick names G3, not G2',
+          fv._gauge_label == 'G3'
+          and 'arrival at G2.' not in fv.caption.text()
+          and ('arrival at' not in fv.caption.text()
+               or 'arrival at G3.' in fv.caption.text()),
+          f'{fv._gauge_label!r} {fv.caption.text()!r}')
     p.add_result('sample', 2, sample_2d())
     pump(40)
+    check('a result without a dropped gauge: the Field caption is '
+          'G<number> again', fv._gauge_label == f'G{g.selected()}',
+          f'{fv._gauge_label!r} {g.selected()}')
     check('a result without a dropped gauge: G2 / G1 and the plain '
           'caption again', [c[0] for c in g.cells()] == ['G2', 'G1']
           and g.caption_text() == RG.TABLE_CAPTION,

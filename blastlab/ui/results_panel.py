@@ -787,7 +787,10 @@ class ResultsPanel(QWidget):
     def _gauge_selected(self, _number=None):
         """The Field view's time-bar tick follows the selected gauge."""
         n = self.gauges.selected()
-        self.field_view.set_arrival(n, self.gauges.arrival(n))
+        # the caption names it as the Gauges table does (D201)
+        self.field_view.set_arrival(
+            n, self.gauges.arrival(n),
+            None if n is None else self.gauges.label(n))
 
     def set_colour_scale(self, scale, clim=None):
         """The Field view's colour scale ('run' | 'frame' | 'manual', with
