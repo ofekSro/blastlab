@@ -182,6 +182,18 @@ def s2_layout(win):
     check('and the links are the board\'s 118 px',
           [a.width() for a in ch.arrows] == [118, 118],
           str([a.width() for a in ch.arrows]))
+    heights = dict(
+        group=ch.route_bar.height(),
+        routes=sorted({b.height() for b in ch.route_btns.values()}),
+        run=(ch.run_btn.width(), ch.run_btn.height()),
+        copy=ed.copy_btn.height(), load=ed.load_btn.height(),
+        pill=ed.tree.pill.height(),
+        tools=sorted({b.height() for b in (ed.show_mesh, ed.fit_btn)}))
+    check('the board heights hold under the QSS (D41): route group 38 with '
+          '32 px buttons, Run chain 176 x 56, Copy / Load 36, pill 40, '
+          'the view tools 28',
+          heights == dict(group=38, routes=[32], run=(176, 56), copy=36,
+                          load=36, pill=40, tools=[28]), str(heights))
     ch.set_route('13')
     pump(200)
     check('a two-stage route\'s link is 200 px',
@@ -337,6 +349,32 @@ def s3_cards(win):
     f2.v['trigger_gauge'].set('')
     f2.v['trigger_action'].set('terminate')
     f2.points['gauges'].set([])
+    pump(450)
+
+    # the folder note names the model folder (D47's rule) and a long
+    # path wraps inside the 340 px column instead of widening it
+    from blastlab.services import model_folder
+    ed = ch.editors[2]
+    ch.focus_stage(2)
+    ed.select_node('stage')
+    pump(300)
+    want = model_folder.folder_for(os.path.join(TMP, 'runs'), 'CHAIN')
+    note = ed.note.text().replace('​', '')
+    check('the folder note names the model folder',
+          f'The files go to {want}{os.sep} (1d, 2d, 3d' in note,
+          ascii(note[:120]))
+    check(f'and a {len(want)}-character folder path wraps: the column '
+          f'stays 340 px', ed.props_width() == 340, str(ed.props_width()))
+    win.run_panel.set_run_name('M' * 60, replace=True)
+    pump(450)
+    path_part = ch.run_line_text().split(' ')[-1]
+    check('a 60-character model name is elided on the Run chain line, '
+          'whole in its tooltip',
+          '…' in ch.run_line_text() and ch.run_line.toolTip()
+          == 'Into ' + 'M' * 60
+          and ch.run_line.fontMetrics().horizontalAdvance(path_part)
+          <= ch.run_line.width(), ascii(ch.run_line_text()))
+    win.run_panel.set_run_name('CHAIN', replace=True)
     pump(450)
 
 

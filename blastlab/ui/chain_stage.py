@@ -104,6 +104,9 @@ class StageEditor(QWidget):
         self.tree.child_clicked.connect(self._child_clicked)
         self.tree.pill_clicked.connect(
             lambda: self.select_node(STAGE_NODE))
+        # the board's 40 px pill (theme: `#casepill[chain="true"]`)
+        self.tree.pill.setProperty('chain', 'true')
+        theme.repolish(self.tree.pill)
         foot = QWidget()
         fl = QHBoxLayout(foot)
         fl.setContentsMargins(0, 0, 0, 0)
@@ -301,7 +304,11 @@ class StageEditor(QWidget):
             pic.setPixmap(theme.pixmap(icon_name, 14,
                                        color=theme.cur(colour)))
             rl.addWidget(pic, 0, Qt.AlignTop)
-            text = label(str(message), 'body', wrap=True)
+            # a path in a message may wrap after a separator: unbroken it
+            # would set the page's minimum and widen the column (D19)
+            shown = str(message).replace('\\', '\\​') \
+                .replace('/', '/​')
+            text = label(shown, 'body', wrap=True)
             text.setObjectName('checktext')
             text.setStyleSheet(f'color: {theme.cur(colour)};')
             text.setTextInteractionFlags(Qt.TextSelectableByMouse)

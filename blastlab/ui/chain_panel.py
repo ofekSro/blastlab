@@ -434,8 +434,15 @@ class ChainPanel(QWidget):
         n = len(self.checked())
         _runs, model = self._model_source()
         model = str(model or '').strip()
-        self.run_line.setText(f'{n} stages · into \\{model}\\' if model
+        # an unbroken model name would overrun the 176 px column: elided
+        # in the middle to fit its own line, the whole in the tooltip
+        self.run_line.ensurePolished()
+        fm = self.run_line.fontMetrics()
+        shown = fm.elidedText(model, Qt.ElideMiddle,
+                              RUN_W - fm.horizontalAdvance('\\\\') - 4)
+        self.run_line.setText(f'{n} stages · into \\{shown}\\' if model
                               else f'{n} stages · set the Model on 02 Run')
+        self.run_line.setToolTip(f'Into {model}' if shown != model else '')
 
     def run_line_text(self):
         return self.run_line.text()
@@ -509,7 +516,10 @@ class ChainPanel(QWidget):
         self._checks = checks
         self._sync_titles()
         runs, model = self._model_source()
-        where = folder_text(runs, model)
+        # a zero-width space between the path's characters lets the note
+        # wrap inside a long folder path; unbroken, the path was the
+        # page's minimum and widened the 340 px column (D19) to ~490
+        where = '​'.join(folder_text(runs, model))
         note = (f'Every stage is checked live, like 01 Setup. The files go '
                 f'to {where} (1d, 2d, 3d, and the hand-offs at its root). '
                 f'If that folder already exists, the app asks before '

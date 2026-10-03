@@ -43,7 +43,9 @@ class RouteBar(QFrame):
         self.setObjectName('chainroutes')
         self.setFixedHeight(38)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(3, 3, 3, 3)
+        # 1 px border + 2 px + 32 px button + 2 px + 1 px = 38 (the plan's
+        # group height; the board's padding 3 would make it 40)
+        lay.setContentsMargins(2, 2, 2, 2)
         lay.setSpacing(2)
         self._grp = QButtonGroup(self)
         self._grp.setExclusive(True)

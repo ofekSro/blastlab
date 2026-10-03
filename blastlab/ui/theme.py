@@ -768,7 +768,7 @@ def qss(mode_name):
     QLabel#chaincaption {{ font-size: 12px; color: {p['faint']}; }}
     QFrame#chainroutes {{ background: {p['bg']};
         border: 1px solid {p['seg']}; border-radius: 10px;
-        min-height: 38px; max-height: 38px; }}
+        min-height: 36px; max-height: 36px; }}
     QPushButton#chainroute {{ background: transparent; color: {p['muted']};
         border: none; border-radius: 7px; padding: 0px 14px;
         min-height: 32px; max-height: 32px;
@@ -807,8 +807,13 @@ def qss(mode_name):
     QLabel#chainrunline {{ font-size: 12px; color: {p['muted']}; }}
     QPushButton#stagebtn {{ background: transparent; color: {p['text2']};
         border: 1px solid {p['entry_border']}; border-radius: 8px;
-        padding: 0px 6px; min-height: 36px; max-height: 36px;
+        padding: 0px 6px; min-height: 34px; max-height: 34px;
         font-size: 12.5px; font-weight: 500; }}
+    /* the stage tree's pill (board line 114: 40 px). The QSS heights are
+       the content box: + the 1 px border = 40. Setup's own pill is not
+       touched here (F21). */
+    QPushButton#casepill[chain="true"] {{ min-height: 38px;
+                                          max-height: 38px; }}
     QPushButton#stagebtn:hover {{ background: {p['hover']}; }}
     QPushButton#stagebtn:disabled {{ color: {p['muted']}; }}
     QLabel#stageviewtitle {{ font-family: "{DISPLAY}"; font-size: 15px;
