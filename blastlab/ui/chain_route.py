@@ -10,8 +10,11 @@ and its live per-stage checks, as data. Toolkit-free on purpose, like
   (`tests/test_ui_char_chain_wiring.py`) pins what it hands on.
 - `stage_checks()` is what the screen shows per stage while you type:
   parse, wire, then `validate_case(..., pending_inputs=...)` and the
-  native -> blastFoam hand-off rule, exactly what `run()` will say.
-  Nothing is written and no hand-off path of a later stage is checked.
+  native -> blastFoam hand-off rule, exactly what `run()` will say, plus
+  one warning `run()` does not give: `handoff_reach`, a 1D hand-off
+  radius that already reaches the next stage's boundary or a wall (QA
+  S2-1, D200). Nothing is written and no hand-off path of a later stage
+  is checked.
 - The hand-off texts are the board's sentences with the wired case's own
   numbers (formatted, never computed).
 
@@ -168,6 +171,93 @@ class StageCheck:
                 + [('note', m) for m in self.notes])
 
 
+def _reach_2d(R, case):
+    """(limit, far, domain text, reaches) of a 1D profile of radius R
+    remapped onto 2D stage `case`, burst at (0, cy). The rule is the
+    solver's own remap warning (solvers/solver2d.py, `if profile is not
+    None`: R > Lx, cy - R < 0, cy + R > Ly, or an obstacle closer than R
+    to (0, cy)); `limit` is the largest R that does not trigger it, `far`
+    the farthest domain point from the burst."""
+    Lx, Ly = float(case.Lx), float(case.Ly)
+    cy = float(case.center[1])
+    gaps = [Lx, cy, Ly - cy]
+    for box in case.obstacles or []:
+        ox0, ox1, oy0, oy1 = (float(v) for v in box[:4])
+        px = min(max(0.0, ox0), ox1)
+        py = min(max(cy, oy0), oy1)
+        gaps.append((px * px + (py - cy) ** 2) ** 0.5)
+    limit = min(gaps)
+    far = (Lx * Lx + max(cy, Ly - cy) ** 2) ** 0.5
+    reaches = R > Lx or cy - R < 0 or cy + R > Ly or any(
+        g < R for g in gaps[3:])
+    return limit, far, f'{_n1(Lx)} × {_n1(Ly)}', reaches
+
+
+def _reach_3d(R, case):
+    """The same for a 1D profile placed around the 3D burst point: the
+    solver's rule (solvers/solver3d.py, the 1D-profile branch) is
+    min(x0, Lx - x0, y0, Ly - y0, z0, Lz - z0) < R; obstacles are not
+    part of it."""
+    Ls = [float(case.Lx), float(case.Ly), float(case.Lz)]
+    c = [float(v) for v in case.center[:3]]
+    gaps = [g for v, L in zip(c, Ls) for g in (v, L - v)]
+    limit = min(gaps)
+    far = sum(max(v, L - v) ** 2 for v, L in zip(c, Ls)) ** 0.5
+    dom = ' × '.join(_n1(L) for L in Ls)
+    return limit, far, dom, limit < R
+
+
+def handoff_reach(dims, cases):
+    """{dim: warning} for a stage fed by a 1D stage whose shock has, at
+    the hand-off, already reached this stage's boundary or a wall (QA
+    S2-1, D200). Toolkit-free; `cases` are the WIRED cases ({dim: case
+    or None}).
+
+    Checked only where the hand-off radius is known before the run: the
+    stage before is 1D, its Outer boundary terminates it and it has no
+    End time, so it hands off when the shock is at R = radius_m
+    (`out_text`; solvers/solver1d.py stops at the End time when one is
+    set, or at the shock's arrival at a terminating Outer, whichever
+    comes first - with an End time the radius at the hand-off is not
+    known before the run). Every other case (a 2D stage feeding 3D
+    included) is not checked and nothing is said. The rule mirrors the
+    solvers' own remap warning (`_reach_2d`, `_reach_3d`); this only
+    says it before the run."""
+    dims = [int(d) for d in dims]
+    out = {}
+    for prev, d in zip(dims, dims[1:]):
+        one, case = cases.get(prev), cases.get(d)
+        if prev != 1 or d not in (2, 3) or one is None or case is None:
+            continue
+        try:
+            if 'Outer' not in setup_nodes.terminate_sides(one) \
+                    or float(getattr(one, 't_end', 0.0) or 0.0) > 0.0:
+                continue
+            R = float(one.radius_m)
+            limit, far, dom, reaches = (_reach_2d if d == 2
+                                        else _reach_3d)(R, case)
+        except (AttributeError, TypeError, ValueError, IndexError):
+            continue
+        if not reaches:
+            continue
+        fix = limit > 0.0
+        if R >= far:
+            msg = (f'The 1D stage hands off when its shock is at '
+                   f'{_n1(R)} m, beyond this stage\'s whole {dom} m '
+                   f'domain: this stage would start after the wave has '
+                   f'left it.'
+                   + (f' Set stage 1\'s radius below {_n1(limit)} m.'
+                      if fix else ''))
+        else:
+            msg = (f'The 1D stage hands off at {_n1(R)} m; that already '
+                   f'reaches this stage\'s boundary or a wall, so the remap '
+                   f'is not spherical there (the run warns too).'
+                   + (f' Set stage 1\'s radius below {_n1(limit)} m to '
+                      f'keep it inside.' if fix else ''))
+        out[d] = msg
+    return out
+
+
 def stage_checks(dims, sources, hand):
     """{dim: StageCheck} for the route `dims`. `sources` maps each dim to
     a form (anything with `get_case()`, whose ValueError lines are parse
@@ -198,6 +288,7 @@ def stage_checks(dims, sources, hand):
                    else getattr(sources[d], 'mode', 'native'))
                for d in dims}
     conflicts = dict(chain_svc.handoff_conflicts(dims, solvers))
+    reach = handoff_reach(dims, cases)
     out = {}
     for d in dims:
         chk = StageCheck(case=cases[d], parse=parse[d])
@@ -211,6 +302,9 @@ def stage_checks(dims, sources, hand):
             chk.errors += list(rep.errors)
             chk.warnings = list(rep.warnings)
             chk.notes = list(rep.notes)
+        if d in reach:
+            # D200: a warning, never a refusal - run() is unchanged
+            chk.warnings.append(reach[d])
         out[d] = chk
     return out
 

@@ -480,6 +480,36 @@ def s5_live(win):
     win.set_solver('native')
     ch.set_route('123')
     pump(450)
+    # GUI-11 T9 (QA S2-1, D200): the default seed's 10 m 1D stage hands
+    # off after its shock has left the 4 x 4 m stage 2 - card 2 warns
+    want = cr.handoff_reach([1, 2], {
+        1: ch.checks()[1].case, 2: ch.checks()[2].case})[2]
+    ed = ch.editors[2]
+    check('S2-1: the default seed (stage 1 at 10 m) warns on card 2: '
+          '● 1 warning, the pill Stage OK · 1 warning, the message in '
+          'its Checks',
+          ch.forms[1].get_case().radius_m == 10.0
+          and ch.cards[2].state_text() == '● 1 warning'
+          and ed.pill()[0] == 'warn'
+          and ed.pill()[1].startswith('Stage OK · 1 warning')
+          and ('warn', want) in ed.check_rows()
+          and want.startswith('The 1D stage hands off when its shock is '
+                              'at 10.0 m, beyond this stage\'s whole 4.0 × '
+                              '4.0 m domain'),
+          ascii([ch.cards[2].state_text(), ed.pill(), want]))
+    check('S2-1: cards 1 and 3 do not warn, and Run chain stays enabled',
+          ch.cards[1].state_text() == '● case OK'
+          and ch.cards[3].state_text() == '● case OK'
+          and ch.run_btn.isEnabled(),
+          ascii([ch.cards[d].state_text() for d in (1, 3)]))
+    # the error paths below start from the board's 1.5 m, so they test
+    # what they tested (a fixture change: the seed now warns)
+    ch.forms[1].v['radius_m'].set('1.5')
+    pump(450)
+    check('S2-1: at 1.5 m the warning is gone',
+          ch.cards[2].state_text() == '● case OK'
+          and not any('hands off' in m for _s, m in ed.check_rows()),
+          ascii(ch.cards[2].state_text()))
     check('all three cards start ● case OK',
           [ch.cards[d].state_text() for d in (1, 2, 3)]
           == ['● case OK'] * 3,
@@ -572,6 +602,81 @@ def s5_live(win):
     timers = [t for t in ch.findChildren(QTimer) if t.isActive()]
     check('and no timer runs on the idle Chain screen', not timers,
           str(len(timers)))
+
+
+def s5r_reach():
+    """GUI-11 T9 (QA S2-1, D200): `chain_route.handoff_reach`, toolkit-
+    free. The QA case (1D 10 m into a 4 x 4 m stage, burst z 2) has left
+    the whole domain; the QA control (1.5 m) says nothing; a wall within
+    R gives the second text. The limit is the largest R that is silent."""
+    from blastlab.models.case import Case1D, Case2D, Case3D
+    from blastlab.ui import chain_route as cr
+    print('\nS5r: handoff_reach (no Qt)')
+    two = Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0,
+                 center=(0.0, 2.0))
+
+    def one(r, outer='terminate'):
+        return Case1D(radius_m=r, bc_outer=outer)
+
+    got = cr.handoff_reach([1, 2], {1: one(10.0), 2: two})
+    check('1 → 2, QA case 10 m into 4 × 4 m, cy 2: the wave has left the '
+          'whole domain, limit 2.0 m',
+          got == {2: 'The 1D stage hands off when its shock is at 10.0 m, '
+                     'beyond this stage\'s whole 4.0 × 4.0 m domain: this '
+                     'stage would start after the wave has left it. Set '
+                     'stage 1\'s radius below 2.0 m.'}, ascii(got))
+    check('1 → 2, QA control 1.5 m: nothing',
+          cr.handoff_reach([1, 2], {1: one(1.5), 2: two}) == {})
+    got = cr.handoff_reach([1, 2], {1: one(3.0), 2: two})
+    check('1 → 2, 3 m: past the ground and the top, not the whole domain',
+          got == {2: 'The 1D stage hands off at 3.0 m; that already '
+                     'reaches this stage\'s boundary or a wall, so the '
+                     'remap is not spherical there (the run warns too). Set '
+                     'stage 1\'s radius below 2.0 m to keep it inside.'},
+          ascii(got))
+    check('1 → 2, exactly the limit (2.0 m): silent (the solver\'s rule '
+          'is strict)',
+          cr.handoff_reach([1, 2], {1: one(2.0), 2: two}) == {})
+    walled = Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0,
+                    center=(0.0, 2.0), obstacles=[(1.2, 1.4, 0.0, 3.0)])
+    got = cr.handoff_reach([1, 2], {1: one(1.5), 2: walled})
+    check('1 → 2, a wall 1.2 m from the burst, 1.5 m: the second text, '
+          'limit 1.2 m',
+          got == {2: 'The 1D stage hands off at 1.5 m; that already '
+                     'reaches this stage\'s boundary or a wall, so the '
+                     'remap is not spherical there (the run warns too). Set '
+                     'stage 1\'s radius below 1.2 m to keep it inside.'},
+          ascii(got))
+    check('1 → 2, Outer not terminating: no check, nothing said',
+          cr.handoff_reach([1, 2], {1: one(10.0, 'transmit'), 2: two})
+          == {})
+    timed = Case1D(radius_m=10.0, bc_outer='terminate', t_end=3e-4)
+    check('1 → 2, a 1D stage with an End time: no check (it may hand off '
+          'before Outer, so its radius is not known before the run)',
+          cr.handoff_reach([1, 2], {1: timed, 2: two}) == {})
+    three = Case3D(Lx=6.0, Ly=6.0, Lz=4.0, center=(3.0, 3.0, 2.0))
+    got = cr.handoff_reach([1, 3], {1: one(10.0), 3: three})
+    check('1 → 3, 10 m into 6 × 6 × 4 m, burst z 2: left the whole '
+          'domain, limit 2.0 m',
+          got == {3: 'The 1D stage hands off when its shock is at 10.0 m, '
+                     'beyond this stage\'s whole 6.0 × 6.0 × 4.0 m domain: '
+                     'this stage would start after the wave has left it. '
+                     'Set stage 1\'s radius below 2.0 m.'}, ascii(got))
+    got = cr.handoff_reach([1, 3], {1: one(2.5), 3: three})
+    check('1 → 3, 2.5 m: the second text',
+          list(got) == [3] and got[3].startswith(
+              'The 1D stage hands off at 2.5 m; that already reaches')
+          and got[3].endswith('below 2.0 m to keep it inside.'), ascii(got))
+    check('1 → 3, 1.5 m: nothing',
+          cr.handoff_reach([1, 3], {1: one(1.5), 3: three}) == {})
+    got = cr.handoff_reach([1, 2, 3], {1: one(10.0), 2: two, 3: three})
+    check('1 → 2 → 3: only stage 2 is checked (2D → 3D is not predicted)',
+          list(got) == [2], ascii(list(got)))
+    check('2 → 3: nothing',
+          cr.handoff_reach([2, 3], {2: two, 3: three}) == {})
+    check('an unparsed stage (None): nothing',
+          cr.handoff_reach([1, 2], {1: None, 2: two}) == {}
+          and cr.handoff_reach([1, 2], {1: one(10.0), 2: None}) == {})
 
 
 # ── S6 ───────────────────────────────────────────────────────────────────
@@ -1458,6 +1563,7 @@ def main():
         s2_layout(win)
         s3_cards(win)
         s4_editor(win)
+        s5r_reach()
         s5_live(win)
         s9_copy_checks(win)
         win.close()
