@@ -207,6 +207,8 @@ class ChainPanel(QWidget):
         run_col.setSpacing(8)
         run_col.addStretch(1)
         self.run_btn = _RunButton()
+        # F5 runs the chain while this screen is shown (UXR-7, D205)
+        self.run_btn.setToolTip('Run the chain (F5)')
         self.run_btn.clicked.connect(lambda *_: self.run())
         run_col.addWidget(self.run_btn, 0, Qt.AlignHCenter)
         self.run_line = QLabel('')

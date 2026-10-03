@@ -508,10 +508,18 @@ class MainWindow(QMainWindow):
         for seq, fn in (('Ctrl+O', self._open_case),
                         ('Ctrl+S', self._save_case_inplace),
                         ('Ctrl+Shift+S', self._save_case),
-                        ('F5', self._run_single),
+                        ('F5', self._f5),
                         ('Shift+Esc', self._stop)):
             sc = QShortcut(QKeySequence(seq), self)
             sc.activated.connect(lambda f=fn: f())
+
+    def _f5(self):
+        """F5 runs what the screen shows: the chain on the Chain screen,
+        01 Setup's case everywhere else (UXR-7, D205)."""
+        if self.current_tab() == 'chain':
+            self.chain.run()
+        else:
+            self._run_single()
 
     def _restore_ui_state(self, st):
         try:

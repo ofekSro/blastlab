@@ -25,6 +25,8 @@ BC_Combined lines 20-54 / 392-396).
      drops its word only then (verify10b, F37 / D198)
  F11 Save as reports a write failure (no crash dialog) and starts in the
      case folder / the newest Recent's / the Runs folder (GUI-11, D204)
+ F12 F5 runs the chain on the Chain screen, 01 Setup's case elsewhere
+     (GUI-11, D205)
 
 Plain script, offscreen, no pytest: `python test_ui_frame.py`.
 """
@@ -564,6 +566,36 @@ def main():
     win._case_path = p3
     win._set_dirty(False)
     win.topbar.set_case_name(win._case_stem())
+
+    print('\nF12: F5 runs the chain on the Chain screen, the case '
+          'elsewhere (GUI-11 T4, UXR-7 / D205)')
+    calls = []
+    win.chain.run = lambda: calls.append('chain')
+    win._run_single = lambda *a, **k: calls.append('single')
+    f5 = [sc for sc in win.findChildren(QShortcut)
+          if sc.key().toString() == 'F5']
+    try:
+        win._show('chain')
+        pump(40)
+        f5[0].activated.emit()
+        pump(20)
+        check('on Chain: F5 calls chain.run once, _run_single never',
+              calls == ['chain'], str(calls))
+        del calls[:]
+        win._show('setup')
+        pump(40)
+        f5[0].activated.emit()
+        pump(20)
+        check('on Setup: F5 calls _run_single once, chain.run never',
+              calls == ['single'], str(calls))
+    finally:
+        del win.chain.run
+        del win._run_single
+    check('still exactly five shortcuts',
+          len(win.findChildren(QShortcut)) == 5,
+          str(len(win.findChildren(QShortcut))))
+    check('the Run chain tooltip names F5',
+          'F5' in win.chain.run_btn.toolTip(), win.chain.run_btn.toolTip())
 
     win.close()
     pump(80)
