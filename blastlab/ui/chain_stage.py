@@ -17,8 +17,8 @@ time (CLAUDE.md §8.7; decision D-row).
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
-                               QScrollArea, QSizePolicy, QStackedWidget,
-                               QVBoxLayout, QWidget)
+                               QScrollArea, QSizePolicy, QVBoxLayout,
+                               QWidget)
 
 from ..core import mode as mode_mod
 from . import chain_route, setup_nodes, setup_strip, theme

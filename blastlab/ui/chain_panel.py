@@ -34,7 +34,7 @@ import os
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
-                               QSizePolicy, QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget)
 
 from ..core import mode as mode_mod
 from ..core import chain
