@@ -29,7 +29,7 @@ from ..models import fields
 from . import dialogs, theme
 from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, SPAN, cards
 from .theme import GAP
-from .widgets import Card, button, label
+from .widgets import Card, button, label, wrap_tip
 
 #: the form's cards use the same 12 px padding as every other card on
 #: the Setup and Chain panels. It used to be theme.PAD (16), which cost
@@ -944,7 +944,8 @@ class FieldForm(QWidget):
         if f.kind not in ('bool', 'matrix'):
             w.setMinimumWidth(INPUT_MIN)
         if f.tip:
-            w.setToolTip(f.tip)
+            # a long spec tip wraps (P2-24, D208); its words are unchanged
+            w.setToolTip(wrap_tip(f.tip))
         self.widgets[f.name] = w
         return w
 

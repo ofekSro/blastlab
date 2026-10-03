@@ -3830,6 +3830,7 @@ def v06_keep_all_fields(qa):
     from blastlab.core.case import Case1D, Case3D, case_to_dict
     from blastlab.models import fields as mfields
     from blastlab.services import model_folder as mf
+    from blastlab.ui.widgets import tip_text
     qa.goto('setup')
     for dim, cls in ((1, Case1D), (3, Case3D)):
         qa.set_case(cls(solver='blastfoam'))
@@ -3837,7 +3838,8 @@ def v06_keep_all_fields(qa):
         w = form.widgets.get('keep_all_fields')
         qa.check(w is not None and w.isVisible() and not w.isChecked()
                  and w.text() == mfields.KEEP_ALL_CAPTION
-                 and w.toolTip() == mfields.KEEP_ALL_TIP,
+                 # GUI-11 (P2-24): a wrapped tip, the same words
+                 and tip_text(w.toolTip()) == mfields.KEEP_ALL_TIP,
                  f'{dim}D: the box is on the card, unticked, with its '
                  f'tooltip', 'S2')
         _vtk_shots(qa, f'{dim}d_keep_off')

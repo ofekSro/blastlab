@@ -27,6 +27,8 @@ BC_Combined lines 20-54 / 392-396).
      case folder / the newest Recent's / the Runs folder (GUI-11, D204)
  F12 F5 runs the chain on the Chain screen, 01 Setup's case elsewhere
      (GUI-11, D205)
+ F13 the in-progress refusal is titled after the action; a message box
+     keeps a path on one line; long tooltips wrap (GUI-11, D207 / D208)
 
 Plain script, offscreen, no pytest: `python test_ui_frame.py`.
 """
@@ -596,6 +598,61 @@ def main():
           str(len(win.findChildren(QShortcut))))
     check('the Run chain tooltip names F5',
           'F5' in win.chain.run_btn.toolTip(), win.chain.run_btn.toolTip())
+
+    print('\nF13: refusal titles, paths kept whole, wrapped tooltips '
+          '(GUI-11 T6, P2-18 / P2-24, D207 / D208)')
+    infos = []
+    real_info = dialogs.show_info
+    dialogs.show_info = lambda t, m, p=None: infos.append((t, m))
+    win._hd13_busy = True
+    try:
+        got = win._model_target('Run chain')
+    finally:
+        win._hd13_busy = False
+        dialogs.show_info = real_info
+    check("the in-progress refusal is titled after the action: 'Run chain'",
+          got is None
+          and infos == [('Run chain', 'A run is already in progress.')],
+          str(infos))
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QLabel, QMessageBox
+    from blastlab.ui.widgets import TIP_WRAP_CHARS, tip_text, wrap_tip
+    # short: the offscreen screen is 800 px wide, so the cap is 200 px
+    # there (the 70-character path is measured on the real platform)
+    runs = 'C:\\runs\\lab'
+    text = (f'QA_MODEL already exists in {runs}. Overwrite? The previous '
+            f"run's files will be deleted.")
+    box = QMessageBox(QMessageBox.Question, 'Model folder', text,
+                      QMessageBox.Yes | QMessageBox.No, win)
+    dialogs._keep_paths(box)
+    lbl = box.findChild(QLabel, 'qt_msgbox_label')
+    adv = lbl.fontMetrics().horizontalAdvance(runs + '.')
+    check('a message with a path: the label is at least the path wide',
+          lbl.minimumWidth() >= adv, f'{lbl.minimumWidth()} >= {adv}')
+    check('the path starts its own line, the words unchanged',
+          box.text() == text.replace(' C:\\', '\nC:\\')
+          and box.text().replace('\n', ' ') == text, repr(box.text()[:40]))
+    check('and the text is selectable',
+          bool(lbl.textInteractionFlags() & Qt.TextSelectableByMouse))
+    huge = 'C:\\' + '\\'.join(['a_very_long_folder_name'] * 40)
+    box2 = QMessageBox(QMessageBox.Critical, 'Run', f'Missing {huge}',
+                       QMessageBox.Ok, win)
+    dialogs._keep_paths(box2)
+    lbl2 = box2.findChild(QLabel, 'qt_msgbox_label')
+    check('a path past the cap is elided in the middle, the whole text '
+          'in the tooltip',
+          '…' in box2.text() and lbl2.toolTip() == f'Missing {huge}'
+          and lbl2.minimumWidth() < lbl2.fontMetrics().horizontalAdvance(
+              huge), f'{box2.text()[:30]!r} min {lbl2.minimumWidth()}')
+    box.deleteLater()
+    box2.deleteLater()
+    short = 'x' * TIP_WRAP_CHARS
+    long_tip = 'word & <tag> ' * 10 + '\nnext line'
+    check('wrap_tip: a short tip is unchanged, a long one is rich text '
+          'whose plain text is the tip',
+          wrap_tip(short) == short and wrap_tip(long_tip).startswith('<')
+          and tip_text(wrap_tip(long_tip)) == long_tip,
+          repr(tip_text(wrap_tip(long_tip))[:30]))
 
     win.close()
     pump(80)

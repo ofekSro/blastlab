@@ -907,8 +907,9 @@ class MainWindow(QMainWindow):
         if self.ctrl.running or self._hd13_busy:
             # before prepare: an overwrite could hit the running model (an
             # HD 1.3 assessment runs on its own thread, not the controller:
-            # the Chain tab and a resume are not greyed by it)
-            dialogs.show_info('Run', 'A run is already in progress.')
+            # a resume, and a direct chain.run(), are not greyed by it);
+            # titled after the action that was refused (P2-18, D207)
+            dialogs.show_info(title, 'A run is already in progress.')
             return None
         errors = self.model_check()
         if errors:
@@ -1111,7 +1112,7 @@ class MainWindow(QMainWindow):
         cases = [c for _d, c in dim_cases]
         if not self._confirm_long_run(cases):
             return False
-        model = self._model_target('Chain')
+        model = self._model_target('Run chain')
         if model is None:
             return False
         # the manifest's n_cells / n_procs, one report per stage

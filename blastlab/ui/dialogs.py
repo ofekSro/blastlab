@@ -5,8 +5,10 @@ with `messagebox`): an e2e script or the QA harness that reaches one
 stops dead. Resolving them through this module at CALL time lets a test
 replace `dialogs.show_error` with a recorder and keep going."""
 
-from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import QFileDialog, QMessageBox
+import re
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtWidgets import QApplication, QFileDialog, QLabel, QMessageBox
 
 #: the tray icon behind the last desktop notification, or None. It is
 #: created on demand and removed on a click, after TRAY_LIFE_MS, at the
@@ -16,17 +18,95 @@ TRAY_LIFE_MS = 60_000
 #: how long Windows is asked to show the notification
 TOAST_MS = 10_000
 
+#: a Windows path in a message: a drive or UNC start, up to the next space
+_PATH_TOKEN = re.compile(r'(?:[A-Za-z]:[\\/]|\\\\)\S*')
+#: a message box may widen to keep a path on one line up to this share of
+#: the available screen width (P2-18, D207) ...
+PATH_SCREEN_SHARE = 0.70
+#: ... and never past QMessageBox's own hard limit, min(available width
+#: - 480, 1000) px (Qt 6 qmessagebox.cpp, updateSize), less the icon and
+#: the margins: past that limit Qt wraps the text anywhere
+_BOX_HARD_MARGIN, _BOX_HARD_MAX, _BOX_ICON_ALLOW = 480, 1000, 120
+
+
+def _keep_paths(box):
+    """Keep every path in `box`'s text on one line (P2-18: the refusal and
+    overwrite boxes broke a path after `C:`). The text label's minimum
+    width becomes the advance of the longest path token, capped as above.
+    That alone is not enough (measured on the real platform, D207): Qt's
+    line breaking may break between `C:` and `\\` whenever the text
+    before the path leaves too little room on its line. So a path whose
+    line would not fit starts a new line instead. A path wider than the
+    cap is elided in the middle, the whole text in the label's tooltip.
+    The text is selectable either way."""
+    lbl = box.findChild(QLabel, 'qt_msgbox_label')
+    if lbl is None:
+        return
+    lbl.setTextInteractionFlags(Qt.TextSelectableByMouse
+                                | Qt.TextSelectableByKeyboard)
+    text = box.text()
+    tokens = _PATH_TOKEN.findall(text)
+    if not tokens:
+        return
+    box.ensurePolished()
+    lbl.ensurePolished()
+    fm = lbl.fontMetrics()
+    parent = box.parentWidget()
+    screen = ((parent.screen() if parent is not None else None)
+              or QApplication.primaryScreen())
+    avail = screen.availableGeometry().width() if screen else 1280
+    cap = int(min(avail * PATH_SCREEN_SHARE,
+                  min(avail - _BOX_HARD_MARGIN, _BOX_HARD_MAX)
+                  - _BOX_ICON_ALLOW))
+    need = max(fm.horizontalAdvance(t) for t in tokens) + 2
+    shown = text
+    if need > cap:
+        def elide(m):
+            tok = m.group(0)
+            if fm.horizontalAdvance(tok) + 2 <= cap:
+                return tok
+            return fm.elidedText(tok, Qt.ElideMiddle, cap - 2)
+        shown = _PATH_TOKEN.sub(elide, text)
+        lbl.setToolTip(text)
+        need = cap
+    shown = _paths_start_lines(shown, fm, need)
+    if shown != text:
+        box.setText(shown)
+    lbl.setMinimumWidth(need)
+
+
+def _paths_start_lines(text, fm, width):
+    """`text` with the space before a path turned into a line break when
+    the path's line, from its start to the path's end, is wider than
+    `width` px (see `_keep_paths`)."""
+    out, last, line_start = [], 0, 0
+    for m in _PATH_TOKEN.finditer(text):
+        s, e = m.span()
+        start = max(line_start, text.rfind('\n', 0, s) + 1)
+        if s > start and text[s - 1] == ' ' \
+                and fm.horizontalAdvance(text[start:e]) > width:
+            out += [text[last:s - 1], '\n']
+            last = line_start = s
+    out.append(text[last:])
+    return ''.join(out)
+
+
+def _message(icon, title, text, parent=None):
+    box = QMessageBox(icon, title, str(text), QMessageBox.Ok, parent)
+    _keep_paths(box)
+    box.exec()
+
 
 def show_error(title, text, parent=None):
-    QMessageBox.critical(parent, title, str(text))
+    _message(QMessageBox.Critical, title, text, parent)
 
 
 def show_info(title, text, parent=None):
-    QMessageBox.information(parent, title, str(text))
+    _message(QMessageBox.Information, title, text, parent)
 
 
 def warn(title, text, parent=None):
-    QMessageBox.warning(parent, title, str(text))
+    _message(QMessageBox.Warning, title, text, parent)
 
 
 def ask_yes_no(title, text, parent=None, yes=None, no=None):
@@ -36,16 +116,20 @@ def ask_yes_no(title, text, parent=None, yes=None, no=None):
     yes. With neither label given it is the plain Yes / No box, as
     every existing call has it."""
     if yes is None and no is None:
-        btn = QMessageBox.question(parent, title, str(text),
-                                   QMessageBox.Yes | QMessageBox.No,
-                                   QMessageBox.No)
-        return btn == QMessageBox.Yes
+        box = QMessageBox(QMessageBox.Question, title, str(text),
+                          QMessageBox.Yes | QMessageBox.No, parent)
+        box.setDefaultButton(QMessageBox.No)
+        box.setEscapeButton(QMessageBox.No)
+        _keep_paths(box)
+        box.exec()
+        return box.clickedButton() is box.button(QMessageBox.Yes)
     box = QMessageBox(QMessageBox.Question, title, str(text),
                       QMessageBox.NoButton, parent)
     yes_btn = box.addButton(str(yes or 'Yes'), QMessageBox.YesRole)
     no_btn = box.addButton(str(no or 'No'), QMessageBox.NoRole)
     box.setDefaultButton(no_btn)
     box.setEscapeButton(no_btn)
+    _keep_paths(box)
     box.exec()
     return box.clickedButton() is yes_btn
 
@@ -65,6 +149,7 @@ def ask_discard(kind, text, parent=None, title='BlastLab'):
     box = QMessageBox(QMessageBox.Question if kind == 'dirty'
                       else QMessageBox.Warning, title, str(text),
                       QMessageBox.NoButton, parent)
+    _keep_paths(box)
     if kind == 'dirty':
         save = box.addButton('Save', QMessageBox.AcceptRole)
         discard = box.addButton('Discard', QMessageBox.DestructiveRole)

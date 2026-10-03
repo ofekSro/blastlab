@@ -2,6 +2,8 @@
 chips, scroll columns and small factories, all styled through the
 object names `theme.qss` knows about."""
 
+import html
+
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal  # noqa: F401
 from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame,
@@ -151,6 +153,39 @@ def clean_copy(label):
     `label._clean_copy`."""
     label._clean_copy = _CleanCopy(label)
     return label._clean_copy
+
+
+#: a tooltip longer than this many characters is wrapped (P2-24, D208)
+TIP_WRAP_CHARS = 60
+#: the width a wrapped tooltip's lines break at, in px: with the tooltip's
+#: own frame and padding (+32 px, measured on the real platform) the box
+#: is about 432 px wide
+TIP_WIDTH = 400
+
+
+def wrap_tip(text):
+    """`text` as a tooltip Qt word-wraps at TIP_WIDTH px: rich text in a
+    fixed-width table, the words themselves unchanged (a plain-text tip
+    is one line however long it is - the Keep all fields tip was ~1000
+    px, P2-24). A short, empty or already rich tip is returned as it is.
+    `tip_text` gives the plain text back (D208)."""
+    text = str(text or '')
+    if len(text) <= TIP_WRAP_CHARS or text.lstrip().startswith('<'):
+        return text
+    body = html.escape(text, quote=False).replace('\n', '<br>')
+    return f'<table width="{TIP_WIDTH}"><tr><td>{body}</td></tr></table>'
+
+
+def tip_text(tip):
+    """The plain text of a tooltip `wrap_tip` made (tests, the harness);
+    a plain tooltip is returned as it is."""
+    tip = str(tip or '')
+    if not tip.startswith('<'):
+        return tip
+    from PySide6.QtGui import QTextDocument
+    doc = QTextDocument()
+    doc.setHtml(tip)
+    return doc.toPlainText().strip('\n')
 
 
 def hbox(parent=None, spacing=GAP, margins=(0, 0, 0, 0)):
