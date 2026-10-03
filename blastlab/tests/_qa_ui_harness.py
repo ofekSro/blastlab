@@ -327,6 +327,7 @@ class QA:
                          f'could not grab {state}: {exc}')
             return None
         self._shots_this.append(name)
+        self.last_luma = luma           # K03 (GUI-10) reads it
         self._jsonl('shots.jsonl', dict(
             shot=name, state=state, tab=tab, mode=self.mode,
             action=self.action, luma=round(luma, 1),
@@ -1399,7 +1400,7 @@ def _clipped_labels(root):
                 out.append(f'QLabel({text[:40]!r}) wraps to {want} px '
                            f'in {w.height()}')
             continue
-        need = w.fontMetrics().horizontalAdvance(text)
+        need = _text_need(w, text)
         room = w.width()
         if isinstance(w, QAbstractButton) and not w.icon().isNull():
             room -= w.iconSize().width() + 6
@@ -1409,6 +1410,26 @@ def _clipped_labels(root):
             out.append(f'{type(w).__name__}({text!r}) needs {need} '
                        f'has {room}')
     return out
+
+
+def _text_need(w, text):
+    """The width `text` takes in `w`. A rich-text label (the tree's
+    `<span>01</span> Threat`, a tile's `1.0 <span>kg TNT</span>`) is
+    measured as the rendered document, not as its markup - GUI-10's K02
+    found the markup width reported as clipping (`needs 519 has 322`)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import Qt as GuiQt, QTextDocument
+    from PySide6.QtWidgets import QLabel
+    if isinstance(w, QLabel) and (
+            w.textFormat() == Qt.RichText
+            or (w.textFormat() == Qt.AutoText
+                and GuiQt.mightBeRichText(text))):
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        doc.setDefaultFont(w.font())
+        doc.setHtml(text)
+        return int(doc.idealWidth() + 0.999)
+    return w.fontMetrics().horizontalAdvance(text)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -4215,6 +4236,285 @@ def i06_small_window_3d(qa):
              f'the window refuses to go under its own minimum '
              f'({qa.geometry()})', 'S2')
     qa.win.results.show_view('Fields')
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Group K - the window frame itself (GUI-10, plan T6)
+# ═══════════════════════════════════════════════════════════════════════
+def _menu_texts(menu):
+    """The case menu's entries as a user reads them: the text before the
+    `\\t` key hint, separators and the disabled credit left out."""
+    return [a.text().split('\t')[0] for a in menu.actions()
+            if not a.isSeparator() and a.isEnabled() and a.text()]
+
+
+@scenario('K01', 'K', est=60)
+def k01_frame(qa):
+    """The frame: pills, Chain link, dimension, solver chip, case menu,
+    Dark mode, the status-bar keys and the title."""
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui import theme
+    win = qa.win
+    for tab in ('setup', 'run', 'results', 'chain', 'setup'):
+        qa.goto(tab)
+        others = {k: b.property('active') for k, b in win._nav_btns.items()
+                  if k != tab}
+        qa.check(all(v == 'false' for v in others.values()),
+                 f'only the {tab} pill is active', 'S2', evidence=str(others))
+    for d in (0, 1, 2, 3, 2):
+        qa.dim(d)
+    seed = win.solver_mode.get()
+    for mode in mode_mod.MODES + (seed,):
+        qa.solver(mode)
+        chip = win.topbar.chip.text()
+        qa.check(mode_mod.label(mode) in chip,
+                 f'the chip reads {mode_mod.label(mode)!r} ({chip!r})', 'S2')
+    want = ['Open…', 'Save', 'Save as…', 'Recent', 'Dark mode']
+    got = _menu_texts(win._case_menu)
+    qa.check(got == want, f'the case menu holds {want}', 'S2',
+             evidence=str(got))
+    recent = next((a for a in win._case_menu.actions()
+                   if a.text() == 'Recent'), None)
+    qa.check(recent is not None and recent.menu() is not None,
+             'Recent opens a submenu', 'S2')
+    for mode in ('light', 'dark'):
+        qa.set_mode(mode)
+        qa.check(win._dark_action.isChecked() == (mode == 'dark'),
+                 f'the Dark-mode action reads {mode == "dark"} in {mode}',
+                 'S2')
+        qa.shot(f'frame_{mode}')
+    keys = win._keys_lbl.text()
+    qa.check(keys.startswith('Ctrl+S save · F5 run · Shift+Esc stop')
+             and (win._keys_lbl.isVisible() or bool(win._status.text())),
+             f'the status bar shows the keys ({keys!r})', 'S2')
+    title = win.windowTitle()
+    qa.check(title.endswith(f'{win._case_stem()} · BlastLab'),
+             f'the title reads <case> · BlastLab ({title!r})', 'S2')
+    lx = _form(qa).v['Lx'].get()
+    try:
+        bumped = f'{float(lx) + 0.5:g}'
+    except ValueError:
+        bumped = '4.5'
+    qa.field('Lx', bumped)
+    title = win.windowTitle()
+    tb = win.topbar
+    qa.check('● ' in title and tb.dirty_lbl.isVisible()
+             and tb.dirty_lbl.text() == '● unsaved',
+             f'an edit marks the title and the top bar ({title!r})', 'S2')
+    qa.shot('frame_dirty')
+    qa.field('Lx', lx)
+    qa.check(theme.mode() == 'dark', 'the theme is back to dark', 'S2')
+
+
+def _outside(win):
+    """Visible widgets of the window that stand past its content rect by
+    more than 1 px (GUI-10, D184). Left out: descendants of a scroll
+    area's viewport (they scroll legitimately) and the 3D host's native
+    container (the viewer sampler's subject)."""
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QAbstractScrollArea, QWidget
+    from blastlab.ui.view3d_host import View3DHost
+    W, H = win.width(), win.height()
+    out = []
+    for w in win.findChildren(QWidget):
+        if not w.isVisible() or w.window() is not win:
+            continue
+        skip, p = False, w
+        while p is not None and p is not win:
+            parent = p.parentWidget()
+            if isinstance(parent, QAbstractScrollArea) \
+                    and p is parent.viewport():
+                skip = True
+                break
+            if isinstance(parent, View3DHost):
+                skip = True
+                break
+            p = parent
+        if skip:
+            continue
+        tl = w.mapTo(win, QPoint(0, 0))
+        x0, y0 = tl.x(), tl.y()
+        x1, y1 = x0 + w.width(), y0 + w.height()
+        if x0 < -1 or y0 < -1 or x1 > W + 1 or y1 > H + 1:
+            out.append(f'{type(w).__name__}({w.objectName()!r}) at '
+                       f'{x0},{y0} {w.width()}x{w.height()} in {W}x{H}')
+    return out
+
+
+def _props_hscroll(qa):
+    """A horizontal scroll bar shown in the Setup properties column (F3:
+    a known point-table overhang, a note rather than a finding)."""
+    from PySide6.QtWidgets import QScrollArea
+    sc = getattr(qa.win.setup, '_scroll', None)
+    if isinstance(sc, QScrollArea) \
+            and sc.horizontalScrollBar().isVisible():
+        return True
+    return False
+
+
+def _k02_state(qa, screen, state):
+    """One K02 state: nothing glyph-clipped, nothing outside the window."""
+    qa.pump(0.3)
+    tag = f'{screen} {state} ({qa.mode}, {qa.geometry()})'
+    clipped = _clipped_labels(qa.win)
+    qa.check(not clipped, f'{tag}: nothing clipped', 'S2',
+             evidence='; '.join(clipped[:8]))
+    outside = _outside(qa.win)
+    qa.check(not outside, f'{tag}: nothing outside the window', 'S2',
+             evidence='; '.join(outside[:8]))
+    if screen == 'setup' and _props_hscroll(qa):
+        qa.note(f'{tag}: the properties column scrolls sideways (F3)')
+
+
+def _k02_results(qa, mode):
+    """Results: the cached QA results x Field / Gauges / 3D, the newest
+    entry, and a chain's STAGE tabs when the process holds a chain."""
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    labels = [lbl for lbl in ('QA native1d', 'QA native2d', 'QA native3d')
+              if any(e.label == lbl for e in rs.entries())]
+    if not labels:
+        qa.note('no cached QA native results in this process (run group D '
+                'first); Results is checked on the newest entry only')
+    ents = rs.entries()
+    if ents and not isinstance(ents[-1], ChainEntry) \
+            and ents[-1].label not in labels:
+        labels.append(ents[-1].label)
+    for label in labels:
+        if not select_result(qa, label):
+            continue
+        for view in ('Field', 'Gauges', '3D'):
+            rs.show_view(view)
+            _k02_state(qa, 'results', f'{label} {view}')
+    rs.show_view('Field')
+    chains = [e for e in rs.entries() if isinstance(e, ChainEntry)]
+    if not chains:
+        qa.note('no chain entry in this process: the STAGE tabs are not '
+                'checked here (G02 makes one)')
+        return
+    for s in chains[-1].stages:
+        if select_result(qa, s.label):
+            _k02_state(qa, 'results', f'chain stage {s.label}')
+    qa.shot(f'results_chain_{mode}')
+
+
+@scenario('K02', 'K', est=400)
+def k02_nothing_clipped(qa):
+    """1100 x 720, dark then light: nothing clipped or outside on Setup
+    (dims 0-3 x both solvers x every node), Run, Results and Chain."""
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui import chain_route
+    C = cases()
+    win = qa.win
+    seed = win.solver_mode.get()
+    for mode in ('dark', 'light'):
+        qa.set_mode(mode)
+        qa.geometry('1100x720')
+        qa.goto('setup')
+        setup = win.setup
+        for solver in mode_mod.MODES:
+            qa.dim(2)                   # the chip hides at 0-D
+            qa.solver(solver)
+            for d in (0, 1, 2, 3):
+                qa.dim(d)
+                shown = setup.visible_nodes()
+                for node, _titles in setup_nodes_for(d):
+                    if node.id not in shown:
+                        qa.note(f'{solver} {d}D {node.number}: hidden in '
+                                f'this mode - skipped')
+                        continue
+                    setup.select_node(node.id)
+                    _k02_state(qa, 'setup',
+                               f'{solver} {d}D {node.number} {node.title}')
+            qa.shot(f'setup_{solver}_{mode}')
+        qa.dim(2)
+        qa.solver(seed)
+        # Run: idle, then after a tiny native 1D run (the banner shown)
+        qa.goto('run')
+        rp = win.run_panel
+        _k02_state(qa, 'run', 'idle' if not rp.banner_text() else 'banner')
+        if not rp.banner_text():
+            qa.goto('setup')
+            qa.solver('native')
+            qa.set_case(C['N1D'])
+            qa.goto('run')
+            qa.click(rp.run_btn, 'Run')
+            qa.check(qa.run_wait(180), 'the tiny 1D run finished', 'S1')
+            qa.check(bool(rp.banner_text()), 'and the banner shows', 'S2')
+            qa.solver(seed)
+        _k02_state(qa, 'run', 'finished, banner shown')
+        qa.shot(f'run_banner_{mode}')
+        qa.goto('results')
+        _k02_results(qa, mode)
+        qa.goto('chain')
+        ch = win.chain
+        for key, _label, _dims in chain_route.ROUTES:
+            ch.set_route(key)
+            qa.pump(0.3)
+            ed = ch.editor()
+            for node in ed.visible_nodes():
+                ed.select_node(node)
+                _k02_state(qa, 'chain', f'route {key} stage {ch.stage()} '
+                                        f'{node}')
+        ch.set_route('123')
+        qa.shot(f'chain_{mode}')
+        qa.goto('setup')
+        qa.dim(2)
+    qa.set_mode('dark')
+    qa.reset_window()
+
+
+def setup_nodes_for(dim):
+    """The model-tree nodes of `dim`, in tree order (setup_nodes.nodes)."""
+    from blastlab.ui import setup_nodes
+    return setup_nodes.nodes(dim)
+
+
+#: K03's luma floor for a light-mode window grab (D185; dark grabs read
+#: 38-41 in M7, so a panel left dark pulls a grab well under this)
+LIGHT_LUMA_MIN = 140
+
+
+@scenario('K03', 'K', est=200)
+def k03_light_screens(qa):
+    """Light mode, every screen with content, at 1100 x 720 and
+    1600 x 1000: the theme is light and no grab reads dark."""
+    import shutil
+    from blastlab.ui import theme
+    win = qa.win
+    curated = os.path.join(qa.out, 'curated')
+    os.makedirs(curated, exist_ok=True)
+    rs = win.results
+    qa.set_mode('light')
+    for size in ('1100x720', '1600x1000'):
+        qa.geometry(size)
+        states = [('setup', 'tree', lambda: (qa.goto('setup'), qa.dim(2),
+                                             win.setup.select_node('gauges'))),
+                  ('run', 'finished' if win.run_panel.banner_text()
+                   else 'idle', lambda: qa.goto('run')),
+                  ('results', 'field' if rs.entries() else 'empty',
+                   lambda: (qa.goto('results'), rs.show_view('Field'))),
+                  ('chain', 'route123', lambda: (qa.goto('chain'),
+                                                 win.chain.set_route('123')))]
+        for screen, state, go in states:
+            go()
+            qa.pump(0.6)
+            qa.check(theme.mode() == 'light',
+                     f'{screen} {size}: the theme is light', 'S2')
+            name = qa.shot(f'{size}-{screen}-{state}')
+            luma = getattr(qa, 'last_luma', None)
+            qa.check(name is not None and luma is not None
+                     and luma >= LIGHT_LUMA_MIN,
+                     f'{screen} {state} {size}: the light grab reads light '
+                     f'(luma {luma if luma is None else round(luma, 1)} '
+                     f'>= {LIGHT_LUMA_MIN})', 'S2')
+            if name:
+                shutil.copyfile(
+                    os.path.join(qa.dirs['shots'], name),
+                    os.path.join(curated, f'gui10-light-{size}-{screen}-'
+                                          f'{state}.png'))
+    qa.set_mode('dark')
+    qa.reset_window()
 
 
 def main():
