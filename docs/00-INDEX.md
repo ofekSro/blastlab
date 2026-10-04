@@ -20,8 +20,11 @@ the original Hebrew notes are preserved under [`archive/`](archive/).
 
 | File | What is in it |
 |---|---|
-| [../TODO.md](../TODO.md) | **Open work only**, ordered HD1 → P0 → P4, plus the standing rules and the test matrix |
-| [../DONE.md](../DONE.md) | The completed record, the timeline, and **the identifier index that code comments cite** |
+| [../TODO.md](../TODO.md) | **Open work only**, ordered GUI → OUT → HD1 → P0 → P4 |
+| [standing-rules-and-tests.md](standing-rules-and-tests.md) | The standing rules for every task and the test matrix (out of TODO.md, 2026-10-04) |
+| [history/todo-closed.md](history/todo-closed.md) | Closed GUI / OUT rows and the HD1 status and deviation records (out of TODO.md, 2026-10-04) |
+| [../DONE.md](../DONE.md) | The completed record (§0l on), the timeline, and **the identifier index that code comments cite** |
+| [history/done-2026-09.md](history/done-2026-09.md) | DONE.md §0-§0k: the HD1.3 track and the batches of 2026-09-20 … 09-28 |
 
 ## Verification — what has been checked, and how
 
