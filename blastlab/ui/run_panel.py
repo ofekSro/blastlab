@@ -57,6 +57,12 @@ PATH_BLANK = '<Runs folder>' + os.sep + '<Model>' + os.sep
 #: a run shows (`88,888 kPa`, `1,234,567` cells) in Space Grotesk 21 px
 TILE_MIN = 112
 PROGRESS_MIN = 220
+#: Progress's one-row floor (D213 b): lower than PROGRESS_MIN because the
+#: time line already elides (`QSizePolicy.Ignored`) - only its caps +
+#: percent head must stay readable (measured ~158 px for `PROGRESS` +
+#: `100 %` at 1280 x 840, offscreen; +2 px margin). Applied only while
+#: `arrange()` picks one row; two-row mode keeps PROGRESS_MIN.
+PROGRESS_MIN_1ROW = 160
 #: the widest P MAX readout the one-row rule must hold at StatTile's
 #: 14 px floor (GUI-11 T18, QA S3-1, D213); the readout string itself is
 #: unchanged (U4, D52)
@@ -275,21 +281,21 @@ class _RunStrip(QFrame):
         return (math.ceil(doc.idealWidth()) + m.left() + m.right()
                 + 2 * t.frameWidth())
 
+    def _one_row_need(self, tiles):
+        """The width one row needs (D213 b): P MAX its measured need,
+        every other shown tile TILE_MIN, Progress its lower one-row
+        floor - widths, not the old readout-stretch share."""
+        pmax = self.tiles['pmax']
+        need = sum(TILE_MIN for t in tiles if t is not pmax)
+        if pmax in tiles:
+            need += self._pmax_need()
+        return need + PROGRESS_MIN_1ROW
+
     def _one_row_fits(self, width):
         tiles = self._shown_tiles()
         n = len(tiles)
-        if PROGRESS_MIN + n * (TILE_MIN + GAP) > width:
-            return False
-        if self.tiles['pmax'] not in tiles:
-            return True
-        # GUI-11 T18 (QA S3-1, D213): one row only when the P MAX tile's
-        # share (stretch 10 against Progress's 23, Progress kept at
-        # PROGRESS_MIN) holds the widest readout at the 14 px floor
         avail = width - GAP * n
-        tile = avail * 10 / (23 + 10 * n)
-        if avail * 23 / (23 + 10 * n) < PROGRESS_MIN:
-            tile = (avail - PROGRESS_MIN) / n
-        return tile >= self._pmax_need()
+        return avail >= self._one_row_need(tiles)
 
     def rows(self):
         """1 or 2 (tests, the viewer sampler)."""
@@ -308,11 +314,23 @@ class _RunStrip(QFrame):
                 lay.takeAt(0)
         t = self.tiles
         if rows == 1:
+            # D213 b: each tile holds its own floor (TILE_MIN, or P MAX's
+            # measured need) and Progress its lower one-row floor, so the
+            # widths the fits check promised are the widths Qt gives -
+            # stretch (unchanged) only shares space above those floors.
+            self.progress_tile.setMinimumWidth(PROGRESS_MIN_1ROW)
             self._row0.addWidget(self.progress_tile, 23)
             for k in ('time', 'step', 'pmax', 'cells'):
+                t[k].setMinimumWidth(self._pmax_need() if k == 'pmax'
+                                      else TILE_MIN)
                 self._row0.addWidget(t[k], 10)
         else:
-            # Progress (and the AMR cells) on top, the readouts below
+            # Progress (and the AMR cells) on top, the readouts below -
+            # the two-row layout, unchanged (D29): no per-tile floor,
+            # Progress back at its wider two-row minimum
+            self.progress_tile.setMinimumWidth(PROGRESS_MIN)
+            for k in ('time', 'step', 'pmax', 'cells'):
+                t[k].setMinimumWidth(0)
             self._row0.addWidget(self.progress_tile, 23)
             self._row0.addWidget(t['cells'], 10)
             for k in ('time', 'step', 'pmax'):
