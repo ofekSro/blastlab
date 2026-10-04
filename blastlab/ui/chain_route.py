@@ -219,6 +219,25 @@ def _reach_3d(R, case):
     return limit, far, dom, limit < R
 
 
+def _burst_above_3d(two, three):
+    """GUI-12 B1 (F45, owner row 5): the 2D -> 3D remap
+    (core/profiles.remap_profile_2d_to_3d) rotates the r-z field about the
+    3D burst axis and maps the 2D z onto the 3D z (both grounds at 0). A 2D
+    burst at or above the 3D height therefore lands outside the 3D box.
+    Only the burst height is checked; a cut radial far field is normal in a
+    chain (decision row 3). Returns the warning or ''."""
+    try:
+        zb = float(two.center[1])
+        Lz = float(three.Lz)
+    except (AttributeError, TypeError, ValueError, IndexError):
+        return ''
+    if zb < Lz:
+        return ''
+    return (f'The 2D stage\'s burst is at z {_n1(zb)} m, above this '
+            f'stage\'s {_n1(Lz)} m height: the remapped field misses the '
+            f'burst. Raise this stage\'s height above {_n1(zb)} m.')
+
+
 def handoff_reach(dims, cases):
     """{dim: warning} for a stage fed by a 1D stage whose shock has, at
     the hand-off, already reached this stage's boundary or a wall (QA
@@ -231,14 +250,20 @@ def handoff_reach(dims, cases):
     (`out_text`; solvers/solver1d.py stops at the End time when one is
     set, or at the shock's arrival at a terminating Outer, whichever
     comes first - with an End time the radius at the hand-off is not
-    known before the run). Every other case (a 2D stage feeding 3D
-    included) is not checked and nothing is said. The rule mirrors the
+    known before the run). A 2D stage feeding 3D is checked on the burst
+    height alone (`_burst_above_3d`, GUI-12 B1). Every other case is not
+    checked and nothing is said. The rule mirrors the
     solvers' own remap warning (`_reach_2d`, `_reach_3d`); this only
     says it before the run."""
     dims = [int(d) for d in dims]
     out = {}
     for prev, d in zip(dims, dims[1:]):
         one, case = cases.get(prev), cases.get(d)
+        if prev == 2 and d == 3 and one is not None and case is not None:
+            msg = _burst_above_3d(one, case)
+            if msg:
+                out[d] = msg
+            continue
         if prev != 1 or d not in (2, 3) or one is None or case is None:
             continue
         try:

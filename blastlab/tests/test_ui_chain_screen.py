@@ -544,11 +544,30 @@ def s5_live(win):
                               'at 10.0 m, beyond this stage\'s whole 4.0 × '
                               '4.0 m domain'),
           ascii([ch.cards[2].state_text(), ed.pill(), want]))
-    check('S2-1: cards 1 and 3 do not warn, and Run chain stays enabled',
+    check('S2-1: card 1 does not warn, and Run chain stays enabled',
           ch.cards[1].state_text() == '● case OK'
-          and ch.cards[3].state_text() == '● case OK'
           and ch.run_btn.isEnabled(),
           ascii([ch.cards[d].state_text() for d in (1, 3)]))
+    # GUI-12 B1 (F45): the seed's 2D burst (z 2.0 m) is above stage 3's
+    # 1.5 m box, so card 3 warns too; a warning never blocks the run (D200)
+    w3 = cr.handoff_reach([2, 3], {
+        2: ch.checks()[2].case, 3: ch.checks()[3].case})[3]
+    ed3 = ch.editors[3]
+    check('F45: the default seed (2D burst z 2.0 m, 3D Lz 1.5 m) warns on '
+          'card 3, the line in its Checks, Run chain still enabled',
+          ch.cards[3].state_text() == '● 1 warning'
+          and ('warn', w3) in ed3.check_rows()
+          and w3 == 'The 2D stage\'s burst is at z 2.0 m, above this '
+                    'stage\'s 1.5 m height: the remapped field misses the '
+                    'burst. Raise this stage\'s height above 2.0 m.'
+          and ch.run_btn.isEnabled(),
+          ascii([ch.cards[3].state_text(), w3]))
+    ch.forms[3].v['Lz'].set('2.5')
+    pump(450)
+    check('F45: with the 3D height 2.5 m, card 3 is silent',
+          ch.cards[3].state_text() == '● case OK'
+          and not any('burst is at' in m for _s, m in ed3.check_rows()),
+          ascii(ch.cards[3].state_text()))
     # the error paths below start from the board's 1.5 m, so they test
     # what they tested (a fixture change: the seed now warns)
     ch.forms[1].v['radius_m'].set('1.5')
@@ -717,10 +736,26 @@ def s5r_reach():
     check('1 → 3, 1.5 m: nothing',
           cr.handoff_reach([1, 3], {1: one(1.5), 3: three}) == {})
     got = cr.handoff_reach([1, 2, 3], {1: one(10.0), 2: two, 3: three})
-    check('1 → 2 → 3: only stage 2 is checked (2D → 3D is not predicted)',
+    check('1 → 2 → 3, burst z 2 under Lz 4: only stage 2 (the 1D radius)',
           list(got) == [2], ascii(list(got)))
-    check('2 → 3: nothing',
+    check('2 → 3, burst z 2 under Lz 4: nothing',
           cr.handoff_reach([2, 3], {2: two, 3: three}) == {})
+    # GUI-12 B1 (F45): the 2D burst at or above the 3D height
+    low = Case3D(Lx=6.0, Ly=6.0, Lz=1.5, center=(3.0, 3.0, 0.75))
+    got = cr.handoff_reach([2, 3], {2: two, 3: low})
+    check('2 → 3, burst z 2 above Lz 1.5: the F45 text',
+          got == {3: 'The 2D stage\'s burst is at z 2.0 m, above this '
+                     'stage\'s 1.5 m height: the remapped field misses the '
+                     'burst. Raise this stage\'s height above 2.0 m.'},
+          ascii(got))
+    at = Case3D(Lx=6.0, Ly=6.0, Lz=2.0, center=(3.0, 3.0, 1.0))
+    check('2 → 3, burst exactly at Lz: warns (at or above); Lz 2.5: silent',
+          list(cr.handoff_reach([2, 3], {2: two, 3: at})) == [3]
+          and cr.handoff_reach([2, 3], {2: two, 3: Case3D(
+              Lx=6.0, Ly=6.0, Lz=2.5, center=(3.0, 3.0, 1.0))}) == {})
+    check('2 → 3 with an unparsed stage (None): nothing',
+          cr.handoff_reach([2, 3], {2: None, 3: low}) == {}
+          and cr.handoff_reach([2, 3], {2: two, 3: None}) == {})
     check('an unparsed stage (None): nothing',
           cr.handoff_reach([1, 2], {1: None, 2: two}) == {}
           and cr.handoff_reach([1, 2], {1: one(10.0), 2: None}) == {})
