@@ -288,6 +288,10 @@ class PointList(QWidget):
         self.tree.setHeaderLabels(cols)
         if self.entry.property('bad') != 'true':
             self.hint.setText(self._idle_text())
+        elif self._refusal is not None:
+            # F46 (GUI-11): a standing refusal that names the columns is
+            # worded again with the new ones; it stays red, not lost
+            self.hint.setText(self._refusal())
 
     def columns(self):
         return list(self._columns)
@@ -297,22 +301,30 @@ class PointList(QWidget):
         return 'add a row: ' + '  '.join(self._columns)
 
     def _accept(self):
+        self._refusal = None
         self.hint.setText(self._idle_text())
         self.hint.setStyleSheet(f'color: {theme.cur("muted")};')
         self.entry.setProperty('bad', 'false')
         theme.repolish(self.entry)
 
-    def _reject(self, message):
+    def _reject(self, message, words=None):
+        """Show `message` in red. `words`, when given, builds the message
+        again from the current column names (`set_columns`, F46)."""
+        self._refusal = words
         self.hint.setText(message)
         self.hint.setStyleSheet(f'color: {theme.cur("error")};')
         self.entry.setProperty('bad', 'true')
         theme.repolish(self.entry)
 
+    def _arity_text(self, what):
+        return (f'expected {self._arity} {what} '
+                f'({"  ".join(self._columns)})')
+
     # ── rows ─────────────────────────────────────────────────────────────
     def add(self):
         raw = self.entry.text().replace(',', ' ').split()
         if not raw:
-            self._reject(self._idle_text())
+            self._reject(self._idle_text(), self._idle_text)
             return False
         if any(k != 'float' for k in self._kinds):
             return self._add_typed(raw)
@@ -323,8 +335,8 @@ class PointList(QWidget):
             self._reject('not numbers: ' + ', '.join(bad))
             return False
         if len(vals) != self._arity:
-            self._reject(f'expected {self._arity} numbers '
-                         f'({"  ".join(self._columns)})')
+            self._reject(self._arity_text('numbers'),
+                         lambda: self._arity_text('numbers'))
             return False
         self.tree.addTopLevelItem(
             QTreeWidgetItem([f'{v:g}' for v in vals]))
@@ -336,8 +348,8 @@ class PointList(QWidget):
     def _add_typed(self, raw):
         """`add` for a table with a non-numeric column (D7)."""
         if len(raw) != self._arity:
-            self._reject(f'expected {self._arity} values '
-                         f'({"  ".join(self._columns)})')
+            self._reject(self._arity_text('values'),
+                         lambda: self._arity_text('values'))
             return False
         try:
             vals = [_parse_cell(k, x) for k, x in zip(self._kinds, raw)]

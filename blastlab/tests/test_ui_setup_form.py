@@ -400,6 +400,32 @@ def main():
         check(f"{placement}: a refusal names the r / z columns",
               pl.hint.text() == 'expected 4 numbers (r0  r1  z0  z1)',
               pl.hint.text())
+        # F46 (GUI-11): a standing refusal follows a geometry toggle, red
+        f.v['geometry'].set('planar')
+        pump(5)
+        check(f"{placement}: after a toggle to planar it names x0 … y1, "
+              f"still a refusal",
+              pl.hint.text() == 'expected 4 numbers (x0  x1  y0  y1)'
+              and pl.entry.property('bad') == 'true', pl.hint.text())
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        check(f"{placement}: and back, r0 … z1 again",
+              pl.hint.text() == 'expected 4 numbers (r0  r1  z0  z1)'
+              and pl.entry.property('bad') == 'true', pl.hint.text())
+        gl = f.points['gauges']
+        gl.entry.setText('')
+        gl.add()
+        f.v['geometry'].set('planar')
+        pump(5)
+        check(f"{placement}: an empty Add's refusal follows too",
+              gl.hint.text() == 'add a row: x  y'
+              and gl.entry.property('bad') == 'true', gl.hint.text())
+        gl.entry.setText('1 a')
+        gl.add()
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        check(f"{placement}: a refusal without column names is kept as is",
+              gl.hint.text() == 'not numbers: a', gl.hint.text())
         f.deleteLater()
     f = CaseForm(3, mode='blastfoam')
     check("3D keeps x y z", headers(f, 'gauges') == ['x', 'y', 'z'])
