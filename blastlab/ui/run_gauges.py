@@ -153,7 +153,9 @@ def _drop_reason(case, point):
     The wall is the solver's own drop rule (`services.validation.
     drop_rule`), the one Setup's warning names, and inside / face is the
     warning's open-box split, in the warning's words (`gauge_drop_reason`;
-    GUI-13 (e))."""
+    GUI-13 (e)). A case the rule cannot lay out (the Results screen's
+    meta view, `scaled_distance.case_from_meta`) falls back to the first
+    wall within a cell of the gauge, as before."""
     p = [float(v) for v in point]
     dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(p)]]
     try:
@@ -170,6 +172,15 @@ def _drop_reason(case, point):
                    if len(box) == len(p)
                    and all(lo < v < hi for v, (lo, hi) in zip(p, box))), 0)
     wall = drop_wall(case, p) if boxes else 0
+    if not (inside or wall):
+        try:
+            tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
+        except (TypeError, ValueError):
+            tol = 0.0
+        wall = next((i for i, box in enumerate(boxes, start=1)
+                     if len(box) == len(p)
+                     and all(lo - tol <= v <= hi + tol
+                             for v, (lo, hi) in zip(p, box))), 0)
     if inside or wall:
         return gauge_drop_reason(inside or wall, bool(inside))
     return ''

@@ -597,6 +597,16 @@ def s3_dock():
           sd.where_text(kept, (1.252, 0.5)))
     check("Run's reason for a gauge outside the domain is the warning's "
           "words", _drop_reason(near, (5.0, 0.5)) == 'outside the domain')
+    # the Results screen's meta view (results_gauges.labels_and_dropped)
+    # is no Case the rule can lay out: the first wall within a cell
+    view = sd.case_from_meta(dict(charge=1.0, charge_center=(0.0, 2.0),
+                                  geometry='axisymmetric', from_profile=False,
+                                  gauges=[(1.18, 0.5)], dx=0.05), 2)
+    view.obstacles, view.Lx, view.Ly = [(1.2, 1.6, 0.0, 1.0)], 4.0, 4.0
+    check("a meta view the rule cannot lay out: the wall within a cell "
+          "('on the face of Wall 1')",
+          _drop_reason(view, (1.18, 0.5)) == 'on the face of Wall 1',
+          _drop_reason(view, (1.18, 0.5)))
     check("05 summary, board line 89: '2 · in front of Wall 1'",
           setup_nodes.summaries(case)['gauges'] == '2 · in front of Wall 1',
           setup_nodes.summaries(case)['gauges'])
