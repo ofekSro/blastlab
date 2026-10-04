@@ -177,6 +177,31 @@ Qt and Tk; the preset's peak ≥ every corner of a band taken with the same pivo
 the starter case, for each material; a saved case reloads with its own values; P1-15's
 own acceptance; goldens unchanged except the form's; Qt and Tk GUI QA.
 
+### `HD1-19` · Three honesty gaps in `core/vent.py` · **owner decision 2026-10-04**
+
+Found by the `/neat` proposal for `core/vent.py` (`docs/tidy/blastlab-core-vent.py.md`);
+source `docs/ENGINEERING_QUESTIONS.md`, "`/neat` proposal for `core/vent.py`" #1-#3.
+Each changes a reported number or text, so none is tidying.
+
+- **(a) Sea-level ambient, stated.** `handoff` ignores its `p_amb` argument and
+  `validity` passes a fixed `P_AIR` to `_vent_mdot`. **Owner:** a sea-level ambient is
+  an acceptable assumption, but it must be stated in the code (docstrings, and drop or
+  document the dead `p_amb`) and in the reports that quote the drain time.
+- **(b) The CFD `Cd` is interpolated in 1/N.** It today steps from 0.7227
+  to 0.8102 at 9 cells across the opening. **Owner:** interpolate linearly in 1/N (h)
+  between the two measured points (in `cfd_point_in_band`), the usual mesh-convergence assumption, and hold the
+  end values outside 6-12 cells (no extrapolation from two points). Only the report's
+  position-in-band sentence moves; the structural envelope does not. Update the
+  comment that `/neat` vent item 5 rewrote. Owner still to check whether the step was
+  deliberate before this is implemented.
+- **(c) A CFD window past the end of the 0-D record is flagged.** When
+  `t_open + t_cfd` is after the last 0-D sample, `validity` silently uses the last
+  sample, so `burn_fraction` can read low. **Owner:** no extrapolation; add a line to
+  the validity output and the report that the 0-D record ended first and the burn
+  fraction is a lower bound.
+
+Acceptance: each with a test; any golden that moves gets a before/after note (§9).
+
 ### `HD1-14` · A third `Cd` convergence point — optional, not done
 
 24 cells across the opening, on a geometrically shrunken room: `Cd` depends on the

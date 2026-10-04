@@ -491,3 +491,40 @@ Nothing below was acted on. Every number and rule stays as registered.
 9. **Residual capacity is computed but has never been shown**, before or after the batch. It is computed from Ru = 400 kPa, a default in the Structure card, which is now hidden. The owner's "stays in the report" answer therefore refers to a section that does not exist (UX E7). *Show it, with a visible Ru, or drop it?*
 10. **Pre-existing bug:** `services/hd13.assess` raises a ValueError for a case with `h_c = 0` that has standoffs, because `figure_thermal` gets an empty q. The batch does not make it newly reachable.
 11. **Validation looseness**, low: `wall_errors` accepts `True` as 1 m and accepts `inf`, and a bad H or W is silently read as 0 while clearing is off. This belongs with P1-11.
+
+---
+
+## 2026-10-04 · `/neat` proposal for `core/assessment.py`
+
+Source: [the tidy proposal](tidy/blastlab-core-assessment.py.md). Nothing changed.
+
+1. **The burn-law range warning is one-sided** (L120). It fires only when the chamber
+   pressure cap is below `p_valid_min`; a cap above `p_valid_max` gets no warning.
+2. **`confinement='both'` takes the fireball mass from the unconfined burnt fraction**
+   (L514-515), not the confined `Z[-1]`. *Which one should govern?*
+3. **`run` iterates `case.qd_criteria` without the `or ()` guard** that `validate` uses
+   (L533 vs L204). A JSON case with `qd_criteria: null` plus standoffs passes validation
+   and then raises TypeError in `run`. A bug rather than a question - for TODO.md.
+
+---
+
+## 2026-10-04 · `/neat` proposal for `core/vent.py`
+
+Source: [the tidy proposal](tidy/blastlab-core-vent.py.md). Nothing changed.
+
+1. **`handoff` never uses its `p_amb` argument** (L176), and `validity` passes a
+   hard-coded `P_AIR` to `_vent_mdot` (L338). A non-standard ambient gets a sea-level
+   drain time.
+   **Decided 2026-10-04 (owner):** a sea-level ambient is an acceptable assumption, but
+   it must be stated in the code and in the reports. → `HD1-19`(a).
+2. **The CFD Cd is a step at 9 cells, flat outside 6-12 cells** (L463), so anything
+   above 12 cells is reported at Cd 0.81. The comment says it is interpolated in 1/dx.
+   *Is the step intended, or should it interpolate?*
+   **Owner 2026-10-04:** open - needs checking.
+   **Decided 2026-10-04 → `HD1-19`(b):** interpolate in 1/N between the two measured
+   points, hold the ends outside 6-12 cells; the owner checks first that the step was
+   not deliberate.
+3. **`t_open + t_cfd` past the last 0-D sample clamps silently** (L327): the index goes
+   to the end and `burn_fraction` comes out short with no warning.
+   **Decided 2026-10-04 → `HD1-19`(c):** no extrapolation; flag it, burn fraction is a
+   lower bound.
