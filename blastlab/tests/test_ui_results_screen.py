@@ -1721,6 +1721,45 @@ def s6_field(link):
     del fk
 
 
+def s3_placeholder(win):
+    """GUI-11 T21 (QA S3-6, the text half; D215): Results ▸ 3D says what
+    to do, from a subclass in results_panel.py; the shared host text and
+    the Results centre's minimum width are unchanged."""
+    from blastlab.ui.results_panel import ResultsView3DHost
+    from blastlab.ui.view3d_host import View3DHost
+    print('\nS3e: the Results 3D placeholder (GUI-11 T21)')
+    rs = win.results
+    win._show('results')
+    win.resize(1100, 720)
+    pump(150)
+    host = rs.view3d
+    want = ('Select a 3D result, then press\nOpen the 3D viewer in the\n'
+            'Export column.')
+    check('results.view3d is still a View3DHost (the Results subclass)',
+          isinstance(host, View3DHost) and isinstance(host,
+                                                      ResultsView3DHost))
+    check('its placeholder is the new text', host._holder.text() == want,
+          repr(host._holder.text()))
+    check('the shared host text is unchanged',
+          View3DHost.PLACEHOLDER.startswith('Run a 3D case'))
+    fm = host._holder.fontMetrics()
+    longest = max(fm.horizontalAdvance(s)
+                  for s in View3DHost.PLACEHOLDER.split('\n'))
+    new = max(fm.horizontalAdvance(s) for s in want.split('\n'))
+    check('no line longer than the shared text\'s longest',
+          new <= longest, f'{new} <= {longest} px')
+    now = rs._centre.minimumSizeHint().width()
+    host._holder.setText(View3DHost.PLACEHOLDER)
+    pump(30)
+    old = rs._centre.minimumSizeHint().width()
+    host._holder.setText(want)
+    pump(30)
+    check('1100 x 720: the Results centre minimum width is unchanged',
+          now == old, f'{now} vs {old} with the old text')
+    win.resize(1280, 840)
+    pump(60)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     from blastlab.ui.results_panel import ResultsPanel
@@ -1746,6 +1785,7 @@ def main():
         s3_layout(win, link)
         s3_busy(link)
         s3_view3d_and_title(link)
+        s3_placeholder(win)
         s5_gauges(win, link)
         s5g_dropped(link)
         s6_field(link)

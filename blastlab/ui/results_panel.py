@@ -216,6 +216,19 @@ class CaseViewer(QDialog):
         QApplication.clipboard().setText(self._text)
 
 
+class ResultsView3DHost(View3DHost):
+    """The Results 3D view's host: only its placeholder differs (QA S3-6,
+    the text half; GUI-11 T21, D215). The shared one says a live view
+    attaches on its own and results replay "here", neither of which a
+    Results user can act on. No line is longer than the shared text's
+    longest, so D25's minimum width holds; `view3d_host.py` is
+    untouched."""
+
+    PLACEHOLDER = ('Select a 3D result, then press\n'
+                   'Open the 3D viewer in the\n'
+                   'Export column.')
+
+
 class TwoLineLabel(QLabel):
     """A value that word-wraps onto at most two lines, the second elided
     at the right, the whole text in the tooltip when cut (UXR-10, the
@@ -540,7 +553,8 @@ class ResultsPanel(QWidget):
         # Field = the two engines above under one set of controls (T6)
         self.field_view = FieldView(self.fields, self.anim,
                                     bridge=self._bridge, log=log_fn)
-        self.view3d = (View3DHost(viewer_link, 'results', log_fn=log_fn)
+        self.view3d = (ResultsView3DHost(viewer_link, 'results',
+                                         log_fn=log_fn)
                        if viewer_link is not None else QWidget())
         self._views = {'Field': self.field_view, 'Gauges': self.gauges,
                        '3D': self.view3d}
