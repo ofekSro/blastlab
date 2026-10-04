@@ -72,7 +72,12 @@ def screen_title_1d(c):
     """The 1D profile figure's title on screen (F17, D214): `1D spherical
     · 1.0 kg TNT · JWL`, with the builder's own charge and EOS wording
     (`kg TNT` is E1's open question). `plots.figure_results_1d`'s
-    `1D Spherical Blast - 1.0 kg TNT - EOS: JWL` stays in every export."""
+    `1D Spherical Blast - 1.0 kg TNT - EOS: JWL` stays in every export.
+
+    Three title styles meet on Results (GUI-12 B3, UX quick win 5): this
+    short 1D one on screen; the 2D map's `<field> - <charge_label>` and the
+    3D plane's, which `select_field` builds and the exports reuse unchanged.
+    The 1D canvas's tooltip names the full export title."""
     return f'1D spherical · {c.charge_kg} kg TNT · {c.eos}'
 
 
@@ -424,9 +429,14 @@ class FieldsView(QWidget):
                 # F17 (GUI-11 T19, D214): on screen only, a title that
                 # fits the canvas; the builder and every export keep
                 # `1D Spherical Blast - … - EOS: …`
+                # GUI-12 B3 (UX finding 2): say so - the tooltip carries
+                # the builder's own title, read back, never retyped
+                full = fig.axes[0].get_title()
                 fig.axes[0].set_title(plots.titled(
                     screen_title_1d(c), self._title_extra))
+                self.canvas.setToolTip(f'Exports use the full title: {full}')
             else:
+                self.canvas.setToolTip('')
                 fig = plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,
                     title_extra=self._title_extra)
@@ -438,6 +448,7 @@ class FieldsView(QWidget):
         self.stack.setCurrentIndex(1)
 
     def _draw_map(self, ent, sel):
+        self.canvas.setToolTip('')          # the 1D title hint is 1D only
         key = (str(ent.label), np.shape(sel['xf']), np.shape(sel['yf']),
                repr(sel['sl']))
         if key != self._key:

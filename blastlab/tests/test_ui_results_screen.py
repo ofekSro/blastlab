@@ -1331,8 +1331,21 @@ def s6_field(link):
                   built.axes[0].get_title()
                   == f'1D Spherical Blast - {c.charge_kg} kg TNT - EOS: '
                      f'{c.eos}', ascii(built.axes[0].get_title()))
+            # GUI-12 B3 (UX finding 2): the canvas says the export keeps
+            # the full title, built from the builder's own string
+            tip = p.fields.canvas.toolTip()
+            check('GUI-12 B3: the 1D canvas tooltip carries the exported '
+                  'suptitle',
+                  tip == 'Exports use the full title: '
+                         + built.axes[0].get_title()
+                  and '1D Spherical Blast' in tip, ascii(tip))
             p.title_box.setText('QA title')
             pump(120)
+            check('GUI-12 B3: with a user title the tooltip carries the '
+                  'exported (titled) form',
+                  p.fields.canvas.toolTip().endswith(
+                      P.titled(built.axes[0].get_title(), 'QA title')),
+                  ascii(p.fields.canvas.toolTip()))
             got_t = p.fields.canvas.figure.axes[0].get_title()
             check('the user\'s title line stays above the short one',
                   got_t == 'QA title\n' + want, ascii(got_t))
