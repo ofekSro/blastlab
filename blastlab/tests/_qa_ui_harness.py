@@ -1388,9 +1388,16 @@ def _clipped_labels(root):
     on one line, so 'Domain radius [m]' needing 141 px in a 132 px column
     means it uses two lines, not that it is clipped. For those the
     question is height, which Qt's own heightForWidth answers.
+
+    A QToolButton (Segmented, the dock tabs) elides its text inside its
+    QSS padding, so its room is its content rect, not its width (F38,
+    GUI-11): `0D · HD 1.3` drew as `0D …1.3` in a 72 px segment while
+    the text still fit the whole button. The padding is read from the
+    size hint - QToolButton::sizeHint is the text's size plus two spaces
+    plus the style's (QSS) box - so no QSS value is copied here.
     """
     from PySide6.QtWidgets import (QAbstractButton, QCheckBox, QLabel,
-                                   QWidget)
+                                   QToolButton, QWidget)
     out = []
     for w in root.findChildren(QWidget):
         if not w.isVisible():
@@ -1408,7 +1415,9 @@ def _clipped_labels(root):
             continue
         need = _text_need(w, text)
         room = w.width()
-        if isinstance(w, QAbstractButton) and not w.icon().isNull():
+        if isinstance(w, QToolButton):
+            room -= _tool_button_box(w, text)
+        elif isinstance(w, QAbstractButton) and not w.icon().isNull():
             room -= w.iconSize().width() + 6
         if isinstance(w, QCheckBox):
             room -= 22
@@ -1416,6 +1425,17 @@ def _clipped_labels(root):
             out.append(f'{type(w).__name__}({text!r}) needs {need} '
                        f'has {room}')
     return out
+
+
+def _tool_button_box(w, text):
+    """The width a QToolButton keeps around its label (QSS padding and
+    border, an icon beside the text): its size hint less the text's size
+    and the two spaces QToolButton::sizeHint adds (F38)."""
+    from PySide6.QtCore import Qt
+    fm = w.fontMetrics()
+    text_w = fm.size(Qt.TextShowMnemonic, text).width()
+    return max(0, w.sizeHint().width() - text_w
+               - 2 * fm.horizontalAdvance(' '))
 
 
 def _text_need(w, text):
@@ -2774,15 +2794,61 @@ def f02_foam_2d_planar(qa):
     qa.pump(0.8)
     qa.shot('anim')
     rs.show_view('Fields')
+    # F36 (GUI-11): since OUT-1 a model-folder run with Keep all fields
+    # off releases its WSL scratch, so the VTK export is rightly
+    # disabled, saying why; the export itself is checked on a second run
+    # with Keep all fields on
+    _vtk_released(qa, rs, meta)
+    qa.shot('after_vtk')
+    _cache_result(qa, 'foam2d', dim=2)
+    _vtk_keep_all(qa, 'F2D', 'foam2d_keepall')
+
+
+def _vtk_released(qa, rs, meta):
+    """F36: a fresh foam result whose scratch was released offers no VTK
+    export, and the disabled button's tooltip is the scratch-released
+    reason (`services.exports.SCRATCH_RELEASED`)."""
+    from blastlab.services.exports import SCRATCH_RELEASED
+    from blastlab.ui.widgets import tip_text
+    btn = rs._export_btns.get('vtk')
+    tip = tip_text(btn.toolTip() if btn is not None else '')
+    released = bool((meta or {}).get('scratch_released'))
+    qa.note(f'VTK on a fresh foam result: scratch_released={released}, '
+            f'enabled={rs.export_enabled("vtk")}')
+    qa.check(released and not rs.export_enabled('vtk')
+             and SCRATCH_RELEASED in tip,
+             'a fresh foam result (Keep all fields off): VTK disabled with '
+             'the scratch-released reason', 'S2', evidence=repr(tip[:120]))
+
+
+def _vtk_keep_all(qa, key, label):
+    """F36, second step: with Keep all fields on the scratch is kept, the
+    VTK export is offered and finishes. A second WSL solve, so only on
+    an idle VM with >= 3 GB free physical memory; otherwise a note, for
+    the office machine."""
+    import copy
+    busy = _foreign_busy(qa)
+    free = _free_physical_mb()
+    if busy or free is None or free < 3072:
+        qa.note(f'office machine: the Keep all fields VTK step was not run '
+                f'(pgrep {busy[:2]}, free {free} MB; needs an idle VM and '
+                f'>= 3 GB)')
+        return
+    case = copy.deepcopy(cases()[key])
+    case.keep_all_fields = True
+    if not _foam_run(qa, case, label, 700):
+        return
+    qa.goto('results')
+    rs = qa.win.results
+    rs.show_view('Fields')
     qa.check(rs.export_enabled('vtk'),
-             'the VTK export is offered for a foam run', 'S2')
+             'Keep all fields on: the VTK export is offered', 'S2')
     qa.click(rs._export_btns['vtk'], 'VTK')
     ok = qa.wait_log('VTK export done', 300)
     tail = qa.run_log().strip().splitlines()[-4:]
     qa.note('VTK export log: ' + ' / '.join(tail))
     qa.check(ok, 'and it finishes', 'S2', evidence=' / '.join(tail))
-    qa.shot('after_vtk')
-    _cache_result(qa, 'foam2d', dim=2)
+    qa.shot(f'{label}_after_vtk')
 
 
 @scenario('F03', 'F', est=420)
@@ -3095,8 +3161,15 @@ def f10_foam_dialogs(qa):
     if qa.cached('foam2d') is not None:
         ensure_results(qa, names=('foam2d',))
         if select_result(qa, 'QA foam2d'):
-            qa.check(rs.export_enabled('vtk'),
-                     'and it IS offered for a foam result', 'S2')
+            # F36 (GUI-11): F02's foam result ran with Keep all fields
+            # off, so its scratch is released and VTK says why it is off
+            meta = rs.current().result.meta if rs.current() else {}
+            if meta.get('scratch_released'):
+                _vtk_released(qa, rs, meta)
+            else:
+                qa.check(rs.export_enabled('vtk'),
+                         'and it IS offered for a foam result whose '
+                         'scratch is kept', 'S2')
             qa.shot('foam_exports')
 
 
