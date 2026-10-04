@@ -35,7 +35,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -117,7 +117,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -199,7 +199,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -281,7 +281,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -363,7 +363,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -1622,7 +1622,7 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 7cf8e640d698c6e2",
+      "fields": "ok 848b00011c2c1334",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1630,7 +1630,7 @@
     "charge_kg": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 31ec7de1ae62a6d5",
+      "fields": "ok 227c7d5c477ffc39",
       "fields page": "empty",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1638,7 +1638,7 @@
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 31ec7de1ae62a6d5",
+      "fields": "ok 227c7d5c477ffc39",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1646,7 +1646,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "empty",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1654,7 +1654,7 @@
     "final_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1662,7 +1662,7 @@
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1670,7 +1670,7 @@
     "r": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1678,7 +1678,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1686,7 +1686,7 @@
     "radius_m": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "empty",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -1694,7 +1694,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -2542,7 +2542,7 @@
     "final_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -2550,7 +2550,7 @@
     "r": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -2558,7 +2558,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -2566,7 +2566,7 @@
     "radius_m": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "empty",
       "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
@@ -3300,7 +3300,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3382,7 +3382,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3464,7 +3464,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3546,7 +3546,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3628,7 +3628,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
