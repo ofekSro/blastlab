@@ -726,6 +726,58 @@ def s5r_reach():
           and cr.handoff_reach([1, 2], {1: one(10.0), 2: None}) == {})
 
 
+def s5f_fed_face():
+    """GUI-12 A5 (QA 11e Finding 1): a FED 2D stage is a profile start,
+    which the native solver does not auto-refine, so its gauge-drop
+    warnings follow the stage's own cell, not Setup's refined one
+    (`_gauge_drop_rule`, "not a profile start - P3"). The A5 probe ran
+    solve_2d / solve_3d's first step on these wired cases: 21 rows, 0
+    mismatches between the solver's dropped gauges and these warnings.
+    Toolkit-free."""
+    import copy
+    import re
+    from blastlab.models.case import Case1D, Case2D
+    from blastlab.services.validation import validate_case
+    from blastlab.ui import chain_route as cr
+    print('\nS5f: a fed stage\'s gauge-drop warnings (no Qt)')
+
+    def warned(warnings):
+        return sorted(m.group(1) for w in warnings for m in
+                      [re.match(r'Gauge (\(.*?\)) .* - will be dropped$',
+                                w)] if m)
+    # the QA case's axisymmetric twin: Wall 1 x 1.2-1.6, y 0-0.6; G2
+    # inside, G3 on the left face, two more face gauges; 20 kg, cell 0.05
+    two = Case2D(solver='native', geometry='axisymmetric', Lx=2.4, Ly=1.6,
+                 cell_size_m=0.05, charge=20.0, center=(0.0, 0.8),
+                 obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                 gauges=[(0.3, 0.8), (1.4, 0.3), (1.2, 0.3), (1.8, 0.8),
+                         (2.0, 1.2), (1.6, 0.3), (1.4, 0.6)])
+    hand = {(1, 2): 'p1.txt', (2, 3): 'p2.npz'}
+    setup = warned(validate_case(copy.deepcopy(two)).warnings)
+    check('Setup (a charge start, refined to 2.4/84 m): (1.4, 0.3) and '
+          '(1.4, 0.6)', setup == ['(1.4, 0.3)', '(1.4, 0.6)'], str(setup))
+    fed = cr.stage_checks([1, 2], {1: Case1D(radius_m=1.0), 2: two},
+                          hand)[2]
+    check('1 → 2: the fed stage is a profile start',
+          fed.case.init_mode == 'profile1d', fed.case.init_mode)
+    got = warned(fed.warnings)
+    check('1 → 2: its warnings follow its own 0.05 m cell - (1.6, 0.3) '
+          'on the right face is dropped there too',
+          got == ['(1.4, 0.3)', '(1.4, 0.6)', '(1.6, 0.3)'], str(got))
+    feeding = cr.stage_checks([2, 3], {2: two, 3: None}, hand)[2]
+    got = warned(feeding.warnings)
+    check('2 → 3: a feeding stage is still a charge start - Setup\'s '
+          'warnings', got == setup, str(got))
+    planar = copy.deepcopy(two)
+    planar.geometry, planar.center = 'planar', (0.6, 0.8)
+    fed = cr.stage_checks([1, 2], {1: Case1D(radius_m=1.0), 2: planar},
+                          hand)[2]
+    check('1 → 2, the planar QA case: the stage is refused (the solver '
+          'raises too), so its warnings describe no run',
+          '1D profile remap is only valid in axisymmetric mode'
+          in fed.errors, str(fed.errors))
+
+
 # ── S6 ───────────────────────────────────────────────────────────────────
 def s6_copy_load():
     import dataclasses
@@ -1611,6 +1663,7 @@ def main():
         s3_cards(win)
         s4_editor(win)
         s5r_reach()
+        s5f_fed_face()
         s5_live(win)
         s9_copy_checks(win)
         win.close()
