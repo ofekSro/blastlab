@@ -65,11 +65,11 @@ the defaults and reviewed the list in bulk). Work items go to `TODO.md` GUI-11.
 | D228 | GUI-11 (11d, session default) | F40: D207 elides a path wider than the message box's cap in the middle, and the whole text was only in the label's tooltip, which cannot be copied. | `dialogs._keep_paths`: when it shortens a path it also sets the box's detailed text (`QMessageBox.setDetailedText`, the `Show Details…` button) to each shortened path, whole, one per line, without its quote or bracket and the sentence's trailing punctuation; a quoted path (an OSError's repr) has its doubled backslashes halved back (`_bare_path`). A box whose paths all fit gets no details. The shown text, the tooltip and D207's line rule are unchanged. `ui/dialogs.py` only. `test_ui_frame` F13 (+3). Real platform: a real click on `Show Details...` shows the pane, Ctrl+A, Ctrl+C copies exactly the path (`docs/qa/2026-10-03-gui-polish/gui11-dialog-details.png`). The details pane word-wraps the path at its own width (cosmetic; the copy is whole). |
 | D229 | GUI-11 (11d, session default) | F46: a red point-list refusal kept its column names across a planar ↔ axisymmetric toggle (`expected 4 numbers (r0  r1  z0  z1)` under `x0 x1 y0 y1` headers). | `PointList._reject(message, words)`: a refusal that names the columns (the wrong count, numbers or values, and an empty Add's `add a row: …`) keeps a callable that words it again; `set_columns` re-renders a standing refusal through it with the new names, still red (the error is not lost). A refusal without column names (`not numbers: a`, `select a row in the list first`, a parse error) is kept as is. Setup and every Chain 2D stage (the same `CaseForm`). UI only (`ui/fieldform.py`). `test_ui_setup_form` S8b (+4 per placement). |
 
-## Open for the owner, 2026-10-04 — answer these first (GUI-11e)
+## Owner review, 2026-10-04 (GUI-11e)
 
-Put to the owner with the session's recommendation; not yet answered (the owner
-continues in a new session). Answer "approve all" or name the numbers to change. Items
-1, 2, 7, 9 (and 8 if changed) become GUI-11e; 5 goes to the backlog.
+Put to the owner with the session's recommendation. **The owner answered "approve all"
+on 2026-10-04**: every row below is decided as its recommendation reads. Items 1, 2, 7
+and 9 are GUI-11e; 3, 4, 6 and 8 stand as they are; 5 goes to the backlog (`TODO.md`).
 
 | # | Item | Recommendation |
 |---|---|---|
