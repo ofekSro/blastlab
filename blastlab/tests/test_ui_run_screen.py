@@ -1777,10 +1777,20 @@ def r5b_dropped(win):
           [w.number for w in col.row_widgets()] == [2, 1]
           and [r['entered'] for r in col.table()] == [3, 1],
           str([(r['number'], r['entered']) for r in col.table()]))
-    check('the caption names G2 and the wall',
-          col.caption_text() == '2 gauges, sorted by Z. Click a row to '
-          'enlarge it. G2 dropped by the solver (inside Wall 1).',
+    # GUI-13 B3 (UX #11): the note comes first, in the warn colour (the
+    # string moved from the end of the caption to its start)
+    check('the caption names G2 and the wall, first',
+          col.caption_text() == 'G2 dropped by the solver (inside Wall 1). '
+          '2 gauges, sorted by Z. Click a row to enlarge it.',
           col.caption_text())
+    from blastlab.ui import theme as _theme
+    check('B3: the note starts the caption and is in the warn colour; no '
+          'drop, no note label',
+          col.drop.text().startswith('G2 dropped by the solver')
+          and not col.drop.isHidden()
+          and _theme.cur('warn') in col.drop.styleSheet()
+          and _theme.cur('warn') not in col.sub.styleSheet(),
+          f'{col.drop.text()!r} {col.drop.styleSheet()!r}')
     check('the enlarged card says G3', col.card_texts()[0] == 'G3',
           str(col.card_texts()))
     # GUI-13 (g), QA #2: the card header elides its middle when narrow,
@@ -1809,7 +1819,8 @@ def r5b_dropped(win):
     col.flush()
     pump(20)
     check('nothing dropped: each label is G<payload number>, no note',
-          all(w.num.text() == f'G{w.number}' for w in col.row_widgets())
+          col.drop.isHidden()
+          and all(w.num.text() == f'G{w.number}' for w in col.row_widgets())
           and 'dropped' not in col.caption_text(),
           f'{col.row_labels()} {col.caption_text()!r}')
     # blastFoam's live 3D payload carries x only (`radii`, D73): a kept

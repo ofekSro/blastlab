@@ -664,6 +664,11 @@ class GaugeColumn(QWidget):
         self.caps.setObjectName('eyebrow')
         _letter_space(self.caps)
         top.addWidget(self.caps)
+        # GUI-13 B3 (UX #11): the drop note comes first, in the warn colour
+        self.drop = QLabel('')
+        self.drop.setWordWrap(True)
+        self.drop.setVisible(False)
+        top.addWidget(self.drop)
         self.sub = QLabel('')
         self.sub.setWordWrap(True)
         top.addWidget(self.sub)
@@ -825,8 +830,10 @@ class GaugeColumn(QWidget):
 
     def caption_text(self):
         """The line above the card: the count, the sort, and a dropped
-        gauge's name (D201)."""
-        return self.sub.text()
+        gauge's name first (D201, GUI-13 B3)."""
+        if self.drop.isHidden():
+            return self.sub.text()
+        return f'{self.drop.text()} {self.sub.text()}'
 
     def row_labels(self):
         """The GAUGE cells in display order (`G1`, `G3`, ...)."""
@@ -873,10 +880,12 @@ class GaugeColumn(QWidget):
         # numbers on the rows do not read as a gap
         note = (dropped_text(numbering(self._case, self._payload)[1])
                 if self._payload else '')
-        self.sub.setText((f'{n} gauge{"" if n == 1 else "s"}, sorted by '
-                          f'{axis}. Click a row to enlarge it.'
-                          + (f' {note}.' if note else '')) if has else '')
+        self.sub.setText(f'{n} gauge{"" if n == 1 else "s"}, sorted by '
+                         f'{axis}. Click a row to enlarge it.'
+                         if has else '')
         self.sub.setVisible(has)
+        self.drop.setText(f'{note}.' if note else '')
+        self.drop.setVisible(has and bool(note))
         order = [row['number'] for row in self._table]
         if order != self._order:
             self._rebuild(order)
@@ -929,6 +938,7 @@ class GaugeColumn(QWidget):
     def _retheme(self, _mode=None):
         p = theme.pal()
         self.sub.setStyleSheet(_css(12.5, None, 'muted'))
+        self.drop.setStyleSheet(_css(12.5, 600, 'warn'))
         self.list_frame.setStyleSheet(
             f'QFrame#gaugelist {{ background: {p["card"]}; '
             f'border: 1px solid {p["border2"]}; border-radius: 10px; }}')
