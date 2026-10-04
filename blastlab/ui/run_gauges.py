@@ -43,6 +43,7 @@ from . import scaled_distance as sd
 from . import theme
 from .components import _css
 from .live_gauges import NO_GAUGES, _decimate
+from .results_list import ElidedLabel
 from .setup_tree import _letter_space
 
 #: the row text before the wave arrives (board line 327, `faint`)
@@ -528,9 +529,9 @@ class _SelectedCard(QFrame):
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(8)
         self.num = QLabel('')
-        self.meta = QLabel('')
-        self.meta.setMinimumWidth(0)
-        self.meta.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        # GUI-13 (g), QA #2: the middle is elided (`R … · Wall 1`), the
+        # whole text is the tooltip, and it never runs under the peak
+        self.meta = ElidedLabel('', Qt.ElideMiddle)
         self.peak = QLabel('')
         head.addWidget(self.num, 0, Qt.AlignBaseline)
         head.addWidget(self.meta, 1, Qt.AlignBaseline)
@@ -813,7 +814,7 @@ class GaugeColumn(QWidget):
         return None if row is None else row['number']
 
     def card_texts(self):
-        return (self.card.num.text(), self.card.meta.text(),
+        return (self.card.num.text(), self.card.meta.full_text(),
                 self.card.peak.text())
 
     def now_visible(self):

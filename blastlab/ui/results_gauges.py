@@ -355,6 +355,16 @@ class GaugesView(QWidget):
         self.copy_btn.clicked.connect(lambda *_: self.copy_table())
         th.addWidget(self.copy_btn)
         tl.addWidget(thead)
+        # GUI-13 (g), QA #3: a dropped gauge's note has its own line, which
+        # wraps as Run's caption does, so it is never cut at 1100 px; the
+        # static caption above stays one elided line
+        self.drop_caption = QLabel('')
+        self.drop_caption.setObjectName('gaugecaption')
+        self.drop_caption.setWordWrap(True)
+        self.drop_caption.setContentsMargins(14, 0, 12, 6)
+        self.drop_caption.setVisible(False)
+        tl.addWidget(self.drop_caption)
+        self._drop_note = ''
         self._table_head = thead
         self.table_card = tcard
 
@@ -416,7 +426,7 @@ class GaugesView(QWidget):
         self._ent = None
         self._summary, self._strings, self._z = [], [], None
         self._labels = {}
-        self.table_caption.setText(TABLE_CAPTION)
+        self._set_drop_note('')
         self._order, self._sel = [], None
         self._drop_curves()
         self.hint.setText(self.NO_RESULT)
@@ -487,11 +497,8 @@ class GaugesView(QWidget):
             self._labels, dropped = labels_and_dropped(res, ent.dim)
         except Exception:
             self._labels, dropped = {}, []
-        # D201: a dropped gauge is named first, so an elided caption
-        # still says it (the whole text is the tooltip)
-        note = dropped_text(dropped)
-        self.table_caption.setText(f'{note} · {TABLE_CAPTION}' if note
-                                   else TABLE_CAPTION)
+        # D201: a dropped gauge is named, on a line of its own that wraps
+        self._set_drop_note(dropped_text(dropped))
         self._draw_curves(res)
         self.fill_summary(res)
         if self._sel not in self._order:
@@ -559,7 +566,13 @@ class GaugesView(QWidget):
     def caption_text(self):
         """The Summary card's caption, whole (D201 names a dropped gauge
         in it)."""
-        return self.table_caption.full_text()
+        return (f'{self._drop_note} · {TABLE_CAPTION}' if self._drop_note
+                else TABLE_CAPTION)
+
+    def _set_drop_note(self, note):
+        self._drop_note = note
+        self.drop_caption.setText(note)
+        self.drop_caption.setVisible(bool(note))
 
     def fill_summary(self, res):
         """The rows, sorted by Z (ties by number, D61) - by number when Z
@@ -669,8 +682,13 @@ class GaugesView(QWidget):
         h = self.height()
         # the share holds the whole table card: its Summary / Copy row
         # comes out of it too
-        share = (int(h * TABLE_MAX_SHARE)
-                 - self._table_head.sizeHint().height()) if h > 0 else want
+        # (and the drop note under it, when there is one)
+        thead = self._table_head.sizeHint().height()
+        if not self.drop_caption.isHidden():
+            dw = self.drop_caption.width()
+            thead += (self.drop_caption.heightForWidth(dw) if dw > 0
+                      else self.drop_caption.sizeHint().height())
+        share = int(h * TABLE_MAX_SHARE) - thead if h > 0 else want
         cap = max(floor, min(want, share))
         self.table.setMinimumHeight(min(floor, cap))
         self.table.setMaximumHeight(cap)

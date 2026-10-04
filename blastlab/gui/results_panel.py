@@ -275,9 +275,12 @@ class ResultsPanel(ctk.CTkFrame):
         }
         for col, head in zip(cols, heads):
             self.summary_table.heading(col, text=head)
+            # GUI-13 (g), QA #4: the gauge column holds `G1 (0.830, 0.610)
+            # -> cell (0.826, 0.605) m` at the 1100 px window minimum (it
+            # was 150 px and cut the cell at `-> cell`)
             self.summary_table.column(
-                col, width=150 if col == 'gauge' else 104, stretch=True,
-                minwidth=90 if col != 'gauge' else 120,
+                col, width=310 if col == 'gauge' else 104, stretch=True,
+                minwidth=250 if col == 'gauge' else 90,
                 anchor='e' if col != 'gauge' else 'w')
         self.summary_table.pack(side='bottom', fill='x', pady=(GAP, 0))
         self.gauge_canvas.pack(fill='both', expand=True)

@@ -940,6 +940,15 @@ def s5g_dropped(link):
     check('the caption names G2 first, then the usual caption',
           g.caption_text() == 'G2 dropped by the solver (inside Wall 1) · '
           + RG.TABLE_CAPTION, g.caption_text())
+    # GUI-13 (g), QA #3: the note wraps on a line of its own, and the
+    # static caption above it stays one elided line
+    dc = g.drop_caption
+    check('the drop note is its own wrapped line, whole; the caption '
+          'above stays one line',
+          dc.isVisibleTo(g) and dc.wordWrap()
+          and dc.text() == 'G2 dropped by the solver (inside Wall 1)'
+          and g.table_caption.full_text() == RG.TABLE_CAPTION,
+          f'{dc.text()!r}')
     # GUI-13 (d), D6: the Qt PNG / report export hands that note to the
     # gauge figure as its footnote
     import types

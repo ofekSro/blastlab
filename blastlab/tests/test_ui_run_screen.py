@@ -1783,6 +1783,21 @@ def r5b_dropped(win):
           col.caption_text())
     check('the enlarged card says G3', col.card_texts()[0] == 'G3',
           str(col.card_texts()))
+    # GUI-13 (g), QA #2: the card header elides its middle when narrow,
+    # keeps the whole text as the tooltip and never runs under the peak
+    card = col.card
+    full = card.meta.full_text()
+    card.meta.setFixedWidth(60)
+    pump(20)
+    check('a narrow card header: the middle is elided, the whole text is '
+          'the tooltip, the peak keeps its own rect',
+          card.meta.elided() and card.meta.text() != full
+          and card.meta.toolTip() == full
+          and card.meta.geometry().right() < card.peak.geometry().left(),
+          f'{card.meta.text()!r} {card.meta.toolTip()!r}')
+    card.meta.setMinimumWidth(0)
+    card.meta.setMaximumWidth(16777215)
+    pump(20)
     labels, dropped = RG.numbering(case, pay)
     check('numbering(): G1, G3 and G2 inside Wall 1',
           labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
