@@ -7,8 +7,9 @@ import os
 import sys
 import threading
 
-from PySide6.QtCore import QEvent, QTimer
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence, QShortcut
+from PySide6.QtCore import QEvent, QRect, QTimer
+from PySide6.QtGui import (QAction, QActionGroup, QGuiApplication,
+                           QKeySequence, QShortcut)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout,
                                QMainWindow, QMenu, QSizePolicy,
                                QStackedWidget, QVBoxLayout, QWidget)
@@ -538,8 +539,15 @@ class MainWindow(QMainWindow):
                 w, h = (int(v) for v in size.split('x'))
                 self.resize(max(w, 1100), max(h, 720))
                 if rest:
+                    # negative x is a real place (a monitor left of the
+                    # primary), so the test is "is the title bar on some
+                    # screen today", not x >= 0: a monitor unplugged or
+                    # rearranged since the save would strand the window.
                     x, y = (int(v) for v in rest.split('+')[:2])
-                    self.move(max(0, x), max(0, y))
+                    grip = QRect(x + 40, y, 120, 30)
+                    if any(s.availableGeometry().intersects(grip)
+                           for s in QGuiApplication.screens()):
+                        self.move(x, y)
             self.run_panel.set_refresh_policy_text(
                 st.get('refresh_value', ''), str(st.get('refresh_mode',
                                                        'seconds')))
