@@ -60,4 +60,40 @@ repeat > 80 ms. Copy the rule into `measurements.md` and commit it first."
 
 ## Results
 
-(added after the runs)
+Run 2026-10-04, 05:52-05:56, at **`c171f6f`** (the 11d HEAD after T16-T21, F43,
+F40, F46 and the harness fixes; the rule above was committed at 05:16:17 in
+`49f9a75`, and the three raw sampler outputs are stamped 05:53:48, 05:55:21 and
+05:56:03). Real platform (`windows`), one sampler at a time, 2.6 / 2.4 / 3.1 GB
+free physical memory before each. Each sampler's self-test saw the deliberate
+60 px / 150 ms displacement (149.5-149.8 ms, 60 px), and each closed its own
+viewer child with its window. The numbers are in
+[`viewer_measure_gui11.json`](viewer_measure_gui11.json).
+
+Changes near a viewer since GUI-10 (`116ea96`): T18 on the run surface (the
+strip's one-row rule, the 200 px `runview` minimum, the dock giving way) and T21
+on the results surface (the placeholder text). `git diff 116ea96..HEAD --
+blastlab/ui/view3d_host.py` is empty.
+
+**R10-PLACE** (longest wrong-place stretch, samples with a viewer window, summed
+over the 5 repeats):
+
+| Surface | Action | Repeats (ms) | With window | Verdict |
+|---|---|---|---|---|
+| results | tabs | 0, 0, 0, 0, 0 | 1758 | PASS |
+| results | theme | 0, 0, 0, 0, 0 | 19973 | PASS |
+| run | tabs | 0, 0, 0, 0, 0 | 1753 | PASS |
+| run | theme | 0, 0, 0, 0, 0 | 20965 | PASS |
+| setup | chaintab | 0, 0, 0, 0, 0 | 1761 | PASS |
+
+**R10-RESIZE** (longest wrong stretch per repeat, 1600 ↔ 1100):
+
+| Surface | Repeats (ms) | Median | Max | Worst offset | Verdict |
+|---|---|---|---|---|---|
+| results | 20.7, 18.2, 17.6, 28.5, 17.7 | 18.2 | 28.5 | 472 px | PASS (≤ 50, ≤ 80) |
+| run | 42.5, 43.3, 43.1, 44.6, 43.8 | 43.3 | 44.6 | 476 px | PASS (≤ 50, ≤ 80) |
+| setup | 29.4, 26.2, 28.5, 32.9, 28.3 | 28.5 | 32.9 | 468 px | PASS (≤ 50, ≤ 80) |
+
+GUI-10's medians for comparison: results 15.3, run 44.7, setup 30.3 ms.
+
+**Verdict: R10 passes on every surface, so GUI-11 did not regress F13.** No A/B
+at `116ea96` was needed. F13 itself stays open for the viewer-host batch (≤ 17 ms).
