@@ -240,6 +240,9 @@ class PointList(QWidget):
         self._arity = len(self._columns)
         self._kinds = tuple(kinds) or ('float',) * self._arity
         self._on_change = on_change or (lambda: None)
+        #: called with the 0-based index of a row the user removed, before
+        #: on_change (UXR-9: the trigger gauge follows its gauge)
+        self.on_remove = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(GAP)
@@ -338,8 +341,11 @@ class PointList(QWidget):
         if item is None:
             self._reject('select a row in the list first')
             return False
-        self.tree.takeTopLevelItem(self.tree.indexOfTopLevelItem(item))
+        index = self.tree.indexOfTopLevelItem(item)
+        self.tree.takeTopLevelItem(index)
         self._accept()
+        if self.on_remove is not None:
+            self.on_remove(index)
         self._on_change()
         return True
 

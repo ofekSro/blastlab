@@ -90,6 +90,9 @@ class CaseForm(FieldForm):
             if 'init_mode' in self.v:
                 # GUI-9: a fed Chain stage hides it (set_fed)
                 self.set_row_group('init_mode', 'unfed')
+        if 'gauges' in self.points and 'trigger_gauge' in self.v:
+            # UXR-9: a removed gauge must not re-target the trigger
+            self.points['gauges'].on_remove = self._gauge_removed
         if 'amr_levels' in self.v:
             self.on_field('amr_levels', self._apply_mode)
         if 'anim_scale' in self.v:
@@ -326,6 +329,35 @@ class CaseForm(FieldForm):
         self._set_trigger_on(bool(self.v['trigger_gauge'].get().strip()))
         self._apply_mode()
         self.refresh_trigger_choices()
+
+    def _gauge_removed(self, index):
+        """UXR-9 (D219): the user removed gauge row `index` (0-based).
+        The trigger follows its gauge: a row before it decrements
+        `trigger_gauge`, the trigger row itself blanks it (with the switch
+        on, D27's red pending state), a row after it changes nothing. A
+        number that named no gauge (D17's `G5 (no such gauge)`) is left
+        alone. Only an edit in the session: `set_case` never removes."""
+        removed = index + 1
+        n_before = self.points['gauges'].count() + 1
+
+        def follow(text):
+            k = _gauge_index(text, n_before)
+            if not k or removed > k:
+                return None
+            return '' if removed == k else str(k - 1)
+
+        new = follow(self.v['trigger_gauge'].get().strip())
+        if new is not None:
+            if self._trig is not None:
+                self._trigger_write(new)    # the switch keeps its state
+            else:
+                self.v['trigger_gauge'].set(new)
+        if self._trig is not None:
+            # the number the switch restores when turned back on
+            last = follow(self._trig['last'])
+            if last is not None:
+                self._trig['last'] = last
+            self.refresh_trigger_choices()
 
     def _gauge_label(self, i, g):
         if self.dim == 3:

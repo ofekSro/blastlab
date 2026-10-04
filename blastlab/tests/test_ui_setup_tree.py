@@ -517,6 +517,77 @@ def t3_trigger():
     check("a standalone 'columns' form has no switch (Chain, golden)",
           form(2, 'blastfoam', 'columns').trigger_switch is None)
 
+    print('\nT3e: removing a gauge keeps the trigger on its gauge '
+          '(UXR-9, D219)')
+    four = {2: [(1.0, 0.5), (2.0, 0.5), (3.0, 0.5), (3.5, 1.0)],
+            3: [(0.5, 0.5, 0.5), (0.6, 0.6, 0.6), (0.7, 0.7, 0.7),
+                (0.8, 0.8, 0.8)]}
+
+    def remove_row(f, i):
+        pl = f.points['gauges']
+        pl.tree.setCurrentItem(pl.tree.topLevelItem(i))
+        return pl.remove()
+
+    for d, cls in ((2, Case2D), (3, Case3D)):
+        for placement in ('nodes', 'columns'):
+            tag = f'{d}D {placement}'
+            f = form(d, 'blastfoam', placement)
+            f.set_case(cls(solver='blastfoam', gauges=four[d],
+                           trigger_gauge=3))
+            pump(5)
+            g3 = four[d][2]
+            remove_row(f, 0)
+            pump(5)
+            pts = f.points['gauges'].get()
+            check(f'{tag}: trigger G3, remove G1 -> 2, the same point',
+                  f.v['trigger_gauge'].get() == '2'
+                  and pts[1] == g3 and f.get_case().trigger_gauge == 2,
+                  f.v['trigger_gauge'].get())
+            if f.trigger_combo is not None:
+                check(f'{tag}: the dropdown shows the same coordinates',
+                      f.trigger_combo.currentData() == '2'
+                      and f.trigger_combo.currentText().endswith(
+                          f'{g3[-1]:.2f}')
+                      and f'{g3[0]:.2f}' in f.trigger_combo.currentText(),
+                      f.trigger_combo.currentText())
+            remove_row(f, 2)            # old G4, after the trigger
+            pump(5)
+            check(f'{tag}: a row after the trigger changes nothing',
+                  f.v['trigger_gauge'].get() == '2')
+            remove_row(f, 1)            # the trigger itself
+            pump(5)
+            check(f'{tag}: removing the trigger gauge blanks it',
+                  f.v['trigger_gauge'].get() == ''
+                  and f.get_case().trigger_gauge is None)
+            if f.trigger_switch is not None:
+                check(f'{tag}: the switch stays on, pending and red (D27)',
+                      f.trigger_switch.isChecked() and f.trigger_pending()
+                      and f.trigger_combo.property('bad') == 'true')
+            f.deleteLater()
+        f = form(d, 'blastfoam', 'nodes')
+        f.set_case(cls(solver='blastfoam', gauges=four[d],
+                       trigger_gauge=3))
+        pump(5)
+        remove_row(f, 3)
+        check(f'{d}D: trigger G3, remove G4 -> still 3',
+              f.v['trigger_gauge'].get() == '3')
+        f.set_case(cls(solver='blastfoam', gauges=four[d][:3],
+                       trigger_gauge=5))
+        pump(5)
+        remove_row(f, 0)
+        check(f'{d}D: a loaded G5 (no such gauge) is untouched',
+              f.v['trigger_gauge'].get() == '5'
+              and f.trigger_combo.currentText() == 'G5 (no such gauge)',
+              f.trigger_combo.currentText())
+        f.set_case(cls(solver='blastfoam', gauges=four[d],
+                       trigger_gauge=3))
+        f.trigger_switch.click()            # off: 3 is remembered
+        remove_row(f, 0)
+        f.trigger_switch.click()            # on again
+        check(f'{d}D: off, remove G1, on again -> the same gauge (2)',
+              f.v['trigger_gauge'].get() == '2')
+        f.deleteLater()
+
     print('\nT3c: Profile file only in profile mode')
     for d in (2, 3):
         f = form(d, 'blastfoam', 'nodes')
