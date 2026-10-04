@@ -194,6 +194,16 @@ def labels_and_dropped(res, dim):
     return {k: lbl for k, lbl in enumerate(labels, start=1)}, dropped
 
 
+def export_drop_note(res, dim):
+    """The exported gauge grid's footnote on the Qt side (GUI-13 (d),
+    D6): the screen's own `G2 dropped by the solver (inside Wall 1)`, ''
+    when no gauge was dropped or the meta cannot say (the figure then
+    builds its own from the pairing)."""
+    if dim not in (2, 3):
+        return ''
+    return dropped_text(labels_and_dropped(res, dim)[1])
+
+
 class _Table(QTableWidget):
     """The summary table. Ctrl+C with the table focused copies the whole
     table: the key is caught here, before the item view's own copy (the

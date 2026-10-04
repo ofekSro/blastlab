@@ -32,7 +32,7 @@ except ImportError:
     HAVE_SKIMAGE = False
 
 from ..core.constants import P_AIR
-from .gauge_summary import entered_numbers
+from .gauge_summary import dropped_numbers, entered_numbers
 
 
 def titled(base, extra=None):
@@ -368,10 +368,19 @@ def gauge_fields_available(gauge_out):
             if gauge_out.get(key)]
 
 
-def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
+def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None,
+                     drop_note=None):
     """Gauge grid for 2D (x,y points) and 3D (x,y,z points). `field`
     picks the trace: 'p' (default, always there), '|U|' or 'rho' when
-    the run recorded them (blastFoam since T44)."""
+    the run recorded them (blastFoam since T44).
+
+    GUI-13 (d), D6: when the solver dropped a gauge the figure says so in
+    a footnote - `drop_note` (the Qt export passes the Run screen's
+    detailed `G2 dropped by the solver (inside Wall 1)`), else
+    `Not shown: G2, G3 - dropped by the solver` from the pairing, so the
+    Tk export gets one too - and each panel title reads `G4 (1.20, 0.30)
+    m → cell (1.25, 0.30)`, entered position and cell. A run without a
+    drop keeps its exact figure (F42)."""
     key, ylabel, tr = GAUGE_FIELDS[field]
     times  = gauge_out['times']
     points = gauge_out['points']
@@ -393,20 +402,34 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
     # GUI-12 A3: a panel carries its ENTERED gauge number, so a gauge the
     # solver dropped does not renumber the later ones (F42; no drop ->
     # the panel index, byte-identical)
-    nums = entered_numbers(points, meta.get('gauges'))
+    want = list(meta.get('gauges') or [])
+    nums = entered_numbers(points, want)
+    dropped = dropped_numbers(points, want)
     for k, (p_arr, pt, color) in enumerate(zip(pdata, points, colors)):
         ax  = axes[k // ncols][k % ncols]
         ovp = tr(p_arr)
         ax.plot(times * 1e3, ovp, color=color, lw=1.2)
         ax.axhline(0, color='k', lw=0.7, ls='--', alpha=0.5)
         loc = ", ".join(f"{v:.2f}" for v in pt)
-        ax.set_title(f'Gauge {nums[k]}  ({loc}) m', fontsize=10)
+        if dropped:
+            asked = ", ".join(f"{float(v):.2f}" for v in want[nums[k] - 1])
+            ax.set_title(f'G{nums[k]} ({asked}) m → cell ({loc})',
+                         fontsize=10)
+        else:
+            ax.set_title(f'Gauge {nums[k]}  ({loc}) m', fontsize=10)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.3)
 
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
+
+    note = drop_note or (
+        'Not shown: ' + ', '.join(f'G{j}' for j in dropped)
+        + ' - dropped by the solver' if dropped else '')
+    if note:
+        # a figure-level x label, so constrained layout makes room for it
+        fig.supxlabel(note, fontsize=9, style='italic')
 
     return fig
 

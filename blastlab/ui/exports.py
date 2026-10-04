@@ -108,6 +108,13 @@ def export(kind, ent, opts=None, log=print, parent=None, on_error=None,
     target = pick_target(kind, ent, log=log, parent=parent)
     if not target:
         return ''
+    if kind in ('pngs', 'report'):
+        # GUI-13 (d): the gauge grid's footnote names the reason, as the
+        # Gauges screen does; computed here, on the GUI thread
+        from .results_gauges import export_drop_note
+        note = export_drop_note(ent.result, ent.dim)
+        if note:
+            opts = dict(opts or {}, gauge_drop_note=note)
     args = (kind, ent, target, opts, log, parent, on_error)
     if threaded:
         def work():

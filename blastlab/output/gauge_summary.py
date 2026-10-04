@@ -137,6 +137,23 @@ def entered_numbers(points, requested=None):
     return [j + 1 for j in pair]
 
 
+def dropped_numbers(points, requested=None):
+    """The entered numbers (1-based) that have no point - the gauges the
+    solver dropped - by `entered_numbers`' pairing; [] when none is
+    dropped, and when the pairing is short of a point (P1: which gauges
+    are missing is then not known). The exported gauge grid's footnote
+    (GUI-13 (d))."""
+    pts = list(points)
+    want = list(requested or [])
+    if len(pts) >= len(want):
+        return []
+    pair = _nearest_entered(pts, want)
+    if any(j is None for j in pair):
+        return []
+    kept = set(pair)
+    return [j + 1 for j in range(len(want)) if j not in kept]
+
+
 def _same_dim_dist(w, pt):
     if pt is None or len(w) != len(pt):
         return None

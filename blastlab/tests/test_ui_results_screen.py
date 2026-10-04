@@ -940,6 +940,29 @@ def s5g_dropped(link):
     check('the caption names G2 first, then the usual caption',
           g.caption_text() == 'G2 dropped by the solver (inside Wall 1) · '
           + RG.TABLE_CAPTION, g.caption_text())
+    # GUI-13 (d), D6: the Qt PNG / report export hands that note to the
+    # gauge figure as its footnote
+    import types
+    from blastlab.ui import exports as UE
+    seen = []
+    real = (UE.pick_target, UE.run_export)
+    UE.pick_target = lambda *a, **k: 'target'
+    UE.run_export = lambda *a: seen.append(a[3])
+    try:
+        ent = types.SimpleNamespace(result=res, dim=2)
+        UE.export('pngs', ent, threaded=False)
+        UE.export('tsv', ent, threaded=False)
+    finally:
+        UE.pick_target, UE.run_export = real
+    note = 'G2 dropped by the solver (inside Wall 1)'
+    fig = dict(UE.png_figures(res, 2, drop_note=note))['blast_2d_gauges.png']
+    check('GUI-13 (d): export_drop_note is the caption\'s note; the PNG '
+          'export passes it (a TSV does not), and it is the figure\'s '
+          'footnote',
+          RG.export_drop_note(res, 2) == note
+          and seen == [{'gauge_drop_note': note}, None]
+          and fig._supxlabel is not None
+          and fig._supxlabel.get_text() == note, str(seen))
     check('rows() is table_rows(summary_rows(res)), unchanged (D98)',
           g.rows() == [tuple(r) for r in gauge_summary.table_rows(
               summary_rows(res))], str(g.rows()))

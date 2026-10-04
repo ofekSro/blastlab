@@ -173,9 +173,12 @@ def _report_caption(fname, dim):
     return stem[:1].upper() + stem[1:]
 
 
-def png_figures(res, dim, show_mesh=False, title_extra=None):
+def png_figures(res, dim, show_mesh=False, title_extra=None,
+                drop_note=None):
     """(filename, Figure) for the `pngs` export: the FULL snapshot grid
-    that output/plots.py builds, not the single panel on screen."""
+    that output/plots.py builds, not the single panel on screen.
+    `drop_note` is the gauge grid's dropped-gauge footnote (GUI-13 (d);
+    None: the figure's own)."""
     if dim == 1:
         c = charge_label(res.meta)
         return [('blast_1d_results.png',
@@ -191,7 +194,8 @@ def png_figures(res, dim, show_mesh=False, title_extra=None):
                    show_mesh=show_mesh, title_extra=title_extra)
     figs.append((f'blast_{dim}d_gauges.png',
                  plots.figure_gauges_nd(res.gauges, res.meta,
-                                        title_extra=title_extra)))
+                                        title_extra=title_extra,
+                                        drop_note=drop_note)))
     if dim == 3:
         figs.append(('blast_3d_isosurface.png',
                      plots.figure_isosurfaces_3d(res.snapshots, res.meta,
@@ -199,8 +203,10 @@ def png_figures(res, dim, show_mesh=False, title_extra=None):
     return figs
 
 
-def report_figures(res, dim, show_mesh=False, title_extra=None):
-    """(caption, Figure) for the HTML report."""
+def report_figures(res, dim, show_mesh=False, title_extra=None,
+                   drop_note=None):
+    """(caption, Figure) for the HTML report (`drop_note`: as
+    `png_figures`)."""
     if dim == 1:
         c = charge_label(res.meta)
         return [('Results', plots.figure_results_1d(
@@ -218,7 +224,8 @@ def report_figures(res, dim, show_mesh=False, title_extra=None):
     # the table section's
     figs.append(('Gauge time histories',
                  plots.figure_gauges_nd(res.gauges, res.meta,
-                                        title_extra=title_extra)))
+                                        title_extra=title_extra,
+                                        drop_note=drop_note)))
     return figs
 
 
@@ -228,7 +235,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
     """Write one export. Safe on a worker thread: it touches no widget,
     and every failure reaches `log`. Returns what was written, or None.
 
-    `opts` may carry `show_mesh`, `title_extra`, and for `gif` an
+    `opts` may carry `show_mesh`, `title_extra`, `gauge_drop_note` (the
+    gauge grid's dropped-gauge footnote, GUI-13 (d)), and for `gif` an
     `anim_scale` / `anim_clim` override of the run's own colour range.
     `open_after=False` skips showing a written report / VTK folder
     (`os.startfile`): the model folder writes them unattended (OUT-1).
@@ -236,12 +244,14 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
     opts = opts or {}
     show_mesh = bool(opts.get('show_mesh'))
     title_extra = opts.get('title_extra') or None
+    drop_note = opts.get('gauge_drop_note') or None
     res, dim = ent.result, ent.dim
     pre = name_prefix(res)
     try:
         if kind == 'pngs':
             written = []
-            for name, fig in png_figures(res, dim, show_mesh, title_extra):
+            for name, fig in png_figures(res, dim, show_mesh, title_extra,
+                                         drop_note):
                 if fig is None:            # figure_gauges_nd: no gauges
                     continue
                 name = pre + name
@@ -268,7 +278,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
             from ..output import report as report_mod
             report_mod.save_html_report(
                 res, dim, target,
-                figures=report_figures(res, dim, show_mesh, title_extra),
+                figures=report_figures(res, dim, show_mesh, title_extra,
+                                       drop_note),
                 # the user's own line wins over the run name for the
                 # report's heading
                 title=title_extra or ent.label)
