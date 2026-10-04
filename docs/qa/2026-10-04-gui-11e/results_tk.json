@@ -1,0 +1,30 @@
+{
+  "the Tk 2D run finished": {
+    "ok": true,
+    "detail": "22s"
+  },
+  "Tk summary_rows labels G1 with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Tk summary_rows labels G4 (not shifted to G3) with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Tk summary_rows labels G5 (not shifted to G4) with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Tk Results summary TABLE (Treeview) shows G1 entered pos": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Tk Results summary TABLE shows G4 (not shifted)": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Tk Results summary TABLE shows G5 (not shifted)": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  }
+}
