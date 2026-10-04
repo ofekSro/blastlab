@@ -592,6 +592,7 @@
       "activation",
       "afterburn",
       "gauge_file",
+      "material",
       "profile_out"
     ],
     "points": {
@@ -1604,6 +1605,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs",
       "profile_out",
       "trigger_file"
@@ -1797,6 +1799,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs",
       "profile_out",
       "trigger_file"
@@ -2763,6 +2766,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs"
     ],
     "points": {
