@@ -152,14 +152,36 @@ def main():
     f.set_case(Case2D(solver='blastfoam', amr_levels=0, **amr))
     f.v['amr_refine'].set('not a number')
     case = f.get_case()
-    check("a hidden box that does not parse keeps the fallback, "
-          "and blocks nothing", case.amr_refine == 0.4
+    check("a hidden box that does not parse blocks nothing, and the "
+          "file's value goes back (D223)", case.amr_refine == 0.2
           and case.amr_unrefine == 0.1, str(case.amr_refine))
     f.v['amr_levels'].set('2')
     f.v['amr_refine'].set('0.3')
     case = f.get_case()
     check("AMR on reads the boxes as before", case.amr_levels == 2
           and case.amr_refine == 0.3 and case.amr_unrefine == 0.1)
+    # verify11c (D223): a value typed after the load, in a box that is
+    # hidden again when the case is read, is never written (CLAUDE.md §4)
+    f.v['amr_refine'].set('0.9')
+    f.v['amr_levels'].set('0')
+    case = f.get_case()
+    check("AMR on, 0.9 typed, AMR off again: the file's 0.2 is saved, "
+          "not the hidden 0.9", case.amr_refine == 0.2
+          and case.amr_levels == 0, str(case.amr_refine))
+    f = form(3, 'native')
+    f.set_case(Case3D(solver='native', amr_levels=0, **amr))
+    f.v['amr_refine'].set('0.9')
+    f.v['amr_buffer'].set('7')
+    case = f.get_case()
+    check("native, a typed hidden AMR box is not written either",
+          (case.amr_refine, case.amr_buffer) == (0.2, 1),
+          f'{case.amr_refine} {case.amr_buffer}')
+    f = form(2, 'blastfoam')
+    f.set_case(Case2D(solver='blastfoam', amr_levels=0,
+                      **dict(amr, amr_refine=0.123456789)))
+    check("the file's value goes back whole, not as the box's 6 digits",
+          f.get_case().amr_refine == 0.123456789,
+          repr(f.get_case().amr_refine))
     import shutil
     shutil.rmtree(tmp, ignore_errors=True)
 

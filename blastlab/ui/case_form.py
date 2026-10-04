@@ -62,7 +62,7 @@ class CaseForm(FieldForm):
         self._mode = mode_mod.normalize(mode)
         self._trig = None            # the trigger switch widgets ('nodes')
         self._fed = False            # a Chain stage fed by the one before
-        self._loaded = False         # set_case has filled it (F16, D211)
+        self._loaded_amr = {}        # set_case's AMR values (F16, D223)
         self.t_end_ms = None         # the `= 12.0 ms` line (D221)
         super().__init__(dim, on_change=on_change, mode=self._mode,
                          parent=parent, placement=placement)
@@ -589,25 +589,27 @@ class CaseForm(FieldForm):
         return case
 
     def _keep_loaded_amr(self, case):
-        """F16 (GUI-11 e, D211): with AMR off, `models.fields` writes
+        """F16 (GUI-11 e, D211, D223): with AMR off, `models.fields` writes
         `AMR_FORM_FALLBACKS` (0.4 / 0.2 ...) into the case, so a file's own
         hidden values (0.2 / 0.1) did not survive Open -> Save. In a form
-        that holds a loaded case (`set_case`), each of the five hidden
-        boxes goes back into the case when it parses; otherwise the
-        fallback stays. A form never loaded keeps the fallbacks, so a
-        fresh case is unchanged. `models/` and the solver defaults are
-        untouched."""
-        if not self._loaded or getattr(case, 'amr_levels', 0):
+        that holds a loaded case (`set_case`), each of the five values AS
+        LOADED goes back into the case when it is a usable number;
+        otherwise the fallback stays. Not the boxes (D223): a value typed
+        into a box that is hidden now (AMR switched off again, or native
+        mode) is never written (CLAUDE.md §4). A form never loaded keeps
+        the fallbacks, so a fresh case is unchanged. `models/` and the
+        solver defaults are untouched."""
+        if not self._loaded_amr or getattr(case, 'amr_levels', 0):
             return
         for key, fallback in fields.AMR_FORM_FALLBACKS.items():
-            if key not in self.v or not hasattr(case, key):
+            if key not in self._loaded_amr or not hasattr(case, key):
                 continue
             parse = (fields.parse_float if isinstance(fallback, float)
                      else fields.parse_int)
             try:
-                setattr(case, key, parse(self.v[key].get(), key))
+                setattr(case, key, parse(str(self._loaded_amr[key]), key))
             except ValueError:
-                pass
+                pass        # not a number in the file: the fallback stays
 
     def set_case(self, case):
         """Load `case` into the widgets, in the order
@@ -619,7 +621,10 @@ class CaseForm(FieldForm):
                 self.points[name].set(value)
             else:
                 self.v[name].set(value)
-        self._loaded = True          # F16: the AMR boxes hold its values
+        # F16 (D211, D223): the file's own AMR values, kept as loaded
+        self._loaded_amr = {k: getattr(case, k)
+                            for k in fields.AMR_FORM_FALLBACKS
+                            if hasattr(case, k)}
         # GUI-5: the switch follows the loaded value even when the Var did
         # not change (a blank over a blank fires no trace)
         self._sync_trigger_from_var()
