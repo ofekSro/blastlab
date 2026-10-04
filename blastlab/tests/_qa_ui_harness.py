@@ -1421,7 +1421,9 @@ def _clipped_labels(root):
             room -= w.iconSize().width() + 6
         if isinstance(w, QCheckBox):
             room -= 22
-        if need > room + 1:
+        # a tool button elides as soon as its text is wider than the
+        # label rect (QCommonStyle's toolButtonElideText): no slack
+        if need > room + (0 if isinstance(w, QToolButton) else 1):
             out.append(f'{type(w).__name__}({text!r}) needs {need} '
                        f'has {room}')
     return out
@@ -1430,12 +1432,19 @@ def _clipped_labels(root):
 def _tool_button_box(w, text):
     """The width a QToolButton keeps around its label (QSS padding and
     border, an icon beside the text): its size hint less the text's size
-    and the two spaces QToolButton::sizeHint adds (F38)."""
+    and the two spaces QToolButton::sizeHint adds (F38). Under a style
+    sheet the hint also carries 3 px that are never painted
+    (qstylesheetstyle.cpp, CT_ToolButton: `sz += QSize(3, 3); // ###
+    broken QToolButton`); measured on the real platform, `0D · HD 1.3`
+    (61 px of text) is drawn whole from 85 px, i.e. the 24 px of its QSS
+    padding, not the hint's 27."""
     from PySide6.QtCore import Qt
     fm = w.fontMetrics()
     text_w = fm.size(Qt.TextShowMnemonic, text).width()
-    return max(0, w.sizeHint().width() - text_w
-               - 2 * fm.horizontalAdvance(' '))
+    box = w.sizeHint().width() - text_w - 2 * fm.horizontalAdvance(' ')
+    if w.style().metaObject().className() == 'QStyleSheetStyle':
+        box -= 3
+    return max(0, box)
 
 
 def _text_need(w, text):
