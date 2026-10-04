@@ -564,21 +564,22 @@ def gauge_in_obstacle_checks():
     the gauge - native by the nearest cell centre's closed solid test,
     blastFoam by the closed test on the outward-snapped boxes - with one
     warning, and the case stays valid. Strictly inside the box reads
-    `inside an obstacle`, otherwise `on an obstacle face` (P2). Changed
-    by owner row 2: a gauge on a face now warns wherever its solver drops
-    it (the 2D native face (1.2, 0.3) does not: its nearest centre is
-    fluid)."""
+    `inside Wall n`, otherwise `on the face of Wall n` (P2; the wall
+    named since GUI-12 A4, as Run and Setup's Where column name it).
+    Changed by owner row 2: a gauge on a face now warns wherever its
+    solver drops it (the 2D native face (1.2, 0.3) does not: its nearest
+    centre is fluid)."""
     print()
     print("gauge inside an obstacle: warned, not refused")
 
     def new_warnings(rep, ref):
         return [w for w in rep.warnings if w not in ref.warnings]
 
-    def face(pt):
-        return [f'Gauge {pt} on an obstacle face - will be dropped']
+    def face(pt, wall=1):
+        return [f'Gauge {pt} on the face of Wall {wall} - will be dropped']
 
-    def inside(pt):
-        return [f'Gauge {pt} inside an obstacle - will be dropped']
+    def inside(pt, wall=1):
+        return [f'Gauge {pt} inside Wall {wall} - will be dropped']
 
     for solver in ('native', 'blastfoam'):
         two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0,
@@ -588,7 +589,7 @@ def gauge_in_obstacle_checks():
         rep = validate_case(Case2D(gauges=[(1.4, 0.3)], **two))
         got = new_warnings(rep, ref)
         check(f'2D {solver}: a gauge inside Wall 1 gets exactly the new '
-              f'warning', got == ['Gauge (1.4, 0.3) inside an obstacle - '
+              f'warning', got == ['Gauge (1.4, 0.3) inside Wall 1 - '
                                   'will be dropped'], str(got))
         check(f'2D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
@@ -616,8 +617,8 @@ def gauge_in_obstacle_checks():
         rep = validate_case(Case3D(gauges=[(1.6, 1.0, 0.5)], **three))
         got = new_warnings(rep, ref)
         check(f'3D {solver}: a gauge inside Wall 1 gets exactly the new '
-              f'warning', got == ['Gauge (1.6, 1.0, 0.5) inside an '
-                                  'obstacle - will be dropped'], str(got))
+              f'warning', got == ['Gauge (1.6, 1.0, 0.5) inside '
+                                  'Wall 1 - will be dropped'], str(got))
         check(f'3D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
         # the blastFoam 3D case refines to ~28 M cells: its writer plan
@@ -677,6 +678,49 @@ def gauge_in_obstacle_checks():
                   str(got))
             check(f'F44 3D {solver} {pt}: warned <=> its solver drops it',
                   bool(got) == solver_drops(case, pt))
+
+    # GUI-12 A4: the warning names the wall that drops the gauge, and it
+    # is the wall Setup's Where column (scaled_distance.where) names
+    import re
+    from blastlab.ui import scaled_distance as sd
+    two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+               charge=1.0, center=(0.0, 1.0),
+               obstacles=[(1.2, 1.6, 0.0, 1.0), (2.4, 2.8, 0.0, 1.0)])
+    pts2 = [(1.4, 0.3), (1.4, 1.0), (2.6, 0.3), (2.6, 1.0), (2.4, 0.5),
+            (1.0, 0.3), (3.2, 0.3)]
+    three = dict(Lx=3.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=1.0,
+                 center=(0.5, 1.0, 1.0),
+                 obstacles=[(1.2, 1.5, 0.5, 1.5, 0.0, 1.0),
+                            (2.2, 2.5, 0.5, 1.5, 0.0, 1.0)])
+    pts3 = [(1.3, 1.0, 0.5), (2.3, 1.0, 0.5), (2.2, 1.0, 0.5),
+            (2.3, 1.0, 1.0), (1.9, 1.0, 0.5)]
+    for solver in ('native', 'blastfoam'):
+        for dim, kw, pts in ((2, two, pts2), (3, three, pts3)):
+            make = Case2D if dim == 2 else Case3D
+            ref = validate_case(make(gauges=[], solver=solver, **kw))
+            if dim == 2:
+                got = new_warnings(validate_case(
+                    make(gauges=[(2.6, 0.3)], solver=solver, **kw)), ref)
+                check(f'A4 2D {solver}: a gauge inside the second '
+                      f'obstacle names Wall 2',
+                      got == inside((2.6, 0.3), 2), str(got))
+            case = make(gauges=pts, solver=solver, **kw)
+            got = new_warnings(validate_case(case), ref)
+            walls = {}
+            for w in got:
+                m = re.match(r'Gauge (\(.*?\)) .*Wall (\d+) - will be '
+                             r'dropped$', w)
+                if m:
+                    walls[m.group(1)] = int(m.group(2))
+            where = {str(tuple(p)): (sd.where(case, p) or (None,))[0]
+                     for p in pts}
+            check(f'A4 {dim}D {solver}: every drop warning names a wall '
+                  f'({len(walls)} of {len(got)})',
+                  len(walls) == len(got) and len(walls) >= 2, str(got))
+            check(f'A4 {dim}D {solver}: each warning\'s Wall n is '
+                  f'scaled_distance.where\'s wall',
+                  all(where[k] == v for k, v in walls.items()),
+                  f'{walls} {where}')
 
 
 def thin_obstacle_warn_checks():

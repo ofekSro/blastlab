@@ -1566,12 +1566,15 @@ def _validate_closing(case, rep, ctx):
             continue
         if dropped is None:
             dropped = _gauge_drop_rule(case, ctx)
-        if not dropped(pt):
+        wall = dropped(pt)
+        if not wall:
             continue
-        if _in_obstacle_open(pt, case.obstacles):
-            warn(f"Gauge {tuple(pt)} inside an obstacle - will be dropped")
-        else:
-            warn(f"Gauge {tuple(pt)} on an obstacle face - will be dropped")
+        # GUI-12 A4: named as Run and Setup's Where column name it; the
+        # inside / face split is the open-box test
+        inside = _in_obstacle_open(pt, case.obstacles)
+        warn(f"Gauge {tuple(pt)} "
+             f"{gauge_drop_reason(inside or wall, bool(inside))}"
+             f" - will be dropped")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
@@ -1586,10 +1589,20 @@ def _validate_closing(case, rep, ctx):
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
 
 
+def gauge_drop_reason(wall, inside):
+    """`inside Wall 2` / `on the face of Wall 2`: why the solver drops a
+    gauge for obstacle `wall` (1-based, as the tree names it). One
+    wording for the validation warning and the Run screen's dropped-gauge
+    note (`ui/run_gauges._drop_reason`; D201, GUI-12 A4)."""
+    return f'inside Wall {wall}' if inside else f'on the face of Wall {wall}'
+
+
 def _gauge_drop_rule(case, ctx):
-    """`dropped(pt)`: True when the case's solver will drop the in-domain
-    gauge `pt` for an obstacle - each solver's own rule, so the warning
-    is exact (F44, GUI-11e A2; owner review row 2). No solver code runs:
+    """`dropped(pt)`: the 1-based index of the obstacle for which the
+    case's solver will drop the in-domain gauge `pt`, 0 when it keeps it
+    - each solver's own rule, so the warning is exact (F44, GUI-11e A2;
+    owner review row 2). Snapping keeps the obstacles' order, so the
+    index is the case's (`Wall n`, GUI-12 A4). No solver code runs:
 
     native      the nearest cell centre per axis is solid, by the closed
                 test of core/bc.solid_mask_2d/3d on the raw boxes
@@ -1613,7 +1626,7 @@ def _gauge_drop_rule(case, ctx):
     obstacles = [tuple(float(v) for v in b) for b in case.obstacles or []]
     n = case.dim
     if n < 2 or not obstacles:
-        return lambda pt: False
+        return lambda pt: 0
     lengths = tuple(float(L) for L in ctx.dims)
     charged = (getattr(case, 'init_mode', 'charge') == 'charge'
                and case.charge is not None and case.charge > 0)
@@ -1655,33 +1668,35 @@ def _gauge_drop_rule(case, ctx):
 
 
 def _in_box_closed(pt, boxes):
-    """True when `pt` lies in any box, faces included (the closed test
-    of core/bc.solid_mask_* and the foam writer's `_in_obstacle`)."""
-    for box in boxes:
+    """The 1-based index of the first box `pt` lies in, faces included
+    (the closed test of core/bc.solid_mask_* and the foam writer's
+    `_in_obstacle`), 0 when none."""
+    for i, box in enumerate(boxes, start=1):
         if len(box) >= 2 * len(pt) and all(
                 lo <= float(v) <= hi
                 for v, lo, hi in zip(pt, box[0::2], box[1::2])):
-            return True
-    return False
+            return i
+    return 0
 
 
 def _in_obstacle_open(pt, obstacles):
-    """True when gauge `pt` lies strictly inside an obstacle box (open
-    box, the test of ui/scaled_distance.where's `inside`). Only the
+    """The 1-based index of the first obstacle box gauge `pt` lies
+    strictly inside (open box, the test of ui/scaled_distance.where's
+    `inside`), 0 when none. Only the
     wording of the drop warning now: whether a gauge is dropped at all
     is each solver's own rule (`_gauge_drop_rule`, F44), which keeps a
     native gauge within half a cell of an off-grid face and drops one on
     or just outside a face (verify 11b, UXR-2, D201)."""
     n = len(pt)
     if n < 2:
-        return False
-    for box in obstacles or []:
+        return 0
+    for i, box in enumerate(obstacles or [], start=1):
         if len(box) < 2 * n:
             continue
         if all(float(lo) < float(v) < float(hi)
                for v, lo, hi in zip(pt, box[0::2], box[1::2])):
-            return True
-    return False
+            return i
+    return 0
 
 
 def _warn_thin_obstacle(rep, box, lo, hi, dxb, foam):

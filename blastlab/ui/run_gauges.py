@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
 from ..core.constants import P_AIR
 from ..output.gauge_summary import (pair_in_order, summarize_gauges,
                                     summarize_trace)
+from ..services.validation import gauge_drop_reason
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
@@ -150,7 +151,8 @@ def _drop_reason(case, point):
     """Why an entered gauge has no series, from the case's geometry:
     `inside Wall 1`, `on the face of Wall 1` (within a cell: the native
     nearest-cell rule, blastFoam's face-snapped boxes), `outside the
-    domain`, or '' when the geometry does not say."""
+    domain`, or '' when the geometry does not say. The wall wording is
+    the validation warning's (`services.validation.gauge_drop_reason`)."""
     try:
         boxes = sd.obstacle_boxes(case)
     except (AttributeError, TypeError, ValueError):
@@ -164,11 +166,11 @@ def _drop_reason(case, point):
         if len(box) != len(p):
             continue
         if all(lo < v < hi for v, (lo, hi) in zip(p, box)):
-            return f'inside Wall {i}'
+            return gauge_drop_reason(i, True)
     for i, box in enumerate(boxes, start=1):
         if len(box) == len(p) and all(lo - tol <= v <= hi + tol
                                       for v, (lo, hi) in zip(p, box)):
-            return f'on the face of Wall {i}'
+            return gauge_drop_reason(i, False)
     dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(p)]]
     try:
         if all(d is not None for d in dims) and any(
