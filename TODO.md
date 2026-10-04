@@ -28,19 +28,21 @@ orders it; every rule, value and acceptance criterion lives there. Qt only
 (`blastlab/ui/`): the Tk app, the solvers, the defaults and every file format stay as
 they are. Owner: *"implement everything"*, then run the QA and UX agents on the result.
 
-> **▶ RESUME HERE — the first thing to do from this list.** Branch `gui-redesign`;
+> **▶ RESUME HERE — the first thing to do from this list.** Branch `master`
+> (`gui-redesign` merged in on 2026-10-04, `58911bd`);
 > GUI-1..11 done (GUI-11e 2026-10-04, DONE.md §0u). Next, in order:
 > 1. **`GUI-12`** — the backlog GUI-11e left (row below); the owner picks what to run.
 > 2. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` (the blastFoam 1→2→3
 >    chain; the home PC's 3D stage outlived 1800 s), harness F07 (over the home VM's cell
 >    cap), `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
 >
-> The owner reviewed the open calls on 2026-10-03 ("approve all"):
+> The owner reviewed the open calls on 2026-10-03 and 2026-10-04 ("approve all"):
 > [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) § Owner review.
 > F1: an agent once ran a broad `taskkill`.
 >
 > Run agents on Opus 5.5 (`model: "opus"`) if Fable 5 credits run out, as happened on
-> 2026-09-29. The home PC has 8 GB RAM: heavy suites one at a time.
+> 2026-09-29. Heavy suites one at a time: the home PC has 8 GB RAM, and the machine
+> GUI-11e ran on (2026-10-04) 15.7 GB with C: nearly full, so test temp files went to D:.
 
 | Id | What | Size | Order |
 |---|---|---|---|
