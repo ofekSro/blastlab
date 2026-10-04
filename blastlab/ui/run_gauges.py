@@ -861,6 +861,9 @@ class GaugeColumn(QWidget):
         self.empty.setVisible(not has)
         axis = 'Z' if z_on else 'R'
         self.head_lbls[1].setText(axis)
+        # UXR-15 (D221): the unit the narrow header leaves out
+        self.head_lbls[1].setToolTip(
+            sd.UNIT_TIP if z_on else 'R: the distance from the burst, in m')
         # D201: a gauge the solver dropped is named, so the entered
         # numbers on the rows do not read as a gap
         note = (dropped_text(numbering(self._case, self._payload)[1])

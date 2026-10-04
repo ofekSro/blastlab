@@ -24,7 +24,7 @@ from ..core import mode as mode_mod
 from . import chain_route, setup_nodes, setup_strip, theme
 from .case_form import CaseForm
 from .components import HandoffCard
-from .model_overlay import ModelOverlay, hover_text, plane_caption
+from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
 from .preview_panel import Preview1D, Preview2D
 from .results_list import ElidedLabel
 from .setup_panel import (PROPS_PAD, PROPS_W, WHEEL_ZOOM, DerivedCard,
@@ -523,6 +523,7 @@ class StageEditor(QWidget):
         if lbl.property('hover') != 'true':
             lbl.setProperty('hover', 'true')
             theme.repolish(lbl)
+            lbl.set_tip(HOVER_TIP)              # UXR-15: the units
         lbl.setText(text)
 
     def _unhover(self, _event=None):
@@ -530,6 +531,7 @@ class StageEditor(QWidget):
         if lbl.property('hover') == 'true':
             lbl.setProperty('hover', 'false')
             theme.repolish(lbl)
+            lbl.set_tip(None)
         self._sync_toolbar()
 
     def _wheel(self, event):

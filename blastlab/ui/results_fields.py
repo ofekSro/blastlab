@@ -60,6 +60,14 @@ def field_options(res, dim):
     return out
 
 
+def screen_unit(unit):
+    """The colour-bar label as the screen shows it. UXR-15 (D221): the
+    Impulse map reads kPa·ms, as the Gauges table beside it does; the
+    number is the same, because 1 Pa·s = 1 kPa·ms. `select_field`'s `unit`
+    (the exported PNG's label, `plots.IMPULSE_LABEL`) is unchanged."""
+    return unit.replace('[Pa·s]', '[kPa·ms]')
+
+
 def select_field(res, dim, snap_label, field, title_extra=None):
     """Everything needed to paint one field panel, or None when this
     field is not a map (1D profiles, the 3D isosurface view).
@@ -423,7 +431,7 @@ class FieldsView(QWidget):
             self._drop_image()
             self.image = pg_plots.ScalarImage(
                 self.plot, sel['xf'], sel['yf'], sel['solid'],
-                label=sel['unit'])
+                label=screen_unit(sel['unit']))
             self.overlay = pg_plots.MeshOverlay(self.plot)
             self._key = key
         else:
@@ -438,7 +446,7 @@ class FieldsView(QWidget):
         # exported PNG uses. A whole-run range clipped by frame_clim says
         # so on the bar only, as the replay does.
         self.image.set_bar_label(
-            sel['unit'] + (pg_plots.CLIP_BAR_SUFFIX
+            screen_unit(sel['unit']) + (pg_plots.CLIP_BAR_SUFFIX
                            if clipped or run_clipped else ''))
         title = f"{sel['title']}  ·  {sel['panel']}"
         if clipped:

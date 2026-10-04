@@ -33,6 +33,11 @@ from types import SimpleNamespace
 
 #: the column / tile label everywhere (plan §5.3)
 LABEL = 'Z [m/kg^1/3]'
+#: UXR-15 (D221): the tooltip wherever a Z value is shown without its
+#: unit. UFC 3-340-02 (2008), para. 2-13.1, printed p. 44: Z = R/W^1/3
+UNIT_TIP = ('Z = R / W^(1/3): the scaled distance, in m/kg^1/3 '
+            '(UFC 3-340-02, para. 2-13.1). R in m from the burst, W the '
+            'charge in kg as entered.')
 
 
 def case_from_meta(meta, dim, gauge_out=None):

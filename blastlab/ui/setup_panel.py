@@ -20,7 +20,7 @@ from ..viz3d import MISSING_MSG, pyvista_available
 from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
 from .components import DockTabs
-from .model_overlay import ModelOverlay, hover_text, plane_caption
+from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_strip import LiveStrip
 from .setup_tree import TREE_MIN, SetupTree, _letter_space
@@ -157,6 +157,10 @@ class DerivedCard(Card):
         else:
             text = f'G{near[0]} · R {near[1]:.2f} m'
         self._vals['nearest'].setText(text)
+        # UXR-15 (D221): the unit the compact `Z 2.99` leaves out
+        self._vals['nearest'].setToolTip(
+            scaled_distance.UNIT_TIP if near is not None
+            and near[2] is not None else '')
 
 
 def _tool_button(text, checkable=False, tip=None):
@@ -1099,6 +1103,7 @@ class SetupPanel(QWidget):
         if lbl.property('hover') != 'true':
             lbl.setProperty('hover', 'true')
             theme.repolish(lbl)
+            lbl.setToolTip(HOVER_TIP)           # UXR-15: the units
         lbl.setText(text)
 
     def _unhover(self, _event=None):
@@ -1106,6 +1111,7 @@ class SetupPanel(QWidget):
         if lbl.property('hover') == 'true':
             lbl.setProperty('hover', 'false')
             theme.repolish(lbl)
+            lbl.setToolTip('')
         self._sync_toolbar()
 
     def _wheel(self, event):

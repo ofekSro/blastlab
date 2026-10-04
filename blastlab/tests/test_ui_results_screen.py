@@ -1518,6 +1518,36 @@ def s6_field(link):
     check('the replay geometry (This frame .png) keeps its own x label',
           plane_geometry(r2.meta)['xlabel'] == 'x [m]')
 
+    # UXR-15 (D221): the Impulse map reads kPa·ms on screen, as the
+    # Gauges table does; 1 Pa·s = 1 kPa·ms, so the numbers are the same
+    from blastlab.output import plots
+    from blastlab.ui.results_fields import screen_unit, select_field
+    fv.field_seg._btns['Impulse'].click()
+    pump(20)
+
+    def bar_text(image):
+        for axis in ('right', 'left'):
+            try:
+                text = image.bar.getAxis(axis).labelText
+            except Exception:
+                text = ''
+            if text:
+                return text
+        return ''
+    bar = bar_text(p.fields.image)
+    sel = select_field(r2, 2, p.fields.snapshot(), p.fields.field())
+    check('the Impulse colour bar reads kPa·ms, not Pa·s',
+          p.fields.field().startswith('net ovp impulse')
+          and 'kPa·ms' in bar and 'Pa·s' not in bar, bar)
+    check('its Min / Max caption and the hover unit too',
+          fv.unit_lbl.text() == 'kPa·ms', fv.unit_lbl.text())
+    check('the export\'s label (select_field, This frame .png) keeps '
+          'Pa·s', sel['unit'] == plots.IMPULSE_LABEL
+          and screen_unit(plots.IMPULSE_LABEL)
+          == 'Net overpressure impulse [kPa·ms]', sel['unit'])
+    fv.field_seg._btns['Overpressure'].click()
+    pump(20)
+
     print('\nS6g: the arrival tick')
     rows = summary_rows(r2)
     g1 = p.selected_gauge()

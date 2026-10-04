@@ -444,6 +444,10 @@ def s2_model_view():
     check("over G1: 'r 2.95 · z 0.50 · R 3.31 · Z 3.31'",
           sp.view_caption() == 'r 2.95 · z 0.50 · R 3.31 · Z 3.31',
           sp.view_caption())
+    # UXR-15 (D221): the units the compact readout leaves out
+    tip = sp._view_caption.toolTip()
+    check('the readout\'s tooltip gives the units (Z in m/kg^1/3)',
+          'm/kg^1/3' in tip and 'in m' in tip, tip)
     from matplotlib.backend_bases import LocationEvent
     canvas.callbacks.process('figure_leave_event',
                              LocationEvent('figure_leave_event', canvas,
@@ -451,6 +455,8 @@ def s2_model_view():
     check('leaving the model restores the plane caption',
           sp.view_caption() == 'r–z plane · charge on the axis',
           sp.view_caption())
+    check('and drops the readout\'s tooltip',
+          sp._view_caption.toolTip() == '')
     show(sample_case(geometry='planar', center=(1.0, 2.0)))
     _mouse(canvas, ax, 'motion_notify_event', 2.0, 2.0)
     check("planar: 'x · y · R', no Z",
@@ -691,10 +697,73 @@ def s3_dock():
     sp.close()
 
 
+def s4_units():
+    """UXR-15, the small half (D221): units where they were missing."""
+    from blastlab.ui.case_form import CaseForm
+    from blastlab.ui.run_gauges import GaugeColumn
+    print('\nS4a: End time typed in s shows its ms')
+    for d in (1, 2, 3):
+        for placement in ('columns', 'nodes'):
+            f = CaseForm(d, mode='native', placement=placement)
+            f.show()
+            pump(5)
+            fresh = f.t_end_ms_text()
+            f.v['t_end'].set('0.012')
+            pump(5)
+            twelve = f.t_end_ms_text()
+            f.v['t_end'].set('3e-4')
+            small = f.t_end_ms_text()
+            f.v['t_end'].set('0')
+            zero = f.t_end_ms_text()
+            f.v['t_end'].set('abc')
+            bad = f.t_end_ms_text()
+            check(f'{d}D {placement}: 0.012 -> "= 12.0 ms", 3e-4 -> '
+                  f'"= 0.3 ms", 0 / fresh / unparsed -> nothing',
+                  (fresh, twelve, small, zero, bad)
+                  == ('', '= 12.0 ms', '= 0.3 ms', '', ''),
+                  str((fresh, twelve, small, zero, bad)))
+            check(f'{d}D {placement}: the row\'s widget is still the box',
+                  f.widgets['t_end'].text() == 'abc')
+            f.deleteLater()
+
+    print('\nS4b: every Z without its unit has it in a tooltip '
+          '(UFC 3-340-02 para. 2-13.1)')
+    sp = panel()
+    case, rep = load(sp, sample_case())
+    z_tip = sp.strip.tiles['z'].toolTip()
+    check('the strip Z tile', 'm/kg^1/3' in z_tip, z_tip)
+    near = sp.derived()
+    check('the Derived card\'s nearest gauge (Z 2.99)',
+          ' · Z ' in near.value('nearest')
+          and 'm/kg^1/3' in near._vals['nearest'].toolTip(),
+          f"{near.value('nearest')!r} {near._vals['nearest'].toolTip()!r}")
+    load(sp, sample_case(geometry='planar', center=(1.0, 2.0)))
+    check('no Z (planar): no Z tooltip on the Derived card',
+          near._vals['nearest'].toolTip() == '',
+          near._vals['nearest'].toolTip())
+    sp.close()
+    col = GaugeColumn()
+    col.resize(320, 500)
+    col.show()
+    col.set_case(case)
+    pump(20)
+    head = col.head_lbls[1]
+    check('the live gauge column\'s Z header',
+          head.text() == 'Z' and 'm/kg^1/3' in head.toolTip(),
+          f'{head.text()!r} {head.toolTip()!r}')
+    col.set_case(sample_case(geometry='planar', center=(1.0, 2.0)))
+    pump(20)
+    check('an R header (no Z) says R is in m',
+          head.text() == 'R' and 'in m' in head.toolTip(),
+          f'{head.text()!r} {head.toolTip()!r}')
+    col.deleteLater()
+
+
 def main():
     s1_strip()
     s2_model_view()
     s3_dock()
+    s4_units()
     pump(20)
     print('\n' + '=' * 52)
     if FAIL:

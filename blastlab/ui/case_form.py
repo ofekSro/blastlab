@@ -17,6 +17,8 @@ mapping itself (parsing, defaults, which fields each solver reads) is
 widget values, marks the bad fields and raises.
 """
 
+import math
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QGridLayout, QHBoxLayout, QLabel,
                                QVBoxLayout, QWidget)
@@ -61,6 +63,7 @@ class CaseForm(FieldForm):
         self._trig = None            # the trigger switch widgets ('nodes')
         self._fed = False            # a Chain stage fed by the one before
         self._loaded = False         # set_case has filled it (F16, D211)
+        self.t_end_ms = None         # the `= 12.0 ms` line (D221)
         super().__init__(dim, on_change=on_change, mode=self._mode,
                          parent=parent, placement=placement)
         # the reactive rules, registered once the widgets exist. A 0-D
@@ -78,6 +81,7 @@ class CaseForm(FieldForm):
             return
         if self.dim == 2:
             self.on_field('geometry', self._sync_geometry)
+        self._build_t_end_ms()
         if placement == 'nodes':
             # GUI-5 (plan §5.2): the Setup screen's dependent rows. Only
             # the 'nodes' forms get them - a standalone form (the Chain
@@ -105,6 +109,47 @@ class CaseForm(FieldForm):
         self._sync_geometry()
         self._apply_mode()
         self._sync_vtk()
+
+    # ── UXR-15: End time in ms, beside the box typed in s ───────────────
+    def _build_t_end_ms(self):
+        """End time is typed in seconds while every readout is in ms, so
+        a faint `= 12.0 ms` sits under the box when it is non-zero
+        (D221). The box stays the row's widget; only its cell gains the
+        line, so nothing that reads `widgets['t_end']` changes."""
+        self.t_end_ms = None
+        w = self.widgets.get('t_end')
+        if w is None or 't_end' not in self.rows:
+            return
+        grid, _r = self.rows['t_end']
+        row, col, rows, cols = grid.getItemPosition(grid.indexOf(w))
+        grid.removeWidget(w)
+        cell = QWidget()
+        lay = QVBoxLayout(cell)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(2)
+        lay.addWidget(w)
+        self.t_end_ms = label('', 'small')
+        self.t_end_ms.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        lay.addWidget(self.t_end_ms)
+        grid.addWidget(cell, row, col, rows, cols)
+        self.on_field('t_end', self._sync_t_end_ms)
+        self._sync_t_end_ms()
+
+    def _sync_t_end_ms(self):
+        try:
+            ms = float(self.v['t_end'].get()) * 1e3
+        except ValueError:
+            ms = 0.0
+        shown = math.isfinite(ms) and ms > 0
+        self.t_end_ms.setText(
+            (f'= {ms:.1f} ms' if ms >= 1 else f'= {ms:.3g} ms')
+            if shown else '')
+        self.t_end_ms.setVisible(shown)
+
+    def t_end_ms_text(self):
+        """The `= 12.0 ms` line, '' while hidden (tests)."""
+        lbl = self.t_end_ms
+        return lbl.text() if lbl is not None and not lbl.isHidden() else ''
 
     # ── the point lists, under the names the Tk form used ───────────────
     @property

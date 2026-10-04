@@ -29,6 +29,9 @@ from . import scaled_distance, theme
 RING_Z = (1, 2, 3)
 RING_ALPHA = (0.65, 0.5, 0.38)
 GID = 'overlay'
+#: UXR-15 (D221): the hover readout's tooltip, with the units its compact
+#: text leaves out (r, z and R in m; Z in m/kg^1/3)
+HOVER_TIP = ('r, z (x, y) and R in m. ' + scaled_distance.UNIT_TIP)
 
 
 def plane_caption(case):

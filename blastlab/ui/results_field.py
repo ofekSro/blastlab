@@ -45,7 +45,7 @@ from ..models.meta import anim_scale_of, frames_of
 from ..output import plots
 from . import dialogs, theme
 from .results_anim import SPEED_LABELS, plane_geometry
-from .results_fields import field_options, select_field
+from .results_fields import field_options, screen_unit, select_field
 from .widgets import Segmented, WrapRow
 
 #: (field_options key, the Segmented label), board line 195-197
@@ -60,10 +60,14 @@ SCALES = (('run', 'whole run'), ('frame', 'each frame'),
           ('manual', 'manual'))
 SCALE_OF = {lbl: key for key, lbl in SCALES}
 SCALE_LABEL = dict(SCALES)
-#: the unit of each base field's Min / Max and of the hover value
+#: the unit of each base field's Min / Max and of the hover value.
+#: UXR-15 (D221): Impulse reads kPa·ms on screen, as the Gauges table
+#: does; the values are unchanged, 1 Pa·s (plots.IMPULSE_LABEL, the
+#: export's unit) = 1 kPa·ms
 UNITS = {'Overpressure': 'kPa', 'Density': 'kg/m³', 'Speed': 'm/s',
          'Peak': 'kPa',
-         'Impulse': re.search(r'\[(.*)\]', plots.IMPULSE_LABEL).group(1)}
+         'Impulse': re.search(r'\[(.*)\]', screen_unit(
+             plots.IMPULSE_LABEL)).group(1)}
 #: the hover readout's name of each base field (board line 245)
 HOVER_NAMES = {'Overpressure': 'overpressure', 'Density': 'density',
                'Speed': 'speed', 'Peak': 'peak overpressure',
