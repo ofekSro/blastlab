@@ -1,0 +1,22 @@
+[
+ {
+  "name": "Tk Setup warnings: G<n> (x, y) m wording",
+  "ok": true,
+  "detail": "['G2 (1.40, 0.30) m inside Wall 1 - will be dropped', 'G3 (1.20, 0.30) m on the face of Wall 1 - will be dropped', 'G5 (1.90, 1.10) m inside Wall 2 - will be dropped', 'G6 (2.00, 1.20) m on the face of Wall 2 - will be dropped', 'G7 (3.00, 0.50) m outside the domain - will be dropped']"
+ },
+ {
+  "name": "Tk Gauges: gauge column fits the widest cell text at 1100x720",
+  "ok": false,
+  "detail": "(250, 287, 'G1 (1.063, 0.723) -> cell (1.088, 0.698) m')"
+ },
+ {
+  "name": "Tk Gauges: labels G1, G3",
+  "ok": true,
+  "detail": "[('G1 (1.063, 0.723) -> cell (1.088, 0.698) m', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'), ('G3 (1.119, 0.698) -> cell (1.144, 0.698) m', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no')]"
+ },
+ {
+  "name": "Tk: no modal dialogs",
+  "ok": true,
+  "detail": "[]"
+ }
+]

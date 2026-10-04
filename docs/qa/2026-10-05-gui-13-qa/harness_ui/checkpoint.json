@@ -1,0 +1,1606 @@
+{
+ "done": {
+  "B01": {
+   "status": "done",
+   "t": 1791151961.976507,
+   "shots": [
+    "001_B01_setup_coldstart_dark.png"
+   ],
+   "err": "",
+   "wall_s": 8.6
+  },
+  "B02": {
+   "status": "done",
+   "t": 1791151982.5334697,
+   "shots": [
+    "002_B02_run_empty_dark.png",
+    "003_B02_results_empty_dark.png",
+    "004_B02_chain_empty_dark.png"
+   ],
+   "err": "",
+   "wall_s": 18.2
+  },
+  "B03": {
+   "status": "done",
+   "t": 1791151992.4713356,
+   "shots": [
+    "005_B03_setup_form1d_top_dark.png",
+    "006_B03_setup_form1d_bottom_dark.png",
+    "007_B03_setup_form2d_top_dark.png",
+    "008_B03_setup_form2d_bottom_dark.png",
+    "009_B03_setup_form3d_top_dark.png",
+    "010_B03_setup_form3d_bottom_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.5
+  },
+  "B04": {
+   "status": "done",
+   "t": 1791151998.679963,
+   "shots": [
+    "011_B04_setup_hover_nav_run_dark.png",
+    "012_B04_run_hover_run_btn_dark.png",
+    "013_B04_run_hover_disabled_stop_dark.png"
+   ],
+   "err": "",
+   "wall_s": 3.7
+  },
+  "B05": {
+   "status": "done",
+   "t": 1791152014.5086913,
+   "shots": [
+    "014_B05_setup_geom1100x720_dark.png",
+    "015_B05_run_geom1100x720_dark.png",
+    "016_B05_results_geom1100x720_dark.png",
+    "017_B05_chain_geom1100x720_dark.png",
+    "018_B05_setup_geom900x600_dark.png",
+    "019_B05_run_geom900x600_dark.png",
+    "020_B05_results_geom900x600_dark.png",
+    "021_B05_chain_geom900x600_dark.png",
+    "022_B05_setup_zoomed_dark.png",
+    "023_B05_run_zoomed_dark.png",
+    "024_B05_results_zoomed_dark.png",
+    "025_B05_chain_zoomed_dark.png"
+   ],
+   "err": "",
+   "wall_s": 13.4
+  },
+  "B06": {
+   "status": "done",
+   "t": 1791152022.1462767,
+   "shots": [
+    "026_B06_run_focus_run_btn_dark.png",
+    "027_B06_run_focus_after_tab_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.8
+  },
+  "B07": {
+   "status": "done",
+   "t": 1791152054.5403845,
+   "shots": [
+    "028_B07_setup_setup_default_light.png",
+    "029_B07_run_empty_light.png",
+    "030_B07_results_empty_light.png",
+    "031_B07_chain_empty_light.png",
+    "032_B07_setup_form1d_top_light.png",
+    "033_B07_setup_form1d_bottom_light.png",
+    "034_B07_setup_form2d_top_light.png",
+    "035_B07_setup_form2d_bottom_light.png",
+    "036_B07_setup_form3d_top_light.png",
+    "037_B07_setup_form3d_bottom_light.png",
+    "038_B07_setup_error_strip_light.png",
+    "039_B07_setup_geom1100x720_light.png"
+   ],
+   "err": "",
+   "wall_s": 30.0
+  },
+  "Q01": {
+   "status": "done",
+   "t": 1791152064.8280108,
+   "shots": [
+    "040_Q01_setup_setup_3d_dark.png",
+    "041_Q01_setup_back_to_2d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.4
+  },
+  "Q02": {
+   "status": "done",
+   "t": 1791152112.918113,
+   "shots": [
+    "042_Q02_setup_light_setup_light.png",
+    "043_Q02_run_light_run_light.png",
+    "044_Q02_results_light_results_light.png",
+    "045_Q02_chain_light_chain_light.png",
+    "046_Q02_setup_dark_setup_dark.png",
+    "047_Q02_run_dark_run_dark.png",
+    "048_Q02_results_dark_results_dark.png",
+    "049_Q02_chain_dark_chain_dark.png",
+    "050_Q02_setup_light_setup_light.png",
+    "051_Q02_run_light_run_light.png",
+    "052_Q02_results_light_results_light.png",
+    "053_Q02_chain_light_chain_light.png",
+    "054_Q02_setup_dark_setup_dark.png",
+    "055_Q02_run_dark_run_dark.png",
+    "056_Q02_results_dark_results_dark.png",
+    "057_Q02_chain_dark_chain_dark.png"
+   ],
+   "err": "",
+   "wall_s": 45.7
+  },
+  "Q03": {
+   "status": "done",
+   "t": 1791152116.350939,
+   "shots": [],
+   "err": "",
+   "wall_s": 0.4
+  },
+  "Q04": {
+   "status": "done",
+   "t": 1791152128.9953773,
+   "shots": [
+    "058_Q04_setup_dpi125_setup_dark.png",
+    "059_Q04_run_dpi125_run_dark.png",
+    "060_Q04_results_dpi125_results_dark.png",
+    "061_Q04_chain_dpi125_chain_dark.png",
+    "062_Q04_setup_dpi150_setup_dark.png",
+    "063_Q04_run_dpi150_run_dark.png",
+    "064_Q04_results_dpi150_results_dark.png",
+    "065_Q04_chain_dpi150_chain_dark.png"
+   ],
+   "err": "",
+   "wall_s": 10.3
+  },
+  "C01": {
+   "status": "done",
+   "t": 1791152135.2679434,
+   "shots": [
+    "066_C01_setup_two_parse_errors_dark.png",
+    "067_C01_setup_one_parse_error_left_dark.png"
+   ],
+   "err": "",
+   "wall_s": 3.6
+  },
+  "C02": {
+   "status": "done",
+   "t": 1791152150.8016868,
+   "shots": [
+    "068_C02_setup_cell_0_dark.png",
+    "069_C02_setup_charge_0_dark.png",
+    "070_C02_setup_Lx_-1_dark.png",
+    "071_C02_setup_1d_radius_0_dark.png",
+    "072_C02_setup_3d_tend_neg_dark.png",
+    "073_C02_setup_3d_slice_99_dark.png"
+   ],
+   "err": "",
+   "wall_s": 12.5
+  },
+  "C03": {
+   "status": "done",
+   "t": 1791152163.5621786,
+   "shots": [
+    "074_C03_setup_charge_outside_dark.png",
+    "075_C03_setup_charge_in_obstacle_dark.png",
+    "076_C03_setup_bad_obstacle_box_dark.png",
+    "077_C03_setup_gauge_outside_dark.png",
+    "078_C03_setup_charge_near_ground_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.5
+  },
+  "C04": {
+   "status": "done",
+   "t": 1791152174.1706457,
+   "shots": [
+    "079_C04_setup_gauge_row_a_b_dark.png",
+    "080_C04_setup_gauge_row_1_2_3_dark.png",
+    "081_C04_setup_gauge_row_empty_dark.png",
+    "082_C04_setup_gauge_row_1,2_dark.png",
+    "083_C04_setup_gauge_row_1;2_dark.png",
+    "084_C04_setup_remove_nothing_selected_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.4
+  },
+  "C05": {
+   "status": "done",
+   "t": 1791152185.1122108,
+   "shots": [
+    "085_C05_setup_numerics_native_dark.png",
+    "086_C05_setup_numerics_foam_dark.png",
+    "087_C05_setup_amr_card_on_dark.png",
+    "088_C05_setup_back_to_native_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.7
+  },
+  "C06": {
+   "status": "done",
+   "t": 1791152199.960999,
+   "shots": [
+    "089_C06_setup_zone_on_native_dark.png",
+    "090_C06_setup_zone_on_foam_dark.png",
+    "091_C06_setup_zone_level7_dark.png",
+    "092_C06_setup_zone_jump_dark.png",
+    "093_C06_setup_zone_snapped_dark.png",
+    "094_C06_setup_axisym_zone_on_axis_l2_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.7
+  },
+  "C07": {
+   "status": "done",
+   "t": 1791152216.5839775,
+   "shots": [
+    "095_C07_setup_amr_native_dark.png",
+    "096_C07_setup_amr_valid_dark.png",
+    "097_C07_setup_amr_plus_zones_dark.png",
+    "098_C07_setup_amr_unrefine_gt_refine_dark.png",
+    "099_C07_setup_amr_display_gt_levels_dark.png",
+    "100_C07_setup_amr_charge_unresolved_dark.png"
+   ],
+   "err": "",
+   "wall_s": 13.4
+  },
+  "C08": {
+   "status": "done",
+   "t": 1791152227.2153056,
+   "shots": [
+    "101_C08_setup_2d_cap_dark.png",
+    "102_C08_run_dialog-show_error_dark.png",
+    "103_C08_run_after_modal_dark.png",
+    "104_C08_setup_3d_large_warning_dark.png",
+    "105_C08_setup_3d_foam_cap_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.3
+  },
+  "C09": {
+   "status": "done",
+   "t": 1791152251.9448807,
+   "shots": [
+    "106_C09_setup_overflow_dark.png",
+    "107_C09_setup_overflow_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 21.6
+  },
+  "C10": {
+   "status": "done",
+   "t": 1791152269.852772,
+   "shots": [
+    "108_C10_setup_3d_zones_preview_dark.png",
+    "109_C10_setup_3d_zones_mesh_dark.png",
+    "110_C10_setup_2d_refine_mesh_dark.png",
+    "111_C10_setup_2d_amr_mesh_dark.png",
+    "112_C10_setup_1d_preview_hint_dark.png"
+   ],
+   "err": "",
+   "wall_s": 14.8
+  },
+  "C11": {
+   "status": "done",
+   "t": 1791152277.0961235,
+   "shots": [
+    "113_C11_setup_axisym_labels_dark.png",
+    "114_C11_setup_planar_labels_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.0
+  },
+  "C12": {
+   "status": "done",
+   "t": 1791152284.7885802,
+   "shots": [
+    "115_C12_setup_dialog-save_file_dark.png",
+    "116_C12_setup_after_open_dark.png",
+    "117_C12_setup_dialog-open_file_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.6
+  },
+  "D01": {
+   "status": "done",
+   "t": 1791152293.3847919,
+   "shots": [
+    "118_D01_run_running_dark.png",
+    "119_D01_run_dialog-notify_desktop_dark.png",
+    "120_D01_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.5
+  },
+  "D02": {
+   "status": "done",
+   "t": 1791152330.0139747,
+   "shots": [
+    "121_D02_run_dialog-ask_yes_no_dark.png",
+    "122_D02_run_live_mesh_dark.png",
+    "123_D02_run_refresh_steps5_dark.png",
+    "124_D02_run_live_nomesh_dark.png",
+    "125_D02_run_dialog-notify_desktop_dark.png",
+    "126_D02_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 33.5
+  },
+  "D03": {
+   "status": "done",
+   "t": 1791152374.4895363,
+   "shots": [
+    "127_D03_run_dialog-ask_yes_no_dark.png",
+    "128_D03_run_initialised_dark.png",
+    "129_D03_run_exec10_dark.png",
+    "130_D03_run_interrupted_dark.png",
+    "131_D03_run_dialog-notify_desktop_dark.png",
+    "132_D03_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 41.2
+  },
+  "D04": {
+   "status": "done",
+   "t": 1791152944.9361634,
+   "shots": [
+    "133_D04_setup_3d_form_dark.png",
+    "134_D04_run_dialog-ask_yes_no_dark.png",
+    "135_D04_run_live_slice_dark.png",
+    "136_D04_run_live_3d_dark.png",
+    "137_D04_run_dialog-notify_desktop_dark.png",
+    "138_D04_run_finished_slice_dark.png",
+    "139_D04_run_finished_3d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 567.2
+  },
+  "D05": {
+   "status": "done",
+   "t": 1791152976.3797715,
+   "shots": [
+    "140_D05_run_dialog-ask_yes_no_dark.png",
+    "141_D05_run_stop_requested_dark.png",
+    "142_D05_run_stopped_dark.png"
+   ],
+   "err": "",
+   "wall_s": 28.1
+  },
+  "D06": {
+   "status": "done",
+   "t": 1791153013.8798075,
+   "shots": [
+    "143_D06_run_dialog-ask_yes_no_dark.png",
+    "144_D06_run_dialog-show_info_dark.png",
+    "145_D06_run_second_start_dark.png"
+   ],
+   "err": "",
+   "wall_s": 34.3
+  },
+  "E01": {
+   "status": "done",
+   "t": 1791153026.978847,
+   "shots": [
+    "146_E01_results_1d_fields_dark.png",
+    "147_E01_results_1d_gauges_dark.png",
+    "148_E01_results_1d_3d_dark.png",
+    "149_E01_results_dialog-save_file_dark.png",
+    "150_E01_results_after_3dviewer_click_dark.png"
+   ],
+   "err": "",
+   "wall_s": 10.0
+  },
+  "E02": {
+   "status": "done",
+   "t": 1791153043.8650205,
+   "shots": [
+    "151_E02_results_overpressure_t_=_0.110_ms_dark.png",
+    "152_E02_results_overpressure_t_=_0.466_ms_dark.png",
+    "153_E02_results_density_t_=_0.110_ms_dark.png",
+    "154_E02_results_density_t_=_0.466_ms_dark.png",
+    "155_E02_results_speed_t_=_0.110_ms_dark.png",
+    "156_E02_results_speed_t_=_0.466_ms_dark.png",
+    "157_E02_results_peak_overpressure_t_=_0.110_ms_dark.png",
+    "158_E02_results_peak_overpressure_t_=_0.466_ms_dark.png",
+    "159_E02_results_net_ovp_impulse_t_=_0.110_ms_dark.png",
+    "160_E02_results_net_ovp_impulse_t_=_0.466_ms_dark.png",
+    "161_E02_results_overpressure_mesh_dark.png"
+   ],
+   "err": "",
+   "wall_s": 14.3
+  },
+  "E03": {
+   "status": "done",
+   "t": 1791153061.9969404,
+   "shots": [
+    "162_E03_results_gauges_2d_dark.png",
+    "163_E03_results_dialog-save_file_dark.png",
+    "164_E03_results_after_summary_export_dark.png",
+    "165_E03_results_dialog-save_file_dark.png",
+    "166_E03_results_after_tsv_export_dark.png",
+    "167_E03_results_dialog-pick_dir_dark.png",
+    "168_E03_results_after_fieldcsv_export_dark.png",
+    "169_E03_results_dialog-save_file_dark.png",
+    "170_E03_results_after_report_export_dark.png",
+    "171_E03_results_gauges_1d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 15.3
+  },
+  "E04": {
+   "status": "done",
+   "t": 1791153073.2732584,
+   "shots": [
+    "172_E04_results_anim_frame0_dark.png",
+    "173_E04_results_playing_dark.png",
+    "174_E04_results_last_frame_dark.png",
+    "175_E04_results_mid_frame_mesh_dark.png"
+   ],
+   "err": "",
+   "wall_s": 8.5
+  },
+  "E05": {
+   "status": "done",
+   "t": 1791153091.7907357,
+   "shots": [
+    "176_E05_results_overpressure_x-z_dark.png",
+    "177_E05_results_overpressure_x-y_dark.png",
+    "178_E05_results_density_x-z_dark.png",
+    "179_E05_results_density_x-y_dark.png",
+    "180_E05_results_peak_overpressure_x-z_dark.png",
+    "181_E05_results_peak_overpressure_x-y_dark.png",
+    "182_E05_results_net_ovp_impulse_x-z_dark.png",
+    "183_E05_results_net_ovp_impulse_x-y_dark.png",
+    "184_E05_results_isosurface_dark.png",
+    "185_E05_results_ovp_slice_mesh_dark.png",
+    "186_E05_results_gauges_3d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 16.0
+  },
+  "E06": {
+   "status": "done",
+   "t": 1791153112.188394,
+   "shots": [
+    "187_E06_results_viewer_default_dark.png",
+    "188_E06_results_field_rho_dark.png",
+    "189_E06_results_field_e_dark.png",
+    "190_E06_results_field_p_peak_dark.png",
+    "191_E06_results_field_imp_dark.png",
+    "192_E06_results_field_p_dark.png",
+    "193_E06_results_manual_clim_0_200_dark.png",
+    "194_E06_results_log_toggled_dark.png",
+    "195_E06_results_iso_off_dark.png"
+   ],
+   "err": "",
+   "wall_s": 17.6
+  },
+  "E07": {
+   "status": "done",
+   "t": 1791153135.4898999,
+   "shots": [
+    "196_E07_results_dialog-pick_dir_dark.png",
+    "197_E07_results_after_pngs_dark.png",
+    "198_E07_results_dialog-save_file_dark.png",
+    "199_E07_results_after_anim_dark.png"
+   ],
+   "err": "",
+   "wall_s": 20.6
+  },
+  "E08": {
+   "status": "done",
+   "t": 1791153140.6608841,
+   "shots": [
+    "200_E08_results_after_remove_dark.png"
+   ],
+   "err": "",
+   "wall_s": 2.6
+  },
+  "E09": {
+   "status": "done",
+   "t": 1791153147.243268,
+   "shots": [
+    "201_E09_results_titled_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.2
+  },
+  "F00": {
+   "status": "done",
+   "t": 1791153150.6448488,
+   "shots": [],
+   "err": "",
+   "wall_s": 1.0
+  },
+  "G01": {
+   "status": "done",
+   "t": 1791153158.520151,
+   "shots": [
+    "202_G01_chain_chain_default_dark.png",
+    "203_G01_chain_after_refusals_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.5
+  },
+  "G02": {
+   "status": "done",
+   "t": 1791153190.6527274,
+   "shots": [
+    "204_G02_chain_chain_running_dark.png",
+    "205_G02_run_stage1_dark.png",
+    "206_G02_run_stage2_dark.png",
+    "207_G02_run_stage3_dark.png",
+    "208_G02_run_stage3_3d_dark.png",
+    "209_G02_run_dialog-notify_desktop_dark.png",
+    "210_G02_run_chain_done_dark.png",
+    "211_G02_results_results_picker_dark.png",
+    "212_G02_results_chain_stage3d_dark.png",
+    "213_G02_results_chain_stage1d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 29.7
+  },
+  "G03": {
+   "status": "done",
+   "t": 1791153223.2084916,
+   "shots": [
+    "214_G03_chain_chain_while_running_dark.png"
+   ],
+   "err": "",
+   "wall_s": 29.8
+  },
+  "M01": {
+   "status": "done",
+   "t": 1791153230.6018038,
+   "shots": [
+    "215_M01_run_empty_runs_folder_dark.png",
+    "216_M01_run_dialog-show_error_dark.png",
+    "217_M01_run_dialog-show_error_dark.png",
+    "218_M01_run_refused_model_name_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.4
+  },
+  "M02": {
+   "status": "done",
+   "t": 1791153240.9144082,
+   "shots": [
+    "219_M02_run_dialog-ask_yes_no_dark.png",
+    "220_M02_run_dialog-ask_yes_no_dark.png",
+    "221_M02_run_dialog-notify_desktop_dark.png",
+    "222_M02_run_overwritten_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.1
+  },
+  "M03": {
+   "status": "done",
+   "t": 1791153279.2130735,
+   "shots": [
+    "223_M03_run_dialog-notify_desktop_dark.png",
+    "224_M03_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 35.1
+  },
+  "M04": {
+   "status": "done",
+   "t": 1791153294.6452718,
+   "shots": [
+    "225_M04_chain_chain_two_stages_dark.png",
+    "226_M04_chain_dialog-notify_desktop_dark.png",
+    "227_M04_run_chain_done_dark.png"
+   ],
+   "err": "",
+   "wall_s": 12.4
+  },
+  "M05": {
+   "status": "done",
+   "t": 1791153302.2912567,
+   "shots": [
+    "228_M05_run_hd13_done_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.1
+  },
+  "V01": {
+   "status": "done",
+   "t": 1791153312.1758459,
+   "shots": [
+    "229_V01_setup_1d_off_dark.png",
+    "230_V01_setup_1d_off_card_dark.png",
+    "231_V01_setup_1d_time_dark.png",
+    "232_V01_setup_1d_time_card_dark.png",
+    "233_V01_setup_1d_step_dark.png",
+    "234_V01_setup_1d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.4
+  },
+  "V02": {
+   "status": "done",
+   "t": 1791153324.524771,
+   "shots": [
+    "235_V02_setup_2d_no_obstacles_dark.png",
+    "236_V02_setup_2d_no_obstacles_card_dark.png",
+    "237_V02_setup_2d_with_obstacle_dark.png",
+    "238_V02_setup_2d_with_obstacle_card_dark.png",
+    "239_V02_setup_2d_step_dark.png",
+    "240_V02_setup_2d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.0
+  },
+  "V03": {
+   "status": "done",
+   "t": 1791153337.2559133,
+   "shots": [
+    "241_V03_setup_3d_off_dark.png",
+    "242_V03_setup_3d_off_card_dark.png",
+    "243_V03_setup_3d_time_dark.png",
+    "244_V03_setup_3d_time_card_dark.png",
+    "245_V03_setup_3d_plane_q1_refused_card_dark.png",
+    "246_V03_setup_3d_step_plane_dark.png",
+    "247_V03_setup_3d_step_plane_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.3
+  },
+  "V04": {
+   "status": "done",
+   "t": 1791153347.4352357,
+   "shots": [
+    "248_V04_setup_native_no_card_dark.png",
+    "249_V04_setup_foam_again_dark.png",
+    "250_V04_setup_foam_again_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 6.5
+  },
+  "V05": {
+   "status": "done",
+   "t": 1791153352.3035922,
+   "shots": [],
+   "err": "",
+   "wall_s": 1.6
+  },
+  "V06": {
+   "status": "done",
+   "t": 1791153366.4428663,
+   "shots": [
+    "251_V06_setup_1d_keep_off_dark.png",
+    "252_V06_setup_1d_keep_off_card_dark.png",
+    "253_V06_setup_1d_keep_on_dark.png",
+    "254_V06_setup_1d_keep_on_card_dark.png",
+    "255_V06_setup_3d_keep_off_dark.png",
+    "256_V06_setup_3d_keep_off_card_dark.png",
+    "257_V06_setup_3d_keep_on_dark.png",
+    "258_V06_setup_3d_keep_on_card_dark.png",
+    "259_V06_setup_native_keep_hidden_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.8
+  },
+  "V07": {
+   "status": "done",
+   "t": 1791153377.3392904,
+   "shots": [
+    "260_V07_setup_1d_gauges_off_dark.png",
+    "261_V07_setup_1d_gauges_off_card_dark.png",
+    "262_V07_setup_1d_gauges_on_dark.png",
+    "263_V07_setup_1d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.1
+  },
+  "V08": {
+   "status": "done",
+   "t": 1791153387.737285,
+   "shots": [
+    "264_V08_setup_2d_gauges_off_dark.png",
+    "265_V08_setup_2d_gauges_off_card_dark.png",
+    "266_V08_setup_2d_gauges_on_dark.png",
+    "267_V08_setup_2d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.1
+  },
+  "V09": {
+   "status": "done",
+   "t": 1791153398.233791,
+   "shots": [
+    "268_V09_setup_3d_gauges_off_dark.png",
+    "269_V09_setup_3d_gauges_off_card_dark.png",
+    "270_V09_setup_3d_gauges_on_dark.png",
+    "271_V09_setup_3d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  },
+  "V10": {
+   "status": "done",
+   "t": 1791153408.834347,
+   "shots": [
+    "272_V10_setup_3d_decimate_2_dark.png",
+    "273_V10_setup_3d_decimate_2_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  },
+  "H01": {
+   "status": "done",
+   "t": 1791153440.8739314,
+   "shots": [
+    "274_H01_setup_preview_dark_dark.png",
+    "275_H01_setup_preview_light_no_redraw_light.png",
+    "276_H01_setup_preview_light_redrawn_light.png",
+    "277_H01_setup_preview_dark_no_redraw_dark.png"
+   ],
+   "err": "",
+   "wall_s": 28.8
+  },
+  "H02": {
+   "status": "done",
+   "t": 1791153503.884135,
+   "shots": [
+    "278_H02_run_dialog-ask_yes_no_dark.png",
+    "279_H02_run_live_light_light.png",
+    "280_H02_run_dialog-notify_desktop_light.png",
+    "281_H02_run_finished_light_light.png",
+    "282_H02_run_finished_dark_again_dark.png"
+   ],
+   "err": "",
+   "wall_s": 59.7
+  },
+  "H03": {
+   "status": "done",
+   "t": 1791153545.5502968,
+   "shots": [
+    "283_H03_results_2d_field_light.png",
+    "284_H03_results_2d_gauges_light.png",
+    "285_H03_results_2d_3d_light.png",
+    "286_H03_results_3d_field_light.png",
+    "287_H03_results_3d_gauges_light.png",
+    "288_H03_results_3d_3d_light.png",
+    "289_H03_results_3d_viewer_light.png",
+    "290_H03_results_browser_light_light.png",
+    "291_H03_chain_chain_light_light.png",
+    "292_H03_run_run_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 38.4
+  },
+  "I01": {
+   "status": "done",
+   "t": 1791154131.4537134,
+   "shots": [
+    "293_I01_run_dialog-ask_yes_no_dark.png",
+    "294_I01_run_dialog-notify_desktop_dark.png",
+    "295_I01_setup_after_rapid_dark.png",
+    "296_I01_run_after_rapid_dark.png",
+    "297_I01_results_after_rapid_dark.png",
+    "298_I01_chain_after_rapid_dark.png"
+   ],
+   "err": "",
+   "wall_s": 583.1
+  },
+  "I02": {
+   "status": "done",
+   "t": 1791154154.0934188,
+   "shots": [
+    "299_I02_run_dialog-ask_yes_no_dark.png"
+   ],
+   "err": "",
+   "wall_s": 19.3
+  },
+  "I03": {
+   "status": "done",
+   "t": 1791154200.0755894,
+   "shots": [
+    "300_I03_setup_dialog-show_error_dark.png",
+    "301_I03_setup_dialog-show_error_dark.png",
+    "302_I03_setup_dialog-show_error_dark.png",
+    "303_I03_setup_dialog-show_error_dark.png",
+    "304_I03_setup_dialog-show_error_dark.png",
+    "305_I03_setup_after_bad_json_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.9
+  },
+  "I04": {
+   "status": "done",
+   "t": 1791154266.0814016,
+   "shots": [
+    "306_I04_run_dialog-show_error_dark.png",
+    "307_I04_run_large_run_started_dark.png"
+   ],
+   "err": "",
+   "wall_s": 63.5
+  },
+  "I05": {
+   "status": "done",
+   "t": 1791154277.8220754,
+   "shots": [
+    "308_I05_setup_charge_1e400_dark.png",
+    "309_I05_setup_charge_nan_dark.png",
+    "310_I05_setup_charge_inf_dark.png",
+    "311_I05_setup_charge_1_dark.png",
+    "312_I05_setup_charge_1comma5_dark.png",
+    "313_I05_setup_charge_neg0_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.3
+  },
+  "I06": {
+   "status": "done",
+   "t": 1791154297.9430053,
+   "shots": [
+    "314_I06_results_3d_1100x720_dark.png",
+    "315_I06_results_3d_900x600_dark.png"
+   ],
+   "err": "",
+   "wall_s": 17.5
+  },
+  "K01": {
+   "status": "done",
+   "t": 1791154326.1581361,
+   "shots": [
+    "316_K01_setup_frame_light_light.png",
+    "317_K01_setup_frame_dark_dark.png",
+    "318_K01_setup_frame_dirty_dark.png"
+   ],
+   "err": "",
+   "wall_s": 25.8
+  },
+  "K02": {
+   "status": "done",
+   "t": 1791154449.2497115,
+   "shots": [
+    "319_K02_setup_setup_native_dark_dark.png",
+    "320_K02_setup_setup_blastfoam_dark_dark.png",
+    "321_K02_run_run_banner_dark_dark.png",
+    "322_K02_chain_chain_dark_dark.png",
+    "323_K02_setup_setup_native_light_light.png",
+    "324_K02_setup_setup_blastfoam_light_light.png",
+    "325_K02_run_run_banner_light_light.png",
+    "326_K02_chain_chain_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 120.6
+  },
+  "K03": {
+   "status": "done",
+   "t": 1791154483.625261,
+   "shots": [
+    "327_K03_setup_1100x720-setup-tree_light.png",
+    "328_K03_run_1100x720-run-finished_light.png",
+    "329_K03_results_1100x720-results-field_light.png",
+    "330_K03_chain_1100x720-chain-route123_light.png",
+    "331_K03_setup_1600x1000-setup-tree_light.png",
+    "332_K03_run_1600x1000-run-finished_light.png",
+    "333_K03_results_1600x1000-results-field_light.png",
+    "334_K03_chain_1600x1000-chain-route123_light.png"
+   ],
+   "err": "",
+   "wall_s": 31.7
+  }
+ },
+ "shot_counter": 334,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1791151946.7493045,
+   "argv": [
+    "--out",
+    "C:\\Users\\ROTEM~1.OFE\\AppData\\Local\\Temp\\claude\\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\\e7422584-05b6-4ea1-a838-af932f770ee0\\scratchpad\\h13",
+    "--skip",
+    "F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11",
+    "--budget",
+    "7000"
+   ],
+   "end": 1791154154.1446838,
+   "exit": 75
+  },
+  {
+   "start": 1791154179.8048563,
+   "argv": [
+    "--out",
+    "C:\\Users\\ROTEM~1.OFE\\AppData\\Local\\Temp\\claude\\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\\e7422584-05b6-4ea1-a838-af932f770ee0\\scratchpad\\h13",
+    "--resume",
+    "--skip",
+    "F01,F02,F03,F04,F05,F06,F07,F08,F09,F10,F11",
+    "--budget",
+    "7000"
+   ],
+   "end": 1791154488.9409275,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "B01": {
+   "wall_s": 8.6,
+   "max_gap_ms": 182,
+   "p99_gap_ms": 27,
+   "big_gaps": []
+  },
+  "B02": {
+   "wall_s": 18.2,
+   "max_gap_ms": 83,
+   "p99_gap_ms": 29,
+   "big_gaps": []
+  },
+  "B03": {
+   "wall_s": 7.5,
+   "max_gap_ms": 186,
+   "p99_gap_ms": 146,
+   "big_gaps": []
+  },
+  "B04": {
+   "wall_s": 3.7,
+   "max_gap_ms": 26,
+   "p99_gap_ms": 26,
+   "big_gaps": []
+  },
+  "B05": {
+   "wall_s": 13.4,
+   "max_gap_ms": 110,
+   "p99_gap_ms": 78,
+   "big_gaps": []
+  },
+  "B06": {
+   "wall_s": 4.8,
+   "max_gap_ms": 33,
+   "p99_gap_ms": 28,
+   "big_gaps": []
+  },
+  "B07": {
+   "wall_s": 30.0,
+   "max_gap_ms": 350,
+   "p99_gap_ms": 131,
+   "big_gaps": [
+    [
+     335,
+     "appearance light"
+    ],
+    [
+     350,
+     "appearance dark"
+    ]
+   ]
+  },
+  "Q01": {
+   "wall_s": 7.4,
+   "max_gap_ms": 211,
+   "p99_gap_ms": 109,
+   "big_gaps": []
+  },
+  "Q02": {
+   "wall_s": 45.7,
+   "max_gap_ms": 351,
+   "p99_gap_ms": 111,
+   "big_gaps": [
+    [
+     351,
+     "appearance light"
+    ],
+    [
+     301,
+     "appearance dark"
+    ],
+    [
+     305,
+     "appearance light"
+    ],
+    [
+     300,
+     "appearance dark"
+    ]
+   ]
+  },
+  "Q03": {
+   "wall_s": 0.4,
+   "max_gap_ms": 29,
+   "p99_gap_ms": 29,
+   "big_gaps": []
+  },
+  "Q04": {
+   "wall_s": 10.3,
+   "max_gap_ms": 110,
+   "p99_gap_ms": 33,
+   "big_gaps": []
+  },
+  "C01": {
+   "wall_s": 3.6,
+   "max_gap_ms": 143,
+   "p99_gap_ms": 133,
+   "big_gaps": []
+  },
+  "C02": {
+   "wall_s": 12.5,
+   "max_gap_ms": 189,
+   "p99_gap_ms": 152,
+   "big_gaps": []
+  },
+  "C03": {
+   "wall_s": 9.5,
+   "max_gap_ms": 144,
+   "p99_gap_ms": 141,
+   "big_gaps": []
+  },
+  "C04": {
+   "wall_s": 7.4,
+   "max_gap_ms": 137,
+   "p99_gap_ms": 126,
+   "big_gaps": []
+  },
+  "C05": {
+   "wall_s": 7.7,
+   "max_gap_ms": 147,
+   "p99_gap_ms": 143,
+   "big_gaps": []
+  },
+  "C06": {
+   "wall_s": 11.7,
+   "max_gap_ms": 367,
+   "p99_gap_ms": 159,
+   "big_gaps": [
+    [
+     367,
+     "solver blastfoam"
+    ],
+    [
+     259,
+     "solver blastfoam"
+    ]
+   ]
+  },
+  "C07": {
+   "wall_s": 13.4,
+   "max_gap_ms": 147,
+   "p99_gap_ms": 131,
+   "big_gaps": []
+  },
+  "C08": {
+   "wall_s": 7.3,
+   "max_gap_ms": 209,
+   "p99_gap_ms": 150,
+   "big_gaps": []
+  },
+  "C09": {
+   "wall_s": 21.6,
+   "max_gap_ms": 377,
+   "p99_gap_ms": 336,
+   "big_gaps": [
+    [
+     336,
+     "appearance light"
+    ],
+    [
+     377,
+     "appearance dark"
+    ]
+   ]
+  },
+  "C10": {
+   "wall_s": 14.8,
+   "max_gap_ms": 758,
+   "p99_gap_ms": 155,
+   "big_gaps": [
+    [
+     758,
+     "set_case Case3D"
+    ],
+    [
+     300,
+     "set_case Case3D"
+    ],
+    [
+     273,
+     "set_case Case2D"
+    ]
+   ]
+  },
+  "C11": {
+   "wall_s": 4.0,
+   "max_gap_ms": 149,
+   "p99_gap_ms": 125,
+   "big_gaps": []
+  },
+  "C12": {
+   "wall_s": 4.6,
+   "max_gap_ms": 152,
+   "p99_gap_ms": 147,
+   "big_gaps": []
+  },
+  "D01": {
+   "wall_s": 5.5,
+   "max_gap_ms": 334,
+   "p99_gap_ms": 188,
+   "big_gaps": [
+    [
+     334,
+     "click Run"
+    ]
+   ]
+  },
+  "D02": {
+   "wall_s": 33.5,
+   "max_gap_ms": 282,
+   "p99_gap_ms": 102,
+   "big_gaps": [
+    [
+     282,
+     "click Run"
+    ]
+   ]
+  },
+  "D03": {
+   "wall_s": 41.2,
+   "max_gap_ms": 294,
+   "p99_gap_ms": 91,
+   "big_gaps": [
+    [
+     294,
+     "click END"
+    ]
+   ]
+  },
+  "D04": {
+   "wall_s": 567.2,
+   "max_gap_ms": 10595,
+   "p99_gap_ms": 60,
+   "big_gaps": [
+    [
+     10595,
+     "click Run"
+    ],
+    [
+     327,
+     "click Run"
+    ]
+   ]
+  },
+  "D05": {
+   "wall_s": 28.1,
+   "max_gap_ms": 345,
+   "p99_gap_ms": 168,
+   "big_gaps": [
+    [
+     345,
+     "click Run"
+    ]
+   ]
+  },
+  "D06": {
+   "wall_s": 34.3,
+   "max_gap_ms": 257,
+   "p99_gap_ms": 108,
+   "big_gaps": [
+    [
+     257,
+     "click Run"
+    ]
+   ]
+  },
+  "E01": {
+   "wall_s": 10.0,
+   "max_gap_ms": 211,
+   "p99_gap_ms": 37,
+   "big_gaps": []
+  },
+  "E02": {
+   "wall_s": 14.3,
+   "max_gap_ms": 54,
+   "p99_gap_ms": 35,
+   "big_gaps": []
+  },
+  "E03": {
+   "wall_s": 15.3,
+   "max_gap_ms": 248,
+   "p99_gap_ms": 37,
+   "big_gaps": []
+  },
+  "E04": {
+   "wall_s": 8.5,
+   "max_gap_ms": 50,
+   "p99_gap_ms": 41,
+   "big_gaps": []
+  },
+  "E05": {
+   "wall_s": 16.0,
+   "max_gap_ms": 173,
+   "p99_gap_ms": 36,
+   "big_gaps": []
+  },
+  "E06": {
+   "wall_s": 17.6,
+   "max_gap_ms": 55,
+   "p99_gap_ms": 49,
+   "big_gaps": []
+  },
+  "E07": {
+   "wall_s": 20.6,
+   "max_gap_ms": 58,
+   "p99_gap_ms": 39,
+   "big_gaps": []
+  },
+  "E08": {
+   "wall_s": 2.6,
+   "max_gap_ms": 63,
+   "p99_gap_ms": 63,
+   "big_gaps": []
+  },
+  "E09": {
+   "wall_s": 4.2,
+   "max_gap_ms": 59,
+   "p99_gap_ms": 45,
+   "big_gaps": []
+  },
+  "F00": {
+   "wall_s": 1.0,
+   "max_gap_ms": 0,
+   "p99_gap_ms": 0,
+   "big_gaps": []
+  },
+  "G01": {
+   "wall_s": 5.5,
+   "max_gap_ms": 161,
+   "p99_gap_ms": 154,
+   "big_gaps": []
+  },
+  "G02": {
+   "wall_s": 29.7,
+   "max_gap_ms": 696,
+   "p99_gap_ms": 221,
+   "big_gaps": [
+    [
+     696,
+     "goto chain"
+    ],
+    [
+     303,
+     "click pill run"
+    ],
+    [
+     273,
+     "goto run"
+    ],
+    [
+     280,
+     "goto run"
+    ],
+    [
+     352,
+     "goto results"
+    ]
+   ]
+  },
+  "G03": {
+   "wall_s": 29.8,
+   "max_gap_ms": 263,
+   "p99_gap_ms": 140,
+   "big_gaps": [
+    [
+     263,
+     "goto chain"
+    ]
+   ]
+  },
+  "M01": {
+   "wall_s": 4.4,
+   "max_gap_ms": 153,
+   "p99_gap_ms": 87,
+   "big_gaps": []
+  },
+  "M02": {
+   "wall_s": 7.1,
+   "max_gap_ms": 575,
+   "p99_gap_ms": 189,
+   "big_gaps": [
+    [
+     575,
+     "click Run"
+    ]
+   ]
+  },
+  "M03": {
+   "wall_s": 35.1,
+   "max_gap_ms": 359,
+   "p99_gap_ms": 144,
+   "big_gaps": [
+    [
+     359,
+     "click Run"
+    ]
+   ]
+  },
+  "M04": {
+   "wall_s": 12.4,
+   "max_gap_ms": 716,
+   "p99_gap_ms": 304,
+   "big_gaps": [
+    [
+     716,
+     "goto chain"
+    ],
+    [
+     325,
+     "goto chain"
+    ],
+    [
+     304,
+     "goto chain"
+    ]
+   ]
+  },
+  "M05": {
+   "wall_s": 5.1,
+   "max_gap_ms": 120,
+   "p99_gap_ms": 87,
+   "big_gaps": []
+  },
+  "V01": {
+   "wall_s": 7.4,
+   "max_gap_ms": 133,
+   "p99_gap_ms": 94,
+   "big_gaps": []
+  },
+  "V02": {
+   "wall_s": 9.0,
+   "max_gap_ms": 187,
+   "p99_gap_ms": 155,
+   "big_gaps": []
+  },
+  "V03": {
+   "wall_s": 9.3,
+   "max_gap_ms": 189,
+   "p99_gap_ms": 88,
+   "big_gaps": []
+  },
+  "V04": {
+   "wall_s": 6.5,
+   "max_gap_ms": 190,
+   "p99_gap_ms": 182,
+   "big_gaps": []
+  },
+  "V05": {
+   "wall_s": 1.6,
+   "max_gap_ms": 0,
+   "p99_gap_ms": 0,
+   "big_gaps": []
+  },
+  "V06": {
+   "wall_s": 11.8,
+   "max_gap_ms": 198,
+   "p99_gap_ms": 121,
+   "big_gaps": []
+  },
+  "V07": {
+   "wall_s": 7.1,
+   "max_gap_ms": 144,
+   "p99_gap_ms": 91,
+   "big_gaps": []
+  },
+  "V08": {
+   "wall_s": 7.1,
+   "max_gap_ms": 192,
+   "p99_gap_ms": 146,
+   "big_gaps": []
+  },
+  "V09": {
+   "wall_s": 7.2,
+   "max_gap_ms": 203,
+   "p99_gap_ms": 95,
+   "big_gaps": []
+  },
+  "V10": {
+   "wall_s": 7.2,
+   "max_gap_ms": 172,
+   "p99_gap_ms": 139,
+   "big_gaps": []
+  },
+  "H01": {
+   "wall_s": 28.8,
+   "max_gap_ms": 630,
+   "p99_gap_ms": 542,
+   "big_gaps": [
+    [
+     630,
+     "appearance light"
+    ],
+    [
+     542,
+     "appearance dark"
+    ]
+   ]
+  },
+  "H02": {
+   "wall_s": 59.7,
+   "max_gap_ms": 572,
+   "p99_gap_ms": 149,
+   "big_gaps": [
+    [
+     572,
+     "appearance light"
+    ],
+    [
+     376,
+     "appearance light"
+    ],
+    [
+     541,
+     "appearance dark"
+    ]
+   ]
+  },
+  "H03": {
+   "wall_s": 38.4,
+   "max_gap_ms": 646,
+   "p99_gap_ms": 77,
+   "big_gaps": [
+    [
+     502,
+     "appearance light"
+    ],
+    [
+     646,
+     "appearance dark"
+    ]
+   ]
+  },
+  "I01": {
+   "wall_s": 583.1,
+   "max_gap_ms": 398,
+   "p99_gap_ms": 63,
+   "big_gaps": [
+    [
+     262,
+     "click Run"
+    ],
+    [
+     326,
+     "goto run"
+    ],
+    [
+     332,
+     "goto run"
+    ],
+    [
+     269,
+     "goto run"
+    ],
+    [
+     317,
+     "goto run"
+    ],
+    [
+     398,
+     "goto run"
+    ]
+   ]
+  },
+  "I02": {
+   "wall_s": 19.3,
+   "max_gap_ms": 236,
+   "p99_gap_ms": 175,
+   "big_gaps": []
+  },
+  "I03": {
+   "wall_s": 4.9,
+   "max_gap_ms": 142,
+   "p99_gap_ms": 115,
+   "big_gaps": []
+  },
+  "I04": {
+   "wall_s": 63.5,
+   "max_gap_ms": 818,
+   "p99_gap_ms": 96,
+   "big_gaps": [
+    [
+     818,
+     "click Run"
+    ],
+    [
+     800,
+     "click Run"
+    ],
+    [
+     812,
+     "click Run"
+    ],
+    [
+     802,
+     "click Run"
+    ],
+    [
+     796,
+     "click Run"
+    ],
+    [
+     781,
+     "click Run"
+    ],
+    [
+     782,
+     "click Run"
+    ],
+    [
+     793,
+     "click Run"
+    ]
+   ]
+  },
+  "I05": {
+   "wall_s": 9.3,
+   "max_gap_ms": 150,
+   "p99_gap_ms": 130,
+   "big_gaps": []
+  },
+  "I06": {
+   "wall_s": 17.5,
+   "max_gap_ms": 10489,
+   "p99_gap_ms": 170,
+   "big_gaps": [
+    [
+     10489,
+     "resize 900x600"
+    ]
+   ]
+  },
+  "K01": {
+   "wall_s": 25.8,
+   "max_gap_ms": 610,
+   "p99_gap_ms": 232,
+   "big_gaps": [
+    [
+     610,
+     "appearance light"
+    ],
+    [
+     465,
+     "appearance dark"
+    ]
+   ]
+  },
+  "K02": {
+   "wall_s": 120.6,
+   "max_gap_ms": 491,
+   "p99_gap_ms": 114,
+   "big_gaps": [
+    [
+     352,
+     "goto results"
+    ],
+    [
+     491,
+     "appearance light"
+    ],
+    [
+     332,
+     "goto results"
+    ],
+    [
+     443,
+     "appearance dark"
+    ]
+   ]
+  },
+  "K03": {
+   "wall_s": 31.7,
+   "max_gap_ms": 486,
+   "p99_gap_ms": 122,
+   "big_gaps": [
+    [
+     475,
+     "appearance light"
+    ],
+    [
+     486,
+     "appearance dark"
+    ]
+   ]
+  }
+ },
+ "f00_attempts": 1,
+ "pre_f_pgrep": [],
+ "runs_root_bytes_before": 3340154367
+}

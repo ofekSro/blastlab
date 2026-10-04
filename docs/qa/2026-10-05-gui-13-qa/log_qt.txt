@@ -1,0 +1,100 @@
+﻿platform windows model folder C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_6kb7py6i\runs\gui13qa
+PASS startup: title
+      ● untitled · BlastLab
+CHAIN3 rows (default) [('warn', "The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.")]
+card states ['● case OK', '● 1 warning', '● 1 warning']
+seed Lz 1.5 get_case Lz 1.5
+PASS Chain default: A1 skipped, so the seed still warns (Lz 1.5, card 3 1 warning)
+      ('● 1 warning', [('warn', "The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.")])
+PASS Chain default: card 2 state (S2-1 expected to remain, Q1)
+      ● 1 warning | [('warn', "The 1D stage hands off when its shock is at 10.0 m, beyond this stage's whole 4.0 × 4.0 m domain: this stage would start after the wave has left it. Set stage 1's radius below 2.0 m.")]
+CARD LABELS [(1, '01'), (1, '1D spherical'), (1, 'native'), (1, '1.0 kg TNT · R 10.0 m · 1 …'), (1, '● case OK'), (1, '\\1d'), (2, '02'), (2, '2D axisymm…'), (2, 'native'), (2, '4 × 4 m · 25 mm · from 1D'), (2, '● 1 warning'), (2, '\\2d'), (3, '03'), (3, '3D'), (3, 'native'), (3, '1.5 × 1.5 × 1.5 m · 25 mm …'), (3, '● 1 warning'), (3, '\\3d')]
+PASS Chain: card labels not clipped at 1100x720
+CHAIN3 rows Lz1.5 [('warn', "The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.")]
+PASS Chain Lz 1.5: F45 warns with the D3 text
+      ["The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z."]
+PASS Chain Lz 1.5: card 3 shows 1 warning
+      ● 1 warning
+PASS Chain Lz 1.5: Domain & mesh row shows "!" (warn)
+      ('warn', '!')
+PASS Chain Lz 1.5: F45 text wraps, not clipped at 1100x720
+PASS Chain Lz 4.0 again: row ok, card OK
+      ('ok', '● case OK')
+stage1 rows [('ok', 'Stage OK')] tree dom ok
+Lz after route toggle 4.0
+SETUP REPORT [('warn', "No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it."), ('warn', 'G2 (1.40, 0.30) m inside Wall 1 - will be dropped'), ('warn', 'G3 (1.20, 0.30) m on the face of Wall 1 - will be dropped'), ('warn', 'G5 (1.90, 1.10) m inside Wall 2 - will be dropped'), ('warn', 'G6 (2.00, 1.20) m on the face of Wall 2 - will be dropped'), ('warn', 'G7 (3.00, 0.50) m outside the domain - will be dropped'), ('note', 'Cell size will be refined to 0.01250 m (5 cells across the charge radius)'), ('note', '~24,576 cells at dx = 0.012499 m')]
+PASS Setup Checks: every drop line is "G<n> (x, y) m ... - will be dropped"
+      (['G2 (1.40, 0.30) m inside Wall 1 - will be dropped', 'G3 (1.20, 0.30) m on the face of Wall 1 - will be dropped', 'G5 (1.90, 1.10) m inside Wall 2 - will be dropped', 'G6 (2.00, 1.20) m on the face of Wall 2 - will be dropped', 'G7 (3.00, 0.50) m outside the domain - will be dropped'], [])
+PASS Setup Checks: names G2 inside Wall 1 and G7 outside the domain
+      ['G2 (1.40, 0.30) m inside Wall 1 - will be dropped', 'G3 (1.20, 0.30) m on the face of Wall 1 - will be dropped', 'G5 (1.90, 1.10) m inside Wall 2 - will be dropped', 'G6 (2.00, 1.20) m on the face of Wall 2 - will be dropped', 'G7 (3.00, 0.50) m outside the domain - will be dropped']
+PASS Setup Checks: no text clipped at 1100x720
+GAUGE ROWS [['G1', '0.00', ''], ['G2', '1.21', 'inside Wall 1'], ['G3', '1.03', 'on the face of Wall 1'], ['G4', '1.50', '10 cm in front of Wall 2'], ['G5', '1.63', 'inside Wall 2'], ['G6', '1.75', 'on the face of Wall 2'], ['G7', '2.72', ''], ['G8', '1.01', '2 cm in front of Wall 1']]
+PASS Setup Where column: a "(dropped)" entry exists for a gauge in/at a wall
+      ['', 'inside Wall 1', 'on the face of Wall 1', '10 cm in front of Wall 2', 'inside Wall 2', 'on the face of Wall 2', '', '2 cm in front of Wall 1']
+near rows [['G1', '0.99', '4 cm in front of Wall 1'], ['G2', '1.12', 'inside Wall 1'], ['G3', '0.30', '']]
+FOAM where rows [['G1', '1.95', '0.25', '4 cm in front of Wall 1 (dropped)'], ['G2', '2.42', '0.30', '30 cm behind Wall 1']]
+FOAM report [('warn', "No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it."), ('warn', 'G1 (1.25, 0.50) m on the face of Wall 1 - will be dropped'), ('note', 'Obstacles: cells inside each box are carved out of the mesh (rigid walls)'), ('note', 'blastFoam ready in WSL (Ubuntu)'), ('note', 'Charge cells: 108 at 0.05 m -> ~0.98 of the 500 kg set by blastFoam (whole cells are marked; 8 cells across the radius)'), ('note', 'Parallel run: 1 rank: 6,400 cells is below the 200,000-cell parallel floor'), ('note', '~6,400 cells at dx = 0.05 m')]
+PASS Setup Where (blastFoam snapping): 4 cm in front of Wall 1 (dropped)
+      [['G1', '1.95', '0.25', '4 cm in front of Wall 1 (dropped)'], ['G2', '2.42', '0.30', '30 cm behind Wall 1']]
+RUN CASE warn ['G2 (1.12, 0.73) m inside Wall 1 - will be dropped']
+PASS Run case: Setup names the dropped gauge as G2 (x, y) m
+      ['G2 (1.12, 0.73) m inside Wall 1 - will be dropped']
+  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_6kb7py6i\runs\gui13qa\gauges\gauges_2d.txt  (425 rows x 2 gauges)
+PASS run finished
+      6.5s
+run caption 'G2 dropped by the solver (inside Wall 1). 2 gauges, sorted by R. Click a row to enlarge it.' labels ['G1', 'G3']
+PASS Run caption starts "G2 dropped by the solver"
+      G2 dropped by the solver (inside Wall 1). 2 gauges, sorted by R. Click a row to enlarge it.
+drop stylesheet font-size: 12px; font-weight: 600; color: #f5d061; warn #f5d061 None
+PASS Run drop note visible and styled in the warn colour
+      ('font-size: 12px; font-weight: 600; color: #f5d061;', '#f5d061')
+PASS Run: drop note sits above the caption
+      (PySide6.QtCore.QRect(0, 18, 302, 15), PySide6.QtCore.QRect(0, 37, 302, 15))
+card meta 'R 0.77 m · … · selected' PySide6.QtCore.QRect(37, 14, 132, 15) peak 'peak 280,753 kPa' PySide6.QtCore.QRect(177, 14, 112, 15) elided True tip 'R 0.77 m · Wall 1 · selected'
+PASS Run card: header and peak rects do not overlap at 1100x720
+      (PySide6.QtCore.QRect(37, 14, 132, 15), PySide6.QtCore.QRect(177, 14, 112, 15))
+PASS Run card: header tooltip is the full text
+      ('R 0.77 m · Wall 1 · selected', 'R 0.77 m · Wall 1 · selected')
+PASS Run gauge column: wrapped labels fit (heightForWidth <= height) at 1100x720
+PASS Run card: forced narrow header elides middle, tooltip full
+      ('R 0.…cted', 'R 0.77 m · Wall 1 · selected')
+PASS solver kept 2 gauges (G2 dropped)
+      [(1.0883720930232559, 0.6976744186046512), (1.1441860465116278, 0.6976744186046512)]
+results cells [['G1', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'], ['G3', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no']] caption 'G2 dropped by the solver (inside Wall 1) · click a row to plot it · net impulse includes the negative phase'
+PASS Results labels G1, G3
+      [['G1', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'], ['G3', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no']]
+PASS Results drop caption wraps, visible, text G2 dropped
+      G2 dropped by the solver (inside Wall 1)
+PASS Results Gauges: drop line not clipped at 1100x720
+export note G2 dropped by the solver (inside Wall 1)
+footnote bbox Bbox(x0=573.8125, y0=4.167, x1=826.1875, y1=17.167) fig bbox TransformedBbox(
+    Bbox(x0=0.0, y0=0.0, x1=14.0, y1=4.0),
+    Affine2D().scale(100.0))
+PASS Export PNG (Qt note): footnote present and inside the figure
+      ('G2 dropped by the solver (inside Wall 1)', Bbox([[573.8125, 4.167], [826.1875, 17.167]]))
+titles ['G1 (1.06, 0.72) m → cell (1.09, 0.70)', 'G3 (1.12, 0.70) m → cell (1.14, 0.70)']
+PASS Export PNG titles: G1/G3 with entered pos -> cell
+      ['G1 (1.06, 0.72) m → cell (1.09, 0.70)', 'G3 (1.12, 0.70) m → cell (1.14, 0.70)']
+builder footnote Not shown: G2 - dropped by the solver
+PASS Export PNG (no Qt note): builder footnote "Not shown: G2 - dropped by the solver"
+      Not shown: G2 - dropped by the solver
+PASS UI export path passes gauge_drop_note
+      [{'gauge_drop_note': 'G2 dropped by the solver (inside Wall 1)'}]
+  Field profile saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_6kb7py6i\runs\gui13qa\profile.txt  (400 cells, t = 1.828 ms)
+PASS 1D run finished
+      3.0s
+export btn tips {'summary': 'This result has no gauges.', 'tsv': 'This result has no gauges.', 'fieldcsv': 'Every field map as a long-format CSV, one file per field.', 'profile': 'Save the final state for a later stage to start from.', 'vtk': 'Only a blastFoam run whose case directory still exists can be written as VTK.', 'pngs': 'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas\nThe FULL multi-panel snapshot grid as PNGs, not just the single panel on screen.', 'report': 'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas\nOne self-contained HTML file: the FULL snapshot grid, the gauge table and the case, not just the panel on screen.', 'gif': 'This result has no recorded frames - tick "Record replay frames" before the run.'}
+PASS 1D Field: PNG button tooltip starts "Exports use the full title:"
+      Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas
+The FULL multi-panel snapshot grid as PNGs, not just the single panel on screen.
+PASS 1D Field: Report button tooltip starts the same
+      Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas
+One self-contained HTML file: the FULL snapshot grid, the gauge table and the case, not just the panel on screen.
+PASS 1D Field: canvas has no tooltip
+tip grabbed PySide6.QtCore.QSize(456, 58)
+PASS PNG button tooltip visible via QHelpEvent
+      'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas\nThe FULL multi-panel snapshot grid as PNGs
+PASS modal dialogs only the harness-expected overwrite asks
+      [('ask', ('Model folder',))]
+
+37/37 checks passed

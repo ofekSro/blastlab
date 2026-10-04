@@ -45,6 +45,21 @@ purpose. It adds to `CLAUDE.md`, never replaces it. Owner-approved 2026-10-04.
   `PYTHONIOENCODING=utf-8`. Long passes: `python -u` in the background, poll.
 - `test_regression.py` must stay byte-identical; run it last.
 
+## Do it once (owner-approved 2026-10-05)
+
+- **Planner: probe feasibility before planning.** Any task that changes a default, a
+  seed value or anything a golden pins gets a cheap check in the plan itself (validate
+  the case unprobed and probed, grep `char_golden/` and `baseline/` for the value). A
+  task that would fail its own stop rule is not planned; it goes to the owner as a
+  question with the numbers.
+- **New tests pin meaning, not prose.** Assert that the warning exists, names `G3`,
+  names the wall - not the whole sentence. Exact-string pins only where the string is
+  the deliverable.
+- **Implementers do not run the big harnesses** (`_qa_ui_harness.py`, `_qa_gui_harness.py`).
+  They run once, in the QA stage. Any harness `--resume` gets an explicit `--out`.
+- **UX findings: only medium or higher become tasks.** Low ones go to a "parking"
+  section of the UX report and are not planned unless the owner picks them.
+
 ## Token budget - work as if paid in tokens
 
 - Read big files by section: Grep first, then Read the lines you need. Never Read a file

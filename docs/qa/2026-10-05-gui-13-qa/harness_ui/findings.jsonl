@@ -1,0 +1,2 @@
+{"sev": "S2", "cat": "check", "text": "no result labelled 'QA native2d' to select", "tab": "results", "mode": "dark", "shots": [], "evidence": "[]", "scenario": "Q03", "t": 1791152116.350939}
+{"sev": "S2", "cat": "check", "text": "closing during a native run returned in 13.3 s", "tab": "run", "mode": "dark", "shots": ["299_I02_run_dialog-ask_yes_no_dark.png"], "evidence": null, "scenario": "I02", "t": 1791154154.0934188}

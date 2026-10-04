@@ -395,6 +395,27 @@ Decision rows D233-D236.
   warning, export footnote, y/z face ties, layout lows at 1100 × 720, HD13 on the home PC.
 - **Commits:** `d7332df`..`39e0cb7` and the commit of this entry, on branch `gui-12`.
 
+## 0w. 2026-10-05 — batch `gui-13-backlog` (GUI-13; branch `gui-13`)
+
+Plan `docs/batches/2026-10-04-gui-13-backlog.md`; reports `…-backlog-{A,B,C}.*.md`; QA
+`docs/qa/2026-10-05-gui-13-qa/`, UX `docs/qa/2026-10-05-gui-13-ux.md`. Owner "approve all" (D1 keep
+the burst ≥ Lz trigger, Q1-Q3). **A1 (Lz 4 m + 1D radius 1.5 m) SKIPPED** under the plan's stop rule:
+unprobed blastFoam refuses the 4 m box (~1.23 M > 1.11 M cells); the radius is pinned by
+`char_golden/ui_chain_wiring.json` → GUI-14 (a).
+- **A2-A6:** F45 names the form's own fields ("Burst z / Height H" for the axisymmetric stage),
+  "at or above", advises Lz ≥ the 2D height; drop/outside warnings name `G<n> (x, y) m`; one
+  `validation.drop_rule`/`drop_wall` for Setup and Run, Where adds "(dropped)"; export footnote
+  only when a gauge is dropped; top-face rows off exact y/z ties.
+- **B1-B5:** 1100 × 720 clipping (Run header elides, Results drop note wraps, Tk gauge column
+  310/250 px); `!` glyph on the stage-tree row; Run drop note first in warn colour; export-title
+  hint on the export buttons; Results labels fall back to the entered numbers.
+- **C1:** TODO.md 1079 → 978 lines; records to `docs/history/todo-closed.md`.
+- **Tests:** per-task suites, 21 char + 16 `test_gui_*`, `test_regression` byte-identical; Part A
+  mutation-tested (10/10 caught). QA real platform: all PASS but the Tk column (still cut at
+  1100); `_qa_ui_harness` 1543 ok.
+- **Verifier fixes:** `434b60f` (A4 check could not fail), `d4fa2f7` (typo).
+- **Commits:** `1e9e853`..`00a3b8e` and this entry, branch `gui-13`.
+
 ---
 
 ## 1. The timeline — T0–T70
