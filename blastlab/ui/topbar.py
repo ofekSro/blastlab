@@ -32,7 +32,8 @@ DIM_LABELS = ('0D · HD 1.3', '1D', '2D', '3D')
 
 BAR_H = 64
 
-#: the unsaved marker, and its form when the bar is out of room (D198)
+#: the unsaved marker, and its form when the case name is elided or the
+#: bar is out of room (D191 / D198)
 DIRTY_LONG, DIRTY_SHORT = '● unsaved', '●'
 
 
@@ -258,18 +259,22 @@ class TopBar(QFrame):
 
     # ── room (verify10b, F37 / D198) ─────────────────────────────────────
     def _fit_marker(self):
-        """With Setup ✓, Run ✓, `● unsaved` and a long blastFoam chip
-        (`WSL at run start`, `WSL unavailable`), the bar at 1100 px is up
-        to 22 px short even with the case name at its 40 px minimum, and
-        the layout took it from the dimension control (`0D · HD 1.3` drew
-        as `0D …1.3`). Then, and only then, the marker drops its word:
-        `●`, with the word in its tooltip. The status bar still says
-        `<case> has unsaved changes`, and the title carries `●`."""
+        """The unsaved marker drops its word (`●`, the word in its
+        tooltip) whenever the case name is elided (GUI-11, D191 owner
+        review): the name then keeps those letters. Also when the bar is
+        short even with the name at its 40 px minimum (verify10b, F37 /
+        D198: with Setup ✓, Run ✓ and a long blastFoam chip the layout
+        took the room from the dimension control). Both are predicted
+        from size hints with the marker's whole word, never read back
+        from the shown name, so the marker cannot flip-flop. The status
+        bar still says `<case> has unsaved changes`; the title has `●`."""
         lay = self.layout()
         if lay is None or not hasattr(self, 'dim_seg'):     # in __init__
             return
         m = lay.contentsMargins()
         need, n = m.left() + m.right(), 0
+        cb = self.case_btn
+        whole = cb.sizeHint().width()       # the whole name (ElidedButton)
         for i in range(lay.count()):
             it = lay.itemAt(i)
             w = it.widget()
@@ -277,14 +282,18 @@ class TopBar(QFrame):
                     w is not None and not w.isVisibleTo(self)):
                 continue
             n += 1
-            if w is self.case_btn:
+            if w is cb:
                 need += w.minimumWidth()
             elif w is self.dirty_lbl:
                 need += w.fontMetrics().horizontalAdvance(DIRTY_LONG) + 1
             else:
                 need += it.sizeHint().width()
         need += lay.spacing() * max(0, n - 1)
-        short = need > self.width()
+        # D191: the name is elided when the bar cannot give it its whole
+        # width beside `● unsaved`, or when that is past its 200 px cap
+        need_whole = need - cb.minimumWidth() + min(whole, cb.maximumWidth())
+        elided = whole > cb.maximumWidth() or need_whole > self.width()
+        short = need > self.width() or elided
         text = DIRTY_SHORT if short else DIRTY_LONG
         if self.dirty_lbl.text() != text:
             self.dirty_lbl.setText(text)

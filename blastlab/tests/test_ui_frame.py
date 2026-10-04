@@ -23,6 +23,8 @@ BC_Combined lines 20-54 / 392-396).
      name elides, the whole name in its tooltip (GUI-10, F29)
  F10 the longest chip at 1100 px squeezes no control: the unsaved marker
      drops its word only then (verify10b, F37 / D198)
+ F10b the marker is `●` whenever the case name is elided (GUI-11 T16,
+     D191 owner review); a clean elided name shows no marker
  F11 Save as reports a write failure (no crash dialog) and starts in the
      case folder / the newest Recent's / the Runs folder (GUI-11, D204)
  F12 F5 runs the chain on the Chain screen, 01 Setup's case elsewhere
@@ -499,6 +501,64 @@ def main():
           bar.dirty_lbl.text() == DIRTY_LONG
           and bar.dirty_lbl.toolTip() == '', repr(bar.dirty_lbl.text()))
     host.close()
+
+    print('\nF10b: the marker is ● whenever the case name is elided '
+          '(GUI-11 T16, D191 owner review)')
+    tb.set_chip('native', None)
+    name30 = 'blast_wall_case_A_rev3_long_nm'     # 30 characters
+    tb.set_case_name(name30)
+    tb.set_dirty(True)
+    win.resize(1100, 720)
+    pump(150)
+    check('1100 px, a 30-character name, dirty: the name is elided',
+          tb.case_btn.text() != name30, repr(tb.case_btn.text()))
+    check('and the marker reads ●, the word in its tooltip',
+          tb.dirty_lbl.isVisible() and tb.dirty_lbl.text() == DIRTY_SHORT
+          and tb.dirty_lbl.toolTip() == 'Unsaved changes',
+          f'{tb.dirty_lbl.text()!r} {tb.dirty_lbl.toolTip()!r}')
+    tb.set_case_name('wall_A')
+    win.resize(1600, 1000)
+    pump(150)
+    check('1600 px, wall_A, dirty: the name is whole and the marker '
+          'reads ● unsaved',
+          tb.case_btn.text() == 'wall_A'
+          and tb.dirty_lbl.text() == DIRTY_LONG
+          and tb.dirty_lbl.toolTip() == '',
+          f'{tb.case_btn.text()!r} {tb.dirty_lbl.text()!r}')
+    tb.set_case_name(name30)
+    tb.set_dirty(False)
+    win.resize(1100, 720)
+    pump(150)
+    check('an elided name with a clean case shows no marker',
+          tb.case_btn.text() != name30 and not tb.dirty_lbl.isVisible(),
+          f'{tb.case_btn.text()!r} {tb.dirty_lbl.isVisible()}')
+    sweep_bad = []
+    tb.set_dirty(True)
+    tlay = tb.layout()
+    for nm in ('wall_A', 'wall_A_blastfoam', name30):
+        tb.set_case_name(nm)
+        for wpx in range(1100, 1620, 40):
+            win.resize(wpx, 720)
+            pump(40)
+            el = tb.case_btn.text() != nm
+            short = tb.dirty_lbl.text() == DIRTY_SHORT
+            # a name whole only because the word dropped: the stretch and
+            # the button's slack together are under the word's width
+            slack = sum(tlay.itemAt(i).geometry().width()
+                        for i in range(tlay.count())
+                        if tlay.itemAt(i).spacerItem() is not None) + max(
+                0, tb.case_btn.width() - min(tb.case_btn.sizeHint().width(),
+                                             tb.case_btn.maximumWidth()))
+            if (el and not short) or (short and not el and slack >= save):
+                sweep_bad.append(f'{nm}@{wpx}: {tb.case_btn.text()!r} '
+                                 f'{tb.dirty_lbl.text()!r} slack {slack}')
+    check('1100-1600 px, three names: ● whenever the name would be '
+          'elided beside ● unsaved, and only then',
+          not sweep_bad, '; '.join(sweep_bad[:4]))
+    tb.set_dirty(False)
+    tb.set_case_name(win._case_stem())
+    win.resize(1280, 840)
+    pump(60)
 
     print('\nF11: Save as reports a write failure and starts in a useful '
           'folder (GUI-11 T3, UXR-5 / D204)')
