@@ -1,0 +1,22 @@
+[
+ {
+  "name": "Tk: a result exists after the run",
+  "ok": true,
+  "detail": "1"
+ },
+ {
+  "name": "Tk Gauges tab: 2 traces, titled Gauge 1 and Gauge 3 (no Gauge 2)",
+  "ok": true,
+  "detail": "['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']"
+ },
+ {
+  "name": "Tk summary table labels G1, G3",
+  "ok": true,
+  "detail": "[('G1 (1.063, 0.723) -> cell (1.088, 0.698) m', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'), ('G3 (1.119, 0.698) -> cell (1.144, 0.698) m', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no')]"
+ },
+ {
+  "name": "Tk: no modal dialogs",
+  "ok": true,
+  "detail": "[]"
+ }
+]

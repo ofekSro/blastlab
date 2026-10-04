@@ -1,0 +1,76 @@
+﻿platform windows model folder C:\Users\ROTEM~1.OFE\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\e7422584-05b6-4ea1-a838-af932f770ee0\scratchpad\blastlab_ui_3hkfmv88\runs\gui12qa
+PASS startup: title
+      ● untitled · BlastLab
+SETUP REPORT [('warn', "No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it."), ('warn', 'Gauge (1.4, 0.3) inside Wall 1 - will be dropped'), ('warn', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped'), ('warn', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped'), ('warn', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped'), ('note', 'Cell size will be refined to 0.01250 m (5 cells across the charge radius)'), ('note', '~24,576 cells at dx = 0.012499 m')]
+PASS Setup: every drop warning names a wall (Wall i)
+      ['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']
+PASS Setup: has an "inside Wall 1" warning
+      ['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']
+PASS Setup: has an "inside Wall 2" warning (second obstacle index)
+      ['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']
+PASS Setup: has an "on the face of Wall" warning
+      ['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']
+PASS Setup: old wording "inside an obstacle" gone
+      ["No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it.", 'Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 -
+setup checks scroll max at 1100x720 116
+PASS Setup: no check text clipped (heightForWidth <= height) at 1600x1000
+PASS Setup: no check text clipped at 1100x720
+CHAIN3 rows [('warn', "The 2D stage's burst is at z 2.0 m, above this stage's 1.5 m height: the remapped field misses the burst. Raise this stage's height above 2.0 m.")]
+PASS Chain: default seed stage 3 shows the 2D->3D reach warning
+      ["The 2D stage's burst is at z 2.0 m, above this stage's 1.5 m height: the remapped field misses the burst. Raise this stage's height above 2.0 m."]
+PASS Chain: card 3 reads 1 warning, Run chain enabled
+      ('● 1 warning', True)
+seed Lz 1.5 center z 2D 2
+chain scroll areas scrolled 2
+PASS Chain: stage 3 check text not clipped at 1100x720
+PASS Chain: silent at Lz 2.5
+      ([('ok', 'Stage OK')], '● case OK')
+PASS Chain: Lz == burst z (2.0) still warns (at-or-above rule)
+      [('warn', "The 2D stage's burst is at z 2.0 m, above this stage's 2.0 m height: the remapped field misses the burst. Raise this stage's height above 2.0 m.")]
+G1 (1.0633, 0.7228) G2 (1.1191, 0.7284) G3 (1.1191, 0.6977) wall (1.1163, 1.5, 0.7256, 1.0)
+RUN CASE setup report [('warn', 'Gauge (1.1191, 0.7284) inside Wall 1 - will be dropped'), ('note', 'Cell size will be refined to 0.05590 m (5 cells across the charge radius)'), ('note', '~1,176 cells at dx = 0.0558974 m')]
+PASS run case: Setup warns G2 (inside Wall 1) only
+      ['Gauge (1.1191, 0.7284) inside Wall 1 - will be dropped']
+mid labels ['G1', 'G3'] 2 gauges, sorted by R. Click a row to enlarge it. G2 dropped by the solver (inside Wall 1).
+  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\e7422584-05b6-4ea1-a838-af932f770ee0\scratchpad\blastlab_ui_3hkfmv88\runs\gui12qa\gauges\gauges_2d.txt  (425 rows x 2 gauges)
+PASS run finished
+      6.3s
+final labels ['G1', 'G3'] caption: 2 gauges, sorted by R. Click a row to enlarge it. G2 dropped by the solver (inside Wall 1).
+solver points [(1.0883720930232559, 0.6976744186046512), (1.1441860465116278, 0.6976744186046512)] dx 0.05581395348837209
+PASS run: solver kept 2 gauges, dropped G2
+      [(1.0883720930232559, 0.6976744186046512), (1.1441860465116278, 0.6976744186046512)]
+greedy would pair [2, 1]  order-preserving [0, 2]
+PASS real run discriminates greedy from order-preserving
+      ([2, 1], [0, 2])
+PASS Run live column labels are G1, G3 (sorted set)
+      ['G1', 'G3']
+PASS Run live caption names G2 and Wall 1
+      2 gauges, sorted by R. Click a row to enlarge it. G2 dropped by the solver (inside Wall 1).
+PASS exported gauge_labels == [G1, G3]
+      ['G1', 'G3']
+results gauges cells [['G1', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'], ['G3', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no']] caption G2 dropped by the solver (inside Wall 1) · click a row to plot it · net impulse includes the negative phase
+PASS Results Gauges rows labelled G1, G3
+      [['G1', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'], ['G3', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no']]
+report figure captions ['Pressure', 'Density', 'Peak overpressure', 'Impulse', 'Gauge time histories']
+export titles ['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']
+PASS export (report) gauge titles start Gauge 1 / Gauge 3, never Gauge 2
+      ['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']
+PASS export (PNG set) gauge titles agree
+      ['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']
+on-screen pg texts ['']
+exports module has report_html False
+pickled result for Tk step
+  Field profile saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\e7422584-05b6-4ea1-a838-af932f770ee0\scratchpad\blastlab_ui_3hkfmv88\runs\gui12qa\profile.txt  (400 cells, t = 1.828 ms)
+PASS 1D run finished
+      2.9s
+1D tooltip: Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas
+PASS 1D Field tooltip = "Exports use the full title: <export suptitle>"
+      ('Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas', '1D Spherical Blast - 1.0 kg TNT - EOS: idealGas')
+tooltip widget grabbed PySide6.QtCore.QSize(403, 42)
+tooltip visible True 'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas'
+PASS QHelpEvent on the 1D canvas shows the tooltip (QToolTip visible)
+      'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas'
+PASS no modal dialogs except the model-folder overwrite question of the 3rd run in one folder (harness artefact)
+      [('ask', ('Model folder',))]
+
+27/27 checks passed

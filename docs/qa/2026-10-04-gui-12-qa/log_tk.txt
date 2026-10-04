@@ -1,0 +1,16 @@
+﻿  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\claude\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\e7422584-05b6-4ea1-a838-af932f770ee0\scratchpad\blastlab_ui_xre8wrwz\runs\gui12qa_tk\gauges\gauges_2d.txt  (425 rows x 2 gauges)
+modal []
+PASS Tk: a result exists after the run
+      1
+Tk gauge figure titles ['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']
+points [(1.0883720930232559, 0.6976744186046512), (1.1441860465116278, 0.6976744186046512)]
+PASS Tk Gauges tab: 2 traces, titled Gauge 1 and Gauge 3 (no Gauge 2)
+      ['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']
+Tk summary rows [('G1 (1.063, 0.723) -> cell (1.088, 0.698) m', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'), ('G3 (1.119, 0.698) -> cell (1.144, 0.698) m', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no')]
+PASS Tk summary table labels G1, G3
+      [('G1 (1.063, 0.723) -> cell (1.088, 0.698) m', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'), ('G3 (1.119, 0.698) -> cell (1.144, 0.698) m', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no')]
+shot c:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-04-gui-12-qa\10_tk_gauges_tab_1280x840.png (8, 31, 1280, 840)
+shot c:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-04-gui-12-qa\10_tk_gauges_tab_1000x700.png (8, 31, 1100, 720)
+shot c:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-04-gui-12-qa\10_tk_gauges_tab_1600x1000.png (8, 31, 1600, 1000)
+PASS Tk: no modal dialogs
+4 / 4

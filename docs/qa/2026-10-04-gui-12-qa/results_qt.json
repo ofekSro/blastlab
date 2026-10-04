@@ -1,0 +1,137 @@
+[
+ {
+  "name": "startup: title",
+  "ok": true,
+  "detail": "\u25cf untitled \u00b7 BlastLab"
+ },
+ {
+  "name": "Setup: every drop warning names a wall (Wall i)",
+  "ok": true,
+  "detail": "['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']"
+ },
+ {
+  "name": "Setup: has an \"inside Wall 1\" warning",
+  "ok": true,
+  "detail": "['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']"
+ },
+ {
+  "name": "Setup: has an \"inside Wall 2\" warning (second obstacle index)",
+  "ok": true,
+  "detail": "['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']"
+ },
+ {
+  "name": "Setup: has an \"on the face of Wall\" warning",
+  "ok": true,
+  "detail": "['Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped']"
+ },
+ {
+  "name": "Setup: old wording \"inside an obstacle\" gone",
+  "ok": true,
+  "detail": "[\"No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it.\", 'Gauge (1.4, 0.3) inside Wall 1 - will be dropped', 'Gauge (1.2, 0.3) on the face of Wall 1 - will be dropped', 'Gauge (1.9, 1.1) inside Wall 2 - will be dropped', 'Gauge (2.0, 1.2) on the face of Wall 2 - will be dropped', 'Cell size will be refined to 0.01250 m (5 cells across the charge radius)', '~24,576 cells at dx = 0.012499 m']"
+ },
+ {
+  "name": "Setup: no check text clipped (heightForWidth <= height) at 1600x1000",
+  "ok": true,
+  "detail": "[]"
+ },
+ {
+  "name": "Setup: no check text clipped at 1100x720",
+  "ok": true,
+  "detail": "[]"
+ },
+ {
+  "name": "Chain: default seed stage 3 shows the 2D->3D reach warning",
+  "ok": true,
+  "detail": "[\"The 2D stage's burst is at z 2.0 m, above this stage's 1.5 m height: the remapped field misses the burst. Raise this stage's height above 2.0 m.\"]"
+ },
+ {
+  "name": "Chain: card 3 reads 1 warning, Run chain enabled",
+  "ok": true,
+  "detail": "('\u25cf 1 warning', True)"
+ },
+ {
+  "name": "Chain: stage 3 check text not clipped at 1100x720",
+  "ok": true,
+  "detail": "[]"
+ },
+ {
+  "name": "Chain: silent at Lz 2.5",
+  "ok": true,
+  "detail": "([('ok', 'Stage OK')], '\u25cf case OK')"
+ },
+ {
+  "name": "Chain: Lz == burst z (2.0) still warns (at-or-above rule)",
+  "ok": true,
+  "detail": "[('warn', \"The 2D stage's burst is at z 2.0 m, above this stage's 2.0 m height: the remapped field misses the burst. Raise this stage's height above 2.0 m.\")]"
+ },
+ {
+  "name": "run case: Setup warns G2 (inside Wall 1) only",
+  "ok": true,
+  "detail": "['Gauge (1.1191, 0.7284) inside Wall 1 - will be dropped']"
+ },
+ {
+  "name": "run finished",
+  "ok": true,
+  "detail": "6.3s"
+ },
+ {
+  "name": "run: solver kept 2 gauges, dropped G2",
+  "ok": true,
+  "detail": "[(1.0883720930232559, 0.6976744186046512), (1.1441860465116278, 0.6976744186046512)]"
+ },
+ {
+  "name": "real run discriminates greedy from order-preserving",
+  "ok": true,
+  "detail": "([2, 1], [0, 2])"
+ },
+ {
+  "name": "Run live column labels are G1, G3 (sorted set)",
+  "ok": true,
+  "detail": "['G1', 'G3']"
+ },
+ {
+  "name": "Run live caption names G2 and Wall 1",
+  "ok": true,
+  "detail": "2 gauges, sorted by R. Click a row to enlarge it. G2 dropped by the solver (inside Wall 1)."
+ },
+ {
+  "name": "exported gauge_labels == [G1, G3]",
+  "ok": true,
+  "detail": "['G1', 'G3']"
+ },
+ {
+  "name": "Results Gauges rows labelled G1, G3",
+  "ok": true,
+  "detail": "[['G1', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'], ['G3', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no']]"
+ },
+ {
+  "name": "export (report) gauge titles start Gauge 1 / Gauge 3, never Gauge 2",
+  "ok": true,
+  "detail": "['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']"
+ },
+ {
+  "name": "export (PNG set) gauge titles agree",
+  "ok": true,
+  "detail": "['Gauge 1  (1.09, 0.70) m', 'Gauge 3  (1.14, 0.70) m']"
+ },
+ {
+  "name": "1D run finished",
+  "ok": true,
+  "detail": "2.9s"
+ },
+ {
+  "name": "1D Field tooltip = \"Exports use the full title: <export suptitle>\"",
+  "ok": true,
+  "detail": "('Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas', '1D Spherical Blast - 1.0 kg TNT - EOS: idealGas')"
+ },
+ {
+  "name": "QHelpEvent on the 1D canvas shows the tooltip (QToolTip visible)",
+  "ok": true,
+  "detail": "'Exports use the full title: 1D Spherical Blast - 1.0 kg TNT - EOS: idealGas'"
+ },
+ {
+  "name": "no modal dialogs except the model-folder overwrite question of the 3rd run in one folder (harness artefact)",
+  "ok": true,
+  "detail": "[('ask', ('Model folder',))]"
+ }
+]
