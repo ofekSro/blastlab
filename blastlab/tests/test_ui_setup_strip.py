@@ -455,8 +455,12 @@ def s2_model_view():
     check('leaving the model restores the plane caption',
           sp.view_caption() == 'r–z plane · charge on the axis',
           sp.view_caption())
-    check('and drops the readout\'s tooltip',
-          sp._view_caption.toolTip() == '')
+    # verify11c (D224): on the real platform the pointer leaves the model
+    # on its way to the caption, so a tooltip dropped on leave could never
+    # be read; it stays while a 1D / 2D model is on screen
+    check('and keeps the units tooltip, so moving onto the caption '
+          'shows it', sp._view_caption.toolTip() == tip, repr(
+              sp._view_caption.toolTip()[:40]))
     show(sample_case(geometry='planar', center=(1.0, 2.0)))
     _mouse(canvas, ax, 'motion_notify_event', 2.0, 2.0)
     check("planar: 'x · y · R', no Z",

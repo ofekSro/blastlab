@@ -498,6 +498,7 @@ class StageEditor(QWidget):
         case = self._case
         if self.preview is None:
             self._view_caption.setText('')
+            self._view_caption.set_tip(None)
             return
         from . import scaled_distance
         self.z_rings.setVisible(case is not None
@@ -505,6 +506,9 @@ class StageEditor(QWidget):
         if self._view_caption.property('hover') != 'true':
             self._view_caption.setText(plane_caption(case) if case
                                        else '')
+            # UXR-15 (D221, D224): the readout's units stay on the
+            # caption, so moving onto it after the hover can show them
+            self._view_caption.set_tip(HOVER_TIP if case else None)
 
     def _rings_toggled(self, on):
         self._overlay.rings = bool(on)
@@ -536,8 +540,7 @@ class StageEditor(QWidget):
         if lbl.property('hover') == 'true':
             lbl.setProperty('hover', 'false')
             theme.repolish(lbl)
-            lbl.set_tip(None)
-        self._sync_toolbar()
+        self._sync_toolbar()                    # the caption and its tip
 
     def _wheel(self, event):
         ax = event.inaxes

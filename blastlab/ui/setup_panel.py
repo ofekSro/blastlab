@@ -1062,6 +1062,12 @@ class SetupPanel(QWidget):
         if not self._view_caption.property('hover') == 'true':
             self._view_caption.setText(
                 plane_caption(case) if kind != 'hint' else '')
+            # UXR-15 (D221, D224): the readout's units stay on the caption
+            # after the pointer leaves the model, so moving onto the
+            # caption can show them (the hover itself clears the readout)
+            self._view_caption.setToolTip(
+                HOVER_TIP if kind in ('1d', '2d') and case is not None
+                else '')
 
     def _redraw_overlay(self):
         p = self._mpl_preview()
@@ -1111,8 +1117,7 @@ class SetupPanel(QWidget):
         if lbl.property('hover') == 'true':
             lbl.setProperty('hover', 'false')
             theme.repolish(lbl)
-            lbl.setToolTip('')
-        self._sync_toolbar()
+        self._sync_toolbar()                    # the caption and its tip
 
     def _wheel(self, event):
         """A wheel notch zooms the 1D/2D view about the pointer; Fit

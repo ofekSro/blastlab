@@ -30,8 +30,10 @@ RING_Z = (1, 2, 3)
 RING_ALPHA = (0.65, 0.5, 0.38)
 GID = 'overlay'
 #: UXR-15 (D221): the hover readout's tooltip, with the units its compact
-#: text leaves out (r, z and R in m; Z in m/kg^1/3)
-HOVER_TIP = ('r, z (x, y) and R in m. ' + scaled_distance.UNIT_TIP)
+#: text leaves out (r, z and R in m; Z in m/kg^1/3). D224: it stays on the
+#: caption after the pointer leaves the model, so it names the readout
+HOVER_TIP = ('The readout over the model: r, z (x, y) and R in m. '
+             + scaled_distance.UNIT_TIP)
 
 
 def plane_caption(case):
