@@ -68,14 +68,6 @@ def screen_unit(unit):
     return unit.replace('[Pa·s]', '[kPa·ms]')
 
 
-def screen_title_1d(c):
-    """The 1D profile figure's title on screen (F17, D214): `1D spherical
-    · 1.0 kg TNT · JWL`, with the builder's own charge and EOS wording
-    (`kg TNT` is E1's open question). `plots.figure_results_1d`'s
-    `1D Spherical Blast - 1.0 kg TNT - EOS: JWL` stays in every export."""
-    return f'1D spherical · {c.charge_kg} kg TNT · {c.eos}'
-
-
 def select_field(res, dim, snap_label, field, title_extra=None):
     """Everything needed to paint one field panel, or None when this
     field is not a map (1D profiles, the 3D isosurface view).
@@ -421,11 +413,6 @@ class FieldsView(QWidget):
                 # fell outside the canvas. Laid out again at every draw,
                 # at the canvas's size (GUI-7 verification)
                 fig.set_layout_engine('tight')
-                # F17 (GUI-11 T19, D214): on screen only, a title that
-                # fits the canvas; the builder and every export keep
-                # `1D Spherical Blast - … - EOS: …`
-                fig.axes[0].set_title(plots.titled(
-                    screen_title_1d(c), self._title_extra))
             else:
                 fig = plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,

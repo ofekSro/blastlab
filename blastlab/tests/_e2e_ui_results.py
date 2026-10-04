@@ -287,29 +287,6 @@ def main():
             seen.append(rs.fields.field())
             check(f'{name}: Field shows the profiles (a figure)',
                   rs.fields.page() == 'figure' and fields_drawn())
-            # GUI-11 T19 (F17, D214): at 1100 x 720 the short on-screen
-            # title lies inside the canvas (the screen grab is saved)
-            win.resize(1100, 720)
-            pump(600)
-            cv = rs.fields.canvas._canvas
-            cv.draw()
-            ax0 = rs.fields.canvas.figure.axes[0]
-            tb = ax0.title.get_window_extent(renderer=cv.get_renderer())
-            cw, chh = cv.get_width_height()
-            check(f'{name}: at 1100 x 720 the title '
-                  f'{ax0.get_title()!r} lies inside the canvas',
-                  ax0.get_title().startswith('1D spherical · ')
-                  and tb.x0 >= -0.5 and tb.x1 <= cw + 0.5
-                  and tb.y1 <= chh + 0.5,
-                  f'x {tb.x0:.0f}..{tb.x1:.0f} in {cw}, top {tb.y1:.0f} '
-                  f'of {chh}')
-            to_front(win)
-            pump(300)
-            shot = os.path.join(scratch, 'gui11-1d-title-1100x720.png')
-            app.primaryScreen().grabWindow(int(win.winId())).save(shot)
-            print(f'    screen grab {shot}', flush=True)
-            win.resize(1600, 1000)
-            pump(400)
         else:
             for base in fv.field_seg.values():
                 fv.field_seg._btns[base].click()
