@@ -84,6 +84,9 @@ EXPORT_HELP = {
             'single panel on screen.',
 }
 
+#: the exports that write the figures' full title (GUI-13 B4)
+TITLE_HINT_KINDS = ('pngs', 'report')
+
 VIEWS = ('Field', 'Gauges', '3D')
 #: the old tab names, still accepted by show_view (the QA harness, the
 #: R- and E-checks): both are the Field view now
@@ -545,6 +548,7 @@ class ResultsPanel(QWidget):
         self.stack = _ViewStack()
         vl.addWidget(self.stack, 1)
         self.fields = FieldsView(on_change=self._mesh_changed)
+        self.fields.export_hint.connect(self._export_hint_changed)
         self.gauges = GaugesView()
         # the selected gauge is the Gauges view's, shared through
         # selected_gauge() / select_gauge() (T6's time-bar tick reads it)
@@ -979,6 +983,17 @@ class ResultsPanel(QWidget):
         self._foam_runs_btn.setVisible(foam)
         self.export_col.items['vtk'].set_mode_hidden(not foam)
 
+    #: the 1D figure's export-title hint (FieldsView.export_hint), '' when
+    #: the view on screen has none
+    _export_hint = ''
+
+    def _export_hint_changed(self, text):
+        if text == self._export_hint:
+            return
+        self._export_hint = text
+        if hasattr(self, '_export_btns'):
+            self._sync_export_buttons(self.current())
+
     def _sync_export_buttons(self, ent):
         """Only offer an export that can actually run for this result.
         Every button used to stay enabled: with nothing selected they
@@ -990,8 +1005,13 @@ class ResultsPanel(QWidget):
             # a greyed button has to say why; a VTK button that opens the
             # run's own vtk\ folder says where it is (GUI QA F2)
             tip = exports.vtk_tip(ent) if kind == 'vtk' else ''
-            b.setToolTip(tip or (EXPORT_HELP.get(kind, '') if good
-                                 else exports.why_not(kind, ent)))
+            tip = tip or (EXPORT_HELP.get(kind, '') if good
+                          else exports.why_not(kind, ent))
+            # GUI-13 B4 (UX #10): the 1D figure's title hint rides on the
+            # figure exports, where the full title is written
+            if good and kind in TITLE_HINT_KINDS and self._export_hint:
+                tip = f'{self._export_hint}\n{tip}'
+            b.setToolTip(tip)
         self.export_col.items['profile'].set_suffix(
             profile_suffix(ent.dim if ent is not None else None))
         good, tip = self._view3d_state(ent)

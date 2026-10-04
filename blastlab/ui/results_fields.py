@@ -17,7 +17,7 @@ builders.
 """
 
 import numpy as np
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (QComboBox, QPushButton, QStackedWidget,
                                QWidget)
 import pyqtgraph as pg
@@ -193,6 +193,10 @@ class FieldsView(QWidget):
     `results_field.FieldView`; `set_scale` gives the snapshot maps the
     Field view's colour scale."""
 
+    #: GUI-13 B4 (UX #10): the 1D figure's export-title hint, '' when this
+    #: view has none; the panel puts it on the figure Export buttons
+    export_hint = Signal(str)
+
     def __init__(self, on_change=None, parent=None):
         super().__init__(parent)
         self._on_change = on_change or (lambda: None)
@@ -278,6 +282,7 @@ class FieldsView(QWidget):
 
     def clear(self, text=None):
         self._ent = None
+        self.export_hint.emit('')
         self._drop_image()
         for combo in (self.snap_sel, self.field_sel):
             combo.blockSignals(True)
@@ -434,10 +439,11 @@ class FieldsView(QWidget):
                 full = fig.axes[0].get_title()
                 fig.axes[0].set_title(plots.titled(
                     screen_title_1d(c), self._title_extra))
-                self.canvas.setToolTip(f'Exports use the full title: {full}')
+                # GUI-13 B4: on the Export buttons, not the canvas
+                self.export_hint.emit(f'Exports use the full title: {full}')
             else:
-                self.canvas.setToolTip('')
-                fig = plots.figure_isosurfaces_3d(
+                self.export_hint.emit('')
+                fig =plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,
                     title_extra=self._title_extra)
         except Exception as exc:
@@ -448,7 +454,7 @@ class FieldsView(QWidget):
         self.stack.setCurrentIndex(1)
 
     def _draw_map(self, ent, sel):
-        self.canvas.setToolTip('')          # the 1D title hint is 1D only
+        self.export_hint.emit('')           # the 1D title hint is 1D only
         key = (str(ent.label), np.shape(sel['xf']), np.shape(sel['yf']),
                repr(sel['sl']))
         if key != self._key:
