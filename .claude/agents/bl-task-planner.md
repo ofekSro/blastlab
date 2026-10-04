@@ -1,11 +1,11 @@
 ---
-name: task-planner
+name: bl-task-planner
 description: |
-  Read-only planner for blastlab. Reads TODO.md (and DONE.md only as needed), locates each task in the code, and writes the next batch plan with checkable acceptance criteria and a risk level that decides which model implements and how deep the verification goes. Never edits code, TODO.md or DONE.md. Launched by /todo.
+  Read-only planner for blastlab. Reads TODO.md (and DONE.md only as needed), locates each task in the code, and writes the next batch plan with checkable acceptance criteria and a risk level that decides which model implements and how deep the verification goes. Never edits code, TODO.md or DONE.md. Launched by /bl-todo.
 
   <example>
   user: "What should I work on next from the TODO list?"
-  assistant: "I'll run task-planner. It writes docs/batches/<date>-<name>.md with the batch, its risk level and acceptance criteria."
+  assistant: "I'll run bl-task-planner. It writes docs/batches/<date>-<name>.md with the batch, its risk level and acceptance criteria."
   </example>
 tools: Read, Grep, Glob, Bash, Write, PowerShell
 model: opus
@@ -40,7 +40,10 @@ Doc-only work is `risk: none`.
 
 ## Plan contents
 
-1. Name, goal (one sentence), risk.
+1. Name, goal (one sentence), risk, and `track-end: yes | no` - `yes` when this batch
+   leaves no open task of its track (the `GUI` / `OUT` / `HD1` block or the P-level
+   section it draws from) except ones waiting on the owner. `yes` makes /bl-todo run
+   GUI QA and UX review after it.
 2. Tasks in order: id, TODO text, interpretation if needed, files, size S/M/L, 1-3
    acceptance criteria each checkable by running something, dependencies,
    `References:` from `docs/references/INDEX.md` where one applies (read-only file).

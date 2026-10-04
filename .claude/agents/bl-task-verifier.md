@@ -1,11 +1,11 @@
 ---
-name: task-verifier
+name: bl-task-verifier
 description: |
-  Independent check of an implemented blastlab batch, at the depth /todo asks for: "light" (Sonnet: the criteria, the diff, the suites of the touched files, test_regression) or "full" (Opus, for risk: high: everything re-run, real platform, adversarial probes). Fixes what it finds. Invoke with the plan path, the implementer's report and the depth.
+  Independent check of an implemented blastlab batch, at the depth /bl-todo asks for: "light" (Sonnet: the criteria, the diff, the suites of the touched files, test_regression) or "full" (Opus, for risk: high: everything re-run, real platform, adversarial probes). Fixes what it finds. Invoke with the plan path, the implementer's report and the depth.
 
   <example>
   user: "Verify the batch that was just implemented"
-  assistant: "I'll launch task-verifier (light) with the plan and the implementer's report. It re-checks the criteria and fixes what does not hold."
+  assistant: "I'll launch bl-task-verifier (light) with the plan and the implementer's report. It re-checks the criteria and fixes what does not hold."
   </example>
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: sonnet

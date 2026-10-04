@@ -283,13 +283,15 @@ is still matplotlib via `output/plots.py`.
   equation, a solver keyword or a case file, cite the document and section in
   comments, and if code and document disagree, report it - never silently
   change either.
-- **Custom agents** (`eng-code-simplifier`, `task-*`, `arch-*`, `gui-*`, and
-  the `/todo`, `/refactor`, `/gui-qa` skills) follow this file. When `/todo`
+- **Custom agents** (`eng-code-simplifier`, `bl-task-*`, `arch-*`, `gui-*`, and
+  the `/bl-todo`, `/refactor`, `/gui-qa` skills) follow this file. When `/bl-todo`
   runs, it keeps the stable IDs and P0-P4 order of `TODO.md`, moves finished
   items to `DONE.md` in the existing style, and never rewrites either file
-  wholesale. `/todo` and the three `task-*` agents have repo-local versions in
-  `.claude/` (token-saving, owner 2026-10-04): model and verification depth by the
-  plan's risk level, and every agent follows **`docs/agent-rules.md`**. **`/neat`** (repo-local, `.claude/skills/neat/` + agent
+  wholesale. **Use `/bl-todo`, not `/todo`**: the repo-local versions in `.claude/`
+  (token-saving, owner 2026-10-04) carry the `bl-` prefix because the personal
+  `todo` / `task-*` in `~/.claude/` would otherwise shadow them. Model and
+  verification depth follow the plan's risk level, and every agent follows
+  **`docs/agent-rules.md`**. **`/neat`** (repo-local, `.claude/skills/neat/` + agent
   `bl-tidier`) is the tidying skill for this repo - use it, not `/tidy`.
 
 

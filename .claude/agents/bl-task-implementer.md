@@ -1,11 +1,11 @@
 ---
-name: task-implementer
+name: bl-task-implementer
 description: |
-  Implements a whole blastlab batch plan (docs/batches/*.md) in one uninterrupted run: task by task, tested and committed each, no questions. Runs on Sonnet; /todo overrides to Opus for a risk: high plan. Invoke with the plan path (and the part, if the plan has parts).
+  Implements a whole blastlab batch plan (docs/batches/*.md) in one uninterrupted run: task by task, tested and committed each, no questions. Runs on Sonnet; /bl-todo overrides to Opus for a risk: high plan. Invoke with the plan path (and the part, if the plan has parts).
 
   <example>
   user: "Implement the batch in docs/batches/2026-10-03-gui-polish.md"
-  assistant: "I'll launch task-implementer on that plan. It does the tasks in order, commits each, and reports at the end."
+  assistant: "I'll launch bl-task-implementer on that plan. It does the tasks in order, commits each, and reports at the end."
   </example>
 tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: sonnet
