@@ -1004,6 +1004,23 @@ def s5g_dropped(link):
           'caption again', [c[0] for c in g.cells()] == ['G2', 'G1']
           and g.caption_text() == RG.TABLE_CAPTION,
           f'{g.cells()} {g.caption_text()}')
+    # GUI-13 B5 (UX #8): a meta that cannot build a case (no charge
+    # centre) labels the gauges by the entered numbers, as the PNG does
+    nores = sample_dropped()
+    del nores.meta['charge_center']
+    check('B5: no charge centre -> sd.case_from_meta is None, as assumed',
+          RG.sd.case_from_meta(nores.meta, 2, nores.gauges) is None)
+    labels5, drop5 = RG.labels_and_dropped(nores, 2)
+    check('B5: the fallback labels G1 G3 and names G2 as dropped',
+          labels5 == {1: 'G1', 2: 'G3'} and drop5 == [(2, '')],
+          f'{labels5} {drop5}')
+    p.add_result('nocentre', 2, nores)
+    pump(60)
+    check('B5: on screen the rows read G1 and G3 (not G1 G2) and the '
+          'caption names G2',
+          sorted(c[0] for c in g.cells()) == ['G1', 'G3']
+          and g.caption_text().startswith('G2 dropped by the solver'),
+          f'{g.cells()} {g.caption_text()}')
     p.shutdown()
     p.deleteLater()
     pump(20)

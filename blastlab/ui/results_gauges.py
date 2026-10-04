@@ -183,9 +183,18 @@ def labels_and_dropped(res, dim):
     gauge alike. The obstacles and the domain come from the meta, for
     the reason (`inside Wall 1`). Empty when the meta cannot say."""
     case = sd.case_from_meta(res.meta, dim, res.gauges)
-    if case is None:
-        return {}, []
     meta = res.meta or {}
+    if case is None:
+        # GUI-13 B5 (UX #8): a meta that cannot build a case (no charge
+        # centre) still numbers the gauges as the exported figure does,
+        # by the entered numbers; the reason for a drop is not known
+        pts = (res.gauges or {}).get('points')
+        if not pts or not meta.get('gauges'):
+            return {}, []
+        nums = gauge_summary.entered_numbers(pts, meta['gauges'])
+        gone = gauge_summary.dropped_numbers(pts, meta['gauges'])
+        return ({k: f'G{n}' for k, n in enumerate(nums, start=1)},
+                [(n, '') for n in gone])
     case.obstacles = [tuple(o) for o in (meta.get('obstacles') or [])]
     for k in ('Lx', 'Ly', 'Lz'):
         if meta.get(k) is not None:
