@@ -108,3 +108,119 @@ yields a light panel (μ = 32.1) and does not yield a 200 mm reinforced wall
 
 ### `HD1-12` · ✅ closed 2026-09-21 — moved to [DONE.md](../../DONE.md) §0 on 2026-09-26
 
+## Records moved out of TODO.md on 2026-10-05 (GUI-13 backlog, C1; 1000-line cap)
+
+Moved verbatim. Each has a pointer left in `TODO.md`.
+
+### MPI decomposition breaks x/y symmetry · **document, do not touch**
+
+On a perfectly fixed mesh with no AMR, with mirror gauges at exact cell centres and
+a pinned write schedule: np=1 → **0.10 %**, np=2 → **0.26 %**, np=8 → **4.85 %**,
+deterministic to the digit at every rank count. The absolute peak also moves between
+rank counts (8277 / 8872 / 8517 kPa) — **a ±7 % parallel deviation in the near field
+on a fixed mesh.**
+
+`test_foam_3d_smoke` now pins np=2 so the gate is not machine-dependent.
+
+> **This is physical accuracy — record it and leave it alone.** If it is ever worth
+> reducing, the next direction is the decomposition method (`scotch` is not
+> symmetric; try `simple` with symmetric coefficients) — **an owner decision**,
+> because it changes the physics and the wall time of every parallel run.
+
+**And a warning against the obvious move:** `hierarchical`/planar decomposition was
+tried and **reverted**. In the 2D parallel case `scotch` reproduces serial almost
+exactly (impulse 188.5 against 188.5 Pa·s) and the planar cut **broke np1↔np2
+equivalence entirely**. Two cases, opposite answers, and no mechanism that explains
+both. **That is not enough to change what every parallel run does.**
+
+### HD1 background: what was asked, and the three loads of 1.3
+
+**What was asked:** compute the effects of an **HD1.3 — non-detonating** material
+on a structure.
+
+**Why this is a new track and not a parameter.** HD1.3 is **deflagration**:
+subsonic, pressure-dependent burning (Vieille, `r = a·p^n`, `n ≈ 0.7–1.0` for
+double-base). There is no detonation front, no `vDet`, no CJ state. The entire
+blastFoam path in this repository is built on the opposite assumption.
+
+> **Feeding HD1.3 in as "equivalent TNT" gives a wrong answer in the
+> dangerous-in-reverse direction:** rise time too short, peak too high, duration
+> too short — i.e. an impulsive load instead of a quasi-static one, which is
+> exactly the distinction that decides the structural response.
+
+#### The three loads of 1.3, and which belongs to blastFoam
+
+| Load | Standing | blastFoam? |
+|---|---|---|
+| **Fireball / thermal radiation** | Usually the **governing** harm in 1.3 | **No** — `radiationModel none`, and there is no radiation solver on the path |
+| **QSP — quasi-static pressure under confinement** | The real structural load | Yes, but not through a reacting JWL phase |
+| **Venting / jetting out of an opening** | Pressurised gas through an orifice | **Yes** — classical gas dynamics |
+
+The physics that distinguishes 1.3: in the open the gas is produced slowly enough
+to expand quasi-statically and barely makes a wave. **Under confinement it is a
+positive feedback loop** — pressure ↑ → faster burning ↑ → pressure ↑. That is
+why the same material is negligible outdoors and dangerous in a magazine, and why
+**confinement is the first input**.
+
+### Scope decision — pyrotechnics are out
+
+*(The vent verification that used to sit here closed with `HD1-3`; its record,
+`Cd` as the fifth band axis and the ≥ 12-cell rule are in [DONE.md](../../DONE.md) §0.)*
+
+- **Pyrotechnics are out of scope by decision** (owner, 2026-09-21). `gas_yield`
+  and `Cp_condensed` are not modelled: every kilogram burnt is treated as gas,
+  so pressure is over-predicted and the heat retained in solid residue ignored.
+  `assessment.validate` now says so on any row that declares residue, rather than
+  computing quietly.
+
+### The highest-value next step needs no code at all
+
+**There is no closed-vessel data for a real material.** `core/calibration.py` is
+ready to receive it, and every row carries `uncalibrated` until it arrives.
+
+Nothing in `PROPELLANTS` is calibrated, and that is **enforced by a test**
+(`calibrated=False` on every row). The numbers are digit-ranges for material
+classes, not product data — exactly the standing of the non-TNT afterburn rows.
+**Without a closed-vessel experiment on the real material, no number from here can
+be cited.**
+
+**Three fields the existing data cannot determine**, which will recur at every
+stage: the low-pressure extinction threshold, the heat capacity of condensed
+residue, and the atmospheric burn rate. Each carries **its own** `calibrated`
+flag, not one flag per row. This is a permanent property of a model calibrated in
+a closed vessel (50–300 MPa) and applied at magazine pressures (0.1–2 MPa) — an
+extrapolation of 2–3 orders of magnitude, in which the dominant error is in `n`,
+not in `a`.
+
+> **`extrapolated_fraction` is the number-one risk, and it is now measured rather
+> than asserted.** Both gun propellants return **1.000**: a closed vessel is
+> calibrated at 50–300 MPa and a magazine sits at a few MPa, so **all** of the burn
+> is a two-decade extrapolation. The composite, characterised in a strand burner at
+> motor pressures, returns **0.430**.
+
+### `N5-7` · ✅ closed 2026-09-20 — `det_radii` is now the default (closed body)
+
+`writer.default_det_radius` now **always** writes `initiation.radii`, at a radius of
+0.9 cells of the mesh *at the detonation point* (it follows `lmax` and AMR, otherwise
+a base-cell radius would ignite dozens of refined cells).
+
+**Why it works:** the `radius_ > small` branch tests **cell centres**, and every cell
+centre belongs to exactly one rank — so it is partition-invariant **by construction**,
+not by measurement.
+
+**Acceptance measurements:** the seed goes from 1-vs-4 to `sum(lambda) = 4.000000` in
+both serial and the worst-case parallel; at an engineering-range gauge **+0.006 %** on
+peak and **0.000 %** on impulse and arrival, against +1.5 % for the `findCell` path;
+the Kingery-Bulmash anchor **did not move at all** (0.89/0.85/0.86/0.87), so the
+afterburn calibration needs no refit; `test_regression.py` stayed byte-green.
+
+> **The cost, stated explicitly:** foam results from before 2026-09-20 are not
+> byte-comparable. The serial peak in the measured case went 19914 → 19607 kPa
+> (−1.5 %), because a ball of radius ~dx around a corner point ignites the 4 cells
+> meeting there instead of the one cell `findCell` chose arbitrarily. 15 goldens were
+> updated — one `radii` line in each, zero deletions.
+
+**What is still open from it** is the residual ≈2 % parallel offset in P1 above — the
++7 % at `scotch np=2` is **not** this mechanism. Full history:
+[docs/verification/blastfoam-claims.md](../verification/blastfoam-claims.md).
+
