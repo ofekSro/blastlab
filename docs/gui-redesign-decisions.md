@@ -261,6 +261,24 @@ the defaults and reviewed the list in bulk). Work items go to `TODO.md` GUI-11.
 | D228 | GUI-11 (11d, session default) | F40: D207 elides a path wider than the message box's cap in the middle, and the whole text was only in the label's tooltip, which cannot be copied. | `dialogs._keep_paths`: when it shortens a path it also sets the box's detailed text (`QMessageBox.setDetailedText`, the `Show Details…` button) to each shortened path, whole, one per line, without its quote or bracket and the sentence's trailing punctuation; a quoted path (an OSError's repr) has its doubled backslashes halved back (`_bare_path`). A box whose paths all fit gets no details. The shown text, the tooltip and D207's line rule are unchanged. `ui/dialogs.py` only. `test_ui_frame` F13 (+3). Real platform: a real click on `Show Details...` shows the pane, Ctrl+A, Ctrl+C copies exactly the path (`docs/qa/2026-10-03-gui-polish/gui11-dialog-details.png`). The details pane word-wraps the path at its own width (cosmetic; the copy is whole). |
 | D229 | GUI-11 (11d, session default) | F46: a red point-list refusal kept its column names across a planar ↔ axisymmetric toggle (`expected 4 numbers (r0  r1  z0  z1)` under `x0 x1 y0 y1` headers). | `PointList._reject(message, words)`: a refusal that names the columns (the wrong count, numbers or values, and an empty Add's `add a row: …`) keeps a callable that words it again; `set_columns` re-renders a standing refusal through it with the new names, still red (the error is not lost). A refusal without column names (`not numbers: a`, `select a row in the list first`, a parse error) is kept as is. Setup and every Chain 2D stage (the same `CaseForm`). UI only (`ui/fieldform.py`). `test_ui_setup_form` S8b (+4 per placement). |
 
+## Open for the owner, 2026-10-04 — answer these first (GUI-11e)
+
+Put to the owner with the session's recommendation; not yet answered (the owner
+continues in a new session). Answer "approve all" or name the numbers to change. Items
+1, 2, 7, 9 (and 8 if changed) become GUI-11e; 5 goes to the backlog.
+
+| # | Item | Recommendation |
+|---|---|---|
+| 1 | **F42** — after a dropped gauge, the exported Summary .csv / HTML report label pairs entered and snapped positions by index (G3 shows G2's position); also the Qt Gauge tooltip and the Tk summary table. Pre-existing. Fix needs `output/gauge_summary.gauge_labels` (shared; Tk gate) — the verifier's minimal fix is in `docs/batches/2026-10-03-gui-polish-b.verify.md`. | **Fix**, printing the entered number (G3) as the screens do. Runs without a drop stay byte-identical (measured); only runs with a drop change, and those are the wrong ones today. |
+| 2 | **F44** — the "inside an obstacle - will be dropped" warning uses the box test; native keeps a gauge within half a cell of an off-grid face, and both solvers can drop a gauge just outside a face. | Use each solver's real drop rule (native cell-centre test, blastFoam's outward snap) so the warning is exact. `services/validation.py`, Tk gate. |
+| 3 | **D200** — the Chain hand-off reach warning is skipped when the 1D stage has an End time (radius not known before the run). | Approve as is. |
+| 4 | **Native material** — the Qt form always sends TNT in native mode (UX-E2), though the native engine supports other materials since T46. 11c now hides the row (owner, UXR-3). The session's earlier wording "the native solver only knows TNT" was inaccurate. | Keep TNT-only and hidden. Native materials beyond TNT are uncalibrated; if wanted, a separate item with an impulse check (CLAUDE.md §6). |
+| 5 | **F45** — the default 1D → 2D → 3D chain puts the 2D burst at z 2.0 m above the 1.5 m 3D box; nothing warns. | Add a 2D → 3D reach check — backlog item, not 11e. |
+| 6 | **D211 / D223** — hidden AMR values go back into the case only as loaded from a file; typed hidden values are never written; a file without AMR keys re-saves 0.2 / 0.1. | Approve. |
+| 7 | **T19 / F17** — the shorter on-screen 1D figure title is built and reverted (`0d71956`) because `char_golden/ui_results_meta.json` pins it. | Approve re-recording its five `title` entries and the `fields` hash, then revert `0d71956`. Exports stay byte-identical. |
+| 8 | **D213 (a)** — at 1100 × 720 after a chain with its banner, the Log dock steps aside so the live view keeps 200 px (it returns when there is room). | Keep (hide the dock). |
+| 9 | **D213 (b)** — at the default 1280 × 840 the Run strip now wraps to two rows. | Rebalance the tile widths so one row holds from about 1280 px, as the board shows. |
+
 ## Found along the way — not caused by the redesign, not fixed
 
 | # | Found in | What | Suggested |
