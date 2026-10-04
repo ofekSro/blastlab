@@ -1126,6 +1126,41 @@ number matched the core). Shots in `docs/qa/2026-10-03-gui-polish/`.
 
 ---
 
+## 0u. 2026-10-04 — batch `gui-11e` (GUI-11 part e; GUI-11 closed)
+
+Plan: `docs/batches/2026-10-04-gui-11e.md`; reports `…gui-11e.{implA,verifyA,implB,verifyB}.md`;
+QA and UX in `docs/qa/2026-10-04-gui-11e/`. Inputs: the owner review of 2026-10-04
+(`docs/gui-redesign-decisions.md`, "approve all"), C1 widened by the owner to 24 golden
+entries, defaults P1-P5 (D230-D232). Worked in a worktree on D: (`D:\blastlab_wt\gui-11e`).
+
+- **A1, F42 (`output/gauge_summary.gauge_labels`):** after a dropped gauge each point is
+  paired with its nearest entered gauge and labelled by the entered number and position
+  (Summary .csv, HTML report, Qt Gauge tooltip, Tk summary table). Without a drop, byte-
+  identical (3000 random inputs, 0 differences). Tk gate run.
+- **A2, F44 (`services/validation.py`):** the drop warning follows each solver's own rule —
+  native nearest cell centre on its own auto-refined grid, blastFoam's outward snap
+  (`core.refine.snap_obstacles`). New line `on an obstacle face - will be dropped`; four
+  `test_case_validate` "face gets none" checks flipped (owner row 2). Verifier probe: 13
+  cases, 509 gauges vs `solve_2d` / `solve_3d` / `writer.plan_case`, 0 mismatches.
+- **A3, T19 / F17:** the short on-screen 1D title (`1D spherical · 1.0 kg TNT · JWL`) back
+  (`git revert` of `0d71956`'s revert); `char_golden/ui_results_meta.json` re-recorded in
+  its own commit — exactly 24 entries (10 titles, 10 figure-page and 4 empty-page `fields`
+  hashes). Exports byte-identical. Real platform: title x 107-364 of a 405 px canvas.
+- **B1, D213 (b) (`ui/run_panel._RunStrip`):** one-row widths from the tiles' needs
+  (`PROGRESS_MIN_1ROW` 160); one row from 1220 px, two at 1100 × 720 (D232).
+- **Stand as they are (owner):** D200, native TNT-only, D211 / D223, D213 (a).
+- **Tests:** Part A suites, 14/16 `test_gui_*`, `_e2e_ui_results.py` (32), `test_ui_run_screen`
+  (217), harness D02 / K02; `test_regression` byte-identical after each part. Four char
+  suites red identically at base `ee9a4b5` (GUI-12 f). QA (real platform, Qt + Tk, native):
+  every item PASS, the Chain 2D face warning PARTIAL (GUI-12 c).
+- **Verifier fixes:** none needed (A1-A3, B1 all VERIFIED).
+- **Open → `GUI-12`:** gauge-trace subplot titles, wall name in the warning, Chain face
+  warning, F45, harness E03, stale char goldens, pairing edge cases, title styles.
+- **Commits:** `4c0a834`..`b4f50fc` and the commit of this entry. `7fc34c0` carries git's
+  default revert message.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
