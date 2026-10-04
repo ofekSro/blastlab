@@ -1317,6 +1317,28 @@ def r6_finish(win):
               len(calls) == 1 and calls[0]['text']
               == f'wall_A finished in {fmt_duration(331.0)}.',
               repr(calls[0]['text'] if calls else None))
+
+        # F43 (GUI-11): G2 entered inside Wall 1 is dropped; the highest
+        # peak is on the second series, which is the entered G3 - the
+        # notification says G3, as the Run column and Results do (D201)
+        calls.clear()
+        dcase = sample_case(gauges=[(2.95, 0.5), (3.1, 0.5), (2.95, 1.5)])
+        win._run_cases = [dcase]
+        pts = [snapped(dcase.gauges[0], dcase.cell_size_m),
+               snapped(dcase.gauges[2], dcase.cell_size_m)]
+        pres = [np.asarray(rise(400, 250, 120e3)),
+                np.asarray(rise(400, 180, 296e3))]
+        dres = Result(base.snapshots, dict(times=t, points=pts,
+                                           pressures=pres),
+                      base.meta, 'shock arrived at a terminate boundary', False)
+        fake_run(dres)
+        check('a dropped G2: the notification names the entered G3 (F43)',
+              len(calls) == 1 and 'Highest peak: G3, 296 kPa' in
+              calls[0]['text'], repr(calls[0]['text'] if calls else None))
+        from blastlab.ui.run_gauges import numbering as _num
+        check('(the same label the Run column gives that series)',
+              _num(dcase, dres.gauges)[0] == ['G1', 'G3'],
+              str(_num(dcase, dres.gauges)))
     finally:
         dialogs.notify_desktop = real_notify
         clock.now = real_now

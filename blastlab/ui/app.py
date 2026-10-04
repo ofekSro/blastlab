@@ -32,7 +32,7 @@ from .chain_strip import ChainStrip
 from .results_panel import ResultsPanel
 from .run_clock import fmt_duration
 from .run_controller import RunController
-from .run_gauges import highest_peak
+from .run_gauges import highest_peak, numbering
 from .run_panel import RunPanel
 from .setup_panel import SetupPanel
 from .theme import PAD
@@ -1432,8 +1432,26 @@ class MainWindow(QMainWindow):
         top = highest_peak(getattr(res, 'gauges', None))
         if top is not None:
             n, kpa, t_ms = top
-            text += f' Highest peak: G{n}, {kpa:,.0f} kPa at {t_ms:.2f} ms.'
+            text += (f' Highest peak: {self._peak_label(n, res)}, '
+                     f'{kpa:,.0f} kPa at {t_ms:.2f} ms.')
         return text
+
+    def _peak_label(self, n, res):
+        """`G<n>` of payload series `n` as the 02 Run column and 03 Results
+        label it: the ENTERED gauge's number when the solver dropped one
+        (`run_gauges.numbering` with the last stage's case, D201 / D218;
+        F43, GUI-11). Without a case, or when nothing was dropped, it is
+        the payload number, as before."""
+        cases = self._run_cases or []
+        case = cases[-1] if cases else None
+        if case is not None:
+            try:
+                labels, _dropped = numbering(case, res.gauges)
+            except (AttributeError, IndexError, TypeError, ValueError):
+                labels = []
+            if 0 < n <= len(labels):
+                return labels[n - 1]
+        return f'G{n}'
 
     def _open_results(self):
         """03 Results with the newest result selected."""
