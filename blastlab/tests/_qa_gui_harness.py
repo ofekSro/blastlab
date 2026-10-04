@@ -222,6 +222,7 @@ class QA:
                            shot_counter=qa.ckpt['shot_counter'])
                 qa._jsonl('dialogs.jsonl', rec)
                 qa._dialogs_since_shot.append(rec)
+                qa.last_answer = ans        # GUI-12 B1: E03 checks this path
                 qa.log(f'DIALOG {fn} [{title}] {str(text)[:160]!r} -> {ans!r}')
                 if threading.current_thread() is threading.main_thread() \
                         and qa.root is not None and fn != 'os.startfile':
@@ -1784,14 +1785,26 @@ def e03_gauges_table(qa):
                         ('tsv', 'gauges_2d.txt'),
                         ('fieldcsv', 'p_peak.csv'),
                         ('report', 'blast_2d_report.html')):
+        qa.last_answer = None
         qa.click(qa.app.results._export_btns[kind], kind)
+        # the file the dialog stub answered with: the app prefixes its
+        # suggested name with the run's save number (`save1_<file>`), so
+        # the path is read from the answer, never rebuilt (GUI-12 B2)
+        p = qa.last_answer
+        if p and kind != 'fieldcsv':        # that one answers a directory
+            fname = os.path.basename(p)
         # wait for THIS export's own line - a bare 'Saved' matches a
         # previous export's stale log line and races the writer
         ok = qa.wait_log(fname if kind != 'fieldcsv'
                          else 'field CSV', 30)
-        p = os.path.join(qa.dirs['exports'], 'E03', fname)
-        qa.check(ok and os.path.exists(p), f'{kind} export wrote {fname}',
-                 'S2')
+        if kind == 'fieldcsv':      # the app prefixes each file it writes
+            import glob
+            found = glob.glob(os.path.join(glob.escape(p or ''),
+                                           '*' + fname))
+        else:
+            found = [p] if p and os.path.exists(p) else []
+        qa.check(ok and bool(found), f'{kind} export wrote {fname}', 'S2',
+                 evidence=str([os.path.basename(f) for f in found]))
         qa.shot(f'after_{kind}_export')
     qa.note('export feedback: only a "Saved ..." line in the RUN-tab log')
     select_result(qa, 'QA native1d')
