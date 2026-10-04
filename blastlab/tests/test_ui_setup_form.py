@@ -323,9 +323,11 @@ def main():
           f.is_enabled('cx') and f.is_enabled('bc_x_lo'))
     f.v['cx'].set('1.5')
     f.v['geometry'].set('axisymmetric')
+    # UXR-11 (D220): `Height Z` became `Height H`, so Z is only the scaled
+    # distance on this screen (a caption pin, changed per plan §9)
     check("axisym relabels to r/z",
           f.label_text('Lx') == 'Radius R [m]'
-          and f.label_text('Ly') == 'Height Z [m]'
+          and f.label_text('Ly') == 'Height H [m]'
           and f.label_text('cx') == 'Burst r [m]'
           and f.label_text('cy') == 'Burst z [m]', f.label_text('Ly'))
     check("axisym charge is a plain mass",
@@ -338,6 +340,60 @@ def main():
           and not f.is_enabled('bc_x_lo'))
     check("the case agrees", f.get_case().center[0] == 0.0)
 
+    print("\nS8b: axisymmetric r / z on every point list (UXR-11, F4, "
+          "D220)")
+    want_axi = {'gauges': ['r', 'z'], 'det_pts': ['r', 'z'],
+                'obstacles': ['r0', 'r1', 'z0', 'z1'],
+                'zones': ['r0', 'r1', 'z0', 'z1', 'level']}
+    want_pl = {'gauges': ['x', 'y'], 'det_pts': ['x', 'y'],
+               'obstacles': ['x0', 'x1', 'y0', 'y1'],
+               'zones': ['x0', 'x1', 'y0', 'y1', 'level']}
+
+    def headers(f, name):
+        h = f.points[name].tree.headerItem()
+        return [h.text(i) for i in range(h.columnCount())]
+
+    for placement in ('columns', 'nodes'):
+        f = CaseForm(2, mode='blastfoam', placement=placement)
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        for geom, want in (('axisymmetric', want_axi),
+                           ('planar', want_pl),
+                           ('axisymmetric', want_axi)):
+            f.v['geometry'].set(geom)
+            pump(5)
+            got = {n: headers(f, n) for n in want}
+            hints = {n: f.points[n].hint.text() for n in want}
+            check(f"{placement} {geom}: the point-list headers",
+                  got == want, str(got))
+            check(f"{placement} {geom}: the entry hints",
+                  all(hints[n] == 'add a row: ' + '  '.join(want[n])
+                      for n in want), str(hints))
+        check(f"{placement}: the captions read Radius R / Height H",
+              f.label_text('Lx') == 'Radius R [m]'
+              and f.label_text('Ly') == 'Height H [m]')
+        pl = f.points['obstacles']
+        pl.entry.setText('1 2 3')
+        pl.add()
+        check(f"{placement}: a refusal names the r / z columns",
+              pl.hint.text() == 'expected 4 numbers (r0  r1  z0  z1)',
+              pl.hint.text())
+        f.deleteLater()
+    f = CaseForm(3, mode='blastfoam')
+    check("3D keeps x y z", headers(f, 'gauges') == ['x', 'y', 'z'])
+    f.deleteLater()
+    from blastlab.ui.preview_panel import Preview2D
+    pv = Preview2D()
+    pv.resize(500, 400)
+    pv.show_case(Case2D(geometry='axisymmetric'))
+    axi_y, axi_x = pv.ax.get_ylabel(), pv.ax.get_xlabel()
+    pv.show_case(Case2D(geometry='planar'))
+    check("the Setup preview's axes read r / z in axisymmetric, x / y "
+          "planar", (axi_x, axi_y) == ('r [m]', 'z [m]')
+          and (pv.ax.get_xlabel(), pv.ax.get_ylabel())
+          == ('x [m]', 'y [m]'), f'{axi_x} {axi_y}')
+    pv.deleteLater()
+
     print("\nS9: the point lists")
     arity = {1: dict(gauges=1), 2: dict(gauges=2, obstacles=4, zones=5,
                                         det_pts=2),
@@ -349,6 +405,9 @@ def main():
             check(f"dim {d} {name} takes {n} numbers",
                   f.points[name]._arity == n, str(f.points[name]._arity))
     f = form(2)
+    # planar, so the x / y captions below hold: the default axisymmetric
+    # form now reads r / z (UXR-11, D220; a fixture change, S8b checks it)
+    f.v['geometry'].set('planar')
     pl = f.points['obstacles']
     pl.entry.setText('1, 2, 3, 4')
     pl.add()

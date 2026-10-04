@@ -277,6 +277,21 @@ class PointList(QWidget):
         lay.addWidget(self.hint)
         self._accept()
 
+    def set_columns(self, columns):
+        """Rename the columns (UXR-11: r / z in 2D axisymmetric): the
+        headers, the idle hint and the refusal texts. The arity, the
+        parsers and the rows are unchanged."""
+        cols = list(columns)
+        if len(cols) != self._arity or cols == self._columns:
+            return
+        self._columns = cols
+        self.tree.setHeaderLabels(cols)
+        if self.entry.property('bad') != 'true':
+            self.hint.setText(self._idle_text())
+
+    def columns(self):
+        return list(self._columns)
+
     # ── hint / refusal ───────────────────────────────────────────────────
     def _idle_text(self):
         return 'add a row: ' + '  '.join(self._columns)

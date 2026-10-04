@@ -308,7 +308,13 @@ class AnimView(QWidget):
         g = self._geom
         self.image = pg_plots.ScalarImage(self.plot, g['xf'], g['yf'],
                                           g['solid'])
-        self.image.set_labels(g['xlabel'], g['ylabel'])
+        # UXR-11 / QA S4-a (D220, amends D111): on screen a 2D
+        # axisymmetric replay reads r, as its snapshot maps do (and so does
+        # the hover readout, which takes the axis names); plane_geometry
+        # keeps the video's own labels for This frame .png
+        axisym = g['sl'] is None and meta.get('geometry') == 'axisymmetric'
+        self.image.set_labels('r [m]' if axisym else g['xlabel'],
+                              g['ylabel'])
         self.overlay = pg_plots.MeshOverlay(self.plot)
         # a dynamic-AMR run recorded a level map per frame, so the
         # overlay is rebuilt per frame instead of drawn once

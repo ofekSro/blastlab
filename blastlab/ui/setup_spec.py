@@ -557,9 +557,14 @@ def by_name(dim):
 #: captions the axisymmetric hook swaps in (2D only). The planar form
 #: keeps the spec's own labels.
 AXISYM_LABELS = {
-    'Lx': 'Radius R [m]', 'Ly': 'Height Z [m]',
+    # UXR-11 (D220): Height H, so Z stays the scaled distance alone
+    'Lx': 'Radius R [m]', 'Ly': 'Height H [m]',
     'cx': 'Burst r [m]', 'cy': 'Burst z [m]',
     'charge': 'Charge [kg TNT]',
 }
+#: UXR-11 / F4 (D220): the point-list column captions the axisymmetric
+#: hook swaps in (gauges, obstacles, refinement zones, detonation points)
+AXISYM_COLUMNS = {'x': 'r', 'y': 'z', 'x0': 'r0', 'x1': 'r1',
+                  'y0': 'z0', 'y1': 'z1'}
 #: UX-02: planar charges are per metre of depth
 PLANAR_LABELS = {'charge': 'Charge [kg TNT/m]'}

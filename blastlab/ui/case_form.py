@@ -466,6 +466,11 @@ class CaseForm(FieldForm):
             else:
                 text = setup_spec.PLANAR_LABELS.get(key, spec[key].label)
             self.set_label(key, text)
+        # UXR-11 / F4: the point lists' columns and hints read r / z too
+        for name, pl in self.points.items():
+            cols = spec[name].cols
+            pl.set_columns([setup_spec.AXISYM_COLUMNS.get(c, c)
+                            for c in cols] if axisym else cols)
         # axisym: the domain is the (r, z) half-plane revolved about the
         # axis, so the burst sits on r = 0
         if axisym:

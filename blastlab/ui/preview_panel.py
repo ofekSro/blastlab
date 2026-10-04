@@ -106,9 +106,19 @@ class Preview1D(_MplPreview):
         super().__init__(preview_draw.draw_1d, parent)
 
 
+def _draw_2d(ax, case, **kw):
+    """`preview_draw.draw_2d`, with the axisymmetric vertical axis named
+    z, as the r axis beside it and the tree are (UXR-11, D220). Set here,
+    Qt-side: `output/preview_draw.py` is shared with Tk and unchanged."""
+    note = preview_draw.draw_2d(ax, case, **kw)
+    if getattr(case, 'geometry', '') == 'axisymmetric':
+        ax.set_ylabel('z [m]')
+    return note
+
+
 class Preview2D(_MplPreview):
     def __init__(self, parent=None):
-        super().__init__(preview_draw.draw_2d, parent)
+        super().__init__(_draw_2d, parent)
 
 
 class Preview3DBridge:

@@ -1499,6 +1499,24 @@ def s6_field(link):
     check('on the replay too, in kPa', v == aim.shown[i, j]
           and fv.hover_text().endswith(f'overpressure {v:.4g} kPa'),
           fv.hover_text())
+    # UXR-11 / QA S4-a (D220, amends D111): the axisymmetric replay reads
+    # r · z like its snapshot maps; This frame .png keeps the video's
+    # own labels (plane_geometry)
+    bottom = p.anim.plot.getAxis('bottom').labelText
+    check('the axisymmetric replay\'s axis and readout read r · z',
+          r2.meta.get('geometry') == 'axisymmetric'
+          and bottom.startswith('r ')
+          and p.fields.plot.getAxis('bottom').labelText.startswith('r ')
+          and fv.hover_text().startswith('r ')
+          and ' · z ' in fv.hover_text(), f'{bottom!r} {fv.hover_text()!r}')
+    p.anim.set_show_mesh(not p.anim._show_mesh)
+    p.anim.set_show_mesh(not p.anim._show_mesh)
+    check('and still after the mesh overlay is redrawn',
+          p.anim.plot.getAxis('bottom').labelText.startswith('r '),
+          p.anim.plot.getAxis('bottom').labelText)
+    from blastlab.ui.results_anim import plane_geometry
+    check('the replay geometry (This frame .png) keeps its own x label',
+          plane_geometry(r2.meta)['xlabel'] == 'x [m]')
 
     print('\nS6g: the arrival tick')
     rows = summary_rows(r2)
