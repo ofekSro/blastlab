@@ -1079,6 +1079,53 @@ measurements and screenshots in `docs/qa/2026-10-03-gui-qa/` (`findings.md`).
 
 ---
 
+## 0t. 2026-10-04 — batch `gui-polish` (GUI-11, parts a-d; 11e awaits the owner)
+
+Plan: `docs/batches/2026-10-03-gui-polish.md`; implement and verify reports
+`…gui-polish-{a,b,c,d}.{implement,verify}.md`. Inputs: the owner review of 2026-10-03,
+`docs/UX_REVIEW-redesign.md` (UXR-1..26, written after GUI-10) and
+`docs/qa/2026-10-03-gui-final/QA_REPORT.md` (the final real-platform QA: every on-screen
+number matched the core). Shots in `docs/qa/2026-10-03-gui-polish/`.
+
+- **11a, correctness in the frame:** the crash dialog only on the GUI thread (UXR-4);
+  Close / Open / Recent ask before dropping a live run, an HD 1.3 assessment or unsaved
+  edits (UXR-1, QA S2-2); Save as reports a write failure (UXR-5); F5 on Chain runs the
+  chain (UXR-7); the 0-D run goes to 02 Run with Run greyed and a 0-D note (UXR-8, F12,
+  P2-18); refusals titled after the action, paths kept whole, long tooltips wrapped
+  (P2-24 Qt half).
+- **11b, shared modules (Tk gate run, 16 suites + the Tk harness):** `solvers/worker.py`
+  one line — a stage start clears the previous stage's progress (F28, owner-approved);
+  `services/validation.py` warns of a gauge inside an obstacle, and Run / Results keep
+  the entered gauge numbers (UXR-2); the Chain warns when a 1D hand-off already reaches
+  the next stage's boundary (QA S2-1, D200).
+- **11c, Setup and Chain:** Material hidden in native mode (owner, UXR-3; the native
+  case still writes TNT, 48 case files byte-identical); a loaded case keeps its hidden
+  AMR values (F16); removing a gauge keeps the trigger on its gauge (UXR-9); r / z and
+  `Height H` in axisymmetric (UXR-11, F4); kPa·ms, `= N ms`, Z-unit tooltips citing
+  UFC 3-340-02 para. 2-13.1 (UXR-15); Chain route tooltips and hints (UXR-12).
+- **11d, Run / Results / top bar:** `●` whenever the case name is elided (D191);
+  visible dark tree hover (D192); P MAX fits at 1280, strip and live view keep their
+  minimums (QA S3-1, S3-2, S3-7); method card units (UXR-10); Results 3D placeholder;
+  finish notification by entered gauge number (F43); Show Details for a shortened path
+  (F40); refusal re-worded after a geometry toggle (F46); harness F38 / F36.
+- **Goldens re-recorded (owner-approved, own commits):** `ui_case_form.json` — `material`
+  hidden in 4 native entries (UXR-3), `amr_refine` / `amr_unrefine` in 3 `/get` entries
+  (F16). Tk goldens untouched.
+- **Tests:** every `test_ui_*` suite one at a time, the char goldens, the real-platform
+  e2e scripts, the Tk suites in 11b; harness vs GUI-10: 0 new S1 / S2; R10 passes (viewer
+  placement 0 ms, resize median ≤ 44 ms); `test_regression` byte-identical after every
+  part; `test_ui_char_chain_wiring` unedited and green.
+- **Verifier fixes:** `41404bd` (quoted path broke mid-line), `9d83f5b` (blastFoam 3D
+  x-only payload named the wrong dropped gauge), `3487c8b` (typed hidden AMR values were
+  saved), `79fcd4c` (Z-unit tooltip could never be seen).
+- **Not done — 11e, awaiting the owner:** T19 / F17 (needs the on-screen title entries
+  of `ui_results_meta.json` re-recorded), F42 (exported gauge labels after a dropped
+  gauge — `output/`, changes export bytes only for runs with a drop), F44, F45, D213's
+  two layout calls.
+- **Commits:** `73ee673`..`d25255f` and the commit of this entry.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
