@@ -945,6 +945,12 @@ def s5g_dropped(link):
               summary_rows(res))], str(g.rows()))
     check('the headers are unchanged', g.headers() == list(RG.HEADERS),
           str(g.headers()))
+    # F42 (GUI-11e A1): the exported label numbers the gauge as the cell
+    # does, so each Gauge cell's tooltip starts with the cell's own label
+    tips = [g.table.item(r, 0).toolTip() for r in range(len(labels))]
+    check("each Gauge cell's tooltip starts with its own label (F42)",
+          all(tip.startswith(lab + ' (') for lab, tip in zip(labels, tips))
+          and len(tips) == 2, str(list(zip(labels, tips))))
     check('the keys stay the payload numbers; the readout says G3',
           g.order() == [2, 1] and g.selected() == 2
           and g.readout_text()[0] == 'G3 · Z 2.99',
