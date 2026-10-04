@@ -606,10 +606,17 @@ def gauge_in_obstacle_checks():
         # decides. The fixed-verdict row sits a quarter cell (0.0026 m)
         # in front of the face instead; the tie itself is pinned below as
         # "validator == solver" only.
+        # GUI-13 (f): the top face y = 1.0 is a native cell face too (95
+        # cells of 4/380), the same argmin tie in y, so native's row sits
+        # a quarter cell (0.0026 m) above it (nearest centre fluid); the
+        # tie is pinned below as "validator == solver" only
+        top = ((1.4, 1.0), 'on the top face', face((1.4, 1.0)))
+        if solver == 'native':
+            top = ((1.4, 1.0026), 'a quarter cell above the top face', [])
         for pt, where, want in (
                 ((1.1974, 0.3), 'a quarter cell in front of the left face',
                  [] if solver == 'native' else face((1.1974, 0.3))),
-                ((1.4, 1.0), 'on the top face', face((1.4, 1.0))),
+                top,
                 ((1.0, 0.3), 'in front of it', []),
                 ((1.4, 1.5), 'above it', [])):
             case = Case2D(gauges=[pt], **two)
@@ -625,6 +632,13 @@ def gauge_in_obstacle_checks():
               f'cell-face tie): warned <=> its solver drops it',
               bool(got) == solver_drops(case, (1.2, 0.3))
               and got in ([], face((1.2, 0.3))), str(got))
+        if solver == 'native':
+            case = Case2D(gauges=[(1.4, 1.0)], **two)
+            got = new_warnings(validate_case(case), ref)
+            check('2D native: (1.4, 1.0) exactly on the top face (a cell-'
+                  'face tie in y): warned <=> its solver drops it',
+                  bool(got) == solver_drops(case, (1.4, 1.0))
+                  and got in ([], face((1.4, 1.0))), str(got))
 
         three = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=1.0,
                      center=(1.0, 1.0, 1.0),
@@ -647,12 +661,18 @@ def gauge_in_obstacle_checks():
         # cell in front (nearest centre fluid by a quarter cell); the tie
         # is pinned below as "validator == solver" only
         on_face = ((1.5, 1.0, 0.5), 'on the face', face((1.5, 1.0, 0.5)))
+        # GUI-13 (f): the top face z = 1.0 is a native cell face (95 cells
+        # of 2/190), an argmin tie in z, so native's row sits a quarter
+        # cell (0.0026 m) above it; the tie is pinned below
+        top = ((1.6, 1.0, 1.0), 'on the top face', face((1.6, 1.0, 1.0)))
         if solver == 'native':
             on_face = ((1.4921, 1.0, 0.5),
                        'three quarters of a cell in front of the face', [])
+            top = ((1.6, 1.0, 1.0026), 'a quarter cell above the top face',
+                   [])
         for pt, where, want in (
                 on_face,
-                ((1.6, 1.0, 1.0), 'on the top face', face((1.6, 1.0, 1.0))),
+                top,
                 ((1.9, 1.0, 0.5), 'behind it', [])):
             case = Case3D(gauges=[pt], **three)
             got = new_warnings(validate_case(case), ref)
@@ -669,6 +689,12 @@ def gauge_in_obstacle_checks():
                   '(a closed-test tie): warned <=> the solver drops it',
                   bool(got) == solver_drops(case, (1.5, 1.0, 0.5))
                   and got in ([], face((1.5, 1.0, 0.5))), str(got))
+            case = Case3D(gauges=[(1.6, 1.0, 1.0)], **three)
+            got = new_warnings(validate_case(case), ref)
+            check('3D native: (1.6, 1.0, 1.0) exactly on the top face (a '
+                  'cell-face tie in z): warned <=> the solver drops it',
+                  bool(got) == solver_drops(case, (1.6, 1.0, 1.0))
+                  and got in ([], face((1.6, 1.0, 1.0))), str(got))
 
     # F44, the verifier's cases (verify 11b): an off-grid box face. 2D
     # box x 1.006-1.494 on 0.01 m cells (no auto-refine for either
