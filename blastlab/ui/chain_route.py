@@ -225,7 +225,12 @@ def _burst_above_3d(two, three):
     3D burst axis and maps the 2D z onto the 3D z (both grounds at 0). A 2D
     burst at or above the 3D height therefore lands outside the 3D box.
     Only the burst height is checked; a cut radial far field is normal in a
-    chain (decision row 3). Returns the warning or ''."""
+    chain (decision row 3). Returns the warning or ''.
+
+    GUI-13 (b), owner 2026-10-04 (D1, D3, Q3): the trigger stays Burst >=
+    Lz; the text names the fields by their form labels (the axisymmetric
+    form calls cy `Burst z` and Ly `Height H`, `setup_spec.AXISYM_LABELS`)
+    and advises Lz >= the 2D stage's height, the whole 2D field."""
     try:
         zb = float(two.center[1])
         Lz = float(three.Lz)
@@ -233,9 +238,17 @@ def _burst_above_3d(two, three):
         return ''
     if zb < Lz:
         return ''
-    return (f'The 2D stage\'s burst is at z {_n1(zb)} m, above this '
-            f'stage\'s {_n1(Lz)} m height: the remapped field misses the '
-            f'burst. Raise this stage\'s height above {_n1(zb)} m.')
+    axisym = getattr(two, 'geometry', 'axisymmetric') == 'axisymmetric'
+    burst, height = ('Burst z', 'Height H') if axisym else ('Burst y', 'Ly')
+    head = (f'The 2D stage\'s {burst} ({_n1(zb)} m) is at or above this '
+            f'stage\'s Lz ({_n1(Lz)} m): the 3D box cuts the 2D field off '
+            f'above {_n1(Lz)} m, burst included. ')
+    try:
+        Ly = float(two.Ly)
+    except (AttributeError, TypeError, ValueError):
+        return head + f'Raise Lz above {_n1(zb)} m.'
+    return head + (f'Raise Lz to at least {_n1(Ly)} m (the 2D stage\'s '
+                   f'{height}) or lower the 2D stage\'s {burst}.')
 
 
 def handoff_reach(dims, cases):
@@ -406,19 +419,22 @@ def out_file(d, nxt):
 
 def in_text(case, prev):
     """HAND-OFF IN (plan §8.2): what the stage starts from. The burst
-    height named is the wired case's own (2D: cy, 3D: cz)."""
+    height named is the wired case's own (2D: cy, 3D: cz), by its form
+    label (GUI-13 (b))."""
     if not prev:
         return NONE_IN
     if case.dim == 2:
-        return (f'Remapped onto the axis. The burst height, z '
-                f'{_n1(case.center[1])} m, is taken from this stage’s '
+        burst = ('Burst z' if getattr(case, 'geometry', 'axisymmetric')
+                 == 'axisymmetric' else 'Burst y')
+        return (f'Remapped onto the axis. The burst height ({burst}, '
+                f'{_n1(case.center[1])} m) is taken from this stage’s '
                 f'form.')
     if prev == 2:
         return ('Swept around the burst axis to start the 3D field. The '
                 'burst height comes from the 2D profile.')
     return (f'The 1D profile is placed around the burst point. With no 2D '
-            f'stage, the burst height, z {_n1(case.center[2])} m, is set '
-            f'in this stage’s form.')
+            f'stage, the burst height (Burst z, {_n1(case.center[2])} m) '
+            f'is set in this stage’s form.')
 
 
 #: the 3D stage's centre before its first live check (UXR-12)

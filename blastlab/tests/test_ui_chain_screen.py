@@ -361,7 +361,8 @@ def s3_cards(win):
               'The field when the wave reaches G1 (trigger gauge, remap)'),
           ascii(ch.editors[2].hand_out.caption.text()))
     check('the 2D in-text names the 2D form\'s burst height',
-          'z 2.0 m' in ch.editors[2].hand_in.caption.text(),
+          # GUI-13 (b): by its form label, Burst z
+          'Burst z, 2.0 m' in ch.editors[2].hand_in.caption.text(),
           ascii(ch.editors[2].hand_in.caption.text()))
     f2.v['trigger_gauge'].set('')
     f2.v['trigger_action'].set('terminate')
@@ -557,9 +558,12 @@ def s5_live(win):
           'card 3, the line in its Checks, Run chain still enabled',
           ch.cards[3].state_text() == '● 1 warning'
           and ('warn', w3) in ed3.check_rows()
-          and w3 == 'The 2D stage\'s burst is at z 2.0 m, above this '
-                    'stage\'s 1.5 m height: the remapped field misses the '
-                    'burst. Raise this stage\'s height above 2.0 m.'
+          # GUI-13 (b): the axisymmetric form's labels, "at or above"
+          and w3 == 'The 2D stage\'s Burst z (2.0 m) is at or above this '
+                    'stage\'s Lz (1.5 m): the 3D box cuts the 2D field '
+                    'off above 1.5 m, burst included. Raise Lz to at '
+                    'least 4.0 m (the 2D stage\'s Height H) or lower the '
+                    '2D stage\'s Burst z.'
           and ch.run_btn.isEnabled(),
           ascii([ch.cards[3].state_text(), w3]))
     ch.forms[3].v['Lz'].set('2.5')
@@ -743,11 +747,41 @@ def s5r_reach():
     # GUI-12 B1 (F45): the 2D burst at or above the 3D height
     low = Case3D(Lx=6.0, Ly=6.0, Lz=1.5, center=(3.0, 3.0, 0.75))
     got = cr.handoff_reach([2, 3], {2: two, 3: low})
+    # GUI-13 (b), owner 2026-10-04 (D1, D3, Q3): the form labels, "at or
+    # above", the advice Lz >= the 2D stage's height
     check('2 → 3, burst z 2 above Lz 1.5: the F45 text',
-          got == {3: 'The 2D stage\'s burst is at z 2.0 m, above this '
-                     'stage\'s 1.5 m height: the remapped field misses the '
-                     'burst. Raise this stage\'s height above 2.0 m.'},
+          got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
+                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
+                     'above 1.5 m, burst included. Raise Lz to at least '
+                     '4.0 m (the 2D stage\'s Height H) or lower the 2D '
+                     'stage\'s Burst z.'},
           ascii(got))
+    flat = Case2D(geometry='planar', Lx=4.0, Ly=5.0, center=(1.0, 2.0))
+    check('2 → 3, a planar 2D stage (its form says Burst y, Ly): the D3 '
+          'text with those labels and its Ly',
+          cr.handoff_reach([2, 3], {2: flat, 3: low})
+          == {3: 'The 2D stage\'s Burst y (2.0 m) is at or above this '
+                 'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
+                 'above 1.5 m, burst included. Raise Lz to at least 5.0 m '
+                 '(the 2D stage\'s Ly) or lower the 2D stage\'s Burst y.'})
+    import types
+    noly = types.SimpleNamespace(geometry='axisymmetric', center=(0.0, 2.0))
+    got = cr.handoff_reach([2, 3], {2: noly, 3: low})
+    check('2 → 3, the 2D Ly unreadable: the text ends "Raise Lz above '
+          '2.0 m."',
+          got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
+                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
+                     'above 1.5 m, burst included. Raise Lz above 2.0 m.'},
+          ascii(got))
+    check('in_text names the burst height by its form label (Burst z), '
+          'not "burst height, z"',
+          cr.in_text(two, 1) == 'Remapped onto the axis. The burst height '
+                                '(Burst z, 2.0 m) is taken from this '
+                                'stage’s form.'
+          and cr.in_text(three, 1).endswith(
+              'the burst height (Burst z, 2.0 m) is set in this stage’s '
+              'form.'),
+          ascii([cr.in_text(two, 1), cr.in_text(three, 1)]))
     at = Case3D(Lx=6.0, Ly=6.0, Lz=2.0, center=(3.0, 3.0, 1.0))
     check('2 → 3, burst exactly at Lz: warns (at or above); Lz 2.5: silent',
           list(cr.handoff_reach([2, 3], {2: two, 3: at})) == [3]
