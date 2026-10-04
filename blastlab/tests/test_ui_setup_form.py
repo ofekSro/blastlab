@@ -121,6 +121,48 @@ def main():
         check(f'dim {d}: no optional path comes back as a string',
               not bad, str(bad))
 
+    print("\nS3c: a case file's hidden AMR values survive Open -> Save "
+          "(F16, GUI-11 e, D211)")
+    import tempfile
+    from blastlab.core.case import load_case, save_case
+    tmp = tempfile.mkdtemp(prefix='blastlab_f16_')
+    amr = dict(amr_refine=0.2, amr_unrefine=0.1, amr_interval=3,
+               amr_buffer=1, amr_max_cells=400000)
+    for d, cls in ((2, Case2D), (3, Case3D)):
+        for mode in ('native', 'blastfoam'):
+            src = os.path.join(tmp, f'in_{d}_{mode}.json')
+            out = os.path.join(tmp, f'out_{d}_{mode}.json')
+            save_case(cls(solver=mode, amr_levels=0, **amr), src)
+            f = form(d, mode)
+            f.set_case(load_case(src))
+            pump(5)
+            save_case(f.get_case(), out)
+            back = load_case(out)
+            got = {k: getattr(back, k) for k in amr}
+            check(f"dim {d} {mode}: AMR off, the file's 0.2 / 0.1 (and "
+                  f"3, 1, 400000) are saved back", got == amr, str(got))
+    for d in (2, 3):
+        f = form(d, 'blastfoam')
+        case = f.get_case()
+        check(f"dim {d}: a fresh blastFoam form still sends 0.4 / 0.2",
+              (case.amr_refine, case.amr_unrefine, case.amr_interval,
+               case.amr_buffer, case.amr_max_cells) == (0.4, 0.2, 2, 2, 0),
+              f'{case.amr_refine} {case.amr_unrefine}')
+    f = form(2, 'blastfoam')
+    f.set_case(Case2D(solver='blastfoam', amr_levels=0, **amr))
+    f.v['amr_refine'].set('not a number')
+    case = f.get_case()
+    check("a hidden box that does not parse keeps the fallback, "
+          "and blocks nothing", case.amr_refine == 0.4
+          and case.amr_unrefine == 0.1, str(case.amr_refine))
+    f.v['amr_levels'].set('2')
+    f.v['amr_refine'].set('0.3')
+    case = f.get_case()
+    check("AMR on reads the boxes as before", case.amr_levels == 2
+          and case.amr_refine == 0.3 and case.amr_unrefine == 0.1)
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+
     print("\nS4: every bad field is reported, and marked")
     f = form(2)
     f.v['Lx'].set('abc')
