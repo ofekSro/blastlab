@@ -465,7 +465,11 @@ class StageEditor(QWidget):
         stage_level = {chain_route.AXISYM_REFUSAL.split(': ', 1)[1],
                        _handoff_msg()}
         for n, _t in setup_nodes.nodes(self.dim):
-            self.tree.set_status(n.id, 'error' if n.id in bad else 'ok')
+            # GUI-13 B2 (UX #12, D8): the row that fixes the F45 / S2-1
+            # reach line shows the warn glyph, not a tick
+            self.tree.set_status(n.id, 'error' if n.id in bad else
+                                 'warn' if n.id == 'domain' and chk.reach
+                                 else 'ok')
         self.tree.set_status(STAGE_NODE, 'error' if any(
             e in stage_level for e in chk.errors) else 'ok')
         self.tree.set_pill(*pill_text(chk.n_errors, len(chk.warnings),

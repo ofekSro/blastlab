@@ -169,6 +169,9 @@ class StageCheck:
     warnings: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     report: object = None
+    #: the F45 / S2-1 line (also in `warnings`), '' when there is none:
+    #: it is fixed on the Domain & mesh node (GUI-13 B2, D8)
+    reach: str = ''
 
     @property
     def n_errors(self):
@@ -355,6 +358,7 @@ def stage_checks(dims, sources, hand):
         if d in reach:
             # D200: a warning, never a refusal - run() is unchanged
             chk.warnings.append(reach[d])
+            chk.reach = reach[d]
         out[d] = chk
     return out
 

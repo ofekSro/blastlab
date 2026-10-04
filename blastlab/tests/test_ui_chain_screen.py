@@ -566,6 +566,25 @@ def s5_live(win):
                     '2D stage\'s Burst z.'
           and ch.run_btn.isEnabled(),
           ascii([ch.cards[3].state_text(), w3]))
+    # GUI-13 B2 (UX #12, D8): the Domain & mesh row, where Lz is fixed,
+    # carries the warn glyph while the reach line stands, a tick after
+    check('B2: at Lz 1.5 the stage-3 Domain & mesh row shows warn (S2-1 '
+          'on stage 2 likewise), other rows ok',
+          ed3.tree.rows['domain']._status == 'warn'
+          and ed3.tree.rows['domain'].mark.text() == '!'
+          and ed.tree.rows['domain']._status == 'warn'
+          and all(ed3.tree.rows[n.id]._status == 'ok'
+                  for n, _t in cr.setup_nodes.nodes(3) if n.id != 'domain'),
+          ascii([ed3.tree.rows['domain']._status,
+                 ed.tree.rows['domain']._status]))
+    ch.forms[3].v['Lz'].set('4.0')
+    pump(450)
+    check('B2: at Lz 4.0 the stage-3 Domain & mesh row shows ok again',
+          ed3.tree.rows['domain']._status == 'ok'
+          and ed3.tree.rows['domain'].mark.text() == '✓'
+          and ch.cards[3].state_text() == '● case OK',
+          ascii([ed3.tree.rows['domain']._status,
+                 ch.cards[3].state_text()]))
     ch.forms[3].v['Lz'].set('2.5')
     pump(450)
     check('F45: with the 3D height 2.5 m, card 3 is silent',
