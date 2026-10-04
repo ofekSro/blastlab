@@ -209,10 +209,16 @@ def where(case, point):
     return i, gap, inside, behind
 
 
-def where_text(case, point):
+def where_text(case, point, dropped=None):
     """The Where cell: `5 cm in front of Wall 1`, `5 cm behind Wall 1`
     (the wall stands between the burst and the gauge), `on the face of
-    Wall 1`, `inside Wall 1`, or '' (no obstacle within WHERE_MAX)."""
+    Wall 1`, `inside Wall 1`, or '' (no obstacle within WHERE_MAX).
+
+    GUI-13 (e), D5: a gauge in front of or behind a wall that the
+    solver's drop rule still drops (it is within a cell of a face) reads
+    `4 cm in front of Wall 1 (dropped)`, so the column agrees with the
+    Checks warning. `dropped` is `services.validation.drop_rule(case)`,
+    built once per table by the caller; None builds it here."""
     w = where(case, point)
     if w is None:
         return ''
@@ -222,7 +228,11 @@ def where_text(case, point):
     cm = int(round(gap * 100.0))
     if cm == 0:
         return f'on the face of Wall {i}'
-    return f'{cm} cm {"behind" if behind else "in front of"} Wall {i}'
+    text = f'{cm} cm {"behind" if behind else "in front of"} Wall {i}'
+    if dropped is None:
+        from ..services.validation import drop_rule
+        dropped = drop_rule(case)
+    return text + (' (dropped)' if dropped(point) else '')
 
 
 def walls_in_front(case):

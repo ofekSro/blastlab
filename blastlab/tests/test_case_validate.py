@@ -760,6 +760,46 @@ def gauge_in_obstacle_checks():
                   all(where[k] == v for k, v in walls.items()),
                   f'{walls} {where}')
 
+    # GUI-13 (e): validation.drop_wall is the warning's rule. Two walls
+    # within one cell (0.03 m gap, 0.05 m cells) under blastFoam's outward
+    # snap: Wall 1 x 1.2-1.61 snaps to 1.65, Wall 2 x 1.64-2.0 to 1.60, so
+    # a gauge between them (x 1.628) is in both snapped boxes; the warning
+    # and drop_wall both name the first, Wall 1. 500 kg keeps the 0.05 m
+    # base cell (no charge refinement).
+    from blastlab.core.case import Case1D
+    from blastlab.services.validation import (_in_obstacle_open as _in_open,
+                                              drop_rule, drop_wall)
+    pair = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+                charge=500.0, center=(0.0, 2.0), solver='blastfoam',
+                obstacles=[(1.2, 1.61, 0.0, 1.0), (1.64, 2.0, 0.0, 1.0)])
+    case = Case2D(gauges=[(1.628, 0.5)], **pair)
+    got = new_warnings(validate_case(case), validate_case(
+        Case2D(gauges=[], **pair)))
+    check('GUI-13 (e): two walls within a cell, blastFoam: the warning '
+          'names Wall 1 and drop_wall says 1',
+          got == ['G1 (1.63, 0.50) m on the face of Wall 1 - will be '
+                  'dropped'] and drop_wall(case, (1.628, 0.5)) == 1,
+          str(got))
+    pts = [(1.628, 0.5), (1.4, 0.5), (1.8, 0.5), (1.1, 0.5), (2.5, 0.5),
+           (1.628, 1.2), (5.0, 0.5)]
+    case = Case2D(gauges=pts, **pair)
+    named = {}
+    for w in validate_case(case).warnings:
+        m = re.match(r'G(\d+) .*Wall (\d+) - will be dropped$', w)
+        if m:
+            named[int(m.group(1))] = int(m.group(2))
+    rule = drop_rule(case)
+    mine = {k: rule(p) for k, p in enumerate(pts, start=1) if rule(p)}
+    check('GUI-13 (e): drop_rule drops exactly the warned gauges, naming '
+          'the warning\'s wall where it is not strictly inside another',
+          len(named) >= 3 and set(mine) == set(named) and all(
+              named[k] == mine[k] for k in mine
+              if not _in_open(pts[k - 1], pair['obstacles'])),
+          f'{named} {mine}')
+    check('GUI-13 (e): outside the domain or a 1D case: drop_wall 0',
+          drop_wall(case, (5.0, 0.5)) == 0
+          and drop_wall(Case1D(), (0.5,)) == 0)
+
 
 def thin_obstacle_warn_checks():
     """A wall carved a single cell thick is a numerical hazard (run

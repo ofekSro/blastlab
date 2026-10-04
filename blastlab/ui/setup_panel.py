@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
 from ..core import mode as mode_mod
+from ..services.validation import drop_rule
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
@@ -844,13 +845,16 @@ class SetupPanel(QWidget):
         t.setRowCount(len(pts))
         mono = QFont(theme.MONO)
         mono.setPixelSize(13)
+        # GUI-13 (e): the solver's drop rule, built once for the table
+        dropped = drop_rule(case)
         for r, (p, (num, R, Z)) in enumerate(zip(pts, rows)):
             cells = ([(f'G{num}', 'gauge')]
                      + [(f'{v:.2f}', 'text') for v in p]
                      + [('', 'text')] * (3 - len(p))
                      + [(f'{R:.2f}', 'text2'),
                         ('' if Z is None else f'{Z:.2f}', 'accent_soft'),
-                        (scaled_distance.where_text(case, p), 'muted')])
+                        (scaled_distance.where_text(case, p, dropped),
+                         'muted')])
             for c, (text, colour) in enumerate(cells):
                 item = QTableWidgetItem(text)
                 item.setForeground(theme.qcolor(colour))

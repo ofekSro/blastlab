@@ -1565,7 +1565,8 @@ def _validate_closing(case, rep, ctx):
         # the entered order) at its coordinates in metres
         name = f"G{k} ({', '.join(f'{float(v):.2f}' for v in pt)}) m"
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
-            warn(f"{name} outside the domain - will be dropped")
+            warn(f"{name} {gauge_drop_reason(0, False, outside=True)}"
+                 f" - will be dropped")
             continue
         if dropped is None:
             dropped = _gauge_drop_rule(case, ctx)
@@ -1592,12 +1593,58 @@ def _validate_closing(case, rep, ctx):
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
 
 
-def gauge_drop_reason(wall, inside):
+#: why a gauge outside the domain is dropped (GUI-13 (e))
+OUTSIDE_DOMAIN = 'outside the domain'
+
+
+def gauge_drop_reason(wall, inside, outside=False):
     """`inside Wall 2` / `on the face of Wall 2`: why the solver drops a
-    gauge for obstacle `wall` (1-based, as the tree names it). One
-    wording for the validation warning and the Run screen's dropped-gauge
-    note (`ui/run_gauges._drop_reason`; D201, GUI-12 A4)."""
+    gauge for obstacle `wall` (1-based, as the tree names it), or
+    `outside the domain` when `outside`. One wording for the validation
+    warning and the Run screen's dropped-gauge note
+    (`ui/run_gauges._drop_reason`; D201, GUI-12 A4, GUI-13 (e))."""
+    if outside:
+        return OUTSIDE_DOMAIN
     return f'inside Wall {wall}' if inside else f'on the face of Wall {wall}'
+
+
+def drop_rule(case, pending_inputs=False):
+    """`dropped(pt)`: the 1-based wall for which the case's solver drops
+    gauge `pt`, 0 when it keeps it, when `pt` is outside the domain, or
+    when the case cannot be laid out. The same rule as the validation
+    warning (`_gauge_drop_rule` on the context `validate_case` builds up
+    to its refinement block, which is all the rule reads), so Setup's
+    warning, Setup's Where column and Run's dropped-gauge note name one
+    wall (GUI-13 (e)). Build it once per case, call it per gauge."""
+    def none(_pt):
+        return 0
+    try:
+        if case.dim < 2 or not case.obstacles:
+            return none
+        rep = ValidationReport()
+        ctx = _validate_common(case, rep)
+        if ctx is None or not _validate_domain_and_charge(case, rep, ctx):
+            return none
+        _validate_profile_init(case, rep, ctx, pending_inputs)
+        if not _validate_refinement(case, rep, ctx):
+            return none
+        rule, dims = _gauge_drop_rule(case, ctx), ctx.dims
+    except (ArithmeticError, AttributeError, IndexError, TypeError,
+            ValueError):
+        return none
+
+    def dropped(pt):
+        pt = tuple(float(v) for v in pt)
+        if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
+            return 0
+        return rule(pt)
+    return dropped
+
+
+def drop_wall(case, point):
+    """The 1-based wall for which the case's solver drops gauge `point`,
+    0 when it keeps it (`drop_rule`; one call, one gauge)."""
+    return drop_rule(case)(point)
 
 
 def _gauge_drop_rule(case, ctx):

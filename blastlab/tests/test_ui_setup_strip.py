@@ -554,6 +554,49 @@ def s3_dock():
     check("3D boxes: '10 cm in front of Wall 1'",
           sd.where_text(c3, (1.9, 0.5, 1.0)) == '10 cm in front of Wall 1')
     check("1D has no obstacles", sd.obstacle_boxes(Case1D()) == [])
+
+    # GUI-13 (e): one drop-wall rule for Setup and Run, and Where says
+    # when the solver drops a gauge it calls "in front of" (D5). 500 kg
+    # keeps blastFoam's 0.05 m base cell; boxes snap outward onto it.
+    import dataclasses
+    import re
+    from blastlab.services.validation import drop_wall, validate_case
+    from blastlab.ui.run_gauges import _drop_reason
+    kw = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+              charge=500.0, center=(0.0, 2.0))
+    # two walls 0.03 m apart (within one cell): Wall 1 snaps to x 1.65,
+    # Wall 2 to x 1.60, so x 1.628 lies in both snapped boxes
+    pair = Case2D(solver='blastfoam', gauges=[(1.628, 0.5)],
+                  obstacles=[(1.2, 1.61, 0.0, 1.0), (1.64, 2.0, 0.0, 1.0)],
+                  **kw)
+    warned = [int(m.group(1)) for w in validate_case(pair).warnings
+              for m in [re.search(r'Wall (\d+) - will be dropped$', w)]
+              if m]
+    check('two walls within a cell (blastFoam): Setup\'s warning, '
+          'drop_wall and Run\'s _drop_reason name the same wall (Wall 1)',
+          warned == [1] and drop_wall(pair, (1.628, 0.5)) == 1
+          and _drop_reason(pair, (1.628, 0.5)) == 'on the face of Wall 1',
+          f'{warned} {_drop_reason(pair, (1.628, 0.5))}')
+    # Wall 1 x 1.29-1.6 snaps to x 1.25: a gauge at x 1.252 is 3.8 cm in
+    # front of the wall as entered, and blastFoam drops it
+    near = Case2D(solver='blastfoam', gauges=[(1.252, 0.5)],
+                  obstacles=[(1.29, 1.6, 0.0, 1.0)], **kw)
+    check("D5: a dropped gauge 4 cm in front of Wall 1 reads "
+          "'4 cm in front of Wall 1 (dropped)', as the warning drops it",
+          sd.where_text(near, (1.252, 0.5))
+          == '4 cm in front of Wall 1 (dropped)'
+          and any(w.endswith('Wall 1 - will be dropped')
+                  for w in validate_case(near).warnings),
+          sd.where_text(near, (1.252, 0.5)))
+    kept = dataclasses.replace(near, solver='native')
+    check("D5: the same gauge kept (native, nearest centre fluid): "
+          "'4 cm in front of Wall 1', no warning",
+          sd.where_text(kept, (1.252, 0.5)) == '4 cm in front of Wall 1'
+          and not any('will be dropped' in w
+                      for w in validate_case(kept).warnings),
+          sd.where_text(kept, (1.252, 0.5)))
+    check("Run's reason for a gauge outside the domain is the warning's "
+          "words", _drop_reason(near, (5.0, 0.5)) == 'outside the domain')
     check("05 summary, board line 89: '2 · in front of Wall 1'",
           setup_nodes.summaries(case)['gauges'] == '2 · in front of Wall 1',
           setup_nodes.summaries(case)['gauges'])

@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
 from ..core.constants import P_AIR
 from ..output.gauge_summary import (pair_in_order, summarize_gauges,
                                     summarize_trace)
-from ..services.validation import gauge_drop_reason
+from ..services.validation import drop_wall, gauge_drop_reason
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
@@ -148,36 +148,30 @@ def match_gauges(case, gauge_out):
 
 
 def _drop_reason(case, point):
-    """Why an entered gauge has no series, from the case's geometry:
-    `inside Wall 1`, `on the face of Wall 1` (within a cell: the native
-    nearest-cell rule, blastFoam's face-snapped boxes), `outside the
-    domain`, or '' when the geometry does not say. The wall wording is
-    the validation warning's (`services.validation.gauge_drop_reason`)."""
-    try:
-        boxes = sd.obstacle_boxes(case)
-    except (AttributeError, TypeError, ValueError):
-        boxes = []
-    try:
-        tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
-    except (TypeError, ValueError):
-        tol = 0.0
+    """Why an entered gauge has no series: `inside Wall 1`, `on the face
+    of Wall 1`, `outside the domain`, or '' when the case does not say.
+    The wall is the solver's own drop rule (`services.validation.
+    drop_rule`), the one Setup's warning names, and inside / face is the
+    warning's open-box split, in the warning's words (`gauge_drop_reason`;
+    GUI-13 (e))."""
     p = [float(v) for v in point]
-    for i, box in enumerate(boxes, start=1):
-        if len(box) != len(p):
-            continue
-        if all(lo < v < hi for v, (lo, hi) in zip(p, box)):
-            return gauge_drop_reason(i, True)
-    for i, box in enumerate(boxes, start=1):
-        if len(box) == len(p) and all(lo - tol <= v <= hi + tol
-                                      for v, (lo, hi) in zip(p, box)):
-            return gauge_drop_reason(i, False)
     dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(p)]]
     try:
         if all(d is not None for d in dims) and any(
                 not 0.0 <= v <= float(d) for v, d in zip(p, dims)):
-            return 'outside the domain'
+            return gauge_drop_reason(0, False, outside=True)
     except (TypeError, ValueError):
         pass
+    try:
+        boxes = sd.obstacle_boxes(case)
+    except (AttributeError, TypeError, ValueError):
+        boxes = []
+    inside = next((i for i, box in enumerate(boxes, start=1)
+                   if len(box) == len(p)
+                   and all(lo < v < hi for v, (lo, hi) in zip(p, box))), 0)
+    wall = drop_wall(case, p) if boxes else 0
+    if inside or wall:
+        return gauge_drop_reason(inside or wall, bool(inside))
     return ''
 
 
