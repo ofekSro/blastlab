@@ -1161,6 +1161,42 @@ entries, defaults P1-P5 (D230-D232). Worked in a worktree on D: (`D:\blastlab_wt
 
 ---
 
+## 0v. 2026-10-04 — batch `gui-12-backlog` (GUI-12; branch `gui-12`)
+
+Plan: `docs/batches/2026-10-04-gui-12-backlog.md`; reports `…-backlog-{A,B}.{implement,verify}.md`;
+QA `docs/qa/2026-10-04-gui-12-qa/`, UX `docs/qa/2026-10-04-gui-12-ux.md`. Owner: "approve all"
+(all items, re-record only explained drift, `test_case_validate` edits, order-preserving pairing).
+Decision rows D233-D236.
+
+- **A1 (f), goldens:** all 14 char suites green at `eb7b58c`, `f4d9426` and HEAD here, in three
+  setups; HD13 end value -45.3645 = committed. Nothing re-recorded; the home PC's -45.3536 stays
+  unexplained (`docs/batches/2026-10-04-gui-12.goldens.md`, GUI-13 i).
+- **A2 (g Q1):** `gauge_summary.pair_in_order` pairs survivors with the entered list in order;
+  `run_gauges._match` uses it. Verifier: brute force over 3000 random cases, 0 mismatches.
+- **A3 (a):** exported gauge-trace titles use the entered number (`Gauge 1/3/4` after a drop),
+  Tk Gauges tab too without touching `gui/`; no-drop titles unchanged. `test_plots_gauge_titles.py`.
+- **A4 (b):** the drop warning reads `inside Wall i` / `on the face of Wall i`, one helper
+  `gauge_drop_reason` shared with Run.
+- **A5 (c):** correct as is — a fed Chain stage is not auto-refined, so its warnings follow its
+  own dx. Verifier's own probe: 18 rows vs the real solvers, 0 mismatches. Pinned in
+  `test_ui_chain_screen`.
+- **A6 (g Q2):** the 2D and 3D native face rows moved off the exact x ties; ±1e-12 flips nothing.
+- **B1 (d) F45:** `chain_route.handoff_reach` warns when the 2D burst height ≥ the 3D `Lz`;
+  warning only, so the default chain now shows "1 warning" on stage 3. Two S5 checks in
+  `test_ui_chain_screen` adjusted (verifier: nothing loosened).
+- **B2 (e):** harness E03 checks the path the dialog stub answered with.
+- **B3 (h):** 1D Field tooltip "Exports use the full title: …"; `screen_title_1d` docstring
+  lists the three title styles.
+- **Tests:** fast + 14 char suites, Qt screen suites, all 16 `test_gui_*`, harness D02 and
+  D01/D02/E03; `test_regression` byte-identical after each part. QA (real platform, Qt + Tk,
+  native): 5/5 PASS, 27/27 + 4/4 checks.
+- **Verifier fixes:** `644afd9` (D233's check count). Part B: none.
+- **Open → `GUI-13`:** default-chain warning (owner call), F45 wording, `G<n>` in the drop
+  warning, export footnote, y/z face ties, layout lows at 1100 × 720, HD13 on the home PC.
+- **Commits:** `d7332df`..`39e0cb7` and the commit of this entry, on branch `gui-12`.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
