@@ -469,10 +469,11 @@ def cards(dim):
     if dim == 1:
         out.append(CardSpec('Charge', col=0, rows=(
             F('charge', 'Charge [kg TNT]', 'float', 1.0),
-            # N11/T46: the native solvers share the JWL material table,
-            # so this row shows in both solver modes
+            # UXR-3, owner decision 2026-10-03 (D210): a native case always
+            # carries TNT (models.fields._charge_model, D138), so the row
+            # is hidden in native mode; its value stays in the form
             F('material', 'Material', 'choice', 'TNT',
-              values=tuple(MATERIAL_NAMES)))))
+              values=tuple(MATERIAL_NAMES), scope='blastfoam'))))
     else:
         modes = (('charge', 'profile1d') if dim == 2
                  else ('charge', 'profile1d', 'profile2d'))
@@ -483,8 +484,9 @@ def cards(dim):
                 # kg per metre of depth for planar) via the hook
                 F('charge', 'Charge [kg TNT]', 'float',
                   1.0 if dim == 2 else 25.0, dyn=(dim == 2)),
+                # UXR-3 (D210): blastFoam only, as in 1D
                 F('material', 'Material', 'choice', 'TNT',
-                  values=tuple(MATERIAL_NAMES))]
+                  values=tuple(MATERIAL_NAMES), scope='blastfoam')]
         if dim == 3:
             # blastFoam always resolves the charge (smear is ignored with
             # a note), so the choice is a native row
@@ -555,9 +557,14 @@ def by_name(dim):
 #: captions the axisymmetric hook swaps in (2D only). The planar form
 #: keeps the spec's own labels.
 AXISYM_LABELS = {
-    'Lx': 'Radius R [m]', 'Ly': 'Height Z [m]',
+    # UXR-11 (D220): Height H, so Z stays the scaled distance alone
+    'Lx': 'Radius R [m]', 'Ly': 'Height H [m]',
     'cx': 'Burst r [m]', 'cy': 'Burst z [m]',
     'charge': 'Charge [kg TNT]',
 }
+#: UXR-11 / F4 (D220): the point-list column captions the axisymmetric
+#: hook swaps in (gauges, obstacles, refinement zones, detonation points)
+AXISYM_COLUMNS = {'x': 'r', 'y': 'z', 'x0': 'r0', 'x1': 'r1',
+                  'y0': 'z0', 'y1': 'z1'}
 #: UX-02: planar charges are per metre of depth
 PLANAR_LABELS = {'charge': 'Charge [kg TNT/m]'}

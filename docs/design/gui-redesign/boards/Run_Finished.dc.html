@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Run, finished</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#070708}
+a{color:#ff8a55}a:hover{color:#ffab85}
+.i{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+</style>
+</helmet>
+<div style="position: relative; width: 1440px; height: 900px; display: flex; flex-direction: column; overflow: hidden; background: #0b0b0c; color: #f2efe9; font-family: 'IBM Plex Sans', system-ui, sans-serif">
+
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 0 0 12px; background: #202024; font-size: 12px; color: #d9d4cc">
+<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" style="shape-rendering: crispEdges">
+<g style="fill: #ff6a2b"><rect x="2" y="4" width="3" height="2"></rect><rect x="5" y="5" width="2" height="3"></rect><rect x="7" y="7" width="2" height="2"></rect><rect x="8" y="9" width="3" height="2"></rect><rect x="10" y="11" width="2" height="3"></rect></g>
+<rect x="1.5" y="1.5" width="13" height="13" style="fill: none; stroke: #e7eaee; stroke-width: 1"></rect>
+</svg>
+<span>{{ windowTitle }}</span>
+<span style="margin-left: 8px; font-size: 11px; color: #8f8a82">← progress in the window title and on the taskbar</span>
+<span style="flex-grow: 1"></span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">–</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">□</span>
+<span aria-hidden="true" style="width: 44px; text-align: center; color: #a8a39b">×</span>
+</div>
+
+<header style="height: 64px; flex-shrink: 0; display: flex; align-items: center; gap: 26px; padding: 0 20px; border-bottom: 1px solid #1f1f23">
+<div style="display: flex; align-items: center; gap: 10px">
+<svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+<path d="M7.5 4V28M10.5 4V28M13.5 4V28M16.5 4V28M19.5 4V28M22.5 4V28M25.5 4V28M4 7.5H28M4 10.5H28M4 13.5H28M4 16.5H28M4 19.5H28M4 22.5H28M4 25.5H28" style="fill: none; stroke: #26262a; stroke-width: 1"></path>
+<g style="fill: #ff6a2b; opacity: 0.35"><rect x="4" y="13" width="3" height="3"></rect><rect x="7" y="13" width="3" height="3"></rect><rect x="10" y="16" width="3" height="3"></rect><rect x="13" y="16" width="3" height="3"></rect><rect x="13" y="19" width="3" height="3"></rect><rect x="16" y="22" width="3" height="3"></rect><rect x="16" y="25" width="3" height="3"></rect></g>
+<g style="fill: #ff6a2b"><rect x="4" y="10" width="3" height="3"></rect><rect x="7" y="10" width="3" height="3"></rect><rect x="10" y="10" width="3" height="3"></rect><rect x="10" y="13" width="3" height="3"></rect><rect x="13" y="13" width="3" height="3"></rect><rect x="16" y="13" width="3" height="3"></rect><rect x="16" y="16" width="3" height="3"></rect><rect x="16" y="19" width="3" height="3"></rect><rect x="19" y="19" width="3" height="3"></rect><rect x="19" y="22" width="3" height="3"></rect><rect x="19" y="25" width="3" height="3"></rect></g>
+<rect x="3" y="3" width="26" height="26" style="fill: none; stroke: #f2efe9; stroke-width: 2"></rect>
+</svg>
+<span style="font: 700 16px 'Space Grotesk', sans-serif; letter-spacing: 0.08em">BLAST<span style="color: #ff6a2b">LAB</span></span>
+</div>
+<nav aria-label="Workflow" style="display: flex; align-items: center; gap: 6px">
+<a href="BC_Combined.dc.html" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: #a8a39b; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">01</span>Setup<svg class="i" viewBox="0 0 24 24" width="13" height="13" aria-label="complete" style="color: #7ddc9a"><path d="M5 12l5 5L20 7"></path></svg></a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="#run" aria-current="page" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 16px; border-radius: 20px; background: #f2efe9; color: #0b0b0c; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">02</span>Run</a>
+<svg class="i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="color: #4a4a50"><path d="M9 6l6 6-6 6"></path></svg>
+<a href="#results" style="display: flex; gap: 8px; height: 40px; align-items: center; padding: 0 14px; border-radius: 20px; color: {{ resultsNavColor }}; text-decoration: none; font: 600 14px 'Space Grotesk', sans-serif"><span style="font-size: 12px; opacity: 0.6">03</span>Results</a>
+<span style="width: 1px; height: 22px; margin: 0 6px; background: #29292e"></span>
+<a href="#chain" style="display: flex; height: 40px; align-items: center; padding: 0 10px; color: #a8a39b; text-decoration: none; font-size: 13.5px">Chain 1D → 2D → 3D</a>
+</nav>
+<span style="flex-grow: 1"></span>
+<span style="font: 600 17px 'Space Grotesk', sans-serif">wall_A</span>
+<span style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #29292e; border-radius: 16px; font-size: 12.5px; color: #cfcac2">
+<span style="width: 8px; height: 8px; border-radius: 4px; background: {{ statusDot }}"></span>
+{{ statusText }}
+</span>
+</header>
+
+<div style="flex: 1; min-height: 0; display: flex">
+
+<aside aria-label="Run controls" style="width: 280px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px; padding: 16px 16px; border-right: 1px solid #1f1f23; background: #0e0e10">
+
+<div style="display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">WHERE THE FILES GO</span>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="r-root" style="font-size: 12.5px; color: #a8a39b">Runs folder</label>
+<div style="display: flex; gap: 6px">
+<input id="r-root" value="C:\BLASTLAB_RUNS" style="flex: 1; min-width: 0; height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 8px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<button aria-label="Browse for the runs folder" style="width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #cfcac2; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg></button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 5px">
+<label for="r-model" style="font-size: 12.5px; color: #a8a39b">Model</label>
+<input id="r-model" value="wall_A" style="height: 34px; box-sizing: border-box; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 8px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+</div>
+<span style="display: flex; gap: 6px; font: 11.5px 'IBM Plex Mono', monospace; line-height: 1.45; color: #8f8a82">
+<svg class="i" viewBox="0 0 24 24" width="13" height="13" aria-hidden="true" style="flex-shrink: 0; margin-top: 2px"><path d="M9 6l6 6-6 6"></path></svg>
+C:\BLASTLAB_RUNS\wall_A\
+</span>
+</div>
+
+<div style="display: flex; gap: 8px">
+<sc-if value="{{ running }}" hint-placeholder-val="{{ true }}">
+<button onClick="{{ askStop }}" style="flex: 1; height: 48px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 1px solid #6b2a37; border-radius: 10px; background: #26141a; color: #ff9aac; font: 700 16px 'Space Grotesk', sans-serif; cursor: pointer">
+<svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" style="fill: #ff9aac"></rect></svg>
+Stop
+<span style="padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,0.08); font: 500 10.5px 'IBM Plex Mono', monospace">Shift+Esc</span>
+</button>
+</sc-if>
+<sc-if value="{{ finished }}" hint-placeholder-val="{{ false }}">
+<button style="flex: 1; height: 48px; display: flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 10px; background: #ff6a2b; color: #1a0d06; font: 700 16px 'Space Grotesk', sans-serif; cursor: pointer">
+<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 5l12 7-12 7z" style="fill: #1a0d06"></path></svg>
+Run again
+</button>
+</sc-if>
+<button aria-label="Open the 3D view" style="width: 56px; height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2c31; border-radius: 10px; background: transparent; color: #cfcac2; cursor: pointer"><svg class="i" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"></path><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"></path></svg></button>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #242428; border-radius: 10px; background: #111113">
+<button aria-expanded="{{ stepExpanded }}" onClick="{{ toggleStep }}" style="display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: #f2efe9; font: 600 14px 'IBM Plex Sans', sans-serif; text-align: left; cursor: pointer">
+<svg class="i" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" style="transform: {{ stepChevron }}"><path d="M9 6l6 6-6 6"></path></svg>
+<span style="flex: 1">Step through</span>
+<span style="font-size: 12px; font-weight: 400; color: #8f8a82">{{ stepHint }}</span>
+</button>
+<sc-if value="{{ stepOpen }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; line-height: 1.4; color: #8f8a82">Initialise, then advance the solver a few steps at a time.</span>
+<button style="height: 34px; border: 1px solid #2c2c31; border-radius: 8px; background: transparent; color: #f2efe9; font: 500 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Initialise model</button>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+<button style="height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Mono', monospace; cursor: pointer">+1</button>
+<button style="height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Mono', monospace; cursor: pointer">+10</button>
+<button style="height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Mono', monospace; cursor: pointer">+100</button>
+<button style="height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Mono', monospace; cursor: pointer">+1000</button>
+</div>
+<div style="display: flex; gap: 6px">
+<button style="flex: 1; height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">To the end</button>
+<button style="flex: 1; height: 32px; border: 0; border-radius: 7px; background: #1c1c1f; color: #f2efe9; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Pause</button>
+</div>
+</div>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px; padding: 12px; border: 1px solid #242428; border-radius: 10px; background: #111113">
+<span style="font-size: 14px; font-weight: 600">Live view</span>
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="r-ref" style="flex: 1; font-size: 12.5px; color: #a8a39b">Refresh every</label>
+<input id="r-ref" placeholder="auto" style="width: 56px; height: 32px; box-sizing: border-box; padding: 0 8px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<select aria-label="Refresh unit" style="height: 32px; padding: 0 6px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Sans', sans-serif"><option>seconds</option><option>steps</option></select>
+</div>
+<div style="display: flex; align-items: center; gap: 10px">
+<span style="flex: 1; font-size: 12.5px; color: #a8a39b">Colour range: auto</span>
+<button aria-label="Automatic colour range" aria-pressed="{{ autoPressed }}" onClick="{{ toggleAuto }}" style="position: relative; width: 42px; height: 24px; padding: 0; border: 0; border-radius: 12px; background: {{ autoTrack }}; cursor: pointer">
+<span style="position: absolute; top: 3px; left: {{ autoKnob }}; width: 18px; height: 18px; border-radius: 9px; background: #ffffff"></span>
+</button>
+</div>
+<sc-if value="{{ manualClim }}" hint-placeholder-val="{{ false }}">
+<div style="display: flex; align-items: center; gap: 8px">
+<label for="r-min" style="font-size: 12px; color: #8f8a82">Min</label>
+<input id="r-min" value="100" style="width: 64px; height: 32px; box-sizing: border-box; padding: 0 8px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<label for="r-max" style="font-size: 12px; color: #8f8a82">Max</label>
+<input id="r-max" value="1000" style="width: 64px; height: 32px; box-sizing: border-box; padding: 0 8px; border: 1px solid #2c2c31; border-radius: 7px; background: #0b0b0c; color: #f2efe9; font: 12.5px 'IBM Plex Mono', monospace">
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #8f8a82">kPa</span>
+</div>
+</sc-if>
+</div>
+
+<span style="flex-grow: 1"></span>
+<a href="BC_Combined.dc.html" style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 12px; border: 1px solid #24302a; border-radius: 10px; background: #121814; color: #cfe9d7; font-size: 13px; text-decoration: none">
+<svg class="i" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" style="color: #7ddc9a"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg>
+Setup: case OK · 368 k cells
+</a>
+</aside>
+
+<main style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+
+<section aria-label="Run progress" style="flex-shrink: 0; display: flex; gap: 8px; padding: 14px 16px; border-bottom: 1px solid #1f1f23">
+<div style="flex: 2.3; min-width: 0; display: flex; flex-direction: column; gap: 6px; padding: 10px 14px; border-radius: 10px; background: #1d1511">
+<div style="display: flex; align-items: baseline; gap: 10px">
+<span style="font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; color: #ff8a55">PROGRESS</span>
+<span style="font: 600 22px 'Space Grotesk', sans-serif">{{ pct }}</span>
+</div>
+<span style="height: 6px; border-radius: 3px; background: #3a2a20; overflow: hidden"><span style="display: block; width: {{ barW }}; height: 6px; background: #ff6a2b"></span></span>
+<span style="font-size: 12px; color: #c9b3a6">{{ timeLine }}</span>
+</div>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: #141416">
+<span style="font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">TIME</span>
+<span style="font: 600 21px 'Space Grotesk', sans-serif">{{ tNow }} <span style="font-size: 13px; color: #a8a39b">ms</span></span>
+<span style="font-size: 11.5px; color: #a8a39b">simulated</span>
+</div>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: #141416">
+<span style="font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">STEP</span>
+<span style="font: 600 21px 'Space Grotesk', sans-serif">{{ stepNo }}</span>
+<span style="font-size: 11.5px; color: #a8a39b">dt {{ dt }} s</span>
+</div>
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: #141416">
+<span style="font-size: 10.5px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">P MAX</span>
+<span style="font: 600 21px 'Space Grotesk', sans-serif">{{ pmax }} <span style="font-size: 13px; color: #a8a39b">kPa</span></span>
+<span style="font-size: 11.5px; color: #a8a39b">in the field now</span>
+</div>
+</section>
+
+<sc-if value="{{ finished }}" hint-placeholder-val="{{ false }}">
+<div style="flex-shrink: 0; display: flex; align-items: center; gap: 12px; margin: 12px 16px 0; padding: 12px 16px; border: 1px solid #2c4a37; border-radius: 10px; background: #122018">
+<svg class="i" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="color: #7ddc9a"><circle cx="12" cy="12" r="9"></circle><path d="M8 12l3 3 5-6"></path></svg>
+<span style="flex: 1; font-size: 14px; color: #d8f0df">Result ready: wall_A · the wave reached Outer at 6.31 ms. Files in C:\BLASTLAB_RUNS\wall_A\</span>
+<a href="#results" style="display: flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 8px; background: #7ddc9a; color: #08140c; font: 600 13.5px 'IBM Plex Sans', sans-serif; text-decoration: none">Open in 03 Results →</a>
+</div>
+</sc-if>
+
+<div style="flex: 1; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; background: #0d0d0f">
+<div role="group" aria-label="Live view" style="position: absolute; top: 10px; left: 14px; display: flex; gap: 2px; padding: 3px; border: 1px solid #29292e; border-radius: 9px; background: #0b0b0c">
+<button style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: #2a2a2f; color: #f2efe9; font: 600 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Live slice</button>
+<button style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">Gauges</button>
+<button style="height: 28px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12.5px 'IBM Plex Sans', sans-serif; cursor: pointer">3D view</button>
+</div>
+<button aria-pressed="false" style="position: absolute; top: 12px; right: 14px; height: 28px; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Show mesh</button>
+<span style="position: absolute; bottom: 10px; left: 16px; font-size: 11.5px; color: #8f8a82">Mockup: the field and the numbers during the run are sample values.</span>
+<svg viewBox="0 0 400 360" width="470" height="423" role="img" aria-label="Live pressure slice at t 4.90 ms: the incident front has passed over the wall top, the wave reflected from Wall 1 is travelling back toward the charge, and the ground reflection is rising behind the incident front">
+<rect x="44" y="44" width="280" height="280" style="fill: #1b1433"></rect>
+<path d="M44 100A84 84 0 0 1 44 268" style="fill: none; stroke: #7e2a6b; stroke-width: 3; opacity: 0.7"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296L254 149Z" style="fill: #f97316; opacity: 0.55"></path>
+<g style="fill: none; stroke: #f97316; stroke-width: 12; opacity: 0.4; stroke-linecap: round">
+<path d="M236.5 44A238 238 0 0 1 279.4 149"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296"></path>
+<path d="M254 296A238 238 0 0 1 236.5 324"></path>
+<path d="M44 226A238 238 0 0 1 236.5 324"></path>
+</g>
+<g style="fill: none; stroke: #fde68a; stroke-width: 2.5; stroke-linecap: round">
+<path d="M236.5 44A238 238 0 0 1 279.4 149"></path>
+<path d="M228.6 149A238 238 0 0 0 254 296"></path>
+<path d="M254 296A238 238 0 0 1 236.5 324"></path>
+<path d="M44 226A238 238 0 0 1 236.5 324"></path>
+</g>
+<rect x="254" y="149" width="14" height="175" style="fill: #cfcac2"></rect>
+<rect x="247" y="285" width="7" height="7" transform="rotate(45 250.5 288.5)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<rect x="247" y="215.5" width="7" height="7" transform="rotate(45 250.5 219)" style="fill: #0b0b0c; stroke: #4cc9f0; stroke-width: 1.5"></rect>
+<text x="238" y="292" style="font: 600 8px 'IBM Plex Mono', monospace; fill: #4cc9f0; text-anchor: end">G1</text>
+<text x="238" y="222.5" style="font: 600 8px 'IBM Plex Mono', monospace; fill: #4cc9f0; text-anchor: end">G2</text>
+<circle cx="44" cy="184" r="3" style="fill: #fde68a"></circle>
+<path d="M44 324H324" style="fill: none; stroke: #f2efe9; stroke-width: 1.5"></path>
+<text x="184" y="36" style="font: 600 9px 'IBM Plex Mono', monospace; fill: #f2efe9; text-anchor: middle">t = {{ tNow }} ms</text>
+<text x="44" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">0</text>
+<text x="114" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">1</text>
+<text x="184" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">2</text>
+<text x="254" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">3</text>
+<text x="324" y="337" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: middle">4</text>
+<text x="37" y="327" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">0</text>
+<text x="37" y="187" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">2</text>
+<text x="37" y="47" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">4</text>
+<text x="184" y="352" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">r [m]</text>
+<text x="15" y="184" transform="rotate(-90 15 184)" style="font: 8.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">z [m]</text>
+<rect x="344" y="64" width="12" height="40" style="fill: #fff3b0"></rect>
+<rect x="344" y="104" width="12" height="40" style="fill: #fbbf24"></rect>
+<rect x="344" y="144" width="12" height="40" style="fill: #f97316"></rect>
+<rect x="344" y="184" width="12" height="40" style="fill: #c2410c"></rect>
+<rect x="344" y="224" width="12" height="40" style="fill: #7e2a6b"></rect>
+<rect x="344" y="264" width="12" height="40" style="fill: #1b1433"></rect>
+<text x="360" y="67" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">1000</text>
+<text x="360" y="187" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">300</text>
+<text x="360" y="307" style="font: 7.5px 'IBM Plex Mono', monospace; fill: #a8a39b">100</text>
+<text x="350" y="56" style="font: 7.5px 'IBM Plex Sans', sans-serif; fill: #a8a39b; text-anchor: middle">p [kPa], log</text>
+</svg>
+</div>
+
+<div style="height: 142px; flex-shrink: 0; display: flex; flex-direction: column; border-top: 1px solid #1f1f23; background: #0e0e10">
+<div role="tablist" aria-label="Run details" style="height: 38px; flex-shrink: 0; display: flex; align-items: stretch; padding: 0 8px; border-bottom: 1px solid #1c1c20">
+<button role="tab" aria-selected="true" style="padding: 0 14px; border: 0; border-bottom: 2px solid #ff6a2b; background: transparent; color: #f2efe9; font: 600 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Log</button>
+<button role="tab" aria-selected="false" style="padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #a8a39b; font: 500 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Messages</button>
+<button role="tab" aria-selected="false" style="display: flex; align-items: center; gap: 6px; padding: 0 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #a8a39b; font: 500 13px 'IBM Plex Sans', sans-serif; cursor: pointer">Earlier runs <span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">3</span></button>
+<span style="flex-grow: 1"></span>
+<button style="align-self: center; height: 28px; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Copy</button>
+<button style="align-self: center; margin-left: 6px; height: 28px; padding: 0 10px; border: 1px solid #2c2c31; border-radius: 6px; background: transparent; color: #a8a39b; font: 500 12px 'IBM Plex Sans', sans-serif; cursor: pointer">Save log…</button>
+</div>
+<pre style="flex: 1; margin: 0; padding: 10px 16px; overflow: hidden; font: 12px/1.6 'IBM Plex Mono', monospace; color: #b9b4ac; white-space: pre-wrap">{{ logText }}</pre>
+</div>
+</main>
+
+<aside aria-label="Live gauges" style="width: 340px; flex-shrink: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 16px 18px; border-left: 1px solid #1f1f23; background: #0e0e10">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<span style="font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: #8f8a82">LIVE GAUGES</span>
+<span style="font-size: 12.5px; line-height: 1.45; color: #a8a39b">6 gauges, sorted by Z. Tap a row to enlarge it.</span>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border: 1px solid #1f4a5a; border-radius: 10px; background: #0f1a1f">
+<div style="display: flex; align-items: baseline; gap: 8px">
+<span style="font: 600 13px 'IBM Plex Mono', monospace; color: #4cc9f0">G2</span>
+<span style="font-size: 12px; color: #8f8a82">Z 2.99 · Wall 1 · selected</span>
+<span style="flex-grow: 1"></span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #f2efe9">peak 231 kPa</span>
+</div>
+<svg viewBox="0 0 300 116" width="100%" role="img" aria-label="G2 overpressure against time: flat until 4.18 ms, a peak of 231 kPa, then decay">
+<path d="M36 12V96H292" style="fill: none; stroke: #2c2c31; stroke-width: 1"></path>
+<path d="M36 54.5H292" style="fill: none; stroke: #1f1f23; stroke-width: 1; stroke-dasharray: 2 3"></path>
+<text x="31" y="15" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">250</text>
+<text x="31" y="99" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">0</text>
+<text x="36" y="110" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82">0</text>
+<text x="292" y="110" style="font: 8px 'IBM Plex Mono', monospace; fill: #8f8a82; text-anchor: end">6.5 ms</text>
+<path d="M36 96H199.4V18.4C203 40 208 60 211.9 65.8C217 75 222 81 227.5 84.2" style="fill: none; stroke: #4cc9f0; stroke-width: 1.8; stroke-linejoin: round"></path>
+<path d="M227.5 84.2C235 90 241 97 247 98.7C255 100.5 262 100.5 270.5 100C276 99.5 280 98.5 282.6 97.7" style="fill: none; stroke: #4cc9f0; stroke-width: 1.8; opacity: {{ finOpacity }}"></path>
+<circle cx="199.4" cy="18.4" r="3" style="fill: #4cc9f0"></circle>
+<text x="194" y="21" style="font: 8px 'IBM Plex Mono', monospace; fill: #4cc9f0; text-anchor: end">4.18 ms</text>
+<g style="opacity: {{ nowOpacity }}">
+<path d="M227.5 10V96" style="fill: none; stroke: #ff6a2b; stroke-width: 1; stroke-dasharray: 3 3"></path>
+<text x="231" y="16" style="font: 8px 'IBM Plex Mono', monospace; fill: #ff8a55">now</text>
+</g>
+</svg>
+</div>
+
+<div style="display: flex; flex-direction: column; border: 1px solid #242428; border-radius: 10px; background: #111113; overflow: hidden">
+<div style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 28px; padding: 0 10px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; color: #8f8a82">
+<span>GAUGE</span><span>Z</span><span>TRACE</span><span style="text-align: right">PEAK</span>
+</div>
+<button style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G6</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">2.00</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H30.6V2.2C32 9 35 14 39 17.5C43 20.5 48 21.2 54 20.8C60 20.4 64 20.2 67.9 20.1" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 20.1H90" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right">296 <span style="color: #8f8a82">kPa</span></span>
+</button>
+<button style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G5</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">2.50</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H41V10.5C42.5 14 45 16.5 49 18.5C53 20.8 58 21 62 20.6C65 20.3 66.5 20.1 67.9 20" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 20H90" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right">158 <span style="color: #8f8a82">kPa</span></span>
+</button>
+<button style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G3</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">2.96</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H57.1V7.3C58.7 11 61 14.5 63.5 16.5C65 17.4 66.5 17.9 67.9 18.2" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 18.2C71 19.6 75 20.7 80 20.6C85 20.4 88 20.2 90 20.1" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right">212 <span style="color: #8f8a82">kPa</span></span>
+</button>
+<button aria-pressed="true" style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: #0f1a1f; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G2</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">2.99</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H57.9V6.1C59.5 11 62 14.5 64 16.3C65.5 17.2 66.8 17.7 67.9 18" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 18C71 19.5 75 20.8 80 20.7C84 20.6 88 20.3 90 20.2" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right">231 <span style="color: #8f8a82">kPa</span></span>
+</button>
+<button style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G1</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">3.31</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H65.2V9C66 11.5 67 13 67.9 14" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 14C70 17 74 19.5 80 20.4C84 20.8 88 20.4 90 20.2" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right">184 <span style="color: #8f8a82">kPa</span></span>
+</button>
+<button style="display: grid; grid-template-columns: 30px 36px 90px minmax(0, 1fr); gap: 8px; align-items: center; height: 40px; padding: 0 10px; border: 0; border-top: 1px solid #1c1c20; background: transparent; color: #f2efe9; text-align: left; cursor: pointer">
+<span style="font: 600 12.5px 'IBM Plex Mono', monospace; color: #4cc9f0">G4</span>
+<span style="font: 12px 'IBM Plex Mono', monospace; color: #ffb896">3.62</span>
+<svg viewBox="0 0 90 24" width="90" height="24" aria-hidden="true"><path d="M0 20H67.9" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3"></path><path d="M67.9 20H77.8V17.5C79 18.3 81 19.3 84 19.8C87 20 89 20 90 20" style="fill: none; stroke: #4cc9f0; stroke-width: 1.3; opacity: {{ finOpacity }}"></path></svg>
+<span style="font: 12.5px 'IBM Plex Mono', monospace; text-align: right; color: {{ g4Color }}">{{ g4Peak }}</span>
+</button>
+</div>
+<span style="font-size: 11.5px; line-height: 1.4; color: #8f8a82">G4 sits behind the wall (r 3.30 m, z 0.50 m). The demo uses 6 gauges to show the list; the Setup case has 2.</span>
+
+<span style="flex-grow: 1"></span>
+<p style="margin: 0; padding: 12px 14px; border-radius: 10px; background: #141416; font-size: 12.5px; line-height: 1.5; color: #a8a39b">When the run ends, its full traces, impulse and arrival times open in <b style="color: #f2efe9">03 Results → Gauges</b>.</p>
+</aside>
+</div>
+
+<footer style="height: 28px; flex-shrink: 0; display: flex; align-items: center; gap: 20px; padding: 0 20px; border-top: 1px solid #1f1f23; font-size: 12px; color: #a8a39b">
+<span style="display: flex; align-items: center; gap: 7px"><span style="width: 7px; height: 7px; border-radius: 4px; background: #7ddc9a"></span>WSL ready · 14 cores · 63 GB VM</span>
+<span style="font-family: 'IBM Plex Mono', monospace">blastFoam · 7 ranks · 368,449 cells</span>
+<span style="flex-grow: 1"></span>
+<span style="font: 11.5px 'IBM Plex Mono', monospace; color: #8f8a82">F5 run · Shift+Esc stop · v1.0.0</span>
+</footer>
+
+<sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; top: 0; left: 0; width: 1440px; height: 900px; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55)">
+<div role="dialog" aria-modal="true" aria-label="Stop the run" style="width: 440px; display: flex; flex-direction: column; gap: 14px; padding: 22px; border: 1px solid #333338; border-radius: 14px; background: #161618">
+<h2 style="margin: 0; font: 600 20px 'Space Grotesk', sans-serif">Stop wall_A at 78 %?</h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.55; color: #cfcac2">It has been running for 4 min 18 s. blastFoam keeps what it has written, so you can resume it later from the runs list.</p>
+<p style="margin: 0; font-size: 12.5px; line-height: 1.5; color: #8f8a82">Asked only after the first 30 s. A shorter run stops at once.</p>
+<div style="display: flex; justify-content: flex-end; gap: 10px; padding-top: 4px">
+<button onClick="{{ closeConfirm }}" style="height: 40px; padding: 0 16px; border: 1px solid #333338; border-radius: 9px; background: transparent; color: #f2efe9; font: 500 14px 'IBM Plex Sans', sans-serif; cursor: pointer">Keep running</button>
+<button onClick="{{ closeConfirm }}" style="height: 40px; padding: 0 16px; border: 0; border-radius: 9px; background: #e5484d; color: #ffffff; font: 600 14px 'IBM Plex Sans', sans-serif; cursor: pointer">Stop the run</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ finished }}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; right: 20px; bottom: 44px; width: 360px; display: flex; flex-direction: column; gap: 6px">
+<span style="align-self: flex-end; font-size: 11px; color: #8f8a82">Windows notification ↓</span>
+<div role="status" style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid #3a3a40; border-radius: 10px; background: #1f1f23">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a8a39b">
+<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" style="shape-rendering: crispEdges"><g style="fill: #ff6a2b"><rect x="2" y="4" width="3" height="2"></rect><rect x="5" y="5" width="2" height="3"></rect><rect x="7" y="7" width="2" height="2"></rect><rect x="8" y="9" width="3" height="2"></rect><rect x="10" y="11" width="2" height="3"></rect></g><rect x="1.5" y="1.5" width="13" height="13" style="fill: none; stroke: #e7eaee; stroke-width: 1"></rect></svg>
+BlastLab
+</div>
+<span style="font-size: 14.5px; font-weight: 600">wall_A finished in 5 min 31 s</span>
+<span style="font-size: 13px; line-height: 1.45; color: #cfcac2">Highest peak: G6, 296 kPa at 2.21 ms. The wave reached Outer at 6.31 ms.</span>
+<a href="#results" style="align-self: flex-start; display: flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 7px; background: #2a2a2f; color: #f2efe9; font-size: 13px; text-decoration: none">Open results</a>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["running","finished"],"default":"finished","section":"Demo"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.state || {};
+    const fin = (this.props.state ?? 'finished') === 'finished';
+    const stepOpen = !!s.step;
+    const auto = s.auto === undefined ? true : !!s.auto;
+    return {
+      running: !fin,
+      finished: fin,
+      statusDot: fin ? '#7ddc9a' : '#ff6a2b',
+      statusText: fin ? 'Finished · result ready' : 'Running · blastFoam, 7 ranks',
+      resultsNavColor: fin ? '#f2efe9' : '#a8a39b',
+      pct: fin ? '100 %' : '78 %',
+      barW: fin ? '100%' : '78%',
+      timeLine: fin ? 'Done in 5 min 31 s · the wave reached Outer' : '4 min 18 s elapsed · about 1 min 15 s left',
+      tNow: fin ? '6.31' : '4.90',
+      stepNo: fin ? '14,902' : '11,284',
+      dt: fin ? '4.3e-7' : '4.1e-7',
+      pmax: fin ? '64' : '231',
+      finOpacity: fin ? '1' : '0',
+      nowOpacity: fin ? '0' : '1',
+      logText: fin
+        ? 'Time = 0.00631\nCourant Number mean: 0.018 max: 0.399\ndeltaT = 4.3e-07\nExecutionTime = 327.4 s  ClockTime = 331 s\n[blastlab] Outer boundary reached: run ended at t = 6.31 ms\n[blastlab] result written to C:\\BLASTLAB_RUNS\\wall_A\\'
+        : 'Time = 0.0049\nCourant Number mean: 0.021 max: 0.398\ndeltaT = 4.1e-07\nExecutionTime = 254.9 s  ClockTime = 258 s\n\nTime = 0.00490041',
+      stepExpanded: stepOpen ? 'true' : 'false',
+      stepOpen: stepOpen,
+      toggleStep: () => this.setState({ step: !stepOpen }),
+      stepChevron: stepOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+      stepHint: stepOpen ? '' : 'Exec 1 … 1000',
+      autoPressed: auto ? 'true' : 'false',
+      toggleAuto: () => this.setState({ auto: !auto }),
+      autoTrack: auto ? '#ff6a2b' : '#3a3a40',
+      autoKnob: auto ? '21px' : '3px',
+      manualClim: !auto,
+      windowTitle: fin ? '✓ Done · wall_A · BlastLab' : '78 % · wall_A · BlastLab',
+      confirmOpen: !fin && !!s.confirm,
+      askStop: () => this.setState({ confirm: true }),
+      closeConfirm: () => this.setState({ confirm: false }),
+      g4Peak: fin ? '41 kPa' : 'waiting',
+      g4Color: fin ? '#f2efe9' : '#8f8a82'
+    };
+  }
+}
+</script>
+</body>
+</html>

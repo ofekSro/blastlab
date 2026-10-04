@@ -1,37 +1,76 @@
-"""Design system of the Qt front-end: the palette shared with the Tk app,
-fonts and spacing, a Fusion QPalette + a small style sheet per mode, and
-the app's icons drawn with QPainter (no asset files).
+"""Design system of the Qt front-end: the GUI redesign's own warm-black
+palette (docs/gui-redesign-plan.md §2 - the Tk app keeps its own palette
+in gui/theme.py, untouched), bundled fonts, spacing, a Fusion QPalette +
+a small style sheet per mode, and the app's icons drawn with QPainter
+(no asset files).
 
 `apply(app, mode)` switches the whole application; widgets that hold
 mode-dependent state (pyqtgraph panes, icon buttons) connect to
 `signals.changed` and re-theme themselves.
 """
 
+import os
+
 from PySide6.QtCore import QObject, QPointF, QRectF, Qt, Signal
-from PySide6.QtGui import (QBrush, QColor, QFont, QIcon, QPainter,
-                           QPainterPath, QPalette, QPen, QPixmap, QPolygonF)
+from PySide6.QtGui import (QBrush, QColor, QFont, QFontDatabase, QIcon,
+                           QPainter, QPainterPath, QPalette, QPen, QPixmap,
+                           QPolygonF)
 
-# ── palette (identical to gui/theme.py so both front-ends look alike) ───
+# ── palette (GUI-1: docs/gui-redesign-plan.md §2.1 / §2.2) ──────────────
+# `error` / `danger_hover` have no §2.1 value: derived from the `danger`
+# family (error = danger; hover one step lighter in dark, darker in
+# light). `tile` is the same value as `card2`, both keys kept (§2.1).
 DARK = dict(
-    bg='#1a1a1a', card='#2b2b2b', card2='#333333', border='#3a3a3a',
-    entry='#222222', accent='#4f9eff', accent_hover='#3f8ce6',
-    text='#e8e8e8', muted='#9aa4b2', view='#141414',
-    danger='#e5484d', danger_hover='#c93a3f',
-    error='#ff6b6b', warn='#ffb86b', ok='#69db7c',
-    seg='#3a3f46',
+    bg='#0b0b0c', panel='#0e0e10', card='#111113', card2='#141416',
+    tile='#141416', view='#0d0d0f', hover='#1c1c1f', seg='#2a2a2f',
+    border='#1f1f23', border2='#242428', entry='#0b0b0c',
+    entry_border='#2c2c31', text='#f2efe9', text2='#cfcac2',
+    # num_dim #6f6a63 -> #817b73 (GUI-10, F8 / D180): >= 4.5:1 on bg,
+    # panel and card, lightened along its own hue (D1's method)
+    muted='#a8a39b', faint='#8f8a82', num_dim='#817b73',
+    accent='#ff6a2b', accent_hover='#ff7f47', on_accent='#1a0d06',
+    accent_text='#ff8a55', accent_soft='#ffb896', accent_bg='#1d1511',
+    accent_border='#5a3522', gauge='#4cc9f0', gauge_bg='#0f1a1f',
+    ok='#7ddc9a', ok_bg='#121814', ok_border='#24302a', warn='#f5d061',
+    danger='#ff5c7a', danger_hover='#ff7490', error='#ff5c7a',
+    stop_bg='#26141a', stop_border='#6b2a37', stop_text='#ff9aac',
+    title_bar='#202024',
 )
+# Light mode per plan §2.2, keys it omits derived with the same roles.
+# Six of the §2.2 proposed values failed the 4.5:1 contrast gate the
+# same section imposes and were darkened until they pass (measured by
+# tests/test_ui_theme.py): faint #7a7e85->#696c72,
+# accent_text #c7430f->#c5420f, gauge #0e7fa6->#0d7599,
+# ok #2f9e44->#257d36, warn #b07d00->#926800, danger #d6336c->#cb3067.
+# GUI-10 (F8 / D180), the same method: num_dim #9b958c->#746e65 (>= 4.5:1
+# on bg, panel and card; it is text - the tree and stage numbers).
 LIGHT = dict(
-    bg='#f2f4f7', card='#ffffff', card2='#e9edf2', border='#dde2e9',
-    entry='#f2f4f7', accent='#3b8bef', accent_hover='#2f7cdd',
-    text='#1f2430', muted='#5f6b7a', view='#141414',
-    danger='#d13438', danger_hover='#b02a2f',
-    error='#d6336c', warn='#c77700', ok='#2f9e44',
-    seg='#ced6e0',
+    bg='#f4f3f0', panel='#faf9f7', card='#ffffff', card2='#f1efeb',
+    tile='#f1efeb', view='#ecebe7', hover='#e9e6e1', seg='#dcd8d1',
+    border='#e2ded7', border2='#d8d3cb', entry='#ffffff',
+    entry_border='#cdc7be', text='#1f2430', text2='#3a3f4a',
+    muted='#5f6368', faint='#696c72', num_dim='#746e65',
+    accent='#ff6a2b', accent_hover='#e85d20', on_accent='#1a0d06',
+    accent_text='#c5420f', accent_soft='#b4461c', accent_bg='#fbe9df',
+    accent_border='#e0b394', gauge='#0d7599', gauge_bg='#e3f1f7',
+    ok='#257d36', ok_bg='#e7f3ea', ok_border='#c4dccb', warn='#926800',
+    danger='#cb3067', danger_hover='#b52a5b', error='#cb3067',
+    stop_bg='#fbe4e9', stop_border='#e3aab8', stop_text='#b02a48',
+    title_bar='#dedad3',
 )
 
-# ── typography / spacing ─────────────────────────────────────────────────
-FONT = 'Segoe UI'
-MONO = 'Consolas'
+# ── typography / spacing (plan §2.3: OFL fonts bundled under fonts/) ────
+FONT = 'IBM Plex Sans'
+MONO = 'IBM Plex Mono'
+DISPLAY = 'Space Grotesk'
+#: fallbacks when a bundled TTF is missing - the app must never crash
+#: over a font (plan §2.3)
+FONT_FALLBACK = 'Segoe UI'
+MONO_FALLBACK = 'Consolas'
+#: where the bundled TTFs live - the package directory, never
+#: %WINDIR%\Fonts (plan §11: the Store-Python sandbox)
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        'fonts')
 PAD = 16          # outer padding between cards / panel edges
 GAP = 8           # inner padding between rows/controls
 RADIUS = 10       # buttons and inputs
@@ -66,27 +105,77 @@ def qcolor(key):
     return QColor(cur(key))
 
 
+def _body_font(size):
+    f = QFont()
+    f.setFamilies([FONT, FONT_FALLBACK])
+    f.setPointSize(size)
+    return f
+
+
+def _display_font(size, weight=QFont.DemiBold):
+    """Space Grotesk (600-700), falling back to Segoe UI (plan §2.3)."""
+    f = QFont()
+    f.setFamilies([DISPLAY, FONT, FONT_FALLBACK])
+    f.setPointSize(size)
+    f.setWeight(weight)
+    return f
+
+
 def font(kind='body'):
-    """QFont for 'h1' | 'h2' | 'body' | 'small' | 'mono' | 'chip'."""
+    """QFont for 'h1' | 'h2' | 'display' | 'body' | 'small' |
+    'small_bold' | 'chip' | 'mono' (plan §2.3: h1/h2/display are the
+    Space Grotesk display family, body is IBM Plex Sans, mono is IBM
+    Plex Mono, each with a system fallback)."""
     if kind == 'h1':
-        f = QFont(FONT, 20)
-        f.setBold(True)
+        f = _display_font(20, QFont.Bold)
     elif kind == 'h2':
-        f = QFont(FONT, 14)
-        f.setBold(True)
+        f = _display_font(14, QFont.Bold)
+    elif kind == 'display':
+        # stat-tile values, step titles: SG 600, 21-26 px (plan §2.5)
+        f = _display_font(16, QFont.DemiBold)
     elif kind == 'small':
-        f = QFont(FONT, 11)
+        f = _body_font(11)
     elif kind == 'small_bold':
-        f = QFont(FONT, 11)
+        f = _body_font(11)
         f.setBold(True)
     elif kind == 'chip':
-        f = QFont(FONT, 12)
+        f = _body_font(12)
         f.setBold(True)
     elif kind == 'mono':
-        f = QFont(MONO, 12)
+        f = QFont()
+        f.setFamilies([MONO, MONO_FALLBACK])
+        f.setPointSize(12)
     else:
-        f = QFont(FONT, 13)
+        f = _body_font(13)
     return f
+
+
+# ── bundled fonts (plan §2.3) ────────────────────────────────────────────
+_fonts_loaded = False
+
+
+def _load_fonts():
+    """Register every bundled TTF under `FONT_DIR` once per process.
+
+    Called from `apply()`, so every entry path (the app, the tests, the
+    QA harness) gets the families. A missing directory or a bad file is
+    silently survived: the QFont fallbacks take over (plan §2.3 - never
+    crash over a font)."""
+    global _fonts_loaded
+    if _fonts_loaded:
+        return
+    _fonts_loaded = True
+    try:
+        for base, _dirs, files in os.walk(FONT_DIR):
+            for name in files:
+                if name.lower().endswith('.ttf'):
+                    try:
+                        QFontDatabase.addApplicationFont(
+                            os.path.join(base, name))
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 
 # ── QPalette + style sheet ───────────────────────────────────────────────
@@ -98,7 +187,9 @@ def make_palette(mode_name):
         QPalette.Base: p['entry'], QPalette.AlternateBase: p['card2'],
         QPalette.Text: p['text'], QPalette.Button: p['card2'],
         QPalette.ButtonText: p['text'], QPalette.Highlight: p['accent'],
-        QPalette.HighlightedText: '#ffffff', QPalette.ToolTipBase: p['card2'],
+        # never white on the orange Highlight (plan §2.1: on_accent)
+        QPalette.HighlightedText: p['on_accent'],
+        QPalette.ToolTipBase: p['card2'],
         QPalette.ToolTipText: p['text'], QPalette.PlaceholderText: p['muted'],
         QPalette.Link: p['accent'], QPalette.Mid: p['border'],
         QPalette.Dark: p['border'], QPalette.Light: p['card'],
@@ -114,33 +205,85 @@ def make_palette(mode_name):
     return q
 
 
+def _blend(a, b, t):
+    """`a` blended toward `b` by t (0..1), '#rrggbb'."""
+    ca = [int(a[i:i + 2], 16) for i in (1, 3, 5)]
+    cb = [int(b[i:i + 2], 16) for i in (1, 3, 5)]
+    return '#' + ''.join(f'{round(x + (y - x) * t):02x}'
+                         for x, y in zip(ca, cb))
+
+
+def chain_tint(mode_name=None):
+    """GUI-9: the fill of the selected stage card and of the tinted
+    hand-off card. `accent_bg`, except in light mode, where accent_text,
+    ok, warn, danger and faint fall to 4.24-4.47:1 on it; there it is
+    blended halfway toward `card` (#fdf4ef: all of them >= 4.6)."""
+    mode_name = mode_name or _mode
+    p = DARK if mode_name == 'dark' else LIGHT
+    if mode_name == 'dark':
+        return p['accent_bg']
+    return _blend(p['accent_bg'], p['card'], 0.5)
+
+
+#: GUI-10 (D190): how far the tree rows' hover is blended from `hover`
+#: toward `panel` - the smallest step at which every role drawn on a
+#: row (num_dim, text, text2, faint, ok, warn, danger, gauge) reaches
+#: 4.5:1 (light: warn 4.01 -> 4.50). Dark is 0, the global `hover`
+#: itself: D192's t 0.76 left the hover 1.02:1 from the panel, too faint
+#: to see, and the owner accepted dark num_dim at D190's 4.06:1 while a
+#: row is hovered (owner review 2026-10-03, GUI-11 b; D212)
+TREE_HOVER_BLEND = {'dark': 0.0, 'light': 0.66}
+
+
+def tree_hover(mode_name=None):
+    """The model tree's own row hover fill; the global `hover` key, used
+    by every other control, is unchanged (D190)."""
+    mode_name = mode_name or _mode
+    p = DARK if mode_name == 'dark' else LIGHT
+    return _blend(p['hover'], p['panel'], TREE_HOVER_BLEND[mode_name])
+
+
 def qss(mode_name):
     p = DARK if mode_name == 'dark' else LIGHT
+    # Danger buttons: white fails 4.5:1 on the dark danger #ff5c7a
+    # (2.97:1) and passes on the light #cb3067 (5.78:1) - measured by
+    # tests/test_ui_theme.py, so the dark mode uses on_accent dark text.
+    danger_fg = p['on_accent'] if mode_name == 'dark' else 'white'
+    tint = chain_tint(mode_name)
+    tree_hov = tree_hover(mode_name)
+    # GUI-9b: an orange edge that must read as a graphic (>= 3:1) - the
+    # running chain pill; `accent` is 2.72:1 on the light panel, so the
+    # darker accent_text there (D152's arrow rule)
+    edge = p['accent'] if mode_name == 'dark' else p['accent_text']
     return f"""
     QWidget {{ font-family: "{FONT}"; font-size: 13pt; }}
     QToolTip {{ background: {p['card2']}; color: {p['text']};
                 border: 1px solid {p['border']}; padding: 4px 6px; }}
-    QFrame#card {{ background: {p['card']}; border: 1px solid {p['border']};
+    QFrame#card {{ background: {p['card']}; border: 1px solid {p['border2']};
                    border-radius: {CARD_RADIUS}px; }}
     QFrame#chip {{ background: {p['card2']}; border-radius: 8px; }}
-    QFrame#sidebar {{ background: {p['bg']}; }}
     QLabel {{ background: transparent; }}
-    QLabel#h1 {{ font-size: 20pt; font-weight: bold; color: {p['text']}; }}
-    QLabel#h2 {{ font-size: 14pt; font-weight: bold; color: {p['text']}; }}
+    /* the app-wide QWidget font rule overrides programmatic QFont
+       family/size (measured), so the display family is set here too */
+    QLabel#h1 {{ font-family: "{DISPLAY}"; font-size: 20pt;
+                 font-weight: bold; color: {p['text']}; }}
+    QLabel#h2 {{ font-family: "{DISPLAY}"; font-size: 14pt;
+                 font-weight: bold; color: {p['text']}; }}
     QLabel#muted {{ color: {p['muted']}; }}
     QLabel#small {{ color: {p['muted']}; font-size: 11pt; }}
-    QLabel#view {{ background: {DARK['view']}; color: {DARK['muted']};
+    QLabel#view {{ background: {p['view']}; color: {p['muted']};
                    border-radius: 6px; }}
     QPushButton {{ background: {p['card2']}; color: {p['text']};
                    border: none; border-radius: {RADIUS}px;
                    padding: 6px 14px; min-height: 24px; }}
     QPushButton:hover {{ background: {p['border']}; }}
     QPushButton:disabled {{ color: {p['muted']}; background: {p['card2']}; }}
-    QPushButton#primary {{ background: {p['accent']}; color: white; }}
+    QPushButton#primary {{ background: {p['accent']};
+                           color: {p['on_accent']}; }}
     QPushButton#primary:hover {{ background: {p['accent_hover']}; }}
     QPushButton#primary:disabled {{ background: {p['card2']};
                                     color: {p['muted']}; }}
-    QPushButton#danger {{ background: {p['danger']}; color: white; }}
+    QPushButton#danger {{ background: {p['danger']}; color: {danger_fg}; }}
     QPushButton#danger:hover {{ background: {p['danger_hover']}; }}
     QPushButton#danger:disabled {{ background: {p['card2']};
                                    color: {p['muted']}; }}
@@ -155,18 +298,20 @@ def qss(mode_name):
     QPushButton#link {{ background: transparent; color: {p['accent']};
                         padding: 0px 4px; min-height: 16px; }}
     QPushButton#link:hover {{ background: {p['card']}; }}
-    QToolButton#seg {{ background: {p['seg']}; color: {p['text']};
+    QToolButton#seg {{ background: transparent; color: {p['muted']};
                        border: none; padding: 4px 12px; }}
-    QToolButton#seg:hover {{ background: {p['border']}; }}
-    QToolButton#seg:checked {{ background: {p['accent']}; color: white; }}
+    QToolButton#seg:hover {{ background: {p['hover']}; }}
+    QToolButton#seg:checked {{ background: {p['seg']};
+                               color: {p['text']}; }}
     QToolButton#seg[pos="first"] {{ border-top-left-radius: {RADIUS}px;
                                     border-bottom-left-radius: {RADIUS}px; }}
     QToolButton#seg[pos="last"] {{ border-top-right-radius: {RADIUS}px;
                                    border-bottom-right-radius: {RADIUS}px; }}
     QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QPlainTextEdit,
     QTextEdit {{ background: {p['entry']}; color: {p['text']};
-                 border: 1px solid {p['border']}; border-radius: 8px;
-                 padding: 3px 6px; selection-background-color: {p['accent']}; }}
+                 border: 1px solid {p['entry_border']}; border-radius: 8px;
+                 padding: 3px 6px; selection-background-color: {p['accent']};
+                 selection-color: {p['on_accent']}; }}
     QLineEdit:disabled {{ color: {p['muted']}; }}
     /* a field the validator refused: `error` is the Run tab's refresh box,
        `bad` is what the Setup form's mark_fields() sets */
@@ -175,7 +320,8 @@ def qss(mode_name):
     QLineEdit:focus, QComboBox:focus {{ border: 1px solid {p['accent']}; }}
     QComboBox::drop-down {{ border: none; width: 22px; }}
     QComboBox QAbstractItemView {{ background: {p['card2']}; color: {p['text']};
-                                   selection-background-color: {p['accent']}; }}
+                                   selection-background-color: {p['accent']};
+                                   selection-color: {p['on_accent']}; }}
     QPlainTextEdit#log {{ font-family: "{MONO}"; font-size: 12pt;
                           border: none; }}
     QCheckBox, QRadioButton {{ color: {p['text']}; spacing: 6px; }}
@@ -206,13 +352,569 @@ def qss(mode_name):
     QSplitter::handle:horizontal {{ width: 8px; }}
     QTableWidget, QTableView, QTreeView {{ background: {p['entry']};
         color: {p['text']}; border: none; gridline-color: {p['border']};
-        selection-background-color: {p['accent']}; selection-color: white; }}
+        selection-background-color: {p['accent']};
+        selection-color: {p['on_accent']}; }}
     QHeaderView::section {{ background: {p['card2']}; color: {p['muted']};
         border: none; padding: 4px 6px; font-weight: bold; font-size: 11pt; }}
     QStatusBar {{ color: {p['muted']}; }}
     QMenu {{ background: {p['card2']}; color: {p['text']};
              border: 1px solid {p['border']}; }}
-    QMenu::item:selected {{ background: {p['accent']}; color: white; }}
+    /* GUI-4 shared components (ui/components.py, plan §2.5) */
+    QFrame#tile {{ background: {p['tile']}; border: none;
+                   border-radius: 10px; }}
+    QFrame#tile[variant="accent"] {{ background: {p['accent_bg']}; }}
+    QFrame#treerow {{ background: transparent; border: none;
+                      border-radius: 9px; }}
+    QFrame#treerow:hover {{ background: {tree_hov}; }}
+    /* GUI-10 (F8 / D180): the chain tint, as on the selected stage card -
+       on light accent_bg the number (accent_text 4.28) and the caption
+       (faint 4.47) fell under 4.5:1; dark is accent_bg, unchanged */
+    QFrame#treerow[selected="true"] {{ background: {tint}; }}
+    QToolButton#docktab {{ background: transparent; border: none;
+                           border-bottom: 2px solid transparent;
+                           padding: 0px 14px; color: {p['muted']};
+                           font-size: 13px; font-weight: 600; }}
+    QToolButton#docktab:checked {{ color: {p['text']};
+                                   border-bottom: 2px solid {p['accent']}; }}
+    QFrame#banner {{ background: {p['ok_bg']};
+                     border: 1px solid {p['ok_border']};
+                     border-radius: 10px; }}
+    QFrame#handoff {{ background: {tint};
+                      border: 1px solid {p['accent_border']};
+                      border-radius: 10px; }}
+    QMenu::item:selected {{ background: {p['accent']};
+                            color: {p['on_accent']}; }}
+    QMenu::item:disabled {{ color: {p['muted']}; }}
+    /* GUI-3 window frame (ui/topbar.py + the status bar, plan §4;
+       board BC_Combined lines 20-54 / 392-396). Sizes in px because the
+       board writes px; the app-wide QWidget font rule would otherwise
+       override any programmatic QFont (D6). */
+    QFrame#topbar {{ background: {p['bg']}; border: none;
+                     border-bottom: 1px solid {p['border']}; }}
+    QFrame#statusbar {{ background: {p['bg']}; border: none;
+                        border-top: 1px solid {p['border']}; }}
+    /* F29 (GUI-10): pill padding 10 -> 8 and the Chain link's 8 -> 6, so
+       blastFoam mode's chip fits the bar at 1100 px (ui/topbar.py) */
+    QPushButton#pill {{ background: transparent; color: {p['muted']};
+                        border: none; border-radius: 20px;
+                        padding: 0px 8px;
+                        font-family: "{DISPLAY}"; font-size: 14px;
+                        font-weight: 600; }}
+    QPushButton#pill:hover {{ background: {p['hover']}; }}
+    QPushButton#pill[active="true"] {{ background: {p['text']};
+                                       color: {p['bg']}; }}
+    QPushButton#chainlink {{ background: transparent; color: {p['muted']};
+                             border: none; border-radius: 8px;
+                             padding: 0px 6px; font-size: 13px; }}
+    QPushButton#chainlink:hover {{ background: {p['hover']}; }}
+    QPushButton#chainlink[active="true"] {{ color: {p['text']}; }}
+    QPushButton#casebtn {{ background: transparent; color: {p['text']};
+                           border: none; border-radius: 8px;
+                           padding: 0px 6px;
+                           font-family: "{DISPLAY}"; font-size: 17px;
+                           font-weight: 600; }}
+    QPushButton#casebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#chipbtn {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['seg']};
+                           border-radius: 16px; padding: 0px 10px;
+                           font-size: 12px; }}
+    QPushButton#chipbtn:hover {{ background: {p['hover']}; }}
+    /* the bar's dimension segments at the board's 12.5 px (the app-wide
+       font rule would render them 13 pt and push the bar past 1100) */
+    QFrame#topbar QToolButton#seg {{ font-size: 12px; }}
+    /* GUI-5 Setup (board BC_Combined lines 58-121, 268-388): the tree
+       and properties columns, px sizes as the board writes them (D6) */
+    QFrame#setuptree, QFrame#setupprops {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#eyebrow {{ font-size: 11px; font-weight: 600;
+                      color: {p['faint']}; }}
+    QLabel#propstitle {{ font-family: "{DISPLAY}"; font-size: 22px;
+                         font-weight: 600; color: {p['text']}; }}
+    QLabel#propscaption {{ font-size: 12px; color: {p['muted']}; }}
+    QFrame#treechild {{ background: transparent; border: none;
+                        border-radius: 7px; }}
+    QFrame#treechild:hover {{ background: {tree_hov}; }}
+    QLabel#childname {{ font-size: 13px; color: {p['text2']}; }}
+    QLabel#childval {{ font-family: "{MONO}"; font-size: 11px;
+                       color: {p['faint']}; }}
+    QLabel#treemark_gauge {{ font-size: 12px; font-weight: 700;
+                             color: {p['gauge']}; }}
+    QLabel#treemark_obstacle {{ font-size: 12px; color: {p['text2']}; }}
+    QPushButton#treeadd {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['entry_border']};
+                           border-radius: 8px; padding: 0px 8px;
+                           font-size: 13px; font-weight: 500;
+                           min-height: 34px; max-height: 34px; }}
+    QPushButton#treeadd:hover {{ background: {p['hover']}; }}
+    /* the case pill: the state colour is on its icon (setup_tree); the
+       text stays >= 4.5:1 in both modes (ok/warn on ok_bg measured
+       4.38 in light, danger on stop_bg 4.18 - too low for text) */
+    /* GUI-10 (F21 / D179): the board heights, pinned here because the
+       generic QPushButton min-height beats setFixedHeight (D41, D153):
+       the QSS height is the content box, + the 1 px border x 2 = the
+       board's 42 (BC_Combined line 116) for the pill and 36 for + Gauge /
+       + Obstacle (lines 113-114, rule above); the Chain's own pill
+       (#casepill[chain="true"], 40) wins by specificity */
+    QPushButton#casepill {{ text-align: left; padding: 0px 12px;
+                            border-radius: 10px; font-size: 13px;
+                            font-weight: 500; background: {p['ok_bg']};
+                            border: 1px solid {p['ok_border']};
+                            color: {p['text2']};
+                            min-height: 40px; max-height: 40px; }}
+    QPushButton#casepill[state="error"] {{ background: {p['stop_bg']};
+                                          border: 1px solid {p['stop_border']};
+                                          color: {p['stop_text']}; }}
+    QLabel#trigtitle {{ font-size: 14px; font-weight: 600;
+                        color: {p['text']}; }}
+    QLabel#derivedkey {{ font-size: 13px; color: {p['muted']}; }}
+    QLabel#derivedval {{ font-family: "{MONO}"; font-size: 13px;
+                         color: {p['text']}; }}
+    QFrame#card[flash="true"] {{ border: 1px solid {p['accent']}; }}
+    /* GUI-5b Setup centre (board BC_Combined lines 125-265): the Run
+       column of the live-number strip */
+    QPushButton#runbig {{ background: {p['accent']}; border: none;
+                          border-radius: 10px; padding: 0px;
+                          min-height: 0px; }}
+    QPushButton#runbig:hover {{ background: {p['accent_hover']}; }}
+    QPushButton#runbig:disabled {{ background: {p['card2']}; }}
+    QLabel#runbigtext {{ font-family: "{DISPLAY}"; font-size: 18px;
+                         font-weight: 700; color: {p['on_accent']}; }}
+    QLabel#runbigkey {{ font-family: "{MONO}"; font-size: 11px;
+                        font-weight: 500; color: {p['on_accent']};
+                        background: rgba(0, 0, 0, 40); border-radius: 4px;
+                        padding: 1px 5px; }}
+    QLabel#runbigtext:disabled, QLabel#runbigkey:disabled {{
+        color: {p['muted']}; }}
+    QPushButton#initbtn {{ background: transparent; color: {p['text2']};
+                           border: 1px solid {p['entry_border']};
+                           border-radius: 8px; padding: 0px 8px;
+                           min-height: 26px; max-height: 26px;
+                           font-size: 12px; font-weight: 500; }}
+    QPushButton#initbtn:hover {{ background: {p['hover']}; }}
+    QPushButton#initbtn:disabled {{ color: {p['muted']}; }}
+    /* the model view's toolbar (board lines 163-167): Z rings, Mesh, Fit */
+    QPushButton#viewtool {{ background: transparent; color: {p['muted']};
+                            border: 1px solid {p['entry_border']};
+                            border-radius: 6px; padding: 0px 10px;
+                            min-height: 26px; max-height: 26px;
+                            font-size: 12px; font-weight: 500; }}
+    QPushButton#viewtool:hover {{ background: {p['hover']}; }}
+    QPushButton#viewtool:checked {{ background: {p['accent_bg']};
+                                    color: {p['accent_soft']};
+                                    border: 1px solid {p['accent_border']}; }}
+    /* the dock Gauges · Checks · Log (board lines 217-265) */
+    QFrame#setupdock {{ background: {p['panel']};
+                        border: 1px solid {p['border']};
+                        border-radius: 10px; }}
+    QFrame#dockrule {{ background: {p['border']}; border: none; }}
+    QFrame#setupdock QStackedWidget, QFrame#setupdock QScrollArea {{
+        background: transparent; }}
+    QTableWidget#gaugetable {{ background: transparent; border: none;
+        font-size: 13px; selection-background-color: {p['gauge_bg']};
+        selection-color: {p['text']}; }}
+    QTableWidget#gaugetable::item {{ border-top: 1px solid {p['border']};
+                                     padding: 0px 12px; }}
+    QTableWidget#gaugetable QHeaderView::section {{
+        background: transparent; color: {p['faint']}; border: none;
+        padding: 6px 12px; font-size: 11px; font-weight: 500; }}
+    QFrame#setupdock QPlainTextEdit#log {{ background: transparent;
+        font-size: 11px; padding: 6px 10px; }}
+    QLabel#checktext {{ font-size: 13px; }}
+    QLabel#viewcaption {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#viewcaption[hover="true"] {{ font-family: "{MONO}";
+                                        font-size: 11px;
+                                        color: {p['text2']}; }}
+    /* GUI-6 02 Run (board Run lines 62-256). Every board height is
+       pinned here: a QSS min-height beats setFixedHeight (D41). */
+    QFrame#runctl, QFrame#rungauges {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#runfield {{ font-size: 12px; color: {p['muted']}; }}
+    QLineEdit#runbox {{ font-family: "{MONO}"; font-size: 12px;
+                        min-height: 26px; max-height: 26px; }}
+    QLabel#runpath {{ font-family: "{MONO}"; font-size: 11px;
+                      color: {p['faint']}; }}
+    QPushButton#squarebtn {{ background: transparent;
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px; min-height: 32px; max-height: 32px; }}
+    QPushButton#squarebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#runbig[runtab="true"] {{ color: {p['on_accent']};
+        font-family: "{DISPLAY}"; font-size: 16px; font-weight: 700;
+        padding: 0px 10px; min-height: 48px; max-height: 48px; }}
+    QPushButton#runbig[runtab="true"]:disabled {{ color: {p['muted']}; }}
+    QPushButton#danger[stop="true"] {{ background: {p['stop_bg']};
+        border: 1px solid {p['stop_border']}; border-radius: 10px;
+        padding: 0px; min-height: 46px; max-height: 46px; }}
+    QPushButton#danger[stop="true"]:hover {{
+        border: 1px solid {p['stop_text']}; }}
+    QLabel#stoptext {{ font-family: "{DISPLAY}"; font-size: 16px;
+                       font-weight: 700; color: {p['stop_text']}; }}
+    QLabel#stopkey {{ font-family: "{MONO}"; font-size: 11px;
+        font-weight: 500; color: {p['stop_text']};
+        background: {'rgba(255, 255, 255, 20)' if mode_name == 'dark'
+                     else 'rgba(0, 0, 0, 16)'};
+        border-radius: 4px; padding: 1px 5px; }}
+    QPushButton#run3d {{ background: transparent;
+        border: 1px solid {p['entry_border']}; border-radius: 10px;
+        padding: 0px; min-height: 46px; max-height: 46px; }}
+    QPushButton#run3d:hover {{ background: {p['hover']}; }}
+    QFrame#collapsible, QFrame#runcard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 10px; }}
+    QPushButton#collapsehead {{ background: transparent; border: none;
+        padding: 0px; min-height: 22px; max-height: 22px; }}
+    QPushButton#collapsehead:hover {{ background: transparent; }}
+    QLabel#runcardtitle {{ font-size: 14px; font-weight: 600;
+                           color: {p['text']}; }}
+    QLabel#runhint {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#rununit {{ font-family: "{MONO}"; font-size: 12px;
+                      color: {p['faint']}; }}
+    QLineEdit#runsmall, QComboBox#runsmall {{ font-family: "{MONO}";
+        font-size: 12px; min-height: 24px; max-height: 24px; }}
+    QComboBox#runsmall {{ font-family: "{FONT}"; }}
+    QPushButton#runquiet {{ background: transparent; color: {p['text']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 8px; min-height: 32px; max-height: 32px;
+        font-size: 13px; font-weight: 500; }}
+    QPushButton#runquiet:hover {{ background: {p['hover']}; }}
+    QPushButton#runquiet:disabled {{ color: {p['muted']}; }}
+    QPushButton#execbtn {{ background: {p['hover']}; color: {p['text']};
+        border: none; border-radius: 7px; padding: 0px 4px;
+        min-height: 32px; max-height: 32px; font-size: 12px;
+        font-weight: 500; }}
+    QPushButton#execbtn[mono="true"] {{ font-family: "{MONO}"; }}
+    QPushButton#execbtn:hover {{ background: {p['seg']}; }}
+    QPushButton#execbtn:disabled {{ background: {p['hover']};
+                                    color: {p['muted']}; }}
+    QPushButton#setuplink {{ text-align: left; background: {p['ok_bg']};
+        border: 1px solid {p['ok_border']}; border-radius: 10px;
+        padding: 0px; min-height: 40px; max-height: 40px; }}
+    QPushButton#setuplink:hover {{ border: 1px solid {p['ok']}; }}
+    QPushButton#setuplink[state="error"] {{ background: {p['stop_bg']};
+        border: 1px solid {p['stop_border']}; }}
+    QPushButton#setuplink[state="error"]:hover {{
+        border: 1px solid {p['stop_text']}; }}
+    QFrame#runseg {{ background: {p['bg']};
+        border: 1px solid {p['seg']}; border-radius: 9px; }}
+    QFrame#runseg QToolButton#seg {{ font-size: 12px; border-radius: 6px; }}
+    QFrame#runview {{ background: {p['view']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#rundock {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#rundock QStackedWidget {{ background: transparent; }}
+    QFrame#rundock QPlainTextEdit#log,
+    QFrame#rundock QPlainTextEdit#runmsgs,
+    QFrame#rundock QPlainTextEdit#earlierlog {{ background: transparent;
+        font-family: "{MONO}"; font-size: 12px; padding: 6px 10px;
+        border: none; color: {p['text2']}; }}
+    /* the Run dock's tabs 12 px a side (the board's 14 leaves the tab
+       strip 4 px wider than the 432 px centre at 1100 x 720 once the
+       label reads `Earlier runs   20` - measured) */
+    QFrame#rundock QToolButton#docktab {{ padding: 0px 12px; }}
+    QPushButton#docktool {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 6px;
+        padding: 0px 8px; min-height: 26px; max-height: 26px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#docktool:hover {{ background: {p['hover']};
+                                  color: {p['text']}; }}
+    QListWidget#earlierlist {{ background: transparent; border: none;
+        border-right: 1px solid {p['border']}; font-size: 12px;
+        color: {p['text2']}; padding: 4px 0px; }}
+    QListWidget#earlierlist::item {{ padding: 3px 10px; }}
+    QListWidget#earlierlist::item:selected {{ background: {p['accent_bg']};
+                                              color: {p['text']}; }}
+    QLabel#progresscaps {{ font-size: 10px; font-weight: 600;
+        color: {p['accent_text'] if mode_name == 'dark'
+                else p['accent_soft']}; }}
+    /* a `bg` badge: light `warn` on the Progress tile's accent_bg is
+       4.24:1, under the 4.5 rule; on `bg` it passes (test_ui_theme) */
+    QLabel#pausedlbl {{ font-size: 11px; font-weight: 600;
+                        color: {p['warn']}; background: {p['bg']};
+                        border-radius: 4px; padding: 1px 6px; }}
+    QLabel#progresspct {{ font-family: "{DISPLAY}"; font-size: 22px;
+                          font-weight: 600; color: {p['text']}; }}
+    QLabel#progresstime {{ font-size: 12px; color: {p['text2']}; }}
+    QProgressBar#runbar {{ background: {p['accent_border']}; border: none;
+        border-radius: 3px; max-height: 6px; }}
+    QProgressBar#runbar::chunk {{ background: {p['accent']};
+                                  border-radius: 3px; }}
+    QLabel#gaugenote {{ font-size: 12px; color: {p['muted']}; }}
+    /* GUI-7 03 Results (board Results lines 57-331). Board heights are
+       pinned here: a QSS min-height beats setFixedHeight (D41). */
+    QFrame#resleft, QFrame#resright {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QFrame#resrow {{ background: transparent; border: none;
+                     border-radius: 9px; min-height: 44px; }}
+    QFrame#resrow:hover {{ background: {p['hover']}; }}
+    QFrame#resrow[selected="true"] {{ background: {p['accent_bg']}; }}
+    QLabel#resname {{ font-family: "{DISPLAY}"; font-size: 14px;
+                      font-weight: 600; color: {p['text']}; }}
+    QLabel#rescaption {{ font-size: 12px; color: {p['faint']}; }}
+    /* on the selected row's accent_bg, faint is 4.47:1 in light mode;
+       muted is 5.13 light, 7.17 dark (GUI-7 verification) */
+    QFrame#resrow[selected="true"] QLabel#rescaption {{
+        color: {p['muted']}; }}
+    QLabel#reslatest {{ background: {p['accent_bg']};
+        color: {p['accent_soft']}; border: 1px solid {p['accent_border']};
+        border-radius: 4px; padding: 0px 5px; font-size: 11px; }}
+    QLabel#reschain {{ background: {p['gauge_bg']}; color: {p['gauge']};
+        border-radius: 4px; padding: 0px 5px; font-size: 11px; }}
+    QPushButton#resbtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 10px; min-height: 32px; max-height: 32px;
+        font-size: 13px; font-weight: 500; }}
+    QPushButton#resbtn:hover, QPushButton#ressquare:hover {{
+        background: {p['hover']}; }}
+    QPushButton#resbtn:disabled {{ color: {p['muted']}; }}
+    QPushButton#resquiet {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 6px; min-height: 30px; max-height: 30px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#resquiet:hover {{ background: {p['hover']}; }}
+    QPushButton#resquiet:disabled {{ color: {p['muted']}; }}
+    QPushButton#ressquare {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px; min-height: 32px; max-height: 32px;
+        min-width: 32px; max-width: 32px; font-size: 14px; }}
+    QLabel#methodkey {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#methodval {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['text']}; }}
+    QFrame#resseg {{ background: {p['bg']}; border: 1px solid {p['seg']};
+        border-radius: 10px; min-height: 36px; max-height: 36px; }}
+    QFrame#resseg QToolButton#seg {{ font-size: 13px; font-weight: 600;
+        border-radius: 7px; padding: 0px 16px;
+        min-height: 32px; max-height: 32px; }}
+    QFrame#resview {{ background: {p['view']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLineEdit#restitle {{ min-height: 28px; max-height: 28px; }}
+    /* the export column (ui/export_column.py, board lines 298-331) */
+    QLabel#expcaption {{ font-size: 12px; color: {p['muted']}; }}
+    QLabel#expgroup {{ font-size: 12px; font-weight: 600;
+                       color: {p['text2']}; }}
+    QPushButton#expbtn {{ text-align: left; background: {p['card']};
+        color: {p['text']}; border: 1px solid {p['border2']};
+        border-radius: 8px; padding: 0px 12px; font-size: 13px;
+        font-weight: 500; min-height: 38px; max-height: 38px; }}
+    QPushButton#expbtn:hover {{ background: {p['hover']}; }}
+    QPushButton#expbtn:disabled {{ color: {p['muted']}; }}
+    QLabel#expsuffix {{ font-family: "{MONO}"; font-size: 11px;
+                        color: {p['faint']}; background: transparent; }}
+    QFrame#expbusy {{ background: {p['accent_bg']};
+        border: 1px solid {p['accent_border']}; border-radius: 8px;
+        min-height: 38px; }}
+    QLabel#expbusyname {{ font-size: 13px; color: {p['text']};
+                          background: transparent; }}
+    QLabel#expbusytext {{ font-family: "{MONO}"; font-size: 11px;
+        color: {p['accent_soft']}; background: transparent; }}
+    QProgressBar#expbar {{ background: {p['accent_border']}; border: none;
+        border-radius: 2px; min-height: 4px; max-height: 4px; }}
+    QProgressBar#expbar::chunk {{ background: {p['accent']};
+                                  border-radius: 2px; }}
+    QPushButton#res3d {{ background: transparent; color: {p['text']};
+        border: 1px solid {p['entry_border']}; border-radius: 10px;
+        padding: 0px 10px; font-size: 13px; font-weight: 500;
+        min-height: 40px; max-height: 40px; }}
+    QPushButton#res3d:hover {{ background: {p['hover']}; }}
+    QPushButton#res3d:disabled {{ color: {p['muted']}; }}
+    QPlainTextEdit#caseview {{ font-family: "{MONO}"; font-size: 12px; }}
+    /* the Gauges view (ui/results_gauges.py, board lines 107-189) */
+    QFrame#gaugeplotcard {{ background: {p['tile']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QLabel#gaugehead {{ font-family: "{DISPLAY}"; font-size: 15px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QLabel#gaugecaption {{ font-size: 12px; color: {p['faint']};
+                           background: transparent; }}
+    QLabel#gaugereadsel {{ font-family: "{MONO}"; font-size: 13px;
+        font-weight: 600; color: {p['gauge']}; background: transparent; }}
+    QLabel#gaugeread {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['text']}; background: transparent; }}
+    QFrame#gaugetablecard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QWidget#gaugetablehead {{ background: transparent;
+        border-bottom: 1px solid {p['border']};
+        min-height: 30px; }}
+    QLabel#gaugesumtitle {{ font-family: "{DISPLAY}"; font-size: 14px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QPushButton#gaugecopy {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 62px 0px 12px; min-height: 28px; max-height: 28px;
+        font-size: 12.5px; font-weight: 500; text-align: left; }}
+    QPushButton#gaugecopy:hover {{ background: {p['hover']}; }}
+    QPushButton#gaugecopy:disabled {{ color: {p['muted']}; }}
+    QLabel#gaugecopykey {{ font-family: "{MONO}"; font-size: 11px;
+                           color: {p['faint']}; background: transparent; }}
+    QTableWidget#gaugetable {{ background: {p['card']}; border: none;
+        font-family: "{MONO}"; font-size: 12.5px; gridline-color:
+        {p['border']}; }}
+    QTableWidget#gaugetable QHeaderView::section {{
+        background: {p['card']}; color: {p['faint']}; border: none;
+        border-bottom: 1px solid {p['border']}; padding: 4px 8px;
+        font-family: "{FONT}"; font-size: 11.5px; font-weight: 500; }}
+    /* the Field view (ui/results_field.py, board lines 191-286) */
+    QFrame#fieldcard {{ background: {p['panel']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QWidget#fieldctl {{ background: transparent;
+        border-bottom: 1px solid {p['border']}; }}
+    QFrame#fieldseg {{ background: {p['bg']}; border: 1px solid {p['seg']};
+        border-radius: 9px; min-height: 34px; max-height: 34px; }}
+    QFrame#fieldseg QToolButton#seg {{ font-size: 12.5px; font-weight: 500;
+        border-radius: 6px; padding: 0px 8px;
+        min-height: 28px; max-height: 28px; }}
+    QLabel#fieldkey {{ font-size: 12.5px; color: {p['muted']};
+                       background: transparent; }}
+    QLabel#fieldunit {{ font-family: "{MONO}"; font-size: 12px;
+                        color: {p['faint']}; background: transparent; }}
+    QLineEdit#fieldrange {{ font-family: "{MONO}"; font-size: 12.5px;
+        min-height: 22px; max-height: 22px; }}
+    QPushButton#fieldmesh {{ background: transparent; color: {p['muted']};
+        border: 1px solid {p['entry_border']}; border-radius: 6px;
+        padding: 0px 10px; min-height: 28px; max-height: 28px;
+        font-size: 12px; font-weight: 500; }}
+    QPushButton#fieldmesh:hover {{ background: {p['hover']}; }}
+    QPushButton#fieldmesh:checked {{ background: {p['accent_bg']};
+        color: {p['accent_soft']}; border-color: {p['accent_border']}; }}
+    QFrame#timebar {{ background: transparent;
+        border-top: 1px solid {p['border']}; }}
+    QPushButton#playround {{ background: {p['accent']}; border: none;
+        border-radius: 20px; min-width: 40px; max-width: 40px;
+        min-height: 40px; max-height: 40px; padding: 0px; }}
+    QPushButton#playround:hover {{ background: {p['accent_hover']}; }}
+    QLabel#timenow {{ font-family: "{DISPLAY}"; font-size: 15px;
+        font-weight: 600; color: {p['text']}; background: transparent; }}
+    QLabel#timelen {{ font-family: "{MONO}"; font-size: 12px;
+                      color: {p['faint']}; background: transparent; }}
+    QSlider#timeslider::groove:horizontal {{ background: {p['seg']};
+        height: 4px; border-radius: 2px; }}
+    QSlider#timeslider::sub-page:horizontal {{ background: {p['accent']};
+        border-radius: 2px; }}
+    QSlider#timeslider::handle:horizontal {{ background: {p['text']};
+        width: 16px; height: 16px; margin: -6px 0px; border-radius: 8px; }}
+    QComboBox#timespeed {{ font-size: 12.5px; min-height: 24px;
+                           max-height: 24px; }}
+    QPushButton#framebtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 7px;
+        padding: 0px 12px; min-height: 30px; max-height: 30px;
+        font-size: 12.5px; font-weight: 500; }}
+    QPushButton#framebtn:hover {{ background: {p['hover']}; }}
+    QFrame#framebusy {{ background: {p['accent_bg']};
+        border: 1px solid {p['accent_border']}; border-radius: 7px;
+        min-height: 30px; max-height: 32px; }}
+    QLabel#fieldcaption {{ font-size: 11.5px; color: {p['muted']};
+                           background: transparent; }}
+    /* GUI-9 Chain (board Chain lines 52-217). Every board height is
+       pinned here (D41): route buttons 32 in a 38 px group, Run chain
+       56, Copy / Load 36. */
+    QFrame#chaintop {{ background: transparent; border: none;
+                       border-bottom: 1px solid {p['border']}; }}
+    QLabel#chainfield {{ font-size: 12.5px; color: {p['muted']}; }}
+    QLabel#chaincaption {{ font-size: 12px; color: {p['faint']}; }}
+    QFrame#chainroutes {{ background: {p['bg']};
+        border: 1px solid {p['seg']}; border-radius: 10px;
+        min-height: 36px; max-height: 36px; }}
+    QPushButton#chainroute {{ background: transparent; color: {p['muted']};
+        border: none; border-radius: 7px; padding: 0px 14px;
+        min-height: 32px; max-height: 32px;
+        font-family: "{DISPLAY}"; font-size: 13px; font-weight: 600; }}
+    QPushButton#chainroute:hover {{ background: {p['hover']}; }}
+    QPushButton#chainroute:checked {{ background: {p['text']};
+                                      color: {p['bg']}; }}
+    QFrame#stagecard {{ background: {p['card']};
+        border: 1px solid {p['border2']}; border-radius: 12px; }}
+    QFrame#stagecard:hover {{ border: 1px solid {p['entry_border']}; }}
+    QFrame#stagecard[selected="true"] {{ background: {tint};
+        border: 1px solid {p['accent']}; }}
+    QLabel#stagenum {{ font-family: "{DISPLAY}"; font-size: 12px;
+                       font-weight: 600; color: {p['num_dim']}; }}
+    QLabel#stagenum[selected="true"] {{ color: {p['accent_text']}; }}
+    QLabel#stagetitle {{ font-family: "{DISPLAY}"; font-size: 16px;
+                         font-weight: 600; color: {p['text']}; }}
+    QLabel#stagechip {{ background: {p['hover']}; border-radius: 10px;
+        padding: 2px 8px; font-size: 11.5px; color: {p['text2']}; }}
+    QLabel#stagekey {{ font-family: "{MONO}"; font-size: 12.5px;
+                       color: {p['text2']}; }}
+    QLabel#stagestate {{ font-size: 12px; color: {p['ok']}; }}
+    QLabel#stagestate[state="warn"] {{ color: {p['warn']}; }}
+    QLabel#stagestate[state="error"] {{ color: {p['danger']}; }}
+    QLabel#stagefolder {{ font-family: "{MONO}"; font-size: 11.5px;
+                          color: {p['faint']}; }}
+    QLabel#handofflabel {{ font-family: "{MONO}"; font-size: 10.5px;
+                           color: {p['accent_soft']}; }}
+    QPushButton#chainrun {{ background: {p['accent']};
+        color: {p['on_accent']}; border: none; border-radius: 12px;
+        padding: 0px; min-height: 56px; max-height: 56px;
+        font-family: "{DISPLAY}"; font-size: 17px; font-weight: 700; }}
+    QPushButton#chainrun:hover {{ background: {p['accent_hover']}; }}
+    QPushButton#chainrun:disabled {{ background: {p['card2']};
+                                     color: {p['muted']}; }}
+    QLabel#chainrunline {{ font-size: 12px; color: {p['muted']}; }}
+    QPushButton#stagebtn {{ background: transparent; color: {p['text2']};
+        border: 1px solid {p['entry_border']}; border-radius: 8px;
+        padding: 0px 6px; min-height: 34px; max-height: 34px;
+        font-size: 12.5px; font-weight: 500; }}
+    /* the stage tree's pill (board line 114: 40 px). The QSS heights are
+       the content box: + the 1 px border = 40. Setup's own pill (42) is
+       pinned in the #casepill rule since GUI-10 (F21). */
+    QPushButton#casepill[chain="true"] {{ min-height: 38px;
+                                          max-height: 38px; }}
+    QPushButton#stagebtn:hover {{ background: {p['hover']}; }}
+    QPushButton#stagebtn:disabled {{ color: {p['muted']}; }}
+    QLabel#stageviewtitle {{ font-family: "{DISPLAY}"; font-size: 15px;
+                             font-weight: 600; color: {p['text']}; }}
+    QLabel#stagenumbers {{ font-family: "{MONO}"; font-size: 12px;
+                           color: {p['text2']}; }}
+    QLabel#stagefield {{ font-size: 12.5px; color: {p['muted']}; }}
+    QLabel#stagesub {{ font-size: 11.5px; color: {p['faint']}; }}
+    QLabel#stagenote {{ font-size: 12px; color: {p['faint']}; }}
+    QLabel#stagehint {{ font-size: 13px; color: {p['muted']}; }}
+    QFrame#handoffplain {{ background: {p['card']};
+                           border: 1px solid {p['border2']};
+                           border-radius: 10px; }}
+    /* GUI-9 T4: the 02 Run chain strip (ui/chain_strip.py, board
+       Run_Chain lines 60-70). On `panel`, not the board's tint: warn
+       and faint stay >= 4.5:1 on it in light mode. Pill heights are
+       set in code (no generic QFrame min-height rule beats them). */
+    QFrame#chainstrip {{ background: {p['panel']};
+        border: 1px solid {p['border']}; border-radius: 10px; }}
+    QLabel#chaineyebrow {{ font-size: 11px; font-weight: 600;
+                           color: {p['accent_text']}; }}
+    QLabel#stripcaption {{ font-size: 12px; color: {p['muted']}; }}
+    QFrame#chainpill {{ background: transparent;
+        border: 1px solid {p['border2']}; border-radius: 15px; }}
+    QFrame#chainpill[state="done"] {{ background: {p['ok_bg']};
+        border: 1px solid {p['ok_border']}; }}
+    QFrame#chainpill[state="running"] {{ background: {tint};
+        border: 1px solid {edge}; }}
+    QFrame#chainpill[state="stopped"] {{ border: 1px solid {p['warn']}; }}
+    QFrame#chainpill[state="failed"] {{ border: 1px solid {p['danger']}; }}
+    QLabel#chainpillnum {{ font-family: "{DISPLAY}"; font-size: 11.5px;
+                           font-weight: 600; color: {p['muted']}; }}
+    QLabel#chainpillnum[state="running"] {{ color: {p['accent_text']}; }}
+    QLabel#chainpillnum[state="waiting"],
+    QLabel#chainpillnum[state="notrun"] {{ color: {p['faint']}; }}
+    QLabel#chainpillname {{ font-size: 13px; color: {p['text']}; }}
+    QLabel#chainpillname[state="waiting"],
+    QLabel#chainpillname[state="notrun"] {{ color: {p['faint']}; }}
+    QLabel#chainpillval {{ font-family: "{MONO}"; font-size: 11.5px;
+                           color: {p['faint']}; }}
+    QLabel#chainpillval[state="done"] {{ color: {p['ok']}; }}
+    QLabel#chainpillval[state="running"] {{ color: {p['accent_soft']};
+                                            font-weight: 600; }}
+    QLabel#chainpillval[state="stopped"] {{ color: {p['warn']}; }}
+    QLabel#chainpillval[state="failed"] {{ color: {p['danger']}; }}
+    /* GUI-9 T5: a chain's STAGE tabs in 03 Results (ui/results_stages.py,
+       board Results_Chain lines 98-103): 32 px tabs in a 38 px group (QSS
+       heights are the content box, D153). On the chain tint (D152: on the
+       light accent_bg, accent_text is 4.28:1). */
+    QFrame#stagetabs {{ background: {tint};
+        border: 1px solid {p['accent_border']}; border-radius: 10px;
+        min-height: 36px; max-height: 36px; }}
+    QLabel#stagetabeyebrow {{ font-size: 11px; font-weight: 600;
+                              color: {p['accent_text']}; }}
+    QPushButton#stagetab {{ background: transparent; color: {p['muted']};
+        border: none; border-radius: 7px; padding: 0px 14px;
+        min-height: 32px; max-height: 32px;
+        font-family: "{DISPLAY}"; font-size: 13px; font-weight: 600; }}
+    QPushButton#stagetab:hover {{ background: {p['hover']}; }}
+    QPushButton#stagetab:checked {{ background: {p['accent']};
+                                    color: {p['on_accent']}; }}
     """
 
 
@@ -220,6 +922,7 @@ def apply(app, mode_name='dark'):
     """Switch the application to `mode_name` ('dark' | 'light')."""
     global _mode
     _mode = 'light' if str(mode_name).lower() == 'light' else 'dark'
+    _load_fonts()
     app.setStyle('Fusion')
     app.setPalette(make_palette(_mode))
     app.setStyleSheet(qss(_mode))
@@ -424,6 +1127,12 @@ def _shape(name, p, S, lw):
     elif name == 'step_fwd':
         rrect(72, 26, 82, 74, 3)
         poly((20, 26), (20, 74), (64, 50))
+    elif name == 'fit':                      # four corners (board line 166)
+        for pts in (((16, 38), (16, 16), (38, 16)),
+                    ((62, 16), (84, 16), (84, 38)),
+                    ((16, 62), (16, 84), (38, 84)),
+                    ((62, 84), (84, 84), (84, 62))):
+            line(*pts, w=lw * 0.95)
     elif name == 'loop':
         pn = QPen(white, lw)
         pn.setCapStyle(Qt.RoundCap)
@@ -460,25 +1169,164 @@ def _glyph(name, size, colour):
     return tinted
 
 
+def _resolve_colour(colour):
+    """A palette key becomes the current mode's hex; anything else is
+    passed to QColor as-is (so 'white' and '#rrggbb' still work)."""
+    if colour is not None and colour in pal():
+        return cur(colour)
+    return colour
+
+
 def icon(name, size=16, color=None):
     """A cached QIcon of the named glyph. Default colouring follows the
     text colour of the current mode (muted when disabled); pass `color`
-    to force one (e.g. 'white' for icons sitting on accent buttons)."""
+    to force one - a palette key (e.g. 'on_accent' for icons sitting on
+    accent buttons) or any QColor name."""
     key = (name, size, color, _mode)
     ic = _ICON_CACHE.get(key)
     if ic is None:
         ic = QIcon()
-        normal = _glyph(name, size, color or cur('text'))
+        normal = _glyph(name, size, _resolve_colour(color) or cur('text'))
         ic.addPixmap(normal, QIcon.Normal)
         ic.addPixmap(normal, QIcon.Active)
-        ic.addPixmap(_glyph(name, size, color or cur('muted')),
+        ic.addPixmap(_glyph(name, size,
+                            _resolve_colour(color) or cur('muted')),
                      QIcon.Disabled)
         _ICON_CACHE[key] = ic
     return ic
 
 
 def pixmap(name, size=16, color=None):
-    return _glyph(name, size, color or cur('text'))
+    return _glyph(name, size, _resolve_colour(color) or cur('text'))
+
+
+# ── the BlastLab mark and app icon (GUI-2, plan §3, board Logo_Final) ───
+# A front stepping across a regular 8 x 8 grid, with a faint wake behind
+# it. Drawn from the board's rectangle lists at three hand-tuned sizes
+# (64 / 32 / 16); a design is never scaled below 24 px - below that the
+# pixel-drawn 16 takes over. Multi-colour, so it does NOT go through
+# `_glyph()` (that pipeline tints single-colour glyphs).
+
+#: 64 design: 5x5 cells with a 0.5 inset, radius 1, at these origins
+_MARK64_FRONT = [(8, 20), (14, 20), (20, 20), (20, 26), (26, 26),
+                 (32, 26), (32, 32), (32, 38), (38, 38), (38, 44),
+                 (38, 50)]
+_MARK64_WAKE = [(8, 26), (14, 26), (20, 32), (26, 32), (26, 38),
+                (32, 44), (32, 50)]
+#: 32 design: 3x3 cells, no inset
+_MARK32_FRONT = [(4, 10), (7, 10), (10, 10), (10, 13), (13, 13),
+                 (16, 13), (16, 16), (16, 19), (19, 19), (19, 22),
+                 (19, 25)]
+_MARK32_WAKE = [(4, 13), (7, 13), (10, 16), (13, 16), (13, 19),
+                (16, 22), (16, 25)]
+#: 16 design: frame and five steps only (x, y, w, h)
+_MARK16_STEPS = [(2, 4, 3, 2), (5, 5, 2, 3), (7, 7, 2, 2), (8, 9, 3, 2),
+                 (10, 11, 2, 3)]
+
+
+def _draw_mark(p, design, dark, grid=None):
+    """Paint the mark in design coordinates (the painter is pre-scaled).
+    Board Logo_Final: front #ff6a2b dark / #e0501a light, frame #e7eaee
+    / #1f2430, wake at 35 % (30 % light) opacity."""
+    front = QColor('#ff6a2b' if dark else '#e0501a')
+    frame = QColor('#e7eaee' if dark else '#1f2430')
+    wake_opacity = 0.35 if dark else 0.30
+    p.setPen(Qt.NoPen)
+    if design == 16:            # no grid, no wake - crisp edges
+        p.setBrush(QBrush(front))
+        for x, y, w, h in _MARK16_STEPS:
+            p.drawRect(QRectF(x, y, w, h))
+        pen = QPen(frame, 1)
+        pen.setJoinStyle(Qt.MiterJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawRect(QRectF(1.5, 1.5, 13, 13))
+        return
+    if design == 32:
+        grid_pen = QPen(QColor(grid or ('#2c3137' if dark else '#d3d8df')), 1)
+        p.setPen(grid_pen)
+        for k in range(7):
+            v = 7.5 + 3 * k
+            p.drawLine(QPointF(v, 4), QPointF(v, 28))
+            p.drawLine(QPointF(4, v), QPointF(28, v))
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(front))
+        p.setOpacity(wake_opacity)
+        for x, y in _MARK32_WAKE:
+            p.drawRect(QRectF(x, y, 3, 3))
+        p.setOpacity(1.0)
+        for x, y in _MARK32_FRONT:
+            p.drawRect(QRectF(x, y, 3, 3))
+        pen = QPen(frame, 2)
+        pen.setJoinStyle(Qt.MiterJoin)
+        p.setPen(pen)
+        p.setBrush(Qt.NoBrush)
+        p.drawRect(QRectF(3, 3, 26, 26))
+        return
+    # 64 (and larger, scaled up)
+    grid_pen = QPen(QColor(grid or ('#353a41' if dark else '#d3d8df')), 0.75)
+    p.setPen(grid_pen)
+    for k in range(7):
+        v = 14 + 6 * k
+        p.drawLine(QPointF(v, 8), QPointF(v, 56))
+        p.drawLine(QPointF(8, v), QPointF(56, v))
+    p.setPen(Qt.NoPen)
+    p.setBrush(QBrush(front))
+    p.setOpacity(wake_opacity)
+    for x, y in _MARK64_WAKE:
+        p.drawRoundedRect(QRectF(x + 0.5, y + 0.5, 5, 5), 1, 1)
+    p.setOpacity(1.0)
+    for x, y in _MARK64_FRONT:
+        p.drawRoundedRect(QRectF(x + 0.5, y + 0.5, 5, 5), 1, 1)
+    p.setPen(QPen(frame, 2.5))
+    p.setBrush(Qt.NoBrush)
+    p.drawRoundedRect(QRectF(8, 8, 48, 48), 3, 3)
+
+
+def logo_pixmap(size, mode=None, _grid=None):
+    """The BlastLab mark at `size` device pixels (DPR 1, so the pixel
+    test reads device pixels). `mode` defaults to the current one."""
+    dark = (mode or _mode) != 'light'
+    size = int(size)
+    design = 64 if size >= 48 else (32 if size >= 24 else 16)
+    pm = QPixmap(size, size)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    # the 16 design is drawn to the pixel (board: crispEdges)
+    p.setRenderHint(QPainter.Antialiasing, size != 16)
+    s = size / design
+    p.scale(s, s)
+    try:
+        _draw_mark(p, design, dark, grid=_grid)
+    finally:
+        p.end()
+    return pm
+
+
+def app_icon():
+    """The app icon: the mark on a #1f1c1b rounded square (radius
+    ~20/88, mark ~68/88 of the tile - board Logo_Final, APP ICON).
+    One QIcon with 16/24/32/48/64/128/256 pixmaps, to be set on the
+    QApplication and the main window (plan §3)."""
+    ic = QIcon()
+    for s in (16, 24, 32, 48, 64, 128, 256):
+        pm = QPixmap(s, s)
+        pm.fill(Qt.transparent)
+        p = QPainter(pm)
+        p.setRenderHint(QPainter.Antialiasing, True)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(QColor('#1f1c1b')))
+        r = s * 20.0 / 88.0
+        p.drawRoundedRect(QRectF(0, 0, s, s), r, r)
+        p.end()
+        mark_size = max(1, round(s * 68.0 / 88.0))
+        mark = logo_pixmap(mark_size, 'dark', _grid='#3a3634')
+        q = QPainter(pm)
+        off = (s - mark_size) / 2.0
+        q.drawPixmap(QPointF(off, off), mark)
+        q.end()
+        ic.addPixmap(pm)
+    return ic
 
 
 # ── matplotlib figure theming ────────────────────────────────────────────

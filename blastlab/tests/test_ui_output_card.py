@@ -36,6 +36,7 @@ from blastlab.models import fields as F                     # noqa: E402
 from blastlab.models.case import vtk_fields_for             # noqa: E402
 from blastlab.ui.case_form import CaseForm                  # noqa: E402
 from blastlab.ui.setup_spec import SPAN                     # noqa: E402
+from blastlab.ui.widgets import tip_text                    # noqa: E402
 
 FAIL = []
 TITLE = 'VTK output (ParaView)'
@@ -132,7 +133,11 @@ def keep_all_box():
         check(f'{d}D: the box is on the card, unticked, with its tooltip',
               isinstance(w, QCheckBox) and 'keep_all_fields' in card_names(f)
               and w.text() == F.KEEP_ALL_CAPTION and not w.isChecked()
-              and w.toolTip() == F.KEEP_ALL_TIP and w.isVisible())
+              and tip_text(w.toolTip()) == F.KEEP_ALL_TIP and w.isVisible())
+        # GUI-11 T6 (P2-24, D208): the long tip is wrapped rich text, its
+        # words unchanged
+        check(f'{d}D: the tooltip is wrapped rich text (P2-24)',
+              w.toolTip().startswith('<'), w.toolTip()[:40])
         check(f'{d}D: default case has keep_all_fields False, not written',
               f.get_case().keep_all_fields is False
               and 'keep_all_fields' not in case_to_dict(f.get_case()))
@@ -213,7 +218,7 @@ def decimation():
           and w.maximum() == F.VTK_DECIMATE_MAX and w.value() == 1
           and f.v['vtk_v_decimate'].get() == '1'
           and 'vtk_v_decimate' in card_names(f) and w.isVisible()
-          and w.toolTip() == F.VTK_DECIMATE_TIP)
+          and tip_text(w.toolTip()) == F.VTK_DECIMATE_TIP)
     check('   the owner\'s warning line under it, visible',
           note is not None and note.text() == F.VTK_DECIMATE_NOTE
           and 'viewing only; peaks may be missed' in note.text()

@@ -1,0 +1,594 @@
+{
+ "dark-1100x720": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 432,
+  "strip_rows": 2,
+  "strip_h": 134,
+  "tiles": {
+   "charge": [
+    139,
+    63
+   ],
+   "cells": [
+    138,
+    63
+   ],
+   "ranks": [
+    139,
+    63
+   ],
+   "memory": [
+    139,
+    63
+   ],
+   "z": [
+    138,
+    63
+   ]
+  },
+  "tile_text": {
+   "charge": [
+    "1.0 kg TNT",
+    "radius 52.7 mm"
+   ],
+   "cells": [
+    "368 k",
+    "cell 6.59 mm"
+   ],
+   "ranks": [
+    "7",
+    "auto · 53 k cells each"
+   ],
+   "memory": [
+    "0.9 GB",
+    "VM size not measured yet"
+   ],
+   "z": [
+    "2.99–3.31",
+    "m/kg^1/3"
+   ]
+  },
+  "tile_bg": "#141416",
+  "z_tile_bg": "#1d1511",
+  "run_btn": [
+   139,
+   40
+  ],
+  "run_bg": "#ff6a2b",
+  "view_caption": "r–z plane · charge on the axis",
+  "rings": 3,
+  "ring_colour": [
+   "#ff6a2b"
+  ],
+  "charge_tag": [
+   "Charge · 1 kg TNT"
+  ],
+  "dock_h": 170,
+  "dock_tab": "Checks",
+  "tab_labels": [
+   "Gauges   2",
+   "Checks   0 · 1 · 6",
+   "Log"
+  ],
+  "tab_underline": "#ff6a2b",
+  "accent": "#ff6a2b",
+  "tile": "#141416",
+  "accent_bg": "#1d1511",
+  "checks": [
+   [
+    "warn",
+    "WSL hardware not detected - cell caps assume a 4 GB VM (1,113,510 cells). A case that validated on another machine may be refused here; click Re-detect once WSL is up. Headless callers should call solvers.foam.env.prime_from_settings() at start-up."
+   ],
+   [
+    "note",
+    "Obstacles: cells inside each box are carved out of the mesh (rigid walls)"
+   ],
+   [
+    "note",
+    "Checking WSL blastFoam availability..."
+   ],
+   [
+    "note",
+    "Cell size will be refined to 0.00659 m (8 cells across the charge radius)"
+   ],
+   [
+    "note",
+    "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)"
+   ],
+   [
+    "note",
+    "Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank)"
+   ],
+   [
+    "note",
+    "~368,449 cells at dx = 0.00658898 m"
+   ]
+  ],
+  "checks_cols": 1,
+  "gauge_headers": [
+   "Gauge",
+   "R [m]",
+   "Z [m/kg^1/3]",
+   "Where"
+  ],
+  "gauge_rows": [
+   [
+    "G1",
+    "3.31",
+    "3.31",
+    "5 cm in front of Wall 1"
+   ],
+   [
+    "G2",
+    "2.99",
+    "2.99",
+    "5 cm in front of Wall 1"
+   ]
+  ],
+  "halos": 2,
+  "r_labels": [
+   "R 3.31",
+   "R 2.99"
+  ],
+  "summary_05": "2 · in front of Wall 1",
+  "dock_tab_gauges": "Gauges",
+  "native_tiles": [
+   "charge",
+   "cells",
+   "z"
+  ],
+  "3d_tools": [
+   "Mesh",
+   "Fit"
+  ],
+  "0d_tabs": [
+   "Checks",
+   "Log"
+  ]
+ },
+ "dark-1600x1000": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 932,
+  "strip_rows": 1,
+  "strip_h": 87,
+  "tiles": {
+   "charge": [
+    144,
+    87
+   ],
+   "cells": [
+    145,
+    87
+   ],
+   "ranks": [
+    144,
+    87
+   ],
+   "memory": [
+    145,
+    87
+   ],
+   "z": [
+    166,
+    87
+   ]
+  },
+  "tile_text": {
+   "charge": [
+    "1.0 kg TNT",
+    "radius 52.7 mm"
+   ],
+   "cells": [
+    "368 k",
+    "cell 6.59 mm"
+   ],
+   "ranks": [
+    "2",
+    "auto · 184 k cells each"
+   ],
+   "memory": [
+    "0.9 GB",
+    "of 5 GB VM"
+   ],
+   "z": [
+    "2.99–3.31",
+    "m/kg^1/3"
+   ]
+  },
+  "tile_bg": "#141416",
+  "z_tile_bg": "#1d1511",
+  "run_btn": [
+   148,
+   64
+  ],
+  "run_bg": "#ff6a2b",
+  "view_caption": "r–z plane · charge on the axis",
+  "rings": 3,
+  "ring_colour": [
+   "#ff6a2b"
+  ],
+  "charge_tag": [
+   "Charge · 1 kg TNT"
+  ],
+  "dock_h": 212,
+  "dock_tab": "Checks",
+  "tab_labels": [
+   "Gauges   2",
+   "Checks   0 · 0 · 6",
+   "Log"
+  ],
+  "tab_underline": "#ff6a2b",
+  "accent": "#ff6a2b",
+  "tile": "#141416",
+  "accent_bg": "#1d1511",
+  "checks": [
+   [
+    "note",
+    "Obstacles: cells inside each box are carved out of the mesh (rigid walls)"
+   ],
+   [
+    "note",
+    "blastFoam ready in WSL (Ubuntu)"
+   ],
+   [
+    "note",
+    "Cell size will be refined to 0.00659 m (8 cells across the charge radius)"
+   ],
+   [
+    "note",
+    "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)"
+   ],
+   [
+    "note",
+    "Parallel run: auto: 2 MPI ranks (5 GB at 2 GB/rank)"
+   ],
+   [
+    "note",
+    "~368,449 cells at dx = 0.00658898 m"
+   ]
+  ],
+  "checks_cols": 2,
+  "gauge_headers": [
+   "Gauge",
+   "r [m]",
+   "z [m]",
+   "R from charge [m]",
+   "Z [m/kg^1/3]",
+   "Where"
+  ],
+  "gauge_rows": [
+   [
+    "G1",
+    "2.95",
+    "0.50",
+    "3.31",
+    "3.31",
+    "5 cm in front of Wall 1"
+   ],
+   [
+    "G2",
+    "2.95",
+    "1.50",
+    "2.99",
+    "2.99",
+    "5 cm in front of Wall 1"
+   ]
+  ],
+  "halos": 2,
+  "r_labels": [
+   "R 3.31",
+   "R 2.99"
+  ],
+  "summary_05": "2 · in front of Wall 1",
+  "dock_tab_gauges": "Gauges",
+  "native_tiles": [
+   "charge",
+   "cells",
+   "z"
+  ],
+  "3d_tools": [
+   "Mesh",
+   "Fit"
+  ],
+  "0d_tabs": [
+   "Checks",
+   "Log"
+  ]
+ },
+ "light-1100x720": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 432,
+  "strip_rows": 2,
+  "strip_h": 141,
+  "tiles": {
+   "charge": [
+    139,
+    63
+   ],
+   "cells": [
+    138,
+    63
+   ],
+   "ranks": [
+    139,
+    63
+   ],
+   "memory": [
+    139,
+    70
+   ],
+   "z": [
+    138,
+    70
+   ]
+  },
+  "tile_text": {
+   "charge": [
+    "1.0 kg TNT",
+    "radius 52.7 mm"
+   ],
+   "cells": [
+    "368 k",
+    "cell 6.59 mm"
+   ],
+   "ranks": [
+    "2",
+    "auto · 184 k cells each"
+   ],
+   "memory": [
+    "0.9 GB",
+    "of 5 GB VM"
+   ],
+   "z": [
+    "2.99–3.31",
+    "m/kg^1/3"
+   ]
+  },
+  "tile_bg": "#f1efeb",
+  "z_tile_bg": "#fbe9df",
+  "run_btn": [
+   139,
+   47
+  ],
+  "run_bg": "#ff6a2b",
+  "view_caption": "r–z plane · charge on the axis",
+  "rings": 3,
+  "ring_colour": [
+   "#ff6a2b"
+  ],
+  "charge_tag": [
+   "Charge · 1 kg TNT"
+  ],
+  "dock_h": 170,
+  "dock_tab": "Checks",
+  "tab_labels": [
+   "Gauges   2",
+   "Checks   0 · 0 · 6",
+   "Log"
+  ],
+  "tab_underline": "#ff6a2b",
+  "accent": "#ff6a2b",
+  "tile": "#f1efeb",
+  "accent_bg": "#fbe9df",
+  "checks": [
+   [
+    "note",
+    "Obstacles: cells inside each box are carved out of the mesh (rigid walls)"
+   ],
+   [
+    "note",
+    "blastFoam ready in WSL (Ubuntu)"
+   ],
+   [
+    "note",
+    "Cell size will be refined to 0.00659 m (8 cells across the charge radius)"
+   ],
+   [
+    "note",
+    "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)"
+   ],
+   [
+    "note",
+    "Parallel run: auto: 2 MPI ranks (5 GB at 2 GB/rank)"
+   ],
+   [
+    "note",
+    "~368,449 cells at dx = 0.00658898 m"
+   ]
+  ],
+  "checks_cols": 1,
+  "gauge_headers": [
+   "Gauge",
+   "R [m]",
+   "Z [m/kg^1/3]",
+   "Where"
+  ],
+  "gauge_rows": [
+   [
+    "G1",
+    "3.31",
+    "3.31",
+    "5 cm in front of Wall 1"
+   ],
+   [
+    "G2",
+    "2.99",
+    "2.99",
+    "5 cm in front of Wall 1"
+   ]
+  ],
+  "halos": 2,
+  "r_labels": [
+   "R 3.31",
+   "R 2.99"
+  ],
+  "summary_05": "2 · in front of Wall 1",
+  "dock_tab_gauges": "Gauges",
+  "native_tiles": [
+   "charge",
+   "cells",
+   "z"
+  ],
+  "3d_tools": [
+   "Mesh",
+   "Fit"
+  ],
+  "0d_tabs": [
+   "Checks",
+   "Log"
+  ]
+ },
+ "light-1600x1000": {
+  "tree_w": 280,
+  "props_w": 340,
+  "centre_w": 932,
+  "strip_rows": 1,
+  "strip_h": 87,
+  "tiles": {
+   "charge": [
+    144,
+    87
+   ],
+   "cells": [
+    145,
+    87
+   ],
+   "ranks": [
+    144,
+    87
+   ],
+   "memory": [
+    145,
+    87
+   ],
+   "z": [
+    166,
+    87
+   ]
+  },
+  "tile_text": {
+   "charge": [
+    "1.0 kg TNT",
+    "radius 52.7 mm"
+   ],
+   "cells": [
+    "368 k",
+    "cell 6.59 mm"
+   ],
+   "ranks": [
+    "2",
+    "auto · 184 k cells each"
+   ],
+   "memory": [
+    "0.9 GB",
+    "of 5 GB VM"
+   ],
+   "z": [
+    "2.99–3.31",
+    "m/kg^1/3"
+   ]
+  },
+  "tile_bg": "#f1efeb",
+  "z_tile_bg": "#fbe9df",
+  "run_btn": [
+   148,
+   64
+  ],
+  "run_bg": "#ff6a2b",
+  "view_caption": "r–z plane · charge on the axis",
+  "rings": 3,
+  "ring_colour": [
+   "#ff6a2b"
+  ],
+  "charge_tag": [
+   "Charge · 1 kg TNT"
+  ],
+  "dock_h": 212,
+  "dock_tab": "Checks",
+  "tab_labels": [
+   "Gauges   2",
+   "Checks   0 · 0 · 6",
+   "Log"
+  ],
+  "tab_underline": "#ff6a2b",
+  "accent": "#ff6a2b",
+  "tile": "#f1efeb",
+  "accent_bg": "#fbe9df",
+  "checks": [
+   [
+    "note",
+    "Obstacles: cells inside each box are carved out of the mesh (rigid walls)"
+   ],
+   [
+    "note",
+    "blastFoam ready in WSL (Ubuntu)"
+   ],
+   [
+    "note",
+    "Cell size will be refined to 0.00659 m (8 cells across the charge radius)"
+   ],
+   [
+    "note",
+    "Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius)"
+   ],
+   [
+    "note",
+    "Parallel run: auto: 2 MPI ranks (5 GB at 2 GB/rank)"
+   ],
+   [
+    "note",
+    "~368,449 cells at dx = 0.00658898 m"
+   ]
+  ],
+  "checks_cols": 2,
+  "gauge_headers": [
+   "Gauge",
+   "r [m]",
+   "z [m]",
+   "R from charge [m]",
+   "Z [m/kg^1/3]",
+   "Where"
+  ],
+  "gauge_rows": [
+   [
+    "G1",
+    "2.95",
+    "0.50",
+    "3.31",
+    "3.31",
+    "5 cm in front of Wall 1"
+   ],
+   [
+    "G2",
+    "2.95",
+    "1.50",
+    "2.99",
+    "2.99",
+    "5 cm in front of Wall 1"
+   ]
+  ],
+  "halos": 2,
+  "r_labels": [
+   "R 3.31",
+   "R 2.99"
+  ],
+  "summary_05": "2 · in front of Wall 1",
+  "dock_tab_gauges": "Gauges",
+  "native_tiles": [
+   "charge",
+   "cells",
+   "z"
+  ],
+  "3d_tools": [
+   "Mesh",
+   "Fit"
+  ],
+  "0d_tabs": [
+   "Checks",
+   "Log"
+  ]
+ }
+}

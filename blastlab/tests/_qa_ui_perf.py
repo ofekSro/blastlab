@@ -81,6 +81,10 @@ def main():
     from blastlab.ui import theme
     theme.apply(app, 'dark')
     from blastlab.ui.app import MainWindow
+    # GUI-11 T2 (D202): the typing bursts dirty Setup, so the close would
+    # ask Save / Discard / Cancel; answer it as before (discard)
+    from blastlab.ui.testing import answer_discard
+    answer_discard()
 
     def pump(n):
         for _ in range(n):

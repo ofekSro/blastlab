@@ -86,6 +86,7 @@ class GuiHooks(RunHooks):
             self._gauges_pending = False
             self._latest_surf3d = None
             self._surf3d_pending = False
+            self._last_p = None       # F28: no last-stage step at a held gate
         self.feed3d = None
         self.ring = None
         self.scene3d = None

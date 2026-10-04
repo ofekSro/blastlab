@@ -1,6 +1,13 @@
 """The Qt Run tab: control states, stat chips, the pyqtgraph live pane
 (orientation, obstacle mask, colour range, mesh overlay), the collapsed
-AMR log and the cadence line. Headless: offscreen Qt, no solver run."""
+AMR log and the cadence line. Headless: offscreen Qt, no solver run.
+
+GUI-6 (plan §9, batch 2026-09-29-gui-run): the chips became the progress
+strip's stat tiles, so U4 reads them through `chip_texts()` with the same
+expected strings, U1/U8/U14 look at the Cells tile under its new name
+(`_tile_cells`), and U15 (the log | view sash) became "the view spans the
+centre and is >= 240 px tall at the 1100 x 720 window" - the splitter is
+gone and the log sits in the dock under the view."""
 import os, sys
 import numpy as np
 
@@ -51,7 +58,7 @@ def main():
     check("the live pane starts on its placeholder",
           rp.pane.image is None and rp.pane.line is None)
     check("the AMR cell chip is hidden until a level map arrives",
-          not rp._chip_cells.isVisible())
+          not rp._tile_cells.isVisible())
 
     print("\nU2: an invalid case gates the start buttons")
     rp.set_validation(False, 3)
@@ -76,13 +83,12 @@ def main():
     print("\nU4: progress fills the chips")
     rp.on_progress(Progress(step=1234, t=1.5e-3, dt=2.5e-7, p_max=345678.0,
                             frac=0.37))
-    check("step", rp._chip_step.value.text() == '1234')
-    check("t in ms", rp._chip_t.value.text() == '1.500',
-          rp._chip_t.value.text())
-    check("dt in s", rp._chip_dt.value.text() == '2.50e-07',
-          rp._chip_dt.value.text())
-    check("p max in kPa, not Pa", rp._chip_pmax.value.text() == '345.7',
-          rp._chip_pmax.value.text())
+    chips = rp.chip_texts()
+    check("step", chips['step'] == '1234', chips['step'])
+    check("t in ms", chips['t [ms]'] == '1.500', chips['t [ms]'])
+    check("dt in s", chips['dt [s]'] == '2.50e-07', chips['dt [s]'])
+    check("p max in kPa, not Pa", chips['p max [kPa]'] == '345.7',
+          chips['p max [kPa]'])
     check("the bar followed frac", rp.progress.value() == 370,
           rp.progress.value())
     rp.set_paused(True)
@@ -166,11 +172,11 @@ def main():
     rp.show_mesh.setChecked(True)
     rp.on_frame(RAMP, 4.0e-3, levels=levels)
     check("the cells chip appears with a level map",
-          rp._chip_cells.isVisible())
+          rp._tile_cells.isVisible())
     # 8 level-1 cells count once each, the 24 level-0 cells stand for
     # 4 display cells each -> 8 + 24/4 = 14
     check("the chip counts true cells, not display cells",
-          rp._chip_cells.value.text() == '14', rp._chip_cells.value.text())
+          rp.chip_texts()['cells'] == '14', rp.chip_texts()['cells'])
     check("the overlay was rebuilt from the frame's own levels",
           len(rp.pane.overlay.item.getData()[0]) != n_uniform,
           f'{len(rp.pane.overlay.item.getData()[0])} vs {n_uniform}')
@@ -235,23 +241,29 @@ def main():
     rp.set_running(False)
     rp.set_running(True)
     check("chips are blank again",
-          rp._chip_step.value.text() == '—'
-          and rp._chip_pmax.value.text() == '—')
+          rp.chip_texts()['step'] == '—'
+          and rp.chip_texts()['p max [kPa]'] == '—')
     check("the pane is back to its placeholder",
           rp.pane.image is None and rp.pane.line is None)
     check("the log was cleared", rp.log_text() == '')
-    check("the cell chip is hidden again", not rp._chip_cells.isVisible())
+    check("the cell chip is hidden again", not rp._tile_cells.isVisible())
     check("the cadence does not carry over", rp.cadence_text() == '')
     rp.set_running(False)
     check("the 3D button only lives during a run",
           not rp.view3d_btn.isEnabled())
 
-    print("\nU15: the live pane keeps at least 60 % of the width (QA-17)")
-    rp.resize(1100, 700)
-    pump(60)
-    sizes = rp._body.sizes()
-    check("the sash is parked to the right of the log",
-          sizes[1] >= 0.6 * sum(sizes), str(sizes))
+    print("\nU15: the view spans the centre and keeps its height (QA-17)")
+    # the panel's size inside the 1100 x 720 minimum window: 1100 - 2 x 16
+    # of window padding, 720 - the 64 px top bar - the 28 px status bar -
+    # 18 px of column margins (measured through MainWindow in R1)
+    rp.resize(1068, 610)
+    pump(80)
+    view, centre = rp._view_frame, rp._centre
+    check("the view spans the centre column's width",
+          view.width() == centre.width(),
+          f'{view.width()} vs {centre.width()}')
+    check("and is at least 240 px tall at the 1100 x 720 window",
+          view.height() >= 240, str(view.height()))
 
     pump(20)
     print("\n" + "=" * 50)

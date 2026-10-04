@@ -121,6 +121,70 @@ def main():
         check(f'dim {d}: no optional path comes back as a string',
               not bad, str(bad))
 
+    print("\nS3c: a case file's hidden AMR values survive Open -> Save "
+          "(F16, GUI-11 e, D211)")
+    import tempfile
+    from blastlab.core.case import load_case, save_case
+    tmp = tempfile.mkdtemp(prefix='blastlab_f16_')
+    amr = dict(amr_refine=0.2, amr_unrefine=0.1, amr_interval=3,
+               amr_buffer=1, amr_max_cells=400000)
+    for d, cls in ((2, Case2D), (3, Case3D)):
+        for mode in ('native', 'blastfoam'):
+            src = os.path.join(tmp, f'in_{d}_{mode}.json')
+            out = os.path.join(tmp, f'out_{d}_{mode}.json')
+            save_case(cls(solver=mode, amr_levels=0, **amr), src)
+            f = form(d, mode)
+            f.set_case(load_case(src))
+            pump(5)
+            save_case(f.get_case(), out)
+            back = load_case(out)
+            got = {k: getattr(back, k) for k in amr}
+            check(f"dim {d} {mode}: AMR off, the file's 0.2 / 0.1 (and "
+                  f"3, 1, 400000) are saved back", got == amr, str(got))
+    for d in (2, 3):
+        f = form(d, 'blastfoam')
+        case = f.get_case()
+        check(f"dim {d}: a fresh blastFoam form still sends 0.4 / 0.2",
+              (case.amr_refine, case.amr_unrefine, case.amr_interval,
+               case.amr_buffer, case.amr_max_cells) == (0.4, 0.2, 2, 2, 0),
+              f'{case.amr_refine} {case.amr_unrefine}')
+    f = form(2, 'blastfoam')
+    f.set_case(Case2D(solver='blastfoam', amr_levels=0, **amr))
+    f.v['amr_refine'].set('not a number')
+    case = f.get_case()
+    check("a hidden box that does not parse blocks nothing, and the "
+          "file's value goes back (D223)", case.amr_refine == 0.2
+          and case.amr_unrefine == 0.1, str(case.amr_refine))
+    f.v['amr_levels'].set('2')
+    f.v['amr_refine'].set('0.3')
+    case = f.get_case()
+    check("AMR on reads the boxes as before", case.amr_levels == 2
+          and case.amr_refine == 0.3 and case.amr_unrefine == 0.1)
+    # verify11c (D223): a value typed after the load, in a box that is
+    # hidden again when the case is read, is never written (CLAUDE.md §4)
+    f.v['amr_refine'].set('0.9')
+    f.v['amr_levels'].set('0')
+    case = f.get_case()
+    check("AMR on, 0.9 typed, AMR off again: the file's 0.2 is saved, "
+          "not the hidden 0.9", case.amr_refine == 0.2
+          and case.amr_levels == 0, str(case.amr_refine))
+    f = form(3, 'native')
+    f.set_case(Case3D(solver='native', amr_levels=0, **amr))
+    f.v['amr_refine'].set('0.9')
+    f.v['amr_buffer'].set('7')
+    case = f.get_case()
+    check("native, a typed hidden AMR box is not written either",
+          (case.amr_refine, case.amr_buffer) == (0.2, 1),
+          f'{case.amr_refine} {case.amr_buffer}')
+    f = form(2, 'blastfoam')
+    f.set_case(Case2D(solver='blastfoam', amr_levels=0,
+                      **dict(amr, amr_refine=0.123456789)))
+    check("the file's value goes back whole, not as the box's 6 digits",
+          f.get_case().amr_refine == 0.123456789,
+          repr(f.get_case().amr_refine))
+    import shutil
+    shutil.rmtree(tmp, ignore_errors=True)
+
     print("\nS4: every bad field is reported, and marked")
     f = form(2)
     f.v['Lx'].set('abc')
@@ -215,6 +279,35 @@ def main():
     check("nothing typed was lost across two switches",
           f.v['Lx'].get() == '6.25' and f.v['n_procs'].get() == '7')
 
+    print("\nS6b: Material is a blastFoam row (UXR-3, owner 2026-10-03, "
+          "D210)")
+    for d in (1, 2, 3):
+        for placement in ('columns', 'nodes'):
+            f = CaseForm(d, mode='native', placement=placement)
+            f.resize(900, 700)
+            f.show()
+            pump(20)
+            tag = f'dim {d} {placement}'
+            check(f"{tag}: native hides the Material row",
+                  not f.row_visible('material'))
+            f.v['material'].set('ANFO')
+            check(f"{tag}: native still runs TNT, the box keeps ANFO",
+                  f.get_case().material == 'TNT'
+                  and f.v['material'].get() == 'ANFO',
+                  f.get_case().material)
+            f.set_mode('blastfoam')
+            check(f"{tag}: blastFoam shows it and runs ANFO",
+                  f.row_visible('material')
+                  and f.get_case().material == 'ANFO',
+                  f.get_case().material)
+            f.set_mode('native')
+            check(f"{tag}: back to native hides it again, value kept",
+                  not f.row_visible('material')
+                  and f.v['material'].get() == 'ANFO'
+                  and f.get_case().material == 'TNT')
+            f.deleteLater()
+    pump(20)
+
     print("\nS7: the AMR sub-group follows the level count")
     f = form(2, 'blastfoam')
     check("AMR off: coefficients hidden, charge refinement shown",
@@ -252,9 +345,11 @@ def main():
           f.is_enabled('cx') and f.is_enabled('bc_x_lo'))
     f.v['cx'].set('1.5')
     f.v['geometry'].set('axisymmetric')
+    # UXR-11 (D220): `Height Z` became `Height H`, so Z is only the scaled
+    # distance on this screen (a caption pin, changed per plan §9)
     check("axisym relabels to r/z",
           f.label_text('Lx') == 'Radius R [m]'
-          and f.label_text('Ly') == 'Height Z [m]'
+          and f.label_text('Ly') == 'Height H [m]'
           and f.label_text('cx') == 'Burst r [m]'
           and f.label_text('cy') == 'Burst z [m]', f.label_text('Ly'))
     check("axisym charge is a plain mass",
@@ -267,6 +362,86 @@ def main():
           and not f.is_enabled('bc_x_lo'))
     check("the case agrees", f.get_case().center[0] == 0.0)
 
+    print("\nS8b: axisymmetric r / z on every point list (UXR-11, F4, "
+          "D220)")
+    want_axi = {'gauges': ['r', 'z'], 'det_pts': ['r', 'z'],
+                'obstacles': ['r0', 'r1', 'z0', 'z1'],
+                'zones': ['r0', 'r1', 'z0', 'z1', 'level']}
+    want_pl = {'gauges': ['x', 'y'], 'det_pts': ['x', 'y'],
+               'obstacles': ['x0', 'x1', 'y0', 'y1'],
+               'zones': ['x0', 'x1', 'y0', 'y1', 'level']}
+
+    def headers(f, name):
+        h = f.points[name].tree.headerItem()
+        return [h.text(i) for i in range(h.columnCount())]
+
+    for placement in ('columns', 'nodes'):
+        f = CaseForm(2, mode='blastfoam', placement=placement)
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        for geom, want in (('axisymmetric', want_axi),
+                           ('planar', want_pl),
+                           ('axisymmetric', want_axi)):
+            f.v['geometry'].set(geom)
+            pump(5)
+            got = {n: headers(f, n) for n in want}
+            hints = {n: f.points[n].hint.text() for n in want}
+            check(f"{placement} {geom}: the point-list headers",
+                  got == want, str(got))
+            check(f"{placement} {geom}: the entry hints",
+                  all(hints[n] == 'add a row: ' + '  '.join(want[n])
+                      for n in want), str(hints))
+        check(f"{placement}: the captions read Radius R / Height H",
+              f.label_text('Lx') == 'Radius R [m]'
+              and f.label_text('Ly') == 'Height H [m]')
+        pl = f.points['obstacles']
+        pl.entry.setText('1 2 3')
+        pl.add()
+        check(f"{placement}: a refusal names the r / z columns",
+              pl.hint.text() == 'expected 4 numbers (r0  r1  z0  z1)',
+              pl.hint.text())
+        # F46 (GUI-11): a standing refusal follows a geometry toggle, red
+        f.v['geometry'].set('planar')
+        pump(5)
+        check(f"{placement}: after a toggle to planar it names x0 … y1, "
+              f"still a refusal",
+              pl.hint.text() == 'expected 4 numbers (x0  x1  y0  y1)'
+              and pl.entry.property('bad') == 'true', pl.hint.text())
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        check(f"{placement}: and back, r0 … z1 again",
+              pl.hint.text() == 'expected 4 numbers (r0  r1  z0  z1)'
+              and pl.entry.property('bad') == 'true', pl.hint.text())
+        gl = f.points['gauges']
+        gl.entry.setText('')
+        gl.add()
+        f.v['geometry'].set('planar')
+        pump(5)
+        check(f"{placement}: an empty Add's refusal follows too",
+              gl.hint.text() == 'add a row: x  y'
+              and gl.entry.property('bad') == 'true', gl.hint.text())
+        gl.entry.setText('1 a')
+        gl.add()
+        f.v['geometry'].set('axisymmetric')
+        pump(5)
+        check(f"{placement}: a refusal without column names is kept as is",
+              gl.hint.text() == 'not numbers: a', gl.hint.text())
+        f.deleteLater()
+    f = CaseForm(3, mode='blastfoam')
+    check("3D keeps x y z", headers(f, 'gauges') == ['x', 'y', 'z'])
+    f.deleteLater()
+    from blastlab.ui.preview_panel import Preview2D
+    pv = Preview2D()
+    pv.resize(500, 400)
+    pv.show_case(Case2D(geometry='axisymmetric'))
+    axi_y, axi_x = pv.ax.get_ylabel(), pv.ax.get_xlabel()
+    pv.show_case(Case2D(geometry='planar'))
+    check("the Setup preview's axes read r / z in axisymmetric, x / y "
+          "planar", (axi_x, axi_y) == ('r [m]', 'z [m]')
+          and (pv.ax.get_xlabel(), pv.ax.get_ylabel())
+          == ('x [m]', 'y [m]'), f'{axi_x} {axi_y}')
+    pv.deleteLater()
+
     print("\nS9: the point lists")
     arity = {1: dict(gauges=1), 2: dict(gauges=2, obstacles=4, zones=5,
                                         det_pts=2),
@@ -278,6 +453,9 @@ def main():
             check(f"dim {d} {name} takes {n} numbers",
                   f.points[name]._arity == n, str(f.points[name]._arity))
     f = form(2)
+    # planar, so the x / y captions below hold: the default axisymmetric
+    # form now reads r / z (UXR-11, D220; a fixture change, S8b checks it)
+    f.v['geometry'].set('planar')
     pl = f.points['obstacles']
     pl.entry.setText('1, 2, 3, 4')
     pl.add()

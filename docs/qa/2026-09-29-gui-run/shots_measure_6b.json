@@ -1,0 +1,816 @@
+{
+ "took": {
+  "running": true,
+  "clicked": true
+ },
+ "shots": {
+  "gui6b-running-1100x720-dark": {
+   "size": "1100x720",
+   "mode": "dark",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    432,
+    271
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G5",
+    "Z 1.41 \u00b7 selected",
+    "peak 321 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "29 kPa",
+    "waiting",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "1 min 34 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-running-1600x1000-dark": {
+   "size": "1600x1000",
+   "mode": "dark",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    932,
+    609
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G5",
+    "Z 1.41 \u00b7 selected",
+    "peak 321 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "42 kPa",
+    "waiting",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "1 min 34 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-running-1100x720-light": {
+   "size": "1100x720",
+   "mode": "light",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    432,
+    271
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G5",
+    "Z 1.41 \u00b7 selected",
+    "peak 321 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "59 kPa",
+    "waiting",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "1 min 38 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-running-1600x1000-light": {
+   "size": "1600x1000",
+   "mode": "light",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    932,
+    609
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G5",
+    "Z 1.41 \u00b7 selected",
+    "peak 321 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "74 kPa",
+    "waiting",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "1 min 38 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-clicked-1100x720-dark": {
+   "size": "1100x720",
+   "mode": "dark",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    432,
+    271
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "15 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "2 min 27 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-clicked-1600x1000-dark": {
+   "size": "1600x1000",
+   "mode": "dark",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    932,
+    609
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "21 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "2 min 27 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-clicked-1100x720-light": {
+   "size": "1100x720",
+   "mode": "light",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    432,
+    271
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "24 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "2 min 31 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-clicked-1600x1000-light": {
+   "size": "1600x1000",
+   "mode": "light",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": null,
+   "view": [
+    932,
+    609
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "30 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "2 min 31 s elapsed \u00b7 about 0 s left"
+  },
+  "gui6b-finished-1100x720-dark": {
+   "size": "1100x720",
+   "mode": "dark",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    432,
+    62
+   ],
+   "view": [
+    432,
+    201
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "88 kPa",
+    "106 kPa",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 3 min 25 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.014e+05 Pa)"
+  },
+  "gui6b-finished-1600x1000-dark": {
+   "size": "1600x1000",
+   "mode": "dark",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    932,
+    62
+   ],
+   "view": [
+    932,
+    539
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "88 kPa",
+    "106 kPa",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 3 min 25 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.014e+05 Pa)"
+  },
+  "gui6b-finished-1100x720-light": {
+   "size": "1100x720",
+   "mode": "light",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    432,
+    62
+   ],
+   "view": [
+    432,
+    201
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "88 kPa",
+    "106 kPa",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 3 min 25 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.014e+05 Pa)"
+  },
+  "gui6b-finished-1600x1000-light": {
+   "size": "1600x1000",
+   "mode": "light",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    932,
+    62
+   ],
+   "view": [
+    932,
+    539
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 Z \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "Z 2.12 \u00b7 selected",
+    "peak 123 kPa"
+   ],
+   "peaks": [
+    "321 kPa",
+    "123 kPa",
+    "88 kPa",
+    "106 kPa",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 3 min 25 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.014e+05 Pa)"
+  },
+  "gui6b-planar-finished-1100x720-dark": {
+   "size": "1100x720",
+   "mode": "dark",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    432,
+    62
+   ],
+   "view": [
+    432,
+    201
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 R \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "R 0.42 m \u00b7 selected",
+    "peak 9,076 kPa"
+   ],
+   "peaks": [
+    "9,076 kPa",
+    "6,546 kPa",
+    "4,480 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 9 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.016e+05 Pa)"
+  },
+  "gui6b-planar-finished-1600x1000-dark": {
+   "size": "1600x1000",
+   "mode": "dark",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    932,
+    62
+   ],
+   "view": [
+    932,
+    539
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 R \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "R 0.42 m \u00b7 selected",
+    "peak 9,076 kPa"
+   ],
+   "peaks": [
+    "9,076 kPa",
+    "6,546 kPa",
+    "4,480 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 9 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.016e+05 Pa)"
+  },
+  "gui6b-planar-finished-1100x720-light": {
+   "size": "1100x720",
+   "mode": "light",
+   "columns": [
+    280,
+    432,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    432,
+    62
+   ],
+   "view": [
+    432,
+    201
+   ],
+   "dock_h": 110,
+   "strip_rows": 2,
+   "header": "GAUGE \u00b7 R \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "R 0.42 m \u00b7 selected",
+    "peak 9,076 kPa"
+   ],
+   "peaks": [
+    "9,076 kPa",
+    "6,546 kPa",
+    "4,480 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 9 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.016e+05 Pa)"
+  },
+  "gui6b-planar-finished-1600x1000-light": {
+   "size": "1600x1000",
+   "mode": "light",
+   "columns": [
+    280,
+    932,
+    340
+   ],
+   "gauge_card": [
+    302,
+    165
+   ],
+   "gauge_plot_h": 116,
+   "list_frame": [
+    302,
+    272
+   ],
+   "list_rows_visible": 6,
+   "list_scrolls": false,
+   "row_h": [
+    40
+   ],
+   "spark": [
+    90,
+    24
+   ],
+   "banner": [
+    932,
+    62
+   ],
+   "view": [
+    932,
+    539
+   ],
+   "dock_h": 140,
+   "strip_rows": 1,
+   "header": "GAUGE \u00b7 R \u00b7 TRACE \u00b7 PEAK",
+   "card": [
+    "G3",
+    "R 0.42 m \u00b7 selected",
+    "peak 9,076 kPa"
+   ],
+   "peaks": [
+    "9,076 kPa",
+    "6,546 kPa",
+    "4,480 kPa",
+    "waiting",
+    "waiting",
+    "waiting"
+   ],
+   "time_line": "Done in 9 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.016e+05 Pa)"
+  }
+ }
+}

@@ -20,8 +20,11 @@ from .mpl_canvas import MplCanvas
 
 
 def _pal():
+    # the palette's `accent` is what preview_draw paints the gauges in;
+    # the redesign draws gauges in `gauge` cyan everywhere (plan §2.1,
+    # GUI-5b) - told apart from the orange charge by hue and lightness
     return preview_draw.palette(dark=theme.mode() == 'dark',
-                                accent=theme.cur('accent'),
+                                accent=theme.cur('gauge'),
                                 muted=theme.cur('muted'))
 
 
@@ -34,15 +37,30 @@ class _MplPreview(MplCanvas):
         fig = Figure(figsize=(5, 5))
         self._ax = fig.add_subplot()
         self.set_figure(fig)
+        # re-fit the margins when the canvas changes size, not only once
+        # per case: the Setup centre (GUI-5b) resizes the canvas under a
+        # drawn case, and the one-off tight_layout then cut the axis
+        # labels off (measured at 1100 x 720: 'r [m]' half below it)
+        fig.canvas.mpl_connect('resize_event', self._refit)
         self._last = None
+        #: GUI-5b: `overlay(ax, case)` draws on top of the shared drawing
+        #: after `preview_draw` returns (the Setup panel's Z rings and
+        #: selection highlight); None draws nothing extra
+        self.overlay = None
 
     @property
     def ax(self):
         return self._ax
 
+    @property
+    def last_case(self):
+        return self._last[0] if self._last is not None else None
+
     def show_case(self, case, show_mesh=False):
         self._last = (case, bool(show_mesh))
         note = self._draw(self._ax, case, show_mesh=show_mesh, pal=_pal())
+        if self.overlay is not None:
+            self.overlay(self._ax, case)
         theme.style_figure(self.figure)
         try:
             self.figure.tight_layout()
@@ -50,6 +68,29 @@ class _MplPreview(MplCanvas):
             pass                      # a degenerate case must not raise
         self.draw()
         return note
+
+    def _refit(self, _event=None):
+        if self._last is None:
+            return
+        try:
+            self.figure.tight_layout()
+        except Exception:
+            pass                      # a degenerate case must not raise
+        self.draw()
+
+    def redraw_overlay(self):
+        """Re-draw only the overlay (a new selection, the rings toggle):
+        the case drawing stays, the overlay's own artists are swapped."""
+        if self._last is None or self.overlay is None:
+            return
+        self.overlay(self._ax, self._last[0])
+        self.draw()
+
+    def fit(self):
+        """Back to the whole domain: replay the drawing, whose limits are
+        the domain plus a margin."""
+        if self._last is not None:
+            self.show_case(*self._last)
 
     def retheme(self):
         """A dark/light switch changes the boundary and mesh colours, so
@@ -65,9 +106,19 @@ class Preview1D(_MplPreview):
         super().__init__(preview_draw.draw_1d, parent)
 
 
+def _draw_2d(ax, case, **kw):
+    """`preview_draw.draw_2d`, with the axisymmetric vertical axis named
+    z, as the r axis beside it and the tree are (UXR-11, D220). Set here,
+    Qt-side: `output/preview_draw.py` is shared with Tk and unchanged."""
+    note = preview_draw.draw_2d(ax, case, **kw)
+    if getattr(case, 'geometry', '') == 'axisymmetric':
+        ax.set_ylabel('z [m]')
+    return note
+
+
 class Preview2D(_MplPreview):
     def __init__(self, parent=None):
-        super().__init__(preview_draw.draw_2d, parent)
+        super().__init__(_draw_2d, parent)
 
 
 class Preview3DBridge:

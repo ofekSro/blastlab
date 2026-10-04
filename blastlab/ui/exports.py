@@ -93,9 +93,15 @@ def pick_target(kind, ent, log=print, parent=None):
 
 
 def export(kind, ent, opts=None, log=print, parent=None, on_error=None,
-           threaded=True):
+           threaded=True, on_done=None):
     """Pick a target on the calling (GUI) thread, then write on a worker.
-    Returns the target, or '' when nothing will be written."""
+    Returns the target, or '' when nothing will be written.
+
+    `on_done(ret)` is called with what `run_export` returned once the
+    writing is over - on the worker (after it, whatever happened) when
+    threaded, else right after the call. It is never called when nothing
+    is written (a cancelled dialog, a refusal). The Results panel posts it
+    to the GUI thread to take its busy strip down (UX-13)."""
     if ent is None:
         log('Select a result before exporting.')
         return ''
@@ -104,7 +110,16 @@ def export(kind, ent, opts=None, log=print, parent=None, on_error=None,
         return ''
     args = (kind, ent, target, opts, log, parent, on_error)
     if threaded:
-        threading.Thread(target=run_export, args=args, daemon=True).start()
+        def work():
+            ret = None
+            try:
+                ret = run_export(*args)
+            finally:
+                if on_done is not None:
+                    on_done(ret)
+        threading.Thread(target=work, daemon=True).start()
     else:
-        run_export(*args)
+        ret = run_export(*args)
+        if on_done is not None:
+            on_done(ret)
     return target

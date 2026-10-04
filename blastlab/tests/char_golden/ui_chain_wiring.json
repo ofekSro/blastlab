@@ -1,0 +1,1255 @@
+{
+  "refuse/model_name_empty": {
+    "launched": [],
+    "log": [
+      "Chain: Model name: the name is empty",
+      "Chain: The Runs folder and Model boxes are on the Run tab."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Model name: the name is empty",
+          "The Runs folder and Model boxes are on the Run tab."
+        ]
+      ]
+    ]
+  },
+  "refuse/model_runs_empty": {
+    "launched": [],
+    "log": [
+      "Chain: Runs folder is empty",
+      "Chain: The Runs folder and Model boxes are on the Run tab."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Runs folder is empty",
+          "The Runs folder and Model boxes are on the Run tab."
+        ]
+      ]
+    ]
+  },
+  "refuse/model_runs_missing": {
+    "launched": [],
+    "log": [
+      "Chain: Runs folder does not exist: <RUNS>\\no",
+      "Chain: The Runs folder and Model boxes are on the Run tab."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Runs folder does not exist: <RUNS>\\no",
+          "The Runs folder and Model boxes are on the Run tab."
+        ]
+      ]
+    ]
+  },
+  "refuse/native1d_foam2d": {
+    "launched": [],
+    "log": [
+      "Chain: Stage 2 (2D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Stage 2 (2D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+        ]
+      ]
+    ]
+  },
+  "refuse/native1d_foam3d_route13": {
+    "launched": [],
+    "log": [
+      "Chain: Stage 3 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Stage 3 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+        ]
+      ]
+    ]
+  },
+  "refuse/stage2_Lx_abc": {
+    "launched": [],
+    "log": [
+      "Chain: Stage 2 (2D): 'Lx' is not a number: 'abc'"
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Stage 2 (2D): 'Lx' is not a number: 'abc'"
+        ]
+      ]
+    ]
+  },
+  "refuse/stage2_cy_99": {
+    "launched": [],
+    "log": [
+      "Chain: Stage 2 (2D): Charge centre is outside the domain"
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Stage 2 (2D): Charge centre is outside the domain"
+        ]
+      ]
+    ]
+  },
+  "refuse/stage2_planar_with_3d": {
+    "launched": [],
+    "log": [
+      "Chain: Stage 2 (2D): must be axisymmetric to feed the 3D stage."
+    ],
+    "on_disk": [],
+    "returned": false,
+    "sink": [
+      [
+        "Chain",
+        [
+          "Stage 2 (2D): must be axisymmetric to feed the 3D stage."
+        ]
+      ]
+    ]
+  },
+  "route/12/default": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_2d.txt",
+            "radius_m": "10.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [],
+            "geometry": "axisymmetric",
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": null,
+            "profile_file_in": "<MODEL>\\handoff_1d_to_2d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/12/variant": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_2d.txt",
+            "radius_m": "2.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [
+              [
+                "1.5",
+                "1.0"
+              ]
+            ],
+            "geometry": "axisymmetric",
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": null,
+            "profile_file_in": "<MODEL>\\handoff_1d_to_2d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": 1,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/123/default": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_2d.txt",
+            "radius_m": "10.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [],
+            "geometry": "axisymmetric",
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_2d_to_3d.npz",
+            "profile_file_in": "<MODEL>\\handoff_1d_to_2d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile2d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_2d_to_3d.npz",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 3 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/123/variant": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_2d.txt",
+            "radius_m": "2.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [
+              [
+                "1.5",
+                "1.0"
+              ]
+            ],
+            "geometry": "axisymmetric",
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_2d_to_3d.npz",
+            "profile_file_in": "<MODEL>\\handoff_1d_to_2d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": 1,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile2d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_2d_to_3d.npz",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 3 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/13/default": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_3d.txt",
+            "radius_m": "10.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_1d_to_3d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/13/variant": {
+    "launched": [
+      [
+        [
+          1,
+          {
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "bc_outer": "terminate",
+            "cell_size_m": "0.001",
+            "cfl": "0.5",
+            "charge_kg": "1.0",
+            "det_delays": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges.txt",
+            "gauge_radii": [],
+            "keep_all_fields": false,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 5,
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_1d_to_3d.txt",
+            "radius_m": "2.0",
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "vtk_gauges": null,
+            "vtk_volumes": null
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile1d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_1d_to_3d.txt",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/23/default": {
+    "launched": [
+      [
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [],
+            "geometry": "axisymmetric",
+            "init_mode": "charge",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_2d_to_3d.npz",
+            "profile_file_in": null,
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile2d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_2d_to_3d.npz",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  },
+  "route/23/variant": {
+    "launched": [
+      [
+        [
+          2,
+          {
+            "Lx": "4.0",
+            "Ly": "4.0",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_2d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "reflect",
+              "y_hi": "transmit",
+              "y_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.0",
+              "2.0"
+            ],
+            "cfl": "0.4",
+            "charge": "1.0",
+            "charge_refine": "global",
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "gauge_file": "gauges_2d.txt",
+            "gauges": [
+              [
+                "1.5",
+                "1.0"
+              ]
+            ],
+            "geometry": "axisymmetric",
+            "init_mode": "charge",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file": "<MODEL>\\handoff_2d_to_3d.npz",
+            "profile_file_in": null,
+            "record_frames": 150,
+            "refine_zones": [],
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": "trigger_remap.npz",
+            "trigger_gauge": 1,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ],
+        [
+          3,
+          {
+            "Lx": "1.5",
+            "Ly": "1.5",
+            "Lz": "1.5",
+            "activation": "linear",
+            "adaptive_write": false,
+            "afterburn": "none",
+            "amr_buffer": 2,
+            "amr_display_level": null,
+            "amr_estimator": "Lohner",
+            "amr_interval": 2,
+            "amr_levels": 0,
+            "amr_max_cells": 0,
+            "amr_refine": "0.4",
+            "amr_unrefine": "0.2",
+            "anim_clim": null,
+            "anim_file": "blast_3d_animation.mp4",
+            "anim_mesh": false,
+            "anim_scale": "run",
+            "bcs": {
+              "x_hi": "terminate",
+              "x_lo": "transmit",
+              "y_hi": "transmit",
+              "y_lo": "transmit",
+              "z_hi": "transmit",
+              "z_lo": "reflect"
+            },
+            "cell_size_m": "0.025",
+            "center": [
+              "0.75",
+              "0.75",
+              "0.75"
+            ],
+            "cfl": "0.3",
+            "chamber_state": {},
+            "charge": "25.0",
+            "charge_refine": "global",
+            "charge_resolution": "resolve",
+            "charges": null,
+            "det_delays": null,
+            "det_points": null,
+            "det_radii": null,
+            "eos": "idealGas",
+            "fixed_dt": "0.0",
+            "gauge_file": "gauges_3d.txt",
+            "gauges": [],
+            "init_mode": "profile2d",
+            "keep_all_fields": false,
+            "live": true,
+            "material": "TNT",
+            "n_procs": 0,
+            "n_snapshots": 6,
+            "obstacles": [],
+            "order": 1,
+            "probe_adjust": true,
+            "profile_file_in": "<MODEL>\\handoff_2d_to_3d.npz",
+            "record_frames": 150,
+            "refine_zones": [],
+            "room": {},
+            "slice_axis": "y",
+            "slice_pos": null,
+            "solver": "blastfoam",
+            "t_end": "0.0",
+            "trigger_action": "terminate",
+            "trigger_file": null,
+            "trigger_gauge": null,
+            "vtk_gauges": null,
+            "vtk_surfaces": null,
+            "vtk_volumes": null,
+            "write_budget": 0
+          }
+        ]
+      ]
+    ],
+    "log": [
+      "Chain: 2 stage(s) into <MODEL>"
+    ],
+    "on_disk": [],
+    "returned": true,
+    "sink": []
+  }
+}

@@ -223,6 +223,10 @@ class View3DHost(QWidget):
         self._float_lbl = QLabel(self.FLOATING)
         self._float_lbl.setObjectName('muted')
         self._float_lbl.setAlignment(Qt.AlignCenter)
+        # wrapped like the placeholder: unwrapped, this one line was the
+        # whole host's minimum width (338 px of 368, measured) and pushed
+        # the GUI-5 Setup centre past a 1100 px window
+        self._float_lbl.setWordWrap(True)
         fl.addWidget(self._float_lbl)
         fl.addWidget(button('Re-attach', 'detach', width=120,
                             on_click=lambda: self.set_floating(False)),
@@ -591,6 +595,23 @@ class View3DHost(QWidget):
                 self._SWP_FLAGS)
         except Exception:
             pass
+
+    def shrink_ahead(self, dh):
+        """Make the embedded window `dh` px shorter NOW, ahead of a layout
+        change the caller knows will shrink its card by that much.
+
+        GUI-6b: the finish banner appears above the Run view and takes its
+        height from it. The card shrinks in Qt's next layout pass, and the
+        window used to follow ~30 ms later, standing 70 px out of its card
+        meanwhile (T9, Win32 sampler). Shrinking first leaves the window
+        inside the card throughout; the resize sync then sets the exact
+        size. Native embedding only, a no-op otherwise.
+        """
+        c = self._container
+        if not self._native or not self._hwnd or c is None or dh <= 0:
+            return
+        self._pin_foreign(QRect(0, 0, c.width(),
+                                max(1, c.height() - int(dh))))
 
     def _watch_foreign_moves(self):
         """Correct the move itself, in the frame it happens."""
@@ -1323,7 +1344,7 @@ class View3DHost(QWidget):
         self._playing = bool(playing)
         self.play_btn.setText('Pause' if self._playing else 'Play')
         self.play_btn.setIcon(theme.icon('pause' if self._playing else 'play',
-                                         12, color='white'))
+                                         12, color='on_accent'))
 
     def _apply_all_controls(self):
         """Replay the control state into a freshly built scene."""

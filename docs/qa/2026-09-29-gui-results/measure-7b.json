@@ -1,0 +1,258 @@
+{
+  "dark-1600x1000": {
+    "columns": [
+      280,
+      968,
+      320
+    ],
+    "timebar": {
+      "one_line": true,
+      "height": 61,
+      "play": [
+        40,
+        40
+      ],
+      "speed": 32,
+      "frame_btn": 32,
+      "slider": 366,
+      "ticks": [
+        44
+      ]
+    },
+    "controls_lines": 1,
+    "view_tabs": 32,
+    "export_buttons": [
+      40
+    ],
+    "open3d": 42,
+    "hover": "x 0.41 · z 0.80 m\noverpressure 1944 kPa",
+    "gauges": {
+      "plot": 545,
+      "table": 119,
+      "table_width": 906,
+      "headers_wrapped": true,
+      "hscroll": 0,
+      "vscroll": 0
+    },
+    "planar_z_hidden": true,
+    "method_foam_rows": [
+      [
+        "Solver",
+        "blastFoam"
+      ],
+      [
+        "Charge",
+        "1 kg TNT · z 0.7 m"
+      ],
+      [
+        "Detonation",
+        "linear"
+      ],
+      [
+        "Afterburn",
+        "none"
+      ],
+      [
+        "Mesh",
+        "cell 10.5263 mm · finest 2.63 mm"
+      ],
+      [
+        "Ended",
+        "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa) · t = 0.375 ms"
+      ]
+    ],
+    "busy_strip": 48
+  },
+  "dark-1100x720": {
+    "columns": [
+      280,
+      468,
+      320
+    ],
+    "timebar": {
+      "one_line": false,
+      "height": 101,
+      "play": [
+        40,
+        40
+      ],
+      "speed": 32,
+      "frame_btn": 32,
+      "slider": 230,
+      "ticks": [
+        44
+      ]
+    },
+    "controls_lines": 3,
+    "view_tabs": 32,
+    "export_buttons": [
+      40
+    ],
+    "open3d": 42,
+    "hover": "x 0.41 · z 0.81 m\noverpressure 1944 kPa",
+    "gauges": {
+      "plot": 222,
+      "table": 129,
+      "table_width": 406,
+      "headers_wrapped": true,
+      "hscroll": 500,
+      "vscroll": 0
+    },
+    "planar_z_hidden": true,
+    "method_foam_rows": [
+      [
+        "Solver",
+        "blastFoam"
+      ],
+      [
+        "Charge",
+        "1 kg TNT · z 0.7 m"
+      ],
+      [
+        "Detonation",
+        "linear"
+      ],
+      [
+        "Afterburn",
+        "none"
+      ],
+      [
+        "Mesh",
+        "cell 10.5263 mm · finest 2.63 mm"
+      ],
+      [
+        "Ended",
+        "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa) · t = 0.375 ms"
+      ]
+    ],
+    "busy_strip": 48
+  },
+  "light-1600x1000": {
+    "columns": [
+      280,
+      968,
+      320
+    ],
+    "timebar": {
+      "one_line": true,
+      "height": 61,
+      "play": [
+        40,
+        40
+      ],
+      "speed": 32,
+      "frame_btn": 32,
+      "slider": 366,
+      "ticks": [
+        44
+      ]
+    },
+    "controls_lines": 1,
+    "view_tabs": 32,
+    "export_buttons": [
+      40
+    ],
+    "open3d": 42,
+    "hover": "x 0.41 · z 0.80 m\noverpressure 1944 kPa",
+    "gauges": {
+      "plot": 545,
+      "table": 119,
+      "table_width": 906,
+      "headers_wrapped": true,
+      "hscroll": 0,
+      "vscroll": 0
+    },
+    "planar_z_hidden": true,
+    "method_foam_rows": [
+      [
+        "Solver",
+        "blastFoam"
+      ],
+      [
+        "Charge",
+        "1 kg TNT · z 0.7 m"
+      ],
+      [
+        "Detonation",
+        "linear"
+      ],
+      [
+        "Afterburn",
+        "none"
+      ],
+      [
+        "Mesh",
+        "cell 10.5263 mm · finest 2.63 mm"
+      ],
+      [
+        "Ended",
+        "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa) · t = 0.375 ms"
+      ]
+    ],
+    "busy_strip": 48
+  },
+  "light-1100x720": {
+    "columns": [
+      280,
+      468,
+      320
+    ],
+    "timebar": {
+      "one_line": false,
+      "height": 101,
+      "play": [
+        40,
+        40
+      ],
+      "speed": 32,
+      "frame_btn": 32,
+      "slider": 230,
+      "ticks": [
+        44
+      ]
+    },
+    "controls_lines": 3,
+    "view_tabs": 32,
+    "export_buttons": [
+      40
+    ],
+    "open3d": 42,
+    "hover": "x 0.41 · z 0.81 m\noverpressure 1944 kPa",
+    "gauges": {
+      "plot": 222,
+      "table": 129,
+      "table_width": 406,
+      "headers_wrapped": true,
+      "hscroll": 500,
+      "vscroll": 0
+    },
+    "planar_z_hidden": true,
+    "method_foam_rows": [
+      [
+        "Solver",
+        "blastFoam"
+      ],
+      [
+        "Charge",
+        "1 kg TNT · z 0.7 m"
+      ],
+      [
+        "Detonation",
+        "linear"
+      ],
+      [
+        "Afterburn",
+        "none"
+      ],
+      [
+        "Mesh",
+        "cell 10.5263 mm · finest 2.63 mm"
+      ],
+      [
+        "Ended",
+        "shock arrived at a terminate boundary (p_edge = 1.015e+05 Pa) · t = 0.375 ms"
+      ]
+    ],
+    "busy_strip": 48
+  }
+}

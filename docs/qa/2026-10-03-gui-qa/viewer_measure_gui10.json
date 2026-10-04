@@ -1,0 +1,813 @@
+{
+  "rule": "R10 (docs/qa/2026-10-03-gui-qa/measurements.md)",
+  "surfaces": {
+    "results": {
+      "commit": "8585aa6",
+      "surface": "results",
+      "platform": "windows",
+      "repeat": 5,
+      "tol_px": 2,
+      "watch_ms": 700,
+      "viewer_pid": 3548,
+      "actions": {
+        "tabs": {
+          "repeats": [
+            {
+              "samples": 1072,
+              "with_window": 348,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.6
+            },
+            {
+              "samples": 1060,
+              "with_window": 352,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 1056,
+              "with_window": 350,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 1067,
+              "with_window": 353,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.6
+            },
+            {
+              "samples": 1057,
+              "with_window": 348,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.1
+            }
+          ],
+          "samples": 5312,
+          "with_window": 1751,
+          "not_child": 0,
+          "longest_wrong_ms": 0.0,
+          "median_longest_wrong_ms": 0.0,
+          "worst_offset_px": 0,
+          "longest_mismatch_ms": 0.0
+        },
+        "theme": {
+          "repeats": [
+            {
+              "samples": 4133,
+              "with_window": 4133,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 4112,
+              "with_window": 4112,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.3
+            },
+            {
+              "samples": 4070,
+              "with_window": 4070,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 4152,
+              "with_window": 4152,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 4014,
+              "with_window": 4014,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.4
+            }
+          ],
+          "samples": 20481,
+          "with_window": 20481,
+          "not_child": 0,
+          "longest_wrong_ms": 0.0,
+          "median_longest_wrong_ms": 0.0,
+          "worst_offset_px": 0,
+          "longest_mismatch_ms": 0.0
+        },
+        "resize": {
+          "repeats": [
+            {
+              "samples": 744,
+              "with_window": 744,
+              "not_child": 0,
+              "longest_wrong_ms": 9.8,
+              "worst_offset_px": 472,
+              "worst_past": [
+                0,
+                0,
+                472,
+                280
+              ],
+              "longest_mismatch_ms": 29.5,
+              "max_gap_ms": 2.6
+            },
+            {
+              "samples": 759,
+              "with_window": 759,
+              "not_child": 0,
+              "longest_wrong_ms": 26.0,
+              "worst_offset_px": 472,
+              "worst_past": [
+                0,
+                0,
+                472,
+                280
+              ],
+              "longest_mismatch_ms": 29.1,
+              "max_gap_ms": 2.8
+            },
+            {
+              "samples": 754,
+              "with_window": 754,
+              "not_child": 0,
+              "longest_wrong_ms": 14.8,
+              "worst_offset_px": 472,
+              "worst_past": [
+                0,
+                0,
+                472,
+                280
+              ],
+              "longest_mismatch_ms": 29.1,
+              "max_gap_ms": 4.0
+            },
+            {
+              "samples": 769,
+              "with_window": 769,
+              "not_child": 0,
+              "longest_wrong_ms": 15.3,
+              "worst_offset_px": 472,
+              "worst_past": [
+                0,
+                0,
+                472,
+                280
+              ],
+              "longest_mismatch_ms": 32.9,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 770,
+              "with_window": 770,
+              "not_child": 0,
+              "longest_wrong_ms": 28.4,
+              "worst_offset_px": 472,
+              "worst_past": [
+                0,
+                0,
+                472,
+                280
+              ],
+              "longest_mismatch_ms": 45.2,
+              "max_gap_ms": 2.6
+            }
+          ],
+          "samples": 3796,
+          "with_window": 3796,
+          "not_child": 0,
+          "longest_wrong_ms": 28.4,
+          "median_longest_wrong_ms": 15.3,
+          "worst_offset_px": 472,
+          "longest_mismatch_ms": 45.2
+        }
+      },
+      "self_test": {
+        "samples": 427,
+        "with_window": 427,
+        "not_child": 0,
+        "longest_wrong_ms": 149.8,
+        "worst_offset_px": 60,
+        "worst_past": [
+          0,
+          0,
+          60,
+          0
+        ],
+        "longest_mismatch_ms": 149.8,
+        "max_gap_ms": 2.5
+      }
+    },
+    "run": {
+      "commit": "8585aa6",
+      "surface": "run",
+      "platform": "windows",
+      "repeat": 5,
+      "tol_px": 2,
+      "watch_ms": 700,
+      "viewer_pid": 15416,
+      "actions": {
+        "tabs": {
+          "repeats": [
+            {
+              "samples": 1079,
+              "with_window": 349,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.8
+            },
+            {
+              "samples": 1063,
+              "with_window": 351,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.9
+            },
+            {
+              "samples": 1060,
+              "with_window": 351,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 4.0
+            },
+            {
+              "samples": 1062,
+              "with_window": 350,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.0
+            },
+            {
+              "samples": 1067,
+              "with_window": 350,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.2
+            }
+          ],
+          "samples": 5331,
+          "with_window": 1751,
+          "not_child": 0,
+          "longest_wrong_ms": 0.0,
+          "median_longest_wrong_ms": 0.0,
+          "worst_offset_px": 0,
+          "longest_mismatch_ms": 0.0
+        },
+        "theme": {
+          "repeats": [
+            {
+              "samples": 4081,
+              "with_window": 4081,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.7
+            },
+            {
+              "samples": 4031,
+              "with_window": 4031,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.1
+            },
+            {
+              "samples": 4034,
+              "with_window": 4034,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 4040,
+              "with_window": 4040,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.0
+            },
+            {
+              "samples": 4065,
+              "with_window": 4065,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.1
+            }
+          ],
+          "samples": 20251,
+          "with_window": 20251,
+          "not_child": 0,
+          "longest_wrong_ms": 0.0,
+          "median_longest_wrong_ms": 0.0,
+          "worst_offset_px": 0,
+          "longest_mismatch_ms": 0.0
+        },
+        "resize": {
+          "repeats": [
+            {
+              "samples": 770,
+              "with_window": 770,
+              "not_child": 0,
+              "longest_wrong_ms": 44.0,
+              "worst_offset_px": 476,
+              "worst_past": [
+                0,
+                0,
+                476,
+                280
+              ],
+              "longest_mismatch_ms": 44.0,
+              "max_gap_ms": 3.0
+            },
+            {
+              "samples": 772,
+              "with_window": 772,
+              "not_child": 0,
+              "longest_wrong_ms": 45.2,
+              "worst_offset_px": 476,
+              "worst_past": [
+                0,
+                0,
+                476,
+                280
+              ],
+              "longest_mismatch_ms": 45.2,
+              "max_gap_ms": 2.8
+            },
+            {
+              "samples": 762,
+              "with_window": 762,
+              "not_child": 0,
+              "longest_wrong_ms": 44.8,
+              "worst_offset_px": 476,
+              "worst_past": [
+                0,
+                0,
+                476,
+                280
+              ],
+              "longest_mismatch_ms": 44.8,
+              "max_gap_ms": 3.1
+            },
+            {
+              "samples": 757,
+              "with_window": 757,
+              "not_child": 0,
+              "longest_wrong_ms": 42.2,
+              "worst_offset_px": 476,
+              "worst_past": [
+                0,
+                0,
+                476,
+                280
+              ],
+              "longest_mismatch_ms": 42.2,
+              "max_gap_ms": 3.1
+            },
+            {
+              "samples": 766,
+              "with_window": 766,
+              "not_child": 0,
+              "longest_wrong_ms": 44.7,
+              "worst_offset_px": 476,
+              "worst_past": [
+                0,
+                0,
+                476,
+                280
+              ],
+              "longest_mismatch_ms": 44.7,
+              "max_gap_ms": 2.5
+            }
+          ],
+          "samples": 3827,
+          "with_window": 3827,
+          "not_child": 0,
+          "longest_wrong_ms": 45.2,
+          "median_longest_wrong_ms": 44.7,
+          "worst_offset_px": 476,
+          "longest_mismatch_ms": 45.2
+        }
+      },
+      "self_test": {
+        "samples": 424,
+        "with_window": 424,
+        "not_child": 0,
+        "longest_wrong_ms": 149.9,
+        "worst_offset_px": 60,
+        "worst_past": [
+          0,
+          0,
+          60,
+          0
+        ],
+        "longest_mismatch_ms": 149.9,
+        "max_gap_ms": 2.6
+      }
+    },
+    "setup": {
+      "commit": "8585aa6",
+      "surface": "setup",
+      "platform": "windows",
+      "repeat": 5,
+      "tol_px": 2,
+      "watch_ms": 700,
+      "viewer_pid": 26116,
+      "actions": {
+        "chaintab": {
+          "repeats": [
+            {
+              "samples": 762,
+              "with_window": 361,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 727,
+              "with_window": 356,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.6
+            },
+            {
+              "samples": 713,
+              "with_window": 353,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 3.2
+            },
+            {
+              "samples": 710,
+              "with_window": 348,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 714,
+              "with_window": 355,
+              "not_child": 0,
+              "longest_wrong_ms": 0.0,
+              "worst_offset_px": 0,
+              "worst_past": [
+                0,
+                0,
+                0,
+                0
+              ],
+              "longest_mismatch_ms": 0.0,
+              "max_gap_ms": 2.5
+            }
+          ],
+          "samples": 3626,
+          "with_window": 1773,
+          "not_child": 0,
+          "longest_wrong_ms": 0.0,
+          "median_longest_wrong_ms": 0.0,
+          "worst_offset_px": 0,
+          "longest_mismatch_ms": 0.0
+        },
+        "resize": {
+          "repeats": [
+            {
+              "samples": 810,
+              "with_window": 810,
+              "not_child": 0,
+              "longest_wrong_ms": 30.3,
+              "worst_offset_px": 468,
+              "worst_past": [
+                0,
+                0,
+                468,
+                280
+              ],
+              "longest_mismatch_ms": 30.3,
+              "max_gap_ms": 2.9
+            },
+            {
+              "samples": 804,
+              "with_window": 804,
+              "not_child": 0,
+              "longest_wrong_ms": 30.4,
+              "worst_offset_px": 468,
+              "worst_past": [
+                0,
+                0,
+                468,
+                280
+              ],
+              "longest_mismatch_ms": 30.4,
+              "max_gap_ms": 2.7
+            },
+            {
+              "samples": 808,
+              "with_window": 808,
+              "not_child": 0,
+              "longest_wrong_ms": 26.9,
+              "worst_offset_px": 468,
+              "worst_past": [
+                0,
+                0,
+                468,
+                280
+              ],
+              "longest_mismatch_ms": 26.9,
+              "max_gap_ms": 2.5
+            },
+            {
+              "samples": 806,
+              "with_window": 806,
+              "not_child": 0,
+              "longest_wrong_ms": 27.6,
+              "worst_offset_px": 468,
+              "worst_past": [
+                0,
+                0,
+                468,
+                280
+              ],
+              "longest_mismatch_ms": 27.6,
+              "max_gap_ms": 3.5
+            },
+            {
+              "samples": 816,
+              "with_window": 816,
+              "not_child": 0,
+              "longest_wrong_ms": 40.9,
+              "worst_offset_px": 468,
+              "worst_past": [
+                0,
+                0,
+                468,
+                280
+              ],
+              "longest_mismatch_ms": 40.9,
+              "max_gap_ms": 3.0
+            }
+          ],
+          "samples": 4044,
+          "with_window": 4044,
+          "not_child": 0,
+          "longest_wrong_ms": 40.9,
+          "median_longest_wrong_ms": 30.3,
+          "worst_offset_px": 468,
+          "longest_mismatch_ms": 40.9
+        }
+      },
+      "self_test": {
+        "samples": 424,
+        "with_window": 424,
+        "not_child": 0,
+        "longest_wrong_ms": 149.9,
+        "worst_offset_px": 60,
+        "worst_past": [
+          0,
+          0,
+          60,
+          0
+        ],
+        "longest_mismatch_ms": 149.9,
+        "max_gap_ms": 2.9
+      }
+    }
+  },
+  "verdicts": [
+    {
+      "surface": "results",
+      "action": "tabs",
+      "passed": true
+    },
+    {
+      "surface": "results",
+      "action": "theme",
+      "passed": true
+    },
+    {
+      "surface": "results",
+      "action": "resize",
+      "passed": true
+    },
+    {
+      "surface": "run",
+      "action": "tabs",
+      "passed": true
+    },
+    {
+      "surface": "run",
+      "action": "theme",
+      "passed": true
+    },
+    {
+      "surface": "run",
+      "action": "resize",
+      "passed": true
+    },
+    {
+      "surface": "setup",
+      "action": "chaintab",
+      "passed": true
+    },
+    {
+      "surface": "setup",
+      "action": "resize",
+      "passed": true
+    }
+  ]
+}

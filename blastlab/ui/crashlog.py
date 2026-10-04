@@ -21,7 +21,10 @@ inconsistent state, because after an unhandled exception it may be.
 
 THREADS TOO. `threading.excepthook` gets the same treatment: the run
 worker is a thread, and an exception there used to vanish entirely -
-the GUI simply stopped reporting progress.
+the GUI simply stopped reporting progress. The log file and stderr are
+written on the raising thread; the dialog is a widget with a nested
+event loop, so it is only ever built on the GUI thread. A worker's
+crash reaches it through a queued signal (GUI-11 T1, UXR-4, D203).
 
 `KeyboardInterrupt` is passed through untouched, so Ctrl-C from a
 terminal still stops the program rather than opening a dialog about
@@ -42,6 +45,11 @@ LOG_NAME = 'blastlab-crash.log'
 
 #: Set by `install`; the tests read it rather than parsing the file.
 last_crash = None
+
+#: The GUI-thread relay for a crash raised on a worker thread, made by
+#: `install` (UXR-4: a QMessageBox on a worker thread is undefined
+#: behaviour in Qt and can take the window down).
+_relay = None
 
 
 def log_path():
@@ -83,14 +91,34 @@ def _report(exc_type, exc, tb, where='main thread'):
     # to end.
     sys.stderr.write(text)
     sys.stderr.flush()
-    _dialog(exc_type, exc, path)
+    if _on_gui_thread():
+        _dialog(exc_type, exc, path, text)
+    elif _relay is not None:
+        # the box is the GUI thread's business: hand it over, queued
+        try:
+            _relay.show.emit((exc_type, exc, path, text))
+        except Exception:
+            pass
 
 
-def _dialog(exc_type, exc, path):
+def _on_gui_thread():
+    return threading.current_thread() is threading.main_thread()
+
+
+def _suppressed():
+    """No dialog without an application or on the offscreen platform
+    (the tests): the log file and stderr carry the crash."""
+    from PySide6.QtWidgets import QApplication
+    return (QApplication.instance() is None
+            or os.environ.get('QT_QPA_PLATFORM') == 'offscreen')
+
+
+def _dialog(exc_type, exc, path, text=None):
+    if not _on_gui_thread():
+        return
     try:
-        from PySide6.QtWidgets import QApplication, QMessageBox
-        app = QApplication.instance()
-        if app is None or os.environ.get('QT_QPA_PLATFORM') == 'offscreen':
+        from PySide6.QtWidgets import QMessageBox
+        if _suppressed():
             return
         box = QMessageBox()
         box.setIcon(QMessageBox.Critical)
@@ -101,14 +129,42 @@ def _dialog(exc_type, exc, path):
             'in an inconsistent state - save anything you care about and '
             'restart.'
             + (f'\n\nThe full traceback is in:\n{path}' if path else ''))
-        box.setDetailedText(last_crash['text'] if last_crash else '')
+        if text is None:
+            text = last_crash['text'] if last_crash else ''
+        box.setDetailedText(text)
         box.exec()
     except Exception:
         pass
 
 
+def _make_relay():
+    """A QObject living on the GUI thread whose queued signal shows a
+    worker's crash dialog there."""
+    from PySide6.QtCore import QObject, Qt, Signal, Slot
+
+    class _Relay(QObject):
+        show = Signal(object)
+
+        def __init__(self):
+            super().__init__()
+            self.show.connect(self._show, Qt.QueuedConnection)
+
+        @Slot(object)
+        def _show(self, args):
+            _dialog(*args)
+
+    return _Relay()
+
+
 def install():
-    """Install the handlers. Idempotent, and returns the log path."""
+    """Install the handlers. Idempotent, and returns the log path.
+    Call it on the GUI thread: the dialog relay lives there."""
+    global _relay
+    if _relay is None and _on_gui_thread():
+        try:
+            _relay = _make_relay()
+        except Exception:
+            _relay = None
     if getattr(sys.excepthook, '_blastlab', False):
         return log_path()
 

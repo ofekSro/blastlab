@@ -90,8 +90,9 @@ def main():
           't =' in pane.title(), pane.title())
     check("the obstacle mask is present", pane.image.mask is not None)
     check("the chips show the final step",
-          win.run_panel._chip_step.value.text() not in ('', '—'),
-          win.run_panel._chip_step.value.text())
+          # GUI-6: the chips are the strip's tiles; read them as shown
+          win.run_panel.chip_texts()['step'] not in ('', '—'),
+          win.run_panel.chip_texts()['step'])
 
     print("\nW3: no 3D view - and no VTK process - for a 2D run")
     check("the 3D button stays disabled",

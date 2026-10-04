@@ -1,0 +1,226 @@
+[
+ {
+  "pair": "Stop text / key cap",
+  "bg": "stop_bg",
+  "fg_dark": "stop_text",
+  "dark": 8.74,
+  "fg_light": "stop_text",
+  "light": 5.31
+ },
+ {
+  "pair": "eyebrow caps (WHERE THE FILES GO, LIVE GAUGES)",
+  "bg": "panel",
+  "fg_dark": "faint",
+  "dark": 5.63,
+  "fg_light": "faint",
+  "light": 5.0
+ },
+ {
+  "pair": "resolved path (runpath)",
+  "bg": "panel",
+  "fg_dark": "faint",
+  "dark": 5.63,
+  "fg_light": "faint",
+  "light": 5.0
+ },
+ {
+  "pair": "field captions (runfield)",
+  "bg": "panel",
+  "fg_dark": "muted",
+  "dark": 7.69,
+  "fg_light": "muted",
+  "light": 5.75
+ },
+ {
+  "pair": "gauge placeholder (gaugenote)",
+  "bg": "panel",
+  "fg_dark": "muted",
+  "dark": 7.69,
+  "fg_light": "muted",
+  "light": 5.75
+ },
+ {
+  "pair": "Run text",
+  "bg": "accent",
+  "fg_dark": "on_accent",
+  "dark": 6.66,
+  "fg_light": "on_accent",
+  "light": 6.66
+ },
+ {
+  "pair": "card title (runcardtitle)",
+  "bg": "card",
+  "fg_dark": "text",
+  "dark": 16.43,
+  "fg_light": "text",
+  "light": 15.52
+ },
+ {
+  "pair": "card hints / units (runhint, rununit)",
+  "bg": "card",
+  "fg_dark": "faint",
+  "dark": 5.5,
+  "fg_light": "faint",
+  "light": 5.26
+ },
+ {
+  "pair": "Exec buttons",
+  "bg": "hover",
+  "fg_dark": "text",
+  "dark": 14.81,
+  "fg_light": "text",
+  "light": 12.47
+ },
+ {
+  "pair": "Setup link, OK",
+  "bg": "ok_bg",
+  "fg_dark": "text2",
+  "dark": 11.04,
+  "fg_light": "text2",
+  "light": 9.25
+ },
+ {
+  "pair": "Setup link, errors",
+  "bg": "stop_bg",
+  "fg_dark": "stop_text",
+  "dark": 8.74,
+  "fg_light": "stop_text",
+  "light": 5.31
+ },
+ {
+  "pair": "progress percent",
+  "bg": "accent_bg",
+  "fg_dark": "text",
+  "dark": 15.67,
+  "fg_light": "text",
+  "light": 13.17
+ },
+ {
+  "pair": "progress time line",
+  "bg": "accent_bg",
+  "fg_dark": "text2",
+  "dark": 11.03,
+  "fg_light": "text2",
+  "light": 8.96
+ },
+ {
+  "pair": "progress caps (dark accent_text / light accent_soft)",
+  "bg": "accent_bg",
+  "fg_dark": "accent_text",
+  "dark": 7.72,
+  "fg_light": "accent_soft",
+  "light": 4.65
+ },
+ {
+  "pair": "tile caps",
+  "bg": "tile",
+  "fg_dark": "faint",
+  "dark": 5.37,
+  "fg_light": "faint",
+  "light": 4.58
+ },
+ {
+  "pair": "tile value",
+  "bg": "tile",
+  "fg_dark": "text",
+  "dark": 16.03,
+  "fg_light": "text",
+  "light": 13.51
+ },
+ {
+  "pair": "tile caption / unit",
+  "bg": "tile",
+  "fg_dark": "muted",
+  "dark": 7.34,
+  "fg_light": "muted",
+  "light": 5.27
+ },
+ {
+  "pair": "PAUSED label as built in T2 (warn on the tile) - fixed",
+  "bg": "accent_bg",
+  "fg_dark": "warn",
+  "dark": 12.06,
+  "fg_light": "warn",
+  "light": 4.24
+ },
+ {
+  "pair": "PAUSED badge after the T5 fix (warn on a bg badge, D57)",
+  "bg": "bg",
+  "fg_dark": "warn",
+  "dark": 13.19,
+  "fg_light": "warn",
+  "light": 4.5
+ },
+ {
+  "pair": "dock tab / active",
+  "bg": "panel",
+  "fg_dark": "muted",
+  "dark": 7.69,
+  "fg_light": "muted",
+  "light": 5.75
+ },
+ {
+  "pair": "dock tab active",
+  "bg": "panel",
+  "fg_dark": "text",
+  "dark": 16.8,
+  "fg_light": "text",
+  "light": 14.75
+ },
+ {
+  "pair": "dock log text",
+  "bg": "panel",
+  "fg_dark": "text2",
+  "dark": 11.83,
+  "fg_light": "text2",
+  "light": 10.03
+ },
+ {
+  "pair": "Copy / Save log",
+  "bg": "panel",
+  "fg_dark": "muted",
+  "dark": 7.69,
+  "fg_light": "muted",
+  "light": 5.75
+ },
+ {
+  "pair": "Earlier runs row",
+  "bg": "panel",
+  "fg_dark": "text2",
+  "dark": 11.83,
+  "fg_light": "text2",
+  "light": 10.03
+ },
+ {
+  "pair": "Earlier runs selected",
+  "bg": "accent_bg",
+  "fg_dark": "text",
+  "dark": 15.67,
+  "fg_light": "text",
+  "light": 13.17
+ },
+ {
+  "pair": "Messages warn",
+  "bg": "panel",
+  "fg_dark": "warn",
+  "dark": 12.93,
+  "fg_light": "warn",
+  "light": 4.75
+ },
+ {
+  "pair": "Messages error",
+  "bg": "panel",
+  "fg_dark": "danger",
+  "dark": 6.49,
+  "fg_light": "danger",
+  "light": 4.8
+ },
+ {
+  "pair": "view toolbar button (Show mesh)",
+  "bg": "card",
+  "fg_dark": "muted",
+  "dark": 7.52,
+  "fg_light": "muted",
+  "light": 6.05
+ }
+]

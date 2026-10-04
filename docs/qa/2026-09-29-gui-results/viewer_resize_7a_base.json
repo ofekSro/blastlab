@@ -1,0 +1,82 @@
+{
+  "commit": "c8a04d2",
+  "surface": "results",
+  "platform": "windows",
+  "repeat": 3,
+  "tol_px": 2,
+  "watch_ms": 700,
+  "viewer_pid": 24888,
+  "actions": {
+    "resize": {
+      "repeats": [
+        {
+          "samples": 759,
+          "with_window": 759,
+          "not_child": 0,
+          "longest_wrong_ms": 24.6,
+          "worst_offset_px": 500,
+          "worst_past": [
+            0,
+            0,
+            500,
+            280
+          ],
+          "longest_mismatch_ms": 24.6,
+          "max_gap_ms": 4.0
+        },
+        {
+          "samples": 760,
+          "with_window": 760,
+          "not_child": 0,
+          "longest_wrong_ms": 16.2,
+          "worst_offset_px": 500,
+          "worst_past": [
+            0,
+            0,
+            500,
+            280
+          ],
+          "longest_mismatch_ms": 28.4,
+          "max_gap_ms": 5.7
+        },
+        {
+          "samples": 762,
+          "with_window": 762,
+          "not_child": 0,
+          "longest_wrong_ms": 23.7,
+          "worst_offset_px": 500,
+          "worst_past": [
+            0,
+            0,
+            500,
+            280
+          ],
+          "longest_mismatch_ms": 31.5,
+          "max_gap_ms": 5.4
+        }
+      ],
+      "samples": 2281,
+      "with_window": 2281,
+      "not_child": 0,
+      "longest_wrong_ms": 24.6,
+      "median_longest_wrong_ms": 23.7,
+      "worst_offset_px": 500,
+      "longest_mismatch_ms": 31.5
+    }
+  },
+  "self_test": {
+    "samples": 431,
+    "with_window": 431,
+    "not_child": 0,
+    "longest_wrong_ms": 149.1,
+    "worst_offset_px": 60,
+    "worst_past": [
+      0,
+      0,
+      60,
+      0
+    ],
+    "longest_mismatch_ms": 149.1,
+    "max_gap_ms": 2.9
+  }
+}

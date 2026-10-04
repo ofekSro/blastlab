@@ -2,10 +2,14 @@
 chips, scroll columns and small factories, all styled through the
 object names `theme.qss` knows about."""
 
-from PySide6.QtCore import QSize, Qt, Signal    # noqa: F401
-from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel,
-                               QPushButton, QScrollArea, QSizePolicy,
-                               QToolButton, QVBoxLayout, QWidget)
+import html
+
+from PySide6.QtCore import QEvent, QObject, QSize, Qt, Signal  # noqa: F401
+from PySide6.QtGui import QKeySequence
+from PySide6.QtWidgets import (QApplication, QButtonGroup, QFrame,
+                               QHBoxLayout, QLabel, QMenu, QPushButton,
+                               QScrollArea, QSizePolicy, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from . import theme
 from .theme import GAP, PAD
@@ -31,6 +35,19 @@ def label(text='', kind='body', wrap=False, align=None):
     return lbl
 
 
+def icon_colour(kind):
+    """Icon tint for a button kind. Primary buttons sit on the orange
+    accent, where white fails 4.5:1 - they use `on_accent` (plan §2.1:
+    never white on orange). Danger: on_accent in dark, white in light
+    (the contrast script in tests/test_ui_theme.py flags white only on
+    the dark danger)."""
+    if kind == 'primary':
+        return 'on_accent'
+    if kind == 'danger':
+        return 'on_accent' if theme.mode() == 'dark' else 'white'
+    return None
+
+
 def button(text, icon=None, kind='default', width=None, height=None,
            tooltip=None, on_click=None, icon_size=15):
     """QPushButton styled as 'default' | 'primary' | 'danger' | 'nav' |
@@ -39,7 +56,7 @@ def button(text, icon=None, kind='default', width=None, height=None,
     if kind != 'default':
         b.setObjectName(kind)
     if icon:
-        colour = 'white' if kind in ('primary', 'danger') else None
+        colour = icon_colour(kind)
         b.setIcon(theme.icon(icon, icon_size, color=colour))
         b.setIconSize(QSize(icon_size, icon_size))
         b._blastlab_icon = (icon, icon_size, colour)
@@ -61,7 +78,7 @@ def set_button_kind(b, kind):
     ic = getattr(b, '_blastlab_icon', None)
     if ic is not None:
         name, size, _colour = ic
-        colour = 'white' if kind in ('primary', 'danger') else None
+        colour = icon_colour(kind)
         b.setIcon(theme.icon(name, size, color=colour))
         b._blastlab_icon = (name, size, colour)
     theme.repolish(b)
@@ -74,7 +91,101 @@ def refresh_icons(root):
         ic = getattr(b, '_blastlab_icon', None)
         if ic is not None:
             name, size, colour = ic
+            if b.objectName() in ('primary', 'danger'):
+                # the tint is mode-dependent (danger: on_accent in
+                # dark, white in light) - recompute, don't replay
+                colour = icon_colour(b.objectName())
+                b._blastlab_icon = (name, size, colour)
             b.setIcon(theme.icon(name, size, color=colour))
+
+
+# ── copying a wrapped path (GUI-10, F23) ─────────────────────────────────
+#: the zero-width space a selectable label puts after a path separator so
+#: an unbroken path can wrap; it must never reach the clipboard
+ZWSP = '\u200b'
+
+
+class _CleanCopy(QObject):
+    """Ctrl+C and a Copy / Select all context menu for a selectable
+    label, copying its selection without ZWSP. An event filter, never a
+    QShortcut (test_ui_frame F5 pins the window's five)."""
+
+    def __init__(self, label):
+        super().__init__(label)
+        self._label = label
+        label.installEventFilter(self)
+        label.setContextMenuPolicy(Qt.CustomContextMenu)
+        label.customContextMenuRequested.connect(self._popup)
+
+    def copy(self):
+        text = self._label.selectedText()
+        if text:
+            QApplication.clipboard().setText(text.replace(ZWSP, ''))
+
+    def select_all(self):
+        self._label.setSelection(0, len(self._label.text()))
+
+    def menu(self):
+        """The context menu (built per request; the caller shows it)."""
+        m = QMenu(self._label)
+        copy = m.addAction('Copy', self.copy)
+        copy.setEnabled(self._label.hasSelectedText())
+        m.addAction('Select all', self.select_all)
+        return m
+
+    def _popup(self, pos):
+        m = self.menu()
+        m.setAttribute(Qt.WA_DeleteOnClose)
+        m.popup(self._label.mapToGlobal(pos))
+
+    def eventFilter(self, obj, event):
+        if obj is self._label and event.type() == QEvent.KeyPress \
+                and event.matches(QKeySequence.Copy):
+            self.copy()
+            event.accept()
+            return True
+        return False
+
+
+def clean_copy(label):
+    """Make copying `label`'s selection strip ZWSP (the text shown, its
+    wrap and its tooltip are unchanged). Returns the helper, also kept as
+    `label._clean_copy`."""
+    label._clean_copy = _CleanCopy(label)
+    return label._clean_copy
+
+
+#: a tooltip longer than this many characters is wrapped (P2-24, D208)
+TIP_WRAP_CHARS = 60
+#: the width a wrapped tooltip's lines break at, in px: with the tooltip's
+#: own frame and padding (+32 px, measured on the real platform) the box
+#: is about 432 px wide
+TIP_WIDTH = 400
+
+
+def wrap_tip(text):
+    """`text` as a tooltip Qt word-wraps at TIP_WIDTH px: rich text in a
+    fixed-width table, the words themselves unchanged (a plain-text tip
+    is one line however long it is - the Keep all fields tip was ~1000
+    px, P2-24). A short, empty or already rich tip is returned as it is.
+    `tip_text` gives the plain text back (D208)."""
+    text = str(text or '')
+    if len(text) <= TIP_WRAP_CHARS or text.lstrip().startswith('<'):
+        return text
+    body = html.escape(text, quote=False).replace('\n', '<br>')
+    return f'<table width="{TIP_WIDTH}"><tr><td>{body}</td></tr></table>'
+
+
+def tip_text(tip):
+    """The plain text of a tooltip `wrap_tip` made (tests, the harness);
+    a plain tooltip is returned as it is."""
+    tip = str(tip or '')
+    if not tip.startswith('<'):
+        return tip
+    from PySide6.QtGui import QTextDocument
+    doc = QTextDocument()
+    doc.setHtml(tip)
+    return doc.toPlainText().strip('\n')
 
 
 def hbox(parent=None, spacing=GAP, margins=(0, 0, 0, 0)):

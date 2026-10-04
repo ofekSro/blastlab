@@ -1,0 +1,160 @@
+{
+ "rule": "measurements-6b.md R-VIEWER banner transitions on the real path",
+ "case": "tests/cases/native_3d_small.json at cell 0.075 m (native, 64 k cells)",
+ "n_samples": 5436,
+ "n_with_viewer": 4468,
+ "n_wrong": 0,
+ "longest_wrong_ms": 0.0,
+ "PASS": true,
+ "by_phase": {
+  "start": {
+   "n": 72,
+   "vis": 0,
+   "wrong": 0
+  },
+  "A1 run start, 3D view shown (auto-attach)": {
+   "n": 1089,
+   "vis": 193,
+   "wrong": 0
+  },
+  "A2 finished: the banner above the host, playback": {
+   "n": 892,
+   "vis": 892,
+   "wrong": 0
+  },
+  "D0 banner hidden (what the next start does)": {
+   "n": 339,
+   "vis": 339,
+   "wrong": 0
+  },
+  "D0 banner shown through show_finish": {
+   "n": 340,
+   "vis": 340,
+   "wrong": 0
+  },
+  "D1 banner hidden (what the next start does)": {
+   "n": 336,
+   "vis": 336,
+   "wrong": 0
+  },
+  "D1 banner shown through show_finish": {
+   "n": 339,
+   "vis": 339,
+   "wrong": 0
+  },
+  "D2 banner hidden (what the next start does)": {
+   "n": 338,
+   "vis": 338,
+   "wrong": 0
+  },
+  "D2 banner shown through show_finish": {
+   "n": 337,
+   "vis": 337,
+   "wrong": 0
+  },
+  "D3 banner hidden (what the next start does)": {
+   "n": 338,
+   "vis": 338,
+   "wrong": 0
+  },
+  "D3 banner shown through show_finish": {
+   "n": 339,
+   "vis": 339,
+   "wrong": 0
+  },
+  "D4 banner hidden (what the next start does)": {
+   "n": 339,
+   "vis": 339,
+   "wrong": 0
+  },
+  "D4 banner shown through show_finish": {
+   "n": 338,
+   "vis": 338,
+   "wrong": 0
+  }
+ },
+ "phases": [
+  [
+   "A1 run start, 3D view shown (auto-attach)",
+   1162052.13,
+   false,
+   1
+  ],
+  [
+   "A2 finished: the banner above the host, playback",
+   1162058.704,
+   true,
+   1
+  ],
+  [
+   "D0 banner hidden (what the next start does)",
+   1162062.697,
+   true,
+   1
+  ],
+  [
+   "D0 banner shown through show_finish",
+   1162064.197,
+   false,
+   1
+  ],
+  [
+   "D1 banner hidden (what the next start does)",
+   1162065.713,
+   true,
+   1
+  ],
+  [
+   "D1 banner shown through show_finish",
+   1162067.211,
+   false,
+   1
+  ],
+  [
+   "D2 banner hidden (what the next start does)",
+   1162068.728,
+   true,
+   1
+  ],
+  [
+   "D2 banner shown through show_finish",
+   1162070.227,
+   false,
+   1
+  ],
+  [
+   "D3 banner hidden (what the next start does)",
+   1162071.742,
+   true,
+   1
+  ],
+  [
+   "D3 banner shown through show_finish",
+   1162073.241,
+   false,
+   1
+  ],
+  [
+   "D4 banner hidden (what the next start does)",
+   1162074.757,
+   true,
+   1
+  ],
+  [
+   "D4 banner shown through show_finish",
+   1162076.257,
+   false,
+   1
+  ],
+  [
+   "end",
+   1162077.77,
+   true,
+   1
+  ]
+ ],
+ "first_wrong": [],
+ "stretches": [],
+ "notes": 1,
+ "viewer_pid": 36196
+}

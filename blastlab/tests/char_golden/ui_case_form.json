@@ -592,6 +592,7 @@
       "activation",
       "afterburn",
       "gauge_file",
+      "material",
       "profile_out"
     ],
     "points": {
@@ -1604,6 +1605,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs",
       "profile_out",
       "trigger_file"
@@ -1713,8 +1715,8 @@
       "amr_interval": 2,
       "amr_levels": 0,
       "amr_max_cells": 0,
-      "amr_refine": 0.4,
-      "amr_unrefine": 0.2,
+      "amr_refine": 0.35,
+      "amr_unrefine": 0.1,
       "anim_clim": [
         5.0,
         50.0
@@ -1797,6 +1799,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs",
       "profile_out",
       "trigger_file"
@@ -2407,8 +2410,8 @@
       "amr_interval": 2,
       "amr_levels": 0,
       "amr_max_cells": 0,
-      "amr_refine": 0.4,
-      "amr_unrefine": 0.2,
+      "amr_refine": 0.2,
+      "amr_unrefine": 0.1,
       "anim_clim": null,
       "anim_file": null,
       "anim_mesh": true,
@@ -2763,6 +2766,7 @@
       "anim_file",
       "charge_refine",
       "gauge_file",
+      "material",
       "n_procs"
     ],
     "points": {
@@ -2867,8 +2871,8 @@
       "amr_interval": 2,
       "amr_levels": 0,
       "amr_max_cells": 0,
-      "amr_refine": 0.4,
-      "amr_unrefine": 0.2,
+      "amr_refine": 0.2,
+      "amr_unrefine": 0.1,
       "anim_clim": null,
       "anim_file": null,
       "anim_mesh": true,

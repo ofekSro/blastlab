@@ -1,0 +1,182 @@
+{
+ "script_pid": 16396,
+ "viewer_pids": [
+  34960
+ ],
+ "A_attached": true,
+ "strip_rows_dock_h": {
+  "1600x1000": [
+   1,
+   140
+  ],
+  "1100x720": [
+   2,
+   110
+  ]
+ },
+ "A_finished": true,
+ "samples": 2032,
+ "samples_with_viewer_window": 1624,
+ "wrong": 0,
+ "longest_wrong_ms": 0,
+ "worst": "",
+ "phases": {
+  "A: Initialise -> viewer start -> auto-attach": {
+   "samples": 35,
+   "with_viewer": 1,
+   "wrong": 0
+  },
+  "A: held at step 0 (PAUSED badge)": {
+   "samples": 64,
+   "with_viewer": 64,
+   "wrong": 0
+  },
+  "step through open #0": {
+   "samples": 32,
+   "with_viewer": 32,
+   "wrong": 0
+  },
+  "step through closed #0": {
+   "samples": 33,
+   "with_viewer": 33,
+   "wrong": 0
+  },
+  "step through open #1": {
+   "samples": 33,
+   "with_viewer": 33,
+   "wrong": 0
+  },
+  "step through closed #1": {
+   "samples": 33,
+   "with_viewer": 33,
+   "wrong": 0
+  },
+  "dock Messages": {
+   "samples": 46,
+   "with_viewer": 46,
+   "wrong": 0
+  },
+  "dock Earlier runs": {
+   "samples": 23,
+   "with_viewer": 23,
+   "wrong": 0
+  },
+  "dock Log": {
+   "samples": 46,
+   "with_viewer": 46,
+   "wrong": 0
+  },
+  "switch->setup #0": {
+   "samples": 32,
+   "with_viewer": 32,
+   "wrong": 0
+  },
+  "switch->run #0": {
+   "samples": 65,
+   "with_viewer": 65,
+   "wrong": 0
+  },
+  "switch->results #0": {
+   "samples": 32,
+   "with_viewer": 0,
+   "wrong": 0
+  },
+  "switch->setup #1": {
+   "samples": 32,
+   "with_viewer": 32,
+   "wrong": 0
+  },
+  "switch->run #1": {
+   "samples": 65,
+   "with_viewer": 65,
+   "wrong": 0
+  },
+  "switch->results #1": {
+   "samples": 33,
+   "with_viewer": 0,
+   "wrong": 0
+  },
+  "resize (1600, 1000)": {
+   "samples": 31,
+   "with_viewer": 31,
+   "wrong": 0
+  },
+  "resize (1600, 1000) settled (strip rows 1, dock 140)": {
+   "samples": 78,
+   "with_viewer": 78,
+   "wrong": 0
+  },
+  "resize (1100, 720)": {
+   "samples": 22,
+   "with_viewer": 22,
+   "wrong": 0
+  },
+  "resize (1100, 720) settled (strip rows 2, dock 110)": {
+   "samples": 52,
+   "with_viewer": 52,
+   "wrong": 0
+  },
+  "theme light": {
+   "samples": 35,
+   "with_viewer": 35,
+   "wrong": 0
+  },
+  "theme dark": {
+   "samples": 35,
+   "with_viewer": 35,
+   "wrong": 0
+  },
+  "+100 (streaming)": {
+   "samples": 95,
+   "with_viewer": 95,
+   "wrong": 0
+  },
+  "streaming at 1100x720 (strip two rows)": {
+   "samples": 59,
+   "with_viewer": 59,
+   "wrong": 0
+  },
+  "step through open while streaming": {
+   "samples": 32,
+   "with_viewer": 32,
+   "wrong": 0
+  },
+  "A: to the end (streaming)": {
+   "samples": 571,
+   "with_viewer": 571,
+   "wrong": 0
+  },
+  "A: finished (playback)": {
+   "samples": 64,
+   "with_viewer": 64,
+   "wrong": 0
+  },
+  "A: finished, 1600x1000": {
+   "samples": 45,
+   "with_viewer": 45,
+   "wrong": 0
+  },
+  "B: Run start (auto-attach)": {
+   "samples": 124,
+   "with_viewer": 0,
+   "wrong": 0
+  },
+  "B: streaming at 1100x720": {
+   "samples": 64,
+   "with_viewer": 0,
+   "wrong": 0
+  },
+  "B: stopping": {
+   "samples": 57,
+   "with_viewer": 0,
+   "wrong": 0
+  },
+  "B: stopped": {
+   "samples": 64,
+   "with_viewer": 0,
+   "wrong": 0
+  }
+ },
+ "rule": "pre-registered: longest wrong stretch 0 ms over >= 500 samples with a viewer window",
+ "pass": true
+}

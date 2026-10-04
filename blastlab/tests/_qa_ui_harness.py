@@ -106,7 +106,14 @@ class QA:
         self.paths = []
         self.app = None              # QApplication
         self.win = None              # MainWindow
+        #: (run generation, log length) taken at the last click (GUI-10,
+        #: F22); the generation counts RunDock.record_start calls, the
+        #: one place a run start clears the log
         self._log_mark = None
+        self._log_gen = 0
+        #: the solver mode neutral() puts back after every scenario
+        #: (GUI-10, D174): --solver, else the mode the app started in
+        self.solver_seed = None
         self._t_scn = time.perf_counter()
         self._warn_seen = set()
         self._in_callback = False
@@ -186,7 +193,9 @@ class QA:
                 return ans
             return wrapped
 
-        for name in ('show_error', 'show_info', 'warn'):
+        # notify_desktop (GUI-6b): QA runs record the toast rather than
+        # raising a real one
+        for name in ('show_error', 'show_info', 'warn', 'notify_desktop'):
             setattr(dialogs, name, recorder(name, 'info'))
         setattr(dialogs, 'ask_yes_no', recorder('ask_yes_no', 'ask'))
         for name in ('open_file', 'save_file', 'pick_dir'):
@@ -318,6 +327,7 @@ class QA:
                          f'could not grab {state}: {exc}')
             return None
         self._shots_this.append(name)
+        self.last_luma = luma           # K03 (GUI-10) reads it
         self._jsonl('shots.jsonl', dict(
             shot=name, state=state, tab=tab, mode=self.mode,
             action=self.action, luma=round(luma, 1),
@@ -385,6 +395,9 @@ class QA:
         if not painted:
             self.note('the window never reported itself visible')
         self._watch_bridge()
+        self._watch_log_clear()
+        if not self.solver_seed:
+            self.solver_seed = self.win.solver_mode.get()
         self.log(f'window up: {self.win.width()}x{self.win.height()} '
                  f'(built {self.build_ms:.0f} ms, shown '
                  f'{self.first_paint_ms:.0f} ms)')
@@ -411,49 +424,130 @@ class QA:
         ThreadBridge._qa_real_run = real
         ThreadBridge._qa_wrapped = True
 
+    def _watch_log_clear(self):
+        """Count run starts (GUI-10, F22). `RunDock.record_start` is the
+        one place a run start clears the Log pane, so a mark taken before
+        the click is stale once the count has moved - whatever the new
+        log's length."""
+        from blastlab.ui.run_dock import RunDock
+        qa = self
+        if getattr(RunDock, '_qa_wrapped', False):
+            return
+        real = RunDock.record_start
+
+        def record_start(dock, *a, **kw):
+            qa._log_gen += 1
+            return real(dock, *a, **kw)
+        RunDock.record_start = record_start
+        RunDock._qa_real_record_start = real
+        RunDock._qa_wrapped = True
+
+    def mark_log(self):
+        """The mark wait_log searches after: (run generation, length)."""
+        self._log_mark = (self._log_gen, len(self.run_log()))
+        return self._log_mark
     # ── navigation / widget pokes ───────────────────────────────────────
-    def goto(self, tab):
-        self.action = f'goto {tab}'
-        self.win._show(tab)
+    # GUI-10 (D173): the frame is driven the way a user drives it - the
+    # pills and the Chain link, the dimension segments, the solver chip's
+    # menu actions, the case menu's Dark-mode action - and every helper
+    # checks that its click worked, so a dead control cannot pass.
+    def goto(self, tab, settle=0.4):
+        """Click the top bar's pill (or the Chain link) of `tab`."""
+        btn = self.win._nav_btns[tab]
         self.tab = tab
-        self.pump(0.4)
+        if not self.press(btn, f'pill {tab}', settle):
+            return
+        self.action = f'goto {tab}'
+        self.check(self.win.current_tab() == tab,
+                   f'the {tab} pill shows its screen', 'S1',
+                   evidence=str(self.win.current_tab()))
+        self.check(btn.property('active') == 'true',
+                   f'and the {tab} pill is the active one', 'S2',
+                   evidence=str({k: b.property('active') for k, b
+                                 in self.win._nav_btns.items()}))
 
     def dim(self, d):
-        self.action = f'dim {d}'
-        self.win.setup.set_dim(int(d))
-        self.pump(0.5)
+        """Click the top bar's dimension segment of `d` (0-3)."""
+        from blastlab.ui.topbar import DIM_LABELS
+        label = next(lbl for lbl in DIM_LABELS if int(lbl[0]) == int(d))
+        btn = self.win.topbar.dim_seg._btns[label]
+        if self.press(btn, f'dim {label}', 0.5):
+            self.action = f'dim {d}'
+            self.check(self.win.setup.dim == int(d),
+                       f'the {label} segment sets the dimension', 'S1',
+                       evidence=str(self.win.setup.dim))
 
     def field(self, name, value, dim=None):
         form = self.win.setup._forms[dim or self.win.setup.dim]
         self.action = f'{name}={value}'
-        self._log_mark = len(self.run_log())
+        self.mark_log()
+        if form is self.win.setup.form:
+            self.show_field(name)
         form.v[name].set(str(value))
         self.pump(0.45)
 
+    def show_field(self, name):
+        """GUI-5: a Setup field is on screen only while its model-tree
+        node is selected, so select that node first, as a user must -
+        otherwise the scenario's screenshots show another node's page.
+        Selecting never touches a value or the solver scope."""
+        from blastlab.ui import setup_nodes
+        setup = self.win.setup
+        node = setup_nodes.node_of_field(setup.dim, name)
+        if node is not None and node != setup.selected_node():
+            if not setup.select_node(node):
+                self.note(f'(the node {node!r} of {name!r} is hidden in '
+                          f'this solver mode)')
+
     def click(self, btn, label=''):
-        """Press a button the way a user does, and refuse a dead one."""
+        """Press a button the way a user does, and refuse a dead one.
+        The log mark is taken first, for wait_log."""
+        self.mark_log()
+        return self.press(btn, label)
+
+    def press(self, btn, label='', settle=0.45):
+        """click() without moving the log mark: navigation between a
+        click and its wait_log must not hide the lines it waits for."""
         self.action = f'click {label or btn.text() or btn.objectName()}'
-        self._log_mark = len(self.run_log())
         if not btn.isEnabled():
             self.finding('S2', 'dead-control',
                          f'{self.action} is disabled')
             return False
+        # GUI-10 (F33): click() fires on an invisible button too, and a
+        # user cannot press what is not on screen
+        if not btn.isVisible():
+            self.finding('S2', 'hidden-control',
+                         f'{self.action} is not on screen')
+            return False
         btn.click()
-        self.pump(0.45)
+        if settle:
+            self.pump(settle)
         return True
 
     def set_mode(self, mode):
-        from PySide6.QtWidgets import QApplication
+        """The case menu's Dark-mode action. If it already reads `mode`
+        while the theme does not, the action is out of sync: an app
+        finding, not something to work around here."""
         from blastlab.ui import theme
         self.action = f'appearance {mode}'
-        theme.apply(QApplication.instance(), mode)
+        act = self.win._dark_action
+        was = act.isChecked()
+        act.setChecked(mode == 'dark')
         self.mode = mode
         self.pump(0.6)
+        self.check(theme.mode() == mode,
+                   f'the Dark-mode action gives the {mode} theme', 'S2',
+                   evidence=f'action was {was}, is {act.isChecked()}, '
+                            f'theme {theme.mode()}')
 
     def solver(self, mode):
+        """The solver chip's menu action of `mode`."""
         self.action = f'solver {mode}'
-        self.win.solver_mode.set(mode)
+        self.win._chip_actions[mode].trigger()
         self.pump(0.6)
+        self.check(self.win.solver_mode.get() == mode,
+                   f'the chip\'s {mode} action switches the solver', 'S1',
+                   evidence=str(self.win.solver_mode.get()))
 
     def run_log(self):
         try:
@@ -472,12 +566,18 @@ class QA:
         the mark taken when the button was pressed - and then the slice
         is empty forever and the wait always times out. A log shorter
         than its own mark has been cleared, so everything in it is new.
+
+        Length alone is not enough (GUI-10, F22): the new run's log can
+        already be LONGER than the mark at the first look, with the line
+        sitting before it. So the mark carries the run generation too; a
+        run started since the mark makes the whole log new.
         """
         def seen():
             log = self.run_log()
-            mark = self._log_mark or 0
-            if len(log) < mark:
-                self._log_mark = mark = 0
+            gen, mark = self._log_mark or (self._log_gen, 0)
+            if gen != self._log_gen or len(log) < mark:
+                self._log_mark = (self._log_gen, 0)
+                mark = 0
             return text in log[mark:]
         return self.until(seen, timeout)
 
@@ -552,7 +652,7 @@ class QA:
         from PySide6.QtGui import QKeySequence
         from PySide6.QtTest import QTest
         self.action = f'key {sequence}'
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         seq = QKeySequence(sequence)
         if not seq.count():
             return False
@@ -682,7 +782,7 @@ class QA:
         self._dialogs_since_shot = []
         self.answers = []
         self.paths = []
-        self._log_mark = len(self.run_log())
+        self.mark_log()
         self._t_scn = time.perf_counter()
         self.log('--- begin ---')
 
@@ -718,7 +818,13 @@ class QA:
             self.set_mode('dark')
             self.reset_window()
             self.goto('setup')
-            self.win.setup.set_dim(2)
+            self.dim(2)
+            # GUI-10 (D174): every scenario starts in the invocation's
+            # solver, whatever the one before it left (C05 / C07 leave
+            # blastFoam, and the app persists it)
+            if self.solver_seed and \
+                    self.win.solver_mode.get() != self.solver_seed:
+                self.solver(self.solver_seed)
             self.pump(0.3)
         except Exception as exc:
             self.log(f'(neutral failed: {exc})')
@@ -790,8 +896,58 @@ def install_warning_capture(qa):
         qa._warn_seen.add(key)
         # Qt says "QWidget::setMinimumSize: negative size" and the like;
         # those are layout bugs, not noise
-        qa.finding('S3', 'qt-message', text[:300])
+        evidence = (_font_engine_evidence(qa) if 'QFontEngine' in text
+                    else None)
+        qa.finding('S3', 'qt-message', text[:300], evidence=evidence)
     qInstallMessageHandler(qt_handler)
+
+
+def _free_physical_mb():
+    """Free physical memory in MB (Win32 GlobalMemoryStatusEx), or None."""
+    import ctypes
+
+    class MEMORYSTATUSEX(ctypes.Structure):
+        _fields_ = [('dwLength', ctypes.c_ulong),
+                    ('dwMemoryLoad', ctypes.c_ulong),
+                    ('ullTotalPhys', ctypes.c_ulonglong),
+                    ('ullAvailPhys', ctypes.c_ulonglong),
+                    ('ullTotalPageFile', ctypes.c_ulonglong),
+                    ('ullAvailPageFile', ctypes.c_ulonglong),
+                    ('ullTotalVirtual', ctypes.c_ulonglong),
+                    ('ullAvailVirtual', ctypes.c_ulonglong),
+                    ('ullAvailExtendedVirtual', ctypes.c_ulonglong)]
+    try:
+        st = MEMORYSTATUSEX()
+        st.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+            return None
+        return round(st.ullAvailPhys / 2**20)
+    except Exception:
+        return None
+
+
+def _font_engine_evidence(qa):
+    """F26 (GUI-10): what a `QFontEngine` message needs to be classified -
+    the platform, the app and focus fonts, the action, free memory. The
+    finding keeps its S3; nothing is hidden."""
+    ev = dict(action=qa.action, free_physical_mb=_free_physical_mb())
+    if threading.current_thread() is not threading.main_thread():
+        # a message from a worker: no widget may be read from here
+        ev['thread'] = threading.current_thread().name
+        return ev
+    try:
+        app = qa.app
+        ev['platform'] = app.platformName()
+        ev['app_font'] = app.font().family()
+        w = app.focusWidget()
+        ev['focus_widget'] = (f'{type(w).__name__} {w.objectName()!r}'
+                              if w is not None else None)
+        ev['focus_font'] = (f'{w.font().family()} '
+                            f'{w.font().pointSizeF():g} pt'
+                            if w is not None else None)
+    except Exception as exc:
+        ev['error'] = f'{type(exc).__name__}: {exc}'
+    return ev
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -823,14 +979,21 @@ def s00_smoke(qa):
 
 @scenario('B01', 'B', est=40)
 def b01_coldstart(qa):
-    """Cold start: title, sidebar, default 2D case + validation strip."""
+    """Cold start: title, top bar, default 2D case + validation strip."""
     qa.note(f'App construction {qa.build_ms:.0f} ms, first paint '
             f'{qa.first_paint_ms:.0f} ms')
     qa.shot('coldstart')
     qa.note(f'window title: {qa.win.windowTitle()!r}')
+    # the top bar's unsaved marker; its `●` is also what F24's cp1252
+    # stdout died on (GUI-10)
+    tb = qa.win.topbar
+    qa.note(f'case button {tb.case_btn.text()!r}, unsaved marker '
+            f'{tb.dirty_lbl.text()!r} '
+            f'{"shown" if tb.dirty_lbl.isVisible() else "hidden"}')
     qa.note('validation strip on the default 2D case: '
             + ' | '.join(qa.strip_text()))
-    qa.check(qa.win._mode_switch.isChecked(), 'Dark mode switch is on')
+    # GUI-3: the sidebar checkbox became the case menu's Dark-mode action
+    qa.check(qa.win._dark_action.isChecked(), 'Dark mode action is on')
     qa.check(bool(qa.win.windowTitle().strip()),
              'the window has a title', 'S3')
     qa.cpu_idle(8)
@@ -944,22 +1107,15 @@ def b06_keyboard(qa):
     F5 starts a REAL solver, so the F5/Esc pair is closed inside the
     scenario - a worker left running leaks into the next one and
     neutral() reports it as an S1.
-    """
-    for seq in ('Ctrl+O', 'Ctrl+S'):
-        qa.key(seq)
-    n = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
-    qa.note(f'Ctrl+O / Ctrl+S: dialogs recorded so far = {n} '
-            f'(an Open dialog would have appeared as one)')
 
-    was_running = qa.worker_alive()
-    qa.key('F5')
-    started = qa.until(lambda: qa.worker_alive(), 8)
-    qa.check(started or was_running, 'F5 starts a run (G9 accelerator)',
-             'S3')
-    if started:
-        qa.key('Esc')
-        qa.check(qa.until(lambda: not qa.worker_alive(), 120),
-                 'Esc stops the run that F5 started', 'S2')
+    GUI-10 (F10, D175): window-context QShortcuts never fire on the
+    offscreen platform, so offscreen the shortcut half is a note and only
+    the Tab order runs. Run B06 with --window for the shortcuts.
+    """
+    if qa.app.platformName() == 'offscreen':
+        qa.note('shortcuts are real-platform only: run B06 with --window')
+    else:
+        _b06_shortcuts(qa)
 
     # Tab order: walk the focus chain and say where it goes, which is the
     # thing that was measured and fixed on the Run tab
@@ -976,6 +1132,46 @@ def b06_keyboard(qa):
     qa.note('Tab from Run: ' + ' -> '.join(order))
     qa.shot('focus_after_tab')
     qa.goto('setup')
+
+
+def _b06_shortcuts(qa):
+    """B06's real-platform half: Ctrl+O / Ctrl+S reach their dialogs, F5
+    starts a run, plain Esc does not stop it, Shift+Esc does."""
+    dlg = os.path.join(qa.out, 'dialogs.jsonl')
+    had_path = bool(qa.win._case_path)
+    for seq, fn in (('Ctrl+O', 'open_file'), ('Ctrl+S', 'save_file')):
+        n0 = _ndialogs(dlg, (fn,))
+        qa.key(seq)
+        got = _ndialogs(dlg, (fn,)) - n0
+        if fn == 'save_file' and had_path:
+            # a case with a path saves in place, with no dialog (plan §4)
+            qa.note('Ctrl+S: the case has a path, so it saved in place')
+            continue
+        qa.check(got >= 1, f'{seq} reaches its {fn} dialog', 'S2',
+                 evidence=f'{got} new {fn} dialog(s)')
+    n = _nlines(dlg)
+    qa.note(f'Ctrl+O / Ctrl+S: dialogs recorded so far = {n}')
+
+    was_running = qa.worker_alive()
+    qa.key('F5')
+    started = qa.until(lambda: qa.worker_alive(), 8)
+    qa.check(started or was_running, 'F5 starts a run (G9 accelerator)',
+             'S3')
+    if started:
+        # GUI-3 / UX-7: the stop key is Shift+Esc; plain Esc is unbound
+        # and must not stop the run (GUI-6 brought this scenario over)
+        alive = qa.worker_alive()
+        mark = len(qa.run_log())
+        qa.key('Esc')
+        # a stop takes seconds to end the worker, longer than key()'s
+        # pump, so "still alive" alone cannot tell; ctrl.stop() logs
+        # `[stop requested` at once - plain Esc must not have
+        qa.check((qa.worker_alive() or not alive)
+                 and '[stop requested' not in qa.run_log()[mark:],
+                 'plain Esc does NOT stop the run (Shift+Esc does)', 'S2')
+        qa.key('Shift+Esc')
+        qa.check(qa.until(lambda: not qa.worker_alive(), 120),
+                 'Shift+Esc stops the run that F5 started', 'S2')
 
 
 @scenario('B07', 'B', est=120)
@@ -1012,6 +1208,22 @@ def _nlines(path):
             return sum(1 for _ in f)
     except OSError:
         return 0
+
+
+def _ndialogs(path, fns):
+    """How many recorded dialogs in dialogs.jsonl are one of `fns`."""
+    n = 0
+    try:
+        with open(path, encoding='utf-8') as f:
+            for line in f:
+                try:
+                    if json.loads(line).get('fn') in fns:
+                        n += 1
+                except ValueError:
+                    continue
+    except OSError:
+        return 0
+    return n
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1176,9 +1388,16 @@ def _clipped_labels(root):
     on one line, so 'Domain radius [m]' needing 141 px in a 132 px column
     means it uses two lines, not that it is clipped. For those the
     question is height, which Qt's own heightForWidth answers.
+
+    A QToolButton (Segmented, the dock tabs) elides its text inside its
+    QSS padding, so its room is its content rect, not its width (F38,
+    GUI-11): `0D · HD 1.3` drew as `0D …1.3` in a 72 px segment while
+    the text still fit the whole button. The padding is read from the
+    size hint - QToolButton::sizeHint is the text's size plus two spaces
+    plus the style's (QSS) box - so no QSS value is copied here.
     """
     from PySide6.QtWidgets import (QAbstractButton, QCheckBox, QLabel,
-                                   QWidget)
+                                   QToolButton, QWidget)
     out = []
     for w in root.findChildren(QWidget):
         if not w.isVisible():
@@ -1194,16 +1413,58 @@ def _clipped_labels(root):
                 out.append(f'QLabel({text[:40]!r}) wraps to {want} px '
                            f'in {w.height()}')
             continue
-        need = w.fontMetrics().horizontalAdvance(text)
+        need = _text_need(w, text)
         room = w.width()
-        if isinstance(w, QAbstractButton) and not w.icon().isNull():
+        if isinstance(w, QToolButton):
+            room -= _tool_button_box(w, text)
+        elif isinstance(w, QAbstractButton) and not w.icon().isNull():
             room -= w.iconSize().width() + 6
         if isinstance(w, QCheckBox):
             room -= 22
-        if need > room + 1:
+        # a tool button elides as soon as its text is wider than the
+        # label rect (QCommonStyle's toolButtonElideText): no slack
+        if need > room + (0 if isinstance(w, QToolButton) else 1):
             out.append(f'{type(w).__name__}({text!r}) needs {need} '
                        f'has {room}')
     return out
+
+
+def _tool_button_box(w, text):
+    """The width a QToolButton keeps around its label (QSS padding and
+    border, an icon beside the text): its size hint less the text's size
+    and the two spaces QToolButton::sizeHint adds (F38). Under a style
+    sheet the hint also carries 3 px that are never painted
+    (qstylesheetstyle.cpp, CT_ToolButton: `sz += QSize(3, 3); // ###
+    broken QToolButton`); measured on the real platform, `0D · HD 1.3`
+    (61 px of text) is drawn whole from 85 px, i.e. the 24 px of its QSS
+    padding, not the hint's 27."""
+    from PySide6.QtCore import Qt
+    fm = w.fontMetrics()
+    text_w = fm.size(Qt.TextShowMnemonic, text).width()
+    box = w.sizeHint().width() - text_w - 2 * fm.horizontalAdvance(' ')
+    if w.style().metaObject().className() == 'QStyleSheetStyle':
+        box -= 3
+    return max(0, box)
+
+
+def _text_need(w, text):
+    """The width `text` takes in `w`. A rich-text label (the tree's
+    `<span>01</span> Threat`, a tile's `1.0 <span>kg TNT</span>`) is
+    measured as the rendered document, not as its markup - GUI-10's K02
+    found the markup width reported as clipping (`needs 519 has 322`)."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import Qt as GuiQt, QTextDocument
+    from PySide6.QtWidgets import QLabel
+    if isinstance(w, QLabel) and (
+            w.textFormat() == Qt.RichText
+            or (w.textFormat() == Qt.AutoText
+                and GuiQt.mightBeRichText(text))):
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        doc.setDefaultFont(w.font())
+        doc.setHtml(text)
+        return int(doc.idealWidth() + 0.999)
+    return w.fontMetrics().horizontalAdvance(text)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -1218,9 +1479,19 @@ def _form(qa):
     return qa.win.setup.form
 
 
+def _show_list(qa, plist):
+    """Select the model-tree node of a Setup point list (GUI-5), so the
+    list is on screen while a scenario edits it."""
+    name = next((k for k, p in _form(qa).points.items() if p is plist),
+                None)
+    if name is not None:
+        qa.show_field(name)
+
+
 def _add_row(qa, plist, text):
     """Type a row into a point list's entry and press its + button."""
     qa.action = f'add row {text!r}'
+    _show_list(qa, plist)
     plist.entry.setText(text)
     ok = plist.add()
     qa.pump(0.5)
@@ -1231,6 +1502,7 @@ def _set_rows(qa, plist, rows, settle=0.8):
     """`PointList.set()` does not fire on_change by design (set_case
     drives it), so a scenario that edits rows has to revalidate the way
     a user's +/- click would."""
+    _show_list(qa, plist)
     plist.set(rows)
     plist._on_change()
     qa.pump(settle)
@@ -1788,14 +2060,42 @@ def ensure_results(qa, names=('native1d', 'native2d', 'native3d')):
 
 
 def select_result(qa, label):
-    sel = qa.win.results.sel
-    for i in range(sel.count()):
-        if sel.itemText(i) == label or label in sel.itemText(i):
-            sel.setCurrentIndex(i)
+    """Select a result by its label, as a user picks it in the list.
+
+    GUI-10 (D177): a chain is ONE row with STAGE tabs (GUI-9), so a stage
+    label (`QA_CHAIN - 3D`) selects the chain's row and then its stage
+    tab. An exact entry or stage label wins; then the old loose match on
+    the row text (`QA native2d` finds `QA native2d #2`)."""
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    sel = rs.sel
+    ents = rs.entries()
+
+    def pick(i, stage_dim=None):
+        sel.setCurrentIndex(i)
+        qa.pump(0.8)
+        if stage_dim is not None:
+            rs.select_stage(stage_dim)
             qa.pump(0.8)
-            return True
+        return True
+
+    for i, e in enumerate(ents):
+        if e.label == label:
+            return pick(i)
+        if isinstance(e, ChainEntry):
+            for s in e.stages:
+                if s.label == label:
+                    return pick(i, s.dim)
+    for i in range(sel.count()):
+        if label in sel.itemText(i):
+            return pick(i)
+    every = []
+    for e in ents:
+        every.append(e.label)
+        if isinstance(e, ChainEntry):
+            every.extend(f'  stage {s.label}' for s in e.stages)
     qa.check(False, f'no result labelled {label!r} to select', 'S2',
-             evidence=str([sel.itemText(i) for i in range(sel.count())]))
+             evidence=str(every))
     return False
 
 
@@ -1865,6 +2165,12 @@ def d03_stepped(qa):
     qa.set_case(C['N2D'])
     qa.goto('run')
     rp = qa.win.run_panel
+    # GUI-6: Initialise and Exec sit in the Step through card, closed
+    # by default; open it as a user must (F33: press() refuses a hidden
+    # button)
+    if not rp.step_card.is_open():
+        qa.press(rp.step_card.header, 'Step through')
+    qa.check(rp.step_card.is_open(), 'the Step through card opens', 'S2')
     qa.click(rp.init_btn, 'Initialise Model')
     qa.pump(1.5)
     qa.shot('initialised')
@@ -2002,7 +2308,8 @@ def e01_picker_and_1d(qa):
     qa.check(rs.fields.page() == 'figure',
              'a 1D result draws profiles, not a map '
              f'(page {rs.fields.page()!r})', 'S2')
-    for view in ('Gauges', 'Animation', '3D'):
+    # GUI-10: Fields and Animation are one Field view since GUI-7
+    for view in ('Gauges', '3D'):
         rs.show_view(view)
         qa.pump(0.8)
         qa.shot(f'1d_{view.lower()}')
@@ -2067,9 +2374,10 @@ def e03_gauges_table(qa):
     qa.note(f'summary rows: {rows}')
     qa.check(bool(rows), 'the summary table has a row per gauge', 'S2')
     # N2-09: the table must not starve the traces it sits above
-    qa.check(rs.gauges.canvas.height() > rs.gauges.table.height(),
+    # GUI-7 T5: the traces are one pyqtgraph plot (plot_w)
+    qa.check(rs.gauges.plot_w.height() > rs.gauges.table.height(),
              f'the traces keep more height than the table '
-             f'({rs.gauges.canvas.height()} vs '
+             f'({rs.gauges.plot_w.height()} vs '
              f'{rs.gauges.table.height()} px)', 'S2')
     # no scripted path: `default_path` already answers pick_dir with the
     # exports directory and save_file with a name inside it, which is
@@ -2495,15 +2803,61 @@ def f02_foam_2d_planar(qa):
     qa.pump(0.8)
     qa.shot('anim')
     rs.show_view('Fields')
+    # F36 (GUI-11): since OUT-1 a model-folder run with Keep all fields
+    # off releases its WSL scratch, so the VTK export is rightly
+    # disabled, saying why; the export itself is checked on a second run
+    # with Keep all fields on
+    _vtk_released(qa, rs, meta)
+    qa.shot('after_vtk')
+    _cache_result(qa, 'foam2d', dim=2)
+    _vtk_keep_all(qa, 'F2D', 'foam2d_keepall')
+
+
+def _vtk_released(qa, rs, meta):
+    """F36: a fresh foam result whose scratch was released offers no VTK
+    export, and the disabled button's tooltip is the scratch-released
+    reason (`services.exports.SCRATCH_RELEASED`)."""
+    from blastlab.services.exports import SCRATCH_RELEASED
+    from blastlab.ui.widgets import tip_text
+    btn = rs._export_btns.get('vtk')
+    tip = tip_text(btn.toolTip() if btn is not None else '')
+    released = bool((meta or {}).get('scratch_released'))
+    qa.note(f'VTK on a fresh foam result: scratch_released={released}, '
+            f'enabled={rs.export_enabled("vtk")}')
+    qa.check(released and not rs.export_enabled('vtk')
+             and SCRATCH_RELEASED in tip,
+             'a fresh foam result (Keep all fields off): VTK disabled with '
+             'the scratch-released reason', 'S2', evidence=repr(tip[:120]))
+
+
+def _vtk_keep_all(qa, key, label):
+    """F36, second step: with Keep all fields on the scratch is kept, the
+    VTK export is offered and finishes. A second WSL solve, so only on
+    an idle VM with >= 3 GB free physical memory; otherwise a note, for
+    the office machine."""
+    import copy
+    busy = _foreign_busy(qa)
+    free = _free_physical_mb()
+    if busy or free is None or free < 3072:
+        qa.note(f'office machine: the Keep all fields VTK step was not run '
+                f'(pgrep {busy[:2]}, free {free} MB; needs an idle VM and '
+                f'>= 3 GB)')
+        return
+    case = copy.deepcopy(cases()[key])
+    case.keep_all_fields = True
+    if not _foam_run(qa, case, label, 700):
+        return
+    qa.goto('results')
+    rs = qa.win.results
+    rs.show_view('Fields')
     qa.check(rs.export_enabled('vtk'),
-             'the VTK export is offered for a foam run', 'S2')
+             'Keep all fields on: the VTK export is offered', 'S2')
     qa.click(rs._export_btns['vtk'], 'VTK')
     ok = qa.wait_log('VTK export done', 300)
     tail = qa.run_log().strip().splitlines()[-4:]
     qa.note('VTK export log: ' + ' / '.join(tail))
     qa.check(ok, 'and it finishes', 'S2', evidence=' / '.join(tail))
-    qa.shot('after_vtk')
-    _cache_result(qa, 'foam2d', dim=2)
+    qa.shot(f'{label}_after_vtk')
 
 
 @scenario('F03', 'F', est=420)
@@ -2675,7 +3029,10 @@ def f07_stop_during_meshing(qa):
     qa.goto('run')
     rp = qa.win.run_panel
     n_res = len(qa.win.results.entries())
-    d0 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    # GUI-6: only failure dialogs count - a Stop more than 30 s into the
+    # run records the Stop confirmation, which is not a failure
+    failures = ('show_error', 'warn')
+    d0 = _ndialogs(os.path.join(qa.out, 'dialogs.jsonl'), failures)
     qa.click(rp.run_btn, 'Run')
     qa.check(qa.wait_log('blockMesh', 200),
              'the blockMesh stage line appeared', 'S2')
@@ -2686,7 +3043,7 @@ def f07_stop_during_meshing(qa):
     dt = time.perf_counter() - t0
     qa.note(f'stop during meshing -> the run ended in {dt:.1f} s')
     qa.check(dt < 15, f'a stop during meshing returns in {dt:.1f} s', 'S2')
-    d1 = _nlines(os.path.join(qa.out, 'dialogs.jsonl'))
+    d1 = _ndialogs(os.path.join(qa.out, 'dialogs.jsonl'), failures)
     qa.check(d1 == d0,
              'no "Run failed" dialog for a deliberate stop', 'S2')
     qa.check(len(qa.win.results.entries()) == n_res,
@@ -2736,6 +3093,11 @@ def f08_stop_during_solve(qa):
                     f'{browser.status.text()!r}')
         browser.close()
         qa.pump(0.5)
+    # GUI-10 (F35): the refused Delete warns and never asks, so its
+    # scripted No was left queued, and since GUI-6 a Stop more than 30 s
+    # into a run asks first (D54): that No kept the run going. Replace
+    # it with the answer a user pressing Stop gives: Stop the run.
+    qa.script_answers(True)
     t0 = time.perf_counter()
     qa.click(rp.stop_btn, 'Stop')
     qa.check(qa.run_wait(300), 'the run stopped', 'S1')
@@ -2808,8 +3170,15 @@ def f10_foam_dialogs(qa):
     if qa.cached('foam2d') is not None:
         ensure_results(qa, names=('foam2d',))
         if select_result(qa, 'QA foam2d'):
-            qa.check(rs.export_enabled('vtk'),
-                     'and it IS offered for a foam result', 'S2')
+            # F36 (GUI-11): F02's foam result ran with Keep all fields
+            # off, so its scratch is released and VTK says why it is off
+            meta = rs.current().result.meta if rs.current() else {}
+            if meta.get('scratch_released'):
+                _vtk_released(qa, rs, meta)
+            else:
+                qa.check(rs.export_enabled('vtk'),
+                         'and it IS offered for a foam result whose '
+                         'scratch is kept', 'S2')
             qa.shot('foam_exports')
 
 
@@ -2864,8 +3233,7 @@ def _chain_forms(qa, model='QA_CHAIN'):
                                 n_snapshots=1, gauges=[],
                                 gauge_file=None, anim_file=None,
                                 record_frames=0))
-    for d in (1, 2, 3):
-        ch.use[d].setChecked(True)
+    ch.set_route('123')         # GUI-9: the routes replaced the checkboxes
     qa.pump(0.5)
     return ch
 
@@ -2891,13 +3259,24 @@ def g01_chain_validation(qa):
                  evidence=str(refusals[-1] if refusals else []))
         qa.note(f'{tag}: {refusals[-1] if refusals else []}')
 
-    for d in (1, 2, 3):
-        ch.use[d].setChecked(False)
-    refuse('no stage checked')
-    ch.use[1].setChecked(True)
-    ch.use[3].setChecked(True)
-    refuse('a gap in the chain (1 and 3)')
-    ch.use[2].setChecked(True)
+    # GUI-9 (F18): 'no stage checked' and 'a gap in the chain (1 and
+    # 3)' had no checkboxes left to drive, and {1, 3} is a route since
+    # GUI-8. The route control offers exactly the four routes, and a
+    # route that does not exist is refused with the route unchanged.
+    from blastlab.ui import chain_route
+    qa.check(sorted(ch.route_btns) == sorted(k for k, _l, _d
+                                             in chain_route.ROUTES)
+             and len(ch.route_btns) == 4,
+             'the route control offers exactly the four routes', 'S2',
+             evidence=str(sorted(ch.route_btns)))
+    try:
+        ch.set_route('')
+        raised = False
+    except ValueError:
+        raised = True
+    qa.check(raised and ch.route() == '123',
+             'an empty route is refused, the route unchanged', 'S2',
+             evidence=f'{raised} {ch.route()}')
     ch.forms[2].v['geometry'].set('planar')
     qa.pump(0.3)
     refuse('a planar stage 2 with a 3D stage after it')
@@ -2992,6 +3371,30 @@ def g02_chain_run(qa):
     qa.goto('results')
     qa.shot('results_picker')
     _cache_result(qa, 'chain3d', dim=3)
+    # GUI-10 (D177): a chain stage is found by its own label, which
+    # selects the chain's row and its STAGE tab. The labels are the
+    # newest chain's (`QA_CHAIN - 3D` in a fresh process; a second chain
+    # in the same list is uniquified to `… #2`).
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    chains = [e for e in rs.entries() if isinstance(e, ChainEntry)]
+    stages = {s.dim: s.label for s in chains[-1].stages} if chains else {}
+    qa.check(stages.get(3, '').startswith('QA_CHAIN - 3D')
+             and stages.get(1, '').startswith('QA_CHAIN - 1D'),
+             'the chain is one Results entry with QA_CHAIN - 1D … 3D '
+             'stages', 'S2', evidence=str(stages))
+    for dim in (3, 1):
+        label = stages.get(dim, f'QA_CHAIN - {dim}D')
+        if select_result(qa, label):
+            cur = rs.current()
+            qa.check(rs.stage() == dim and cur is not None
+                     and cur.label == label,
+                     f'select_result({label!r}) shows that stage '
+                     f'(stage {rs.stage()}, '
+                     f'{getattr(cur, "label", None)!r})', 'S2')
+            qa.shot(f'chain_stage{dim}d')
+    if 3 in stages:
+        select_result(qa, stages[3])
 
 
 @scenario('G03', 'G', est=120)
@@ -3176,7 +3579,7 @@ def m04_chain_folder(qa):
     the chain manifest at its root."""
     qa.goto('chain')
     ch = _chain_forms(qa, 'M04')
-    ch.use[3].setChecked(False)
+    ch.set_route('12')          # GUI-9: was use[3].setChecked(False)
     qa.pump(0.4)
     qa.shot('chain_two_stages')
     started = ch.run()
@@ -3204,8 +3607,8 @@ def m05_hd13_folder(qa):
     from blastlab.core import assessment
     from blastlab.ui.testing import use_model
     qa.goto('setup')
-    qa.win.setup.set_dim(0)
-    qa.pump(0.6)
+    qa.dim(0)
+    qa.pump(0.1)
     qa.win.setup.forms[0].set_case(assessment.DeflagrationCase(
         name='QA M05', charge_kg=5.0, volume_m3=1.0, vent_area_m2=0.02,
         scenario_kind='flame_spread', n_cohorts=4, spread_time=4.0,
@@ -3228,8 +3631,7 @@ def m05_hd13_folder(qa):
     qa.check(os.path.isdir(loads) and any(
         n.endswith('.csv') for n in os.listdir(loads)),
              'hd13_loads\\ holds the SBEDS CSVs', 'S1')
-    qa.win.setup.set_dim(2)
-    qa.pump(0.5)
+    qa.dim(2)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -3239,14 +3641,21 @@ def m05_hd13_folder(qa):
 VTK_CARD = 'VTK output (ParaView)'
 
 
-def _vtk_card(qa):
-    """Scroll the Setup form so the VTK card is on screen; return it."""
-    card = _form(qa).cards[VTK_CARD]
+def _show_card(qa, title):
+    """Bring a Setup card on screen. GUI-5: a card shows only while its
+    model-tree node is selected, so select the node (07 Output for the
+    VTK card) and scroll the properties column to it."""
     try:
-        qa.win.setup._scroll.ensureWidgetVisible(card, 0, 0)
+        qa.win.setup.show_card(title)
     except Exception:
         pass
     qa.pump(0.4)
+
+
+def _vtk_card(qa):
+    """Scroll the Setup form so the VTK card is on screen; return it."""
+    card = _form(qa).cards[VTK_CARD]
+    _show_card(qa, VTK_CARD)
     return card
 
 
@@ -3396,15 +3805,8 @@ def v04_vtk_native(qa):
     form = _form(qa)
     qa.check(not form.card_visible(VTK_CARD),
              'native: the VTK card is hidden', 'S1')
-    # where the card sat: Outputs, then straight on to the Trigger card
-    # (the bottom of the scroll range is the stack's blank tail - the
-    # QStackedWidget takes its tallest page's height)
-    try:
-        qa.win.setup._scroll.ensureWidgetVisible(form.cards['Trigger gauge'],
-                                                 0, 0)
-    except Exception:
-        pass
-    qa.pump(0.4)
+    # where the card sat: 07 Output now shows only the Outputs card
+    _show_card(qa, 'Outputs')
     qa.shot('native_no_card')
     saved = case_to_dict(qa.win.setup.get_case())
     path = os.path.join(qa.dirs['cache'], 'v04_native.json')
@@ -3510,6 +3912,7 @@ def v06_keep_all_fields(qa):
     from blastlab.core.case import Case1D, Case3D, case_to_dict
     from blastlab.models import fields as mfields
     from blastlab.services import model_folder as mf
+    from blastlab.ui.widgets import tip_text
     qa.goto('setup')
     for dim, cls in ((1, Case1D), (3, Case3D)):
         qa.set_case(cls(solver='blastfoam'))
@@ -3517,7 +3920,8 @@ def v06_keep_all_fields(qa):
         w = form.widgets.get('keep_all_fields')
         qa.check(w is not None and w.isVisible() and not w.isChecked()
                  and w.text() == mfields.KEEP_ALL_CAPTION
-                 and w.toolTip() == mfields.KEEP_ALL_TIP,
+                 # GUI-11 (P2-24): a wrapped tip, the same words
+                 and tip_text(w.toolTip()) == mfields.KEEP_ALL_TIP,
                  f'{dim}D: the box is on the card, unticked, with its '
                  f'tooltip', 'S2')
         _vtk_shots(qa, f'{dim}d_keep_off')
@@ -3729,7 +4133,7 @@ def h03_results_light(qa):
     for label in ('QA native2d', 'QA native3d'):
         if not select_result(qa, label):
             continue
-        for view in ('Fields', 'Gauges', 'Animation'):
+        for view in ('Field', 'Gauges', '3D'):
             rs.show_view(view)
             qa.pump(0.8)
             qa.shot(f'{label[-2:]}_{view.lower()}')
@@ -3771,19 +4175,23 @@ def i01_rapid_tabs(qa):
     qa.action = 'rapid tabs'
     while time.perf_counter() - t0 < 12:
         k = rnd.choice(['setup', 'run', 'results', 'chain'])
-        qa.win._show(k)
-        qa.tab = k
+        # GUI-10: the pill's click path (goto), not the window's _show
+        qa.goto(k, settle=0)
+        qa.action = 'rapid tabs'
         if k == 'results' and rnd.random() < 0.5:
-            qa.win.results.show_view(rnd.choice(
-                ['Fields', 'Gauges', 'Animation', '3D']))
+            qa.win.results.show_view(rnd.choice(['Field', 'Gauges', '3D']))
         if k == 'run' and rnd.random() < 0.5:
             (rp.show_3d_tab if rnd.random() < 0.5
              else rp.show_slice_tab)()
         qa.pump(0.1)
     qa.action = ''
     qa.goto('run')
-    qa.check(qa.win.ctrl.running or not qa.win.ctrl.running,
-             'the window survived the switching', 'S1')
+    # F32: was `running or not running`, always true
+    qa.check(qa.win.isVisible() and qa.win.current_tab() == 'run'
+             and qa.win.run_panel.isVisible(),
+             'the window survived the switching', 'S1',
+             evidence=f'visible {qa.win.isVisible()}, '
+                      f'tab {qa.win.current_tab()!r}')
     qa.check(qa.run_wait(900), 'and the run still finished', 'S1')
     for k in ('setup', 'run', 'results', 'chain'):
         qa.goto(k)
@@ -3935,6 +4343,285 @@ def i06_small_window_3d(qa):
     qa.win.results.show_view('Fields')
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  Group K - the window frame itself (GUI-10, plan T6)
+# ═══════════════════════════════════════════════════════════════════════
+def _menu_texts(menu):
+    """The case menu's entries as a user reads them: the text before the
+    `\\t` key hint, separators and the disabled credit left out."""
+    return [a.text().split('\t')[0] for a in menu.actions()
+            if not a.isSeparator() and a.isEnabled() and a.text()]
+
+
+@scenario('K01', 'K', est=60)
+def k01_frame(qa):
+    """The frame: pills, Chain link, dimension, solver chip, case menu,
+    Dark mode, the status-bar keys and the title."""
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui import theme
+    win = qa.win
+    for tab in ('setup', 'run', 'results', 'chain', 'setup'):
+        qa.goto(tab)
+        others = {k: b.property('active') for k, b in win._nav_btns.items()
+                  if k != tab}
+        qa.check(all(v == 'false' for v in others.values()),
+                 f'only the {tab} pill is active', 'S2', evidence=str(others))
+    for d in (0, 1, 2, 3, 2):
+        qa.dim(d)
+    seed = win.solver_mode.get()
+    for mode in mode_mod.MODES + (seed,):
+        qa.solver(mode)
+        chip = win.topbar.chip.text()
+        qa.check(mode_mod.label(mode) in chip,
+                 f'the chip reads {mode_mod.label(mode)!r} ({chip!r})', 'S2')
+    want = ['Open…', 'Save', 'Save as…', 'Recent', 'Dark mode']
+    got = _menu_texts(win._case_menu)
+    qa.check(got == want, f'the case menu holds {want}', 'S2',
+             evidence=str(got))
+    recent = next((a for a in win._case_menu.actions()
+                   if a.text() == 'Recent'), None)
+    qa.check(recent is not None and recent.menu() is not None,
+             'Recent opens a submenu', 'S2')
+    for mode in ('light', 'dark'):
+        qa.set_mode(mode)
+        qa.check(win._dark_action.isChecked() == (mode == 'dark'),
+                 f'the Dark-mode action reads {mode == "dark"} in {mode}',
+                 'S2')
+        qa.shot(f'frame_{mode}')
+    keys = win._keys_lbl.text()
+    qa.check(keys.startswith('Ctrl+S save · F5 run · Shift+Esc stop')
+             and (win._keys_lbl.isVisible() or bool(win._status.text())),
+             f'the status bar shows the keys ({keys!r})', 'S2')
+    title = win.windowTitle()
+    qa.check(title.endswith(f'{win._case_stem()} · BlastLab'),
+             f'the title reads <case> · BlastLab ({title!r})', 'S2')
+    lx = _form(qa).v['Lx'].get()
+    try:
+        bumped = f'{float(lx) + 0.5:g}'
+    except ValueError:
+        bumped = '4.5'
+    qa.field('Lx', bumped)
+    title = win.windowTitle()
+    tb = win.topbar
+    qa.check('● ' in title and tb.dirty_lbl.isVisible()
+             and tb.dirty_lbl.text() == '● unsaved',
+             f'an edit marks the title and the top bar ({title!r})', 'S2')
+    qa.shot('frame_dirty')
+    qa.field('Lx', lx)
+    qa.check(theme.mode() == 'dark', 'the theme is back to dark', 'S2')
+
+
+def _outside(win):
+    """Visible widgets of the window that stand past its content rect by
+    more than 1 px (GUI-10, D184). Left out: descendants of a scroll
+    area's viewport (they scroll legitimately) and the 3D host's native
+    container (the viewer sampler's subject)."""
+    from PySide6.QtCore import QPoint
+    from PySide6.QtWidgets import QAbstractScrollArea, QWidget
+    from blastlab.ui.view3d_host import View3DHost
+    W, H = win.width(), win.height()
+    out = []
+    for w in win.findChildren(QWidget):
+        if not w.isVisible() or w.window() is not win:
+            continue
+        skip, p = False, w
+        while p is not None and p is not win:
+            parent = p.parentWidget()
+            if isinstance(parent, QAbstractScrollArea) \
+                    and p is parent.viewport():
+                skip = True
+                break
+            if isinstance(parent, View3DHost):
+                skip = True
+                break
+            p = parent
+        if skip:
+            continue
+        tl = w.mapTo(win, QPoint(0, 0))
+        x0, y0 = tl.x(), tl.y()
+        x1, y1 = x0 + w.width(), y0 + w.height()
+        if x0 < -1 or y0 < -1 or x1 > W + 1 or y1 > H + 1:
+            out.append(f'{type(w).__name__}({w.objectName()!r}) at '
+                       f'{x0},{y0} {w.width()}x{w.height()} in {W}x{H}')
+    return out
+
+
+def _props_hscroll(qa):
+    """A horizontal scroll bar shown in the Setup properties column (F3:
+    a known point-table overhang, a note rather than a finding)."""
+    from PySide6.QtWidgets import QScrollArea
+    sc = getattr(qa.win.setup, '_scroll', None)
+    if isinstance(sc, QScrollArea) \
+            and sc.horizontalScrollBar().isVisible():
+        return True
+    return False
+
+
+def _k02_state(qa, screen, state):
+    """One K02 state: nothing glyph-clipped, nothing outside the window."""
+    qa.pump(0.3)
+    tag = f'{screen} {state} ({qa.mode}, {qa.geometry()})'
+    clipped = _clipped_labels(qa.win)
+    qa.check(not clipped, f'{tag}: nothing clipped', 'S2',
+             evidence='; '.join(clipped[:8]))
+    outside = _outside(qa.win)
+    qa.check(not outside, f'{tag}: nothing outside the window', 'S2',
+             evidence='; '.join(outside[:8]))
+    if screen == 'setup' and _props_hscroll(qa):
+        qa.note(f'{tag}: the properties column scrolls sideways (F3)')
+
+
+def _k02_results(qa, mode):
+    """Results: the cached QA results x Field / Gauges / 3D, the newest
+    entry, and a chain's STAGE tabs when the process holds a chain."""
+    from blastlab.ui.results_panel import ChainEntry
+    rs = qa.win.results
+    labels = [lbl for lbl in ('QA native1d', 'QA native2d', 'QA native3d')
+              if any(e.label == lbl for e in rs.entries())]
+    if not labels:
+        qa.note('no cached QA native results in this process (run group D '
+                'first); Results is checked on the newest entry only')
+    ents = rs.entries()
+    if ents and not isinstance(ents[-1], ChainEntry) \
+            and ents[-1].label not in labels:
+        labels.append(ents[-1].label)
+    for label in labels:
+        if not select_result(qa, label):
+            continue
+        for view in ('Field', 'Gauges', '3D'):
+            rs.show_view(view)
+            _k02_state(qa, 'results', f'{label} {view}')
+    rs.show_view('Field')
+    chains = [e for e in rs.entries() if isinstance(e, ChainEntry)]
+    if not chains:
+        qa.note('no chain entry in this process: the STAGE tabs are not '
+                'checked here (G02 makes one)')
+        return
+    for s in chains[-1].stages:
+        if select_result(qa, s.label):
+            _k02_state(qa, 'results', f'chain stage {s.label}')
+    qa.shot(f'results_chain_{mode}')
+
+
+@scenario('K02', 'K', est=400)
+def k02_nothing_clipped(qa):
+    """1100 x 720, dark then light: nothing clipped or outside on Setup
+    (dims 0-3 x both solvers x every node), Run, Results and Chain."""
+    from blastlab.core import mode as mode_mod
+    from blastlab.ui import chain_route
+    C = cases()
+    win = qa.win
+    seed = win.solver_mode.get()
+    for mode in ('dark', 'light'):
+        qa.set_mode(mode)
+        qa.geometry('1100x720')
+        qa.goto('setup')
+        setup = win.setup
+        for solver in mode_mod.MODES:
+            qa.dim(2)                   # the chip hides at 0-D
+            qa.solver(solver)
+            for d in (0, 1, 2, 3):
+                qa.dim(d)
+                shown = setup.visible_nodes()
+                for node, _titles in setup_nodes_for(d):
+                    if node.id not in shown:
+                        qa.note(f'{solver} {d}D {node.number}: hidden in '
+                                f'this mode - skipped')
+                        continue
+                    setup.select_node(node.id)
+                    _k02_state(qa, 'setup',
+                               f'{solver} {d}D {node.number} {node.title}')
+            qa.shot(f'setup_{solver}_{mode}')
+        qa.dim(2)
+        qa.solver(seed)
+        # Run: idle, then after a tiny native 1D run (the banner shown)
+        qa.goto('run')
+        rp = win.run_panel
+        _k02_state(qa, 'run', 'idle' if not rp.banner_text() else 'banner')
+        if not rp.banner_text():
+            qa.goto('setup')
+            qa.solver('native')
+            qa.set_case(C['N1D'])
+            qa.goto('run')
+            qa.click(rp.run_btn, 'Run')
+            qa.check(qa.run_wait(180), 'the tiny 1D run finished', 'S1')
+            qa.check(bool(rp.banner_text()), 'and the banner shows', 'S2')
+            qa.solver(seed)
+        _k02_state(qa, 'run', 'finished, banner shown')
+        qa.shot(f'run_banner_{mode}')
+        qa.goto('results')
+        _k02_results(qa, mode)
+        qa.goto('chain')
+        ch = win.chain
+        for key, _label, _dims in chain_route.ROUTES:
+            ch.set_route(key)
+            qa.pump(0.3)
+            ed = ch.editor()
+            for node in ed.visible_nodes():
+                ed.select_node(node)
+                _k02_state(qa, 'chain', f'route {key} stage {ch.stage()} '
+                                        f'{node}')
+        ch.set_route('123')
+        qa.shot(f'chain_{mode}')
+        qa.goto('setup')
+        qa.dim(2)
+    qa.set_mode('dark')
+    qa.reset_window()
+
+
+def setup_nodes_for(dim):
+    """The model-tree nodes of `dim`, in tree order (setup_nodes.nodes)."""
+    from blastlab.ui import setup_nodes
+    return setup_nodes.nodes(dim)
+
+
+#: K03's luma floor for a light-mode window grab (D185; dark grabs read
+#: 38-41 in M7, so a panel left dark pulls a grab well under this)
+LIGHT_LUMA_MIN = 140
+
+
+@scenario('K03', 'K', est=200)
+def k03_light_screens(qa):
+    """Light mode, every screen with content, at 1100 x 720 and
+    1600 x 1000: the theme is light and no grab reads dark."""
+    import shutil
+    from blastlab.ui import theme
+    win = qa.win
+    curated = os.path.join(qa.out, 'curated')
+    os.makedirs(curated, exist_ok=True)
+    rs = win.results
+    qa.set_mode('light')
+    for size in ('1100x720', '1600x1000'):
+        qa.geometry(size)
+        states = [('setup', 'tree', lambda: (qa.goto('setup'), qa.dim(2),
+                                             win.setup.select_node('gauges'))),
+                  ('run', 'finished' if win.run_panel.banner_text()
+                   else 'idle', lambda: qa.goto('run')),
+                  ('results', 'field' if rs.entries() else 'empty',
+                   lambda: (qa.goto('results'), rs.show_view('Field'))),
+                  ('chain', 'route123', lambda: (qa.goto('chain'),
+                                                 win.chain.set_route('123')))]
+        for screen, state, go in states:
+            go()
+            qa.pump(0.6)
+            qa.check(theme.mode() == 'light',
+                     f'{screen} {size}: the theme is light', 'S2')
+            name = qa.shot(f'{size}-{screen}-{state}')
+            luma = getattr(qa, 'last_luma', None)
+            qa.check(name is not None and luma is not None
+                     and luma >= LIGHT_LUMA_MIN,
+                     f'{screen} {state} {size}: the light grab reads light '
+                     f'(luma {luma if luma is None else round(luma, 1)} '
+                     f'>= {LIGHT_LUMA_MIN})', 'S2')
+            if name:
+                shutil.copyfile(
+                    os.path.join(qa.dirs['shots'], name),
+                    os.path.join(curated, f'gui10-light-{size}-{screen}-'
+                                          f'{state}.png'))
+    qa.set_mode('dark')
+    qa.reset_window()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out')
@@ -3949,9 +4636,18 @@ def main():
     ap.add_argument('--window', action='store_true',
                     help='run on the real desktop instead of offscreen')
     ap.add_argument('--solver', default='',
-                    help="seed the sidebar solver mode the app starts in "
+                    help="seed the solver mode the app starts in, and the "
+                         "one neutral() restores after every scenario "
                          "('native' | 'blastfoam')")
     args = ap.parse_args()
+
+    # GUI-10 (F24): a redirected stdout is cp1252 on this PC and the log
+    # lines carry the title's `●`; never die printing a log line
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
 
     if args.out:
         out = args.out
@@ -3983,6 +4679,7 @@ def main():
     sys.path.insert(0, REPO)
 
     qa = QA(out, args)
+    qa.solver_seed = args.solver or None
     only = [g for g in args.only.split(',') if g]
     skip = [s for s in args.skip.split(',') if s]
     for r in (s for s in args.redo.split(',') if s):

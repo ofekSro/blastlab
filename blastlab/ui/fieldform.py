@@ -14,6 +14,7 @@ writes `cx` from inside the `geometry` trace, and without this the write
 either re-enters or is lost.
 """
 
+import shiboken6
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (QBoxLayout, QButtonGroup, QCheckBox,
                                QComboBox, QFormLayout, QGraphicsOpacityEffect,
@@ -28,7 +29,7 @@ from ..models import fields
 from . import dialogs, theme
 from .setup_spec import HIDDEN_ROWS, INPUT_MIN, LABEL_WRAP, SPAN, cards
 from .theme import GAP
-from .widgets import Card, button, label
+from .widgets import Card, button, label, wrap_tip
 
 #: the form's cards use the same 12 px padding as every other card on
 #: the Setup and Chain panels. It used to be theme.PAD (16), which cost
@@ -239,6 +240,9 @@ class PointList(QWidget):
         self._arity = len(self._columns)
         self._kinds = tuple(kinds) or ('float',) * self._arity
         self._on_change = on_change or (lambda: None)
+        #: called with the 0-based index of a row the user removed, before
+        #: on_change (UXR-9: the trigger gauge follows its gauge)
+        self.on_remove = None
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(GAP)
@@ -273,27 +277,54 @@ class PointList(QWidget):
         lay.addWidget(self.hint)
         self._accept()
 
+    def set_columns(self, columns):
+        """Rename the columns (UXR-11: r / z in 2D axisymmetric): the
+        headers, the idle hint and the refusal texts. The arity, the
+        parsers and the rows are unchanged."""
+        cols = list(columns)
+        if len(cols) != self._arity or cols == self._columns:
+            return
+        self._columns = cols
+        self.tree.setHeaderLabels(cols)
+        if self.entry.property('bad') != 'true':
+            self.hint.setText(self._idle_text())
+        elif self._refusal is not None:
+            # F46 (GUI-11): a standing refusal that names the columns is
+            # worded again with the new ones; it stays red, not lost
+            self.hint.setText(self._refusal())
+
+    def columns(self):
+        return list(self._columns)
+
     # ── hint / refusal ───────────────────────────────────────────────────
     def _idle_text(self):
         return 'add a row: ' + '  '.join(self._columns)
 
     def _accept(self):
+        self._refusal = None
         self.hint.setText(self._idle_text())
         self.hint.setStyleSheet(f'color: {theme.cur("muted")};')
         self.entry.setProperty('bad', 'false')
         theme.repolish(self.entry)
 
-    def _reject(self, message):
+    def _reject(self, message, words=None):
+        """Show `message` in red. `words`, when given, builds the message
+        again from the current column names (`set_columns`, F46)."""
+        self._refusal = words
         self.hint.setText(message)
         self.hint.setStyleSheet(f'color: {theme.cur("error")};')
         self.entry.setProperty('bad', 'true')
         theme.repolish(self.entry)
 
+    def _arity_text(self, what):
+        return (f'expected {self._arity} {what} '
+                f'({"  ".join(self._columns)})')
+
     # ── rows ─────────────────────────────────────────────────────────────
     def add(self):
         raw = self.entry.text().replace(',', ' ').split()
         if not raw:
-            self._reject(self._idle_text())
+            self._reject(self._idle_text(), self._idle_text)
             return False
         if any(k != 'float' for k in self._kinds):
             return self._add_typed(raw)
@@ -304,8 +335,8 @@ class PointList(QWidget):
             self._reject('not numbers: ' + ', '.join(bad))
             return False
         if len(vals) != self._arity:
-            self._reject(f'expected {self._arity} numbers '
-                         f'({"  ".join(self._columns)})')
+            self._reject(self._arity_text('numbers'),
+                         lambda: self._arity_text('numbers'))
             return False
         self.tree.addTopLevelItem(
             QTreeWidgetItem([f'{v:g}' for v in vals]))
@@ -317,8 +348,8 @@ class PointList(QWidget):
     def _add_typed(self, raw):
         """`add` for a table with a non-numeric column (D7)."""
         if len(raw) != self._arity:
-            self._reject(f'expected {self._arity} values '
-                         f'({"  ".join(self._columns)})')
+            self._reject(self._arity_text('values'),
+                         lambda: self._arity_text('values'))
             return False
         try:
             vals = [_parse_cell(k, x) for k, x in zip(self._kinds, raw)]
@@ -337,8 +368,11 @@ class PointList(QWidget):
         if item is None:
             self._reject('select a row in the list first')
             return False
-        self.tree.takeTopLevelItem(self.tree.indexOfTopLevelItem(item))
+        index = self.tree.indexOfTopLevelItem(item)
+        self.tree.takeTopLevelItem(index)
         self._accept()
+        if self.on_remove is not None:
+            self.on_remove(index)
         self._on_change()
         return True
 
@@ -429,10 +463,28 @@ class FilePicker(QWidget):
 
 # ── the form ─────────────────────────────────────────────────────────────
 class FieldForm(QWidget):
-    """Two columns of titled cards built from `setup_spec.cards(dim)`."""
+    """Titled cards built from `setup_spec.cards(dim)`.
 
-    def __init__(self, dim, on_change=None, mode='blastfoam', parent=None):
+    `placement` decides only WHERE the built cards are laid, never what
+    they parse (GUI-5, plan §11):
+      'columns' (default) - two columns plus the spanning cards below,
+          collapsing to one column when narrow. The Chain editor and
+          every standalone form use it.
+      'nodes' - one page per model-tree node (`setup_nodes`), stacked in
+          one column; `show_node()` shows one page. The Setup screen's
+          properties column uses it. The spanning VTK card always stacks
+          its panes and a multi-pair grid (the boundaries) lays one pair
+          per line, so the cards fit a narrow column.
+    The registries (`v`, `points`, `rows`, `widgets`, `labels`, `cards`)
+    and everything that reads them are the same in both."""
+
+    def __init__(self, dim, on_change=None, mode='blastfoam', parent=None,
+                 placement='columns'):
         super().__init__(parent)
+        if placement not in ('columns', 'nodes'):
+            raise ValueError(f'placement must be columns or nodes, '
+                             f'not {placement!r}')
+        self.placement = placement
         self.dim = int(dim)
         self._on_change = on_change or (lambda: None)
         self.v = {}                  # name -> Var / BoolVar
@@ -445,12 +497,97 @@ class FieldForm(QWidget):
         self.row_notes = {}          # name -> the QLabel under its row
         self._specs = {}             # name -> F
         self._card_of = {}           # name -> card title
+        self._row_groups = {}        # name -> group a hook adds (GUI-5)
+        self.pages = {}              # node id -> page ('nodes' only)
+        self._node = None
         self._notifying = False
         self._pending = []
         self._bad = set()
-        self._build()
+        if placement == 'nodes':
+            self._build_nodes()
+        else:
+            self._build()
 
     # ── construction ─────────────────────────────────────────────────────
+    def _build_nodes(self):
+        """'nodes' placement: the cards are built in spec order (so every
+        registry fills exactly as in 'columns') and then laid on one page
+        per tree node, in tree order. Pages that are not shown are hidden
+        widgets, so they add nothing to the form's minimum size - unlike
+        a QStackedWidget, whose minimum is its largest page."""
+        from . import setup_nodes
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        self._cols, self._holders = [], []
+        self._span_panes = []
+        self._card_order = []
+        for spec in cards(self.dim):
+            card = Card(spec.title, pad=CARD_PAD, parent=self)
+            self.cards[spec.title] = card
+            card._blastlab_scope = spec.scope
+            self._card_order.append(
+                (card, spec.col, 1 if spec.field_rows else 0))
+            self._fill_card(card, spec)
+        pages =[(n.id, titles) for n, titles in setup_nodes.nodes(self.dim)]
+        # a card no node shows (HIDDEN_CARDS_0) still passes its values
+        # through load -> save; it lives on a page that is never shown
+        rest = [t for t in self.cards
+                if t not in {x for _i, ts in pages for x in ts}]
+        if rest:
+            pages.append(('_unlisted', tuple(rest)))
+        for node_id, titles in pages:
+            page = QWidget(self)
+            lay = QVBoxLayout(page)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setSpacing(theme.PAD - 4)
+            for t in titles:
+                lay.addWidget(self.cards[t], 0)
+            page.setVisible(False)
+            outer.addWidget(page)
+            self.pages[node_id] = page
+        outer.addStretch(1)
+        self._single = True
+        self._watched = None
+        first = next((i for i, _t in pages if i != '_unlisted'), None)
+        if first is not None:
+            self.show_node(first)
+
+    def show_node(self, node_id):
+        """'nodes' placement: show the page of `node_id` and hide the
+        others. False for an unknown id (and always in 'columns')."""
+        if node_id not in self.pages or node_id == '_unlisted':
+            return False
+        for nid, page in self.pages.items():
+            page.setVisible(nid == node_id)
+        self._node = node_id
+        self._relayout()
+        self.updateGeometry()
+        return True
+
+    def current_node(self):
+        return self._node
+
+    def node_visible(self, node_id):
+        """True when at least one card of `node_id` is shown by the
+        solver scope - a node with none is hidden in the tree, never
+        greyed (plan §5.1)."""
+        from . import setup_nodes
+        return any(self.card_visible(t)
+                   for t in setup_nodes.node_cards(self.dim, node_id))
+
+    def add_to_page(self, node_id, widget, index=-1):
+        """Put a widget the form does not own (the Derived card) on a
+        node's page, at `index` among its cards (-1: last)."""
+        self.pages[node_id].layout().insertWidget(index, widget)
+        return widget
+
+    def set_row_group(self, name, group):
+        """Put row `name` in sub-group `group` for `apply_scope`, as a
+        spec `group=` would (a hook's own group: GUI-5 trigger switch,
+        profile row). Does not re-apply the scope."""
+        self._row_groups[name] = group
+
     def _build(self):
         # the two columns side by side, and under them the cards that
         # span both (setup_spec.SPAN - the VTK card, owner decision P13)
@@ -522,12 +659,33 @@ class FieldForm(QWidget):
         return vp.width() if vp is not None else self.width()
 
     def _watch_viewport(self):
+        """Watch the nearest scroll viewport for resizes, moving the
+        filter when the form now lives under another scroll area.
+
+        F14 (docs/gui-redesign-decisions.md): a viewport deleted with its
+        scroll area while this form lives on must never be called - its
+        wrapper raised `Internal C++ object ... already deleted` from
+        `removeEventFilter`. A dead one is dropped here, and
+        `_forget_viewport` drops it the moment Qt destroys it."""
+        if self._watched is not None and not shiboken6.isValid(
+                self._watched):
+            self._watched = None
         vp = self._viewport()
         if vp is not None and vp is not self._watched:
             if self._watched is not None:
                 self._watched.removeEventFilter(self)
+                self._watched.destroyed.disconnect(self._forget_viewport)
             vp.installEventFilter(self)
+            vp.destroyed.connect(self._forget_viewport)
             self._watched = vp
+
+    def _forget_viewport(self, obj=None):
+        """The watched viewport is being destroyed (F14): forget it, so
+        nothing calls it again. Another object's `destroyed` is ignored."""
+        if self._watched is not None and (
+                obj is None or obj is self._watched
+                or not shiboken6.isValid(self._watched)):
+            self._watched = None
 
     def eventFilter(self, obj, event):
         if obj is self._watched and event.type() == QEvent.Resize:
@@ -551,7 +709,12 @@ class FieldForm(QWidget):
         The three dimension forms share a QStackedWidget, whose minimum
         is the LARGEST of its pages whether they are visible or not - so
         collapsing only the page on screen changed nothing, and all
-        three have to move together."""
+        three have to move together.
+
+        'nodes' placement has no columns to fit (and its spanning card
+        is always stacked)."""
+        if self.placement != 'columns':
+            return
         avail = self._avail_width()
         single = avail < 2 * COL_MIN + GAP
         self._apply_single(single)
@@ -609,7 +772,9 @@ class FieldForm(QWidget):
         return False
 
     def _apply_single(self, single):
-        if single == self._single:
+        # columns-only bookkeeping: a 'nodes' form has no holders, and its
+        # cards must never be taken out of their pages
+        if self.placement != 'columns' or single == self._single:
             return
         self._single = single
         # a card hidden by the solver scope must stay hidden: adding a
@@ -672,6 +837,9 @@ class FieldForm(QWidget):
             panes.setSpacing(theme.PAD)
             panes.addWidget(left, 1, Qt.AlignTop)
             panes.addWidget(right, 1, Qt.AlignTop)
+            if self.placement == 'nodes':
+                # the properties column never holds both panes (GUI-5)
+                panes.setDirection(QBoxLayout.TopToBottom)
             card.add_layout(panes)
             self._span_panes.append((panes, left, right))
             self._fill_grid(_grid(left), spec,
@@ -687,8 +855,10 @@ class FieldForm(QWidget):
     def _fill_grid(self, grid, spec, rows, note=True):
         """Lay `rows` of card `spec` into `grid`: caption + input pairs,
         wide rows (a table, the matrix) across both grid columns, and the
-        card's note above the first wide row (or at the end)."""
-        pairs = max(1, spec.grid)
+        card's note above the first wide row (or at the end). In 'nodes'
+        placement every card is one pair per line: the properties column
+        cannot hold the boundary grid's two (measured 409 px)."""
+        pairs = 1 if self.placement == 'nodes' else max(1, spec.grid)
         for c in range(pairs):
             grid.setColumnMinimumWidth(c * 2, LABEL_WRAP if pairs == 1
                                        else 0)
@@ -807,7 +977,8 @@ class FieldForm(QWidget):
         if f.kind not in ('bool', 'matrix'):
             w.setMinimumWidth(INPUT_MIN)
         if f.tip:
-            w.setToolTip(f.tip)
+            # a long spec tip wraps (P2-24, D208); its words are unchanged
+            w.setToolTip(wrap_tip(f.tip))
         self.widgets[f.name] = w
         return w
 
@@ -870,8 +1041,9 @@ class FieldForm(QWidget):
             card.setVisible(scope in (None, mode) and title not in emptied)
         for name, f in self._specs.items():
             on = f.scope in (None, mode) and name not in HIDDEN_ROWS
-            if on and f.group is not None:
-                on = bool(groups.get(f.group, True))
+            group = f.group or self._row_groups.get(name)
+            if on and group is not None:
+                on = bool(groups.get(group, True))
             self._set_row_visible(name, on)
 
     def _set_row_visible(self, name, on):

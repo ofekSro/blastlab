@@ -133,6 +133,9 @@ class ScalarImage:
         self.plot = plot
         xf = np.asarray(x_face, dtype=float)
         yf = np.asarray(y_face, dtype=float)
+        self.xf, self.yf = xf, yf
+        #: the array on screen, in its own unit, NaN where solid
+        self.shown = None
         self.shape = (len(xf) - 1, len(yf) - 1)
         self.rect = QRectF(xf[0], yf[0], xf[-1] - xf[0], yf[-1] - yf[0])
         cmap, lut = inferno()
@@ -193,9 +196,16 @@ class ScalarImage:
         the field selector moves, so this must not rebuild the bar."""
         if self.bar is None:
             return
-        for axis in ('right', 'left'):
+        # a vertical ColorBarItem carries its label on the 'left' axis;
+        # labelling 'right' as well drew it twice, either side of the
+        # numbers (F15's doubled label)
+        for axis, on in (('left', True), ('right', False)):
             try:
-                self.bar.getAxis(axis).setLabel(str(text))
+                ax = self.bar.getAxis(axis)
+                if on:
+                    ax.setLabel(str(text))
+                else:
+                    ax.showLabel(False)
             except Exception:
                 pass
 
@@ -232,6 +242,28 @@ class ScalarImage:
         if self.bar is not None:
             self.bar.setLevels((lo, hi))
         self.levels = (lo, hi)
+        self.shown = zm
+
+    def value_at(self, x, y):
+        """What the image shows at the point (x, y) [m]: None outside the
+        faces, 'solid' on a masked cell, else the displayed cell's value
+        (the array on screen, found by `searchsorted` on the faces - no
+        interpolation). The Results Field view's hover readout."""
+        if self.shown is None:
+            return None
+        xf, yf = self.xf, self.yf
+        if not (xf[0] <= x <= xf[-1] and yf[0] <= y <= yf[-1]):
+            return None
+        i = min(int(np.searchsorted(xf, x, side='right')) - 1,
+                self.shape[0] - 1)
+        j = min(int(np.searchsorted(yf, y, side='right')) - 1,
+                self.shape[1] - 1)
+        if i < 0 or j < 0:
+            return None
+        if self.solid is not None and self.solid[i, j]:
+            return 'solid'
+        v = float(self.shown[i, j])
+        return 'solid' if np.isnan(v) else v
 
     def _masked(self, z):
         zm = np.asarray(z, dtype=np.float64)
@@ -269,6 +301,12 @@ class ScalarImage:
             try:
                 if item is self.bar:
                     self.plot.layout.removeItem(item)
+                    # out of the layout is not out of the scene: the old
+                    # bar stayed behind, squeezed at the top left, with
+                    # its label over the new one's (F15)
+                    scene = item.scene()
+                    if scene is not None:
+                        scene.removeItem(item)
                 else:
                     self.plot.removeItem(item)
             except Exception:

@@ -83,6 +83,12 @@ def gauge_labels(gauge_out, requested=None):
     when the solver snapped it to a cell centre - the table used to show
     the snapped numbers alone, which read as a typo in the user's input
     (QA-33). `requested` is the case's gauge list (meta['gauges']).
+
+    When the solver dropped a gauge (fewer points than entered gauges),
+    each point is paired with its nearest entered gauge and labelled with
+    that gauge's ENTERED number and position - `G3 (1.530, 1.710) -> cell
+    (...)` - as the screens number it (F42, D201). Points >= entered keeps
+    the index pairing, so a run without a drop is byte-identical.
     """
     def fmt(pt):
         return '(' + ', '.join(f'{float(v):.3f}' for v in pt) + ')'
@@ -92,15 +98,45 @@ def gauge_labels(gauge_out, requested=None):
                 for k, r in enumerate(gauge_out['radii'])]
     pts = list(gauge_out.get('points', []))
     want = list(requested or [])
+    if len(pts) >= len(want):
+        pair = list(range(len(pts)))
+    else:
+        pair = _nearest_entered(pts, want)
+        if any(j is None for j in pair):    # the count does not add up:
+            pair = [None] * len(pts)        # plain labels for all (P1)
     out = []
     for k, pt in enumerate(pts):
-        label = f'G{k + 1} {fmt(pt)} m'
-        if k < len(want) and len(want[k]) == len(pt):
+        j = pair[k]
+        num = k + 1 if j is None or len(pts) >= len(want) else j + 1
+        label = f'G{num} {fmt(pt)} m'
+        if j is not None and j < len(want) and len(want[j]) == len(pt):
             snapped = any(abs(float(a) - float(b)) > 1e-9
-                          for a, b in zip(want[k], pt))
+                          for a, b in zip(want[j], pt))
             if snapped:
-                label = f'G{k + 1} {fmt(want[k])} -> cell {fmt(pt)} m'
+                label = f'G{num} {fmt(want[j])} -> cell {fmt(pt)} m'
         out.append(label)
+    return out
+
+
+def _nearest_entered(pts, want):
+    """The entered gauge (0-based) each point belongs to, or None: the
+    nearest entered gauge of the same dimension, greedy in point order,
+    each entered gauge taken once (F42; the match `ui/run_gauges._match`
+    makes, without its one-cell tolerance - `output/` has no case)."""
+    used, out = set(), []
+    for pt in pts:
+        best = None
+        for j, w in enumerate(want):
+            if j in used or len(w) != len(pt):
+                continue
+            d = sum((float(a) - float(b)) ** 2 for a, b in zip(w, pt))
+            if best is None or d < best[1]:
+                best = (j, d)
+        if best is None:
+            out.append(None)
+        else:
+            used.add(best[0])
+            out.append(best[0])
     return out
 
 

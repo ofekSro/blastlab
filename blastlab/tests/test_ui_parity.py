@@ -169,8 +169,14 @@ def main():
                if isinstance(v, str) and not v.startswith('#')][:4]))
     check('switching modes raises nothing', not crashes, str(crashes[:1]))
 
-    print('\nP3: the Setup form collapses to one column instead of '
-          'clipping')
+    # GUI-5 (plan §9, batch 2026-09-29-gui-setup): the Setup form is no
+    # longer two collapsing columns - each node's cards sit alone in the
+    # 340 px properties column ('nodes' placement). P3 keeps its idea
+    # against the new layout: nothing clipped at 1100x720 on any node of
+    # any dimension in either mode, and a genuinely narrow window still
+    # leaves everything reachable. The two-column machinery stays pinned
+    # where it still runs (the Chain editor's standalone forms).
+    print('\nP3: the properties column is never clipped, on any node')
     win._show('setup')
     win.resize(1600, 900)
     pump(250)
@@ -184,41 +190,51 @@ def main():
           len(forms) == len(win.setup.forms) and len(vis) == 1,
           f'{len(forms)} forms / {len(vis)} visible, '
           f'dims {sorted(win.setup.forms)}')
-    check('wide: two columns', not vis[0].single_column(),
-          f'avail {vis[0]._avail_width()}')
-    check('and the form fills the viewport, not its minimum',
-          vis[0].width() == vis[0]._avail_width(),
-          f'{vis[0].width()} vs {vis[0]._avail_width()}')
-    # the DEFAULT window, and the size the owner's saved geometry uses:
-    # the Tk form showed two columns here, so the Qt one must too
-    win.resize(1280, 840)
-    pump(250)
-    check('the default 1280x840 still gets two columns',
-          not vis[0].single_column(),
-          f'avail {vis[0]._avail_width()} needs {2 * COL_MIN + 8}')
+    check("the Setup forms use the 'nodes' placement",
+          all(f.placement == 'nodes' for f in forms))
+
+    def node_sweep(tag):
+        bad = []
+        for mode in ('native', 'blastfoam'):
+            win.solver_mode.set(mode)
+            pump(120)
+            for d in sorted(win.setup.forms):
+                win.setup.set_dim(d)
+                pump(120)
+                for node_id in win.setup.visible_nodes():
+                    win.setup.select_node(node_id)
+                    pump(80)
+                    cut = clipped(win)
+                    if cut:
+                        cut.sort(key=lambda t: -t[2])
+                        bad.append((mode, d, node_id, cut[0]))
+        win.setup.set_dim(2)
+        win.setup.select_node('threat')
+        pump(120)
+        check(f'{tag}: every node of every dimension, both modes, '
+              f'nothing clipped', not bad, str(bad[:3]))
+
     win.resize(1100, 720)
     pump(200)
-    check('narrow: one column', vis[0].single_column(),
-          f'avail {vis[0]._avail_width()}')
-    check('ALL three forms collapsed, not just the visible one - the '
-          'stack takes the largest page as its minimum',
-          all(f.single_column() for f in forms),
-          str([f.single_column() for f in forms]))
-    check('the second holder is out of the layout, so it stops '
-          'contributing to the minimum',
-          vis[0]._holders[1].isHidden())
-    check('and the form now fits the viewport',
-          vis[0].width() <= vis[0]._avail_width(),
-          f'{vis[0].width()} vs {vis[0]._avail_width()}')
-    check('the threshold is two columns plus the gap',
+    node_sweep('1100x720')
+    check('the properties column is the board\'s 340 px on 01 Threat',
+          win.setup.props_width() == 340, str(win.setup.props_width()))
+    # lift the window minimum IN THE TEST ONLY so a genuinely narrow
+    # window exists
+    win.setMinimumSize(900, 600)
+    win.resize(1000, 700)
+    pump(200)
+    node_sweep('narrow 1000x700')
+    check('the threshold is two columns plus the gap (Chain forms)',
           COL_MIN == 302 and 2 * COL_MIN + 8 == 612, str(COL_MIN))
     check('and the form cards use the panel-wide 12 px padding - 16 cost '
           '8 px a column, which is what pushed 1280 over the edge',
           CARD_PAD == 12, str(CARD_PAD))
 
-    print('\nP4: collapsing must not lose anything')
+    print('\nP4: relayout must not lose anything')
     win.resize(1600, 900)
     pump(200)
+    vis = [f for f in forms if f.isVisible()]
     form = vis[0]
     form.v['Lx'].set('7.25')
     form.v['cell'].set('0.033')
@@ -227,6 +243,12 @@ def main():
     hidden_before = {t: form.cards[t].isHidden() for t in form.cards}
     win.resize(900, 600)
     pump(250)
+    # GUI-5: a relayout is now also every node page shown and hidden
+    for node_id in win.setup.visible_nodes():
+        win.setup.select_node(node_id)
+        pump(40)
+    win.setup.select_node('domain')
+    pump(80)
     check('every card survived the move',
           sorted(form.cards) == before_cards,
           str(set(before_cards) ^ set(form.cards)))
@@ -266,19 +288,24 @@ def main():
           and form.labels['Lx'].text() == 'Lx [m]')
     win.resize(1600, 900)
     pump(250)
-    check('going back to two columns restores them',
-          not form.single_column()
-          and not form._holders[1].isHidden())
+    check('going back wide shows the selected node\'s cards again',
+          set(win.setup.shown_cards())
+          == {t for t in ('Domain', 'Dynamic refinement (AMR)',
+                          'Refinement zones [m, level]')
+              if form.card_visible(t)},
+          str(win.setup.shown_cards()))
     check('still with the values', form.v['Lx'].get() == '7.25')
+    win.setMinimumSize(1100, 720)       # the app's own minimum, back
 
     print('\nP5: tooltips on everything that is greyed or abbreviated')
     win._show('results')
     pump(150)
     heads = win.results.gauges.table
-    check('all eight summary headers explain themselves',
+    # GUI-7 T5: nine with Z (board Results line 162)
+    check('all nine summary headers (Z included) explain themselves',
           all(heads.horizontalHeaderItem(i).toolTip()
               for i in range(heads.columnCount()))
-          and heads.columnCount() == len(RG.HEADERS))
+          and heads.columnCount() == len(RG.HEADERS) == 9)
     btns = win.results._export_btns
     check('all eight export buttons have a tooltip',
           len(btns) == 8 and all(b.toolTip() for b in btns.values()),
@@ -289,11 +316,15 @@ def main():
     check('and a disabled one says WHY, not just what',
           off and all(btns[k].toolTip() for k in off), str(off))
 
-    print('\nP6: the four accelerators are bound')
+    print('\nP6: the five accelerators are bound, and Esc is not')
+    # GUI-3 / UX-7: the stop key is Shift+Esc now (plain Esc unbound),
+    # Ctrl+S saves in place and Ctrl+Shift+S is Save as (plan §4)
     from PySide6.QtGui import QShortcut
     keys = {sc.key().toString() for sc in win.findChildren(QShortcut)}
-    for want in ('Ctrl+O', 'Ctrl+S', 'F5', 'Esc'):
+    for want in ('Ctrl+O', 'Ctrl+S', 'Ctrl+Shift+S', 'F5', 'Shift+Esc'):
         check(f'{want} is bound', want in keys, str(sorted(keys)))
+    check("plain 'Esc' is NOT bound", 'Esc' not in keys,
+          str(sorted(keys)))
 
     check('nothing raised during the whole sweep', not crashes,
           str(crashes[:1]))

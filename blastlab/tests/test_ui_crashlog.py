@@ -108,6 +108,9 @@ def main():
           and 'thread' in crashlog.last_crash['where'],
           str(crashlog.last_crash and crashlog.last_crash['where']))
 
+    _dialog_only_on_gui_thread(check)
+    _post_to_deleted_bridge(check)
+
     print('\n  what is deliberately NOT caught')
     check('KeyboardInterrupt goes to the default hook, so Ctrl-C from a '
           'terminal still stops the program rather than opening a dialog '
@@ -117,6 +120,78 @@ def main():
     print('\nUI CRASHLOG: '
           + ('FAIL - ' + ', '.join(FAIL) if FAIL else 'PASS'))
     return 1 if FAIL else 0
+
+
+def _dialog_only_on_gui_thread(check):
+    """GUI-11 T1 (UXR-4, D203): a worker's crash writes the log on the
+    worker and builds its QMessageBox on the GUI thread, never on the
+    raising one. The box class is replaced by a recorder (no modal) and
+    the offscreen suppression lifted for the check."""
+    import threading
+    from PySide6 import QtWidgets
+    from blastlab.ui import crashlog
+    from blastlab.ui.testing import pump
+
+    print('\n  a worker crash shows its dialog on the GUI thread only')
+    built = []
+    real_box = QtWidgets.QMessageBox
+    real_suppressed = crashlog._suppressed
+
+    class RecordingBox(real_box):
+        def __init__(self, *a, **kw):
+            built.append(threading.current_thread())
+            super().__init__(*a, **kw)
+
+        def exec(self):
+            return 0
+
+    pump(50)        # the earlier worker check's queued (offscreen) dialog
+    path = crashlog.log_path()
+    before = os.path.getsize(path) if os.path.exists(path) else 0
+    QtWidgets.QMessageBox = RecordingBox
+    crashlog._suppressed = lambda: False
+    try:
+        crashlog.last_crash = None
+
+        def explode():
+            raise RuntimeError('deliberate: a worker crash for the dialog')
+
+        th = threading.Thread(target=explode, name='deliberate-dialog')
+        th.start()
+        th.join(5.0)
+        on_worker = list(built)
+        check('the worker crash wrote the log',
+              crashlog.last_crash is not None
+              and 'worker crash' in crashlog.last_crash['message']
+              and os.path.getsize(path) > before,
+              str(crashlog.last_crash and crashlog.last_crash['where']))
+        check('no QMessageBox was built on the raising thread',
+              on_worker == [], str(on_worker))
+        pump(100)
+        check('the box was built once, on the main thread, after a pump',
+              built == [threading.main_thread()], str(built))
+    finally:
+        QtWidgets.QMessageBox = real_box
+        crashlog._suppressed = real_suppressed
+
+
+def _post_to_deleted_bridge(check):
+    """GUI-11 T1 (UXR-4, D203): the HD 1.3 worker posting after the
+    window closed reaches a deleted ThreadBridge; that must raise
+    nothing."""
+    import shiboken6
+    from blastlab.ui.bridge import ThreadBridge
+
+    print('\n  posting to a deleted bridge')
+    bridge = ThreadBridge()
+    shiboken6.delete(bridge)
+    err = None
+    try:
+        bridge.post(lambda: None)
+    except Exception as exc:          # noqa: BLE001 - the check
+        err = exc
+    check('bridge.post on a deleted ThreadBridge raises nothing',
+          err is None and not shiboken6.isValid(bridge), repr(err))
 
 
 def _ctrl_c_passes_through():

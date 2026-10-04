@@ -1,0 +1,365 @@
+{
+ "rule": "measurements-6b.md R-VIEWER (pre-registered 10:39)",
+ "case": "tests/cases/native_3d_small.json at cell 0.075 m (native, 64 k cells)",
+ "n_samples": 9863,
+ "n_with_viewer": 2913,
+ "n_wrong": 30,
+ "longest_wrong_ms": 44.590899996459484,
+ "PASS": false,
+ "by_phase": {
+  "start": {
+   "n": 71,
+   "vis": 0,
+   "wrong": 0
+  },
+  "A1 run start, 3D view shown (auto-attach)": {
+   "n": 1082,
+   "vis": 250,
+   "wrong": 2
+  },
+  "A2 finished: the banner above the host, playback": {
+   "n": 903,
+   "vis": 903,
+   "wrong": 0
+  },
+  "A3 resize 1100 x 720 with the banner": {
+   "n": 574,
+   "vis": 574,
+   "wrong": 13
+  },
+  "A4 resize 1600 x 1000 with the banner": {
+   "n": 569,
+   "vis": 569,
+   "wrong": 15
+  },
+  "A5 dock tab switch, Setup and back, with the banner": {
+   "n": 800,
+   "vis": 613,
+   "wrong": 0
+  },
+  "B1 second start (Run): the banner goes": {
+   "n": 1499,
+   "vis": 4,
+   "wrong": 0
+  },
+  "B2 stop the second run": {
+   "n": 685,
+   "vis": 0,
+   "wrong": 0
+  },
+  "C1 third start (Initialise): the banner goes": {
+   "n": 1817,
+   "vis": 0,
+   "wrong": 0
+  },
+  "C2 +100, then to the end": {
+   "n": 954,
+   "vis": 0,
+   "wrong": 0
+  },
+  "C3 finished again: the banner above the host": {
+   "n": 909,
+   "vis": 0,
+   "wrong": 0
+  }
+ },
+ "phases": [
+  [
+   "A1 run start, 3D view shown (auto-attach)",
+   1160806.223,
+   false,
+   1
+  ],
+  [
+   "A2 finished: the banner above the host, playback",
+   1160812.836,
+   true,
+   1
+  ],
+  [
+   "A3 resize 1100 x 720 with the banner",
+   1160816.835,
+   true,
+   1
+  ],
+  [
+   "A4 resize 1600 x 1000 with the banner",
+   1160819.397,
+   true,
+   2
+  ],
+  [
+   "A5 dock tab switch, Setup and back, with the banner",
+   1160821.946,
+   true,
+   1
+  ],
+  [
+   "B1 second start (Run): the banner goes",
+   1160825.522,
+   true,
+   1
+  ],
+  [
+   "B2 stop the second run",
+   1160833.555,
+   true,
+   1
+  ],
+  [
+   "C1 third start (Initialise): the banner goes",
+   1160836.554,
+   true,
+   1
+  ],
+  [
+   "C2 +100, then to the end",
+   1160844.57,
+   false,
+   1
+  ],
+  [
+   "C3 finished again: the banner above the host",
+   1160850.068,
+   true,
+   1
+  ],
+  [
+   "end",
+   1160854.069,
+   true,
+   1
+  ]
+ ],
+ "first_wrong": [
+  {
+   "t": 6.854312299983576,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 6.858805399853736,
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ]
+  },
+  {
+   "t": 10.975535199977458,
+   "phase": "A3 resize 1100 x 720 with the banner",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ]
+  },
+  {
+   "t": 10.980038999812678,
+   "phase": "A3 resize 1100 x 720 with the banner",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ]
+  },
+  {
+   "t": 10.984209900023416,
+   "phase": "A3 resize 1100 x 720 with the banner",
+   "vis": true,
+   "wrong": true,
+   "top": false,
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ]
+  }
+ ],
+ "stretches": [
+  {
+   "phase": "A1 run start, 3D view shown (auto-attach)",
+   "t0": 6.854312299983576,
+   "t1": 6.858805399853736,
+   "n": 2,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    70
+   ],
+   "rh": [
+    559,
+    317,
+    1235,
+    908
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 8.5
+  },
+  {
+   "phase": "A3 resize 1100 x 720 with the banner",
+   "t0": 10.975535199977458,
+   "t1": 11.002269699936733,
+   "n": 7,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    476,
+    298
+   ],
+   "rh": [
+    547,
+    335,
+    1223,
+    856
+   ],
+   "rc": [
+    547,
+    335,
+    747,
+    558
+   ],
+   "ms": 30.7
+  },
+  {
+   "phase": "A3 resize 1100 x 720 with the banner",
+   "t0": 11.02900919993408,
+   "t1": 11.051598799880594,
+   "n": 6,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    -184,
+    58
+   ],
+   "rh": [
+    351,
+    423,
+    551,
+    646
+   ],
+   "rc": [
+    351,
+    423,
+    735,
+    588
+   ],
+   "ms": 26.6
+  },
+  {
+   "phase": "A4 resize 1600 x 1000 with the banner",
+   "t0": 13.581104199867696,
+   "t1": 13.598684899974614,
+   "n": 5,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    0,
+    30
+   ],
+   "rh": [
+    527,
+    405,
+    1275,
+    868
+   ],
+   "rc": [
+    527,
+    405,
+    1275,
+    838
+   ],
+   "ms": 21.6
+  },
+  {
+   "phase": "A4 resize 1600 x 1000 with the banner",
+   "t0": 13.625833199825138,
+   "t1": 13.666424099821597,
+   "n": 10,
+   "top": false,
+   "over_max": [
+    0,
+    0,
+    72,
+    -88
+   ],
+   "rh": [
+    559,
+    317,
+    1307,
+    750
+   ],
+   "rc": [
+    559,
+    317,
+    1235,
+    838
+   ],
+   "ms": 44.6
+  }
+ ],
+ "notes": 3,
+ "viewer_pid": 44196
+}

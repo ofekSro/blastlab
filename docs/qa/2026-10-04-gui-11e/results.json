@@ -1,0 +1,114 @@
+{
+  "Setup shows the \"inside an obstacle - will be dropped\" warning": {
+    "ok": true,
+    "detail": "Gauge (1.4, 0.3) inside an obstacle - will be dropped\nGauge (1.2, 0.3) on an obstacle face - will be dropped\nCharge is truncated by the y_lo wall (surface burst)\nCell size will be refined to 0.01250 m (5 cells across the charge radius)\n~24,576 cells at dx = 0.012499 m"
+  },
+  "Setup shows the \"on an obstacle face - will be dropped\" warning": {
+    "ok": true,
+    "detail": "Gauge (1.4, 0.3) inside an obstacle - will be dropped\nGauge (1.2, 0.3) on an obstacle face - will be dropped\nCharge is truncated by the y_lo wall (surface burst)\nCell size will be refined to 0.01250 m (5 cells across the charge radius)\n~24,576 cells at dx = 0.012499 m"
+  },
+  "Chain stage 2 card shows a warning state (not an error)": {
+    "ok": false,
+    "detail": "\u25cf 1 error"
+  },
+  "Chain stage 2 Checks list has the \"inside an obstacle\" line": {
+    "ok": true,
+    "detail": "1D profile remap is only valid in axisymmetric mode\nGauge (1.4, 0.3) inside an obstacle - will be dropped\nThe 1D stage hands off when its shock is at 10.0 m, beyond this stage's whole 2.4 \u00d7 1.6 m domain: this stage would start after the wave has left it."
+  },
+  "Chain stage 2 Checks list has the \"on an obstacle face\" line": {
+    "ok": false,
+    "detail": "1D profile remap is only valid in axisymmetric mode\nGauge (1.4, 0.3) inside an obstacle - will be dropped\nThe 1D stage hands off when its shock is at 10.0 m, beyond this stage's whole 2.4 \u00d7 1.6 m domain: this stage would start after the wave has left it."
+  },
+  "the 2D run finished within the budget": {
+    "ok": true,
+    "detail": "17s"
+  },
+  "Run strip is one row at 1280x840": {
+    "ok": true,
+    "detail": "rows=1"
+  },
+  "Run strip is one row at 1600x1000": {
+    "ok": true,
+    "detail": "rows=1"
+  },
+  "Run strip is two rows at 1100x720": {
+    "ok": true,
+    "detail": "rows=2"
+  },
+  "Run strip stays one row at 1280x840 in light theme": {
+    "ok": true,
+    "detail": "rows=1"
+  },
+  "Run strip stays two rows at 1100x720 in light theme": {
+    "ok": true,
+    "detail": "rows=2"
+  },
+  "exactly two gauges were dropped (G2 inside, G3 on-face)": {
+    "ok": true,
+    "detail": "points=3"
+  },
+  "core gauge_summary labels G1 with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "core gauge_summary labels G4 (not shifted to G3) with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "core gauge_summary labels G5 (not shifted to G4) with its entered position": {
+    "ok": true,
+    "detail": "['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', 'G4 (1.800, 0.800) -> cell (1.797, 0.802) m', 'G5 (2.000, 1.200) -> cell (1.996, 1.200) m']"
+  },
+  "Gauges table tooltip for G4 shows the ENTERED position (1.800, 0.800), not shifted": {
+    "ok": true,
+    "detail": "G1 (0.300, 0.800) -> cell (0.305, 0.802) m | G4 (1.800, 0.800) -> cell (1.797, 0.802) m | G5 (2.000, 1.200) -> cell (1.996, 1.200) m"
+  },
+  "Gauges table tooltip for G5 shows the ENTERED position (2.000, 1.200), not shifted": {
+    "ok": true,
+    "detail": "G1 (0.300, 0.800) -> cell (0.305, 0.802) m | G4 (1.800, 0.800) -> cell (1.797, 0.802) m | G5 (2.000, 1.200) -> cell (1.996, 1.200) m"
+  },
+  "Summary .csv was written": {
+    "ok": true,
+    "detail": "D:\\blastlab_tmp\\blastlab_qa_exp_jj7w1oqw\\qa_2d_obstacle_gauges_2d_summary.csv"
+  },
+  "Summary .csv gauge column has G1 (0.300, 0.800)": {
+    "ok": true,
+    "detail": ""
+  },
+  "Summary .csv gauge column has G4 (1.800, 0.800) (not shifted)": {
+    "ok": true,
+    "detail": ""
+  },
+  "Summary .csv gauge column has G5 (2.000, 1.200) (not shifted)": {
+    "ok": true,
+    "detail": ""
+  },
+  "HTML report was written": {
+    "ok": true,
+    "detail": "D:\\blastlab_tmp\\blastlab_qa_exp_jj7w1oqw\\qa_2d_obstacle_blast_2d_report.html"
+  },
+  "HTML report gauge column has G1 (0.300, 0.800)": {
+    "ok": true,
+    "detail": ""
+  },
+  "HTML report gauge column has G4 (1.800, 0.800) (not shifted)": {
+    "ok": true,
+    "detail": ""
+  },
+  "HTML report gauge column has G5 (2.000, 1.200) (not shifted)": {
+    "ok": true,
+    "detail": ""
+  },
+  "the 1D run finished": {
+    "ok": true,
+    "detail": "2s"
+  },
+  "1D Field title matches screen_title_1d() exactly": {
+    "ok": false,
+    "detail": "'<error: AttributeError(\"\\'FieldView\\' object has no attribute \\'title\\'\")>' vs '1D spherical \u00b7 1.0 kg TNT \u00b7 idealGas'"
+  },
+  "no uncaught exception during the whole run": {
+    "ok": true,
+    "detail": "0 crash(es)"
+  }
+}

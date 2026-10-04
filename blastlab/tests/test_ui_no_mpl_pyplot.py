@@ -86,22 +86,41 @@ def main():
     win.on_result(2, 3, 'Run 2 - 3D', fake_3d())
     win._show('results')
     pump(40)
-    for view in ('Fields', 'Gauges', 'Animation', '3D'):
+    # GUI-7 T6: Field replaces the Fields and Animation tabs
+    for view in ('Field', 'Gauges', '3D'):
         win.results.show_view(view)
         pump(40)
         check(f'nor drawing Results / {view} with real data', clean())
     # the two views that fall back to a matplotlib canvas are the most
     # likely to reach for pyplot by habit
-    win.results.show_view('Fields')
+    win.results.show_view('Field')
     win.results.fields.field_sel.setCurrentText('isosurface')
     pump(60)
     check('nor the 3D isosurface page, which IS matplotlib',
           clean() and win.results.fields.page() == 'figure')
-    win.results.show_view('Animation')
-    win.results.anim.start_play()
+    win.results.sel.setCurrentIndex(0)             # the 2D, with frames
     pump(40)
-    win.results.anim.stop_play()
+    win.results.field_view.start_play()
+    pump(40)
+    win.results.field_view.stop_play()
     check('nor replaying the animation', clean())
+    # the snapshots play on the Field view's own timer
+    win.results.field_view.field_seg.changed.emit('Density')
+    pump(20)
+    win.results.field_view.start_play()
+    pump(40)
+    win.results.field_view.stop_play()
+    check('nor stepping the snapshots', clean())
+    # This frame .png builds and saves a matplotlib figure: OO only
+    from blastlab.ui import dialogs
+    out = os.path.join(tempfile.mkdtemp(prefix='blastlab_np_png_'), 'f.png')
+    real = dialogs.save_file
+    dialogs.save_file = lambda *a, **k: out
+    try:
+        win.results.field_view.save_frame_png(threaded=False)
+    finally:
+        dialogs.save_file = real
+    check('nor This frame .png', clean() and os.path.exists(out))
     check('and VTK is still nowhere near the GUI process',
           not [m for m in sys.modules
                if m.startswith(('vtk', 'pyvista'))],

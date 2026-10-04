@@ -35,7 +35,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -117,7 +117,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -199,7 +199,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -281,7 +281,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -363,7 +363,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -425,72 +425,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "e933ac5bae1abe3e5d7abb8440d41eef499dee6b",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (r = 0.50 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "306dec9fb1e112c5dc965def7c100fb7a8780d48",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (r = 0.99 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "cc8382d8abcaaa2bac1a6b3c7c9d65fa4a672551",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 3  (r = 1.50 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [],
-            "lines": [],
-            "texts": [],
-            "title": "",
-            "xlabel": "",
-            "ylabel": ""
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1.0 kg TNT - EOS: JWL",
-        "texts": [
-          "Gauge Time Histories - 1.0 kg TNT - EOS: JWL"
-        ]
-      },
       "rows": [
         [
           "G1  r = 0.500 m",
@@ -522,6 +456,11 @@
           "88.03",
           "no"
         ]
+      ],
+      "traces": [
+        "e933ac5bae1abe3e5d7abb8440d41eef499dee6b",
+        "306dec9fb1e112c5dc965def7c100fb7a8780d48",
+        "cc8382d8abcaaa2bac1a6b3c7c9d65fa4a672551"
       ]
     }
   },
@@ -1068,46 +1007,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "178a6d1d6f0050d255a9732657f4acca26973b72",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.50, 0.70) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.41, 0.21) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1 kg TNT - EOS: JWL",
-        "texts": [
-          "Gauge Time Histories - 1 kg TNT - EOS: JWL"
-        ]
-      },
       "rows": [
         [
           "G1 (0.500, 0.700) m",
@@ -1129,6 +1028,10 @@
           "143.02",
           "no"
         ]
+      ],
+      "traces": [
+        "178a6d1d6f0050d255a9732657f4acca26973b72",
+        "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3"
       ]
     }
   },
@@ -1687,46 +1590,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: JWL",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: JWL"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -1748,6 +1611,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   },
@@ -1755,81 +1622,81 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 7cf8e640d698c6e2",
+      "fields": "ok 848b00011c2c1334",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "charge_kg": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 31ec7de1ae62a6d5",
+      "fields": "ok 227c7d5c477ffc39",
       "fields page": "empty",
-      "gauges": "ok d8a2cb1a85ca5ba9",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 31ec7de1ae62a6d5",
+      "fields": "ok 227c7d5c477ffc39",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "empty",
-      "gauges": "ok d8a2cb1a85ca5ba9",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "final_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "r": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "radius_m": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "empty",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     }
   },
@@ -1837,7 +1704,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1848,7 +1715,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1859,7 +1726,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1870,7 +1737,7 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1881,7 +1748,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 1bfa24e351d77f84",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "KeyError: 'charge'",
       "select net ovp impulse": "KeyError: 'charge'",
@@ -1892,7 +1759,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1903,7 +1770,7 @@
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1914,7 +1781,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1925,7 +1792,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 1bfa24e351d77f84",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1936,7 +1803,7 @@
     "final_state": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1947,7 +1814,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1958,7 +1825,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1969,7 +1836,7 @@
     "gauges": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 8b35acba4269f5c4",
+      "gauges": "ok 4f535cec703409d0",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1980,7 +1847,7 @@
     "geometry": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok 7a8dc8242713e684",
       "select density": "ok 509b19271d0e65b2",
       "select net ovp impulse": "ok d884b761946b3ffe",
@@ -1991,7 +1858,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'impulse'",
@@ -2002,7 +1869,7 @@
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2013,7 +1880,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2024,7 +1891,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'p_peak'",
@@ -2035,7 +1902,7 @@
     "peak_source": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2046,7 +1913,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2057,7 +1924,7 @@
     "refine": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2068,7 +1935,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'solid'",
       "select density": "KeyError: 'solid'",
       "select net ovp impulse": "KeyError: 'solid'",
@@ -2079,7 +1946,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2090,7 +1957,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2101,7 +1968,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2112,7 +1979,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'x_face'",
       "select density": "KeyError: 'x_face'",
       "select net ovp impulse": "KeyError: 'x_face'",
@@ -2123,7 +1990,7 @@
     "y_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2134,7 +2001,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f957271425ee8189",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'y_face'",
       "select density": "KeyError: 'y_face'",
       "select net ovp impulse": "KeyError: 'y_face'",
@@ -2147,7 +2014,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2162,7 +2029,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2177,7 +2044,7 @@
     "Lz": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2192,7 +2059,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2207,7 +2074,7 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2222,7 +2089,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok c37d39de1f8da823",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'charge'",
       "select density (x-z)": "KeyError: 'charge'",
@@ -2237,7 +2104,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2252,7 +2119,7 @@
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2267,7 +2134,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2282,7 +2149,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok c37d39de1f8da823",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2297,7 +2164,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2312,7 +2179,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2327,7 +2194,7 @@
     "gauges": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 8f75128b235f6b7e",
+      "gauges": "ok a51463c95a437776",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2342,7 +2209,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2357,7 +2224,7 @@
     "j0": {
       "anim": "KeyError: 'j0'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'j0'",
       "select density (x-y)": "KeyError: 'j0'",
       "select density (x-z)": "KeyError: 'j0'",
@@ -2372,7 +2239,7 @@
     "k0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'k0'",
       "select density (x-z)": "KeyError: 'k0'",
@@ -2387,7 +2254,7 @@
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2402,7 +2269,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2417,7 +2284,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2432,7 +2299,7 @@
     "peak_source": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2447,7 +2314,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2462,7 +2329,7 @@
     "r_src": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2477,7 +2344,7 @@
     "refine": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2492,7 +2359,7 @@
     "s0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2507,7 +2374,7 @@
     "slice_axis": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2522,7 +2389,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'solid'",
       "select density (x-y)": "KeyError: 'solid'",
       "select density (x-z)": "KeyError: 'solid'",
@@ -2537,7 +2404,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2552,7 +2419,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2567,7 +2434,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2582,7 +2449,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'x_face'",
       "select density (x-y)": "KeyError: 'x_face'",
       "select density (x-z)": "KeyError: 'x_face'",
@@ -2597,7 +2464,7 @@
     "y_c": {
       "anim": "KeyError: 'y_c'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'y_c'",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'y_c'",
@@ -2612,7 +2479,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'y_face'",
       "select density (x-y)": "KeyError: 'y_face'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2627,7 +2494,7 @@
     "z_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'z_c'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2642,7 +2509,7 @@
     "z_face": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok d6f97c0393e46580",
-      "gauges": "ok ffe2ef8e2dd97797",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok df0855578b924343",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'z_face'",
@@ -2661,7 +2528,7 @@
       "anim shown": "ok 12b11228c00cb6ab",
       "fields": "ok 3a28f0d76050f92a",
       "fields page": "empty",
-      "gauges": "ok d8a2cb1a85ca5ba9",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "eos": {
@@ -2669,39 +2536,39 @@
       "anim shown": "ok 12b11228c00cb6ab",
       "fields": "ok 9977246a0b9d2948",
       "fields page": "empty",
-      "gauges": "ok d8a2cb1a85ca5ba9",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "final_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "r": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok ba3b34815fe72e77",
+      "fields": "ok 400d3f323fe3b667",
       "fields page": "figure",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     },
     "radius_m": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 12b11228c00cb6ab",
-      "fields": "ok 735c8f452fe92c8b",
+      "fields": "ok 54266cb63a21ebf8",
       "fields page": "empty",
-      "gauges": "ok e0367ca92da0e1d2",
+      "gauges": "ok d16b7eee35574b2d",
       "select profiles": "ok 2be88ca4242c76e8"
     }
   },
@@ -2709,7 +2576,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2720,7 +2587,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2731,7 +2598,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2742,7 +2609,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 1bfa24e351d77f84",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "KeyError: 'charge'",
       "select net ovp impulse": "KeyError: 'charge'",
@@ -2753,7 +2620,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2764,7 +2631,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2775,7 +2642,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 1bfa24e351d77f84",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2786,7 +2653,7 @@
     "final_state": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2797,7 +2664,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2808,7 +2675,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2819,7 +2686,7 @@
     "gauges": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 3660ceee96c2e03b",
+      "gauges": "ok 4f535cec703409d0",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2830,7 +2697,7 @@
     "geometry": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok 7a8dc8242713e684",
       "select density": "ok 509b19271d0e65b2",
       "select net ovp impulse": "ok d884b761946b3ffe",
@@ -2841,7 +2708,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'impulse'",
@@ -2852,7 +2719,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2863,7 +2730,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'p_peak'",
@@ -2874,7 +2741,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2885,7 +2752,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'solid'",
       "select density": "KeyError: 'solid'",
       "select net ovp impulse": "KeyError: 'solid'",
@@ -2896,7 +2763,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2907,7 +2774,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2918,7 +2785,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2929,7 +2796,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'x_face'",
       "select density": "KeyError: 'x_face'",
       "select net ovp impulse": "KeyError: 'x_face'",
@@ -2940,7 +2807,7 @@
     "y_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2951,7 +2818,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 61c5eb0186c666d7",
+      "gauges": "ok 7b406cc6c991b394",
       "plane_geometry": "KeyError: 'y_face'",
       "select density": "KeyError: 'y_face'",
       "select net ovp impulse": "KeyError: 'y_face'",
@@ -2964,7 +2831,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2979,7 +2846,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2994,7 +2861,7 @@
     "Lz": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3009,7 +2876,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3024,7 +2891,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok c37d39de1f8da823",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'charge'",
       "select density (x-z)": "KeyError: 'charge'",
@@ -3039,7 +2906,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3054,7 +2921,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3069,7 +2936,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok c37d39de1f8da823",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3084,7 +2951,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3099,7 +2966,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3114,7 +2981,7 @@
     "gauges": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 48b807ced2be7959",
+      "gauges": "ok a51463c95a437776",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3129,7 +2996,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3144,7 +3011,7 @@
     "j0": {
       "anim": "KeyError: 'j0'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'j0'",
       "select density (x-y)": "KeyError: 'j0'",
       "select density (x-z)": "KeyError: 'j0'",
@@ -3159,7 +3026,7 @@
     "k0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'k0'",
       "select density (x-z)": "KeyError: 'k0'",
@@ -3174,7 +3041,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3189,7 +3056,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3204,7 +3071,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3219,7 +3086,7 @@
     "r_src": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3234,7 +3101,7 @@
     "s0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3249,7 +3116,7 @@
     "slice_axis": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3264,7 +3131,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'solid'",
       "select density (x-y)": "KeyError: 'solid'",
       "select density (x-z)": "KeyError: 'solid'",
@@ -3279,7 +3146,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3294,7 +3161,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3309,7 +3176,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3324,7 +3191,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'x_face'",
       "select density (x-y)": "KeyError: 'x_face'",
       "select density (x-z)": "KeyError: 'x_face'",
@@ -3339,7 +3206,7 @@
     "y_c": {
       "anim": "KeyError: 'y_c'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'y_c'",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'y_c'",
@@ -3354,7 +3221,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "KeyError: 'y_face'",
       "select density (x-y)": "KeyError: 'y_face'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3369,7 +3236,7 @@
     "z_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'z_c'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3384,7 +3251,7 @@
     "z_face": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok d6f97c0393e46580",
-      "gauges": "ok 458a7860de087ccb",
+      "gauges": "ok f4c2c3e8de58d946",
       "plane_geometry": "ok df0855578b924343",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'z_face'",
@@ -3433,7 +3300,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3515,7 +3382,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3597,7 +3464,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3679,7 +3546,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3761,7 +3628,7 @@
                 "d53e107772ca9f11f00f3347d419d49a6b5766d4"
               ],
               "texts": [],
-              "title": "1D Spherical Blast - 1.0 kg TNT - EOS: JWL",
+              "title": "1D spherical \u00b7 1.0 kg TNT \u00b7 JWL",
               "xlabel": "",
               "ylabel": "Pressure [kPa]"
             },
@@ -3823,72 +3690,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "e933ac5bae1abe3e5d7abb8440d41eef499dee6b",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (r = 0.50 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "306dec9fb1e112c5dc965def7c100fb7a8780d48",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (r = 0.99 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "cc8382d8abcaaa2bac1a6b3c7c9d65fa4a672551",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 3  (r = 1.50 m)",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [],
-            "lines": [],
-            "texts": [],
-            "title": "",
-            "xlabel": "",
-            "ylabel": ""
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1.0 kg TNT - EOS: JWL",
-        "texts": [
-          "Gauge Time Histories - 1.0 kg TNT - EOS: JWL"
-        ]
-      },
       "rows": [
         [
           "G1  r = 0.500 m",
@@ -3920,6 +3721,11 @@
           "88.03",
           "no"
         ]
+      ],
+      "traces": [
+        "e933ac5bae1abe3e5d7abb8440d41eef499dee6b",
+        "306dec9fb1e112c5dc965def7c100fb7a8780d48",
+        "cc8382d8abcaaa2bac1a6b3c7c9d65fa4a672551"
       ]
     }
   },
@@ -4466,46 +4272,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "178a6d1d6f0050d255a9732657f4acca26973b72",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.50, 0.70) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.41, 0.21) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 1 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.500, 0.700) m",
@@ -4527,6 +4293,10 @@
           "143.02",
           "no"
         ]
+      ],
+      "traces": [
+        "178a6d1d6f0050d255a9732657f4acca26973b72",
+        "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3"
       ]
     }
   },
@@ -5045,46 +4815,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "178a6d1d6f0050d255a9732657f4acca26973b72",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.50, 0.70) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.41, 0.21) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 1 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.500, 0.700) m",
@@ -5106,6 +4836,10 @@
           "143.02",
           "no"
         ]
+      ],
+      "traces": [
+        "178a6d1d6f0050d255a9732657f4acca26973b72",
+        "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3"
       ]
     }
   },
@@ -5652,46 +5386,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "178a6d1d6f0050d255a9732657f4acca26973b72",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.50, 0.70) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.41, 0.21) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 1 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.500, 0.700) m",
@@ -5713,6 +5407,10 @@
           "143.02",
           "no"
         ]
+      ],
+      "traces": [
+        "178a6d1d6f0050d255a9732657f4acca26973b72",
+        "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3"
       ]
     }
   },
@@ -6231,46 +5929,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "178a6d1d6f0050d255a9732657f4acca26973b72",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.50, 0.70) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.41, 0.21) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 1 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 1 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.500, 0.700) m",
@@ -6292,6 +5950,10 @@
           "143.02",
           "no"
         ]
+      ],
+      "traces": [
+        "178a6d1d6f0050d255a9732657f4acca26973b72",
+        "001cd1fd85e42a8a608258b8ca7fae1c8322a7f3"
       ]
     }
   },
@@ -6850,46 +6512,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -6911,6 +6533,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   },
@@ -7460,46 +7086,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -7521,6 +7107,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   },
@@ -8079,46 +7669,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -8140,6 +7690,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   },
@@ -8698,46 +8252,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -8759,6 +8273,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   },
@@ -9317,46 +8835,6 @@
     },
     "gauges": {
       "field": "p",
-      "figure": {
-        "axes": [
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "5756da23f54b5f0b82a72b7c8604d800763d83a2",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 1  (0.84, 0.51, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          },
-          {
-            "collections": [],
-            "images": [],
-            "labels": [
-              "_child0",
-              "_child1"
-            ],
-            "lines": [
-              "183d4f94efd75970b44e537d25121d5c11134ae6",
-              "00c24c0a8f3ef67803416891034f719cb8c764a4"
-            ],
-            "texts": [],
-            "title": "Gauge 2  (0.51, 0.84, 0.51) m",
-            "xlabel": "Time [ms]",
-            "ylabel": "Overpressure [kPa]"
-          }
-        ],
-        "suptitle": "Gauge Time Histories - 8 kg TNT - EOS: idealGas",
-        "texts": [
-          "Gauge Time Histories - 8 kg TNT - EOS: idealGas"
-        ]
-      },
       "rows": [
         [
           "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
@@ -9378,6 +8856,10 @@
           "130.20",
           "no"
         ]
+      ],
+      "traces": [
+        "5756da23f54b5f0b82a72b7c8604d800763d83a2",
+        "183d4f94efd75970b44e537d25121d5c11134ae6"
       ]
     }
   }

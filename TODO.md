@@ -13,8 +13,49 @@ that code comments cite.
 Every item carries a stable id (`P2-3`, `N5-11`, `HD1-3`) — **cite it in commits
 and in discussion.**
 
-**Two exceptions sit above P0, in this order: `OUT`, then `HD1`.** Both are owner
-directives (2026-09-26 and 2026-09-20) and are not part of the P ranking.
+**Three exceptions sit above P0, in this order: `GUI`, `OUT`, then `HD1`.** All are
+owner directives (2026-09-28, 2026-09-26 and 2026-09-20) and are not part of the P
+ranking.
+
+---
+
+## GUI · ⭐ Highest priority (owner, 2026-09-28) — the redesigned Qt GUI
+
+**The whole specification, approved screen by screen on 2026-09-28, is
+[docs/gui-redesign-plan.md](docs/gui-redesign-plan.md)**, with the design boards in
+[docs/design/gui-redesign/boards/](docs/design/gui-redesign/boards/). This entry only
+orders it; every rule, value and acceptance criterion lives there. Qt only
+(`blastlab/ui/`): the Tk app, the solvers, the defaults and every file format stay as
+they are. Owner: *"implement everything"*, then run the QA and UX agents on the result.
+
+> **▶ RESUME HERE — the first thing to do from this list.** Branch `gui-redesign`;
+> GUI-1..11 done (GUI-11e 2026-10-04, DONE.md §0u). Next, in order:
+> 1. **`GUI-12`** — the backlog GUI-11e left (row below); the owner picks what to run.
+> 2. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` (the blastFoam 1→2→3
+>    chain; the home PC's 3D stage outlived 1800 s), harness F07 (over the home VM's cell
+>    cap), `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
+>
+> The owner reviewed the open calls on 2026-10-03 ("approve all"):
+> [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) § Owner review.
+> F1: an agent once ran a broad `taskkill`.
+>
+> Run agents on Opus 5.5 (`model: "opus"`) if Fable 5 credits run out, as happened on
+> 2026-09-29. The home PC has 8 GB RAM: heavy suites one at a time.
+
+| Id | What | Size | Order |
+|---|---|---|---|
+| `GUI-1` | ✅ done 2026-09-29 (DONE.md §0l) · **Design tokens and fonts** — warm-black palette + light, orange accent, cyan gauges; Space Grotesk / IBM Plex Sans / IBM Plex Mono bundled (OFL). Plan §2 | M | 1 |
+| `GUI-2` | ✅ done 2026-09-29 (DONE.md §0l) · **Logo and app icon** — the stepped front on an 8 × 8 grid, drawn with QPainter at 16/32/64; BLASTLAB wordmark; window + taskbar icon. Plan §3 | S | 2 |
+| `GUI-3` | ✅ done 2026-09-29 (DONE.md §0m) · **Window frame** — top bar with 01 Setup → 02 Run → 03 Results + Chain, solver chip, case menu (Open / Save / Save as / Recent / Dark), status bar, title with progress, Shift+Esc stop. No sidebar. Plan §4 | L | 3 |
+| `GUI-4` | ✅ done 2026-09-29 (DONE.md §0l) · **Shared components** — toggle switch, stat tile, tree row, dock tabs, banner. Plan §2.5 | M | 4 |
+| `GUI-5` | ✅ done 2026-09-29 (DONE.md §0n part a, §0o part b) · **01 Setup** — numbered model tree + properties of the selected node + live-number strip, Z rings, gauge table with Z; dependent settings open only when switched on. Plan §5 | L | 5 |
+| `GUI-6` | ✅ done 2026-09-29 (DONE.md §0p) · **02 Run** — controls / progress strip with ETA / live view / log dock / live-gauge list sorted by Z; Stop confirms after 30 s; finish banner + Windows notification. Plan §6 | L | 6 |
+| `GUI-7` | ✅ done 2026-09-29 (DONE.md §0q) · **03 Results** — results list + "how it was computed"; views Field (= Fields + Animation) · Gauges · 3D; table with Z and Copy; impulse in kPa·ms on screen only; exports grouped. No KB columns, no run overlay. Plan §7 | L | 7 |
+| `GUI-8` | ✅ done 2026-09-29 (DONE.md §0m) · **Chain 1D → 3D wiring** — `handoff_1d_to_3d.txt`; the engine already supports it, only `ChainPanel.run()` misses it; with tests. Plan §8.3 | S | 8 |
+| `GUI-9` | ✅ done 2026-10-03 (DONE.md §0r) · **Chain screen** — route buttons, pipeline with hand-off files, stage editor in the Setup layout, per-stage live validation, Copy from Setup / Load case; chain strip in Run, one result with stage tabs in Results. Plan §8 | L | 9 |
+| `GUI-10` | ✅ done 2026-10-03 (DONE.md §0s) · **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
+| `GUI-11` | ✅ done 2026-10-04 (DONE.md §0t parts a-d, §0u part e) · **Polish, owner-approved 2026-10-03** (`docs/gui-redesign-decisions.md`, owner-review rows) — (a) D191: `● unsaved` shortens to `●` (tooltip) whenever the case name is elided (D198 does it only when a control would be squeezed); F38: the harness clip check sees tool-button elision, then K02 `--window` again; F36: harness F02/F10 expect the VTK export disabled with its reason; (b) D192: tree-row hover visible in dark, dark `num_dim` at 4.06:1 on hover accepted; (c) F28: clear the previous stage's progress at a stage start, one line in `solvers/worker.py` — own commit, `test_regression` + the Tk suites; (d) F12: at 0-D hide the Run view toolbar, show a 0-D note; (e) F16: keep a case file's hidden-row value (`amr_refine` / `amr_unrefine`), solver defaults untouched; (f) F17: a shorter on-screen 1D figure title, exports byte-identical; (g) P2-18 and P2-24; (h) whatever the `gui-qa-tester` / `gui-ux-reviewer` pass after GUI-10 finds. Plan: `docs/batches/2026-10-03-gui-polish.md` (11a-11d). Owner 2026-10-03: UXR-3 → **hide** the Material row in native mode (not the plan's warning; the hidden-rows pin changes with that reason); UXR-14 → `P2-25`, not here | L | 11 |
+| `GUI-12` | **Backlog left by GUI-11e** (2026-10-04; `docs/qa/2026-10-04-gui-11e/`, `docs/batches/2026-10-04-gui-11e.verifyA.md`) — (a) QA, medium: the exported gauge-trace subplot titles (`output/plots.py` `figure_gauges_1d` / `_nd`) and the Tk Gauges tab number by survivor index (`Gauge 1/2/3`), not the entered G as the table beside them does (F42's sibling; export bytes change for runs with a drop); (b) UX, medium: the F44 warning names no wall, while Run and Setup's Where column say `Wall 1` (the index is in `_gauge_drop_rule`'s loop); (c) QA, low: the Chain 2D stage's Checks show `inside an obstacle` but not `on an obstacle face` for the case Setup warns on (the stage's auto-refined dx differs); (d) F45: a 2D → 3D reach check (the default chain's burst at z 2.0 m above the 1.5 m box); (e) harness E03 looks for `<file>` where the app writes `save1_<file>` (4 false findings); (f) the stale char goldens red at base `ee9a4b5` (`test_char_exports`, `test_ui_char_results_exports`, `test_gui_char_case_form`, `test_gui_char_exports`; the owner's session also lists `test_char_hd13`, `_cli`, `test_ui_char_case_form`, `_chain_wiring`, `_hd13_run`): check that the HD13 drift (-45.3645 vs -45.3536) is expected, then re-record, owner-approved; (g) low: the nearest-entered pairing can mislabel when two gauges sit within about a cell and the earlier one is dropped (verifyA Q1); the (1.2, 0.3) native face check sits on an exact cell-face tie (Q2); (h) UX, low: the short on-screen 1D title differs from the exported one with no hint; a third title style on Results | M | 12 |
 
 ---
 
@@ -921,6 +962,7 @@ Qt refusal and overwrite dialogs break a path after "C:".
 - `P2-22` Validation accepts a detonation point that activates no cell; blastFoam then dies at t = 0 ("No cells will be activated using the detonation point"). Seen in OUT-3 e2e and harness F05.
 - `P2-23` A resumed run's gauges lose U: after a restart blastProbes writes only p and rho, so `read_probes` drops U_mag (warns since 25ce709). Pre-existing on master (OUT-3 verifier).
 - `P2-24` Qt: the Keep all fields tooltip is one ~1000 px line - wrap it. Tk light mode: unselected sidebar / dimension buttons are very faint (OUT-3 QA).
+- `P2-25` Qt: a native result cannot be reopened in 03 Results after a restart, though its files are in the model folder - add `Open a model folder…` to 03 Results (also covers blastFoam runs whose WSL scratch was released). `docs/UX_REVIEW-redesign.md` UXR-14; owner approved as its own item, not GUI-11 (2026-10-03).
 
 ---
 

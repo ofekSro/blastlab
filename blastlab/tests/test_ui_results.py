@@ -154,21 +154,20 @@ def main():
     check('and every button says why',
           all(p._export_btns[k].toolTip() == 'Select a result first.'
               for k in p._export_btns))
-    # four of these labels need 116-155 px and were pinned to 106, so
-    # they read 'Animatio', 'Summary C', 'Gauges TS', 'Field CSV'
-    cut = [b.text() for b in p._export_btns.values()
-           if b.fontMetrics().horizontalAdvance(b.text())
-           > b.width() - 15 - 6 - 24]
+    # four of these labels needed 116-155 px and were pinned to 106, so
+    # they read 'Animatio', 'Summary C', 'Gauges TS', 'Field CSV'. GUI-7
+    # moved them into the export column: each label must fit beside its
+    # suffix inside its own button (ExportButton.label_fits)
+    items = p.export_col.items
+    cut = [it.text() for it in items.values() if not it.label_fits()]
     check('no export label is cut off by its own button', not cut,
           str(cut))
     p.resize(900, 600)
     pump(60)
-    cut = [b.text() for b in p._export_btns.values()
-           if b.fontMetrics().horizontalAdvance(b.text())
-           > b.width() - 15 - 6 - 24]
-    check('nor at 900x600, where the row wraps instead of shrinking',
-          not cut and p._export_row.rows() > 1,
-          f'{cut} in {p._export_row.rows()} row(s)')
+    cut = [it.text() for it in items.values() if not it.label_fits()]
+    check('nor at 900x600, in the export column',
+          not cut and all(it.button.width() > 0 for it in items.values()),
+          f'{cut} widths {[it.button.width() for it in items.values()]}')
     p.resize(1280, 840)
     pump(60)
     a = p.add_result('run', 2, fake_2d())
@@ -344,16 +343,18 @@ def main():
     g = p.gauges
     check('1D: no trace selector (there is nothing to choose)',
           not g.selector_visible())
-    check('the table has one column per summary field',
-          len(RG.COLUMNS) == len(RG.HEADERS) == 8
-          == g.table.columnCount() == len(gauge_summary.COLUMNS),
+    # GUI-7 T5: the board's table adds Z after Gauge (plan section 7)
+    check('the table has one column per summary field, plus Z',
+          len(RG.COLUMNS) == len(RG.HEADERS) == 9
+          == g.table.columnCount() == len(gauge_summary.COLUMNS) + 1
+          and RG.COLUMNS[1] == 'z',
           f'{len(RG.COLUMNS)} {g.table.columnCount()} '
           f'{len(gauge_summary.COLUMNS)}')
     check('every header carries a tooltip',
           all(g.table.horizontalHeaderItem(i).toolTip()
               for i in range(g.table.columnCount())))
-    check('the headers are the abbreviated set the report uses',
-          RG.HEADERS[1] == 'Peak ovp [kPa]'
+    check('the headers are the board\'s set',
+          RG.HEADERS[2] == 'Peak [kPa]'
           and RG.HEADERS[-1] == 'Phase ended')
     gg = p.add_result('p only', 2, with_gauges(fake_2d()))
     pump(40)
@@ -361,9 +362,18 @@ def main():
           not g.selector_visible())
     check('but fills the table, one row per gauge',
           len(g.rows()) == 3, str(len(g.rows())))
+    want_rows = [tuple(r) for r in
+                 gauge_summary.table_rows(g.summary_rows(gg.result))]
     check('the rows are the shared summary formatting',
-          g.rows() == [tuple(r) for r in
-                       gauge_summary.table_rows(g.summary_rows(gg.result))])
+          g.rows() == want_rows)
+    # and on screen: per gauge number, every numeric cell is that string
+    shown = {int(r[0][1:]): r for r in g.cells()}
+    num = [c for c in g.visible_columns() if c >= 2]
+    bad = [n for n, row in enumerate(want_rows, start=1)
+           if [shown[n][g.visible_columns().index(c)] for c in num]
+           != list(row[1:])]
+    check('every numeric cell on screen is table_rows\' string, by gauge',
+          len(shown) == len(want_rows) and not bad, str(bad))
     gm = p.add_result('three traces', 2,
                       with_gauges(fake_2d(), fields=('p', '|U|', 'rho')))
     pump(40)
@@ -388,8 +398,8 @@ def main():
                         ('q', 'Dynamic pressure [kPa]')):
         g.field_seg.changed.emit(fld)
         pump(30)
-        fig = g.canvas.figure
-        got = fig.axes[0].get_ylabel() if fig is not None else None
+        # GUI-7 T5: the plot on screen is pyqtgraph; the same strings
+        got = g.ylabel()
         check(f'OUT-4a: switching to {fld} redraws with "{ylabel}"',
               g.field() == fld and got == ylabel, str(got))
     p.sel.setCurrentIndex(p.entries().index(gg))
@@ -408,16 +418,16 @@ def main():
           f'scroll {g.table.verticalScrollBar().maximum()} '
           f'rows {g.table.rowCount()} h {g.table.height()}')
     check('and the table does not eat the traces',
-          g.canvas.height() > g.table.height(),
-          f'canvas {g.canvas.height()} vs table {g.table.height()}')
+          g.plot_w.height() > g.table.height(),
+          f'plot {g.plot_w.height()} vs table {g.table.height()}')
     # below the minimum the table scrolls rather than crowding the
     # traces out - that trade-off is the point of TABLE_MAX_SHARE
     p.resize(900, 600)
     pump(200)
     check('below the minimum the traces still win',
-          g.canvas.height() > g.table.height()
+          g.plot_w.height() > g.table.height()
           and g.table.height() <= int(g.height() * RG.TABLE_MAX_SHARE) + 2,
-          f'canvas {g.canvas.height()} table {g.table.height()} '
+          f'plot {g.plot_w.height()} table {g.table.height()} '
           f'share {int(g.height() * RG.TABLE_MAX_SHARE)}')
     many = with_gauges(fake_2d(), n=12)
     p.add_result('twelve gauges', 2, many)
@@ -427,9 +437,9 @@ def main():
     check('twelve gauges scroll instead of squeezing the traces out',
           g.table.rowCount() == 12
           and g.table.maximumHeight() < 6 * g.table.rowHeight(0)
-          and g.canvas.height() > g.table.height(),
+          and g.plot_w.height() > g.table.height(),
           f'max {g.table.maximumHeight()} row {g.table.rowHeight(0)} '
-          f'canvas {g.canvas.height()} table {g.table.height()}')
+          f'plot {g.plot_w.height()} table {g.table.height()}')
     p.sel.setCurrentIndex(p.entries().index(gg))
     pump(40)
     p.resize(1280, 840)
@@ -724,9 +734,12 @@ def main():
     check('the replay says what would fill it, and holds no image',
           'Record replay frames' in p.anim.hint.text()
           and p.anim.image is None, repr(p.anim.hint.text()[:40]))
+    # GUI-7 T5: Gauges says it on its own page (the matplotlib canvas
+    # that carried the message is gone from the screen)
     check('and so do Fields and Gauges',
           'appear here' in p.fields.hint.text()
-          and p.gauges.canvas.figure is not None,
+          and p.gauges.page() == 'empty'
+          and 'appear here' in p.gauges.hint.text(),
           repr(p.fields.hint.text()[:40]))
     check('Remove with nothing selected says so, it does not raise',
           (p.remove_current() or True)

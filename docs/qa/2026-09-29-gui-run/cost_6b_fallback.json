@@ -1,0 +1,148 @@
+{
+ "rule": "measurements-6b.md R-COST (pre-registered 10:39)",
+ "platform": "offscreen",
+ "case": {
+  "geometry": "planar",
+  "Lx": 2.0,
+  "Ly": 1.2,
+  "cell_size_m": 0.03,
+  "charge": 8.0,
+  "center": [
+   0.4,
+   0.0
+  ],
+  "gauges": [
+   [
+    1.0,
+    0.4
+   ],
+   [
+    1.6,
+    0.2
+   ],
+   [
+    0.7,
+    0.3
+   ],
+   [
+    1.2,
+    0.8
+   ],
+   [
+    1.4,
+    0.1
+   ],
+   [
+    1.9,
+    0.9
+   ]
+  ]
+ },
+ "runs": [
+  {
+   "cond": "B",
+   "k": 0,
+   "wall_s": 8.258418400073424,
+   "collecting": false,
+   "max_gap_ms": 60.54099998436868,
+   "n_ticks": 737,
+   "col_rows": null,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_B_0 - 2D"
+  },
+  {
+   "cond": "A",
+   "k": 1,
+   "wall_s": 8.876351000042632,
+   "collecting": true,
+   "max_gap_ms": 239.33849995955825,
+   "n_ticks": 782,
+   "col_rows": 6,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_A_1 - 2D"
+  },
+  {
+   "cond": "B",
+   "k": 2,
+   "wall_s": 7.753621099982411,
+   "collecting": false,
+   "max_gap_ms": 88.22689997032285,
+   "n_ticks": 705,
+   "col_rows": null,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_B_2 - 2D"
+  },
+  {
+   "cond": "A",
+   "k": 3,
+   "wall_s": 8.70880620018579,
+   "collecting": true,
+   "max_gap_ms": 242.40040010772645,
+   "n_ticks": 762,
+   "col_rows": 6,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_A_3 - 2D"
+  },
+  {
+   "cond": "B",
+   "k": 4,
+   "wall_s": 8.153955299872905,
+   "collecting": false,
+   "max_gap_ms": 63.098999904468656,
+   "n_ticks": 722,
+   "col_rows": null,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_B_4 - 2D"
+  },
+  {
+   "cond": "A",
+   "k": 5,
+   "wall_s": 8.771778899943456,
+   "collecting": true,
+   "max_gap_ms": 243.4229999780655,
+   "n_ticks": 768,
+   "col_rows": 6,
+   "col_has_data": true,
+   "n_samples": 741,
+   "label": "cost_A_5 - 2D"
+  }
+ ],
+ "verdict": {
+  "first_pair_ratio": 1.0748245693102343,
+  "median_ratio": 1.0757698046345903,
+  "pair_ratios": [
+   1.0748245693102343,
+   1.1231921302171377,
+   1.0757698046345903
+  ],
+  "arrays_equal": [
+   true,
+   true,
+   true,
+   true,
+   true,
+   true
+  ],
+  "collecting_A": [
+   true,
+   true,
+   true
+  ],
+  "collecting_B": [
+   false,
+   false,
+   false
+  ],
+  "max_gap_ms_A": [
+   239.33849995955825,
+   242.40040010772645,
+   243.4229999780655
+  ],
+  "PASS": true
+ }
+}

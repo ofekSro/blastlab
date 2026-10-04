@@ -781,6 +781,10 @@ def test_c_run_info_and_layout():
     h = mf.handoff_paths(t, [1, 2, 3])
     assert h == {(1, 2): os.path.join(t.folder, 'handoff_1d_to_2d.txt'),
                  (2, 3): os.path.join(t.folder, 'handoff_2d_to_3d.npz')}
+    # GUI-8 (plan sec. 8.3): the 1D -> 3D route's hand-off, a .txt
+    # because the source is 1D
+    h13 = mf.handoff_paths(t, [1, 3])
+    assert h13 == {(1, 3): os.path.join(t.folder, 'handoff_1d_to_3d.txt')}
 
 
 def test_c_unfinished_stage_says_so():
