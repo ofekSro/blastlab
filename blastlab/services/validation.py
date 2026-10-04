@@ -1558,12 +1558,20 @@ def _validate_closing(case, rep, ctx):
     foam, dims, dx, plan = ctx.foam, ctx.dims, ctx.dx, ctx.plan
 
     # gauges / obstacles sanity
+    dropped = None                  # the solver's drop rule, built once
     for g in getattr(case, 'gauges', []):
         pt = g if isinstance(g, (list, tuple)) else (g,)
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             warn(f"Gauge {tuple(pt)} outside domain - will be dropped")
-        elif _in_obstacle_open(pt, case.obstacles):
+            continue
+        if dropped is None:
+            dropped = _gauge_drop_rule(case, ctx)
+        if not dropped(pt):
+            continue
+        if _in_obstacle_open(pt, case.obstacles):
             warn(f"Gauge {tuple(pt)} inside an obstacle - will be dropped")
+        else:
+            warn(f"Gauge {tuple(pt)} on an obstacle face - will be dropped")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
@@ -1578,19 +1586,92 @@ def _validate_closing(case, rep, ctx):
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
 
 
+def _gauge_drop_rule(case, ctx):
+    """`dropped(pt)`: True when the case's solver will drop the in-domain
+    gauge `pt` for an obstacle - each solver's own rule, so the warning
+    is exact (F44, GUI-11e A2; owner review row 2). No solver code runs:
+
+    native      the nearest cell centre per axis is solid, by the closed
+                test of core/bc.solid_mask_2d/3d on the raw boxes
+                (solvers/solver2d.py and solver3d.py, gauge setup). The
+                centres are the solver's own: `case.cell_size_m`, or the
+                charge auto-refine of solver2d.py 163-175 / solver3d.py
+                186-203 (`refine.effective_dx`, not 'smear', not a
+                profile start - P3), fitted by core.grid like
+                make_geometry / make_grid. Never `ctx.dx`: the validator
+                refines to r_exp / n_exp, which is not the solver's.
+    blastFoam   the closed test on the boxes snapped OUTWARD onto
+                base-cell faces (core.refine.snap_obstacles;
+                solvers/foam/writer.py 495-501 / 555-562), on the plan's
+                base spacing - `ctx.plan.dx_base`, or the base cell of
+                refine.plan_levels 516-530 when no plan was made.
+
+    Per-axis 1-D centres only, never a full mask (validation runs on
+    every keystroke)."""
+    from ..core.grid import _faces_shared
+    from ..core import refine
+    obstacles = [tuple(float(v) for v in b) for b in case.obstacles or []]
+    n = case.dim
+    if n < 2 or not obstacles:
+        return lambda pt: False
+    lengths = tuple(float(L) for L in ctx.dims)
+    charged = (getattr(case, 'init_mode', 'charge') == 'charge'
+               and case.charge is not None and case.charge > 0)
+    dx = float(case.cell_size_m)
+    try:
+        if ctx.foam:
+            plan = ctx.plan
+            if plan is not None:
+                dx_base = float(plan.dx_base)
+            else:
+                amr = int(getattr(case, 'amr_levels', 0) or 0)
+                if (charged and not amr
+                        and getattr(case, 'charge_refine', 'global') != 'zone'):
+                    dx = min(refine.effective_dx(dx, r, case.Lx, ctx.n_exp)
+                             for _c, r in refine._charges(case, ctx.rho0))
+                dx_base = _faces_shared(lengths, dx)[1]
+            boxes, _moved = refine.snap_obstacles(obstacles, dx_base, n)
+            return lambda pt: _in_box_closed(pt, boxes)
+        if charged:
+            r_exp = _charge_radius(case, ctx.rho0)
+            smear = (n == 3 and getattr(case, 'charge_resolution',
+                                        'resolve') == 'smear')
+            if not (smear and dx > r_exp / MIN_EXP_CELLS):
+                dx = refine.effective_dx(dx, r_exp, case.Lx, MIN_EXP_CELLS)
+        if any(L / dx > 1e7 for L in lengths):
+            raise ValueError('grid too fine to lay out')
+        faces, _dx = _faces_shared(lengths, dx)
+    except (ArithmeticError, ValueError, TypeError, IndexError):
+        # a case that cannot be gridded is refused elsewhere; the open
+        # box still says "inside"
+        return lambda pt: _in_obstacle_open(pt, obstacles)
+    centres = [0.5 * (f[:-1] + f[1:]) for f in faces]
+
+    def native(pt):
+        near = [float(c[int(np.argmin(np.abs(c - float(v))))])
+                for c, v in zip(centres, pt)]
+        return _in_box_closed(near, obstacles)
+    return native
+
+
+def _in_box_closed(pt, boxes):
+    """True when `pt` lies in any box, faces included (the closed test
+    of core/bc.solid_mask_* and the foam writer's `_in_obstacle`)."""
+    for box in boxes:
+        if len(box) >= 2 * len(pt) and all(
+                lo <= float(v) <= hi
+                for v, lo, hi in zip(pt, box[0::2], box[1::2])):
+            return True
+    return False
+
+
 def _in_obstacle_open(pt, obstacles):
     """True when gauge `pt` lies strictly inside an obstacle box (open
-    box, the test of ui/scaled_distance.where's `inside`). blastFoam
-    always drops such a gauge, before writing the probes
-    (solvers/foam/writer.py, `_in_obstacle2` / `_in_obstacle`, closed
-    test on the boxes snapped OUTWARD onto base-cell faces). The native
-    solver drops it when its nearest cell centre is solid
-    (solvers/solver2d.py, solver3d.py, gauge setup; core/bc.py
-    solid_mask_*): always, except within half a cell of a face that does
-    not lie on a cell face, where the nearest centre can be outside the
-    box and the gauge is kept (verify 11b, F44). A gauge on a face or
-    just outside one may be dropped too; neither zone is predicted here
-    (UXR-2, D201)."""
+    box, the test of ui/scaled_distance.where's `inside`). Only the
+    wording of the drop warning now: whether a gauge is dropped at all
+    is each solver's own rule (`_gauge_drop_rule`, F44), which keeps a
+    native gauge within half a cell of an off-grid face and drops one on
+    or just outside a face (verify 11b, UXR-2, D201)."""
     n = len(pt)
     if n < 2:
         return False
