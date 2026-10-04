@@ -577,6 +577,23 @@ def s3_dock():
           warned == [1] and drop_wall(pair, (1.628, 0.5)) == 1
           and _drop_reason(pair, (1.628, 0.5)) == 'on the face of Wall 1',
           f'{warned} {_drop_reason(pair, (1.628, 0.5))}')
+    # GUI-13 verify: the pair above names Wall 1 under the old "first wall
+    # within a cell" too, so it cannot tell whether Run uses the rule.
+    # Here the two disagree: Wall 1 x 1.0-1.22 (within a cell of the gauge)
+    # snaps to 1.25, Wall 2 x 1.26-1.6 snaps to 1.25 and holds x 1.252, so
+    # the solver drops it for Wall 2 while the old heuristic said Wall 1
+    split = Case2D(solver='blastfoam', gauges=[(1.252, 0.5)],
+                   obstacles=[(1.0, 1.22, 0.0, 1.0), (1.26, 1.6, 0.0, 1.0)],
+                   **kw)
+    warned = [int(m.group(1)) for w in validate_case(split).warnings
+              for m in [re.search(r'Wall (\d+) - will be dropped$', w)]
+              if m]
+    check('walls within a cell where the old first-within-a-cell wall '
+          'differs: '
+          'warning, drop_wall and Run\'s _drop_reason all name Wall 2',
+          warned == [2] and drop_wall(split, (1.252, 0.5)) == 2
+          and _drop_reason(split, (1.252, 0.5)) == 'on the face of Wall 2',
+          f'{warned} {_drop_reason(split, (1.252, 0.5))}')
     # Wall 1 x 1.29-1.6 snaps to x 1.25: a gauge at x 1.252 is 3.8 cm in
     # front of the wall as entered, and blastFoam drops it
     near = Case2D(solver='blastfoam', gauges=[(1.252, 0.5)],
