@@ -7,11 +7,13 @@ through the same on_* methods; the public API of that one-column panel
 (signals, attributes, methods) is kept with its meaning unchanged, only
 where the widgets sit moved."""
 
+import math
 import os
 
 import numpy as np
+import shiboken6
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QIcon, QTextCursor
+from PySide6.QtGui import QFont, QIcon, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QProgressBar, QPushButton,
                                QSizePolicy, QStackedWidget, QVBoxLayout,
@@ -55,6 +57,15 @@ PATH_BLANK = '<Runs folder>' + os.sep + '<Model>' + os.sep
 #: a run shows (`88,888 kPa`, `1,234,567` cells) in Space Grotesk 21 px
 TILE_MIN = 112
 PROGRESS_MIN = 220
+#: the widest P MAX readout the one-row rule must hold at StatTile's
+#: 14 px floor (GUI-11 T18, QA S3-1, D213); the readout string itself is
+#: unchanged (U4, D52)
+PMAX_WIDEST = '8.888e+05'
+#: the live view never gets less than this; the dock gives way first,
+#: down to its tab strip (GUI-11 T18, QA S3-7, D213)
+VIEW_MIN = 200
+#: the dock's tab strip: 40 px tabs, the 1 px rule and its 1 px margin
+DOCK_FLOOR = 42
 
 #: what a 0-D case shows where the view toolbar and the live view were
 #: (GUI-11 T5, F12 owner-approved as GUI-11 d, D206)
@@ -70,6 +81,14 @@ CHIP_KEYS = ('step', 't [ms]', 'dt [s]', 'p max [kPa]', 'cells')
 #: assessment is live - a blastFoam cold start sends no progress for
 #: minutes, and the time must still move (off while idle: B02 idle CPU)
 TICK_MS = 1000
+
+
+def unit_html(value, unit, colour):
+    """A tile readout with its unit in a 13 px span (`5.818e+05 kPa`)."""
+    if value == '—':
+        return value
+    return (f'{value} <span style="font-size: 13px; color: '
+            f'{colour};">{unit}</span>')
 
 
 def _two_state_icon(name, size, normal, disabled='muted'):
@@ -240,9 +259,37 @@ class _RunStrip(QFrame):
         return [self.tiles[k] for k in ('time', 'step', 'pmax', 'cells')
                 if not self._hidden(self.tiles[k])]
 
+    def _pmax_need(self):
+        """The P MAX tile width the widest readout (PMAX_WIDEST kPa) needs
+        at StatTile's 14 px floor: font metrics of the rendered readout,
+        as StatTile._fit_value measures it, never geometry (D164)."""
+        t = self.tiles['pmax']
+        t.value.ensurePolished()
+        f = QFont(t.value.font())
+        f.setPixelSize(StatTile.FIT_MIN_PX)
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        doc.setDefaultFont(f)
+        doc.setHtml(unit_html(PMAX_WIDEST, 'kPa', '#000'))
+        m = t.layout().contentsMargins()
+        return (math.ceil(doc.idealWidth()) + m.left() + m.right()
+                + 2 * t.frameWidth())
+
     def _one_row_fits(self, width):
-        n = len(self._shown_tiles())
-        return PROGRESS_MIN + n * (TILE_MIN + GAP) <= width
+        tiles = self._shown_tiles()
+        n = len(tiles)
+        if PROGRESS_MIN + n * (TILE_MIN + GAP) > width:
+            return False
+        if self.tiles['pmax'] not in tiles:
+            return True
+        # GUI-11 T18 (QA S3-1, D213): one row only when the P MAX tile's
+        # share (stretch 10 against Progress's 23, Progress kept at
+        # PROGRESS_MIN) holds the widest readout at the 14 px floor
+        avail = width - GAP * n
+        tile = avail * 10 / (23 + 10 * n)
+        if avail * 23 / (23 + 10 * n) < PROGRESS_MIN:
+            tile = (avail - PROGRESS_MIN) / n
+        return tile >= self._pmax_need()
 
     def rows(self):
         """1 or 2 (tests, the viewer sampler)."""
@@ -283,6 +330,17 @@ class _RunStrip(QFrame):
         super().resizeEvent(event)
         self.arrange()
 
+    def changeEvent(self, event):
+        # QA S3-2 (D213): a theme or font change re-measures the tiles, so
+        # the strip is laid out again at their new heights
+        super().changeEvent(event)
+        if event.type() in (QEvent.StyleChange, QEvent.FontChange):
+            QTimer.singleShot(0, self._rearrange)
+
+    def _rearrange(self):
+        if shiboken6.isValid(self):
+            self.arrange(force=True)
+
 
 class RunPanel(QWidget):
     run_requested = Signal()
@@ -321,6 +379,9 @@ class RunPanel(QWidget):
         self._ctrl = self._build_controls()
         body.addWidget(self._ctrl)
         self._centre = self._build_centre()
+        # a strip, banner or chain strip changing height re-fits the dock
+        # (D213: the live view keeps VIEW_MIN)
+        self._centre.installEventFilter(self)
         body.addWidget(self._centre, 1)
         self._gauge_col = self._build_gauge_column()
         body.addWidget(self._gauge_col)
@@ -717,6 +778,8 @@ class RunPanel(QWidget):
         self._view_seg.set('Live slice')
         self._stack.setCurrentWidget(self.pane)
         self._view_frame = view
+        # QA S3-7 (D213): never collapsed under the strips and the banner
+        view.setMinimumHeight(VIEW_MIN)
         cl.addWidget(view, 1)
         # 0-D: an HD 1.3 assessment has no field, so the toolbar and the
         # view give their place to one note (GUI-11 T5, F12, D206)
@@ -733,6 +796,7 @@ class RunPanel(QWidget):
         self.dock = RunDock()
         self.dock_frame = self.dock
         self.dock.setFixedHeight(DOCK_H)
+        self._dock_tucked = False       # stepped aside for the view (D213)
         self.log = self.dock.log
         cl.addWidget(self.dock)
         return centre
@@ -791,9 +855,45 @@ class RunPanel(QWidget):
         if h <= 1:
             return
         want = max(DOCK_MIN, min(DOCK_H, int(h * DOCK_FRACTION)))
+        room = self._dock_room()
+        # QA S3-7 (D213): the view keeps VIEW_MIN; the dock gives way
+        # first, down to its tab strip, and steps aside when not even that
+        # fits (1100 x 720 after a chain: chain strip, two-row strip and
+        # banner). Decided with the dock counted as shown, so it cannot
+        # flip-flop
+        tuck = room is not None and room < DOCK_FLOOR
+        if tuck != self._dock_tucked:
+            self._dock_tucked = tuck
+            self.dock_frame.setVisible(not tuck)
+        if tuck:
+            return
+        if room is not None and room < want:
+            want = room
         if self.dock_frame.height() != want \
                 or self.dock_frame.minimumHeight() != want:
             self.dock_frame.setFixedHeight(want)
+
+    def _dock_room(self):
+        """The dock height that leaves the live view VIEW_MIN under the
+        chain strip, the progress strip, the banner and the toolbar at
+        their size hints; None when the view is hidden (0-D)."""
+        view = self._view_frame
+        if not view.isVisibleTo(self):
+            return None
+        lay = self._centre.layout()
+        h = self._centre.height() if self._centre.height() > 1 \
+            else self.height()
+        above, n = 0, 0
+        for i in range(lay.count()):
+            it = lay.itemAt(i)
+            w = it.widget()
+            if w is None or (w is not self.dock_frame
+                             and not w.isVisibleTo(self)):
+                continue
+            n += 1
+            if w not in (view, self.dock_frame):
+                above += it.sizeHint().height()
+        return h - above - lay.spacing() * max(0, n - 1) - VIEW_MIN
 
     # ── the chain hook (T8; GUI-9 builds the strip) ──────────────────────
     def set_chain_strip(self, widget=None):
@@ -917,10 +1017,7 @@ class RunPanel(QWidget):
         muted = theme.cur('muted')
 
         def with_unit(value, unit):
-            if value == '—':
-                return value
-            return (f'{value} <span style="font-size: 13px; color: '
-                    f'{muted};">{unit}</span>')
+            return unit_html(value, unit, muted)
 
         self._tile_time.set(with_unit(r['t [ms]'], 'ms'))
         self._tile_step.set(r['step'], f'dt {r["dt [s]"]} s')
@@ -1099,6 +1196,9 @@ class RunPanel(QWidget):
     def eventFilter(self, obj, event):
         if obj is self.banner.message and event.type() == QEvent.Resize:
             self._render_banner()
+        elif obj is getattr(self, '_centre', None) \
+                and event.type() == QEvent.LayoutRequest:
+            self._fit_dock()
         return super().eventFilter(obj, event)
 
     def _banner_dh(self):

@@ -44,6 +44,10 @@ Run / Run_Finished; batch docs/batches/2026-09-29-gui-run.md).
      tile's value face steps down, the tile keeps its height.
  R11 (GUI-11 T5, F12 / D206) the 0-D run flow: 02 Run, the greys, the
      note in place of the toolbar and the view, F5 while busy, `—` after.
+ R12 (GUI-11 T18, QA S3-1 / S3-2 / S3-7, D213) one strip row only when
+     P MAX holds `8.888e+05 kPa` at 14 px; no tile under its minimum
+     after a theme switch; the live view keeps VIEW_MIN, the dock gives
+     way first.
 
 Plain script, offscreen, throwaway settings, no solver run:
     cd blastlab/tests && python test_ui_run_screen.py
@@ -1619,6 +1623,94 @@ def r11_hd13_flow(win):
           and not rp.hd13_note.isVisibleTo(rp))
 
 
+def r12_strip_and_view(win):
+    """GUI-11 T18 (QA S3-1, S3-2, S3-7; D213). The strip goes onto one
+    row only when the P MAX tile holds `8.888e+05 kPa` at the 14 px
+    floor; a theme switch leaves no tile under its minimum height; at
+    1100 x 720 after a chain (chain strip, two-row strip, banner) the
+    live view keeps VIEW_MIN and the dock steps aside, and comes back
+    when there is room."""
+    from PySide6.QtGui import QFont, QTextDocument
+    from blastlab.ui import theme
+    from blastlab.ui.chain_strip import ChainStrip
+    from blastlab.ui.run_panel import DOCK_FLOOR, PMAX_WIDEST, VIEW_MIN
+    print('\nR12: the strip, P MAX and the live view (GUI-11 T18)')
+    rp = win.run_panel
+    size = (win.width(), win.height())
+    win._show('run')
+    rp._readout.update({'t [ms]': '4.600', 'step': '1,234',
+                        'dt [s]': '1.93e-06', 'p max [kPa]': PMAX_WIDEST})
+    rp._render_readouts()
+    short = []
+    for wpx in range(1100, 1620, 20):
+        win.resize(wpx, 840)
+        pump(60)
+        lbl = rp._tile_pmax.value
+        doc = QTextDocument()
+        doc.setDocumentMargin(0)
+        doc.setDefaultFont(QFont(lbl.font()))
+        doc.setHtml(lbl.text())
+        if lbl.width() < doc.idealWidth():
+            short.append(f'{wpx}: {lbl.width()} < {doc.idealWidth():.0f} '
+                         f'at {lbl.font().pixelSize()} px, rows '
+                         f'{rp.strip.rows()}')
+    check('1100-1600 px (20 px steps): P MAX holds 8.888e+05 kPa at the '
+          'face it chose', not short, '; '.join(short[:4]))
+    win.resize(1600, 1000)
+    pump(150)
+    check('(1600 px: one row)', rp.strip.rows() == 1, str(rp.strip.rows()))
+
+    def squeezed():
+        return [f'{t.height()}<{t.minimumSizeHint().height()}'
+                for t in [rp.strip.progress_tile, *rp.strip.tiles.values()]
+                if t.isVisibleTo(rp)
+                and t.height() < t.minimumSizeHint().height()]
+
+    strip = ChainStrip()
+    strip.set_chain('QA_CHAIN', [1, 2])
+    win.resize(1100, 720)
+    pump(150)
+    strip.arrange(rp.column_widths()[1])
+    rp.set_chain_strip(strip)
+    rp.show_finish('QA_CHAIN', 'reached the end time',
+                   os.path.join(tempfile.gettempdir(), 'QA_CHAIN'))
+    pump(250)
+    was = theme.mode()
+    for mode in ('light' if was == 'dark' else 'dark', was):
+        theme.apply(app, mode)
+        pump(250)
+        bad = squeezed()
+        check(f'after theme.apply({mode!r}) at 1100 x 720 no tile is under '
+              f'its minimum height', not bad, str(bad))
+    check('1100 x 720 after a chain: the live view keeps VIEW_MIN',
+          rp._view_frame.height() >= VIEW_MIN,
+          f'{rp._view_frame.height()} px')
+    room = rp._dock_room()
+    check('and the dock steps aside only because not even its tab strip '
+          'fits', (not rp.dock.isVisibleTo(rp)) == (room < DOCK_FLOOR),
+          f'room {room}, dock shown {rp.dock.isVisibleTo(rp)}')
+    rp.banner.hide()
+    pump(200)
+    check('without the banner the dock is back, the view still >= '
+          'VIEW_MIN', rp.dock.isVisibleTo(rp)
+          and rp.dock.height() >= DOCK_FLOOR
+          and rp._view_frame.height() >= VIEW_MIN,
+          f'dock {rp.dock.height()}, view {rp._view_frame.height()}')
+    rp.show_finish('QA_CHAIN', 'reached the end time', None)
+    win.resize(1280, 840)
+    pump(250)
+    check('1280 x 840: the dock is shown and the view >= VIEW_MIN',
+          rp.dock.isVisibleTo(rp) and rp._view_frame.height() >= VIEW_MIN,
+          f'dock {rp.dock.height()}, view {rp._view_frame.height()}')
+    rp.set_chain_strip(None)
+    rp.banner.hide()
+    rp._reset_readouts_text()
+    win.resize(*size)
+    pump(200)
+    check('a single run at its size: the dock is shown',
+          rp.dock.isVisibleTo(rp), f'{win.width()}x{win.height()}')
+
+
 def r5b_dropped(win):
     """UXR-2 / D201 (GUI-11 T8): G2 entered inside Wall 1 is dropped by
     the solver; the live column labels the two series G1 and G3 (as
@@ -1708,6 +1800,7 @@ def main():
         r9_copy_path(win)
         r10_pmax_fit(win)
         r11_hd13_flow(win)
+        r12_strip_and_view(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a
