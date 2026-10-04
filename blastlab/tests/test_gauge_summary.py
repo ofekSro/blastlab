@@ -97,7 +97,39 @@ def main():
     check('an exact gauge is not cluttered with an arrow',
           '->' not in gs.summarize_gauges(
               g3, requested=[(1.0, 2.0, 0.5)])[0]['gauge'])
-    check('empty gauges -> no rows', gs.summarize_gauges(dict(times=np.array([]), points=[], pressures=[])) == [])
+    # F42: the solver dropped the middle gauge (inside a wall); each point
+    # keeps its own entered number and entered position, as the screens do
+    want = [(0.83, 0.61), (1.2, 0.6), (1.53, 1.71)]
+    g2 = dict(times=t, points=[(0.8263, 0.6053), (1.5316, 1.7106)],
+              pressures=[p, p])
+    lab = gs.gauge_labels(g2, want)
+    check('a dropped gauge: labels keep the entered numbers G1, G3',
+          lab[0].startswith('G1 ') and lab[1].startswith('G3 '), str(lab))
+    check("a dropped gauge: G3's label carries G3's entered position",
+          lab[1] == 'G3 (1.530, 1.710) -> cell (1.532, 1.711) m', lab[1])
+    check('a dropped gauge: G1 unchanged',
+          lab[0] == 'G1 (0.830, 0.610) -> cell (0.826, 0.605) m', lab[0])
+    # points >= entered: the index pairing, exactly today's labels
+    g4 = dict(times=t, points=[(0.8263, 0.6053), (1.2, 0.6),
+                               (1.5316, 1.7106)], pressures=[p, p, p])
+    check('no drop: labels as before (literal)',
+          gs.gauge_labels(g4, want) == [
+              'G1 (0.830, 0.610) -> cell (0.826, 0.605) m',
+              'G2 (1.200, 0.600) m',
+              'G3 (1.530, 1.710) -> cell (1.532, 1.711) m'],
+          str(gs.gauge_labels(g4, want)))
+    check('more points than entered: index pairing, plain extras',
+          gs.gauge_labels(g4, want[:1]) == [
+              'G1 (0.830, 0.610) -> cell (0.826, 0.605) m',
+              'G2 (1.200, 0.600) m', 'G3 (1.532, 1.711) m'],
+          str(gs.gauge_labels(g4, want[:1])))
+    # P1: a point no entered gauge can take -> plain labels for all
+    mixed = [(0.83, 0.61, 0.0), (1.2, 0.6), (1.53, 1.71, 0.0)]
+    check('pairing short of a point: plain labels for all (P1)',
+          gs.gauge_labels(g2, mixed) == ['G1 (0.826, 0.605) m',
+                                         'G2 (1.532, 1.711) m'],
+          str(gs.gauge_labels(g2, mixed)))
+    check('empty gauges -> no rows',gs.summarize_gauges(dict(times=np.array([]), points=[], pressures=[])) == [])
     out = os.path.join(tempfile.mkdtemp(prefix='blastlab_gs_'), 'gauges_summary.csv')
     gs.save_gauge_summary(rows, out)
     with open(out, newline='') as f:

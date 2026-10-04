@@ -521,16 +521,64 @@ def axisym_pin_note_checks():
           not any('is ignored' in n for n in rep.notes), str(rep.notes))
 
 
+def solver_drops(case, pt):
+    """Whether the case's own solver drops in-domain gauge `pt` for an
+    obstacle, by the solver's code path rather than the validator's
+    (F44): native - the solver's charge auto-refine (solver2d.py /
+    solver3d.py, written out here), its grid from core.grid and the
+    full core/bc.solid_mask_* at the nearest centre per axis; blastFoam
+    - `writer.plan_case(case).gauge_ids` (dropped <=> missing)."""
+    import math
+    import numpy as np
+    from blastlab.core.bc import solid_mask_2d, solid_mask_3d
+    from blastlab.core.constants import JWL_TNT, MIN_EXP_CELLS
+    from blastlab.core.grid import make_geometry, make_grid
+    if case.solver == 'blastfoam':
+        from blastlab.solvers.foam import writer
+        return tuple(pt) not in [tuple(g) for g in
+                                 writer.plan_case(case).gauge_ids]
+    rho, dx, L = JWL_TNT['rho0'], case.cell_size_m, case.Lx
+    if case.dim == 2 and case.geometry == 'planar':
+        r = math.sqrt(case.charge / (math.pi * rho))
+    else:
+        r = (3.0 * case.charge / (4.0 * math.pi * rho)) ** (1.0 / 3.0)
+    smeared = case.dim == 3 and case.charge_resolution == 'smear' \
+        and dx > r / MIN_EXP_CELLS
+    if not smeared and dx > r / MIN_EXP_CELLS:
+        dx = L / math.ceil(L / (r / MIN_EXP_CELLS))
+    if case.dim == 2:
+        g = make_geometry(case.geometry, case.Lx, case.Ly, dx)
+        axes = (g['x_c'], g['y_c'])
+        solid = solid_mask_2d(*axes, case.obstacles)
+    else:
+        g = make_grid(case.Lx, case.Ly, case.Lz, dx)
+        axes = (g['x_c'], g['y_c'], g['z_c'])
+        solid = solid_mask_3d(*axes, case.obstacles)
+    idx = tuple(int(np.argmin(np.abs(c - v))) for c, v in zip(axes, pt))
+    return bool(solid[idx])
+
+
 def gauge_in_obstacle_checks():
-    """UXR-2 / D201 (GUI-11 T8): a gauge strictly inside an obstacle box
-    is dropped by both solvers, so Setup warns - exactly one new warning,
-    and the case stays valid. A gauge on the face or outside the box gets
-    none (open-box test, as scaled_distance.where's `inside`)."""
+    """UXR-2 / D201 (GUI-11 T8), made exact by F44 (GUI-11e A2, owner
+    review row 2): Setup warns exactly when the case's own solver drops
+    the gauge - native by the nearest cell centre's closed solid test,
+    blastFoam by the closed test on the outward-snapped boxes - with one
+    warning, and the case stays valid. Strictly inside the box reads
+    `inside an obstacle`, otherwise `on an obstacle face` (P2). Changed
+    by owner row 2: a gauge on a face now warns wherever its solver drops
+    it (the 2D native face (1.2, 0.3) does not: its nearest centre is
+    fluid)."""
     print()
     print("gauge inside an obstacle: warned, not refused")
 
     def new_warnings(rep, ref):
         return [w for w in rep.warnings if w not in ref.warnings]
+
+    def face(pt):
+        return [f'Gauge {pt} on an obstacle face - will be dropped']
+
+    def inside(pt):
+        return [f'Gauge {pt} inside an obstacle - will be dropped']
 
     for solver in ('native', 'blastfoam'):
         two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0,
@@ -544,14 +592,21 @@ def gauge_in_obstacle_checks():
                                   'will be dropped'], str(got))
         check(f'2D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
-        for pt, where in (((1.2, 0.3), 'on the face'),
-                          ((1.4, 1.0), 'on the top face'),
-                          ((1.0, 0.3), 'in front of it'),
-                          ((1.4, 1.5), 'above it')):
-            got = new_warnings(validate_case(Case2D(gauges=[pt], **two)),
-                               ref)
-            check(f'2D {solver}: a gauge {where} gets none', got == [],
-                  str(got))
+        check(f'2D {solver}: ... and its solver drops it',
+              solver_drops(Case2D(gauges=[(1.4, 0.3)], **two), (1.4, 0.3)))
+        for pt, where, want in (
+                ((1.2, 0.3), 'on the face',
+                 [] if solver == 'native' else face((1.2, 0.3))),
+                ((1.4, 1.0), 'on the top face', face((1.4, 1.0))),
+                ((1.0, 0.3), 'in front of it', []),
+                ((1.4, 1.5), 'above it', [])):
+            case = Case2D(gauges=[pt], **two)
+            got = new_warnings(validate_case(case), ref)
+            check(f'2D {solver}: a gauge {where} gets '
+                  f'{"the face warning" if want else "none"}',
+                  got == want, str(got))
+            check(f'2D {solver}: {where}: warned <=> its solver drops it',
+                  bool(got) == solver_drops(case, pt))
 
         three = dict(Lx=2.0, Ly=2.0, Lz=2.0, cell_size_m=0.1, charge=1.0,
                      center=(1.0, 1.0, 1.0),
@@ -565,13 +620,63 @@ def gauge_in_obstacle_checks():
                                   'obstacle - will be dropped'], str(got))
         check(f'3D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
-        for pt, where in (((1.5, 1.0, 0.5), 'on the face'),
-                          ((1.6, 1.0, 1.0), 'on the top face'),
-                          ((1.9, 1.0, 0.5), 'behind it')):
-            got = new_warnings(validate_case(Case3D(gauges=[pt], **three)),
-                               ref)
-            check(f'3D {solver}: a gauge {where} gets none', got == [],
+        # the blastFoam 3D case refines to ~28 M cells: its writer plan
+        # is too big for a fast suite, so only native is cross-checked
+        for pt, where, want in (
+                ((1.5, 1.0, 0.5), 'on the face', face((1.5, 1.0, 0.5))),
+                ((1.6, 1.0, 1.0), 'on the top face', face((1.6, 1.0, 1.0))),
+                ((1.9, 1.0, 0.5), 'behind it', [])):
+            case = Case3D(gauges=[pt], **three)
+            got = new_warnings(validate_case(case), ref)
+            check(f'3D {solver}: a gauge {where} gets '
+                  f'{"the face warning" if want else "none"}',
+                  got == want, str(got))
+            if solver == 'native':
+                check(f'3D native: {where}: warned <=> the solver drops it',
+                      bool(got) == solver_drops(case, pt))
+
+    # F44, the verifier's cases (verify 11b): an off-grid box face. 2D
+    # box x 1.006-1.494 on 0.01 m cells (no auto-refine for either
+    # solver: 5 kg keeps 8 cells across the radius at 0.01 m)
+    two = dict(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.01,
+               charge=5.0, center=(0.0, 1.5),
+               obstacles=[(1.006, 1.494, 0.33, 0.97)])
+    for pt, warn_n, warn_f in (((1.008, 0.6), [], inside((1.008, 0.6))),
+                               ((1.492, 0.6), [], inside((1.492, 0.6))),
+                               ((1.004, 0.6), [], face((1.004, 0.6))),
+                               ((1.25, 0.6), inside((1.25, 0.6)),
+                                inside((1.25, 0.6)))):
+        for solver, want in (('native', warn_n), ('blastfoam', warn_f)):
+            ref = validate_case(Case2D(gauges=[], solver=solver, **two))
+            case = Case2D(gauges=[pt], solver=solver, **two)
+            got = new_warnings(validate_case(case), ref)
+            check(f'F44 2D {solver} {pt}: '
+                  f'{"warned" if want else "not warned"}', got == want,
                   str(got))
+            check(f'F44 2D {solver} {pt}: warned <=> its solver drops it',
+                  bool(got) == solver_drops(case, pt))
+    # 3D box x 1.06-1.94, z 0.43-1.27 on 0.1 m cells: native 'smear'
+    # (1 kg keeps dx); blastFoam needs a charge that keeps 0.1 m as its
+    # base cell (8 cells across the radius) to put the snap on 0.1 m
+    three = dict(Lx=6.0, Ly=6.0, Lz=6.0, cell_size_m=0.1,
+                 obstacles=[(1.06, 1.94, 0.0, 1.2, 0.43, 1.27)])
+    kinds = (('native', dict(charge=1.0, center=(4.5, 4.5, 4.5),
+                             charge_resolution='smear')),
+             ('blastfoam', dict(charge=4000.0, center=(4.5, 4.5, 4.5))))
+    for pt, warn_n, warn_f in (
+            ((1.08, 0.6, 0.8), [], inside((1.08, 0.6, 0.8))),
+            ((1.5, 0.6, 0.41), face((1.5, 0.6, 0.41)),
+             face((1.5, 0.6, 0.41)))):
+        for (solver, kw), want in zip(kinds, (warn_n, warn_f)):
+            ref = validate_case(Case3D(gauges=[], solver=solver, **kw,
+                                       **three))
+            case = Case3D(gauges=[pt], solver=solver, **kw, **three)
+            got = new_warnings(validate_case(case), ref)
+            check(f'F44 3D {solver} {pt}: '
+                  f'{"warned" if want else "not warned"}', got == want,
+                  str(got))
+            check(f'F44 3D {solver} {pt}: warned <=> its solver drops it',
+                  bool(got) == solver_drops(case, pt))
 
 
 def thin_obstacle_warn_checks():

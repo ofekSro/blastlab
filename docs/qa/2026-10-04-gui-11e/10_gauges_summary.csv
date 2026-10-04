@@ -1,0 +1,4 @@
+gauge,peak_overpressure_kPa,arrival_ms,time_of_peak_ms,positive_phase_duration_ms,positive_phase_impulse_Pa_s,net_impulse_Pa_s,positive_phase_complete
+"G1 (0.300, 0.800) -> cell (0.305, 0.802) m",7759.4,0.211,0.237,0.255,619.31,619.32,no
+"G4 (1.800, 0.800) -> cell (1.797, 0.802) m",0.0,,0.466,,,0.00,no
+"G5 (2.000, 1.200) -> cell (1.996, 1.200) m",0.0,,0.000,,,0.00,no

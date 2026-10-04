@@ -945,6 +945,12 @@ def s5g_dropped(link):
               summary_rows(res))], str(g.rows()))
     check('the headers are unchanged', g.headers() == list(RG.HEADERS),
           str(g.headers()))
+    # F42 (GUI-11e A1): the exported label numbers the gauge as the cell
+    # does, so each Gauge cell's tooltip starts with the cell's own label
+    tips = [g.table.item(r, 0).toolTip() for r in range(len(labels))]
+    check("each Gauge cell's tooltip starts with its own label (F42)",
+          all(tip.startswith(lab + ' (') for lab, tip in zip(labels, tips))
+          and len(tips) == 2, str(list(zip(labels, tips))))
     check('the keys stay the payload numbers; the readout says G3',
           g.order() == [2, 1] and g.selected() == 2
           and g.readout_text()[0] == 'G3 · Z 2.99',
@@ -1306,6 +1312,32 @@ def s6_field(link):
                    and t.get_window_extent(renderer=r).x0 < -0.5]
             check('1D at 1100 px: every tick label and y label inside the '
                   'canvas', not out, ascii(out[:4]))
+            # GUI-11 T19 (F17, D214): the short title on screen only
+            from blastlab.models.meta import charge_label as m_charge
+            from blastlab.output import plots as P
+            c = m_charge(res.meta)
+            want = f'1D spherical · {c.charge_kg} kg TNT · {c.eos}'
+            got_t = fig.axes[0].get_title()
+            check('1D: the on-screen title is the short form (F17)',
+                  got_t == want, ascii(got_t))
+            tb = fig.axes[0].title.get_window_extent(renderer=r)
+            cw, ch_ = cv.get_width_height()
+            check('1D at 1100 px: the title lies inside the canvas',
+                  tb.x0 >= -0.5 and tb.x1 <= cw + 0.5 and tb.y1 <= ch_ + 0.5,
+                  f'{tb.x0:.0f}..{tb.x1:.0f} in {cw}, top {tb.y1:.0f}/{ch_}')
+            built = P.figure_results_1d(res.snapshots, c.eos, c.charge_kg,
+                                        c.radius_m)
+            check('the builder (every export) keeps its long title',
+                  built.axes[0].get_title()
+                  == f'1D Spherical Blast - {c.charge_kg} kg TNT - EOS: '
+                     f'{c.eos}', ascii(built.axes[0].get_title()))
+            p.title_box.setText('QA title')
+            pump(120)
+            got_t = p.fields.canvas.figure.axes[0].get_title()
+            check('the user\'s title line stays above the short one',
+                  got_t == 'QA title\n' + want, ascii(got_t))
+            p.title_box.setText('')
+            pump(60)
             p.resize(1600, 1000)
             pump(40)
             continue

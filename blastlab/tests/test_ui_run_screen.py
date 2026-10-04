@@ -1660,10 +1660,19 @@ def r12_strip_and_view(win):
     rp = win.run_panel
     size = (win.width(), win.height())
     win._show('run')
-    rp._readout.update({'t [ms]': '4.600', 'step': '1,234',
+    # D213 b: the widest readouts on all three tiles at once - P MAX's
+    # own widest string, plus the widest STEP and TIME the board shows
+    rp._readout.update({'t [ms]': '4.600', 'step': '1,234,567',
                         'dt [s]': '1.93e-06', 'p max [kPa]': PMAX_WIDEST})
     rp._render_readouts()
-    short = []
+
+    def squeezed():
+        return [f'{t.height()}<{t.minimumSizeHint().height()}'
+                for t in [rp.strip.progress_tile, *rp.strip.tiles.values()]
+                if t.isVisibleTo(rp)
+                and t.height() < t.minimumSizeHint().height()]
+
+    short, wrong_rows, squeezed_at = [], [], []
     for wpx in range(1100, 1620, 20):
         win.resize(wpx, 840)
         pump(60)
@@ -1676,17 +1685,24 @@ def r12_strip_and_view(win):
             short.append(f'{wpx}: {lbl.width()} < {doc.idealWidth():.0f} '
                          f'at {lbl.font().pixelSize()} px, rows '
                          f'{rp.strip.rows()}')
+        if wpx >= 1280 and rp.strip.rows() != 1:
+            wrong_rows.append(f'{wpx}: rows {rp.strip.rows()}')
+        bad = squeezed()
+        if bad:
+            squeezed_at.append(f'{wpx}: {bad}')
     check('1100-1600 px (20 px steps): P MAX holds 8.888e+05 kPa at the '
           'face it chose', not short, '; '.join(short[:4]))
+    check('1280-1600 px (20 px steps): one strip row (D213 b)',
+          not wrong_rows, '; '.join(wrong_rows[:4]))
+    check('1100-1600 px (20 px steps): no tile under its minimum height',
+          not squeezed_at, '; '.join(squeezed_at[:4]))
+    win.resize(1100, 720)
+    pump(150)
+    check('1100 x 720: two strip rows', rp.strip.rows() == 2,
+          str(rp.strip.rows()))
     win.resize(1600, 1000)
     pump(150)
     check('(1600 px: one row)', rp.strip.rows() == 1, str(rp.strip.rows()))
-
-    def squeezed():
-        return [f'{t.height()}<{t.minimumSizeHint().height()}'
-                for t in [rp.strip.progress_tile, *rp.strip.tiles.values()]
-                if t.isVisibleTo(rp)
-                and t.height() < t.minimumSizeHint().height()]
 
     strip = ChainStrip()
     strip.set_chain('QA_CHAIN', [1, 2])
