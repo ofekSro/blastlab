@@ -215,6 +215,35 @@ def main():
     check("nothing typed was lost across two switches",
           f.v['Lx'].get() == '6.25' and f.v['n_procs'].get() == '7')
 
+    print("\nS6b: Material is a blastFoam row (UXR-3, owner 2026-10-03, "
+          "D210)")
+    for d in (1, 2, 3):
+        for placement in ('columns', 'nodes'):
+            f = CaseForm(d, mode='native', placement=placement)
+            f.resize(900, 700)
+            f.show()
+            pump(20)
+            tag = f'dim {d} {placement}'
+            check(f"{tag}: native hides the Material row",
+                  not f.row_visible('material'))
+            f.v['material'].set('ANFO')
+            check(f"{tag}: native still runs TNT, the box keeps ANFO",
+                  f.get_case().material == 'TNT'
+                  and f.v['material'].get() == 'ANFO',
+                  f.get_case().material)
+            f.set_mode('blastfoam')
+            check(f"{tag}: blastFoam shows it and runs ANFO",
+                  f.row_visible('material')
+                  and f.get_case().material == 'ANFO',
+                  f.get_case().material)
+            f.set_mode('native')
+            check(f"{tag}: back to native hides it again, value kept",
+                  not f.row_visible('material')
+                  and f.v['material'].get() == 'ANFO'
+                  and f.get_case().material == 'TNT')
+            f.deleteLater()
+    pump(20)
+
     print("\nS7: the AMR sub-group follows the level count")
     f = form(2, 'blastfoam')
     check("AMR off: coefficients hidden, charge refinement shown",

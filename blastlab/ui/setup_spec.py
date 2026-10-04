@@ -469,10 +469,11 @@ def cards(dim):
     if dim == 1:
         out.append(CardSpec('Charge', col=0, rows=(
             F('charge', 'Charge [kg TNT]', 'float', 1.0),
-            # N11/T46: the native solvers share the JWL material table,
-            # so this row shows in both solver modes
+            # UXR-3, owner decision 2026-10-03 (D210): a native case always
+            # carries TNT (models.fields._charge_model, D138), so the row
+            # is hidden in native mode; its value stays in the form
             F('material', 'Material', 'choice', 'TNT',
-              values=tuple(MATERIAL_NAMES)))))
+              values=tuple(MATERIAL_NAMES), scope='blastfoam'))))
     else:
         modes = (('charge', 'profile1d') if dim == 2
                  else ('charge', 'profile1d', 'profile2d'))
@@ -483,8 +484,9 @@ def cards(dim):
                 # kg per metre of depth for planar) via the hook
                 F('charge', 'Charge [kg TNT]', 'float',
                   1.0 if dim == 2 else 25.0, dyn=(dim == 2)),
+                # UXR-3 (D210): blastFoam only, as in 1D
                 F('material', 'Material', 'choice', 'TNT',
-                  values=tuple(MATERIAL_NAMES))]
+                  values=tuple(MATERIAL_NAMES), scope='blastfoam')]
         if dim == 3:
             # blastFoam always resolves the charge (smear is ignored with
             # a note), so the choice is a native row
