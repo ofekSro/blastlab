@@ -40,10 +40,11 @@ TREE_W = 272
 STAGE_NODE = 'stage'
 STAGE_TITLE = 'Stage'
 
-#: a 3D stage's centre (decision D-row: no fourth viewer embedding)
-HINT_3D = ('The 3D model view runs in its own window and is shown in 01 '
-           'Setup. This stage\'s numbers are above; its checks are on 00 '
-           'Stage.')
+#: a 3D stage's centre (decision D-row: no fourth viewer embedding) until
+#: its first live check; then `chain_route.hint_3d` names the wired
+#: domain and burst height (UXR-12, D222: the old text said the view
+#: "is shown in 01 Setup", which shows a different case)
+HINT_3D = chain_route.HINT_3D_HEAD
 
 SOLVER_SUB = 'Preset from the solver switch; override per stage.'
 COPY_TEXT = 'Copy from 01 Setup'
@@ -429,9 +430,11 @@ class StageEditor(QWidget):
                 for i, row in enumerate(rows, start=1)])
 
     # ── what the live check found ────────────────────────────────────────
-    def show_check(self, chk, solver, prev, nxt, note):
+    def show_check(self, chk, solver, prev, nxt, note, source=None):
         """Fill the tree, the pill, the header numbers, the 00 Stage page
-        and the preview from one `chain_route.StageCheck`."""
+        and the preview from one `chain_route.StageCheck`. `source` is
+        the wired case of the stage before (the 3D hint's burst height
+        when fed by 2D), or None."""
         f = self.form
         case = chk.case
         self._sync_tree_nodes()
@@ -449,6 +452,8 @@ class StageEditor(QWidget):
                              chain_route.in_text(case, prev))
             self.hand_out.set(chain_route.out_file(self.dim, nxt),
                               chain_route.out_text(case, nxt))
+            if self.hint is not None:
+                self.hint.setText(chain_route.hint_3d(case, prev, source))
             self.update_preview(case)
         else:
             # the form does not parse: the files still follow the route

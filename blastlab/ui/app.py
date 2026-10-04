@@ -184,6 +184,7 @@ class MainWindow(QMainWindow):
         self.chain.route_changed.connect(
             lambda key: self.topbar.set_chain_label(
                 'Chain ' + chain_route.route_label(key)))
+        self.chain.model_link_clicked.connect(self._focus_model_box)
         self._panels = {'setup': self.setup, 'run': self.run_panel,
                         'results': self.results, 'chain': self.chain}
         for panel in self._panels.values():
@@ -359,6 +360,14 @@ class MainWindow(QMainWindow):
             theme.repolish(b)
         # GUI-6b: the Run screen's live-gauge column is on screen
         self._sync_gauge_collection()
+
+    def _focus_model_box(self):
+        """The Chain's `into \\<model>\\` link (UXR-12, D222): 02 Run, where
+        the chain's model folder is set, with the Model box focused."""
+        self._show('run')
+        box = self.run_panel.run_name
+        box.setFocus()
+        box.selectAll()
 
     def current_tab(self):
         for k, p in self._panels.items():

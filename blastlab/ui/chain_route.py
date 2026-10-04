@@ -39,6 +39,18 @@ ROUTES = (('123', '1D → 2D → 3D', (1, 2, 3)),
           ('12', '1D → 2D', (1, 2)),
           ('23', '2D → 3D', (2, 3)))
 DEFAULT_ROUTE = '123'
+#: UXR-12 (D222): one line per route button, what its hand-offs do (the
+#: route group's own tooltip keeps the whole explanation, HINT)
+ROUTE_TIPS = {
+    '123': ('1D → 2D → 3D: the 1D profile is remapped onto the 2D axis, '
+            'then the 2D field is swept around the 3D burst axis'),
+    '13': ('1D → 3D: the 1D profile is placed around the 3D burst point; '
+           'no 2D stage'),
+    '12': ('1D → 2D: the 1D profile is remapped onto the 2D axis at the 2D '
+           'burst height; no 3D stage'),
+    '23': ('2D → 3D: the 2D stage starts from its charge, and its field is '
+           'swept around the 3D burst axis; no 1D stage'),
+}
 
 #: the refusal `run()` has always given for a planar 2D stage feeding 3D
 AXISYM_REFUSAL = 'Stage 2 (2D): must be axisymmetric to feed the 3D stage.'
@@ -382,6 +394,34 @@ def in_text(case, prev):
     return (f'The 1D profile is placed around the burst point. With no 2D '
             f'stage, the burst height, z {_n1(case.center[2])} m, is set '
             f'in this stage’s form.')
+
+
+#: the 3D stage's centre before its first live check (UXR-12)
+HINT_3D_HEAD = 'This 3D stage has no preview here.'
+
+
+def hint_3d(case, prev, source=None):
+    """The 3D stage's centre text (UXR-12, D222), from the WIRED case:
+    `This 3D stage has no preview here. Its domain is 6 × 6 × 4 m, burst
+    at z 2.0 m (from the 2D profile).` Fed by 2D, the burst height is the
+    2D stage's (`source`) burst z: `core/profiles.remap_profile_2d_to_3d`
+    maps the 2D z straight onto the 3D z. Fed by 1D, it is this stage's
+    own cz (`in_text`). Display only, formatted, never computed."""
+    if case is None:
+        return HINT_3D_HEAD
+    dom = ' × '.join(f'{float(v):g}' for v in (case.Lx, case.Ly, case.Lz))
+    if prev == 2:
+        z = (source.center[1] if source is not None
+             and getattr(source, 'center', None) else None)
+        burst = (f'burst at z {_n1(z)} m (from the 2D profile)'
+                 if z is not None else
+                 'its burst height comes from the 2D profile')
+    elif prev == 1:
+        burst = (f'burst at z {_n1(case.center[2])} m (set in this '
+                 f'stage’s form)')
+    else:
+        burst = f'burst at z {_n1(case.center[2])} m'
+    return f'{HINT_3D_HEAD} Its domain is {dom} m, {burst}.'
 
 
 def out_text(case, nxt):

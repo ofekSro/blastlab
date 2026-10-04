@@ -30,6 +30,7 @@ check here, by the window (`on_run_chain`), which asks before it
 overwrites an existing model.
 """
 
+import html
 import os
 
 from PySide6.QtCore import QSize, Qt, QTimer, Signal
@@ -129,6 +130,9 @@ class _RunButton(QPushButton):
 class ChainPanel(QWidget):
     #: the route key ('123', '13', '12', '23') after every change
     route_changed = Signal(str)
+    #: the Run chain line's folder link was clicked (UXR-12, D222): the
+    #: window shows 02 Run with the Model box focused
+    model_link_clicked = Signal()
 
     def __init__(self, on_run_chain=None, mode=None, log_fn=print,
                  error_sink=None, model_source=None, setup_source=None,
@@ -192,6 +196,9 @@ class ChainPanel(QWidget):
         self.route_group = self.route_bar
         self.route_group.setToolTip(HINT)
         self.route_btns = self.route_bar.btns
+        # UXR-12 (D222): each route says in one line what it hands on
+        for key, btn in self.route_btns.items():
+            btn.setToolTip(chain_route.ROUTE_TIPS[key])
         row.addWidget(self.route_bar)
         self.caption = ElidedLabel(SEED_CAPTION, mode=Qt.ElideRight)
         self.caption.setObjectName('chaincaption')
@@ -217,6 +224,14 @@ class ChainPanel(QWidget):
         self.run_line.setAlignment(Qt.AlignHCenter)
         self.run_line.setWordWrap(True)
         self.run_line.setFixedWidth(RUN_W)
+        # UXR-12 (D222): the line is a link to the Model box on 02 Run,
+        # where the chain's folder is set
+        self.run_line.setTextFormat(Qt.RichText)
+        self.run_line.setTextInteractionFlags(Qt.LinksAccessibleByMouse)
+        self.run_line.linkActivated.connect(
+            lambda *_a: self.model_link_clicked.emit())
+        self._run_line_text = ''
+        theme.signals.changed.connect(self._retheme_run_line)
         run_col.addWidget(self.run_line)
         run_col.addStretch(1)
         pipe_row.addLayout(run_col)
@@ -444,12 +459,24 @@ class ChainPanel(QWidget):
         fm = self.run_line.fontMetrics()
         shown = fm.elidedText(model, Qt.ElideMiddle,
                               RUN_W - fm.horizontalAdvance('\\\\') - 4)
-        self.run_line.setText(f'{n} stages · into \\{shown}\\' if model
-                              else f'{n} stages · set the Model on 02 Run')
-        self.run_line.setToolTip(f'Into {model}' if shown != model else '')
+        head, tail = ((f'{n} stages · into ', f'\\{shown}\\') if model
+                      else (f'{n} stages · ', 'set the Model on 02 Run'))
+        self._run_line_text = head + tail
+        # the folder part is the link (UXR-12, D222), in the accent text
+        # colour, so it reads as one in both themes
+        self.run_line.setText(
+            f'{html.escape(head)}<a href="model" style="color: '
+            f'{theme.cur("accent_text")}; text-decoration: none;">'
+            f'{html.escape(tail)}</a>')
+        self.run_line.setToolTip(f'Into {model}' if shown != model else
+                                 'Set the Model on 02 Run')
 
     def run_line_text(self):
-        return self.run_line.text()
+        """The line as plain text (it is shown as a link)."""
+        return self._run_line_text
+
+    def _retheme_run_line(self, _mode=None):
+        self._update_run_line()           # the link's colour
 
     # ── navigation ───────────────────────────────────────────────────────
     def focus_stage(self, d):
@@ -535,8 +562,9 @@ class ChainPanel(QWidget):
             if chk.case is not None:
                 key = chain_route.key_line(chk.case, prev)
                 self.cards[d].set_key(key)
+            src = checks[prev].case if prev in checks else None
             self.editors[d].show_check(chk, self.stage_solver[d], prev, nxt,
-                                       note)
+                                       note, source=src)
         self._update_run_line()
         self._refresh_copy()
 

@@ -459,14 +459,61 @@ def s4_editor(win):
               f'for the wired case', ch.editors[d].numbers.full_text()
               == want and bool(want), ascii(want))
     e3 = ch.editors[3]
+    # UXR-12 (D222): the hint text is now built from the wired case (it
+    # used to be the fixed HINT_3D, which pointed at 01 Setup); the
+    # structural half of this check is unchanged
     check('a 3D stage shows the hint, no canvas, no View3DHost',
-          e3.hint is not None and e3.hint.text() == HINT_3D
+          e3.hint is not None and e3.hint.text().startswith(HINT_3D)
           and not e3.findChildren(MplCanvas)
           and not ch.findChildren(View3DHost)
           and e3.preview is None)
     check('the 1D / 2D stages draw the Setup\'s previews',
           ch.editors[1].preview is not None
           and ch.editors[2].preview is not None)
+
+    print('\nS4u: the Chain explains itself (UXR-12, D222)')
+    from blastlab.ui import chain_route as cr
+    c3, c2 = checks[3].case, checks[2].case
+    dom = f'{c3.Lx:g} × {c3.Ly:g} × {c3.Lz:g} m'
+    want = (f'This 3D stage has no preview here. Its domain is {dom}, '
+            f'burst at z {cr._n1(c2.center[1])} m (from the 2D profile).')
+    check('the 3D hint names the wired domain and the burst height '
+          '(the 2D stage\'s z, 1 → 2 → 3)', e3.hint.text() == want,
+          ascii(e3.hint.text()))
+    check('no "shown in 01 Setup" any more',
+          '01 Setup' not in e3.hint.text())
+    ch.set_route('13')
+    pump(500)
+    c3 = ch.checks()[3].case
+    check('1 → 3: the burst height is this stage\'s own cz',
+          e3.hint.text().endswith(
+              f'burst at z {cr._n1(c3.center[2])} m (set in this '
+              f'stage’s form).'), ascii(e3.hint.text()))
+    ch.set_route('123')
+    pump(500)
+    tips = {k: b.toolTip() for k, b in ch.route_btns.items()}
+    check('four route tooltips, non-empty and distinct',
+          len(tips) == 4 and all(tips.values())
+          and len(set(tips.values())) == 4
+          and tips['13'] == '1D → 3D: the 1D profile is placed around '
+                            'the 3D burst point; no 2D stage',
+          ascii(tips))
+    check('each one line', all('\n' not in t for t in tips.values()))
+    win._show('chain')
+    pump(50)
+    ch.run_line.linkActivated.emit('model')
+    pump(50)
+    check('a click on the "into \\<model>\\" line opens 02 Run with the '
+          'Model box focused', win.current_tab() == 'run'
+          and win.focusWidget() is win.run_panel.run_name,
+          f'{win.current_tab()} {win.focusWidget()!r}')
+    check('the line is a link, its text unchanged',
+          '<a href=' in ch.run_line.text()
+          and ch.run_line_text().endswith('\\')
+          and ' stages · ' in ch.run_line_text(),
+          ascii(ch.run_line_text()))
+    win._show('chain')
+    pump(100)
 
 
 # ── S5 ───────────────────────────────────────────────────────────────────
