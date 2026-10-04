@@ -32,6 +32,7 @@ except ImportError:
     HAVE_SKIMAGE = False
 
 from ..core.constants import P_AIR
+from .gauge_summary import entered_numbers
 
 
 def titled(base, extra=None):
@@ -389,13 +390,17 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None):
     fig.suptitle(titled(f"Gauge Time Histories - {charge_label(meta)} - "
                         f"EOS: {meta['eos']}", title_extra), fontsize=12)
 
+    # GUI-12 A3: a panel carries its ENTERED gauge number, so a gauge the
+    # solver dropped does not renumber the later ones (F42; no drop ->
+    # the panel index, byte-identical)
+    nums = entered_numbers(points, meta.get('gauges'))
     for k, (p_arr, pt, color) in enumerate(zip(pdata, points, colors)):
         ax  = axes[k // ncols][k % ncols]
         ovp = tr(p_arr)
         ax.plot(times * 1e3, ovp, color=color, lw=1.2)
         ax.axhline(0, color='k', lw=0.7, ls='--', alpha=0.5)
         loc = ", ".join(f"{v:.2f}" for v in pt)
-        ax.set_title(f'Gauge {k+1}  ({loc}) m', fontsize=10)
+        ax.set_title(f'Gauge {nums[k]}  ({loc}) m', fontsize=10)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.3)

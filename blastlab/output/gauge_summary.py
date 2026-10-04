@@ -120,6 +120,23 @@ def gauge_labels(gauge_out, requested=None):
     return out
 
 
+def entered_numbers(points, requested=None):
+    """The G number (1-based) of each 2D/3D point, as `gauge_labels`
+    numbers it: the ENTERED gauge's number when the solver dropped one
+    (F42), else - no drop, or a pairing short of a point (P1) - the
+    point's own index + 1. The exported gauge-trace titles use it
+    (GUI-12 A3)."""
+    pts = list(points)
+    want = list(requested or [])
+    plain = list(range(1, len(pts) + 1))
+    if len(pts) >= len(want):
+        return plain
+    pair = _nearest_entered(pts, want)
+    if any(j is None for j in pair):
+        return plain
+    return [j + 1 for j in pair]
+
+
 def _same_dim_dist(w, pt):
     if pt is None or len(w) != len(pt):
         return None
