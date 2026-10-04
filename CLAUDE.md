@@ -287,7 +287,9 @@ is still matplotlib via `output/plots.py`.
   the `/todo`, `/refactor`, `/gui-qa` skills) follow this file. When `/todo`
   runs, it keeps the stable IDs and P0-P4 order of `TODO.md`, moves finished
   items to `DONE.md` in the existing style, and never rewrites either file
-  wholesale. **`/neat`** (repo-local, `.claude/skills/neat/` + agent
+  wholesale. `/todo` and the three `task-*` agents have repo-local versions in
+  `.claude/` (token-saving, owner 2026-10-04): model and verification depth by the
+  plan's risk level, and every agent follows **`docs/agent-rules.md`**. **`/neat`** (repo-local, `.claude/skills/neat/` + agent
   `bl-tidier`) is the tidying skill for this repo - use it, not `/tidy`.
 
 
