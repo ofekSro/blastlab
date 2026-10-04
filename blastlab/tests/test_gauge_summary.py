@@ -129,6 +129,38 @@ def main():
           gs.gauge_labels(g2, mixed) == ['G1 (0.826, 0.605) m',
                                          'G2 (1.532, 1.711) m'],
           str(gs.gauge_labels(g2, mixed)))
+    # GUI-12 A2 (verifyA Q1): G2 and G3 entered 0.4 cell apart (dx 0.1),
+    # G2 dropped; G1's cell centre is nearer G3 than G1, so a greedy
+    # nearest match gives the first point G3 and the survivor at G3's
+    # cell G2. The solver keeps the entered order, so the pairing must be
+    # an increasing subsequence: G1, G3.
+    want5 = [(1.106, 0.694), (1.201, 0.69), (1.201, 0.65)]
+    g5 = dict(times=t, points=[(1.15, 0.65), (1.25, 0.65)],
+              pressures=[p, p])
+
+    def greedy(pts, w):         # the pre-A2 rule, for the mutation check
+        used, out = set(), []
+        for pt in pts:
+            j = min((j for j in range(len(w)) if j not in used),
+                    key=lambda j: sum((a - b) ** 2
+                                      for a, b in zip(w[j], pt)))
+            used.add(j)
+            out.append(j)
+        return out
+    check('A2 case discriminates: greedy nearest gives G3, G2',
+          greedy(g5['points'], want5) == [2, 1],
+          str(greedy(g5['points'], want5)))
+    lab5 = gs.gauge_labels(g5, want5)
+    check('A2: order-preserving pairing labels the survivor at G3\'s '
+          'cell G3, not G2',
+          lab5 == ['G1 (1.106, 0.694) -> cell (1.150, 0.650) m',
+                   'G3 (1.201, 0.650) -> cell (1.250, 0.650) m'], str(lab5))
+    check('A2: pair_in_order is an increasing subsequence',
+          gs.pair_in_order(g5['points'], want5) == [0, 2])
+    check('A2: a pair beyond tol cannot pair',
+          gs.pair_in_order([(5.0, 5.0)], want5, tol=0.1) == [None])
+    check('A2: ties go to the earlier entered gauge',
+          gs.pair_in_order([(1.0,)], [(0.5,), (1.5,)]) == [0])
     check('empty gauges -> no rows',gs.summarize_gauges(dict(times=np.array([]), points=[], pressures=[])) == [])
     out = os.path.join(tempfile.mkdtemp(prefix='blastlab_gs_'), 'gauges_summary.csv')
     gs.save_gauge_summary(rows, out)

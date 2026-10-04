@@ -1816,6 +1816,18 @@ def r5b_dropped(win):
     check('x-only payload, no x tie: G1, G3 and G2 inside Wall 1',
           labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
           f'{labels} {dropped}')
+    # GUI-12 A2: G2 and G3 0.4 cell apart, G2 dropped, G1's cell nearer
+    # G3 than G1 - the order-preserving pairing (test_gauge_summary's
+    # case) gives the screens and the exported labels the same numbers
+    from blastlab.output.gauge_summary import gauge_labels
+    want5 = [(1.106, 0.694), (1.201, 0.69), (1.201, 0.65)]
+    c5 = sample_case(gauges=want5, cell_size_m=0.1, obstacles=[])
+    pay5 = flat_payload([(1.15, 0.65), (1.25, 0.65)])
+    labels, _dropped = RG.numbering(c5, pay5)
+    exported = [s.split()[0] for s in gauge_labels(pay5, want5)]
+    check('A2: numbering() G1, G3, as gauge_labels',
+          labels == ['G1', 'G3'] and exported == labels,
+          f'{labels} {exported}')
 
 
 def main():

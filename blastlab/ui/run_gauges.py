@@ -36,7 +36,8 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
                                QSizePolicy, QVBoxLayout, QWidget)
 
 from ..core.constants import P_AIR
-from ..output.gauge_summary import summarize_gauges, summarize_trace
+from ..output.gauge_summary import (pair_in_order, summarize_gauges,
+                                    summarize_trace)
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
@@ -102,42 +103,38 @@ def _entered(case):
         return []
 
 
+def _match_dist(g, pos):
+    """`pair_in_order`'s distance for `_match`: Euclidean in the same
+    dimension; x alone for a one-coordinate position against a
+    multi-coordinate gauge; None otherwise."""
+    if pos is None:
+        return None
+    if len(g) == len(pos):
+        return math.dist(g, pos)
+    if len(pos) == 1 and len(g) > 1:
+        return abs(g[0] - pos[0])           # blastFoam live: x only
+    return None
+
+
 def _match(case, positions):
     """The entered gauge (0-based) each payload position belongs to, or
     None. The solver snaps a gauge to its cell centre, at most half a
-    cell away per axis, so the nearest entered gauge within one cell is
-    unambiguous; each entered gauge is taken once.
+    cell away per axis, and keeps the entered order, so the positions
+    pair with the entered gauges in order, each within one cell
+    (`output.gauge_summary.pair_in_order`, GUI-12 A2 - the labels'
+    rule too); each entered gauge is taken once.
 
     blastFoam's live payload of a 3D run carries `radii` - the probes' x
     only (`solvers/foam/backend._gauges_from_probes`) - so a
     one-coordinate position against multi-coordinate gauges is matched
     on x, in entered order (the probes are written in that order), and
     ties go to the first gauge not yet taken."""
-    entered = _entered(case)
     try:
         tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
     except (TypeError, ValueError):
         tol = 0.0
-    used, out = set(), []
-    for pos in positions:
-        best = None
-        for j, g in enumerate(entered):
-            if j in used or pos is None:
-                continue
-            if len(g) == len(pos):
-                d = math.dist(g, pos)
-            elif len(pos) == 1 and len(g) > 1:
-                d = abs(g[0] - pos[0])      # blastFoam live: x only
-            else:
-                continue
-            if best is None or d < best[1]:
-                best = (j, d)
-        if best is not None and best[1] <= tol + 1e-9:
-            used.add(best[0])
-            out.append(best[0])
-        else:
-            out.append(None)
-    return out
+    return pair_in_order(list(positions), _entered(case),
+                         dist=_match_dist, tol=tol)
 
 
 def match_gauges(case, gauge_out):

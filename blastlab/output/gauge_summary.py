@@ -14,6 +14,7 @@ byte-pinned gauge TSVs.
 """
 
 import csv
+import math
 
 import numpy as np
 
@@ -85,7 +86,8 @@ def gauge_labels(gauge_out, requested=None):
     (QA-33). `requested` is the case's gauge list (meta['gauges']).
 
     When the solver dropped a gauge (fewer points than entered gauges),
-    each point is paired with its nearest entered gauge and labelled with
+    the points are paired with the entered gauges in order
+    (`pair_in_order`, GUI-12 A2) and each is labelled with
     that gauge's ENTERED number and position - `G3 (1.530, 1.710) -> cell
     (...)` - as the screens number it (F42, D201). Points >= entered keeps
     the index pairing, so a run without a drop is byte-identical.
@@ -118,26 +120,70 @@ def gauge_labels(gauge_out, requested=None):
     return out
 
 
-def _nearest_entered(pts, want):
-    """The entered gauge (0-based) each point belongs to, or None: the
-    nearest entered gauge of the same dimension, greedy in point order,
-    each entered gauge taken once (F42; the match `ui/run_gauges._match`
-    makes, without its one-cell tolerance - `output/` has no case)."""
-    used, out = set(), []
-    for pt in pts:
-        best = None
-        for j, w in enumerate(want):
-            if j in used or len(w) != len(pt):
-                continue
-            d = sum((float(a) - float(b)) ** 2 for a, b in zip(w, pt))
-            if best is None or d < best[1]:
-                best = (j, d)
-        if best is None:
-            out.append(None)
+def _same_dim_dist(w, pt):
+    if pt is None or len(w) != len(pt):
+        return None
+    return math.dist([float(v) for v in w], [float(v) for v in pt])
+
+
+def pair_in_order(pts, want, dist=None, tol=None):
+    """The entered gauge (0-based) each point belongs to, or None - an
+    ORDER-PRESERVING alignment (GUI-12 A2, verifyA Q1): the solvers keep
+    the entered order and only leave gauges out, so the points pair with
+    an increasing subsequence of `want`. Of those, the one pairing the
+    most points, then with the least summed distance, wins; ties go to
+    the earlier entered gauge. A greedy nearest match could hand a point
+    a dropped neighbour's number when two gauges sit within a cell.
+
+    `dist(entered, point)` is a distance, or None when the two cannot
+    pair (default: Euclidean, same dimension only); a pair farther than
+    `tol` (None: no limit) cannot pair either. Shared by the labels here
+    and `ui/run_gauges._match` (D201), so screens and exports agree."""
+    dist = dist or _same_dim_dist
+    n, m = len(pts), len(want)
+
+    def d(i, j):
+        v = dist(want[j], pts[i])
+        if v is None or (tol is not None and v > tol + 1e-9):
+            return None
+        return v
+
+    # g[i][j]: (unpaired points, summed distance) of the best alignment
+    # of pts[i:] with want[j:]
+    g = [[(0, 0.0)] * (m + 1) for _ in range(n + 1)]
+    for i in range(n - 1, -1, -1):
+        g[i][m] = (n - i, 0.0)
+        for j in range(m - 1, -1, -1):
+            u = g[i + 1][j]
+            best = (u[0] + 1, u[1])                 # point i unpaired
+            if g[i][j + 1] < best:
+                best = g[i][j + 1]                  # want[j] left out
+            v = d(i, j)
+            if v is not None:
+                w = g[i + 1][j + 1]
+                if (w[0], w[1] + v) <= best:        # pair: wins ties
+                    best = (w[0], w[1] + v)
+            g[i][j] = best
+    out, i, j = [], 0, 0
+    while i < n:
+        v = d(i, j) if j < m else None
+        if v is not None and (g[i + 1][j + 1][0],
+                              g[i + 1][j + 1][1] + v) == g[i][j]:
+            out.append(j)
+            i, j = i + 1, j + 1
+        elif j < m and g[i][j + 1] == g[i][j]:
+            j += 1
         else:
-            used.add(best[0])
-            out.append(best[0])
+            out.append(None)
+            i += 1
     return out
+
+
+def _nearest_entered(pts, want):
+    """The entered gauge (0-based) each point belongs to, or None:
+    `pair_in_order` without the one-cell tolerance `ui/run_gauges._match`
+    uses (F42; `output/` has no case)."""
+    return pair_in_order(pts, want)
 
 
 def summarize_gauges(gauge_out, p_ambient=P_AIR, requested=None):
