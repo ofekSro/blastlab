@@ -228,8 +228,11 @@ def chain_tint(mode_name=None):
 #: GUI-10 (D190): how far the tree rows' hover is blended from `hover`
 #: toward `panel` - the smallest step at which every role drawn on a
 #: row (num_dim, text, text2, faint, ok, warn, danger, gauge) reaches
-#: 4.5:1 (dark: num_dim 4.06 -> 4.50; light: warn 4.01 -> 4.50)
-TREE_HOVER_BLEND = {'dark': 0.76, 'light': 0.66}
+#: 4.5:1 (light: warn 4.01 -> 4.50). Dark is 0, the global `hover`
+#: itself: D192's t 0.76 left the hover 1.02:1 from the panel, too faint
+#: to see, and the owner accepted dark num_dim at D190's 4.06:1 while a
+#: row is hovered (owner review 2026-10-03, GUI-11 b; D212)
+TREE_HOVER_BLEND = {'dark': 0.0, 'light': 0.66}
 
 
 def tree_hover(mode_name=None):

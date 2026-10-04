@@ -210,7 +210,9 @@ def t6_selected_row():
     QSS rule's own (`treerow[selected="true"]`), and every role drawn on
     it reaches 4.5:1. D190: a hovered tree row (node or child) is on the
     tree's own `tree_hover` fill, gated the same way; the global `hover`
-    key is unchanged and only printed."""
+    key is unchanged and only printed. GUI-11 (D212, owner review of
+    D192): the dark hover is the global `hover`, visibly apart from the
+    panel, and dark num_dim on it has a 4.0 floor (measured 4.06)."""
     import re
     print('\nT6: the selected tree row (every role >= 4.5)')
     for name, pal in (('dark', theme.DARK), ('light', theme.LIGHT)):
@@ -243,14 +245,27 @@ def t6_selected_row():
         got = [m.group(1) if m else None for m in rules]
         check(f'{name}: tree rows hover on tree_hover ({hov}), the global '
               f'hover {pal["hover"]} unchanged', got == [hov, hov], str(got))
+        # GUI-11 (D212): the owner accepted dark num_dim at D190's 4.06:1
+        # on hover (owner review 2026-10-03, D192), so that one pair's
+        # floor is 4.0; every other role, and light, keep 4.5
+        sep = contrast(hov, pal['panel'])
+        print(f'    hover {hov} against panel {pal["panel"]}: {sep:.2f}')
+        if name == 'dark':
+            check('dark: the tree hover is visible against the panel '
+                  '(> 1.02, D192\'s faint value)', sep > 1.02, f'{sep:.3f}')
         worst = None
+        low = []
         for role in TREE_HOVER_ROLES:
             r = contrast(pal[role], hov)
-            print(f'    {role:12s} on hover {hov}  {r:6.2f}')
+            floor = 4.0 if (name, role) == ('dark', 'num_dim') else 4.5
+            print(f'    {role:12s} on hover {hov}  {r:6.2f}  (floor {floor})')
+            if r < floor:
+                low.append(f'{role} {r:.2f} < {floor}')
             if worst is None or r < worst[0]:
                 worst = (r, role)
-        check(f'{name}: every role on a hovered tree row >= 4.5',
-              worst[0] >= 4.5, f'worst {worst[1]} = {worst[0]:.2f}')
+        check(f'{name}: every role on a hovered tree row >= 4.5 (dark '
+              f'num_dim >= 4.0, owner-approved)',
+              not low, f'worst {worst[1]} = {worst[0]:.2f}; {low}')
 
 
 def main():
