@@ -127,13 +127,30 @@ def _position(meta, dim):
     return ''
 
 
+def _material(meta, case):
+    return meta.get('material') or (case or {}).get('material')
+
+
 def _charge(meta, case, dim):
     w = _num(meta.get('charge_kg') if dim == 1 else meta.get('charge'))
     if w is None:
         return None
-    material = meta.get('material') or (case or {}).get('material')
-    text = f'{w:g} kg' + (f' {material}' if material else '')
+    material = _material(meta, case)
+    # UXR-10 (GUI-11 T20): a planar 2D charge is a line charge, per metre
+    unit = 'kg/m' if dim == 2 and meta.get('geometry') == 'planar' else 'kg'
+    text = f'{w:g} {unit}' + (f' {material}' if material else '')
     return text + _position(meta, dim)
+
+
+def _afterburn(value, meta, case):
+    """The Afterburn row's value. `miller` is calibrated against data for
+    TNT only; the other materials scale by oxygen balance (CLAUDE.md
+    section 7, `solvers/foam/materials.py`), so it says so (UXR-10)."""
+    text = str(value)
+    material = _material(meta, case)
+    if text == 'miller' and material and str(material) != 'TNT':
+        text += ' (calibrated for TNT only)'
+    return text
 
 
 def _mesh(meta, case, dim):
@@ -142,7 +159,8 @@ def _mesh(meta, case, dim):
         dx = _num((case or {}).get('cell_size_m'))
     if dx is None:
         return None
-    text = f'cell {dx * 1000:g} mm'
+    # UXR-10 (GUI-11 T20, amends D90): three significant figures
+    text = f'cell {dx * 1000:.3g} mm'
     ref = meta.get('refine')
     if isinstance(ref, dict):
         lmax, base = _num(ref.get('lmax')), _num(ref.get('dx_base'))
@@ -211,7 +229,8 @@ def method_rows(res, dim):
         for label, key in (('Detonation', 'activation'),
                            ('Afterburn', 'afterburn')):
             if case.get(key):
-                rows.append((label, str(case[key])))
+                rows.append((label, _afterburn(case[key], meta, case)
+                             if key == 'afterburn' else str(case[key])))
     mesh = _mesh(meta, case, dim)
     if mesh:
         rows.append(('Mesh', mesh))

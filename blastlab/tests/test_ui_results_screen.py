@@ -285,7 +285,7 @@ def s2_method(p):
     want = [('Solver', 'native'),
             ('Charge', f"{m['charge']:g} kg {CASES['2d'].material}"
                        f" · z {m['charge_center'][1]:g} m"),
-            ('Mesh', f"cell {m['dx'] * 1000:g} mm"),
+            ('Mesh', f"cell {m['dx'] * 1000:.3g} mm"),     # T20: .3g
             ('Parallel', 'serial'),
             ('Ended', f'{res.stop_reason} · {t_part(res)} · finished 10:05')]
     got = RM.method_rows(res, 2)
@@ -330,7 +330,7 @@ def s2_method(p):
                        f" · z {fm['charge_center'][1]:g} m"),
             ('Detonation', 'linear'),
             ('Afterburn', 'none'),
-            ('Mesh', f"cell {fm['dx'] * 1000:g} mm · finest "
+            ('Mesh', f"cell {fm['dx'] * 1000:.3g} mm · finest "
                      f"{0.025 / 2 ** 2 * 1000:.3g} mm"),
             ('Ended', f'{fres.stop_reason} · {t_part(fres)}')]
     got = RM.method_rows(fres, 2)
@@ -357,6 +357,64 @@ def s2_method(p):
     check('no row reads None, nan or ?',
           not any(re.search(r'\bNone\b|\bnan\b|\?', v)
                   for v in everything), str(everything))
+
+    # GUI-11 T20 (UXR-10): unit, precision, caveat, the Ended wrap
+    import copy
+    pl = copy.copy(res)
+    pl.meta = dict(res.meta, geometry='planar')
+    ch = dict(RM.method_rows(pl, 2)).get('Charge', '')
+    check('a planar charge reads kg/m (a line charge)',
+          f"{m['charge']:g} kg/m " in ch and ' kg ' not in ch, ch)
+    check('an axisymmetric charge still reads kg',
+          dict(RM.method_rows(res, 2))['Charge'].startswith(
+              f"{m['charge']:g} kg "), dict(RM.method_rows(res, 2))['Charge'])
+    dxr = copy.copy(res)
+    dxr.meta = dict(res.meta, dx=0.0124352)
+    check('dx 0.0124352 reads cell 12.4 mm (amends D90)',
+          dict(RM.method_rows(dxr, 2))['Mesh'] == 'cell 12.4 mm',
+          dict(RM.method_rows(dxr, 2))['Mesh'])
+    c4 = copy.copy(fres)
+    c4.meta = dict(fres.meta, material='C4')
+    c4d = os.path.join(TMP, 'foam_run_c4')
+    os.makedirs(c4d, exist_ok=True)
+    with open(os.path.join(c4d, 'case.json'), 'w', encoding='utf-8') as f:
+        json.dump(dict(schema='blastlab-case', dim=2, solver='blastfoam',
+                       material='C4', activation='linear',
+                       afterburn='miller'), f)
+    c4.meta['case_dir'] = c4d
+    ab = dict(RM.method_rows(c4, 2)).get('Afterburn')
+    check('a C4 blastFoam result with miller: the TNT-only caveat',
+          ab == 'miller (calibrated for TNT only)', repr(ab))
+    tnt = copy.copy(c4)
+    tnt.meta = dict(c4.meta, material='TNT')
+    with open(os.path.join(c4d, 'case.json'), 'w', encoding='utf-8') as f:
+        json.dump(dict(schema='blastlab-case', dim=2, solver='blastfoam',
+                       material='TNT', activation='linear',
+                       afterburn='miller'), f)
+    ab = dict(RM.method_rows(tnt, 2)).get('Afterburn')
+    check('TNT with miller: no caveat', ab == 'miller', repr(ab))
+    ent_e = p.add_result('ended_wrap', 2, res)
+    pump(30)
+    lbl = p.method.value_label('Ended')
+    check('the Ended value word-wraps, onto at most two lines',
+          lbl is not None and lbl.wordWrap()
+          and lbl.full_text() == dict(
+              want_e := RM.method_rows(res, 2))['Ended']
+          and 1 <= len(lbl.text().split('\n')) <= 2,
+          repr(lbl.text() if lbl else None))
+    shown = lbl.text().replace('\n', ' ')
+    check('its lines are the text (the second elided only when cut, the '
+          'whole text then its tooltip)',
+          shown == lbl.full_text() or (shown.endswith('…')
+                                       and lbl.toolTip() == lbl.full_text()),
+          repr(lbl.text()))
+    others = [p.method.value_label(k) for k, _v in want_e if k != 'Ended']
+    check('the other values stay one elided line',
+          all(not hasattr(w, 'wordWrap') or not w.wordWrap()
+              for w in others))
+    p.sel.setCurrentIndex(p.entries().index(ent_e))
+    p.remove_current()
+    pump(20)
     e1 = p.add_result('free_field_1D', 1, r1)
     pump(30)
     tip = RM.NO_CASE_TIP

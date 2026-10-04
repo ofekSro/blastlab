@@ -28,8 +28,8 @@ import threading
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QDialog, QFrame,
                                QGridLayout, QHBoxLayout, QLabel,
-                               QPlainTextEdit, QPushButton, QStackedWidget,
-                               QVBoxLayout, QWidget)
+                               QPlainTextEdit, QPushButton, QSizePolicy,
+                               QStackedWidget, QVBoxLayout, QWidget)
 
 from ..viz3d import MISSING_MSG, pyvista_available
 from . import dialogs, exports, theme
@@ -216,6 +216,71 @@ class CaseViewer(QDialog):
         QApplication.clipboard().setText(self._text)
 
 
+class TwoLineLabel(QLabel):
+    """A value that word-wraps onto at most two lines, the second elided
+    at the right, the whole text in the tooltip when cut (UXR-10, the
+    method card's Ended row). The lines are broken here at the label's
+    width, not by Qt's height-for-width, so a long stop reason never
+    makes the card - and the column above it - taller than two lines."""
+
+    def __init__(self, text='', parent=None):
+        super().__init__(parent)
+        self._full = str(text or '')
+        self._lines = 1
+        self.setWordWrap(True)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._render()
+
+    def full_text(self):
+        return self._full
+
+    def hasHeightForWidth(self):                     # noqa: N802 (Qt)
+        return False
+
+    def _height(self, lines):
+        m = self.contentsMargins()
+        return lines * self.fontMetrics().lineSpacing() + m.top() + m.bottom()
+
+    def sizeHint(self):
+        return QSize(self.fontMetrics().horizontalAdvance(self._full),
+                     self._height(self._lines))
+
+    def minimumSizeHint(self):
+        return QSize(0, self._height(self._lines))
+
+    def _render(self):
+        fm = self.fontMetrics()
+        w = max(1, self.contentsRect().width())
+        words = self._full.split(' ')
+        first = []
+        while words and fm.horizontalAdvance(' '.join(first + words[:1])) <= w:
+            first.append(words.pop(0))
+        if not first and words:                  # one word wider than w
+            first, words = [fm.elidedText(words[0], Qt.ElideRight, w)], \
+                words[1:]
+        lines = [' '.join(first)]
+        if words:
+            lines.append(fm.elidedText(' '.join(words), Qt.ElideRight, w))
+        text = '\n'.join(lines)
+        if super().text() != text:
+            super().setText(text)
+        cut = text.replace('\n', ' ') != self._full
+        self.setToolTip(self._full if cut else '')
+        if len(lines) != self._lines:
+            self._lines = len(lines)
+            self.updateGeometry()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._render()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._render()
+
+
 class MethodCard(QFrame):
     """HOW IT WAS COMPUTED (UX-15, board lines 78-91): the rows of
     `results_method.method_rows`, then Show case / Load into 01 Setup."""
@@ -300,9 +365,16 @@ class MethodCard(QFrame):
         for k, (key, val) in enumerate(self._rows):
             kl = QLabel(key)
             kl.setObjectName('methodkey')
-            vl = ElidedLabel(val, Qt.ElideRight)
+            if key == 'Ended':
+                # UXR-10 (GUI-11 T20): the stop reason, the final time
+                # and the clock word-wrap onto two lines rather than elide
+                vl = TwoLineLabel(val)
+                vl.setAlignment(Qt.AlignRight | Qt.AlignTop)
+                kl.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+            else:
+                vl = ElidedLabel(val, Qt.ElideRight)
+                vl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             vl.setObjectName('methodval')
-            vl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self._grid.addWidget(kl, k, 0)
             self._grid.addWidget(vl, k, 1)
             self._row_widgets += [kl, vl]
