@@ -811,9 +811,16 @@ def s5f_fed_face():
     print('\nS5f: a fed stage\'s gauge-drop warnings (no Qt)')
 
     def warned(warnings):
-        return sorted(m.group(1) for w in warnings for m in
-                      [re.match(r'Gauge (\(.*?\)) .* - will be dropped$',
-                                w)] if m)
+        # GUI-13 (c): `G<n> (x, y) m ...` - the entered point n, whose
+        # 2-decimal coordinates the warning must carry
+        out = []
+        for w in warnings:
+            m = re.match(r'G(\d+) \((.*?)\) m .* - will be dropped$', w)
+            if m:
+                p = two.gauges[int(m.group(1)) - 1]
+                if m.group(2) == ', '.join(f'{v:.2f}' for v in p):
+                    out.append(str(tuple(p)))
+        return sorted(out)
     # the QA case's axisymmetric twin: Wall 1 x 1.2-1.6, y 0-0.6; G2
     # inside, G3 on the left face, two more face gauges; 20 kg, cell 0.05
     two = Case2D(solver='native', geometry='axisymmetric', Lx=2.4, Ly=1.6,

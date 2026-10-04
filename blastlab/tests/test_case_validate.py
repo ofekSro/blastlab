@@ -575,11 +575,16 @@ def gauge_in_obstacle_checks():
     def new_warnings(rep, ref):
         return [w for w in rep.warnings if w not in ref.warnings]
 
+    # GUI-13 (c), D4: the warning names the gauge G<n> (each case below
+    # has one gauge, G1) at its coordinates to 2 decimals, in metres
+    def gname(pt, n=1):
+        return f'G{n} ({", ".join(f"{v:.2f}" for v in pt)}) m'
+
     def face(pt, wall=1):
-        return [f'Gauge {pt} on the face of Wall {wall} - will be dropped']
+        return [f'{gname(pt)} on the face of Wall {wall} - will be dropped']
 
     def inside(pt, wall=1):
-        return [f'Gauge {pt} inside Wall {wall} - will be dropped']
+        return [f'{gname(pt)} inside Wall {wall} - will be dropped']
 
     for solver in ('native', 'blastfoam'):
         two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0,
@@ -589,7 +594,7 @@ def gauge_in_obstacle_checks():
         rep = validate_case(Case2D(gauges=[(1.4, 0.3)], **two))
         got = new_warnings(rep, ref)
         check(f'2D {solver}: a gauge inside Wall 1 gets exactly the new '
-              f'warning', got == ['Gauge (1.4, 0.3) inside Wall 1 - '
+              f'warning', got == ['G1 (1.40, 0.30) m inside Wall 1 - '
                                   'will be dropped'], str(got))
         check(f'2D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
@@ -629,7 +634,7 @@ def gauge_in_obstacle_checks():
         rep = validate_case(Case3D(gauges=[(1.6, 1.0, 0.5)], **three))
         got = new_warnings(rep, ref)
         check(f'3D {solver}: a gauge inside Wall 1 gets exactly the new '
-              f'warning', got == ['Gauge (1.6, 1.0, 0.5) inside '
+              f'warning', got == ['G1 (1.60, 1.00, 0.50) m inside '
                                   'Wall 1 - will be dropped'], str(got))
         check(f'3D {solver}: it is a warning, not an error',
               rep.errors == ref.errors, str(rep.errors))
@@ -737,10 +742,14 @@ def gauge_in_obstacle_checks():
             got = new_warnings(validate_case(case), ref)
             walls = {}
             for w in got:
-                m = re.match(r'Gauge (\(.*?\)) .*Wall (\d+) - will be '
+                # GUI-13 (c): G<n> (x, y) m - n picks the entered point,
+                # whose coordinates the warning must print
+                m = re.match(r'(G(\d+) \(.*?\) m) .*Wall (\d+) - will be '
                              r'dropped$', w)
                 if m:
-                    walls[m.group(1)] = int(m.group(2))
+                    p = pts[int(m.group(2)) - 1]
+                    if m.group(1) == gname(p, int(m.group(2))):
+                        walls[str(tuple(p))] = int(m.group(3))
             where = {str(tuple(p)): (sd.where(case, p) or (None,))[0]
                      for p in pts}
             check(f'A4 {dim}D {solver}: every drop warning names a wall '

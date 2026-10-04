@@ -1559,10 +1559,13 @@ def _validate_closing(case, rep, ctx):
 
     # gauges / obstacles sanity
     dropped = None                  # the solver's drop rule, built once
-    for g in getattr(case, 'gauges', []):
+    for k, g in enumerate(getattr(case, 'gauges', []), start=1):
         pt = g if isinstance(g, (list, tuple)) else (g,)
+        # GUI-13 (c), D4: the gauge as the screens name it, G<n> (1-based,
+        # the entered order) at its coordinates in metres
+        name = f"G{k} ({', '.join(f'{float(v):.2f}' for v in pt)}) m"
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
-            warn(f"Gauge {tuple(pt)} outside domain - will be dropped")
+            warn(f"{name} outside the domain - will be dropped")
             continue
         if dropped is None:
             dropped = _gauge_drop_rule(case, ctx)
@@ -1572,7 +1575,7 @@ def _validate_closing(case, rep, ctx):
         # GUI-12 A4: named as Run and Setup's Where column name it; the
         # inside / face split is the open-box test
         inside = _in_obstacle_open(pt, case.obstacles)
-        warn(f"Gauge {tuple(pt)} "
+        warn(f"{name} "
              f"{gauge_drop_reason(inside or wall, bool(inside))}"
              f" - will be dropped")
     for box in case.obstacles:

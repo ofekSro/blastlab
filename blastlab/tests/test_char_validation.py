@@ -235,8 +235,9 @@ def test_block_closing():
         rep, ctx, _ = _upto(case, '_validate_caps')
         before = list(rep.warnings)
         sv._validate_closing(case, rep, ctx)
+    # GUI-13 (c), owner Q2 2026-10-04: a wording change, no number
     assert rep.warnings == before + [
-        'Gauge (5.0, 5.0) outside domain - will be dropped']
+        'G1 (5.00, 5.00) m outside the domain - will be dropped']
 
 
 def main():
