@@ -64,18 +64,40 @@ def _keep_paths(box):
     need = max(fm.horizontalAdvance(t) for t in tokens) + 2
     shown = text
     if need > cap:
+        cut = []
+
         def elide(m):
             tok = m.group(0)
             if fm.horizontalAdvance(tok) + 2 <= cap:
                 return tok
+            cut.append(tok)
             return fm.elidedText(tok, Qt.ElideMiddle, cap - 2)
         shown = _PATH_TOKEN.sub(elide, text)
         lbl.setToolTip(text)
+        # F40 (GUI-11): a tooltip cannot be copied, so each path shortened
+        # here is also given whole under Show Details…, one per line
+        box.setDetailedText('\n'.join(_bare_path(t) for t in cut))
         need = cap
     shown = _paths_start_lines(shown, fm, need)
     if shown != text:
         box.setText(shown)
     lbl.setMinimumWidth(need)
+
+
+def _bare_path(token):
+    """A path token without the quote or bracket around it and the
+    sentence's own trailing punctuation: `'C:\\a\\b.json'.` -> the path.
+    A quoted path is an OSError's repr, whose backslashes are doubled;
+    they are halved back (a UNC start doubled twice gives `\\\\`)."""
+    opener = token[:1] if token[:1] in '\'"(' else ''
+    path = token[len(opener):]
+    closer = {'\'': '\'', '"': '"', '(': ')'}.get(opener, '')
+    path = path.rstrip('.,;:')
+    if closer and path.endswith(closer):
+        path = path[:-1]
+    if opener in '\'"' and opener:
+        path = path.replace('\\\\', '\\')
+    return path.rstrip('.,;:')
 
 
 def _paths_start_lines(text, fm, width):

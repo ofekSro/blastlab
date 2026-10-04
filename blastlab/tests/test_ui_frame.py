@@ -704,6 +704,21 @@ def main():
           '…' in box2.text() and lbl2.toolTip() == f'Missing {huge}'
           and lbl2.minimumWidth() < lbl2.fontMetrics().horizontalAdvance(
               huge), f'{box2.text()[:30]!r} min {lbl2.minimumWidth()}')
+    # F40 (GUI-11): the shortened path is whole, and copyable, under
+    # Show Details…; a box whose path was not shortened has no details
+    check('a shortened path: Show Details… holds the whole path',
+          box2.detailedText() == huge, repr(box2.detailedText()[:30]))
+    check('a path kept whole: no Show Details…', box.detailedText() == '',
+          repr(box.detailedText()))
+    quoted = QMessageBox(QMessageBox.Critical, 'Save case',
+                         f'Could not write {huge}.json: [Errno 13] '
+                         f'Permission denied: {huge + ".json"!r}.',
+                         QMessageBox.Ok, win)
+    dialogs._keep_paths(quoted)
+    check('quoted and bare paths: each whole on its own line, no quote '
+          'or full stop', quoted.detailedText()
+          == f'{huge}.json\n{huge}.json', repr(quoted.detailedText()[-40:]))
+    quoted.deleteLater()
     # verify11a: an OSError's text quotes its path; the quoted path starts
     # its own line with its quote (the real platform broke it mid-path)
     p = 'C:\\runs\\lab.json'
