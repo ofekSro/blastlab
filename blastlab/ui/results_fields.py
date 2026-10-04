@@ -443,7 +443,7 @@ class FieldsView(QWidget):
                 self.export_hint.emit(f'Exports use the full title: {full}')
             else:
                 self.export_hint.emit('')
-                fig =plots.figure_isosurfaces_3d(
+                fig = plots.figure_isosurfaces_3d(
                     res.snapshots, res.meta,
                     title_extra=self._title_extra)
         except Exception as exc:
