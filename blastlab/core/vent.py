@@ -85,7 +85,7 @@ reportable.
 import math
 
 from .constants import P_AIR
-from .deflagration import AIR_R, AIR_CV, mixture
+from .deflagration import AIR_R, _vent_mdot, mixture
 
 #: Opening modes. See the module docstring on why they share a CFD case
 #: and do not share a standing.
@@ -100,12 +100,35 @@ MODES = ('burst', 'open')
 #: the front and the early jet and not for the whole event.
 WINDOW_FRACTION_WARN = 0.25
 
+# Molar gas constant in J/(kmol K) (CODATA 2018 R = 8.314462618... J/(mol K),
+# x 1000), so R_specific [J/(kg K)] -> molar mass M [g/mol] = _R_UNIVERSAL / R.
+_R_UNIVERSAL = 8314.46261815324
+
+# Effective discharge coefficient the CFD produces, by cells across the
+# opening - measured in `tests/_e2e_vent_verify.py` (see `cfd_point_in_band`).
+_CD_EFF_6_CELLS = 0.7227
+_CD_EFF_12_CELLS = 0.8102
+# below this many cells the 6-cell value is used, at or above it the 12-cell one
+_CD_CELLS_SWITCH = 9
+# default Cd axis of the sensitivity envelope
+_CD_RANGE = (0.72, 0.90)
+
+# Cd used when the 0-D result carries none: = `deflagration.simulate`'s
+# default `cd`.
+_CD_FALLBACK = 0.8
+
 
 class ChamberState:
     """What the mesh is initialised with, and where it came from.
 
     Deliberately plain: this object is consumed by `writer.profile_state`
     and by the report, and both want numbers rather than behaviour.
+
+    Units: `p`, `p_0d` Pa; `T` K; `m_p`, `m_a` kg; `E` J; `volume`,
+    `volume_0d` m^3; `rho_expl`, `rho_air`, `rho_mix` kg/m^3; `e_mix` J/kg;
+    `R_p` J/(kg K); `mol_weight_p` g/mol; `t_open` s. `alpha_*`,
+    `gamma_p`, `wall_loss_fraction` and the two `*_shift` values are
+    dimensionless (the shifts are relative pressure changes).
     """
 
     __slots__ = ('p', 'T', 'm_p', 'm_a', 'E', 'volume',
@@ -181,6 +204,22 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
     walls (`core/room.py`). Mass and energy cross unchanged and the
     pressure follows from the EOS on that volume - see the module
     docstring for why that way round.
+
+    Args:
+        result: the dict `deflagration.simulate` returns.
+        prop: the propellant whose products fill the chamber (`R`, `gamma`).
+        mode: one of `MODES`; see `open_time`.
+        p_burst: panel burst pressure [Pa], required for `mode='burst'`.
+        volume_cfd: the mesh cavity [m^3]; falls back to the 0-D volume.
+        p_amb: ambient pressure [Pa]. Accepted but not used here.
+
+    Returns:
+        a `ChamberState`.
+
+    Raises:
+        ValueError: from `open_time`; if the volume is not positive; if
+        the chamber holds no gas; if the 0-D run stopped on a
+        conservation violation.
     """
     t_open, i = open_time(result, mode=mode, p_burst=p_burst)
     m_p = float(result['m'][i])
@@ -252,10 +291,10 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
         e_mix=cv_mix * T,
         R_p=prop.R,
         gamma_p=prop.gamma,
-        #: g/mol, which is the unit blastFoam's `molWeight` wants. NOT
-        #: air's 28.97 - see the module docstring on the 15 % that would
-        #: have hidden inside Cd.
-        mol_weight_p=8314.46261815324 / prop.R,
+        # g/mol, which is the unit blastFoam's `molWeight` wants. NOT
+        # air's 28.97 - see the module docstring on the 15 % that would
+        # have hidden inside Cd.
+        mol_weight_p=_R_UNIVERSAL / prop.R,
         t_open=t_open, mode=mode,
         # A room initialised at pressure against ambient outside is a
         # shock tube. For a burst panel that IS the event; for an
@@ -289,6 +328,11 @@ def handoff(result, prop, mode='burst', p_burst=None, volume_cfd=None,
     )
 
 
+def _nearest_index(t, target):
+    """Index of the sample in `t` [s] nearest `target` [s]; first on a tie."""
+    return min(range(len(t)), key=lambda k: abs(t[k] - target))
+
+
 def validity(result, state, t_cfd, prop=None, vent_area=None):
     """How much of the event a CFD window of `t_cfd` seconds covers.
 
@@ -317,14 +361,16 @@ def validity(result, state, t_cfd, prop=None, vent_area=None):
     fractions coincide identically, and reporting both would be
     pretending there are two checks where there is one. That mode gets
     `window_over_drain` alone.
+
+    Units: `t_cfd` s; `vent_area` m^2; `tau_drain` in the result s.
     """
     t_cfd = float(t_cfd)
     if t_cfd <= 0:
         raise ValueError('the CFD window must be positive')
     t, m, m_air, mdot = (result['t'], result['m'], result['m_air'],
                          result['mdot_out'])
-    i = min(range(len(t)), key=lambda k: abs(t[k] - state.t_open))
-    j = min(range(len(t)), key=lambda k: abs(t[k] - (state.t_open + t_cfd)))
+    i = _nearest_index(t, state.t_open)
+    j = _nearest_index(t, state.t_open + t_cfd)
 
     in_room = m[i] + m_air[i]
 
@@ -333,9 +379,9 @@ def validity(result, state, t_cfd, prop=None, vent_area=None):
     # and the area, recompute it from the hand-off state; otherwise fall
     # back to the run's own outflow and SAY that is what happened.
     if prop is not None and vent_area:
-        from .deflagration import _vent_mdot
         out_rate = _vent_mdot(state.p, state.T, prop, float(vent_area),
-                              result.get('cd', 0.8) or 0.8, P_AIR,
+                              result.get('cd', _CD_FALLBACK) or _CD_FALLBACK,
+                              P_AIR,
                               m_p=state.m_p, m_a=state.m_a)
         rate_from = 'the vent that will be open'
     else:
@@ -421,6 +467,8 @@ def energy_check(state, e_total_from_solver, tol=0.02):
     `e_total_from_solver` must come from the deflagration RESULT, never
     from `state`. Taking it from the hand-off would compare the hand-off
     with itself, which is a check that can only pass.
+
+    Energies are in J; `tol` is a relative tolerance on E.
     """
     got = state.E
     want = float(e_total_from_solver)
@@ -457,10 +505,12 @@ def cfd_point_in_band(band, cells_across, cd_range=None):
     this run does not close it: a single sample cannot settle a question
     whose answer changes across the interval it was drawn from.
     """
-    lo, hi = cd_range or (0.72, 0.90)
-    # the two measured points, interpolated in 1/dx - the only two this
-    # repository has, and the reason the range exists at all
-    cd_cfd = 0.7227 if cells_across < 9 else 0.8102
+    lo, hi = cd_range or _CD_RANGE
+    # the two measured points - the only two this repository has, and the
+    # reason the range exists at all. A step at 9 cells between them, not an
+    # interpolation; interpolating in 1/N is open as TODO.md HD1-19(b).
+    cd_cfd = (_CD_EFF_6_CELLS if cells_across < _CD_CELLS_SWITCH
+              else _CD_EFF_12_CELLS)
     pos = (cd_cfd - lo) / (hi - lo) if hi > lo else 0.0
     verdict = (band or {}).get('verdict')
     note = (f'The CFD ran at {cells_across} cells across the opening, '
@@ -484,7 +534,10 @@ def cfd_point_in_band(band, cells_across, cd_range=None):
 
 
 def summary_line(state, val):
-    """One line for the report, caveats attached."""
+    """One line for the report, caveats attached.
+
+    `val` is the dict `validity` returns; its `warnings` are appended.
+    """
     txt = (f'{state.p / 1e6:.4f} MPa, {state.T:.0f} K, '
            f'alpha_expl {state.alpha_expl:.3f}, handed over at '
            f't = {state.t_open:.4g} s ({state.mode})')

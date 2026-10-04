@@ -26,7 +26,7 @@ answer with the uncertainty hidden.
 
 from dataclasses import replace    # noqa: F401 - tests call assessment.replace
 
-from . import deflagration, scenario as _scenario, thermal, unconfined
+from . import deflagration, thermal, unconfined
 # Named at its real home, not through the core.case shim, so the layering
 # test sees this core -> models edge (Phase 9; tests/test_layering.py)
 from ..models.result import ValidationReport
@@ -41,6 +41,17 @@ from ..models.hd13_case import (SCHEMA, VERSION,            # noqa: F401
 
 
 CONFINEMENTS = ('confined', 'unconfined', 'both')
+
+# Below this many packages over a nonzero spread time the progressive-
+# package release is flagged as a coarse staircase. Same n at which the
+# flame-spread ramp converges (scenario.windows); see
+# deflagration._COHORT_TOL.
+_MIN_PACKAGE_COHORTS = 20
+
+# Relative gap between the 0-D chamber volume and the meshed room above
+# which `validate` warns. core/room.py alignment can move the cavity by
+# up to ~10 %, so a larger gap usually means two different rooms.
+_ROOM_VOLUME_TOL = 0.1
 
 
 def wall_errors(case) -> list[str]:
@@ -60,7 +71,13 @@ def wall_errors(case) -> list[str]:
 
 
 def validate(case):
-    """Pre-flight report, in the same shape the blast cases use."""
+    """Pre-flight report, in the same shape the blast cases use.
+
+    Returns a `ValidationReport`. Any entry in `errors` blocks `run`.
+    If the propellant cannot be built, returns at once with that single
+    error and no further checks. Warnings and notes are appended in the
+    order the Setup validation card shows them.
+    """
     rep = ValidationReport()
     err, warn, note = (rep.errors.append, rep.warnings.append,
                        rep.notes.append)
@@ -161,7 +178,8 @@ def validate(case):
     # version: the artefact grows with spread time, so a slow fire cut
     # into few steps is the shape at risk. See deflagration._COHORT_TOL.
     if (case.scenario_kind == 'progressive_package'
-            and case.spread_time > 0 and case.n_cohorts < 20):
+            and case.spread_time > 0
+            and case.n_cohorts < _MIN_PACKAGE_COHORTS):
         # Only the PACKAGE case is a staircase now - a flame spread is
         # entrained as a ramp and converges by n = 20 (scenario.windows).
         # A package letting go really is a step, so it keeps the warning.
@@ -304,7 +322,7 @@ def validate(case):
             # the aligned cavity, so this is a note rather than an error -
             # but a big gap usually means two different rooms.
             if m['volume'] > 0 and case.volume_m3 > 0 and \
-                    abs(case.volume_m3 / m['volume'] - 1.0) > 0.1:
+                    abs(case.volume_m3 / m['volume'] - 1.0) > _ROOM_VOLUME_TOL:
                 warn(f'The 0-D chamber volume ({case.volume_m3:.3f} m3) '
                      f'and the meshed room ({m["volume"]:.3f} m3) differ '
                      f'by {case.volume_m3 / m["volume"] - 1.0:+.0%}. The '
@@ -312,10 +330,10 @@ def validate(case):
                      f'cavity, so the two answers in this report will not '
                      f'be for the same room.')
             dom = [float(v) for v in case.domain_size]
-            cells = 1
+            n_cells = 1
             for L in dom:
-                cells *= max(1, int(round(L / case.cfd_dx_m)))
-            note(f'Venting stage: {cells:,} base cells over a '
+                n_cells *= max(1, int(round(L / case.cfd_dx_m)))
+            note(f'Venting stage: {n_cells:,} base cells over a '
                  f'{dom[0]:g} x {dom[1]:g} x {dom[2]:g} m domain at '
                  f'dx = {case.cfd_dx_m:g} m.')
             hi = [float(o) + float(s) for o, s
@@ -405,7 +423,19 @@ def build_vent_case(case, dim=3):
 
 def run(case):
     """Run the whole assessment. Returns a bundle ready for
-    `output.hd13.save_hd13_report`."""
+    `output.hd13.save_hd13_report`.
+
+    Raises `ValueError` (the `validate` errors joined by '; ') when the
+    case does not validate.
+
+    The bundle is a dict. Always present: `case, prop, report, confined,
+    unconfined, thermal, radiation, sdof, component, band, sensitivity,
+    sensitivity_note, verdict, qd` - `sdof`, `component` and `verdict`
+    are always None (HD1-16). `sensitivity`, when set, maps a label to a
+    (low, high) tuple in the label's unit (MPa, s, -). Present only
+    conditionally: `fireball` (standoffs given and fireball energy > 0)
+    and `residual` (`Ru_pa > 0` and a thermal result exists).
+    """
     rep = validate(case)
     if not rep.ok:
         raise ValueError('; '.join(rep.errors))
