@@ -69,6 +69,7 @@ def validate_name(name):
 
 
 def _norm(path):
+    """`path` made absolute, symlink-resolved and case-normalised."""
     return os.path.normcase(os.path.realpath(os.path.abspath(path)))
 
 
@@ -428,6 +429,7 @@ def bind_case(case, stage_dir):
 
 
 def _inside(path, root):
+    """True when `path` is `root` or below it; False across drives."""
     try:
         return os.path.commonpath([_norm(path), _norm(root)]) == _norm(root)
     except ValueError:                   # another drive
@@ -449,7 +451,18 @@ def relative_case(case, stage_dir, root=None):
 
 
 # ── the manifest ─────────────────────────────────────────────────────────
+#: git's default abbreviation length for a commit hash
+SHORT_HASH_LEN = 7
+
+
+def _read_stripped(path):
+    """The UTF-8 text of `path`, stripped. Raises OSError."""
+    with open(path, encoding='utf-8') as f:
+        return f.read().strip()
+
+
 def _repo_root():
+    """The repository checkout root (two levels above services/)."""
     here = os.path.dirname(os.path.abspath(__file__))       # .../services
     return os.path.dirname(os.path.dirname(here))
 
@@ -462,8 +475,7 @@ def git_commit(repo=None):
     try:
         dot = os.path.join(repo or _repo_root(), '.git')
         if os.path.isfile(dot):
-            with open(dot, encoding='utf-8') as f:
-                line = f.read().strip()
+            line = _read_stripped(dot)
             if not line.startswith('gitdir:'):
                 return None
             gitdir = line[len('gitdir:'):].strip()
@@ -474,26 +486,23 @@ def git_commit(repo=None):
         common = gitdir
         cfile = os.path.join(gitdir, 'commondir')
         if os.path.isfile(cfile):
-            with open(cfile, encoding='utf-8') as f:
-                common = os.path.normpath(os.path.join(gitdir,
-                                                       f.read().strip()))
-        with open(os.path.join(gitdir, 'HEAD'), encoding='utf-8') as f:
-            head = f.read().strip()
+            common = os.path.normpath(os.path.join(gitdir,
+                                                   _read_stripped(cfile)))
+        head = _read_stripped(os.path.join(gitdir, 'HEAD'))
         if not head.startswith('ref:'):
-            return head[:7] or None                     # detached HEAD
+            return head[:SHORT_HASH_LEN] or None        # detached HEAD
         ref = head[4:].strip()
         for base in (gitdir, common):
             path = os.path.join(base, *ref.split('/'))
             if os.path.isfile(path):
-                with open(path, encoding='utf-8') as f:
-                    return f.read().strip()[:7] or None
+                return _read_stripped(path)[:SHORT_HASH_LEN] or None
         packed = os.path.join(common, 'packed-refs')
         if os.path.isfile(packed):
             with open(packed, encoding='utf-8') as f:
                 for line in f:
                     parts = line.split()
                     if len(parts) == 2 and parts[1] == ref:
-                        return parts[0][:7]
+                        return parts[0][:SHORT_HASH_LEN]
     except OSError:
         pass
     return None
@@ -852,12 +861,34 @@ def parse_sums(text):
     return out
 
 
+_HASH_CHUNK = 1 << 20  # 1 MiB read size
+
+
 def _sha256(path):
+    """Hex SHA-256 of a file, read in 1 MiB chunks."""
     h = hashlib.sha256()
     with open(path, 'rb') as f:
-        for chunk in iter(lambda: f.read(1 << 20), b''):
+        for chunk in iter(lambda: f.read(_HASH_CHUNK), b''):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _copy_listed(listing, root, foam, out):
+    """Copy each (digest, rel) of `listing` from `root` into `foam`, hash
+    the copy and compare; updates `out` files / errors / mismatches."""
+    for digest, rel in listing:
+        parts = rel.split('/')
+        dst = os.path.join(foam, *parts)
+        try:
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copyfile(os.path.join(root, *parts), dst)
+            got = _sha256(dst)
+        except OSError as exc:
+            out['errors'].append((rel, str(exc) or type(exc).__name__))
+            continue
+        out['files'] += 1
+        if got != digest:
+            out['mismatches'].append(rel)
 
 
 def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
@@ -912,19 +943,7 @@ def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
     if unread:
         out['errors'].append((SUMS_FILE, f'{unread} line(s) not understood'))
     listing = [(h, rel) for h, rel in listing if in_skeleton(rel)]
-    for digest, rel in listing:
-        parts = rel.split('/')
-        dst = os.path.join(foam, *parts)
-        try:
-            os.makedirs(os.path.dirname(dst), exist_ok=True)
-            shutil.copyfile(os.path.join(root, *parts), dst)
-            got = _sha256(dst)
-        except OSError as exc:
-            out['errors'].append((rel, str(exc) or type(exc).__name__))
-            continue
-        out['files'] += 1
-        if got != digest:
-            out['mismatches'].append(rel)
+    _copy_listed(listing, root, foam, out)
     try:
         os.makedirs(foam, exist_ok=True)
         shutil.copyfile(os.path.join(root, SUMS_FILE),
@@ -1135,7 +1154,8 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
         info.setdefault('created', now_iso())
         log_path = os.path.join(stage_dir, LOG_FILE)
         os.makedirs(stage_dir, exist_ok=True)
-        open(log_path, 'a', encoding='utf-8').close()   # exists from start
+        with open(log_path, 'a', encoding='utf-8'):     # exists from start
+            pass
         prev_log = getattr(hooks, 'log_file', None)
         prev_vtk = getattr(hooks, 'vtk_dir', None)
         prev_fields = (getattr(hooks, 'purge_fields', False),
@@ -1187,7 +1207,7 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                                      log=hooks.log)
                 hooks.folder_notice = None
                 posix = getattr(hooks, 'scratch_posix', None)
-                if posix and getattr(case, 'solver', '') == 'blastfoam':
+                if posix and foam:
                     try:
                         manifest, hooks.folder_notice = \
                             verify_and_release_scratch(
