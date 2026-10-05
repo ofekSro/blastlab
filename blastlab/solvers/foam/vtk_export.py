@@ -44,6 +44,8 @@ VOLUMES = 'volumes'
 SECTIONS = 'sections'
 OBSTACLES = 'obstacles'
 KINDS = (VOLUMES, SECTIONS, OBSTACLES)
+#: the surface function object -> its vtk\ family
+_SURFACE_FAMILIES = ((VTK_SECTIONS, SECTIONS), (VTK_OBSTACLES, OBSTACLES))
 #: the `family` of a not_converted entry for the export as a whole (an
 #: unexpected error, VtkExport._broken)
 EXPORT = 'export'
@@ -60,6 +62,7 @@ _SAFE_NAME = re.compile(r'[A-Za-z0-9_][A-Za-z0-9_.+-]*')
 
 
 def _time_key(name):
+    """Sort key of a time directory name: its value as a float."""
     return float(name)
 
 
@@ -244,6 +247,8 @@ def surface_sweep_plan(listing, final):
 
 
 def _safe(name, what):
+    """`name` as a string when it is a safe path component (`_SAFE_NAME`,
+    no `..`), else ValueError naming `what`."""
     s = str(name)
     if not _SAFE_NAME.fullmatch(s) or '..' in s:
         raise ValueError(f'not a {what} name: {s!r}')
@@ -426,10 +431,49 @@ def decimation_of(fam):
     1 when it is absent or not a whole number >= 1 (validation refuses
     that)."""
     k = (fam or {}).get('decimate', 1)
-    if isinstance(k, bool) or not isinstance(k, (int, float)) \
-            or k != int(k) or k < 1:
+    if isinstance(k, bool) or not isinstance(k, (int, float)):
+        return 1
+    if k != int(k) or k < 1:
         return 1
     return int(k)
+
+
+def _cell_centroids(pts, conn, ctype, n):
+    """Walk the CELLS array `conn` of `n` cells: (centroids (n, 3) [m],
+    start index of each cell's entry, its size entry, and a mask of the
+    entries that are point ids). `pts` (m, 3) [m]; `ctype` the cell
+    types. A polyhedron is a face stream (`_POLYHEDRON`)."""
+    c = conn.tolist()
+    starts = np.empty(n, dtype=np.int64)
+    pos = 0
+    for i in range(n):
+        starts[i] = pos
+        pos += 1 + c[pos]
+    sizes = conn[starts]
+    # which CELLS entries are point ids (not a cell size or a face size)
+    is_id = np.ones(conn.size, dtype=bool)
+    is_id[starts] = False
+    cen = np.empty((n, 3))
+    poly = ctype == _POLYHEDRON
+    for i in np.flatnonzero(poly):
+        s = int(starts[i]) + 1
+        n_faces, j, ids = c[s], s + 1, []
+        is_id[s] = False
+        for _ in range(n_faces):
+            is_id[j] = False
+            ids += c[j + 1:j + 1 + c[j]]
+            j += 1 + c[j]
+        cen[i] = pts[np.unique(ids)].mean(axis=0)
+    simple = ~poly
+    if simple.any():
+        s_st, s_sz = starts[simple], sizes[simple]
+        if s_sz.min() < 1:
+            raise ValueError('a cell with no point')
+        off = np.concatenate([[0], np.cumsum(s_sz)[:-1]])
+        idx = np.repeat(s_st + 1 - off, s_sz) + np.arange(int(s_sz.sum()))
+        cen[simple] = np.add.reduceat(pts[conn[idx]], off,
+                                      axis=0) / s_sz[:, None]
+    return cen, starts, sizes, is_id
 
 
 def decimate(vd, k, origin, dx_base):
@@ -467,36 +511,7 @@ def decimate(vd, k, origin, dx_base):
     conn = np.asarray(cells.values, dtype=np.int64)
     ctype = np.asarray(types.values)
     n = int(cells.args[0])
-    c = conn.tolist()
-    starts = np.empty(n, dtype=np.int64)
-    pos = 0
-    for i in range(n):
-        starts[i] = pos
-        pos += 1 + c[pos]
-    sizes = conn[starts]
-    # which CELLS entries are point ids (not a cell size or a face size)
-    is_id = np.ones(conn.size, dtype=bool)
-    is_id[starts] = False
-    cen = np.empty((n, 3))
-    poly = ctype == _POLYHEDRON
-    for i in np.flatnonzero(poly):
-        s = int(starts[i]) + 1
-        n_faces, j, ids = c[s], s + 1, []
-        is_id[s] = False
-        for _ in range(n_faces):
-            is_id[j] = False
-            ids += c[j + 1:j + 1 + c[j]]
-            j += 1 + c[j]
-        cen[i] = pts[np.unique(ids)].mean(axis=0)
-    simple = ~poly
-    if simple.any():
-        s_st, s_sz = starts[simple], sizes[simple]
-        if s_sz.min() < 1:
-            raise ValueError('a cell with no point')
-        off = np.concatenate([[0], np.cumsum(s_sz)[:-1]])
-        idx = np.repeat(s_st + 1 - off, s_sz) + np.arange(int(s_sz.sum()))
-        cen[simple] = np.add.reduceat(pts[conn[idx]], off,
-                                      axis=0) / s_sz[:, None]
+    cen, starts, sizes, is_id = _cell_centroids(pts, conn, ctype, n)
     layer = np.floor((cen - origin) / dx_base).astype(np.int64)
     keep = np.all(layer % k == 0, axis=1)
     if not keep.any():
@@ -584,6 +599,14 @@ ATTEMPTS = 2
 FINAL_WAIT_MIN_S = 600.0
 #: while the solver runs, the export looks at the disk at most this often
 EVERY_S = 1.0
+#: one `rm -rf` stage in WSL may take this long [s] before the delete fails
+DELETE_TIMEOUT_S = 300
+#: how long Conversion.kill waits for the killed foamToVTK to exit [s]
+KILL_WAIT_S = 10
+#: foamToVTK output lines kept for a failure detail
+TAIL_LINES = 40
+#: of those, the last this many go into the failure detail
+DETAIL_LINES = 3
 
 _T_FILE = re.compile(r't_(.+)\.vtk')
 
@@ -602,7 +625,8 @@ def delete_wsl(paths):
     for script in rm_scripts(paths):
         try:
             res = subprocess.run(env.wsl_plain_argv(script),
-                                 capture_output=True, timeout=300,
+                                 capture_output=True,
+                                 timeout=DELETE_TIMEOUT_S,
                                  stdin=subprocess.DEVNULL,
                                  creationflags=env.CREATE_NO_WINDOW)
         except (OSError, subprocess.TimeoutExpired):
@@ -622,7 +646,7 @@ class Conversion:
         self.names = list(names)
         script = (f'cd {_case_path(case_posix)} && '
                   + vtk_argv_script(self.names, fields))
-        self.tail = collections.deque(maxlen=40)
+        self.tail = collections.deque(maxlen=TAIL_LINES)
         self.proc = subprocess.Popen(
             env.wsl_argv(script), stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -645,12 +669,13 @@ class Conversion:
         if rc == 0:
             return True, ''
         return False, (f'exit {rc}: '
-                       + ' / '.join(ln for ln in list(self.tail)[-3:] if ln))
+                       + ' / '.join(ln for ln in list(self.tail)[-DETAIL_LINES:] if ln))
 
     def kill(self):
+        """Kill the converter and wait for it; a failure is ignored."""
         try:
             self.proc.kill()
-            self.proc.wait(timeout=10)
+            self.proc.wait(timeout=KILL_WAIT_S)
         except (OSError, subprocess.TimeoutExpired):
             pass
 
@@ -725,19 +750,25 @@ def deleted_note(case_dir, vtk_dir=None):
         note = vtk_series.deleted_warning(vtk_dir) if vtk_dir else None
         if note:
             return note
-        if vtk_dir:
-            path = os.path.join(os.path.dirname(os.path.normpath(vtk_dir)),
-                                vtk_series.ROOT_MANIFEST)
-            state = vtk_series.load_vtk_manifest(os.path.dirname(path))
-            found = (path, state) if state else None
-        else:
-            found = vtk_series.find_model_manifest(posix, runs_dir)
+        found = _manifest_found(vtk_dir, posix, runs_dir)
         return vtk_series.fields_warning(*found) if found else None
     except Exception:                   # noqa: BLE001 - a note, never a failure
         return None
 
 
+def _manifest_found(vtk_dir, posix, runs_dir):
+    """(path, state) of the model root manifest: beside `vtk_dir` when it
+    is known, else found by the WSL path `posix`; None when absent."""
+    if vtk_dir:
+        path = os.path.join(os.path.dirname(os.path.normpath(vtk_dir)),
+                            vtk_series.ROOT_MANIFEST)
+        state = vtk_series.load_vtk_manifest(os.path.dirname(path))
+        return (path, state) if state else None
+    return vtk_series.find_model_manifest(posix, runs_dir)
+
+
 def _size(path):
+    """The size of `path` in bytes, -1 when it is absent."""
     try:
         return os.path.getsize(path)
     except OSError:
@@ -752,6 +783,7 @@ def _field_order(part):
 
 
 def _remove(path):
+    """Delete the file `path`; a missing or locked file is ignored."""
     try:
         os.remove(path)
     except OSError:
@@ -769,6 +801,8 @@ def _nc_key(e):
 
 
 def _cadence(fam):
+    """The manifest's cadence entry of a family (mode, value, unit), or
+    None when the family is off."""
     if not fam:
         return None
     # Time mode is in seconds (owner decision P22)
@@ -962,10 +996,7 @@ class VtkExport:
         self.protect(getattr(spec, 'restart_dir', None), 'restart')
         if self.export_on:
             self._resume_state()
-            fams = ([VOLUMES] if self.volumes_on else []) + [
-                k for fo, k in ((VTK_SECTIONS, SECTIONS),
-                                (VTK_OBSTACLES, OBSTACLES))
-                if self.surf and self.surf_fields[fo]]
+            fams = self._families()
             hooks.log(f'  [blastfoam] VTK output ({", ".join(fams)}) into '
                       f'{self.vtk_dir}'
                       + (f' - WSL deletes off ({NO_DELETE_ENV})'
@@ -987,6 +1018,13 @@ class VtkExport:
                           + (f' - WSL deletes off ({NO_DELETE_ENV})'
                              if self.no_delete else ''))
 
+    def _families(self):
+        """The active vtk\\ families, volumes first (needs `volumes_on`,
+        `surf` and `surf_fields`)."""
+        return ([VOLUMES] if self.volumes_on else []) + [
+            k for fo, k in _SURFACE_FAMILIES
+            if self.surf and self.surf_fields[fo]]
+
     # ── what the backend and the loop tell it ──
     def protect(self, name, why='read'):
         """Never delete written time `name`: finalize re-reads it. `why`
@@ -996,6 +1034,8 @@ class VtkExport:
             self._protect.setdefault(str(name), set()).add(why)
 
     def unprotect(self, name, why='read'):
+        """Release the reason `why` for keeping written time `name`; the
+        time is deletable again once no reason is left."""
         keys = self._protect.get(str(name)) if name is not None else None
         if keys is not None:
             keys.discard(why)
@@ -1014,9 +1054,11 @@ class VtkExport:
 
     # ── state ──
     def _dest(self, rel):
+        """The absolute path of the vtk\\-relative '/' path `rel`."""
         return os.path.join(self.vtk_dir, *rel.split('/'))
 
     def _once(self, kind, msg):
+        """Log `msg` the first time `kind` is seen, then never again."""
         if kind not in self._said:
             self._said.add(kind)
             self.hooks.log(msg)
@@ -1032,22 +1074,24 @@ class VtkExport:
         for kind in KINDS:
             for srel in (fams.get(kind) or {}).get('series') or ():
                 path = self._dest(str(srel))
-                for entry, t in vtk_series.read_series(path):
+                for entry, _t in vtk_series.read_series(path):
                     rel = posixpath.normpath(posixpath.join(
                         posixpath.dirname(srel), entry))
                     m = _T_FILE.fullmatch(posixpath.basename(rel))
+                    # _T_FILE keeps only `t_<time>.vtk` entries: a series
+                    # entry under any other file name is skipped silently
+                    # (mirrors dest_name)
                     if not m or _size(self._dest(rel)) <= 0:
                         continue
                     self.files[rel] = (kind, m.group(1))
                     self.series.setdefault(str(srel), {})[entry] = \
                         m.group(1)
                     self.series_kind[str(srel)] = kind
-        for rel, (kind, t) in self.files.items():
+        for kind, t in self.files.values():
             if kind == VOLUMES:
                 self.converted.add(t)
                 self.copied.add(t)
-        for fo, kind in ((VTK_SECTIONS, SECTIONS),
-                         (VTK_OBSTACLES, OBSTACLES)):
+        for fo, kind in _SURFACE_FAMILIES:
             self.swept[fo].update(
                 str(t) for t in (fams.get(kind) or {}).get('times') or ())
         for e in state.get('not_converted') or ():
@@ -1060,11 +1104,7 @@ class VtkExport:
     def state(self):
         """The vtk\\ manifest (output.vtk_series.write_vtk_manifest)."""
         fams = {}
-        kinds = ([VOLUMES] if self.volumes_on else []) + [
-            k for fo, k in ((VTK_SECTIONS, SECTIONS),
-                            (VTK_OBSTACLES, OBSTACLES))
-            if self.surf and self.surf_fields[fo]]
-        for kind in kinds:
+        for kind in self._families():
             rels = [r for r, (k, _t) in self.files.items() if k == kind]
             fams[kind] = dict(
                 count=len(rels),
@@ -1109,6 +1149,8 @@ class VtkExport:
         return out
 
     def _add_file(self, rel, kind, surface, t):
+        """Record the written file `rel` (family `kind`, time `t`) and
+        mark its series for rewriting."""
         self.files[rel] = (kind, t)
         srel = series_name(kind, surface)
         # entries relative to the series file, which sits beside the
@@ -1120,6 +1162,8 @@ class VtkExport:
         self._dirty = True
 
     def _fail(self, family, t, kind, why, path):
+        """Count a failed `kind` (conversion / copy) of time `t`: retried
+        once, then listed in `not_converted` (plan sec. 3.5)."""
         key = (kind, family, t)
         self.failures[key] += 1
         if self.failures[key] < ATTEMPTS:
@@ -1180,6 +1224,8 @@ class VtkExport:
             pass
 
     def _run(self, done, final):
+        """One pass: convert and copy volumes, sweep surfaces, write the
+        index, then delete in WSL what the plan allows."""
         names = []
         if self.volumes_on:
             self._convert(done, final)
@@ -1210,10 +1256,13 @@ class VtkExport:
 
     # ── 1-2: convert and copy the volumes ──
     def _src_volume(self, name):
+        """The converted `VTK/<case>_<name>.vtk` as a UNC path on the
+        Windows side."""
         rel = volume_file_name(self.spec.case_posix, name)
         return os.path.join(self.spec.case_unc, *rel.split('/'))
 
     def _todo(self, done):
+        """The ingested written times still to convert, sorted by time."""
         running = set(self.job.names) if self.job is not None else set()
         out = []
         for n in done:
@@ -1232,6 +1281,8 @@ class VtkExport:
         return solo[:1] or todo[:n]
 
     def _start(self, names):
+        """Start the converter on `names`: the job, or None when it did
+        not start (recorded through `_finished`)."""
         try:
             return self.runner(self.spec, names, self.vol_fields)
         except Exception as exc:        # noqa: BLE001 - recorded, retried
@@ -1239,6 +1290,9 @@ class VtkExport:
             return None
 
     def _finished(self, names, ok, detail):
+        """Book the result of one foamToVTK call over `names`: a failed
+        batch is split into single writes, else each write is converted
+        (its VTK/ file exists) or goes to `_fail`."""
         if not ok and len(names) > 1:
             # one bad write fails the whole call: convert these one at a
             # time, so only the bad one is retried and given up
