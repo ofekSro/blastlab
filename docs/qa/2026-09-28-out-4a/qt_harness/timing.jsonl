@@ -1,4 +1,0 @@
-{"sid": "V06", "wall_s": 11.5, "max_gap_ms": 121, "p99_gap_ms": 74, "big_gaps": [], "scenario": "V06", "t": 1790594012.0126739}
-{"sid": "V07", "wall_s": 6.9, "max_gap_ms": 96, "p99_gap_ms": 68, "big_gaps": [], "scenario": "V07", "t": 1790594026.7765653}
-{"sid": "V08", "wall_s": 7.0, "max_gap_ms": 125, "p99_gap_ms": 97, "big_gaps": [], "scenario": "V08", "t": 1790594041.1231172}
-{"sid": "V09", "wall_s": 7.0, "max_gap_ms": 128, "p99_gap_ms": 72, "big_gaps": [], "scenario": "V09", "t": 1790594055.614465}
