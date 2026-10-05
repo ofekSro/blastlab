@@ -123,7 +123,7 @@ Dimensions: 1D spherical, 2D planar or axisymmetric, 3D Cartesian.
 ## 2. Glossary
 
 **All current documentation is English** (consolidated 2026-09-21). The original
-Hebrew notes are preserved under `docs/archive/`, and the Hebrew glossary needed to
+Hebrew notes survive in git history (`docs/archive/`, removed 2026-10-05), and the Hebrew glossary needed to
 read them - and the git history - is in
 [`docs/SCOPE.md`](docs/SCOPE.md) §6. The two rows worth knowing without looking:
 **מטען** is a charge, i.e. a mass in kg typed into a form field, and **חומר נפץ**
@@ -227,7 +227,6 @@ docs/        00-INDEX.md (the map) · SCOPE.md (what this project is)
                   solver-options-review (the code against the guide)
   history/        qa-nights · ui-migration (and the standing Tk decision)
   heavy-runs.md   the R1-R9 catalogue + unattended-run ground rules
-  archive/        the 15 pre-2026-09-21 Hebrew originals, unchanged
 ```
 
 **Every markdown file is capped at 1000 lines** (owner directive, 2026-09-21).

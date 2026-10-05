@@ -111,7 +111,7 @@ Three solver paths, one GUI:
 | [DONE.md](DONE.md) | The completed record and the identifier index that code comments cite |
 | [docs/00-INDEX.md](docs/00-INDEX.md) | The full documentation index |
 | [blastlab/README.md](blastlab/README.md) | The application itself: tabs, options, features |
-| [BlastFoam_Basic_Info/](BlastFoam_Basic_Info/) | Learning material — a blastFoam guide, JWL parameter tables, a cheatsheet (Hebrew) |
+| [BlastFoam_Basic_Info/](BlastFoam_Basic_Info/) | Learning material — JWL parameter tables, a cheatsheet (Hebrew) |
 
 ## Credits
 

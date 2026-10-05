@@ -124,11 +124,11 @@ as such.
 | **Afterburn** | Energy released by reaction products burning with atmospheric oxygen, after the initial anaerobic release |
 | **Standoff** | The distance between the source and the structure being protected |
 
-### Hebrew glossary — for the archive and the git history
+### Hebrew glossary — for the git history
 
 The project's working notes were written in Hebrew until 2026-09-21, when the
-documentation was consolidated into English. The originals are preserved under
-[`docs/archive/`](archive/) and in git history, and code comments, measurement
+documentation was consolidated into English. The originals were removed from the
+tree on 2026-10-05 and remain in git history (`docs/archive/`), and code comments, measurement
 text and all current documentation are English. These terms appear there:
 
 | Hebrew | Meaning here |

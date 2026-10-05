@@ -6,7 +6,7 @@
 # Documentation index
 
 Every file here is capped at 1000 lines. The working documentation is English;
-the original Hebrew notes are preserved under [`archive/`](archive/).
+the original Hebrew notes survive only in git history (`docs/archive/`).
 
 ## Start here
 
@@ -54,14 +54,13 @@ the original Hebrew notes are preserved under [`archive/`](archive/).
 | File | What is in it |
 |---|---|
 | [../blastlab/README.md](../blastlab/README.md) | The application itself: tabs, options, features; [where a run's files go](../blastlab/README.md#where-a-runs-files-go) (the model folder, `OUT-1`) |
-| [../BlastFoam_Basic_Info/](../BlastFoam_Basic_Info/) | Learning material — a blastFoam guide, JWL parameter tables, a cheatsheet (Hebrew) |
+| [../BlastFoam_Basic_Info/](../BlastFoam_Basic_Info/) | Learning material — JWL parameter tables, a cheatsheet (Hebrew); the PDFs themselves are in [references/](references/) |
 
-## Archive
+## Archive (removed from the tree, 2026-10-05)
 
-[`archive/`](archive/) holds the 15 original work-management files exactly as they
-were before the 2026-09-21 consolidation, untranslated. They are kept so that
-nothing exists only in git history. Once the consolidated files have been read and
-accepted, the archive can be removed in a single commit — git keeps it either way.
+The 15 original Hebrew work-management files of the 2026-09-21 consolidation were
+deleted from the working tree; they live in git history under `docs/archive/`
+(`git log -- docs/archive`). Where their content is now:
 
 | Original | Where its content is now |
 |---|---|
