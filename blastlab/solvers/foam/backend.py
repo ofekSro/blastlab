@@ -1,4 +1,4 @@
-"""blastFoam backend entry points (phased bring-up).
+"""blastFoam backend entry points (1D, 2D and 3D).
 
 Signatures mirror the native solvers exactly
 (`solve_1d_foam(case, hooks=None) -> Result`) and the returned Result
@@ -26,19 +26,30 @@ import numpy as np
 from ...core.bc import normalize_bc
 from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
-from ..hooks import Result, RunHooks, StoppedBeforeStart
+from ..hooks import Result, RunHooks, StoppedBeforeStart, frame_budget
 from . import dicts, env, reader, runner, writer
 # part_counts/rd_scalar live in common.py since Phase 9 (runloop needs
 # them without importing this module); re-exported, same objects
 from .common import part_counts, rd_scalar
 from .materials import MATERIALS
 from .runloop import (ARRIVAL_P, BENIGN_WARN, STOP_UNSTABLE, FoamRunLoop,
-                      PeakImpulse, WslVanished, due_sparse, new_live)
-from .runloop import amr_note, level_counts
-from ..hooks import frame_budget
+                      PeakImpulse, WslVanished, amr_note, due_sparse,
+                      level_counts, new_live)
 
-#: dims with a working blastFoam backend (grows per phase)
+#: dims with a working blastFoam backend
 IMPLEMENTED = frozenset({1, 2, 3})
+
+#: gamma_air - 1 as the literal 0.4 (NOT 1.4 - 1, which is not bit-equal):
+#: ideal-gas specific energy e = p / ((gamma - 1) rho), the live-viewer
+#: stand-in for the energy field (P2-2)
+_AIR_GAMMA_M1 = 0.4
+#: density floor (kg/m^3) so e = p / ((gamma - 1) rho) stays finite
+_RHO_FLOOR = 1e-10
+
+
+def _e_approx(p, rho):
+    """Ideal-gas specific energy (J/kg) from p (Pa) and rho (kg/m^3)."""
+    return p / (_AIR_GAMMA_M1 * np.maximum(rho, _RHO_FLOOR))
 
 
 def _stop_check(hooks, where):
@@ -150,6 +161,15 @@ def _mesh_stages(spec, hooks):
     return stages
 
 
+def _drop_centre_components(directory):
+    """Delete the per-component cell-centre files Cx/Cy/Cz in `directory`."""
+    for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
+        try:
+            os.remove(os.path.join(directory, f))
+        except OSError:
+            pass
+
+
 def build_remap(spec, hooks):
     """Refined mesh -> fine-grid gather map. Reads the cell centres the
     mesh stages wrote (0/C), matches them against the predicted
@@ -173,11 +193,7 @@ def build_remap(spec, hooks):
             f'blastFoam refined mesh does not match the refinement plan: '
             f'{exc} - case kept at {spec.case_unc}') from exc
     spec.n_cells_actual = int(len(C))
-    for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
-        try:
-            os.remove(os.path.join(spec.case_unc, '0', f))
-        except OSError:
-            pass
+    _drop_centre_components(os.path.join(spec.case_unc, '0'))
     hooks.log(f'  [blastfoam] refined mesh: {len(C):,} cells matched the '
               f'predicted structure ({spec.lmax} level(s), finest '
               f'{spec.dx:.5g} m, displayed on a '
@@ -251,11 +267,7 @@ def _build_remap_amr(spec, hooks):
             f'grid: {exc} - case kept at {spec.case_unc}') from exc
     spec.mesh0 = mm
     spec.n_cells_actual = int(mm.n_cells)
-    for f in ('Cx', 'Cy', 'Cz'):        # C itself stays for post-mortem
-        try:
-            os.remove(os.path.join(d0, f))
-        except OSError:
-            pass
+    _drop_centre_components(d0)
     hooks.log(f'  [blastfoam] AMR mesh at t = {spec.start_dir}: '
               f'{mm.n_cells:,} cells '
               f'({level_counts(mm.counts)}), displayed on a '
@@ -264,6 +276,8 @@ def _build_remap_amr(spec, hooks):
 
 
 def _preflight(case, hooks):
+    """Probe WSL, validate `case`, write the OpenFOAM case dir and return
+    its spec (rank count resolved here; raises ValueError if invalid)."""
     _check_available_stoppable(hooks)
     from ...core.case import validate_case
     rep = validate_case(case)
@@ -384,6 +398,16 @@ def _surface_ok(spec, value):
     return value
 
 
+def _cell_index_uv(pts, ax_u, ax_v, dxf, shape):
+    """In-plane (iu, iv) grid indices of sample points `pts` (m), clipped
+    to `shape`; `dxf` is the finest cell size (m)."""
+    iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
+                 shape[0] - 1)
+    iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,
+                 shape[1] - 1)
+    return iu, iv
+
+
 def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
                     remap_sl=None):
     """One liveSlice raw sample -> grid-shaped p array or None while
@@ -405,10 +429,7 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
     pts, vals = data
     if remap_sl is not None:
         dxf = float(spec.dx)
-        iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
-                     shape[0] - 1)
-        iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,
-                     shape[1] - 1)
+        iu, iv = _cell_index_uv(pts, ax_u, ax_v, dxf, shape)
         cells = remap_sl[iu, iv]
         fluid = remap_sl >= 0
         want = len(np.unique(remap_sl[fluid]))
@@ -456,10 +477,7 @@ def _decode_surface(spec, tdir, shape, ax_u, ax_v, slice_mask=None,
     dxf = float(getattr(spec, 'dx', 0) or 0)
     if not dxf > 0:
         return _surface_refused(spec, len(vals), want)
-    iu = np.clip(np.floor(pts[:, ax_u] / dxf).astype(int), 0,
-                 shape[0] - 1)
-    iv = np.clip(np.floor(pts[:, ax_v] / dxf).astype(int), 0,
-                 shape[1] - 1)
+    iu, iv = _cell_index_uv(pts, ax_u, ax_v, dxf, shape)
     full = np.full(shape, float(P_AIR))
     full[iu, iv] = vals
     return _surface_ok(spec, full)
@@ -571,11 +589,6 @@ def _arrival_pin(names, t_of, stop_reason, arrived, hooks):
     return pin
 
 
-# how the 2D pin keeps its cost bounded: arrived_2d reads one field per
-# probed write, and the forward scan touches only the quiet prefix plus
-# the crossing write itself - the long post-arrival tail is never read
-
-
 def _track_pin(loop, pin, name, arrived):
     """OUT-2 (D1): keep the write `_arrival_pin` would pick on the VTK
     export's never-delete list while the run is still writing. That is the
@@ -658,6 +671,7 @@ def _emit_gauges(hooks, spec):
 
 
 def _log_banner_1d(hooks, case, spec):
+    """Log the run banner (mesh, charge, material) for a 1D blastFoam run."""
     m = MATERIALS[spec.material]
     bar = '=' * 55
     for line in (
@@ -923,6 +937,7 @@ def resume_run(case_dir, hooks=None, adaptive_write=True):
 
 
 def _n_procs_on_disk(case_unc):
+    """Number of consecutive `processor<N>` dirs in the case (0 = serial)."""
     n = 0
     while os.path.isdir(os.path.join(case_unc, f'processor{n}')):
         n += 1
@@ -1299,9 +1314,9 @@ def _refine_lines(spec):
     dim = lv.ndim
     counts = np.bincount(lv.ravel().astype(np.int64), minlength=spec.lmax + 1)
     per = []
-    for l in range(1, spec.lmax + 1):
-        n_l = int(counts[l]) // (2 ** (dim * (spec.lmax - l)))
-        per.append(f'L{l} {spec.dx_base / 2 ** l:g} m: {n_l:,}')
+    for lev in range(1, spec.lmax + 1):
+        n_l = int(counts[lev]) // (2 ** (dim * (spec.lmax - lev)))
+        per.append(f'L{lev} {spec.dx_base / 2 ** lev:g} m: {n_l:,}')
     disp = ' x '.join(str(n) for n in lv.shape)
     return [f'  Refinement      : {spec.lmax} level(s) - ' + ', '.join(per)
             + ' cells',
@@ -1340,6 +1355,7 @@ def _source_lines(case, spec, charge_lbl):
 
 
 def _log_banner_2d(hooks, case, spec, n_gauges, has_term):
+    """Log the run banner (mesh, charge, BCs, gauges) for a 2D run."""
     m = MATERIALS[spec.material]
     bar = '=' * 60
     bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
@@ -1396,12 +1412,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
-    # either side saying False pins the write schedule (N2-13; see the
-    # solve_1d_foam docstring), and so does a write budget (HD1-15)
-    spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0)
-                           and not getattr(spec, 'vtk_volumes', None))
+    _resolve_adaptive_write(case, spec, adaptive_write)
     spec.hooks = hooks              # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
@@ -1683,8 +1694,8 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
                 conserved=conserved,
                 # what the USER asked for; gauge_out['points'] is where
                 # the probes landed in the mesh (QA-33)
-                gauges=[tuple(float(v) for v in g)
-                        for g in (case.gauges or [])],
+                gauges=[tuple(float(v) for v in gpt)
+                        for gpt in (case.gauges or [])],
                 case_dir=spec.case_unc, refine=spec.refine_meta())
     # per-step FO peak/impulse maps, falling back to the per-write Python
     # accumulator (B17: same policy as 3D)
@@ -1698,6 +1709,9 @@ def finalize_2d(case, spec, hooks, stop_reason, n_steps, ingested,
     # N2-13: the state handed to the next chain stage is pinned to the
     # arrival write. Everything above - maps, snapshots, frames, gauges -
     # keeps describing the run that actually happened.
+    # how the 2D pin keeps its cost bounded: arrived_2d reads one field per
+    # probed write, and the forward scan touches only the quiet prefix plus
+    # the crossing write itself - the long post-arrival tail is never read
     def arrived_2d(name):
         """The loop's own stop criterion ('shock arrived at a terminate
         boundary'), re-evaluated on the WRITTEN data of one time dir -
@@ -1915,7 +1929,7 @@ def _initial_frame3d(spec, hooks):
     except (OSError, ValueError):
         return
     rho0 = np.full_like(p0, RHO_AIR)
-    e0 = p0 / (0.4 * rho0)
+    e0 = p0 / (_AIR_GAMMA_M1 * rho0)
     hooks.frame3d(0.0, dict(p=p0, rho=rho0, e=e0, p_peak=p0.copy(),
                             imp=np.zeros_like(p0),
                             **_levels_of(spec.mesh0)))
@@ -1974,7 +1988,19 @@ def _write_cadence_dt(spec):
     return None if getattr(spec, 'write_steps', 0) else spec.write_interval
 
 
+def _resolve_adaptive_write(case, spec, adaptive_write):
+    """Set `spec.adaptive_write` for a 2D/3D run (1D has no write-budget
+    term and stays inline). Either side saying False pins the write
+    schedule (N2-13; see the solve_1d_foam docstring), and so does a
+    write budget (HD1-15)."""
+    spec.adaptive_write = (bool(adaptive_write)
+                           and bool(getattr(case, 'adaptive_write', True))
+                           and not getattr(spec, 'write_budget', 0)
+                           and not getattr(spec, 'vtk_volumes', None))
+
+
 def _log_banner_3d(hooks, case, spec, n_gauges, has_term):
+    """Log the run banner (mesh, charge, BCs, gauges) for a 3D run."""
     m = MATERIALS[spec.material]
     bar = '=' * 62
     bc_lbl = ", ".join(f"{k}={v}" for k, v in case.bcs.items())
@@ -2026,13 +2052,8 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks = hooks or RunHooks()
     if spec is None:
         spec = _preflight(case, hooks)
-    # either side saying False pins the write schedule (N2-13; see the
-    # solve_1d_foam docstring), and so does a write budget (HD1-15)
-    spec.adaptive_write = (bool(adaptive_write)
-                           and bool(getattr(case, 'adaptive_write', True))
-                           and not getattr(spec, 'write_budget', 0)
-                           and not getattr(spec, 'vtk_volumes', None))
-    spec.hooks = hooks              # the live-slice canary logs through it
+    _resolve_adaptive_write(case, spec, adaptive_write)
+    spec.hooks = hooks             # the live-slice canary logs through it
     # blastFoam cannot emit a frame per step: the live view moves at the
     # live-sample cadence, or at writeInterval without one (G7)
     hooks.cadence(dt=_write_cadence_dt(spec),
@@ -2071,7 +2092,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
     snap_radii = geometry.snap_radii(spec.r_exp, dists, n_snapshots)
 
     # burst-plane slice indices + user live slice (native conventions)
-    (j0, k0, slice_axis, s0, live_sl, live_faces, live_labels,
+    (_j0, _k0, slice_axis, s0, live_sl, live_faces, live_labels,
      live_title) = slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_term)
@@ -2081,7 +2102,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
         gauges=geometry.plane_gauges(
-            [tuple(float(v) for v in g) for g in (case.gauges or [])],
+            [tuple(float(v) for v in gpt) for gpt in (case.gauges or [])],
             live_sl, (x_c, y_c, z_c), dx),
         mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
                                    solid_fine=spec.solid)
@@ -2177,7 +2198,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
             live['draw'] = _time.time()
         if will_3d:
             rho = got['rho']
-            e_approx = p / (0.4 * np.maximum(rho, 1e-10))
+            e_approx = _e_approx(p, rho)
             pk_live, imp_live = acc.live()
             hooks.frame3d(t, dict(p=p, rho=rho, e=e_approx,
                                   p_peak=pk_live, imp=imp_live,
@@ -2318,7 +2339,7 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
         if mesh_fin is not None and frame_lv is not None:
             frame_lv.append(mesh_fin.levels[live_sl])
     _emit_frame(hooks, fin['p'], t_fin, mesh_fin, live_sl)
-    e_approx = fin['p'] / (0.4 * np.maximum(fin['rho'], 1e-10))
+    e_approx = _e_approx(fin['p'], fin['rho'])
     hooks.frame3d(t_fin, dict(p=fin['p'], rho=fin['rho'], e=e_approx,
                               p_peak=p_peak, imp=impulse,
                               **_levels_of(mesh_fin)), force=True)
@@ -2350,8 +2371,8 @@ def finalize_3d(case, spec, hooks, stop_reason, n_steps, ingested,
                 conserved=conserved,
                 # what the USER asked for; gauge_out['points'] is where
                 # the probes landed in the mesh (QA-33)
-                gauges=[tuple(float(v) for v in g)
-                        for g in (case.gauges or [])],
+                gauges=[tuple(float(v) for v in gpt)
+                        for gpt in (case.gauges or [])],
                 case_dir=spec.case_unc, refine=spec.refine_meta(),
                 p_peak=p_peak, impulse=impulse, peak_source=peak_source)
     if record_frames > 0:
