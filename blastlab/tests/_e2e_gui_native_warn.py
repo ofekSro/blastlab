@@ -1,9 +1,10 @@
 """B11 GUI check: a native solver warning must reach the GUI log pane.
 A tiny native planar 2D case with one gauge placed inside a wall is
 started through the real App (hidden root, real worker thread and
-drainer); the solver drops that gauge with a "[warn] G2 ... inside
-Wall 1 - dropped" line, which used to go to stdout only and so never
-showed in the GUI. No WSL needed."""
+drainer); the solver drops that gauge with a "[warn] G2 (1.40, 0.30) m
+inside Wall 1 - dropped" line, which used to go to stdout only and so
+never showed in the GUI, and names the kept G1 nowhere. No WSL needed.
+The same lines, in seconds and for 3D too: test_solver_gauge_log.py."""
 import os, sys, time
 
 os.environ.setdefault('MPLBACKEND', 'Agg')
@@ -57,11 +58,14 @@ def main():
 
     check('run finished in the GUI', '[run finished]' in log)
     check('native banner reached the GUI log', '2D Blast Solver' in log)
-    check('"[warn] Gauge ... dropped" reached the GUI log',
+    check('"[warn] G2 (1.40, 0.30) m inside Wall 1 - dropped" reached the '
+          'GUI log',
           '[warn] G2 (1.40, 0.30) m inside Wall 1 - dropped' in log,
           '(not in log)')
-    check('the kept gauge is not reported dropped',
-          'Gauge (0.3, 0.8)' not in log)
+    # GUI-15 (g): the old `Gauge (0.3, 0.8)` text no longer exists, so
+    # that check could not fail; the kept gauge as the log would name it
+    check('the kept gauge G1 is not reported dropped',
+          'G1 (0.30, 0.80) m' not in log)
     root.destroy()
 
     print()
