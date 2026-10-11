@@ -1,0 +1,629 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:30:27] [boot] window up: 1280x840 (built 3582 ms, shown 1822 ms)
+[14:30:27] [I03] --- begin ---
+[14:30:28] [I03] ok: the setup pill shows its screen
+[14:30:28] [I03] ok: and the setup pill is the active one
+[14:30:28] [I03] DIALOG show_error [Open case] 'This file is not valid JSON (line 1, column 2).' -> 'ok'
+[14:30:29] [I03] NOTE: garbage.json: form Lx still '3.3'
+[14:30:29] [I03] ok: garbage.json left the form alone rather than half-loading it
+[14:30:29] [I03] DIALOG show_error [Open case] 'Not a blastlab case file' -> 'ok'
+[14:30:30] [I03] NOTE: wrongschema.json: form Lx still '3.3'
+[14:30:30] [I03] ok: wrongschema.json left the form alone rather than half-loading it
+[14:30:30] [I03] DIALOG show_error [Open case] 'Not a blastlab case file: unsupported or missing field 5.' -> 'ok'
+[14:30:30] [I03] NOTE: dim5.json: form Lx still '3.3'
+[14:30:30] [I03] ok: dim5.json left the form alone rather than half-loading it
+[14:30:30] [I03] DIALOG show_error [Open case] 'This file is not valid JSON (line 1, column 1).' -> 'ok'
+[14:30:31] [I03] NOTE: empty.json: form Lx still '3.3'
+[14:30:31] [I03] ok: empty.json left the form alone rather than half-loading it
+[14:30:31] [I03] DIALOG show_error [Open case] 'File not found: C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\cwd\\missing.json' -> 'ok'
+[14:30:32] [I03] NOTE: missing.json: form Lx still '3.3'
+[14:30:32] [I03] ok: missing.json left the form alone rather than half-loading it
+[14:30:32] [I03] contact sheet: contact_I03.png (6 shots)
+[14:30:32] [I03] --- end done in 5.0s (max gap 155 ms) ---
+[14:30:33] [I03] ok: the Dark-mode action gives the dark theme
+[14:30:34] [I03] ok: the setup pill shows its screen
+[14:30:34] [I03] ok: and the setup pill is the active one
+[14:30:34] [I03] ok: the 2D segment sets the dimension
+[14:30:35] [I04] --- begin ---
+[14:30:35] [I04] ok: the setup pill shows its screen
+[14:30:35] [I04] ok: and the setup pill is the active one
+[14:30:37] [I04] ok: the run pill shows its screen
+[14:30:37] [I04] ok: and the run pill is the active one
+[14:30:37] [I04] DIALOG show_error [Run] '~100,000,000 cells exceeds the 2D cap of 8,000,000' -> 'ok'
+[14:30:38] [I04] ok: a 100 M cell case is refused at Run
+[14:30:39] [I04] ok: and refused at Initialise Model too
+[14:30:39] [I04] ok: the setup pill shows its screen
+[14:30:39] [I04] ok: and the setup pill is the active one
+[14:30:40] [I04] NOTE: 2.25 M-cell 2D case strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it. | Large grid: ~2,250,000 cells - expect a long run and ~1.6 GB of RAM | ~2,250,000 cells at dx = 0.004 m
+[14:30:40] [I04] ok: the run pill shows its screen
+[14:30:40] [I04] ok: and the run pill is the active one
+[14:30:43] [I04] NOTE: warning-level case: started=True, dialogs=0 (no confirmation prompt for a merely large run)
+[14:30:43] [I04] ok: a case that only WARNS starts without asking
+[14:31:40] [I04] ok: and stops on request
+[14:31:40] [I04] contact sheet: contact_I04.png (2 shots)
+[14:31:40] [I04] --- end done in 65.2s (max gap 864 ms) ---
+[14:31:41] [I04] ok: the Dark-mode action gives the dark theme
+[14:31:42] [I04] ok: the setup pill shows its screen
+[14:31:42] [I04] ok: and the setup pill is the active one
+[14:31:42] [I04] ok: the 2D segment sets the dimension
+[14:31:42] [I05] --- begin ---
+[14:31:43] [I05] ok: the setup pill shows its screen
+[14:31:43] [I05] ok: and the setup pill is the active one
+[14:31:44] [I05] NOTE: charge='1e400': 'charge' must be a finite number: '1e400'
+[14:31:45] [I05] NOTE: charge='nan': 'charge' must be a finite number: 'nan'
+[14:31:46] [I05] NOTE: charge='inf': 'charge' must be a finite number: 'inf'
+[14:31:47] [I05] NOTE: charge=' 1 ': No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[14:31:48] [I05] NOTE: charge='1,5': 'charge' is not a number: '1,5'
+[14:31:49] [I05] NOTE: charge='-0': Charge must be > 0 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.
+[14:31:51] [I05] NOTE: n_snapshots=2.7: 'snapshots' must be a whole number: '2.7' (rejected: ValueError: 'snapshots' must be a whole number: '2.7')
+[14:31:52] [I05] NOTE: cell=1e-9: ~1.6e+19 cells exceeds the 2D cap of 8,000,000 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | ~1.6e+19 cells at dx = 1e-09 m
+[14:31:52] [I05] ok: a 1e-9 m cell is reported rather than accepted in silence
+[14:31:52] [I05] contact sheet: contact_I05.png (6 shots)
+[14:31:52] [I05] --- end done in 9.6s (max gap 173 ms) ---
+[14:31:53] [I05] ok: the Dark-mode action gives the dark theme
+[14:31:54] [I05] ok: the setup pill shows its screen
+[14:31:54] [I05] ok: and the setup pill is the active one
+[14:31:54] [I05] ok: the 2D segment sets the dimension
+[14:31:55] [I06] --- begin ---
+[14:31:57] [I06] ok: the results pill shows its screen
+[14:31:57] [I06] ok: and the results pill is the active one
+[14:32:03] [I06] ok: the window refuses to go under its own minimum (1280x840)
+[14:32:03] [I06] contact sheet: contact_I06.png (2 shots)
+[14:32:03] [I06] --- end done in 8.3s (max gap 1010 ms) ---
+[14:32:04] [I06] ok: the Dark-mode action gives the dark theme
+[14:32:05] [I06] ok: the setup pill shows its screen
+[14:32:05] [I06] ok: and the setup pill is the active one
+[14:32:05] [I06] ok: the 2D segment sets the dimension
+[14:32:06] [K01] --- begin ---
+[14:32:06] [K01] ok: the setup pill shows its screen
+[14:32:06] [K01] ok: and the setup pill is the active one
+[14:32:06] [K01] ok: only the setup pill is active
+[14:32:06] [K01] ok: the run pill shows its screen
+[14:32:06] [K01] ok: and the run pill is the active one
+[14:32:06] [K01] ok: only the run pill is active
+[14:32:07] [K01] ok: the results pill shows its screen
+[14:32:07] [K01] ok: and the results pill is the active one
+[14:32:07] [K01] ok: only the results pill is active
+[14:32:07] [K01] ok: the chain pill shows its screen
+[14:32:07] [K01] ok: and the chain pill is the active one
+[14:32:07] [K01] ok: only the chain pill is active
+[14:32:08] [K01] ok: the setup pill shows its screen
+[14:32:08] [K01] ok: and the setup pill is the active one
+[14:32:08] [K01] ok: only the setup pill is active
+[14:32:08] [K01] ok: the 0D · HD 1.3 segment sets the dimension
+[14:32:09] [K01] ok: the 1D segment sets the dimension
+[14:32:09] [K01] ok: the 2D segment sets the dimension
+[14:32:10] [K01] ok: the 3D segment sets the dimension
+[14:32:11] [K01] ok: the 2D segment sets the dimension
+[14:32:11] [K01] ok: the chip's native action switches the solver
+[14:32:11] [K01] ok: the chip reads 'native' ('native')
+[14:32:12] [K01] ok: the chip's blastfoam action switches the solver
+[14:32:12] [K01] ok: the chip reads 'blastFoam' ('blastFoam · checking')
+[14:32:13] [K01] ok: the chip's native action switches the solver
+[14:32:13] [K01] ok: the chip reads 'native' ('native')
+[14:32:13] [K01] ok: the case menu holds ['Open…', 'Save', 'Save as…', 'Recent', 'Dark mode']
+[14:32:13] [K01] ok: Recent opens a submenu
+[14:32:22] [K01] ok: the Dark-mode action gives the light theme
+[14:32:22] [K01] ok: the Dark-mode action reads False in light
+[14:32:31] [K01] ok: the Dark-mode action gives the dark theme
+[14:32:31] [K01] ok: the Dark-mode action reads True in dark
+[14:32:31] [K01] ok: the status bar shows the keys ('Ctrl+S save · F5 run · Shift+Esc stop · v1.0.0')
+[14:32:31] [K01] ok: the title reads <case> · BlastLab ('● untitled · BlastLab')
+[14:32:32] [K01] ok: an edit marks the title and the top bar ('● untitled · BlastLab')
+[14:32:33] [K01] ok: the theme is back to dark
+[14:32:33] [K01] contact sheet: contact_K01.png (3 shots)
+[14:32:33] [K01] --- end done in 27.4s (max gap 600 ms) ---
+[14:32:34] [K01] ok: the Dark-mode action gives the dark theme
+[14:32:35] [K01] ok: the setup pill shows its screen
+[14:32:35] [K01] ok: and the setup pill is the active one
+[14:32:35] [K01] ok: the 2D segment sets the dimension
+[14:32:35] [K02] --- begin ---
+[14:32:36] [K02] ok: the Dark-mode action gives the dark theme
+[14:32:37] [K02] ok: the setup pill shows its screen
+[14:32:37] [K02] ok: and the setup pill is the active one
+[14:32:38] [K02] ok: the 2D segment sets the dimension
+[14:32:38] [K02] ok: the chip's native action switches the solver
+[14:32:39] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[14:32:39] [K02] ok: setup native 0D 01 Material (dark, 1100x720): nothing clipped
+[14:32:39] [K02] ok: setup native 0D 01 Material (dark, 1100x720): nothing outside the window
+[14:32:40] [K02] ok: setup native 0D 02 Charge and chamber (dark, 1100x720): nothing clipped
+[14:32:40] [K02] ok: setup native 0D 02 Charge and chamber (dark, 1100x720): nothing outside the window
+[14:32:40] [K02] ok: setup native 0D 03 Ignition (dark, 1100x720): nothing clipped
+[14:32:40] [K02] ok: setup native 0D 03 Ignition (dark, 1100x720): nothing outside the window
+[14:32:40] [K02] ok: setup native 0D 04 Run (dark, 1100x720): nothing clipped
+[14:32:40] [K02] ok: setup native 0D 04 Run (dark, 1100x720): nothing outside the window
+[14:32:41] [K02] ok: setup native 0D 05 Heat (dark, 1100x720): nothing clipped
+[14:32:41] [K02] ok: setup native 0D 05 Heat (dark, 1100x720): nothing outside the window
+[14:32:41] [K02] ok: setup native 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing clipped
+[14:32:41] [K02] ok: setup native 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing outside the window
+[14:32:41] [K02] ok: setup native 0D 07 Loaded wall (dark, 1100x720): nothing clipped
+[14:32:41] [K02] ok: setup native 0D 07 Loaded wall (dark, 1100x720): nothing outside the window
+[14:32:42] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing clipped
+[14:32:42] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing outside the window
+[14:32:42] [K02] ok: setup native 0D 09 Vent gauges [m] (dark, 1100x720): nothing clipped
+[14:32:42] [K02] ok: setup native 0D 09 Vent gauges [m] (dark, 1100x720): nothing outside the window
+[14:32:42] [K02] ok: setup native 0D 10 Outputs (dark, 1100x720): nothing clipped
+[14:32:42] [K02] ok: setup native 0D 10 Outputs (dark, 1100x720): nothing outside the window
+[14:32:43] [K02] ok: the 1D segment sets the dimension
+[14:32:43] [K02] ok: setup native 1D 01 Threat (dark, 1100x720): nothing clipped
+[14:32:43] [K02] ok: setup native 1D 01 Threat (dark, 1100x720): nothing outside the window
+[14:32:43] [K02] ok: setup native 1D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:32:43] [K02] ok: setup native 1D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:32:44] [K02] ok: setup native 1D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:32:44] [K02] ok: setup native 1D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:32:44] [K02] NOTE: native 1D 04: hidden in this mode - skipped
+[14:32:44] [K02] ok: setup native 1D 05 Gauges (dark, 1100x720): nothing clipped
+[14:32:44] [K02] ok: setup native 1D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:32:44] [K02] ok: setup native 1D 06 Solver (dark, 1100x720): nothing clipped
+[14:32:44] [K02] ok: setup native 1D 06 Solver (dark, 1100x720): nothing outside the window
+[14:32:44] [K02] NOTE: native 1D 07: hidden in this mode - skipped
+[14:32:45] [K02] ok: the 2D segment sets the dimension
+[14:32:45] [K02] ok: setup native 2D 01 Threat (dark, 1100x720): nothing clipped
+[14:32:45] [K02] ok: setup native 2D 01 Threat (dark, 1100x720): nothing outside the window
+[14:32:46] [K02] ok: setup native 2D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:32:46] [K02] ok: setup native 2D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:32:46] [K02] ok: setup native 2D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:32:46] [K02] ok: setup native 2D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:32:46] [K02] ok: setup native 2D 04 Structure (dark, 1100x720): nothing clipped
+[14:32:46] [K02] ok: setup native 2D 04 Structure (dark, 1100x720): nothing outside the window
+[14:32:47] [K02] ok: setup native 2D 05 Gauges (dark, 1100x720): nothing clipped
+[14:32:47] [K02] ok: setup native 2D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:32:47] [K02] ok: setup native 2D 06 Solver (dark, 1100x720): nothing clipped
+[14:32:47] [K02] ok: setup native 2D 06 Solver (dark, 1100x720): nothing outside the window
+[14:32:47] [K02] ok: setup native 2D 07 Output (dark, 1100x720): nothing clipped
+[14:32:47] [K02] ok: setup native 2D 07 Output (dark, 1100x720): nothing outside the window
+[14:32:48] [K02] ok: the 3D segment sets the dimension
+[14:32:48] [K02] ok: setup native 3D 01 Threat (dark, 1100x720): nothing clipped
+[14:32:48] [K02] ok: setup native 3D 01 Threat (dark, 1100x720): nothing outside the window
+[14:32:49] [K02] ok: setup native 3D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:32:49] [K02] ok: setup native 3D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:32:49] [K02] ok: setup native 3D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:32:49] [K02] ok: setup native 3D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:32:49] [K02] ok: setup native 3D 04 Structure (dark, 1100x720): nothing clipped
+[14:32:49] [K02] ok: setup native 3D 04 Structure (dark, 1100x720): nothing outside the window
+[14:32:50] [K02] ok: setup native 3D 05 Gauges (dark, 1100x720): nothing clipped
+[14:32:50] [K02] ok: setup native 3D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:32:50] [K02] ok: setup native 3D 06 Solver (dark, 1100x720): nothing clipped
+[14:32:50] [K02] ok: setup native 3D 06 Solver (dark, 1100x720): nothing outside the window
+[14:32:50] [K02] ok: setup native 3D 07 Output (dark, 1100x720): nothing clipped
+[14:32:50] [K02] ok: setup native 3D 07 Output (dark, 1100x720): nothing outside the window
+[14:32:51] [K02] ok: the 2D segment sets the dimension
+[14:32:52] [K02] ok: the chip's blastfoam action switches the solver
+[14:32:53] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[14:32:53] [K02] ok: setup blastfoam 0D 01 Material (dark, 1100x720): nothing clipped
+[14:32:53] [K02] ok: setup blastfoam 0D 01 Material (dark, 1100x720): nothing outside the window
+[14:32:53] [K02] ok: setup blastfoam 0D 02 Charge and chamber (dark, 1100x720): nothing clipped
+[14:32:53] [K02] ok: setup blastfoam 0D 02 Charge and chamber (dark, 1100x720): nothing outside the window
+[14:32:54] [K02] ok: setup blastfoam 0D 03 Ignition (dark, 1100x720): nothing clipped
+[14:32:54] [K02] ok: setup blastfoam 0D 03 Ignition (dark, 1100x720): nothing outside the window
+[14:32:54] [K02] ok: setup blastfoam 0D 04 Run (dark, 1100x720): nothing clipped
+[14:32:54] [K02] ok: setup blastfoam 0D 04 Run (dark, 1100x720): nothing outside the window
+[14:32:54] [K02] ok: setup blastfoam 0D 05 Heat (dark, 1100x720): nothing clipped
+[14:32:54] [K02] ok: setup blastfoam 0D 05 Heat (dark, 1100x720): nothing outside the window
+[14:32:55] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing clipped
+[14:32:55] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing outside the window
+[14:32:55] [K02] ok: setup blastfoam 0D 07 Loaded wall (dark, 1100x720): nothing clipped
+[14:32:55] [K02] ok: setup blastfoam 0D 07 Loaded wall (dark, 1100x720): nothing outside the window
+[14:32:55] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing clipped
+[14:32:55] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing outside the window
+[14:32:56] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (dark, 1100x720): nothing clipped
+[14:32:56] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (dark, 1100x720): nothing outside the window
+[14:32:56] [K02] ok: setup blastfoam 0D 10 Outputs (dark, 1100x720): nothing clipped
+[14:32:56] [K02] ok: setup blastfoam 0D 10 Outputs (dark, 1100x720): nothing outside the window
+[14:32:56] [K02] ok: the 1D segment sets the dimension
+[14:32:57] [K02] ok: setup blastfoam 1D 01 Threat (dark, 1100x720): nothing clipped
+[14:32:57] [K02] ok: setup blastfoam 1D 01 Threat (dark, 1100x720): nothing outside the window
+[14:32:57] [K02] ok: setup blastfoam 1D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:32:57] [K02] ok: setup blastfoam 1D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:32:57] [K02] ok: setup blastfoam 1D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:32:57] [K02] ok: setup blastfoam 1D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:32:57] [K02] NOTE: blastfoam 1D 04: hidden in this mode - skipped
+[14:32:58] [K02] ok: setup blastfoam 1D 05 Gauges (dark, 1100x720): nothing clipped
+[14:32:58] [K02] ok: setup blastfoam 1D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:32:58] [K02] ok: setup blastfoam 1D 06 Solver (dark, 1100x720): nothing clipped
+[14:32:58] [K02] ok: setup blastfoam 1D 06 Solver (dark, 1100x720): nothing outside the window
+[14:32:58] [K02] ok: setup blastfoam 1D 07 Output (dark, 1100x720): nothing clipped
+[14:32:59] [K02] ok: setup blastfoam 1D 07 Output (dark, 1100x720): nothing outside the window
+[14:32:59] [K02] ok: the 2D segment sets the dimension
+[14:32:59] [K02] ok: setup blastfoam 2D 01 Threat (dark, 1100x720): nothing clipped
+[14:32:59] [K02] ok: setup blastfoam 2D 01 Threat (dark, 1100x720): nothing outside the window
+[14:33:00] [K02] ok: setup blastfoam 2D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:33:00] [K02] ok: setup blastfoam 2D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:33:00] [K02] ok: setup blastfoam 2D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:33:00] [K02] ok: setup blastfoam 2D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:33:01] [K02] ok: setup blastfoam 2D 04 Structure (dark, 1100x720): nothing clipped
+[14:33:01] [K02] ok: setup blastfoam 2D 04 Structure (dark, 1100x720): nothing outside the window
+[14:33:01] [K02] ok: setup blastfoam 2D 05 Gauges (dark, 1100x720): nothing clipped
+[14:33:01] [K02] ok: setup blastfoam 2D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:33:01] [K02] ok: setup blastfoam 2D 06 Solver (dark, 1100x720): nothing clipped
+[14:33:01] [K02] ok: setup blastfoam 2D 06 Solver (dark, 1100x720): nothing outside the window
+[14:33:02] [K02] ok: setup blastfoam 2D 07 Output (dark, 1100x720): nothing clipped
+[14:33:02] [K02] ok: setup blastfoam 2D 07 Output (dark, 1100x720): nothing outside the window
+[14:33:02] [K02] ok: the 3D segment sets the dimension
+[14:33:03] [K02] ok: setup blastfoam 3D 01 Threat (dark, 1100x720): nothing clipped
+[14:33:03] [K02] ok: setup blastfoam 3D 01 Threat (dark, 1100x720): nothing outside the window
+[14:33:03] [K02] ok: setup blastfoam 3D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[14:33:03] [K02] ok: setup blastfoam 3D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[14:33:03] [K02] ok: setup blastfoam 3D 03 Boundaries (dark, 1100x720): nothing clipped
+[14:33:03] [K02] ok: setup blastfoam 3D 03 Boundaries (dark, 1100x720): nothing outside the window
+[14:33:04] [K02] ok: setup blastfoam 3D 04 Structure (dark, 1100x720): nothing clipped
+[14:33:04] [K02] ok: setup blastfoam 3D 04 Structure (dark, 1100x720): nothing outside the window
+[14:33:04] [K02] ok: setup blastfoam 3D 05 Gauges (dark, 1100x720): nothing clipped
+[14:33:04] [K02] ok: setup blastfoam 3D 05 Gauges (dark, 1100x720): nothing outside the window
+[14:33:04] [K02] ok: setup blastfoam 3D 06 Solver (dark, 1100x720): nothing clipped
+[14:33:04] [K02] ok: setup blastfoam 3D 06 Solver (dark, 1100x720): nothing outside the window
+[14:33:05] [K02] ok: setup blastfoam 3D 07 Output (dark, 1100x720): nothing clipped
+[14:33:05] [K02] ok: setup blastfoam 3D 07 Output (dark, 1100x720): nothing outside the window
+[14:33:06] [K02] ok: the 2D segment sets the dimension
+[14:33:06] [K02] ok: the chip's native action switches the solver
+[14:33:07] [K02] ok: the run pill shows its screen
+[14:33:07] [K02] ok: and the run pill is the active one
+[14:33:07] [K02] ok: run banner (dark, 1100x720): nothing clipped
+[14:33:07] [K02] ok: run banner (dark, 1100x720): nothing outside the window
+[14:33:07] [K02] ok: run finished, banner shown (dark, 1100x720): nothing clipped
+[14:33:07] [K02] ok: run finished, banner shown (dark, 1100x720): nothing outside the window
+[14:33:08] [K02] ok: the results pill shows its screen
+[14:33:08] [K02] ok: and the results pill is the active one
+[14:33:09] [K02] ok: results QA native1d Field (dark, 1100x720): nothing clipped
+[14:33:09] [K02] ok: results QA native1d Field (dark, 1100x720): nothing outside the window
+[14:33:10] [K02] ok: results QA native1d Gauges (dark, 1100x720): nothing clipped
+[14:33:10] [K02] ok: results QA native1d Gauges (dark, 1100x720): nothing outside the window
+[14:33:10] [K02] ok: results QA native1d 3D (dark, 1100x720): nothing clipped
+[14:33:10] [K02] ok: results QA native1d 3D (dark, 1100x720): nothing outside the window
+[14:33:11] [K02] ok: results QA native2d Field (dark, 1100x720): nothing clipped
+[14:33:11] [K02] ok: results QA native2d Field (dark, 1100x720): nothing outside the window
+[14:33:12] [K02] ok: results QA native2d Gauges (dark, 1100x720): nothing clipped
+[14:33:12] [K02] ok: results QA native2d Gauges (dark, 1100x720): nothing outside the window
+[14:33:12] [K02] ok: results QA native2d 3D (dark, 1100x720): nothing clipped
+[14:33:12] [K02] ok: results QA native2d 3D (dark, 1100x720): nothing outside the window
+[14:33:13] [K02] ok: results QA native3d Field (dark, 1100x720): nothing clipped
+[14:33:13] [K02] ok: results QA native3d Field (dark, 1100x720): nothing outside the window
+[14:33:14] [K02] ok: results QA native3d Gauges (dark, 1100x720): nothing clipped
+[14:33:14] [K02] ok: results QA native3d Gauges (dark, 1100x720): nothing outside the window
+[14:33:14] [K02] ok: results QA native3d 3D (dark, 1100x720): nothing clipped
+[14:33:14] [K02] ok: results QA native3d 3D (dark, 1100x720): nothing outside the window
+[14:33:14] [K02] NOTE: no chain entry in this process: the STAGE tabs are not checked here (G02 makes one)
+[14:33:15] [K02] ok: the chain pill shows its screen
+[14:33:15] [K02] ok: and the chain pill is the active one
+[14:33:15] [K02] ok: chain route 123 stage 1 stage (dark, 1100x720): nothing clipped
+[14:33:15] [K02] ok: chain route 123 stage 1 stage (dark, 1100x720): nothing outside the window
+[14:33:16] [K02] ok: chain route 123 stage 1 threat (dark, 1100x720): nothing clipped
+[14:33:16] [K02] ok: chain route 123 stage 1 threat (dark, 1100x720): nothing outside the window
+[14:33:16] [K02] ok: chain route 123 stage 1 domain (dark, 1100x720): nothing clipped
+[14:33:16] [K02] ok: chain route 123 stage 1 domain (dark, 1100x720): nothing outside the window
+[14:33:16] [K02] ok: chain route 123 stage 1 bounds (dark, 1100x720): nothing clipped
+[14:33:16] [K02] ok: chain route 123 stage 1 bounds (dark, 1100x720): nothing outside the window
+[14:33:17] [K02] ok: chain route 123 stage 1 gauges (dark, 1100x720): nothing clipped
+[14:33:17] [K02] ok: chain route 123 stage 1 gauges (dark, 1100x720): nothing outside the window
+[14:33:17] [K02] ok: chain route 123 stage 1 solver (dark, 1100x720): nothing clipped
+[14:33:17] [K02] ok: chain route 123 stage 1 solver (dark, 1100x720): nothing outside the window
+[14:33:18] [K02] ok: chain route 13 stage 1 stage (dark, 1100x720): nothing clipped
+[14:33:18] [K02] ok: chain route 13 stage 1 stage (dark, 1100x720): nothing outside the window
+[14:33:18] [K02] ok: chain route 13 stage 1 threat (dark, 1100x720): nothing clipped
+[14:33:18] [K02] ok: chain route 13 stage 1 threat (dark, 1100x720): nothing outside the window
+[14:33:18] [K02] ok: chain route 13 stage 1 domain (dark, 1100x720): nothing clipped
+[14:33:18] [K02] ok: chain route 13 stage 1 domain (dark, 1100x720): nothing outside the window
+[14:33:19] [K02] ok: chain route 13 stage 1 bounds (dark, 1100x720): nothing clipped
+[14:33:19] [K02] ok: chain route 13 stage 1 bounds (dark, 1100x720): nothing outside the window
+[14:33:19] [K02] ok: chain route 13 stage 1 gauges (dark, 1100x720): nothing clipped
+[14:33:19] [K02] ok: chain route 13 stage 1 gauges (dark, 1100x720): nothing outside the window
+[14:33:19] [K02] ok: chain route 13 stage 1 solver (dark, 1100x720): nothing clipped
+[14:33:19] [K02] ok: chain route 13 stage 1 solver (dark, 1100x720): nothing outside the window
+[14:33:20] [K02] ok: chain route 12 stage 1 stage (dark, 1100x720): nothing clipped
+[14:33:20] [K02] ok: chain route 12 stage 1 stage (dark, 1100x720): nothing outside the window
+[14:33:20] [K02] ok: chain route 12 stage 1 threat (dark, 1100x720): nothing clipped
+[14:33:20] [K02] ok: chain route 12 stage 1 threat (dark, 1100x720): nothing outside the window
+[14:33:21] [K02] ok: chain route 12 stage 1 domain (dark, 1100x720): nothing clipped
+[14:33:21] [K02] ok: chain route 12 stage 1 domain (dark, 1100x720): nothing outside the window
+[14:33:21] [K02] ok: chain route 12 stage 1 bounds (dark, 1100x720): nothing clipped
+[14:33:21] [K02] ok: chain route 12 stage 1 bounds (dark, 1100x720): nothing outside the window
+[14:33:21] [K02] ok: chain route 12 stage 1 gauges (dark, 1100x720): nothing clipped
+[14:33:21] [K02] ok: chain route 12 stage 1 gauges (dark, 1100x720): nothing outside the window
+[14:33:22] [K02] ok: chain route 12 stage 1 solver (dark, 1100x720): nothing clipped
+[14:33:22] [K02] ok: chain route 12 stage 1 solver (dark, 1100x720): nothing outside the window
+[14:33:22] [K02] ok: chain route 23 stage 2 stage (dark, 1100x720): nothing clipped
+[14:33:22] [K02] ok: chain route 23 stage 2 stage (dark, 1100x720): nothing outside the window
+[14:33:23] [K02] ok: chain route 23 stage 2 threat (dark, 1100x720): nothing clipped
+[14:33:23] [K02] ok: chain route 23 stage 2 threat (dark, 1100x720): nothing outside the window
+[14:33:23] [K02] ok: chain route 23 stage 2 domain (dark, 1100x720): nothing clipped
+[14:33:23] [K02] ok: chain route 23 stage 2 domain (dark, 1100x720): nothing outside the window
+[14:33:23] [K02] ok: chain route 23 stage 2 bounds (dark, 1100x720): nothing clipped
+[14:33:23] [K02] ok: chain route 23 stage 2 bounds (dark, 1100x720): nothing outside the window
+[14:33:24] [K02] ok: chain route 23 stage 2 structure (dark, 1100x720): nothing clipped
+[14:33:24] [K02] ok: chain route 23 stage 2 structure (dark, 1100x720): nothing outside the window
+[14:33:24] [K02] ok: chain route 23 stage 2 gauges (dark, 1100x720): nothing clipped
+[14:33:24] [K02] ok: chain route 23 stage 2 gauges (dark, 1100x720): nothing outside the window
+[14:33:24] [K02] ok: chain route 23 stage 2 solver (dark, 1100x720): nothing clipped
+[14:33:24] [K02] ok: chain route 23 stage 2 solver (dark, 1100x720): nothing outside the window
+[14:33:25] [K02] ok: chain route 23 stage 2 output (dark, 1100x720): nothing clipped
+[14:33:25] [K02] ok: chain route 23 stage 2 output (dark, 1100x720): nothing outside the window
+[14:33:26] [K02] ok: the setup pill shows its screen
+[14:33:26] [K02] ok: and the setup pill is the active one
+[14:33:26] [K02] ok: the 2D segment sets the dimension
+[14:33:35] [K02] ok: the Dark-mode action gives the light theme
+[14:33:36] [K02] ok: the setup pill shows its screen
+[14:33:36] [K02] ok: and the setup pill is the active one
+[14:33:37] [K02] ok: the 2D segment sets the dimension
+[14:33:37] [K02] ok: the chip's native action switches the solver
+[14:33:38] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[14:33:38] [K02] ok: setup native 0D 01 Material (light, 1100x720): nothing clipped
+[14:33:38] [K02] ok: setup native 0D 01 Material (light, 1100x720): nothing outside the window
+[14:33:39] [K02] ok: setup native 0D 02 Charge and chamber (light, 1100x720): nothing clipped
+[14:33:39] [K02] ok: setup native 0D 02 Charge and chamber (light, 1100x720): nothing outside the window
+[14:33:39] [K02] ok: setup native 0D 03 Ignition (light, 1100x720): nothing clipped
+[14:33:39] [K02] ok: setup native 0D 03 Ignition (light, 1100x720): nothing outside the window
+[14:33:39] [K02] ok: setup native 0D 04 Run (light, 1100x720): nothing clipped
+[14:33:39] [K02] ok: setup native 0D 04 Run (light, 1100x720): nothing outside the window
+[14:33:40] [K02] ok: setup native 0D 05 Heat (light, 1100x720): nothing clipped
+[14:33:40] [K02] ok: setup native 0D 05 Heat (light, 1100x720): nothing outside the window
+[14:33:40] [K02] ok: setup native 0D 06 Radiation standoffs [m] (light, 1100x720): nothing clipped
+[14:33:40] [K02] ok: setup native 0D 06 Radiation standoffs [m] (light, 1100x720): nothing outside the window
+[14:33:40] [K02] ok: setup native 0D 07 Loaded wall (light, 1100x720): nothing clipped
+[14:33:40] [K02] ok: setup native 0D 07 Loaded wall (light, 1100x720): nothing outside the window
+[14:33:41] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing clipped
+[14:33:41] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing outside the window
+[14:33:41] [K02] ok: setup native 0D 09 Vent gauges [m] (light, 1100x720): nothing clipped
+[14:33:41] [K02] ok: setup native 0D 09 Vent gauges [m] (light, 1100x720): nothing outside the window
+[14:33:41] [K02] ok: setup native 0D 10 Outputs (light, 1100x720): nothing clipped
+[14:33:41] [K02] ok: setup native 0D 10 Outputs (light, 1100x720): nothing outside the window
+[14:33:42] [K02] ok: the 1D segment sets the dimension
+[14:33:42] [K02] ok: setup native 1D 01 Threat (light, 1100x720): nothing clipped
+[14:33:42] [K02] ok: setup native 1D 01 Threat (light, 1100x720): nothing outside the window
+[14:33:42] [K02] ok: setup native 1D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:33:42] [K02] ok: setup native 1D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:33:43] [K02] ok: setup native 1D 03 Boundaries (light, 1100x720): nothing clipped
+[14:33:43] [K02] ok: setup native 1D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:33:43] [K02] NOTE: native 1D 04: hidden in this mode - skipped
+[14:33:43] [K02] ok: setup native 1D 05 Gauges (light, 1100x720): nothing clipped
+[14:33:43] [K02] ok: setup native 1D 05 Gauges (light, 1100x720): nothing outside the window
+[14:33:43] [K02] ok: setup native 1D 06 Solver (light, 1100x720): nothing clipped
+[14:33:43] [K02] ok: setup native 1D 06 Solver (light, 1100x720): nothing outside the window
+[14:33:43] [K02] NOTE: native 1D 07: hidden in this mode - skipped
+[14:33:44] [K02] ok: the 2D segment sets the dimension
+[14:33:44] [K02] ok: setup native 2D 01 Threat (light, 1100x720): nothing clipped
+[14:33:44] [K02] ok: setup native 2D 01 Threat (light, 1100x720): nothing outside the window
+[14:33:45] [K02] ok: setup native 2D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:33:45] [K02] ok: setup native 2D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:33:45] [K02] ok: setup native 2D 03 Boundaries (light, 1100x720): nothing clipped
+[14:33:45] [K02] ok: setup native 2D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:33:45] [K02] ok: setup native 2D 04 Structure (light, 1100x720): nothing clipped
+[14:33:45] [K02] ok: setup native 2D 04 Structure (light, 1100x720): nothing outside the window
+[14:33:46] [K02] ok: setup native 2D 05 Gauges (light, 1100x720): nothing clipped
+[14:33:46] [K02] ok: setup native 2D 05 Gauges (light, 1100x720): nothing outside the window
+[14:33:46] [K02] ok: setup native 2D 06 Solver (light, 1100x720): nothing clipped
+[14:33:46] [K02] ok: setup native 2D 06 Solver (light, 1100x720): nothing outside the window
+[14:33:46] [K02] ok: setup native 2D 07 Output (light, 1100x720): nothing clipped
+[14:33:46] [K02] ok: setup native 2D 07 Output (light, 1100x720): nothing outside the window
+[14:33:47] [K02] ok: the 3D segment sets the dimension
+[14:33:47] [K02] ok: setup native 3D 01 Threat (light, 1100x720): nothing clipped
+[14:33:47] [K02] ok: setup native 3D 01 Threat (light, 1100x720): nothing outside the window
+[14:33:48] [K02] ok: setup native 3D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:33:48] [K02] ok: setup native 3D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:33:48] [K02] ok: setup native 3D 03 Boundaries (light, 1100x720): nothing clipped
+[14:33:48] [K02] ok: setup native 3D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:33:48] [K02] ok: setup native 3D 04 Structure (light, 1100x720): nothing clipped
+[14:33:48] [K02] ok: setup native 3D 04 Structure (light, 1100x720): nothing outside the window
+[14:33:49] [K02] ok: setup native 3D 05 Gauges (light, 1100x720): nothing clipped
+[14:33:49] [K02] ok: setup native 3D 05 Gauges (light, 1100x720): nothing outside the window
+[14:33:49] [K02] ok: setup native 3D 06 Solver (light, 1100x720): nothing clipped
+[14:33:49] [K02] ok: setup native 3D 06 Solver (light, 1100x720): nothing outside the window
+[14:33:49] [K02] ok: setup native 3D 07 Output (light, 1100x720): nothing clipped
+[14:33:49] [K02] ok: setup native 3D 07 Output (light, 1100x720): nothing outside the window
+[14:33:50] [K02] ok: the 2D segment sets the dimension
+[14:33:51] [K02] ok: the chip's blastfoam action switches the solver
+[14:33:52] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[14:33:52] [K02] ok: setup blastfoam 0D 01 Material (light, 1100x720): nothing clipped
+[14:33:52] [K02] ok: setup blastfoam 0D 01 Material (light, 1100x720): nothing outside the window
+[14:33:52] [K02] ok: setup blastfoam 0D 02 Charge and chamber (light, 1100x720): nothing clipped
+[14:33:52] [K02] ok: setup blastfoam 0D 02 Charge and chamber (light, 1100x720): nothing outside the window
+[14:33:53] [K02] ok: setup blastfoam 0D 03 Ignition (light, 1100x720): nothing clipped
+[14:33:53] [K02] ok: setup blastfoam 0D 03 Ignition (light, 1100x720): nothing outside the window
+[14:33:53] [K02] ok: setup blastfoam 0D 04 Run (light, 1100x720): nothing clipped
+[14:33:53] [K02] ok: setup blastfoam 0D 04 Run (light, 1100x720): nothing outside the window
+[14:33:53] [K02] ok: setup blastfoam 0D 05 Heat (light, 1100x720): nothing clipped
+[14:33:53] [K02] ok: setup blastfoam 0D 05 Heat (light, 1100x720): nothing outside the window
+[14:33:54] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (light, 1100x720): nothing clipped
+[14:33:54] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (light, 1100x720): nothing outside the window
+[14:33:54] [K02] ok: setup blastfoam 0D 07 Loaded wall (light, 1100x720): nothing clipped
+[14:33:54] [K02] ok: setup blastfoam 0D 07 Loaded wall (light, 1100x720): nothing outside the window
+[14:33:54] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing clipped
+[14:33:54] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing outside the window
+[14:33:55] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (light, 1100x720): nothing clipped
+[14:33:55] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (light, 1100x720): nothing outside the window
+[14:33:55] [K02] ok: setup blastfoam 0D 10 Outputs (light, 1100x720): nothing clipped
+[14:33:55] [K02] ok: setup blastfoam 0D 10 Outputs (light, 1100x720): nothing outside the window
+[14:33:56] [K02] ok: the 1D segment sets the dimension
+[14:33:56] [K02] ok: setup blastfoam 1D 01 Threat (light, 1100x720): nothing clipped
+[14:33:56] [K02] ok: setup blastfoam 1D 01 Threat (light, 1100x720): nothing outside the window
+[14:33:56] [K02] ok: setup blastfoam 1D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:33:56] [K02] ok: setup blastfoam 1D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:33:57] [K02] ok: setup blastfoam 1D 03 Boundaries (light, 1100x720): nothing clipped
+[14:33:57] [K02] ok: setup blastfoam 1D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:33:57] [K02] NOTE: blastfoam 1D 04: hidden in this mode - skipped
+[14:33:57] [K02] ok: setup blastfoam 1D 05 Gauges (light, 1100x720): nothing clipped
+[14:33:57] [K02] ok: setup blastfoam 1D 05 Gauges (light, 1100x720): nothing outside the window
+[14:33:57] [K02] ok: setup blastfoam 1D 06 Solver (light, 1100x720): nothing clipped
+[14:33:57] [K02] ok: setup blastfoam 1D 06 Solver (light, 1100x720): nothing outside the window
+[14:33:58] [K02] ok: setup blastfoam 1D 07 Output (light, 1100x720): nothing clipped
+[14:33:58] [K02] ok: setup blastfoam 1D 07 Output (light, 1100x720): nothing outside the window
+[14:33:58] [K02] ok: the 2D segment sets the dimension
+[14:33:59] [K02] ok: setup blastfoam 2D 01 Threat (light, 1100x720): nothing clipped
+[14:33:59] [K02] ok: setup blastfoam 2D 01 Threat (light, 1100x720): nothing outside the window
+[14:33:59] [K02] ok: setup blastfoam 2D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:33:59] [K02] ok: setup blastfoam 2D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:33:59] [K02] ok: setup blastfoam 2D 03 Boundaries (light, 1100x720): nothing clipped
+[14:33:59] [K02] ok: setup blastfoam 2D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:34:00] [K02] ok: setup blastfoam 2D 04 Structure (light, 1100x720): nothing clipped
+[14:34:00] [K02] ok: setup blastfoam 2D 04 Structure (light, 1100x720): nothing outside the window
+[14:34:00] [K02] ok: setup blastfoam 2D 05 Gauges (light, 1100x720): nothing clipped
+[14:34:00] [K02] ok: setup blastfoam 2D 05 Gauges (light, 1100x720): nothing outside the window
+[14:34:00] [K02] ok: setup blastfoam 2D 06 Solver (light, 1100x720): nothing clipped
+[14:34:00] [K02] ok: setup blastfoam 2D 06 Solver (light, 1100x720): nothing outside the window
+[14:34:01] [K02] ok: setup blastfoam 2D 07 Output (light, 1100x720): nothing clipped
+[14:34:01] [K02] ok: setup blastfoam 2D 07 Output (light, 1100x720): nothing outside the window
+[14:34:01] [K02] ok: the 3D segment sets the dimension
+[14:34:02] [K02] ok: setup blastfoam 3D 01 Threat (light, 1100x720): nothing clipped
+[14:34:02] [K02] ok: setup blastfoam 3D 01 Threat (light, 1100x720): nothing outside the window
+[14:34:02] [K02] ok: setup blastfoam 3D 02 Domain & mesh (light, 1100x720): nothing clipped
+[14:34:02] [K02] ok: setup blastfoam 3D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[14:34:02] [K02] ok: setup blastfoam 3D 03 Boundaries (light, 1100x720): nothing clipped
+[14:34:02] [K02] ok: setup blastfoam 3D 03 Boundaries (light, 1100x720): nothing outside the window
+[14:34:03] [K02] ok: setup blastfoam 3D 04 Structure (light, 1100x720): nothing clipped
+[14:34:03] [K02] ok: setup blastfoam 3D 04 Structure (light, 1100x720): nothing outside the window
+[14:34:03] [K02] ok: setup blastfoam 3D 05 Gauges (light, 1100x720): nothing clipped
+[14:34:03] [K02] ok: setup blastfoam 3D 05 Gauges (light, 1100x720): nothing outside the window
+[14:34:03] [K02] ok: setup blastfoam 3D 06 Solver (light, 1100x720): nothing clipped
+[14:34:03] [K02] ok: setup blastfoam 3D 06 Solver (light, 1100x720): nothing outside the window
+[14:34:04] [K02] ok: setup blastfoam 3D 07 Output (light, 1100x720): nothing clipped
+[14:34:04] [K02] ok: setup blastfoam 3D 07 Output (light, 1100x720): nothing outside the window
+[14:34:05] [K02] ok: the 2D segment sets the dimension
+[14:34:05] [K02] ok: the chip's native action switches the solver
+[14:34:06] [K02] ok: the run pill shows its screen
+[14:34:06] [K02] ok: and the run pill is the active one
+[14:34:06] [K02] ok: run banner (light, 1100x720): nothing clipped
+[14:34:06] [K02] ok: run banner (light, 1100x720): nothing outside the window
+[14:34:06] [K02] ok: run finished, banner shown (light, 1100x720): nothing clipped
+[14:34:06] [K02] ok: run finished, banner shown (light, 1100x720): nothing outside the window
+[14:34:07] [K02] ok: the results pill shows its screen
+[14:34:07] [K02] ok: and the results pill is the active one
+[14:34:09] [K02] ok: results QA native1d Field (light, 1100x720): nothing clipped
+[14:34:09] [K02] ok: results QA native1d Field (light, 1100x720): nothing outside the window
+[14:34:09] [K02] ok: results QA native1d Gauges (light, 1100x720): nothing clipped
+[14:34:09] [K02] ok: results QA native1d Gauges (light, 1100x720): nothing outside the window
+[14:34:09] [K02] ok: results QA native1d 3D (light, 1100x720): nothing clipped
+[14:34:09] [K02] ok: results QA native1d 3D (light, 1100x720): nothing outside the window
+[14:34:11] [K02] ok: results QA native2d Field (light, 1100x720): nothing clipped
+[14:34:11] [K02] ok: results QA native2d Field (light, 1100x720): nothing outside the window
+[14:34:11] [K02] ok: results QA native2d Gauges (light, 1100x720): nothing clipped
+[14:34:11] [K02] ok: results QA native2d Gauges (light, 1100x720): nothing outside the window
+[14:34:11] [K02] ok: results QA native2d 3D (light, 1100x720): nothing clipped
+[14:34:11] [K02] ok: results QA native2d 3D (light, 1100x720): nothing outside the window
+[14:34:13] [K02] ok: results QA native3d Field (light, 1100x720): nothing clipped
+[14:34:13] [K02] ok: results QA native3d Field (light, 1100x720): nothing outside the window
+[14:34:13] [K02] ok: results QA native3d Gauges (light, 1100x720): nothing clipped
+[14:34:13] [K02] ok: results QA native3d Gauges (light, 1100x720): nothing outside the window
+[14:34:13] [K02] ok: results QA native3d 3D (light, 1100x720): nothing clipped
+[14:34:13] [K02] ok: results QA native3d 3D (light, 1100x720): nothing outside the window
+[14:34:13] [K02] NOTE: no chain entry in this process: the STAGE tabs are not checked here (G02 makes one)
+[14:34:14] [K02] ok: the chain pill shows its screen
+[14:34:14] [K02] ok: and the chain pill is the active one
+[14:34:14] [K02] ok: chain route 123 stage 2 stage (light, 1100x720): nothing clipped
+[14:34:14] [K02] ok: chain route 123 stage 2 stage (light, 1100x720): nothing outside the window
+[14:34:15] [K02] ok: chain route 123 stage 2 threat (light, 1100x720): nothing clipped
+[14:34:15] [K02] ok: chain route 123 stage 2 threat (light, 1100x720): nothing outside the window
+[14:34:15] [K02] ok: chain route 123 stage 2 domain (light, 1100x720): nothing clipped
+[14:34:15] [K02] ok: chain route 123 stage 2 domain (light, 1100x720): nothing outside the window
+[14:34:16] [K02] ok: chain route 123 stage 2 bounds (light, 1100x720): nothing clipped
+[14:34:16] [K02] ok: chain route 123 stage 2 bounds (light, 1100x720): nothing outside the window
+[14:34:16] [K02] ok: chain route 123 stage 2 structure (light, 1100x720): nothing clipped
+[14:34:16] [K02] ok: chain route 123 stage 2 structure (light, 1100x720): nothing outside the window
+[14:34:16] [K02] ok: chain route 123 stage 2 gauges (light, 1100x720): nothing clipped
+[14:34:16] [K02] ok: chain route 123 stage 2 gauges (light, 1100x720): nothing outside the window
+[14:34:17] [K02] ok: chain route 123 stage 2 solver (light, 1100x720): nothing clipped
+[14:34:17] [K02] ok: chain route 123 stage 2 solver (light, 1100x720): nothing outside the window
+[14:34:17] [K02] ok: chain route 123 stage 2 output (light, 1100x720): nothing clipped
+[14:34:17] [K02] ok: chain route 123 stage 2 output (light, 1100x720): nothing outside the window
+[14:34:18] [K02] ok: chain route 13 stage 3 stage (light, 1100x720): nothing clipped
+[14:34:18] [K02] ok: chain route 13 stage 3 stage (light, 1100x720): nothing outside the window
+[14:34:18] [K02] ok: chain route 13 stage 3 threat (light, 1100x720): nothing clipped
+[14:34:18] [K02] ok: chain route 13 stage 3 threat (light, 1100x720): nothing outside the window
+[14:34:18] [K02] ok: chain route 13 stage 3 domain (light, 1100x720): nothing clipped
+[14:34:18] [K02] ok: chain route 13 stage 3 domain (light, 1100x720): nothing outside the window
+[14:34:19] [K02] ok: chain route 13 stage 3 bounds (light, 1100x720): nothing clipped
+[14:34:19] [K02] ok: chain route 13 stage 3 bounds (light, 1100x720): nothing outside the window
+[14:34:19] [K02] ok: chain route 13 stage 3 structure (light, 1100x720): nothing clipped
+[14:34:19] [K02] ok: chain route 13 stage 3 structure (light, 1100x720): nothing outside the window
+[14:34:19] [K02] ok: chain route 13 stage 3 gauges (light, 1100x720): nothing clipped
+[14:34:19] [K02] ok: chain route 13 stage 3 gauges (light, 1100x720): nothing outside the window
+[14:34:20] [K02] ok: chain route 13 stage 3 solver (light, 1100x720): nothing clipped
+[14:34:20] [K02] ok: chain route 13 stage 3 solver (light, 1100x720): nothing outside the window
+[14:34:20] [K02] ok: chain route 13 stage 3 output (light, 1100x720): nothing clipped
+[14:34:20] [K02] ok: chain route 13 stage 3 output (light, 1100x720): nothing outside the window
+[14:34:21] [K02] ok: chain route 12 stage 2 stage (light, 1100x720): nothing clipped
+[14:34:21] [K02] ok: chain route 12 stage 2 stage (light, 1100x720): nothing outside the window
+[14:34:21] [K02] ok: chain route 12 stage 2 threat (light, 1100x720): nothing clipped
+[14:34:21] [K02] ok: chain route 12 stage 2 threat (light, 1100x720): nothing outside the window
+[14:34:21] [K02] ok: chain route 12 stage 2 domain (light, 1100x720): nothing clipped
+[14:34:21] [K02] ok: chain route 12 stage 2 domain (light, 1100x720): nothing outside the window
+[14:34:22] [K02] ok: chain route 12 stage 2 bounds (light, 1100x720): nothing clipped
+[14:34:22] [K02] ok: chain route 12 stage 2 bounds (light, 1100x720): nothing outside the window
+[14:34:22] [K02] ok: chain route 12 stage 2 structure (light, 1100x720): nothing clipped
+[14:34:22] [K02] ok: chain route 12 stage 2 structure (light, 1100x720): nothing outside the window
+[14:34:23] [K02] ok: chain route 12 stage 2 gauges (light, 1100x720): nothing clipped
+[14:34:23] [K02] ok: chain route 12 stage 2 gauges (light, 1100x720): nothing outside the window
+[14:34:23] [K02] ok: chain route 12 stage 2 solver (light, 1100x720): nothing clipped
+[14:34:23] [K02] ok: chain route 12 stage 2 solver (light, 1100x720): nothing outside the window
+[14:34:23] [K02] ok: chain route 12 stage 2 output (light, 1100x720): nothing clipped
+[14:34:23] [K02] ok: chain route 12 stage 2 output (light, 1100x720): nothing outside the window
+[14:34:24] [K02] ok: chain route 23 stage 2 stage (light, 1100x720): nothing clipped
+[14:34:24] [K02] ok: chain route 23 stage 2 stage (light, 1100x720): nothing outside the window
+[14:34:24] [K02] ok: chain route 23 stage 2 threat (light, 1100x720): nothing clipped
+[14:34:24] [K02] ok: chain route 23 stage 2 threat (light, 1100x720): nothing outside the window
+[14:34:25] [K02] ok: chain route 23 stage 2 domain (light, 1100x720): nothing clipped
+[14:34:25] [K02] ok: chain route 23 stage 2 domain (light, 1100x720): nothing outside the window
+[14:34:25] [K02] ok: chain route 23 stage 2 bounds (light, 1100x720): nothing clipped
+[14:34:25] [K02] ok: chain route 23 stage 2 bounds (light, 1100x720): nothing outside the window
+[14:34:25] [K02] ok: chain route 23 stage 2 structure (light, 1100x720): nothing clipped
+[14:34:25] [K02] ok: chain route 23 stage 2 structure (light, 1100x720): nothing outside the window
+[14:34:26] [K02] ok: chain route 23 stage 2 gauges (light, 1100x720): nothing clipped
+[14:34:26] [K02] ok: chain route 23 stage 2 gauges (light, 1100x720): nothing outside the window
+[14:34:26] [K02] ok: chain route 23 stage 2 solver (light, 1100x720): nothing clipped
+[14:34:26] [K02] ok: chain route 23 stage 2 solver (light, 1100x720): nothing outside the window
+[14:34:26] [K02] ok: chain route 23 stage 2 output (light, 1100x720): nothing clipped
+[14:34:26] [K02] ok: chain route 23 stage 2 output (light, 1100x720): nothing outside the window
+[14:34:27] [K02] ok: the setup pill shows its screen
+[14:34:27] [K02] ok: and the setup pill is the active one
+[14:34:28] [K02] ok: the 2D segment sets the dimension
+[14:34:37] [K02] ok: the Dark-mode action gives the dark theme
+[14:34:38] [K02] contact sheet: contact_K02.png (8 shots)
+[14:34:38] [K02] --- end done in 121.8s (max gap 493 ms) ---
+[14:34:38] [K02] ok: the Dark-mode action gives the dark theme
+[14:34:39] [K02] ok: the setup pill shows its screen
+[14:34:39] [K02] ok: and the setup pill is the active one
+[14:34:40] [K02] ok: the 2D segment sets the dimension
+[14:34:40] [K03] --- begin ---
+[14:34:49] [K03] ok: the Dark-mode action gives the light theme
+[14:34:50] [K03] ok: the setup pill shows its screen
+[14:34:50] [K03] ok: and the setup pill is the active one
+[14:34:51] [K03] ok: the 2D segment sets the dimension
+[14:34:51] [K03] ok: setup 1100x720: the theme is light
+[14:34:52] [K03] ok: setup tree 1100x720: the light grab reads light (luma 243.6 >= 140)
+[14:34:52] [K03] ok: the run pill shows its screen
+[14:34:52] [K03] ok: and the run pill is the active one
+[14:34:53] [K03] ok: run 1100x720: the theme is light
+[14:34:53] [K03] ok: run finished 1100x720: the light grab reads light (luma 238.3 >= 140)
+[14:34:54] [K03] ok: the results pill shows its screen
+[14:34:54] [K03] ok: and the results pill is the active one
+[14:34:54] [K03] ok: results 1100x720: the theme is light
+[14:34:55] [K03] ok: results field 1100x720: the light grab reads light (luma 239.1 >= 140)
+[14:34:55] [K03] ok: the chain pill shows its screen
+[14:34:55] [K03] ok: and the chain pill is the active one
+[14:34:56] [K03] ok: chain 1100x720: the theme is light
+[14:34:56] [K03] ok: chain route123 1100x720: the light grab reads light (luma 242.6 >= 140)
+[14:34:57] [K03] ok: the setup pill shows its screen
+[14:34:57] [K03] ok: and the setup pill is the active one
+[14:34:58] [K03] ok: the 2D segment sets the dimension
+[14:34:59] [K03] ok: setup 1600x1000: the theme is light
+[14:34:59] [K03] ok: setup tree 1600x1000: the light grab reads light (luma 245.7 >= 140)
+[14:35:00] [K03] ok: the run pill shows its screen
+[14:35:00] [K03] ok: and the run pill is the active one
+[14:35:00] [K03] ok: run 1600x1000: the theme is light
+[14:35:01] [K03] ok: run finished 1600x1000: the light grab reads light (luma 215.7 >= 140)
+[14:35:01] [K03] ok: the results pill shows its screen
+[14:35:01] [K03] ok: and the results pill is the active one
+[14:35:02] [K03] ok: results 1600x1000: the theme is light
+[14:35:02] [K03] ok: results field 1600x1000: the light grab reads light (luma 206.7 >= 140)
+[14:35:03] [K03] ok: the chain pill shows its screen
+[14:35:03] [K03] ok: and the chain pill is the active one
+[14:35:03] [K03] ok: chain 1600x1000: the theme is light
+[14:35:04] [K03] ok: chain route123 1600x1000: the light grab reads light (luma 246.0 >= 140)
+[14:35:13] [K03] ok: the Dark-mode action gives the dark theme
+[14:35:14] [K03] contact sheet: contact_K03.png (8 shots)
+[14:35:14] [K03] --- end done in 33.5s (max gap 502 ms) ---
+[14:35:15] [K03] ok: the Dark-mode action gives the dark theme
+[14:35:15] [K03] ok: the setup pill shows its screen
+[14:35:15] [K03] ok: and the setup pill is the active one
+[14:35:16] [K03] ok: the 2D segment sets the dimension
+[14:35:19] [K03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x172f9dd3160, name="viewWindow") , parent:  QWidgetWindow(0x172f9dd34c0, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:35:19] [K03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x172f9dd1f60, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x172f9dd34c0, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:35:19] [K03] exit 0; pending: []

@@ -1,0 +1,15 @@
+﻿  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_wyley07t\runs\gui14tk\gauges\gauges_2d.txt  (425 rows x 2 gauges)
+modal []
+Tk summary rows [('G1 (1.063, 0.723) -> cell (1.088, 0.698) m', '280753.3', '0.068', '0.325', '1.432', '201557.15', '201557.17', 'no'), ('G3 (1.119, 0.698) -> cell (1.144, 0.698) m', '145909.0', '0.081', '1.004', '1.419', '119499.09', '119499.17', 'no')]
+shot tk_results_gauges_s1p0_1100x720.png (8, 31, 1100, 720)
+columns (width, minwidth) {'gauge': (288, 288), 'peak': (80, 72), 'arrival': (80, 72), 't_peak': (79, 72), 'pos_dur': (79, 72), 'pos_imp': (79, 72), 'net_imp': (79, 72), 'complete': (76, 72)} table width 844 font {'family': 'Segoe UI', 'size': 11, 'weight': 'normal', 'slant': 'roman', 'underline': 0, 'overstrike': 0}
+PASS [1.0] gauge cell text fits the gauge column
+      ((288, 288), 264)
+complete cell bbox (766, 30, 76, 26) table width 844
+PASS [1.0] right edge of the complete cell inside the table
+      ((766, 30, 76, 26), 844)
+PASS [1.0] every result column visible (bbox non-empty)
+      {'gauge': (2, 30, 288, 26), 'peak': (290, 30, 80, 26), 'arrival': (370, 30, 80, 26), 't_peak': (450, 30, 79, 26), 'pos_dur': (529, 30, 79, 26), 'pos_imp': (608, 30, 79, 26), 'net_imp': (687, 30, 79, 26), 'complete': (766, 30, 76, 26)}
+shot tk_results_gauges_s1p0_1600x1000.png (8, 31, 1600, 1000)
+PASS [1.0] no modal dialogs
+4 / 4

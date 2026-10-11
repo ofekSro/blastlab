@@ -1,0 +1,171 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[15:07:21] [boot] foreign WSL solvers at kickoff: []
+[15:07:35] [boot] App built in 5181 ms
+[15:07:35] [M02] === BEGIN M02 ===
+[15:07:37] [M02] DIALOG askyesno [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be d" -> False
+[15:07:37] [M02] SHOT 219_M02_run_dialog-askyesno_dark.png (printwindow, lum 38)
+[15:07:43] [M02] ok: an existing model asks before overwriting
+[15:07:43] [M02] ok: No: the folder is untouched and no run started
+[15:07:43] [M02] DIALOG askyesno [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be d" -> True
+[15:07:43] [M02] SHOT 220_M02_run_dialog-askyesno_dark.png (printwindow, lum 38)
+[15:07:44] [M02] ok: Yes: the old file is gone
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M02\gauges\gauges_1d.txt  (1356 rows x 2 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M02\profile.txt  (400 cells, t = 1.828 ms)
+[15:07:47] [M02] ok: and the run finished
+[15:07:48] [M02] SHOT 221_M02_run_overwritten_dark.png (printwindow, lum 40)
+[15:07:48] [M02] ok: the new run wrote its folder
+[15:07:48] [M02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_M02.png
+[15:07:48] [M02] === END M02: done (12s, max gap 5597 ms) ===
+[15:07:49] [M03] === BEGIN M03 ===
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M03\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M03\animation.gif
+[15:08:39] [M03] ok: the 2D run finished
+[15:08:40] [M03] SHOT 222_M03_run_finished_dark.png (printwindow, lum 42)
+[15:08:40] [M03] NOTE: M03 model folder: ['.blastlab-model', 'MODEL.json', 'animation.gif', 'fields', 'figures', 'gauges', 'manifest.json', 'report.html', 'run.log']
+[15:08:40] [M03] ok: the folder holds MODEL.json
+[15:08:40] [M03] ok: the folder holds run.log
+[15:08:40] [M03] ok: the folder holds manifest.json
+[15:08:40] [M03] ok: the folder holds report.html
+[15:08:40] [M03] ok: the folder holds gauges
+[15:08:40] [M03] ok: the folder holds figures
+[15:08:40] [M03] ok: the folder holds fields
+[15:08:40] [M03] ok: the manifest names the model and nothing failed
+[15:08:40] [M03] ok: run.log is not empty
+[15:08:40] [M03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_M03.png
+[15:08:40] [M03] === END M03: done (51s, max gap 644 ms) ===
+[15:08:41] [M04] === BEGIN M04 ===
+[15:08:43] [M04] SHOT 223_M04_chain_chain_two_stages_dark.png (printwindow, lum 40)
+[15:08:43] [M04] ok: the chain started
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\1d\gauges\gauges_1d.txt  (751 rows x 1 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\handoff_1d_to_2d.txt  (300 cells, t = 0.214 ms)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\2d\gauges\gauges_2d.txt  (8128 rows x 1 gauges)
+  Writing animation (128 frames, fixed (whole video) -101 .. 2.77e+03 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\2d\animation.mp4
+  2D field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\2d\profile_2d.npz  (100 x 100 cells, t = 58.987 ms)
+[15:09:51] [M04] ok: the chain finished
+[15:09:51] [M04] NOTE: M04 model folder: ['.blastlab-model', '1d', '2d', 'handoff_1d_to_2d.txt', 'manifest.json']
+[15:09:51] [M04] ok: 1d\, 2d\, the hand-off and the root manifest
+[15:09:52] [M04] SHOT 224_M04_run_chain_done_dark.png (printwindow, lum 50)
+[15:09:52] [M04] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_M04.png
+[15:09:52] [M04] === END M04: done (71s, max gap 11741 ms) ===
+[15:09:53] [V01] === BEGIN V01 ===
+[15:09:56] [V01] ok: the 1D card is shown in blastFoam mode
+[15:09:56] [V01] ok: Time by default: the steps box is disabled
+[15:09:56] [V01] SHOT 225_V01_setup_1d_off_dark.png (printwindow, lum 39)
+[15:09:57] [V01] ok: the first tick fills p, rho, U
+[15:09:57] [V01] NOTE: 1D VTK strip: blastFoam ready in WSL (Ubuntu) | VTK volumes: one write every 0.001 s, up to 294 writes (~0.5 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~10,000 cells at dx = 0.001 m
+[15:09:58] [V01] SHOT 226_V01_setup_1d_time_dark.png (printwindow, lum 40)
+[15:09:59] [V01] ok: Step disables the seconds box instead
+[15:10:00] [V01] SHOT 227_V01_setup_1d_step_dark.png (printwindow, lum 39)
+[15:10:01] [V01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V01.png
+[15:10:01] [V01] === END V01: done (8s, max gap 809 ms) ===
+[15:10:02] [V02] === BEGIN V02 ===
+[15:10:05] [V02] NOTE: 2D obstacles, none drawn: VTK obstacles: the case has no obstacles - nothing to sample | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[15:10:05] [V02] ok: no obstacles: the strip says "nothing to sample"
+[15:10:06] [V02] SHOT 228_V02_setup_2d_no_obstacles_dark.png (printwindow, lum 41)
+[15:10:07] [V02] ok: with an obstacle the refusal is gone
+[15:10:08] [V02] SHOT 229_V02_setup_2d_with_obstacle_dark.png (printwindow, lum 41)
+[15:10:10] [V02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V02.png
+[15:10:10] [V02] === END V02: done (8s, max gap 408 ms) ===
+[15:10:11] [V03] === BEGIN V03 ===
+[15:10:15] [V03] ok: three destination columns plus the Gauges column (Q2, OUT-4a)
+[15:10:15] [V03] SHOT 230_V03_setup_3d_off_dark.png (printwindow, lum 41)
+[15:10:17] [V03] ok: the first ticks fill the Viper defaults
+[15:10:17] [V03] ok: Step on the surfaces disables their seconds box only
+[15:10:18] [V03] ok: a plane `q, 1` is refused with a reason
+[15:10:19] [V03] SHOT 231_V03_setup_3d_plane_q1_refused_dark.png (printwindow, lum 41)
+[15:10:20] [V03] ok: a plane `y, 1.4` is accepted
+[15:10:20] [V03] NOTE: 3D VTK strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK obstacles: the case has no obstacles - only the sections are written | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~456,533 cells at dx = 0.0192663 m
+[15:10:21] [V03] SHOT 232_V03_setup_3d_step_plane_dark.png (printwindow, lum 41)
+[15:10:22] [V03] SHOT 233_V03_setup_3d_matrix_dark.png (printwindow, lum 40)
+[15:10:24] [V03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V03.png
+[15:10:24] [V03] === END V03: done (12s, max gap 1485 ms) ===
+[15:10:25] [V04] === BEGIN V04 ===
+[15:10:29] [V04] ok: native: the VTK card is hidden
+[15:10:30] [V04] SHOT 234_V04_setup_native_no_card_dark.png (printwindow, lum 37)
+[15:10:30] [V04] ok: the native case has no vtk_ key
+[15:10:32] [V04] ok: back to blastFoam: the card and the tick are back
+[15:10:33] [V04] SHOT 235_V04_setup_foam_again_dark.png (printwindow, lum 41)
+[15:10:35] [V04] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V04.png
+[15:10:35] [V04] === END V04: done (10s, max gap 310 ms) ===
+[15:10:36] [V05] === BEGIN V05 ===
+[15:10:38] [V05] ok: 3D: the box is on the card, unticked
+[15:10:39] [V05] SHOT 236_V05_setup_3d_keep_off_dark.png (printwindow, lum 41)
+[15:10:39] [V05] NOTE: 3D keep-all strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | Keep all fields in WSL: every write stays in WSL and the scratch is kept after the run; disk estimate ~4.2 GB (up to 60 writes at ~155 B per cell per write) | ~456,533 cells at dx = 0.0192663 m
+[15:10:39] [V05] ok: 3D: the strip explains the box (disk estimate)
+[15:10:39] [V05] ok: 3D: the case carries it
+[15:10:41] [V05] SHOT 237_V05_setup_3d_keep_on_dark.png (printwindow, lum 41)
+[15:10:42] [V05] ok: native: the box is hidden with the card, not in the case
+[15:10:45] [V05] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V05.png
+[15:10:45] [V05] === END V05: done (9s, max gap 313 ms) ===
+[15:10:47] [V06] === BEGIN V06 ===
+[15:10:49] [V06] ok: 1D: p/rho/U locked and ticked; live gauge cells ['T', 'dynamicP']
+[15:10:50] [V06] SHOT 238_V06_setup_1d_gauges_off_dark.png (printwindow, lum 39)
+[15:10:51] [V06] ok: 1D: the ticks reach vtk_gauges
+[15:10:51] [V06] ok: 1D: no VTK gauges message on the strip
+[15:10:52] [V06] SHOT 239_V06_setup_1d_gauges_on_dark.png (printwindow, lum 39)
+[15:10:53] [V06] ok: 1D native: no vtk_gauges key
+[15:10:56] [V06] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V06.png
+[15:10:56] [V06] === END V06: done (9s, max gap 228 ms) ===
+[15:10:57] [V07] === BEGIN V07 ===
+[15:11:00] [V07] ok: 2D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[15:11:01] [V07] SHOT 240_V07_setup_2d_gauges_off_dark.png (printwindow, lum 40)
+[15:11:01] [V07] ok: 2D: the ticks reach vtk_gauges
+[15:11:01] [V07] ok: 2D: no VTK gauges message on the strip
+[15:11:02] [V07] SHOT 241_V07_setup_2d_gauges_on_dark.png (printwindow, lum 41)
+[15:11:04] [V07] ok: 2D native: no vtk_gauges key
+[15:11:07] [V07] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V07.png
+[15:11:07] [V07] === END V07: done (9s, max gap 455 ms) ===
+[15:11:08] [V08] === BEGIN V08 ===
+[15:11:10] [V08] ok: 3D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[15:11:11] [V08] SHOT 242_V08_setup_3d_gauges_off_dark.png (printwindow, lum 40)
+[15:11:12] [V08] ok: 3D: the ticks reach vtk_gauges
+[15:11:12] [V08] ok: 3D: no VTK gauges message on the strip
+[15:11:13] [V08] SHOT 243_V08_setup_3d_gauges_on_dark.png (printwindow, lum 40)
+[15:11:15] [V08] ok: 3D native: no vtk_gauges key
+[15:11:18] [V08] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V08.png
+[15:11:18] [V08] === END V08: done (10s, max gap 460 ms) ===
+[15:11:19] [V09] === BEGIN V09 ===
+[15:11:22] [V09] ok: 2D: no decimation box (3D only)
+[15:11:23] [V09] ok: 3D: the box shows 1, the warning line is under it
+[15:11:24] [V09] ok: 3D: k = 2 reaches vtk_volumes.decimate
+[15:11:24] [V09] NOTE: 3D decimate strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | VTK volumes: decimated - one base-cell layer in 2 is kept on each axis (about 1/8 of the cells); decimated files are for viewing only; peaks may be missed | ~456,533 cells at dx = 0.0192663 m
+[15:11:26] [V09] SHOT 244_V09_setup_3d_decimate_2_dark.png (printwindow, lum 41)
+[15:11:26] [V09] ok: 3D: k = 1 writes no decimate key
+[15:11:28] [V09] ok: native: the box and its warning are hidden with the card
+[15:11:31] [V09] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_V09.png
+[15:11:31] [V09] === END V09: done (12s, max gap 390 ms) ===
+[15:11:32] [H01] === BEGIN H01 ===
+[15:11:36] [H01] SHOT 245_H01_setup_preview_dark_dark.png (printwindow, lum 40)
+[15:11:40] [H01] SHOT 246_H01_setup_preview_light_no_redraw_light.png (printwindow, lum 243)
+[15:11:42] [H01] SHOT 247_H01_setup_preview_light_redrawn_light.png (printwindow, lum 242)
+[15:11:46] [H01] SHOT 248_H01_setup_preview_dark_no_redraw_dark.png (printwindow, lum 40)
+[15:11:47] [H01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_H01.png
+[15:11:47] [H01] === END H01: done (15s, max gap 157 ms) ===
+[15:11:48] [H02] === BEGIN H02 ===
+[15:11:50] [H02] DIALOG askyesno [Model folder] "M04 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be d" -> True
+[15:11:50] [H02] SHOT 249_H02_run_dialog-askyesno_dark.png (printwindow, lum 50)
+[15:12:00] [H02] SHOT 250_H02_run_live_light_light.png (printwindow, lum 217)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\M04\animation.gif
+[15:12:32] [H02] SHOT 251_H02_run_finished_light_light.png (printwindow, lum 219)
+[15:12:37] [H02] SHOT 252_H02_run_finished_dark_again_dark.png (printwindow, lum 43)
+[15:12:38] [H02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_H02.png
+[15:12:38] [H02] === END H02: done (49s, max gap 554 ms) ===
+[15:12:39] [H03] === BEGIN H03 ===
+[15:12:49] [H03] SHOT 253_H03_results_2d_fields_light.png (printwindow, lum 211)
+[15:12:50] [H03] SHOT 254_H03_results_2d_gauges_light.png (printwindow, lum 242)
+[15:12:52] [H03] SHOT 255_H03_results_2d_animation_light.png (printwindow, lum 181)
+[15:12:54] [H03] SHOT 256_H03_results_3d_fields_light.png (printwindow, lum 218)
+[15:12:55] [H03] SHOT 257_H03_results_3d_gauges_light.png (printwindow, lum 242)
+[15:12:56] [H03] SHOT 258_H03_results_3d_animation_light.png (printwindow, lum 206)
+[15:12:59] [H03] SHOT 259_H03_results_3d_viewer_light.png (printwindow, lum 165)
+[15:13:02] [H03] SHOT 260_H03_results_browser_light_light.png (printwindow, lum 230)
+[15:13:03] [H03] SHOT 261_H03_chain_chain_light_light.png (printwindow, lum 243)
+[15:13:04] [H03] SHOT 262_H03_run_run_light_light.png (printwindow, lum 219)
+[15:13:08] [H03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_H03.png
+[15:13:08] [H03] === END H03: done (29s, max gap 415 ms) ===
+[15:13:10] [H03] budget: 191s left < 330s for I01 - exiting 75
+[15:13:15] [H03] exit 75; pending: ['I01', 'I02', 'I03', 'I04', 'I05', 'I06']

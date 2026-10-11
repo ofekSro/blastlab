@@ -1,0 +1,55 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[15:00:03] [boot] foreign WSL solvers at kickoff: []
+[15:00:11] [boot] App built in 4896 ms
+[15:00:11] [G02] === BEGIN G02 ===
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\1d\gauges\gauges_1d.txt  (751 rows x 1 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\handoff_1d_to_2d.txt  (300 cells, t = 0.214 ms)
+[15:00:12] [G02] ok: Run chain disabled while the chain runs
+[15:00:13] [G02] SHOT 206_G02_chain_chain_running_dark.png (printwindow, lum 40)
+[15:00:18] [G02] SHOT 207_G02_run_stage1_dark.png (printwindow, lum 44)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\2d\gauges\gauges_2d.txt  (8128 rows x 1 gauges)
+  Writing animation (128 frames, fixed (whole video) -101 .. 2.77e+03 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\2d\animation.mp4
+  2D field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\handoff_2d_to_3d.npz  (100 x 100 cells, t = 58.987 ms)
+[15:02:18] [G02] wait_log TIMEOUT for '=== Stage 2D ==='
+[15:02:21] [G02] SHOT 208_G02_run_stage2_dark.png (printwindow, lum 49)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\3d\gauges\gauges_3d.txt  (4458 rows x 1 gauges)
+  Writing animation (141 frames, fixed (whole video) -22.5 .. 22.2 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_CHAIN\3d\animation.mp4
+[15:06:21] [G02] wait_log TIMEOUT for '=== Stage 3D ==='
+[15:06:25] [G02] SHOT 209_G02_run_stage3_dark.png (printwindow, lum 48)
+[15:06:27] [G02] SHOT 210_G02_run_stage3_3d_dark.png (printwindow, lum 40)
+[15:06:28] [G02] NOTE: chain wall 377 s
+[15:06:29] [G02] SHOT 211_G02_run_chain_done_dark.png (printwindow, lum 48)
+[15:06:29] [G02] ok: Run chain re-enabled after the chain
+[15:06:29] [G02] NOTE: results after chain: ['QA_CHAIN - 1D', 'QA_CHAIN - 2D', 'QA_CHAIN - 3D']
+[15:06:29] [G02] NOTE: model folder: ['.blastlab-model', '1d', '2d', '3d', 'handoff_1d_to_2d.txt', 'handoff_2d_to_3d.npz', 'manifest.json']
+[15:06:29] [G02] ok: the model folder has the hand-offs and a MODEL.json per stage
+[15:06:30] [G02] SHOT 212_G02_results_results_combo_dark.png (printwindow, lum 46)
+[15:06:30] [G02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_G02.png
+[15:06:30] [G02] === END G02: done (380s, max gap 2702 ms) ===
+[15:06:32] [G03] === BEGIN G03 ===
+[15:06:35] [G03] SHOT 213_G03_chain_chain_while_running_dark.png (printwindow, lum 40)
+[15:06:35] [G03] ok: Run chain disabled during a Run-tab run
+[15:06:35] [G03] click on DISABLED button Run chain (disabled)
+[15:06:37] [G03] DIALOG showinfo [Run] 'A run is already in progress.' -> 'ok'
+[15:06:37] [G03] SHOT 214_G03_chain_dialog-showinfo_dark.png (printwindow, lum 40)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_G03\gauges\gauges_2d.txt  (204 rows x 1 gauges)
+  Writing animation (103 frames, fixed (whole video) 0 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA_G03\animation.gif
+[15:07:05] [G03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_G03.png
+[15:07:05] [G03] === END G03: done (33s, max gap 667 ms) ===
+[15:07:06] [M01] === BEGIN M01 ===
+[15:07:09] [M01] SHOT 215_M01_run_empty_runs_folder_dark.png (printwindow, lum 38)
+[15:07:09] [M01] DIALOG showerror [Run] 'Runs folder is empty' -> 'ok'
+[15:07:09] [M01] SHOT 216_M01_run_dialog-showerror_dark.png (printwindow, lum 38)
+[15:07:10] [M01] ok: an empty Runs folder is refused, naming the box
+[15:07:10] [M01] DIALOG showerror [Run] 'Model name: a folder name cannot contain :' -> 'ok'
+[15:07:10] [M01] SHOT 217_M01_run_dialog-showerror_dark.png (printwindow, lum 39)
+[15:07:11] [M01] ok: a bad Model name is refused, naming the box
+[15:07:11] [M01] ok: no run started and no folder was created
+[15:07:11] [M01] SHOT 218_M01_run_refused_model_name_dark.png (printwindow, lum 39)
+[15:07:12] [M01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_M01.png
+[15:07:12] [M01] === END M01: done (5s, max gap 233 ms) ===
+[15:07:13] [M01] budget: 110s left < 120s for M02 - exiting 75
+[15:07:20] [M01] exit 75; pending: ['M02', 'M03', 'M04', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06']

@@ -1,0 +1,3 @@
+2026-10-11 13:55:14.851 ( 150.560s) [63E4ED02A021FFB4]     vtkLookupTable.cxx:160    ERR| vtkLookupTable (00000245070FAD80): Bad table range for log scale: [-5621.37, 254182]
+WARNING:root:ERROR: In vtkLookupTable.cxx, line 160
+vtkLookupTable (00000245070FAD80): Bad table range for log scale: [-5621.37, 254182]

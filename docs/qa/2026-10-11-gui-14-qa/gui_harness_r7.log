@@ -1,0 +1,53 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[15:20:55] [boot] foreign WSL solvers at kickoff: []
+[15:21:03] [boot] App built in 4916 ms
+[15:21:03] [I03] === BEGIN I03 ===
+[15:21:04] [I03] DIALOG showerror [Open case] 'This file is not valid JSON (line 1, column 2).' -> 'ok'
+[15:21:04] [I03] SHOT 268_I03_setup_dialog-showerror_dark.png (printwindow, lum 39)
+[15:21:05] [I03] NOTE: garbage.json: form Lx still '3.3'
+[15:21:05] [I03] DIALOG showerror [Open case] 'Not a blastlab case file' -> 'ok'
+[15:21:06] [I03] SHOT 269_I03_setup_dialog-showerror_dark.png (printwindow, lum 39)
+[15:21:07] [I03] NOTE: wrongschema.json: form Lx still '3.3'
+[15:21:07] [I03] DIALOG showerror [Open case] 'Not a blastlab case file: unsupported or missing field 5.' -> 'ok'
+[15:21:07] [I03] SHOT 270_I03_setup_dialog-showerror_dark.png (printwindow, lum 39)
+[15:21:08] [I03] NOTE: dim5.json: form Lx still '3.3'
+[15:21:08] [I03] DIALOG showerror [Open case] 'This file is not valid JSON (line 1, column 1).' -> 'ok'
+[15:21:08] [I03] SHOT 271_I03_setup_dialog-showerror_dark.png (printwindow, lum 39)
+[15:21:09] [I03] NOTE: empty.json: form Lx still '3.3'
+[15:21:09] [I03] DIALOG showerror [Open case] 'File not found: C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\cwd\\missing.json' -> 'ok'
+[15:21:09] [I03] SHOT 272_I03_setup_dialog-showerror_dark.png (printwindow, lum 39)
+[15:21:10] [I03] NOTE: missing.json: form Lx still '3.3'
+[15:21:10] [I03] SHOT 273_I03_setup_after_bad_json_dark.png (printwindow, lum 39)
+[15:21:11] [I03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I03.png
+[15:21:11] [I03] === END I03: done (8s, max gap 1057 ms) ===
+[15:21:12] [I04] === BEGIN I04 ===
+[15:21:14] [I04] click on DISABLED button Run
+[15:21:14] [I04] click on DISABLED button Initialise Model
+[15:21:16] [I04] NOTE: 2.25 M-cell 2D case strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it. | Large grid: ~2,250,000 cells - expect a long run and ~1.6 GB of RAM | ~2,250,000 cells at dx = 0.004 m
+[15:21:19] [I04] NOTE: warning-level case: started=True, dialogs=0 (no confirmation prompt for a large run)
+[15:21:19] [I04] SHOT 274_I04_run_large_run_started_dark.png (printwindow, lum 34)
+[15:22:19] [I04] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I04.png
+[15:22:19] [I04] === END I04: done (67s, max gap 2007 ms) ===
+[15:22:20] [I05] === BEGIN I05 ===
+[15:22:22] [I05] NOTE: charge='1e400': 'charge' must be a finite number: '1e400'
+[15:22:23] [I05] SHOT 275_I05_setup_charge_1e400_dark.png (printwindow, lum 38)
+[15:22:24] [I05] NOTE: charge='nan': 'charge' must be a finite number: 'nan'
+[15:22:24] [I05] SHOT 276_I05_setup_charge_nan_dark.png (printwindow, lum 38)
+[15:22:25] [I05] NOTE: charge='inf': 'charge' must be a finite number: 'inf'
+[15:22:26] [I05] SHOT 277_I05_setup_charge_inf_dark.png (printwindow, lum 38)
+[15:22:26] [I05] NOTE: charge=' 1 ': No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[15:22:27] [I05] SHOT 278_I05_setup_charge_1_dark.png (printwindow, lum 39)
+[15:22:28] [I05] NOTE: charge='1,5': 'charge' is not a number: '1,5'
+[15:22:28] [I05] SHOT 279_I05_setup_charge_1comma5_dark.png (printwindow, lum 38)
+[15:22:29] [I05] NOTE: charge='-0': Charge must be > 0 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.
+[15:22:30] [I05] SHOT 280_I05_setup_charge_-0_dark.png (printwindow, lum 39)
+[15:22:31] [I05] NOTE: n_snapshots=2.7: 'snapshots' must be a whole number: '2.7' (rejected: ValueError: 'snapshots' must be a whole number: '2.7')
+[15:22:32] [I05] NOTE: cell=1e-9: ~1.6e+19 cells exceeds the 2D cap of 8,000,000 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | ~1.6e+19 cells at dx = 1e-09 m
+[15:22:33] [I05] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I05.png
+[15:22:33] [I05] === END I05: done (13s, max gap 114 ms) ===
+[15:22:34] [I06] === BEGIN I06 ===
+[15:22:44] [I06] SHOT 281_I06_results_3d_1100x720_dark.png (printwindow, lum 39)
+[15:22:46] [I06] SHOT 282_I06_results_3d_900x600_dark.png (printwindow, lum 39)
+[15:22:49] [I06] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I06.png
+[15:22:49] [I06] === END I06: done (15s, max gap 2735 ms) ===
+[15:22:58] [I06] exit 0; pending: []

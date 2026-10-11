@@ -1,0 +1,53 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[13:57:21] [boot] window up: 1280x840 (built 3943 ms, shown 1883 ms)
+[13:57:21] [F02] --- begin ---
+[13:57:22] [F02] ok: the setup pill shows its screen
+[13:57:22] [F02] ok: and the setup pill is the active one
+[13:57:23] [F02] NOTE: foam2d strip: Checking WSL blastFoam availability... | Cell size will be refined to 0.01235 m (8 cells across the charge radius) | Charge cells: 208 at 0.012352 m -> ~1.03 of the 50 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Cell caps from hardware measured on this machine in an earlier session (63 GB VM); re-checking in the background. | Parallel run: 1 rank: 25,921 cells is below the 200,000-cell parallel floor | ~25,921 cells at dx = 0.0123517 m
+[13:57:24] [F02] ok: the run pill shows its screen
+[13:57:24] [F02] ok: and the run pill is the active one
+[13:57:42] [F02] NOTE: foam2d: progress at the first write = 0.253 (19 s after Run)
+[13:57:42] [F02] ok: the progress bar has moved by the first write (B7)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (429 rows x 1 gauges)
+  Writing animation (47 frames, fixed (whole video) 0 .. 1.05e+07 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.mp4
+[13:58:47] [F02] DIALOG notify_desktop [BlastLab] 'QA finished in 1 min 23 s. Highest peak: G1, 18,304 kPa at 0.09 ms.' -> 'ok'
+[13:58:49] [F02] ok: foam2d finished
+[13:58:49] [F02] NOTE: foam2d wall 85 s
+[13:58:50] [F02] NOTE: own runs after foam2d: 
+[13:58:50] [F02] ok: the results pill shows its screen
+[13:58:50] [F02] ok: and the results pill is the active one
+[13:58:50] [F02] NOTE: foam 2D fields: ['overpressure', 'density', 'speed', 'peak overpressure', 'net ovp impulse']; peak_source=foam-fo
+[13:58:58] [F02] NOTE: VTK on a fresh foam result: scratch_released=True, enabled=False
+[13:58:58] [F02] ok: a fresh foam result (Keep all fields off): VTK disabled with the scratch-released reason
+[13:58:59] [F02] ok: the setup pill shows its screen
+[13:58:59] [F02] ok: and the setup pill is the active one
+[13:59:00] [F02] NOTE: foam2d_keepall strip: blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01235 m (8 cells across the charge radius) | Charge cells: 208 at 0.012352 m -> ~1.03 of the 50 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 25,921 cells is below the 200,000-cell parallel floor | Keep all fields in WSL: every write stays in WSL and the scratch is kept after the run; disk estimate ~0.2 GB (up to 60 writes at ~155 B per cell per write) | ~25,921 cells at dx = 0.0123517 m
+[13:59:01] [F02] ok: the run pill shows its screen
+[13:59:01] [F02] ok: and the run pill is the active one
+[13:59:01] [F02] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be del" -> True
+[13:59:19] [F02] NOTE: foam2d_keepall: progress at the first write = 0.329 (19 s after Run)
+[13:59:19] [F02] ok: the progress bar has moved by the first write (B7)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (430 rows x 1 gauges)
+  Writing animation (47 frames, fixed (whole video) 0 .. 1.05e+07 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.mp4
+[14:00:24] [F02] DIALOG show_error [Model folder] 'The blastFoam run finished, but its WSL scratch was kept:\nKeep all fields in WSL was ticked\n\n/root/blastlab_runs/20261011-135901_2d_p52196-01\n\nThe model folder ' -> 'ok'
+[14:00:24] [F02] DIALOG notify_desktop [BlastLab] 'QA finished in 1 min 23 s. Highest peak: G1, 18,304 kPa at 0.09 ms.' -> 'ok'
+[14:00:26] [F02] ok: foam2d_keepall finished
+[14:00:26] [F02] NOTE: foam2d_keepall wall 85 s
+[14:00:26] [F02] NOTE: own runs after foam2d_keepall: 20261011-135901_2d_p52196-01 alive=False
+[14:00:27] [F02] ok: the results pill shows its screen
+[14:00:27] [F02] ok: and the results pill is the active one
+[14:00:27] [F02] ok: Keep all fields on: the VTK export is offered
+[14:00:31] [F02] DIALOG os.startfile [] '\\\\wsl.localhost\\Ubuntu\\root\\blastlab_runs\\20261011-135901_2d_p52196-01\\VTK' -> 'suppressed'
+[14:00:31] [F02] NOTE: VTK export log:   [run finished] /   [vtk] foamToVTK -useTimeName -poly in /root/blastlab_runs/20261011-135901_2d_p52196-01 (48 time dirs) ... /   [vtk] wrote 48 file(s) to \\wsl.localhost\Ubuntu\root\blastlab_runs\20261011-135901_2d_p52196-01\VTK / VTK export done: \\wsl.localhost\Ubuntu\root\blastlab_runs\20261011-135901_2d_p52196-01\VTK
+[14:00:31] [F02] ok: and it finishes
+[14:00:33] [F02] contact sheet: contact_F02.png (23 shots)
+[14:00:33] [F02] --- end done in 190.3s (max gap 396 ms) ---
+[14:00:33] [F02] ok: the Dark-mode action gives the dark theme
+[14:00:34] [F02] ok: the setup pill shows its screen
+[14:00:34] [F02] ok: and the setup pill is the active one
+[14:00:35] [F02] ok: the 2D segment sets the dimension
+[14:00:35] [F02] ok: the chip's native action switches the solver
+[14:00:36] [F02] budget: 338s left < 420s for F03 - exiting 75
+[14:00:36] [F02] exit 75; pending: ['F03', 'F04', 'F05', 'F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

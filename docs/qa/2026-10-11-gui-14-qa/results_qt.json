@@ -1,0 +1,107 @@
+[
+ {
+  "name": "Chain default: stage 1 radius 1.5 m",
+  "ok": true,
+  "detail": "1.5"
+ },
+ {
+  "name": "Chain default: stage 1 holds no gauge at all (none beyond 1.5 m)",
+  "ok": true,
+  "detail": "({1: [], 2: [], 3: []}, [])"
+ },
+ {
+  "name": "Chain default: card 1 and card 2 clean",
+  "ok": true,
+  "detail": "['\u25cf case OK', '\u25cf case OK', '\u25cf 1 warning']"
+ },
+ {
+  "name": "Chain default: card 3 state (info)",
+  "ok": true,
+  "detail": "\u25cf 1 warning [('warn', \"The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.\")]"
+ },
+ {
+  "name": "Chain stage 2: Gauges node warn with a wall and an outside gauge",
+  "ok": true,
+  "detail": "('warn', [('error', 'must be axisymmetric to feed the 3D stage.'), ('error', '1D profile remap is only valid in axisymmetric mode'), ('warn', \"No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it.\"), ('warn', 'G2 (1.40, 0.30) m inside Wall 1 - will be dropped'), ('warn', 'G3 (3.00, 0.50) m outside the domain - will be dropped'), ('warn', \"The 1D stage hands off at 1.5 m; that already reaches this stage's boundary or a wall, so the remap is not spherical there (the run warns too). Set stage 1's radius below 0.8 m to keep it inside.\")])"
+ },
+ {
+  "name": "Chain stage 2: Gauges node back to ok when moved inside",
+  "ok": true,
+  "detail": "ok"
+ },
+ {
+  "name": "Setup Where: outside gauges read \"outside the domain (dropped)\"",
+  "ok": true,
+  "detail": "['', 'inside Wall 1', 'outside the domain (dropped)', '']"
+ },
+ {
+  "name": "Setup Where: x == Lx gauge (2.4, 0.8) not outside",
+  "ok": true,
+  "detail": ""
+ },
+ {
+  "name": "Setup Where: gauge in the wall reads inside Wall 1 (no suffix, warn-coloured)",
+  "ok": true,
+  "detail": "inside Wall 1"
+ },
+ {
+  "name": "Setup table: dropped G<n> cells differ in colour from kept ones",
+  "ok": true,
+  "detail": "[('G1', '#4cc9f0', '#a8a39b'), ('G2', '#f5d061', '#f5d061'), ('G3', '#f5d061', '#f5d061'), ('G4', '#4cc9f0', '#a8a39b')]"
+ },
+ {
+  "name": "Setup: Gauges node warn",
+  "ok": true,
+  "detail": "warn"
+ },
+ {
+  "name": "run finished",
+  "ok": true,
+  "detail": "6.3s"
+ },
+ {
+  "name": "Native log: G2 inside an obstacle line",
+  "ok": true,
+  "detail": "['  [warn] G2 (1.12, 0.73) m inside an obstacle - dropped', '  [warn] G3 (3.00, 0.50) m outside the domain - dropped']"
+ },
+ {
+  "name": "Native log: G3 outside the domain line",
+  "ok": true,
+  "detail": "['  [warn] G2 (1.12, 0.73) m inside an obstacle - dropped', '  [warn] G3 (3.00, 0.50) m outside the domain - dropped']"
+ },
+ {
+  "name": "Run card header (planar 2D, R mode): no selected",
+  "ok": true,
+  "detail": "R 0.77 m \u00b7 Wall 1"
+ },
+ {
+  "name": "Run card: header and peak do not overlap (1100x720)",
+  "ok": true,
+  "detail": "(PySide6.QtCore.QRect(37, 14, 132, 15), PySide6.QtCore.QRect(177, 14, 112, 15))"
+ },
+ {
+  "name": "Run card (R mode) forced narrow: elided at the END, tooltip full",
+  "ok": true,
+  "detail": "('R 0.77 m \u00b7 \u2026', 'R 0.77 m \u00b7 Wall 1')"
+ },
+ {
+  "name": "Results drop line [dark] visible, objectName gaugedrop, weight>=600",
+  "ok": true,
+  "detail": "('gaugedrop', 600, '#f5d061')"
+ },
+ {
+  "name": "Results drop line [light] visible, objectName gaugedrop, weight>=600",
+  "ok": true,
+  "detail": "('gaugedrop', 600, '#926800')"
+ },
+ {
+  "name": "Chain stage 3: Gauges node warn with one outside gauge",
+  "ok": true,
+  "detail": "warn"
+ },
+ {
+  "name": "no modal dialogs",
+  "ok": true,
+  "detail": "[]"
+ }
+]

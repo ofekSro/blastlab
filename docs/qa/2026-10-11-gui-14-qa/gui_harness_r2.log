@@ -1,0 +1,35 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[14:48:07] [boot] foreign WSL solvers at kickoff: []
+[14:48:15] [boot] App built in 4883 ms
+[14:48:15] [D03] === BEGIN D03 ===
+[14:48:20] [D03] SHOT 099_D03_run_initialised_dark.png (printwindow, lum 38)
+[14:48:20] [D03] ok: G1 hint present after Initialise Model
+[14:48:20] [D03] NOTE: after init: Run=disabled Exec1=normal progress=0.000 step chip=—
+[14:48:23] [D03] SHOT 100_D03_run_exec10_dark.png (printwindow, lum 38)
+[14:48:23] [D03] NOTE: step chip after Exec 10: 10
+[14:48:26] [D03] SHOT 101_D03_run_interrupted_dark.png (printwindow, lum 38)
+[14:48:26] [D03] NOTE: paused state is indicated only by the "[interrupted]" log line; chips/progress/buttons do not change
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[14:49:13] [D03] SHOT 102_D03_run_finished_dark.png (printwindow, lum 42)
+[14:49:13] [D03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_D03.png
+[14:49:13] [D03] === END D03: done (58s, max gap 829 ms) ===
+[14:49:15] [D04] === BEGIN D04 ===
+[14:49:17] [D04] SHOT 103_D04_setup_3d_form_dark.png (printwindow, lum 39)
+[14:49:17] [D04] DIALOG askyesno [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be de" -> True
+[14:49:18] [D04] SHOT 104_D04_run_dialog-askyesno_dark.png (printwindow, lum 42)
+[14:49:19] [D04] ok: 3D View button enabled at run start
+[14:49:22] [D04] SHOT 105_D04_run_live_slice_dark.png (printwindow, lum 37)
+[14:49:26] [D04] SHOT 106_D04_run_live_3d_dark.png (printwindow, lum 40)
+[14:54:26] [D04] run_wait TIMEOUT after 300s - stopping
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_3d.txt  (2137 rows x 2 gauges)
+  Writing animation (135 frames, fixed (whole video) -101 .. 2.77e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[14:55:10] [D04] SHOT 107_D04_run_finished_slice_dark.png (printwindow, lum 44)
+[14:55:12] [D04] SHOT 108_D04_run_finished_3d_dark.png (printwindow, lum 40)
+[14:55:12] [D04] NOTE: after run: follow=False frames in store=267 3D View btn=disabled
+[14:55:13] [D04] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_D04.png
+[14:55:13] [D04] === END D04: done (358s, max gap 1493 ms) ===
+[14:55:14] [D04] budget: 113s left < 200s for D05 - exiting 75
+[14:55:21] [D04] exit 75; pending: ['D05', 'D06', 'E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08', 'E09', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06']

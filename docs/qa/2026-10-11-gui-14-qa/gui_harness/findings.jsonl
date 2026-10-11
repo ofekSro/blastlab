@@ -1,0 +1,1 @@
+{"sev": "S2", "cat": "check", "text": "close during a native run returned in 15.7 s", "tab": "run", "mode": "dark", "shots": ["267_I02_run_dialog-askyesno_dark.png"], "evidence": null, "scenario": "I02", "t": 1791721254.0229926}

@@ -1,0 +1,383 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:11:59] [boot] window up: 1280x840 (built 3692 ms, shown 1854 ms)
+[14:11:59] [G01] --- begin ---
+[14:12:00] [G01] ok: the chain pill shows its screen
+[14:12:00] [G01] ok: and the chain pill is the active one
+[14:12:01] [G01] ok: the route control offers exactly the four routes
+[14:12:01] [G01] ok: an empty route is refused, the route unchanged
+[14:12:02] [G01] ok: a planar stage 2 with a 3D stage after it is refused, with a reason
+[14:12:02] [G01] NOTE: a planar stage 2 with a 3D stage after it: ['Stage 2 (2D): must be axisymmetric to feed the 3D stage.']
+[14:12:03] [G01] ok: a stage-2 field that does not parse is refused, with a reason
+[14:12:03] [G01] NOTE: a stage-2 field that does not parse: ["Stage 2 (2D): 'Lx' is not a number: 'abc'"]
+[14:12:03] [G01] ok: and the refusal names the stage
+[14:12:04] [G01] ok: a charge outside stage 2 is refused, with a reason
+[14:12:04] [G01] NOTE: a charge outside stage 2: ['Stage 2 (2D): Charge centre is outside the domain']
+[14:12:05] [G01] ok: an empty Model name on the Run tab is refused, with a reason
+[14:12:05] [G01] NOTE: an empty Model name on the Run tab: ['Model name: the name is empty', 'The Runs folder and Model boxes are on the Run tab.']
+[14:12:05] [G01] ok: and the refusal names the Model box
+[14:12:05] [G01] NOTE: stage switcher after the refusals: stage 2 (a refusal naming stage 2 should have brought it forward)
+[14:12:05] [G01] ok: no model folder was created while every run was refused
+[14:12:05] [G01] ok: Run chain is still enabled after refused starts
+[14:12:05] [G01] contact sheet: contact_G01.png (2 shots)
+[14:12:05] [G01] --- end done in 5.8s (max gap 174 ms) ---
+[14:12:06] [G01] ok: the Dark-mode action gives the dark theme
+[14:12:07] [G01] ok: the setup pill shows its screen
+[14:12:07] [G01] ok: and the setup pill is the active one
+[14:12:07] [G01] ok: the 2D segment sets the dimension
+[14:12:08] [G02] --- begin ---
+[14:12:08] [G02] ok: the chain pill shows its screen
+[14:12:08] [G02] ok: and the chain pill is the active one
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA_CHAIN\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+[14:12:09] [G02] ok: the chain started
+[14:12:09] [G02] ok: Run chain is disabled while the chain runs
+[14:12:10] [G02] ok: the chain pill shows its screen
+[14:12:10] [G02] ok: and the chain pill is the active one
+[14:12:11] [G02] ok: the run pill shows its screen
+[14:12:11] [G02] ok: and the run pill is the active one
+[14:12:11] [G02] ok: stage 2 started
+  2D field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA_CHAIN\handoff_2d_to_3d.npz  (33 x 53 cells, t = 47.440 ms)
+[14:12:17] [G02] ok: stage 3 started
+[14:12:27] [G02] DIALOG notify_desktop [BlastLab] 'QA_CHAIN finished in 18 s.' -> 'ok'
+[14:12:30] [G02] ok: the chain finished
+[14:12:30] [G02] NOTE: chain wall 21 s
+[14:12:30] [G02] ok: Run chain is enabled again afterwards
+[14:12:30] [G02] NOTE: results after the chain: ['QA_CHAIN']
+[14:12:30] [G02] NOTE: model folder: ['.blastlab-model', '1d', '2d', '3d', 'handoff_1d_to_2d.txt', 'handoff_2d_to_3d.npz', 'manifest.json']
+[14:12:30] [G02] ok: the model folder holds a stage folder with its MODEL.json per stage
+[14:12:30] [G02] ok: and the hand-offs and the root manifest at the model root
+[14:12:30] [G02] ok: the results pill shows its screen
+[14:12:30] [G02] ok: and the results pill is the active one
+[14:12:31] [G02] ok: the chain is one Results entry with QA_CHAIN - 1D … 3D stages
+[14:12:33] [G02] ok: select_result('QA_CHAIN - 3D') shows that stage (stage 3, 'QA_CHAIN - 3D')
+[14:12:35] [G02] ok: select_result('QA_CHAIN - 1D') shows that stage (stage 1, 'QA_CHAIN - 1D')
+[14:12:37] [G02] contact sheet: contact_G02.png (10 shots)
+[14:12:37] [G02] --- end done in 29.3s (max gap 1012 ms) ---
+[14:12:38] [G02] ok: the Dark-mode action gives the dark theme
+[14:12:39] [G02] ok: the setup pill shows its screen
+[14:12:39] [G02] ok: and the setup pill is the active one
+[14:12:40] [G02] ok: the 2D segment sets the dimension
+[14:12:40] [G03] --- begin ---
+[14:12:40] [G03] ok: the setup pill shows its screen
+[14:12:40] [G03] ok: and the setup pill is the active one
+[14:12:42] [G03] ok: the run pill shows its screen
+[14:12:42] [G03] ok: and the run pill is the active one
+[14:12:42] [G03] ok: the run started
+[14:12:43] [G03] ok: the chain pill shows its screen
+[14:12:43] [G03] ok: and the chain pill is the active one
+[14:12:44] [G03] ok: Run chain is disabled during a Run-tab run
+[14:12:44] [G03] ok: and the callback behind it refuses too, so the guard is not just a greyed button
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA_G03\gauges\gauges_2d.txt  (200 rows x 1 gauges)
+  Writing animation (101 frames, fixed (whole video) 0 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA_G03\animation.gif
+[14:13:11] [G03] ok: the Run-tab run still stops
+[14:13:11] [G03] contact sheet: contact_G03.png (1 shots)
+[14:13:11] [G03] --- end done in 31.3s (max gap 214 ms) ---
+[14:13:12] [G03] ok: the Dark-mode action gives the dark theme
+[14:13:13] [G03] ok: the setup pill shows its screen
+[14:13:13] [G03] ok: and the setup pill is the active one
+[14:13:13] [G03] ok: the 2D segment sets the dimension
+[14:13:14] [M01] --- begin ---
+[14:13:14] [M01] ok: the setup pill shows its screen
+[14:13:14] [M01] ok: and the setup pill is the active one
+[14:13:15] [M01] ok: the run pill shows its screen
+[14:13:15] [M01] ok: and the run pill is the active one
+[14:13:16] [M01] DIALOG show_error [Run] 'Runs folder is empty' -> 'ok'
+[14:13:17] [M01] ok: an empty Runs folder is refused, naming the box
+[14:13:17] [M01] ok: and no run started
+[14:13:17] [M01] DIALOG show_error [Run] 'Model name: a folder name cannot contain :' -> 'ok'
+[14:13:17] [M01] ok: a bad Model name is refused, naming the box
+[14:13:17] [M01] ok: no run started and no folder was created
+[14:13:18] [M01] contact sheet: contact_M01.png (4 shots)
+[14:13:18] [M01] --- end done in 4.4s (max gap 148 ms) ---
+[14:13:19] [M01] ok: the Dark-mode action gives the dark theme
+[14:13:20] [M01] ok: the setup pill shows its screen
+[14:13:20] [M01] ok: and the setup pill is the active one
+[14:13:20] [M01] ok: the 2D segment sets the dimension
+[14:13:20] [M02] --- begin ---
+[14:13:21] [M02] ok: the setup pill shows its screen
+[14:13:21] [M02] ok: and the setup pill is the active one
+[14:13:22] [M02] ok: the run pill shows its screen
+[14:13:22] [M02] ok: and the run pill is the active one
+[14:13:22] [M02] DIALOG ask_yes_no [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be de" -> False
+[14:13:23] [M02] ok: an existing model asks before overwriting
+[14:13:23] [M02] ok: No: the folder is untouched and no run started
+[14:13:23] [M02] DIALOG ask_yes_no [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be de" -> True
+[14:13:23] [M02] ok: Yes: the old file is gone
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M02\gauges\gauges_1d.txt  (1356 rows x 2 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M02\profile.txt  (400 cells, t = 1.828 ms)
+[14:13:25] [M02] DIALOG notify_desktop [BlastLab] 'M02 finished in 3 s. Highest peak: G1, 3,413 kPa at 0.16 ms.' -> 'ok'
+[14:13:27] [M02] ok: and the run finished
+[14:13:27] [M02] ok: the new run wrote its folder
+[14:13:27] [M02] contact sheet: contact_M02.png (4 shots)
+[14:13:27] [M02] --- end done in 6.5s (max gap 421 ms) ---
+[14:13:28] [M02] ok: the Dark-mode action gives the dark theme
+[14:13:29] [M02] ok: the setup pill shows its screen
+[14:13:29] [M02] ok: and the setup pill is the active one
+[14:13:29] [M02] ok: the 2D segment sets the dimension
+[14:13:30] [M03] --- begin ---
+[14:13:30] [M03] ok: the setup pill shows its screen
+[14:13:30] [M03] ok: and the setup pill is the active one
+[14:13:31] [M03] ok: the run pill shows its screen
+[14:13:31] [M03] ok: and the run pill is the active one
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M03\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M03\animation.gif
+[14:14:01] [M03] DIALOG notify_desktop [BlastLab] 'M03 finished in 30 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[14:14:02] [M03] ok: the 2D run finished
+[14:14:03] [M03] NOTE: M03 model folder: ['.blastlab-model', 'MODEL.json', 'animation.gif', 'fields/impulse.csv', 'fields/p_peak.csv', 'fields/t0p110ms_p.csv', 'fields/t0p110ms_rho.csv', 'fields/t0p110ms_speed.csv', 'fields/t0p276ms_p.csv', 'fields/t0p276ms_rho.csv', 'fields/t0p276ms_speed.csv', 'fields/t0p466ms_final_p.csv', 'fields/t0p466ms_final_rho.csv', 'fields/t0p466ms_final_speed.csv', 'figures/blast_2d_density.png', 'figures/blast_2d_gauges.png', 'figures/blast_2d_impulse.png', 'figures/blast_2d_peak_overpressure.png', 'figures/blast_2d_pressure.png', 'gauges/gauges_2d.txt', 'gauges/gauges_2d_summary.csv', 'manifest.json', 'report.html', 'run.log']
+[14:14:03] [M03] ok: the folder holds the sec. 2.2 rows of a planar 2D run (no profile export for planar)
+[14:14:03] [M03] ok: the gauge TSV and summary
+[14:14:03] [M03] ok: manifest.json lists exactly what is on disk, nothing failed
+[14:14:03] [M03] ok: and says why there is no profile
+[14:14:03] [M03] ok: run.log is not empty
+[14:14:03] [M03] contact sheet: contact_M03.png (2 shots)
+[14:14:03] [M03] --- end done in 33.4s (max gap 327 ms) ---
+[14:14:04] [M03] ok: the Dark-mode action gives the dark theme
+[14:14:04] [M03] ok: the setup pill shows its screen
+[14:14:04] [M03] ok: and the setup pill is the active one
+[14:14:05] [M03] ok: the 2D segment sets the dimension
+[14:14:05] [M04] --- begin ---
+[14:14:06] [M04] ok: the chain pill shows its screen
+[14:14:06] [M04] ok: and the chain pill is the active one
+[14:14:07] [M04] ok: the chain started
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M04\handoff_1d_to_2d.txt  (150 cells, t = 0.244 ms)
+  2D field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M04\2d\profile_2d.npz  (33 x 53 cells, t = 47.440 ms)
+[14:14:15] [M04] DIALOG notify_desktop [BlastLab] 'M04 finished in 8 s.' -> 'ok'
+[14:14:16] [M04] ok: the chain finished
+[14:14:16] [M04] NOTE: M04 model folder: ['.blastlab-model', '1d', '2d', 'handoff_1d_to_2d.txt', 'manifest.json']
+[14:14:16] [M04] ok: 1d\, 2d\, the hand-off and the root manifest
+[14:14:16] [M04] ok: each stage has its MODEL.json
+[14:14:17] [M04] ok: the run pill shows its screen
+[14:14:17] [M04] ok: and the run pill is the active one
+[14:14:17] [M04] contact sheet: contact_M04.png (3 shots)
+[14:14:17] [M04] --- end done in 11.7s (max gap 425 ms) ---
+[14:14:18] [M04] ok: the Dark-mode action gives the dark theme
+[14:14:19] [M04] ok: the setup pill shows its screen
+[14:14:19] [M04] ok: and the setup pill is the active one
+[14:14:19] [M04] ok: the 2D segment sets the dimension
+[14:14:20] [M05] --- begin ---
+[14:14:20] [M05] ok: the setup pill shows its screen
+[14:14:20] [M05] ok: and the setup pill is the active one
+[14:14:21] [M05] ok: the 0D · HD 1.3 segment sets the dimension
+[14:14:22] [M05] ok: the run pill shows its screen
+[14:14:22] [M05] ok: and the run pill is the active one
+[14:14:23] [M05] ok: the HD 1.3 assessment finished
+[14:14:24] [M05] NOTE: M05 model folder: ['.blastlab-model', 'MODEL.json', 'hd13_loads', 'hd13_report.html', 'manifest.json']
+[14:14:24] [M05] ok: the report, hd13_loads\, MODEL.json and the manifest
+[14:14:24] [M05] ok: hd13_loads\ holds the SBEDS CSVs
+[14:14:25] [M05] ok: the 2D segment sets the dimension
+[14:14:25] [M05] contact sheet: contact_M05.png (1 shots)
+[14:14:25] [M05] --- end done in 5.0s (max gap 114 ms) ---
+[14:14:25] [M05] ok: the Dark-mode action gives the dark theme
+[14:14:26] [M05] ok: the setup pill shows its screen
+[14:14:26] [M05] ok: and the setup pill is the active one
+[14:14:27] [M05] ok: the 2D segment sets the dimension
+[14:14:27] [V01] --- begin ---
+[14:14:28] [V01] ok: the setup pill shows its screen
+[14:14:28] [V01] ok: and the setup pill is the active one
+[14:14:28] [V01] ok: the 1D card is shown in blastFoam mode
+[14:14:28] [V01] ok: 1D offers one family, "Whole domain"
+[14:14:28] [V01] ok: Time by default: the steps box is greyed
+[14:14:31] [V01] ok: the first tick fills p, rho, U
+[14:14:31] [V01] NOTE: 1D VTK strip: blastFoam ready in WSL (Ubuntu) | VTK volumes: one write every 0.001 s, up to 294 writes (~0.5 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~10,000 cells at dx = 0.001 m
+[14:14:31] [V01] ok: the strip gives the write count and the disk estimate
+[14:14:32] [V01] ok: Step greys the seconds box instead
+[14:14:35] [V01] contact sheet: contact_V01.png (6 shots)
+[14:14:35] [V01] --- end done in 7.4s (max gap 172 ms) ---
+[14:14:36] [V01] ok: the Dark-mode action gives the dark theme
+[14:14:36] [V01] ok: the setup pill shows its screen
+[14:14:36] [V01] ok: and the setup pill is the active one
+[14:14:37] [V01] ok: the 2D segment sets the dimension
+[14:14:37] [V02] --- begin ---
+[14:14:38] [V02] ok: the setup pill shows its screen
+[14:14:38] [V02] ok: and the setup pill is the active one
+[14:14:39] [V02] ok: 2D offers Whole domain and Obstacles
+[14:14:39] [V02] NOTE: 2D obstacles, none drawn: VTK obstacles: the case has no obstacles - nothing to sample | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[14:14:39] [V02] ok: no obstacles: the strip says "nothing to sample"
+[14:14:42] [V02] NOTE: 2D obstacles, one drawn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Obstacles: cells inside each box are carved out of the mesh (rigid walls) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[14:14:42] [V02] ok: with an obstacle the refusal is gone
+[14:14:43] [V02] ok: Step on both 2D families greys both seconds boxes
+[14:14:47] [V02] contact sheet: contact_V02.png (6 shots)
+[14:14:47] [V02] --- end done in 9.1s (max gap 201 ms) ---
+[14:14:47] [V02] ok: the Dark-mode action gives the dark theme
+[14:14:48] [V02] ok: the setup pill shows its screen
+[14:14:48] [V02] ok: and the setup pill is the active one
+[14:14:49] [V02] ok: the 2D segment sets the dimension
+[14:14:49] [V03] --- begin ---
+[14:14:50] [V03] ok: the setup pill shows its screen
+[14:14:50] [V03] ok: and the setup pill is the active one
+[14:14:50] [V03] ok: three destination columns plus the Gauges column (Q2, OUT-4a)
+[14:14:53] [V03] ok: first ticks: p/pMax on sections and obstacles, p/rho/U on volumes
+[14:14:54] [V03] ok: Step on the surfaces greys their seconds box only
+[14:14:56] [V03] ok: a plane `q, 1` is refused with a reason
+[14:14:56] [V03] ok: a plane `y, 1.4` is accepted
+[14:14:58] [V03] NOTE: 3D VTK strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK obstacles: the case has no obstacles - only the sections are written | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~456,533 cells at dx = 0.0192663 m
+[14:14:58] [V03] ok: both families with a plane at y = 1.4 m validate (Ly = 1.5 m; the live slice is at the burst)
+[14:14:59] [V03] contact sheet: contact_V03.png (7 shots)
+[14:14:59] [V03] --- end done in 9.3s (max gap 179 ms) ---
+[14:15:00] [V03] ok: the Dark-mode action gives the dark theme
+[14:15:01] [V03] ok: the setup pill shows its screen
+[14:15:01] [V03] ok: and the setup pill is the active one
+[14:15:01] [V03] ok: the 2D segment sets the dimension
+[14:15:02] [V04] --- begin ---
+[14:15:02] [V04] ok: the setup pill shows its screen
+[14:15:02] [V04] ok: and the setup pill is the active one
+[14:15:04] [V04] ok: the chip's native action switches the solver
+[14:15:04] [V04] ok: native: the VTK card is hidden
+[14:15:05] [V04] ok: the saved native case has no vtk_ key
+[14:15:06] [V04] ok: the chip's blastfoam action switches the solver
+[14:15:06] [V04] ok: back to blastFoam: the card and the tick are back
+[14:15:09] [V04] contact sheet: contact_V04.png (3 shots)
+[14:15:09] [V04] --- end done in 6.5s (max gap 114 ms) ---
+[14:15:09] [V04] ok: the Dark-mode action gives the dark theme
+[14:15:10] [V04] ok: the setup pill shows its screen
+[14:15:10] [V04] ok: and the setup pill is the active one
+[14:15:11] [V04] ok: the 2D segment sets the dimension
+[14:15:11] [V05] --- begin ---
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\V05\gauges\gauges_1d.txt  (1107 rows x 1 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\V05\profile.txt  (325 cells, t = 2.815 ms)
+[14:15:12] [V05] ok: the stage ran with hooks.vtk_dir = <model>\vtk
+[14:15:12] [V05] NOTE: V05 root manifest vtk: {'dir': 'vtk', 'counts': {'volumes': 2}, 'files': 4, 'bytes': 588, 'not_converted': []}; tree: ['.blastlab-model', 'MODEL.json', 'fields/t0p155ms_p.csv', 'fields/t0p155ms_rho.csv', 'fields/t0p539ms_p.csv', 'fields/t0p539ms_rho.csv', 'fields/t1p162ms_p.csv', 'fields/t1p162ms_rho.csv', 'fields/t1p949ms_p.csv', 'fields/t1p949ms_rho.csv', 'fields/t2p815ms_final_p.csv', 'fields/t2p815ms_final_rho.csv', 'figures/blast_1d_gauges.png', 'figures/blast_1d_results.png', 'gauges/gauges_1d.txt', 'gauges/gauges_1d_summary.csv', 'manifest.json', 'profile.txt', 'report.html', 'run.log', 'vtk/manifest.json', 'vtk/volumes.vtk.series', 'vtk/volumes/t_0.0005.vtk', 'vtk/volumes/t_0.001.vtk']
+[14:15:12] [V05] ok: the root manifest carries the numeric vtk summary (P4)
+[14:15:13] [V05] ok: the vtk\ tree is on disk, left out of `outputs` (P4), nothing failed
+[14:15:13] [V05] --- end done in 1.6s (max gap 0 ms) ---
+[14:15:13] [V05] ok: the Dark-mode action gives the dark theme
+[14:15:14] [V05] ok: the setup pill shows its screen
+[14:15:14] [V05] ok: and the setup pill is the active one
+[14:15:15] [V05] ok: the 2D segment sets the dimension
+[14:15:15] [V06] --- begin ---
+[14:15:15] [V06] ok: the setup pill shows its screen
+[14:15:15] [V06] ok: and the setup pill is the active one
+[14:15:16] [V06] ok: 1D: the box is on the card, unticked, with its tooltip
+[14:15:18] [V06] NOTE: 1D keep-all strip: blastFoam ready in WSL (Ubuntu) | Keep all fields in WSL: 1D keeps its written times until the scratch is released anyway (P9); the box also keeps the scratch after the run | ~10,000 cells at dx = 0.001 m
+[14:15:18] [V06] ok: 1D: the strip explains the box (P9)
+[14:15:18] [V06] ok: 1D: the case carries it
+[14:15:20] [V06] ok: 3D: the box is on the card, unticked, with its tooltip
+[14:15:22] [V06] NOTE: 3D keep-all strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | Keep all fields in WSL: every write stays in WSL and the scratch is kept after the run; disk estimate ~4.2 GB (up to 60 writes at ~155 B per cell per write) | ~456,533 cells at dx = 0.0192663 m
+[14:15:22] [V06] ok: 3D: the strip explains the box (disk estimate)
+[14:15:22] [V06] ok: 3D: the case carries it
+[14:15:24] [V06] ok: the chip's native action switches the solver
+[14:15:24] [V06] ok: native: the box is hidden with the card, not in the case
+[14:15:25] [V06] ok: the chip's blastfoam action switches the solver
+[14:15:25] [V06] NOTE: V06 kept-scratch reason: Keep all fields in WSL was ticked
+[14:15:25] [V06] ok: a ticked finished run keeps its scratch, and says why
+[14:15:27] [V06] contact sheet: contact_V06.png (9 shots)
+[14:15:27] [V06] --- end done in 11.7s (max gap 140 ms) ---
+[14:15:28] [V06] ok: the Dark-mode action gives the dark theme
+[14:15:29] [V06] ok: the setup pill shows its screen
+[14:15:29] [V06] ok: and the setup pill is the active one
+[14:15:30] [V06] ok: the 2D segment sets the dimension
+[14:15:30] [V07] --- begin ---
+[14:15:30] [V07] ok: the setup pill shows its screen
+[14:15:30] [V07] ok: and the setup pill is the active one
+[14:15:31] [V07] ok: 1D: p/rho/U locked and ticked; live gauge cells ['T', 'dynamicP']
+[14:15:33] [V07] ok: 1D: the ticks reach vtk_gauges
+[14:15:33] [V07] ok: 1D: the case validates
+[14:15:35] [V07] ok: the chip's native action switches the solver
+[14:15:35] [V07] ok: 1D native: no vtk_gauges key
+[14:15:36] [V07] ok: the chip's blastfoam action switches the solver
+[14:15:37] [V07] contact sheet: contact_V07.png (4 shots)
+[14:15:37] [V07] --- end done in 7.0s (max gap 148 ms) ---
+[14:15:38] [V07] ok: the Dark-mode action gives the dark theme
+[14:15:39] [V07] ok: the setup pill shows its screen
+[14:15:39] [V07] ok: and the setup pill is the active one
+[14:15:39] [V07] ok: the 2D segment sets the dimension
+[14:15:40] [V08] --- begin ---
+[14:15:40] [V08] ok: the setup pill shows its screen
+[14:15:40] [V08] ok: and the setup pill is the active one
+[14:15:41] [V08] ok: 2D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[14:15:43] [V08] ok: 2D: the ticks reach vtk_gauges
+[14:15:43] [V08] ok: 2D: the case validates
+[14:15:45] [V08] ok: the chip's native action switches the solver
+[14:15:45] [V08] ok: 2D native: no vtk_gauges key
+[14:15:45] [V08] ok: the chip's blastfoam action switches the solver
+[14:15:47] [V08] contact sheet: contact_V08.png (4 shots)
+[14:15:47] [V08] --- end done in 7.1s (max gap 198 ms) ---
+[14:15:48] [V08] ok: the Dark-mode action gives the dark theme
+[14:15:49] [V08] ok: the setup pill shows its screen
+[14:15:49] [V08] ok: and the setup pill is the active one
+[14:15:49] [V08] ok: the 2D segment sets the dimension
+[14:15:49] [V09] --- begin ---
+[14:15:50] [V09] ok: the setup pill shows its screen
+[14:15:50] [V09] ok: and the setup pill is the active one
+[14:15:51] [V09] ok: 3D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[14:15:53] [V09] ok: 3D: the ticks reach vtk_gauges
+[14:15:53] [V09] ok: 3D: the case validates
+[14:15:55] [V09] ok: the chip's native action switches the solver
+[14:15:55] [V09] ok: 3D native: no vtk_gauges key
+[14:15:55] [V09] ok: the chip's blastfoam action switches the solver
+[14:15:57] [V09] contact sheet: contact_V09.png (4 shots)
+[14:15:57] [V09] --- end done in 7.1s (max gap 177 ms) ---
+[14:15:58] [V09] ok: the Dark-mode action gives the dark theme
+[14:15:59] [V09] ok: the setup pill shows its screen
+[14:15:59] [V09] ok: and the setup pill is the active one
+[14:15:59] [V09] ok: the 2D segment sets the dimension
+[14:15:59] [V10] --- begin ---
+[14:16:00] [V10] ok: the setup pill shows its screen
+[14:16:00] [V10] ok: and the setup pill is the active one
+[14:16:01] [V10] ok: 2D: no decimation box (3D only)
+[14:16:02] [V10] ok: 3D: the box shows 1, the warning line is under it
+[14:16:02] [V10] ok: 3D: k = 2 reaches vtk_volumes.decimate
+[14:16:02] [V10] ok: 3D: validates, the note carries the warning
+[14:16:04] [V10] ok: 3D: k = 1 writes no decimate key
+[14:16:05] [V10] ok: the chip's native action switches the solver
+[14:16:05] [V10] ok: native: the box and its warning are hidden with the card
+[14:16:05] [V10] ok: the chip's blastfoam action switches the solver
+[14:16:07] [V10] contact sheet: contact_V10.png (2 shots)
+[14:16:07] [V10] --- end done in 7.2s (max gap 146 ms) ---
+[14:16:07] [V10] ok: the Dark-mode action gives the dark theme
+[14:16:08] [V10] ok: the setup pill shows its screen
+[14:16:08] [V10] ok: and the setup pill is the active one
+[14:16:09] [V10] ok: the 2D segment sets the dimension
+[14:16:09] [H01] --- begin ---
+[14:16:10] [H01] ok: the setup pill shows its screen
+[14:16:10] [H01] ok: and the setup pill is the active one
+[14:16:22] [H01] ok: the Dark-mode action gives the light theme
+[14:16:34] [H01] ok: the Dark-mode action gives the dark theme
+[14:16:35] [H01] ok: the preview survived four theme changes
+[14:16:35] [H01] contact sheet: contact_H01.png (4 shots)
+[14:16:35] [H01] --- end done in 25.5s (max gap 685 ms) ---
+[14:16:36] [H01] ok: the Dark-mode action gives the dark theme
+[14:16:36] [H01] ok: the setup pill shows its screen
+[14:16:36] [H01] ok: and the setup pill is the active one
+[14:16:37] [H01] ok: the 2D segment sets the dimension
+[14:16:37] [H02] --- begin ---
+[14:16:38] [H02] ok: the setup pill shows its screen
+[14:16:38] [H02] ok: and the setup pill is the active one
+[14:16:39] [H02] ok: the run pill shows its screen
+[14:16:39] [H02] ok: and the run pill is the active one
+[14:16:39] [H02] DIALOG ask_yes_no [Model folder] "M05 already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be de" -> True
+[14:16:40] [H02] ok: the run started
+[14:16:52] [H02] ok: the Dark-mode action gives the light theme
+[14:16:54] [H02] ok: the run is still alive (or already done) after a repaint
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M05\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\M05\animation.gif
+[14:17:19] [H02] DIALOG notify_desktop [BlastLab] 'M05 finished in 40 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[14:17:20] [H02] ok: and it finished
+[14:17:30] [H02] ok: the Dark-mode action gives the dark theme
+[14:17:32] [H02] contact sheet: contact_H02.png (5 shots)
+[14:17:32] [H02] --- end done in 54.4s (max gap 675 ms) ---
+[14:17:33] [H02] ok: the Dark-mode action gives the dark theme
+[14:17:34] [H02] ok: the setup pill shows its screen
+[14:17:34] [H02] ok: and the setup pill is the active one
+[14:17:34] [H02] ok: the 2D segment sets the dimension
+[14:17:34] [H03] --- begin ---
+[14:17:47] [H03] ok: the Dark-mode action gives the light theme
+[14:17:47] [H03] ok: the results pill shows its screen
+[14:17:47] [H03] ok: and the results pill is the active one
+[14:18:01] [H03] ok: the chain pill shows its screen
+[14:18:01] [H03] ok: and the chain pill is the active one
+[14:18:02] [H03] ok: the run pill shows its screen
+[14:18:02] [H03] ok: and the run pill is the active one
+[14:18:13] [H03] ok: the Dark-mode action gives the dark theme
+[14:18:13] [H03] contact sheet: contact_H03.png (10 shots)
+[14:18:13] [H03] --- end done in 38.1s (max gap 632 ms) ---
+[14:18:14] [H03] ok: the Dark-mode action gives the dark theme
+[14:18:15] [H03] ok: the setup pill shows its screen
+[14:18:15] [H03] ok: and the setup pill is the active one
+[14:18:15] [H03] ok: the 2D segment sets the dimension
+[14:18:15] [H03] budget: 156s left < 330s for I01 - exiting 75
+[14:18:18] [H03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x12728aca640, name="viewWindow") , parent:  QWidgetWindow(0x12728acbc60, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:18:18] [H03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x12728aca0a0, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x12728acbc60, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:18:18] [H03] exit 75; pending: ['I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

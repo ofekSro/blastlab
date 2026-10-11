@@ -1,0 +1,59 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:03:37] [boot] window up: 1280x840 (built 3924 ms, shown 1865 ms)
+[14:03:37] [F04] --- begin ---
+[14:03:37] [F04] ok: the setup pill shows its screen
+[14:03:37] [F04] ok: and the setup pill is the active one
+[14:03:38] [F04] ok: the setup pill shows its screen
+[14:03:38] [F04] ok: and the setup pill is the active one
+[14:03:39] [F04] NOTE: refine2d strip: Refinement zone (0.9, 2.4, 1.2, 2.0, 1) snapped outward to level-0 cell faces: (0.88, 2.4, 1.2, 2.0) | Refinement zone (1.7, 2.3, 1.4, 1.8, 2) snapped outward to level-1 cell faces: (1.68, 2.32, 1.4, 1.8) | Checking WSL blastFoam availability... | Local refinement: 4 level(s), finest cell 0.005 m, ~5,058 mesh cells; results are resampled to a 307,200-cell display grid | Charge resolved by automatic level-4 zones (base cell kept at 0.08 m) | Charge cells: 484 at 0.005 m -> ~0.99 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Cell caps from hardware measured on this machine in an earlier session (63 GB VM); re-checking in the background. | Parallel run: 1 rank: 5,058 cells is below the 200,000-cell parallel floor | ~5,058 cells at dx = 0.08 m (finest 0.005 m, 307,200 display cells)
+[14:03:40] [F04] ok: the run pill shows its screen
+[14:03:40] [F04] ok: and the run pill is the active one
+[14:04:04] [F04] NOTE: refine2d: progress at the first write = 0.337 (24 s after Run)
+[14:04:04] [F04] ok: the progress bar has moved by the first write (B7)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (631 rows x 1 gauges)
+  Writing animation (45 frames, fixed (whole video) 0 .. 6.23e+04 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.mp4
+[14:04:53] [F04] DIALOG notify_desktop [BlastLab] 'QA finished in 1 min 14 s. Highest peak: G1, 7,919 kPa at 0.22 ms.' -> 'ok'
+[14:04:55] [F04] ok: refine2d finished
+[14:04:55] [F04] NOTE: refine2d wall 75 s
+[14:04:55] [F04] NOTE: own runs after refine2d: 
+[14:04:56] [F04] ok: the results pill shows its screen
+[14:04:56] [F04] ok: and the results pill is the active one
+[14:05:00] [F04] DIALOG pick_dir [Save PNGs into] '<blastlab.ui.results_panel.ResultsPanel(0x2cab89ce230) at 0x000002CA987C9040>' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports'
+[14:05:03] [F04] NOTE: PNG export with mesh: ['QA_blast_2d_density.png', 'QA_blast_2d_gauges.png', 'QA_blast_2d_impulse.png', 'QA_blast_2d_peak_overpressure.png', 'QA_blast_2d_pressure.png']
+[14:05:03] [F04] ok: the PNG export wrote files
+[14:05:04] [F04] contact sheet: contact_F04.png (10 shots)
+[14:05:04] [F04] --- end done in 86.6s (max gap 492 ms) ---
+[14:05:04] [F04] ok: the Dark-mode action gives the dark theme
+[14:05:05] [F04] ok: the setup pill shows its screen
+[14:05:05] [F04] ok: and the setup pill is the active one
+[14:05:06] [F04] ok: the 2D segment sets the dimension
+[14:05:06] [F04] ok: the chip's native action switches the solver
+[14:05:07] [F05] --- begin ---
+[14:05:07] [F05] ok: the setup pill shows its screen
+[14:05:07] [F05] ok: and the setup pill is the active one
+[14:05:08] [F05] ok: the report names the AMR levels and the display level
+[14:05:09] [F05] ok: the setup pill shows its screen
+[14:05:09] [F05] ok: and the setup pill is the active one
+[14:05:10] [F05] NOTE: amr2d strip: blastFoam ready in WSL (Ubuntu) | AMR (Lohner): up to 3 level(s) below the 0.1 m base cell (finest 0.0125 m), refining every 2 step(s) with 2 buffer layer(s) | Results are resampled to the finest level (102,400 display cells) | The mesh starts at ~1,600 cells and may grow to 8,000,000 (maxCells) | Charge cells: 392 at 0.0125 m -> ~1.00 of the 100 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 1,600 cells is below the 200,000-cell parallel floor | ~1,600 cells at dx = 0.1 m at t = 0; AMR up to level 3 (finest 0.0125 m), displayed at level 3 (102,400 cells)
+[14:05:10] [F05] ok: the run pill shows its screen
+[14:05:10] [F05] ok: and the run pill is the active one
+[14:05:10] [F05] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be del" -> True
+[14:05:16] [F05] DIALOG show_error [Run failed] 'RuntimeError: blastFoam failed (exit 134) - case kept at \\\\wsl.localhost\\Ubuntu\\root\\blastlab_runs\\20261011-140510_2d_p10740-01\n\nSee the run log for details.' -> 'ok'
+[14:10:13] [F05] ok: amr2d finished
+[14:10:13] [F05] NOTE: amr2d wall 303 s
+[14:10:14] [F05] NOTE: own runs after amr2d: 20261011-140510_2d_p10740-01 alive=False
+[14:10:14] [F05] NOTE: 0 AMR log lines; first [], last []
+[14:10:14] [F05] FINDING S2 check: the mesh really did adapt during the run
+[14:10:15] [F05] ok: the results pill shows its screen
+[14:10:15] [F05] ok: and the results pill is the active one
+[14:10:17] [F05] FINDING S2 check: a level map was recorded per frame, so the replay can draw the mesh the solver actually had
+[14:10:19] [F05] contact sheet: contact_F05.png (9 shots)
+[14:10:19] [F05] --- end done in 311.4s (max gap 163 ms) ---
+[14:10:19] [F05] ok: the Dark-mode action gives the dark theme
+[14:10:20] [F05] ok: the setup pill shows its screen
+[14:10:20] [F05] ok: and the setup pill is the active one
+[14:10:21] [F05] ok: the 2D segment sets the dimension
+[14:10:21] [F05] ok: the chip's native action switches the solver
+[14:10:22] [F05] budget: 127s left < 200s for F06 - exiting 75
+[14:10:22] [F05] exit 75; pending: ['F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

@@ -1,0 +1,460 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[13:10:17] [boot] window up: 1280x840 (built 4073 ms, shown 1854 ms)
+[13:10:17] [B01] --- begin ---
+[13:10:17] [B01] NOTE: App construction 4073 ms, first paint 1854 ms
+[13:10:17] [B01] NOTE: window title: 'untitled · BlastLab'
+[13:10:17] [B01] NOTE: case button 'untitled', unsaved marker '● unsaved' hidden
+[13:10:17] [B01] NOTE: validation strip on the default 2D case: Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[13:10:17] [B01] ok: Dark mode action is on
+[13:10:17] [B01] ok: the window has a title
+[13:10:25] [B01] NOTE: idle CPU on setup: 1.8 % of a core over 8 s
+[13:10:25] [B01] contact sheet: contact_B01.png (1 shots)
+[13:10:25] [B01] --- end done in 8.6s (max gap 68 ms) ---
+[13:10:26] [B01] ok: the Dark-mode action gives the dark theme
+[13:10:27] [B01] ok: the setup pill shows its screen
+[13:10:27] [B01] ok: and the setup pill is the active one
+[13:10:28] [B01] ok: the 2D segment sets the dimension
+[13:10:28] [B02] --- begin ---
+[13:10:28] [B02] ok: the run pill shows its screen
+[13:10:28] [B02] ok: and the run pill is the active one
+[13:10:34] [B02] NOTE: idle CPU on run: 0.9 % of a core over 5 s
+[13:10:34] [B02] ok: the results pill shows its screen
+[13:10:34] [B02] ok: and the results pill is the active one
+[13:10:40] [B02] NOTE: idle CPU on results: 0.9 % of a core over 5 s
+[13:10:40] [B02] ok: the chain pill shows its screen
+[13:10:40] [B02] ok: and the chain pill is the active one
+[13:10:46] [B02] NOTE: idle CPU on chain: 1.6 % of a core over 5 s
+[13:10:46] [B02] NOTE: Run tab empty state: Stop=False Exec=False 3DView=False progress=0
+[13:10:46] [B02] ok: Stop is disabled with nothing running
+[13:10:46] [B02] ok: the Exec buttons are disabled with nothing running
+[13:10:46] [B02] NOTE: Results empty: export button states summary=False, tsv=False, fieldcsv=False, profile=False, vtk=False, pngs=False, report=False, gif=False
+[13:10:46] [B02] ok: every export is disabled with no result selected - the Tk app left them live and a click did nothing (G3)
+[13:10:46] [B02] NOTE: Chain writes into the model folder 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs' / 'QA'
+[13:10:46] [B02] ok: the setup pill shows its screen
+[13:10:46] [B02] ok: and the setup pill is the active one
+[13:10:46] [B02] contact sheet: contact_B02.png (3 shots)
+[13:10:46] [B02] --- end done in 18.2s (max gap 63 ms) ---
+[13:10:47] [B02] ok: the Dark-mode action gives the dark theme
+[13:10:48] [B02] ok: the setup pill shows its screen
+[13:10:48] [B02] ok: and the setup pill is the active one
+[13:10:48] [B02] ok: the 2D segment sets the dimension
+[13:10:49] [B03] --- begin ---
+[13:10:49] [B03] ok: the 1D segment sets the dimension
+[13:10:51] [B03] NOTE: 1D strip: ~10,000 cells at dx = 0.001 m
+[13:10:51] [B03] ok: the 2D segment sets the dimension
+[13:10:53] [B03] NOTE: 2D strip: Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[13:10:54] [B03] ok: the 3D segment sets the dimension
+[13:10:55] [B03] NOTE: 3D strip: ~216,000 cells at dx = 0.025 m
+[13:10:55] [B03] ok: the 3D preview is the one showing for a 3D case (got '3d')
+[13:10:56] [B03] ok: the 2D segment sets the dimension
+[13:10:56] [B03] ok: and the 2D preview comes back for a 2D case (got '2d')
+[13:10:56] [B03] contact sheet: contact_B03.png (6 shots)
+[13:10:56] [B03] --- end done in 7.5s (max gap 153 ms) ---
+[13:10:57] [B03] ok: the Dark-mode action gives the dark theme
+[13:10:58] [B03] ok: the setup pill shows its screen
+[13:10:58] [B03] ok: and the setup pill is the active one
+[13:10:58] [B03] ok: the 2D segment sets the dimension
+[13:10:59] [B04] --- begin ---
+[13:11:00] [B04] ok: the run pill shows its screen
+[13:11:00] [B04] ok: and the run pill is the active one
+[13:11:01] [B04] ok: Stop is the disabled one to photograph
+[13:11:02] [B04] ok: the setup pill shows its screen
+[13:11:02] [B04] ok: and the setup pill is the active one
+[13:11:02] [B04] contact sheet: contact_B04.png (3 shots)
+[13:11:02] [B04] --- end done in 3.7s (max gap 30 ms) ---
+[13:11:03] [B04] ok: the Dark-mode action gives the dark theme
+[13:11:04] [B04] ok: the setup pill shows its screen
+[13:11:04] [B04] ok: and the setup pill is the active one
+[13:11:05] [B04] ok: the 2D segment sets the dimension
+[13:11:05] [B05] --- begin ---
+[13:11:05] [B05] NOTE: requested 1100x720 -> actual 1100x720
+[13:11:06] [B05] ok: the setup pill shows its screen
+[13:11:06] [B05] ok: and the setup pill is the active one
+[13:11:07] [B05] ok: the run pill shows its screen
+[13:11:07] [B05] ok: and the run pill is the active one
+[13:11:08] [B05] ok: the results pill shows its screen
+[13:11:08] [B05] ok: and the results pill is the active one
+[13:11:08] [B05] ok: the chain pill shows its screen
+[13:11:08] [B05] ok: and the chain pill is the active one
+[13:11:10] [B05] NOTE: requested 900x600 -> actual 1100x720
+[13:11:10] [B05] ok: the setup pill shows its screen
+[13:11:10] [B05] ok: and the setup pill is the active one
+[13:11:11] [B05] ok: the run pill shows its screen
+[13:11:11] [B05] ok: and the run pill is the active one
+[13:11:12] [B05] ok: the results pill shows its screen
+[13:11:12] [B05] ok: and the results pill is the active one
+[13:11:13] [B05] ok: the chain pill shows its screen
+[13:11:13] [B05] ok: and the chain pill is the active one
+[13:11:14] [B05] NOTE: maximised -> 1920x1009
+[13:11:14] [B05] ok: the setup pill shows its screen
+[13:11:14] [B05] ok: and the setup pill is the active one
+[13:11:15] [B05] ok: the run pill shows its screen
+[13:11:15] [B05] ok: and the run pill is the active one
+[13:11:16] [B05] ok: the results pill shows its screen
+[13:11:16] [B05] ok: and the results pill is the active one
+[13:11:17] [B05] ok: the chain pill shows its screen
+[13:11:17] [B05] ok: and the chain pill is the active one
+[13:11:19] [B05] ok: the setup pill shows its screen
+[13:11:19] [B05] ok: and the setup pill is the active one
+[13:11:19] [B05] contact sheet: contact_B05.png (12 shots)
+[13:11:19] [B05] --- end done in 13.7s (max gap 109 ms) ---
+[13:11:20] [B05] ok: the Dark-mode action gives the dark theme
+[13:11:20] [B05] ok: the setup pill shows its screen
+[13:11:20] [B05] ok: and the setup pill is the active one
+[13:11:21] [B05] ok: the 2D segment sets the dimension
+[13:11:21] [B06] --- begin ---
+[13:11:21] [B06] DIALOG open_file [Open case] 'blastlab case (*.json);;All files (*.*)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\B06_025.txt'
+[13:11:21] [B06] DIALOG show_error [Open case] 'File not found: C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\B06_025.txt' -> 'ok'
+[13:11:22] [B06] ok: Ctrl+O reaches its open_file dialog
+[13:11:22] [B06] DIALOG save_file [Save case] 'blastlab case (*.json)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\B06_027.json'
+[13:11:23] [B06] ok: Ctrl+S reaches its save_file dialog
+[13:11:23] [B06] NOTE: Ctrl+O / Ctrl+S: dialogs recorded so far = 3
+[13:11:24] [B06] ok: F5 starts a run (G9 accelerator)
+[13:11:24] [B06] ok: plain Esc does NOT stop the run (Shift+Esc does)
+  Writing animation (36 frames, fixed (whole video) 0 .. 2.72e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.mp4
+  2D field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\profile_2d.npz  (380 x 380 cells, t = 0.025 ms)
+[13:11:41] [B06] ok: Shift+Esc stops the run that F5 started
+[13:11:41] [B06] ok: the run pill shows its screen
+[13:11:41] [B06] ok: and the run pill is the active one
+[13:11:45] [B06] NOTE: Tab from Run: _CollapseHeader -> QLineEdit -> QComboBox -> ToggleSwitch -> _SetupLink -> QPushButton
+[13:11:45] [B06] ok: the setup pill shows its screen
+[13:11:45] [B06] ok: and the setup pill is the active one
+[13:11:46] [B06] contact sheet: contact_B06.png (5 shots)
+[13:11:46] [B06] --- end done in 24.1s (max gap 1068 ms) ---
+[13:11:46] [B06] ok: the Dark-mode action gives the dark theme
+[13:11:47] [B06] ok: the setup pill shows its screen
+[13:11:47] [B06] ok: and the setup pill is the active one
+[13:11:48] [B06] ok: the 2D segment sets the dimension
+[13:11:48] [B07] --- begin ---
+[13:11:56] [B07] ok: the Dark-mode action gives the light theme
+[13:11:57] [B07] ok: the run pill shows its screen
+[13:11:57] [B07] ok: and the run pill is the active one
+[13:11:58] [B07] ok: the results pill shows its screen
+[13:11:58] [B07] ok: and the results pill is the active one
+[13:11:59] [B07] ok: the chain pill shows its screen
+[13:11:59] [B07] ok: and the chain pill is the active one
+[13:11:59] [B07] ok: the setup pill shows its screen
+[13:11:59] [B07] ok: and the setup pill is the active one
+[13:12:00] [B07] ok: the 1D segment sets the dimension
+[13:12:02] [B07] ok: the 2D segment sets the dimension
+[13:12:04] [B07] ok: the 3D segment sets the dimension
+[13:12:07] [B07] ok: the 2D segment sets the dimension
+[13:12:08] [B07] ok: the bad field is named in the report
+[13:12:18] [B07] ok: the Dark-mode action gives the dark theme
+[13:12:18] [B07] contact sheet: contact_B07.png (12 shots)
+[13:12:18] [B07] --- end done in 29.9s (max gap 349 ms) ---
+[13:12:19] [B07] ok: the Dark-mode action gives the dark theme
+[13:12:20] [B07] ok: the setup pill shows its screen
+[13:12:20] [B07] ok: and the setup pill is the active one
+[13:12:20] [B07] ok: the 2D segment sets the dimension
+[13:12:21] [Q01] --- begin ---
+[13:12:21] [Q01] NOTE: hosts: setup=View3DHost, run=View3DHost, results=ResultsView3DHost
+[13:12:21] [Q01] ok: the setup pill shows its screen
+[13:12:21] [Q01] ok: and the setup pill is the active one
+[13:12:22] [Q01] ok: the 3D segment sets the dimension
+[13:12:22] [Q01] ok: the Setup preview got a render window from the child
+[13:12:23] [Q01] ok: the run pill shows its screen
+[13:12:23] [Q01] ok: and the run pill is the active one
+[13:12:23] [Q01] ok: the results pill shows its screen
+[13:12:23] [Q01] ok: and the results pill is the active one
+[13:12:23] [Q01] ok: the setup pill shows its screen
+[13:12:23] [Q01] ok: and the setup pill is the active one
+[13:12:24] [Q01] ok: the run pill shows its screen
+[13:12:24] [Q01] ok: and the run pill is the active one
+[13:12:24] [Q01] ok: the results pill shows its screen
+[13:12:24] [Q01] ok: and the results pill is the active one
+[13:12:25] [Q01] ok: the setup pill shows its screen
+[13:12:25] [Q01] ok: and the setup pill is the active one
+[13:12:25] [Q01] ok: the run pill shows its screen
+[13:12:25] [Q01] ok: and the run pill is the active one
+[13:12:26] [Q01] ok: the results pill shows its screen
+[13:12:26] [Q01] ok: and the results pill is the active one
+[13:12:26] [Q01] ok: the setup pill shows its screen
+[13:12:26] [Q01] ok: and the setup pill is the active one
+[13:12:26] [Q01] ok: and it is the SAME window after three tab round trips - a new one each time would mean the child is re-creating them
+[13:12:26] [Q01] ok: one viewer child is still alive for all three surfaces
+[13:12:26] [Q01] NOTE: render windows per surface: {'setup': 144713162, 'run': 6170188, 'results': None}
+[13:12:26] [Q01] ok: no two surfaces share a render window
+[13:12:27] [Q01] ok: the 2D segment sets the dimension
+[13:12:28] [Q01] ok: and leaving 3D does not take the child down with it
+[13:12:28] [Q01] contact sheet: contact_Q01.png (2 shots)
+[13:12:28] [Q01] --- end done in 7.3s (max gap 152 ms) ---
+[13:12:29] [Q01] ok: the Dark-mode action gives the dark theme
+[13:12:30] [Q01] ok: the setup pill shows its screen
+[13:12:30] [Q01] ok: and the setup pill is the active one
+[13:12:30] [Q01] ok: the 2D segment sets the dimension
+[13:12:30] [Q02] --- begin ---
+[13:12:39] [Q02] ok: the Dark-mode action gives the light theme
+[13:12:39] [Q02] ok: the setup pill shows its screen
+[13:12:39] [Q02] ok: and the setup pill is the active one
+[13:12:40] [Q02] ok: the run pill shows its screen
+[13:12:40] [Q02] ok: and the run pill is the active one
+[13:12:41] [Q02] ok: the results pill shows its screen
+[13:12:41] [Q02] ok: and the results pill is the active one
+[13:12:42] [Q02] ok: the chain pill shows its screen
+[13:12:42] [Q02] ok: and the chain pill is the active one
+[13:12:42] [Q02] ok: the theme really is light
+[13:12:50] [Q02] ok: the Dark-mode action gives the dark theme
+[13:12:51] [Q02] ok: the setup pill shows its screen
+[13:12:51] [Q02] ok: and the setup pill is the active one
+[13:12:52] [Q02] ok: the run pill shows its screen
+[13:12:52] [Q02] ok: and the run pill is the active one
+[13:12:53] [Q02] ok: the results pill shows its screen
+[13:12:53] [Q02] ok: and the results pill is the active one
+[13:12:53] [Q02] ok: the chain pill shows its screen
+[13:12:53] [Q02] ok: and the chain pill is the active one
+[13:12:54] [Q02] ok: the theme really is dark
+[13:13:02] [Q02] ok: the Dark-mode action gives the light theme
+[13:13:03] [Q02] ok: the setup pill shows its screen
+[13:13:03] [Q02] ok: and the setup pill is the active one
+[13:13:03] [Q02] ok: the run pill shows its screen
+[13:13:03] [Q02] ok: and the run pill is the active one
+[13:13:04] [Q02] ok: the results pill shows its screen
+[13:13:04] [Q02] ok: and the results pill is the active one
+[13:13:05] [Q02] ok: the chain pill shows its screen
+[13:13:05] [Q02] ok: and the chain pill is the active one
+[13:13:06] [Q02] ok: the theme really is light
+[13:13:14] [Q02] ok: the Dark-mode action gives the dark theme
+[13:13:15] [Q02] ok: the setup pill shows its screen
+[13:13:15] [Q02] ok: and the setup pill is the active one
+[13:13:15] [Q02] ok: the run pill shows its screen
+[13:13:15] [Q02] ok: and the run pill is the active one
+[13:13:16] [Q02] ok: the results pill shows its screen
+[13:13:16] [Q02] ok: and the results pill is the active one
+[13:13:17] [Q02] ok: the chain pill shows its screen
+[13:13:17] [Q02] ok: and the chain pill is the active one
+[13:13:18] [Q02] ok: the theme really is dark
+[13:13:18] [Q02] ok: the Dark-mode action gives the dark theme
+[13:13:18] [Q02] ok: every palette colour is a usable hex string
+[13:13:19] [Q02] contact sheet: contact_Q02.png (16 shots)
+[13:13:19] [Q02] --- end done in 47.8s (max gap 336 ms) ---
+[13:13:20] [Q02] ok: the Dark-mode action gives the dark theme
+[13:13:20] [Q02] ok: the setup pill shows its screen
+[13:13:20] [Q02] ok: and the setup pill is the active one
+[13:13:21] [Q02] ok: the 2D segment sets the dimension
+[13:13:21] [Q03] --- begin ---
+[13:13:21] [Q03] no cache for native2d
+[13:13:22] [Q03] ok: the results pill shows its screen
+[13:13:22] [Q03] ok: and the results pill is the active one
+[13:13:22] [Q03] FINDING S2 check: no result labelled 'QA native2d' to select
+[13:13:22] [Q03] --- end done in 0.4s (max gap 22 ms) ---
+[13:13:22] [Q03] ok: the Dark-mode action gives the dark theme
+[13:13:23] [Q03] ok: the setup pill shows its screen
+[13:13:23] [Q03] ok: and the setup pill is the active one
+[13:13:24] [Q03] ok: the 2D segment sets the dimension
+[13:13:24] [Q04] --- begin ---
+[13:13:25] [Q04] ok: the setup pill shows its screen
+[13:13:25] [Q04] ok: and the setup pill is the active one
+[13:13:26] [Q04] ok: the run pill shows its screen
+[13:13:26] [Q04] ok: and the run pill is the active one
+[13:13:27] [Q04] ok: the results pill shows its screen
+[13:13:27] [Q04] ok: and the results pill is the active one
+[13:13:28] [Q04] ok: the chain pill shows its screen
+[13:13:28] [Q04] ok: and the chain pill is the active one
+[13:13:28] [Q04] ok: nothing is clipped at 125 %
+[13:13:28] [Q04] NOTE: 125 %: 0 clipped widget(s)
+[13:13:30] [Q04] ok: the setup pill shows its screen
+[13:13:30] [Q04] ok: and the setup pill is the active one
+[13:13:31] [Q04] ok: the run pill shows its screen
+[13:13:31] [Q04] ok: and the run pill is the active one
+[13:13:32] [Q04] ok: the results pill shows its screen
+[13:13:32] [Q04] ok: and the results pill is the active one
+[13:13:33] [Q04] ok: the chain pill shows its screen
+[13:13:33] [Q04] ok: and the chain pill is the active one
+[13:13:33] [Q04] ok: nothing is clipped at 150 %
+[13:13:33] [Q04] NOTE: 150 %: 0 clipped widget(s)
+[13:13:34] [Q04] ok: the setup pill shows its screen
+[13:13:34] [Q04] ok: and the setup pill is the active one
+[13:13:35] [Q04] contact sheet: contact_Q04.png (8 shots)
+[13:13:35] [Q04] --- end done in 10.4s (max gap 108 ms) ---
+[13:13:35] [Q04] ok: the Dark-mode action gives the dark theme
+[13:13:36] [Q04] ok: the setup pill shows its screen
+[13:13:36] [Q04] ok: and the setup pill is the active one
+[13:13:37] [Q04] ok: the 2D segment sets the dimension
+[13:13:37] [C01] --- begin ---
+[13:13:39] [C01] NOTE: strip with Lx=abc AND cell="": 'Lx' is not a number: 'abc' | 'cell size' is not a number: ''
+[13:13:39] [C01] ok: both parse errors are listed - the Tk app showed only the first (G3)
+[13:13:39] [C01] ok: and both fields are marked in red (marked: ['Lx', 'cell'])
+[13:13:40] [C01] ok: fixing one field clears its mark
+[13:13:41] [C01] contact sheet: contact_C01.png (2 shots)
+[13:13:41] [C01] --- end done in 3.6s (max gap 148 ms) ---
+[13:13:41] [C01] ok: the Dark-mode action gives the dark theme
+[13:13:42] [C01] ok: the setup pill shows its screen
+[13:13:42] [C01] ok: and the setup pill is the active one
+[13:13:43] [C01] ok: the 2D segment sets the dimension
+[13:13:43] [C02] --- begin ---
+[13:13:45] [C02] NOTE: 2D cell=0: Cell size must be > 0
+[13:13:45] [C02] ok: cell=0 is reported at all
+[13:13:47] [C02] NOTE: 2D charge=0: Charge must be > 0 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.
+[13:13:47] [C02] ok: charge=0 is reported at all
+[13:13:49] [C02] NOTE: 2D Lx=-1: Domain extents must be > 0
+[13:13:49] [C02] ok: Lx=-1 is reported at all
+[13:13:51] [C02] NOTE: 1D radius=0: Domain radius must be > 0
+[13:13:53] [C02] NOTE: 3D t_end=-1: End time must be >= 0 (0 = automatic stop condition) | ~216,000 cells at dx = 0.025 m
+[13:13:54] [C02] NOTE: 3D slice_pos=99: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | Live slice position 99 m is outside the domain (0..1.5 m) - the nearest cell is used | ~216,000 cells at dx = 0.025 m
+[13:13:56] [C02] contact sheet: contact_C02.png (6 shots)
+[13:13:56] [C02] --- end done in 12.5s (max gap 404 ms) ---
+[13:13:56] [C02] ok: the Dark-mode action gives the dark theme
+[13:13:57] [C02] ok: the setup pill shows its screen
+[13:13:57] [C02] ok: and the setup pill is the active one
+[13:13:58] [C02] ok: the 2D segment sets the dimension
+[13:13:58] [C03] --- begin ---
+[13:14:00] [C03] NOTE: charge outside: Charge centre is outside the domain | Charge (r_exp = 0.0140 m) pokes through the open 'x_hi' boundary | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[13:14:00] [C03] ok: a charge outside the domain is reported
+[13:14:01] [C03] NOTE: charge in obstacle: Charge overlaps obstacle (0.9, 1.1, 0.9, 1.1) | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[13:14:03] [C03] NOTE: inverted obstacle box accepted=True, rows now [(1.5, 1.0, 0.0, 1.0)], strip: Charge overlaps obstacle (1.5, 1.0, 0.0, 1.0) | Obstacle (1.5, 1.0, 0.0, 1.0) is not a valid in-domain box | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[13:14:05] [C03] NOTE: gauge outside: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | G1 (9.00, 9.00) m outside the domain - will be dropped | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[13:14:07] [C03] NOTE: axisym charge 5 cm above the ground: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Charge is truncated by the y_lo wall (surface burst) | Cell size will be refined to 0.02108 m (5 cells across the charge radius) | ~8,836 cells at dx = 0.0210847 m
+[13:14:08] [C03] contact sheet: contact_C03.png (5 shots)
+[13:14:08] [C03] --- end done in 9.5s (max gap 161 ms) ---
+[13:14:09] [C03] ok: the Dark-mode action gives the dark theme
+[13:14:09] [C03] ok: the setup pill shows its screen
+[13:14:09] [C03] ok: and the setup pill is the active one
+[13:14:10] [C03] ok: the 2D segment sets the dimension
+[13:14:10] [C04] --- begin ---
+[13:14:12] [C04] NOTE: gauge entry 'a b': accepted=False, rows 0->0, hint 'not numbers: a, b'
+[13:14:12] [C04] ok: row 'a b' refused WITH a visible reason ('not numbers: a, b')
+[13:14:13] [C04] NOTE: gauge entry '1 2 3': accepted=False, rows 0->0, hint 'expected 2 numbers (r  z)'
+[13:14:13] [C04] ok: row '1 2 3' refused WITH a visible reason ('expected 2 numbers (r  z)')
+[13:14:14] [C04] NOTE: gauge entry '': accepted=False, rows 0->0, hint 'add a row: r  z'
+[13:14:15] [C04] NOTE: gauge entry '1,2': accepted=True, rows 0->1, hint 'add a row: r  z'
+[13:14:16] [C04] NOTE: gauge entry '1;2': accepted=False, rows 1->1, hint 'not numbers: 1;2'
+[13:14:16] [C04] ok: row '1;2' refused WITH a visible reason ('not numbers: 1;2')
+[13:14:16] [C04] ok: Remove with nothing selected explains itself
+[13:14:18] [C04] contact sheet: contact_C04.png (6 shots)
+[13:14:18] [C04] --- end done in 7.4s (max gap 157 ms) ---
+[13:14:19] [C04] ok: the Dark-mode action gives the dark theme
+[13:14:19] [C04] ok: the setup pill shows its screen
+[13:14:19] [C04] ok: and the setup pill is the active one
+[13:14:20] [C04] ok: the 2D segment sets the dimension
+[13:14:20] [C05] --- begin ---
+[13:14:22] [C05] ok: the chip's native action switches the solver
+[13:14:22] [C05] ok: native mode: the AMR card is hidden and the EOS row shown
+[13:14:23] [C05] ok: the chip's blastfoam action switches the solver
+[13:14:23] [C05] ok: blastFoam mode: the AMR card is shown and the EOS row hidden
+[13:14:23] [C05] NOTE: foam strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | WSL hardware not detected - cell caps assume a 4 GB VM (1,113,510 cells). A case that validated on another machine may be refused here; click Re-detect once WSL is up. Headless callers should call solvers.foam.env.prime_from_settings() at start-up. | Checking WSL blastFoam availability... | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[13:14:26] [C05] ok: the chip's native action switches the solver
+[13:14:27] [C05] ok: native keeps the typed foam values in the form and strips them from the case
+[13:14:27] [C05] NOTE: after native: material=C4 amr_levels=2 (case: TNT, 0)
+[13:14:28] [C05] contact sheet: contact_C05.png (4 shots)
+[13:14:28] [C05] --- end done in 7.8s (max gap 207 ms) ---
+[13:14:29] [C05] ok: the Dark-mode action gives the dark theme
+[13:14:30] [C05] ok: the setup pill shows its screen
+[13:14:30] [C05] ok: and the setup pill is the active one
+[13:14:30] [C05] ok: the 2D segment sets the dimension
+[13:14:31] [C06] --- begin ---
+[13:14:33] [C06] NOTE: zone on native (card hidden, case stripped): No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.01250 m (5 cells across the charge radius) | ~25,600 cells at dx = 0.012499 m
+[13:14:33] [C06] ok: the chip's blastfoam action switches the solver
+[13:14:34] [C06] NOTE: zone on foam: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.5, 1.5, 0.5, 1.5, 1) snapped outward to level-0 cell faces: (0.498054, 1.501946, 0.498054, 1.501946) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Local refinement: 1 level(s), finest cell 0.0038911 m, ~115,972 mesh cells; results are resampled to a 264,196-cell display grid | Charge cells: 812 at 0.0038911 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 115,972 cells is below the 200,000-cell parallel floor | ~115,972 cells at dx = 0.00781189 m (finest 0.00389105 m, 264,196 display cells)
+[13:14:35] [C06] NOTE: zone_level7: Refinement zone (0.5, 1.5, 0.5, 1.5, 7): level must be 1..4 | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Parallel run: 1 rank: 65,536 cells is below the 200,000-cell parallel floor | ~65,536 cells at dx = 0.00781189 m
+[13:14:36] [C06] NOTE: zone_jump: Refinement level jumps by 2 or more between neighbouring cells near (0.5, 0.5) m - nest each level-l zone inside a level-(l-1) zone with at least one level-(l-1) cell of margin | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Parallel run: 1 rank: 65,536 cells is below the 200,000-cell parallel floor | ~65,536 cells at dx = 0.00781189 m
+[13:14:38] [C06] NOTE: zone_snapped: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.53, 1.47, 0.53, 1.47, 1) snapped outward to level-0 cell faces: (0.529183, 1.470817, 0.529183, 1.470817) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Local refinement: 1 level(s), finest cell 0.0038911 m, ~109,972 mesh cells; results are resampled to a 264,196-cell display grid | Charge cells: 812 at 0.0038911 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 109,972 cells is below the 200,000-cell parallel floor | ~109,972 cells at dx = 0.00781189 m (finest 0.00389105 m, 264,196 display cells)
+[13:14:41] [C06] NOTE: axisym level-2 zone touching the axis: Axisymmetric: refinement zones touching the symmetry axis (x0 = 0) are limited to level 1 (the wedge axis cells are prisms, not hexahedra) | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.0, 0.6, 0.6, 1.4, 1) snapped outward to level-0 cell faces: (0.0, 0.605263, 0.592105, 1.407895) | Refinement zone (0.0, 0.3, 0.8, 1.2, 2) snapped outward to level-1 cell faces: (0.0, 0.302632, 0.796053, 1.203947) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01318 m (8 cells across the charge radius) | Parallel run: 1 rank: 22,801 cells is below the 200,000-cell parallel floor | ~22,801 cells at dx = 0.013178 m
+[13:14:42] [C06] contact sheet: contact_C06.png (6 shots)
+[13:14:42] [C06] --- end done in 11.6s (max gap 359 ms) ---
+[13:14:43] [C06] ok: the Dark-mode action gives the dark theme
+[13:14:44] [C06] ok: the setup pill shows its screen
+[13:14:44] [C06] ok: and the setup pill is the active one
+[13:14:44] [C06] ok: the 2D segment sets the dimension
+[13:14:45] [C07] --- begin ---
+[13:14:46] [C07] ok: the chip's native action switches the solver
+[13:14:48] [C07] NOTE: AMR on native: amr_levels is still '2' in the hidden card and stripped from the case; strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.02795 m (5 cells across the charge radius) | ~20,449 cells at dx = 0.0279487 m
+[13:14:49] [C07] ok: the chip's blastfoam action switches the solver
+[13:14:50] [C07] NOTE: valid AMR case: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[13:14:50] [C07] ok: the charge-refinement row is hidden while AMR is on
+[13:14:52] [C07] NOTE: AMR + zones: Dynamic AMR and static refinement zones are mutually exclusive - clear the zones and set charge refinement to 'global' (the charge is refined at t = 0 by the AMR itself) | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[13:14:53] [C07] NOTE: amr_unrefine_gt_refine: The AMR unrefine threshold must not exceed the refine threshold (cells would refine and unrefine in turn) | Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[13:14:54] [C07] NOTE: amr_display_gt_levels: The AMR unrefine threshold must not exceed the refine threshold (cells would refine and unrefine in turn) | AMR display level must be 0..3 (the AMR levels) | Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[13:14:57] [C07] NOTE: AMR 1 level with a 0.5 kg/m charge on 0.2 m cells: Resolving the charge (8 cells across its radius) needs AMR level 8 (finest 0.00078125 m) - raise the AMR levels or lower the base cell to at most 0.0015625 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[13:14:58] [C07] contact sheet: contact_C07.png (6 shots)
+[13:14:58] [C07] --- end done in 13.4s (max gap 156 ms) ---
+[13:14:59] [C07] ok: the Dark-mode action gives the dark theme
+[13:15:00] [C07] ok: the setup pill shows its screen
+[13:15:00] [C07] ok: and the setup pill is the active one
+[13:15:01] [C07] ok: the 2D segment sets the dimension
+[13:15:01] [C08] --- begin ---
+[13:15:02] [C08] NOTE: 2D 100M cells: ~100,000,000 cells exceeds the 2D cap of 8,000,000 | No terminate boundary and no end time: the run is bounded only by the safety cap (~294 ms). Set a side to 'terminate' to stop when the wave reaches it. | ~100,000,000 cells at dx = 0.001 m
+[13:15:02] [C08] ok: a 100 M cell case is reported before Run
+[13:15:03] [C08] ok: the run pill shows its screen
+[13:15:03] [C08] ok: and the run pill is the active one
+[13:15:03] [C08] DIALOG show_error [Run] '~100,000,000 cells exceeds the 2D cap of 8,000,000' -> 'ok'
+[13:15:04] [C08] ok: and Run refuses it rather than starting a doomed solve
+[13:15:05] [C08] ok: the setup pill shows its screen
+[13:15:05] [C08] ok: and the setup pill is the active one
+[13:15:06] [C08] NOTE: 3D 0.06 m: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.03083 m (5 cells across the charge radius) | ~110,592 cells at dx = 0.0308261 m
+[13:15:07] [C08] NOTE: 3D foam 0.02 m: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | ~456,533 cells at dx = 0.0192663 m
+[13:15:08] [C08] contact sheet: contact_C08.png (5 shots)
+[13:15:08] [C08] --- end done in 7.3s (max gap 190 ms) ---
+[13:15:09] [C08] ok: the Dark-mode action gives the dark theme
+[13:15:10] [C08] ok: the setup pill shows its screen
+[13:15:10] [C08] ok: and the setup pill is the active one
+[13:15:10] [C08] ok: the 2D segment sets the dimension
+[13:15:11] [C09] --- begin ---
+[13:15:14] [C09] NOTE: 8 report lines: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.00625 m) - raise the AMR levels or lower the base cell to at most 0.025 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it. | Obstacles: cells inside each box are carved out of the mesh (rigid walls) | Instant detonation ('none'): the whole charge reacts at t = 0 | Afterburn (Miller): up to 2 MJ/kg released as the products burn with atmospheric oxygen - calibrated against Kingery-Bulmash (DONE.md N3: the anchor reads 1.02-1.20 of KB with this model on) | blastFoam ready in WSL (Ubuntu) | Parallel run: auto: 4 MPI ranks (216,000 cells at 50,000/rank) | ~216,000 cells at dx = 0.1 m
+[13:15:14] [C09] ok: a long report scrolls instead of pushing the preview off the tab (160 px of 170)
+[13:15:14] [C09] ok: and the preview is still on screen underneath it
+[13:15:14] [C09] NOTE: G8: the 3D preview should show 3 charges + 2 det points (see the shot)
+[13:15:23] [C09] ok: the Dark-mode action gives the light theme
+[13:15:32] [C09] ok: the Dark-mode action gives the dark theme
+[13:15:33] [C09] contact sheet: contact_C09.png (2 shots)
+[13:15:33] [C09] --- end done in 22.5s (max gap 340 ms) ---
+[13:15:34] [C09] ok: the Dark-mode action gives the dark theme
+[13:15:35] [C09] ok: the setup pill shows its screen
+[13:15:35] [C09] ok: and the setup pill is the active one
+[13:15:35] [C09] ok: the 2D segment sets the dimension
+[13:15:36] [C10] --- begin ---
+[13:15:39] [C10] NOTE: 3D zones strip: Resolving the charge needs level 6 (> 4) below the base cell - lower the base cell size to at most 0.125 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~294 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 8,000 cells is below the 200,000-cell parallel floor | ~8,000 cells at dx = 0.5 m
+[13:15:39] [C10] ok: the report explains that the charge needs a level over the cap
+[13:15:44] [C10] NOTE: 2D refine strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Local refinement: 4 level(s), finest cell 0.003125 m, ~10,276 mesh cells; results are resampled to a 1,638,400-cell display grid | Charge resolved by automatic level-4 zones (base cell kept at 0.05 m) | Charge cells: 624 at 0.003125 m -> ~0.99 of the 10 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 10,276 cells is below the 200,000-cell parallel floor | ~10,276 cells at dx = 0.05 m (finest 0.003125 m, 1,638,400 display cells)
+[13:15:44] [C10] ok: the report says "Local refinement: N level(s)" for a charge_refine=zone case that validates
+[13:15:47] [C10] NOTE: 2D AMR strip: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.003125 m) - raise the AMR levels or lower the base cell to at most 0.0125 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 6,400 cells is below the 200,000-cell parallel floor | ~6,400 cells at dx = 0.05 m
+[13:15:50] [C10] contact sheet: contact_C10.png (5 shots)
+[13:15:50] [C10] --- end done in 14.6s (max gap 585 ms) ---
+[13:15:51] [C10] ok: the Dark-mode action gives the dark theme
+[13:15:52] [C10] ok: the setup pill shows its screen
+[13:15:52] [C10] ok: and the setup pill is the active one
+[13:15:53] [C10] ok: the 2D segment sets the dimension
+[13:15:53] [C11] --- begin ---
+[13:15:54] [C11] NOTE: axisym labels: {'Lx': 'Radius R [m]', 'Ly': 'Height H [m]', 'cx': 'Burst r [m]', 'cy': 'Burst z [m]'}; cx='0'
+[13:15:54] [C11] ok: axisymmetric relabels the geometry fields ({'Lx': 'Radius R [m]', 'Ly': 'Height H [m]', 'cx': 'Burst r [m]', 'cy': 'Burst z [m]'})
+[13:15:56] [C11] NOTE: planar labels: {'Lx': 'Lx [m]', 'Ly': 'Ly [m]', 'cx': 'Burst x [m]', 'cy': 'Burst y [m]'}
+[13:15:56] [C11] ok: and planar puts them back
+[13:15:57] [C11] contact sheet: contact_C11.png (2 shots)
+[13:15:57] [C11] --- end done in 4.0s (max gap 147 ms) ---
+[13:15:58] [C11] ok: the Dark-mode action gives the dark theme
+[13:15:58] [C11] ok: the setup pill shows its screen
+[13:15:58] [C11] ok: and the setup pill is the active one
+[13:15:59] [C11] ok: the 2D segment sets the dimension
+[13:15:59] [C12] --- begin ---
+[13:16:00] [C12] DIALOG save_file [Save case] 'blastlab case (*.json)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\save1.json'
+[13:16:01] [C12] ok: Save case wrote the JSON
+[13:16:03] [C12] ok: Open case round-trips the saved fields
+[13:16:03] [C12] DIALOG open_file [Open case] 'blastlab case (*.json);;All files (*.*)' -> ''
+[13:16:04] [C12] ok: a cancelled Open leaves the form alone
+[13:16:04] [C12] NOTE: Open case cancelled -> nothing happened (expected)
+[13:16:04] [C12] contact sheet: contact_C12.png (3 shots)
+[13:16:04] [C12] --- end done in 4.6s (max gap 149 ms) ---
+[13:16:05] [C12] ok: the Dark-mode action gives the dark theme
+[13:16:05] [C12] ok: the setup pill shows its screen
+[13:16:05] [C12] ok: and the setup pill is the active one
+[13:16:06] [C12] ok: the 2D segment sets the dimension
+[13:16:06] [D01] --- begin ---
+[13:16:08] [D01] ok: the run pill shows its screen
+[13:16:08] [D01] ok: and the run pill is the active one
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\save1\gauges\gauges_1d.txt  (1356 rows x 2 gauges)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\save1\profile.txt  (400 cells, t = 1.828 ms)
+[13:16:10] [D01] DIALOG notify_desktop [BlastLab] 'save1 finished in 3 s. Highest peak: G1, 3,413 kPa at 0.16 ms.' -> 'ok'
+[13:16:11] [D01] ok: the 1D run finished
+[13:16:12] [D01] NOTE: chips after the 1D run: {'step': '1355', 't [ms]': '1.828', 'dt [s]': '1.93e-06', 'p max [kPa]': '284.3', 'cells': '—'}
+[13:16:12] [D01] ok: progress reads 100 % after the run (1000 of 1000)
+[13:16:12] [D01] contact sheet: contact_D01.png (3 shots)
+[13:16:12] [D01] --- end done in 5.4s (max gap 373 ms) ---
+[13:16:12] [D01] ok: the Dark-mode action gives the dark theme
+[13:16:13] [D01] ok: the setup pill shows its screen
+[13:16:13] [D01] ok: and the setup pill is the active one
+[13:16:14] [D01] ok: the 2D segment sets the dimension
+[13:16:14] [D01] budget: 175s left < 200s for D02 - exiting 75
+[13:16:16] [D01] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x2d56b2cdf40, name="viewWindow") , parent:  QWidgetWindow(0x2d56b2cea20, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[13:16:16] [D01] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x2d56b2cdbe0, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x2d56b2cea20, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[13:16:17] [D01] exit 75; pending: ['D02', 'D03', 'D04', 'D05', 'D06', 'E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08', 'E09', 'F00', 'F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

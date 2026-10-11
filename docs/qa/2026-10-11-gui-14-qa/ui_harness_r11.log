@@ -1,0 +1,19 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:29:59] [boot] window up: 1280x840 (built 3676 ms, shown 1860 ms)
+[14:29:59] [I02] --- begin ---
+[14:29:59] [I02] ok: the setup pill shows its screen
+[14:29:59] [I02] ok: and the setup pill is the active one
+[14:30:01] [I02] ok: the run pill shows its screen
+[14:30:01] [I02] ok: and the run pill is the active one
+[14:30:01] [I02] ok: the run started
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_3d.txt  (25 rows x 2 gauges)
+  Writing animation (25 frames, fixed (whole video) 0 .. 2.77e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.gif
+[14:30:16] [I02] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x27e932f5100, name="viewWindow") , parent:  QWidgetWindow(0x27e932f5e20, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:30:16] [I02] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x27e932f4fe0, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x27e932f5e20, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:30:19] [I02] close took 13.2 s; worker alive after join: False
+[14:30:19] [I02] FINDING S2 check: closing during a native run returned in 13.2 s
+[14:30:19] [I02] ok: and the solver thread did not outlive the window
+[14:30:19] [I02] --- end done in 20.3s (max gap 1140 ms) ---
+[14:30:19] [I02] I02 is terminal - exiting 75 for a fresh app
+[14:30:19] [I02] exit 75; pending: ['I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

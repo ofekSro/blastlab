@@ -1,0 +1,26 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[15:13:16] [boot] foreign WSL solvers at kickoff: []
+[15:13:24] [boot] App built in 4877 ms
+[15:13:24] [I01] === BEGIN I01 ===
+[15:18:44] [I01] run_wait TIMEOUT after 300s - stopping
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_3d.txt  (2218 rows x 2 gauges)
+  Writing animation (140 frames, fixed (whole video) -101 .. 2.77e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[15:19:28] [I01] SHOT 263_I01_setup_after_rapid_dark.png (printwindow, lum 40)
+[15:19:29] [I01] SHOT 264_I01_run_after_rapid_dark.png (printwindow, lum 40)
+[15:19:30] [I01] SHOT 265_I01_results_after_rapid_dark.png (printwindow, lum 43)
+[15:19:31] [I01] SHOT 266_I01_chain_after_rapid_dark.png (printwindow, lum 40)
+[15:19:32] [I01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I01.png
+[15:19:32] [I01] === END I01: done (367s, max gap 1209 ms) ===
+[15:19:33] [I02] === BEGIN I02 ===
+[15:19:35] [I02] DIALOG askyesno [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be de" -> True
+[15:19:35] [I02] SHOT 267_I02_run_dialog-askyesno_dark.png (printwindow, lum 45)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_3d.txt  (20 rows x 2 gauges)
+  Writing animation (20 frames, fixed (whole video) 0 .. 2.77e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[15:20:54] [I02] _on_close took 15.7 s; worker alive after join: True
+[15:20:54] [I02] FINDING S2 check: close during a native run returned in 15.7 s
+[15:20:54] [I02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_I02.png
+[15:20:54] [I02] === END I02: done (81s, max gap 452 ms) ===
+[15:20:54] [I02] I02 is terminal - exiting 75 for a fresh App
+[15:20:54] [I02] exit 75; pending: ['I03', 'I04', 'I05', 'I06']
