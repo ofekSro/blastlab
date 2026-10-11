@@ -33,6 +33,7 @@ the original Hebrew notes survive only in git history (`docs/archive/`).
 | [verification/physics-anchors.md](verification/physics-anchors.md) | The Kingery-Bulmash anchor, every measured number, the reference chain, and the measurement discipline |
 | [verification/blastfoam-claims.md](verification/blastfoam-claims.md) | The independent adversarial audit of the five defects attributed to blastFoam — verdicts, pre-registered rules, and the runs that settle what is left |
 | [verification/solver-options-review.md](verification/solver-options-review.md) | Every dictionary the code generates, against the official guide and the vendor source. Also the catalogue of guide features not yet used |
+| [verification/remap-chain-gaps.md](verification/remap-chain-gaps.md) | The 1D→2D / 2D→3D / 1D→3D hand-offs and the missing 3D→3D: every gap with its evidence, behind `TODO.md` P1-20..22, P3-14, P2-26..30, P3-27..28 (2026-10-11) |
 
 ## History — how things came to be the way they are
 

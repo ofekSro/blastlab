@@ -645,6 +645,13 @@ builds a 3D scene inside the Tk process (`gui/app.py _attach_view3d_auto` →
 `gui/view3d_panel.py adopt_feed` → `_ensure_scene`). Pre-existing, not OUT-1. Evidence:
 `docs/qa/2026-09-26-out-1/tk_timing.out.txt`.
 
+### Remap-chain gaps · **found 2026-10-11** · detail: [docs/verification/remap-chain-gaps.md](docs/verification/remap-chain-gaps.md)
+
+- `P1-20` Gauges inside the hand-off radius already saw their peak in the stage before; no warning, no mark in Results, no stitched history.
+- `P1-21` 2D→3D burst height: native takes the 2D profile's and refuses ≥ Lz; blastFoam takes the 3D form's z (`burst_points`, timing) and refuses nothing.
+- `P1-22` Afterburn across a hand-off: `c.expl` is not carried and stages are not checked to agree. Verify blastFoam's starting `c` first.
+- `P3-14` **3D→3D, raised from P3 and expanded (owner 2026-10-11)**: no format, no remap, no 3D final state, and the chain is keyed by dimension. Owner questions in the detail doc §3.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
@@ -815,6 +822,11 @@ Qt refusal and overwrite dialogs break a path after "C:".
 - `P2-23` A resumed run's gauges lose U: after a restart blastProbes writes only p and rho, so `read_probes` drops U_mag (warns since 25ce709). Pre-existing on master (OUT-3 verifier).
 - `P2-24` Qt: the Keep all fields tooltip is one ~1000 px line - wrap it. Tk light mode: unselected sidebar / dimension buttons are very faint (OUT-3 QA).
 - `P2-25` Qt: a native result cannot be reopened in 03 Results after a restart, though its files are in the model folder - add `Open a model folder…` to 03 Results (also covers blastFoam runs whose WSL scratch was released). `docs/UX_REVIEW-redesign.md` UXR-14; owner approved as its own item, not GUI-11 (2026-10-03).
+- `P2-26` Chain: W and Z lost after the first stage - Z hidden on profile stages; a foam 2D profile stage records the form's stale charge and `from_profile=False`; native records 0 (`P3-10`). Detail: `docs/verification/remap-chain-gaps.md` §4, as for P2-27..30.
+- `P2-27` Chain: blastFoam is silent when the hand-off already reaches a boundary, the ground or an obstacle (native warns); `writer.py:1777-1778` claims `validate_case` warns and it does not.
+- `P2-28` Chain accuracy coverage: no impulse in `_e2e_foam_chain`; no blastFoam chain-vs-direct test for 2D→3D or 1D→3D; no `profile2d` writer golden.
+- `P2-29` 2D→3D remap puts ambient air in the 3D layer below the first 2D cell centre (`core/profiles.py:274-275`) - latent, only when the 3D cells are finer near the ground.
+- `P2-30` Hand-off fidelity, measure first: interface cut at alpha 0.5 with `p` recomputed; no source-vs-target mass/energy/momentum check; a 2D AMR source exports at display level.
 
 ---
 
@@ -840,13 +852,13 @@ Qt refusal and overwrite dialogs break a path after "C:".
   charge is an infinite cylinder, and `spec.charges` is already a list on the 2D
   path. Missing: the setFieldsDict, overlap/boundary checks and the GUI table.
   Axisymmetric stays a single charge on the axis — that is geometry, not a gap.
-- `P3-14` There is no 3D remap format, so **a 3D stage is always the end of a
-  chain**. Large work (format + remap + validation + GUI); only if continuing a 3D
-  run into a further stage is really wanted.
+- `P3-14` 3D→3D remap — **moved to P1** ("Remap-chain gaps", owner 2026-10-11).
 - `P3-15` Obstacles do not survive the 2D→3D remap — they would become rings around
   the axis, so `save_profile_2d` drops them with a warning only. The 3D stage
   continues a state that evolved around obstacles that are no longer there.
   **Minimum:** raise it to a validation warning in the GUI instead of a stdout print.
+- `P3-27` A hemispherical surface burst through the chain (1D→3D / 1D→2D near the ground); the factor is an owner call, cited from UFC 3-340-02. Detail: `docs/verification/remap-chain-gaps.md` §5.
+- `P3-28` Several charges with a hand-off: extra charges beside a remapped field, and several 1D hand-offs placed in one 2D/3D stage (one common hand-off time, fields not yet met). Same doc §5.
 
 **From the solver-options review** — full detail and dict snippets in
 [docs/verification/solver-options-review.md](docs/verification/solver-options-review.md).
