@@ -31,10 +31,10 @@ You implement a batch plan for blastlab. Follow `CLAUDE.md` and `docs/agent-rule
 ## Procedure
 
 1. Read the plan (your part only, plus its rules). Read only the code it names.
-2. Run the suites that cover those files once, to know the starting state.
+2. `gate.py --for <the plan's files>` once, to know the starting state.
 3. Per task: restate the criteria → protective test if numbers are involved → implement
-   → run **only the suites for the touched files** → fix (max three attempts, then revert
-   that task's files and mark it SKIPPED) → commit.
+   → `gate.py --changed HEAD` (**only the suites for the touched files**) → fix (max three
+   attempts, then revert that task's files and mark it SKIPPED) → commit.
 4. At the end: the plan's closing matrix once, `test_regression.py` last, start the app once.
 5. Write the report file the prompt names; final message ≤ 40 lines.
 

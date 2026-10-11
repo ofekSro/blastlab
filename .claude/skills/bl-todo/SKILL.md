@@ -30,7 +30,7 @@ paste the standing rules - they live in `docs/agent-rules.md`.
 ## Stage 0: preconditions
 
 `TODO.md` exists; git repo; tree clean apart from the owner's private paths listed in
-`docs/agent-rules.md`; record `BASE`.
+`docs/agent-rules.md`; record `BASE` and the start time (`Get-Date -Format s`).
 
 ## Stage 1: plan
 
@@ -77,7 +77,9 @@ batches. Skip the stage when no GUI screen was touched.
 
 Short: done vs left, one line each; tests; verifier fixes; open questions **each with a
 recommendation** (the owner answers "approve all" or by number); the commit range and
-how to undo it; what needs the office machine.
+how to undo it; what needs the office machine. Last, the `total` and `rule` lines of
+`python .claude/skills/bl-todo/cost.py <session id> --since <start> --tasks <planned>`
+(the session id is your scratchpad's folder name).
 
 ## Rules
 

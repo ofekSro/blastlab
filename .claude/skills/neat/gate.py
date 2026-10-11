@@ -1,4 +1,4 @@
-"""Test gate for /neat: run every fast suite, print one line per failure.
+"""Test gate for /neat and /bl-todo: run fast suites, print one line per failure.
 
 The point is tokens. A full test run prints thousands of lines; the agent
 needs to know only which suites failed and why. Logs go to a scratch
@@ -9,10 +9,21 @@ edit's fault).
     python .claude/skills/neat/gate.py --baseline     # prints its NAME
     python .claude/skills/neat/gate.py --against NAME
     python .claude/skills/neat/gate.py --only regression foam_writer
+    python .claude/skills/neat/gate.py --changed HEAD          # this edit
+    python .claude/skills/neat/gate.py --for blastlab/ui/run_panel.py --deep
 
 `--baseline` is keyed on HEAD plus the working-tree diff, and reuses a
 saved run with the same key - a second apply on an unchanged tree does
 not pay for the "before" run again.
+
+`--changed REV` (files changed since REV, uncommitted and untracked
+included) and `--for FILE...` (paths from the repo root) run only the
+suites that import those files - anywhere in the suite, lazy imports and
+dotted names in strings included, and through the test helpers. `--deep`
+follows the imports through the package too, so a suite that builds the
+MainWindow runs for a change to any widget it pulls in. Changed files no
+fast suite imports, and WSL solve suites that would have been picked, are
+printed - never silently dropped.
 
 Excluded on purpose: the WSL solve suites (minutes each, and they need an
 idle VM - CLAUDE.md 8.6), `_e2e_*` and `_qa_*`. A tidy edit that cannot
@@ -22,6 +33,7 @@ makes.
 """
 
 import argparse
+import ast
 import hashlib
 import json
 import os
@@ -51,8 +63,14 @@ GUI_SOURCE = re.compile(r'PySide6|tkinter|blastlab\.ui|blastlab\.gui|viz3d')
 #: 8 lanes pushed test_blast3d from 10.6 to over 15 min (BLAS threads
 #: oversubscribe the cores); 4 + the GUI lane measured clean
 JOBS = 4
+#: below this much RAM the default is one lane: the home PC has 8 GB and
+#: runs heavy suites one at a time (docs/agent-rules.md)
+LOW_RAM_GB = 16
 TIMEOUT_S = 1800
 TAIL_LINES = 12
+#: a package module named inside a string (subprocess code, importlib)
+DOTTED = re.compile(r'\bblastlab(?:\.\w+)+')
+IMPORT_LINE = re.compile(r'^\s*(?:from|import)\s+([\w.]+)', re.M)
 
 
 def suites(only):
@@ -65,6 +83,146 @@ def suites(only):
         names.remove(FIRST)
         names.insert(0, FIRST)
     return names
+
+
+def module_name(path):
+    """'<root>/blastlab/ui/run_panel.py' -> 'blastlab.ui.run_panel'
+    (a package's `__init__.py` -> the package)."""
+    parts = os.path.relpath(path, ROOT)[:-3].replace('\\', '/').split('/')
+    if parts[-1] == '__init__':
+        parts.pop()
+    return '.'.join(parts)
+
+
+def module_index():
+    """{module name: path} for every package module outside tests/."""
+    idx = {}
+    for dirpath, dirs, files in os.walk(os.path.join(ROOT, 'blastlab')):
+        dirs[:] = [d for d in dirs if d not in ('tests', '__pycache__')]
+        for f in files:
+            if f.endswith('.py'):
+                p = os.path.join(dirpath, f)
+                idx[module_name(p)] = p
+    return idx
+
+
+def imports_of(path, package=''):
+    """Every name `path` imports, anywhere in the file; for
+    `from X import Y` both X and X.Y. `package` resolves relative imports."""
+    with open(path, encoding='utf-8-sig', errors='replace') as f:
+        text = f.read()
+    try:
+        tree = ast.parse(text, path)
+    except SyntaxError:  # the suite will fail anyway; select it by its text
+        return set(IMPORT_LINE.findall(text)) | set(DOTTED.findall(text))
+    out = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            mod = node.module or ''
+            if node.level:
+                base = package.split('.')[:len(package.split('.')) - node.level + 1]
+                mod = '.'.join(base + ([mod] if mod else []))
+            out.add(mod)
+            out.update(mod + '.' + a.name for a in node.names)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str):
+            out.update(DOTTED.findall(node.value))
+    return out
+
+
+def with_parents(names):
+    """Importing a.b.c runs a/__init__ and a/b/__init__ too."""
+    out = set()
+    for n in names:
+        parts = n.split('.')
+        out.update('.'.join(parts[:i]) for i in range(1, len(parts) + 1))
+    return out
+
+
+def closure(start, graph):
+    seen, todo = set(), list(start)
+    while todo:
+        m = todo.pop()
+        if m not in seen:
+            seen.add(m)
+            todo.extend(graph.get(m, ()))
+    return seen
+
+
+def changed_since(rev):
+    """Repo-relative paths changed since `rev`: committed, staged,
+    unstaged and untracked."""
+    def git(*a):
+        p = subprocess.run(['git', *a], cwd=ROOT, capture_output=True, text=True)
+        if p.returncode:
+            sys.exit(f'git {" ".join(a)} failed: {p.stderr.strip()}')
+        return p.stdout.splitlines()
+    return sorted(set(git('diff', '--name-only', rev, '--'))
+                  | set(git('ls-files', '--others', '--exclude-standard')))
+
+
+def select(paths, deep):
+    """Suites that import any of `paths`, plus changed suites themselves.
+    Prints what it picked and what no fast suite covers; returns the names."""
+    idx = module_index()
+    helpers = {f[:-3]: os.path.join(TESTS, f) for f in os.listdir(TESTS)
+               if f.endswith('.py') and not f.startswith(('test_', '_e2e_', '_qa_'))}
+    keys, own, other = {}, set(), []
+    for p in paths:
+        full = os.path.normpath(p if os.path.isabs(p) else os.path.join(ROOT, p))
+        rel = os.path.relpath(full, ROOT).replace('\\', '/')
+        name = os.path.basename(full)
+        if not rel.startswith('blastlab/'):
+            continue
+        if not rel.endswith('.py'):
+            other.append(rel)
+        elif os.path.dirname(full) == TESTS and name.startswith('test_'):
+            own.add(name)
+        elif os.path.dirname(full) == TESTS and name[:-3] in helpers:
+            keys[name[:-3]] = rel
+        elif rel.startswith('blastlab/tests/'):
+            other.append(rel)
+        else:
+            keys[module_name(full)] = rel
+
+    graph = {}
+    if deep:
+        for m, p in idx.items():
+            pkg = m if p.endswith('__init__.py') else m.rpartition('.')[0]
+            graph[m] = {x for x in with_parents(imports_of(p, pkg)) if x in idx}
+    picked, wsl, hit = set(), set(), set()
+    for name in sorted(f for f in os.listdir(TESTS)
+                       if f.startswith('test_') and f.endswith('.py')):
+        raw = imports_of(os.path.join(TESTS, name))
+        for h in raw & helpers.keys():
+            raw |= imports_of(helpers[h])
+        reach = with_parents(raw)
+        if deep:
+            reach |= closure(reach & idx.keys(), graph)
+        found = reach & keys.keys()
+        if found or name in own:
+            (wsl if name in WSL_SOLVES else picked).add(name)
+            if name not in WSL_SOLVES:
+                hit |= found
+
+    how = 'imports, followed through the package' if deep else 'direct imports'
+    print(f'{len(picked)} suites for {len(keys) + len(own)} changed files ({how})')
+    uncovered = [keys[k] for k in keys if k not in hit] + other
+    if uncovered:
+        print('no fast suite imports (pick suites yourself, or try --deep):',
+              ', '.join(sorted(uncovered)))
+    if wsl:
+        print('WSL solve suites not run (CLAUDE.md 8.6):', ', '.join(sorted(wsl)))
+    return picked
+
+
+def default_jobs():
+    """JOBS lanes, or one on a machine under LOW_RAM_GB."""
+    sys.path.insert(0, ROOT)
+    from blastlab.core import hardware
+    ram = hardware.detect_host_ram_gb()
+    return 1 if ram and ram < LOW_RAM_GB else JOBS
 
 
 def check_cleanup_off():
@@ -148,9 +306,21 @@ def main():
     ap.add_argument('--against', metavar='NAME', help='report changes vs NAME')
     ap.add_argument('--only', nargs='+', metavar='SUBSTR',
                     help='run only suites whose filename contains SUBSTR')
-    ap.add_argument('-j', '--jobs', type=int, default=JOBS,
-                    help=f'parallel lanes for non-GUI suites (default {JOBS}; 1 = serial)')
+    ap.add_argument('--changed', metavar='REV',
+                    help='run only the suites that import files changed since REV')
+    ap.add_argument('--for', dest='files', nargs='+', metavar='FILE',
+                    help='run only the suites that import FILE (repo-relative)')
+    ap.add_argument('--deep', action='store_true',
+                    help='with --changed / --for: follow imports through the package')
+    ap.add_argument('-j', '--jobs', type=int, default=None,
+                    help=f'parallel lanes for non-GUI suites (default {JOBS}, '
+                         f'1 under {LOW_RAM_GB} GB RAM; 1 = serial)')
     args = ap.parse_args()
+    picking = args.changed or args.files
+    if picking and args.baseline:
+        ap.error('--baseline keys a full run; do not combine it with --changed / --for')
+    if args.jobs is None:
+        args.jobs = default_jobs()
 
     if args.baseline:
         args.save = tree_key()
@@ -163,8 +333,15 @@ def main():
             return 0
         print(f'BASELINE {args.save}')
 
-    check_cleanup_off()
     names = suites(args.only)
+    if picking:
+        paths = (args.files or []) + (changed_since(args.changed) if args.changed else [])
+        picked = select(paths, args.deep)
+        names = [n for n in names if n in picked]
+        if not names:
+            print('nothing to run')
+            return 0
+    check_cleanup_off()
     tag = args.save or args.against or 'last'
     logdir = os.path.join(STATE, tag + ('-after' if args.against else ''))
     os.makedirs(logdir, exist_ok=True)

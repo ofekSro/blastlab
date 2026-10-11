@@ -42,7 +42,13 @@ purpose. It adds to `CLAUDE.md`, never replaces it. Owner-approved 2026-10-04.
   viewer child (CLAUDE.md §8.7).
 - The home PC has 8 GB RAM: heavy suites and harness passes ONE AT A TIME. A
   `MemoryError` on a heavy suite: rerun it alone before blaming code. Harness with
-  `PYTHONIOENCODING=utf-8`. Long passes: `python -u` in the background, poll.
+  `PYTHONIOENCODING=utf-8`. Long passes: `python -u` in the background, poll at most
+  4 min apart (Token budget).
+- Run suites through `python .claude/skills/neat/gate.py`: one line per failure, logs
+  out of your context, one lane on the 8 GB PC. `--for <files>` before you start,
+  `--changed HEAD` per task (the uncommitted edit), `--changed <base>` for a whole part,
+  `--deep` at full verification depth, `--only regression` last. Its *no fast suite
+  imports* line names files no suite covers - pick those suites yourself.
 - `test_regression.py` must stay byte-identical; run it last.
 
 ## Do it once (owner-approved 2026-10-05)
@@ -62,6 +68,15 @@ purpose. It adds to `CLAUDE.md`, never replaces it. Owner-approved 2026-10-04.
 
 ## Token budget - work as if paid in tokens
 
+- **Never let more than 4 minutes pass between two of your tool calls.** A subagent's
+  prompt cache lives 5 minutes; after a longer gap the whole context is written again at
+  full price. `Start-Sleep 540`-`595` waits cost a third of the 2026-10-04 /bl-todo run
+  (measured 2026-10-11). Anything that may run past ~3 min (gate.py on more than a few
+  suites, a harness, a WSL solve): `run_in_background`, then poll with `Start-Sleep 240`
+  or shorter.
+- Independent calls go in ONE message: several Reads, Greps, or a Read and a Grep that
+  do not depend on each other. Every message re-reads the whole context; more than half
+  of the implementers' messages carried a single call.
 - Read big files by section: Grep first, then Read the lines you need. Never Read a file
   over ~600 lines whole unless the task is that file.
 - From `docs/gui-redesign-decisions.md` read only the open rows the task cites.

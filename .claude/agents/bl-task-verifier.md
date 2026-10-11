@@ -22,10 +22,12 @@ You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.m
 - Read `git diff <base>..HEAD` once for: numbers / units / signs the plan did not ask
   for, silent failures (`except Exception: pass`, swallowed errors), widgets touched
   off the GUI thread, tests that cannot fail, callers not updated, leftovers.
-- Run the suites for the touched files, then `test_regression.py` last.
+- `gate.py --changed <base>` (the suites for the touched files), then
+  `gate.py --only regression` last.
 - Go deeper (real platform, probes, a worktree A/B) only where something looks wrong.
 
 **full** (`risk: high`), everything in light, plus:
+- `gate.py --changed <base> --deep` instead of the plain selection.
 - Re-run every demonstration the criteria name, geometry on the real platform.
 - For each changed check or golden, show it still fails when it should.
 - Check cited documents say what the comments claim.
