@@ -652,6 +652,25 @@ builds a 3D scene inside the Tk process (`gui/app.py _attach_view3d_auto` →
 - `P1-22` Afterburn across a hand-off: `c.expl` is not carried and stages are not checked to agree. Verify blastFoam's starting `c` first.
 - `P3-14` **3D→3D, raised from P3 and expanded (owner 2026-10-11)**: no format, no remap, no 3D final state, and the chain is keyed by dimension. Owner questions in the detail doc §3.
 
+### P1-23 · The default ignition radius uses the global `lmax`, not the level at the charge · **found 2026-10-11**
+
+`writer.default_det_radius` (`N5-7`) returns `0.9 · dx_base / 2**max(lmax, amr)`. Its
+docstring says the radius follows the mesh *at the charge*, but `lmax` is the deepest
+zone anywhere. When the charge sits in a shallower zone the radius falls below the
+0.707 · dx corner distance and blastFoam aborts at t = 0 with `No cells will be
+activated using the detonation point`. Hit three times on 2026-10-11
+(`/root/blastlab_runs/20261011-08*_2d_p61324-0*`): axisymmetric 10 × 10 m, 100 kg C4 at
+(0, 0), zones `[0, 7.5, 0, 6, 1]` + `[3.5, 7.5, 0.1, 5.9, 2]` → radius 6.9 mm, nearest
+centre 10.8 mm. Validation passes it. Workaround: a small level-`lmax` zone around the
+charge.
+
+Fix: take the level from `spec.levels` at each detonation point (the deepest cell
+touching it), max with `amr`; check `dx_charge`, which has the same `lmax`
+assumption. Validation should refuse an explicit `det_radii` below the corner distance.
+Acceptance: the case above runs in serial and parallel; a new `test_foam_writer.py`
+case pins the radius for a charge outside the deepest zone; existing fixtures with the
+charge in the deepest zone stay byte-identical.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
