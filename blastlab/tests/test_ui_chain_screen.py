@@ -347,7 +347,8 @@ def s3_cards(win):
     pump(400)
     case1 = ch.checks()[1].case
     check('the 1D out-text names Outer (it ends the run) and its radius',
-          'Outer (10.0 m)' in ch.editors[1].hand_out.caption.text()
+          # GUI-14 (a): the chain seeds stage 1's radius at 1.5 m
+          'Outer (1.5 m)' in ch.editors[1].hand_out.caption.text()
           and 'Outer' in __import__('blastlab.ui.setup_nodes', fromlist=[
               'terminate_sides']).terminate_sides(case1),
           ascii(ch.editors[1].hand_out.caption.text()))
@@ -527,6 +528,29 @@ def s5_live(win):
     win._show('chain')
     win.set_solver('native')
     ch.set_route('123')
+    pump(450)
+    # GUI-14 (a): the default chain seeds stage 1's radius at 1.5 m, so
+    # card 2 opens clean; the radius survives a route change; 01 Setup's
+    # own 1D radius stays 10 m
+    from blastlab.ui import setup_spec
+    ed = ch.editors[2]
+    check('GUI-14 (a): the default 1 → 2 → 3 route: card 2 is ● case OK, '
+          'no S2-1 line, stage 1 at 1.5 m and untouched',
+          ch.cards[2].state_text() == '● case OK'
+          and not any('hands off' in m for _s, m in ed.check_rows())
+          and ch.forms[1].get_case().radius_m == 1.5
+          and not ch.touched(1),
+          ascii([ch.cards[2].state_text(), ch.forms[1].v['radius_m'].get()]))
+    ch.set_route('13')
+    ch.set_route('123')
+    pump(450)
+    check('GUI-14 (a): a route change does not bring 10 m back',
+          ch.forms[1].get_case().radius_m == 1.5,
+          ch.forms[1].v['radius_m'].get())
+    check('GUI-14 (a): 01 Setup\'s 1D radius default is still 10 m',
+          setup_spec.by_name(1)['radius_m'].default == 10.0)
+    # the checks below pin the S2-1 warning, which needs the form's 10 m
+    ch.forms[1].v['radius_m'].set('10.0')
     pump(450)
     # GUI-11 T9 (QA S2-1, D200): the default seed's 10 m 1D stage hands
     # off after its shock has left the 4 x 4 m stage 2 - card 2 warns
@@ -927,7 +951,11 @@ def s6_copy_load():
               mat == 'TNT', mat)
         for d in (1, 3):
             fresh = CaseForm(d, mode='native', placement='nodes')
-            want = dict(fresh.field_values(), charge='2.5', material=mat)
+            # GUI-14 (a): "the rest" is the spec default but for the
+            # chain's own seed (stage 1's radius, 1.5 m; pinned above)
+            from blastlab.ui.chain_panel import CHAIN_SEED
+            want = dict(fresh.field_values(), charge='2.5', material=mat,
+                        **CHAIN_SEED.get(d, {}))
             fresh.deleteLater()
             got = values(d)
             diff = {k: (got[k], want[k]) for k in want if got[k] != want[k]}
