@@ -1763,9 +1763,15 @@ def r5b_dropped(win):
     dx = case.cell_size_m
     rp.set_gauge_case(case)
     pump(20)
-    check('before a payload: G1 G2 G3 by Z, no note',
-          sorted(col.row_labels()) == ['G1', 'G2', 'G3']
-          and 'dropped' not in col.caption_text(),
+    # GUI-15 (a), D1 (pin edit, owner-approved): Run knows the drop from
+    # Start - no G2 row, a drop line naming G2 and Wall 1, the card G1
+    pre_labels = col.row_labels()
+    pre_pairs = [(r['number'], r['entered']) for r in col.table()]
+    check('before a payload: G3 and G1 only (by Z), the note names G2 and '
+          'Wall 1, the lowest Z enlarged',
+          pre_labels == ['G3', 'G1']
+          and 'G2' in col.drop.text() and 'Wall 1' in col.drop.text()
+          and not col.drop.isHidden() and col.card_texts()[0] == 'G3',
           f'{col.row_labels()} {col.caption_text()!r}')
     pay = flat_payload([snapped(case.gauges[0], dx),
                         snapped(case.gauges[2], dx)])
@@ -1774,6 +1780,12 @@ def r5b_dropped(win):
     pump(20)
     check('two rows, labelled G3 (Z 2.99) then G1 (Z 3.31)',
           col.row_labels() == ['G3', 'G1'], str(col.row_labels()))
+    check('GUI-15 (a): the first payload changes neither the rows nor '
+          'the enlarged card',
+          pre_labels == ['G3', 'G1'] and pre_pairs == [
+              (r['number'], r['entered']) for r in col.table()]
+          and col.card_texts()[0] == 'G3',
+          f'{pre_labels} {pre_pairs}')
     check('the keys are still the payload numbers (D61)',
           [w.number for w in col.row_widgets()] == [2, 1]
           and [r['entered'] for r in col.table()] == [3, 1],
@@ -1848,6 +1860,49 @@ def r5b_dropped(win):
     check('x-only payload, no x tie: G1, G3 and G2 inside Wall 1',
           labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
           f'{labels} {dropped}')
+    # GUI-15 (a), D1: the e2e fixture (_e2e_gui_native_warn.py) plus a
+    # kept G3 - the lowest-Z kept gauge is G1, enlarged before any payload
+    from blastlab.core.case import Case2D
+    ew = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                charge=20.0, center=(0.6, 0.0), solver='native',
+                obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                bcs=dict(x_lo='reflect', x_hi='terminate', y_lo='reflect',
+                         y_hi='terminate'),
+                gauges=[(0.3, 0.8), (1.4, 0.3), (0.9, 1.0)])
+    rp.set_gauge_case(ew)
+    pump(20)
+    check('GUI-15 (a): e2e case, before a payload: no G2 row, the note '
+          'names G2 and Wall 1, G1 enlarged',
+          'G2' not in col.row_labels() and sorted(col.row_labels()) ==
+          ['G1', 'G3'] and 'G2' in col.drop.text()
+          and 'Wall 1' in col.drop.text() and col.card_texts()[0] == 'G1',
+          f'{col.row_labels()} {col.drop.text()!r} {col.card_texts()}')
+    col.set_payload(flat_payload([snapped(ew.gauges[0], 0.04),
+                                  snapped(ew.gauges[2], 0.04)]), final=True)
+    col.flush()
+    pump(20)
+    check('GUI-15 (a): after the first payload the card and the order '
+          'are unchanged',
+          col.card_texts()[0] == 'G1' and col.row_labels() == ['G1', 'G3']
+          and 'G2' in col.drop.text() and 'Wall 1' in col.drop.text(),
+          f'{col.row_labels()} {col.drop.text()!r}')
+    # the GUI-14 A1 tie fixture (test_ui_setup_strip): Run's rows and
+    # drop line name the wall the rule drops the gauge for, not the
+    # nearest as entered
+    from blastlab.services.validation import drop_wall
+    tie = Case2D(solver='blastfoam', geometry='axisymmetric', Lx=4.0,
+                 Ly=4.0, cell_size_m=0.05, charge=500.0, center=(0.0, 2.0),
+                 gauges=[(1.245, 0.5), (0.5, 0.5)],
+                 obstacles=[(1.0, 1.22, 0.0, 1.0), (1.26, 1.6, 0.0, 1.0)])
+    rp.set_gauge_case(tie)
+    pump(20)
+    heads = ' '.join(r['where'] for r in col.table()) + col.header_text()
+    check('GUI-15 (a): tie fixture, G1 dropped for Wall 1 - the note and '
+          'no row header name Wall 2',
+          drop_wall(tie, (1.245, 0.5)) == 1 and col.row_labels() == ['G2']
+          and 'Wall 1' in col.drop.text() and 'Wall 2' not in col.drop.text()
+          and 'Wall 2' not in heads,
+          f'{col.row_labels()} {col.drop.text()!r} {heads!r}')
     # GUI-12 A2: G2 and G3 0.4 cell apart, G2 dropped, G1's cell nearer
     # G3 than G1 - the order-preserving pairing (test_gauge_summary's
     # case) gives the screens and the exported labels the same numbers
