@@ -59,8 +59,8 @@ def trigger_index(trigger_gauge, n_gauges, hooks):
 
     `trigger_gauge` is what the case carries: a 1-BASED gauge number so
     it reads like the gauge table and the plot labels. Out-of-range (or
-    a run whose gauges were all dropped as outside/inside an obstacle)
-    warns and disables the trigger rather than failing the run."""
+    a run whose gauges were all dropped, outside the domain or in a
+    wall) warns and disables the trigger rather than failing the run."""
     if trigger_gauge in (None, 0, ''):
         return None
     try:

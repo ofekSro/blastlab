@@ -348,7 +348,15 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         j = int(np.argmin(np.abs(y_c - gy)))
         k = int(np.argmin(np.abs(z_c - gz)))
         if solid[i, j, k]:
-            hooks.log(f"  [warn] {name} inside an obstacle - dropped")
+            # GUI-15 (b), D6: as solver2d - the wall whose closed box holds
+            # the snapped centre, `inside` only strictly inside a box
+            wall = core_geometry._in_box_closed(
+                (x_c[i], y_c[j], z_c[k]), obstacles)
+            inside = core_geometry._in_obstacle_open((gx, gy, gz), obstacles)
+            why = (core_geometry.gauge_drop_reason(inside or wall,
+                                                   bool(inside))
+                   if inside or wall else 'inside an obstacle')
+            hooks.log(f"  [warn] {name} {why} - dropped")
             continue
         gauge_ijk.append((i, j, k))
         gauge_actual.append((float(x_c[i]), float(y_c[j]), float(z_c[k])))

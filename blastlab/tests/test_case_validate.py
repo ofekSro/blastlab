@@ -571,7 +571,7 @@ def gauge_in_obstacle_checks():
     solver drops it (the 2D native face (1.2, 0.3) does not: its nearest
     centre is fluid)."""
     print()
-    print("gauge inside an obstacle: warned, not refused")
+    print("gauge in a wall: warned, not refused")
 
     def new_warnings(rep, ref):
         return [w for w in rep.warnings if w not in ref.warnings]

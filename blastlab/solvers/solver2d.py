@@ -289,7 +289,15 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
         if solid[i, j]:
-            hooks.log(f"  [warn] {name} inside an obstacle - dropped")
+            # GUI-15 (b), D6: the validation warning's own pair - the wall
+            # whose closed box holds the snapped centre, `inside` only
+            # when the entered point is strictly inside a box
+            wall = core_geometry._in_box_closed((x_c[i], y_c[j]), obstacles)
+            inside = core_geometry._in_obstacle_open((gx, gy), obstacles)
+            why = (core_geometry.gauge_drop_reason(inside or wall,
+                                                   bool(inside))
+                   if inside or wall else 'inside an obstacle')
+            hooks.log(f"  [warn] {name} {why} - dropped")
             continue
         gauge_ij.append((i, j))
         gauge_actual.append((float(x_c[i]), float(y_c[j])))
