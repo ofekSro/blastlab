@@ -1594,7 +1594,7 @@ def d02_native_2d_live(qa):
     qa.shot('live_nomesh')
     qa.run_wait(240)
     qa.shot('finished')
-    qa.check(qa.log_has('[warn] G2 (1.40, 0.30) m inside an obstacle - dropped'),
+    qa.check(qa.log_has('[warn] G2 (1.40, 0.30) m inside Wall 1 - dropped'),
              'dropped-gauge warning reached the run log', 'S2')
     qa.note('the dropped-gauge warning lives only in the Run log; the '
             'Results Gauges table will simply show one gauge')
@@ -2315,7 +2315,22 @@ def f00_gate(qa):
         qa.log(f'run_info failed: {exc}')
 
 
+def skip_reason(sid, group, solver_seed):
+    """Why scenario `sid` of `group` is skipped, '' when it runs. The F
+    group sets blastFoam cases, which switches the app to blastFoam and
+    starts WSL solves - against an explicit `--solver native` (GUI-15 (h),
+    D4). No seed, or blastFoam, runs it."""
+    if group == 'F' and solver_seed == 'native':
+        return (f'{sid}: --solver native keeps the harness off WSL '
+                f'(the F group runs blastFoam solves)')
+    return ''
+
+
 def _foam_run(qa, case, label, timeout, show_mesh=False):
+    why = skip_reason(label, 'F', getattr(qa, 'solver_seed', None))
+    if why:                     # GUI-15 (h): before touching env or the case
+        qa.note(why)
+        return False
     qa.goto('setup')
     qa.set_case(case, settle=1.5)
     qa.shot(f'{label}_setup')
@@ -3569,11 +3584,27 @@ def main():
             return False
         return True
 
+    # GUI-15 (h), D4: `--solver native` skips the F group (blastFoam, WSL),
+    # recorded in the checkpoint with the reason, not run
+    qa.solver_seed = args.solver or None
+    skipped = [(s[0], skip_reason(s[0], s[1], qa.solver_seed))
+               for s in SCENARIOS if selected(s[0], s[1])
+               and s[0] not in qa.ckpt['done']]
+    skipped = [(sid, why) for sid, why in skipped if why]
     todo = [s for s in SCENARIOS if selected(s[0], s[1])
-            and s[0] not in qa.ckpt['done']]
+            and s[0] not in qa.ckpt['done']
+            and s[0] not in {sid for sid, _w in skipped}]
+    if skipped and not args.list:
+        for sid, why in skipped:
+            qa.ckpt['done'][sid] = dict(status='skipped', t=time.time(),
+                                        shots=[], err=why, wall_s=0.0)
+            qa.log(f'{sid} skipped: {why}')
+        qa.save_ckpt()
     if args.list:
         for sid, group, est, term, fn, doc in SCENARIOS:
-            st = qa.ckpt['done'].get(sid, {}).get('status', '-')
+            st = qa.ckpt['done'].get(sid, {}).get('status') or (
+                'skipped' if skip_reason(sid, group, qa.solver_seed)
+                else '-')
             print(f'  {sid:5s} {group:2s} {est:4d}s {st:10s} {doc}')
         print(f'{len(todo)} pending')
         return 0

@@ -220,6 +220,59 @@ def main():
     c._drain_pending = False
     c.worker._alive = False
 
+    print("\nT5b: GUI-15 (c) - a stage's result carries Run's drop reasons")
+    import time
+    from blastlab.core.case import Case2D
+    from blastlab.ui import run_gauges
+    ew = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                charge=20.0, center=(0.6, 0.0), solver='native',
+                obstacles=[(1.2, 1.6, 0.0, 0.6)], t_end=2e-4,
+                bcs=dict(x_lo='reflect', x_hi='terminate', y_lo='reflect',
+                         y_hi='terminate'),
+                gauges=[(0.3, 0.8), (1.4, 0.3), (0.9, 1.0)],
+                n_snapshots=1, record_frames=0, gauge_file=None)
+    why = run_gauges.drops(ew)
+    check("drops(): G2 only, the reason names Wall 1",
+          len(why) == 1 and why[0][0] == 2 and 'Wall 1' in why[0][1],
+          str(why))
+    h = _Handlers()
+    c = RunController(handlers=h)
+    check("start_stages accepts a native 2D case",
+          c.start_stages([(2, ew)]) is True)
+    end = time.time() + 300
+    while c.running and time.time() < end:
+        pump(100)
+    got = h.results[0][3] if h.results else None
+    check("the finished Result's meta['gauges_dropped'] is [[2, reason]]",
+          got is not None and got.meta.get('gauges_dropped') == why
+          and 'Wall 1' in why[0][1], str(got and got.meta.get(
+              'gauges_dropped')))
+
+    print("\nT5c: GUI-15 (f) - a 1D gauge beyond the radius, through Run")
+    from blastlab.core.case import Case1D
+    from blastlab.ui import results_gauges
+    one = Case1D(radius_m=1.5, charge_kg=0.5, cell_size_m=0.005,
+                 n_snapshots=1, gauge_radii=[1.0, 2.0, 1.2], gauge_file=None)
+    h = _Handlers()
+    c = RunController(handlers=h)
+    check("start_stages accepts a native 1D case",
+          c.start_stages([(1, one)]) is True)
+    end = time.time() + 300
+    while c.running and time.time() < end:
+        pump(100)
+    got = h.results[0][3] if h.results else None
+    labels, dropped = (results_gauges.labels_and_dropped(got, 1)
+                       if got is not None else ({}, []))
+    check("Results labels the two series G1 and G3; its drop line names G2 "
+          "outside the domain",
+          labels == {1: 'G1', 2: 'G3'}
+          and results_gauges.dropped_text(dropped)
+          == 'G2 dropped by the solver (outside the domain)',
+          f'{labels} {dropped}')
+    check("the run log names G2 beyond the radius",
+          any('G2 (r 2.00 m) outside the domain - dropped' in ln
+              for ln in h.lines), str([ln for ln in h.lines if 'G2' in ln]))
+
     print("\nT6: refresh policy parsing")
     cases = [(('', 'seconds'), None), (('0', 'seconds'), None),
              (('0.25', 'seconds'), ('seconds', 0.25)),

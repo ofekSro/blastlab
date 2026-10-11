@@ -42,6 +42,10 @@ from ..core.constants import (ANIM_SCALES, JWL_TNT, MIN_EXP_CELLS,
                               FOAM_VM_GB_ASSUMED,
                               BYTES_PER_CELL)
 from ..core import hardware as _hardware
+# GUI-15 (d): the dropped-gauge tests and wording live in core, where the
+# native solvers share them; imported back so every caller is unchanged
+from ..core.geometry import (OUTSIDE_DOMAIN, gauge_drop_reason,  # noqa: F401
+                             _in_box_closed, _in_obstacle_open)
 from ..models.case import TRIGGER_ACTIONS, fmt_cells
 from ..models.case import VTK_FIELDS as _VTK_FIELDS
 from ..models.case import VTK_MODES as _VTK_MODES
@@ -918,6 +922,16 @@ def _validate_1d(case, rep, ctx):
         err("Charge must be > 0")
     if case.radius_m <= 0:
         err("Domain radius must be > 0")
+    else:
+        # GUI-15 (f), D9: both solvers keep a gauge only at 0 < r <=
+        # radius_m (solver1d.py, foam/writer.py plan_case) and drop the
+        # rest; named as the 2D/3D warning names a gauge, G<n> as entered
+        for k, g in enumerate(getattr(case, 'gauge_radii', None) or [],
+                              start=1):
+            if not 0 < float(g) <= case.radius_m:
+                warn(f"G{k} (r {float(g):.2f} m) "
+                     f"{gauge_drop_reason(0, False, outside=True)}"
+                     f" - will be dropped")
     if rep.errors:
         return
     r_exp = (3.0 * case.charge_kg
@@ -1559,6 +1573,7 @@ def _validate_closing(case, rep, ctx):
 
     # gauges / obstacles sanity
     dropped = None                  # the solver's drop rule, built once
+    gone = []                       # the entered numbers it drops
     for k, g in enumerate(getattr(case, 'gauges', []), start=1):
         pt = g if isinstance(g, (list, tuple)) else (g,)
         # GUI-13 (c), D4: the gauge as the screens name it, G<n> (1-based,
@@ -1567,6 +1582,7 @@ def _validate_closing(case, rep, ctx):
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             warn(f"{name} {gauge_drop_reason(0, False, outside=True)}"
                  f" - will be dropped")
+            gone.append(k)
             continue
         if dropped is None:
             dropped = _gauge_drop_rule(case, ctx)
@@ -1579,6 +1595,16 @@ def _validate_closing(case, rep, ctx):
         warn(f"{name} "
              f"{gauge_drop_reason(inside or wall, bool(inside))}"
              f" - will be dropped")
+        gone.append(k)
+    # P1-24 (D13, native only): the native solvers disable a trigger whose
+    # gauge they drop (hooks.trigger_index), so say so before the run
+    try:
+        trig = int(getattr(case, 'trigger_gauge', None) or 0)
+    except (TypeError, ValueError):
+        trig = 0
+    if not foam and trig and trig in gone:
+        warn(f"Trigger disabled: trigger gauge G{trig} is dropped (see "
+             f"above), so the run ends by its normal stop")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
@@ -1591,21 +1617,6 @@ def _validate_closing(case, rep, ctx):
 
     if case.dim == 2 and case.profile_file and case.geometry != 'axisymmetric':
         err("2D profile export (for 3D remap) requires axisymmetric geometry")
-
-
-#: why a gauge outside the domain is dropped (GUI-13 (e))
-OUTSIDE_DOMAIN = 'outside the domain'
-
-
-def gauge_drop_reason(wall, inside, outside=False):
-    """`inside Wall 2` / `on the face of Wall 2`: why the solver drops a
-    gauge for obstacle `wall` (1-based, as the tree names it), or
-    `outside the domain` when `outside`. One wording for the validation
-    warning and the Run screen's dropped-gauge note
-    (`ui/run_gauges._drop_reason`; D201, GUI-12 A4, GUI-13 (e))."""
-    if outside:
-        return OUTSIDE_DOMAIN
-    return f'inside Wall {wall}' if inside else f'on the face of Wall {wall}'
 
 
 def drop_rule(case, pending_inputs=False):
@@ -1715,38 +1726,6 @@ def _gauge_drop_rule(case, ctx):
                 for c, v in zip(centres, pt)]
         return _in_box_closed(near, obstacles)
     return native
-
-
-def _in_box_closed(pt, boxes):
-    """The 1-based index of the first box `pt` lies in, faces included
-    (the closed test of core/bc.solid_mask_* and the foam writer's
-    `_in_obstacle`), 0 when none."""
-    for i, box in enumerate(boxes, start=1):
-        if len(box) >= 2 * len(pt) and all(
-                lo <= float(v) <= hi
-                for v, lo, hi in zip(pt, box[0::2], box[1::2])):
-            return i
-    return 0
-
-
-def _in_obstacle_open(pt, obstacles):
-    """The 1-based index of the first obstacle box gauge `pt` lies
-    strictly inside (open box, the test of ui/scaled_distance.where's
-    `inside`), 0 when none. Only the
-    wording of the drop warning now: whether a gauge is dropped at all
-    is each solver's own rule (`_gauge_drop_rule`, F44), which keeps a
-    native gauge within half a cell of an off-grid face and drops one on
-    or just outside a face (verify 11b, UXR-2, D201)."""
-    n = len(pt)
-    if n < 2:
-        return 0
-    for i, box in enumerate(obstacles or [], start=1):
-        if len(box) < 2 * n:
-            continue
-        if all(float(lo) < float(v) < float(hi)
-               for v, lo, hi in zip(pt, box[0::2], box[1::2])):
-            return i
-    return 0
 
 
 def _warn_thin_obstacle(rep, box, lo, hi, dxb, foam):

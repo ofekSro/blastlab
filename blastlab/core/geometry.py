@@ -2,7 +2,8 @@
 backend and the post-mortem loader (ROADMAP A2): terminating-boundary
 edge masks, the charge-to-boundary distances that drive the arrival stop
 / progress / snapshot scheduling, the snapshot trigger radii and the
-per-cell distance-to-charge fields.
+per-cell distance-to-charge fields; and the dropped-gauge tests and
+wording every surface shares (GUI-15 (d)).
 
 Two different questions are asked of `bcs` here and they no longer have
 the same answer (T50): only a `terminate` side ENDS a run, while ANY
@@ -99,14 +100,15 @@ def stop_dists_3d(Lx, Ly, Lz, centers, bcs):
     return dists
 
 
-def plane_gauges(points, sl, coords, tol):
+def plane_gauges(points, sl, coords, tol, numbers=None):
     """The gauges a 3D live/animated plane actually cuts, as
     [(number, u, v), ...] in that plane's own coordinates (T53).
 
     `sl` is the plane selector (a tuple with one integer index), `coords`
     the (x_c, y_c, z_c) cell centres and `tol` the half-width that still
     counts as "on the plane" (one cell). A gauge a metre off the slice
-    must not be drawn as if it sat on it."""
+    must not be drawn as if it sat on it. `numbers` (P1-24) labels each
+    point with its entered gauge number; None numbers them 1, 2, ..."""
     axis = next(a for a, x in enumerate(sl) if not isinstance(x, slice))
     plane = float(coords[axis][int(sl[axis])])
     keep = [a for a in range(3) if a != axis]
@@ -114,8 +116,66 @@ def plane_gauges(points, sl, coords, tol):
     for n, pt in enumerate(points):
         if abs(float(pt[axis]) - plane) > tol:
             continue
-        out.append((n + 1, float(pt[keep[0]]), float(pt[keep[1]])))
+        num = n + 1 if numbers is None else int(numbers[n])
+        out.append((num, float(pt[keep[0]]), float(pt[keep[1]])))
     return out
+
+
+# ── Dropped gauges: the tests and the one wording (GUI-15 (d), D5) ──────────
+# Shared by the validation warning (services/validation), the Run and
+# Results screens (ui/run_gauges, ui/results_gauges) and the native
+# solvers' log lines (solver2d / solver3d), so every surface names a
+# dropped gauge alike.
+
+#: why a gauge outside the domain is dropped (GUI-13 (e))
+OUTSIDE_DOMAIN = 'outside the domain'
+
+
+def gauge_drop_reason(wall, inside, outside=False):
+    """`inside Wall 2` / `within a cell of Wall 2`: why the solver drops a
+    gauge for obstacle `wall` (1-based, as the tree names it), or
+    `outside the domain` when `outside`. A gauge not strictly inside is
+    dropped because the cell it samples is solid: it lies within a cell
+    of the wall, on whichever side (GUI-15 (d), the owner's wording).
+    One wording for the validation warning, the Run and Results screens'
+    dropped-gauge note and the native solvers' log (D201, GUI-12 A4,
+    GUI-13 (e))."""
+    if outside:
+        return OUTSIDE_DOMAIN
+    return f'inside Wall {wall}' if inside else f'within a cell of Wall {wall}'
+
+
+def _in_box_closed(pt, boxes):
+    """The 1-based index of the first box `pt` lies in, faces included
+    (the closed test of core/bc.solid_mask_* and the foam writer's
+    `_in_obstacle`), 0 when none."""
+    for i, box in enumerate(boxes, start=1):
+        if len(box) >= 2 * len(pt) and all(
+                lo <= float(v) <= hi
+                for v, lo, hi in zip(pt, box[0::2], box[1::2])):
+            return i
+    return 0
+
+
+def _in_obstacle_open(pt, obstacles):
+    """The 1-based index of the first obstacle box gauge `pt` lies
+    strictly inside (open box, the test of ui/scaled_distance.where's
+    `inside`), 0 when none. Only the
+    wording of the drop warning now: whether a gauge is dropped at all
+    is each solver's own rule (services/validation `_gauge_drop_rule`,
+    F44), which keeps a native gauge within half a cell of an off-grid
+    face and drops one on or just outside a face (verify 11b, UXR-2,
+    D201)."""
+    n = len(pt)
+    if n < 2:
+        return 0
+    for i, box in enumerate(obstacles or [], start=1):
+        if len(box) < 2 * n:
+            continue
+        if all(float(lo) < float(v) < float(hi)
+               for v, lo, hi in zip(pt, box[0::2], box[1::2])):
+            return i
+    return 0
 
 
 def snap_radii(r_start, dists, n_snapshots):

@@ -602,26 +602,29 @@ class SetupPanel(QWidget):
             if self._dim:
                 self._table_case = case
                 self._fill_gauges(case)
-        self._sync_children()
+        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
+        # (the rule, not the warning text); GUI-15 (e): so is its child row
+        gone = (scaled_distance.dropped_numbers(case)
+                if case is not None and getattr(case, 'dim', None) == self._dim
+                else [])
+        self._sync_children(gone)
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self._dim, n) for n in f.bad}
-        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
-        # (the rule, not the warning text)
-        drop = (case is not None and getattr(case, 'dim', None) == self._dim
-                and scaled_distance.any_dropped(case))
+        drop = bool(gone)
         for n, _t in setup_nodes.nodes(self._dim):
             self.tree.set_status(n.id, 'error' if n.id in bad else
                                  'warn' if n.id == 'gauges' and drop
                                  else 'ok')
         self._sync_tree()
 
-    def _sync_children(self):
+    def _sync_children(self, gone=()):
+        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows)."""
         f = self.form
         if 'gauges' in f.points:
             rows = f.points['gauges'].get()
             self.tree.set_children('gauges', 'gauge', [
-                (f'G{i}', ', '.join(f'{v:.2f}' for v in row))
+                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone)
                 for i, row in enumerate(rows, start=1)])
         if 'obstacles' in f.points:
             axis = ('r' if self._dim == 2

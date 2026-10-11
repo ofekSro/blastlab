@@ -38,7 +38,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QScrollArea,
 from ..core.constants import P_AIR
 from ..output.gauge_summary import (pair_in_order, summarize_gauges,
                                     summarize_trace)
-from ..services.validation import drop_wall, gauge_drop_reason
+from ..services.validation import drop_rule, drop_wall, gauge_drop_reason
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
@@ -148,13 +148,13 @@ def match_gauges(case, gauge_out):
     return _match(case, _positions(gauge_out or {}))
 
 
-def _drop_reason(case, point):
-    """Why an entered gauge has no series: `inside Wall 1`, `on the face
-    of Wall 1`, `outside the domain`, or '' when the case does not say.
-    The wall is the solver's own drop rule (`services.validation.
-    drop_rule`), the one Setup's warning names, and inside / face is the
-    warning's open-box split, in the warning's words (`gauge_drop_reason`;
-    GUI-13 (e)). A case the rule cannot lay out (the Results screen's
+def _drop_reason(case, point, rule=None):
+    """Why an entered gauge has no series: `inside Wall 1`, `within a
+    cell of Wall 1`, `outside the domain`, or '' when the case does not
+    say. The wall is the solver's own drop rule (`services.validation.
+    drop_rule`), the one Setup's warning names, and inside / within a
+    cell is the warning's open-box split, in the warning's words
+    (`core.geometry.gauge_drop_reason`; GUI-13 (e), GUI-15 (d)). A case the rule cannot lay out (the Results screen's
     meta view, `scaled_distance.case_from_meta`) falls back to the first
     wall within a cell of the gauge, as before."""
     p = [float(v) for v in point]
@@ -167,7 +167,10 @@ def _drop_reason(case, point):
     inside = next((i for i, box in enumerate(boxes, start=1)
                    if len(box) == len(p)
                    and all(lo < v < hi for v, (lo, hi) in zip(p, box))), 0)
-    wall = drop_wall(case, p) if boxes else 0
+    if boxes:
+        wall = rule(p) if rule is not None else drop_wall(case, p)
+    else:
+        wall = 0
     if not (inside or wall):
         try:
             tol = float(getattr(case, 'cell_size_m', 0.0) or 0.0)
@@ -259,8 +262,41 @@ def z_mode(case):
         return False
 
 
-def _geometry(case, point):
-    """(R, Z or None, short wall name or '') of `point` in the case."""
+def pre_payload(case, rule=None):
+    """(kept, dropped) before any series exists (GUI-15 (a), D1): `kept`
+    the 0-based entered gauges the solver keeps, `dropped` [(entered
+    number, reason)] for the ones it drops - the same rule
+    (`sd.is_dropped`, `services.validation.drop_rule`) Setup's warning
+    and the first payload's `_numbering` use, so Run names the drop from
+    Start. `rule` is `drop_rule(case)`, built once by the caller."""
+    entered = _entered(case)
+    if rule is None:
+        rule = drop_rule(case)
+    kept, dropped = [], []
+    for j, g in enumerate(entered):
+        if sd.is_dropped(case, g, rule):
+            dropped.append((j + 1, _drop_reason(case, g, rule)))
+        else:
+            kept.append(j)
+    return kept, dropped
+
+
+def drops(case):
+    """`[[entered number, reason], ...]` of the gauges the solver drops in
+    `case`, as Run words them (GUI-15 (c), D3). `RunController` stamps it
+    into the finished Result's `meta['gauges_dropped']` (memory only), so
+    Results gives the reason Run gave - its own meta holds the
+    face-snapped walls of a blastFoam run, which would read `inside`."""
+    try:
+        return [[n, why] for n, why in pre_payload(case)[1]]
+    except (AttributeError, TypeError, ValueError):
+        return []
+
+
+def _geometry(case, point, rule=None):
+    """(R, Z or None, short wall name or '') of `point` in the case. With
+    the drop `rule` a dropped gauge is measured against the wall the rule
+    drops it for, as Setup's Where column does (`sd.where_text`)."""
     if case is None or point is None:
         return None, None, ''
     try:
@@ -271,17 +307,22 @@ def _geometry(case, point):
         r = sd.distance(case, point)
         z = sd.scaled_distance(case, point)
         w = sd.where(case, point)
+        wall = rule(point) if (rule is not None and w) else 0
+        if wall and wall != w[0]:
+            w = sd.where(case, point, wall=wall) or w
     except (AttributeError, TypeError, ValueError, ZeroDivisionError):
         return None, None, ''
     return r, z, (f'Wall {w[0]}' if w else '')
 
 
-def rows(case, payload=None):
+def rows(case, payload=None, rule=None):
     """One dict per gauge, sorted by Z (ties: R, then the number) - by R
-    when Z is hidden:
+    when Z is hidden. `rule` is `drop_rule(case)` (built here when None);
+    before any payload the gauges the solver drops are left out (GUI-15
+    (a), `pre_payload`):
 
         number      G number, payload order (entered order before any
-                    payload) - the row's key
+                    payload, the kept gauges counted 1..k) - the row's key
         label       `G<n>` as shown: the entered number when the solver
                     dropped a gauge (`_numbering`, D201), else `number`
         entered     the matched entered gauge, 1-based, or None
@@ -293,6 +334,8 @@ def rows(case, payload=None):
         peak_text   `296 kPa` or `waiting`
     """
     out = []
+    if rule is None:
+        rule = drop_rule(case) if case is not None else None
     if payload:
         times = _arr(payload.get('times'))
         series = payload.get('pressures')
@@ -311,11 +354,14 @@ def rows(case, payload=None):
             s = summarize_trace(times[:n], p[:n])
             out.append(_row(case, k + 1, None if j is None else j + 1,
                             point, times[:n] * 1e3,
-                            (p[:n] - P_AIR) / 1e3, s, labels[k]))
+                            (p[:n] - P_AIR) / 1e3, s, labels[k], rule))
     else:
-        for k, g in enumerate(_entered(case)):
-            out.append(_row(case, k + 1, k + 1, g, np.zeros(0),
-                            np.zeros(0), None))
+        entered = _entered(case)
+        kept = pre_payload(case, rule)[0] if rule is not None \
+            else range(len(entered))
+        for k, j in enumerate(kept):
+            out.append(_row(case, k + 1, j + 1, entered[j], np.zeros(0),
+                            np.zeros(0), None, f'G{j + 1}', rule))
     by_z = z_mode(case)
     inf = float('inf')
 
@@ -327,8 +373,8 @@ def rows(case, payload=None):
     return sorted(out, key=key)
 
 
-def _row(case, number, entered, point, t_ms, kpa, s, label=None):
-    r, z, where = _geometry(case, point)
+def _row(case, number, entered, point, t_ms, kpa, s, label=None, rule=None):
+    r, z, where = _geometry(case, point, rule)
     nan = float('nan')
     s = s or dict(peak_kpa=nan, t_peak_ms=nan, arrival_ms=nan)
     waiting = not np.isfinite(s['arrival_ms'])
@@ -732,6 +778,7 @@ class GaugeColumn(QWidget):
         lay.addWidget(self.foot)
 
         self._case = None
+        self._rule = None
         self._payload = None
         self._table = []
         self._widgets = {}          # G number -> _GaugeRow
@@ -753,8 +800,14 @@ class GaugeColumn(QWidget):
         trigger gauge). Its series so far are dropped: a new stage, or
         no run yet - the rows are the case's gauges, all `waiting`."""
         self._case = case
+        self._rule = self._build_rule(case)
         self._payload = None
         self._render()
+
+    @staticmethod
+    def _build_rule(case):
+        """The solver's drop rule, built once per case (GUI-15 (a), D1)."""
+        return None if case is None else drop_rule(case)
 
     def case(self):
         return self._case
@@ -861,7 +914,7 @@ class GaugeColumn(QWidget):
 
     def _render(self):
         self._dirty = False
-        self._table = rows(self._case, self._payload)
+        self._table = rows(self._case, self._payload, self._rule)
         z_on = z_mode(self._case)
         n = len(self._table)
         has = n > 0
@@ -877,8 +930,11 @@ class GaugeColumn(QWidget):
             sd.UNIT_TIP if z_on else 'R: the distance from the burst, in m')
         # D201: a gauge the solver dropped is named, so the entered
         # numbers on the rows do not read as a gap
-        note = (dropped_text(numbering(self._case, self._payload)[1])
-                if self._payload else '')
+        # (before the first payload too: the same rule, GUI-15 (a))
+        note = dropped_text(
+            numbering(self._case, self._payload)[1] if self._payload
+            else pre_payload(self._case, self._rule)[1]
+            if self._rule is not None else [])
         self.sub.setText(f'{n} gauge{"" if n == 1 else "s"}, sorted by '
                          f'{axis}. Click a row to enlarge it.'
                          if has else '')

@@ -110,9 +110,18 @@ def gauge_points(case):
 def outside_domain(case, point):
     """True when `point` lies outside the closed domain 0 <= v <= L on
     any axis - the solvers' own test (solver2d.py 283, solver3d.py 341,
-    validation `_validate_closing`). False for a case without extents
-    (1D, the Results screen's meta view). One test for Setup's Where
-    column and Run's dropped-gauge note (GUI-14 d, D2)."""
+    validation `_validate_closing`). 1D: outside 0 < r <= radius_m, the
+    solvers' own test too (solver1d.py, foam/writer.py; GUI-15 (f), D9).
+    False for a case without extents (the Results screen's meta view).
+    One test for Setup's Where column and Run's dropped-gauge note
+    (GUI-14 d, D2)."""
+    if getattr(case, 'dim', None) == 1:
+        radius = getattr(case, 'radius_m', None)
+        try:
+            return radius is not None and not (
+                0.0 < float(point[0]) <= float(radius))
+        except (TypeError, ValueError, IndexError):
+            return False
     dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(point)]]
     try:
         return (all(d is not None for d in dims) and any(
@@ -276,14 +285,26 @@ def is_dropped(case, point, dropped=None):
     return bool(dropped(point))
 
 
-def any_dropped(case):
-    """True when some gauge of `case` is dropped - the `gauges` tree
-    node's warn state. The rule is built once."""
-    if getattr(case, 'dim', None) not in (2, 3):
-        return False                # 1D has no domain test, 0D no gauges
+def dropped_numbers(case):
+    """The 1-based numbers (entered order) of the gauges the solver drops
+    - `is_dropped`, the rule built once. 1D: the radii beyond the domain
+    (GUI-15 (f)). [] for 0D (no gauges) and for a case that cannot say.
+    GUI-15 (e): the Gauges node's caption and warn child rows."""
+    if getattr(case, 'dim', None) not in (1, 2, 3):
+        return []
     from ..services.validation import drop_rule
     dropped = drop_rule(case)
-    return any(is_dropped(case, p, dropped) for p in gauge_points(case))
+    try:
+        return [k for k, p in enumerate(gauge_points(case), start=1)
+                if is_dropped(case, p, dropped)]
+    except (AttributeError, TypeError, ValueError):
+        return []
+
+
+def any_dropped(case):
+    """True when some gauge of `case` is dropped - the `gauges` tree
+    node's warn state."""
+    return bool(dropped_numbers(case))
 
 
 def walls_in_front(case):

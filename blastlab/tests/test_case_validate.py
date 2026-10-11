@@ -564,13 +564,14 @@ def gauge_in_obstacle_checks():
     the gauge - native by the nearest cell centre's closed solid test,
     blastFoam by the closed test on the outward-snapped boxes - with one
     warning, and the case stays valid. Strictly inside the box reads
-    `inside Wall n`, otherwise `on the face of Wall n` (P2; the wall
-    named since GUI-12 A4, as Run and Setup's Where column name it).
+    `inside Wall n`, otherwise `within a cell of Wall n` (P2; the wall
+    named since GUI-12 A4, as Run and Setup's Where column name it; the
+    owner's wording since GUI-15 (d), was `on the face of Wall n`).
     Changed by owner row 2: a gauge on a face now warns wherever its
     solver drops it (the 2D native face (1.2, 0.3) does not: its nearest
     centre is fluid)."""
     print()
-    print("gauge inside an obstacle: warned, not refused")
+    print("gauge in a wall: warned, not refused")
 
     def new_warnings(rep, ref):
         return [w for w in rep.warnings if w not in ref.warnings]
@@ -581,7 +582,8 @@ def gauge_in_obstacle_checks():
         return f'G{n} ({", ".join(f"{v:.2f}" for v in pt)}) m'
 
     def face(pt, wall=1):
-        return [f'{gname(pt)} on the face of Wall {wall} - will be dropped']
+        return [f'{gname(pt)} within a cell of Wall {wall} - will be '
+                f'dropped']
 
     def inside(pt, wall=1):
         return [f'{gname(pt)} inside Wall {wall} - will be dropped']
@@ -803,7 +805,7 @@ def gauge_in_obstacle_checks():
         Case2D(gauges=[], **pair)))
     check('GUI-13 (e): two walls within a cell, blastFoam: the warning '
           'names Wall 1 and drop_wall says 1',
-          got == ['G1 (1.63, 0.50) m on the face of Wall 1 - will be '
+          got == ['G1 (1.63, 0.50) m within a cell of Wall 1 - will be '
                   'dropped'] and drop_wall(case, (1.628, 0.5)) == 1,
           str(got))
     pts = [(1.628, 0.5), (1.4, 0.5), (1.8, 0.5), (1.1, 0.5), (2.5, 0.5),
@@ -825,6 +827,30 @@ def gauge_in_obstacle_checks():
     check('GUI-13 (e): outside the domain or a 1D case: drop_wall 0',
           drop_wall(case, (5.0, 0.5)) == 0
           and drop_wall(Case1D(), (0.5,)) == 0)
+    gauge_beyond_radius_checks()
+
+
+def gauge_beyond_radius_checks():
+    """GUI-15 (f), D9: a 1D gauge beyond the domain radius is dropped by
+    both solvers (`0 < r <= radius_m`), so Checks warns once, naming the
+    gauge and the domain, in either mode; one at the radius is kept."""
+    print()
+    print("1D gauge beyond the radius: warned, named")
+    from blastlab.core.case import Case1D
+    for solver in ('native', 'blastfoam'):
+        kw = dict(radius_m=1.5, solver=solver)
+        ref = validate_case(Case1D(gauge_radii=[], **kw)).warnings
+        got = [w for w in validate_case(
+            Case1D(gauge_radii=[1.0, 2.0, 1.2], **kw)).warnings
+            if w not in ref]
+        check(f'1D {solver}: one warning, naming G2 and the domain',
+              len(got) == 1 and got[0].startswith('G2 ')
+              and 'outside the domain' in got[0]
+              and 'dropped' in got[0], str(got))
+        edge = [w for w in validate_case(
+            Case1D(gauge_radii=[1.0, 1.5], **kw)).warnings if w not in ref]
+        check(f'1D {solver}: a gauge at r = 1.5 exactly is not warned',
+              edge == [], str(edge))
 
 
 def thin_obstacle_warn_checks():

@@ -577,7 +577,7 @@ def s3_dock():
     check('two walls within a cell (blastFoam): Setup\'s warning, '
           'drop_wall and Run\'s _drop_reason name the same wall (Wall 1)',
           warned == [1] and drop_wall(pair, (1.628, 0.5)) == 1
-          and _drop_reason(pair, (1.628, 0.5)) == 'on the face of Wall 1',
+          and _drop_reason(pair, (1.628, 0.5)) == 'within a cell of Wall 1',
           f'{warned} {_drop_reason(pair, (1.628, 0.5))}')
     # GUI-13 verify: the pair above names Wall 1 under the old "first wall
     # within a cell" too, so it cannot tell whether Run uses the rule.
@@ -594,7 +594,7 @@ def s3_dock():
           'differs: '
           'warning, drop_wall and Run\'s _drop_reason all name Wall 2',
           warned == [2] and drop_wall(split, (1.252, 0.5)) == 2
-          and _drop_reason(split, (1.252, 0.5)) == 'on the face of Wall 2',
+          and _drop_reason(split, (1.252, 0.5)) == 'within a cell of Wall 2',
           f'{warned} {_drop_reason(split, (1.252, 0.5))}')
     # GUI-14 (c), D1: at x 1.245 Wall 2 is the nearest as entered (1.5 cm)
     # but the solver drops the gauge for Wall 1 (3 cm behind it), so Where
@@ -639,8 +639,8 @@ def s3_dock():
                                   gauges=[(1.18, 0.5)], dx=0.05), 2)
     view.obstacles, view.Lx, view.Ly = [(1.2, 1.6, 0.0, 1.0)], 4.0, 4.0
     check("a meta view the rule cannot lay out: the wall within a cell "
-          "('on the face of Wall 1')",
-          _drop_reason(view, (1.18, 0.5)) == 'on the face of Wall 1',
+          "('within a cell of Wall 1')",
+          _drop_reason(view, (1.18, 0.5)) == 'within a cell of Wall 1',
           _drop_reason(view, (1.18, 0.5)))
     check("05 summary, board line 89: '2 · in front of Wall 1'",
           setup_nodes.summaries(case)['gauges'] == '2 · in front of Wall 1',
@@ -726,6 +726,36 @@ def s3_dock():
           sp.tree.rows['gauges']._status == 'ok'
           and warn_cells(0) == [False, False],
           str(sp.tree.rows['gauges']._status))
+    # GUI-15 (e), D2: the e2e fixture (_e2e_gui_native_warn.py) - G2 sits
+    # inside Wall 1: the caption names it, its child row is warn, G1's not
+    ew = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                charge=20.0, center=(0.6, 0.0), solver='native',
+                obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                gauges=[(0.3, 0.8), (1.4, 0.3)])
+    load(sp, ew)
+    cap = sp.tree.summary('gauges')
+    kids = [sp.tree.child_row('gauges', i).warn for i in (0, 1)]
+    check('GUI-15 (e): the Gauges caption names G2 as dropped; the G2 child '
+          'is warn and G1 is not',
+          'G2 dropped' in cap and 'G1' not in cap.split(' · trigger')[0]
+          and kids == [False, True], f'{cap!r} {kids}')
+    load(sp, dataclasses.replace(ew, gauges=[(0.3, 0.8), (1.0, 0.3)]))
+    kids = [sp.tree.child_row('gauges', i).warn for i in (0, 1)]
+    check('GUI-15 (e): moved out of the wall, the caption and the child '
+          'rows clear',
+          'dropped' not in sp.tree.summary('gauges') and kids == [False] * 2,
+          f'{sp.tree.summary("gauges")!r} {kids}')
+    # GUI-15 (f), D9: a 1D gauge beyond the radius is dropped by both
+    # solvers - the Gauges node is warn and its caption names it
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0, 1.2]))
+    cap = sp.tree.summary('gauges')
+    check("GUI-15 (f): 1D, G2 at r 2.0 beyond the 1.5 m radius: the "
+          "Gauges node is warn, its caption names ' · G2 dropped'",
+          sp.tree.rows['gauges']._status == 'warn'
+          and ' · G2 dropped' in cap and 'G1' not in cap
+          and sd.dropped_numbers(Case1D(radius_m=1.5,
+                                        gauge_radii=[1.0, 1.5])) == [],
+          f'{cap!r} {sp.tree.rows["gauges"]._status}')
     c3, _r = load(sp, Case3D(charge=8.0, gauges=[(1.0, 2.0, 3.0)],
                              center=(1.0, 2.0, 1.0)))
     check('3D: x / y / z, Z = R / 2 for 8 kg',

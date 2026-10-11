@@ -143,6 +143,15 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     # ── Gauge setup ────────────────────────────────────────────────────────
     if gauge_radii is None:
         gauge_radii = []
+    # GUI-15 (f), D9: a gauge beyond the radius is named as Setup warns it
+    # (G<n>, the entered number), and gauge_num keeps the kept gauges'
+    # entered numbers for the live labels (as solver2d / solver3d, P1-24)
+    gauge_num = [n for n, g in enumerate(gauge_radii, start=1)
+                 if 0 < g <= radius_m]
+    for n, g in enumerate(gauge_radii, start=1):
+        if not 0 < g <= radius_m:
+            hooks.log(f"  [warn] G{n} (r {g:.2f} m) outside the domain "
+                      f"- dropped")
     gauge_radii = [g for g in gauge_radii if 0 < g <= radius_m]
     # Map each gauge radius to the index of its nearest cell centre
     gauge_indices = [int(np.argmin(np.abs(r - g))) for g in gauge_radii]
@@ -152,7 +161,7 @@ def _run_blast_1d(radius_m, charge_kg, cell_size_m, material='TNT',
     gauge_press_lists = [[] for _ in gauge_radii]
 
     hooks.run_started(dict(dim=1, r=r, radius_m=radius_m,
-                           gauges=[(n + 1, float(g), 0.0)
+                           gauges=[(gauge_num[n], float(g), 0.0)
                                    for n, g in enumerate(gauge_actual)]))
     import time as _time
     _last_draw = 0.0

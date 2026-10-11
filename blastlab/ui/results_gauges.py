@@ -182,8 +182,19 @@ def labels_and_dropped(res, dim):
     one (`run_gauges.numbering`, D201), so Results and Setup number a
     gauge alike. The obstacles and the domain come from the meta, for
     the reason (`inside Wall 1`). Empty when the meta cannot say."""
-    case = sd.case_from_meta(res.meta, dim, res.gauges)
     meta = res.meta or {}
+    if dim == 1 and meta.get('gauges_dropped'):
+        # GUI-15 (f), D9: a 1D meta keeps no entered list, so the series
+        # are numbered from RunController's stamp - the entered numbers
+        # it does not name as dropped, in order
+        gone = {int(n): why for n, why in meta['gauges_dropped']}
+        series = (res.gauges or {}).get('pressures')
+        n_series = 0 if series is None else len(series)
+        nums = [n for n in range(1, n_series + len(gone) + 1)
+                if n not in gone]
+        return ({k: f'G{n}' for k, n in enumerate(nums, start=1)},
+                sorted(gone.items()))
+    case = sd.case_from_meta(res.meta, dim, res.gauges)
     if case is None:
         # GUI-13 B5 (UX #8): a meta that cannot build a case (no charge
         # centre) still numbers the gauges as the exported figure does,
@@ -200,6 +211,11 @@ def labels_and_dropped(res, dim):
         if meta.get(k) is not None:
             setattr(case, k, meta[k])
     labels, dropped = numbering(case, res.gauges)
+    # GUI-15 (c), D3: the reason Run gave (`meta['gauges_dropped']`, set by
+    # RunController; the meta's own walls are the face-snapped ones). Older
+    # results keep the reasons read off the meta.
+    stamped = {int(n): why for n, why in meta.get('gauges_dropped') or []}
+    dropped = [(n, stamped.get(n, why)) for n, why in dropped]
     return {k: lbl for k, lbl in enumerate(labels, start=1)}, dropped
 
 
@@ -554,8 +570,13 @@ class GaugesView(QWidget):
         return summary_rows(res)
 
     def _default_gauge(self, res):
-        """The trigger gauge when the run had one, else the first row."""
+        """The trigger gauge when the run had one, else the first row.
+        P1-24: the meta holds the trigger's ENTERED number (blastFoam
+        always, native since P1-24), so after a dropped gauge its row is
+        the one labelled `G<n>`, not row n."""
         trig = res.meta.get('trigger_gauge')
+        trig = next((k for k, lbl in self._labels.items()
+                     if lbl == f'G{trig}'), trig)
         if trig in self._order:
             return trig
         return self._order[0] if self._order else None

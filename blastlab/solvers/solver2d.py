@@ -278,7 +278,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
 
     # ── Gauge setup ────────────────────────────────────────────────────────
     gauges = gauges or []
-    gauge_ij, gauge_actual = [], []
+    # P1-24: gauge_num is each kept gauge's ENTERED number, which the
+    # trigger, its log lines, the meta and the live labels carry
+    gauge_ij, gauge_actual, gauge_num = [], [], []
     for n, (gx, gy) in enumerate(gauges, start=1):
         # GUI-14 (g): the gauge as Setup and the validation warning name
         # it, G<n> (1-based, the entered order) at its coordinates in metres
@@ -289,14 +291,26 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
         if solid[i, j]:
-            hooks.log(f"  [warn] {name} inside an obstacle - dropped")
+            # GUI-15 (b), D6: the validation warning's own pair - the wall
+            # whose closed box holds the snapped centre, `inside` only
+            # when the entered point is strictly inside a box
+            wall = core_geometry._in_box_closed((x_c[i], y_c[j]), obstacles)
+            inside = core_geometry._in_obstacle_open((gx, gy), obstacles)
+            why = (core_geometry.gauge_drop_reason(inside or wall,
+                                                   bool(inside))
+                   if inside or wall else 'inside an obstacle')
+            hooks.log(f"  [warn] {name} {why} - dropped")
             continue
         gauge_ij.append((i, j))
         gauge_actual.append((float(x_c[i]), float(y_c[j])))
+        gauge_num.append(n)
     gauge_times_list  = []
     gauge_press_lists = [[] for _ in gauge_ij]
-    # T51 trigger gauge: 1-based on the way in, index on the way through
-    trig_k = trigger_index(trigger_gauge, len(gauge_ij), hooks)
+    # T51 trigger gauge: 1-based on the way in, index on the way through;
+    # trig_no is its entered number (P1-24)
+    trig_k = trigger_index(trigger_gauge, len(gauges), hooks,
+                           numbers=gauge_num)
+    trig_no = None if trig_k is None else gauge_num[trig_k]
     trigger = trigger_state = None
 
     # ── Print summary ───────────────────────────────────────────────────────
@@ -334,9 +348,10 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         xlabel='r [m]' if geometry == 'axisymmetric' else 'x [m]',
         ylabel='z [m]' if geometry == 'axisymmetric' else 'y [m]',
         # T53: where the gauges landed, numbered as in the gauge table
-        gauges=[(n + 1, gx, gy)
+        # (their entered numbers, P1-24)
+        gauges=[(gauge_num[n], gx, gy)
                 for n, (gx, gy) in enumerate(gauge_actual)],
-        trigger_gauge=None if trig_k is None else trig_k + 1,
+        trigger_gauge=trig_no,
         title='')
     if geometry == 'axisymmetric':
         # live (r, z) frames can be revolved into a 3D cylinder view
@@ -382,9 +397,9 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         if trig_k is not None and trigger is None \
                 and p_f[gauge_ij[trig_k]] > arrival_p:
             gx, gy = gauge_actual[trig_k]
-            trigger = dict(t=float(t), gauge=trig_k + 1,
+            trigger = dict(t=float(t), gauge=trig_no,
                            point=(gx, gy), action=trigger_action)
-            hooks.log(f"  Trigger gauge {trig_k + 1} ({gx:.4f}, "
+            hooks.log(f"  Trigger gauge {trig_no} ({gx:.4f}, "
                       f"{gy:.4f}) m reached at t = {t*1e3:.3f} ms")
             if 'remap' in trigger_action:
                 trigger_state = dict(t=float(t), rho=rho_f.copy(),
@@ -392,7 +407,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                                      e=e_f.copy(), p=p_f.copy(),
                                      phase=phase.copy())
             if 'terminate' in trigger_action:
-                stop_reason = (f'trigger gauge {trig_k + 1} reached '
+                stop_reason = (f'trigger gauge {trig_no} reached '
                                f'({gx:.4f}, {gy:.4f}) m')
                 break
 
@@ -532,7 +547,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                 # what the USER asked for; gauge_out['points'] is where
                 # they landed after snapping to cell centres (QA-33)
                 gauges=[tuple(float(v) for v in g) for g in gauges],
-                trigger_gauge=None if trig_k is None else trig_k + 1,
+                trigger_gauge=trig_no,
                 # per-step running peak pressure and net overpressure
                 # impulse, same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)

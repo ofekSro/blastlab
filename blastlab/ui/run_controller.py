@@ -27,7 +27,7 @@ from ..services import model_folder
 from ..solvers.jobs import resume_stage, solve_stage
 from ..solvers.worker import SolverWorker
 from ..viz3d import MISSING_MSG, pyvista_available
-from . import dialogs
+from . import dialogs, run_gauges
 
 _TB_HEADER = 'Traceback (most recent call last):'
 _TB_CHAIN = (
@@ -91,6 +91,7 @@ class RunController(QObject):
         self._run_count = 0
         self._run_name = ''
         self._stage_dims = []
+        self._gauge_drops = []          # per stage, run_gauges.drops (GUI-15 c)
         self._run_stopped_early = False
         self._run_errored = False
         self._drain_pending = False
@@ -137,12 +138,14 @@ class RunController(QObject):
             dialogs.show_info('Run', 'A run is already in progress.')
             return False
         dims = [dim for dim, _ in dim_cases]
+        # GUI-15 (c), D3: the reasons Run gives, kept for each Result
+        drops = [run_gauges.drops(case) for _dim, case in dim_cases]
         if model is None:
             stages = [solve_stage(dim, case) for dim, case in dim_cases]
         else:
             stages = model_folder.make_stages(model, dim_cases, reports)
         return self._launch(stages, dims, paused=paused, run_name=run_name,
-                            model=model)
+                            model=model, drops=drops)
 
     def resume_foam_run(self, path, dim, run_name='', model=None, case=None):
         """Resume a stopped blastFoam run through the ordinary worker
@@ -160,7 +163,9 @@ class RunController(QObject):
                                  run_info=model_folder.run_info(model, case))
         return self._launch([stage], [dim], run_name=run_name, model=model)
 
-    def _launch(self, stages, dims, paused=False, run_name='', model=None):
+    def _launch(self, stages, dims, paused=False, run_name='', model=None,
+                drops=None):
+        self._gauge_drops = list(drops or [])
         self._drain_pending = True
         self._done_seen = False
         self._run_count += 1
@@ -354,6 +359,11 @@ class RunController(QObject):
                      + (' (stopped)' if res.stopped_early else ''))
             if name:
                 res.meta['name'] = name
+            # GUI-15 (c): in memory only - the stage's files are written
+            drop = (self._gauge_drops[k] if k < len(self._gauge_drops)
+                    else [])
+            if drop and res.meta is not None:
+                res.meta['gauges_dropped'] = drop
             self._run_stopped_early |= bool(res.stopped_early)
             h.on_result(k, dim, label, res)
             # the live viewer belongs to this stage: hand it its playback

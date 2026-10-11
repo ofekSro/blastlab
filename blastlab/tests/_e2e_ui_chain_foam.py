@@ -105,9 +105,12 @@ def main():
                   solver='blastfoam', material='TNT',
                   bcs=dict(x_lo='reflect', x_hi='terminate',
                            y_lo='terminate', y_hi='terminate')),
+        # RESUME 2 (D10): a short end time, as _e2e_ui_chain_screen's
+        # stages have - it counts from the hand-off (models/case.py)
         3: Case3D(Lx=1.0, Ly=1.0, Lz=0.6, cell_size_m=0.04,
                   center=(0.5, 0.5, 0.3), gauges=[(0.8, 0.5, 0.3)],
-                  n_snapshots=1, solver='blastfoam', material='TNT'),
+                  n_snapshots=1, solver='blastfoam', material='TNT',
+                  t_end=2e-4),
     }
 
     print('\nC1: three stages, all on blastFoam')
