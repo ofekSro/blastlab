@@ -23,8 +23,9 @@ the original Hebrew notes survive only in git history (`docs/archive/`).
 | [../TODO.md](../TODO.md) | **Open work only**, ordered GUI → OUT → HD1 → P0 → P4 |
 | [standing-rules-and-tests.md](standing-rules-and-tests.md) | The standing rules for every task and the test matrix (out of TODO.md, 2026-10-04) |
 | [history/todo-closed.md](history/todo-closed.md) | Closed GUI / OUT rows and the HD1 status, background and deviation records, the MPI-decomposition and pyrotechnics records, the closed `N5-7` body (out of TODO.md, 2026-10-04 and 10-05) |
-| [../DONE.md](../DONE.md) | The completed record (§0l on), the timeline, and **the identifier index that code comments cite** |
+| [../DONE.md](../DONE.md) | The completed record (§1 on), the timeline, and **the identifier index that code comments cite** |
 | [history/done-2026-09.md](history/done-2026-09.md) | DONE.md §0-§0k: the HD1.3 track and the batches of 2026-09-20 … 09-28 |
+| [history/done-gui-redesign.md](history/done-gui-redesign.md) | DONE.md §0l-§0w: the GUI-redesign batches of 2026-09-28 … 10-05 |
 
 ## Verification — what has been checked, and how
 
