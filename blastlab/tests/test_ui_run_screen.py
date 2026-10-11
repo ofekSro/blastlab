@@ -956,7 +956,8 @@ def r5_gauges(win):
     num, meta, peak = col.card_texts()
     check('a click on G2 moves the enlarged card to it',
           col.selected_number() == 2 and num == 'G2'
-          and meta == f'Z {RG.fmt_dist(want_z[2])} · Wall 1 · selected'
+          # GUI-14 (e), UX F4: no `selected`, Z with its unit
+          and meta == f'Z {RG.fmt_dist(want_z[2])} m/kg^1/3 · Wall 1'
           and peak == f'peak {want}', f'{num} | {meta} | {peak}')
     check('the selected row has the gauge_bg fill',
           theme_pal('gauge_bg') in w2.styleSheet(), w2.styleSheet()[:60])
@@ -1805,6 +1806,11 @@ def r5b_dropped(win):
           and card.meta.toolTip() == full
           and card.meta.geometry().right() < card.peak.geometry().left(),
           f'{card.meta.text()!r} {card.meta.toolTip()!r}')
+    check('GUI-14 (e): the elided header keeps its head (Z ...), not the '
+          'tail',
+          card.meta.text().startswith('Z ') and card.meta.text().endswith(
+              '…') and not card.meta.full_text().endswith('selected'),
+          f'{card.meta.text()!r} {full!r}')
     card.meta.setMinimumWidth(0)
     card.meta.setMaximumWidth(16777215)
     pump(20)

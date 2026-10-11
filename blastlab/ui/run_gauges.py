@@ -524,9 +524,10 @@ class _SelectedCard(QFrame):
         head.setContentsMargins(0, 0, 0, 0)
         head.setSpacing(8)
         self.num = QLabel('')
-        # GUI-13 (g), QA #2: the middle is elided (`R … · Wall 1`), the
-        # whole text is the tooltip, and it never runs under the peak
-        self.meta = ElidedLabel('', Qt.ElideMiddle)
+        # GUI-13 (g), QA #2: the whole text is the tooltip and it never
+        # runs under the peak. GUI-14 (e): the end is elided, so the head
+        # (`Z 1.23 m/kg^1/3`) always stays
+        self.meta = ElidedLabel('', Qt.ElideRight)
         self.peak = QLabel('')
         head.addWidget(self.num, 0, Qt.AlignBaseline)
         head.addWidget(self.meta, 1, Qt.AlignBaseline)
@@ -562,10 +563,13 @@ class _SelectedCard(QFrame):
         was = self._row is None or self._row['waiting']
         self._row, self._live = row, bool(live)
         self.num.setText(row['label'])
-        lead = (f'Z {fmt_dist(row["z"])}' if z_on
+        # GUI-14 (e), UX F4: Z carries its unit (from the column label),
+        # and the header says nothing about being selected - the enlarged
+        # card is the selection
+        unit = sd.LABEL[sd.LABEL.index('[') + 1:sd.LABEL.rindex(']')]
+        lead = (f'Z {fmt_dist(row["z"])} {unit}' if z_on
                 else f'R {fmt_dist(row["r"])} m')
-        bits = [lead] + ([row['where']] if row['where'] else []) \
-            + ['selected']
+        bits = [lead] + ([row['where']] if row['where'] else [])
         self.meta.setText(' · '.join(bits))
         self.peak.setText(WAITING if row['waiting']
                           else f'peak {fmt_peak(row["peak_kpa"])}')
