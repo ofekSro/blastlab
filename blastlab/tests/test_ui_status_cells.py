@@ -52,13 +52,22 @@ def main():
     from blastlab.core.case import load_case
     from blastlab.ui.app import MainWindow
 
+    def wait_for(pred, ms=5000):
+        """Pump in 50 ms steps until `pred()` or `ms` ran out: the 300 ms
+        debounce plus a validation pass is not a fixed 600 ms on a busy
+        machine (GUI-14 h). The checks below still judge the result."""
+        for _ in range(ms // 50):
+            if pred():
+                return
+            pump(50)
+
     win = MainWindow()
     win.show()
     pump(150)
     print('S1: the loaded 2D case')
     win.setup.set_case(load_case(CASE))
     win._schedule_validate()
-    pump(600)
+    wait_for(lambda: cell_lines(win) == [LINE_LOADED])
     check('the strip shows the cell count', cell_lines(win) == [LINE_LOADED],
           str(cell_lines(win)))
 
@@ -68,7 +77,7 @@ def main():
     edit.selectAll()
     QTest.keyClick(edit, Qt.Key_Backspace)
     QTest.keyClicks(edit, '0.01')
-    pump(600)
+    wait_for(lambda: cell_lines(win) == [LINE_TYPED])
     check('the field holds what was typed',
           win.setup.form.v['cell'].get() == '0.01',
           win.setup.form.v['cell'].get())
