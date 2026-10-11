@@ -1,0 +1,8 @@
+﻿python : gc:0: ResourceWarning: gc: 1 uncollectable objects at shutdown; use gc.set_debug(gc.DEBUG_UNCOLLECTABLE) to 
+list them
+At line:1 char:484
++ ... lt 8;$i++){ python -u _qa_ui_harness.py --resume --solver native --ou ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (gc:0: ResourceW...E) to list them:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

@@ -1,0 +1,350 @@
+﻿QA output: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native
+[00:10:45] [boot] window up: 1280x840 (built 6779 ms, shown 1542 ms)
+[00:10:45] [I01] --- begin ---
+[00:10:45] [I01] ok: the setup pill shows its screen
+[00:10:45] [I01] ok: and the setup pill is the active one
+[00:10:46] [I01] ok: the run pill shows its screen
+[00:10:46] [I01] ok: and the run pill is the active one
+[00:10:47] [I01] ok: the run started
+[00:10:50] [I01] ok: the results pill shows its screen
+[00:10:50] [I01] ok: and the results pill is the active one
+[00:10:50] [I01] ok: the chain pill shows its screen
+[00:10:50] [I01] ok: and the chain pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the results pill shows its screen
+[00:10:51] [I01] ok: and the results pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the chain pill shows its screen
+[00:10:51] [I01] ok: and the chain pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the results pill shows its screen
+[00:10:52] [I01] ok: and the results pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:52] [I01] ok: the results pill shows its screen
+[00:10:52] [I01] ok: and the results pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:53] [I01] ok: the setup pill shows its screen
+[00:10:53] [I01] ok: and the setup pill is the active one
+[00:10:53] [I01] ok: the run pill shows its screen
+[00:10:53] [I01] ok: and the run pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:53] [I01] ok: the run pill shows its screen
+[00:10:53] [I01] ok: and the run pill is the active one
+[00:10:53] [I01] ok: the chain pill shows its screen
+[00:10:53] [I01] ok: and the chain pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:54] [I01] ok: the results pill shows its screen
+[00:10:54] [I01] ok: and the results pill is the active one
+[00:10:54] [I01] ok: the setup pill shows its screen
+[00:10:54] [I01] ok: and the setup pill is the active one
+[00:10:54] [I01] ok: the setup pill shows its screen
+[00:10:54] [I01] ok: and the setup pill is the active one
+[00:10:54] [I01] ok: the chain pill shows its screen
+[00:10:54] [I01] ok: and the chain pill is the active one
+[00:10:54] [I01] ok: the run pill shows its screen
+[00:10:54] [I01] ok: and the run pill is the active one
+[00:10:54] [I01] ok: the run pill shows its screen
+[00:10:54] [I01] ok: and the run pill is the active one
+[00:10:54] [I01] ok: the chain pill shows its screen
+[00:10:54] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the results pill shows its screen
+[00:10:55] [I01] ok: and the results pill is the active one
+[00:10:55] [I01] ok: the chain pill shows its screen
+[00:10:55] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the chain pill shows its screen
+[00:10:55] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the results pill shows its screen
+[00:10:55] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the setup pill shows its screen
+[00:10:56] [I01] ok: and the setup pill is the active one
+[00:10:56] [I01] ok: the setup pill shows its screen
+[00:10:56] [I01] ok: and the setup pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the chain pill shows its screen
+[00:10:56] [I01] ok: and the chain pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:57] [I01] ok: the chain pill shows its screen
+[00:10:57] [I01] ok: and the chain pill is the active one
+[00:10:57] [I01] ok: the setup pill shows its screen
+[00:10:57] [I01] ok: and the setup pill is the active one
+[00:10:57] [I01] ok: the run pill shows its screen
+[00:10:57] [I01] ok: and the run pill is the active one
+[00:10:57] [I01] ok: the run pill shows its screen
+[00:10:57] [I01] ok: and the run pill is the active one
+[00:10:57] [I01] ok: the chain pill shows its screen
+[00:10:57] [I01] ok: and the chain pill is the active one
+[00:10:58] [I01] ok: the chain pill shows its screen
+[00:10:58] [I01] ok: and the chain pill is the active one
+[00:11:10] [I01] ok: the run pill shows its screen
+[00:11:10] [I01] ok: and the run pill is the active one
+[00:11:10] [I01] ok: the window survived the switching
+QA output: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native
+[00:25:31] [boot] window up: 1280x840 (built 3096 ms, shown 1792 ms)
+[00:25:31] [I01] --- begin ---
+[00:25:31] [I01] ok: the setup pill shows its screen
+[00:25:31] [I01] ok: and the setup pill is the active one
+[00:25:32] [I01] ok: the run pill shows its screen
+[00:25:32] [I01] ok: and the run pill is the active one
+[00:25:32] [I01] DIALOG show_error [Run] 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA was not created by blastlab - choose another model name' -> 'ok'
+[00:26:13] [I01] FINDING S1 check: the run started
+[00:26:16] [I01] ok: the results pill shows its screen
+[00:26:16] [I01] ok: and the results pill is the active one
+[00:26:16] [I01] ok: the chain pill shows its screen
+[00:26:16] [I01] ok: and the chain pill is the active one
+[00:26:16] [I01] ok: the setup pill shows its screen
+[00:26:16] [I01] ok: and the setup pill is the active one
+[00:26:16] [I01] ok: the setup pill shows its screen
+[00:26:16] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the results pill shows its screen
+[00:26:17] [I01] ok: and the results pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the chain pill shows its screen
+[00:26:18] [I01] ok: and the chain pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the run pill shows its screen
+[00:26:18] [I01] ok: and the run pill is the active one
+[00:26:18] [I01] ok: the results pill shows its screen
+[00:26:18] [I01] ok: and the results pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the results pill shows its screen
+[00:26:18] [I01] ok: and the results pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the setup pill shows its screen
+[00:26:19] [I01] ok: and the setup pill is the active one
+[00:26:19] [I01] ok: the setup pill shows its screen
+[00:26:19] [I01] ok: and the setup pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the results pill shows its screen
+[00:26:19] [I01] ok: and the results pill is the active one
+[00:26:19] [I01] ok: the results pill shows its screen
+[00:26:19] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the run pill shows its screen
+[00:26:20] [I01] ok: and the run pill is the active one
+[00:26:20] [I01] ok: the chain pill shows its screen
+[00:26:20] [I01] ok: and the chain pill is the active one
+[00:26:20] [I01] ok: the results pill shows its screen
+[00:26:20] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the results pill shows its screen
+[00:26:20] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the setup pill shows its screen
+[00:26:20] [I01] ok: and the setup pill is the active one
+[00:26:20] [I01] ok: the setup pill shows its screen
+[00:26:20] [I01] ok: and the setup pill is the active one
+[00:26:20] [I01] ok: the chain pill shows its screen
+[00:26:20] [I01] ok: and the chain pill is the active one
+[00:26:20] [I01] ok: the run pill shows its screen
+[00:26:20] [I01] ok: and the run pill is the active one
+[00:26:21] [I01] ok: the run pill shows its screen
+[00:26:21] [I01] ok: and the run pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:21] [I01] ok: the setup pill shows its screen
+[00:26:21] [I01] ok: and the setup pill is the active one
+[00:26:21] [I01] ok: the setup pill shows its screen
+[00:26:21] [I01] ok: and the setup pill is the active one
+[00:26:21] [I01] ok: the results pill shows its screen
+[00:26:21] [I01] ok: and the results pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the results pill shows its screen
+[00:26:22] [I01] ok: and the results pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the results pill shows its screen
+[00:26:22] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the chain pill shows its screen
+[00:26:23] [I01] ok: and the chain pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the chain pill shows its screen
+[00:26:23] [I01] ok: and the chain pill is the active one
+[00:26:23] [I01] ok: the setup pill shows its screen
+[00:26:23] [I01] ok: and the setup pill is the active one
+[00:26:23] [I01] ok: the run pill shows its screen
+[00:26:23] [I01] ok: and the run pill is the active one
+[00:26:23] [I01] ok: the run pill shows its screen
+[00:26:23] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the setup pill shows its screen
+[00:26:24] [I01] ok: and the setup pill is the active one
+[00:26:24] [I01] ok: the run pill shows its screen
+[00:26:24] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the run pill shows its screen
+[00:26:24] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the results pill shows its screen
+[00:26:24] [I01] ok: and the results pill is the active one
+[00:26:24] [I01] ok: the results pill shows its screen
+[00:26:24] [I01] ok: and the results pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the setup pill shows its screen
+[00:26:25] [I01] ok: and the setup pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the results pill shows its screen
+[00:26:26] [I01] ok: and the results pill is the active one
+[00:26:26] [I01] ok: the results pill shows its screen
+[00:26:26] [I01] ok: and the results pill is the active one
+[00:26:26] [I01] ok: the setup pill shows its screen
+[00:26:26] [I01] ok: and the setup pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:27] [I01] ok: the run pill shows its screen
+[00:26:27] [I01] ok: and the run pill is the active one
+[00:26:27] [I01] ok: the run pill shows its screen
+[00:26:27] [I01] ok: and the run pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:28] [I01] ok: the setup pill shows its screen
+[00:26:28] [I01] ok: and the setup pill is the active one
+[00:26:28] [I01] ok: the run pill shows its screen
+[00:26:28] [I01] ok: and the run pill is the active one
+[00:26:28] [I01] ok: the results pill shows its screen
+[00:26:28] [I01] ok: and the results pill is the active one
+[00:26:28] [I01] ok: the run pill shows its screen
+[00:26:28] [I01] ok: and the run pill is the active one
+[00:26:28] [I01] ok: the window survived the switching
+[00:26:29] [I01] ok: and the run still finished
+[00:26:30] [I01] ok: the setup pill shows its screen
+[00:26:30] [I01] ok: and the setup pill is the active one
+[00:26:31] [I01] ok: the run pill shows its screen
+[00:26:31] [I01] ok: and the run pill is the active one
+[00:26:32] [I01] ok: the results pill shows its screen
+[00:26:32] [I01] ok: and the results pill is the active one
+[00:26:33] [I01] ok: the chain pill shows its screen
+[00:26:33] [I01] ok: and the chain pill is the active one
+[00:26:33] [I01] contact sheet: contact_I01.png (5 shots)
+[00:26:33] [I01] --- end done in 62.5s (max gap 143 ms) ---
+[00:26:34] [I01] ok: the Dark-mode action gives the dark theme
+[00:26:35] [I01] ok: the setup pill shows its screen
+[00:26:35] [I01] ok: and the setup pill is the active one
+[00:26:35] [I01] ok: the 2D segment sets the dimension
+[00:26:36] [I02] --- begin ---
+[00:26:36] [I02] ok: the setup pill shows its screen
+[00:26:36] [I02] ok: and the setup pill is the active one
+[00:26:37] [I02] ok: the run pill shows its screen
+[00:26:37] [I02] ok: and the run pill is the active one
+[00:26:37] [I02] DIALOG show_error [Run] 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA was not created by blastlab - choose another model name' -> 'ok'
+[00:27:18] [I02] FINDING S1 check: the run started
+[00:27:21] [I02] close took 1.5 s; worker alive after join: unknown
+[00:27:21] [I02] ok: closing during a native run returned in 1.5 s
+[00:27:21] [I02] ok: and the solver thread did not outlive the window
+[00:27:21] [I02] contact sheet: contact_I02.png (1 shots)
+[00:27:21] [I02] --- end done in 45.7s (max gap 96 ms) ---
+[00:27:21] [I02] I02 is terminal - exiting 75 for a fresh app
+[00:27:21] [I02] exit 75; pending: ['I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+QA output: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native
+[00:27:27] [boot] HARNESS CRASH
+Traceback (most recent call last):
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 4756, in main
+    qa.build_app()
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 390, in build_app
+    use_model(self.win)
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\ui\testing.py", line 83, in use_model
+    raise RuntimeError(f'use_model: {folder} is not a blastlab '
+RuntimeError: use_model: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native\runs\QA is not a blastlab model folder - not deleting it
+
+[00:27:27] [boot] exit 1; pending: ['I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

@@ -69,6 +69,35 @@ batch first, **Q2 approved** (→ A8), **Q3 approved** (B1's two pin edits).
 
 ---
 
+## 0y. 2026-10-12 — batch `gui-15-backlog` (GUI-15 a-h, P1-24, RESUME 2; branch `gui-15`, merged `f1f9dd4`)
+
+Plan `docs/batches/2026-10-11-gui-15-backlog.md` (D1-D13 there); reports `…-backlog-{A,B}.*.md`;
+QA `docs/qa/2026-10-11-gui-15-qa/`, UX `docs/qa/2026-10-11-gui-15-ux.md`. Owner 2026-10-11: "approve
+all", incl. Q1 (P1-23 + P2-22 next) and Q2 (blastFoam trigger measured in that batch).
+- **A1-A4:** Run leaves out a dropped gauge from Start and shows the drop line before any payload,
+  measured against `drop_rule`'s wall (a); the Gauges node caption reads `… · G2 dropped` and the child
+  row is warn, in Setup and on chain stages (e); `RunController` stamps `meta['gauges_dropped']` in
+  memory only, when non-empty, and Results gives Run's reason (c); `--solver native` skips the F group
+  in both QA harnesses, an explicit `--scenario F…` too (h).
+- **B1-B6:** one wording `within a cell of Wall n` in `core/geometry`, five pins moved (d); native log
+  names the wall, reasons equal `validate_case`'s (b); **P1-24:** native trigger and live labels use
+  the entered numbers, a trigger on a dropped gauge is disabled and warned (native only, D13) —
+  measured 2D stop G4 0.284 ms → G3 9.1236e-05 s, 3D 0.020 ms → 7.2718e-06 s, both bit-equal to the
+  no-drop control; nothing moves without a drop; `test_trigger_numbering.py` new; the e2e kept-gauge
+  check can fail again, `test_solver_gauge_log.py` new (g); a 1D gauge beyond the radius gets a Checks
+  warning, a log line and its entered number in Results, no golden moved (f); chain e2e stage 3
+  `t_end` 2e-4: `_e2e_ui_chain_foam.py` PASS, 33 checks, 144-161 s (RESUME 2).
+- **Tests:** Part A `gate --changed` 19/19, Part B `gate --deep` 117/117 (all 16 `test_gui_*`,
+  `test_blast3d`, `test_bc_trigger`, `test_char_native_api`), `test_regression` byte-identical after
+  each part. QA: `_qa_ui_harness` native 68 done / 12 skipped / 0 crashes (S2 Q03, I02 carried from
+  GUI-14); blastFoam F00, F07 pass. Every touched screen checked.
+- **Verifier fixes:** none (A light, B full).
+- **Open:** `_e2e_ui_view3d.py` G3 fails (3D Detach re-embeds, `view3d_host.on_window`), GUI-16 (g);
+  UX U1-U6 → GUI-16 (a)-(f); (j) of GUI-14 on the home PC; P1-23 + P2-22 next (F05/F06 exit 134).
+- **Commits:** `4d3513e` (plan, master), `48a2784`..`8e6af71` (branch `gui-15`), merge `f1f9dd4`.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

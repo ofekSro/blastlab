@@ -1,0 +1,30 @@
+[01:36:03] [boot] window up: 1280x840 (built 3739 ms, shown 2061 ms)
+[01:36:03] [F00] --- begin ---
+[01:36:03] [F00] NOTE: check_available -> (True, 'blastFoam ready in WSL (Ubuntu)')
+[01:36:04] [F00] disk: C: 469 GB free, WSL / 1016 GB free
+[01:36:04] [F00] ok: the disk gate passes before the foam runs
+[01:36:04] [F00] NOTE: runs root before F: 34 runs, 4.6 GB
+[01:36:04] [F00] --- end done in 1.0s (max gap 0 ms) ---
+[01:36:05] [F00] ok: the Dark-mode action gives the dark theme
+[01:36:06] [F00] ok: the setup pill shows its screen
+[01:36:06] [F00] ok: and the setup pill is the active one
+[01:36:06] [F00] ok: the 2D segment sets the dimension
+[01:36:07] [F07] --- begin ---
+[01:36:07] [F07] ok: the setup pill shows its screen
+[01:36:07] [F07] ok: and the setup pill is the active one
+[01:36:08] [F07] ok: the run pill shows its screen
+[01:36:08] [F07] ok: and the run pill is the active one
+[01:36:09] [F07] ok: the blockMesh stage line appeared
+[01:36:11] [F07] ok: the run ended
+[01:36:11] [F07] NOTE: stop during meshing -> the run ended in 2.1 s
+[01:36:11] [F07] ok: a stop during meshing returns in 2.1 s
+[01:36:11] [F07] ok: no "Run failed" dialog for a deliberate stop
+[01:36:11] [F07] ok: and no Results entry for a run that never started
+[01:36:11] [F07] NOTE: log tail:   [stop requested - finishing the current step] /   [note] WSL scratch kept (the run did not finish (it raised)): /root/blastlab_runs/20261012-013608_2d_p61436-00 /   [stopped during 'blockMesh'] /   [run finished]
+[01:36:12] [F07] contact sheet: contact_F07.png (2 shots)
+[01:36:12] [F07] --- end done in 5.1s (max gap 174 ms) ---
+[01:36:12] [F07] ok: the Dark-mode action gives the dark theme
+[01:36:13] [F07] ok: the setup pill shows its screen
+[01:36:13] [F07] ok: and the setup pill is the active one
+[01:36:14] [F07] ok: the 2D segment sets the dimension
+[01:36:15] [F07] exit 0; pending: []

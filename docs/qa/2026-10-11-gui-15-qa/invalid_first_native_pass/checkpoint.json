@@ -1,0 +1,1674 @@
+{
+ "done": {
+  "F00": {
+   "status": "skipped",
+   "t": 1791751497.3790858,
+   "shots": [],
+   "err": "F00: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F01": {
+   "status": "skipped",
+   "t": 1791751497.3808303,
+   "shots": [],
+   "err": "F01: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F02": {
+   "status": "skipped",
+   "t": 1791751497.3856394,
+   "shots": [],
+   "err": "F02: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F03": {
+   "status": "skipped",
+   "t": 1791751497.387258,
+   "shots": [],
+   "err": "F03: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F04": {
+   "status": "skipped",
+   "t": 1791751497.387258,
+   "shots": [],
+   "err": "F04: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F05": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F05: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F06": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F06: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F07": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F07: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F08": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F08: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F09": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F09: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F10": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F10: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "F11": {
+   "status": "skipped",
+   "t": 1791751497.3924527,
+   "shots": [],
+   "err": "F11: --solver native keeps the harness off WSL (the F group runs blastFoam solves)",
+   "wall_s": 0.0
+  },
+  "B01": {
+   "status": "done",
+   "t": 1791751518.594212,
+   "shots": [
+    "001_B01_setup_coldstart_dark.png"
+   ],
+   "err": "",
+   "wall_s": 8.6
+  },
+  "B02": {
+   "status": "done",
+   "t": 1791751539.1866677,
+   "shots": [
+    "002_B02_run_empty_dark.png",
+    "003_B02_results_empty_dark.png",
+    "004_B02_chain_empty_dark.png"
+   ],
+   "err": "",
+   "wall_s": 18.1
+  },
+  "B03": {
+   "status": "done",
+   "t": 1791751549.037346,
+   "shots": [
+    "005_B03_setup_form1d_top_dark.png",
+    "006_B03_setup_form1d_bottom_dark.png",
+    "007_B03_setup_form2d_top_dark.png",
+    "008_B03_setup_form2d_bottom_dark.png",
+    "009_B03_setup_form3d_top_dark.png",
+    "010_B03_setup_form3d_bottom_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.4
+  },
+  "B04": {
+   "status": "done",
+   "t": 1791751555.3867798,
+   "shots": [
+    "011_B04_setup_hover_nav_run_dark.png",
+    "012_B04_run_hover_run_btn_dark.png",
+    "013_B04_run_hover_disabled_stop_dark.png"
+   ],
+   "err": "",
+   "wall_s": 3.7
+  },
+  "B05": {
+   "status": "done",
+   "t": 1791751571.2422707,
+   "shots": [
+    "014_B05_setup_geom1100x720_dark.png",
+    "015_B05_run_geom1100x720_dark.png",
+    "016_B05_results_geom1100x720_dark.png",
+    "017_B05_chain_geom1100x720_dark.png",
+    "018_B05_setup_geom900x600_dark.png",
+    "019_B05_run_geom900x600_dark.png",
+    "020_B05_results_geom900x600_dark.png",
+    "021_B05_chain_geom900x600_dark.png",
+    "022_B05_setup_zoomed_dark.png",
+    "023_B05_run_zoomed_dark.png",
+    "024_B05_results_zoomed_dark.png",
+    "025_B05_chain_zoomed_dark.png"
+   ],
+   "err": "",
+   "wall_s": 13.4
+  },
+  "B06": {
+   "status": "done",
+   "t": 1791751578.9458961,
+   "shots": [
+    "026_B06_run_focus_run_btn_dark.png",
+    "027_B06_run_focus_after_tab_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.8
+  },
+  "B07": {
+   "status": "done",
+   "t": 1791751612.1433873,
+   "shots": [
+    "028_B07_setup_setup_default_light.png",
+    "029_B07_run_empty_light.png",
+    "030_B07_results_empty_light.png",
+    "031_B07_chain_empty_light.png",
+    "032_B07_setup_form1d_top_light.png",
+    "033_B07_setup_form1d_bottom_light.png",
+    "034_B07_setup_form2d_top_light.png",
+    "035_B07_setup_form2d_bottom_light.png",
+    "036_B07_setup_form3d_top_light.png",
+    "037_B07_setup_form3d_bottom_light.png",
+    "038_B07_setup_error_strip_light.png",
+    "039_B07_setup_geom1100x720_light.png"
+   ],
+   "err": "",
+   "wall_s": 30.8
+  },
+  "Q01": {
+   "status": "done",
+   "t": 1791751622.619807,
+   "shots": [
+    "040_Q01_setup_setup_3d_dark.png",
+    "041_Q01_setup_back_to_2d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.5
+  },
+  "Q02": {
+   "status": "done",
+   "t": 1791751674.5142832,
+   "shots": [
+    "042_Q02_setup_light_setup_light.png",
+    "043_Q02_run_light_run_light.png",
+    "044_Q02_results_light_results_light.png",
+    "045_Q02_chain_light_chain_light.png",
+    "046_Q02_setup_dark_setup_dark.png",
+    "047_Q02_run_dark_run_dark.png",
+    "048_Q02_results_dark_results_dark.png",
+    "049_Q02_chain_dark_chain_dark.png",
+    "050_Q02_setup_light_setup_light.png",
+    "051_Q02_run_light_run_light.png",
+    "052_Q02_results_light_results_light.png",
+    "053_Q02_chain_light_chain_light.png",
+    "054_Q02_setup_dark_setup_dark.png",
+    "055_Q02_run_dark_run_dark.png",
+    "056_Q02_results_dark_results_dark.png",
+    "057_Q02_chain_dark_chain_dark.png"
+   ],
+   "err": "",
+   "wall_s": 49.4
+  },
+  "Q03": {
+   "status": "done",
+   "t": 1791751678.1353233,
+   "shots": [],
+   "err": "",
+   "wall_s": 0.4
+  },
+  "Q04": {
+   "status": "done",
+   "t": 1791751690.948114,
+   "shots": [
+    "058_Q04_setup_dpi125_setup_dark.png",
+    "059_Q04_run_dpi125_run_dark.png",
+    "060_Q04_results_dpi125_results_dark.png",
+    "061_Q04_chain_dpi125_chain_dark.png",
+    "062_Q04_setup_dpi150_setup_dark.png",
+    "063_Q04_run_dpi150_run_dark.png",
+    "064_Q04_results_dpi150_results_dark.png",
+    "065_Q04_chain_dpi150_chain_dark.png"
+   ],
+   "err": "",
+   "wall_s": 10.4
+  },
+  "C01": {
+   "status": "done",
+   "t": 1791751697.396138,
+   "shots": [
+    "066_C01_setup_two_parse_errors_dark.png",
+    "067_C01_setup_one_parse_error_left_dark.png"
+   ],
+   "err": "",
+   "wall_s": 3.7
+  },
+  "C02": {
+   "status": "done",
+   "t": 1791751712.448711,
+   "shots": [
+    "068_C02_setup_cell_0_dark.png",
+    "069_C02_setup_charge_0_dark.png",
+    "070_C02_setup_Lx_-1_dark.png",
+    "071_C02_setup_1d_radius_0_dark.png",
+    "072_C02_setup_3d_tend_neg_dark.png",
+    "073_C02_setup_3d_slice_99_dark.png"
+   ],
+   "err": "",
+   "wall_s": 12.7
+  },
+  "C03": {
+   "status": "done",
+   "t": 1791751724.8379164,
+   "shots": [
+    "074_C03_setup_charge_outside_dark.png",
+    "075_C03_setup_charge_in_obstacle_dark.png",
+    "076_C03_setup_bad_obstacle_box_dark.png",
+    "077_C03_setup_gauge_outside_dark.png",
+    "078_C03_setup_charge_near_ground_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.7
+  },
+  "C04": {
+   "status": "done",
+   "t": 1791751735.0972068,
+   "shots": [
+    "079_C04_setup_gauge_row_a_b_dark.png",
+    "080_C04_setup_gauge_row_1_2_3_dark.png",
+    "081_C04_setup_gauge_row_empty_dark.png",
+    "082_C04_setup_gauge_row_1,2_dark.png",
+    "083_C04_setup_gauge_row_1;2_dark.png",
+    "084_C04_setup_remove_nothing_selected_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.5
+  },
+  "C05": {
+   "status": "done",
+   "t": 1791751745.609375,
+   "shots": [
+    "085_C05_setup_numerics_native_dark.png",
+    "086_C05_setup_numerics_foam_dark.png",
+    "087_C05_setup_amr_card_on_dark.png",
+    "088_C05_setup_back_to_native_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.9
+  },
+  "C06": {
+   "status": "done",
+   "t": 1791751760.0573123,
+   "shots": [
+    "089_C06_setup_zone_on_native_dark.png",
+    "090_C06_setup_zone_on_foam_dark.png",
+    "091_C06_setup_zone_level7_dark.png",
+    "092_C06_setup_zone_jump_dark.png",
+    "093_C06_setup_zone_snapped_dark.png",
+    "094_C06_setup_axisym_zone_on_axis_l2_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.8
+  },
+  "C07": {
+   "status": "done",
+   "t": 1791751776.2932556,
+   "shots": [
+    "095_C07_setup_amr_native_dark.png",
+    "096_C07_setup_amr_valid_dark.png",
+    "097_C07_setup_amr_plus_zones_dark.png",
+    "098_C07_setup_amr_unrefine_gt_refine_dark.png",
+    "099_C07_setup_amr_display_gt_levels_dark.png",
+    "100_C07_setup_amr_charge_unresolved_dark.png"
+   ],
+   "err": "",
+   "wall_s": 13.6
+  },
+  "C08": {
+   "status": "done",
+   "t": 1791751786.2774785,
+   "shots": [
+    "101_C08_setup_2d_cap_dark.png",
+    "102_C08_run_dialog-show_error_dark.png",
+    "103_C08_run_after_modal_dark.png",
+    "104_C08_setup_3d_large_warning_dark.png",
+    "105_C08_setup_3d_foam_cap_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.3
+  },
+  "C09": {
+   "status": "done",
+   "t": 1791751814.1107318,
+   "shots": [
+    "106_C09_setup_overflow_dark.png",
+    "107_C09_setup_overflow_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 25.2
+  },
+  "C10": {
+   "status": "done",
+   "t": 1791751831.3307061,
+   "shots": [
+    "108_C10_setup_3d_zones_preview_dark.png",
+    "109_C10_setup_3d_zones_mesh_dark.png",
+    "110_C10_setup_2d_refine_mesh_dark.png",
+    "111_C10_setup_2d_amr_mesh_dark.png",
+    "112_C10_setup_1d_preview_hint_dark.png"
+   ],
+   "err": "",
+   "wall_s": 14.8
+  },
+  "C11": {
+   "status": "done",
+   "t": 1791751837.9753065,
+   "shots": [
+    "113_C11_setup_axisym_labels_dark.png",
+    "114_C11_setup_planar_labels_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.1
+  },
+  "C12": {
+   "status": "done",
+   "t": 1791751845.081008,
+   "shots": [
+    "115_C12_setup_dialog-save_file_dark.png",
+    "116_C12_setup_after_open_dark.png",
+    "117_C12_setup_dialog-open_file_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.6
+  },
+  "D01": {
+   "status": "done",
+   "t": 1791751853.3114455,
+   "shots": [
+    "118_D01_run_running_dark.png",
+    "119_D01_run_dialog-notify_desktop_dark.png",
+    "120_D01_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.7
+  },
+  "D02": {
+   "status": "done",
+   "t": 1791751986.685409,
+   "shots": [
+    "121_D02_run_live_mesh_dark.png",
+    "122_D02_run_refresh_steps5_dark.png",
+    "123_D02_run_live_nomesh_dark.png",
+    "124_D02_run_dialog-notify_desktop_dark.png",
+    "125_D02_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 35.6
+  },
+  "D03": {
+   "status": "done",
+   "t": 1791752000.5279477,
+   "shots": [
+    "126_D03_run_dialog-ask_yes_no_dark.png",
+    "127_D03_run_dialog-show_error_dark.png",
+    "128_D03_run_initialised_dark.png",
+    "129_D03_run_exec10_dark.png",
+    "130_D03_run_interrupted_dark.png",
+    "131_D03_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.2
+  },
+  "D04": {
+   "status": "done",
+   "t": 1791752105.3909051,
+   "shots": [
+    "132_D04_setup_3d_form_dark.png",
+    "133_D04_run_dialog-ask_yes_no_dark.png",
+    "134_D04_run_dialog-show_error_dark.png",
+    "135_D04_run_live_slice_dark.png",
+    "136_D04_run_live_3d_dark.png",
+    "137_D04_run_finished_slice_dark.png",
+    "138_D04_run_finished_3d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 102.2
+  },
+  "D05": {
+   "status": "done",
+   "t": 1791752156.4464025,
+   "shots": [
+    "139_D05_run_dialog-ask_yes_no_dark.png",
+    "140_D05_run_dialog-show_error_dark.png",
+    "141_D05_run_stop_requested_dark.png",
+    "142_D05_run_stopped_dark.png"
+   ],
+   "err": "",
+   "wall_s": 48.3
+  },
+  "D06": {
+   "status": "done",
+   "t": 1791752203.6376803,
+   "shots": [
+    "143_D06_run_dialog-ask_yes_no_dark.png",
+    "144_D06_run_dialog-show_error_dark.png",
+    "145_D06_run_dialog-ask_yes_no_dark.png",
+    "146_D06_run_dialog-show_error_dark.png",
+    "147_D06_run_second_start_dark.png"
+   ],
+   "err": "",
+   "wall_s": 44.6
+  },
+  "E01": {
+   "status": "done",
+   "t": 1791752215.3852468,
+   "shots": [
+    "148_E01_results_1d_fields_dark.png",
+    "149_E01_results_1d_gauges_dark.png",
+    "150_E01_results_1d_3d_dark.png",
+    "151_E01_results_dialog-save_file_dark.png",
+    "152_E01_results_after_3dviewer_click_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.2
+  },
+  "E02": {
+   "status": "done",
+   "t": 1791752232.132328,
+   "shots": [
+    "153_E02_results_overpressure_t_=_0.110_ms_dark.png",
+    "154_E02_results_overpressure_t_=_0.466_ms_dark.png",
+    "155_E02_results_density_t_=_0.110_ms_dark.png",
+    "156_E02_results_density_t_=_0.466_ms_dark.png",
+    "157_E02_results_speed_t_=_0.110_ms_dark.png",
+    "158_E02_results_speed_t_=_0.466_ms_dark.png",
+    "159_E02_results_peak_overpressure_t_=_0.110_ms_dark.png",
+    "160_E02_results_peak_overpressure_t_=_0.466_ms_dark.png",
+    "161_E02_results_net_ovp_impulse_t_=_0.110_ms_dark.png",
+    "162_E02_results_net_ovp_impulse_t_=_0.466_ms_dark.png",
+    "163_E02_results_overpressure_mesh_dark.png"
+   ],
+   "err": "",
+   "wall_s": 14.1
+  },
+  "E03": {
+   "status": "done",
+   "t": 1791752250.4648721,
+   "shots": [
+    "164_E03_results_gauges_2d_dark.png",
+    "165_E03_results_dialog-save_file_dark.png",
+    "166_E03_results_after_summary_export_dark.png",
+    "167_E03_results_dialog-save_file_dark.png",
+    "168_E03_results_after_tsv_export_dark.png",
+    "169_E03_results_dialog-pick_dir_dark.png",
+    "170_E03_results_after_fieldcsv_export_dark.png",
+    "171_E03_results_dialog-save_file_dark.png",
+    "172_E03_results_after_report_export_dark.png",
+    "173_E03_results_gauges_1d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 15.5
+  },
+  "E04": {
+   "status": "done",
+   "t": 1791752261.7591028,
+   "shots": [
+    "174_E04_results_anim_frame0_dark.png",
+    "175_E04_results_playing_dark.png",
+    "176_E04_results_last_frame_dark.png",
+    "177_E04_results_mid_frame_mesh_dark.png"
+   ],
+   "err": "",
+   "wall_s": 8.5
+  },
+  "E05": {
+   "status": "done",
+   "t": 1791752264.7152123,
+   "shots": [],
+   "err": "",
+   "wall_s": 0.4
+  },
+  "E06": {
+   "status": "done",
+   "t": 1791752267.4987776,
+   "shots": [],
+   "err": "",
+   "wall_s": 0.4
+  },
+  "E07": {
+   "status": "done",
+   "t": 1791752290.8248043,
+   "shots": [
+    "178_E07_results_dialog-pick_dir_dark.png",
+    "179_E07_results_after_pngs_dark.png",
+    "180_E07_results_dialog-save_file_dark.png",
+    "181_E07_results_after_anim_dark.png"
+   ],
+   "err": "",
+   "wall_s": 21.0
+  },
+  "E08": {
+   "status": "done",
+   "t": 1791752295.9008822,
+   "shots": [
+    "182_E08_results_after_remove_dark.png"
+   ],
+   "err": "",
+   "wall_s": 2.5
+  },
+  "E09": {
+   "status": "done",
+   "t": 1791752302.2589054,
+   "shots": [
+    "183_E09_results_titled_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.0
+  },
+  "G01": {
+   "status": "done",
+   "t": 1791752310.217666,
+   "shots": [
+    "184_G01_chain_chain_default_dark.png",
+    "185_G01_chain_after_refusals_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.6
+  },
+  "G02": {
+   "status": "done",
+   "t": 1791752362.6011996,
+   "shots": [
+    "186_G02_chain_chain_running_dark.png",
+    "187_G02_run_stage1_dark.png",
+    "188_G02_run_stage2_dark.png",
+    "189_G02_run_dialog-notify_desktop_dark.png",
+    "190_G02_run_stage3_dark.png",
+    "191_G02_run_stage3_3d_dark.png",
+    "192_G02_run_chain_done_dark.png",
+    "193_G02_results_results_picker_dark.png",
+    "194_G02_results_chain_stage3d_dark.png",
+    "195_G02_results_chain_stage1d_dark.png"
+   ],
+   "err": "",
+   "wall_s": 31.1
+  },
+  "G03": {
+   "status": "done",
+   "t": 1791752396.4324577,
+   "shots": [
+    "196_G03_chain_chain_while_running_dark.png"
+   ],
+   "err": "",
+   "wall_s": 31.1
+  },
+  "M01": {
+   "status": "crashed",
+   "t": 1791752403.147948,
+   "shots": [
+    "197_M01_run_empty_runs_folder_dark.png",
+    "198_M01_run_dialog-show_error_dark.png",
+    "199_M01_run_dialog-show_error_dark.png",
+    "200_M01_run_refused_model_name_dark.png"
+   ],
+   "err": "Traceback (most recent call last):\n  File \"C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\blastlab\\tests\\_qa_ui_harness.py\", line 4767, in main\n    fn(qa)\n  File \"C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\blastlab\\tests\\_qa_ui_harness.py\", line 3512, in m01_model_refusal\n    use_model(qa.win)\n  File \"C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\blastlab\\ui\\testing.py\", line 83, in use_model\n    raise RuntimeError(f'use_model: {folder} is not a blastlab '\nRuntimeError: use_model: C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA is not a blastlab model folder - not deleting it\n",
+   "wall_s": 4.3
+  },
+  "M02": {
+   "status": "done",
+   "t": 1791752412.5300748,
+   "shots": [
+    "201_M02_run_dialog-ask_yes_no_dark.png",
+    "202_M02_run_dialog-ask_yes_no_dark.png",
+    "203_M02_run_dialog-notify_desktop_dark.png",
+    "204_M02_run_overwritten_dark.png"
+   ],
+   "err": "",
+   "wall_s": 6.8
+  },
+  "M03": {
+   "status": "done",
+   "t": 1791752449.154165,
+   "shots": [
+    "205_M03_run_dialog-notify_desktop_dark.png",
+    "206_M03_run_finished_dark.png"
+   ],
+   "err": "",
+   "wall_s": 34.1
+  },
+  "M04": {
+   "status": "done",
+   "t": 1791752464.3807633,
+   "shots": [
+    "207_M04_chain_chain_two_stages_dark.png",
+    "208_M04_chain_dialog-notify_desktop_dark.png",
+    "209_M04_run_chain_done_dark.png"
+   ],
+   "err": "",
+   "wall_s": 12.8
+  },
+  "M05": {
+   "status": "done",
+   "t": 1791752472.0878527,
+   "shots": [
+    "210_M05_run_hd13_done_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.1
+  },
+  "V01": {
+   "status": "done",
+   "t": 1791752481.9372706,
+   "shots": [
+    "211_V01_setup_1d_off_dark.png",
+    "212_V01_setup_1d_off_card_dark.png",
+    "213_V01_setup_1d_time_dark.png",
+    "214_V01_setup_1d_time_card_dark.png",
+    "215_V01_setup_1d_step_dark.png",
+    "216_V01_setup_1d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.4
+  },
+  "V02": {
+   "status": "done",
+   "t": 1791752493.6792831,
+   "shots": [
+    "217_V02_setup_2d_no_obstacles_dark.png",
+    "218_V02_setup_2d_no_obstacles_card_dark.png",
+    "219_V02_setup_2d_with_obstacle_dark.png",
+    "220_V02_setup_2d_with_obstacle_card_dark.png",
+    "221_V02_setup_2d_step_dark.png",
+    "222_V02_setup_2d_step_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.1
+  },
+  "V03": {
+   "status": "done",
+   "t": 1791752505.8439217,
+   "shots": [
+    "223_V03_setup_3d_off_dark.png",
+    "224_V03_setup_3d_off_card_dark.png",
+    "225_V03_setup_3d_time_dark.png",
+    "226_V03_setup_3d_time_card_dark.png",
+    "227_V03_setup_3d_plane_q1_refused_card_dark.png",
+    "228_V03_setup_3d_step_plane_dark.png",
+    "229_V03_setup_3d_step_plane_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.4
+  },
+  "V04": {
+   "status": "done",
+   "t": 1791752515.555218,
+   "shots": [
+    "230_V04_setup_native_no_card_dark.png",
+    "231_V04_setup_foam_again_dark.png",
+    "232_V04_setup_foam_again_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 6.6
+  },
+  "V05": {
+   "status": "done",
+   "t": 1791752520.1318505,
+   "shots": [],
+   "err": "",
+   "wall_s": 2.0
+  },
+  "V06": {
+   "status": "done",
+   "t": 1791752534.2218409,
+   "shots": [
+    "233_V06_setup_1d_keep_off_dark.png",
+    "234_V06_setup_1d_keep_off_card_dark.png",
+    "235_V06_setup_1d_keep_on_dark.png",
+    "236_V06_setup_1d_keep_on_card_dark.png",
+    "237_V06_setup_3d_keep_off_dark.png",
+    "238_V06_setup_3d_keep_off_card_dark.png",
+    "239_V06_setup_3d_keep_on_dark.png",
+    "240_V06_setup_3d_keep_on_card_dark.png",
+    "241_V06_setup_native_keep_hidden_dark.png"
+   ],
+   "err": "",
+   "wall_s": 11.7
+  },
+  "V07": {
+   "status": "done",
+   "t": 1791752544.3481722,
+   "shots": [
+    "242_V07_setup_1d_gauges_off_dark.png",
+    "243_V07_setup_1d_gauges_off_card_dark.png",
+    "244_V07_setup_1d_gauges_on_dark.png",
+    "245_V07_setup_1d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.0
+  },
+  "V08": {
+   "status": "done",
+   "t": 1791752554.0647545,
+   "shots": [
+    "246_V08_setup_2d_gauges_off_dark.png",
+    "247_V08_setup_2d_gauges_off_card_dark.png",
+    "248_V08_setup_2d_gauges_on_dark.png",
+    "249_V08_setup_2d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.0
+  },
+  "V09": {
+   "status": "done",
+   "t": 1791752564.0088987,
+   "shots": [
+    "250_V09_setup_3d_gauges_off_dark.png",
+    "251_V09_setup_3d_gauges_off_card_dark.png",
+    "252_V09_setup_3d_gauges_on_dark.png",
+    "253_V09_setup_3d_gauges_on_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  },
+  "V10": {
+   "status": "done",
+   "t": 1791752573.9588854,
+   "shots": [
+    "254_V10_setup_3d_decimate_2_dark.png",
+    "255_V10_setup_3d_decimate_2_card_dark.png"
+   ],
+   "err": "",
+   "wall_s": 7.2
+  },
+  "H01": {
+   "status": "done",
+   "t": 1791752600.9711196,
+   "shots": [
+    "256_H01_setup_preview_dark_dark.png",
+    "257_H01_setup_preview_light_no_redraw_light.png",
+    "258_H01_setup_preview_light_redrawn_light.png",
+    "259_H01_setup_preview_dark_no_redraw_dark.png"
+   ],
+   "err": "",
+   "wall_s": 24.4
+  },
+  "H02": {
+   "status": "done",
+   "t": 1791752671.183025,
+   "shots": [
+    "260_H02_run_dialog-ask_yes_no_dark.png",
+    "261_H02_run_dialog-show_error_dark.png",
+    "262_H02_run_live_light_light.png",
+    "263_H02_run_finished_light_light.png",
+    "264_H02_run_finished_dark_again_dark.png"
+   ],
+   "err": "",
+   "wall_s": 67.6
+  },
+  "H03": {
+   "status": "done",
+   "t": 1791752703.4757683,
+   "shots": [
+    "265_H03_results_2d_field_light.png",
+    "266_H03_results_2d_gauges_light.png",
+    "267_H03_results_2d_3d_light.png",
+    "268_H03_results_browser_light_light.png",
+    "269_H03_chain_chain_light_light.png",
+    "270_H03_run_run_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 29.7
+  },
+  "I01": {
+   "status": "done",
+   "t": 1791753993.472061,
+   "shots": [
+    "271_I01_run_dialog-show_error_dark.png",
+    "272_I01_setup_after_rapid_dark.png",
+    "273_I01_run_after_rapid_dark.png",
+    "274_I01_results_after_rapid_dark.png",
+    "275_I01_chain_after_rapid_dark.png"
+   ],
+   "err": "",
+   "wall_s": 62.5
+  },
+  "I02": {
+   "status": "done",
+   "t": 1791754041.8112988,
+   "shots": [
+    "276_I02_run_dialog-show_error_dark.png"
+   ],
+   "err": "",
+   "wall_s": 45.7
+  },
+  "I03": {
+   "status": "done",
+   "t": 1791754542.5615058,
+   "shots": [
+    "277_I03_setup_dialog-show_error_dark.png",
+    "278_I03_setup_dialog-show_error_dark.png",
+    "279_I03_setup_dialog-show_error_dark.png",
+    "280_I03_setup_dialog-show_error_dark.png",
+    "281_I03_setup_dialog-show_error_dark.png",
+    "282_I03_setup_after_bad_json_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.9
+  },
+  "I04": {
+   "status": "done",
+   "t": 1791754609.3907728,
+   "shots": [
+    "283_I04_run_dialog-show_error_dark.png",
+    "284_I04_run_large_run_started_dark.png"
+   ],
+   "err": "",
+   "wall_s": 64.2
+  },
+  "I05": {
+   "status": "done",
+   "t": 1791754621.2114365,
+   "shots": [
+    "285_I05_setup_charge_1e400_dark.png",
+    "286_I05_setup_charge_nan_dark.png",
+    "287_I05_setup_charge_inf_dark.png",
+    "288_I05_setup_charge_1_dark.png",
+    "289_I05_setup_charge_1comma5_dark.png",
+    "290_I05_setup_charge_neg0_dark.png"
+   ],
+   "err": "",
+   "wall_s": 9.4
+  },
+  "I06": {
+   "status": "done",
+   "t": 1791754628.1705604,
+   "shots": [
+    "291_I06_results_3d_1100x720_dark.png",
+    "292_I06_results_3d_900x600_dark.png"
+   ],
+   "err": "",
+   "wall_s": 4.4
+  },
+  "K01": {
+   "status": "done",
+   "t": 1791754656.8254554,
+   "shots": [
+    "293_K01_setup_frame_light_light.png",
+    "294_K01_setup_frame_dark_dark.png",
+    "295_K01_setup_frame_dirty_dark.png"
+   ],
+   "err": "",
+   "wall_s": 26.3
+  },
+  "K02": {
+   "status": "done",
+   "t": 1791754776.8514152,
+   "shots": [
+    "296_K02_setup_setup_native_dark_dark.png",
+    "297_K02_setup_setup_blastfoam_dark_dark.png",
+    "298_K02_run_run_banner_dark_dark.png",
+    "299_K02_chain_chain_dark_dark.png",
+    "300_K02_setup_setup_native_light_light.png",
+    "301_K02_setup_setup_blastfoam_light_light.png",
+    "302_K02_run_run_banner_light_light.png",
+    "303_K02_chain_chain_light_light.png"
+   ],
+   "err": "",
+   "wall_s": 117.6
+  },
+  "K03": {
+   "status": "done",
+   "t": 1791754812.1823483,
+   "shots": [
+    "304_K03_setup_1100x720-setup-tree_light.png",
+    "305_K03_run_1100x720-run-finished_light.png",
+    "306_K03_results_1100x720-results-field_light.png",
+    "307_K03_chain_1100x720-chain-route123_light.png",
+    "308_K03_setup_1600x1000-setup-tree_light.png",
+    "309_K03_run_1600x1000-run-finished_light.png",
+    "310_K03_results_1600x1000-results-field_light.png",
+    "311_K03_chain_1600x1000-chain-route123_light.png"
+   ],
+   "err": "",
+   "wall_s": 32.7
+  }
+ },
+ "shot_counter": 311,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1791751497.3942208,
+   "argv": [
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791751857.5204005,
+   "exit": 75
+  },
+  {
+   "start": 1791751944.3465967,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791752313.8196917,
+   "exit": 75
+  },
+  {
+   "start": 1791752314.6855187,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791752708.7663207,
+   "exit": 75
+  },
+  {
+   "start": 1791752709.6126142,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791752715.182019,
+   "exit": 1
+  },
+  {
+   "start": 1791753022.956945,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ]
+  },
+  {
+   "start": 1791753924.20603,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791754041.8618429,
+   "exit": 75
+  },
+  {
+   "start": 1791754042.5049386,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791754047.792473,
+   "exit": 1
+  },
+  {
+   "start": 1791754531.408282,
+   "argv": [
+    "--resume",
+    "--solver",
+    "native",
+    "--out",
+    "C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native"
+   ],
+   "end": 1791754815.8594985,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "B01": {
+   "wall_s": 8.6,
+   "max_gap_ms": 63,
+   "p99_gap_ms": 22,
+   "big_gaps": []
+  },
+  "B02": {
+   "wall_s": 18.1,
+   "max_gap_ms": 56,
+   "p99_gap_ms": 28,
+   "big_gaps": []
+  },
+  "B03": {
+   "wall_s": 7.4,
+   "max_gap_ms": 169,
+   "p99_gap_ms": 147,
+   "big_gaps": []
+  },
+  "B04": {
+   "wall_s": 3.7,
+   "max_gap_ms": 45,
+   "p99_gap_ms": 36,
+   "big_gaps": []
+  },
+  "B05": {
+   "wall_s": 13.4,
+   "max_gap_ms": 137,
+   "p99_gap_ms": 99,
+   "big_gaps": []
+  },
+  "B06": {
+   "wall_s": 4.8,
+   "max_gap_ms": 40,
+   "p99_gap_ms": 30,
+   "big_gaps": []
+  },
+  "B07": {
+   "wall_s": 30.8,
+   "max_gap_ms": 356,
+   "p99_gap_ms": 132,
+   "big_gaps": [
+    [
+     325,
+     "appearance light"
+    ],
+    [
+     356,
+     "appearance dark"
+    ]
+   ]
+  },
+  "Q01": {
+   "wall_s": 7.5,
+   "max_gap_ms": 177,
+   "p99_gap_ms": 95,
+   "big_gaps": []
+  },
+  "Q02": {
+   "wall_s": 49.4,
+   "max_gap_ms": 364,
+   "p99_gap_ms": 149,
+   "big_gaps": [
+    [
+     364,
+     "appearance light"
+    ],
+    [
+     316,
+     "appearance dark"
+    ],
+    [
+     338,
+     "appearance light"
+    ],
+    [
+     310,
+     "appearance dark"
+    ]
+   ]
+  },
+  "Q03": {
+   "wall_s": 0.4,
+   "max_gap_ms": 31,
+   "p99_gap_ms": 31,
+   "big_gaps": []
+  },
+  "Q04": {
+   "wall_s": 10.4,
+   "max_gap_ms": 112,
+   "p99_gap_ms": 52,
+   "big_gaps": []
+  },
+  "C01": {
+   "wall_s": 3.7,
+   "max_gap_ms": 161,
+   "p99_gap_ms": 129,
+   "big_gaps": []
+  },
+  "C02": {
+   "wall_s": 12.7,
+   "max_gap_ms": 338,
+   "p99_gap_ms": 206,
+   "big_gaps": [
+    [
+     338,
+     "set_case Case3D"
+    ]
+   ]
+  },
+  "C03": {
+   "wall_s": 9.7,
+   "max_gap_ms": 257,
+   "p99_gap_ms": 172,
+   "big_gaps": [
+    [
+     257,
+     "add row '0.9 1.1 0.9 1.1'"
+    ]
+   ]
+  },
+  "C04": {
+   "wall_s": 7.5,
+   "max_gap_ms": 209,
+   "p99_gap_ms": 151,
+   "big_gaps": []
+  },
+  "C05": {
+   "wall_s": 7.9,
+   "max_gap_ms": 323,
+   "p99_gap_ms": 183,
+   "big_gaps": [
+    [
+     323,
+     "solver blastfoam"
+    ]
+   ]
+  },
+  "C06": {
+   "wall_s": 11.8,
+   "max_gap_ms": 398,
+   "p99_gap_ms": 198,
+   "big_gaps": [
+    [
+     398,
+     "solver blastfoam"
+    ],
+    [
+     310,
+     "solver blastfoam"
+    ]
+   ]
+  },
+  "C07": {
+   "wall_s": 13.6,
+   "max_gap_ms": 234,
+   "p99_gap_ms": 147,
+   "big_gaps": []
+  },
+  "C08": {
+   "wall_s": 7.3,
+   "max_gap_ms": 224,
+   "p99_gap_ms": 151,
+   "big_gaps": []
+  },
+  "C09": {
+   "wall_s": 25.2,
+   "max_gap_ms": 447,
+   "p99_gap_ms": 447,
+   "big_gaps": [
+    [
+     296,
+     "set_case Case3D"
+    ],
+    [
+     447,
+     "appearance light"
+    ],
+    [
+     361,
+     "appearance dark"
+    ]
+   ]
+  },
+  "C10": {
+   "wall_s": 14.8,
+   "max_gap_ms": 599,
+   "p99_gap_ms": 261,
+   "big_gaps": [
+    [
+     599,
+     "set_case Case3D"
+    ],
+    [
+     330,
+     "set_case Case3D"
+    ],
+    [
+     281,
+     "set_case Case2D"
+    ],
+    [
+     261,
+     "set_case Case2D"
+    ]
+   ]
+  },
+  "C11": {
+   "wall_s": 4.1,
+   "max_gap_ms": 176,
+   "p99_gap_ms": 156,
+   "big_gaps": []
+  },
+  "C12": {
+   "wall_s": 4.6,
+   "max_gap_ms": 192,
+   "p99_gap_ms": 169,
+   "big_gaps": []
+  },
+  "D01": {
+   "wall_s": 5.7,
+   "max_gap_ms": 411,
+   "p99_gap_ms": 220,
+   "big_gaps": [
+    [
+     411,
+     "click Run"
+    ]
+   ]
+  },
+  "D02": {
+   "wall_s": 35.6,
+   "max_gap_ms": 360,
+   "p99_gap_ms": 74,
+   "big_gaps": [
+    [
+     360,
+     "click Run"
+    ]
+   ]
+  },
+  "D03": {
+   "wall_s": 11.2,
+   "max_gap_ms": 194,
+   "p99_gap_ms": 25,
+   "big_gaps": []
+  },
+  "D04": {
+   "wall_s": 102.2,
+   "max_gap_ms": 234,
+   "p99_gap_ms": 32,
+   "big_gaps": []
+  },
+  "D05": {
+   "wall_s": 48.3,
+   "max_gap_ms": 105,
+   "p99_gap_ms": 33,
+   "big_gaps": []
+  },
+  "D06": {
+   "wall_s": 44.6,
+   "max_gap_ms": 206,
+   "p99_gap_ms": 33,
+   "big_gaps": []
+  },
+  "E01": {
+   "wall_s": 9.2,
+   "max_gap_ms": 190,
+   "p99_gap_ms": 45,
+   "big_gaps": []
+  },
+  "E02": {
+   "wall_s": 14.1,
+   "max_gap_ms": 46,
+   "p99_gap_ms": 39,
+   "big_gaps": []
+  },
+  "E03": {
+   "wall_s": 15.5,
+   "max_gap_ms": 280,
+   "p99_gap_ms": 37,
+   "big_gaps": [
+    [
+     280,
+     "goto results"
+    ]
+   ]
+  },
+  "E04": {
+   "wall_s": 8.5,
+   "max_gap_ms": 47,
+   "p99_gap_ms": 39,
+   "big_gaps": []
+  },
+  "E05": {
+   "wall_s": 0.4,
+   "max_gap_ms": 37,
+   "p99_gap_ms": 37,
+   "big_gaps": []
+  },
+  "E06": {
+   "wall_s": 0.4,
+   "max_gap_ms": 43,
+   "p99_gap_ms": 43,
+   "big_gaps": []
+  },
+  "E07": {
+   "wall_s": 21.0,
+   "max_gap_ms": 35,
+   "p99_gap_ms": 31,
+   "big_gaps": []
+  },
+  "E08": {
+   "wall_s": 2.5,
+   "max_gap_ms": 192,
+   "p99_gap_ms": 192,
+   "big_gaps": []
+  },
+  "E09": {
+   "wall_s": 4.0,
+   "max_gap_ms": 46,
+   "p99_gap_ms": 36,
+   "big_gaps": []
+  },
+  "G01": {
+   "wall_s": 5.6,
+   "max_gap_ms": 163,
+   "p99_gap_ms": 140,
+   "big_gaps": []
+  },
+  "G02": {
+   "wall_s": 31.1,
+   "max_gap_ms": 11201,
+   "p99_gap_ms": 170,
+   "big_gaps": [
+    [
+     417,
+     "goto chain"
+    ],
+    [
+     312,
+     "click pill run"
+    ],
+    [
+     11201,
+     "goto run"
+    ]
+   ]
+  },
+  "G03": {
+   "wall_s": 31.1,
+   "max_gap_ms": 203,
+   "p99_gap_ms": 102,
+   "big_gaps": []
+  },
+  "M01": {
+   "wall_s": 4.3,
+   "max_gap_ms": 122,
+   "p99_gap_ms": 120,
+   "big_gaps": []
+  },
+  "M02": {
+   "wall_s": 6.8,
+   "max_gap_ms": 397,
+   "p99_gap_ms": 193,
+   "big_gaps": [
+    [
+     397,
+     "click Run"
+    ]
+   ]
+  },
+  "M03": {
+   "wall_s": 34.1,
+   "max_gap_ms": 312,
+   "p99_gap_ms": 113,
+   "big_gaps": [
+    [
+     312,
+     "click Run"
+    ]
+   ]
+  },
+  "M04": {
+   "wall_s": 12.8,
+   "max_gap_ms": 548,
+   "p99_gap_ms": 175,
+   "big_gaps": [
+    [
+     548,
+     "goto chain"
+    ],
+    [
+     338,
+     "goto chain"
+    ],
+    [
+     287,
+     "goto chain"
+    ]
+   ]
+  },
+  "M05": {
+   "wall_s": 5.1,
+   "max_gap_ms": 132,
+   "p99_gap_ms": 99,
+   "big_gaps": []
+  },
+  "V01": {
+   "wall_s": 7.4,
+   "max_gap_ms": 211,
+   "p99_gap_ms": 118,
+   "big_gaps": []
+  },
+  "V02": {
+   "wall_s": 9.1,
+   "max_gap_ms": 322,
+   "p99_gap_ms": 202,
+   "big_gaps": [
+    [
+     322,
+     "tick Obstacles"
+    ]
+   ]
+  },
+  "V03": {
+   "wall_s": 9.4,
+   "max_gap_ms": 182,
+   "p99_gap_ms": 90,
+   "big_gaps": []
+  },
+  "V04": {
+   "wall_s": 6.6,
+   "max_gap_ms": 181,
+   "p99_gap_ms": 177,
+   "big_gaps": []
+  },
+  "V05": {
+   "wall_s": 2.0,
+   "max_gap_ms": 0,
+   "p99_gap_ms": 0,
+   "big_gaps": []
+  },
+  "V06": {
+   "wall_s": 11.7,
+   "max_gap_ms": 258,
+   "p99_gap_ms": 167,
+   "big_gaps": [
+    [
+     258,
+     "set_case Case3D"
+    ]
+   ]
+  },
+  "V07": {
+   "wall_s": 7.0,
+   "max_gap_ms": 145,
+   "p99_gap_ms": 112,
+   "big_gaps": []
+  },
+  "V08": {
+   "wall_s": 7.0,
+   "max_gap_ms": 195,
+   "p99_gap_ms": 150,
+   "big_gaps": []
+  },
+  "V09": {
+   "wall_s": 7.2,
+   "max_gap_ms": 234,
+   "p99_gap_ms": 214,
+   "big_gaps": []
+  },
+  "V10": {
+   "wall_s": 7.2,
+   "max_gap_ms": 210,
+   "p99_gap_ms": 192,
+   "big_gaps": []
+  },
+  "H01": {
+   "wall_s": 24.4,
+   "max_gap_ms": 574,
+   "p99_gap_ms": 545,
+   "big_gaps": [
+    [
+     545,
+     "appearance light"
+    ],
+    [
+     574,
+     "appearance dark"
+    ]
+   ]
+  },
+  "H02": {
+   "wall_s": 67.6,
+   "max_gap_ms": 491,
+   "p99_gap_ms": 41,
+   "big_gaps": [
+    [
+     485,
+     "appearance light"
+    ],
+    [
+     491,
+     "appearance dark"
+    ]
+   ]
+  },
+  "H03": {
+   "wall_s": 29.7,
+   "max_gap_ms": 550,
+   "p99_gap_ms": 199,
+   "big_gaps": [
+    [
+     550,
+     "appearance light"
+    ],
+    [
+     502,
+     "appearance dark"
+    ]
+   ]
+  },
+  "I01": {
+   "wall_s": 62.5,
+   "max_gap_ms": 143,
+   "p99_gap_ms": 60,
+   "big_gaps": []
+  },
+  "I02": {
+   "wall_s": 45.7,
+   "max_gap_ms": 96,
+   "p99_gap_ms": 32,
+   "big_gaps": []
+  },
+  "I03": {
+   "wall_s": 4.9,
+   "max_gap_ms": 145,
+   "p99_gap_ms": 123,
+   "big_gaps": []
+  },
+  "I04": {
+   "wall_s": 64.2,
+   "max_gap_ms": 911,
+   "p99_gap_ms": 89,
+   "big_gaps": [
+    [
+     911,
+     "click Run"
+    ],
+    [
+     847,
+     "click Run"
+    ],
+    [
+     802,
+     "click Run"
+    ],
+    [
+     822,
+     "click Run"
+    ],
+    [
+     844,
+     "click Run"
+    ],
+    [
+     861,
+     "click Run"
+    ],
+    [
+     805,
+     "click Run"
+    ],
+    [
+     792,
+     "click Run"
+    ]
+   ]
+  },
+  "I05": {
+   "wall_s": 9.4,
+   "max_gap_ms": 169,
+   "p99_gap_ms": 136,
+   "big_gaps": []
+  },
+  "I06": {
+   "wall_s": 4.4,
+   "max_gap_ms": 200,
+   "p99_gap_ms": 170,
+   "big_gaps": []
+  },
+  "K01": {
+   "wall_s": 26.3,
+   "max_gap_ms": 645,
+   "p99_gap_ms": 211,
+   "big_gaps": [
+    [
+     645,
+     "appearance light"
+    ],
+    [
+     514,
+     "appearance dark"
+    ]
+   ]
+  },
+  "K02": {
+   "wall_s": 117.6,
+   "max_gap_ms": 504,
+   "p99_gap_ms": 111,
+   "big_gaps": [
+    [
+     504,
+     "appearance light"
+    ],
+    [
+     463,
+     "appearance dark"
+    ]
+   ]
+  },
+  "K03": {
+   "wall_s": 32.7,
+   "max_gap_ms": 494,
+   "p99_gap_ms": 122,
+   "big_gaps": [
+    [
+     491,
+     "appearance light"
+    ],
+    [
+     494,
+     "appearance dark"
+    ]
+   ]
+  }
+ }
+}

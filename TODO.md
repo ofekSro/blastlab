@@ -30,13 +30,11 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 
 > **▶ RESUME HERE — the first thing to do from this list.** Branch `master`
 > (`gui-redesign` merged in on 2026-10-04, `58911bd`);
-> GUI-1..14 done (GUI-14 2026-10-11, branch `gui-14`; DONE.md §0x). Next, in order:
-> 1. **`GUI-15`** — what GUI-14's QA/UX left (row below).
-> 2. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` ran 2026-10-11: stages 1-2
->    pass, but stage 3 gets no `t_end`, so the app's default `endTime` 29.6 ms (vs a 0.187 ms
->    hand-off) outlives 1800 s on any machine (3.25 ms in 29 min) — give stage 3 a short
->    `t_end` (committed test; owner approved 2026-10-11). Harness F07 (over the home VM's cell cap),
->    `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
+> GUI-1..15 done (GUI-15 2026-10-12, branch `gui-15`; DONE.md §0y). Next, in order:
+> 1. **`P1-23` + `P2-22`** as batch `p1-23-ignition-radius` — owner 2026-10-11 (GUI-15 plan
+>    Q1/Q2): ahead of HD1-18 / HD1-19, because harness F05/F06 die at t = 0. See P1-23 below.
+> 2. **`GUI-16`** — what GUI-15's QA/UX left (row below).
+> 3. GUI-14 (j) on the home PC. The office-machine runs of GUI-14 are done (DONE.md §0y, B6).
 >
 > The owner reviewed the open calls on 2026-10-03 and 2026-10-04 ("approve all"):
 > [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) § Owner review.
@@ -50,7 +48,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 |---|---|---|---|
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
 | `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC). Original row: **Left by GUI-13** (2026-10-05; `docs/qa/2026-10-05-gui-13-ux.md` F1-F6, `docs/qa/2026-10-05-gui-13-qa/` #1-4, `…-gui-13-backlog-A.verify.md`) — (a) **owner call:** A1 skipped (4 m box over the unprobed cap); recommended: keep Lz 1.5 m and re-record `char_golden/ui_chain_wiring.json` (3 × `radius_m` 10.0 → 1.5) so the 1D radius seed lands; (b) Tk Gauges column still cut at 1100 px (`gui/results_panel.py:281-284`, minwidth 250 < ~287 needed; QA #1, UX F6); (c) Where column can name a different wall than Checks when two walls are within a cell (UX F2); (d) dropped gauge not marked where gauges are edited — warn colour on the cells and the Gauges tree node (F3); (e) Run card header: drop `selected`, elide right, Z unit (F4); (f) Results drop line in the warn style, as on Run (F5); (g) solver logs still say `Gauge (x, y) inside an obstacle` without `G<n>` (`solver2d.py:284,289`, `solver3d.py:342`; 3 tests pin it); (h) `test_ui_status_cells` S2 flaky (fixed `pump(600)`, poll instead); (i) harness `latest_out()` picks folders by name — sort by mtime; (j) home PC: HD13 char drift, carried from GUI-13 (i). Low items parked in the UX report §6 | M | 14 |
-| `GUI-15` | **Left by GUI-14** (2026-10-11; `docs/qa/2026-10-11-gui-14-ux.md` F1-F6, `docs/qa/2026-10-11-gui-14-qa/QA_REPORT.md` F1, `…-gui-14-backlog-B.verify.md`) — **owner 2026-10-11: all approved**, incl. the (b)/(g) pin edits and (d)'s wording — (a) Run: from Start to the first gauge data a dropped gauge is an ordinary `waiting` row, can be the enlarged card, and its header can name another wall than Setup (UX F1); (b) the native log names no wall (`inside an obstacle`) and says "inside" for a gauge Setup calls "in front"; the solver has the obstacle list (UX F2; pin edit needs the owner); (c) Results on blastFoam runs says `inside Wall n` where Run said `on the face of` — the meta stores the face-snapped walls (UX F3); (d) Setup: Checks `on the face of Wall 1` vs Where `3 cm behind Wall 1 (dropped)` on one row; proposed `within a cell of Wall n`, wording is the owner's (UX F4); (e) the Gauges node turns warn but its caption and children do not name the gauge; a chain stage has no gauge table (UX F5); (f) 1D: a gauge beyond the radius is dropped silently — no Checks warning, no log, Results renumbers (`solver1d.py:146`, `foam/writer.py:445`; UX F6 = QA F1; the 1.5 m chain seed makes it easier to hit); (g) owner approval: `_e2e_gui_native_warn.py:63-64` can no longer fail (old `Gauge (` text) — pin `G1 (0.30, 0.80) m`; add a fast 2D/3D solver-log pin; (h) `_qa_ui_harness`'s F group switches to blastFoam despite `--solver native` and ran WSL solves (GUI-14 QA) — make it respect the flag; its F05/F06 blastFoam runs died with exit 134 under AMR (perhaps P1-23, unverified). Low items parked in both reports | M | 15 |
+| `GUI-15` | ✅ 2026-10-12 (a)-(h), DONE.md §0y. Original row: **Left by GUI-14** (2026-10-11; `docs/qa/2026-10-11-gui-14-ux.md` F1-F6, `docs/qa/2026-10-11-gui-14-qa/QA_REPORT.md` F1, `…-gui-14-backlog-B.verify.md`) — **owner 2026-10-11: all approved**, incl. the (b)/(g) pin edits and (d)'s wording — (a) Run: from Start to the first gauge data a dropped gauge is an ordinary `waiting` row, can be the enlarged card, and its header can name another wall than Setup (UX F1); (b) the native log names no wall (`inside an obstacle`) and says "inside" for a gauge Setup calls "in front"; the solver has the obstacle list (UX F2; pin edit needs the owner); (c) Results on blastFoam runs says `inside Wall n` where Run said `on the face of` — the meta stores the face-snapped walls (UX F3); (d) Setup: Checks `on the face of Wall 1` vs Where `3 cm behind Wall 1 (dropped)` on one row; proposed `within a cell of Wall n`, wording is the owner's (UX F4); (e) the Gauges node turns warn but its caption and children do not name the gauge; a chain stage has no gauge table (UX F5); (f) 1D: a gauge beyond the radius is dropped silently — no Checks warning, no log, Results renumbers (`solver1d.py:146`, `foam/writer.py:445`; UX F6 = QA F1; the 1.5 m chain seed makes it easier to hit); (g) owner approval: `_e2e_gui_native_warn.py:63-64` can no longer fail (old `Gauge (` text) — pin `G1 (0.30, 0.80) m`; add a fast 2D/3D solver-log pin; (h) `_qa_ui_harness`'s F group switches to blastFoam despite `--solver native` and ran WSL solves (GUI-14 QA) — make it respect the flag; its F05/F06 blastFoam runs died with exit 134 under AMR (perhaps P1-23, unverified). Low items parked in both reports | M | 15 |
+| `GUI-16` | **Left by GUI-15** (2026-10-12; `docs/qa/2026-10-11-gui-15-ux.md` U1-U6, `docs/qa/2026-10-11-gui-15-qa/QA_REPORT.md`, `…-gui-15-backlog-B.verify.md` open items 1-2) — (a) trigger on a dropped gauge: Checks says `Trigger disabled`, but the Checks note ("the run ends when the wave reaches gauge 2" / the remap-file note), the Gauges caption `trigger G2`, the trigger dropdown and the chain HAND-OFF OUT card still show it active; in a chain the hand-off then happens at the stage's normal stop (UX U1, verifier 1); (b) 1D exports (PNG, HTML report, summary) label by kept index (`Gauge 2` for the entered G3) and do not mention the drop — a `numbers=` argument, byte-identical when nothing is dropped (U2); (c) Resume and Run-browser Load: `resume_foam_run` passes no `drops`, `load_foam_run_path` adds no `gauges_dropped` stamp, so Results says `inside Wall 1` on blastFoam and a reloaded 1D run renumbers (U3); (d) blastFoam 3D: a dropped gauge sharing its x with a kept one — the drop line vanishes at the first payload and G3 is relabelled G2; fall back to the drop rule (U4, new from GUI-15 a); (e) every gauge dropped: Run says "This case has no gauges…" and hides the drop line, Results "This result has no gauges" (U5); (f) field-plot markers: native live omits a dropped gauge, blastFoam live draws it plain, the exported animation draws it inside the wall (U6); (g) 3D Detach is undone at once on the native path: `view3d_host.on_window` (`:664-673`) re-embeds while `_floating`; `_e2e_ui_view3d.py` G3 fails, then `AttributeError` at `:131` — fix, update G3, re-measure with the Win32 probe (verifier B item 2, GUI-15 B6). Low items parked in both reports (UX L1-L5; QA: caption cut off at 1100 and 1600 px, `100 %` after a stop, harness `--out` inside OneDrive → `WinError 5`) | M | 16 |
 
 ---
 
@@ -642,15 +641,19 @@ Acceptance: the case above runs in serial and parallel; a new `test_foam_writer.
 case pins the radius for a charge outside the deepest zone; existing fixtures with the
 charge in the deepest zone stay byte-identical.
 
-### P1-24 · The native T51 trigger gauge counts only the kept gauges · **found 2026-10-11 (GUI-14 B verify), owner approved the fix 2026-10-11**
+**Owner 2026-10-11 (GUI-15 plan Q1/Q2): next batch, with P2-22, ahead of HD1-18/19.** The
+GUI-14 QA runs F05 (2D, dx 0.1, AMR 3) and F06 (3D, dx 0.05, AMR 2) have no zones and still
+abort at t = 0, so "max with `amr`" alone would not cover them: first measure the level
+actually present at the charge at t = 0 on F05's case and base the radius on it; then P2-22.
+Also measure what blastFoam's trigger reads at a gauge the writer drops into a wall
+(`foam/backend.py:1785-1804`); extend P1-24's native-only warning if it never fires.
 
-`trigger_gauge` indexes the kept list (`solver2d.py:299`, `solver3d.py:359`), though
-`hooks.py:60` says it reads like the gauge table; blastFoam uses the gauges as entered
-(`foam/backend.py:1785-1814`). Measured: G2 in a wall, trigger 3 → native stops on G4's
-point at 0.284 ms instead of G3's at 0.091 ms; `validate_case` says nothing. The live-view
-labels (`solver2d.py:337`, `geometry.plane_gauges`) and `meta['trigger_gauge']` shift too.
-Fix: carry each gauge's entered number through the native solvers; `_validate_trigger` warns
-when the trigger gauge will be dropped. Characterisation test first; changes when a run stops.
+### P1-24 · The native T51 trigger gauge counts only the kept gauges · ✅ closed 2026-10-12 (DONE.md §0y)
+
+Cited by `solvers/hooks.py`, `solver1d/2d/3d.py`, `services/validation.py`, `core/geometry.py`,
+`ui/results_gauges.py` and `tests/test_trigger_numbering.py`. The native solvers now carry each
+gauge's entered number; a trigger on a dropped gauge is disabled and warned about (native only,
+D13). The blastFoam side is measured in the P1-23 batch (above).
 
 ---
 

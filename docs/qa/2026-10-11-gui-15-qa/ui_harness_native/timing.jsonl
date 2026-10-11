@@ -1,0 +1,73 @@
+{"label": "idle_cpu_setup", "pct": 2.14296070855159, "seconds": 8, "scenario": "B01", "t": 1791755192.8079484}
+{"sid": "B01", "wall_s": 8.6, "max_gap_ms": 66, "p99_gap_ms": 22, "big_gaps": [], "scenario": "B01", "t": 1791755192.8132656}
+{"label": "idle_cpu_run", "pct": 1.8690516683114573, "seconds": 5, "scenario": "B02", "t": 1791755201.1087132}
+{"label": "idle_cpu_results", "pct": 1.559689501893801, "seconds": 5, "scenario": "B02", "t": 1791755206.9705966}
+{"label": "idle_cpu_chain", "pct": 1.557251253530517, "seconds": 5, "scenario": "B02", "t": 1791755212.9468737}
+{"sid": "B02", "wall_s": 18.1, "max_gap_ms": 58, "p99_gap_ms": 29, "big_gaps": [], "scenario": "B02", "t": 1791755213.377566}
+{"sid": "B03", "wall_s": 7.4, "max_gap_ms": 155, "p99_gap_ms": 143, "big_gaps": [], "scenario": "B03", "t": 1791755223.2329767}
+{"sid": "B04", "wall_s": 3.7, "max_gap_ms": 27, "p99_gap_ms": 27, "big_gaps": [], "scenario": "B04", "t": 1791755229.487227}
+{"sid": "B05", "wall_s": 13.3, "max_gap_ms": 108, "p99_gap_ms": 82, "big_gaps": [], "scenario": "B05", "t": 1791755245.2790864}
+{"sid": "B06", "wall_s": 4.8, "max_gap_ms": 32, "p99_gap_ms": 32, "big_gaps": [], "scenario": "B06", "t": 1791755253.0245762}
+{"sid": "B07", "wall_s": 29.6, "max_gap_ms": 348, "p99_gap_ms": 140, "big_gaps": [[332, "appearance light"], [348, "appearance dark"]], "scenario": "B07", "t": 1791755285.063573}
+{"sid": "Q01", "wall_s": 7.4, "max_gap_ms": 227, "p99_gap_ms": 96, "big_gaps": [], "scenario": "Q01", "t": 1791755295.2822049}
+{"sid": "Q02", "wall_s": 46.3, "max_gap_ms": 352, "p99_gap_ms": 109, "big_gaps": [[305, "appearance light"], [334, "appearance dark"], [332, "appearance light"], [352, "appearance dark"]], "scenario": "Q02", "t": 1791755344.0197458}
+{"sid": "Q03", "wall_s": 0.4, "max_gap_ms": 30, "p99_gap_ms": 30, "big_gaps": [], "scenario": "Q03", "t": 1791755347.4916358}
+{"sid": "Q04", "wall_s": 10.3, "max_gap_ms": 115, "p99_gap_ms": 33, "big_gaps": [], "scenario": "Q04", "t": 1791755360.1606455}
+{"sid": "C01", "wall_s": 3.7, "max_gap_ms": 159, "p99_gap_ms": 131, "big_gaps": [], "scenario": "C01", "t": 1791755366.5256593}
+{"sid": "C02", "wall_s": 12.5, "max_gap_ms": 190, "p99_gap_ms": 154, "big_gaps": [], "scenario": "C02", "t": 1791755381.5010383}
+{"sid": "C03", "wall_s": 9.4, "max_gap_ms": 160, "p99_gap_ms": 143, "big_gaps": [], "scenario": "C03", "t": 1791755393.512087}
+{"sid": "C04", "wall_s": 7.4, "max_gap_ms": 139, "p99_gap_ms": 128, "big_gaps": [], "scenario": "C04", "t": 1791755403.4740958}
+{"sid": "C05", "wall_s": 7.9, "max_gap_ms": 295, "p99_gap_ms": 146, "big_gaps": [[295, "solver blastfoam"]], "scenario": "C05", "t": 1791755413.9843268}
+{"sid": "C06", "wall_s": 11.7, "max_gap_ms": 382, "p99_gap_ms": 156, "big_gaps": [[382, "solver blastfoam"]], "scenario": "C06", "t": 1791755428.2143173}
+{"sid": "C07", "wall_s": 13.5, "max_gap_ms": 154, "p99_gap_ms": 145, "big_gaps": [], "scenario": "C07", "t": 1791755444.2875497}
+{"sid": "C08", "wall_s": 7.3, "max_gap_ms": 218, "p99_gap_ms": 134, "big_gaps": [], "scenario": "C08", "t": 1791755454.1639726}
+{"sid": "C09", "wall_s": 22.1, "max_gap_ms": 339, "p99_gap_ms": 338, "big_gaps": [[338, "appearance light"], [339, "appearance dark"]], "scenario": "C09", "t": 1791755478.814308}
+{"sid": "C10", "wall_s": 14.9, "max_gap_ms": 763, "p99_gap_ms": 180, "big_gaps": [[763, "set_case Case3D"], [349, "set_case Case3D"], [271, "set_case Case2D"]], "scenario": "C10", "t": 1791755496.1742153}
+{"sid": "C11", "wall_s": 4.0, "max_gap_ms": 148, "p99_gap_ms": 135, "big_gaps": [], "scenario": "C11", "t": 1791755502.7647986}
+{"sid": "C12", "wall_s": 4.6, "max_gap_ms": 169, "p99_gap_ms": 156, "big_gaps": [], "scenario": "C12", "t": 1791755509.825417}
+{"sid": "D01", "wall_s": 5.9, "max_gap_ms": 397, "p99_gap_ms": 212, "big_gaps": [[397, "click Run"]], "scenario": "D01", "t": 1791755518.2199419}
+{"sid": "D02", "wall_s": 33.0, "max_gap_ms": 278, "p99_gap_ms": 65, "big_gaps": [[278, "click Run"]], "scenario": "D02", "t": 1791755561.7465627}
+{"sid": "D03", "wall_s": 41.2, "max_gap_ms": 287, "p99_gap_ms": 57, "big_gaps": [[287, "click END"]], "scenario": "D03", "t": 1791755605.5971527}
+{"sid": "D04", "wall_s": 604.0, "max_gap_ms": 10805, "p99_gap_ms": 59, "big_gaps": [[910, "click Run"], [10805, "click Run"], [319, "click Run"]], "scenario": "D04", "t": 1791756212.2472672}
+{"sid": "D05", "wall_s": 26.3, "max_gap_ms": 967, "p99_gap_ms": 188, "big_gaps": [[552, "click Run"], [967, "click Run"], [260, "click Stop"]], "scenario": "D05", "t": 1791756262.9030955}
+{"sid": "D06", "wall_s": 35.2, "max_gap_ms": 230, "p99_gap_ms": 102, "big_gaps": [], "scenario": "D06", "t": 1791756300.646071}
+{"sid": "E01", "wall_s": 9.9, "max_gap_ms": 216, "p99_gap_ms": 41, "big_gaps": [], "scenario": "E01", "t": 1791756313.0669425}
+{"sid": "E02", "wall_s": 14.3, "max_gap_ms": 49, "p99_gap_ms": 37, "big_gaps": [], "scenario": "E02", "t": 1791756329.9114223}
+{"sid": "E03", "wall_s": 15.3, "max_gap_ms": 257, "p99_gap_ms": 37, "big_gaps": [[257, "goto results"]], "scenario": "E03", "t": 1791756348.0446556}
+{"sid": "E04", "wall_s": 8.5, "max_gap_ms": 49, "p99_gap_ms": 38, "big_gaps": [], "scenario": "E04", "t": 1791756359.3475797}
+{"sid": "E05", "wall_s": 16.0, "max_gap_ms": 177, "p99_gap_ms": 41, "big_gaps": [], "scenario": "E05", "t": 1791756377.889028}
+{"label": "feed_result native3d", "ms": 32.9, "scenario": "E06", "t": 1791756382.0887341}
+{"sid": "E06", "wall_s": 17.6, "max_gap_ms": 75, "p99_gap_ms": 55, "big_gaps": [], "scenario": "E06", "t": 1791756398.3915193}
+{"sid": "E07", "wall_s": 21.1, "max_gap_ms": 53, "p99_gap_ms": 41, "big_gaps": [], "scenario": "E07", "t": 1791756422.2061307}
+{"sid": "E08", "wall_s": 2.6, "max_gap_ms": 60, "p99_gap_ms": 60, "big_gaps": [], "scenario": "E08", "t": 1791756427.358224}
+{"sid": "E09", "wall_s": 4.1, "max_gap_ms": 54, "p99_gap_ms": 45, "big_gaps": [], "scenario": "E09", "t": 1791756433.8877378}
+{"sid": "G01", "wall_s": 5.3, "max_gap_ms": 272, "p99_gap_ms": 164, "big_gaps": [[272, "goto chain"]], "scenario": "G01", "t": 1791756441.6339095}
+{"sid": "G02", "wall_s": 29.6, "max_gap_ms": 904, "p99_gap_ms": 154, "big_gaps": [[393, "goto chain"], [291, "click pill run"], [904, "goto run"], [337, "goto run"]], "scenario": "G02", "t": 1791756483.7726247}
+{"sid": "G03", "wall_s": 31.5, "max_gap_ms": 193, "p99_gap_ms": 113, "big_gaps": [], "scenario": "G03", "t": 1791756518.054491}
+{"sid": "M01", "wall_s": 4.3, "max_gap_ms": 132, "p99_gap_ms": 120, "big_gaps": [], "scenario": "M01", "t": 1791756524.8188643}
+{"sid": "M02", "wall_s": 6.5, "max_gap_ms": 365, "p99_gap_ms": 194, "big_gaps": [[365, "click Run"]], "scenario": "M02", "t": 1791756533.8992739}
+{"sid": "M03", "wall_s": 34.0, "max_gap_ms": 296, "p99_gap_ms": 114, "big_gaps": [[296, "click Run"]], "scenario": "M03", "t": 1791756570.4752526}
+{"sid": "M04", "wall_s": 12.0, "max_gap_ms": 427, "p99_gap_ms": 185, "big_gaps": [[427, "goto chain"], [318, "goto chain"]], "scenario": "M04", "t": 1791756584.9461563}
+{"sid": "M05", "wall_s": 5.0, "max_gap_ms": 113, "p99_gap_ms": 85, "big_gaps": [], "scenario": "M05", "t": 1791756592.4310758}
+{"sid": "V01", "wall_s": 7.3, "max_gap_ms": 280, "p99_gap_ms": 108, "big_gaps": [[280, "set_case Case1D"]], "scenario": "V01", "t": 1791756602.167174}
+{"sid": "V02", "wall_s": 9.1, "max_gap_ms": 214, "p99_gap_ms": 166, "big_gaps": [], "scenario": "V02", "t": 1791756613.9231443}
+{"sid": "V03", "wall_s": 9.4, "max_gap_ms": 186, "p99_gap_ms": 90, "big_gaps": [], "scenario": "V03", "t": 1791756626.093922}
+{"sid": "V04", "wall_s": 6.6, "max_gap_ms": 190, "p99_gap_ms": 179, "big_gaps": [], "scenario": "V04", "t": 1791756635.674577}
+{"sid": "V05", "wall_s": 1.9, "max_gap_ms": 0, "p99_gap_ms": 0, "big_gaps": [], "scenario": "V05", "t": 1791756640.1846378}
+{"sid": "V06", "wall_s": 11.8, "max_gap_ms": 225, "p99_gap_ms": 168, "big_gaps": [], "scenario": "V06", "t": 1791756654.3269792}
+{"sid": "V07", "wall_s": 7.1, "max_gap_ms": 139, "p99_gap_ms": 91, "big_gaps": [], "scenario": "V07", "t": 1791756664.479786}
+{"sid": "V08", "wall_s": 7.1, "max_gap_ms": 206, "p99_gap_ms": 146, "big_gaps": [], "scenario": "V08", "t": 1791756674.2570698}
+{"sid": "V09", "wall_s": 7.2, "max_gap_ms": 197, "p99_gap_ms": 174, "big_gaps": [], "scenario": "V09", "t": 1791756684.0981705}
+{"sid": "V10", "wall_s": 7.3, "max_gap_ms": 188, "p99_gap_ms": 173, "big_gaps": [], "scenario": "V10", "t": 1791756694.164838}
+{"sid": "H01", "wall_s": 24.2, "max_gap_ms": 559, "p99_gap_ms": 155, "big_gaps": [[559, "appearance light"], [494, "appearance dark"]], "scenario": "H01", "t": 1791756720.9777043}
+{"sid": "H02", "wall_s": 53.6, "max_gap_ms": 560, "p99_gap_ms": 131, "big_gaps": [[560, "appearance light"], [324, "appearance light"], [552, "appearance dark"]], "scenario": "H02", "t": 1791756777.117889}
+{"sid": "H03", "wall_s": 36.6, "max_gap_ms": 542, "p99_gap_ms": 58, "big_gaps": [[527, "appearance light"], [542, "appearance dark"]], "scenario": "H03", "t": 1791756816.2625873}
+{"sid": "I01", "wall_s": 705.0, "max_gap_ms": 971, "p99_gap_ms": 64, "big_gaps": [[551, "click Run"], [971, "click Run"], [400, "goto run"]], "scenario": "I01", "t": 1791757533.802844}
+{"sid": "I02", "wall_s": 20.6, "max_gap_ms": 995, "p99_gap_ms": 494, "big_gaps": [[494, "click Run"], [995, "click Run"]], "scenario": "I02", "t": 1791757567.3101826}
+{"sid": "I03", "wall_s": 4.8, "max_gap_ms": 143, "p99_gap_ms": 124, "big_gaps": [], "scenario": "I03", "t": 1791757579.0543017}
+{"sid": "I04", "wall_s": 64.2, "max_gap_ms": 834, "p99_gap_ms": 96, "big_gaps": [[807, "click Run"], [804, "click Run"], [799, "click Run"], [801, "click Run"], [814, "click Run"], [818, "click Run"], [834, "click Run"], [818, "click Run"]], "scenario": "I04", "t": 1791757645.9039629}
+{"sid": "I05", "wall_s": 9.4, "max_gap_ms": 157, "p99_gap_ms": 128, "big_gaps": [], "scenario": "I05", "t": 1791757657.7876935}
+{"sid": "I06", "wall_s": 8.2, "max_gap_ms": 912, "p99_gap_ms": 190, "big_gaps": [[912, "resize 900x600"]], "scenario": "I06", "t": 1791757668.6197133}
+{"sid": "K01", "wall_s": 26.0, "max_gap_ms": 553, "p99_gap_ms": 198, "big_gaps": [[553, "appearance light"], [486, "appearance dark"]], "scenario": "K01", "t": 1791757697.0283077}
+{"sid": "K02", "wall_s": 121.6, "max_gap_ms": 485, "p99_gap_ms": 112, "big_gaps": [[339, "goto results"], [485, "appearance light"], [355, "goto results"], [479, "appearance dark"]], "scenario": "K02", "t": 1791757821.0490687}
+{"sid": "K03", "wall_s": 32.5, "max_gap_ms": 536, "p99_gap_ms": 122, "big_gaps": [[482, "appearance light"], [536, "appearance dark"]], "scenario": "K03", "t": 1791757856.1742198}

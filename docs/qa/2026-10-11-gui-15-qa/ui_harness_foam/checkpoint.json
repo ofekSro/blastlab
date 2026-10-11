@@ -1,0 +1,56 @@
+{
+ "done": {
+  "F00": {
+   "status": "done",
+   "t": 1791758164.775204,
+   "shots": [],
+   "err": "",
+   "wall_s": 1.0
+  },
+  "F07": {
+   "status": "done",
+   "t": 1791758172.2664168,
+   "shots": [
+    "001_F07_run_stop_during_meshing_dark.png",
+    "002_F07_run_after_stop_dark.png"
+   ],
+   "err": "",
+   "wall_s": 5.1
+  }
+ },
+ "shot_counter": 2,
+ "foreign_pids": [],
+ "invocations": [
+  {
+   "start": 1791758156.1393666,
+   "argv": [
+    "--scenario",
+    "F00,F07",
+    "--solver",
+    "blastfoam",
+    "--window",
+    "--out",
+    "C:\\Users\\ROTEM~1.OFE\\AppData\\Local\\Temp\\claude\\c--Users-rotem-ofek-OneDrive---Technion-BlastFoam\\ba57239d-7d86-440c-8424-7d553dbe0c0b\\scratchpad\\foam"
+   ],
+   "end": 1791758175.355334,
+   "exit": 0
+  }
+ ],
+ "timing": {
+  "F00": {
+   "wall_s": 1.0,
+   "max_gap_ms": 0,
+   "p99_gap_ms": 0,
+   "big_gaps": []
+  },
+  "F07": {
+   "wall_s": 5.1,
+   "max_gap_ms": 174,
+   "p99_gap_ms": 156,
+   "big_gaps": []
+  }
+ },
+ "f00_attempts": 1,
+ "pre_f_pgrep": [],
+ "runs_root_bytes_before": 4604998118
+}

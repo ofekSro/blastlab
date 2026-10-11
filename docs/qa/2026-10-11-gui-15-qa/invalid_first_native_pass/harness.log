@@ -1,0 +1,2035 @@
+[23:44:57] [boot] F00 skipped: F00: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F01 skipped: F01: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F02 skipped: F02: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F03 skipped: F03: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F04 skipped: F04: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F05 skipped: F05: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F06 skipped: F06: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F07 skipped: F07: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F08 skipped: F08: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F09 skipped: F09: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F10 skipped: F10: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:44:57] [boot] F11 skipped: F11: --solver native keeps the harness off WSL (the F group runs blastFoam solves)
+[23:45:10] [boot] window up: 1280x840 (built 3575 ms, shown 2047 ms)
+[23:45:10] [B01] --- begin ---
+[23:45:10] [B01] NOTE: App construction 3575 ms, first paint 2047 ms
+[23:45:10] [B01] NOTE: window title: 'untitled · BlastLab'
+[23:45:10] [B01] NOTE: case button 'untitled', unsaved marker '● unsaved' hidden
+[23:45:10] [B01] NOTE: validation strip on the default 2D case: Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[23:45:10] [B01] ok: Dark mode action is on
+[23:45:10] [B01] ok: the window has a title
+[23:45:18] [B01] NOTE: idle CPU on setup: 1.6 % of a core over 8 s
+[23:45:18] [B01] contact sheet: contact_B01.png (1 shots)
+[23:45:18] [B01] --- end done in 8.6s (max gap 63 ms) ---
+[23:45:19] [B01] ok: the Dark-mode action gives the dark theme
+[23:45:20] [B01] ok: the setup pill shows its screen
+[23:45:20] [B01] ok: and the setup pill is the active one
+[23:45:20] [B01] ok: the 2D segment sets the dimension
+[23:45:21] [B02] --- begin ---
+[23:45:21] [B02] ok: the run pill shows its screen
+[23:45:21] [B02] ok: and the run pill is the active one
+[23:45:26] [B02] NOTE: idle CPU on run: 1.2 % of a core over 5 s
+[23:45:27] [B02] ok: the results pill shows its screen
+[23:45:27] [B02] ok: and the results pill is the active one
+[23:45:32] [B02] NOTE: idle CPU on results: 1.2 % of a core over 5 s
+[23:45:33] [B02] ok: the chain pill shows its screen
+[23:45:33] [B02] ok: and the chain pill is the active one
+[23:45:38] [B02] NOTE: idle CPU on chain: 0.6 % of a core over 5 s
+[23:45:38] [B02] NOTE: Run tab empty state: Stop=False Exec=False 3DView=False progress=0
+[23:45:38] [B02] ok: Stop is disabled with nothing running
+[23:45:38] [B02] ok: the Exec buttons are disabled with nothing running
+[23:45:38] [B02] NOTE: Results empty: export button states summary=False, tsv=False, fieldcsv=False, profile=False, vtk=False, pngs=False, report=False, gif=False
+[23:45:38] [B02] ok: every export is disabled with no result selected - the Tk app left them live and a click did nothing (G3)
+[23:45:38] [B02] NOTE: Chain writes into the model folder 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs' / 'QA'
+[23:45:39] [B02] ok: the setup pill shows its screen
+[23:45:39] [B02] ok: and the setup pill is the active one
+[23:45:39] [B02] contact sheet: contact_B02.png (3 shots)
+[23:45:39] [B02] --- end done in 18.1s (max gap 56 ms) ---
+[23:45:39] [B02] ok: the Dark-mode action gives the dark theme
+[23:45:40] [B02] ok: the setup pill shows its screen
+[23:45:40] [B02] ok: and the setup pill is the active one
+[23:45:41] [B02] ok: the 2D segment sets the dimension
+[23:45:41] [B03] --- begin ---
+[23:45:42] [B03] ok: the 1D segment sets the dimension
+[23:45:43] [B03] NOTE: 1D strip: ~10,000 cells at dx = 0.001 m
+[23:45:44] [B03] ok: the 2D segment sets the dimension
+[23:45:45] [B03] NOTE: 2D strip: Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[23:45:46] [B03] ok: the 3D segment sets the dimension
+[23:45:48] [B03] NOTE: 3D strip: ~216,000 cells at dx = 0.025 m
+[23:45:48] [B03] ok: the 3D preview is the one showing for a 3D case (got '3d')
+[23:45:49] [B03] ok: the 2D segment sets the dimension
+[23:45:49] [B03] ok: and the 2D preview comes back for a 2D case (got '2d')
+[23:45:49] [B03] contact sheet: contact_B03.png (6 shots)
+[23:45:49] [B03] --- end done in 7.4s (max gap 169 ms) ---
+[23:45:49] [B03] ok: the Dark-mode action gives the dark theme
+[23:45:50] [B03] ok: the setup pill shows its screen
+[23:45:50] [B03] ok: and the setup pill is the active one
+[23:45:51] [B03] ok: the 2D segment sets the dimension
+[23:45:51] [B04] --- begin ---
+[23:45:53] [B04] ok: the run pill shows its screen
+[23:45:53] [B04] ok: and the run pill is the active one
+[23:45:54] [B04] ok: Stop is the disabled one to photograph
+[23:45:55] [B04] ok: the setup pill shows its screen
+[23:45:55] [B04] ok: and the setup pill is the active one
+[23:45:55] [B04] contact sheet: contact_B04.png (3 shots)
+[23:45:55] [B04] --- end done in 3.7s (max gap 45 ms) ---
+[23:45:56] [B04] ok: the Dark-mode action gives the dark theme
+[23:45:56] [B04] ok: the setup pill shows its screen
+[23:45:56] [B04] ok: and the setup pill is the active one
+[23:45:57] [B04] ok: the 2D segment sets the dimension
+[23:45:57] [B05] --- begin ---
+[23:45:58] [B05] NOTE: requested 1100x720 -> actual 1100x720
+[23:45:58] [B05] ok: the setup pill shows its screen
+[23:45:58] [B05] ok: and the setup pill is the active one
+[23:45:59] [B05] ok: the run pill shows its screen
+[23:45:59] [B05] ok: and the run pill is the active one
+[23:46:00] [B05] ok: the results pill shows its screen
+[23:46:00] [B05] ok: and the results pill is the active one
+[23:46:01] [B05] ok: the chain pill shows its screen
+[23:46:01] [B05] ok: and the chain pill is the active one
+[23:46:02] [B05] NOTE: requested 900x600 -> actual 1100x720
+[23:46:02] [B05] ok: the setup pill shows its screen
+[23:46:02] [B05] ok: and the setup pill is the active one
+[23:46:03] [B05] ok: the run pill shows its screen
+[23:46:03] [B05] ok: and the run pill is the active one
+[23:46:04] [B05] ok: the results pill shows its screen
+[23:46:04] [B05] ok: and the results pill is the active one
+[23:46:05] [B05] ok: the chain pill shows its screen
+[23:46:05] [B05] ok: and the chain pill is the active one
+[23:46:06] [B05] NOTE: maximised -> 796x796
+[23:46:07] [B05] ok: the setup pill shows its screen
+[23:46:07] [B05] ok: and the setup pill is the active one
+[23:46:08] [B05] ok: the run pill shows its screen
+[23:46:08] [B05] ok: and the run pill is the active one
+[23:46:09] [B05] ok: the results pill shows its screen
+[23:46:09] [B05] ok: and the results pill is the active one
+[23:46:09] [B05] ok: the chain pill shows its screen
+[23:46:09] [B05] ok: and the chain pill is the active one
+[23:46:11] [B05] ok: the setup pill shows its screen
+[23:46:11] [B05] ok: and the setup pill is the active one
+[23:46:11] [B05] contact sheet: contact_B05.png (12 shots)
+[23:46:11] [B05] --- end done in 13.4s (max gap 137 ms) ---
+[23:46:12] [B05] ok: the Dark-mode action gives the dark theme
+[23:46:13] [B05] ok: the setup pill shows its screen
+[23:46:13] [B05] ok: and the setup pill is the active one
+[23:46:13] [B05] ok: the 2D segment sets the dimension
+[23:46:14] [B06] --- begin ---
+[23:46:14] [B06] NOTE: shortcuts are real-platform only: run B06 with --window
+[23:46:14] [B06] ok: the run pill shows its screen
+[23:46:14] [B06] ok: and the run pill is the active one
+[23:46:18] [B06] NOTE: Tab from Run: _CollapseHeader -> QLineEdit -> QComboBox -> ToggleSwitch -> _SetupLink -> QToolButton
+[23:46:18] [B06] ok: the setup pill shows its screen
+[23:46:18] [B06] ok: and the setup pill is the active one
+[23:46:19] [B06] contact sheet: contact_B06.png (2 shots)
+[23:46:19] [B06] --- end done in 4.8s (max gap 40 ms) ---
+[23:46:19] [B06] ok: the Dark-mode action gives the dark theme
+[23:46:20] [B06] ok: the setup pill shows its screen
+[23:46:20] [B06] ok: and the setup pill is the active one
+[23:46:21] [B06] ok: the 2D segment sets the dimension
+[23:46:21] [B07] --- begin ---
+[23:46:29] [B07] ok: the Dark-mode action gives the light theme
+[23:46:30] [B07] ok: the run pill shows its screen
+[23:46:30] [B07] ok: and the run pill is the active one
+[23:46:31] [B07] ok: the results pill shows its screen
+[23:46:31] [B07] ok: and the results pill is the active one
+[23:46:32] [B07] ok: the chain pill shows its screen
+[23:46:32] [B07] ok: and the chain pill is the active one
+[23:46:33] [B07] ok: the setup pill shows its screen
+[23:46:33] [B07] ok: and the setup pill is the active one
+[23:46:33] [B07] ok: the 1D segment sets the dimension
+[23:46:36] [B07] ok: the 2D segment sets the dimension
+[23:46:38] [B07] ok: the 3D segment sets the dimension
+[23:46:41] [B07] ok: the 2D segment sets the dimension
+[23:46:41] [B07] ok: the bad field is named in the report
+[23:46:52] [B07] ok: the Dark-mode action gives the dark theme
+[23:46:52] [B07] contact sheet: contact_B07.png (12 shots)
+[23:46:52] [B07] --- end done in 30.8s (max gap 356 ms) ---
+[23:46:53] [B07] ok: the Dark-mode action gives the dark theme
+[23:46:54] [B07] ok: the setup pill shows its screen
+[23:46:54] [B07] ok: and the setup pill is the active one
+[23:46:54] [B07] ok: the 2D segment sets the dimension
+[23:46:55] [Q01] --- begin ---
+[23:46:55] [Q01] NOTE: hosts: setup=View3DHost, run=View3DHost, results=ResultsView3DHost
+[23:46:55] [Q01] ok: the setup pill shows its screen
+[23:46:55] [Q01] ok: and the setup pill is the active one
+[23:46:56] [Q01] ok: the 3D segment sets the dimension
+[23:46:56] [Q01] ok: the Setup preview got a render window from the child
+[23:46:57] [Q01] ok: the run pill shows its screen
+[23:46:57] [Q01] ok: and the run pill is the active one
+[23:46:57] [Q01] ok: the results pill shows its screen
+[23:46:57] [Q01] ok: and the results pill is the active one
+[23:46:57] [Q01] ok: the setup pill shows its screen
+[23:46:57] [Q01] ok: and the setup pill is the active one
+[23:46:58] [Q01] ok: the run pill shows its screen
+[23:46:58] [Q01] ok: and the run pill is the active one
+[23:46:58] [Q01] ok: the results pill shows its screen
+[23:46:58] [Q01] ok: and the results pill is the active one
+[23:46:59] [Q01] ok: the setup pill shows its screen
+[23:46:59] [Q01] ok: and the setup pill is the active one
+[23:46:59] [Q01] ok: the run pill shows its screen
+[23:46:59] [Q01] ok: and the run pill is the active one
+[23:47:00] [Q01] ok: the results pill shows its screen
+[23:47:00] [Q01] ok: and the results pill is the active one
+[23:47:00] [Q01] ok: the setup pill shows its screen
+[23:47:00] [Q01] ok: and the setup pill is the active one
+[23:47:00] [Q01] ok: and it is the SAME window after three tab round trips - a new one each time would mean the child is re-creating them
+[23:47:00] [Q01] ok: one viewer child is still alive for all three surfaces
+[23:47:00] [Q01] NOTE: render windows per surface: {'setup': 48575580, 'run': None, 'results': None}
+[23:47:00] [Q01] ok: no two surfaces share a render window
+[23:47:01] [Q01] ok: the 2D segment sets the dimension
+[23:47:02] [Q01] ok: and leaving 3D does not take the child down with it
+[23:47:02] [Q01] contact sheet: contact_Q01.png (2 shots)
+[23:47:02] [Q01] --- end done in 7.5s (max gap 177 ms) ---
+[23:47:03] [Q01] ok: the Dark-mode action gives the dark theme
+[23:47:04] [Q01] ok: the setup pill shows its screen
+[23:47:04] [Q01] ok: and the setup pill is the active one
+[23:47:04] [Q01] ok: the 2D segment sets the dimension
+[23:47:05] [Q02] --- begin ---
+[23:47:13] [Q02] ok: the Dark-mode action gives the light theme
+[23:47:13] [Q02] ok: the setup pill shows its screen
+[23:47:13] [Q02] ok: and the setup pill is the active one
+[23:47:14] [Q02] ok: the run pill shows its screen
+[23:47:14] [Q02] ok: and the run pill is the active one
+[23:47:15] [Q02] ok: the results pill shows its screen
+[23:47:15] [Q02] ok: and the results pill is the active one
+[23:47:16] [Q02] ok: the chain pill shows its screen
+[23:47:16] [Q02] ok: and the chain pill is the active one
+[23:47:16] [Q02] ok: the theme really is light
+[23:47:25] [Q02] ok: the Dark-mode action gives the dark theme
+[23:47:25] [Q02] ok: the setup pill shows its screen
+[23:47:25] [Q02] ok: and the setup pill is the active one
+[23:47:26] [Q02] ok: the run pill shows its screen
+[23:47:26] [Q02] ok: and the run pill is the active one
+[23:47:27] [Q02] ok: the results pill shows its screen
+[23:47:27] [Q02] ok: and the results pill is the active one
+[23:47:28] [Q02] ok: the chain pill shows its screen
+[23:47:28] [Q02] ok: and the chain pill is the active one
+[23:47:28] [Q02] ok: the theme really is dark
+[23:47:37] [Q02] ok: the Dark-mode action gives the light theme
+[23:47:37] [Q02] ok: the setup pill shows its screen
+[23:47:37] [Q02] ok: and the setup pill is the active one
+[23:47:38] [Q02] ok: the run pill shows its screen
+[23:47:38] [Q02] ok: and the run pill is the active one
+[23:47:39] [Q02] ok: the results pill shows its screen
+[23:47:39] [Q02] ok: and the results pill is the active one
+[23:47:40] [Q02] ok: the chain pill shows its screen
+[23:47:40] [Q02] ok: and the chain pill is the active one
+[23:47:40] [Q02] ok: the theme really is light
+[23:47:50] [Q02] ok: the Dark-mode action gives the dark theme
+[23:47:50] [Q02] ok: the setup pill shows its screen
+[23:47:50] [Q02] ok: and the setup pill is the active one
+[23:47:51] [Q02] ok: the run pill shows its screen
+[23:47:51] [Q02] ok: and the run pill is the active one
+[23:47:52] [Q02] ok: the results pill shows its screen
+[23:47:52] [Q02] ok: and the results pill is the active one
+[23:47:53] [Q02] ok: the chain pill shows its screen
+[23:47:53] [Q02] ok: and the chain pill is the active one
+[23:47:53] [Q02] ok: the theme really is dark
+[23:47:54] [Q02] ok: the Dark-mode action gives the dark theme
+[23:47:54] [Q02] ok: every palette colour is a usable hex string
+[23:47:55] [Q02] contact sheet: contact_Q02.png (16 shots)
+[23:47:55] [Q02] --- end done in 49.4s (max gap 364 ms) ---
+[23:47:55] [Q02] ok: the Dark-mode action gives the dark theme
+[23:47:56] [Q02] ok: the setup pill shows its screen
+[23:47:56] [Q02] ok: and the setup pill is the active one
+[23:47:57] [Q02] ok: the 2D segment sets the dimension
+[23:47:57] [Q03] --- begin ---
+[23:47:57] [Q03] no cache for native2d
+[23:47:58] [Q03] ok: the results pill shows its screen
+[23:47:58] [Q03] ok: and the results pill is the active one
+[23:47:58] [Q03] FINDING S2 check: no result labelled 'QA native2d' to select
+[23:47:58] [Q03] --- end done in 0.4s (max gap 31 ms) ---
+[23:47:58] [Q03] ok: the Dark-mode action gives the dark theme
+[23:47:59] [Q03] ok: the setup pill shows its screen
+[23:47:59] [Q03] ok: and the setup pill is the active one
+[23:48:00] [Q03] ok: the 2D segment sets the dimension
+[23:48:00] [Q04] --- begin ---
+[23:48:01] [Q04] ok: the setup pill shows its screen
+[23:48:01] [Q04] ok: and the setup pill is the active one
+[23:48:02] [Q04] ok: the run pill shows its screen
+[23:48:02] [Q04] ok: and the run pill is the active one
+[23:48:03] [Q04] ok: the results pill shows its screen
+[23:48:03] [Q04] ok: and the results pill is the active one
+[23:48:04] [Q04] ok: the chain pill shows its screen
+[23:48:04] [Q04] ok: and the chain pill is the active one
+[23:48:05] [Q04] ok: nothing is clipped at 125 %
+[23:48:05] [Q04] NOTE: 125 %: 0 clipped widget(s)
+[23:48:06] [Q04] ok: the setup pill shows its screen
+[23:48:06] [Q04] ok: and the setup pill is the active one
+[23:48:07] [Q04] ok: the run pill shows its screen
+[23:48:07] [Q04] ok: and the run pill is the active one
+[23:48:08] [Q04] ok: the results pill shows its screen
+[23:48:08] [Q04] ok: and the results pill is the active one
+[23:48:09] [Q04] ok: the chain pill shows its screen
+[23:48:09] [Q04] ok: and the chain pill is the active one
+[23:48:09] [Q04] ok: nothing is clipped at 150 %
+[23:48:09] [Q04] NOTE: 150 %: 0 clipped widget(s)
+[23:48:10] [Q04] ok: the setup pill shows its screen
+[23:48:10] [Q04] ok: and the setup pill is the active one
+[23:48:11] [Q04] contact sheet: contact_Q04.png (8 shots)
+[23:48:11] [Q04] --- end done in 10.4s (max gap 112 ms) ---
+[23:48:11] [Q04] ok: the Dark-mode action gives the dark theme
+[23:48:12] [Q04] ok: the setup pill shows its screen
+[23:48:12] [Q04] ok: and the setup pill is the active one
+[23:48:13] [Q04] ok: the 2D segment sets the dimension
+[23:48:13] [C01] --- begin ---
+[23:48:16] [C01] NOTE: strip with Lx=abc AND cell="": 'Lx' is not a number: 'abc' | 'cell size' is not a number: ''
+[23:48:16] [C01] ok: both parse errors are listed - the Tk app showed only the first (G3)
+[23:48:16] [C01] ok: and both fields are marked in red (marked: ['Lx', 'cell'])
+[23:48:16] [C01] ok: fixing one field clears its mark
+[23:48:17] [C01] contact sheet: contact_C01.png (2 shots)
+[23:48:17] [C01] --- end done in 3.7s (max gap 161 ms) ---
+[23:48:18] [C01] ok: the Dark-mode action gives the dark theme
+[23:48:18] [C01] ok: the setup pill shows its screen
+[23:48:18] [C01] ok: and the setup pill is the active one
+[23:48:19] [C01] ok: the 2D segment sets the dimension
+[23:48:19] [C02] --- begin ---
+[23:48:21] [C02] NOTE: 2D cell=0: Cell size must be > 0
+[23:48:21] [C02] ok: cell=0 is reported at all
+[23:48:23] [C02] NOTE: 2D charge=0: Charge must be > 0 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.
+[23:48:23] [C02] ok: charge=0 is reported at all
+[23:48:25] [C02] NOTE: 2D Lx=-1: Domain extents must be > 0
+[23:48:25] [C02] ok: Lx=-1 is reported at all
+[23:48:27] [C02] NOTE: 1D radius=0: Domain radius must be > 0
+[23:48:29] [C02] NOTE: 3D t_end=-1: End time must be >= 0 (0 = automatic stop condition) | ~216,000 cells at dx = 0.025 m
+[23:48:31] [C02] NOTE: 3D slice_pos=99: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | Live slice position 99 m is outside the domain (0..1.5 m) - the nearest cell is used | ~216,000 cells at dx = 0.025 m
+[23:48:32] [C02] contact sheet: contact_C02.png (6 shots)
+[23:48:32] [C02] --- end done in 12.7s (max gap 338 ms) ---
+[23:48:33] [C02] ok: the Dark-mode action gives the dark theme
+[23:48:34] [C02] ok: the setup pill shows its screen
+[23:48:34] [C02] ok: and the setup pill is the active one
+[23:48:34] [C02] ok: the 2D segment sets the dimension
+[23:48:35] [C03] --- begin ---
+[23:48:36] [C03] NOTE: charge outside: Charge centre is outside the domain | Charge (r_exp = 0.0140 m) pokes through the open 'x_hi' boundary | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[23:48:36] [C03] ok: a charge outside the domain is reported
+[23:48:38] [C03] NOTE: charge in obstacle: Charge overlaps obstacle (0.9, 1.1, 0.9, 1.1) | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[23:48:40] [C03] NOTE: inverted obstacle box accepted=True, rows now [(1.5, 1.0, 0.0, 1.0)], strip: Charge overlaps obstacle (1.5, 1.0, 0.0, 1.0) | Obstacle (1.5, 1.0, 0.0, 1.0) is not a valid in-domain box | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[23:48:42] [C03] NOTE: gauge outside: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | G1 (9.00, 9.00) m outside the domain - will be dropped | Cell size will be refined to 0.00279 m (5 cells across the charge radius) | ~511,225 cells at dx = 0.00279487 m
+[23:48:43] [C03] NOTE: axisym charge 5 cm above the ground: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Charge is truncated by the y_lo wall (surface burst) | Cell size will be refined to 0.02108 m (5 cells across the charge radius) | ~8,836 cells at dx = 0.0210847 m
+[23:48:45] [C03] contact sheet: contact_C03.png (5 shots)
+[23:48:45] [C03] --- end done in 9.7s (max gap 257 ms) ---
+[23:48:45] [C03] ok: the Dark-mode action gives the dark theme
+[23:48:46] [C03] ok: the setup pill shows its screen
+[23:48:46] [C03] ok: and the setup pill is the active one
+[23:48:47] [C03] ok: the 2D segment sets the dimension
+[23:48:47] [C04] --- begin ---
+[23:48:49] [C04] NOTE: gauge entry 'a b': accepted=False, rows 0->0, hint 'not numbers: a, b'
+[23:48:49] [C04] ok: row 'a b' refused WITH a visible reason ('not numbers: a, b')
+[23:48:50] [C04] NOTE: gauge entry '1 2 3': accepted=False, rows 0->0, hint 'expected 2 numbers (r  z)'
+[23:48:50] [C04] ok: row '1 2 3' refused WITH a visible reason ('expected 2 numbers (r  z)')
+[23:48:51] [C04] NOTE: gauge entry '': accepted=False, rows 0->0, hint 'add a row: r  z'
+[23:48:52] [C04] NOTE: gauge entry '1,2': accepted=True, rows 0->1, hint 'add a row: r  z'
+[23:48:53] [C04] NOTE: gauge entry '1;2': accepted=False, rows 1->1, hint 'not numbers: 1;2'
+[23:48:53] [C04] ok: row '1;2' refused WITH a visible reason ('not numbers: 1;2')
+[23:48:53] [C04] ok: Remove with nothing selected explains itself
+[23:48:55] [C04] contact sheet: contact_C04.png (6 shots)
+[23:48:55] [C04] --- end done in 7.5s (max gap 209 ms) ---
+[23:48:55] [C04] ok: the Dark-mode action gives the dark theme
+[23:48:56] [C04] ok: the setup pill shows its screen
+[23:48:56] [C04] ok: and the setup pill is the active one
+[23:48:57] [C04] ok: the 2D segment sets the dimension
+[23:48:57] [C05] --- begin ---
+[23:48:59] [C05] ok: the chip's native action switches the solver
+[23:48:59] [C05] ok: native mode: the AMR card is hidden and the EOS row shown
+[23:49:00] [C05] ok: the chip's blastfoam action switches the solver
+[23:49:00] [C05] ok: blastFoam mode: the AMR card is shown and the EOS row hidden
+[23:49:00] [C05] NOTE: foam strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | WSL hardware not detected - cell caps assume a 4 GB VM (1,113,510 cells). A case that validated on another machine may be refused here; click Re-detect once WSL is up. Headless callers should call solvers.foam.env.prime_from_settings() at start-up. | Checking WSL blastFoam availability... | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[23:49:03] [C05] ok: the chip's native action switches the solver
+[23:49:04] [C05] ok: native keeps the typed foam values in the form and strips them from the case
+[23:49:04] [C05] NOTE: after native: material=C4 amr_levels=2 (case: TNT, 0)
+[23:49:05] [C05] contact sheet: contact_C05.png (4 shots)
+[23:49:05] [C05] --- end done in 7.9s (max gap 323 ms) ---
+[23:49:06] [C05] ok: the Dark-mode action gives the dark theme
+[23:49:07] [C05] ok: the setup pill shows its screen
+[23:49:07] [C05] ok: and the setup pill is the active one
+[23:49:07] [C05] ok: the 2D segment sets the dimension
+[23:49:08] [C06] --- begin ---
+[23:49:10] [C06] NOTE: zone on native (card hidden, case stripped): No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.01250 m (5 cells across the charge radius) | ~25,600 cells at dx = 0.012499 m
+[23:49:11] [C06] ok: the chip's blastfoam action switches the solver
+[23:49:11] [C06] NOTE: zone on foam: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.5, 1.5, 0.5, 1.5, 1) snapped outward to level-0 cell faces: (0.498054, 1.501946, 0.498054, 1.501946) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Local refinement: 1 level(s), finest cell 0.0038911 m, ~115,972 mesh cells; results are resampled to a 264,196-cell display grid | Charge cells: 812 at 0.0038911 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 115,972 cells is below the 200,000-cell parallel floor | ~115,972 cells at dx = 0.00781189 m (finest 0.00389105 m, 264,196 display cells)
+[23:49:12] [C06] NOTE: zone_level7: Refinement zone (0.5, 1.5, 0.5, 1.5, 7): level must be 1..4 | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Parallel run: 1 rank: 65,536 cells is below the 200,000-cell parallel floor | ~65,536 cells at dx = 0.00781189 m
+[23:49:14] [C06] NOTE: zone_jump: Refinement level jumps by 2 or more between neighbouring cells near (0.5, 0.5) m - nest each level-l zone inside a level-(l-1) zone with at least one level-(l-1) cell of margin | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Parallel run: 1 rank: 65,536 cells is below the 200,000-cell parallel floor | ~65,536 cells at dx = 0.00781189 m
+[23:49:15] [C06] NOTE: zone_snapped: No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.53, 1.47, 0.53, 1.47, 1) snapped outward to level-0 cell faces: (0.529183, 1.470817, 0.529183, 1.470817) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00781 m (8 cells across the charge radius) | Local refinement: 1 level(s), finest cell 0.0038911 m, ~109,972 mesh cells; results are resampled to a 264,196-cell display grid | Charge cells: 812 at 0.0038911 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 109,972 cells is below the 200,000-cell parallel floor | ~109,972 cells at dx = 0.00781189 m (finest 0.00389105 m, 264,196 display cells)
+[23:49:18] [C06] NOTE: axisym level-2 zone touching the axis: Axisymmetric: refinement zones touching the symmetry axis (x0 = 0) are limited to level 1 (the wedge axis cells are prisms, not hexahedra) | No terminate boundary and no end time: the run is bounded only by the safety cap (~59 ms). Set a side to 'terminate' to stop when the wave reaches it. | Refinement zone (0.0, 0.6, 0.6, 1.4, 1) snapped outward to level-0 cell faces: (0.0, 0.605263, 0.592105, 1.407895) | Refinement zone (0.0, 0.3, 0.8, 1.2, 2) snapped outward to level-1 cell faces: (0.0, 0.302632, 0.796053, 1.203947) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01318 m (8 cells across the charge radius) | Parallel run: 1 rank: 22,801 cells is below the 200,000-cell parallel floor | ~22,801 cells at dx = 0.013178 m
+[23:49:20] [C06] contact sheet: contact_C06.png (6 shots)
+[23:49:20] [C06] --- end done in 11.8s (max gap 398 ms) ---
+[23:49:20] [C06] ok: the Dark-mode action gives the dark theme
+[23:49:21] [C06] ok: the setup pill shows its screen
+[23:49:21] [C06] ok: and the setup pill is the active one
+[23:49:22] [C06] ok: the 2D segment sets the dimension
+[23:49:22] [C07] --- begin ---
+[23:49:24] [C07] ok: the chip's native action switches the solver
+[23:49:25] [C07] NOTE: AMR on native: amr_levels is still '2' in the hidden card and stripped from the case; strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.02795 m (5 cells across the charge radius) | ~20,449 cells at dx = 0.0279487 m
+[23:49:26] [C07] ok: the chip's blastfoam action switches the solver
+[23:49:28] [C07] NOTE: valid AMR case: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[23:49:28] [C07] ok: the charge-refinement row is hidden while AMR is on
+[23:49:29] [C07] NOTE: AMR + zones: Dynamic AMR and static refinement zones are mutually exclusive - clear the zones and set charge refinement to 'global' (the charge is refined at t = 0 by the AMR itself) | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[23:49:31] [C07] NOTE: amr_unrefine_gt_refine: The AMR unrefine threshold must not exceed the refine threshold (cells would refine and unrefine in turn) | Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[23:49:31] [C07] NOTE: amr_display_gt_levels: The AMR unrefine threshold must not exceed the refine threshold (cells would refine and unrefine in turn) | AMR display level must be 0..3 (the AMR levels) | Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.0125 m) - raise the AMR levels or lower the base cell to at most 0.1 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[23:49:35] [C07] NOTE: AMR 1 level with a 0.5 kg/m charge on 0.2 m cells: Resolving the charge (8 cells across its radius) needs AMR level 8 (finest 0.00078125 m) - raise the AMR levels or lower the base cell to at most 0.0015625 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 400 cells is below the 200,000-cell parallel floor | ~400 cells at dx = 0.2 m
+[23:49:36] [C07] contact sheet: contact_C07.png (6 shots)
+[23:49:36] [C07] --- end done in 13.6s (max gap 234 ms) ---
+[23:49:37] [C07] ok: the Dark-mode action gives the dark theme
+[23:49:38] [C07] ok: the setup pill shows its screen
+[23:49:38] [C07] ok: and the setup pill is the active one
+[23:49:38] [C07] ok: the 2D segment sets the dimension
+[23:49:38] [C08] --- begin ---
+[23:49:40] [C08] NOTE: 2D 100M cells: ~100,000,000 cells exceeds the 2D cap of 8,000,000 | No terminate boundary and no end time: the run is bounded only by the safety cap (~294 ms). Set a side to 'terminate' to stop when the wave reaches it. | ~100,000,000 cells at dx = 0.001 m
+[23:49:40] [C08] ok: a 100 M cell case is reported before Run
+[23:49:40] [C08] ok: the run pill shows its screen
+[23:49:40] [C08] ok: and the run pill is the active one
+[23:49:40] [C08] DIALOG show_error [Run] '~100,000,000 cells exceeds the 2D cap of 8,000,000' -> 'ok'
+[23:49:42] [C08] ok: and Run refuses it rather than starting a doomed solve
+[23:49:42] [C08] ok: the setup pill shows its screen
+[23:49:42] [C08] ok: and the setup pill is the active one
+[23:49:44] [C08] NOTE: 3D 0.06 m: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.03083 m (5 cells across the charge radius) | ~110,592 cells at dx = 0.0308261 m
+[23:49:45] [C08] NOTE: 3D foam 0.02 m: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | ~456,533 cells at dx = 0.0192663 m
+[23:49:46] [C08] contact sheet: contact_C08.png (5 shots)
+[23:49:46] [C08] --- end done in 7.3s (max gap 224 ms) ---
+[23:49:47] [C08] ok: the Dark-mode action gives the dark theme
+[23:49:47] [C08] ok: the setup pill shows its screen
+[23:49:47] [C08] ok: and the setup pill is the active one
+[23:49:48] [C08] ok: the 2D segment sets the dimension
+[23:49:48] [C09] --- begin ---
+[23:49:51] [C09] NOTE: 8 report lines: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.00625 m) - raise the AMR levels or lower the base cell to at most 0.025 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it. | Obstacles: cells inside each box are carved out of the mesh (rigid walls) | Instant detonation ('none'): the whole charge reacts at t = 0 | Afterburn (Miller): up to 2 MJ/kg released as the products burn with atmospheric oxygen - calibrated against Kingery-Bulmash (DONE.md N3: the anchor reads 1.02-1.20 of KB with this model on) | blastFoam ready in WSL (Ubuntu) | Parallel run: auto: 4 MPI ranks (216,000 cells at 50,000/rank) | ~216,000 cells at dx = 0.1 m
+[23:49:51] [C09] ok: a long report scrolls instead of pushing the preview off the tab (160 px of 170)
+[23:49:51] [C09] ok: and the preview is still on screen underneath it
+[23:49:51] [C09] NOTE: G8: the 3D preview should show 3 charges + 2 det points (see the shot)
+[23:50:02] [C09] ok: the Dark-mode action gives the light theme
+[23:50:13] [C09] ok: the Dark-mode action gives the dark theme
+[23:50:14] [C09] contact sheet: contact_C09.png (2 shots)
+[23:50:14] [C09] --- end done in 25.2s (max gap 447 ms) ---
+[23:50:14] [C09] ok: the Dark-mode action gives the dark theme
+[23:50:15] [C09] ok: the setup pill shows its screen
+[23:50:15] [C09] ok: and the setup pill is the active one
+[23:50:16] [C09] ok: the 2D segment sets the dimension
+[23:50:16] [C10] --- begin ---
+[23:50:19] [C10] NOTE: 3D zones strip: Resolving the charge needs level 6 (> 4) below the base cell - lower the base cell size to at most 0.125 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~294 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 8,000 cells is below the 200,000-cell parallel floor | ~8,000 cells at dx = 0.5 m
+[23:50:19] [C10] ok: the report explains that the charge needs a level over the cap
+[23:50:25] [C10] NOTE: 2D refine strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Local refinement: 4 level(s), finest cell 0.003125 m, ~10,276 mesh cells; results are resampled to a 1,638,400-cell display grid | Charge resolved by automatic level-4 zones (base cell kept at 0.05 m) | Charge cells: 624 at 0.003125 m -> ~0.99 of the 10 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: 1 rank: 10,276 cells is below the 200,000-cell parallel floor | ~10,276 cells at dx = 0.05 m (finest 0.003125 m, 1,638,400 display cells)
+[23:50:25] [C10] ok: the report says "Local refinement: N level(s)" for a charge_refine=zone case that validates
+[23:50:28] [C10] NOTE: 2D AMR strip: Resolving the charge (8 cells across its radius) needs AMR level 4 (finest 0.003125 m) - raise the AMR levels or lower the base cell to at most 0.0125 m | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Parallel run: 1 rank: 6,400 cells is below the 200,000-cell parallel floor | ~6,400 cells at dx = 0.05 m
+[23:50:31] [C10] contact sheet: contact_C10.png (5 shots)
+[23:50:31] [C10] --- end done in 14.8s (max gap 599 ms) ---
+[23:50:32] [C10] ok: the Dark-mode action gives the dark theme
+[23:50:32] [C10] ok: the setup pill shows its screen
+[23:50:32] [C10] ok: and the setup pill is the active one
+[23:50:33] [C10] ok: the 2D segment sets the dimension
+[23:50:33] [C11] --- begin ---
+[23:50:35] [C11] NOTE: axisym labels: {'Lx': 'Radius R [m]', 'Ly': 'Height H [m]', 'cx': 'Burst r [m]', 'cy': 'Burst z [m]'}; cx='0'
+[23:50:35] [C11] ok: axisymmetric relabels the geometry fields ({'Lx': 'Radius R [m]', 'Ly': 'Height H [m]', 'cx': 'Burst r [m]', 'cy': 'Burst z [m]'})
+[23:50:36] [C11] NOTE: planar labels: {'Lx': 'Lx [m]', 'Ly': 'Ly [m]', 'cx': 'Burst x [m]', 'cy': 'Burst y [m]'}
+[23:50:36] [C11] ok: and planar puts them back
+[23:50:38] [C11] contact sheet: contact_C11.png (2 shots)
+[23:50:38] [C11] --- end done in 4.1s (max gap 176 ms) ---
+[23:50:38] [C11] ok: the Dark-mode action gives the dark theme
+[23:50:39] [C11] ok: the setup pill shows its screen
+[23:50:39] [C11] ok: and the setup pill is the active one
+[23:50:40] [C11] ok: the 2D segment sets the dimension
+[23:50:40] [C12] --- begin ---
+[23:50:41] [C12] DIALOG save_file [Save case] 'blastlab case (*.json)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\save1.json'
+[23:50:41] [C12] ok: Save case wrote the JSON
+[23:50:43] [C12] ok: Open case round-trips the saved fields
+[23:50:44] [C12] DIALOG open_file [Open case] 'blastlab case (*.json);;All files (*.*)' -> ''
+[23:50:45] [C12] ok: a cancelled Open leaves the form alone
+[23:50:45] [C12] NOTE: Open case cancelled -> nothing happened (expected)
+[23:50:45] [C12] contact sheet: contact_C12.png (3 shots)
+[23:50:45] [C12] --- end done in 4.6s (max gap 192 ms) ---
+[23:50:45] [C12] ok: the Dark-mode action gives the dark theme
+[23:50:46] [C12] ok: the setup pill shows its screen
+[23:50:46] [C12] ok: and the setup pill is the active one
+[23:50:47] [C12] ok: the 2D segment sets the dimension
+[23:50:47] [D01] --- begin ---
+[23:50:48] [D01] ok: the run pill shows its screen
+[23:50:48] [D01] ok: and the run pill is the active one
+[23:50:51] [D01] DIALOG notify_desktop [BlastLab] 'save1 finished in 3 s. Highest peak: G1, 3,413 kPa at 0.16 ms.' -> 'ok'
+[23:50:52] [D01] ok: the 1D run finished
+[23:50:53] [D01] NOTE: chips after the 1D run: {'step': '1355', 't [ms]': '1.828', 'dt [s]': '1.93e-06', 'p max [kPa]': '284.3', 'cells': '—'}
+[23:50:53] [D01] ok: progress reads 100 % after the run (1000 of 1000)
+[23:50:53] [D01] contact sheet: contact_D01.png (3 shots)
+[23:50:53] [D01] --- end done in 5.7s (max gap 411 ms) ---
+[23:50:54] [D01] ok: the Dark-mode action gives the dark theme
+[23:50:54] [D01] ok: the setup pill shows its screen
+[23:50:54] [D01] ok: and the setup pill is the active one
+[23:50:55] [D01] ok: the 2D segment sets the dimension
+[23:50:55] [D01] budget: 181s left < 200s for D02 - exiting 75
+[23:50:57] [D01] exit 75; pending: ['D02', 'D03', 'D04', 'D05', 'D06', 'E01', 'E02', 'E03', 'E04', 'E05', 'E06', 'E07', 'E08', 'E09', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[23:52:31] [boot] window up: 1280x840 (built 3388 ms, shown 1532 ms)
+[23:52:31] [D02] --- begin ---
+[23:52:31] [D02] ok: the setup pill shows its screen
+[23:52:31] [D02] ok: and the setup pill is the active one
+[23:52:32] [D02] ok: the run pill shows its screen
+[23:52:32] [D02] ok: and the run pill is the active one
+[23:52:33] [D02] ok: the 2D solver announced itself
+[23:52:36] [D02] NOTE: Refresh every = "abc": entry marked bad=None
+[23:53:05] [D02] DIALOG notify_desktop [BlastLab] 'QA finished in 32 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[23:53:06] [D02] ok: the 2D run finished
+[23:53:06] [D02] ok: the dropped-gauge warning reached the run log
+[23:53:06] [D02] NOTE: that warning lives only in the Run log; the Results Gauges table simply shows one gauge
+[23:53:07] [D02] contact sheet: contact_D02.png (5 shots)
+[23:53:07] [D02] --- end done in 35.6s (max gap 360 ms) ---
+[23:53:07] [D02] ok: the Dark-mode action gives the dark theme
+[23:53:08] [D02] ok: the setup pill shows its screen
+[23:53:08] [D02] ok: and the setup pill is the active one
+[23:53:09] [D02] ok: the 2D segment sets the dimension
+[23:53:09] [D03] --- begin ---
+[23:53:09] [D03] ok: the setup pill shows its screen
+[23:53:09] [D03] ok: and the setup pill is the active one
+[23:53:11] [D03] ok: the run pill shows its screen
+[23:53:11] [D03] ok: and the run pill is the active one
+[23:53:11] [D03] ok: the Step through card opens
+[23:53:11] [D03] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be del" -> True
+[23:53:11] [D03] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA: [WinError 5] Access is denie' -> 'ok'
+[23:53:14] [D03] FINDING S3 check: the G1 hint is there after Initialise Model
+[23:53:14] [D03] NOTE: after init: Run enabled=True Exec1 enabled=False progress=1000 chips={'step': '633', 't [ms]': '0.466', 'dt [s]': '7.63e-07', 'p max [kPa]': '1.419e+04', 'cells': '—'}
+[23:53:14] [D03] FINDING S2 check: and the Exec buttons came alive
+[23:53:14] [D03] FINDING S2 dead-control: click Exec 10 is disabled
+[23:53:16] [D03] NOTE: chips after Exec 10: {'step': '633', 't [ms]': '0.466', 'dt [s]': '7.63e-07', 'p max [kPa]': '1.419e+04', 'cells': '—'}
+[23:53:16] [D03] FINDING S2 dead-control: click Exec 100 is disabled
+[23:53:17] [D03] FINDING S2 dead-control: click Interrupt is disabled
+[23:53:19] [D03] NOTE: paused readout: ''
+[23:53:19] [D03] FINDING S2 check: an interrupted run says so beside the run state, not only in the log
+[23:53:19] [D03] FINDING S2 dead-control: click END is disabled
+[23:53:20] [D03] ok: END finished the run
+[23:53:20] [D03] contact sheet: contact_D03.png (6 shots)
+[23:53:20] [D03] --- end done in 11.2s (max gap 194 ms) ---
+[23:53:21] [D03] ok: the Dark-mode action gives the dark theme
+[23:53:22] [D03] ok: the setup pill shows its screen
+[23:53:22] [D03] ok: and the setup pill is the active one
+[23:53:22] [D03] ok: the 2D segment sets the dimension
+[23:53:23] [D04] --- begin ---
+[23:53:23] [D04] ok: the setup pill shows its screen
+[23:53:23] [D04] ok: and the setup pill is the active one
+[23:53:25] [D04] ok: the run pill shows its screen
+[23:53:25] [D04] ok: and the run pill is the active one
+[23:53:25] [D04] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be del" -> True
+[23:53:25] [D04] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA: [WinError 5] Access is denie' -> 'ok'
+[23:54:55] [D04] FINDING S2 check: the 3D View button is enabled at run start
+[23:55:01] [D04] FINDING S2 check: and it brings the 3D page forward
+[23:55:02] [D04] ok: the 3D run finished
+[23:55:05] [D04] NOTE: after the run: frames in the host=0 3D View enabled=False
+[23:55:05] [D04] FINDING S1 check: the newest result is 2D, not the 3D one native3d is meant to hold - not caching it
+[23:55:05] [D04] contact sheet: contact_D04.png (7 shots)
+[23:55:05] [D04] --- end done in 102.2s (max gap 234 ms) ---
+[23:55:06] [D04] ok: the Dark-mode action gives the dark theme
+[23:55:07] [D04] ok: the setup pill shows its screen
+[23:55:07] [D04] ok: and the setup pill is the active one
+[23:55:07] [D04] ok: the 2D segment sets the dimension
+[23:55:08] [D05] --- begin ---
+[23:55:08] [D05] ok: the setup pill shows its screen
+[23:55:08] [D05] ok: and the setup pill is the active one
+[23:55:09] [D05] ok: the run pill shows its screen
+[23:55:09] [D05] ok: and the run pill is the active one
+[23:55:09] [D05] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be del" -> True
+[23:55:09] [D05] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA: [WinError 5] Access is denie' -> 'ok'
+[23:55:50] [D05] FINDING S1 check: the 3D solver announced itself
+[23:55:54] [D05] FINDING S2 dead-control: click Stop is disabled
+[23:55:54] [D05] NOTE: right after Stop: Stop enabled=False Run enabled=True
+[23:55:55] [D05] ok: the run stopped
+[23:55:55] [D05] NOTE: stop latency 1.5 s
+[23:55:56] [D05] FINDING S2 check: the stopped run is labelled "(stopped)"
+[23:55:56] [D05] FINDING S2 check: and the progress bar is NOT filled after a stop
+[23:55:56] [D05] FINDING S1 check: the newest result is 2D, not the 3D one native3d_stopped is meant to hold - not caching it
+[23:55:56] [D05] contact sheet: contact_D05.png (4 shots)
+[23:55:56] [D05] --- end done in 48.3s (max gap 105 ms) ---
+[23:55:57] [D05] ok: the Dark-mode action gives the dark theme
+[23:55:58] [D05] ok: the setup pill shows its screen
+[23:55:58] [D05] ok: and the setup pill is the active one
+[23:55:58] [D05] ok: the 2D segment sets the dimension
+[23:55:59] [D06] --- begin ---
+[23:55:59] [D06] ok: the setup pill shows its screen
+[23:55:59] [D06] ok: and the setup pill is the active one
+[23:56:00] [D06] ok: the run pill shows its screen
+[23:56:00] [D06] ok: and the run pill is the active one
+[23:56:00] [D06] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be del" -> True
+[23:56:00] [D06] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA: [WinError 5] Access is denie' -> 'ok'
+[23:56:41] [D06] FINDING S1 check: the first run started
+[23:56:41] [D06] FINDING S2 check: Run is disabled while a run is live - the refusal is visible before it is needed
+[23:56:41] [D06] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be del" -> True
+[23:56:41] [D06] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA: [WinError 5] Access is denie' -> 'ok'
+[23:56:42] [D06] ok: a second start did NOT replace the running worker
+[23:56:43] [D06] ok: and the run still stops cleanly
+[23:56:43] [D06] contact sheet: contact_D06.png (5 shots)
+[23:56:43] [D06] --- end done in 44.6s (max gap 206 ms) ---
+[23:56:44] [D06] ok: the Dark-mode action gives the dark theme
+[23:56:45] [D06] ok: the setup pill shows its screen
+[23:56:45] [D06] ok: and the setup pill is the active one
+[23:56:45] [D06] ok: the 2D segment sets the dimension
+[23:56:46] [E01] --- begin ---
+[23:56:47] [E01] no cache for native3d
+[23:56:48] [E01] ok: the results pill shows its screen
+[23:56:48] [E01] ok: and the results pill is the active one
+[23:56:48] [E01] NOTE: picker: ['QA - 2D', 'QA native1d', 'QA native2d']
+[23:56:49] [E01] ok: a 1D result draws profiles, not a map (page 'figure')
+[23:56:52] [E01] DIALOG save_file [Save profile] 'All files (*.*)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E01_150.txt'
+[23:56:54] [E01] ok: 3D Viewer on a 1D result explains itself
+[23:56:55] [E01] contact sheet: contact_E01.png (5 shots)
+[23:56:55] [E01] --- end done in 9.2s (max gap 190 ms) ---
+[23:56:56] [E01] ok: the Dark-mode action gives the dark theme
+[23:56:57] [E01] ok: the setup pill shows its screen
+[23:56:57] [E01] ok: and the setup pill is the active one
+[23:56:57] [E01] ok: the 2D segment sets the dimension
+[23:56:57] [E02] --- begin ---
+[23:56:57] [E02] no cache for native3d
+[23:56:58] [E02] ok: the results pill shows its screen
+[23:56:58] [E02] ok: and the results pill is the active one
+[23:56:59] [E02] NOTE: 2D snapshots: ['t = 0.110 ms', 't = 0.276 ms', 't = 0.466 ms (final)']; fields: ['overpressure', 'density', 'speed', 'peak overpressure', 'net ovp impulse']
+[23:56:59] [E02] ok: the 2D result offers snapshots and fields
+[23:57:00] [E02] ok: overpressure / t = 0.110 ms drew something
+[23:57:01] [E02] ok: overpressure / t = 0.466 ms (final) drew something
+[23:57:02] [E02] ok: density / t = 0.110 ms drew something
+[23:57:03] [E02] ok: density / t = 0.466 ms (final) drew something
+[23:57:04] [E02] ok: speed / t = 0.110 ms drew something
+[23:57:05] [E02] ok: speed / t = 0.466 ms (final) drew something
+[23:57:06] [E02] ok: peak overpressure / t = 0.110 ms drew something
+[23:57:07] [E02] ok: peak overpressure / t = 0.466 ms (final) drew something
+[23:57:08] [E02] ok: net ovp impulse / t = 0.110 ms drew something
+[23:57:09] [E02] ok: net ovp impulse / t = 0.466 ms (final) drew something
+[23:57:12] [E02] contact sheet: contact_E02.png (11 shots)
+[23:57:12] [E02] --- end done in 14.1s (max gap 46 ms) ---
+[23:57:13] [E02] ok: the Dark-mode action gives the dark theme
+[23:57:14] [E02] ok: the setup pill shows its screen
+[23:57:14] [E02] ok: and the setup pill is the active one
+[23:57:14] [E02] ok: the 2D segment sets the dimension
+[23:57:14] [E03] --- begin ---
+[23:57:14] [E03] no cache for native3d
+[23:57:15] [E03] ok: the results pill shows its screen
+[23:57:15] [E03] ok: and the results pill is the active one
+[23:57:17] [E03] NOTE: summary rows: [('G1 (0.300, 0.800) -> cell (0.305, 0.802) m', '7759.4', '0.211', '0.237', '0.255', '619.31', '619.32', 'no')]
+[23:57:17] [E03] ok: the summary table has a row per gauge
+[23:57:17] [E03] ok: the traces keep more height than the table (382 vs 99 px)
+[23:57:17] [E03] DIALOG save_file [Save gauge summary CSV] 'CSV (*.csv)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E03_164.csv'
+[23:57:19] [E03] ok: the summary export wrote a file
+[23:57:19] [E03] NOTE: summary -> ['E03_164.csv']
+[23:57:19] [E03] DIALOG save_file [Save gauges TSV] 'Text (*.txt)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E03_166.txt'
+[23:57:21] [E03] ok: the tsv export wrote a file
+[23:57:21] [E03] NOTE: tsv -> ['E03_166.txt']
+[23:57:21] [E03] DIALOG pick_dir [Save field CSVs into] '<blastlab.ui.results_panel.ResultsPanel(0x17803a5c290) at 0x00000177FFA29F00>' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports'
+[23:57:24] [E03] ok: the fieldcsv export wrote a file
+[23:57:24] [E03] NOTE: fieldcsv -> ['QA_impulse.csv', 'QA_p_peak.csv', 'QA_t0p110ms_p.csv', 'QA_t0p110ms_rho.csv', 'QA_t0p110ms_speed.csv', 'QA_t0p276ms_p.csv', 'QA_t0p276ms_rho.csv', 'QA_t0p276ms_speed.csv', 'QA_t0p466ms_final_p.csv', 'QA_t0p466ms_final_rho.csv', 'QA_t0p466ms_final_speed.csv']
+[23:57:24] [E03] DIALOG save_file [Save HTML report] 'HTML (*.html)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E03_170.html'
+[23:57:27] [E03] DIALOG os.startfile [] 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E03_170.html' -> 'suppressed'
+[23:57:28] [E03] ok: the report export wrote a file
+[23:57:28] [E03] NOTE: report -> ['E03_170.html']
+[23:57:30] [E03] contact sheet: contact_E03.png (10 shots)
+[23:57:30] [E03] --- end done in 15.5s (max gap 280 ms) ---
+[23:57:31] [E03] ok: the Dark-mode action gives the dark theme
+[23:57:32] [E03] ok: the setup pill shows its screen
+[23:57:32] [E03] ok: and the setup pill is the active one
+[23:57:32] [E03] ok: the 2D segment sets the dimension
+[23:57:33] [E04] --- begin ---
+[23:57:33] [E04] no cache for native3d
+[23:57:33] [E04] ok: the results pill shows its screen
+[23:57:33] [E04] ok: and the results pill is the active one
+[23:57:36] [E04] ok: Play is enabled
+[23:57:36] [E04] NOTE: recorded frames: slider 0..80, scale='run' used='run'
+[23:57:36] [E04] ok: the slider spans the recorded frames
+[23:57:38] [E04] ok: and stopping stops the timer
+[23:57:39] [E04] ok: the last frame keeps the SAME colour range as the first - one range for the whole video
+[23:57:41] [E04] contact sheet: contact_E04.png (4 shots)
+[23:57:41] [E04] --- end done in 8.5s (max gap 47 ms) ---
+[23:57:42] [E04] ok: the Dark-mode action gives the dark theme
+[23:57:43] [E04] ok: the setup pill shows its screen
+[23:57:43] [E04] ok: and the setup pill is the active one
+[23:57:43] [E04] ok: the 2D segment sets the dimension
+[23:57:44] [E05] --- begin ---
+[23:57:44] [E05] no cache for native3d
+[23:57:44] [E05] ok: the results pill shows its screen
+[23:57:44] [E05] ok: and the results pill is the active one
+[23:57:44] [E05] FINDING S2 check: no result labelled 'QA native3d' to select
+[23:57:44] [E05] --- end done in 0.4s (max gap 37 ms) ---
+[23:57:45] [E05] ok: the Dark-mode action gives the dark theme
+[23:57:46] [E05] ok: the setup pill shows its screen
+[23:57:46] [E05] ok: and the setup pill is the active one
+[23:57:46] [E05] ok: the 2D segment sets the dimension
+[23:57:47] [E06] --- begin ---
+[23:57:47] [E06] no cache for native3d
+[23:57:47] [E06] ok: the results pill shows its screen
+[23:57:47] [E06] ok: and the results pill is the active one
+[23:57:47] [E06] FINDING S2 check: no result labelled 'QA native3d' to select
+[23:57:47] [E06] --- end done in 0.4s (max gap 43 ms) ---
+[23:57:48] [E06] ok: the Dark-mode action gives the dark theme
+[23:57:48] [E06] ok: the setup pill shows its screen
+[23:57:48] [E06] ok: and the setup pill is the active one
+[23:57:49] [E06] ok: the 2D segment sets the dimension
+[23:57:49] [E07] --- begin ---
+[23:57:49] [E07] no cache for native3d
+[23:57:50] [E07] ok: the results pill shows its screen
+[23:57:50] [E07] ok: and the results pill is the active one
+[23:57:51] [E07] DIALOG pick_dir [Save PNGs into] '<blastlab.ui.results_panel.ResultsPanel(0x17803a5c290) at 0x00000177FFA29F00>' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports'
+[23:57:55] [E07] ok: PNGs wrote the whole snapshot grid, several files - the screen shows one field, the file does not
+[23:57:55] [E07] ok: and each one is a real image
+[23:57:55] [E07] DIALOG save_file [Save animation] 'MP4 video (*.mp4);;Animated GIF (*.gif)' -> 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\exports\\E07_179.mp4'
+[23:58:10] [E07] ok: the animation export wrote a video
+[23:58:10] [E07] NOTE: exports in C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native\exports: ['E01_150.txt', 'E03_164.csv', 'E03_166.txt', 'E03_170.html', 'E07_179.mp4', 'QA_blast_2d_density.png', 'QA_blast_2d_gauges.png', 'QA_blast_2d_impulse.png', 'QA_blast_2d_peak_overpressure.png', 'QA_blast_2d_pressure.png', 'QA_impulse.csv', 'QA_p_peak.csv', 'QA_t0p110ms_p.csv', 'QA_t0p110ms_rho.csv', 'QA_t0p110ms_speed.csv', 'QA_t0p276ms_p.csv', 'QA_t0p276ms_rho.csv', 'QA_t0p276ms_speed.csv', 'QA_t0p466ms_final_p.csv', 'QA_t0p466ms_final_rho.csv', 'QA_t0p466ms_final_speed.csv']
+[23:58:11] [E07] contact sheet: contact_E07.png (4 shots)
+[23:58:11] [E07] --- end done in 21.0s (max gap 35 ms) ---
+[23:58:11] [E07] ok: the Dark-mode action gives the dark theme
+[23:58:12] [E07] ok: the setup pill shows its screen
+[23:58:12] [E07] ok: and the setup pill is the active one
+[23:58:13] [E07] ok: the 2D segment sets the dimension
+[23:58:13] [E08] --- begin ---
+[23:58:13] [E08] no cache for native3d
+[23:58:13] [E08] ok: the results pill shows its screen
+[23:58:13] [E08] ok: and the results pill is the active one
+[23:58:15] [E08] ok: Remove took the entry out (3 -> 2)
+[23:58:15] [E08] contact sheet: contact_E08.png (1 shots)
+[23:58:15] [E08] --- end done in 2.5s (max gap 192 ms) ---
+[23:58:16] [E08] ok: the Dark-mode action gives the dark theme
+[23:58:17] [E08] ok: the setup pill shows its screen
+[23:58:17] [E08] ok: and the setup pill is the active one
+[23:58:17] [E08] ok: the 2D segment sets the dimension
+[23:58:18] [E09] --- begin ---
+[23:58:18] [E09] no cache for native3d
+[23:58:19] [E09] ok: the results pill shows its screen
+[23:58:19] [E09] ok: and the results pill is the active one
+[23:58:21] [E09] ok: the panel carries the typed title
+[23:58:21] [E09] ok: and it reaches the figure title
+[23:58:22] [E09] contact sheet: contact_E09.png (1 shots)
+[23:58:22] [E09] --- end done in 4.0s (max gap 46 ms) ---
+[23:58:22] [E09] ok: the Dark-mode action gives the dark theme
+[23:58:23] [E09] ok: the setup pill shows its screen
+[23:58:23] [E09] ok: and the setup pill is the active one
+[23:58:24] [E09] ok: the 2D segment sets the dimension
+[23:58:24] [G01] --- begin ---
+[23:58:25] [G01] ok: the chain pill shows its screen
+[23:58:25] [G01] ok: and the chain pill is the active one
+[23:58:26] [G01] ok: the route control offers exactly the four routes
+[23:58:26] [G01] ok: an empty route is refused, the route unchanged
+[23:58:26] [G01] ok: a planar stage 2 with a 3D stage after it is refused, with a reason
+[23:58:26] [G01] NOTE: a planar stage 2 with a 3D stage after it: ['Stage 2 (2D): must be axisymmetric to feed the 3D stage.']
+[23:58:28] [G01] ok: a stage-2 field that does not parse is refused, with a reason
+[23:58:28] [G01] NOTE: a stage-2 field that does not parse: ["Stage 2 (2D): 'Lx' is not a number: 'abc'"]
+[23:58:28] [G01] ok: and the refusal names the stage
+[23:58:28] [G01] ok: a charge outside stage 2 is refused, with a reason
+[23:58:28] [G01] NOTE: a charge outside stage 2: ['Stage 2 (2D): Charge centre is outside the domain']
+[23:58:29] [G01] ok: an empty Model name on the Run tab is refused, with a reason
+[23:58:29] [G01] NOTE: an empty Model name on the Run tab: ['Model name: the name is empty', 'The Runs folder and Model boxes are on the Run tab.']
+[23:58:29] [G01] ok: and the refusal names the Model box
+[23:58:30] [G01] NOTE: stage switcher after the refusals: stage 2 (a refusal naming stage 2 should have brought it forward)
+[23:58:30] [G01] ok: no model folder was created while every run was refused
+[23:58:30] [G01] ok: Run chain is still enabled after refused starts
+[23:58:30] [G01] contact sheet: contact_G01.png (2 shots)
+[23:58:30] [G01] --- end done in 5.6s (max gap 163 ms) ---
+[23:58:30] [G01] ok: the Dark-mode action gives the dark theme
+[23:58:31] [G01] ok: the setup pill shows its screen
+[23:58:31] [G01] ok: and the setup pill is the active one
+[23:58:32] [G01] ok: the 2D segment sets the dimension
+[23:58:32] [G01] budget: 172s left < 420s for G02 - exiting 75
+[23:58:33] [G01] exit 75; pending: ['G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[23:58:51] [boot] window up: 1280x840 (built 6831 ms, shown 1828 ms)
+[23:58:51] [G02] --- begin ---
+[23:58:52] [G02] ok: the chain pill shows its screen
+[23:58:52] [G02] ok: and the chain pill is the active one
+[23:58:53] [G02] ok: the chain started
+[23:58:53] [G02] ok: Run chain is disabled while the chain runs
+[23:58:53] [G02] ok: the chain pill shows its screen
+[23:58:53] [G02] ok: and the chain pill is the active one
+[23:58:54] [G02] ok: the run pill shows its screen
+[23:58:54] [G02] ok: and the run pill is the active one
+[23:58:55] [G02] ok: stage 2 started
+[23:59:08] [G02] ok: stage 3 started
+[23:59:10] [G02] DIALOG notify_desktop [BlastLab] 'QA_CHAIN finished in 18 s.' -> 'ok'
+[23:59:15] [G02] ok: the chain finished
+[23:59:15] [G02] NOTE: chain wall 23 s
+[23:59:15] [G02] ok: Run chain is enabled again afterwards
+[23:59:15] [G02] NOTE: results after the chain: ['QA_CHAIN']
+[23:59:15] [G02] NOTE: model folder: ['.blastlab-model', '1d', '2d', '3d', 'handoff_1d_to_2d.txt', 'handoff_2d_to_3d.npz', 'manifest.json']
+[23:59:15] [G02] ok: the model folder holds a stage folder with its MODEL.json per stage
+[23:59:15] [G02] ok: and the hand-offs and the root manifest at the model root
+[23:59:16] [G02] ok: the results pill shows its screen
+[23:59:16] [G02] ok: and the results pill is the active one
+[23:59:16] [G02] ok: the chain is one Results entry with QA_CHAIN - 1D … 3D stages
+[23:59:18] [G02] ok: select_result('QA_CHAIN - 3D') shows that stage (stage 3, 'QA_CHAIN - 3D')
+[23:59:20] [G02] ok: select_result('QA_CHAIN - 1D') shows that stage (stage 1, 'QA_CHAIN - 1D')
+[23:59:23] [G02] contact sheet: contact_G02.png (10 shots)
+[23:59:23] [G02] --- end done in 31.1s (max gap 11201 ms) ---
+[23:59:23] [G02] ok: the Dark-mode action gives the dark theme
+[23:59:24] [G02] ok: the setup pill shows its screen
+[23:59:24] [G02] ok: and the setup pill is the active one
+[23:59:25] [G02] ok: the 2D segment sets the dimension
+[23:59:25] [G03] --- begin ---
+[23:59:25] [G03] ok: the setup pill shows its screen
+[23:59:25] [G03] ok: and the setup pill is the active one
+[23:59:27] [G03] ok: the run pill shows its screen
+[23:59:27] [G03] ok: and the run pill is the active one
+[23:59:27] [G03] ok: the run started
+[23:59:28] [G03] ok: the chain pill shows its screen
+[23:59:28] [G03] ok: and the chain pill is the active one
+[23:59:29] [G03] ok: Run chain is disabled during a Run-tab run
+[23:59:29] [G03] ok: and the callback behind it refuses too, so the guard is not just a greyed button
+[23:59:56] [G03] ok: the Run-tab run still stops
+[23:59:56] [G03] contact sheet: contact_G03.png (1 shots)
+[23:59:56] [G03] --- end done in 31.1s (max gap 203 ms) ---
+[23:59:57] [G03] ok: the Dark-mode action gives the dark theme
+[23:59:57] [G03] ok: the setup pill shows its screen
+[23:59:57] [G03] ok: and the setup pill is the active one
+[23:59:58] [G03] ok: the 2D segment sets the dimension
+[23:59:58] [M01] --- begin ---
+[23:59:59] [M01] ok: the setup pill shows its screen
+[23:59:59] [M01] ok: and the setup pill is the active one
+[00:00:00] [M01] ok: the run pill shows its screen
+[00:00:00] [M01] ok: and the run pill is the active one
+[00:00:01] [M01] DIALOG show_error [Run] 'Runs folder is empty' -> 'ok'
+[00:00:01] [M01] ok: an empty Runs folder is refused, naming the box
+[00:00:01] [M01] ok: and no run started
+[00:00:02] [M01] DIALOG show_error [Run] 'Model name: a folder name cannot contain :' -> 'ok'
+[00:00:02] [M01] ok: a bad Model name is refused, naming the box
+[00:00:02] [M01] ok: no run started and no folder was created
+[00:00:03] [M01] FINDING S1 harness-crash: M01 raised
+[00:00:03] [M01] contact sheet: contact_M01.png (4 shots)
+[00:00:03] [M01] --- end crashed in 4.3s (max gap 122 ms) ---
+[00:00:03] [M01] ok: the Dark-mode action gives the dark theme
+[00:00:04] [M01] ok: the setup pill shows its screen
+[00:00:04] [M01] ok: and the setup pill is the active one
+[00:00:05] [M01] ok: the 2D segment sets the dimension
+[00:00:05] [M02] --- begin ---
+[00:00:06] [M02] ok: the setup pill shows its screen
+[00:00:06] [M02] ok: and the setup pill is the active one
+[00:00:07] [M02] ok: the run pill shows its screen
+[00:00:07] [M02] ok: and the run pill is the active one
+[00:00:07] [M02] DIALOG ask_yes_no [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be de" -> False
+[00:00:07] [M02] ok: an existing model asks before overwriting
+[00:00:07] [M02] ok: No: the folder is untouched and no run started
+[00:00:07] [M02] DIALOG ask_yes_no [Model folder] "M02 already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be de" -> True
+[00:00:08] [M02] ok: Yes: the old file is gone
+[00:00:10] [M02] DIALOG notify_desktop [BlastLab] 'M02 finished in 3 s. Highest peak: G1, 3,413 kPa at 0.16 ms.' -> 'ok'
+[00:00:12] [M02] ok: and the run finished
+[00:00:12] [M02] ok: the new run wrote its folder
+[00:00:12] [M02] contact sheet: contact_M02.png (4 shots)
+[00:00:12] [M02] --- end done in 6.8s (max gap 397 ms) ---
+[00:00:13] [M02] ok: the Dark-mode action gives the dark theme
+[00:00:14] [M02] ok: the setup pill shows its screen
+[00:00:14] [M02] ok: and the setup pill is the active one
+[00:00:14] [M02] ok: the 2D segment sets the dimension
+[00:00:15] [M03] --- begin ---
+[00:00:15] [M03] ok: the setup pill shows its screen
+[00:00:15] [M03] ok: and the setup pill is the active one
+[00:00:16] [M03] ok: the run pill shows its screen
+[00:00:16] [M03] ok: and the run pill is the active one
+[00:00:47] [M03] DIALOG notify_desktop [BlastLab] 'M03 finished in 31 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[00:00:48] [M03] ok: the 2D run finished
+[00:00:49] [M03] NOTE: M03 model folder: ['.blastlab-model', 'MODEL.json', 'animation.gif', 'fields/impulse.csv', 'fields/p_peak.csv', 'fields/t0p110ms_p.csv', 'fields/t0p110ms_rho.csv', 'fields/t0p110ms_speed.csv', 'fields/t0p276ms_p.csv', 'fields/t0p276ms_rho.csv', 'fields/t0p276ms_speed.csv', 'fields/t0p466ms_final_p.csv', 'fields/t0p466ms_final_rho.csv', 'fields/t0p466ms_final_speed.csv', 'figures/blast_2d_density.png', 'figures/blast_2d_gauges.png', 'figures/blast_2d_impulse.png', 'figures/blast_2d_peak_overpressure.png', 'figures/blast_2d_pressure.png', 'gauges/gauges_2d.txt', 'gauges/gauges_2d_summary.csv', 'manifest.json', 'report.html', 'run.log']
+[00:00:49] [M03] ok: the folder holds the sec. 2.2 rows of a planar 2D run (no profile export for planar)
+[00:00:49] [M03] ok: the gauge TSV and summary
+[00:00:49] [M03] ok: manifest.json lists exactly what is on disk, nothing failed
+[00:00:49] [M03] ok: and says why there is no profile
+[00:00:49] [M03] ok: run.log is not empty
+[00:00:49] [M03] contact sheet: contact_M03.png (2 shots)
+[00:00:49] [M03] --- end done in 34.1s (max gap 312 ms) ---
+[00:00:49] [M03] ok: the Dark-mode action gives the dark theme
+[00:00:50] [M03] ok: the setup pill shows its screen
+[00:00:50] [M03] ok: and the setup pill is the active one
+[00:00:51] [M03] ok: the 2D segment sets the dimension
+[00:00:51] [M04] --- begin ---
+[00:00:52] [M04] ok: the chain pill shows its screen
+[00:00:52] [M04] ok: and the chain pill is the active one
+[00:00:53] [M04] ok: the chain started
+[00:01:02] [M04] DIALOG notify_desktop [BlastLab] 'M04 finished in 9 s.' -> 'ok'
+[00:01:03] [M04] ok: the chain finished
+[00:01:03] [M04] NOTE: M04 model folder: ['.blastlab-model', '1d', '2d', 'handoff_1d_to_2d.txt', 'manifest.json']
+[00:01:03] [M04] ok: 1d\, 2d\, the hand-off and the root manifest
+[00:01:03] [M04] ok: each stage has its MODEL.json
+[00:01:03] [M04] ok: the run pill shows its screen
+[00:01:03] [M04] ok: and the run pill is the active one
+[00:01:04] [M04] contact sheet: contact_M04.png (3 shots)
+[00:01:04] [M04] --- end done in 12.8s (max gap 548 ms) ---
+[00:01:05] [M04] ok: the Dark-mode action gives the dark theme
+[00:01:05] [M04] ok: the setup pill shows its screen
+[00:01:05] [M04] ok: and the setup pill is the active one
+[00:01:06] [M04] ok: the 2D segment sets the dimension
+[00:01:06] [M05] --- begin ---
+[00:01:07] [M05] ok: the setup pill shows its screen
+[00:01:07] [M05] ok: and the setup pill is the active one
+[00:01:07] [M05] ok: the 0D · HD 1.3 segment sets the dimension
+[00:01:09] [M05] ok: the run pill shows its screen
+[00:01:09] [M05] ok: and the run pill is the active one
+[00:01:10] [M05] ok: the HD 1.3 assessment finished
+[00:01:11] [M05] NOTE: M05 model folder: ['.blastlab-model', 'MODEL.json', 'hd13_loads', 'hd13_report.html', 'manifest.json']
+[00:01:11] [M05] ok: the report, hd13_loads\, MODEL.json and the manifest
+[00:01:11] [M05] ok: hd13_loads\ holds the SBEDS CSVs
+[00:01:12] [M05] ok: the 2D segment sets the dimension
+[00:01:12] [M05] contact sheet: contact_M05.png (1 shots)
+[00:01:12] [M05] --- end done in 5.1s (max gap 132 ms) ---
+[00:01:12] [M05] ok: the Dark-mode action gives the dark theme
+[00:01:13] [M05] ok: the setup pill shows its screen
+[00:01:13] [M05] ok: and the setup pill is the active one
+[00:01:14] [M05] ok: the 2D segment sets the dimension
+[00:01:14] [V01] --- begin ---
+[00:01:14] [V01] ok: the setup pill shows its screen
+[00:01:14] [V01] ok: and the setup pill is the active one
+[00:01:15] [V01] ok: the 1D card is shown in blastFoam mode
+[00:01:15] [V01] ok: 1D offers one family, "Whole domain"
+[00:01:15] [V01] ok: Time by default: the steps box is greyed
+[00:01:17] [V01] ok: the first tick fills p, rho, U
+[00:01:17] [V01] NOTE: 1D VTK strip: blastFoam ready in WSL (Ubuntu) | VTK volumes: one write every 0.001 s, up to 294 writes (~0.5 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~10,000 cells at dx = 0.001 m
+[00:01:17] [V01] ok: the strip gives the write count and the disk estimate
+[00:01:19] [V01] ok: Step greys the seconds box instead
+[00:01:22] [V01] contact sheet: contact_V01.png (6 shots)
+[00:01:22] [V01] --- end done in 7.4s (max gap 211 ms) ---
+[00:01:22] [V01] ok: the Dark-mode action gives the dark theme
+[00:01:23] [V01] ok: the setup pill shows its screen
+[00:01:23] [V01] ok: and the setup pill is the active one
+[00:01:24] [V01] ok: the 2D segment sets the dimension
+[00:01:24] [V02] --- begin ---
+[00:01:25] [V02] ok: the setup pill shows its screen
+[00:01:25] [V02] ok: and the setup pill is the active one
+[00:01:25] [V02] ok: 2D offers Whole domain and Obstacles
+[00:01:26] [V02] NOTE: 2D obstacles, none drawn: VTK obstacles: the case has no obstacles - nothing to sample | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[00:01:26] [V02] ok: no obstacles: the strip says "nothing to sample"
+[00:01:28] [V02] NOTE: 2D obstacles, one drawn: No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Obstacles: cells inside each box are carved out of the mesh (rigid walls) | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.00659 m (8 cells across the charge radius) | Charge cells: 99 at 0.006589 m -> ~0.98 of the 1 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 7 MPI ranks (368,449 cells at 50,000/rank) | ~368,449 cells at dx = 0.00658898 m
+[00:01:28] [V02] ok: with an obstacle the refusal is gone
+[00:01:30] [V02] ok: Step on both 2D families greys both seconds boxes
+[00:01:34] [V02] contact sheet: contact_V02.png (6 shots)
+[00:01:34] [V02] --- end done in 9.1s (max gap 322 ms) ---
+[00:01:34] [V02] ok: the Dark-mode action gives the dark theme
+[00:01:35] [V02] ok: the setup pill shows its screen
+[00:01:35] [V02] ok: and the setup pill is the active one
+[00:01:36] [V02] ok: the 2D segment sets the dimension
+[00:01:36] [V03] --- begin ---
+[00:01:36] [V03] ok: the setup pill shows its screen
+[00:01:36] [V03] ok: and the setup pill is the active one
+[00:01:37] [V03] ok: three destination columns plus the Gauges column (Q2, OUT-4a)
+[00:01:39] [V03] ok: first ticks: p/pMax on sections and obstacles, p/rho/U on volumes
+[00:01:41] [V03] ok: Step on the surfaces greys their seconds box only
+[00:01:43] [V03] ok: a plane `q, 1` is refused with a reason
+[00:01:43] [V03] ok: a plane `y, 1.4` is accepted
+[00:01:45] [V03] NOTE: 3D VTK strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | VTK obstacles: the case has no obstacles - only the sections are written | VTK volumes: one write every 0.001 s, up to 45 writes (~3.2 GB of written times on the WSL disk at ~155 B per cell per write, before conversion). Every write is also ingested for the live view, so a dense cadence slows it. This cadence becomes the solver's write schedule, and each write time is the first solver step past its interval (the time step is never shortened to land on it) | ~456,533 cells at dx = 0.0192663 m
+[00:01:45] [V03] ok: both families with a plane at y = 1.4 m validate (Ly = 1.5 m; the live slice is at the burst)
+[00:01:46] [V03] contact sheet: contact_V03.png (7 shots)
+[00:01:46] [V03] --- end done in 9.4s (max gap 182 ms) ---
+[00:01:47] [V03] ok: the Dark-mode action gives the dark theme
+[00:01:48] [V03] ok: the setup pill shows its screen
+[00:01:48] [V03] ok: and the setup pill is the active one
+[00:01:48] [V03] ok: the 2D segment sets the dimension
+[00:01:48] [V04] --- begin ---
+[00:01:49] [V04] ok: the setup pill shows its screen
+[00:01:49] [V04] ok: and the setup pill is the active one
+[00:01:51] [V04] ok: the chip's native action switches the solver
+[00:01:51] [V04] ok: native: the VTK card is hidden
+[00:01:52] [V04] ok: the saved native case has no vtk_ key
+[00:01:52] [V04] ok: the chip's blastfoam action switches the solver
+[00:01:52] [V04] ok: back to blastFoam: the card and the tick are back
+[00:01:55] [V04] contact sheet: contact_V04.png (3 shots)
+[00:01:55] [V04] --- end done in 6.6s (max gap 181 ms) ---
+[00:01:56] [V04] ok: the Dark-mode action gives the dark theme
+[00:01:57] [V04] ok: the setup pill shows its screen
+[00:01:57] [V04] ok: and the setup pill is the active one
+[00:01:57] [V04] ok: the 2D segment sets the dimension
+[00:01:58] [V05] --- begin ---
+[00:02:00] [V05] ok: the stage ran with hooks.vtk_dir = <model>\vtk
+[00:02:00] [V05] NOTE: V05 root manifest vtk: {'dir': 'vtk', 'counts': {'volumes': 2}, 'files': 4, 'bytes': 588, 'not_converted': []}; tree: ['.blastlab-model', 'MODEL.json', 'fields/t0p155ms_p.csv', 'fields/t0p155ms_rho.csv', 'fields/t0p539ms_p.csv', 'fields/t0p539ms_rho.csv', 'fields/t1p162ms_p.csv', 'fields/t1p162ms_rho.csv', 'fields/t1p949ms_p.csv', 'fields/t1p949ms_rho.csv', 'fields/t2p815ms_final_p.csv', 'fields/t2p815ms_final_rho.csv', 'figures/blast_1d_gauges.png', 'figures/blast_1d_results.png', 'gauges/gauges_1d.txt', 'gauges/gauges_1d_summary.csv', 'manifest.json', 'profile.txt', 'report.html', 'run.log', 'vtk/manifest.json', 'vtk/volumes.vtk.series', 'vtk/volumes/t_0.0005.vtk', 'vtk/volumes/t_0.001.vtk']
+[00:02:00] [V05] ok: the root manifest carries the numeric vtk summary (P4)
+[00:02:00] [V05] ok: the vtk\ tree is on disk, left out of `outputs` (P4), nothing failed
+[00:02:00] [V05] --- end done in 2.0s (max gap 0 ms) ---
+[00:02:00] [V05] ok: the Dark-mode action gives the dark theme
+[00:02:01] [V05] ok: the setup pill shows its screen
+[00:02:01] [V05] ok: and the setup pill is the active one
+[00:02:02] [V05] ok: the 2D segment sets the dimension
+[00:02:02] [V06] --- begin ---
+[00:02:02] [V06] ok: the setup pill shows its screen
+[00:02:02] [V06] ok: and the setup pill is the active one
+[00:02:03] [V06] ok: 1D: the box is on the card, unticked, with its tooltip
+[00:02:05] [V06] NOTE: 1D keep-all strip: blastFoam ready in WSL (Ubuntu) | Keep all fields in WSL: 1D keeps its written times until the scratch is released anyway (P9); the box also keeps the scratch after the run | ~10,000 cells at dx = 0.001 m
+[00:02:05] [V06] ok: 1D: the strip explains the box (P9)
+[00:02:05] [V06] ok: 1D: the case carries it
+[00:02:07] [V06] ok: 3D: the box is on the card, unticked, with its tooltip
+[00:02:09] [V06] NOTE: 3D keep-all strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~44 ms). Set a side to 'terminate' to stop when the wave reaches it. | blastFoam ready in WSL (Ubuntu) | Cell size will be refined to 0.01927 m (8 cells across the charge radius) | Charge cells: 2,170 at 0.019266 m -> ~1.01 of the 25 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Parallel run: auto: 9 MPI ranks (456,533 cells at 50,000/rank) | Keep all fields in WSL: every write stays in WSL and the scratch is kept after the run; disk estimate ~4.2 GB (up to 60 writes at ~155 B per cell per write) | ~456,533 cells at dx = 0.0192663 m
+[00:02:09] [V06] ok: 3D: the strip explains the box (disk estimate)
+[00:02:09] [V06] ok: 3D: the case carries it
+[00:02:11] [V06] ok: the chip's native action switches the solver
+[00:02:11] [V06] ok: native: the box is hidden with the card, not in the case
+[00:02:12] [V06] ok: the chip's blastfoam action switches the solver
+[00:02:12] [V06] NOTE: V06 kept-scratch reason: Keep all fields in WSL was ticked
+[00:02:12] [V06] ok: a ticked finished run keeps its scratch, and says why
+[00:02:14] [V06] contact sheet: contact_V06.png (9 shots)
+[00:02:14] [V06] --- end done in 11.7s (max gap 258 ms) ---
+[00:02:15] [V06] ok: the Dark-mode action gives the dark theme
+[00:02:16] [V06] ok: the setup pill shows its screen
+[00:02:16] [V06] ok: and the setup pill is the active one
+[00:02:16] [V06] ok: the 2D segment sets the dimension
+[00:02:17] [V07] --- begin ---
+[00:02:17] [V07] ok: the setup pill shows its screen
+[00:02:17] [V07] ok: and the setup pill is the active one
+[00:02:18] [V07] ok: 1D: p/rho/U locked and ticked; live gauge cells ['T', 'dynamicP']
+[00:02:20] [V07] ok: 1D: the ticks reach vtk_gauges
+[00:02:20] [V07] ok: 1D: the case validates
+[00:02:22] [V07] ok: the chip's native action switches the solver
+[00:02:22] [V07] ok: 1D native: no vtk_gauges key
+[00:02:23] [V07] ok: the chip's blastfoam action switches the solver
+[00:02:24] [V07] contact sheet: contact_V07.png (4 shots)
+[00:02:24] [V07] --- end done in 7.0s (max gap 145 ms) ---
+[00:02:25] [V07] ok: the Dark-mode action gives the dark theme
+[00:02:26] [V07] ok: the setup pill shows its screen
+[00:02:26] [V07] ok: and the setup pill is the active one
+[00:02:26] [V07] ok: the 2D segment sets the dimension
+[00:02:27] [V08] --- begin ---
+[00:02:27] [V08] ok: the setup pill shows its screen
+[00:02:27] [V08] ok: and the setup pill is the active one
+[00:02:28] [V08] ok: 2D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[00:02:30] [V08] ok: 2D: the ticks reach vtk_gauges
+[00:02:30] [V08] ok: 2D: the case validates
+[00:02:32] [V08] ok: the chip's native action switches the solver
+[00:02:32] [V08] ok: 2D native: no vtk_gauges key
+[00:02:32] [V08] ok: the chip's blastfoam action switches the solver
+[00:02:34] [V08] contact sheet: contact_V08.png (4 shots)
+[00:02:34] [V08] --- end done in 7.0s (max gap 195 ms) ---
+[00:02:35] [V08] ok: the Dark-mode action gives the dark theme
+[00:02:35] [V08] ok: the setup pill shows its screen
+[00:02:35] [V08] ok: and the setup pill is the active one
+[00:02:36] [V08] ok: the 2D segment sets the dimension
+[00:02:36] [V09] --- begin ---
+[00:02:37] [V09] ok: the setup pill shows its screen
+[00:02:37] [V09] ok: and the setup pill is the active one
+[00:02:38] [V09] ok: 3D: p/rho/U locked and ticked; live gauge cells ['overpressure', 'impulse', 'T', 'dynamicP']
+[00:02:40] [V09] ok: 3D: the ticks reach vtk_gauges
+[00:02:40] [V09] ok: 3D: the case validates
+[00:02:42] [V09] ok: the chip's native action switches the solver
+[00:02:42] [V09] ok: 3D native: no vtk_gauges key
+[00:02:42] [V09] ok: the chip's blastfoam action switches the solver
+[00:02:44] [V09] contact sheet: contact_V09.png (4 shots)
+[00:02:44] [V09] --- end done in 7.2s (max gap 234 ms) ---
+[00:02:45] [V09] ok: the Dark-mode action gives the dark theme
+[00:02:45] [V09] ok: the setup pill shows its screen
+[00:02:45] [V09] ok: and the setup pill is the active one
+[00:02:46] [V09] ok: the 2D segment sets the dimension
+[00:02:46] [V10] --- begin ---
+[00:02:47] [V10] ok: the setup pill shows its screen
+[00:02:47] [V10] ok: and the setup pill is the active one
+[00:02:48] [V10] ok: 2D: no decimation box (3D only)
+[00:02:48] [V10] ok: 3D: the box shows 1, the warning line is under it
+[00:02:49] [V10] ok: 3D: k = 2 reaches vtk_volumes.decimate
+[00:02:49] [V10] ok: 3D: validates, the note carries the warning
+[00:02:51] [V10] ok: 3D: k = 1 writes no decimate key
+[00:02:52] [V10] ok: the chip's native action switches the solver
+[00:02:52] [V10] ok: native: the box and its warning are hidden with the card
+[00:02:52] [V10] ok: the chip's blastfoam action switches the solver
+[00:02:54] [V10] contact sheet: contact_V10.png (2 shots)
+[00:02:54] [V10] --- end done in 7.2s (max gap 210 ms) ---
+[00:02:54] [V10] ok: the Dark-mode action gives the dark theme
+[00:02:55] [V10] ok: the setup pill shows its screen
+[00:02:55] [V10] ok: and the setup pill is the active one
+[00:02:56] [V10] ok: the 2D segment sets the dimension
+[00:02:56] [H01] --- begin ---
+[00:02:56] [H01] ok: the setup pill shows its screen
+[00:02:56] [H01] ok: and the setup pill is the active one
+[00:03:08] [H01] ok: the Dark-mode action gives the light theme
+[00:03:19] [H01] ok: the Dark-mode action gives the dark theme
+[00:03:20] [H01] ok: the preview survived four theme changes
+[00:03:21] [H01] contact sheet: contact_H01.png (4 shots)
+[00:03:21] [H01] --- end done in 24.4s (max gap 574 ms) ---
+[00:03:21] [H01] ok: the Dark-mode action gives the dark theme
+[00:03:22] [H01] ok: the setup pill shows its screen
+[00:03:22] [H01] ok: and the setup pill is the active one
+[00:03:23] [H01] ok: the 2D segment sets the dimension
+[00:03:23] [H02] --- begin ---
+[00:03:24] [H02] ok: the setup pill shows its screen
+[00:03:24] [H02] ok: and the setup pill is the active one
+[00:03:25] [H02] ok: the run pill shows its screen
+[00:03:25] [H02] ok: and the run pill is the active one
+[00:03:25] [H02] DIALOG ask_yes_no [Model folder] "M05 already exists in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs. Overwrite? The previous run's files will be de" -> True
+[00:03:25] [H02] DIALOG show_error [Run] 'Could not delete the previous run in C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\M05: [WinError 5] Access is deni' -> 'ok'
+[00:04:05] [H02] FINDING S1 check: the run started
+[00:04:17] [H02] ok: the Dark-mode action gives the light theme
+[00:04:19] [H02] ok: the run is still alive (or already done) after a repaint
+[00:04:20] [H02] ok: and it finished
+[00:04:29] [H02] ok: the Dark-mode action gives the dark theme
+[00:04:31] [H02] contact sheet: contact_H02.png (5 shots)
+[00:04:31] [H02] --- end done in 67.6s (max gap 491 ms) ---
+[00:04:32] [H02] ok: the Dark-mode action gives the dark theme
+[00:04:32] [H02] ok: the setup pill shows its screen
+[00:04:32] [H02] ok: and the setup pill is the active one
+[00:04:33] [H02] ok: the 2D segment sets the dimension
+[00:04:33] [H03] --- begin ---
+[00:04:35] [H03] no cache for native3d
+[00:04:44] [H03] ok: the Dark-mode action gives the light theme
+[00:04:45] [H03] ok: the results pill shows its screen
+[00:04:45] [H03] ok: and the results pill is the active one
+[00:04:49] [H03] FINDING S2 check: no result labelled 'QA native3d' to select
+[00:04:52] [H03] ok: the chain pill shows its screen
+[00:04:52] [H03] ok: and the chain pill is the active one
+[00:04:53] [H03] ok: the run pill shows its screen
+[00:04:53] [H03] ok: and the run pill is the active one
+[00:05:03] [H03] ok: the Dark-mode action gives the dark theme
+[00:05:03] [H03] contact sheet: contact_H03.png (6 shots)
+[00:05:03] [H03] --- end done in 29.7s (max gap 550 ms) ---
+[00:05:04] [H03] ok: the Dark-mode action gives the dark theme
+[00:05:05] [H03] ok: the setup pill shows its screen
+[00:05:05] [H03] ok: and the setup pill is the active one
+[00:05:05] [H03] ok: the 2D segment sets the dimension
+[00:05:06] [H03] budget: 149s left < 330s for I01 - exiting 75
+[00:05:08] [H03] exit 75; pending: ['I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[00:05:14] [boot] HARNESS CRASH
+Traceback (most recent call last):
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 4756, in main
+    qa.build_app()
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 390, in build_app
+    use_model(self.win)
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\ui\testing.py", line 83, in use_model
+    raise RuntimeError(f'use_model: {folder} is not a blastlab '
+RuntimeError: use_model: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native\runs\QA is not a blastlab model folder - not deleting it
+
+[00:05:15] [boot] exit 1; pending: ['I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[00:10:45] [boot] window up: 1280x840 (built 6779 ms, shown 1542 ms)
+[00:10:45] [I01] --- begin ---
+[00:10:45] [I01] ok: the setup pill shows its screen
+[00:10:45] [I01] ok: and the setup pill is the active one
+[00:10:46] [I01] ok: the run pill shows its screen
+[00:10:46] [I01] ok: and the run pill is the active one
+[00:10:47] [I01] ok: the run started
+[00:10:50] [I01] ok: the results pill shows its screen
+[00:10:50] [I01] ok: and the results pill is the active one
+[00:10:50] [I01] ok: the chain pill shows its screen
+[00:10:50] [I01] ok: and the chain pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:50] [I01] ok: the setup pill shows its screen
+[00:10:50] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the results pill shows its screen
+[00:10:51] [I01] ok: and the results pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the run pill shows its screen
+[00:10:51] [I01] ok: and the run pill is the active one
+[00:10:51] [I01] ok: the setup pill shows its screen
+[00:10:51] [I01] ok: and the setup pill is the active one
+[00:10:51] [I01] ok: the chain pill shows its screen
+[00:10:51] [I01] ok: and the chain pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the results pill shows its screen
+[00:10:52] [I01] ok: and the results pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:52] [I01] ok: the results pill shows its screen
+[00:10:52] [I01] ok: and the results pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the run pill shows its screen
+[00:10:52] [I01] ok: and the run pill is the active one
+[00:10:52] [I01] ok: the setup pill shows its screen
+[00:10:52] [I01] ok: and the setup pill is the active one
+[00:10:53] [I01] ok: the setup pill shows its screen
+[00:10:53] [I01] ok: and the setup pill is the active one
+[00:10:53] [I01] ok: the run pill shows its screen
+[00:10:53] [I01] ok: and the run pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:53] [I01] ok: the run pill shows its screen
+[00:10:53] [I01] ok: and the run pill is the active one
+[00:10:53] [I01] ok: the chain pill shows its screen
+[00:10:53] [I01] ok: and the chain pill is the active one
+[00:10:53] [I01] ok: the results pill shows its screen
+[00:10:53] [I01] ok: and the results pill is the active one
+[00:10:54] [I01] ok: the results pill shows its screen
+[00:10:54] [I01] ok: and the results pill is the active one
+[00:10:54] [I01] ok: the setup pill shows its screen
+[00:10:54] [I01] ok: and the setup pill is the active one
+[00:10:54] [I01] ok: the setup pill shows its screen
+[00:10:54] [I01] ok: and the setup pill is the active one
+[00:10:54] [I01] ok: the chain pill shows its screen
+[00:10:54] [I01] ok: and the chain pill is the active one
+[00:10:54] [I01] ok: the run pill shows its screen
+[00:10:54] [I01] ok: and the run pill is the active one
+[00:10:54] [I01] ok: the run pill shows its screen
+[00:10:54] [I01] ok: and the run pill is the active one
+[00:10:54] [I01] ok: the chain pill shows its screen
+[00:10:54] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the results pill shows its screen
+[00:10:55] [I01] ok: and the results pill is the active one
+[00:10:55] [I01] ok: the chain pill shows its screen
+[00:10:55] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the chain pill shows its screen
+[00:10:55] [I01] ok: and the chain pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the setup pill shows its screen
+[00:10:55] [I01] ok: and the setup pill is the active one
+[00:10:55] [I01] ok: the results pill shows its screen
+[00:10:55] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the setup pill shows its screen
+[00:10:56] [I01] ok: and the setup pill is the active one
+[00:10:56] [I01] ok: the setup pill shows its screen
+[00:10:56] [I01] ok: and the setup pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the chain pill shows its screen
+[00:10:56] [I01] ok: and the chain pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:56] [I01] ok: the results pill shows its screen
+[00:10:56] [I01] ok: and the results pill is the active one
+[00:10:57] [I01] ok: the chain pill shows its screen
+[00:10:57] [I01] ok: and the chain pill is the active one
+[00:10:57] [I01] ok: the setup pill shows its screen
+[00:10:57] [I01] ok: and the setup pill is the active one
+[00:10:57] [I01] ok: the run pill shows its screen
+[00:10:57] [I01] ok: and the run pill is the active one
+[00:10:57] [I01] ok: the run pill shows its screen
+[00:10:57] [I01] ok: and the run pill is the active one
+[00:10:57] [I01] ok: the chain pill shows its screen
+[00:10:57] [I01] ok: and the chain pill is the active one
+[00:10:58] [I01] ok: the chain pill shows its screen
+[00:10:58] [I01] ok: and the chain pill is the active one
+[00:11:10] [I01] ok: the run pill shows its screen
+[00:11:10] [I01] ok: and the run pill is the active one
+[00:11:10] [I01] ok: the window survived the switching
+[00:25:31] [boot] window up: 1280x840 (built 3096 ms, shown 1792 ms)
+[00:25:31] [I01] --- begin ---
+[00:25:31] [I01] ok: the setup pill shows its screen
+[00:25:31] [I01] ok: and the setup pill is the active one
+[00:25:32] [I01] ok: the run pill shows its screen
+[00:25:32] [I01] ok: and the run pill is the active one
+[00:25:32] [I01] DIALOG show_error [Run] 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA was not created by blastlab - choose another model name' -> 'ok'
+[00:26:13] [I01] FINDING S1 check: the run started
+[00:26:16] [I01] ok: the results pill shows its screen
+[00:26:16] [I01] ok: and the results pill is the active one
+[00:26:16] [I01] ok: the chain pill shows its screen
+[00:26:16] [I01] ok: and the chain pill is the active one
+[00:26:16] [I01] ok: the setup pill shows its screen
+[00:26:16] [I01] ok: and the setup pill is the active one
+[00:26:16] [I01] ok: the setup pill shows its screen
+[00:26:16] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the results pill shows its screen
+[00:26:17] [I01] ok: and the results pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:17] [I01] ok: the setup pill shows its screen
+[00:26:17] [I01] ok: and the setup pill is the active one
+[00:26:17] [I01] ok: the run pill shows its screen
+[00:26:17] [I01] ok: and the run pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the chain pill shows its screen
+[00:26:18] [I01] ok: and the chain pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the run pill shows its screen
+[00:26:18] [I01] ok: and the run pill is the active one
+[00:26:18] [I01] ok: the results pill shows its screen
+[00:26:18] [I01] ok: and the results pill is the active one
+[00:26:18] [I01] ok: the setup pill shows its screen
+[00:26:18] [I01] ok: and the setup pill is the active one
+[00:26:18] [I01] ok: the results pill shows its screen
+[00:26:18] [I01] ok: and the results pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the setup pill shows its screen
+[00:26:19] [I01] ok: and the setup pill is the active one
+[00:26:19] [I01] ok: the setup pill shows its screen
+[00:26:19] [I01] ok: and the setup pill is the active one
+[00:26:19] [I01] ok: the run pill shows its screen
+[00:26:19] [I01] ok: and the run pill is the active one
+[00:26:19] [I01] ok: the results pill shows its screen
+[00:26:19] [I01] ok: and the results pill is the active one
+[00:26:19] [I01] ok: the results pill shows its screen
+[00:26:19] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the run pill shows its screen
+[00:26:20] [I01] ok: and the run pill is the active one
+[00:26:20] [I01] ok: the chain pill shows its screen
+[00:26:20] [I01] ok: and the chain pill is the active one
+[00:26:20] [I01] ok: the results pill shows its screen
+[00:26:20] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the results pill shows its screen
+[00:26:20] [I01] ok: and the results pill is the active one
+[00:26:20] [I01] ok: the setup pill shows its screen
+[00:26:20] [I01] ok: and the setup pill is the active one
+[00:26:20] [I01] ok: the setup pill shows its screen
+[00:26:20] [I01] ok: and the setup pill is the active one
+[00:26:20] [I01] ok: the chain pill shows its screen
+[00:26:20] [I01] ok: and the chain pill is the active one
+[00:26:20] [I01] ok: the run pill shows its screen
+[00:26:20] [I01] ok: and the run pill is the active one
+[00:26:21] [I01] ok: the run pill shows its screen
+[00:26:21] [I01] ok: and the run pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:21] [I01] ok: the setup pill shows its screen
+[00:26:21] [I01] ok: and the setup pill is the active one
+[00:26:21] [I01] ok: the setup pill shows its screen
+[00:26:21] [I01] ok: and the setup pill is the active one
+[00:26:21] [I01] ok: the results pill shows its screen
+[00:26:21] [I01] ok: and the results pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:21] [I01] ok: the chain pill shows its screen
+[00:26:21] [I01] ok: and the chain pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the results pill shows its screen
+[00:26:22] [I01] ok: and the results pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the setup pill shows its screen
+[00:26:22] [I01] ok: and the setup pill is the active one
+[00:26:22] [I01] ok: the results pill shows its screen
+[00:26:22] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the chain pill shows its screen
+[00:26:23] [I01] ok: and the chain pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the results pill shows its screen
+[00:26:23] [I01] ok: and the results pill is the active one
+[00:26:23] [I01] ok: the chain pill shows its screen
+[00:26:23] [I01] ok: and the chain pill is the active one
+[00:26:23] [I01] ok: the setup pill shows its screen
+[00:26:23] [I01] ok: and the setup pill is the active one
+[00:26:23] [I01] ok: the run pill shows its screen
+[00:26:23] [I01] ok: and the run pill is the active one
+[00:26:23] [I01] ok: the run pill shows its screen
+[00:26:23] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the chain pill shows its screen
+[00:26:24] [I01] ok: and the chain pill is the active one
+[00:26:24] [I01] ok: the setup pill shows its screen
+[00:26:24] [I01] ok: and the setup pill is the active one
+[00:26:24] [I01] ok: the run pill shows its screen
+[00:26:24] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the run pill shows its screen
+[00:26:24] [I01] ok: and the run pill is the active one
+[00:26:24] [I01] ok: the results pill shows its screen
+[00:26:24] [I01] ok: and the results pill is the active one
+[00:26:24] [I01] ok: the results pill shows its screen
+[00:26:24] [I01] ok: and the results pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the setup pill shows its screen
+[00:26:25] [I01] ok: and the setup pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:25] [I01] ok: the run pill shows its screen
+[00:26:25] [I01] ok: and the run pill is the active one
+[00:26:25] [I01] ok: the chain pill shows its screen
+[00:26:25] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the results pill shows its screen
+[00:26:26] [I01] ok: and the results pill is the active one
+[00:26:26] [I01] ok: the results pill shows its screen
+[00:26:26] [I01] ok: and the results pill is the active one
+[00:26:26] [I01] ok: the setup pill shows its screen
+[00:26:26] [I01] ok: and the setup pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:26] [I01] ok: the chain pill shows its screen
+[00:26:26] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the chain pill shows its screen
+[00:26:27] [I01] ok: and the chain pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:27] [I01] ok: the run pill shows its screen
+[00:26:27] [I01] ok: and the run pill is the active one
+[00:26:27] [I01] ok: the run pill shows its screen
+[00:26:27] [I01] ok: and the run pill is the active one
+[00:26:27] [I01] ok: the setup pill shows its screen
+[00:26:27] [I01] ok: and the setup pill is the active one
+[00:26:28] [I01] ok: the setup pill shows its screen
+[00:26:28] [I01] ok: and the setup pill is the active one
+[00:26:28] [I01] ok: the run pill shows its screen
+[00:26:28] [I01] ok: and the run pill is the active one
+[00:26:28] [I01] ok: the results pill shows its screen
+[00:26:28] [I01] ok: and the results pill is the active one
+[00:26:28] [I01] ok: the run pill shows its screen
+[00:26:28] [I01] ok: and the run pill is the active one
+[00:26:28] [I01] ok: the window survived the switching
+[00:26:29] [I01] ok: and the run still finished
+[00:26:30] [I01] ok: the setup pill shows its screen
+[00:26:30] [I01] ok: and the setup pill is the active one
+[00:26:31] [I01] ok: the run pill shows its screen
+[00:26:31] [I01] ok: and the run pill is the active one
+[00:26:32] [I01] ok: the results pill shows its screen
+[00:26:32] [I01] ok: and the results pill is the active one
+[00:26:33] [I01] ok: the chain pill shows its screen
+[00:26:33] [I01] ok: and the chain pill is the active one
+[00:26:33] [I01] contact sheet: contact_I01.png (5 shots)
+[00:26:33] [I01] --- end done in 62.5s (max gap 143 ms) ---
+[00:26:34] [I01] ok: the Dark-mode action gives the dark theme
+[00:26:35] [I01] ok: the setup pill shows its screen
+[00:26:35] [I01] ok: and the setup pill is the active one
+[00:26:35] [I01] ok: the 2D segment sets the dimension
+[00:26:36] [I02] --- begin ---
+[00:26:36] [I02] ok: the setup pill shows its screen
+[00:26:36] [I02] ok: and the setup pill is the active one
+[00:26:37] [I02] ok: the run pill shows its screen
+[00:26:37] [I02] ok: and the run pill is the active one
+[00:26:37] [I02] DIALOG show_error [Run] 'C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\runs\\QA was not created by blastlab - choose another model name' -> 'ok'
+[00:27:18] [I02] FINDING S1 check: the run started
+[00:27:21] [I02] close took 1.5 s; worker alive after join: unknown
+[00:27:21] [I02] ok: closing during a native run returned in 1.5 s
+[00:27:21] [I02] ok: and the solver thread did not outlive the window
+[00:27:21] [I02] contact sheet: contact_I02.png (1 shots)
+[00:27:21] [I02] --- end done in 45.7s (max gap 96 ms) ---
+[00:27:21] [I02] I02 is terminal - exiting 75 for a fresh app
+[00:27:21] [I02] exit 75; pending: ['I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[00:27:27] [boot] HARNESS CRASH
+Traceback (most recent call last):
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 4756, in main
+    qa.build_app()
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\tests\_qa_ui_harness.py", line 390, in build_app
+    use_model(self.win)
+  File "C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\blastlab\ui\testing.py", line 83, in use_model
+    raise RuntimeError(f'use_model: {folder} is not a blastlab '
+RuntimeError: use_model: C:\Users\rotem.ofek\OneDrive - Technion\BlastFoam\docs\qa\2026-10-11-gui-15-qa\native\runs\QA is not a blastlab model folder - not deleting it
+
+[00:27:27] [boot] exit 1; pending: ['I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']
+[00:35:37] [boot] window up: 1280x840 (built 2963 ms, shown 1513 ms)
+[00:35:37] [I03] --- begin ---
+[00:35:38] [I03] ok: the setup pill shows its screen
+[00:35:38] [I03] ok: and the setup pill is the active one
+[00:35:39] [I03] DIALOG show_error [Open case] 'This file is not valid JSON (line 1, column 2).' -> 'ok'
+[00:35:39] [I03] NOTE: garbage.json: form Lx still '3.3'
+[00:35:39] [I03] ok: garbage.json left the form alone rather than half-loading it
+[00:35:39] [I03] DIALOG show_error [Open case] 'Not a blastlab case file' -> 'ok'
+[00:35:40] [I03] NOTE: wrongschema.json: form Lx still '3.3'
+[00:35:40] [I03] ok: wrongschema.json left the form alone rather than half-loading it
+[00:35:40] [I03] DIALOG show_error [Open case] 'Not a blastlab case file: unsupported or missing field 5.' -> 'ok'
+[00:35:40] [I03] NOTE: dim5.json: form Lx still '3.3'
+[00:35:40] [I03] ok: dim5.json left the form alone rather than half-loading it
+[00:35:40] [I03] DIALOG show_error [Open case] 'This file is not valid JSON (line 1, column 1).' -> 'ok'
+[00:35:41] [I03] NOTE: empty.json: form Lx still '3.3'
+[00:35:41] [I03] ok: empty.json left the form alone rather than half-loading it
+[00:35:41] [I03] DIALOG show_error [Open case] 'File not found: C:\\Users\\rotem.ofek\\OneDrive - Technion\\BlastFoam\\docs\\qa\\2026-10-11-gui-15-qa\\native\\cwd\\missing.json' -> 'ok'
+[00:35:42] [I03] NOTE: missing.json: form Lx still '3.3'
+[00:35:42] [I03] ok: missing.json left the form alone rather than half-loading it
+[00:35:42] [I03] contact sheet: contact_I03.png (6 shots)
+[00:35:42] [I03] --- end done in 4.9s (max gap 145 ms) ---
+[00:35:43] [I03] ok: the Dark-mode action gives the dark theme
+[00:35:44] [I03] ok: the setup pill shows its screen
+[00:35:44] [I03] ok: and the setup pill is the active one
+[00:35:44] [I03] ok: the 2D segment sets the dimension
+[00:35:45] [I04] --- begin ---
+[00:35:45] [I04] ok: the setup pill shows its screen
+[00:35:45] [I04] ok: and the setup pill is the active one
+[00:35:46] [I04] ok: the run pill shows its screen
+[00:35:46] [I04] ok: and the run pill is the active one
+[00:35:46] [I04] DIALOG show_error [Run] '~100,000,000 cells exceeds the 2D cap of 8,000,000' -> 'ok'
+[00:35:47] [I04] ok: a 100 M cell case is refused at Run
+[00:35:48] [I04] ok: and refused at Initialise Model too
+[00:35:49] [I04] ok: the setup pill shows its screen
+[00:35:49] [I04] ok: and the setup pill is the active one
+[00:35:50] [I04] NOTE: 2.25 M-cell 2D case strip: No terminate boundary and no end time: the run is bounded only by the safety cap (~176 ms). Set a side to 'terminate' to stop when the wave reaches it. | Large grid: ~2,250,000 cells - expect a long run and ~1.6 GB of RAM | ~2,250,000 cells at dx = 0.004 m
+[00:35:50] [I04] ok: the run pill shows its screen
+[00:35:50] [I04] ok: and the run pill is the active one
+[00:35:53] [I04] NOTE: warning-level case: started=True, dialogs=0 (no confirmation prompt for a merely large run)
+[00:35:53] [I04] ok: a case that only WARNS starts without asking
+[00:36:49] [I04] ok: and stops on request
+[00:36:49] [I04] contact sheet: contact_I04.png (2 shots)
+[00:36:49] [I04] --- end done in 64.2s (max gap 911 ms) ---
+[00:36:50] [I04] ok: the Dark-mode action gives the dark theme
+[00:36:50] [I04] ok: the setup pill shows its screen
+[00:36:50] [I04] ok: and the setup pill is the active one
+[00:36:51] [I04] ok: the 2D segment sets the dimension
+[00:36:51] [I05] --- begin ---
+[00:36:52] [I05] ok: the setup pill shows its screen
+[00:36:52] [I05] ok: and the setup pill is the active one
+[00:36:53] [I05] NOTE: charge='1e400': 'charge' must be a finite number: '1e400'
+[00:36:54] [I05] NOTE: charge='nan': 'charge' must be a finite number: 'nan'
+[00:36:55] [I05] NOTE: charge='inf': 'charge' must be a finite number: 'inf'
+[00:36:56] [I05] NOTE: charge=' 1 ': No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | Cell size will be refined to 0.01054 m (5 cells across the charge radius) | ~143,641 cells at dx = 0.0105424 m
+[00:36:57] [I05] NOTE: charge='1,5': 'charge' is not a number: '1,5'
+[00:36:58] [I05] NOTE: charge='-0': Charge must be > 0 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it.
+[00:36:59] [I05] NOTE: n_snapshots=2.7: 'snapshots' must be a whole number: '2.7' (rejected: ValueError: 'snapshots' must be a whole number: '2.7')
+[00:37:00] [I05] NOTE: cell=1e-9: ~1.6e+19 cells exceeds the 2D cap of 8,000,000 | No terminate boundary and no end time: the run is bounded only by the safety cap (~118 ms). Set a side to 'terminate' to stop when the wave reaches it. | ~1.6e+19 cells at dx = 1e-09 m
+[00:37:00] [I05] ok: a 1e-9 m cell is reported rather than accepted in silence
+[00:37:01] [I05] contact sheet: contact_I05.png (6 shots)
+[00:37:01] [I05] --- end done in 9.4s (max gap 169 ms) ---
+[00:37:02] [I05] ok: the Dark-mode action gives the dark theme
+[00:37:02] [I05] ok: the setup pill shows its screen
+[00:37:02] [I05] ok: and the setup pill is the active one
+[00:37:03] [I05] ok: the 2D segment sets the dimension
+[00:37:03] [I06] --- begin ---
+[00:37:05] [I06] no cache for native3d
+[00:37:05] [I06] ok: the results pill shows its screen
+[00:37:05] [I06] ok: and the results pill is the active one
+[00:37:05] [I06] FINDING S2 check: no result labelled 'QA native3d' to select
+[00:37:08] [I06] ok: the window refuses to go under its own minimum (1280x840)
+[00:37:08] [I06] contact sheet: contact_I06.png (2 shots)
+[00:37:08] [I06] --- end done in 4.4s (max gap 200 ms) ---
+[00:37:08] [I06] ok: the Dark-mode action gives the dark theme
+[00:37:09] [I06] ok: the setup pill shows its screen
+[00:37:09] [I06] ok: and the setup pill is the active one
+[00:37:10] [I06] ok: the 2D segment sets the dimension
+[00:37:10] [K01] --- begin ---
+[00:37:10] [K01] ok: the setup pill shows its screen
+[00:37:10] [K01] ok: and the setup pill is the active one
+[00:37:10] [K01] ok: only the setup pill is active
+[00:37:11] [K01] ok: the run pill shows its screen
+[00:37:11] [K01] ok: and the run pill is the active one
+[00:37:11] [K01] ok: only the run pill is active
+[00:37:11] [K01] ok: the results pill shows its screen
+[00:37:11] [K01] ok: and the results pill is the active one
+[00:37:11] [K01] ok: only the results pill is active
+[00:37:12] [K01] ok: the chain pill shows its screen
+[00:37:12] [K01] ok: and the chain pill is the active one
+[00:37:12] [K01] ok: only the chain pill is active
+[00:37:12] [K01] ok: the setup pill shows its screen
+[00:37:12] [K01] ok: and the setup pill is the active one
+[00:37:12] [K01] ok: only the setup pill is active
+[00:37:13] [K01] ok: the 0D · HD 1.3 segment sets the dimension
+[00:37:13] [K01] ok: the 1D segment sets the dimension
+[00:37:14] [K01] ok: the 2D segment sets the dimension
+[00:37:15] [K01] ok: the 3D segment sets the dimension
+[00:37:15] [K01] ok: the 2D segment sets the dimension
+[00:37:16] [K01] ok: the chip's native action switches the solver
+[00:37:16] [K01] ok: the chip reads 'native' ('native')
+[00:37:16] [K01] ok: the chip's blastfoam action switches the solver
+[00:37:16] [K01] ok: the chip reads 'blastFoam' ('blastFoam · checking')
+[00:37:17] [K01] ok: the chip's native action switches the solver
+[00:37:17] [K01] ok: the chip reads 'native' ('native')
+[00:37:17] [K01] ok: the case menu holds ['Open…', 'Save', 'Save as…', 'Recent', 'Dark mode']
+[00:37:17] [K01] ok: Recent opens a submenu
+[00:37:26] [K01] ok: the Dark-mode action gives the light theme
+[00:37:26] [K01] ok: the Dark-mode action reads False in light
+[00:37:34] [K01] ok: the Dark-mode action gives the dark theme
+[00:37:34] [K01] ok: the Dark-mode action reads True in dark
+[00:37:35] [K01] ok: the status bar shows the keys ('Ctrl+S save · F5 run · Shift+Esc stop · v1.0.0')
+[00:37:35] [K01] ok: the title reads <case> · BlastLab ('● untitled · BlastLab')
+[00:37:35] [K01] ok: an edit marks the title and the top bar ('● untitled · BlastLab')
+[00:37:36] [K01] ok: the theme is back to dark
+[00:37:36] [K01] contact sheet: contact_K01.png (3 shots)
+[00:37:36] [K01] --- end done in 26.3s (max gap 645 ms) ---
+[00:37:37] [K01] ok: the Dark-mode action gives the dark theme
+[00:37:38] [K01] ok: the setup pill shows its screen
+[00:37:38] [K01] ok: and the setup pill is the active one
+[00:37:38] [K01] ok: the 2D segment sets the dimension
+[00:37:39] [K02] --- begin ---
+[00:37:39] [K02] ok: the Dark-mode action gives the dark theme
+[00:37:40] [K02] ok: the setup pill shows its screen
+[00:37:40] [K02] ok: and the setup pill is the active one
+[00:37:41] [K02] ok: the 2D segment sets the dimension
+[00:37:42] [K02] ok: the chip's native action switches the solver
+[00:37:42] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[00:37:43] [K02] ok: setup native 0D 01 Material (dark, 1100x720): nothing clipped
+[00:37:43] [K02] ok: setup native 0D 01 Material (dark, 1100x720): nothing outside the window
+[00:37:43] [K02] ok: setup native 0D 02 Charge and chamber (dark, 1100x720): nothing clipped
+[00:37:43] [K02] ok: setup native 0D 02 Charge and chamber (dark, 1100x720): nothing outside the window
+[00:37:43] [K02] ok: setup native 0D 03 Ignition (dark, 1100x720): nothing clipped
+[00:37:43] [K02] ok: setup native 0D 03 Ignition (dark, 1100x720): nothing outside the window
+[00:37:44] [K02] ok: setup native 0D 04 Run (dark, 1100x720): nothing clipped
+[00:37:44] [K02] ok: setup native 0D 04 Run (dark, 1100x720): nothing outside the window
+[00:37:44] [K02] ok: setup native 0D 05 Heat (dark, 1100x720): nothing clipped
+[00:37:44] [K02] ok: setup native 0D 05 Heat (dark, 1100x720): nothing outside the window
+[00:37:44] [K02] ok: setup native 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing clipped
+[00:37:44] [K02] ok: setup native 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing outside the window
+[00:37:45] [K02] ok: setup native 0D 07 Loaded wall (dark, 1100x720): nothing clipped
+[00:37:45] [K02] ok: setup native 0D 07 Loaded wall (dark, 1100x720): nothing outside the window
+[00:37:45] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing clipped
+[00:37:45] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing outside the window
+[00:37:45] [K02] ok: setup native 0D 09 Vent gauges [m] (dark, 1100x720): nothing clipped
+[00:37:45] [K02] ok: setup native 0D 09 Vent gauges [m] (dark, 1100x720): nothing outside the window
+[00:37:46] [K02] ok: setup native 0D 10 Outputs (dark, 1100x720): nothing clipped
+[00:37:46] [K02] ok: setup native 0D 10 Outputs (dark, 1100x720): nothing outside the window
+[00:37:46] [K02] ok: the 1D segment sets the dimension
+[00:37:47] [K02] ok: setup native 1D 01 Threat (dark, 1100x720): nothing clipped
+[00:37:47] [K02] ok: setup native 1D 01 Threat (dark, 1100x720): nothing outside the window
+[00:37:47] [K02] ok: setup native 1D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:37:47] [K02] ok: setup native 1D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:37:47] [K02] ok: setup native 1D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:37:47] [K02] ok: setup native 1D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:37:47] [K02] NOTE: native 1D 04: hidden in this mode - skipped
+[00:37:48] [K02] ok: setup native 1D 05 Gauges (dark, 1100x720): nothing clipped
+[00:37:48] [K02] ok: setup native 1D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:37:48] [K02] ok: setup native 1D 06 Solver (dark, 1100x720): nothing clipped
+[00:37:48] [K02] ok: setup native 1D 06 Solver (dark, 1100x720): nothing outside the window
+[00:37:48] [K02] NOTE: native 1D 07: hidden in this mode - skipped
+[00:37:49] [K02] ok: the 2D segment sets the dimension
+[00:37:49] [K02] ok: setup native 2D 01 Threat (dark, 1100x720): nothing clipped
+[00:37:49] [K02] ok: setup native 2D 01 Threat (dark, 1100x720): nothing outside the window
+[00:37:49] [K02] ok: setup native 2D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:37:49] [K02] ok: setup native 2D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:37:50] [K02] ok: setup native 2D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:37:50] [K02] ok: setup native 2D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:37:50] [K02] ok: setup native 2D 04 Structure (dark, 1100x720): nothing clipped
+[00:37:50] [K02] ok: setup native 2D 04 Structure (dark, 1100x720): nothing outside the window
+[00:37:50] [K02] ok: setup native 2D 05 Gauges (dark, 1100x720): nothing clipped
+[00:37:50] [K02] ok: setup native 2D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:37:51] [K02] ok: setup native 2D 06 Solver (dark, 1100x720): nothing clipped
+[00:37:51] [K02] ok: setup native 2D 06 Solver (dark, 1100x720): nothing outside the window
+[00:37:51] [K02] ok: setup native 2D 07 Output (dark, 1100x720): nothing clipped
+[00:37:51] [K02] ok: setup native 2D 07 Output (dark, 1100x720): nothing outside the window
+[00:37:51] [K02] ok: the 3D segment sets the dimension
+[00:37:52] [K02] ok: setup native 3D 01 Threat (dark, 1100x720): nothing clipped
+[00:37:52] [K02] ok: setup native 3D 01 Threat (dark, 1100x720): nothing outside the window
+[00:37:52] [K02] ok: setup native 3D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:37:52] [K02] ok: setup native 3D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:37:53] [K02] ok: setup native 3D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:37:53] [K02] ok: setup native 3D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:37:53] [K02] ok: setup native 3D 04 Structure (dark, 1100x720): nothing clipped
+[00:37:53] [K02] ok: setup native 3D 04 Structure (dark, 1100x720): nothing outside the window
+[00:37:53] [K02] ok: setup native 3D 05 Gauges (dark, 1100x720): nothing clipped
+[00:37:53] [K02] ok: setup native 3D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:37:54] [K02] ok: setup native 3D 06 Solver (dark, 1100x720): nothing clipped
+[00:37:54] [K02] ok: setup native 3D 06 Solver (dark, 1100x720): nothing outside the window
+[00:37:54] [K02] ok: setup native 3D 07 Output (dark, 1100x720): nothing clipped
+[00:37:54] [K02] ok: setup native 3D 07 Output (dark, 1100x720): nothing outside the window
+[00:37:55] [K02] ok: the 2D segment sets the dimension
+[00:37:56] [K02] ok: the chip's blastfoam action switches the solver
+[00:37:56] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[00:37:56] [K02] ok: setup blastfoam 0D 01 Material (dark, 1100x720): nothing clipped
+[00:37:56] [K02] ok: setup blastfoam 0D 01 Material (dark, 1100x720): nothing outside the window
+[00:37:57] [K02] ok: setup blastfoam 0D 02 Charge and chamber (dark, 1100x720): nothing clipped
+[00:37:57] [K02] ok: setup blastfoam 0D 02 Charge and chamber (dark, 1100x720): nothing outside the window
+[00:37:57] [K02] ok: setup blastfoam 0D 03 Ignition (dark, 1100x720): nothing clipped
+[00:37:57] [K02] ok: setup blastfoam 0D 03 Ignition (dark, 1100x720): nothing outside the window
+[00:37:57] [K02] ok: setup blastfoam 0D 04 Run (dark, 1100x720): nothing clipped
+[00:37:57] [K02] ok: setup blastfoam 0D 04 Run (dark, 1100x720): nothing outside the window
+[00:37:58] [K02] ok: setup blastfoam 0D 05 Heat (dark, 1100x720): nothing clipped
+[00:37:58] [K02] ok: setup blastfoam 0D 05 Heat (dark, 1100x720): nothing outside the window
+[00:37:58] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing clipped
+[00:37:58] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (dark, 1100x720): nothing outside the window
+[00:37:58] [K02] ok: setup blastfoam 0D 07 Loaded wall (dark, 1100x720): nothing clipped
+[00:37:58] [K02] ok: setup blastfoam 0D 07 Loaded wall (dark, 1100x720): nothing outside the window
+[00:37:59] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing clipped
+[00:37:59] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (dark, 1100x720): nothing outside the window
+[00:37:59] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (dark, 1100x720): nothing clipped
+[00:37:59] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (dark, 1100x720): nothing outside the window
+[00:38:00] [K02] ok: setup blastfoam 0D 10 Outputs (dark, 1100x720): nothing clipped
+[00:38:00] [K02] ok: setup blastfoam 0D 10 Outputs (dark, 1100x720): nothing outside the window
+[00:38:00] [K02] ok: the 1D segment sets the dimension
+[00:38:00] [K02] ok: setup blastfoam 1D 01 Threat (dark, 1100x720): nothing clipped
+[00:38:00] [K02] ok: setup blastfoam 1D 01 Threat (dark, 1100x720): nothing outside the window
+[00:38:01] [K02] ok: setup blastfoam 1D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:38:01] [K02] ok: setup blastfoam 1D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:38:01] [K02] ok: setup blastfoam 1D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:38:01] [K02] ok: setup blastfoam 1D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:38:01] [K02] NOTE: blastfoam 1D 04: hidden in this mode - skipped
+[00:38:01] [K02] ok: setup blastfoam 1D 05 Gauges (dark, 1100x720): nothing clipped
+[00:38:01] [K02] ok: setup blastfoam 1D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:38:02] [K02] ok: setup blastfoam 1D 06 Solver (dark, 1100x720): nothing clipped
+[00:38:02] [K02] ok: setup blastfoam 1D 06 Solver (dark, 1100x720): nothing outside the window
+[00:38:02] [K02] ok: setup blastfoam 1D 07 Output (dark, 1100x720): nothing clipped
+[00:38:02] [K02] ok: setup blastfoam 1D 07 Output (dark, 1100x720): nothing outside the window
+[00:38:03] [K02] ok: the 2D segment sets the dimension
+[00:38:03] [K02] ok: setup blastfoam 2D 01 Threat (dark, 1100x720): nothing clipped
+[00:38:03] [K02] ok: setup blastfoam 2D 01 Threat (dark, 1100x720): nothing outside the window
+[00:38:03] [K02] ok: setup blastfoam 2D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:38:03] [K02] ok: setup blastfoam 2D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:38:04] [K02] ok: setup blastfoam 2D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:38:04] [K02] ok: setup blastfoam 2D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:38:04] [K02] ok: setup blastfoam 2D 04 Structure (dark, 1100x720): nothing clipped
+[00:38:04] [K02] ok: setup blastfoam 2D 04 Structure (dark, 1100x720): nothing outside the window
+[00:38:04] [K02] ok: setup blastfoam 2D 05 Gauges (dark, 1100x720): nothing clipped
+[00:38:04] [K02] ok: setup blastfoam 2D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:38:05] [K02] ok: setup blastfoam 2D 06 Solver (dark, 1100x720): nothing clipped
+[00:38:05] [K02] ok: setup blastfoam 2D 06 Solver (dark, 1100x720): nothing outside the window
+[00:38:05] [K02] ok: setup blastfoam 2D 07 Output (dark, 1100x720): nothing clipped
+[00:38:05] [K02] ok: setup blastfoam 2D 07 Output (dark, 1100x720): nothing outside the window
+[00:38:06] [K02] ok: the 3D segment sets the dimension
+[00:38:06] [K02] ok: setup blastfoam 3D 01 Threat (dark, 1100x720): nothing clipped
+[00:38:06] [K02] ok: setup blastfoam 3D 01 Threat (dark, 1100x720): nothing outside the window
+[00:38:06] [K02] ok: setup blastfoam 3D 02 Domain & mesh (dark, 1100x720): nothing clipped
+[00:38:06] [K02] ok: setup blastfoam 3D 02 Domain & mesh (dark, 1100x720): nothing outside the window
+[00:38:07] [K02] ok: setup blastfoam 3D 03 Boundaries (dark, 1100x720): nothing clipped
+[00:38:07] [K02] ok: setup blastfoam 3D 03 Boundaries (dark, 1100x720): nothing outside the window
+[00:38:07] [K02] ok: setup blastfoam 3D 04 Structure (dark, 1100x720): nothing clipped
+[00:38:07] [K02] ok: setup blastfoam 3D 04 Structure (dark, 1100x720): nothing outside the window
+[00:38:07] [K02] ok: setup blastfoam 3D 05 Gauges (dark, 1100x720): nothing clipped
+[00:38:07] [K02] ok: setup blastfoam 3D 05 Gauges (dark, 1100x720): nothing outside the window
+[00:38:08] [K02] ok: setup blastfoam 3D 06 Solver (dark, 1100x720): nothing clipped
+[00:38:08] [K02] ok: setup blastfoam 3D 06 Solver (dark, 1100x720): nothing outside the window
+[00:38:08] [K02] ok: setup blastfoam 3D 07 Output (dark, 1100x720): nothing clipped
+[00:38:08] [K02] ok: setup blastfoam 3D 07 Output (dark, 1100x720): nothing outside the window
+[00:38:09] [K02] ok: the 2D segment sets the dimension
+[00:38:10] [K02] ok: the chip's native action switches the solver
+[00:38:10] [K02] ok: the run pill shows its screen
+[00:38:10] [K02] ok: and the run pill is the active one
+[00:38:10] [K02] ok: run banner (dark, 1100x720): nothing clipped
+[00:38:10] [K02] ok: run banner (dark, 1100x720): nothing outside the window
+[00:38:11] [K02] ok: run finished, banner shown (dark, 1100x720): nothing clipped
+[00:38:11] [K02] ok: run finished, banner shown (dark, 1100x720): nothing outside the window
+[00:38:12] [K02] ok: the results pill shows its screen
+[00:38:12] [K02] ok: and the results pill is the active one
+[00:38:13] [K02] ok: results QA native1d Field (dark, 1100x720): nothing clipped
+[00:38:13] [K02] ok: results QA native1d Field (dark, 1100x720): nothing outside the window
+[00:38:13] [K02] ok: results QA native1d Gauges (dark, 1100x720): nothing clipped
+[00:38:13] [K02] ok: results QA native1d Gauges (dark, 1100x720): nothing outside the window
+[00:38:14] [K02] ok: results QA native1d 3D (dark, 1100x720): nothing clipped
+[00:38:14] [K02] ok: results QA native1d 3D (dark, 1100x720): nothing outside the window
+[00:38:15] [K02] ok: results QA native2d Field (dark, 1100x720): nothing clipped
+[00:38:15] [K02] ok: results QA native2d Field (dark, 1100x720): nothing outside the window
+[00:38:15] [K02] ok: results QA native2d Gauges (dark, 1100x720): nothing clipped
+[00:38:15] [K02] ok: results QA native2d Gauges (dark, 1100x720): nothing outside the window
+[00:38:16] [K02] ok: results QA native2d 3D (dark, 1100x720): nothing clipped
+[00:38:16] [K02] ok: results QA native2d 3D (dark, 1100x720): nothing outside the window
+[00:38:16] [K02] NOTE: no chain entry in this process: the STAGE tabs are not checked here (G02 makes one)
+[00:38:16] [K02] ok: the chain pill shows its screen
+[00:38:16] [K02] ok: and the chain pill is the active one
+[00:38:17] [K02] ok: chain route 123 stage 1 stage (dark, 1100x720): nothing clipped
+[00:38:17] [K02] ok: chain route 123 stage 1 stage (dark, 1100x720): nothing outside the window
+[00:38:17] [K02] ok: chain route 123 stage 1 threat (dark, 1100x720): nothing clipped
+[00:38:17] [K02] ok: chain route 123 stage 1 threat (dark, 1100x720): nothing outside the window
+[00:38:17] [K02] ok: chain route 123 stage 1 domain (dark, 1100x720): nothing clipped
+[00:38:17] [K02] ok: chain route 123 stage 1 domain (dark, 1100x720): nothing outside the window
+[00:38:18] [K02] ok: chain route 123 stage 1 bounds (dark, 1100x720): nothing clipped
+[00:38:18] [K02] ok: chain route 123 stage 1 bounds (dark, 1100x720): nothing outside the window
+[00:38:18] [K02] ok: chain route 123 stage 1 gauges (dark, 1100x720): nothing clipped
+[00:38:18] [K02] ok: chain route 123 stage 1 gauges (dark, 1100x720): nothing outside the window
+[00:38:18] [K02] ok: chain route 123 stage 1 solver (dark, 1100x720): nothing clipped
+[00:38:18] [K02] ok: chain route 123 stage 1 solver (dark, 1100x720): nothing outside the window
+[00:38:19] [K02] ok: chain route 13 stage 1 stage (dark, 1100x720): nothing clipped
+[00:38:19] [K02] ok: chain route 13 stage 1 stage (dark, 1100x720): nothing outside the window
+[00:38:19] [K02] ok: chain route 13 stage 1 threat (dark, 1100x720): nothing clipped
+[00:38:19] [K02] ok: chain route 13 stage 1 threat (dark, 1100x720): nothing outside the window
+[00:38:20] [K02] ok: chain route 13 stage 1 domain (dark, 1100x720): nothing clipped
+[00:38:20] [K02] ok: chain route 13 stage 1 domain (dark, 1100x720): nothing outside the window
+[00:38:20] [K02] ok: chain route 13 stage 1 bounds (dark, 1100x720): nothing clipped
+[00:38:20] [K02] ok: chain route 13 stage 1 bounds (dark, 1100x720): nothing outside the window
+[00:38:20] [K02] ok: chain route 13 stage 1 gauges (dark, 1100x720): nothing clipped
+[00:38:20] [K02] ok: chain route 13 stage 1 gauges (dark, 1100x720): nothing outside the window
+[00:38:21] [K02] ok: chain route 13 stage 1 solver (dark, 1100x720): nothing clipped
+[00:38:21] [K02] ok: chain route 13 stage 1 solver (dark, 1100x720): nothing outside the window
+[00:38:21] [K02] ok: chain route 12 stage 1 stage (dark, 1100x720): nothing clipped
+[00:38:21] [K02] ok: chain route 12 stage 1 stage (dark, 1100x720): nothing outside the window
+[00:38:22] [K02] ok: chain route 12 stage 1 threat (dark, 1100x720): nothing clipped
+[00:38:22] [K02] ok: chain route 12 stage 1 threat (dark, 1100x720): nothing outside the window
+[00:38:22] [K02] ok: chain route 12 stage 1 domain (dark, 1100x720): nothing clipped
+[00:38:22] [K02] ok: chain route 12 stage 1 domain (dark, 1100x720): nothing outside the window
+[00:38:22] [K02] ok: chain route 12 stage 1 bounds (dark, 1100x720): nothing clipped
+[00:38:23] [K02] ok: chain route 12 stage 1 bounds (dark, 1100x720): nothing outside the window
+[00:38:23] [K02] ok: chain route 12 stage 1 gauges (dark, 1100x720): nothing clipped
+[00:38:23] [K02] ok: chain route 12 stage 1 gauges (dark, 1100x720): nothing outside the window
+[00:38:23] [K02] ok: chain route 12 stage 1 solver (dark, 1100x720): nothing clipped
+[00:38:23] [K02] ok: chain route 12 stage 1 solver (dark, 1100x720): nothing outside the window
+[00:38:24] [K02] ok: chain route 23 stage 2 stage (dark, 1100x720): nothing clipped
+[00:38:24] [K02] ok: chain route 23 stage 2 stage (dark, 1100x720): nothing outside the window
+[00:38:24] [K02] ok: chain route 23 stage 2 threat (dark, 1100x720): nothing clipped
+[00:38:24] [K02] ok: chain route 23 stage 2 threat (dark, 1100x720): nothing outside the window
+[00:38:25] [K02] ok: chain route 23 stage 2 domain (dark, 1100x720): nothing clipped
+[00:38:25] [K02] ok: chain route 23 stage 2 domain (dark, 1100x720): nothing outside the window
+[00:38:25] [K02] ok: chain route 23 stage 2 bounds (dark, 1100x720): nothing clipped
+[00:38:25] [K02] ok: chain route 23 stage 2 bounds (dark, 1100x720): nothing outside the window
+[00:38:25] [K02] ok: chain route 23 stage 2 structure (dark, 1100x720): nothing clipped
+[00:38:25] [K02] ok: chain route 23 stage 2 structure (dark, 1100x720): nothing outside the window
+[00:38:26] [K02] ok: chain route 23 stage 2 gauges (dark, 1100x720): nothing clipped
+[00:38:26] [K02] ok: chain route 23 stage 2 gauges (dark, 1100x720): nothing outside the window
+[00:38:26] [K02] ok: chain route 23 stage 2 solver (dark, 1100x720): nothing clipped
+[00:38:26] [K02] ok: chain route 23 stage 2 solver (dark, 1100x720): nothing outside the window
+[00:38:26] [K02] ok: chain route 23 stage 2 output (dark, 1100x720): nothing clipped
+[00:38:26] [K02] ok: chain route 23 stage 2 output (dark, 1100x720): nothing outside the window
+[00:38:27] [K02] ok: the setup pill shows its screen
+[00:38:27] [K02] ok: and the setup pill is the active one
+[00:38:28] [K02] ok: the 2D segment sets the dimension
+[00:38:36] [K02] ok: the Dark-mode action gives the light theme
+[00:38:38] [K02] ok: the setup pill shows its screen
+[00:38:38] [K02] ok: and the setup pill is the active one
+[00:38:38] [K02] ok: the 2D segment sets the dimension
+[00:38:39] [K02] ok: the chip's native action switches the solver
+[00:38:39] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[00:38:40] [K02] ok: setup native 0D 01 Material (light, 1100x720): nothing clipped
+[00:38:40] [K02] ok: setup native 0D 01 Material (light, 1100x720): nothing outside the window
+[00:38:40] [K02] ok: setup native 0D 02 Charge and chamber (light, 1100x720): nothing clipped
+[00:38:40] [K02] ok: setup native 0D 02 Charge and chamber (light, 1100x720): nothing outside the window
+[00:38:40] [K02] ok: setup native 0D 03 Ignition (light, 1100x720): nothing clipped
+[00:38:40] [K02] ok: setup native 0D 03 Ignition (light, 1100x720): nothing outside the window
+[00:38:41] [K02] ok: setup native 0D 04 Run (light, 1100x720): nothing clipped
+[00:38:41] [K02] ok: setup native 0D 04 Run (light, 1100x720): nothing outside the window
+[00:38:41] [K02] ok: setup native 0D 05 Heat (light, 1100x720): nothing clipped
+[00:38:41] [K02] ok: setup native 0D 05 Heat (light, 1100x720): nothing outside the window
+[00:38:41] [K02] ok: setup native 0D 06 Radiation standoffs [m] (light, 1100x720): nothing clipped
+[00:38:41] [K02] ok: setup native 0D 06 Radiation standoffs [m] (light, 1100x720): nothing outside the window
+[00:38:42] [K02] ok: setup native 0D 07 Loaded wall (light, 1100x720): nothing clipped
+[00:38:42] [K02] ok: setup native 0D 07 Loaded wall (light, 1100x720): nothing outside the window
+[00:38:42] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing clipped
+[00:38:42] [K02] ok: setup native 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing outside the window
+[00:38:42] [K02] ok: setup native 0D 09 Vent gauges [m] (light, 1100x720): nothing clipped
+[00:38:42] [K02] ok: setup native 0D 09 Vent gauges [m] (light, 1100x720): nothing outside the window
+[00:38:43] [K02] ok: setup native 0D 10 Outputs (light, 1100x720): nothing clipped
+[00:38:43] [K02] ok: setup native 0D 10 Outputs (light, 1100x720): nothing outside the window
+[00:38:43] [K02] ok: the 1D segment sets the dimension
+[00:38:44] [K02] ok: setup native 1D 01 Threat (light, 1100x720): nothing clipped
+[00:38:44] [K02] ok: setup native 1D 01 Threat (light, 1100x720): nothing outside the window
+[00:38:44] [K02] ok: setup native 1D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:38:44] [K02] ok: setup native 1D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:38:44] [K02] ok: setup native 1D 03 Boundaries (light, 1100x720): nothing clipped
+[00:38:44] [K02] ok: setup native 1D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:38:44] [K02] NOTE: native 1D 04: hidden in this mode - skipped
+[00:38:45] [K02] ok: setup native 1D 05 Gauges (light, 1100x720): nothing clipped
+[00:38:45] [K02] ok: setup native 1D 05 Gauges (light, 1100x720): nothing outside the window
+[00:38:45] [K02] ok: setup native 1D 06 Solver (light, 1100x720): nothing clipped
+[00:38:45] [K02] ok: setup native 1D 06 Solver (light, 1100x720): nothing outside the window
+[00:38:45] [K02] NOTE: native 1D 07: hidden in this mode - skipped
+[00:38:45] [K02] ok: the 2D segment sets the dimension
+[00:38:46] [K02] ok: setup native 2D 01 Threat (light, 1100x720): nothing clipped
+[00:38:46] [K02] ok: setup native 2D 01 Threat (light, 1100x720): nothing outside the window
+[00:38:46] [K02] ok: setup native 2D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:38:46] [K02] ok: setup native 2D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:38:46] [K02] ok: setup native 2D 03 Boundaries (light, 1100x720): nothing clipped
+[00:38:46] [K02] ok: setup native 2D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:38:47] [K02] ok: setup native 2D 04 Structure (light, 1100x720): nothing clipped
+[00:38:47] [K02] ok: setup native 2D 04 Structure (light, 1100x720): nothing outside the window
+[00:38:47] [K02] ok: setup native 2D 05 Gauges (light, 1100x720): nothing clipped
+[00:38:47] [K02] ok: setup native 2D 05 Gauges (light, 1100x720): nothing outside the window
+[00:38:47] [K02] ok: setup native 2D 06 Solver (light, 1100x720): nothing clipped
+[00:38:48] [K02] ok: setup native 2D 06 Solver (light, 1100x720): nothing outside the window
+[00:38:48] [K02] ok: setup native 2D 07 Output (light, 1100x720): nothing clipped
+[00:38:48] [K02] ok: setup native 2D 07 Output (light, 1100x720): nothing outside the window
+[00:38:48] [K02] ok: the 3D segment sets the dimension
+[00:38:49] [K02] ok: setup native 3D 01 Threat (light, 1100x720): nothing clipped
+[00:38:49] [K02] ok: setup native 3D 01 Threat (light, 1100x720): nothing outside the window
+[00:38:49] [K02] ok: setup native 3D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:38:49] [K02] ok: setup native 3D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:38:49] [K02] ok: setup native 3D 03 Boundaries (light, 1100x720): nothing clipped
+[00:38:49] [K02] ok: setup native 3D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:38:50] [K02] ok: setup native 3D 04 Structure (light, 1100x720): nothing clipped
+[00:38:50] [K02] ok: setup native 3D 04 Structure (light, 1100x720): nothing outside the window
+[00:38:50] [K02] ok: setup native 3D 05 Gauges (light, 1100x720): nothing clipped
+[00:38:50] [K02] ok: setup native 3D 05 Gauges (light, 1100x720): nothing outside the window
+[00:38:50] [K02] ok: setup native 3D 06 Solver (light, 1100x720): nothing clipped
+[00:38:50] [K02] ok: setup native 3D 06 Solver (light, 1100x720): nothing outside the window
+[00:38:51] [K02] ok: setup native 3D 07 Output (light, 1100x720): nothing clipped
+[00:38:51] [K02] ok: setup native 3D 07 Output (light, 1100x720): nothing outside the window
+[00:38:52] [K02] ok: the 2D segment sets the dimension
+[00:38:52] [K02] ok: the chip's blastfoam action switches the solver
+[00:38:53] [K02] ok: the 0D · HD 1.3 segment sets the dimension
+[00:38:53] [K02] ok: setup blastfoam 0D 01 Material (light, 1100x720): nothing clipped
+[00:38:53] [K02] ok: setup blastfoam 0D 01 Material (light, 1100x720): nothing outside the window
+[00:38:54] [K02] ok: setup blastfoam 0D 02 Charge and chamber (light, 1100x720): nothing clipped
+[00:38:54] [K02] ok: setup blastfoam 0D 02 Charge and chamber (light, 1100x720): nothing outside the window
+[00:38:54] [K02] ok: setup blastfoam 0D 03 Ignition (light, 1100x720): nothing clipped
+[00:38:54] [K02] ok: setup blastfoam 0D 03 Ignition (light, 1100x720): nothing outside the window
+[00:38:54] [K02] ok: setup blastfoam 0D 04 Run (light, 1100x720): nothing clipped
+[00:38:54] [K02] ok: setup blastfoam 0D 04 Run (light, 1100x720): nothing outside the window
+[00:38:55] [K02] ok: setup blastfoam 0D 05 Heat (light, 1100x720): nothing clipped
+[00:38:55] [K02] ok: setup blastfoam 0D 05 Heat (light, 1100x720): nothing outside the window
+[00:38:55] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (light, 1100x720): nothing clipped
+[00:38:55] [K02] ok: setup blastfoam 0D 06 Radiation standoffs [m] (light, 1100x720): nothing outside the window
+[00:38:55] [K02] ok: setup blastfoam 0D 07 Loaded wall (light, 1100x720): nothing clipped
+[00:38:55] [K02] ok: setup blastfoam 0D 07 Loaded wall (light, 1100x720): nothing outside the window
+[00:38:56] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing clipped
+[00:38:56] [K02] ok: setup blastfoam 0D 08 Vent stage (blastFoam) (light, 1100x720): nothing outside the window
+[00:38:56] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (light, 1100x720): nothing clipped
+[00:38:56] [K02] ok: setup blastfoam 0D 09 Vent gauges [m] (light, 1100x720): nothing outside the window
+[00:38:56] [K02] ok: setup blastfoam 0D 10 Outputs (light, 1100x720): nothing clipped
+[00:38:56] [K02] ok: setup blastfoam 0D 10 Outputs (light, 1100x720): nothing outside the window
+[00:38:57] [K02] ok: the 1D segment sets the dimension
+[00:38:57] [K02] ok: setup blastfoam 1D 01 Threat (light, 1100x720): nothing clipped
+[00:38:57] [K02] ok: setup blastfoam 1D 01 Threat (light, 1100x720): nothing outside the window
+[00:38:58] [K02] ok: setup blastfoam 1D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:38:58] [K02] ok: setup blastfoam 1D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:38:58] [K02] ok: setup blastfoam 1D 03 Boundaries (light, 1100x720): nothing clipped
+[00:38:58] [K02] ok: setup blastfoam 1D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:38:58] [K02] NOTE: blastfoam 1D 04: hidden in this mode - skipped
+[00:38:58] [K02] ok: setup blastfoam 1D 05 Gauges (light, 1100x720): nothing clipped
+[00:38:58] [K02] ok: setup blastfoam 1D 05 Gauges (light, 1100x720): nothing outside the window
+[00:38:59] [K02] ok: setup blastfoam 1D 06 Solver (light, 1100x720): nothing clipped
+[00:38:59] [K02] ok: setup blastfoam 1D 06 Solver (light, 1100x720): nothing outside the window
+[00:38:59] [K02] ok: setup blastfoam 1D 07 Output (light, 1100x720): nothing clipped
+[00:38:59] [K02] ok: setup blastfoam 1D 07 Output (light, 1100x720): nothing outside the window
+[00:39:00] [K02] ok: the 2D segment sets the dimension
+[00:39:00] [K02] ok: setup blastfoam 2D 01 Threat (light, 1100x720): nothing clipped
+[00:39:00] [K02] ok: setup blastfoam 2D 01 Threat (light, 1100x720): nothing outside the window
+[00:39:00] [K02] ok: setup blastfoam 2D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:39:00] [K02] ok: setup blastfoam 2D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:39:01] [K02] ok: setup blastfoam 2D 03 Boundaries (light, 1100x720): nothing clipped
+[00:39:01] [K02] ok: setup blastfoam 2D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:39:01] [K02] ok: setup blastfoam 2D 04 Structure (light, 1100x720): nothing clipped
+[00:39:01] [K02] ok: setup blastfoam 2D 04 Structure (light, 1100x720): nothing outside the window
+[00:39:01] [K02] ok: setup blastfoam 2D 05 Gauges (light, 1100x720): nothing clipped
+[00:39:01] [K02] ok: setup blastfoam 2D 05 Gauges (light, 1100x720): nothing outside the window
+[00:39:02] [K02] ok: setup blastfoam 2D 06 Solver (light, 1100x720): nothing clipped
+[00:39:02] [K02] ok: setup blastfoam 2D 06 Solver (light, 1100x720): nothing outside the window
+[00:39:02] [K02] ok: setup blastfoam 2D 07 Output (light, 1100x720): nothing clipped
+[00:39:02] [K02] ok: setup blastfoam 2D 07 Output (light, 1100x720): nothing outside the window
+[00:39:03] [K02] ok: the 3D segment sets the dimension
+[00:39:03] [K02] ok: setup blastfoam 3D 01 Threat (light, 1100x720): nothing clipped
+[00:39:03] [K02] ok: setup blastfoam 3D 01 Threat (light, 1100x720): nothing outside the window
+[00:39:03] [K02] ok: setup blastfoam 3D 02 Domain & mesh (light, 1100x720): nothing clipped
+[00:39:03] [K02] ok: setup blastfoam 3D 02 Domain & mesh (light, 1100x720): nothing outside the window
+[00:39:04] [K02] ok: setup blastfoam 3D 03 Boundaries (light, 1100x720): nothing clipped
+[00:39:04] [K02] ok: setup blastfoam 3D 03 Boundaries (light, 1100x720): nothing outside the window
+[00:39:04] [K02] ok: setup blastfoam 3D 04 Structure (light, 1100x720): nothing clipped
+[00:39:04] [K02] ok: setup blastfoam 3D 04 Structure (light, 1100x720): nothing outside the window
+[00:39:04] [K02] ok: setup blastfoam 3D 05 Gauges (light, 1100x720): nothing clipped
+[00:39:04] [K02] ok: setup blastfoam 3D 05 Gauges (light, 1100x720): nothing outside the window
+[00:39:05] [K02] ok: setup blastfoam 3D 06 Solver (light, 1100x720): nothing clipped
+[00:39:05] [K02] ok: setup blastfoam 3D 06 Solver (light, 1100x720): nothing outside the window
+[00:39:05] [K02] ok: setup blastfoam 3D 07 Output (light, 1100x720): nothing clipped
+[00:39:05] [K02] ok: setup blastfoam 3D 07 Output (light, 1100x720): nothing outside the window
+[00:39:06] [K02] ok: the 2D segment sets the dimension
+[00:39:07] [K02] ok: the chip's native action switches the solver
+[00:39:07] [K02] ok: the run pill shows its screen
+[00:39:07] [K02] ok: and the run pill is the active one
+[00:39:07] [K02] ok: run banner (light, 1100x720): nothing clipped
+[00:39:07] [K02] ok: run banner (light, 1100x720): nothing outside the window
+[00:39:08] [K02] ok: run finished, banner shown (light, 1100x720): nothing clipped
+[00:39:08] [K02] ok: run finished, banner shown (light, 1100x720): nothing outside the window
+[00:39:09] [K02] ok: the results pill shows its screen
+[00:39:09] [K02] ok: and the results pill is the active one
+[00:39:10] [K02] ok: results QA native1d Field (light, 1100x720): nothing clipped
+[00:39:10] [K02] ok: results QA native1d Field (light, 1100x720): nothing outside the window
+[00:39:10] [K02] ok: results QA native1d Gauges (light, 1100x720): nothing clipped
+[00:39:10] [K02] ok: results QA native1d Gauges (light, 1100x720): nothing outside the window
+[00:39:11] [K02] ok: results QA native1d 3D (light, 1100x720): nothing clipped
+[00:39:11] [K02] ok: results QA native1d 3D (light, 1100x720): nothing outside the window
+[00:39:12] [K02] ok: results QA native2d Field (light, 1100x720): nothing clipped
+[00:39:12] [K02] ok: results QA native2d Field (light, 1100x720): nothing outside the window
+[00:39:12] [K02] ok: results QA native2d Gauges (light, 1100x720): nothing clipped
+[00:39:12] [K02] ok: results QA native2d Gauges (light, 1100x720): nothing outside the window
+[00:39:13] [K02] ok: results QA native2d 3D (light, 1100x720): nothing clipped
+[00:39:13] [K02] ok: results QA native2d 3D (light, 1100x720): nothing outside the window
+[00:39:13] [K02] NOTE: no chain entry in this process: the STAGE tabs are not checked here (G02 makes one)
+[00:39:13] [K02] ok: the chain pill shows its screen
+[00:39:13] [K02] ok: and the chain pill is the active one
+[00:39:14] [K02] ok: chain route 123 stage 2 stage (light, 1100x720): nothing clipped
+[00:39:14] [K02] ok: chain route 123 stage 2 stage (light, 1100x720): nothing outside the window
+[00:39:14] [K02] ok: chain route 123 stage 2 threat (light, 1100x720): nothing clipped
+[00:39:14] [K02] ok: chain route 123 stage 2 threat (light, 1100x720): nothing outside the window
+[00:39:15] [K02] ok: chain route 123 stage 2 domain (light, 1100x720): nothing clipped
+[00:39:15] [K02] ok: chain route 123 stage 2 domain (light, 1100x720): nothing outside the window
+[00:39:15] [K02] ok: chain route 123 stage 2 bounds (light, 1100x720): nothing clipped
+[00:39:15] [K02] ok: chain route 123 stage 2 bounds (light, 1100x720): nothing outside the window
+[00:39:15] [K02] ok: chain route 123 stage 2 structure (light, 1100x720): nothing clipped
+[00:39:15] [K02] ok: chain route 123 stage 2 structure (light, 1100x720): nothing outside the window
+[00:39:16] [K02] ok: chain route 123 stage 2 gauges (light, 1100x720): nothing clipped
+[00:39:16] [K02] ok: chain route 123 stage 2 gauges (light, 1100x720): nothing outside the window
+[00:39:16] [K02] ok: chain route 123 stage 2 solver (light, 1100x720): nothing clipped
+[00:39:16] [K02] ok: chain route 123 stage 2 solver (light, 1100x720): nothing outside the window
+[00:39:16] [K02] ok: chain route 123 stage 2 output (light, 1100x720): nothing clipped
+[00:39:16] [K02] ok: chain route 123 stage 2 output (light, 1100x720): nothing outside the window
+[00:39:17] [K02] ok: chain route 13 stage 3 stage (light, 1100x720): nothing clipped
+[00:39:17] [K02] ok: chain route 13 stage 3 stage (light, 1100x720): nothing outside the window
+[00:39:17] [K02] ok: chain route 13 stage 3 threat (light, 1100x720): nothing clipped
+[00:39:17] [K02] ok: chain route 13 stage 3 threat (light, 1100x720): nothing outside the window
+[00:39:18] [K02] ok: chain route 13 stage 3 domain (light, 1100x720): nothing clipped
+[00:39:18] [K02] ok: chain route 13 stage 3 domain (light, 1100x720): nothing outside the window
+[00:39:18] [K02] ok: chain route 13 stage 3 bounds (light, 1100x720): nothing clipped
+[00:39:18] [K02] ok: chain route 13 stage 3 bounds (light, 1100x720): nothing outside the window
+[00:39:18] [K02] ok: chain route 13 stage 3 structure (light, 1100x720): nothing clipped
+[00:39:18] [K02] ok: chain route 13 stage 3 structure (light, 1100x720): nothing outside the window
+[00:39:19] [K02] ok: chain route 13 stage 3 gauges (light, 1100x720): nothing clipped
+[00:39:19] [K02] ok: chain route 13 stage 3 gauges (light, 1100x720): nothing outside the window
+[00:39:19] [K02] ok: chain route 13 stage 3 solver (light, 1100x720): nothing clipped
+[00:39:19] [K02] ok: chain route 13 stage 3 solver (light, 1100x720): nothing outside the window
+[00:39:19] [K02] ok: chain route 13 stage 3 output (light, 1100x720): nothing clipped
+[00:39:19] [K02] ok: chain route 13 stage 3 output (light, 1100x720): nothing outside the window
+[00:39:20] [K02] ok: chain route 12 stage 2 stage (light, 1100x720): nothing clipped
+[00:39:20] [K02] ok: chain route 12 stage 2 stage (light, 1100x720): nothing outside the window
+[00:39:20] [K02] ok: chain route 12 stage 2 threat (light, 1100x720): nothing clipped
+[00:39:20] [K02] ok: chain route 12 stage 2 threat (light, 1100x720): nothing outside the window
+[00:39:21] [K02] ok: chain route 12 stage 2 domain (light, 1100x720): nothing clipped
+[00:39:21] [K02] ok: chain route 12 stage 2 domain (light, 1100x720): nothing outside the window
+[00:39:21] [K02] ok: chain route 12 stage 2 bounds (light, 1100x720): nothing clipped
+[00:39:21] [K02] ok: chain route 12 stage 2 bounds (light, 1100x720): nothing outside the window
+[00:39:21] [K02] ok: chain route 12 stage 2 structure (light, 1100x720): nothing clipped
+[00:39:21] [K02] ok: chain route 12 stage 2 structure (light, 1100x720): nothing outside the window
+[00:39:22] [K02] ok: chain route 12 stage 2 gauges (light, 1100x720): nothing clipped
+[00:39:22] [K02] ok: chain route 12 stage 2 gauges (light, 1100x720): nothing outside the window
+[00:39:22] [K02] ok: chain route 12 stage 2 solver (light, 1100x720): nothing clipped
+[00:39:22] [K02] ok: chain route 12 stage 2 solver (light, 1100x720): nothing outside the window
+[00:39:22] [K02] ok: chain route 12 stage 2 output (light, 1100x720): nothing clipped
+[00:39:22] [K02] ok: chain route 12 stage 2 output (light, 1100x720): nothing outside the window
+[00:39:23] [K02] ok: chain route 23 stage 2 stage (light, 1100x720): nothing clipped
+[00:39:23] [K02] ok: chain route 23 stage 2 stage (light, 1100x720): nothing outside the window
+[00:39:24] [K02] ok: chain route 23 stage 2 threat (light, 1100x720): nothing clipped
+[00:39:24] [K02] ok: chain route 23 stage 2 threat (light, 1100x720): nothing outside the window
+[00:39:24] [K02] ok: chain route 23 stage 2 domain (light, 1100x720): nothing clipped
+[00:39:24] [K02] ok: chain route 23 stage 2 domain (light, 1100x720): nothing outside the window
+[00:39:24] [K02] ok: chain route 23 stage 2 bounds (light, 1100x720): nothing clipped
+[00:39:24] [K02] ok: chain route 23 stage 2 bounds (light, 1100x720): nothing outside the window
+[00:39:25] [K02] ok: chain route 23 stage 2 structure (light, 1100x720): nothing clipped
+[00:39:25] [K02] ok: chain route 23 stage 2 structure (light, 1100x720): nothing outside the window
+[00:39:25] [K02] ok: chain route 23 stage 2 gauges (light, 1100x720): nothing clipped
+[00:39:25] [K02] ok: chain route 23 stage 2 gauges (light, 1100x720): nothing outside the window
+[00:39:25] [K02] ok: chain route 23 stage 2 solver (light, 1100x720): nothing clipped
+[00:39:25] [K02] ok: chain route 23 stage 2 solver (light, 1100x720): nothing outside the window
+[00:39:26] [K02] ok: chain route 23 stage 2 output (light, 1100x720): nothing clipped
+[00:39:26] [K02] ok: chain route 23 stage 2 output (light, 1100x720): nothing outside the window
+[00:39:27] [K02] ok: the setup pill shows its screen
+[00:39:27] [K02] ok: and the setup pill is the active one
+[00:39:27] [K02] ok: the 2D segment sets the dimension
+[00:39:36] [K02] ok: the Dark-mode action gives the dark theme
+[00:39:37] [K02] contact sheet: contact_K02.png (8 shots)
+[00:39:37] [K02] --- end done in 117.6s (max gap 504 ms) ---
+[00:39:37] [K02] ok: the Dark-mode action gives the dark theme
+[00:39:38] [K02] ok: the setup pill shows its screen
+[00:39:38] [K02] ok: and the setup pill is the active one
+[00:39:39] [K02] ok: the 2D segment sets the dimension
+[00:39:39] [K03] --- begin ---
+[00:39:48] [K03] ok: the Dark-mode action gives the light theme
+[00:39:49] [K03] ok: the setup pill shows its screen
+[00:39:49] [K03] ok: and the setup pill is the active one
+[00:39:50] [K03] ok: the 2D segment sets the dimension
+[00:39:50] [K03] ok: setup 1100x720: the theme is light
+[00:39:51] [K03] ok: setup tree 1100x720: the light grab reads light (luma 243.7 >= 140)
+[00:39:51] [K03] ok: the run pill shows its screen
+[00:39:51] [K03] ok: and the run pill is the active one
+[00:39:52] [K03] ok: run 1100x720: the theme is light
+[00:39:52] [K03] ok: run finished 1100x720: the light grab reads light (luma 237.9 >= 140)
+[00:39:53] [K03] ok: the results pill shows its screen
+[00:39:53] [K03] ok: and the results pill is the active one
+[00:39:53] [K03] ok: results 1100x720: the theme is light
+[00:39:54] [K03] ok: results field 1100x720: the light grab reads light (luma 236.7 >= 140)
+[00:39:54] [K03] ok: the chain pill shows its screen
+[00:39:54] [K03] ok: and the chain pill is the active one
+[00:39:55] [K03] ok: chain 1100x720: the theme is light
+[00:39:55] [K03] ok: chain route123 1100x720: the light grab reads light (luma 241.8 >= 140)
+[00:39:56] [K03] ok: the setup pill shows its screen
+[00:39:56] [K03] ok: and the setup pill is the active one
+[00:39:57] [K03] ok: the 2D segment sets the dimension
+[00:39:57] [K03] ok: setup 1600x1000: the theme is light
+[00:39:58] [K03] ok: setup tree 1600x1000: the light grab reads light (luma 245.5 >= 140)
+[00:39:58] [K03] ok: the run pill shows its screen
+[00:39:58] [K03] ok: and the run pill is the active one
+[00:39:59] [K03] ok: run 1600x1000: the theme is light
+[00:39:59] [K03] ok: run finished 1600x1000: the light grab reads light (luma 215.2 >= 140)
+[00:40:00] [K03] ok: the results pill shows its screen
+[00:40:00] [K03] ok: and the results pill is the active one
+[00:40:00] [K03] ok: results 1600x1000: the theme is light
+[00:40:01] [K03] ok: results field 1600x1000: the light grab reads light (luma 185.7 >= 140)
+[00:40:01] [K03] ok: the chain pill shows its screen
+[00:40:01] [K03] ok: and the chain pill is the active one
+[00:40:02] [K03] ok: chain 1600x1000: the theme is light
+[00:40:02] [K03] ok: chain route123 1600x1000: the light grab reads light (luma 246.2 >= 140)
+[00:40:11] [K03] ok: the Dark-mode action gives the dark theme
+[00:40:12] [K03] contact sheet: contact_K03.png (8 shots)
+[00:40:12] [K03] --- end done in 32.7s (max gap 494 ms) ---
+[00:40:13] [K03] ok: the Dark-mode action gives the dark theme
+[00:40:13] [K03] ok: the setup pill shows its screen
+[00:40:13] [K03] ok: and the setup pill is the active one
+[00:40:14] [K03] ok: the 2D segment sets the dimension
+[00:40:15] [K03] exit 0; pending: []
