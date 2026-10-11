@@ -949,6 +949,23 @@ def s5g_dropped(link):
           and dc.text() == 'G2 dropped by the solver (inside Wall 1)'
           and g.table_caption.full_text() == RG.TABLE_CAPTION,
           f'{dc.text()!r}')
+    # GUI-14 (f), D5: the note is in the warn style Run's drop line has,
+    # weight 600, in both themes (the polished label, not the rule text)
+    from blastlab.ui import theme as _th
+    seen_style = {}
+    for mode in ('dark', 'light'):
+        _th.apply(app, mode)
+        _th.repolish(dc)
+        pump(20)
+        seen_style[mode] = (dc.palette().color(dc.foregroundRole()).name(),
+                            dc.font().weight(), _th.cur('warn'))
+    check('GUI-14 (f): the drop note is warn-coloured at weight 600 in '
+          'both themes',
+          all(c.lower() == w.lower() and int(wt) >= 600
+              for c, wt, w in seen_style.values())
+          and seen_style['dark'][0] != seen_style['light'][0],
+          str(seen_style))
+    _th.apply(app, 'dark')
     # GUI-13 (d), D6: the Qt PNG / report export hands that note to the
     # gauge figure as its footnote
     import types

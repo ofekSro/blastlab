@@ -722,6 +722,8 @@ def qss(mode_name):
         font-weight: 600; color: {p['text']}; background: transparent; }}
     QLabel#gaugecaption {{ font-size: 12px; color: {p['faint']};
                            background: transparent; }}
+    QLabel#gaugedrop {{ font-size: 12.5px; font-weight: 600;
+                        color: {p['warn']}; background: transparent; }}
     QLabel#gaugereadsel {{ font-family: "{MONO}"; font-size: 13px;
         font-weight: 600; color: {p['gauge']}; background: transparent; }}
     QLabel#gaugeread {{ font-family: "{MONO}"; font-size: 12px;
