@@ -1,0 +1,6 @@
+{"label": "idle_cpu_setup", "pct": 17.352051549851378, "seconds": 8, "scenario": "B01", "t": 1791718978.8295949}
+{"label": "idle_cpu_run", "pct": 2.187158540805682, "seconds": 5, "scenario": "B02", "t": 1791718986.1989126}
+{"label": "idle_cpu_results", "pct": 3.1145217521593977, "seconds": 5, "scenario": "B02", "t": 1791718992.2498193}
+{"label": "idle_cpu_chain", "pct": 2.1760079363169615, "seconds": 5, "scenario": "B02", "t": 1791718998.3184738}
+{"label": "feed_result native3d", "ms": 487.04619996715337, "scenario": "E06", "t": 1791719868.94735}
+{"label": "volume on + blit", "ms": 134.2545000370592, "scenario": "E06", "t": 1791719890.5366933}

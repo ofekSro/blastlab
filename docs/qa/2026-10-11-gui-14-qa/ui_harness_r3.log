@@ -1,0 +1,190 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[13:52:42] [boot] window up: 1280x840 (built 3742 ms, shown 1873 ms)
+[13:52:42] [D05] --- begin ---
+[13:52:42] [D05] ok: the setup pill shows its screen
+[13:52:42] [D05] ok: and the setup pill is the active one
+[13:52:44] [D05] ok: the run pill shows its screen
+[13:52:44] [D05] ok: and the run pill is the active one
+[13:52:44] [D05] ok: the 3D solver announced itself
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_3d.txt  (35 rows x 2 gauges)
+  Writing animation (35 frames, fixed (whole video) 0 .. 2.77e+06 kPa) ... [13:52:49] [D05] NOTE: right after Stop: Stop enabled=True Run enabled=False
+done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.gif
+[13:53:08] [D05] ok: the run stopped
+[13:53:08] [D05] NOTE: stop latency 19.3 s
+[13:53:08] [D05] ok: the stopped run is labelled "(stopped)"
+[13:53:08] [D05] ok: and the progress bar is NOT filled after a stop
+[13:53:08] [D05] contact sheet: contact_D05.png (2 shots)
+[13:53:08] [D05] --- end done in 26.0s (max gap 1420 ms) ---
+[13:53:09] [D05] ok: the Dark-mode action gives the dark theme
+[13:53:10] [D05] ok: the setup pill shows its screen
+[13:53:10] [D05] ok: and the setup pill is the active one
+[13:53:10] [D05] ok: the 2D segment sets the dimension
+[13:53:11] [D06] --- begin ---
+[13:53:11] [D06] ok: the setup pill shows its screen
+[13:53:11] [D06] ok: and the setup pill is the active one
+[13:53:12] [D06] ok: the run pill shows its screen
+[13:53:12] [D06] ok: and the run pill is the active one
+[13:53:12] [D06] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be del" -> True
+[13:53:13] [D06] ok: the first run started
+[13:53:13] [D06] ok: Run is disabled while a run is live - the refusal is visible before it is needed
+[13:53:13] [D06] DIALOG show_info [Run] 'A run is already in progress.' -> 'ok'
+[13:53:14] [D06] ok: a second start did NOT replace the running worker
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (127 rows x 1 gauges)
+  Writing animation (127 frames, fixed (whole video) 0 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.gif
+[13:53:45] [D06] ok: and the run still stops cleanly
+[13:53:46] [D06] contact sheet: contact_D06.png (3 shots)
+[13:53:46] [D06] --- end done in 34.9s (max gap 241 ms) ---
+[13:53:46] [D06] ok: the Dark-mode action gives the dark theme
+[13:53:47] [D06] ok: the setup pill shows its screen
+[13:53:47] [D06] ok: and the setup pill is the active one
+[13:53:48] [D06] ok: the 2D segment sets the dimension
+[13:53:48] [E01] --- begin ---
+[13:53:51] [E01] ok: the results pill shows its screen
+[13:53:51] [E01] ok: and the results pill is the active one
+[13:53:51] [E01] NOTE: picker: ['QA - 3D (stopped)', 'QA - 2D (stopped)', 'QA native1d', 'QA native2d', 'QA native3d']
+[13:53:52] [E01] ok: a 1D result draws profiles, not a map (page 'figure')
+[13:53:55] [E01] DIALOG save_file [Save profile] 'All files (*.*)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E01_148.txt'
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\exports\E01_148.txt  (400 cells, t = 1.828 ms)
+[13:53:57] [E01] ok: 3D Viewer on a 1D result explains itself
+[13:53:58] [E01] contact sheet: contact_E01.png (5 shots)
+[13:53:58] [E01] --- end done in 9.9s (max gap 203 ms) ---
+[13:53:59] [E01] ok: the Dark-mode action gives the dark theme
+[13:54:00] [E01] ok: the setup pill shows its screen
+[13:54:00] [E01] ok: and the setup pill is the active one
+[13:54:00] [E01] ok: the 2D segment sets the dimension
+[13:54:01] [E02] --- begin ---
+[13:54:01] [E02] ok: the results pill shows its screen
+[13:54:01] [E02] ok: and the results pill is the active one
+[13:54:02] [E02] NOTE: 2D snapshots: ['t = 0.110 ms', 't = 0.276 ms', 't = 0.466 ms (final)']; fields: ['overpressure', 'density', 'speed', 'peak overpressure', 'net ovp impulse']
+[13:54:02] [E02] ok: the 2D result offers snapshots and fields
+[13:54:03] [E02] ok: overpressure / t = 0.110 ms drew something
+[13:54:04] [E02] ok: overpressure / t = 0.466 ms (final) drew something
+[13:54:05] [E02] ok: density / t = 0.110 ms drew something
+[13:54:06] [E02] ok: density / t = 0.466 ms (final) drew something
+[13:54:07] [E02] ok: speed / t = 0.110 ms drew something
+[13:54:08] [E02] ok: speed / t = 0.466 ms (final) drew something
+[13:54:09] [E02] ok: peak overpressure / t = 0.110 ms drew something
+[13:54:10] [E02] ok: peak overpressure / t = 0.466 ms (final) drew something
+[13:54:11] [E02] ok: net ovp impulse / t = 0.110 ms drew something
+[13:54:12] [E02] ok: net ovp impulse / t = 0.466 ms (final) drew something
+[13:54:15] [E02] contact sheet: contact_E02.png (11 shots)
+[13:54:15] [E02] --- end done in 14.1s (max gap 55 ms) ---
+[13:54:16] [E02] ok: the Dark-mode action gives the dark theme
+[13:54:17] [E02] ok: the setup pill shows its screen
+[13:54:17] [E02] ok: and the setup pill is the active one
+[13:54:17] [E02] ok: the 2D segment sets the dimension
+[13:54:18] [E03] --- begin ---
+[13:54:18] [E03] ok: the results pill shows its screen
+[13:54:18] [E03] ok: and the results pill is the active one
+[13:54:20] [E03] NOTE: summary rows: [('G1 (0.300, 0.800) -> cell (0.305, 0.802) m', '7759.4', '0.211', '0.237', '0.255', '619.31', '619.32', 'no')]
+[13:54:20] [E03] ok: the summary table has a row per gauge
+[13:54:20] [E03] ok: the traces keep more height than the table (382 vs 99 px)
+[13:54:20] [E03] DIALOG save_file [Save gauge summary CSV] 'CSV (*.csv)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E03_162.csv'
+[13:54:22] [E03] ok: the summary export wrote a file
+[13:54:22] [E03] NOTE: summary -> ['E03_162.csv']
+[13:54:22] [E03] DIALOG save_file [Save gauges TSV] 'Text (*.txt)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E03_164.txt'
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\exports\E03_164.txt  (634 rows x 1 gauges)
+[13:54:24] [E03] ok: the tsv export wrote a file
+[13:54:24] [E03] NOTE: tsv -> ['E03_164.txt']
+[13:54:24] [E03] DIALOG pick_dir [Save field CSVs into] '<blastlab.ui.results_panel.ResultsPanel(0x235bcffe870) at 0x000002359DBADD00>' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports'
+[13:54:27] [E03] ok: the fieldcsv export wrote a file
+[13:54:27] [E03] NOTE: fieldcsv -> ['QA_impulse.csv', 'QA_p_peak.csv', 'QA_t0p110ms_p.csv', 'QA_t0p110ms_rho.csv', 'QA_t0p110ms_speed.csv', 'QA_t0p276ms_p.csv', 'QA_t0p276ms_rho.csv', 'QA_t0p276ms_speed.csv', 'QA_t0p466ms_final_p.csv', 'QA_t0p466ms_final_rho.csv', 'QA_t0p466ms_final_speed.csv']
+[13:54:27] [E03] DIALOG save_file [Save HTML report] 'HTML (*.html)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E03_168.html'
+[13:54:30] [E03] DIALOG os.startfile [] 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E03_168.html' -> 'suppressed'
+[13:54:31] [E03] ok: the report export wrote a file
+[13:54:31] [E03] NOTE: report -> ['E03_168.html']
+[13:54:33] [E03] contact sheet: contact_E03.png (10 shots)
+[13:54:33] [E03] --- end done in 15.4s (max gap 257 ms) ---
+[13:54:34] [E03] ok: the Dark-mode action gives the dark theme
+[13:54:35] [E03] ok: the setup pill shows its screen
+[13:54:35] [E03] ok: and the setup pill is the active one
+[13:54:35] [E03] ok: the 2D segment sets the dimension
+[13:54:36] [E04] --- begin ---
+[13:54:36] [E04] ok: the results pill shows its screen
+[13:54:36] [E04] ok: and the results pill is the active one
+[13:54:39] [E04] ok: Play is enabled
+[13:54:39] [E04] NOTE: recorded frames: slider 0..80, scale='run' used='run'
+[13:54:39] [E04] ok: the slider spans the recorded frames
+[13:54:41] [E04] ok: and stopping stops the timer
+[13:54:42] [E04] ok: the last frame keeps the SAME colour range as the first - one range for the whole video
+[13:54:45] [E04] contact sheet: contact_E04.png (4 shots)
+[13:54:45] [E04] --- end done in 8.5s (max gap 44 ms) ---
+[13:54:45] [E04] ok: the Dark-mode action gives the dark theme
+[13:54:46] [E04] ok: the setup pill shows its screen
+[13:54:46] [E04] ok: and the setup pill is the active one
+[13:54:47] [E04] ok: the 2D segment sets the dimension
+[13:54:47] [E05] --- begin ---
+[13:54:47] [E05] ok: the results pill shows its screen
+[13:54:47] [E05] ok: and the results pill is the active one
+[13:54:48] [E05] NOTE: 3D fields: ['overpressure (x-z)', 'overpressure (x-y)', 'density (x-z)', 'density (x-y)', 'peak overpressure (x-z)', 'peak overpressure (x-y)', 'net ovp impulse (x-z)', 'net ovp impulse (x-y)', 'isosurface']
+[13:54:49] [E05] ok: overpressure (x-z) drew something
+[13:54:51] [E05] ok: overpressure (x-y) drew something
+[13:54:52] [E05] ok: density (x-z) drew something
+[13:54:53] [E05] ok: density (x-y) drew something
+[13:54:55] [E05] ok: peak overpressure (x-z) drew something
+[13:54:56] [E05] ok: peak overpressure (x-y) drew something
+[13:54:57] [E05] ok: net ovp impulse (x-z) drew something
+[13:54:58] [E05] ok: net ovp impulse (x-y) drew something
+[13:55:00] [E05] ok: isosurface drew something
+[13:55:03] [E05] contact sheet: contact_E05.png (11 shots)
+[13:55:03] [E05] --- end done in 15.9s (max gap 174 ms) ---
+[13:55:04] [E05] ok: the Dark-mode action gives the dark theme
+[13:55:05] [E05] ok: the setup pill shows its screen
+[13:55:05] [E05] ok: and the setup pill is the active one
+[13:55:05] [E05] ok: the 2D segment sets the dimension
+[13:55:06] [E06] --- begin ---
+[13:55:06] [E06] ok: the results pill shows its screen
+[13:55:06] [E06] ok: and the results pill is the active one
+[13:55:07] [E06] timing feed_result native3d: 69 ms
+[13:55:07] [E06] ok: opening the 3D viewer blocked the UI for 69 ms (G4)
+[13:55:09] [E06] NOTE: field buttons: p=True, rho=True, e=True, p_peak=True, imp=True
+[13:55:24] [E06] contact sheet: contact_E06.png (9 shots)
+[13:55:24] [E06] --- end done in 17.5s (max gap 112 ms) ---
+[13:55:24] [E06] ok: the Dark-mode action gives the dark theme
+[13:55:25] [E06] ok: the setup pill shows its screen
+[13:55:25] [E06] ok: and the setup pill is the active one
+[13:55:26] [E06] ok: the 2D segment sets the dimension
+[13:55:26] [E07] --- begin ---
+[13:55:26] [E07] ok: the results pill shows its screen
+[13:55:26] [E07] ok: and the results pill is the active one
+[13:55:27] [E07] DIALOG pick_dir [Save PNGs into] '<blastlab.ui.results_panel.ResultsPanel(0x235bcffe870) at 0x000002359DBADD00>' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports'
+[13:55:32] [E07] ok: PNGs wrote the whole snapshot grid, several files - the screen shows one field, the file does not
+[13:55:32] [E07] ok: and each one is a real image
+[13:55:32] [E07] DIALOG save_file [Save animation] 'MP4 video (*.mp4);;Animated GIF (*.gif)' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\exports\\E07_197.mp4'
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\exports\E07_197.mp4
+[13:55:47] [E07] ok: the animation export wrote a video
+[13:55:47] [E07] NOTE: exports in C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\exports: ['B06_027.json', 'E01_148.txt', 'E03_162.csv', 'E03_164.txt', 'E03_168.html', 'E07_197.mp4', 'QA_blast_2d_density.png', 'QA_blast_2d_gauges.png', 'QA_blast_2d_impulse.png', 'QA_blast_2d_peak_overpressure.png', 'QA_blast_2d_pressure.png', 'QA_impulse.csv', 'QA_p_peak.csv', 'QA_t0p110ms_p.csv', 'QA_t0p110ms_rho.csv', 'QA_t0p110ms_speed.csv', 'QA_t0p276ms_p.csv', 'QA_t0p276ms_rho.csv', 'QA_t0p276ms_speed.csv', 'QA_t0p466ms_final_p.csv', 'QA_t0p466ms_final_rho.csv', 'QA_t0p466ms_final_speed.csv']
+[13:55:48] [E07] contact sheet: contact_E07.png (4 shots)
+[13:55:48] [E07] --- end done in 21.5s (max gap 45 ms) ---
+[13:55:48] [E07] ok: the Dark-mode action gives the dark theme
+[13:55:49] [E07] ok: the setup pill shows its screen
+[13:55:49] [E07] ok: and the setup pill is the active one
+[13:55:50] [E07] ok: the 2D segment sets the dimension
+[13:55:50] [E08] --- begin ---
+[13:55:50] [E08] ok: the results pill shows its screen
+[13:55:50] [E08] ok: and the results pill is the active one
+[13:55:53] [E08] ok: Remove took the entry out (5 -> 4)
+[13:55:53] [E08] contact sheet: contact_E08.png (1 shots)
+[13:55:53] [E08] --- end done in 2.6s (max gap 47 ms) ---
+[13:55:53] [E08] ok: the Dark-mode action gives the dark theme
+[13:55:54] [E08] ok: the setup pill shows its screen
+[13:55:54] [E08] ok: and the setup pill is the active one
+[13:55:55] [E08] ok: the 2D segment sets the dimension
+[13:55:55] [E09] --- begin ---
+[13:55:56] [E09] ok: the results pill shows its screen
+[13:55:56] [E09] ok: and the results pill is the active one
+[13:55:58] [E09] ok: the panel carries the typed title
+[13:55:58] [E09] ok: and it reaches the figure title
+[13:55:59] [E09] contact sheet: contact_E09.png (1 shots)
+[13:55:59] [E09] --- end done in 4.1s (max gap 60 ms) ---
+[13:56:00] [E09] ok: the Dark-mode action gives the dark theme
+[13:56:01] [E09] ok: the setup pill shows its screen
+[13:56:01] [E09] ok: and the setup pill is the active one
+[13:56:01] [E09] ok: the 2D segment sets the dimension
+[13:56:01] [E09] budget: 333s left < 480s for F00 - exiting 75
+[13:56:04] [E09] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x235c11772e0, name="viewWindow") , parent:  QWidgetWindow(0x235c1166ba0, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[13:56:04] [E09] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x235c1176200, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x235c1166ba0, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[13:56:04] [E09] exit 75; pending: ['F00', 'F01', 'F02', 'F03', 'F04', 'F05', 'F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

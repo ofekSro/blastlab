@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QWidget)
 
 from ..core import mode as mode_mod
-from . import chain_route, setup_nodes, setup_strip, theme
+from . import chain_route, scaled_distance, setup_nodes, setup_strip, theme
 from .case_form import CaseForm
 from .components import HandoffCard
 from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
@@ -464,11 +464,14 @@ class StageEditor(QWidget):
         bad = {setup_nodes.node_of_field(self.dim, n) for n in f.bad}
         stage_level = {chain_route.AXISYM_REFUSAL.split(': ', 1)[1],
                        _handoff_msg()}
+        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
+        drop = case is not None and scaled_distance.any_dropped(case)
         for n, _t in setup_nodes.nodes(self.dim):
             # GUI-13 B2 (UX #12, D8): the row that fixes the F45 / S2-1
             # reach line shows the warn glyph, not a tick
             self.tree.set_status(n.id, 'error' if n.id in bad else
                                  'warn' if n.id == 'domain' and chk.reach
+                                 or n.id == 'gauges' and drop
                                  else 'ok')
         self.tree.set_status(STAGE_NODE, 'error' if any(
             e in stage_level for e in chk.errors) else 'ok')
@@ -504,7 +507,6 @@ class StageEditor(QWidget):
             self._view_caption.setText('')
             self._view_caption.set_tip(None)
             return
-        from . import scaled_distance
         self.z_rings.setVisible(case is not None
                                 and scaled_distance.z_shown(case))
         if self._view_caption.property('hover') != 'true':

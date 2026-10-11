@@ -1,0 +1,54 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[13:16:45] [boot] window up: 1280x840 (built 3863 ms, shown 1869 ms)
+[13:16:45] [D02] --- begin ---
+[13:16:45] [D02] ok: the setup pill shows its screen
+[13:16:45] [D02] ok: and the setup pill is the active one
+[13:16:46] [D02] ok: the run pill shows its screen
+[13:16:46] [D02] ok: and the run pill is the active one
+[13:16:47] [D02] ok: the 2D solver announced itself
+[13:16:50] [D02] NOTE: Refresh every = "abc": entry marked bad=None
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.gif
+[13:17:16] [D02] DIALOG notify_desktop [BlastLab] 'QA finished in 29 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[13:17:17] [D02] ok: the 2D run finished
+[13:17:17] [D02] ok: the dropped-gauge warning reached the run log
+[13:17:17] [D02] NOTE: that warning lives only in the Run log; the Results Gauges table simply shows one gauge
+[13:17:17] [D02] contact sheet: contact_D02.png (5 shots)
+[13:17:17] [D02] --- end done in 32.6s (max gap 286 ms) ---
+[13:17:18] [D02] ok: the Dark-mode action gives the dark theme
+[13:17:19] [D02] ok: the setup pill shows its screen
+[13:17:19] [D02] ok: and the setup pill is the active one
+[13:17:20] [D02] ok: the 2D segment sets the dimension
+[13:17:20] [D03] --- begin ---
+[13:17:20] [D03] ok: the setup pill shows its screen
+[13:17:20] [D03] ok: and the setup pill is the active one
+[13:17:22] [D03] ok: the run pill shows its screen
+[13:17:22] [D03] ok: and the run pill is the active one
+[13:17:22] [D03] ok: the Step through card opens
+[13:17:22] [D03] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be del" -> True
+[13:17:25] [D03] ok: the G1 hint is there after Initialise Model
+[13:17:25] [D03] NOTE: after init: Run enabled=False Exec1 enabled=True progress=0 chips={'step': '—', 't [ms]': '—', 'dt [s]': '—', 'p max [kPa]': '—', 'cells': '—'}
+[13:17:25] [D03] ok: and the Exec buttons came alive
+[13:17:27] [D03] NOTE: chips after Exec 10: {'step': '10', 't [ms]': '0.010', 'dt [s]': '7.65e-07', 'p max [kPa]': '2.767e+06', 'cells': '—'}
+[13:17:31] [D03] NOTE: paused readout: 'PAUSED at step 110'
+[13:17:31] [D03] ok: an interrupted run says so beside the run state, not only in the log
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_2d.txt  (634 rows x 1 gauges)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.gif
+[13:18:00] [D03] DIALOG notify_desktop [BlastLab] 'QA finished in 30 s. Highest peak: G1, 7,759 kPa at 0.24 ms.' -> 'ok'
+[13:18:01] [D03] ok: END finished the run
+[13:18:01] [D03] contact sheet: contact_D03.png (6 shots)
+[13:18:01] [D03] --- end done in 41.2s (max gap 309 ms) ---
+[13:18:02] [D03] ok: the Dark-mode action gives the dark theme
+[13:18:03] [D03] ok: the setup pill shows its screen
+[13:18:03] [D03] ok: and the setup pill is the active one
+[13:18:03] [D03] ok: the 2D segment sets the dimension
+[13:18:04] [D04] --- begin ---
+[13:18:04] [D04] ok: the setup pill shows its screen
+[13:18:04] [D04] ok: and the setup pill is the active one
+[13:18:06] [D04] ok: the run pill shows its screen
+[13:18:06] [D04] ok: and the run pill is the active one
+[13:18:06] [D04] DIALOG ask_yes_no [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\ui_harness\\runs. Overwrite? The previous run's files will be del" -> True
+[13:18:06] [D04] ok: the 3D View button is enabled at run start
+[13:18:13] [D04] ok: and it brings the 3D page forward

@@ -64,6 +64,16 @@ WHERE_BOXES = 'The Runs folder and Model boxes are on the Run tab.'
 #: board Chain line 60
 SEED_CAPTION = 'New stages take the charge, material and solver from 01 Setup.'
 
+#: the chain's own start values, {stage dim: {field: text}}, applied once
+#: when the editors are built (01 Setup's defaults do not change). Stage
+#: 1's Domain radius starts at the board's 1.5 m, so the default 1 -> 2 -> 3
+#: route opens with card 2 clean: at the form's 10 m the 1D stage hands off
+#: beyond stage 2's 4 x 4 m box (S2-1). Checked 2026-10-11: 1.5 m brings no
+#: error or warning that 10 m does not, native / blastFoam, unprobed and
+#: probed. Stage 3's Lz stays 1.5 (the 4.0 m seed trips the blastFoam cell
+#: cap unprobed; GUI-13 A1).
+CHAIN_SEED = {1: {'radius_m': '1.5'}}
+
 #: the live checks' debounce: the Setup's (`MainWindow._validate_timer`)
 CHECK_MS = 300
 
@@ -283,6 +293,11 @@ class ChainPanel(QWidget):
             self.stage_solver[d] = self._mode.get()
             ed.solver_seg.set(mode_mod.label(self.stage_solver[d]))
         root.addWidget(self._editors_box, 1)
+        # GUI-14 (a): the chain's own start values, once, while still quiet
+        # (the stage stays untouched; a route change never reapplies them)
+        for d, fields in CHAIN_SEED.items():
+            for name, value in fields.items():
+                self.forms[d].v[name].set(value)
         self._quiet = 0
 
         self._mode.subscribe(self._on_global_mode)

@@ -1,0 +1,22 @@
+[
+ {
+  "name": "[1.0] gauge cell text fits the gauge column",
+  "ok": true,
+  "detail": "((288, 288), 264)"
+ },
+ {
+  "name": "[1.0] right edge of the complete cell inside the table",
+  "ok": true,
+  "detail": "((766, 30, 76, 26), 844)"
+ },
+ {
+  "name": "[1.0] every result column visible (bbox non-empty)",
+  "ok": true,
+  "detail": "{'gauge': (2, 30, 288, 26), 'peak': (290, 30, 80, 26), 'arrival': (370, 30, 80, 26), 't_peak': (450, 30, 79, 26), 'pos_dur': (529, 30, 79, 26), 'pos_imp': (608, 30, 79, 26), 'net_imp': (687, 30, 79, 26), 'complete': (766, 30, 76, 26)}"
+ },
+ {
+  "name": "[1.0] no modal dialogs",
+  "ok": true,
+  "detail": "[]"
+ }
+]

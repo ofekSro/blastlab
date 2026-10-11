@@ -1,0 +1,28 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:00:45] [boot] window up: 1280x840 (built 3845 ms, shown 1868 ms)
+[14:00:45] [F03] --- begin ---
+[14:00:45] [F03] ok: the setup pill shows its screen
+[14:00:45] [F03] ok: and the setup pill is the active one
+[14:00:46] [F03] ok: the run pill shows its screen
+[14:00:46] [F03] ok: and the run pill is the active one
+[14:00:50] [F03] ok: 3D View is enabled for the foam 3D run
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\gauges\gauges_3d.txt  (150 rows x 2 gauges)
+  Writing animation (26 frames, fixed (whole video) 0 .. 9.88e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness\runs\QA\animation.mp4
+[14:03:13] [F03] DIALOG notify_desktop [BlastLab] 'QA finished in 2 min 27 s. Highest peak: G1, 93,487 kPa at 0.03 ms.' -> 'ok'
+[14:03:15] [F03] ok: the foam 3D run finished
+[14:03:15] [F03] NOTE: foam3d wall 148 s
+[14:03:16] [F03] ok: the results pill shows its screen
+[14:03:16] [F03] ok: and the results pill is the active one
+[14:03:18] [F03] NOTE: 3D viewer fields for foam: p=True, rho=True, e=True, p_peak=True, imp=True
+[14:03:22] [F03] contact sheet: contact_F03.png (7 shots)
+[14:03:22] [F03] --- end done in 157.5s (max gap 982 ms) ---
+[14:03:23] [F03] ok: the Dark-mode action gives the dark theme
+[14:03:24] [F03] ok: the setup pill shows its screen
+[14:03:24] [F03] ok: and the setup pill is the active one
+[14:03:24] [F03] ok: the 2D segment sets the dimension
+[14:03:25] [F03] ok: the chip's native action switches the solver
+[14:03:25] [F03] budget: 372s left < 420s for F04 - exiting 75
+[14:03:28] [F03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x147bf689280, name="viewWindow") , parent:  QWidgetWindow(0x147bf689f40, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:03:28] [F03] FINDING S3 qt-message: External WM_DESTROY received for  QWidgetWindow(0x147bf6885c0, name="QWidgetClassWindow") , parent:  QWidgetWindow(0x147bf689f40, name="QStackedWidgetClassWindow") , transient parent:  QWindow(0x0)
+[14:03:28] [F03] exit 75; pending: ['F04', 'F05', 'F06', 'F07', 'F08', 'F09', 'F10', 'F11', 'G01', 'G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'M05', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'V10', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06', 'K01', 'K02', 'K03']

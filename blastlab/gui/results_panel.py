@@ -278,14 +278,27 @@ class ResultsPanel(ctk.CTkFrame):
             # GUI-13 (g), QA #4: the gauge column holds `G1 (0.830, 0.610)
             # -> cell (0.826, 0.605) m` at the 1100 px window minimum (it
             # was 150 px and cut the cell at `-> cell`)
+            # GUI-14 (b), D6: the gauge column's real minimum is measured
+            # from its longest label in _fill_summary (250 was ~37 px
+            # short at 1100 px); the others may shrink to 72 so no result
+            # column is cut
             self.summary_table.column(
                 col, width=310 if col == 'gauge' else 104, stretch=True,
-                minwidth=250 if col == 'gauge' else 90,
+                minwidth=250 if col == 'gauge' else 72,
                 anchor='e' if col != 'gauge' else 'w')
+        # a horizontal bar, shown by _fit_summary only when a column is
+        # still clipped (the pack order puts it under the table)
+        self._summary_xbar = ttk.Scrollbar(
+            gtab, orient='horizontal', command=self.summary_table.xview)
+        self.summary_table.configure(xscrollcommand=self._summary_xbar.set)
         self.summary_table.pack(side='bottom', fill='x', pady=(GAP, 0))
         self.gauge_canvas.pack(fill='both', expand=True)
         self._head_tip = theme.tooltip(self.summary_table, '')
         self.summary_table.bind('<Motion>', self._table_hover, add='+')
+        # a table filled while its tab was hidden is checked when it shows
+        self.summary_table.bind(
+            '<Map>', lambda _e: self.after(50, self._summary_clip_check),
+            add='+')
 
         # Animation view
         atab = ctk.CTkFrame(stack, fg_color='transparent')
@@ -688,8 +701,48 @@ class ResultsPanel(ctk.CTkFrame):
         tbl = self.summary_table
         for iid in tbl.get_children():
             tbl.delete(iid)
-        for row in gauge_summary.table_rows(self.summary_rows(res)):
+        rows = gauge_summary.table_rows(self.summary_rows(res))
+        for row in rows:
             tbl.insert('', 'end', values=row)
+        self._fit_summary(rows)
+
+    def _fit_summary(self, rows):
+        """GUI-14 (b), D6: the gauge column is never narrower than its
+        longest label (measured in the table's own font, plus the cell
+        padding), and a horizontal bar appears only if the last column
+        still does not fit."""
+        import tkinter.font as tkfont
+        tbl = self.summary_table
+        try:
+            name = ttk.Style(tbl).lookup('Treeview', 'font') or 'TkDefaultFont'
+            font = tkfont.Font(root=tbl, font=name)
+        except tk.TclError:
+            return
+        pad = 24
+        texts = [str(tbl.heading('gauge', 'text'))] + [str(r[0]) for r in rows]
+        need = max(font.measure(t) for t in texts) + pad
+        tbl.column('gauge', minwidth=need,
+                   width=max(int(tbl.column('gauge', 'width')), need))
+        if tbl.winfo_ismapped():
+            # after the table is laid out; no update_idletasks here - it
+            # redrew the figure canvas on every call
+            self.after(50, self._summary_clip_check)
+
+    def _summary_clip_check(self):
+        tbl = self.summary_table
+        try:
+            kids = tbl.get_children()
+            box = tbl.bbox(kids[0], 'complete') if kids else ''
+        except tk.TclError:
+            return
+        if not box:                 # no rows, or the tab is not on screen
+            return
+        clipped = box[0] + box[2] > tbl.winfo_width() + 1
+        if clipped:
+            self._summary_xbar.pack(side='bottom', fill='x',
+                                    before=tbl)
+        else:
+            self._summary_xbar.pack_forget()
 
     # ── animation replay ─────────────────────────────────────────────────
     def _anim_placeholder(self, text):

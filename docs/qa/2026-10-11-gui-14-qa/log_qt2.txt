@@ -1,0 +1,18 @@
+﻿AXISYM gauge rows [['G1', '1.00', '0.27', ''], ['G2', '1.50', '0.41', '50 cm in front of Wall 1'], ['G3', '2.20', '0.60', 'inside Wall 1'], ['G4', '4.00', '1.09', 'outside the domain (dropped)']]
+AXISYM drops ['G3 (2.20, 1.50) m inside Wall 1 - will be dropped', 'G4 (4.00, 1.50) m outside the domain - will be dropped']
+  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_45fiddfw\runs\gui14qa2\gauges\gauges_2d.txt  (630 rows x 2 gauges)
+  [warn] 2D field contains obstacles - they would become rings in 3D and are NOT carried over
+  2D field profile saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_45fiddfw\runs\gui14qa2\profile_2d.npz  (78 x 78 cells, t = 2.000 ms)
+PASS axisym run finished
+      8.9s
+LOG ['  [warn] G3 (2.20, 1.50) m inside an obstacle - dropped', '  [warn] G4 (4.00, 1.50) m outside the domain - dropped']
+AXISYM card header 'Z 0.27 m/kg^1/3' | G3 dropped by the solver (inside Wall 1) · G4 dropped by the solver (outside the domain). 2 gauges, sorted by Z. Click a row to enlarge it.
+PASS Run card header (axisym, Z mode): "Z <v> m/kg^1/3", no "selected"
+      Z 0.27 m/kg^1/3
+PASS Run card (Z): header and peak do not overlap at 1100x720
+      (PySide6.QtCore.QRect(37, 14, 146, 15), PySide6.QtCore.QRect(191, 14, 98, 15))
+PASS Run card (Z) forced narrow: elided at the END, starts "Z ", tooltip full
+      ('Z 0.27 m/k…', 'Z 0.27 m/kg^1/3')
+maximised 1920 1009
+PASS no modal dialogs
+5/5 checks passed

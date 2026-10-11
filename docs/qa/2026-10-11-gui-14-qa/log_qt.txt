@@ -1,0 +1,60 @@
+﻿platform windows
+maximised size 1920 1009
+CHAIN gauges per stage {1: [], 2: [], 3: []} stage1 radius 1.5 gauge_radii []
+card states ['● case OK', '● case OK', '● 1 warning'] {1: [('ok', 'Stage OK')], 2: [('ok', 'Stage OK')], 3: [('warn', "The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.")]}
+PASS Chain default: stage 1 radius 1.5 m
+      1.5
+PASS Chain default: stage 1 holds no gauge at all (none beyond 1.5 m)
+      ({1: [], 2: [], 3: []}, [])
+PASS Chain default: card 1 and card 2 clean
+      ['● case OK', '● case OK', '● 1 warning']
+PASS Chain default: card 3 state (info)
+      ● 1 warning [('warn', "The 2D stage's Burst z (2.0 m) is at or above this stage's Lz (1.5 m): the 3D box cuts the 2D field off above 1.5 m, burst included. Raise Lz to at least 4.0 m (the 2D stage's Height H) or lower the 2D stage's Burst z.")]
+chain stage 2 gauges node warn [('error', 'must be axisymmetric to feed the 3D stage.'), ('error', '1D profile remap is only valid in axisymmetric mode'), ('warn', "No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it."), ('warn', 'G2 (1.40, 0.30) m inside Wall 1 - will be dropped'), ('warn', 'G3 (3.00, 0.50) m outside the domain - will be dropped'), ('warn', "The 1D stage hands off at 1.5 m; that already reaches this stage's boundary or a wall, so the remap is not spherical there (the run warns too). Set stage 1's radius below 0.8 m to keep it inside.")]
+PASS Chain stage 2: Gauges node warn with a wall and an outside gauge
+      ('warn', [('error', 'must be axisymmetric to feed the 3D stage.'), ('error', '1D profile remap is only valid in axisymmetric mode'), ('warn', "No terminate boundary and no end time: the run is bounded only by the safety cap (~71 ms). Set a side to 'terminate' to stop when the wave reaches it."), ('warn', 'G2 (1.40, 0.30) m inside Wall 1 - will be dropped'), ('warn', 'G3 (3.00, 0.50) m outside the domain - will be dropped'), ('warn', "The 1D stage hands off at 1.5 m; that already reaches this stage's boundary or a wall, so the remap is not spherical there (the run warns too). Set stage 1's radius below 0.8 m to keep it inside.")])
+PASS Chain stage 2: Gauges node back to ok when moved inside
+      ok
+SETUP gauge rows [['G1', '0.30', ''], ['G2', '1.21', 'inside Wall 1'], ['G3', '2.72', 'outside the domain (dropped)'], ['G4', '2.10', '']]
+PASS Setup Where: outside gauges read "outside the domain (dropped)"
+      ['', 'inside Wall 1', 'outside the domain (dropped)', '']
+PASS Setup Where: x == Lx gauge (2.4, 0.8) not outside
+PASS Setup Where: gauge in the wall reads inside Wall 1 (no suffix, warn-coloured)
+      inside Wall 1
+visible tables [(4, 7)]
+item colours [('G1', '#4cc9f0', '#a8a39b'), ('G2', '#f5d061', '#f5d061'), ('G3', '#f5d061', '#f5d061'), ('G4', '#4cc9f0', '#a8a39b')]
+PASS Setup table: dropped G<n> cells differ in colour from kept ones
+      [('G1', '#4cc9f0', '#a8a39b'), ('G2', '#f5d061', '#f5d061'), ('G3', '#f5d061', '#f5d061'), ('G4', '#4cc9f0', '#a8a39b')]
+Setup gauges node status warn
+PASS Setup: Gauges node warn
+      warn
+  Gauge data saved: C:\Users\ROTEM~1.OFE\AppData\Local\Temp\blastlab_ui_c31axdv3\runs\gui14qa\gauges\gauges_2d.txt  (425 rows x 1 gauges)
+PASS run finished
+      6.3s
+RUN LOG drop lines ['  [warn] G2 (1.12, 0.73) m inside an obstacle - dropped', '  [warn] G3 (3.00, 0.50) m outside the domain - dropped']
+PASS Native log: G2 inside an obstacle line
+      ['  [warn] G2 (1.12, 0.73) m inside an obstacle - dropped', '  [warn] G3 (3.00, 0.50) m outside the domain - dropped']
+PASS Native log: G3 outside the domain line
+      ['  [warn] G2 (1.12, 0.73) m inside an obstacle - dropped', '  [warn] G3 (3.00, 0.50) m outside the domain - dropped']
+run caption 'G2 dropped by the solver (inside Wall 1) · G3 dropped by the solver (outside the domain). 1 gauge, sorted by R. Click a row to enlarge it.' ['G1']
+card meta 'R 0.77 m · Wall 1' full 'R 0.77 m · Wall 1'
+PASS Run card header (planar 2D, R mode): no selected
+      R 0.77 m · Wall 1
+PASS Run card: header and peak do not overlap (1100x720)
+      (PySide6.QtCore.QRect(37, 14, 132, 15), PySide6.QtCore.QRect(177, 14, 112, 15))
+PASS Run card (R mode) forced narrow: elided at the END, tooltip full
+      ('R 0.77 m · …', 'R 0.77 m · Wall 1')
+drop caption 'G2 dropped by the solver (inside Wall 1) · G3 dropped by the solver (outside the domain)' gaugedrop
+dark drop caption colour #f5d061 weight 600 px 13 objname gaugedrop
+PASS Results drop line [dark] visible, objectName gaugedrop, weight>=600
+      ('gaugedrop', 600, '#f5d061')
+light drop caption colour #926800 weight 600 px 13 objname gaugedrop
+PASS Results drop line [light] visible, objectName gaugedrop, weight>=600
+      ('gaugedrop', 600, '#926800')
+stage 3 gauges node warn
+PASS Chain stage 3: Gauges node warn with one outside gauge
+      warn
+modal []
+PASS no modal dialogs
+
+21/21 checks passed

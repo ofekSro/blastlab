@@ -1,0 +1,12 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\ui_harness
+[14:10:51] [boot] window up: 1280x840 (built 7923 ms, shown 1852 ms)
+[14:10:51] [F06] --- begin ---
+[14:10:52] [F06] ok: the setup pill shows its screen
+[14:10:52] [F06] ok: and the setup pill is the active one
+[14:10:53] [F06] NOTE: 3D AMR strip: Checking WSL blastFoam availability... | AMR (Lohner): up to 2 level(s) below the 0.05 m base cell (finest 0.0125 m), refining every 2 step(s) with 2 buffer layer(s) | Results are displayed at level 1 (0.025 m, 216,000 cells); cells finer than that are box-averaged | The mesh starts at ~27,000 cells and may grow to 150,000 (maxCells) | Charge cells: 6,272 at 0.0125 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Cell caps from hardware measured on this machine in an earlier session (63 GB VM); re-checking in the background. | Parallel run: 1 rank: 27,000 cells is below the 200,000-cell parallel floor | ~27,000 cells at dx = 0.05 m at t = 0; AMR up to level 2 (finest 0.0125 m), displayed at level 1 (216,000 cells)
+[14:10:53] [F06] ok: the setup pill shows its screen
+[14:10:53] [F06] ok: and the setup pill is the active one
+[14:10:55] [F06] NOTE: amr3d strip: blastFoam ready in WSL (Ubuntu) | AMR (Lohner): up to 2 level(s) below the 0.05 m base cell (finest 0.0125 m), refining every 2 step(s) with 2 buffer layer(s) | Results are displayed at level 1 (0.025 m, 216,000 cells); cells finer than that are box-averaged | The mesh starts at ~27,000 cells and may grow to 150,000 (maxCells) | Charge cells: 6,272 at 0.0125 m -> ~1.00 of the 20 kg set by blastFoam (whole cells are marked; 8 cells across the radius) | Cell caps from hardware measured on this machine in an earlier session (63 GB VM); re-checking in the background. | Parallel run: 1 rank: 27,000 cells is below the 200,000-cell parallel floor | ~27,000 cells at dx = 0.05 m at t = 0; AMR up to level 2 (finest 0.0125 m), displayed at level 1 (216,000 cells)
+[14:10:55] [F06] ok: the run pill shows its screen
+[14:10:55] [F06] ok: and the run pill is the active one
+[14:11:02] [F06] DIALOG show_error [Run failed] 'RuntimeError: blastFoam failed (exit 134) - case kept at \\\\wsl.localhost\\Ubuntu\\root\\blastlab_runs\\20261011-141055_3d_p50100-00\n\nSee the run log for details.' -> 'ok'

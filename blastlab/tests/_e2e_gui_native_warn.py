@@ -58,7 +58,7 @@ def main():
     check('run finished in the GUI', '[run finished]' in log)
     check('native banner reached the GUI log', '2D Blast Solver' in log)
     check('"[warn] Gauge ... dropped" reached the GUI log',
-          '[warn] Gauge (1.4, 0.3) inside an obstacle - dropped' in log,
+          '[warn] G2 (1.40, 0.30) m inside an obstacle - dropped' in log,
           '(not in log)')
     check('the kept gauge is not reported dropped',
           'Gauge (0.3, 0.8)' not in log)

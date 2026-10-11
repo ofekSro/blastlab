@@ -1,0 +1,228 @@
+QA output: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness
+[14:55:22] [boot] foreign WSL solvers at kickoff: []
+[14:55:30] [boot] App built in 4865 ms
+[14:55:30] [D05] === BEGIN D05 ===
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_3d.txt  (39 rows x 2 gauges)
+  Writing animation (39 frames, fixed (whole video) 0 .. 2.77e+06 kPa) ... [14:55:39] [D05] SHOT 109_D05_run_stop_requested_dark.png (printwindow, lum 37)
+[14:55:39] [D05] NOTE: right after Stop: Stop btn=normal Run btn=disabled
+done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[14:55:58] [D05] NOTE: stop latency 19.9 s
+[14:55:59] [D05] SHOT 110_D05_run_stopped_dark.png (printwindow, lum 37)
+[14:55:59] [D05] ok: stopped run labelled "(stopped)"
+[14:55:59] [D05] ok: progress bar NOT filled after a stop
+[14:55:59] [D05] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_D05.png
+[14:55:59] [D05] === END D05: done (29s, max gap 1419 ms) ===
+[14:56:00] [D06] === BEGIN D06 ===
+[14:56:02] [D06] DIALOG askyesno [Model folder] "QA already exists in C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\runs. Overwrite? The previous run's files will be de" -> True
+[14:56:02] [D06] SHOT 111_D06_run_dialog-askyesno_dark.png (printwindow, lum 37)
+[14:56:02] [D06] DIALOG showinfo [Run] 'A run is already in progress.' -> 'ok'
+[14:56:03] [D06] SHOT 112_D06_run_dialog-showinfo_dark.png (printwindow, lum 38)
+[14:56:03] [D06] click on DISABLED button Run (disabled?)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\gauges\gauges_2d.txt  (76 rows x 1 gauges)
+  Writing animation (76 frames, fixed (whole video) 0 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\runs\QA\animation.gif
+[14:56:24] [D06] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_D06.png
+[14:56:24] [D06] === END D06: done (24s, max gap 675 ms) ===
+[14:56:25] [E01] === BEGIN E01 ===
+[14:56:29] [E01] NOTE: combo values: ['QA - 3D (stopped)', 'QA - 2D (stopped)', 'QA native1d', 'QA native2d', 'QA native3d']
+[14:56:30] [E01] SHOT 113_E01_results_1d_fields_dark.png (printwindow, lum 39)
+[14:56:32] [E01] SHOT 114_E01_results_1d_gauges_dark.png (printwindow, lum 40)
+[14:56:33] [E01] SHOT 115_E01_results_1d_animation_dark.png (printwindow, lum 40)
+[14:56:34] [E01] SHOT 116_E01_results_1d_3d_dark.png (printwindow, lum 32)
+[14:56:35] [E01] DIALOG asksaveasfilename [Save profile] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E01\\save1_blast_profile.txt'
+[14:56:35] [E01] SHOT 117_E01_results_dialog-asksaveasfilename_dark.png (printwindow, lum 39)
+  Field profile saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E01\save1_blast_profile.txt  (400 cells, t = 1.828 ms)
+[14:56:37] [E01] ok: 3D Viewer on a 1D result logs a message
+[14:56:37] [E01] NOTE: that message goes to the RUN-tab log while the user is on Results - nothing visible here
+[14:56:37] [E01] SHOT 118_E01_results_after_3dviewer_click_dark.png (printwindow, lum 39)
+[14:56:38] [E01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E01.png
+[14:56:38] [E01] === END E01: done (12s, max gap 370 ms) ===
+[14:56:39] [E02] === BEGIN E02 ===
+[14:56:40] [E02] NOTE: 2D snapshots: ['t = 0.110 ms', 't = 0.276 ms', 't = 0.466 ms (final)']; fields: ['overpressure', 'density', 'speed', 'peak overpressure', 'net ovp impulse']
+[14:56:42] [E02] SHOT 119_E02_results_overpressure_t_=_0.110_ms_dark.png (printwindow, lum 36)
+[14:56:43] [E02] SHOT 120_E02_results_overpressure_t_=_0.466_ms_dark.png (printwindow, lum 41)
+[14:56:44] [E02] SHOT 121_E02_results_density_t_=_0.110_ms_dark.png (printwindow, lum 36)
+[14:56:46] [E02] SHOT 122_E02_results_density_t_=_0.466_ms_dark.png (printwindow, lum 42)
+[14:56:47] [E02] SHOT 123_E02_results_speed_t_=_0.110_ms_dark.png (printwindow, lum 38)
+[14:56:49] [E02] SHOT 124_E02_results_speed_t_=_0.466_ms_dark.png (printwindow, lum 44)
+[14:56:50] [E02] SHOT 125_E02_results_peak_overpressure_t_=_0.110_ms_dark.png (printwindow, lum 37)
+[14:56:52] [E02] SHOT 126_E02_results_peak_overpressure_t_=_0.466_ms_dark.png (printwindow, lum 37)
+[14:56:53] [E02] SHOT 127_E02_results_net_ovp_impulse_t_=_0.110_ms_dark.png (printwindow, lum 37)
+[14:56:54] [E02] SHOT 128_E02_results_net_ovp_impulse_t_=_0.466_ms_dark.png (printwindow, lum 37)
+[14:56:56] [E02] SHOT 129_E02_results_overpressure_mesh_dark.png (printwindow, lum 42)
+[14:56:58] [E02] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E02.png
+[14:56:58] [E02] === END E02: done (18s, max gap 334 ms) ===
+[14:56:59] [E03] === BEGIN E03 ===
+[14:57:02] [E03] SHOT 130_E03_results_gauges_2d_dark.png (printwindow, lum 39)
+[14:57:02] [E03] NOTE: summary rows: [['G1 (0.300, 0.800) -> cell (0.305, 0.802) m', '7759.4', '0.211', '0.237', '0.255', '619.31', '619.32', 'no']]
+[14:57:02] [E03] NOTE: table column widths: [372, 94, 94, 94, 94, 94, 94, 84] (sum 1020 px) vs table width 1024 px
+[14:57:02] [E03] DIALOG asksaveasfilename [Save gauge summary CSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E03\\save1_gauges_2d_summary.csv'
+[14:57:02] [E03] SHOT 131_E03_results_dialog-asksaveasfilename_dark.png (printwindow, lum 39)
+[14:57:02] [E03] ok: summary export wrote save1_gauges_2d_summary.csv
+[14:57:03] [E03] SHOT 132_E03_results_after_summary_export_dark.png (printwindow, lum 39)
+[14:57:03] [E03] DIALOG asksaveasfilename [Save gauges TSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E03\\save1_gauges_2d.txt'
+[14:57:03] [E03] SHOT 133_E03_results_dialog-asksaveasfilename_dark.png (printwindow, lum 39)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E03\save1_gauges_2d.txt  (634 rows x 1 gauges)
+[14:57:03] [E03] ok: tsv export wrote save1_gauges_2d.txt
+[14:57:04] [E03] SHOT 134_E03_results_after_tsv_export_dark.png (printwindow, lum 39)
+[14:57:04] [E03] DIALOG askdirectory [Save field CSVs into] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E03'
+[14:57:04] [E03] SHOT 135_E03_results_dialog-askdirectory_dark.png (printwindow, lum 39)
+[14:57:05] [E03] ok: fieldcsv export wrote p_peak.csv
+[14:57:06] [E03] SHOT 136_E03_results_after_fieldcsv_export_dark.png (printwindow, lum 39)
+[14:57:06] [E03] DIALOG asksaveasfilename [Save HTML report] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E03\\save1_blast_2d_report.html'
+[14:57:06] [E03] SHOT 137_E03_results_dialog-asksaveasfilename_dark.png (printwindow, lum 39)
+[14:57:08] [E03] DIALOG os.startfile [C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E03\save1_blast_2d_report.html] '' -> 'ok'
+[14:57:08] [E03] ok: report export wrote save1_blast_2d_report.html
+[14:57:09] [E03] SHOT 138_E03_results_after_report_export_dark.png (printwindow, lum 39)
+[14:57:09] [E03] NOTE: export feedback: only a "Saved ..." line in the RUN-tab log
+[14:57:11] [E03] SHOT 139_E03_results_gauges_1d_dark.png (printwindow, lum 40)
+[14:57:12] [E03] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E03.png
+[14:57:12] [E03] === END E03: done (13s, max gap 435 ms) ===
+[14:57:13] [E04] === BEGIN E04 ===
+[14:57:16] [E04] SHOT 140_E04_results_anim_frame0_dark.png (printwindow, lum 32)
+[14:57:16] [E04] NOTE: 81 recorded frames; slider to=80 steps=80
+[14:57:19] [E04] SHOT 141_E04_results_playing_dark.png (printwindow, lum 33)
+[14:57:20] [E04] SHOT 142_E04_results_last_frame_dark.png (printwindow, lum 42)
+[14:57:23] [E04] SHOT 143_E04_results_mid_frame_mesh_dark.png (printwindow, lum 35)
+[14:57:24] [E04] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E04.png
+[14:57:24] [E04] === END E04: done (10s, max gap 330 ms) ===
+[14:57:25] [E05] === BEGIN E05 ===
+[14:57:26] [E05] NOTE: 3D fields: ['overpressure (x-z)', 'overpressure (x-y)', 'density (x-z)', 'density (x-y)', 'peak overpressure (x-z)', 'peak overpressure (x-y)', 'net ovp impulse (x-z)', 'net ovp impulse (x-y)', 'isosurface']
+[14:57:28] [E05] SHOT 144_E05_results_overpressure_x-z_dark.png (printwindow, lum 43)
+[14:57:30] [E05] SHOT 145_E05_results_overpressure_x-y_dark.png (printwindow, lum 44)
+[14:57:31] [E05] SHOT 146_E05_results_density_x-z_dark.png (printwindow, lum 44)
+[14:57:33] [E05] SHOT 147_E05_results_density_x-y_dark.png (printwindow, lum 41)
+[14:57:34] [E05] SHOT 148_E05_results_peak_overpressure_x-z_dark.png (printwindow, lum 37)
+[14:57:36] [E05] SHOT 149_E05_results_peak_overpressure_x-y_dark.png (printwindow, lum 36)
+[14:57:38] [E05] SHOT 150_E05_results_net_ovp_impulse_x-z_dark.png (printwindow, lum 37)
+[14:57:39] [E05] SHOT 151_E05_results_net_ovp_impulse_x-y_dark.png (printwindow, lum 36)
+[14:57:41] [E05] SHOT 152_E05_results_isosurface_dark.png (printwindow, lum 40)
+[14:57:43] [E05] SHOT 153_E05_results_ovp_xz_mesh_dark.png (printwindow, lum 44)
+[14:57:44] [E05] SHOT 154_E05_results_gauges_3d_dark.png (printwindow, lum 40)
+[14:57:45] [E05] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E05.png
+[14:57:45] [E05] === END E05: done (20s, max gap 378 ms) ===
+[14:57:47] [E06] === BEGIN E06 ===
+[14:57:48] [E06] TIMING feed_result native3d: 487 ms
+[14:57:48] [E06] ok: feed_result blocked the UI for 487 ms (G4)
+[14:57:51] [E06] SHOT 155_E06_results_viewer_default_dark.png (printwindow, lum 38)
+[14:57:51] [E06] NOTE: field buttons: p=normal, rho=normal, e=normal, p_peak=normal, imp=normal
+[14:57:53] [E06] SHOT 156_E06_results_field_rho_dark.png (printwindow, lum 38)
+[14:57:55] [E06] SHOT 157_E06_results_field_e_dark.png (printwindow, lum 38)
+[14:57:57] [E06] SHOT 158_E06_results_field_p_peak_dark.png (printwindow, lum 38)
+[14:57:59] [E06] SHOT 159_E06_results_field_imp_dark.png (printwindow, lum 38)
+[14:58:01] [E06] SHOT 160_E06_results_field_p_dark.png (printwindow, lum 38)
+[14:58:03] [E06] SHOT 161_E06_results_manual_clim_0_200_dark.png (printwindow, lum 38)
+[14:58:05] [E06] SHOT 162_E06_results_log_contours_dark.png (printwindow, lum 38)
+[14:58:06] [E06] SHOT 163_E06_results_iso_off_dark.png (printwindow, lum 38)
+[14:58:08] [E06] SHOT 164_E06_results_iso_0.3_dark.png (printwindow, lum 38)
+[14:58:10] [E06] SHOT 165_E06_results_loads_off_dark.png (printwindow, lum 38)
+[14:58:10] [E06] TIMING volume on + blit: 134 ms
+[14:58:12] [E06] SHOT 166_E06_results_volume_on_dark.png (printwindow, lum 38)
+[14:58:14] [E06] SHOT 167_E06_results_mesh_on_dark.png (printwindow, lum 41)
+[14:58:16] [E06] SHOT 168_E06_results_mesh_plane1_0.3_dark.png (printwindow, lum 40)
+[14:58:18] [E06] SHOT 169_E06_results_plane2_z_0.25_op50_dark.png (printwindow, lum 38)
+[14:58:19] [E06] SHOT 170_E06_results_plane1_pos_0.0_dark.png (printwindow, lum 39)
+[14:58:21] [E06] SHOT 171_E06_results_plane1_pos_1.0_dark.png (printwindow, lum 39)
+[14:58:23] [E06] SHOT 172_E06_results_preset_top_dark.png (printwindow, lum 38)
+[14:58:25] [E06] SHOT 173_E06_results_preset_front_dark.png (printwindow, lum 38)
+[14:58:27] [E06] SHOT 174_E06_results_parallel_dark.png (printwindow, lum 38)
+[14:58:28] [E06] SHOT 175_E06_results_time_first_dark.png (printwindow, lum 38)
+[14:58:30] [E06] SHOT 176_E06_results_time_last_dark.png (printwindow, lum 38)
+[14:58:32] [E06] SHOT 177_E06_results_playing_dark.png (printwindow, lum 38)
+[14:58:34] [E06] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E06.png
+[14:58:34] [E06] === END E06: done (46s, max gap 374 ms) ===
+[14:58:36] [E07] === BEGIN E07 ===
+[14:58:37] [E07] click on DISABLED button profile
+[14:58:37] [E07] NOTE: QA native2d: profile button disabled
+[14:58:37] [E07] DIALOG asksaveasfilename [Save animation] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\save1_blast_2d_animation.mp4'
+[14:58:38] [E07] SHOT 178_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 41)
+  Writing animation (81 frames, fixed (whole video) -3.42 .. 1.54e+05 kPa  (top 0.5 % clipped)) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\save1_blast_2d_animation.mp4
+[14:58:52] [E07] NOTE: QA native2d gif: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\save1_blast_2d_animation.mp4
+[14:58:53] [E07] SHOT 179_E07_results_2d_gif_dark.png (printwindow, lum 41)
+[14:58:53] [E07] DIALOG asksaveasfilename [Save gauge summary CSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\save1_gauges_2d_summary.csv'
+[14:58:53] [E07] SHOT 180_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 41)
+[14:58:53] [E07] NOTE: QA native2d summary: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\save1_gauges_2d_summary.csv
+[14:58:54] [E07] SHOT 181_E07_results_2d_summary_dark.png (printwindow, lum 41)
+[14:58:54] [E07] DIALOG asksaveasfilename [Save gauges TSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\save1_gauges_2d.txt'
+[14:58:54] [E07] SHOT 182_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 41)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\save1_gauges_2d.txt  (634 rows x 1 gauges)
+[14:58:55] [E07] NOTE: QA native2d tsv: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\save1_gauges_2d.txt
+[14:58:55] [E07] SHOT 183_E07_results_2d_tsv_dark.png (printwindow, lum 41)
+[14:58:55] [E07] DIALOG askdirectory [Save PNGs into] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07'
+[14:58:56] [E07] SHOT 184_E07_results_dialog-askdirectory_dark.png (printwindow, lum 41)
+[14:58:57] [E07] NOTE: QA native2d pngs: aved save1_blast_2d_pressure.png / Saved save1_blast_2d_density.png
+[14:58:58] [E07] SHOT 185_E07_results_2d_pngs_dark.png (printwindow, lum 41)
+[14:58:58] [E07] click on DISABLED button vtk
+[14:58:58] [E07] NOTE: QA native2d: vtk button disabled
+[14:58:58] [E07] NOTE: files in exports/E07 after QA native2d: ['save1_blast_2d_animation.mp4', 'save1_blast_2d_density.png', 'save1_blast_2d_gauges.png', 'save1_blast_2d_impulse.png', 'save1_blast_2d_peak_overpressure.png', 'save1_blast_2d_pressure.png', 'save1_gauges_2d.txt', 'save1_gauges_2d_summary.csv']
+[14:58:59] [E07] click on DISABLED button profile
+[14:59:00] [E07] NOTE: QA native3d: profile button disabled
+[14:59:00] [E07] DIALOG asksaveasfilename [Save animation] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\QA_blast_3d_animation.mp4'
+[14:59:00] [E07] SHOT 186_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 43)
+  Writing animation (135 frames, fixed (whole video) -101 .. 2.77e+06 kPa) ... done
+  Animation saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\QA_blast_3d_animation.mp4
+[14:59:20] [E07] NOTE: QA native3d gif: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\QA_blast_3d_animation.mp4
+[14:59:21] [E07] SHOT 187_E07_results_3d_gif_dark.png (printwindow, lum 43)
+[14:59:21] [E07] DIALOG asksaveasfilename [Save gauge summary CSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\QA_gauges_3d_summary.csv'
+[14:59:21] [E07] SHOT 188_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 43)
+[14:59:22] [E07] NOTE: QA native3d summary: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\QA_gauges_3d_summary.csv
+[14:59:22] [E07] SHOT 189_E07_results_3d_summary_dark.png (printwindow, lum 43)
+[14:59:22] [E07] DIALOG asksaveasfilename [Save gauges TSV] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07\\QA_gauges_3d.txt'
+[14:59:23] [E07] SHOT 190_E07_results_dialog-asksaveasfilename_dark.png (printwindow, lum 43)
+  Gauge data saved: C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\QA_gauges_3d.txt  (2137 rows x 2 gauges)
+[14:59:23] [E07] NOTE: QA native3d tsv: aved C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\exports\E07\QA_gauges_3d.txt
+[14:59:24] [E07] SHOT 191_E07_results_3d_tsv_dark.png (printwindow, lum 43)
+[14:59:24] [E07] DIALOG askdirectory [Save PNGs into] '' -> 'C:\\Users\\rotem.ofek\\blastlab-worktrees\\gui-14\\docs\\qa\\2026-10-11-gui-14-qa\\gui_harness\\exports\\E07'
+[14:59:24] [E07] SHOT 192_E07_results_dialog-askdirectory_dark.png (printwindow, lum 43)
+[14:59:26] [E07] NOTE: QA native3d pngs: aved QA_blast_3d_pressure_vertical.png / Saved QA_blast_3d_pressure_horizontal.png
+[14:59:27] [E07] SHOT 193_E07_results_3d_pngs_dark.png (printwindow, lum 43)
+[14:59:27] [E07] click on DISABLED button vtk
+[14:59:27] [E07] NOTE: QA native3d: vtk button disabled
+[14:59:27] [E07] NOTE: files in exports/E07 after QA native3d: ['QA_blast_3d_animation.mp4', 'QA_blast_3d_density_vertical.png', 'QA_blast_3d_pressure_horizontal.png', 'QA_blast_3d_pressure_vertical.png', 'QA_gauges_3d.txt', 'QA_gauges_3d_summary.csv', 'save1_blast_2d_animation.mp4', 'save1_blast_2d_density.png', 'save1_blast_2d_gauges.png', 'save1_blast_2d_impulse.png', 'save1_blast_2d_peak_overpressure.png', 'save1_blast_2d_pressure.png', 'save1_gauges_2d.txt', 'save1_gauges_2d_summary.csv']
+[14:59:28] [E07] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E07.png
+[14:59:28] [E07] === END E07: done (52s, max gap 377 ms) ===
+[14:59:30] [E08] === BEGIN E08 ===
+[14:59:30] [E08] click on DISABLED button profile
+[14:59:31] [E08] click on DISABLED button vtk
+[14:59:33] [E08] ok: exports with nothing selected give some feedback (silent no-op - G3)
+[14:59:34] [E08] SHOT 194_E08_results_after_empty_exports_dark.png (printwindow, lum 43)
+[14:59:35] [E08] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E08.png
+[14:59:35] [E08] === END E08: done (5s, max gap 402 ms) ===
+[14:59:37] [E09] === BEGIN E09 ===
+[14:59:38] [E09] NOTE: combo now: ['QA - 3D (stopped)', 'QA - 2D (stopped)', 'QA native1d', 'QA native2d', 'QA native3d', 'QA native1d #2']
+[14:59:38] [E09] ok: a repeated result label is de-duplicated (#2), so both entries stay reachable in the picker
+[14:59:38] [E09] ok: selecting the de-duplicated entry returns that entry
+[14:59:39] [E09] ok: Remove drops the selected result from the picker
+[14:59:39] [E09] SHOT 195_E09_results_duplicate_labels_dark.png (printwindow, lum 43)
+[14:59:39] [E09] NOTE: 5 entries retained; no Remove button exists
+[14:59:40] [E09] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_E09.png
+[14:59:40] [E09] === END E09: done (3s, max gap 679 ms) ===
+[14:59:41] [G01] === BEGIN G01 ===
+[14:59:43] [G01] SHOT 196_G01_chain_chain_default_dark.png (printwindow, lum 40)
+[14:59:43] [G01] DIALOG showerror [Chain] 'No stages selected.' -> 'ok'
+[14:59:43] [G01] SHOT 197_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:43] [G01] DIALOG showerror [Chain] 'Stages must be consecutive.' -> 'ok'
+[14:59:44] [G01] SHOT 198_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:44] [G01] DIALOG showerror [Chain] 'Stage 2 (2D): must be axisymmetric to feed the 3D stage.' -> 'ok'
+[14:59:45] [G01] SHOT 199_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:46] [G01] ok: foam 2D stage fed by 1D is accepted (N7 refusal gone)
+[14:59:47] [G01] SHOT 200_G01_chain_chain_foam_stage_accepted_dark.png (printwindow, lum 41)
+[14:59:47] [G01] ok: native 1D -> foam 2D hand-off is refused (N5-4)
+[14:59:48] [G01] ok: the Tk chain panel says it live and disables Run chain
+[14:59:48] [G01] SHOT 201_G01_chain_chain_native_to_foam_refused_dark.png (printwindow, lum 41)
+[14:59:49] [G01] DIALOG showerror [Chain] "Stage 2 (2D): 'Lx' is not a number: 'abc'" -> 'ok'
+[14:59:49] [G01] SHOT 202_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:50] [G01] DIALOG showerror [Chain] 'Stage 2 (2D): Charge centre is outside the domain' -> 'ok'
+[14:59:50] [G01] SHOT 203_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:52] [G01] SHOT 204_G01_chain_after_dialogs_dark.png (printwindow, lum 40)
+[14:59:52] [G01] NOTE: stage switcher after the dialogs: Stage 2D (the dialog named stage 2)
+[14:59:52] [G01] DIALOG showerror [Chain] 'Model name: the name is empty\nThe Runs folder and Model boxes are on the Run tab.' -> 'ok'
+[14:59:52] [G01] SHOT 205_G01_chain_dialog-showerror_dark.png (printwindow, lum 40)
+[14:59:52] [G01] ok: model folder NOT created while every run was refused
+[14:59:52] [G01] ok: Run chain still enabled after refused starts
+[14:59:53] [G01] SHEET C:\Users\rotem.ofek\blastlab-worktrees\gui-14\docs\qa\2026-10-11-gui-14-qa\gui_harness\sheets\contact_G01.png
+[14:59:53] [G01] === END G01: done (11s, max gap 812 ms) ===
+[14:59:54] [G01] budget: 268s left < 420s for G02 - exiting 75
+[15:00:01] [G01] exit 75; pending: ['G02', 'G03', 'M01', 'M02', 'M03', 'M04', 'V01', 'V02', 'V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'V09', 'H01', 'H02', 'H03', 'I01', 'I02', 'I03', 'I04', 'I05', 'I06']

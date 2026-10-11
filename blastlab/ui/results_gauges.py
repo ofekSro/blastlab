@@ -368,7 +368,8 @@ class GaugesView(QWidget):
         # wraps as Run's caption does, so it is never cut at 1100 px; the
         # static caption above stays one elided line
         self.drop_caption = QLabel('')
-        self.drop_caption.setObjectName('gaugecaption')
+        # GUI-14 (f): the warn style Run's drop line has
+        self.drop_caption.setObjectName('gaugedrop')
         self.drop_caption.setWordWrap(True)
         self.drop_caption.setContentsMargins(14, 0, 12, 6)
         self.drop_caption.setVisible(False)
