@@ -279,14 +279,17 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     # ── Gauge setup ────────────────────────────────────────────────────────
     gauges = gauges or []
     gauge_ij, gauge_actual = [], []
-    for (gx, gy) in gauges:
+    for n, (gx, gy) in enumerate(gauges, start=1):
+        # GUI-14 (g): the gauge as Setup and the validation warning name
+        # it, G<n> (1-based, the entered order) at its coordinates in metres
+        name = f"G{n} ({gx:.2f}, {gy:.2f}) m"
         if not (0 <= gx <= Lx and 0 <= gy <= Ly):
-            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}) outside domain - dropped")
+            hooks.log(f"  [warn] {name} outside the domain - dropped")
             continue
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
         if solid[i, j]:
-            hooks.log(f"  [warn] Gauge ({gx:g}, {gy:g}) inside an obstacle - dropped")
+            hooks.log(f"  [warn] {name} inside an obstacle - dropped")
             continue
         gauge_ij.append((i, j))
         gauge_actual.append((float(x_c[i]), float(y_c[j])))

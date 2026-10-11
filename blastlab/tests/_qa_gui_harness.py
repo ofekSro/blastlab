@@ -1594,7 +1594,7 @@ def d02_native_2d_live(qa):
     qa.shot('live_nomesh')
     qa.run_wait(240)
     qa.shot('finished')
-    qa.check(qa.log_has('[warn] Gauge (1.4, 0.3) inside an obstacle - dropped'),
+    qa.check(qa.log_has('[warn] G2 (1.40, 0.30) m inside an obstacle - dropped'),
              'dropped-gauge warning reached the run log', 'S2')
     qa.note('the dropped-gauge warning lives only in the Run log; the '
             'Results Gauges table will simply show one gauge')
