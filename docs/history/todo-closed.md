@@ -23,6 +23,7 @@ Moved verbatim out of [TODO.md](../../TODO.md) on 2026-10-04 (1000-line cap).
 | `GUI-10` | ✅ done 2026-10-03 (DONE.md §0s) · **QA pass** — harness navigation on the new frame, all 63 scenarios, light mode, 1100 × 720. Plan §10 | M | 10 |
 | `GUI-11` | ✅ done 2026-10-04 (DONE.md §0t parts a-d, §0u part e) · **Polish, owner-approved 2026-10-03** (`docs/gui-redesign-decisions.md`, owner-review rows) — (a) D191: `● unsaved` shortens to `●` (tooltip) whenever the case name is elided (D198 does it only when a control would be squeezed); F38: the harness clip check sees tool-button elision, then K02 `--window` again; F36: harness F02/F10 expect the VTK export disabled with its reason; (b) D192: tree-row hover visible in dark, dark `num_dim` at 4.06:1 on hover accepted; (c) F28: clear the previous stage's progress at a stage start, one line in `solvers/worker.py` — own commit, `test_regression` + the Tk suites; (d) F12: at 0-D hide the Run view toolbar, show a 0-D note; (e) F16: keep a case file's hidden-row value (`amr_refine` / `amr_unrefine`), solver defaults untouched; (f) F17: a shorter on-screen 1D figure title, exports byte-identical; (g) P2-18 and P2-24; (h) whatever the `gui-qa-tester` / `gui-ux-reviewer` pass after GUI-10 finds. Plan: `docs/batches/2026-10-03-gui-polish.md` (11a-11d). Owner 2026-10-03: UXR-3 → **hide** the Material row in native mode (not the plan's warning; the hidden-rows pin changes with that reason); UXR-14 → `P2-25`, not here | L | 11 |
 | `GUI-12` | ✅ done 2026-10-04 (DONE.md §0v; branch `gui-12`, merged into `master` 2026-10-04) · **Backlog left by GUI-11e** (2026-10-04; `docs/qa/2026-10-04-gui-11e/`, `docs/batches/2026-10-04-gui-11e.verifyA.md`) — (a) QA, medium: the exported gauge-trace subplot titles (`output/plots.py` `figure_gauges_1d` / `_nd`) and the Tk Gauges tab number by survivor index (`Gauge 1/2/3`), not the entered G as the table beside them does (F42's sibling; export bytes change for runs with a drop); (b) UX, medium: the F44 warning names no wall, while Run and Setup's Where column say `Wall 1` (the index is in `_gauge_drop_rule`'s loop); (c) QA, low: the Chain 2D stage's Checks show `inside an obstacle` but not `on an obstacle face` for the case Setup warns on (the stage's auto-refined dx differs); (d) F45: a 2D → 3D reach check (the default chain's burst at z 2.0 m above the 1.5 m box); (e) harness E03 looks for `<file>` where the app writes `save1_<file>` (4 false findings); (f) the stale char goldens red at base `ee9a4b5` (`test_char_exports`, `test_ui_char_results_exports`, `test_gui_char_case_form`, `test_gui_char_exports`; the owner's session also lists `test_char_hd13`, `_cli`, `test_ui_char_case_form`, `_chain_wiring`, `_hd13_run`): check that the HD13 drift (-45.3645 vs -45.3536) is expected, then re-record, owner-approved; (g) low: the nearest-entered pairing can mislabel when two gauges sit within about a cell and the earlier one is dropped (verifyA Q1); the (1.2, 0.3) native face check sits on an exact cell-face tie (Q2); (h) UX, low: the short on-screen 1D title differs from the exported one with no hint; a third title style on Results | M | 12 |
+| `GUI-13` | ✅ 2026-10-05, DONE.md §0w. Original row: **Backlog left by GUI-12** (2026-10-04; `docs/qa/2026-10-04-gui-12-ux.md`, `docs/qa/2026-10-04-gui-12-qa/`, `docs/batches/2026-10-04-gui-12-backlog-A.verify.md`) — (a) **owner 2026-10-04: reseed** the default chain's 3D Lz to ≥ stage 2's Ly (≥ 4 m) so it opens without the F45 warning (decision row 2 reopened; own task); still to judge whether "burst ≥ Lz" is the right F45 trigger; (b) UX, medium: F45 wording uses the form labels (`Burst y`, `Lz`), says "at or above", advises Lz ≥ stage 2's Ly (`chain_route.py:234-238`, same y/z at `:413`); (c) UX, medium: the drop warning names the gauge by a raw tuple, not `G<n>` + unit (`validation.py:1565,1575`; edits `test_case_validate`); (d) UX, medium: the gauge export PNG says nothing about the missing numbers - a footnote only when a gauge is dropped; (e) low: `validation.py:1576` names the first containing wall, `scaled_distance.where` the nearest (touching walls only); Where column vs Checks disagree at a face; "outside domain" vs "outside the domain"; (f) low: `test_case_validate` 2D/3D top-face native rows still on exact y/z ties (A6 treatment); (g) QA, low, 1100 × 720: Chain stage 3 / Setup Wall 2 warnings below the fold; Run gauge card header and Results drop caption elided; Tk Gauges table first column truncated; (h) UX, low: the rest of the UX report (#8-#13); (i) home PC: rerun the char suites and compare numpy/scipy - the HD13 -45.3536 vs committed -45.3645 is not reproduced on the work machine (`docs/batches/2026-10-04-gui-12.goldens.md`); do not re-record | M | 13 |
 
 ## OUT
 
@@ -224,3 +225,28 @@ afterburn calibration needs no refit; `test_regression.py` stayed byte-green.
 +7 % at `scotch np=2` is **not** this mechanism. Full history:
 [docs/verification/blastfoam-claims.md](../verification/blastfoam-claims.md).
 
+
+## Records moved out of TODO.md on 2026-10-11 (GUI-14 backlog, C2; 1000-line cap)
+
+Moved verbatim. The GUI-13 row is in the GUI table above; the pointers and item 7 follow.
+
+### The pointers that stood in the HD1 block
+
+### Deviations from the HD1 plan, and `HD1-12` — moved
+
+The recorded, unscheduled deviations (`psi`, grain forms, `hooks.Result`), the
+`governing_confined` fix and the four-axis band note are in
+[docs/history/todo-closed.md](docs/history/todo-closed.md) (2026-10-04).
+
+### Scope decision and the next step — moved
+
+Pyrotechnics are out of scope (owner, 2026-09-21); the record is in
+[docs/history/todo-closed.md](docs/history/todo-closed.md) (2026-10-05).
+
+The highest-value next step is closed-vessel data for a real material, no code (`HD1-3`);
+its text is in the same file.
+
+### P2-14 item 7
+
+7. ✅ 2026-09-27 ([DONE.md](DONE.md) §0g): `read_probes` aligns by time; on a mismatch
+   it keeps p only and warns (owner: never raise).

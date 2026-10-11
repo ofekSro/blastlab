@@ -48,7 +48,6 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 |---|---|---|---|
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
 | `GUI-14` | **Left by GUI-13** (2026-10-05; `docs/qa/2026-10-05-gui-13-ux.md` F1-F6, `docs/qa/2026-10-05-gui-13-qa/` #1-4, `…-gui-13-backlog-A.verify.md`) — (a) **owner call:** A1 skipped (4 m box over the unprobed cap); recommended: keep Lz 1.5 m and re-record `char_golden/ui_chain_wiring.json` (3 × `radius_m` 10.0 → 1.5) so the 1D radius seed lands; (b) Tk Gauges column still cut at 1100 px (`gui/results_panel.py:281-284`, minwidth 250 < ~287 needed; QA #1, UX F6); (c) Where column can name a different wall than Checks when two walls are within a cell (UX F2); (d) dropped gauge not marked where gauges are edited — warn colour on the cells and the Gauges tree node (F3); (e) Run card header: drop `selected`, elide right, Z unit (F4); (f) Results drop line in the warn style, as on Run (F5); (g) solver logs still say `Gauge (x, y) inside an obstacle` without `G<n>` (`solver2d.py:284,289`, `solver3d.py:342`; 3 tests pin it); (h) `test_ui_status_cells` S2 flaky (fixed `pump(600)`, poll instead); (i) harness `latest_out()` picks folders by name — sort by mtime; (j) home PC: HD13 char drift, carried from GUI-13 (i). Low items parked in the UX report §6 | M | 14 |
-| `GUI-13` | ✅ 2026-10-05, DONE.md §0w. Original row: **Backlog left by GUI-12** (2026-10-04; `docs/qa/2026-10-04-gui-12-ux.md`, `docs/qa/2026-10-04-gui-12-qa/`, `docs/batches/2026-10-04-gui-12-backlog-A.verify.md`) — (a) **owner 2026-10-04: reseed** the default chain's 3D Lz to ≥ stage 2's Ly (≥ 4 m) so it opens without the F45 warning (decision row 2 reopened; own task); still to judge whether "burst ≥ Lz" is the right F45 trigger; (b) UX, medium: F45 wording uses the form labels (`Burst y`, `Lz`), says "at or above", advises Lz ≥ stage 2's Ly (`chain_route.py:234-238`, same y/z at `:413`); (c) UX, medium: the drop warning names the gauge by a raw tuple, not `G<n>` + unit (`validation.py:1565,1575`; edits `test_case_validate`); (d) UX, medium: the gauge export PNG says nothing about the missing numbers - a footnote only when a gauge is dropped; (e) low: `validation.py:1576` names the first containing wall, `scaled_distance.where` the nearest (touching walls only); Where column vs Checks disagree at a face; "outside domain" vs "outside the domain"; (f) low: `test_case_validate` 2D/3D top-face native rows still on exact y/z ties (A6 treatment); (g) QA, low, 1100 × 720: Chain stage 3 / Setup Wall 2 warnings below the fold; Run gauge card header and Results drop caption elided; Tk Gauges table first column truncated; (h) UX, low: the rest of the UX report (#8-#13); (i) home PC: rerun the char suites and compare numpy/scipy - the HD13 -45.3536 vs committed -45.3645 is not reproduced on the work machine (`docs/batches/2026-10-04-gui-12.goldens.md`); do not re-record | M | 13 |
 
 ---
 
@@ -210,19 +209,9 @@ Only what `HD1-3` actually needs, from this list:
 it in both directions since `e05ab22`, with a validator warning and a Run
 confirmation. That is the fix that opened the way to this task.)*
 
-### Deviations from the HD1 plan, and `HD1-12` — moved
+### Deviations, `HD1-12`, the scope decision and `HD1-3` — moved
 
-The recorded, unscheduled deviations (`psi`, grain forms, `hooks.Result`), the
-`governing_confined` fix and the four-axis band note are in
-[docs/history/todo-closed.md](docs/history/todo-closed.md) (2026-10-04).
-
-### Scope decision and the next step — moved
-
-Pyrotechnics are out of scope (owner, 2026-09-21); the record is in
-[docs/history/todo-closed.md](docs/history/todo-closed.md) (2026-10-05).
-
-The highest-value next step is closed-vessel data for a real material, no code (`HD1-3`);
-its text is in the same file.
+The HD1 deviations, `HD1-12`, the pyrotechnics scope decision and the next step, `HD1-3` (closed-vessel data for a real material, no code), are in [docs/history/todo-closed.md](docs/history/todo-closed.md).
 
 ---
 
@@ -484,28 +473,7 @@ estimate within 25 %; the estimate updates as the fields change; Qt and Tk GUI Q
 
 ### P1-14 · The material table against its primary source · **owner decision 2026-09-25: must be 100 % sourced**
 
-**Source found and read, 2026-09-25:** Dobratz & Crawford, *LLNL Explosives Handbook*,
-UCRL-52997 (1985), **Table 8-7**, pp. 8-22 / 8-23. The PDF is at
-`https://archive.org/download/LLNLExplosivesHandbook/LLNL%20Explosives%20Handbook.pdf`
-(PDF pages 229-230). Values were read off the page **images**, not the OCR text layer.
-Units there: ρ0 g/cm³, P and A/B/C Mbar, D cm/µs, E0 Mbar·cm³/cm³ (= 100 GPa, per
-unit volume, so e0 [J/kg] = E0 / ρ0). Footnote b = "estimated quantities".
-
-| Row | Field | `core/materials.py` | LLNL Table 8-7 | Gap |
-|---|---|---|---|---|
-| TNT | all 9 | - | 1.630 / 0.210 / 0.693 / 0.07 / 3.712 / 0.03231 / 4.15 / 0.95 / 0.30 | **matches** |
-| C4 | e0 | 5.56e6 | E0 0.090 → 9.0e9 / 1601 = **5.62e6** | -1.1 % |
-| C4 | other 8 | - | 1.601 / 0.280 / 0.8193 / 6.0977 / 0.1295 / 4.5 / 1.4 / 0.25 | matches |
-| HMX | ρ0, D | 1890, 9100 | 1.891, 0.911 | -0.05 %, -0.1 % |
-| HMX | e0 | 5.50e6 | E0 0.1050 → 1.05e10 / 1891 = **5.553e6** | -1.0 % |
-| HMX | Pcj | 3.9e10 | 0.420ᵇ (estimated) → 4.2e10 | -7 % |
-| HMX | A, B, R1, R2, ω | - | 7.783 / 0.07071 / 4.20 / 1.00 / 0.30 | matches |
-| PETN (ρ0 1.770) | D | 8400 | 0.830 → **8300** | +1.2 % |
-| PETN | e0 | 5.81e6 | E0 0.1010 → 1.01e10 / 1770 = **5.706e6** | +1.8 % |
-| PETN | Pcj | 3.1e10 | 0.335 → 3.35e10 | -7 % |
-| PETN | A, B, R1, R2, ω | - | 6.170 / 0.16926 / 4.40 / 1.20 / 0.25 | matches (B rounded) |
-| **RDX** | all | *(removed 2026-09-26)* | **not in Table 8-7** | removed, see 2 |
-| **ANFO** | all | A 4.95e10, B 1.89e9, R1 3.90 ... | **not in Table 8-7** | unsourced |
+**Source record** (Table 8-7, pp. 8-22 / 8-23, and the per-row gap table): [docs/verification/material-table-sources.md](docs/verification/material-table-sources.md).
 
 **Decision (owner):** every row must trace to a primary source, value for value.
 1. The rows LLNL carries (TNT, C4, HMX, PETN) take **exactly** the Table 8-7 values,
@@ -781,8 +749,7 @@ validation dump over ~100 cases (phase 4) is compared before and after.
    "Charge cells: could not compute (‹error›)" instead.
 6. `DecomposedPurge.run` logs "retrying at the next poll" after a failed final sweep, but
    no poll follows. Say "final sweep failed; decomposed copies left at ‹paths›".
-7. ✅ 2026-09-27 ([DONE.md](DONE.md) §0g): `read_probes` aligns by time; on a mismatch
-   it keeps p only and warns (owner: never raise).
+7. ✅ 2026-09-27 (DONE.md §0g), `read_probes` alignment; text in [docs/history/todo-closed.md](docs/history/todo-closed.md).
 8. `_e2e_foam_write_budget.du_sb`: use `env.WSL_DISTRO`, `stdin=DEVNULL`,
    `CREATE_NO_WINDOW`, and check `returncode` before parsing. Rerun it in WSL (§8.6).
 9. `_e2e_vent_3d.evaluate` `traces[0]` raises `IndexError` on a run with no probes.
