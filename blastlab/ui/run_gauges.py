@@ -158,13 +158,8 @@ def _drop_reason(case, point):
     meta view, `scaled_distance.case_from_meta`) falls back to the first
     wall within a cell of the gauge, as before."""
     p = [float(v) for v in point]
-    dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(p)]]
-    try:
-        if all(d is not None for d in dims) and any(
-                not 0.0 <= v <= float(d) for v, d in zip(p, dims)):
-            return gauge_drop_reason(0, False, outside=True)
-    except (TypeError, ValueError):
-        pass
+    if sd.outside_domain(case, p):
+        return gauge_drop_reason(0, False, outside=True)
     try:
         boxes = sd.obstacle_boxes(case)
     except (AttributeError, TypeError, ValueError):

@@ -606,8 +606,14 @@ class SetupPanel(QWidget):
         # the trigger dropdown offers the gauges as they are now
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self._dim, n) for n in f.bad}
+        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
+        # (the rule, not the warning text)
+        drop = (case is not None and getattr(case, 'dim', None) == self._dim
+                and scaled_distance.any_dropped(case))
         for n, _t in setup_nodes.nodes(self._dim):
-            self.tree.set_status(n.id, 'error' if n.id in bad else 'ok')
+            self.tree.set_status(n.id, 'error' if n.id in bad else
+                                 'warn' if n.id == 'gauges' and drop
+                                 else 'ok')
         self._sync_tree()
 
     def _sync_children(self):
@@ -848,13 +854,15 @@ class SetupPanel(QWidget):
         # GUI-13 (e): the solver's drop rule, built once for the table
         dropped = drop_rule(case)
         for r, (p, (num, R, Z)) in enumerate(zip(pts, rows)):
-            cells = ([(f'G{num}', 'gauge')]
+            # GUI-14 (d): a dropped gauge's G<n> and Where cells are warn
+            gone = scaled_distance.is_dropped(case, p, dropped)
+            cells = ([(f'G{num}', 'warn' if gone else 'gauge')]
                      + [(f'{v:.2f}', 'text') for v in p]
                      + [('', 'text')] * (3 - len(p))
                      + [(f'{R:.2f}', 'text2'),
                         ('' if Z is None else f'{Z:.2f}', 'accent_soft'),
                         (scaled_distance.where_text(case, p, dropped),
-                         'muted')])
+                         'warn' if gone else 'muted')])
             for c, (text, colour) in enumerate(cells):
                 item = QTableWidgetItem(text)
                 item.setForeground(theme.qcolor(colour))

@@ -603,6 +603,24 @@ def s5_live(win):
           [ch.cards[d].state_text() for d in (1, 2, 3)]
           == ['● case OK'] * 3,
           ascii([ch.cards[d].state_text() for d in (1, 2, 3)]))
+    # GUI-14 (d), D3: a gauge outside stage 2's 4 x 4 m domain is dropped,
+    # so the Gauges node is warn; moved inside, it is ok again
+    g2 = ch.forms[2].points['gauges']
+    kept = g2.get()
+    g2.set([(5.0, 0.5)])
+    g2._on_change()                 # set() is silent; an edit revalidates
+    pump(450)
+    st_out = ed.tree.rows['gauges']._status
+    g2.set([(3.0, 0.5)])
+    g2._on_change()
+    pump(450)
+    st_in = ed.tree.rows['gauges']._status
+    g2.set(kept)
+    g2._on_change()
+    pump(450)
+    check('GUI-14 (d): a stage\'s Gauges node is warn with a gauge outside '
+          'the domain, ok once it is moved inside',
+          (st_out, st_in) == ('warn', 'ok'), str((st_out, st_in)))
     ch.forms[2].v['Lx'].set('abc')
     pump(400)
     ed = ch.editors[2]

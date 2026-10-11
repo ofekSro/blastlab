@@ -549,8 +549,10 @@ def s3_dock():
           sd.where_text(two, (1.3, 0.5)) == '10 cm behind Wall 2'
           and sd.where_text(two, (0.9, 0.5)) == '10 cm in front of Wall 2',
           sd.where_text(two, (1.3, 0.5)))
+    # GUI-14 (d): the domain is 4 m, so the gauge is not outside it (the
+    # default 1.5 m cube put x 1.9 outside, which now reads as dropped)
     c3 = Case3D(obstacles=[(2.0, 2.2, 0.0, 1.0, 0.0, 3.0)],
-                gauges=[(1.9, 0.5, 1.0)])
+                gauges=[(1.9, 0.5, 1.0)], Lx=4.0, Ly=4.0, Lz=4.0)
     check("3D boxes: '10 cm in front of Wall 1'",
           sd.where_text(c3, (1.9, 0.5, 1.0)) == '10 cm in front of Wall 1')
     check("1D has no obstacles", sd.obstacle_boxes(Case1D()) == [])
@@ -693,6 +695,37 @@ def s3_dock():
                                  'Z [m/kg^1/3]']
           and sp.gauge_rows()[0] == ['G1', '2.00', '2.00', '2.00'],
           str(sp.gauge_rows()))
+    # GUI-14 (d), D2-D3: a dropped gauge is marked in the table and on the
+    # Gauges node. G1 is one metre past Lx, G2 is exactly on x == Lx (the
+    # closed domain keeps it), G3 stands 5 cm in front of Wall 1 (kept)
+    from blastlab.ui import theme
+    warn_c = theme.qcolor('warn')
+
+    def warn_cells(row):
+        t = sp.gauge_table
+        return [t.item(row, c).foreground().color() == warn_c for c in (0, 6)]
+    c4, _r = load(sp, sample_case(gauges=[(5.0, 0.5), (4.0, 0.5),
+                                          (2.95, 0.5)]))
+    where = [r[5] for r in sp.gauge_rows()]
+    check('GUI-14 (d): x = Lx + 1 reads outside the domain (dropped); '
+          'x == Lx is not outside',
+          where[0] == 'outside the domain (dropped)'
+          and 'outside' not in where[1] and sd.outside_domain(c4, (5.0, 0.5))
+          and not sd.outside_domain(c4, (4.0, 0.5)), str(where))
+    check('GUI-14 (d): the G<n> and Where cells are warn for the dropped '
+          'gauge only',
+          warn_cells(0) == [True, True] and warn_cells(1) == [False, False]
+          and warn_cells(2) == [False, False],
+          str([warn_cells(i) for i in range(3)]))
+    check('GUI-14 (d): the Gauges node is warn with the drop',
+          sp.tree.rows['gauges']._status == 'warn',
+          str(sp.tree.rows['gauges']._status))
+    load(sp, sample_case(gauges=[(4.0, 0.5), (2.95, 0.5)]))
+    check('GUI-14 (d): the node is ok again once the gauge is inside; '
+          'the cells are not warn',
+          sp.tree.rows['gauges']._status == 'ok'
+          and warn_cells(0) == [False, False],
+          str(sp.tree.rows['gauges']._status))
     c3, _r = load(sp, Case3D(charge=8.0, gauges=[(1.0, 2.0, 3.0)],
                              center=(1.0, 2.0, 1.0)))
     check('3D: x / y / z, Z = R / 2 for 8 kg',
