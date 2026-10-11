@@ -254,6 +254,12 @@ class PointList(QWidget):
         self.tree.setUniformRowHeights(True)
         self.tree.setSelectionMode(QTreeWidget.SingleSelection)
         head = self.tree.header()
+        # the column order is the tuple's order: a dragged header would
+        # show r1 over the r0 numbers
+        head.setSectionsMovable(False)
+        # QTreeView's default stretch-last pins the last section at 100 px,
+        # which overflows a narrow card and scrolls the first column away
+        head.setStretchLastSection(False)
         for i in range(self._arity):
             head.setSectionResizeMode(i, QHeaderView.Stretch)
         self.tree.setMinimumHeight(26 * max(2, rows))
