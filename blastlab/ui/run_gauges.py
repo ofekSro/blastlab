@@ -281,6 +281,18 @@ def pre_payload(case, rule=None):
     return kept, dropped
 
 
+def drops(case):
+    """`[[entered number, reason], ...]` of the gauges the solver drops in
+    `case`, as Run words them (GUI-15 (c), D3). `RunController` stamps it
+    into the finished Result's `meta['gauges_dropped']` (memory only), so
+    Results gives the reason Run gave - its own meta holds the
+    face-snapped walls of a blastFoam run, which would read `inside`."""
+    try:
+        return [[n, why] for n, why in pre_payload(case)[1]]
+    except (AttributeError, TypeError, ValueError):
+        return []
+
+
 def _geometry(case, point, rule=None):
     """(R, Z or None, short wall name or '') of `point` in the case. With
     the drop `rule` a dropped gauge is measured against the wall the rule

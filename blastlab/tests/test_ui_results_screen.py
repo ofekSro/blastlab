@@ -1038,6 +1038,34 @@ def s5g_dropped(link):
           sorted(c[0] for c in g.cells()) == ['G1', 'G3']
           and g.caption_text().startswith('G2 dropped by the solver'),
           f'{g.cells()} {g.caption_text()}')
+    # GUI-15 (c), D3: a blastFoam run's meta holds the face-snapped walls,
+    # so Results read `inside Wall 1` where Run (the entered walls) said
+    # `on the face of Wall 1`. With RunController's stamp it gives Run's
+    # reason; without the key, today's text.
+    from blastlab.models.case import Case2D
+    from blastlab.ui import run_gauges as RUN
+    kw = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+              charge=500.0, center=(0.0, 2.0), solver='blastfoam')
+    ran = Case2D(gauges=[(2.95, 0.5), (1.252, 0.5), (2.95, 1.5)],
+                 obstacles=[(1.29, 1.6, 0.0, 1.0)], **kw)
+    near = sample_dropped()
+    near.meta.update(gauges=list(ran.gauges), charge=500.0,
+                     obstacles=[(1.25, 1.6, 0.0, 1.0)])  # snapped outward
+    plain = RG.labels_and_dropped(near, 2)[1]
+    near.meta['gauges_dropped'] = RUN.drops(ran)
+    stamped = RG.labels_and_dropped(near, 2)[1]
+    run_text = RUN.dropped_text(RUN.pre_payload(ran)[1])
+    check('GUI-15 (c): without the stamp the meta reads inside Wall 1; with '
+          "it Results' drop text is Run's, word for word",
+          plain == [(2, 'inside Wall 1')]
+          and RG.dropped_text(stamped) == run_text
+          and 'Wall 1' in run_text and stamped != plain,
+          f'{plain} {stamped} {run_text!r}')
+    p.add_result('near', 2, near)
+    pump(60)
+    check("GUI-15 (c): on screen the drop line is Run's text",
+          g.drop_caption.text() == run_text,
+          f'{g.drop_caption.text()!r} {run_text!r}')
     p.shutdown()
     p.deleteLater()
     pump(20)

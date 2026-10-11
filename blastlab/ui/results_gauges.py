@@ -200,6 +200,11 @@ def labels_and_dropped(res, dim):
         if meta.get(k) is not None:
             setattr(case, k, meta[k])
     labels, dropped = numbering(case, res.gauges)
+    # GUI-15 (c), D3: the reason Run gave (`meta['gauges_dropped']`, set by
+    # RunController; the meta's own walls are the face-snapped ones). Older
+    # results keep the reasons read off the meta.
+    stamped = {int(n): why for n, why in meta.get('gauges_dropped') or []}
+    dropped = [(n, stamped.get(n, why)) for n, why in dropped]
     return {k: lbl for k, lbl in enumerate(labels, start=1)}, dropped
 
 
