@@ -745,6 +745,17 @@ def s3_dock():
           'rows clear',
           'dropped' not in sp.tree.summary('gauges') and kids == [False] * 2,
           f'{sp.tree.summary("gauges")!r} {kids}')
+    # GUI-15 (f), D9: a 1D gauge beyond the radius is dropped by both
+    # solvers - the Gauges node is warn and its caption names it
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0, 1.2]))
+    cap = sp.tree.summary('gauges')
+    check("GUI-15 (f): 1D, G2 at r 2.0 beyond the 1.5 m radius: the "
+          "Gauges node is warn, its caption names ' · G2 dropped'",
+          sp.tree.rows['gauges']._status == 'warn'
+          and ' · G2 dropped' in cap and 'G1' not in cap
+          and sd.dropped_numbers(Case1D(radius_m=1.5,
+                                        gauge_radii=[1.0, 1.5])) == [],
+          f'{cap!r} {sp.tree.rows["gauges"]._status}')
     c3, _r = load(sp, Case3D(charge=8.0, gauges=[(1.0, 2.0, 3.0)],
                              center=(1.0, 2.0, 1.0)))
     check('3D: x / y / z, Z = R / 2 for 8 kg',

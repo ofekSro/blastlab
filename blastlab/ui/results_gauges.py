@@ -182,8 +182,19 @@ def labels_and_dropped(res, dim):
     one (`run_gauges.numbering`, D201), so Results and Setup number a
     gauge alike. The obstacles and the domain come from the meta, for
     the reason (`inside Wall 1`). Empty when the meta cannot say."""
-    case = sd.case_from_meta(res.meta, dim, res.gauges)
     meta = res.meta or {}
+    if dim == 1 and meta.get('gauges_dropped'):
+        # GUI-15 (f), D9: a 1D meta keeps no entered list, so the series
+        # are numbered from RunController's stamp - the entered numbers
+        # it does not name as dropped, in order
+        gone = {int(n): why for n, why in meta['gauges_dropped']}
+        series = (res.gauges or {}).get('pressures')
+        n_series = 0 if series is None else len(series)
+        nums = [n for n in range(1, n_series + len(gone) + 1)
+                if n not in gone]
+        return ({k: f'G{n}' for k, n in enumerate(nums, start=1)},
+                sorted(gone.items()))
+    case = sd.case_from_meta(res.meta, dim, res.gauges)
     if case is None:
         # GUI-13 B5 (UX #8): a meta that cannot build a case (no charge
         # centre) still numbers the gauges as the exported figure does,

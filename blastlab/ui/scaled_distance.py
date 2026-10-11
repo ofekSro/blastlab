@@ -110,9 +110,18 @@ def gauge_points(case):
 def outside_domain(case, point):
     """True when `point` lies outside the closed domain 0 <= v <= L on
     any axis - the solvers' own test (solver2d.py 283, solver3d.py 341,
-    validation `_validate_closing`). False for a case without extents
-    (1D, the Results screen's meta view). One test for Setup's Where
-    column and Run's dropped-gauge note (GUI-14 d, D2)."""
+    validation `_validate_closing`). 1D: outside 0 < r <= radius_m, the
+    solvers' own test too (solver1d.py, foam/writer.py; GUI-15 (f), D9).
+    False for a case without extents (the Results screen's meta view).
+    One test for Setup's Where column and Run's dropped-gauge note
+    (GUI-14 d, D2)."""
+    if getattr(case, 'dim', None) == 1:
+        radius = getattr(case, 'radius_m', None)
+        try:
+            return radius is not None and not (
+                0.0 < float(point[0]) <= float(radius))
+        except (TypeError, ValueError, IndexError):
+            return False
     dims = [getattr(case, k, None) for k in ('Lx', 'Ly', 'Lz')[:len(point)]]
     try:
         return (all(d is not None for d in dims) and any(
@@ -278,10 +287,10 @@ def is_dropped(case, point, dropped=None):
 
 def dropped_numbers(case):
     """The 1-based numbers (entered order) of the gauges the solver drops
-    - `is_dropped`, the rule built once. [] for 1D / 0D (no domain test,
-    no gauges) and for a case that cannot say. GUI-15 (e): the Gauges
-    node's caption and warn child rows."""
-    if getattr(case, 'dim', None) not in (2, 3):
+    - `is_dropped`, the rule built once. 1D: the radii beyond the domain
+    (GUI-15 (f)). [] for 0D (no gauges) and for a case that cannot say.
+    GUI-15 (e): the Gauges node's caption and warn child rows."""
+    if getattr(case, 'dim', None) not in (1, 2, 3):
         return []
     from ..services.validation import drop_rule
     dropped = drop_rule(case)

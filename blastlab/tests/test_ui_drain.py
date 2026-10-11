@@ -248,6 +248,31 @@ def main():
           and 'Wall 1' in why[0][1], str(got and got.meta.get(
               'gauges_dropped')))
 
+    print("\nT5c: GUI-15 (f) - a 1D gauge beyond the radius, through Run")
+    from blastlab.core.case import Case1D
+    from blastlab.ui import results_gauges
+    one = Case1D(radius_m=1.5, charge_kg=0.5, cell_size_m=0.005,
+                 n_snapshots=1, gauge_radii=[1.0, 2.0, 1.2], gauge_file=None)
+    h = _Handlers()
+    c = RunController(handlers=h)
+    check("start_stages accepts a native 1D case",
+          c.start_stages([(1, one)]) is True)
+    end = time.time() + 300
+    while c.running and time.time() < end:
+        pump(100)
+    got = h.results[0][3] if h.results else None
+    labels, dropped = (results_gauges.labels_and_dropped(got, 1)
+                       if got is not None else ({}, []))
+    check("Results labels the two series G1 and G3; its drop line names G2 "
+          "outside the domain",
+          labels == {1: 'G1', 2: 'G3'}
+          and results_gauges.dropped_text(dropped)
+          == 'G2 dropped by the solver (outside the domain)',
+          f'{labels} {dropped}')
+    check("the run log names G2 beyond the radius",
+          any('G2 (r 2.00 m) outside the domain - dropped' in ln
+              for ln in h.lines), str([ln for ln in h.lines if 'G2' in ln]))
+
     print("\nT6: refresh policy parsing")
     cases = [(('', 'seconds'), None), (('0', 'seconds'), None),
              (('0.25', 'seconds'), ('seconds', 0.25)),

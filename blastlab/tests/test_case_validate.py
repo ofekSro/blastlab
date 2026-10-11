@@ -827,6 +827,30 @@ def gauge_in_obstacle_checks():
     check('GUI-13 (e): outside the domain or a 1D case: drop_wall 0',
           drop_wall(case, (5.0, 0.5)) == 0
           and drop_wall(Case1D(), (0.5,)) == 0)
+    gauge_beyond_radius_checks()
+
+
+def gauge_beyond_radius_checks():
+    """GUI-15 (f), D9: a 1D gauge beyond the domain radius is dropped by
+    both solvers (`0 < r <= radius_m`), so Checks warns once, naming the
+    gauge and the domain, in either mode; one at the radius is kept."""
+    print()
+    print("1D gauge beyond the radius: warned, named")
+    from blastlab.core.case import Case1D
+    for solver in ('native', 'blastfoam'):
+        kw = dict(radius_m=1.5, solver=solver)
+        ref = validate_case(Case1D(gauge_radii=[], **kw)).warnings
+        got = [w for w in validate_case(
+            Case1D(gauge_radii=[1.0, 2.0, 1.2], **kw)).warnings
+            if w not in ref]
+        check(f'1D {solver}: one warning, naming G2 and the domain',
+              len(got) == 1 and got[0].startswith('G2 ')
+              and 'outside the domain' in got[0]
+              and 'dropped' in got[0], str(got))
+        edge = [w for w in validate_case(
+            Case1D(gauge_radii=[1.0, 1.5], **kw)).warnings if w not in ref]
+        check(f'1D {solver}: a gauge at r = 1.5 exactly is not warned',
+              edge == [], str(edge))
 
 
 def thin_obstacle_warn_checks():

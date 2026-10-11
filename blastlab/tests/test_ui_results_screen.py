@@ -1066,6 +1066,29 @@ def s5g_dropped(link):
     check("GUI-15 (c): on screen the drop line is Run's text",
           g.drop_caption.text() == run_text,
           f'{g.drop_caption.text()!r} {run_text!r}')
+    # GUI-15 (f), D9: a 1D meta keeps no entered list, so a gauge beyond
+    # the radius left the series numbered G1, G2. With RunController's
+    # stamp the series are the entered numbers not dropped, and the drop
+    # is named
+    from test_ui_results import fake_1d
+    one = fake_1d()
+    plain1 = RG.labels_and_dropped(one, 1)
+    one.meta['gauges_dropped'] = [[2, 'outside the domain']]
+    labels1, drop1 = RG.labels_and_dropped(one, 1)
+    check('GUI-15 (f): 1D without the stamp G1 G2 and no drop; with it G1 '
+          'G3 and G2 named outside the domain',
+          plain1 == ({1: 'G1', 2: 'G2'}, [])
+          and labels1 == {1: 'G1', 2: 'G3'}
+          and drop1 == [(2, 'outside the domain')],
+          f'{plain1} {labels1} {drop1}')
+    p.add_result('one', 1, one)
+    pump(60)
+    check('GUI-15 (f): on screen the 1D rows read G1 and G3 and the drop '
+          'line names G2',
+          sorted(c[0] for c in g.cells()) == ['G1', 'G3']
+          and g.drop_caption.text()
+          == 'G2 dropped by the solver (outside the domain)',
+          f'{g.cells()} {g.drop_caption.text()!r}')
     p.shutdown()
     p.deleteLater()
     pump(20)

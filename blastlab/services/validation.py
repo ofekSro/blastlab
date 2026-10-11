@@ -922,6 +922,16 @@ def _validate_1d(case, rep, ctx):
         err("Charge must be > 0")
     if case.radius_m <= 0:
         err("Domain radius must be > 0")
+    else:
+        # GUI-15 (f), D9: both solvers keep a gauge only at 0 < r <=
+        # radius_m (solver1d.py, foam/writer.py plan_case) and drop the
+        # rest; named as the 2D/3D warning names a gauge, G<n> as entered
+        for k, g in enumerate(getattr(case, 'gauge_radii', None) or [],
+                              start=1):
+            if not 0 < float(g) <= case.radius_m:
+                warn(f"G{k} (r {float(g):.2f} m) "
+                     f"{gauge_drop_reason(0, False, outside=True)}"
+                     f" - will be dropped")
     if rep.errors:
         return
     r_exp = (3.0 * case.charge_kg
