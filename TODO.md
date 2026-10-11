@@ -30,11 +30,13 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 
 > **▶ RESUME HERE — the first thing to do from this list.** Branch `master`
 > (`gui-redesign` merged in on 2026-10-04, `58911bd`);
-> GUI-1..13 done (GUI-13 2026-10-05, branch `gui-13`; DONE.md §0w). Next, in order:
-> 1. **`GUI-14`** — what GUI-13 left (row below); (a) needs an owner call first.
-> 2. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` (the blastFoam 1→2→3
->    chain; the home PC's 3D stage outlived 1800 s), harness F07 (over the home VM's cell
->    cap), `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
+> GUI-1..14 done (GUI-14 2026-10-11, branch `gui-14`; DONE.md §0x). Next, in order:
+> 1. **`GUI-15`** — what GUI-14's QA/UX left (row below).
+> 2. **Office machine:** `blastlab/tests/_e2e_ui_chain_foam.py` ran 2026-10-11: stages 1-2
+>    pass, but stage 3 gets no `t_end`, so the app's default `endTime` 29.6 ms (vs a 0.187 ms
+>    hand-off) outlives 1800 s on any machine (3.25 ms in 29 min) — give stage 3 a short
+>    `t_end` (committed test: owner approval). Harness F07 (over the home VM's cell cap),
+>    `_e2e_ui_view3d.py` (F6). `pgrep -a blastFoam` empty first.
 >
 > The owner reviewed the open calls on 2026-10-03 and 2026-10-04 ("approve all"):
 > [docs/gui-redesign-decisions.md](docs/gui-redesign-decisions.md) § Owner review.
@@ -47,7 +49,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | Id | What | Size | Order |
 |---|---|---|---|
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
-| `GUI-14` | **Left by GUI-13** (2026-10-05; `docs/qa/2026-10-05-gui-13-ux.md` F1-F6, `docs/qa/2026-10-05-gui-13-qa/` #1-4, `…-gui-13-backlog-A.verify.md`) — (a) **owner call:** A1 skipped (4 m box over the unprobed cap); recommended: keep Lz 1.5 m and re-record `char_golden/ui_chain_wiring.json` (3 × `radius_m` 10.0 → 1.5) so the 1D radius seed lands; (b) Tk Gauges column still cut at 1100 px (`gui/results_panel.py:281-284`, minwidth 250 < ~287 needed; QA #1, UX F6); (c) Where column can name a different wall than Checks when two walls are within a cell (UX F2); (d) dropped gauge not marked where gauges are edited — warn colour on the cells and the Gauges tree node (F3); (e) Run card header: drop `selected`, elide right, Z unit (F4); (f) Results drop line in the warn style, as on Run (F5); (g) solver logs still say `Gauge (x, y) inside an obstacle` without `G<n>` (`solver2d.py:284,289`, `solver3d.py:342`; 3 tests pin it); (h) `test_ui_status_cells` S2 flaky (fixed `pump(600)`, poll instead); (i) harness `latest_out()` picks folders by name — sort by mtime; (j) home PC: HD13 char drift, carried from GUI-13 (i). Low items parked in the UX report §6 | M | 14 |
+| `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC). Original row: **Left by GUI-13** (2026-10-05; `docs/qa/2026-10-05-gui-13-ux.md` F1-F6, `docs/qa/2026-10-05-gui-13-qa/` #1-4, `…-gui-13-backlog-A.verify.md`) — (a) **owner call:** A1 skipped (4 m box over the unprobed cap); recommended: keep Lz 1.5 m and re-record `char_golden/ui_chain_wiring.json` (3 × `radius_m` 10.0 → 1.5) so the 1D radius seed lands; (b) Tk Gauges column still cut at 1100 px (`gui/results_panel.py:281-284`, minwidth 250 < ~287 needed; QA #1, UX F6); (c) Where column can name a different wall than Checks when two walls are within a cell (UX F2); (d) dropped gauge not marked where gauges are edited — warn colour on the cells and the Gauges tree node (F3); (e) Run card header: drop `selected`, elide right, Z unit (F4); (f) Results drop line in the warn style, as on Run (F5); (g) solver logs still say `Gauge (x, y) inside an obstacle` without `G<n>` (`solver2d.py:284,289`, `solver3d.py:342`; 3 tests pin it); (h) `test_ui_status_cells` S2 flaky (fixed `pump(600)`, poll instead); (i) harness `latest_out()` picks folders by name — sort by mtime; (j) home PC: HD13 char drift, carried from GUI-13 (i). Low items parked in the UX report §6 | M | 14 |
+| `GUI-15` | **Left by GUI-14** (2026-10-11; `docs/qa/2026-10-11-gui-14-ux.md` F1-F6, `docs/qa/2026-10-11-gui-14-qa/QA_REPORT.md` F1, `…-gui-14-backlog-B.verify.md`) — (a) Run: from Start to the first gauge data a dropped gauge is an ordinary `waiting` row, can be the enlarged card, and its header can name another wall than Setup (UX F1); (b) the native log names no wall (`inside an obstacle`) and says "inside" for a gauge Setup calls "in front"; the solver has the obstacle list (UX F2; pin edit needs the owner); (c) Results on blastFoam runs says `inside Wall n` where Run said `on the face of` — the meta stores the face-snapped walls (UX F3); (d) Setup: Checks `on the face of Wall 1` vs Where `3 cm behind Wall 1 (dropped)` on one row; proposed `within a cell of Wall n`, wording is the owner's (UX F4); (e) the Gauges node turns warn but its caption and children do not name the gauge; a chain stage has no gauge table (UX F5); (f) 1D: a gauge beyond the radius is dropped silently — no Checks warning, no log, Results renumbers (`solver1d.py:146`, `foam/writer.py:445`; UX F6 = QA F1; the 1.5 m chain seed makes it easier to hit); (g) owner approval: `_e2e_gui_native_warn.py:63-64` can no longer fail (old `Gauge (` text) — pin `G1 (0.30, 0.80) m`; add a fast 2D/3D solver-log pin. Low items parked in both reports | M | 15 |
 
 ---
 
@@ -638,6 +641,16 @@ assumption. Validation should refuse an explicit `det_radii` below the corner di
 Acceptance: the case above runs in serial and parallel; a new `test_foam_writer.py`
 case pins the radius for a charge outside the deepest zone; existing fixtures with the
 charge in the deepest zone stay byte-identical.
+
+### P1-24 · The native T51 trigger gauge counts only the kept gauges · **found 2026-10-11 (GUI-14 B verify), needs owner decision**
+
+`trigger_gauge` indexes the kept list (`solver2d.py:299`, `solver3d.py:359`), though
+`hooks.py:60` says it reads like the gauge table; blastFoam uses the gauges as entered
+(`foam/backend.py:1785-1814`). Measured: G2 in a wall, trigger 3 → native stops on G4's
+point at 0.284 ms instead of G3's at 0.091 ms; `validate_case` says nothing. The live-view
+labels (`solver2d.py:337`, `geometry.plane_gauges`) and `meta['trigger_gauge']` shift too.
+Fix: carry each gauge's entered number through the native solvers; `_validate_trigger` warns
+when the trigger gauge will be dropped. Characterisation test first; changes when a run stops.
 
 ---
 

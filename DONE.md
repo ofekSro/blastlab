@@ -42,6 +42,33 @@ with the same section numbers.
 
 ---
 
+## 0x. 2026-10-11 — batch `gui-14-backlog` (GUI-14 a-i; branch `gui-14`, merged `e9edc48`)
+
+Plan `docs/batches/2026-10-11-gui-14-backlog.md` (D1-D12 there); reports `…-backlog-{A,B,C}.*.md`;
+QA `docs/qa/2026-10-11-gui-14-qa/`, UX `docs/qa/2026-10-11-gui-14-ux.md`. Owner 2026-10-11: Q1 this
+batch first, **Q2 approved** (→ A8), **Q3 approved** (B1's two pin edits).
+- **A1-A8:** Where takes the wall from `drop_rule` (c); dropped gauge warn-coloured in Setup's table,
+  `outside the domain (dropped)`, one closed `scaled_distance.outside_domain` also used by
+  `run_gauges`, Gauges node warn in Setup and on a chain stage (d); Run card header `Z … m/kg^1/3 ·
+  Wall n`, no `selected`, elides right (e); Results `#gaugedrop` warn style (f); Tk gauge column sized
+  by `font.measure`, others `minwidth 72` (b); `test_ui_status_cells` polls (h); harness
+  `latest_out()` by mtime (i); chain stage 1 seeds `radius_m` 1.5 m, `char_golden/ui_chain_wiring.json`
+  re-recorded (exactly 3 lines, 10.0 → 1.5), card 2 opens clean (a).
+- **B1:** native 2D/3D logs `[warn] G2 (1.40, 0.30) m inside an obstacle - dropped` / `… outside the
+  domain - dropped`; kept-gauge records `array_equal` to base. Pins say `G2`, not the plan's `G1`: the
+  dropped gauge is the second entered (verifier confirmed; the plan contradicted its own D9).
+- **C1/C2:** DONE.md 1017 → 641 (§0l-§0w → `docs/history/done-gui-redesign.md`); TODO.md 1009 → 976
+  (closed rows → `todo-closed.md`, P1-14 sources → `docs/verification/material-table-sources.md`).
+- **Tests:** Part A `gate --deep` 71/71, Part B 105/105 (all 16 `test_gui_*`, `test_blast2d/3d`),
+  `test_regression` byte-identical after each part. QA real platform: `_qa_ui_harness` 1598 ok / 0
+  FAIL, `_qa_gui_harness` 101 ok / 0 FAIL (F groups skipped: they switch to blastFoam by themselves);
+  every touched screen OK at 1100 × 720 and 1600 × 1000, Tk at scaling 1.0 and 1.5.
+- **Verifier fixes:** none (A light, B full).
+- **Open:** (j) home PC; GUI-15 (UX F1-F6, QA F1); P1-24 (T51 trigger counts kept gauges).
+- **Commits:** `7a2f8a0`..`fd35265` (branch `gui-14`), `af2ddb1`..`daceca2` (master), merge `e9edc48`.
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
