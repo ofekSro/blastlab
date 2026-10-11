@@ -594,6 +594,22 @@ def s3_dock():
           warned == [2] and drop_wall(split, (1.252, 0.5)) == 2
           and _drop_reason(split, (1.252, 0.5)) == 'on the face of Wall 2',
           f'{warned} {_drop_reason(split, (1.252, 0.5))}')
+    # GUI-14 (c), D1: at x 1.245 Wall 2 is the nearest as entered (1.5 cm)
+    # but the solver drops the gauge for Wall 1 (3 cm behind it), so Where
+    # names Wall 1, as the warning does
+    tie = Case2D(solver='blastfoam', gauges=[(1.245, 0.5)],
+                 obstacles=[(1.0, 1.22, 0.0, 1.0), (1.26, 1.6, 0.0, 1.0)],
+                 **kw)
+    warned = [int(m.group(1)) for w in validate_case(tie).warnings
+              for m in [re.search(r'Wall (\d+) - will be dropped$', w)]
+              if m]
+    wtxt = sd.where_text(tie, (1.245, 0.5))
+    check('GUI-14 (c): the nearest wall as entered is Wall 2, yet Where, '
+          'drop_wall and the Checks warning all name Wall 1',
+          sd.where(tie, (1.245, 0.5))[0] == 2 and warned == [1]
+          and drop_wall(tie, (1.245, 0.5)) == 1
+          and 'Wall 1' in wtxt and 'Wall 2' not in wtxt
+          and wtxt.endswith('(dropped)'), f'{warned} {wtxt}')
     # Wall 1 x 1.29-1.6 snaps to x 1.25: a gauge at x 1.252 is 3.8 cm in
     # front of the wall as entered, and blastFoam drops it
     near = Case2D(solver='blastfoam', gauges=[(1.252, 0.5)],

@@ -186,16 +186,19 @@ def _shadowed(box, a, b):
     return True
 
 
-def where(case, point):
+def where(case, point, wall=None):
     """(wall number, gap [m], inside, behind) for the obstacle nearest to
     `point`, or None when none is within WHERE_MAX. The gap is the
     distance from the point to the box (0 on a face or inside); `behind`
     is True when the straight line from the burst point to `point`
     passes through that obstacle - the gauge is on its far side, in its
     shadow. Walls are numbered 1-based as the tree names them
-    (`Wall n`)."""
+    (`Wall n`). `wall` (1-based) measures against that wall instead of
+    the nearest one: the wall the solver drops a gauge for (GUI-14 c)."""
     best = None
     for i, box in enumerate(obstacle_boxes(case), start=1):
+        if wall is not None and i != wall:
+            continue
         d = [max(lo - float(p), 0.0, float(p) - hi)
              for p, (lo, hi) in zip(point, box)]
         gap = math.sqrt(sum(x * x for x in d))
@@ -218,10 +221,21 @@ def where_text(case, point, dropped=None):
     solver's drop rule still drops (it is within a cell of a face) reads
     `4 cm in front of Wall 1 (dropped)`, so the column agrees with the
     Checks warning. `dropped` is `services.validation.drop_rule(case)`,
-    built once per table by the caller; None builds it here."""
+    built once per table by the caller; None builds it here.
+
+    GUI-14 (c), D1: a dropped gauge names the wall the rule drops it for
+    (`dropped(point)`, as the Checks warning does), and the gap and the
+    side are measured against that wall - with two walls within a cell
+    the nearest as entered can be the other one."""
     w = where(case, point)
     if w is None:
         return ''
+    if dropped is None:
+        from ..services.validation import drop_rule
+        dropped = drop_rule(case)
+    wall = dropped(point)
+    if wall and wall != w[0]:
+        w = where(case, point, wall=wall) or w
     i, gap, inside, behind = w
     if inside:
         return f'inside Wall {i}'
@@ -229,10 +243,7 @@ def where_text(case, point, dropped=None):
     if cm == 0:
         return f'on the face of Wall {i}'
     text = f'{cm} cm {"behind" if behind else "in front of"} Wall {i}'
-    if dropped is None:
-        from ..services.validation import drop_rule
-        dropped = drop_rule(case)
-    return text + (' (dropped)' if dropped(point) else '')
+    return text + (' (dropped)' if wall else '')
 
 
 def walls_in_front(case):
