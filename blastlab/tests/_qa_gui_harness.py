@@ -3497,8 +3497,11 @@ def i06_small_window_3d(qa):
 # main
 # ─────────────────────────────────────────────────────────────────────────
 def latest_out():
-    dirs = sorted(glob.glob(os.path.join(QA_ROOT, '*')))
-    dirs = [d for d in dirs if os.path.isdir(d)]
+    # the newest folder by mtime (GUI-14 i): a name sort put `out1_x`
+    # after `20261001-1200` whatever their age; the name breaks a tie
+    dirs = [d for d in glob.glob(os.path.join(QA_ROOT, '*'))
+            if os.path.isdir(d)]
+    dirs.sort(key=lambda d: (os.path.getmtime(d), os.path.basename(d)))
     return dirs[-1] if dirs else None
 
 

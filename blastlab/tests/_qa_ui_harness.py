@@ -77,9 +77,13 @@ def scenario(sid, group, est=60, terminal=False):
 
 
 def latest_out():
+    # the newest folder by mtime (GUI-14 i): a name sort put `out1_x`
+    # after `20261001-1200` whatever their age; the name breaks a tie
     try:
-        runs = sorted(d for d in os.listdir(QA_ROOT)
-                      if os.path.isdir(os.path.join(QA_ROOT, d)))
+        runs = sorted((d for d in os.listdir(QA_ROOT)
+                       if os.path.isdir(os.path.join(QA_ROOT, d))),
+                      key=lambda d: (os.path.getmtime(
+                          os.path.join(QA_ROOT, d)), d))
     except OSError:
         return None
     return os.path.join(QA_ROOT, runs[-1]) if runs else None
