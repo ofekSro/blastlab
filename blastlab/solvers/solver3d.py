@@ -336,7 +336,8 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
 
     # ── Gauge setup ────────────────────────────────────────────────────────
     gauges = gauges or []
-    gauge_ijk, gauge_actual = [], []
+    # P1-24: gauge_num is each kept gauge's ENTERED number (see solver2d)
+    gauge_ijk, gauge_actual, gauge_num = [], [], []
     for n, (gx, gy, gz) in enumerate(gauges, start=1):
         # GUI-14 (g): the gauge as Setup and the validation warning name
         # it, G<n> (1-based, the entered order) at its coordinates in metres
@@ -360,11 +361,15 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
             continue
         gauge_ijk.append((i, j, k))
         gauge_actual.append((float(x_c[i]), float(y_c[j]), float(z_c[k])))
+        gauge_num.append(n)
     gauge_times_list  = []
     gauge_press_lists = [[] for _ in gauge_ijk]
     # T51 trigger gauge. 3D has no remap output, so validate_case gates
     # the remap actions here and only the terminate half can fire.
-    trig_k = trigger_index(trigger_gauge, len(gauge_ijk), hooks)
+    # trig_no is its entered number (P1-24).
+    trig_k = trigger_index(trigger_gauge, len(gauges), hooks,
+                           numbers=gauge_num)
+    trig_no = None if trig_k is None else gauge_num[trig_k]
     trigger = None
 
     # Slice indices for the 3D snapshots (always through the burst)
@@ -427,8 +432,9 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
         gauges=core_geometry.plane_gauges(gauge_actual, live_sl,
-                                          (x_c, y_c, z_c), dx),
-        trigger_gauge=None if trig_k is None else trig_k + 1,
+                                          (x_c, y_c, z_c), dx,
+                                          numbers=gauge_num),
+        trigger_gauge=trig_no,
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=obstacles, Lx=Lx, Ly=Ly, Lz=Lz,
                      charge_center=(x0, y0, z0), r_exp=r_src, bcs=bcs)))
@@ -467,13 +473,13 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         if trig_k is not None and trigger is None \
                 and p_f[gauge_ijk[trig_k]] > arrival_p:
             gp = gauge_actual[trig_k]
-            trigger = dict(t=float(t), gauge=trig_k + 1, point=gp,
+            trigger = dict(t=float(t), gauge=trig_no, point=gp,
                            action=trigger_action)
-            hooks.log(f"  Trigger gauge {trig_k + 1} "
+            hooks.log(f"  Trigger gauge {trig_no} "
                       f"({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m "
                       f"reached at t = {t*1e3:.3f} ms")
             if 'terminate' in trigger_action:
-                stop_reason = (f'trigger gauge {trig_k + 1} reached '
+                stop_reason = (f'trigger gauge {trig_no} reached '
                                f'({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m')
                 break
 
@@ -623,7 +629,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                 # what the USER asked for; gauge_out['points'] is where
                 # they landed after snapping to cell centres (QA-33)
                 gauges=[tuple(float(v) for v in g) for g in (gauges or [])],
-                trigger_gauge=None if trig_k is None else trig_k + 1,
+                trigger_gauge=trig_no,
                 # per-step running peak pressure and net overpressure
                 # impulse (the viewer fields), same keys as the foam backend
                 p_peak=p_peak, impulse=impulse)

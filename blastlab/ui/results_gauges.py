@@ -559,8 +559,13 @@ class GaugesView(QWidget):
         return summary_rows(res)
 
     def _default_gauge(self, res):
-        """The trigger gauge when the run had one, else the first row."""
+        """The trigger gauge when the run had one, else the first row.
+        P1-24: the meta holds the trigger's ENTERED number (blastFoam
+        always, native since P1-24), so after a dropped gauge its row is
+        the one labelled `G<n>`, not row n."""
         trig = res.meta.get('trigger_gauge')
+        trig = next((k for k, lbl in self._labels.items()
+                     if lbl == f'G{trig}'), trig)
         if trig in self._order:
             return trig
         return self._order[0] if self._order else None

@@ -54,13 +54,19 @@ def frame_budget(record_frames, n_disp, hooks=None, amr=False,
     return min(record_frames, cap)
 
 
-def trigger_index(trigger_gauge, n_gauges, hooks):
+def trigger_index(trigger_gauge, n_gauges, hooks, numbers=None):
     """The 0-based index of the T51 trigger gauge, or None.
 
     `trigger_gauge` is what the case carries: a 1-BASED gauge number so
     it reads like the gauge table and the plot labels. Out-of-range (or
     a run whose gauges were all dropped, outside the domain or in a
-    wall) warns and disables the trigger rather than failing the run."""
+    wall) warns and disables the trigger rather than failing the run.
+
+    P1-24: `numbers` (the native solvers) are the ENTERED numbers of the
+    gauges the solver kept, in order, and `n_gauges` is then the number
+    entered. The trigger is looked up there, so a dropped gauge before
+    it no longer shifts it onto the next one; a dropped trigger gauge
+    warns and disables the trigger, as blastFoam numbers them."""
     if trigger_gauge in (None, 0, ''):
         return None
     try:
@@ -71,7 +77,14 @@ def trigger_index(trigger_gauge, n_gauges, hooks):
         hooks.log(f"  [warn] Trigger gauge {trigger_gauge} does not exist "
                   f"({n_gauges} gauge(s)) - trigger disabled")
         return None
-    return k
+    if numbers is None:
+        return k
+    numbers = list(numbers)
+    if k + 1 not in numbers:
+        hooks.log(f"  [warn] Trigger gauge {k + 1} was dropped - trigger "
+                  f"disabled")
+        return None
+    return numbers.index(k + 1)
 
 
 # Phase 2 (docs/ARCHITECTURE_REVIEW.md section 5): Progress, Result and

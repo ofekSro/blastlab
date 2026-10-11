@@ -100,14 +100,15 @@ def stop_dists_3d(Lx, Ly, Lz, centers, bcs):
     return dists
 
 
-def plane_gauges(points, sl, coords, tol):
+def plane_gauges(points, sl, coords, tol, numbers=None):
     """The gauges a 3D live/animated plane actually cuts, as
     [(number, u, v), ...] in that plane's own coordinates (T53).
 
     `sl` is the plane selector (a tuple with one integer index), `coords`
     the (x_c, y_c, z_c) cell centres and `tol` the half-width that still
     counts as "on the plane" (one cell). A gauge a metre off the slice
-    must not be drawn as if it sat on it."""
+    must not be drawn as if it sat on it. `numbers` (P1-24) labels each
+    point with its entered gauge number; None numbers them 1, 2, ..."""
     axis = next(a for a, x in enumerate(sl) if not isinstance(x, slice))
     plane = float(coords[axis][int(sl[axis])])
     keep = [a for a in range(3) if a != axis]
@@ -115,7 +116,8 @@ def plane_gauges(points, sl, coords, tol):
     for n, pt in enumerate(points):
         if abs(float(pt[axis]) - plane) > tol:
             continue
-        out.append((n + 1, float(pt[keep[0]]), float(pt[keep[1]])))
+        num = n + 1 if numbers is None else int(numbers[n])
+        out.append((num, float(pt[keep[0]]), float(pt[keep[1]])))
     return out
 
 

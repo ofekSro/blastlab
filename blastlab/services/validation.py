@@ -1563,6 +1563,7 @@ def _validate_closing(case, rep, ctx):
 
     # gauges / obstacles sanity
     dropped = None                  # the solver's drop rule, built once
+    gone = []                       # the entered numbers it drops
     for k, g in enumerate(getattr(case, 'gauges', []), start=1):
         pt = g if isinstance(g, (list, tuple)) else (g,)
         # GUI-13 (c), D4: the gauge as the screens name it, G<n> (1-based,
@@ -1571,6 +1572,7 @@ def _validate_closing(case, rep, ctx):
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             warn(f"{name} {gauge_drop_reason(0, False, outside=True)}"
                  f" - will be dropped")
+            gone.append(k)
             continue
         if dropped is None:
             dropped = _gauge_drop_rule(case, ctx)
@@ -1583,6 +1585,16 @@ def _validate_closing(case, rep, ctx):
         warn(f"{name} "
              f"{gauge_drop_reason(inside or wall, bool(inside))}"
              f" - will be dropped")
+        gone.append(k)
+    # P1-24 (D13, native only): the native solvers disable a trigger whose
+    # gauge they drop (hooks.trigger_index), so say so before the run
+    try:
+        trig = int(getattr(case, 'trigger_gauge', None) or 0)
+    except (TypeError, ValueError):
+        trig = 0
+    if not foam and trig and trig in gone:
+        warn(f"Trigger disabled: trigger gauge G{trig} is dropped (see "
+             f"above), so the run ends by its normal stop")
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
