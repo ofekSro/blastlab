@@ -1040,7 +1040,7 @@ def s5g_dropped(link):
           f'{g.cells()} {g.caption_text()}')
     # GUI-15 (c), D3: a blastFoam run's meta holds the face-snapped walls,
     # so Results read `inside Wall 1` where Run (the entered walls) said
-    # `on the face of Wall 1`. With RunController's stamp it gives Run's
+    # `within a cell of Wall 1`. With RunController's stamp it gives Run's
     # reason; without the key, today's text.
     from blastlab.models.case import Case2D
     from blastlab.ui import run_gauges as RUN

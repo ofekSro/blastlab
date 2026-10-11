@@ -577,7 +577,7 @@ def s3_dock():
     check('two walls within a cell (blastFoam): Setup\'s warning, '
           'drop_wall and Run\'s _drop_reason name the same wall (Wall 1)',
           warned == [1] and drop_wall(pair, (1.628, 0.5)) == 1
-          and _drop_reason(pair, (1.628, 0.5)) == 'on the face of Wall 1',
+          and _drop_reason(pair, (1.628, 0.5)) == 'within a cell of Wall 1',
           f'{warned} {_drop_reason(pair, (1.628, 0.5))}')
     # GUI-13 verify: the pair above names Wall 1 under the old "first wall
     # within a cell" too, so it cannot tell whether Run uses the rule.
@@ -594,7 +594,7 @@ def s3_dock():
           'differs: '
           'warning, drop_wall and Run\'s _drop_reason all name Wall 2',
           warned == [2] and drop_wall(split, (1.252, 0.5)) == 2
-          and _drop_reason(split, (1.252, 0.5)) == 'on the face of Wall 2',
+          and _drop_reason(split, (1.252, 0.5)) == 'within a cell of Wall 2',
           f'{warned} {_drop_reason(split, (1.252, 0.5))}')
     # GUI-14 (c), D1: at x 1.245 Wall 2 is the nearest as entered (1.5 cm)
     # but the solver drops the gauge for Wall 1 (3 cm behind it), so Where
@@ -639,8 +639,8 @@ def s3_dock():
                                   gauges=[(1.18, 0.5)], dx=0.05), 2)
     view.obstacles, view.Lx, view.Ly = [(1.2, 1.6, 0.0, 1.0)], 4.0, 4.0
     check("a meta view the rule cannot lay out: the wall within a cell "
-          "('on the face of Wall 1')",
-          _drop_reason(view, (1.18, 0.5)) == 'on the face of Wall 1',
+          "('within a cell of Wall 1')",
+          _drop_reason(view, (1.18, 0.5)) == 'within a cell of Wall 1',
           _drop_reason(view, (1.18, 0.5)))
     check("05 summary, board line 89: '2 · in front of Wall 1'",
           setup_nodes.summaries(case)['gauges'] == '2 · in front of Wall 1',

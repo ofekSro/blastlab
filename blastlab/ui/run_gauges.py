@@ -149,12 +149,12 @@ def match_gauges(case, gauge_out):
 
 
 def _drop_reason(case, point, rule=None):
-    """Why an entered gauge has no series: `inside Wall 1`, `on the face
-    of Wall 1`, `outside the domain`, or '' when the case does not say.
-    The wall is the solver's own drop rule (`services.validation.
-    drop_rule`), the one Setup's warning names, and inside / face is the
-    warning's open-box split, in the warning's words (`gauge_drop_reason`;
-    GUI-13 (e)). A case the rule cannot lay out (the Results screen's
+    """Why an entered gauge has no series: `inside Wall 1`, `within a
+    cell of Wall 1`, `outside the domain`, or '' when the case does not
+    say. The wall is the solver's own drop rule (`services.validation.
+    drop_rule`), the one Setup's warning names, and inside / within a
+    cell is the warning's open-box split, in the warning's words
+    (`core.geometry.gauge_drop_reason`; GUI-13 (e), GUI-15 (d)). A case the rule cannot lay out (the Results screen's
     meta view, `scaled_distance.case_from_meta`) falls back to the first
     wall within a cell of the gauge, as before."""
     p = [float(v) for v in point]
