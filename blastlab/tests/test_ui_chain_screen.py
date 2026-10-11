@@ -635,10 +635,21 @@ def s5_live(win):
     g2._on_change()                 # set() is silent; an edit revalidates
     pump(450)
     st_out = ed.tree.rows['gauges']._status
+    cap_out = ed.tree.summary('gauges')
+    kid_out = [ed.tree.child_row('gauges', i).warn
+               for i in range(len(g2.get()))]
     g2.set([(3.0, 0.5)])
     g2._on_change()
     pump(450)
     st_in = ed.tree.rows['gauges']._status
+    cap_in = ed.tree.summary('gauges')
+    kid_in = [ed.tree.child_row('gauges', i).warn
+              for i in range(len(g2.get()))]
+    check('GUI-15 (e): a stage\'s Gauges caption names G1 as dropped and its '
+          'child row is warn; both clear once the gauge is inside',
+          'G1 dropped' in cap_out and kid_out == [True]
+          and 'dropped' not in cap_in and kid_in == [False],
+          f'{cap_out!r} {kid_out} {cap_in!r} {kid_in}')
     g2.set(kept)
     g2._on_change()
     pump(450)

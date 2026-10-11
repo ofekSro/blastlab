@@ -726,6 +726,25 @@ def s3_dock():
           sp.tree.rows['gauges']._status == 'ok'
           and warn_cells(0) == [False, False],
           str(sp.tree.rows['gauges']._status))
+    # GUI-15 (e), D2: the e2e fixture (_e2e_gui_native_warn.py) - G2 sits
+    # inside Wall 1: the caption names it, its child row is warn, G1's not
+    ew = Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                charge=20.0, center=(0.6, 0.0), solver='native',
+                obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                gauges=[(0.3, 0.8), (1.4, 0.3)])
+    load(sp, ew)
+    cap = sp.tree.summary('gauges')
+    kids = [sp.tree.child_row('gauges', i).warn for i in (0, 1)]
+    check('GUI-15 (e): the Gauges caption names G2 as dropped; the G2 child '
+          'is warn and G1 is not',
+          'G2 dropped' in cap and 'G1' not in cap.split(' · trigger')[0]
+          and kids == [False, True], f'{cap!r} {kids}')
+    load(sp, dataclasses.replace(ew, gauges=[(0.3, 0.8), (1.0, 0.3)]))
+    kids = [sp.tree.child_row('gauges', i).warn for i in (0, 1)]
+    check('GUI-15 (e): moved out of the wall, the caption and the child '
+          'rows clear',
+          'dropped' not in sp.tree.summary('gauges') and kids == [False] * 2,
+          f'{sp.tree.summary("gauges")!r} {kids}')
     c3, _r = load(sp, Case3D(charge=8.0, gauges=[(1.0, 2.0, 3.0)],
                              center=(1.0, 2.0, 1.0)))
     check('3D: x / y / z, Z = R / 2 for 8 kg',

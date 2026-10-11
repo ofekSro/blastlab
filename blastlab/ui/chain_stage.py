@@ -414,12 +414,13 @@ class StageEditor(QWidget):
         self._content.layout().activate()
         self._scroll.ensureWidgetVisible(pl, 0, 0)
 
-    def _sync_children(self):
+    def _sync_children(self, gone=()):
+        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows)."""
         f = self.form
         if 'gauges' in f.points:
             rows = f.points['gauges'].get()
             self.tree.set_children('gauges', 'gauge', [
-                (f'G{i}', ', '.join(f'{v:.2f}' for v in row))
+                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone)
                 for i, row in enumerate(rows, start=1)])
         if 'obstacles' in f.points:
             axis = ('r' if self.dim == 2
@@ -459,13 +460,16 @@ class StageEditor(QWidget):
             # the form does not parse: the files still follow the route
             self.hand_in.set(chain_route.in_file(prev, self.dim))
             self.hand_out.set(chain_route.out_file(self.dim, nxt))
-        self._sync_children()
+        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped;
+        # GUI-15 (e): so is its child row
+        gone = (scaled_distance.dropped_numbers(case)
+                if case is not None else [])
+        self._sync_children(gone)
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self.dim, n) for n in f.bad}
         stage_level = {chain_route.AXISYM_REFUSAL.split(': ', 1)[1],
                        _handoff_msg()}
-        # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
-        drop = case is not None and scaled_distance.any_dropped(case)
+        drop = bool(gone)
         for n, _t in setup_nodes.nodes(self.dim):
             # GUI-13 B2 (UX #12, D8): the row that fixes the F45 / S2-1
             # reach line shows the warn glyph, not a tick

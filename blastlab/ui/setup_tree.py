@@ -35,10 +35,11 @@ class _ChildRow(QFrame):
 
     clicked = Signal()
 
-    def __init__(self, kind, name, value, parent=None):
+    def __init__(self, kind, name, value, parent=None, warn=False):
         super().__init__(parent)
         self.setObjectName('treechild')
         self.kind = kind
+        self.warn = bool(warn)
         self.setFixedHeight(30)
         self.setCursor(Qt.PointingHandCursor)
         lay = QHBoxLayout(self)
@@ -54,6 +55,8 @@ class _ChildRow(QFrame):
         lay.addWidget(self.name)
         lay.addStretch(1)
         lay.addWidget(self.value)
+        for w in (self.marker, self.name):
+            w.setProperty('warn', self.warn)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton \
@@ -213,13 +216,16 @@ class SetupTree(QFrame):
             row.set_status(status)
 
     def set_children(self, node_id, kind, items):
-        """Replace the child rows of `node_id`: `items` = [(name, value)],
-        `kind` 'gauge' | 'obstacle'."""
+        """Replace the child rows of `node_id`: `items` = [(name, value)]
+        or [(name, value, warn)] (GUI-15 (e): a dropped gauge's marker
+        and name are in the warn colour), `kind` 'gauge' | 'obstacle'."""
         if node_id not in self._kids:
             return
         holder, old = self._kids[node_id]
-        if [(k.name.text(), k.value.text()) for k in old] == \
-                [(str(n), str(v)) for n, v in items]:
+        items = [(it[0], it[1], bool(it[2]) if len(it) > 2 else False)
+                 for it in items]
+        if [(k.name.text(), k.value.text(), k.warn) for k in old] == \
+                [(str(n), str(v), w) for n, v, w in items]:
             return                              # unchanged: no flicker
         lay = holder.layout()
         for k in old:
@@ -227,8 +233,8 @@ class SetupTree(QFrame):
             k.setParent(None)
             k.deleteLater()
         kids = []
-        for i, (name, value) in enumerate(items):
-            k = _ChildRow(kind, name, value)
+        for i, (name, value, warn) in enumerate(items):
+            k = _ChildRow(kind, name, value, warn=warn)
             k.clicked.connect(lambda n=node_id, i=i:
                               self.child_clicked.emit(n, i))
             lay.addWidget(k)

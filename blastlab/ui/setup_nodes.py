@@ -246,6 +246,10 @@ def summaries(case):
     g = (f'{len(pts)} · in front of '
          + ', '.join(f'Wall {i}' for i in walls) if walls
          else _count(len(pts or []), 'gauge'))
+    # GUI-15 (e), D2 / D11: the dropped gauges are named before the trigger
+    gone = scaled_distance.dropped_numbers(case)
+    if gone:
+        g += ' · ' + ', '.join(f'G{n}' for n in gone) + ' dropped'
     tg = getattr(case, 'trigger_gauge', None)
     out['gauges'] = g + (f' · trigger G{tg}' if tg is not None else '')
     # 06 Solver

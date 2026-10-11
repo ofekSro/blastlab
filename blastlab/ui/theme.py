@@ -440,6 +440,8 @@ def qss(mode_name):
     QLabel#treemark_gauge {{ font-size: 12px; font-weight: 700;
                              color: {p['gauge']}; }}
     QLabel#treemark_obstacle {{ font-size: 12px; color: {p['text2']}; }}
+    QLabel#treemark_gauge[warn="true"], QLabel#childname[warn="true"] {{
+        color: {p['warn']}; }}
     QPushButton#treeadd {{ background: transparent; color: {p['text2']};
                            border: 1px solid {p['entry_border']};
                            border-radius: 8px; padding: 0px 8px;

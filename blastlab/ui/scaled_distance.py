@@ -276,14 +276,26 @@ def is_dropped(case, point, dropped=None):
     return bool(dropped(point))
 
 
-def any_dropped(case):
-    """True when some gauge of `case` is dropped - the `gauges` tree
-    node's warn state. The rule is built once."""
+def dropped_numbers(case):
+    """The 1-based numbers (entered order) of the gauges the solver drops
+    - `is_dropped`, the rule built once. [] for 1D / 0D (no domain test,
+    no gauges) and for a case that cannot say. GUI-15 (e): the Gauges
+    node's caption and warn child rows."""
     if getattr(case, 'dim', None) not in (2, 3):
-        return False                # 1D has no domain test, 0D no gauges
+        return []
     from ..services.validation import drop_rule
     dropped = drop_rule(case)
-    return any(is_dropped(case, p, dropped) for p in gauge_points(case))
+    try:
+        return [k for k, p in enumerate(gauge_points(case), start=1)
+                if is_dropped(case, p, dropped)]
+    except (AttributeError, TypeError, ValueError):
+        return []
+
+
+def any_dropped(case):
+    """True when some gauge of `case` is dropped - the `gauges` tree
+    node's warn state."""
+    return bool(dropped_numbers(case))
 
 
 def walls_in_front(case):
