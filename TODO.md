@@ -35,7 +35,10 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 >    Q1/Q2): ahead of HD1-18 / HD1-19, because harness F05/F06 die at t = 0. See P1-23 below.
 >    **Owner 2026-10-12:** the same batch moves the closed GUI-14 / GUI-15 rows and the P1-24
 >    body to `docs/history/todo-closed.md` (TODO.md at 992 of 1000 lines).
-> 2. **`GUI-16`** — what GUI-15's QA/UX left (row below).
+> 2. **`GUI-16`** — what GUI-15's QA/UX left (row below). **Owner 2026-10-12: the LAST GUI batch.**
+>    It takes the parked lows of the GUI-14/15 reports too; every QA/UX finding, any severity, is
+>    fixed in the same batch and QA/UX re-run until clean — nothing new goes to TODO. Only a call
+>    that needs the owner or the home PC is reported.
 > 3. GUI-14 (j) on the home PC. The office-machine runs of GUI-14 are done (DONE.md §0y, B6).
 >
 > The owner reviewed the open calls on 2026-10-03 and 2026-10-04 ("approve all"):
