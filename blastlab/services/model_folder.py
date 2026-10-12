@@ -1001,6 +1001,40 @@ def release_decision(errored, stopped_early, verify, keep_all=False,
     return True, 'finished, every output written and foam\\ verified'
 
 
+def model_of_run(runs_dir, posix):
+    """P2-17 (D15): the stage folder whose manifest.json records `posix`
+    as its WSL scratch (`wsl_scratch.posix`), else None - so a resume of
+    that run writes into the model it belongs to, and its release
+    decision rewrites that same manifest (the original no longer says
+    "kept"). Looks at `<runs_dir>\\<MODEL>\\` and a chain's `1d`, `2d`,
+    `3d` stage folders; when two record the run, the newest manifest
+    (its file time) wins. Read only; no new file (D15)."""
+    if not runs_dir or not posix or not os.path.isdir(runs_dir):
+        return None
+    best = None
+    for name in sorted(os.listdir(runs_dir)):
+        model = os.path.join(runs_dir, name)
+        if not os.path.isdir(model):
+            continue
+        for stage in [model] + [os.path.join(model, f'{d}d')
+                                for d in (1, 2, 3)]:
+            path = os.path.join(stage, MANIFEST_FILE)
+            try:
+                with open(path, encoding='utf-8') as f:
+                    manifest = json.load(f)
+                when = os.path.getmtime(path)
+            except (OSError, ValueError):
+                continue
+            scratch = (manifest.get('wsl_scratch')
+                       if isinstance(manifest, dict) else None)
+            if not isinstance(scratch, dict) \
+                    or scratch.get('posix') != posix:
+                continue
+            if best is None or when > best[0]:
+                best = (when, stage)
+    return best[1] if best else None
+
+
 def is_run_dir(posix):
     """Only a direct child of the runs root is ever deleted."""
     from ..solvers.foam import env

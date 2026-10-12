@@ -1142,6 +1142,98 @@ def test_d_user_stop_is_not_a_raise():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _write_stage_manifest(stage, posix, mtime=None, **scratch):
+    os.makedirs(stage, exist_ok=True)
+    path = os.path.join(stage, mf.MANIFEST_FILE)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(dict(model=os.path.basename(stage),
+                       wsl_scratch=dict(posix=posix, **scratch)), f)
+    if mtime is not None:
+        os.utime(path, (mtime, mtime))
+    return path
+
+
+def test_f_model_of_run():
+    """P2-17 (D15): a run's model is the stage folder whose manifest
+    records its WSL scratch; None when none does; the newest manifest
+    wins when two do; a chain's stage folder is found too."""
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_f_')
+    try:
+        assert mf.model_of_run(runs, POSIX) is None
+        assert mf.model_of_run(os.path.join(runs, 'nope'), POSIX) is None
+        old = os.path.join(runs, 'OLD')
+        _write_stage_manifest(old, POSIX, mtime=1_700_000_000,
+                              deleted=False)
+        _write_stage_manifest(os.path.join(runs, 'OTHER'),
+                              '/root/blastlab_runs/other')
+        with open(os.path.join(runs, 'BROKEN.json'), 'w') as f:
+            f.write('{')                # a stray file, not a folder
+        os.makedirs(os.path.join(runs, 'BAD'))
+        with open(os.path.join(runs, 'BAD', mf.MANIFEST_FILE), 'w') as f:
+            f.write('{ not json')
+        assert mf.model_of_run(runs, POSIX) == old
+        assert mf.model_of_run(runs, '/root/blastlab_runs/none') is None
+        new = os.path.join(runs, 'NEW', '2d')    # a chain's stage
+        _write_stage_manifest(new, POSIX, mtime=1_800_000_000,
+                              deleted=False)
+        assert mf.model_of_run(runs, POSIX) == new
+        os.utime(os.path.join(old, mf.MANIFEST_FILE),
+                 (1_900_000_000, 1_900_000_000))
+        assert mf.model_of_run(runs, POSIX) == old
+    finally:
+        shutil.rmtree(runs, ignore_errors=True)
+
+
+def test_f_resume_rewrites_the_original_manifest():
+    """P2-17: a resume run into model_of_run's folder ends in a release
+    decision that rewrites THAT manifest's wsl_scratch - the original
+    no longer says "kept"."""
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.foam import backend
+    from blastlab.solvers.worker import SolverWorker
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_f_')
+    runs = os.path.join(tmp, 'runs')
+    os.makedirs(runs)
+    real_resume, real_release = backend.resume_run, \
+        mf.verify_and_release_scratch
+    try:
+        folder = mf.prepare(runs, 'STOPPED', confirm=lambda t: True)
+        _write_stage_manifest(folder, POSIX, deleted=False, deleted_at=None,
+                              kept_because='the run ended before its end '
+                                           'time')
+        found = mf.model_of_run(runs, POSIX)
+        assert found == folder, found
+        root = make_scratch(tmp)
+        delete = FakeDelete()
+
+        def fake_resume(path, hooks):
+            hooks.scratch_posix = path
+            return solvers_pkg.get_solver(2, 'native')(case2d(), hooks)
+
+        def release(manifest, stage_dir, posix, errored, stopped_early,
+                    log=print, **kw):
+            kw.update(run=FakeWsl(root), delete=delete,
+                      unc=lambda p: root)
+            return real_release(manifest, stage_dir, posix, errored,
+                                stopped_early, log=log, **kw)
+        backend.resume_run = fake_resume
+        mf.verify_and_release_scratch = release
+        w = SolverWorker([jobs.resume_stage(
+            2, POSIX, case2d(solver='blastfoam'), stage_dir=found,
+            run_info=dict(model='STOPPED'))])
+        w.run()
+        assert w.error is None, w.error
+        m = _manifest(folder)
+        assert m['wsl_scratch']['posix'] == POSIX, m['wsl_scratch']
+        assert m['wsl_scratch']['deleted'] is True, m['wsl_scratch']
+        assert 'kept_because' not in m['wsl_scratch'], m['wsl_scratch']
+        assert delete.calls == [[POSIX]], delete.calls
+    finally:
+        backend.resume_run = real_resume
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_d_skeleton_filter_and_script():
     s = mf.skeleton_script(POSIX)
     assert s.startswith(f"cd '{POSIX}' && find system constant 0 "
@@ -1423,7 +1515,8 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_vtk_not_converted_keeps_scratch,
          test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir,
          test_e_stage_sets_purge_fields, test_e_wsl_fields_record,
-         test_e_keep_all_keeps_the_scratch]
+         test_e_keep_all_keeps_the_scratch, test_f_model_of_run,
+         test_f_resume_rewrites_the_original_manifest]
 
 
 if __name__ == '__main__':
