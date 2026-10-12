@@ -281,12 +281,14 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
     # P1-24: gauge_num is each kept gauge's ENTERED number, which the
     # trigger, its log lines, the meta and the live labels carry
     gauge_ij, gauge_actual, gauge_num = [], [], []
+    gauge_drop = []     # GUI-16 (f): (n, x, y) entered, for the live pane
     for n, (gx, gy) in enumerate(gauges, start=1):
         # GUI-14 (g): the gauge as Setup and the validation warning name
         # it, G<n> (1-based, the entered order) at its coordinates in metres
         name = f"G{n} ({gx:.2f}, {gy:.2f}) m"
         if not (0 <= gx <= Lx and 0 <= gy <= Ly):
             hooks.log(f"  [warn] {name} outside the domain - dropped")
+            gauge_drop.append((n, float(gx), float(gy)))
             continue
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
@@ -300,6 +302,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                                                    bool(inside))
                    if inside or wall else 'inside an obstacle')
             hooks.log(f"  [warn] {name} {why} - dropped")
+            gauge_drop.append((n, float(gx), float(gy)))
             continue
         gauge_ij.append((i, j))
         gauge_actual.append((float(x_c[i]), float(y_c[j])))
@@ -351,6 +354,8 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
         # (their entered numbers, P1-24)
         gauges=[(gauge_num[n], gx, gy)
                 for n, (gx, gy) in enumerate(gauge_actual)],
+        # GUI-16 (f), D13: the dropped ones, at their entered points
+        gauges_dropped=gauge_drop,
         trigger_gauge=trig_no,
         title='')
     if geometry == 'axisymmetric':

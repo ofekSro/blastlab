@@ -18,6 +18,7 @@ import os
 import sys
 import contextlib
 import tempfile
+import types
 
 import numpy as np
 
@@ -397,6 +398,75 @@ def main():
     check('the live pane draws them', 'add_gauge_markers' in
           open(os.path.join(HERE, '..', 'gui', 'run_panel.py'),
                encoding='utf-8').read())
+
+    print("\nT53 / GUI-16 (f): a dropped gauge on every field plot (D13)")
+
+    def describe(arts):
+        out = []
+        for a in arts:
+            if hasattr(a, 'get_marker'):
+                out.append(('marker', tuple(a.get_xydata()[0]),
+                            a.get_marker(), a.get_markersize(),
+                            a.get_markeredgecolor(), a.get_markeredgewidth(),
+                            a.get_markerfacecolor()))
+            else:
+                out.append(('text', a.get_text(), tuple(a.xy),
+                            a.get_color(), a.get_fontweight()))
+        return out
+    today = describe(plots.add_gauge_markers(Figure().add_subplot(), pts,
+                                             trigger=2))
+    for none in (None, []):
+        check(f'dropped={none!r}: the artists equal today\'s (count, '
+              f'positions, styles)',
+              describe(plots.add_gauge_markers(
+                  Figure().add_subplot(), pts, trigger=2,
+                  dropped=none)) == today)
+    got = describe(plots.add_gauge_markers(
+        Figure().add_subplot(), pts, trigger=3, dropped=[(3, 0.7, 0.9)]))
+    extra = got[len(today):]
+    check('one dropped gauge: 2 extra artists, a hollow x and G3 at the '
+          'entered point, warn orange, never starred (even as trigger)',
+          got[:len(today)] == describe(plots.add_gauge_markers(
+              Figure().add_subplot(), pts, trigger=3))
+          and len(extra) == 2 and extra[0][1] == (0.7, 0.9)
+          and extra[0][2] == 'x'
+          and extra[0][4] == plots.GAUGE_DROPPED_COLOR
+          and extra[1][1] == 'G3' and extra[1][3]
+          == plots.GAUGE_DROPPED_COLOR, str(extra))
+
+    # the animation draws the dropped list its caller hands it
+    seen = []
+    real = anim_mod.add_gauge_markers
+
+    def spy(ax, points, trigger=None, dropped=None, **kw):
+        seen.append((list(points), dropped))
+        return real(ax, points, trigger=trigger, dropped=dropped, **kw)
+    import dataclasses
+    res_a, _ = quiet(solve_2d, dataclasses.replace(case2d(t_end=1e-4),
+                                                   record_frames=3),
+                     ConsoleHooks(2))
+    anim_mod.add_gauge_markers = spy
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            anim_mod.write_animation(res_a.meta,
+                                     os.path.join(tmp, 'a.gif'), fps=5)
+            anim_mod.write_animation(res_a.meta,
+                                     os.path.join(tmp, 'b.gif'), fps=5,
+                                     dropped=[2])
+    finally:
+        anim_mod.add_gauge_markers = real
+    check('write_animation: no dropped list - every entered gauge kept, '
+          'as before; dropped=[2] - G2 drawn as dropped',
+          [p[0] for p in seen[0][0]] == [1, 2] and seen[0][1] is None
+          and [p[0] for p in seen[1][0]] == [1]
+          and [p[0] for p in seen[1][1]] == [2], str(seen))
+    from blastlab.services import exports as svc_exports
+    res_a.meta['gauges_dropped'] = [[2, 'inside Wall 1']]
+    check('the GIF export takes the stamp, else the pairing',
+          svc_exports.dropped_gauges(res_a) == [2]
+          and svc_exports.dropped_gauges(types.SimpleNamespace(
+              meta=dict(gauges=[(0.25, 0.6), (0.5, 0.6)]),
+              gauges=dict(points=[(0.255, 0.6)]))) == [2])
 
     import shutil
     shutil.rmtree(tmp, ignore_errors=True)

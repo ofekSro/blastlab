@@ -136,10 +136,20 @@ def gauge_points(meta, sl=None, tol=None):
     return out
 
 
-def add_gauge_markers(ax, points, trigger=None, color='#00e5ff'):
+#: GUI-16 (f), D13: a gauge the solver dropped, on every field plot
+GAUGE_DROPPED_COLOR = '#ff922b'
+
+
+def add_gauge_markers(ax, points, trigger=None, color='#00e5ff',
+                      dropped=None):
     """Draw gauge positions on a field axis: a ringed dot per gauge with
     its number. `points` comes from gauge_points; `trigger` is the
     1-based number of the trigger gauge (T51), drawn heavier.
+
+    GUI-16 (f), D13: `dropped` [(n, x, y)] are the gauges the solver
+    dropped, at their ENTERED points: a hollow `x` in warn orange with
+    its `G<n>`, never starred (a dropped trigger is disabled). None:
+    exactly today's artists.
 
     Returns the artists so a live pane can remove them again."""
     arts = []
@@ -155,6 +165,14 @@ def add_gauge_markers(ax, points, trigger=None, color='#00e5ff'):
             textcoords='offset points', xytext=(6, 4), color=color,
             fontsize=7.5, fontweight='bold' if is_trig else 'normal',
             zorder=3.5))
+    for n, x, y in dropped or ():
+        arts.append(ax.plot(
+            [x], [y], marker='x', markersize=6, linestyle='none',
+            markerfacecolor='none', markeredgecolor=GAUGE_DROPPED_COLOR,
+            markeredgewidth=1.4, zorder=3.5)[0])
+        arts.append(ax.annotate(
+            f'G{n}', (x, y), textcoords='offset points', xytext=(6, 4),
+            color=GAUGE_DROPPED_COLOR, fontsize=7.5, zorder=3.5))
     return arts
 
 

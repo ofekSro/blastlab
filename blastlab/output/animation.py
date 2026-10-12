@@ -138,7 +138,7 @@ def default_ext():
 
 def write_animation(meta, filename='blast_animation.gif', fps=15,
                     progress_callback=None, show_mesh=False,
-                    title=None, scale=None, clim=None):
+                    title=None, scale=None, clim=None, dropped=None):
     """
     Write the frames recorded by a run (meta['frames'] from
     record_frames > 0) to an animated .gif or .mp4.
@@ -150,6 +150,12 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     `scale` is one of SCALES and `clim` is the (vmin, vmax) overpressure
     range in kPa for `scale='manual'`; both default to what the run
     recorded in its meta.
+
+    GUI-16 (f), D13: `dropped` is the entered numbers of the gauges the
+    solver dropped, from the caller (`gauge_summary.dropped_numbers`, or
+    RunController's stamp): those are drawn as dropped, not as kept.
+    meta['gauges'] is every ENTERED gauge, so without it they are drawn
+    as today.
     """
     frames = meta.get('frames')
     if not frames or len(frames['pressures']) == 0:
@@ -211,8 +217,11 @@ def write_animation(meta, filename='blast_animation.gif', fps=15,
     lines = [None]
     # gauges: fixed positions, so drawn once (3D keeps only the ones the
     # animated plane actually cuts)
-    add_gauge_markers(ax, gauge_points(meta, sl),
-                      trigger=meta.get('trigger_gauge'))
+    pts = gauge_points(meta, sl)
+    gone = {int(n) for n in dropped or ()}
+    add_gauge_markers(ax, [p for p in pts if p[0] not in gone],
+                      trigger=meta.get('trigger_gauge'),
+                      dropped=[p for p in pts if p[0] in gone] or None)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     title_art = ax.set_title('')

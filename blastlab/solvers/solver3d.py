@@ -338,12 +338,14 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
     gauges = gauges or []
     # P1-24: gauge_num is each kept gauge's ENTERED number (see solver2d)
     gauge_ijk, gauge_actual, gauge_num = [], [], []
+    gauge_drop = []     # GUI-16 (f): (n, point) entered, for the live pane
     for n, (gx, gy, gz) in enumerate(gauges, start=1):
         # GUI-14 (g): the gauge as Setup and the validation warning name
         # it, G<n> (1-based, the entered order) at its coordinates in metres
         name = f"G{n} ({gx:.2f}, {gy:.2f}, {gz:.2f}) m"
         if not (0 <= gx <= Lx and 0 <= gy <= Ly and 0 <= gz <= Lz):
             hooks.log(f"  [warn] {name} outside the domain - dropped")
+            gauge_drop.append((n, (float(gx), float(gy), float(gz))))
             continue
         i = int(np.argmin(np.abs(x_c - gx)))
         j = int(np.argmin(np.abs(y_c - gy)))
@@ -358,6 +360,7 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
                                                    bool(inside))
                    if inside or wall else 'inside an obstacle')
             hooks.log(f"  [warn] {name} {why} - dropped")
+            gauge_drop.append((n, (float(gx), float(gy), float(gz))))
             continue
         gauge_ijk.append((i, j, k))
         gauge_actual.append((float(x_c[i]), float(y_c[j]), float(z_c[k])))
@@ -434,6 +437,10 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
         gauges=core_geometry.plane_gauges(gauge_actual, live_sl,
                                           (x_c, y_c, z_c), dx,
                                           numbers=gauge_num),
+        # GUI-16 (f), D13: the dropped ones the plane cuts, entered points
+        gauges_dropped=core_geometry.plane_gauges(
+            [p for _n, p in gauge_drop], live_sl, (x_c, y_c, z_c), dx,
+            numbers=[n for n, _p in gauge_drop]),
         trigger_gauge=trig_no,
         scene3d=dict(x_c=x_c, y_c=y_c, z_c=z_c, dx=dx, solid=solid,
                      obstacles=obstacles, Lx=Lx, Ly=Ly, Lz=Lz,

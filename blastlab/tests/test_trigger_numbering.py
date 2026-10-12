@@ -154,6 +154,23 @@ def numbering(tag, solve, make, kept, in_wall):
     check(f'{tag}: live labels are the entered numbers [1, 3, 4]',
           labels == [1, 3, 4] and hooks.info['trigger_gauge'] == 3,
           f'{labels} {hooks.info["trigger_gauge"]}')
+    # GUI-16 (f), D13: the dropped gauge, apart, at its entered point (in
+    # the live plane's coordinates for 3D)
+    want = ([(2,) + tuple(in_wall)] if len(in_wall) == 2
+            else [(2, in_wall[0], in_wall[2])])
+    check(f'{tag}: live gauges_dropped is G2 at its entered point',
+          hooks.info.get('gauges_dropped') == want,
+          f'{hooks.info.get("gauges_dropped")} vs {want}')
+    foam = make(in_wall, trigger_gauge=3)
+    foam.solver = 'blastfoam'
+    from blastlab.solvers.foam import backend, writer
+    spec = writer.render_case(foam)
+    sl = (slice(None), int(abs(spec.grid['y_c'] - 0.57).argmin()),
+          slice(None)) if len(in_wall) == 3 else None
+    kept, gone = backend._live_gauges(foam, spec, sl)
+    check(f'{tag}: a written blastFoam spec gives the same split (no WSL)',
+          [g[0] for g in kept] == [1, 3, 4] and [g[0] for g in gone] == [2]
+          and (len(in_wall) == 3 or gone == want), f'{kept} {gone}')
     check(f'{tag}: the log names Trigger gauge G3 and no "does not exist"',
           any(ln.strip().startswith('Trigger gauge G3 (')
               for ln in hooks.lines)

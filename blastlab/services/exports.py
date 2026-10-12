@@ -52,6 +52,18 @@ def summary_rows(res, opts=None):
         numbers=(opts or {}).get('gauge_numbers') or None)
 
 
+def dropped_gauges(res):
+    """GUI-16 (f): the entered numbers of the gauges a 2D/3D run dropped,
+    for the animation's markers - RunController's stamp
+    (`meta['gauges_dropped']`) when there is one, else the pairing of
+    the gauge points with the entered gauges (`gauge_summary`)."""
+    meta = res.meta or {}
+    if meta.get('gauges_dropped'):
+        return [int(n) for n, _why in meta['gauges_dropped']]
+    return gauge_summary.dropped_numbers(
+        (res.gauges or {}).get('points') or [], meta.get('gauges'))
+
+
 def can(kind, ent):
     """Whether this export can run for this result at all."""
     if ent is None:
@@ -320,7 +332,8 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
             write_animation(res.meta, target, show_mesh=show_mesh,
                             title=title_extra,
                             scale=opts.get('anim_scale'),
-                            clim=opts.get('anim_clim'))
+                            clim=opts.get('anim_clim'),
+                            dropped=dropped_gauges(res))
             log(f'Saved {target}')
             return target
         if kind == 'profile':

@@ -1097,11 +1097,11 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     terminates = normalize_bc(
         getattr(case, 'bc_outer', 'terminate')) == 'terminate'
     _log_banner_1d(hooks, case, spec)
+    # T53: gauge radii for the live pane; GUI-16 (f): the kept ones by
+    # their entered numbers, the dropped ones apart
+    live, live_dropped = _live_gauges(case, spec)
     hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m,
-                           # T53: gauge radii for the live pane
-                           gauges=[(n + 1, float(g), 0.0) for n, g
-                                   in enumerate(case.gauge_radii
-                                                or [])]))
+                           gauges=live, gauges_dropped=live_dropped))
     _initial_frame(spec, hooks)
 
     store = {}                      # dirname -> dict(t, p, rho, u)
@@ -1493,13 +1493,14 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     snap_radii = geometry.snap_radii(spec.r_exp, dists, case.n_snapshots)
 
     _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_term)
+    live, live_dropped = _live_gauges(case, spec)
     run_info = dict(
         dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
         xlabel='r [m]' if axisym else 'x [m]',
         ylabel='z [m]' if axisym else 'y [m]', title='',
-        # T53: what the user asked for (the probes snap in the mesh)
-        gauges=[(n + 1, float(pt[0]), float(pt[1]))
-                for n, pt in enumerate(case.gauges or [])],
+        # T53: what the user asked for (the probes snap in the mesh);
+        # GUI-16 (f): the writer's kept gauges, the dropped ones apart
+        gauges=live, gauges_dropped=live_dropped,
         mesh_src=(refine.slice_src(spec.levels, spec.lmax,
                                    solid_fine=spec.solid)
                   if spec.lmax and not spec.amr else None),
@@ -1832,6 +1833,48 @@ def _emit_frame(hooks, p, t, mesh, sl=None):
                     levels=mesh.levels if sl is None else mesh.levels[sl])
 
 
+def _split_gauges(case, spec):
+    """(kept, dropped): the case's gauges split by the writer's kept list
+    (`spec.gauge_ids`, P1-23 A5), each [(entered number, point)] in the
+    entered order; 1D points are radii. The writer keeps a 1D gauge at
+    0 < r <= the outer face and a 2D/3D one inside the domain and not in
+    or on a snapped wall (writer.plan_case)."""
+    if case.dim == 1:
+        entered = [float(r) for r in case.gauge_radii or []]
+        keep = {float(r) for r in spec.gauge_ids}
+    else:
+        entered = [tuple(float(v) for v in g) for g in case.gauges or []]
+        keep = {tuple(float(v) for v in g) for g in spec.gauge_ids}
+    kept, dropped = [], []
+    for n, pt in enumerate(entered, start=1):
+        (kept if pt in keep else dropped).append((n, pt))
+    return kept, dropped
+
+
+def _live_gauges(case, spec, live_sl=None):
+    """T53 + GUI-16 (f), D13: the live info's `gauges` and
+    `gauges_dropped`, [(entered number, u, v)] - the gauges the writer
+    kept and those it dropped, at the points the user entered (the probes
+    snap in the mesh). 3D: the ones the live plane `live_sl` cuts, within
+    one cell (geometry.plane_gauges)."""
+    kept, dropped = _split_gauges(case, spec)
+    if case.dim == 1:
+        def at(items):
+            return [(n, r, 0.0) for n, r in items]
+    elif case.dim == 2:
+        def at(items):
+            return [(n, p[0], p[1]) for n, p in items]
+    else:
+        g = spec.grid
+        coords = (g['x_c'], g['y_c'], g['z_c'])
+
+        def at(items):
+            return geometry.plane_gauges([p for _n, p in items], live_sl,
+                                         coords, spec.dx,
+                                         numbers=[n for n, _p in items])
+    return at(kept), at(dropped)
+
+
 def _trigger_cells(case, coords, shape, kept=None, hooks=None):
     """T51: (index, cell) for the trigger gauge on a display grid, or
     (None, None). `coords` are the cell centres per axis; the gauge is
@@ -2162,14 +2205,14 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
      live_title) = slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_term)
+    live, live_dropped = _live_gauges(case, spec, live_sl)
     ax_i = 'xyz'.index(slice_axis)
     hooks.run_started(dict(
         dim=3, x_face=live_faces[0], y_face=live_faces[1],
         solid=solid[live_sl], xlabel=live_labels[0],
         ylabel=live_labels[1], title=live_title,
-        gauges=geometry.plane_gauges(
-            [tuple(float(v) for v in gpt) for gpt in (case.gauges or [])],
-            live_sl, (x_c, y_c, z_c), dx),
+        # GUI-16 (f): the writer's kept gauges, the dropped ones apart
+        gauges=live, gauges_dropped=live_dropped,
         mesh_src=(refine.slice_src(spec.levels, spec.lmax, ax_i, s0,
                                    solid_fine=spec.solid)
                   if spec.lmax and not spec.amr else None),
