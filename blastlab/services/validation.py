@@ -908,6 +908,10 @@ def _trigger_note(case):
         trig_i = int(trig)
     except (TypeError, ValueError):
         trig_i = 0
+    if not 1 <= trig_i <= len(case.gauges or []):
+        # no such gauge (refused by _validate_trigger): no note beside
+        # the error claiming the run ends at G5, or at G0
+        return None
     if 'remap' not in action:
         return f"The run ends when the wave reaches G{trig_i}"
     if case.dim == 3 or case.geometry != 'axisymmetric' or not (

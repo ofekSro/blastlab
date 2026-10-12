@@ -251,6 +251,14 @@ def trigger_drop_checks():
           str(rep.notes))
     check('no trigger: trigger_disabled gives None',
           trigger_disabled(Case2D(**base)) is None)
+    # a trigger number with no gauge is an error, and no note beside it
+    # says the run ends there
+    for trig in (5, 'x'):
+        rep = validate_case(Case2D(trigger_gauge=trig, **base))
+        check(f'trigger {trig!r} with no such gauge: an error, no trigger '
+              f'note', bool(rep.errors) and not any(
+                  'wave reaches' in n or 'remap file' in n
+                  for n in rep.notes), f'{rep.errors} {rep.notes}')
 
 
 def drop_rule_failed_checks():
