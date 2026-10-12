@@ -207,6 +207,37 @@ def trigger_drop_checks():
           trigger_disabled(Case2D(**base)) is None)
 
 
+def drop_rule_failed_checks():
+    """G13U sec. 6 (D14): a drop rule that could not be built says why in
+    `failed` (and keeps every gauge); a working rule has failed = ''."""
+    print()
+    print("G13U sec. 6: drop_rule.failed")
+    from blastlab.services.validation import drop_rule
+    wall3 = dict(Lx=4.0, Ly=4.0, Lz=4.0, cell_size_m=0.1, charge=1.0,
+                 center=(2.0, 2.0, 2.0),
+                 obstacles=[(2.5, 3.0, 0.0, 4.0, 0.0, 4.0)],
+                 gauges=[(2.7, 2.0, 2.0)], solver='blastfoam',
+                 material='TNT')
+    # a ~1.7e10-cell AMR display grid: plan_levels refuses it
+    rule = drop_rule(Case3D(amr_levels=6, amr_display_level=6, **wall3))
+    check('the refinement plan fails: failed names it, every gauge kept',
+          'refinement plan' in rule.failed and 'too large' in rule.failed
+          and rule((2.7, 2.0, 2.0)) == 0, repr(rule.failed))
+    rule = drop_rule(Case3D(**dict(wall3, charge=-1.0)))
+    check('the charge check fails: failed carries its error',
+          'Charge must be > 0' in rule.failed, repr(rule.failed))
+    two = dict(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+               charge=1.0, center=(0.0, 1.0),
+               obstacles=[(1.2, 1.6, 0.0, 1.0)], gauges=[(1.4, 0.3)])
+    for solver in ('native', 'blastfoam'):
+        rule = drop_rule(Case2D(solver=solver, **two))
+        check(f'a valid 2D {solver} case with a wall: failed is "", and the '
+              f'rule names Wall 1',
+              rule.failed == '' and rule((1.4, 0.3)) == 1, repr(rule.failed))
+    check('no obstacles: failed is ""',
+          drop_rule(Case2D(**dict(two, obstacles=[]))).failed == '')
+
+
 def chain_stage_checks():
     """B5: an auto-wired chain must be validated per stage BEFORE it
     starts - a foam stage fed by a profile used to reach the backend and
@@ -466,6 +497,7 @@ def main():
     programmed_ignition_checks()
     det_radius_reach_checks()
     trigger_drop_checks()
+    drop_rule_failed_checks()
     chain_stage_checks()
     shared_constant_checks()
     amr_cap_checks()

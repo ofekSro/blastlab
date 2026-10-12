@@ -1729,22 +1729,37 @@ def drop_rule(case, pending_inputs=False):
     warning (`_gauge_drop_rule` on the context `validate_case` builds up
     to its refinement block, which is all the rule reads), so Setup's
     warning, Setup's Where column and Run's dropped-gauge note name one
-    wall (GUI-13 (e)). Build it once per case, call it per gauge."""
+    wall (GUI-13 (e)). Build it once per case, call it per gauge.
+
+    G13U sec. 6 (D14): the rule carries `failed` - '' when it works (no
+    obstacles included), else why it could not be built (the layout step
+    that stopped, with its first error, or the exception); it then keeps
+    every gauge. Checks names the bad input; the screens can say the
+    dropped-gauge test did not run (C6)."""
     def none(_pt):
         return 0
+    none.failed = ''
+
+    def stopped(step, rep):
+        why = rep.errors[0] if rep.errors else 'no error given'
+        none.failed = f'{step} stopped: {why}'
+        return none
     try:
         if case.dim < 2 or not case.obstacles:
             return none
         rep = ValidationReport()
         ctx = _validate_common(case, rep)
-        if ctx is None or not _validate_domain_and_charge(case, rep, ctx):
-            return none
+        if ctx is None:
+            return stopped('the cell size / solver check', rep)
+        if not _validate_domain_and_charge(case, rep, ctx):
+            return stopped('the domain / charge check', rep)
         _validate_profile_init(case, rep, ctx, pending_inputs)
         if not _validate_refinement(case, rep, ctx):
-            return none
+            return stopped('the refinement plan', rep)
         rule, dims = _gauge_drop_rule(case, ctx), ctx.dims
     except (ArithmeticError, AttributeError, IndexError, TypeError,
-            ValueError):
+            ValueError) as exc:
+        none.failed = f'{type(exc).__name__}: {exc}'
         return none
 
     def dropped(pt):
@@ -1752,6 +1767,7 @@ def drop_rule(case, pending_inputs=False):
         if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
             return 0
         return rule(pt)
+    dropped.failed = ''
     return dropped
 
 
