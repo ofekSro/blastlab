@@ -24,6 +24,8 @@ import stat
 import subprocess
 from types import SimpleNamespace
 
+import numpy as np
+
 #: the longest model name accepted (plan sec. 2.1)
 NAME_MAX = 100
 
@@ -1033,6 +1035,182 @@ def model_of_run(runs_dir, posix):
             if best is None or when > best[0]:
                 best = (when, stage)
     return best[1] if best else None
+
+
+def load_result(stage_dir):
+    """P2-25 (D16), services half: a model folder (or a chain's stage
+    folder) loaded back into a Result, read only - no format changes.
+
+      case, dim     MODEL.json (models.case.load_case) and the manifest's
+                    `dim`; meta carries what the Results screens read
+                    (the case's charge, domain, obstacles, entered
+                    gauges), `model_dir`, `loaded_from` and
+                    `gauges_dropped` [(n, reason)], recomputed from the
+                    case by the solvers' own drop rules
+      gauges        gauges\\gauges_<d>d.txt (output.gauges.read_gauges),
+                    always when the run wrote it
+      a field       the saved profile (profile.txt / profile_2d.npz, the
+                    run's end state), else for blastFoam the foam\\
+                    copy's `0\\p` through solvers/foam/reader where it
+                    holds one per display cell (the foam\\ copy keeps no
+                    written time, so that is the initial field). No
+                    field otherwise (3D, planar 2D): gauges only.
+
+    A folder without MODEL.json raises ValueError naming it."""
+    from ..models.case import load_case
+    from ..models.result import Result
+    from ..output.gauges import read_gauges
+    case_path = os.path.join(stage_dir, CASE_FILE)
+    if not os.path.isfile(case_path):
+        raise ValueError(f'{stage_dir} has no {CASE_FILE}: not a model '
+                         f'folder (nor a chain stage of one)')
+    case = load_case(case_path)
+    try:
+        with open(os.path.join(stage_dir, MANIFEST_FILE),
+                  encoding='utf-8') as f:
+            manifest = json.load(f)
+    except (OSError, ValueError):
+        manifest = {}
+    if not isinstance(manifest, dict):
+        manifest = {}
+    dim = int(manifest.get('dim') or case.dim)
+    tsv = os.path.join(stage_dir, GAUGES_DIR, f'gauges_{dim}d.txt')
+    gauges = (read_gauges(tsv) if os.path.isfile(tsv)
+              else dict(times=np.zeros(0), pressures=[]))
+    meta = _loaded_meta(case, dim, manifest, stage_dir, gauges)
+    snapshots = _loaded_field(case, dim, stage_dir, meta)
+    stop = str(manifest.get('stop_reason') or '')
+    return Result(snapshots, gauges, meta, stop, stop == 'stopped by user')
+
+
+def _loaded_meta(case, dim, manifest, stage_dir, gauges):
+    """load_result's meta: the keys a native run's meta takes from its
+    case (solver2d / solver3d / solver1d), plus the folder's own."""
+    meta = dict(solver=getattr(case, 'solver', 'native'),
+                eos=getattr(case, 'eos', 'JWL'), model_dir=stage_dir,
+                loaded_from=stage_dir, name=manifest.get('model')
+                or os.path.basename(os.path.normpath(stage_dir)))
+    if dim == 1:
+        meta.update(radius_m=case.radius_m, charge_kg=case.charge_kg)
+        gone = [(k, _drop_reason_1d()) for k, r in enumerate(
+            case.gauge_radii or [], start=1)
+            if not 0 < float(r) <= case.radius_m]
+    else:
+        meta.update(
+            geometry=getattr(case, 'geometry', None), Lx=case.Lx,
+            Ly=case.Ly, obstacles=[tuple(o) for o in case.obstacles or []],
+            bcs=dict(case.bcs or {}), charge=case.charge,
+            charge_center=tuple(case.center),
+            gauges=[tuple(float(v) for v in g) for g in case.gauges or []],
+            trigger_gauge=getattr(case, 'trigger_gauge', None))
+        if dim == 3:
+            meta['Lz'] = case.Lz
+        gone = _dropped_nd(case, gauges)
+    meta['gauges_dropped'] = [[n, why] for n, why in gone]
+    return meta
+
+
+def _drop_reason_1d():
+    from ..core.geometry import gauge_drop_reason
+    return gauge_drop_reason(0, False, outside=True)
+
+
+def _dropped_nd(case, gauges):
+    """[(entered number, reason)] of the 2D/3D gauges with no series in
+    the TSV, by gauge_summary's pairing; the reason by the validation
+    rule (outside the domain, or the wall its solver drops it for)."""
+    from ..core.geometry import (_in_obstacle_open, gauge_drop_reason)
+    from ..output.gauge_summary import dropped_numbers
+    from .validation import drop_rule
+    want = [tuple(float(v) for v in g) for g in case.gauges or []]
+    gone = dropped_numbers(gauges.get('points') or [], want)
+    if not gone:
+        return []
+    dims = (case.Lx, case.Ly) + ((case.Lz,) if case.dim == 3 else ())
+    rule, out = drop_rule(case), []
+    for n in gone:
+        pt = want[n - 1]
+        if any(not 0 <= v <= L for v, L in zip(pt, dims)):
+            out.append((n, gauge_drop_reason(0, False, outside=True)))
+            continue
+        wall = rule(pt)
+        inside = _in_obstacle_open(pt, case.obstacles or [])
+        out.append((n, gauge_drop_reason(inside or wall, bool(inside))
+                    if inside or wall else ''))
+    return out
+
+
+def _loaded_field(case, dim, stage_dir, meta):
+    """{label: field dict} for load_result: the saved profile, else the
+    foam\\ copy's initial field; {} when neither is there. Adds the grid
+    keys (r / x_c, y_c, faces, solid) to `meta`."""
+    prof = getattr(case, 'profile_file', None)
+    path = (prof if prof and os.path.isabs(prof)
+            else os.path.join(stage_dir, prof) if prof else '')
+    try:
+        if dim == 1 and path and os.path.isfile(path):
+            from ..core.profiles import load_profile
+            fp = load_profile(path)
+            meta.update(r=fp['r'], r_exp=fp['r_exp'], final_profile=fp)
+            return {f"t = {fp['t'] * 1e3:.3f} ms (final)": dict(
+                r=fp['r'], p=fp['p'], rho=fp['rho'], u=fp['u'])}
+        if dim == 2 and path and os.path.isfile(path):
+            from ..core.profiles import load_profile_2d
+            fp = load_profile_2d(path)
+            _grid_meta(meta, fp['r_c'], fp['z_c'], case)
+            meta['r_exp'] = fp['r_exp']
+            return {f"t = {fp['t'] * 1e3:.3f} ms (final)": dict(
+                p=fp['p'], rho=fp['rho'],
+                speed=np.sqrt(fp['u'] ** 2 + fp['v'] ** 2))}
+        if getattr(case, 'solver', 'native') == 'blastfoam' and dim > 1:
+            return _foam_initial_field(case, stage_dir, meta)
+    except Exception as exc:        # the gauges still load (D16)
+        meta['field_note'] = f'no field loaded: {exc!r}'
+    return {}
+
+
+def _grid_meta(meta, x_c, y_c, case, z_c=None):
+    """x_c / y_c (/ z_c), their faces (uniform cells assumed, as every
+    saved profile is) and the obstacle mask, for a loaded field."""
+    from ..core.bc import solid_mask_2d, solid_mask_3d
+
+    def faces(c):
+        c = np.asarray(c, dtype=float)
+        h = (c[1] - c[0]) if len(c) > 1 else 2.0 * c[0]
+        return np.concatenate([c - h / 2.0, [c[-1] + h / 2.0]])
+    meta.update(x_c=np.asarray(x_c), y_c=np.asarray(y_c),
+                x_face=faces(x_c), y_face=faces(y_c),
+                dx=float(np.asarray(x_c)[1] - np.asarray(x_c)[0])
+                if len(x_c) > 1 else None)
+    obstacles = [tuple(o) for o in case.obstacles or []]
+    if z_c is None:
+        meta['solid'] = solid_mask_2d(meta['x_c'], meta['y_c'], obstacles)
+    else:
+        meta.update(z_c=np.asarray(z_c), z_face=faces(z_c))
+        meta['solid'] = solid_mask_3d(meta['x_c'], meta['y_c'], meta['z_c'],
+                                      obstacles)
+
+
+def _foam_initial_field(case, stage_dir, meta):
+    """The foam\\ copy's `0\\p` on the display grid, when it holds one
+    value per cell of it (a uniform, unrefined mesh); else {}."""
+    p_path = os.path.join(stage_dir, FOAM_DIR, '0', 'p')
+    if not os.path.isfile(p_path):
+        return {}
+    from ..solvers.foam import reader, writer
+    spec = writer.render_case(case)
+    n = reader.scalar_size(p_path)
+    if n is not None and n != spec.n_cells:
+        meta['field_note'] = (f'no field loaded: foam\\0\\p holds {n} '
+                              f'values, the display grid {spec.n_cells}')
+        return {}
+    from ..core.constants import P_AIR
+    p = reader.to_grid(reader.read_scalar(p_path, spec.n_cells), spec,
+                       fill=P_AIR)
+    g = spec.grid
+    _grid_meta(meta, g['x_c'], g['y_c'], case,
+               g['z_c'] if case.dim == 3 else None)
+    return {'t = 0.000 ms (initial, foam\\0)': dict(p=p)}
 
 
 def is_run_dir(posix):
