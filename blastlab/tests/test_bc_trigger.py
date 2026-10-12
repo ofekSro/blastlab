@@ -194,7 +194,7 @@ def main():
     res, _ = quiet(solve_2d, case2d(trigger_gauge=1, t_end=5e-3),
                    ConsoleHooks(2))
     check('terminate: the run stops at the gauge',
-          res.stop_reason.startswith('trigger gauge 1 reached'),
+          res.stop_reason.startswith('trigger gauge G1 reached'),
           res.stop_reason)
     t_trig = res.meta['trigger']['t']
     check('the trigger record carries t, the number and the point',
@@ -228,7 +228,7 @@ def main():
     res3, log3 = quiet(solve_2d, case2d(trigger_gauge=9, t_end=2e-4),
                        ConsoleHooks(2))
     check('a gauge number that does not exist warns and runs on',
-          '[warn] Trigger gauge 9' in log3
+          '[warn] Trigger gauge G9' in log3
           and res3.stop_reason == 'end time reached')
 
     # T63: 1D has no trigger gauge at all. The 1D hand-off is the run's
@@ -320,7 +320,7 @@ def main():
     rec = fb._trigger_fire(lp, _Hooks(), c2f, 1, 1.5e-4, 1.2e5)
     check('firing it records t/gauge/point and asks for the stop',
           rec['gauge'] == 2 and rec['action'] == 'terminate'
-          and lp.stop_requested == 'trigger gauge 2 reached', str(rec))
+          and lp.stop_requested == 'trigger gauge G2 reached', str(rec))
     lp2 = _Loop()
     fb._trigger_fire(lp2, _Hooks(),
                      case2d(trigger_gauge=2, trigger_action='remap'),

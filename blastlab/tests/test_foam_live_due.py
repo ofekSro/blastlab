@@ -66,7 +66,7 @@ def w2_note_checks():
 
     from blastlab.solvers.foam.runloop import STOP_UNSTABLE
     for reason in ('stopped by user',
-                   'trigger gauge 2 reached',
+                   'trigger gauge G2 reached',
                    'shock arrived at a terminate boundary (r = 4.0 m)',
                    STOP_UNSTABLE):
         txt = note_for(reason)
@@ -194,7 +194,7 @@ def instability_checks(_st):
     check('a run that achieved what it was asked does not',
           not backend._stopped_early('end time reached')
           and not backend._stopped_early('safety cap')
-          and not backend._stopped_early('trigger gauge 1 reached'))
+          and not backend._stopped_early('trigger gauge G1 reached'))
 
     # wiring: the loop asks for the stop, and the user's stop still wins
     with open(runloop.__file__, encoding='utf-8') as fh:

@@ -1874,11 +1874,11 @@ def _trigger_fire(loop, hooks, case, k, t, p_at):
     so. Returns the trigger record for meta."""
     action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
     pt = tuple(float(v) for v in list(case.gauges)[k])
-    hooks.log(f"  Trigger gauge {k + 1} ("
+    hooks.log(f"  Trigger gauge G{k + 1} ("
               + ", ".join(f"{v:.4f}" for v in pt)
               + f") m reached at t = {t*1e3:.3f} ms (p = {p_at:.3e} Pa)")
     if 'terminate' in action and not loop.stop_requested:
-        loop.request_stop(f'trigger gauge {k + 1} reached')
+        loop.request_stop(f'trigger gauge G{k + 1} reached')
     return dict(t=float(t), gauge=k + 1, point=pt, action=action)
 
 

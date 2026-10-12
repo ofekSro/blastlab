@@ -131,7 +131,7 @@ def numbering(tag, solve, make, kept, in_wall):
     ctl, _ = run(solve, make(kept, trigger_gauge=3))
     ctl_trig = ctl.meta.get('trigger') or {}
     check(f'{tag} control: the run stops on the trigger gauge, G3',
-          ctl.stop_reason.startswith('trigger gauge 3 reached')
+          ctl.stop_reason.startswith('trigger gauge G3 reached')
           and ctl_trig.get('gauge') == 3 and ctl.meta['trigger_gauge'] == 3,
           f'{ctl.stop_reason!r} {ctl_trig}')
     check(f'{tag} control: G3 is the third series, at its snapped point',
@@ -154,8 +154,8 @@ def numbering(tag, solve, make, kept, in_wall):
     check(f'{tag}: live labels are the entered numbers [1, 3, 4]',
           labels == [1, 3, 4] and hooks.info['trigger_gauge'] == 3,
           f'{labels} {hooks.info["trigger_gauge"]}')
-    check(f'{tag}: the log names Trigger gauge 3 and no "does not exist"',
-          any(ln.strip().startswith('Trigger gauge 3 (')
+    check(f'{tag}: the log names Trigger gauge G3 and no "does not exist"',
+          any(ln.strip().startswith('Trigger gauge G3 (')
               for ln in hooks.lines)
           and not any('does not exist' in ln for ln in hooks.lines))
 

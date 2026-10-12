@@ -399,7 +399,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
             gx, gy = gauge_actual[trig_k]
             trigger = dict(t=float(t), gauge=trig_no,
                            point=(gx, gy), action=trigger_action)
-            hooks.log(f"  Trigger gauge {trig_no} ({gx:.4f}, "
+            hooks.log(f"  Trigger gauge G{trig_no} ({gx:.4f}, "
                       f"{gy:.4f}) m reached at t = {t*1e3:.3f} ms")
             if 'remap' in trigger_action:
                 trigger_state = dict(t=float(t), rho=rho_f.copy(),
@@ -407,7 +407,7 @@ def _run_blast_2d(geometry, Lx, Ly, cell_size_m, material='TNT',
                                      e=e_f.copy(), p=p_f.copy(),
                                      phase=phase.copy())
             if 'terminate' in trigger_action:
-                stop_reason = (f'trigger gauge {trig_no} reached '
+                stop_reason = (f'trigger gauge G{trig_no} reached '
                                f'({gx:.4f}, {gy:.4f}) m')
                 break
 

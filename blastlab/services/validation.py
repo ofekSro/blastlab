@@ -876,7 +876,7 @@ def _validate_trigger(case, rep):
         trig_i = 0
         err("Trigger gauge must be a gauge number")
     if trig_i and not 1 <= trig_i <= n_g:
-        err(f"Trigger gauge {trig_i}: the case has {n_g} gauge(s)")
+        err(f"Trigger gauge G{trig_i}: the case has {n_g} gauge(s)")
     if action not in TRIGGER_ACTIONS:
         err(f"Trigger action '{action}': expected one of "
             f"{', '.join(TRIGGER_ACTIONS)}")
@@ -896,10 +896,10 @@ def _validate_trigger(case, rep):
                 then = ""
             else:
                 then = " (the run then continues)"
-            note(f"Gauge {trig_i} will write the remap file when the "
+            note(f"G{trig_i} will write the remap file when the "
                  f"wave reaches it{then}")
     else:
-        note(f"The run ends when the wave reaches gauge {trig_i}")
+        note(f"The run ends when the wave reaches G{trig_i}")
 
 
 def _validate_1d(case, rep, ctx):

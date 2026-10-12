@@ -475,11 +475,11 @@ def _run_blast_3d(Lx, Ly, Lz, cell_size_m, material='TNT', order=1,
             gp = gauge_actual[trig_k]
             trigger = dict(t=float(t), gauge=trig_no, point=gp,
                            action=trigger_action)
-            hooks.log(f"  Trigger gauge {trig_no} "
+            hooks.log(f"  Trigger gauge G{trig_no} "
                       f"({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m "
                       f"reached at t = {t*1e3:.3f} ms")
             if 'terminate' in trigger_action:
-                stop_reason = (f'trigger gauge {trig_no} reached '
+                stop_reason = (f'trigger gauge G{trig_no} reached '
                                f'({gp[0]:.4f}, {gp[1]:.4f}, {gp[2]:.4f}) m')
                 break
 

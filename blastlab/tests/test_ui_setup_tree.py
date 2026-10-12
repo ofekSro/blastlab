@@ -471,7 +471,7 @@ def t3_trigger():
               f.trigger_combo.currentText())
         errs = validate_case(f.get_case()).errors
         check(f'{d}D: and validation still names it',
-              any('Trigger gauge 5' in e for e in errs), str(errs))
+              any('Trigger gauge G5' in e for e in errs), str(errs))
         f.set_case(cls(solver='blastfoam', gauges=[]))
         f.trigger_switch.click()
         check(f'{d}D: on with no gauges: blank, the dropdown says so',

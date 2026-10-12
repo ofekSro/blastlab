@@ -74,7 +74,7 @@ def trigger_index(trigger_gauge, n_gauges, hooks, numbers=None):
     except (TypeError, ValueError):
         k = -1
     if not 0 <= k < n_gauges:
-        hooks.log(f"  [warn] Trigger gauge {trigger_gauge} does not exist "
+        hooks.log(f"  [warn] Trigger gauge G{trigger_gauge} does not exist "
                   f"({n_gauges} gauge(s)) - trigger disabled")
         return None
     if numbers is None:
