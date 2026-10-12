@@ -333,13 +333,17 @@ def _fit_ignition(spec, hooks):
     nearest shell of centres (writer.fit_det_radii), so blastFoam does
     not abort with "No cells will be activated". Only the `radii` line of
     constant/phaseProperties changes, in `spec.files` and on disk; a
-    radius that lights a cell leaves the file byte-identical. Explicit
-    `det_radii` are the user's and are never refitted."""
+    radius that lights a cell leaves the file byte-identical.
+
+    P2-22: explicit `det_radii` are the user's and are never refitted -
+    one that lights no cell raises here, before blastFoam starts, with
+    the point and the nearest centre (validation refuses only what the
+    nominal lattice shows)."""
     rel = 'constant/phaseProperties'
     text = spec.files.get(rel, '')
     radii = writer.written_det_radii(text)
     points = spec.det_points or [c for c, _m in spec.charges]
-    if not radii or len(radii) != len(points) or spec.det_radii:
+    if not radii or len(radii) != len(points):
         return
     try:
         C = reader.read_cell_centres(spec.case_unc, spec.start_dir)
@@ -348,6 +352,16 @@ def _fit_ignition(spec, hooks):
     new, fits = writer.fit_det_radii(points, radii, C)
     if not fits:
         return
+    if spec.det_radii:
+        i, old, _r, _n, d1 = fits[0]
+        pt = ', '.join(f'{v:g}' for v in points[i])
+        raise RuntimeError(
+            f'detonation point {i + 1} ({pt}) m: the ignition radius '
+            f'{old * 1e3:.4g} mm lights no cell of the t = 0 mesh - the '
+            f'nearest cell centre is {d1 * 1e3:.4g} mm away, and blastFoam '
+            f'would stop with "No cells will be activated". Set a radius '
+            f'above {d1 * 1e3:.4g} mm, or leave the radii empty for the '
+            f'default - case kept at {spec.case_unc}')
     spec.files[rel] = writer.with_det_radii(text, new)
     writer._write_files(spec, (rel,))
     for i, old, r, n_lit, d1 in fits:

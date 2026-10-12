@@ -380,6 +380,30 @@ def level_map(centres, zones):
     return lv
 
 
+def level_at(levels, fine, point):
+    """P1-23: the deepest level among the fine cells whose CLOSED box
+    holds `point` - one cell inside a cell, two on a face, four or eight
+    on an edge or a corner. `levels` is a level map on the fine grid
+    `fine` (a core.grid dict: plan.levels / plan.fine, or a CaseSpec's
+    levels / grid); `point` has one coordinate per axis of the map (a
+    longer one is cut). A point outside the grid takes the nearest edge
+    cell. 0 when there is no level map (a uniform case)."""
+    if levels is None or not np.size(levels):
+        return 0
+    lv = np.asarray(levels)
+    idx = []
+    for a, key in enumerate(('x_face', 'y_face', 'z_face')[:lv.ndim]):
+        f = np.asarray(fine[key], dtype=float)
+        p = float(point[a])
+        tol = 1e-9 * max(1.0, float(f[-1] - f[0]))
+        lo = int(np.searchsorted(f, p - tol, side='left')) - 1
+        hi = int(np.searchsorted(f, p + tol, side='right')) - 1
+        n = lv.shape[a]
+        lo, hi = min(max(lo, 0), n - 1), min(max(hi, 0), n - 1)
+        idx.append(slice(min(lo, hi), max(lo, hi) + 1))
+    return int(lv[tuple(idx)].max())
+
+
 def required_level(dx_base, r_exp, n_cells=MIN_EXP_CELLS):
     """Levels needed below dx_base so that r_exp spans `n_cells` cells
     at the finest level (0 when the base already resolves it)."""

@@ -257,10 +257,75 @@ def hook_checks():
     shutil.rmtree(spec.case_unc, ignore_errors=True)
 
 
+def explicit_checks():
+    """A3 (P2-22): an explicit radius is never altered - one that lights
+    no cell of the t = 0 mesh is refused before blastFoam starts."""
+    from blastlab.solvers.foam import backend
+    from blastlab.core.case import validate_case
+    print("\nA3 - an explicit radius that lights nothing")
+    # 18 mm clears the nominal level-1 lattice (axis 2/3 h, y on a face:
+    # 16.7 mm), so validation passes it; the real axis cell is at 20.39
+    rep = validate_case(p123_case(det_radii=[0.018]))
+    check('18 mm explicit passes the nominal validation check',
+          not any('Detonation point' in e for e in rep.errors),
+          str(rep.errors))
+    rep = validate_case(p123_case(det_radii=[0.015]))
+    check('15 mm explicit is refused by it (nominal 16.7 mm)',
+          any(e.startswith('Detonation point 1') and '16.7 mm' in e
+              for e in rep.errors), str(rep.errors))
+    spec, pp = staged_spec(p123_case(det_radii=[0.018]), p123_centres())
+    before = read_text(pp)
+    h = _Hooks()
+    try:
+        backend._fit_ignition(spec, h)
+        msg = ''
+    except RuntimeError as exc:
+        msg = str(exc)
+    check('18 mm explicit: refused at run time, naming point 1 and the '
+          '20.4 mm centre',
+          msg.startswith('detonation point 1 ') and '18 mm' in msg
+          and '20.4 mm' in msg and 'case kept at' in msg, msg)
+    check('and phaseProperties on disk is unchanged, no fit note',
+          read_text(pp) == before
+          and writer.written_det_radii(before) == [0.018]
+          and not h.msgs, f'{h.msgs}')
+    shutil.rmtree(spec.case_unc, ignore_errors=True)
+    spec, pp = staged_spec(p123_case(det_radii=[0.025]), p123_centres())
+    before = read_text(pp)
+    backend._fit_ignition(spec, _Hooks())
+    check('25 mm explicit lights the axis cell: accepted, file unchanged',
+          read_text(pp) == before)
+    shutil.rmtree(spec.case_unc, ignore_errors=True)
+
+
+def level_at_checks():
+    """A3/A4: core.refine.level_at, the deepest fine cell touching a
+    point, on the P1-23 plan (level 1 at the charge, lmax 2)."""
+    from blastlab.core import refine
+    from blastlab.solvers.foam.materials import MATERIALS
+    print("\nlevel_at - the level at a point")
+    plan = refine.plan_levels(p123_case(), MATERIALS['C4'].rho0)
+    check('P1-23: lmax 2, but level 1 at the charge (0, 0)',
+          plan.lmax == 2
+          and refine.level_at(plan.levels, plan.fine, (0.0, 0.0)) == 1)
+    check('P1-23: level 2 inside the deep zone, 0 outside every zone',
+          refine.level_at(plan.levels, plan.fine, (4.0, 3.0)) == 2
+          and refine.level_at(plan.levels, plan.fine, (2.0, 8.0)) == 0)
+    # x = 3.5 is the deep zone's snapped edge, a face shared by a level-1
+    # and a level-2 cell: the deeper one counts
+    check('a point on the deep zone edge takes the deeper level',
+          refine.level_at(plan.levels, plan.fine, (3.5, 3.0)) == 2
+          and refine.level_at(plan.levels, plan.fine, (3.49, 3.0)) == 1)
+    check('no level map -> 0',
+          refine.level_at(None, plan.fine, (0.0, 0.0)) == 0)
+
+
 def main():
     seed_checks()
     fit_checks()
     hook_checks()
+    explicit_checks()
+    level_at_checks()
     print()
     if FAIL:
         print(f"FOAM IGNITION: FAIL ({len(FAIL)}): {', '.join(FAIL)}")

@@ -1292,6 +1292,8 @@ def _validate_refinement(case, rep, ctx):
         elif init == 'charge' and not rep.errors:
             plan = _plan_static_zones(case, rep, rho0, cref)
     ctx.plan = plan
+    if foam and init == 'charge':
+        _validate_det_radii(case, rep, ctx)
 
     # What blastFoam will actually deposit (N5/T39): setFields marks
     # whole cells, so the charge is a staircase whose mass is only
@@ -1342,6 +1344,84 @@ def _plan_static_zones(case, rep, rho0, cref):
             note("The base cell already resolves the "
                  "charge - no automatic zone needed")
     return plan
+
+
+def _validate_det_radii(case, rep, ctx):
+    """P2-22 / P1-23: an explicit ignition radius that cannot light a
+    cell is refused before the run. blastFoam lights the cells whose
+    CENTRE lies within the radius (guide sec. 5.6.1, p. 71, `radii`) and
+    aborts at t = 0 when there is none, so per point the radius must
+    exceed the nominal nearest-centre distance at the deepest level that
+    can be at the point: static zones, the deepest fine cell touching it
+    (`core.refine.level_at`); AMR, `amr`; uniform, 0. On that level's
+    lattice the centres sit at (k + 1/2) h, the axisymmetric axis cell's
+    radial one at 2/3 h (the wedge centroid). Necessary, not sufficient:
+    the real t = 0 mesh can be coarser (refineMesh cuts the axis cell at
+    its centroid, setRefinedFields leaves a charge interior coarse), and
+    the backend refuses the rest on the real centres before blastFoam
+    starts. A zero radius takes blastFoam's findCell branch and is not
+    checked here. 2D/3D only; called once the plan is known."""
+    radii = getattr(case, 'det_radii', None)
+    if not radii or getattr(case, 'activation', 'linear') == 'none':
+        return
+    pts = [tuple(float(v) for v in p)
+           for p in (getattr(case, 'det_points', None) or [])]
+    npts = len(pts) or 1
+    if len(radii) != npts or ctx.dims is None:
+        return                  # the N5-12 block has already said so
+    axisym = case.dim == 2 and case.geometry == 'axisymmetric'
+    if not pts:
+        pts = [tuple(float(v) for v in case.center[:case.dim])]
+    if axisym:
+        pts = [(0.0,) + p[1:] for p in pts]
+    plan = ctx.plan
+    try:
+        from ..solvers.foam.writer import FOAM_SMALL
+        from ..core.grid import _faces_shared
+        from ..core import refine
+        if plan is not None:
+            dx_base = float(plan.dx_base)
+        elif ctx.amr or ctx.zones or ctx.cref == 'zone':
+            return              # no plan for it: refused elsewhere
+        else:
+            # the writer's uniform base cell: refine.plan_levels 516-530
+            # (the rule _gauge_drop_rule mirrors for its blastFoam branch)
+            dx = float(case.cell_size_m)
+            if getattr(case, 'charge_refine', 'global') != 'zone':
+                dx = min(refine.effective_dx(dx, r, case.Lx, ctx.n_exp)
+                         for _c, r in refine._charges(case, ctx.rho0))
+            dx_base = _faces_shared(tuple(float(L) for L in ctx.dims),
+                                    dx)[1]
+    except (ArithmeticError, ValueError, TypeError, IndexError):
+        return
+    for k, (pt, r) in enumerate(zip(pts, radii), start=1):
+        r = float(r)
+        if r <= FOAM_SMALL or len(pt) != case.dim:
+            continue
+        if plan is not None and plan.amr:
+            level = int(plan.amr)
+        elif plan is not None:
+            level = refine.level_at(plan.levels, plan.fine, pt)
+        else:
+            level = 0
+        h = dx_base / 2 ** level
+        d2 = 0.0
+        for a, (p, L) in enumerate(zip(pt, ctx.dims)):
+            if axisym and a == 0:
+                d2 += (2.0 * h / 3.0) ** 2
+                continue
+            n = max(1, int(round(float(L) / h)))
+            c = (min(max(math.floor(p / h), 0), n - 1) + 0.5) * h
+            d2 += (p - c) ** 2
+        d = math.sqrt(d2)
+        if r <= d:
+            rep.errors.append(
+                f"Detonation point {k}: ignition radius {r * 1e3:.3g} mm "
+                f"reaches no cell centre - the nearest is {d * 1e3:.3g} mm "
+                f"away (level {level}, {h * 1e3:.4g} mm cells), and "
+                f"blastFoam stops at t = 0 with 'No cells will be "
+                f"activated'. Use a radius above {d * 1e3:.3g} mm, or "
+                f"leave the radii empty for the default")
 
 
 def _note_charge_cells(case, rep, dx_charge, dims, n_exp):

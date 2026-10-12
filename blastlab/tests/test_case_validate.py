@@ -111,6 +111,45 @@ def programmed_ignition_checks():
           and not any('point' in e for e in r.errors), str(r.errors))
 
 
+def det_radius_reach_checks():
+    """P2-22: an explicit ignition radius that reaches no cell centre of
+    the level at its point is refused (blastFoam dies at t = 0)."""
+    print()
+    print("P2-22: an explicit radius that lights no cell")
+    # the GUI-14 QA case F05: planar, 0.1 m base, AMR 3 -> 12.5 mm cells,
+    # and (2, 2) is a node of that lattice: 4 centres at 8.84 mm
+    f05 = dict(geometry='planar', Lx=4.0, Ly=4.0, cell_size_m=0.1,
+               charge=100.0, center=(2.0, 2.0), gauges=[(3.2, 2.0)],
+               n_snapshots=2, record_frames=60, solver='blastfoam',
+               material='TNT', amr_levels=3, det_points=[(2.0, 2.0)],
+               bcs=dict(x_lo='terminate', x_hi='terminate',
+                        y_lo='terminate', y_hi='terminate'))
+    r = validate_case(Case2D(det_radii=[0.005], **f05))
+    errs = [e for e in r.errors if 'Detonation point 1' in e]
+    check('F05, 5 mm: refused, naming point 1 and the 8.84 mm centre',
+          len(errs) == 1 and '8.84 mm' in errs[0] and 'level 3' in errs[0],
+          str(r.errors))
+    r = validate_case(Case2D(det_radii=[0.02], **f05))
+    check('F05, 20 mm: validates', r.ok, str(r.errors))
+    # the N5-12 case (uniform, axis points): its nearest centre is at
+    # ~4.4 mm (2/3 of a 6.58 mm cell on the axis), under both radii
+    base = dict(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.02,
+                charge=1.0, center=(0.0, 1.0), solver='blastfoam',
+                material='TNT', gauges=[(1.0, 1.0)],
+                det_points=[(0.0, 0.95), (0.0, 1.05)])
+    r = validate_case(Case2D(det_delays=[0.0, 5e-5], det_radii=[0.01, 0.02],
+                             **base))
+    check('the N5-12 case still validates', r.ok, str(r.errors))
+    r = validate_case(Case2D(det_radii=[0.02, 0.001], **base))
+    errs = [e for e in r.errors if 'Detonation point' in e]
+    check('a 1 mm radius on its second point is refused, naming point 2',
+          len(errs) == 1 and errs[0].startswith('Detonation point 2'),
+          str(r.errors))
+    r = validate_case(Case2D(det_radii=[0.0, 0.02], **base))
+    check('a zero radius (blastFoam findCell) is not refused', r.ok,
+          str(r.errors))
+
+
 def chain_stage_checks():
     """B5: an auto-wired chain must be validated per stage BEFORE it
     starts - a foam stage fed by a profile used to reach the backend and
@@ -368,6 +407,7 @@ def main():
          hardware._host_probed) = old_host
 
     programmed_ignition_checks()
+    det_radius_reach_checks()
     chain_stage_checks()
     shared_constant_checks()
     amr_cap_checks()
