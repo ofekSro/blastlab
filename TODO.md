@@ -33,6 +33,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 > GUI-1..15 done (GUI-15 2026-10-12, branch `gui-15`; DONE.md §0y). Next, in order:
 > 1. **`P1-23` + `P2-22`** as batch `p1-23-ignition-radius` — owner 2026-10-11 (GUI-15 plan
 >    Q1/Q2): ahead of HD1-18 / HD1-19, because harness F05/F06 die at t = 0. See P1-23 below.
+>    **Owner 2026-10-12:** the same batch moves the closed GUI-14 / GUI-15 rows and the P1-24
+>    body to `docs/history/todo-closed.md` (TODO.md at 992 of 1000 lines).
 > 2. **`GUI-16`** — what GUI-15's QA/UX left (row below).
 > 3. GUI-14 (j) on the home PC. The office-machine runs of GUI-14 are done (DONE.md §0y, B6).
 >
