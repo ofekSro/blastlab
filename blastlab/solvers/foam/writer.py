@@ -255,10 +255,17 @@ class CaseSpec:
         """Finest spacing the charge region will actually see - the
         grid setFields marks whole cells on. An AMR case is refined to
         `amr` levels around the charge by setRefinedFields before the
-        selection runs; a static case is already at its fine spacing.
+        selection runs; a static refined case has the level of the
+        deepest cell touching the charge centre (P1-23: a charge in a
+        shallower zone than the deepest one sits on that zone's cells,
+        not the global fine ones); a uniform case its own spacing.
         Mirrors what validate_case reports the charge cells at."""
         if self.amr:
             return self.dx_base / 2 ** self.amr
+        if self.lmax and self.levels is not None:
+            lv = refine.level_at(self.levels, self.grid,
+                                 self.center[:self.dim])
+            return self.dx_base / 2 ** lv
         return self.dx
 
     @property

@@ -1305,7 +1305,14 @@ def _validate_refinement(case, rep, ctx):
             if plan.amr:
                 dx_charge = plan.dx_base / 2 ** plan.amr
             else:
-                dx_charge = plan.dx_fine
+                # P1-23: the level at the charge centre, as
+                # writer.CaseSpec.dx_charge takes it
+                from ..core.refine import level_at
+                cen = tuple(float(v) for v in case.center[:case.dim])
+                if case.dim == 2 and case.geometry == 'axisymmetric':
+                    cen = (0.0,) + cen[1:]
+                dx_charge = plan.dx_base / 2 ** level_at(
+                    plan.levels, plan.fine, cen)
         _note_charge_cells(case, rep, dx_charge, dims, n_exp)
     return True
 
