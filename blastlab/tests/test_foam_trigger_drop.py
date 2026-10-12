@@ -143,9 +143,66 @@ def trigger_checks(tag, make):
           not any('Trigger disabled' in w for w in rep.warnings))
 
 
+def drop_log_checks(tag, make):
+    """G15U-L2: the blastFoam run log names each gauge the writer dropped,
+    one `[warn] G<n> (...) m <reason> - dropped` line in the native
+    wording, none when nothing is dropped (written specs, no WSL)."""
+    print(f"\n{tag}: the run log names each dropped gauge (G15U-L2)")
+    case, spec = with_gauges(make)
+    h = _Hooks()
+    lines = backend._log_dropped_gauges(h, case, spec)
+    names = [ln.split()[1] for ln in lines]
+    check(f'{tag}: one line per dropped gauge, G2 G3 G4, logged',
+          names == ['G2', 'G3', 'G4'] and h.msgs == lines, str(lines))
+    check(f'{tag}: native wording - [warn], the wall, "- dropped"',
+          all(ln.strip().startswith('[warn] G') and 'Wall 1' in ln
+              and ln.endswith(' - dropped') for ln in lines), str(lines))
+    check(f'{tag}: G2 (strictly inside) reads "inside Wall 1", the face '
+          f'gauges "within a cell of Wall 1"',
+          'inside Wall 1' in lines[0]
+          and all('within a cell of Wall 1' in ln for ln in lines[1:]),
+          str(lines))
+    pt = tuple(case.gauges[1])
+    check(f'{tag}: G2 is named at its entered point, 2 decimals',
+          f"G2 ({', '.join(f'{v:.2f}' for v in pt)}) m" in lines[0],
+          lines[0])
+    free = make()
+    h = _Hooks()
+    check(f'{tag}: nothing dropped - no line',
+          backend._log_dropped_gauges(h, free, writer.render_case(free))
+          == [] and h.msgs == [])
+    far = dataclasses.replace(free, gauges=list(free.gauges)
+                              + [tuple(9.0 for _ in free.gauges[0])])
+    h = _Hooks()
+    lines = backend._log_dropped_gauges(h, far, writer.render_case(far))
+    check(f'{tag}: a gauge outside the domain reads "outside the domain"',
+          len(lines) == 1 and lines[0].strip().startswith('[warn] G2 (9.00')
+          and lines[0].endswith('outside the domain - dropped'), str(lines))
+
+
+def drop_log_1d_checks():
+    from blastlab.core.case import Case1D
+    print("\n1D: the run log names each dropped radius (G15U-L2)")
+    case = Case1D(radius_m=2.0, charge_kg=1.0, cell_size_m=0.01,
+                  gauge_radii=[0.5, 9.0, 1.5], solver='blastfoam',
+                  material='TNT')
+    h = _Hooks()
+    lines = backend._log_dropped_gauges(h, case, writer.render_case(case))
+    check('1D: G2 past the outer face, in the native 1D wording',
+          lines == ['  [warn] G2 (r 9.00 m) outside the domain - dropped'],
+          str(lines))
+    kept, gone = backend._live_gauges(case, writer.render_case(case))
+    check('1D: the live gauges keep G1 and G3, G2 apart',
+          [g[0] for g in kept] == [1, 3] and [g[0] for g in gone] == [2],
+          f'{kept} {gone}')
+
+
 def main():
     trigger_checks('2D', case_2d)
     trigger_checks('3D', case_3d)
+    drop_log_checks('2D', case_2d)
+    drop_log_checks('3D', case_3d)
+    drop_log_1d_checks()
     print()
     if FAIL:
         print(f"FOAM TRIGGER DROP: FAIL ({len(FAIL)}): {', '.join(FAIL)}")

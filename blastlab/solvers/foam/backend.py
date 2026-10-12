@@ -1097,6 +1097,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     terminates = normalize_bc(
         getattr(case, 'bc_outer', 'terminate')) == 'terminate'
     _log_banner_1d(hooks, case, spec)
+    _log_dropped_gauges(hooks, case, spec)         # G15U-L2
     # T53: gauge radii for the live pane; GUI-16 (f): the kept ones by
     # their entered numbers, the dropped ones apart
     live, live_dropped = _live_gauges(case, spec)
@@ -1493,6 +1494,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
     snap_radii = geometry.snap_radii(spec.r_exp, dists, case.n_snapshots)
 
     _log_banner_2d(hooks, case, spec, len(spec.probe_pts), has_term)
+    _log_dropped_gauges(hooks, case, spec)         # G15U-L2
     live, live_dropped = _live_gauges(case, spec)
     run_info = dict(
         dim=2, x_face=g['x_face'], y_face=g['y_face'], solid=solid,
@@ -1875,6 +1877,38 @@ def _live_gauges(case, spec, live_sl=None):
     return at(kept), at(dropped)
 
 
+def _log_dropped_gauges(hooks, case, spec):
+    """G15U-L2: one `[warn] G2 (1.40, 0.30) m inside Wall 1 - dropped`
+    line per gauge the writer dropped, in the native solvers' wording
+    (solver1d / solver2d / solver3d, core.geometry.gauge_drop_reason): a
+    1D radius past the outer face, a 2D/3D gauge outside the domain, or
+    in or on a snapped wall (the writer's closed test on spec.obstacles;
+    `inside` when strictly inside a wall as entered). blastFoam User
+    Guide v6.0, sec. 15 (blastProbes): the writer hands blastFoam only
+    the probes it kept. Returns the lines logged."""
+    lines = []
+    for n, pt in _split_gauges(case, spec)[1]:
+        if case.dim == 1:
+            lines.append(f"  [warn] G{n} (r {pt:.2f} m) "
+                         f"{geometry.OUTSIDE_DOMAIN} - dropped")
+            continue
+        name = f"G{n} ({', '.join(f'{v:.2f}' for v in pt)}) m"
+        g = spec.grid
+        lengths = [g[k][-1] for k in ('x_face', 'y_face', 'z_face')
+                   [:case.dim]]
+        if any(not 0 <= v <= L for v, L in zip(pt, lengths)):
+            why = geometry.OUTSIDE_DOMAIN
+        else:
+            wall = geometry._in_box_closed(pt, spec.obstacles or [])
+            inside = geometry._in_obstacle_open(pt, case.obstacles or [])
+            why = (geometry.gauge_drop_reason(inside or wall, bool(inside))
+                   if inside or wall else 'inside an obstacle')
+        lines.append(f"  [warn] {name} {why} - dropped")
+    for line in lines:
+        hooks.log(line)
+    return lines
+
+
 def _trigger_cells(case, coords, shape, kept=None, hooks=None):
     """T51: (index, cell) for the trigger gauge on a display grid, or
     (None, None). `coords` are the cell centres per axis; the gauge is
@@ -2205,6 +2239,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
      live_title) = slice_geom_3d(case, spec)
 
     _log_banner_3d(hooks, case, spec, len(spec.probe_pts), has_term)
+    _log_dropped_gauges(hooks, case, spec)         # G15U-L2
     live, live_dropped = _live_gauges(case, spec, live_sl)
     ax_i = 'xyz'.index(slice_axis)
     hooks.run_started(dict(
