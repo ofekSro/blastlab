@@ -42,11 +42,14 @@ def name_prefix(res):
     return f'{slug[:40]}_' if slug else ''
 
 
-def summary_rows(res):
+def summary_rows(res, opts=None):
     """Per-gauge engineering rows. meta['gauges'] is what the user asked
-    for; gauges['points'] is where the solver actually put them."""
+    for; gauges['points'] is where the solver actually put them. `opts`
+    may carry `gauge_numbers`, a 1D result's entered numbers (GUI-16 (b);
+    `run_export`)."""
     return gauge_summary.summarize_gauges(
-        res.gauges, requested=res.meta.get('gauges'))
+        res.gauges, requested=res.meta.get('gauges'),
+        numbers=(opts or {}).get('gauge_numbers') or None)
 
 
 def can(kind, ent):
@@ -174,11 +177,12 @@ def _report_caption(fname, dim):
 
 
 def png_figures(res, dim, show_mesh=False, title_extra=None,
-                drop_note=None):
+                drop_note=None, numbers=None):
     """(filename, Figure) for the `pngs` export: the FULL snapshot grid
     that output/plots.py builds, not the single panel on screen.
     `drop_note` is the gauge grid's dropped-gauge footnote (GUI-13 (d);
-    None: the figure's own)."""
+    None: the figure's own); `numbers` a 1D result's entered gauge
+    numbers (GUI-16 (b))."""
     if dim == 1:
         c = charge_label(res.meta)
         return [('blast_1d_results.png',
@@ -188,7 +192,8 @@ def png_figures(res, dim, show_mesh=False, title_extra=None,
                 ('blast_1d_gauges.png',
                  plots.figure_gauges_1d(
                      res.gauges, c.charge_kg, c.eos,
-                     title_extra=title_extra))]
+                     title_extra=title_extra, numbers=numbers,
+                     drop_note=drop_note))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = builder(res.snapshots, res.meta, include_peak=True,
                    show_mesh=show_mesh, title_extra=title_extra)
@@ -204,8 +209,8 @@ def png_figures(res, dim, show_mesh=False, title_extra=None,
 
 
 def report_figures(res, dim, show_mesh=False, title_extra=None,
-                   drop_note=None):
-    """(caption, Figure) for the HTML report (`drop_note`: as
+                   drop_note=None, numbers=None):
+    """(caption, Figure) for the HTML report (`drop_note`, `numbers`: as
     `png_figures`)."""
     if dim == 1:
         c = charge_label(res.meta)
@@ -214,7 +219,8 @@ def report_figures(res, dim, show_mesh=False, title_extra=None,
                     title_extra=title_extra)),
                 ('Gauge time histories', plots.figure_gauges_1d(
                     res.gauges, c.charge_kg, c.eos,
-                    title_extra=title_extra))]
+                    title_extra=title_extra, numbers=numbers,
+                    drop_note=drop_note))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = [(_report_caption(n, dim), f)
             for n, f in builder(res.snapshots, res.meta, include_peak=True,
@@ -236,8 +242,10 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
     and every failure reaches `log`. Returns what was written, or None.
 
     `opts` may carry `show_mesh`, `title_extra`, `gauge_drop_note` (the
-    gauge grid's dropped-gauge footnote, GUI-13 (d)), and for `gif` an
-    `anim_scale` / `anim_clim` override of the run's own colour range.
+    gauge grid's dropped-gauge footnote, GUI-13 (d)), `gauge_numbers` (a
+    1D result's entered gauge numbers for its figure, report and summary,
+    GUI-16 (b)), and for `gif` an `anim_scale` / `anim_clim` override of
+    the run's own colour range.
     `open_after=False` skips showing a written report / VTK folder
     (`os.startfile`): the model folder writes them unattended (OUT-1).
     """
@@ -245,13 +253,14 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
     show_mesh = bool(opts.get('show_mesh'))
     title_extra = opts.get('title_extra') or None
     drop_note = opts.get('gauge_drop_note') or None
+    numbers = opts.get('gauge_numbers') or None
     res, dim = ent.result, ent.dim
     pre = name_prefix(res)
     try:
         if kind == 'pngs':
             written = []
             for name, fig in png_figures(res, dim, show_mesh, title_extra,
-                                         drop_note):
+                                         drop_note, numbers):
                 if fig is None:            # figure_gauges_nd: no gauges
                     continue
                 name = pre + name
@@ -279,16 +288,17 @@ def run_export(kind, ent, target, opts=None, log=print, parent=None,
             report_mod.save_html_report(
                 res, dim, target,
                 figures=report_figures(res, dim, show_mesh, title_extra,
-                                       drop_note),
+                                       drop_note, numbers),
                 # the user's own line wins over the run name for the
                 # report's heading
-                title=title_extra or ent.label)
+                title=title_extra or ent.label, numbers=numbers)
             log(f'Saved {target}')
             if open_after:
                 _open(target, log)
             return target
         if kind == 'summary':
-            gauge_summary.save_gauge_summary(summary_rows(res), target)
+            gauge_summary.save_gauge_summary(summary_rows(res, opts),
+                                             target)
             log(f'Saved {target}')
             return target
         if kind == 'vtk':

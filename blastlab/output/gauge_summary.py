@@ -76,10 +76,22 @@ def summarize_trace(times, p, p_ambient=P_AIR, arrival_frac=ARRIVAL_FRAC):
     return out
 
 
-def gauge_labels(gauge_out, requested=None):
+def numbers_1d(n_series, dropped):
+    """The entered number of each of a 1D result's `n_series` series when
+    the solver dropped the entered numbers `dropped` (GUI-15 (f), D9: a
+    1D meta keeps no entered list, so they come from RunController's
+    stamp): the entered numbers not dropped, in order. GUI-16 (b): one
+    rule for the Results screens (ui/results_gauges.labels_and_dropped,
+    Tk E1) and the 1D exports."""
+    gone = {int(n) for n in dropped or ()}
+    return [n for n in range(1, n_series + len(gone) + 1) if n not in gone]
+
+
+def gauge_labels(gauge_out, requested=None, numbers=None):
     """One label per gauge.
 
-    1D: 'G1  r = 1.000 m'. 2D/3D: 'G1 (0.300, 0.800)' when the gauge sits
+    1D: 'G1  r = 1.000 m', numbered by `numbers` (`numbers_1d`; None:
+    1, 2, ... - GUI-16 (b)). 2D/3D: 'G1 (0.300, 0.800)' when the gauge sits
     where it was asked for, and 'G1 (0.300, 0.800) -> cell (0.305, 0.802)'
     when the solver snapped it to a cell centre - the table used to show
     the snapped numbers alone, which read as a typo in the user's input
@@ -96,7 +108,8 @@ def gauge_labels(gauge_out, requested=None):
         return '(' + ', '.join(f'{float(v):.3f}' for v in pt) + ')'
 
     if 'radii' in gauge_out:
-        return [f'G{k + 1}  r = {r:.3f} m'
+        nums = list(numbers or ())
+        return [f'G{nums[k] if k < len(nums) else k + 1}  r = {r:.3f} m'
                 for k, r in enumerate(gauge_out['radii'])]
     pts = list(gauge_out.get('points', []))
     want = list(requested or [])
@@ -220,12 +233,14 @@ def _nearest_entered(pts, want):
     return pair_in_order(pts, want)
 
 
-def summarize_gauges(gauge_out, p_ambient=P_AIR, requested=None):
+def summarize_gauges(gauge_out, p_ambient=P_AIR, requested=None,
+                     numbers=None):
     """[row dict per gauge] for a native or foam Result's `gauges`
-    (1D: times/radii/pressures; 2D/3D: times/points/pressures)."""
+    (1D: times/radii/pressures; 2D/3D: times/points/pressures).
+    `numbers`: the 1D entered numbers (`gauge_labels`)."""
     rows = []
     times = gauge_out.get('times', [])
-    for label, p in zip(gauge_labels(gauge_out, requested),
+    for label, p in zip(gauge_labels(gauge_out, requested, numbers),
                         gauge_out.get('pressures', [])):
         row = dict(gauge=label)
         row.update(summarize_trace(times, p, p_ambient))

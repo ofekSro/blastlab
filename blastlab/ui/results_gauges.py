@@ -188,10 +188,7 @@ def labels_and_dropped(res, dim):
         # are numbered from RunController's stamp - the entered numbers
         # it does not name as dropped, in order
         gone = {int(n): why for n, why in meta['gauges_dropped']}
-        series = (res.gauges or {}).get('pressures')
-        n_series = 0 if series is None else len(series)
-        nums = [n for n in range(1, n_series + len(gone) + 1)
-                if n not in gone]
+        nums = export_numbers(res, dim)
         return ({k: f'G{n}' for k, n in enumerate(nums, start=1)},
                 sorted(gone.items()))
     case = sd.case_from_meta(res.meta, dim, res.gauges)
@@ -219,12 +216,30 @@ def labels_and_dropped(res, dim):
     return {k: lbl for k, lbl in enumerate(labels, start=1)}, dropped
 
 
+def export_numbers(res, dim):
+    """GUI-16 (b): a 1D result's entered gauge numbers when the solver
+    dropped one (RunController's stamp, `meta['gauges_dropped']`), for
+    the exports (`opts['gauge_numbers']`): `gauge_summary.numbers_1d`,
+    the rule `labels_and_dropped` numbers the screen by. None otherwise
+    (2D/3D exports number their panels from the meta themselves)."""
+    meta = res.meta or {}
+    if dim != 1 or not meta.get('gauges_dropped'):
+        return None
+    series = (res.gauges or {}).get('pressures')
+    return gauge_summary.numbers_1d(
+        0 if series is None else len(series),
+        [n for n, _why in meta['gauges_dropped']])
+
+
 def export_drop_note(res, dim):
     """The exported gauge grid's footnote on the Qt side (GUI-13 (d),
     D6): the screen's own `G2 dropped by the solver (inside Wall 1)`, ''
     when no gauge was dropped or the meta cannot say (the figure then
-    builds its own from the pairing)."""
-    if dim not in (2, 3):
+    builds its own from the pairing). GUI-16 (b): 1D too, from the
+    stamp."""
+    if dim == 1 and not (res.meta or {}).get('gauges_dropped'):
+        return ''
+    if dim not in (1, 2, 3):
         return ''
     return dropped_text(labels_and_dropped(res, dim)[1])
 

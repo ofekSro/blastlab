@@ -115,6 +115,12 @@ def export(kind, ent, opts=None, log=print, parent=None, on_error=None,
         note = export_drop_note(ent.result, ent.dim)
         if note:
             opts = dict(opts or {}, gauge_drop_note=note)
+    if kind in ('pngs', 'report', 'summary'):
+        # GUI-16 (b): a 1D result keeps its entered gauge numbers
+        from .results_gauges import export_numbers
+        numbers = export_numbers(ent.result, ent.dim)
+        if numbers:
+            opts = dict(opts or {}, gauge_numbers=numbers)
     args = (kind, ent, target, opts, log, parent, on_error)
     if threaded:
         def work():

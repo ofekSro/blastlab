@@ -93,10 +93,11 @@ def kb_peak_kpa(z):
     return float(np.exp(np.interp(np.log(z), lz, lp)))
 
 
-def kb_rows(res, dim):
+def kb_rows(res, dim, numbers=None):
     """[(gauge label, R, Z, peak kPa, KB kPa, ratio)] for a FREE-AIR
     case - single charge, no obstacles - else [] (the report drops the
-    block entirely)."""
+    block entirely). `numbers`: the 1D entered numbers (GUI-16 (b),
+    `gauge_summary.gauge_labels`)."""
     meta = res.meta
     if meta.get('obstacles'):
         return []
@@ -123,8 +124,8 @@ def kb_rows(res, dim):
         if kb is None or k >= len(g.get('pressures', [])):
             continue
         peak = (np.asarray(g['pressures'][k]).max() - P_AIR) / 1e3
-        rows.append((gauge_summary.gauge_labels(g)[k], R, z, peak, kb,
-                     peak / kb))
+        rows.append((gauge_summary.gauge_labels(g, numbers=numbers)[k], R,
+                     z, peak, kb, peak / kb))
     return rows
 
 
@@ -147,12 +148,14 @@ overflow-x:auto;font-size:0.85em}"""
 
 
 def save_html_report(res, dim, path, figures=(), title=None,
-                     case_json=None):
+                     case_json=None, numbers=None):
     """Self-contained HTML report for one Result: banner, case JSON,
     the per-gauge engineering table (N2), inlined field PNGs and - for a
     free-air case - the Kingery-Bulmash comparison. `figures` is
     [(caption, matplotlib Figure)] built by the caller (the GUI reuses
-    its existing builders). Returns the sections it wrote."""
+    its existing builders). `numbers`: a 1D result's entered gauge
+    numbers, for the tables (GUI-16 (b); None: 1, 2, ...). Returns the
+    sections it wrote."""
     meta = res.meta
     name = title or str(meta.get('name') or f'{dim}D run')
     parts, sections = [], []
@@ -169,7 +172,8 @@ def save_html_report(res, dim, path, figures=(), title=None,
 
     rows = gauge_summary.table_rows(
         gauge_summary.summarize_gauges(res.gauges,
-                                       requested=meta.get('gauges')))
+                                       requested=meta.get('gauges'),
+                                       numbers=numbers))
     if rows:
         heads = ('Gauge', 'Peak ovp [kPa]', 'Arrival [ms]', 't peak [ms]',
                  'Pos. phase [ms]', 'Pos. imp [Pa&middot;s]',
@@ -182,7 +186,7 @@ def save_html_report(res, dim, path, figures=(), title=None,
         parts.append('</table>')
         sections.append('gauges')
 
-    kb = kb_rows(res, dim)
+    kb = kb_rows(res, dim, numbers)
     if kb:
         parts.append('<h2>Kingery-Bulmash free-air comparison</h2>'
                      '<table><tr><th>Gauge</th><th>R [m]</th>'

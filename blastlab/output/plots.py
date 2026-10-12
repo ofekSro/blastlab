@@ -298,7 +298,14 @@ def figure_results_1d(snapshots, eos, charge_kg, radius_m,
     return fig
 
 
-def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
+def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None,
+                     numbers=None, drop_note=None):
+    """Gauge grid for 1D (radii). GUI-16 (b): `numbers` are the entered
+    numbers of the series (`gauge_summary.numbers_1d`), so a gauge the
+    solver dropped does not renumber the later ones, and the figure says
+    which in a footnote - `drop_note` (the Qt export passes the Gauges
+    screen's own), else one `G2 dropped by the solver` line per gap in
+    `numbers`. None for both: today's figure exactly."""
     times  = gauge_out['times']
     radii  = gauge_out['radii']
     pdata  = gauge_out['pressures']
@@ -326,12 +333,14 @@ def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
         title_extra),
                  fontsize=12)
 
+    nums = list(numbers or ())
     for k, (p_arr, r_val, color) in enumerate(zip(pdata, radii, colors)):
         ax  = axes[k // ncols][k % ncols]
         ovp = (p_arr - P_AIR) / 1e3   # overpressure [kPa]
         ax.plot(times * 1e3, ovp, color=color, lw=1.2)
         ax.axhline(0, color='k', lw=0.7, ls='--', alpha=0.5)
-        ax.set_title(f'Gauge {k+1}  (r = {r_val:.2f} m)', fontsize=10)
+        num = nums[k] if k < len(nums) else k + 1
+        ax.set_title(f'Gauge {num}  (r = {r_val:.2f} m)', fontsize=10)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel('Overpressure [kPa]')
         ax.grid(True, alpha=0.3)
@@ -339,7 +348,18 @@ def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None):
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
+    gaps = [j for j in range(1, max(nums, default=0) + 1) if j not in nums]
+    note = drop_note or _dropped_lines(gaps)
+    if note:
+        # a figure-level x label, so constrained layout makes room for it
+        fig.supxlabel(note, fontsize=9, style='italic')
     return fig
+
+
+def _dropped_lines(numbers):
+    """The gauge grids' own footnote: one `G2 dropped by the solver`
+    line per dropped entered number (D11, the Qt words); '' for none."""
+    return '\n'.join(f'G{j} dropped by the solver' for j in numbers)
 
 
 # ── 2D/3D gauge figure ───────────────────────────────────────────────────────
