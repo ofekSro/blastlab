@@ -1087,6 +1087,61 @@ def test_d_release_decision_table():
             assert why.endswith('0/p'), why
 
 
+def test_d_user_stop_is_not_a_raise():
+    """G15Q-5b: a Stop during blockMesh raises StoppedBeforeStart, which
+    reached release_decision as `errored` ('it raised'). The stage now
+    passes `stopped`, and the reason reads as a stop."""
+    v = dict(rows_ok=True, hashes_ok=True)
+    assert mf.release_decision(True, False, v, stopped=True) == (
+        False, 'the run was stopped before it finished')
+    assert mf.release_decision(False, False, v, stopped=True)[0] is False
+    import blastlab.solvers as solvers_pkg
+    from blastlab.solvers.hooks import StoppedBeforeStart
+    from blastlab.solvers.worker import SolverWorker
+    runs = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    real_solver, real_release = solvers_pkg.get_solver, \
+        mf.verify_and_release_scratch
+    calls = []
+
+    def recorder(manifest, stage_dir, posix, errored, stopped_early,
+                 log=print, **kw):
+        calls.append((errored, kw.get('stopped')))
+        return manifest, None
+    mf.verify_and_release_scratch = recorder
+    try:
+        for exc in (StoppedBeforeStart("stopped during 'blockMesh'"),
+                    RuntimeError('blockMesh failed')):
+            def foam_like(case, hooks, exc=exc):
+                hooks.scratch_posix = POSIX
+                raise exc
+            solvers_pkg.get_solver = lambda dim, backend, f=foam_like: f
+            folder = mf.prepare(runs, type(exc).__name__,
+                                confirm=lambda t: True)
+            SolverWorker([jobs.solve_stage(2, case2d(solver='blastfoam'),
+                                           stage_dir=folder)]).run()
+        assert calls == [(True, True), (True, False)], calls
+    finally:
+        solvers_pkg.get_solver = real_solver
+        mf.verify_and_release_scratch = real_release
+        shutil.rmtree(runs, ignore_errors=True)
+    # end to end: the kept reason the manifest records
+    tmp = tempfile.mkdtemp(prefix='blastlab_mf_d_')
+    try:
+        root = make_scratch(tmp)
+        folder = os.path.join(tmp, 'MODEL')
+        os.makedirs(folder)
+        m, notice = mf.verify_and_release_scratch(
+            dict(model='MODEL', failed=[], outputs=[], wsl_scratch=None),
+            folder, POSIX, True, False, log=lambda s: None,
+            run=FakeWsl(root), delete=FakeDelete(), unc=lambda p: root,
+            stopped=True)
+        assert m['wsl_scratch']['kept_because'] == \
+            'the run was stopped before it finished', m['wsl_scratch']
+        assert notice is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_d_skeleton_filter_and_script():
     s = mf.skeleton_script(POSIX)
     assert s.startswith(f"cd '{POSIX}' && find system constant 0 "
@@ -1362,7 +1417,8 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_wsl_hash_failure_keeps_scratch,
          test_d_stopped_keeps_scratch, test_d_raised_keeps_scratch,
          test_d_failed_row_keeps_scratch, test_d_only_run_dirs_are_deleted,
-         test_d_release_decision_table, test_d_skeleton_filter_and_script,
+         test_d_release_decision_table, test_d_user_stop_is_not_a_raise,
+         test_d_skeleton_filter_and_script,
          test_d_stage_calls_release_for_foam,
          test_d_vtk_not_converted_keeps_scratch,
          test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir,

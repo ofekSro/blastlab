@@ -968,7 +968,8 @@ def copy_foam_skeleton(scratch_posix, dest, run=subprocess.run, unc=None,
 KEEP_ALL_WHY = 'Keep all fields in WSL was ticked'
 
 
-def release_decision(errored, stopped_early, verify, keep_all=False):
+def release_decision(errored, stopped_early, verify, keep_all=False,
+                     stopped=False):
     """(release, why): may the WSL scratch be deleted? Pure.
 
     Release only when the run did not raise, did not end early (a user
@@ -978,7 +979,13 @@ def release_decision(errored, stopped_early, verify, keep_all=False):
     first reason, in that order; `verify['rows_detail']` /
     `['hash_detail']` say which files. OUT-3 (E5): `keep_all` (the "Keep
     all fields in WSL" box) keeps the scratch of a run that would
-    otherwise be released - else the box would keep nothing."""
+    otherwise be released - else the box would keep nothing.
+
+    G15Q-5b: `stopped` is the user's stop before the solve started (a
+    Stop during blockMesh raises StoppedBeforeStart, so the run also
+    reads as `errored`); it is named first, as a stop, not a raise."""
+    if stopped:
+        return False, 'the run was stopped before it finished'
     if errored:
         return False, 'the run did not finish (it raised)'
     if stopped_early:
@@ -1006,7 +1013,8 @@ def is_run_dir(posix):
 
 def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
                                stopped_early, log=print, run=subprocess.run,
-                               delete=None, unc=None, keep_all=False):
+                               delete=None, unc=None, keep_all=False,
+                               stopped=False):
     """Copy foam\\, decide, and delete the WSL scratch only after a
     verified copy of a finished run (plan sec. 2.3, decision 12).
 
@@ -1016,7 +1024,8 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
     through `env.delete_runs` (batch plan D11) on this run's own posix
     path, and only a direct child of the runs root. The manifest gets
     `wsl_scratch` {posix, deleted, deleted_at} (+ `kept_because`), a
-    failed copy's files in `failed`, and is written again.
+    failed copy's files in `failed`, and is written again. `stopped`:
+    the user stopped the run before its solve (`release_decision`).
 
     Returns (manifest, notice): `notice` is the dialog text for the GUI
     when a finished run's scratch was kept because the copy or a row
@@ -1042,7 +1051,7 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
                   hashes_ok=bool(copied.get('ok')),
                   hash_detail=copied.get('detail', ''))
     release, why = release_decision(errored, stopped_early, verify,
-                                    keep_all=keep_all)
+                                    keep_all=keep_all, stopped=stopped)
     if release and not is_run_dir(scratch_posix):
         release, why = False, (f'{scratch_posix} is not a run directory '
                                f'directly under {env.RUNS_ROOT}')
@@ -1059,7 +1068,7 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
     notice = None
     if not scratch['deleted']:
         scratch['kept_because'] = why
-        kind = 'note' if (errored or stopped_early) else 'warn'
+        kind = 'note' if (errored or stopped_early or stopped) else 'warn'
         log(f'  [{"note" if why == KEEP_ALL_WHY else kind}] WSL scratch '
             f'kept ({why}): {scratch_posix}')
         if kind == 'warn':
@@ -1216,7 +1225,10 @@ def stage_solve(dim, case, stage_dir, run_info, make_solve):
                                     err, _handoff_error()),
                                 stopped_early=bool(res is not None
                                                    and res.stopped_early),
-                                log=hooks.log, keep_all=keep)
+                                log=hooks.log, keep_all=keep,
+                                # G15Q-5b: the user's Stop before the
+                                # solve (during blockMesh) is a stop
+                                stopped=isinstance(err, _stopped_error()))
                     except Exception as exc:   # keeps the scratch
                         hooks.log(f'  [warn] WSL scratch kept: the foam\\ '
                                   f'copy raised {exc!r}: {posix}')
@@ -1256,6 +1268,11 @@ def _exports_vtk(case):
 def _handoff_error():
     from ..solvers.jobs import HandoffWriteError
     return HandoffWriteError
+
+
+def _stopped_error():
+    from ..solvers.hooks import StoppedBeforeStart
+    return StoppedBeforeStart
 
 
 def _register():
