@@ -167,9 +167,11 @@ def numbering(tag, solve, make, kept, in_wall):
           len(warns) == 1 and 'disabled' in warns[0], str(warns))
     foam = make(in_wall, trigger_gauge=2)
     foam.solver = 'blastfoam'
-    check(f'{tag}: blastFoam gets no such warning (D13, native only)',
-          not any('Trigger disabled' in w
-                  for w in validate_case(foam).warnings))
+    # was "no such warning (D13, native only)"; P1-23 A5 (Q2, owner
+    # 2026-10-12) disables blastFoam's trigger on a dropped gauge too
+    check(f'{tag}: blastFoam gets the same warning (P1-23, Q2)',
+          sum('Trigger disabled' in w and 'G2' in w
+              for w in validate_case(foam).warnings) == 1)
     two, hooks = run(solve, case)
     check(f'{tag}: the trigger is disabled and the run ends by its '
           f'normal stop',

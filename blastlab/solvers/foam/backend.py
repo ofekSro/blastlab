@@ -26,7 +26,8 @@ import numpy as np
 from ...core.bc import normalize_bc
 from ...core import geometry, refine
 from ...core.constants import P_AIR, RHO_AIR
-from ..hooks import Result, RunHooks, StoppedBeforeStart, frame_budget
+from ..hooks import (Result, RunHooks, StoppedBeforeStart, frame_budget,
+                     trigger_index)
 from . import dicts, env, reader, runner, writer
 # part_counts/rd_scalar live in common.py since Phase 9 (runloop needs
 # them without importing this module); re-exported, same objects
@@ -1482,7 +1483,8 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
         (Nx, Ny), bcs, fluid=~solid,
         sides=geometry.SIDES_2D if not axisym else ('x_hi', 'y_lo', 'y_hi'))
     has_term = term_edge.any()
-    trig_k, trig_cell = _trigger_cells(case, (x_c, y_c), (Nx, Ny))
+    trig_k, trig_cell = _trigger_cells(case, (x_c, y_c), (Nx, Ny),
+                                       kept=spec.gauge_ids, hooks=hooks)
     trigger = {}
     d_charge = geometry.d_charge_2d(x_c, y_c, x0, y0)
     dists = geometry.stop_dists_2d(case.Lx, case.Ly, x0, y0, bcs,
@@ -1830,10 +1832,18 @@ def _emit_frame(hooks, p, t, mesh, sl=None):
                     levels=mesh.levels if sl is None else mesh.levels[sl])
 
 
-def _trigger_cells(case, coords, shape):
+def _trigger_cells(case, coords, shape, kept=None, hooks=None):
     """T51: (index, cell) for the trigger gauge on a display grid, or
     (None, None). `coords` are the cell centres per axis; the gauge is
-    snapped to its nearest cell exactly as the native solvers do."""
+    snapped to its nearest cell exactly as the native solvers do.
+
+    P1-23 / P1-24 (Q2, owner 2026-10-12): `kept` is the writer's list of
+    the gauges it kept (`spec.gauge_ids`). A trigger on a gauge the
+    writer dropped (outside the domain, or in or on a snapped wall) is
+    disabled, with hooks.trigger_index's warn line, as the native
+    solvers do (D13). Left live it read a carved display cell (ambient,
+    never fires) or, exactly on a snapped low face, the fluid cell in
+    front of the wall (can fire): one rule for both solvers instead."""
     n = getattr(case, 'trigger_gauge', None)
     gauges = list(case.gauges or [])
     if n in (None, 0, '') or not gauges:
@@ -1844,6 +1854,13 @@ def _trigger_cells(case, coords, shape):
         return None, None
     if not 0 <= k < len(gauges):
         return None, None
+    if kept is not None:
+        keep = {tuple(float(v) for v in g) for g in kept}
+        numbers = [i + 1 for i, g in enumerate(gauges)
+                   if tuple(float(v) for v in g) in keep]
+        if trigger_index(n, len(gauges), hooks or RunHooks(),
+                         numbers) is None:
+            return None, None
     pt = tuple(float(v) for v in gauges[k])
     cell = tuple(int(np.argmin(np.abs(np.asarray(c) - pt[a])))
                  for a, c in enumerate(coords))
@@ -2132,7 +2149,8 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                                              fluid=~solid)
     has_term = term_edge.any()
     trig_k, trig_cell = _trigger_cells(case, (x_c, y_c, z_c),
-                                       (Nx, Ny, Nz))
+                                       (Nx, Ny, Nz),
+                                       kept=spec.gauge_ids, hooks=hooks)
     trigger = {}
     d_charge = geometry.d_charge_3d(x_c, y_c, z_c, centers)
     dists = geometry.stop_dists_3d(case.Lx, case.Ly, case.Lz, centers, bcs)

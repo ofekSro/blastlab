@@ -1683,13 +1683,15 @@ def _validate_closing(case, rep, ctx):
              f"{gauge_drop_reason(inside or wall, bool(inside))}"
              f" - will be dropped")
         gone.append(k)
-    # P1-24 (D13, native only): the native solvers disable a trigger whose
-    # gauge they drop (hooks.trigger_index), so say so before the run
+    # P1-24 (D13): the native solvers disable a trigger whose gauge they
+    # drop (hooks.trigger_index), and since P1-23 (Q2, owner 2026-10-12)
+    # blastFoam does too (foam/backend._trigger_cells), so say so before
+    # the run, for both
     try:
         trig = int(getattr(case, 'trigger_gauge', None) or 0)
     except (TypeError, ValueError):
         trig = 0
-    if not foam and trig and trig in gone:
+    if trig and trig in gone:
         warn(f"Trigger disabled: trigger gauge G{trig} is dropped (see "
              f"above), so the run ends by its normal stop")
     for box in case.obstacles:
