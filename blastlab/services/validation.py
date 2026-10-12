@@ -1376,7 +1376,12 @@ def _validate_det_radii(case, rep, ctx):
     its centroid, setRefinedFields leaves a charge interior coarse), and
     the backend refuses the rest on the real centres before blastFoam
     starts. A zero radius takes blastFoam's findCell branch and is not
-    checked here. 2D/3D only; called once the plan is known."""
+    checked here. 2D/3D only; called once the plan is known.
+
+    B11 (owner 2026-10-12): a layout that raises an arithmetic or value
+    error no longer skips the check silently - the case is reported as
+    unchecked (`_det_radii_unchecked`), per point when only that point
+    failed."""
     radii = getattr(case, 'det_radii', None)
     if not radii or getattr(case, 'activation', 'linear') == 'none':
         return
@@ -1408,28 +1413,33 @@ def _validate_det_radii(case, rep, ctx):
                          for _c, r in refine._charges(case, ctx.rho0))
             dx_base = _faces_shared(tuple(float(L) for L in ctx.dims),
                                     dx)[1]
-    except (ArithmeticError, ValueError, TypeError, IndexError):
+    except (ArithmeticError, ValueError, TypeError, IndexError) as exc:
+        _det_radii_unchecked(rep, exc)
         return
     for k, (pt, r) in enumerate(zip(pts, radii), start=1):
-        r = float(r)
-        if r <= FOAM_SMALL or len(pt) != case.dim:
-            continue
-        if plan is not None and plan.amr:
-            level = int(plan.amr)
-        elif plan is not None:
-            level = refine.level_at(plan.levels, plan.fine, pt)
-        else:
-            level = 0
-        h = dx_base / 2 ** level
-        d2 = 0.0
-        for a, (p, L) in enumerate(zip(pt, ctx.dims)):
-            if axisym and a == 0:
-                d2 += (2.0 * h / 3.0) ** 2
+        try:
+            r = float(r)
+            if r <= FOAM_SMALL or len(pt) != case.dim:
                 continue
-            n = max(1, int(round(float(L) / h)))
-            c = (min(max(math.floor(p / h), 0), n - 1) + 0.5) * h
-            d2 += (p - c) ** 2
-        d = math.sqrt(d2)
+            if plan is not None and plan.amr:
+                level = int(plan.amr)
+            elif plan is not None:
+                level = refine.level_at(plan.levels, plan.fine, pt)
+            else:
+                level = 0
+            h = dx_base / 2 ** level
+            d2 = 0.0
+            for a, (p, L) in enumerate(zip(pt, ctx.dims)):
+                if axisym and a == 0:
+                    d2 += (2.0 * h / 3.0) ** 2
+                    continue
+                n = max(1, int(round(float(L) / h)))
+                c = (min(max(math.floor(p / h), 0), n - 1) + 0.5) * h
+                d2 += (p - c) ** 2
+            d = math.sqrt(d2)
+        except (ArithmeticError, ValueError, TypeError, IndexError) as exc:
+            _det_radii_unchecked(rep, exc, k)
+            continue
         if r <= d:
             rep.errors.append(
                 f"Detonation point {k}: ignition radius {r * 1e3:.3g} mm "
@@ -1438,6 +1448,19 @@ def _validate_det_radii(case, rep, ctx):
                 f"blastFoam stops at t = 0 with 'No cells will be "
                 f"activated'. Use a radius above {d * 1e3:.3g} mm, or "
                 f"leave the radii empty for the default")
+
+
+def _det_radii_unchecked(rep, exc, point=None):
+    """B11: say that `_validate_det_radii` could not check the ignition
+    radii (all of them, or detonation point `point`), and why. A warning,
+    not an error: the backend still refuses a radius that lights no cell
+    on the real mesh before blastFoam starts."""
+    which = (f"Detonation point {point}: ignition radius"
+             if point is not None else "Ignition radii")
+    rep.warnings.append(
+        f"{which} not checked - the cell layout could not be computed "
+        f"({type(exc).__name__}: {exc}). The run still refuses a radius "
+        f"that reaches no cell centre before blastFoam starts")
 
 
 def _note_charge_cells(case, rep, dx_charge, dims, n_exp):

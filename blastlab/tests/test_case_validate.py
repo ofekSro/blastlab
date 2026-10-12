@@ -148,6 +148,52 @@ def det_radius_reach_checks():
     r = validate_case(Case2D(det_radii=[0.0, 0.02], **base))
     check('a zero radius (blastFoam findCell) is not refused', r.ok,
           str(r.errors))
+    check('a checked case says nothing about "not checked"',
+          not any('not checked' in w for w in r.warnings), str(r.warnings))
+
+    # B11 (owner 2026-10-12): a layout that raises is reported unchecked,
+    # not skipped in silence - the uniform base cell, then one point's level
+    from blastlab.core import grid, refine
+    real = grid._faces_shared
+
+    def boom(*_a, **_k):
+        raise ValueError('layout failed')
+    grid._faces_shared = boom
+    try:
+        r = validate_case(Case2D(det_radii=[0.02, 0.001], **base))
+    finally:
+        grid._faces_shared = real
+    un = [w for w in r.warnings if 'not checked' in w]
+    check('B11: the base-cell layout raises - one "Ignition radii not '
+          'checked" warning naming the error, no refusal',
+          len(un) == 1 and un[0].startswith('Ignition radii')
+          and 'layout failed' in un[0]
+          and not any('Detonation point' in e for e in r.errors),
+          f'{r.warnings} {r.errors}')
+    # static zones: the level at point 1 raises; point 2 (1 mm, on the
+    # level-1 node (2, 2)) is still checked and refused
+    real_level = refine.level_at
+    calls = []
+
+    def level_boom(*a, **k):
+        calls.append(1)
+        if len(calls) == 1:
+            raise ZeroDivisionError('no level')
+        return real_level(*a, **k)
+    zoned = dict(f05, amr_levels=0, refine_zones=[(1.5, 2.5, 1.5, 2.5, 1)],
+                 det_points=[(2.0, 2.0), (2.0, 2.0)])
+    refine.level_at = level_boom
+    try:
+        r = validate_case(Case2D(det_radii=[0.02, 0.001], **zoned))
+    finally:
+        refine.level_at = real_level
+    un = [w for w in r.warnings if 'not checked' in w]
+    check('B11: one point\'s level raises - that point is named unchecked, '
+          'the other still checked',
+          len(un) == 1 and un[0].startswith('Detonation point 1')
+          and 'ZeroDivisionError' in un[0]
+          and any(e.startswith('Detonation point 2') for e in r.errors),
+          f'{r.warnings} {r.errors} {calls}')
 
 
 def trigger_drop_checks():
