@@ -863,8 +863,10 @@ def _validate_common(case, rep):
 
 def _validate_trigger(case, rep):
     """Trigger gauge (T51), 2D/3D only: the gauge number, the action, and
-    what a remap action needs (an axisymmetric 2D case and a filename)."""
-    err, note = rep.errors.append, rep.notes.append
+    what a remap action needs (an axisymmetric 2D case and a filename).
+    The note saying what the trigger will do is `_trigger_note`'s, said
+    by `_validate_closing` once the dropped gauges are known (GUI-16 (a))."""
+    err = rep.errors.append
     trig = getattr(case, 'trigger_gauge', None)
     action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
     if case.dim < 2 or trig in (None, 0, ''):
@@ -891,15 +893,29 @@ def _validate_trigger(case, rep):
                   or case.profile_file):
             err("Trigger action 'remap' needs a remap filename "
                 "(trigger file, or the case's profile output)")
-        else:
-            if 'terminate' in action:
-                then = ""
-            else:
-                then = " (the run then continues)"
-            note(f"G{trig_i} will write the remap file when the "
-                 f"wave reaches it{then}")
-    else:
-        note(f"The run ends when the wave reaches G{trig_i}")
+
+
+def _trigger_note(case):
+    """The note saying what the trigger gauge will do, or None: where
+    `_validate_trigger` used to say it (the same tests, the same words).
+    GUI-16 (a): `_validate_closing` says it only when the solver keeps
+    that gauge - a dropped trigger is disabled, and says so instead."""
+    trig = getattr(case, 'trigger_gauge', None)
+    action = getattr(case, 'trigger_action', 'terminate') or 'terminate'
+    if case.dim < 2 or trig in (None, 0, '') or action not in TRIGGER_ACTIONS:
+        return None
+    try:
+        trig_i = int(trig)
+    except (TypeError, ValueError):
+        trig_i = 0
+    if 'remap' not in action:
+        return f"The run ends when the wave reaches G{trig_i}"
+    if case.dim == 3 or case.geometry != 'axisymmetric' or not (
+            getattr(case, 'trigger_file', None) or case.profile_file):
+        return None                 # refused by _validate_trigger
+    then = "" if 'terminate' in action else " (the run then continues)"
+    return (f"G{trig_i} will write the remap file when the wave reaches "
+            f"it{then}")
 
 
 def _validate_1d(case, rep, ctx):
@@ -1687,6 +1703,11 @@ def _validate_closing(case, rep, ctx):
     if trig and trig in gone:
         warn(f"Trigger disabled: trigger gauge G{trig} is dropped (see "
              f"above), so the run ends by its normal stop")
+    else:
+        # GUI-16 (a): what the trigger does, only for a gauge kept
+        note = _trigger_note(case)
+        if note:
+            rep.notes.append(note)
     for box in case.obstacles:
         lo, hi = box[0::2], box[1::2]
         if any(a >= b for a, b in zip(lo, hi)) or \
@@ -1738,6 +1759,33 @@ def drop_wall(case, point):
     """The 1-based wall for which the case's solver drops gauge `point`,
     0 when it keeps it (`drop_rule`; one call, one gauge)."""
     return drop_rule(case)(point)
+
+
+def trigger_disabled(case, rule=None):
+    """GUI-16 (a): the trigger gauge's entered number when the case's
+    solver drops that gauge - outside the domain, or `drop_rule` names a
+    wall - so the trigger is disabled (hooks.trigger_index for native,
+    foam/backend._trigger_cells for blastFoam); None otherwise. The test
+    of `_validate_closing`'s `gone` list. `rule` is a `drop_rule(case)`
+    the caller already built (built here when None)."""
+    if case.dim < 2:
+        return None
+    try:
+        trig = int(getattr(case, 'trigger_gauge', None) or 0)
+    except (TypeError, ValueError):
+        return None
+    gauges = list(getattr(case, 'gauges', None) or [])
+    if not 1 <= trig <= len(gauges):
+        return None
+    g = gauges[trig - 1]
+    pt = tuple(float(v) for v in (g if isinstance(g, (list, tuple))
+                                  else (g,)))
+    dims = ((case.Lx, case.Ly) if case.dim == 2
+            else (case.Lx, case.Ly, case.Lz))
+    if any(not (0 <= v <= L) for v, L in zip(pt, dims)):
+        return trig
+    rule = rule if rule is not None else drop_rule(case)
+    return trig if rule(pt) else None
 
 
 def _gauge_drop_rule(case, ctx):

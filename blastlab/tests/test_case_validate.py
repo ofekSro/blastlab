@@ -150,6 +150,63 @@ def det_radius_reach_checks():
           str(r.errors))
 
 
+def trigger_drop_checks():
+    """GUI-16 (a): a trigger on a gauge the solver drops is disabled, and
+    Checks says only that - the note on what the trigger does (`The run
+    ends when the wave reaches G3`) is there for a kept gauge only. Both
+    solvers; `trigger_disabled` gives the same answer for the UI."""
+    print()
+    print("GUI-16 (a): a dropped trigger gauge is disabled, not described")
+    from blastlab.services.validation import trigger_disabled
+    # test_trigger_numbering's case: G2 (1.4, 0.3) inside Wall 1
+    base = dict(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                charge=20.0, center=(0.6, 0.0),
+                obstacles=[(1.2, 1.6, 0.0, 0.6)],
+                bcs=dict(x_lo='reflect', x_hi='terminate', y_lo='reflect',
+                         y_hi='terminate'),
+                gauges=[(0.3, 0.8), (1.4, 0.3), (0.6, 0.5), (1.0, 1.0)],
+                n_snapshots=1, record_frames=0)
+    for solver in ('native', 'blastfoam'):
+        case = Case2D(trigger_gauge=2, solver=solver, **base)
+        rep = validate_case(case)
+        off = [w for w in rep.warnings if 'Trigger disabled' in w]
+        check(f'{solver}: trigger on dropped G2 - one "Trigger disabled" '
+              f'warning naming G2', len(off) == 1 and 'G2' in off[0],
+              str(rep.warnings))
+        check(f'{solver}: ... and no note naming the trigger',
+              not any('G2' in n or 'wave reaches' in n for n in rep.notes),
+              str(rep.notes))
+        check(f'{solver}: trigger_disabled gives 2',
+              trigger_disabled(case) == 2)
+        case = Case2D(trigger_gauge=3, solver=solver, **base)
+        rep = validate_case(case)
+        check(f'{solver}: trigger on kept G3 - the note names G3, no '
+              f'"Trigger disabled"',
+              'The run ends when the wave reaches G3' in rep.notes
+              and not any('Trigger disabled' in w for w in rep.warnings),
+              str(rep.notes))
+        check(f'{solver}: trigger_disabled gives None',
+              trigger_disabled(case) is None)
+    # outside the domain is dropped too; the rule is reusable
+    from blastlab.services.validation import drop_rule
+    case = Case2D(trigger_gauge=4, solver='native',
+                  **dict(base, gauges=[(0.3, 0.8), (1.4, 0.3), (0.6, 0.5),
+                                       (3.0, 1.0)]))
+    check('a trigger outside the domain: trigger_disabled gives 4',
+          trigger_disabled(case, drop_rule(case)) == 4)
+    # a remap trigger on a kept gauge keeps its own note
+    axi = dict(geometry='axisymmetric', Lx=2.0, Ly=2.0, cell_size_m=0.04,
+               charge=1.0, center=(0.0, 1.0), gauges=[(1.0, 1.0)],
+               trigger_gauge=1, trigger_action='remap',
+               trigger_file='x.npz', solver='native')
+    rep = validate_case(Case2D(**axi))
+    check('remap on kept G1: the note names G1',
+          any(n.startswith('G1 will write the remap file') for n in rep.notes),
+          str(rep.notes))
+    check('no trigger: trigger_disabled gives None',
+          trigger_disabled(Case2D(**base)) is None)
+
+
 def chain_stage_checks():
     """B5: an auto-wired chain must be validated per stage BEFORE it
     starts - a foam stage fed by a profile used to reach the backend and
@@ -408,6 +465,7 @@ def main():
 
     programmed_ignition_checks()
     det_radius_reach_checks()
+    trigger_drop_checks()
     chain_stage_checks()
     shared_constant_checks()
     amr_cap_checks()
