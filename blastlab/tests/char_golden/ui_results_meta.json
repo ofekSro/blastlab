@@ -1019,7 +1019,7 @@
           "yes"
         ],
         [
-          "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+          "G2 (0.400, 0.200) \u2192 cell (0.405, 0.205) m",
           "1894.4",
           "0.230",
           "0.258",
@@ -1592,7 +1592,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -1602,7 +1602,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",
@@ -1704,7 +1704,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1715,7 +1715,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1726,7 +1726,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1737,7 +1737,7 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1748,7 +1748,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "KeyError: 'charge'",
       "select net ovp impulse": "KeyError: 'charge'",
@@ -1759,7 +1759,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1770,7 +1770,7 @@
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1781,7 +1781,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1792,7 +1792,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1803,7 +1803,7 @@
     "final_state": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1814,7 +1814,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1825,7 +1825,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1847,7 +1847,7 @@
     "geometry": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok 7a8dc8242713e684",
       "select density": "ok 509b19271d0e65b2",
       "select net ovp impulse": "ok d884b761946b3ffe",
@@ -1858,7 +1858,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'impulse'",
@@ -1869,7 +1869,7 @@
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1880,7 +1880,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1891,7 +1891,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'p_peak'",
@@ -1902,7 +1902,7 @@
     "peak_source": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1913,7 +1913,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1924,7 +1924,7 @@
     "refine": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1935,7 +1935,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'solid'",
       "select density": "KeyError: 'solid'",
       "select net ovp impulse": "KeyError: 'solid'",
@@ -1946,7 +1946,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1957,7 +1957,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1968,7 +1968,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -1979,7 +1979,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'x_face'",
       "select density": "KeyError: 'x_face'",
       "select net ovp impulse": "KeyError: 'x_face'",
@@ -1990,7 +1990,7 @@
     "y_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2001,7 +2001,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'y_face'",
       "select density": "KeyError: 'y_face'",
       "select net ovp impulse": "KeyError: 'y_face'",
@@ -2014,7 +2014,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2029,7 +2029,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2044,7 +2044,7 @@
     "Lz": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2059,7 +2059,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2074,7 +2074,7 @@
     "case_dir": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2089,7 +2089,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'charge'",
       "select density (x-z)": "KeyError: 'charge'",
@@ -2104,7 +2104,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2119,7 +2119,7 @@
     "conserved": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2134,7 +2134,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2149,7 +2149,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2164,7 +2164,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2179,7 +2179,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2209,7 +2209,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2224,7 +2224,7 @@
     "j0": {
       "anim": "KeyError: 'j0'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'j0'",
       "select density (x-y)": "KeyError: 'j0'",
       "select density (x-z)": "KeyError: 'j0'",
@@ -2239,7 +2239,7 @@
     "k0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'k0'",
       "select density (x-z)": "KeyError: 'k0'",
@@ -2254,7 +2254,7 @@
     "material": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2269,7 +2269,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2284,7 +2284,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2299,7 +2299,7 @@
     "peak_source": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2314,7 +2314,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2329,7 +2329,7 @@
     "r_src": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2344,7 +2344,7 @@
     "refine": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2359,7 +2359,7 @@
     "s0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2374,7 +2374,7 @@
     "slice_axis": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2389,7 +2389,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'solid'",
       "select density (x-y)": "KeyError: 'solid'",
       "select density (x-z)": "KeyError: 'solid'",
@@ -2404,7 +2404,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2419,7 +2419,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2434,7 +2434,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2449,7 +2449,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'x_face'",
       "select density (x-y)": "KeyError: 'x_face'",
       "select density (x-z)": "KeyError: 'x_face'",
@@ -2464,7 +2464,7 @@
     "y_c": {
       "anim": "KeyError: 'y_c'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'y_c'",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'y_c'",
@@ -2479,7 +2479,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'y_face'",
       "select density (x-y)": "KeyError: 'y_face'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2494,7 +2494,7 @@
     "z_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'z_c'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2509,7 +2509,7 @@
     "z_face": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok d6f97c0393e46580",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok df0855578b924343",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'z_face'",
@@ -2576,7 +2576,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2587,7 +2587,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2598,7 +2598,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2609,7 +2609,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "KeyError: 'charge'",
       "select net ovp impulse": "KeyError: 'charge'",
@@ -2620,7 +2620,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2631,7 +2631,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2642,7 +2642,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2653,7 +2653,7 @@
     "final_state": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2664,7 +2664,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2675,7 +2675,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2697,7 +2697,7 @@
     "geometry": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok 7a8dc8242713e684",
       "select density": "ok 509b19271d0e65b2",
       "select net ovp impulse": "ok d884b761946b3ffe",
@@ -2708,7 +2708,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'impulse'",
@@ -2719,7 +2719,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2730,7 +2730,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "KeyError: 'p_peak'",
@@ -2741,7 +2741,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2752,7 +2752,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'solid'",
       "select density": "KeyError: 'solid'",
       "select net ovp impulse": "KeyError: 'solid'",
@@ -2763,7 +2763,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2774,7 +2774,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2785,7 +2785,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2796,7 +2796,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'x_face'",
       "select density": "KeyError: 'x_face'",
       "select net ovp impulse": "KeyError: 'x_face'",
@@ -2807,7 +2807,7 @@
     "y_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 2d32fa73102d5f03",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "ok d0bb3b27719886c5",
       "select density": "ok 47ed4ee545cb4507",
       "select net ovp impulse": "ok 51a3a208fc0ad377",
@@ -2818,7 +2818,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok 7b406cc6c991b394",
+      "gauges": "ok beda7f4695ed5abe",
       "plane_geometry": "KeyError: 'y_face'",
       "select density": "KeyError: 'y_face'",
       "select net ovp impulse": "KeyError: 'y_face'",
@@ -2831,7 +2831,7 @@
     "Lx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2846,7 +2846,7 @@
     "Ly": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2861,7 +2861,7 @@
     "Lz": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2876,7 +2876,7 @@
     "bcs": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2891,7 +2891,7 @@
     "charge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'charge'",
       "select density (x-z)": "KeyError: 'charge'",
@@ -2906,7 +2906,7 @@
     "charge_center": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2921,7 +2921,7 @@
     "dx": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2936,7 +2936,7 @@
     "eos": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2951,7 +2951,7 @@
     "frames": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 44b2e17ec7add861",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2966,7 +2966,7 @@
     "from_profile": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -2996,7 +2996,7 @@
     "impulse": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3011,7 +3011,7 @@
     "j0": {
       "anim": "KeyError: 'j0'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'j0'",
       "select density (x-y)": "KeyError: 'j0'",
       "select density (x-z)": "KeyError: 'j0'",
@@ -3026,7 +3026,7 @@
     "k0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'k0'",
       "select density (x-z)": "KeyError: 'k0'",
@@ -3041,7 +3041,7 @@
     "obstacles": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3056,7 +3056,7 @@
     "p_peak": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3071,7 +3071,7 @@
     "r_exp": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3086,7 +3086,7 @@
     "r_src": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3101,7 +3101,7 @@
     "s0": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3116,7 +3116,7 @@
     "slice_axis": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3131,7 +3131,7 @@
     "solid": {
       "anim": "KeyError: 'solid'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'solid'",
       "select density (x-y)": "KeyError: 'solid'",
       "select density (x-z)": "KeyError: 'solid'",
@@ -3146,7 +3146,7 @@
     "solver": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3161,7 +3161,7 @@
     "trigger_gauge": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3176,7 +3176,7 @@
     "x_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3191,7 +3191,7 @@
     "x_face": {
       "anim": "KeyError: 'x_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'x_face'",
       "select density (x-y)": "KeyError: 'x_face'",
       "select density (x-z)": "KeyError: 'x_face'",
@@ -3206,7 +3206,7 @@
     "y_c": {
       "anim": "KeyError: 'y_c'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'y_c'",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'y_c'",
@@ -3221,7 +3221,7 @@
     "y_face": {
       "anim": "KeyError: 'y_face'",
       "anim shown": "ok 230e3f4c961f980e",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "KeyError: 'y_face'",
       "select density (x-y)": "KeyError: 'y_face'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3236,7 +3236,7 @@
     "z_c": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok 7b6b445c39b3f218",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok b5fd0472bbb9f635",
       "select density (x-y)": "KeyError: 'z_c'",
       "select density (x-z)": "ok 18d4eae420ae173b",
@@ -3251,7 +3251,7 @@
     "z_face": {
       "anim": "ok 2be88ca4242c76e8",
       "anim shown": "ok d6f97c0393e46580",
-      "gauges": "ok f4c2c3e8de58d946",
+      "gauges": "ok 4da05311f0d65618",
       "plane_geometry": "ok df0855578b924343",
       "select density (x-y)": "ok 9bbb5ce93eb282a8",
       "select density (x-z)": "KeyError: 'z_face'",
@@ -4284,7 +4284,7 @@
           "yes"
         ],
         [
-          "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+          "G2 (0.400, 0.200) \u2192 cell (0.405, 0.205) m",
           "1894.4",
           "0.230",
           "0.258",
@@ -4827,7 +4827,7 @@
           "yes"
         ],
         [
-          "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+          "G2 (0.400, 0.200) \u2192 cell (0.405, 0.205) m",
           "1894.4",
           "0.230",
           "0.258",
@@ -5398,7 +5398,7 @@
           "yes"
         ],
         [
-          "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+          "G2 (0.400, 0.200) \u2192 cell (0.405, 0.205) m",
           "1894.4",
           "0.230",
           "0.258",
@@ -5941,7 +5941,7 @@
           "yes"
         ],
         [
-          "G2 (0.400, 0.200) -> cell (0.405, 0.205) m",
+          "G2 (0.400, 0.200) \u2192 cell (0.405, 0.205) m",
           "1894.4",
           "0.230",
           "0.258",
@@ -6514,7 +6514,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -6524,7 +6524,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",
@@ -7088,7 +7088,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -7098,7 +7098,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",
@@ -7671,7 +7671,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -7681,7 +7681,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",
@@ -8254,7 +8254,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -8264,7 +8264,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",
@@ -8837,7 +8837,7 @@
       "field": "p",
       "rows": [
         [
-          "G1 (0.850, 0.500, 0.500) -> cell (0.844, 0.510, 0.510) m",
+          "G1 (0.850, 0.500, 0.500) \u2192 cell (0.844, 0.510, 0.510) m",
           "0.0",
           "",
           "0.063",
@@ -8847,7 +8847,7 @@
           "no"
         ],
         [
-          "G2 (0.500, 0.850, 0.500) -> cell (0.510, 0.844, 0.510) m",
+          "G2 (0.500, 0.850, 0.500) \u2192 cell (0.510, 0.844, 0.510) m",
           "7494.8",
           "0.032",
           "0.063",

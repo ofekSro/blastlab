@@ -70,9 +70,9 @@ def main():
     check('G2 and G3 dropped: titles start G1, G4, G5',
           [s.split(' ')[0] for s in got] == ['G1', 'G4', 'G5'], str(got))
     check('G2 and G3 dropped: entered position -> cell position',
-          got == ['G1 (0.83, 0.61) m → cell (0.82, 0.62)',
-                  'G4 (2.01, 0.88) m → cell (2.02, 0.88)',
-                  'G5 (2.52, 1.71) m → cell (2.52, 1.73)'], str(got))
+          got == ['G1 (0.830, 0.610) m → cell (0.825, 0.625) m',
+                  'G4 (2.010, 0.880) m → cell (2.025, 0.875) m',
+                  'G5 (2.520, 1.710) m → cell (2.525, 1.725) m'], str(got))
     full = titles([0, 1, 2, 3, 4])
     check('no drop: titles as before (literal)',
           full == ['Gauge 1  (0.82, 0.62) m', 'Gauge 2  (1.23, 0.62) m',
@@ -82,7 +82,8 @@ def main():
     print('\nfigure_gauges_nd footnote (GUI-13 (d))')
     fig = figure([0, 3, 4])
     check('a drop: the footnote names the missing gauges',
-          footnote(fig) == 'Not shown: G2, G3 - dropped by the solver',
+          footnote(fig)
+          == 'G2 dropped by the solver\nG3 dropped by the solver',
           str(footnote(fig)))
     fig = figure([0, 3, 4], drop_note='G2 dropped by the solver (inside '
                                       'Wall 1) · G3 dropped by the solver')
@@ -96,6 +97,25 @@ def main():
     fig = figure([0, 1, 2, 3, 4], drop_note='')
     check('no drop, an empty Qt note: still no footnote',
           footnote(fig) is None and len(fig.texts) == 1)
+    # D11: one line per dropped gauge, so five drops never clip - the
+    # footnote's drawn extent lies inside the figure (one kept panel, the
+    # smallest figure the grid builds)
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    t = np.linspace(0.0, 5e-3, 50)
+    g = dict(times=t, points=[CELLS[0]],
+             pressures=[np.full(t.size, P_AIR)])
+    fig = plots.figure_gauges_nd(g, dict(
+        charge=1.0, eos='JWL', geometry='axisymmetric',
+        gauges=ENTERED + [(3.01, 1.88)]))
+    canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    box = fig._supxlabel.get_window_extent(canvas.get_renderer())
+    whole = fig.bbox
+    check('a 5-drop footnote: 5 lines, drawn inside the figure',
+          footnote(fig).count('\n') == 4
+          and box.x0 >= whole.x0 and box.x1 <= whole.x1
+          and box.y0 >= whole.y0 and box.y1 <= whole.y1,
+          f'{footnote(fig)!r} {box} {whole}')
     from blastlab.output.gauge_summary import dropped_numbers
     check('dropped_numbers: [2, 3]; none dropped: []; a pairing short of '
           'a point (P1): []',

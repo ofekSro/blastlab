@@ -396,11 +396,12 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None,
 
     GUI-13 (d), D6: when the solver dropped a gauge the figure says so in
     a footnote - `drop_note` (the Qt export passes the Run screen's
-    detailed `G2 dropped by the solver (inside Wall 1)`), else
-    `Not shown: G2, G3 - dropped by the solver` from the pairing, so the
-    Tk export gets one too - and each panel title reads `G4 (1.20, 0.30)
-    m → cell (1.25, 0.30)`, entered position and cell. A run without a
-    drop keeps its exact figure (F42)."""
+    detailed `G2 dropped by the solver (inside Wall 1)`, one line per
+    gauge), else one `G2 dropped by the solver` line per gauge from the
+    pairing (D11: Qt's words, never clipped), so the Tk export gets one
+    too - and each panel title reads `G4 (1.200, 0.300) m → cell (1.250,
+    0.300) m`, entered position and cell to 3 decimals as the summary
+    labels (D10). A run without a drop keeps its exact figure (F42)."""
     key, ylabel, tr = GAUGE_FIELDS[field]
     times  = gauge_out['times']
     points = gauge_out['points']
@@ -430,12 +431,13 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None,
         ovp = tr(p_arr)
         ax.plot(times * 1e3, ovp, color=color, lw=1.2)
         ax.axhline(0, color='k', lw=0.7, ls='--', alpha=0.5)
-        loc = ", ".join(f"{v:.2f}" for v in pt)
         if dropped:
-            asked = ", ".join(f"{float(v):.2f}" for v in want[nums[k] - 1])
-            ax.set_title(f'G{nums[k]} ({asked}) m → cell ({loc})',
+            asked = ", ".join(f"{float(v):.3f}" for v in want[nums[k] - 1])
+            loc = ", ".join(f"{float(v):.3f}" for v in pt)
+            ax.set_title(f'G{nums[k]} ({asked}) m → cell ({loc}) m',
                          fontsize=10)
         else:
+            loc = ", ".join(f"{v:.2f}" for v in pt)
             ax.set_title(f'Gauge {nums[k]}  ({loc}) m', fontsize=10)
         ax.set_xlabel('Time [ms]')
         ax.set_ylabel(ylabel)
@@ -444,9 +446,7 @@ def figure_gauges_nd(gauge_out, meta, field='p', title_extra=None,
     for k in range(n, nrows * ncols):
         axes[k // ncols][k % ncols].set_visible(False)
 
-    note = drop_note or (
-        'Not shown: ' + ', '.join(f'G{j}' for j in dropped)
-        + ' - dropped by the solver' if dropped else '')
+    note = drop_note or _dropped_lines(dropped)
     if note:
         # a figure-level x label, so constrained layout makes room for it
         fig.supxlabel(note, fontsize=9, style='italic')

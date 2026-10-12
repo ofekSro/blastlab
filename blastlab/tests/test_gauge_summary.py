@@ -92,7 +92,7 @@ def main():
     # coordinates do not read as a typo in the user's input (QA-33)
     snapped = gs.summarize_gauges(g3, requested=[(1.0, 2.0, 0.45)])[0]['gauge']
     check('a snapped gauge shows requested -> cell',
-          snapped == 'G1 (1.000, 2.000, 0.450) -> cell '
+          snapped == 'G1 (1.000, 2.000, 0.450) → cell '
                      '(1.000, 2.000, 0.500) m', snapped)
     check('an exact gauge is not cluttered with an arrow',
           '->' not in gs.summarize_gauges(
@@ -106,21 +106,21 @@ def main():
     check('a dropped gauge: labels keep the entered numbers G1, G3',
           lab[0].startswith('G1 ') and lab[1].startswith('G3 '), str(lab))
     check("a dropped gauge: G3's label carries G3's entered position",
-          lab[1] == 'G3 (1.530, 1.710) -> cell (1.532, 1.711) m', lab[1])
+          lab[1] == 'G3 (1.530, 1.710) → cell (1.532, 1.711) m', lab[1])
     check('a dropped gauge: G1 unchanged',
-          lab[0] == 'G1 (0.830, 0.610) -> cell (0.826, 0.605) m', lab[0])
+          lab[0] == 'G1 (0.830, 0.610) → cell (0.826, 0.605) m', lab[0])
     # points >= entered: the index pairing, exactly today's labels
     g4 = dict(times=t, points=[(0.8263, 0.6053), (1.2, 0.6),
                                (1.5316, 1.7106)], pressures=[p, p, p])
     check('no drop: labels as before (literal)',
           gs.gauge_labels(g4, want) == [
-              'G1 (0.830, 0.610) -> cell (0.826, 0.605) m',
+              'G1 (0.830, 0.610) → cell (0.826, 0.605) m',
               'G2 (1.200, 0.600) m',
-              'G3 (1.530, 1.710) -> cell (1.532, 1.711) m'],
+              'G3 (1.530, 1.710) → cell (1.532, 1.711) m'],
           str(gs.gauge_labels(g4, want)))
     check('more points than entered: index pairing, plain extras',
           gs.gauge_labels(g4, want[:1]) == [
-              'G1 (0.830, 0.610) -> cell (0.826, 0.605) m',
+              'G1 (0.830, 0.610) → cell (0.826, 0.605) m',
               'G2 (1.200, 0.600) m', 'G3 (1.532, 1.711) m'],
           str(gs.gauge_labels(g4, want[:1])))
     # P1: a point no entered gauge can take -> plain labels for all
@@ -153,8 +153,8 @@ def main():
     lab5 = gs.gauge_labels(g5, want5)
     check('A2: order-preserving pairing labels the survivor at G3\'s '
           'cell G3, not G2',
-          lab5 == ['G1 (1.106, 0.694) -> cell (1.150, 0.650) m',
-                   'G3 (1.201, 0.650) -> cell (1.250, 0.650) m'], str(lab5))
+          lab5 == ['G1 (1.106, 0.694) → cell (1.150, 0.650) m',
+                   'G3 (1.201, 0.650) → cell (1.250, 0.650) m'], str(lab5))
     check('A2: pair_in_order is an increasing subsequence',
           gs.pair_in_order(g5['points'], want5) == [0, 2])
     check('A2: a pair beyond tol cannot pair',
@@ -170,6 +170,15 @@ def main():
     check('CSV one line per gauge, peak in kPa with 1 decimal',
           len(lines) == 3 and lines[1][1] == '300.0' and lines[1][7] == 'yes', str(lines[1]))
     check('table rows are strings', all(isinstance(v, str) for v in gs.table_rows(rows)[0]))
+    # owner Q4 (2026-10-12): `→` on screens, figures and reports; the CSV
+    # keeps `->`, so its bytes stay pure ASCII
+    out2 = os.path.join(os.path.dirname(out), 'snapped.csv')
+    gs.save_gauge_summary(gs.summarize_gauges(g2, requested=want), out2)
+    with open(out2, 'rb') as f:
+        raw = f.read()
+    check('Q4: the CSV writes the snapped label with -> and is ASCII',
+          b'G3 (1.530, 1.710) -> cell (1.532, 1.711) m' in raw
+          and raw.isascii(), raw[:160])
 
 
 if __name__ == '__main__':

@@ -25,6 +25,12 @@ ARRIVAL_FRAC = 0.10
 
 _trapz = getattr(np, 'trapezoid', None) or np.trapz
 
+#: entered position -> cell in a snapped gauge's label (D10); the summary
+#: CSV writes CSV_ARROW instead, so its bytes stay pure ASCII (owner Q4:
+#: Excel reads a BOM-less UTF-8 CSV as ANSI, `→` as three junk characters)
+ARROW = '→'
+CSV_ARROW = '->'
+
 COLUMNS = ('gauge', 'peak_overpressure_kPa', 'arrival_ms',
            'time_of_peak_ms', 'positive_phase_duration_ms',
            'positive_phase_impulse_Pa_s', 'net_impulse_Pa_s',
@@ -92,7 +98,7 @@ def gauge_labels(gauge_out, requested=None, numbers=None):
 
     1D: 'G1  r = 1.000 m', numbered by `numbers` (`numbers_1d`; None:
     1, 2, ... - GUI-16 (b)). 2D/3D: 'G1 (0.300, 0.800)' when the gauge sits
-    where it was asked for, and 'G1 (0.300, 0.800) -> cell (0.305, 0.802)'
+    where it was asked for, and 'G1 (0.300, 0.800) → cell (0.305, 0.802)'
     when the solver snapped it to a cell centre - the table used to show
     the snapped numbers alone, which read as a typo in the user's input
     (QA-33). `requested` is the case's gauge list (meta['gauges']).
@@ -100,9 +106,13 @@ def gauge_labels(gauge_out, requested=None, numbers=None):
     When the solver dropped a gauge (fewer points than entered gauges),
     the points are paired with the entered gauges in order
     (`pair_in_order`, GUI-12 A2) and each is labelled with
-    that gauge's ENTERED number and position - `G3 (1.530, 1.710) -> cell
+    that gauge's ENTERED number and position - `G3 (1.530, 1.710) → cell
     (...)` - as the screens number it (F42, D201). Points >= entered keeps
     the index pairing, so a run without a drop is byte-identical.
+
+    The arrow is `→` (D10, owner Q4, 2026-10-12), as every screen, figure
+    and report writes it; only the summary CSV keeps `->`
+    (`save_gauge_summary`).
     """
     def fmt(pt):
         return '(' + ', '.join(f'{float(v):.3f}' for v in pt) + ')'
@@ -128,7 +138,7 @@ def gauge_labels(gauge_out, requested=None, numbers=None):
             snapped = any(abs(float(a) - float(b)) > 1e-9
                           for a, b in zip(want[j], pt))
             if snapped:
-                label = f'G{num} {fmt(want[j])} -> cell {fmt(pt)} m'
+                label = f'G{num} {fmt(want[j])} {ARROW} cell {fmt(pt)} m'
         out.append(label)
     return out
 
@@ -270,10 +280,11 @@ def table_rows(rows):
 
 
 def save_gauge_summary(rows, filename):
-    """CSV with COLUMNS as header; one line per gauge."""
+    """CSV with COLUMNS as header; one line per gauge. The gauge column
+    writes `->` for the labels' `→` (owner Q4), so the file is ASCII."""
     with open(filename, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         w.writerow(COLUMNS)
         for r in table_rows(rows):
-            w.writerow(r)
+            w.writerow((r[0].replace(ARROW, CSV_ARROW),) + tuple(r[1:]))
     return filename
