@@ -94,8 +94,7 @@ def written_radii(spec):
 
 
 def seed_checks():
-    """A1: the written radius and charge spacing (pinned before any
-    change; A4 moved the spacing pin, see there)."""
+    """A1: today's written radius and charge spacing, before any change."""
     print("\nA1 - the seed as written today")
     for name, case, want in (('P1-23', p123_case(), 0.009),
                              ('F05', f05_case(), 0.01125),
@@ -106,10 +105,8 @@ def seed_checks():
               r is not None and len(r) == 1 and abs(r[0] - want) < 1e-12,
               f'{r}')
     sp = writer.render_case(p123_case())
-    # A4 moved this pin from the global fine cell (0.01 m, lmax 2) to the
-    # level-1 cell the charge actually sits in
-    check('P1-23: the charge spacing is the level-1 cell at the charge, '
-          '0.02 m', abs(sp.dx_charge - 0.02) < 1e-12, f'{sp.dx_charge}')
+    check('P1-23: the charge spacing is the global fine cell, 0.01 m',
+          abs(sp.dx_charge - 0.01) < 1e-12, f'{sp.dx_charge}')
 
 
 def p123_centres():

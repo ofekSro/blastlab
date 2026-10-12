@@ -1641,11 +1641,7 @@ class VtkExport:
         """OUT-4b: `obstacle_ids` of one merged obstacles file, against
         the spec's snapped boxes, to 1 % of the finest cell."""
         spec = self.spec
-        # the finest cell of the mesh: the AMR level, else the fine grid
-        # (not dx_charge, which since P1-23 is the cell AT the charge)
-        amr = int(getattr(spec, 'amr', 0) or 0)
-        dx_base = float(getattr(spec, 'dx_base', 0.0) or 0.0)
-        cell = float(dx_base / 2 ** amr if amr and dx_base else spec.dx)
+        cell = float(getattr(spec, 'dx_charge', None) or spec.dx)
         axisym = ('wedge', 'wedge') in (getattr(spec, 'patches', None) or ())
         return obstacle_ids(vd.block('POINTS').values, polygon_faces(vd),
                             spec.obstacles, 0.01 * cell, axisym=axisym)

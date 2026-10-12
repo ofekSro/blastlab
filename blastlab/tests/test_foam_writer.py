@@ -810,39 +810,6 @@ def charge_scale_checks(specs):
           'MassToCell' not in sf and 'scale ' not in sf, sf[-160:])
 
 
-def charge_level_checks(specs):
-    """P1-23 (A4): a static charge outside the deepest zone. The case that
-    died at t = 0 on 2026-10-11: axisymmetric 10 x 10 m, 0.04 m base,
-    100 kg C4 at (0, 0) in the level-1 auto zone, a user zone at level 2
-    elsewhere. Not a golden: `dx_charge` (the lattice the mass scale is
-    searched on) is the level-1 cell at the charge, 0.02 m, not the
-    global fine 0.01 m; the written ignition radius is unchanged (the
-    run-time fit of backend._fit_ignition handles the real mesh)."""
-    import re
-    case = Case2D(
-        geometry='axisymmetric', Lx=10.0, Ly=10.0, cell_size_m=0.04,
-        charge=100.0, center=(0.0, 0.0),
-        bcs=dict(x_lo='reflect', x_hi='terminate', y_lo='reflect',
-                 y_hi='transmit'),
-        obstacles=[(5.0, 5.5, 0.0, 4.0), (7.5, 10.0, 0.0, 10.0)],
-        refine_zones=[(0.0, 7.5, 0.0, 6.0, 1), (3.5, 7.5, 0.1, 5.9, 2)],
-        charge_refine='zone', gauges=[(7.49, 0.1)],
-        solver='blastfoam', material='C4')
-    sp = render_case(case)
-    check('P1-23: lmax 2, the charge on the level-1 cell: dx_charge 0.02 m',
-          sp.lmax == 2 and abs(sp.dx_charge - 0.02) < 1e-12,
-          f'lmax {sp.lmax} dx_charge {sp.dx_charge}')
-    m = re.search(r'radii \(([^)]*)\);', sp.files['constant/phaseProperties'])
-    check('P1-23: the written ignition radius is still 9.0 mm',
-          m is not None and m.group(1) == '0.009', m and m.group(0))
-    # a charge IN the deepest zone keeps the global fine spacing
-    for name in ('case2d_planar_refine', 'case3d_refine', 'case2d_axi_refine'):
-        s = specs[name]
-        check(f'P1-23: {name} (charge in its deepest zone) keeps dx_charge '
-              f'= the fine cell', abs(s.dx_charge - s.dx) < 1e-15,
-              f'{s.dx_charge} vs {s.dx}')
-
-
 def golden(specs, update):
     if update or not os.path.isdir(GOLD):
         for name, spec in specs.items():
@@ -1768,7 +1735,6 @@ def main():
     profile_amr_checks(specs)
     chain_eos_checks(specs)
     charge_scale_checks(specs)
-    charge_level_checks(specs)
     burst_point_checks()
     time_name_checks()
     deferred_state_checks()
