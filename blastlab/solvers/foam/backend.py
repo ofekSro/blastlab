@@ -319,8 +319,42 @@ def _preflight(case, hooks):
     _scan_stage_warnings('\n'.join(out), hooks)
     _scan_set_mass('\n'.join(out), hooks, spec)
     if spec.lmax or spec.amr:
+        # after every stage (decomposePar included: the ranks read the
+        # root constant/phaseProperties) and before anything starts
+        # blastFoam; not a stage, since stage commands are strings
+        _fit_ignition(spec, hooks)
         build_remap(spec, hooks)
     return spec
+
+
+def _fit_ignition(spec, hooks):
+    """P1-23: a default ignition radius that lights no cell centre of the
+    real t = 0 mesh (0/C, written by the mesh stages) is refitted to the
+    nearest shell of centres (writer.fit_det_radii), so blastFoam does
+    not abort with "No cells will be activated". Only the `radii` line of
+    constant/phaseProperties changes, in `spec.files` and on disk; a
+    radius that lights a cell leaves the file byte-identical. Explicit
+    `det_radii` are the user's and are never refitted."""
+    rel = 'constant/phaseProperties'
+    text = spec.files.get(rel, '')
+    radii = writer.written_det_radii(text)
+    points = spec.det_points or [c for c, _m in spec.charges]
+    if not radii or len(radii) != len(points) or spec.det_radii:
+        return
+    try:
+        C = reader.read_cell_centres(spec.case_unc, spec.start_dir)
+    except (OSError, ValueError):
+        return                      # build_remap reports the same file
+    new, fits = writer.fit_det_radii(points, radii, C)
+    if not fits:
+        return
+    spec.files[rel] = writer.with_det_radii(text, new)
+    writer._write_files(spec, (rel,))
+    for i, old, r, n_lit, d1 in fits:
+        hooks.log(f'  [note] detonation point {i + 1}: the ignition radius '
+                  f'{old * 1e3:.4g} mm lights no cell of the t = 0 mesh '
+                  f'(nearest centre {d1 * 1e3:.4g} mm) - fitted to '
+                  f'{r * 1e3:.4g} mm, {n_lit} cell(s) lit')
 
 
 #: setFields/setRefinedFields report what the charge region actually

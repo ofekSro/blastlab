@@ -25,6 +25,7 @@ Profile initialization is a later phase.
 
 import math
 import os
+import re
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -1487,6 +1488,74 @@ def default_det_radius(spec):
                 int(getattr(spec, 'amr', 0) or 0))
     dx_base = float(getattr(spec, 'dx_base', 0.0) or 0.0) or float(spec.dx)
     return DET_RADIUS_CELLS * dx_base / (2.0 ** level)
+
+
+#: OpenFOAM's `small` for double scalars: `radius_ > small` selects the
+#: centre test, anything at or below it the `findCell` branch
+#: (activationModel.C:111/124), which takes the cell holding the point
+#: and so has no radius to fit
+FOAM_SMALL = 1e-15
+#: relative tolerance that groups equidistant cell centres into one
+#: shell: a point on a corner has 4 (2D) or 8 (3D) neighbours at the
+#: same distance up to round-off in the written centres
+_SHELL_TOL = 1e-6
+#: the `radii` line `_phaseproperties` writes (dicts.block, scalar list)
+_RE_RADII = re.compile(r'^(\s*)radii \(([^)]*)\);$', re.M)
+
+
+def fit_det_radii(points, radii, centres):
+    """P1-23: ignition radii checked against the REAL t = 0 mesh.
+
+    blastFoam lights a detonation point by testing cell centres,
+    `mag(C - pt) < radius` (guide sec. 5.6.1, p. 71, `radii`: "the cells
+    within the charge with the radii specified are set to full
+    activated"), and aborts at start-up with "No cells will be activated
+    using the detonation point" when no centre passes
+    (activationModel.C:111-137). `default_det_radius` sizes the radius
+    from the case's levels, which cannot see the cell the point really
+    sits in: setRefinedFields leaves an AMR charge interior coarse, and
+    refineMesh cuts the axisymmetric axis cell at its centroid, not its
+    middle. Measured: 0 cells lit on all three 2026-10-11 cases.
+
+    A radius that lights no centre becomes (d1 + d2) / 2, d1 the nearest
+    shell of equidistant centres and d2 the next one: exactly the
+    nearest shell is lit, 1 cell on the axis, 4 or 8 around a corner,
+    and the test stays centre-based, so decomposition-invariant (see
+    default_det_radius). A radius that already lights a cell, or a zero
+    one (the findCell branch), is returned unchanged.
+
+    `points` are foam (x, y, z), `centres` an (n, 3) array. Returns
+    (radii, fits): the radii to write and one (index, old, new, n_lit,
+    d1) per point that lit nothing."""
+    C = np.asarray(centres, dtype=float).reshape(-1, 3)
+    out, fits = [float(r) for r in radii], []
+    for i, (pt, r) in enumerate(zip(points, out)):
+        if r <= FOAM_SMALL or not len(C):
+            continue
+        d = np.sqrt(((C - np.asarray(pt, dtype=float)) ** 2).sum(axis=1))
+        if (d < r).any():
+            continue
+        d1 = float(d.min())
+        rest = d[d > d1 * (1.0 + _SHELL_TOL)]
+        d2 = float(rest.min()) if rest.size else 2.0 * d1
+        new = 0.5 * (d1 + d2)
+        out[i] = new
+        fits.append((i, r, new, int((d < new).sum()), d1))
+    return out, fits
+
+
+def written_det_radii(text):
+    """The `initiation.radii` list of a rendered phaseProperties [m], or
+    None when it has none (activation 'none', a profile stage)."""
+    m = _RE_RADII.search(text or '')
+    return [float(v) for v in m.group(2).split()] if m else None
+
+
+def with_det_radii(text, radii):
+    """`text` with only its `radii` line rewritten to `radii`."""
+    vals = ' '.join(fmt(float(r)) for r in radii)
+    return _RE_RADII.sub(lambda m: f'{m.group(1)}radii ({vals});', text,
+                         count=1)
 
 
 def _chamber_phaseproperties(spec, cs):
