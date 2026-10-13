@@ -130,8 +130,9 @@ batches. Skip the stage when no GUI screen was touched.
 Short: done vs left, one line each; tests; verifier fixes; open questions **each with a
 recommendation** (the owner answers "approve all" or by number); the commit range and
 how to undo it; what needs the office machine. Last, the `total` and `rule` lines of
-`python .claude/skills/bl-todo/cost.py <session id> --since <start> --tasks <planned>`
-(the session id is your scratchpad's folder name).
+`python .claude/skills/bl-todo/cost.py <session id> --since <start> --tasks <planned>
+--kind full|high` (`high` for a risk: high batch with no QA; the session id is your
+scratchpad's folder name).
 
 ## Rules
 
