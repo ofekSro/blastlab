@@ -156,6 +156,7 @@ class View3DHost(QWidget):
         self._container = None
         self._float_win = None
         self._floating = False
+        self._native_float = False    # floating = the child's own window
         self._done = False
         self._n_frames = 0
         self._playing = False
@@ -669,6 +670,13 @@ class View3DHost(QWidget):
             self._claim_if_visible()
             return
         self._hwnd = hwnd
+        if self._floating:
+            # GUI-16 (g): the child re-reports its handle on every
+            # `detach`, and after a native detach there is no container,
+            # so embedding here pulled the window straight back into the
+            # card. Floating, the handle is only kept; Re-attach (or
+            # closing the window, `on_closed`) asks for it again.
+            return
         self._embed()
         self._claim_if_visible()
 
@@ -849,8 +857,8 @@ class View3DHost(QWidget):
             return True
         except Exception as exc:
             # once per window, not once per attempt: a failed embed
-            # leaves _container None, so every later `on_window` retries
-            # and the same line used to stack up in the log
+            # leaves _container None, so a later `on_window` (after a
+            # Re-attach) retries and the same line used to stack up
             if self._embed_failed != self._hwnd:
                 self._embed_failed = self._hwnd
                 self._log(f'  [3D view: embedding failed ({exc}); '
@@ -887,6 +895,26 @@ class View3DHost(QWidget):
         except Exception:
             pass
 
+    def _show_detached(self, rect):
+        """Show the handed-back window as a framed top-level where the
+        card was. `_release_native` hid it with Win32 alone, so the
+        child's Qt still believes it visible and its own `show()` on
+        `detach` is a no-op: measured on the real platform, the detached
+        window never appeared (GUI-16 (g)). Showing it here puts Win32
+        back in step with what the child believes."""
+        u32 = _user32()
+        if u32 is None or not self._hwnd:
+            return
+        try:
+            import ctypes
+            left, top, w, h = rect
+            # HWND_TOP; SWP_SHOWWINDOW | SWP_FRAMECHANGED | SWP_NOOWNERZORDER
+            u32.SetWindowPos(ctypes.c_void_p(int(self._hwnd)), None,
+                             int(left), int(top), max(200, int(w)),
+                             max(150, int(h)), 0x0040 | 0x0020 | 0x0200)
+        except Exception:
+            pass
+
     def set_floating(self, floating):
         """Move the render window into its own top-level window, or bring
         it back into the host. The container travels with it, so the
@@ -896,8 +924,11 @@ class View3DHost(QWidget):
             return
         if self._container is None:
             # nothing embedded (yet, or embedding failed): the child's
-            # window is already on its own
+            # window is already on its own. Re-attach after a native
+            # detach lands here too: the child hides its window and
+            # re-reports the handle, and `on_window` adopts it again.
             self._floating = floating
+            self._native_float = False
             self._view_stack.setCurrentWidget(
                 self._float_box if floating else self._holder)
             self.link.send(('detach', self.surface, floating))
@@ -908,8 +939,12 @@ class View3DHost(QWidget):
             # child window means handing it back to the viewer, which
             # owns it as a proper framed top-level. Coming back, the
             # child re-reports its handle and `on_window` re-adopts it.
+            where = self._real_rect() if floating else None
             self._floating = floating
+            self._native_float = floating
             self._drop_native_mount()
+            if where is not None:
+                self._show_detached(where)
             self._float_lbl.setText(self.FLOATING)
             self._view_stack.setCurrentWidget(
                 self._float_box if floating else self._holder)
@@ -966,6 +1001,12 @@ class View3DHost(QWidget):
 
     def on_closed(self):
         """The child says its window was closed from the outside."""
+        if self._floating and self._native_float:
+            # a native detach floats the child's own window, so its close
+            # button lands here, not in _FloatWindow.closeEvent: it
+            # re-attaches the same way (GUI-16 (g))
+            self.set_floating(False)
+            return
         if self._floating:
             self._float_lbl.setText('The 3D window was closed.')
 
