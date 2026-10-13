@@ -414,13 +414,16 @@ class StageEditor(QWidget):
         self._content.layout().activate()
         self._scroll.ensureWidgetVisible(pl, 0, 0)
 
-    def _sync_children(self, gone=()):
-        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows)."""
+    def _sync_children(self, gone=(), tips=None):
+        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows);
+        `tips` {number: tooltip} for those rows (C6 (vi))."""
         f = self.form
+        tips = tips or {}
         if 'gauges' in f.points:
             rows = f.points['gauges'].get()
             self.tree.set_children('gauges', 'gauge', [
-                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone)
+                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone,
+                 tips.get(i, ''))
                 for i, row in enumerate(rows, start=1)])
         if 'obstacles' in f.points:
             axis = ('r' if self.dim == 2
@@ -462,9 +465,10 @@ class StageEditor(QWidget):
             self.hand_out.set(chain_route.out_file(self.dim, nxt))
         # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped;
         # GUI-15 (e): so is its child row
-        gone, off = (scaled_distance.drop_state(case)
-                     if case is not None else ([], None))
-        self._sync_children(gone)
+        gone, off, _failed = (scaled_distance.drop_state(case)
+                              if case is not None else ([], None, ''))
+        self._sync_children(gone, scaled_distance.drop_tips(case, gone)
+                            if case is not None else None)
         f.set_drops(gone, off is not None)
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self.dim, n) for n in f.bad}

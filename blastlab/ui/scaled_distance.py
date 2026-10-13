@@ -250,13 +250,19 @@ def where_text(case, point, dropped=None):
     (`dropped(point)`, as the Checks warning does), and the gap and the
     side are measured against that wall - with two walls within a cell
     the nearest as entered can be the other one. GUI-14 (d), D2: a gauge
-    outside the domain reads `outside the domain (dropped)`."""
+    outside the domain reads `outside the domain (dropped)`.
+
+    GUI-16 (f), C6 (iv): when the caller hands in the rule, `inside Wall 1`
+    and `on the face of Wall 1` end ` (dropped)` too if it drops the gauge
+    (blastFoam drops a gauge on a face; native only one inside). Without a
+    rule they read as they always did."""
     if outside_domain(case, point):
         from ..services.validation import gauge_drop_reason
         return gauge_drop_reason(0, False, outside=True) + ' (dropped)'
     w = where(case, point)
     if w is None:
         return ''
+    given = dropped is not None
     if dropped is None:
         from ..services.validation import drop_rule
         dropped = drop_rule(case)
@@ -264,13 +270,14 @@ def where_text(case, point, dropped=None):
     if wall and wall != w[0]:
         w = where(case, point, wall=wall) or w
     i, gap, inside, behind = w
+    tag = ' (dropped)' if wall else ''
     if inside:
-        return f'inside Wall {i}'
+        return f'inside Wall {i}' + (tag if given else '')
     cm = int(round(gap * 100.0))
     if cm == 0:
-        return f'on the face of Wall {i}'
+        return f'on the face of Wall {i}' + (tag if given else '')
     text = f'{cm} cm {"behind" if behind else "in front of"} Wall {i}'
-    return text + (' (dropped)' if wall else '')
+    return text + tag
 
 
 def is_dropped(case, point, dropped=None):
@@ -293,21 +300,40 @@ def dropped_numbers(case):
     return drop_state(case)[0]
 
 
+#: GUI-16 / B6, C6 (vii): the Where tooltip and the Gauges caption when
+#: `drop_rule(case).failed` is set - every gauge then reads as kept
+DROP_UNAVAILABLE = 'drop check unavailable - see Checks'
+
+
 def drop_state(case):
-    """(dropped numbers, disabled trigger) with the rule built once.
-    The trigger is `services.validation.trigger_disabled`'s number - the
-    entered trigger gauge when the solver drops that gauge, so the
-    trigger never fires - else None (GUI-16 (a), C1)."""
+    """(dropped numbers, disabled trigger, failed) with the rule built
+    once. The trigger is `services.validation.trigger_disabled`'s number -
+    the entered trigger gauge when the solver drops that gauge, so the
+    trigger never fires - else None (GUI-16 (a), C1). `failed` is the
+    rule's `.failed` ('' when it works, else why it could not run, B6)."""
     if getattr(case, 'dim', None) not in (1, 2, 3):
-        return [], None
+        return [], None, ''
     from ..services.validation import drop_rule, trigger_disabled
     dropped = drop_rule(case)
     try:
         gone = [k for k, p in enumerate(gauge_points(case), start=1)
                 if is_dropped(case, p, dropped)]
-        return gone, trigger_disabled(case, dropped)
+        return (gone, trigger_disabled(case, dropped),
+                getattr(dropped, 'failed', '') or '')
     except (AttributeError, TypeError, ValueError):
-        return [], None
+        return [], None, ''
+
+
+def drop_tips(case, gone):
+    """{number: `G2 - inside Wall 1, dropped by the solver`} for the
+    dropped gauges `gone` - the tree child rows' tooltips (C6 (vi)), the
+    reason in Run's words (`run_gauges.drops`). {} when there is none."""
+    if not gone:
+        return {}
+    from .run_gauges import drops
+    why = {int(n): w for n, w in drops(case)}
+    return {n: f'G{n} - ' + (f'{why[n]}, ' if why.get(n) else '')
+            + 'dropped by the solver' for n in gone}
 
 
 def any_dropped(case):

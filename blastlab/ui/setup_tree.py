@@ -35,11 +35,14 @@ class _ChildRow(QFrame):
 
     clicked = Signal()
 
-    def __init__(self, kind, name, value, parent=None, warn=False):
+    def __init__(self, kind, name, value, parent=None, warn=False, tip=''):
         super().__init__(parent)
         self.setObjectName('treechild')
         self.kind = kind
         self.warn = bool(warn)
+        self.tip = str(tip or '')
+        if self.tip:
+            self.setToolTip(self.tip)       # `G2 - inside Wall 1, dropped…`
         self.setFixedHeight(30)
         self.setCursor(Qt.PointingHandCursor)
         lay = QHBoxLayout(self)
@@ -197,10 +200,24 @@ class SetupTree(QFrame):
 
     @staticmethod
     def _elide(cap):
+        """The caption elided to the row's width. G15Q-1 (D17): the
+        Gauges caption gives up its head (`2 · in front of Wall 1`, the
+        Where segment) first, so `G2 dropped · trigger G3` always shows;
+        with no room for any head the tail stands alone, and only a tail
+        wider than the row elides from the right."""
         full = getattr(cap, '_full', cap.text())
         w = cap.width()
-        text = (cap.fontMetrics().elidedText(full, Qt.ElideRight, w)
-                if w > 0 else full)
+        fm = cap.fontMetrics()
+        text = full
+        if w > 0 and fm.horizontalAdvance(full) > w:
+            head, tail = _split_keep(full)
+            room = w - fm.horizontalAdvance(' · ' + tail) if tail else 0
+            if tail and room > fm.horizontalAdvance('2…'):
+                text = fm.elidedText(head, Qt.ElideRight, room) + ' · ' + tail
+            elif tail:
+                text = fm.elidedText(tail, Qt.ElideRight, w)
+            else:
+                text = fm.elidedText(full, Qt.ElideRight, w)
         if text != cap.text():
             cap.setText(text)
 
@@ -218,14 +235,16 @@ class SetupTree(QFrame):
     def set_children(self, node_id, kind, items):
         """Replace the child rows of `node_id`: `items` = [(name, value)]
         or [(name, value, warn)] (GUI-15 (e): a dropped gauge's marker
-        and name are in the warn colour), `kind` 'gauge' | 'obstacle'."""
+        and name are in the warn colour) or [(name, value, warn, tip)]
+        (C6 (vi): the row's tooltip), `kind` 'gauge' | 'obstacle'."""
         if node_id not in self._kids:
             return
         holder, old = self._kids[node_id]
-        items = [(it[0], it[1], bool(it[2]) if len(it) > 2 else False)
+        items = [(it[0], it[1], bool(it[2]) if len(it) > 2 else False,
+                  str(it[3]) if len(it) > 3 and it[3] else '')
                  for it in items]
-        if [(k.name.text(), k.value.text(), k.warn) for k in old] == \
-                [(str(n), str(v), w) for n, v, w in items]:
+        if [(k.name.text(), k.value.text(), k.warn, k.tip) for k in old] == \
+                [(str(n), str(v), w, t) for n, v, w, t in items]:
             return                              # unchanged: no flicker
         lay = holder.layout()
         for k in old:
@@ -233,8 +252,8 @@ class SetupTree(QFrame):
             k.setParent(None)
             k.deleteLater()
         kids = []
-        for i, (name, value, warn) in enumerate(items):
-            k = _ChildRow(kind, name, value, warn=warn)
+        for i, (name, value, warn, tip) in enumerate(items):
+            k = _ChildRow(kind, name, value, warn=warn, tip=tip)
             k.clicked.connect(lambda n=node_id, i=i:
                               self.child_clicked.emit(n, i))
             lay.addWidget(k)
@@ -279,6 +298,19 @@ class SetupTree(QFrame):
         lay = self.layout()
         lay.insertWidget(lay.indexOf(self.pill), widget)
         return widget
+
+
+def _split_keep(full):
+    """(head, tail) of a node caption: the tail starts at the first segment
+    after the first that says what the solver does with the gauges - `G2
+    dropped`, `trigger G3`, `drop check unavailable …` - and is never
+    elided before the head. The tail is '' for any other caption."""
+    segs = full.split(' · ')
+    for i, s in enumerate(segs):
+        if i > 0 and (s.endswith(' dropped') or s.startswith('trigger ')
+                      or s.startswith('drop check')):
+            return ' · '.join(segs[:i]), ' · '.join(segs[i:])
+    return full, ''
 
 
 def _add_button(text, fn):

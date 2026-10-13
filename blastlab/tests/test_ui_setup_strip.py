@@ -763,6 +763,87 @@ def s3_dock():
     check('GUI-16 (a): a trigger on the kept G1 reads plain, remap shown',
           cap.endswith('G2 dropped · trigger G1')
           and sp.form._trig['remap'].isVisibleTo(sp.form), cap)
+    # GUI-16 / C6 (iv): `inside` and `on the face of` end (dropped) when
+    # the caller's rule drops the gauge; with no rule they are as before
+    from PySide6.QtCore import Qt
+    from blastlab.services.validation import drop_rule
+    bf = sample_case()
+    rule = drop_rule(bf)
+    inside = sd.where_text(bf, (3.1, 1.0), rule)
+    face = sd.where_text(bf, (3.0, 1.0), rule)
+    check('C6 (iv): blastFoam, a gauge inside Wall 1 reads `inside Wall 1 '
+          '(dropped)`; on the face, (dropped) exactly when the rule drops it',
+          inside == 'inside Wall 1 (dropped)'
+          and face.startswith('on the face of Wall 1')
+          and face.endswith('(dropped)') == bool(rule((3.0, 1.0))),
+          f'{inside!r} {face!r}')
+    check('C6 (iv): without a rule `inside` / `on the face of` are '
+          'unchanged',
+          sd.where_text(bf, (3.1, 1.0)) == 'inside Wall 1'
+          and sd.where_text(bf, (3.0, 1.0)) == 'on the face of Wall 1')
+    # C6 (i): the caption gives up its Where segment first
+    from blastlab.ui.setup_tree import SetupTree, _split_keep
+    tr = SetupTree()
+    tr.set_nodes([('gauges', 5, 'Gauges')])
+    tr.resize(224, 400)
+    tr.show()
+    pump(30)
+    full = '2 · in front of Wall 1 · G2 dropped · trigger G3'
+    shown = {}
+    for w in (224, 280):
+        tr.resize(w, 400)
+        tr.set_summary('gauges', full)
+        pump(30)
+        shown[w] = tr.rows['gauges'].caption.text()
+    # (the tree's widest, 280 px, leaves the caption 192 px: the tail is
+    # 161 px, so no head stays; at 224 px (136) the tail itself elides but
+    # keeps `G2 dropped` - the real-platform fit script measures the app)
+    check('C6 (i): at the tree\'s widest the caption shows `G2 dropped · '
+          'trigger G3` (the Where segment elided first); narrowest keeps '
+          '`G2 dropped`, never the Where segment',
+          shown[280] == 'G2 dropped · trigger G3'
+          and shown[224].startswith('G2 dropped')
+          and 'Wall' not in shown[224], str(shown))
+    tr.set_summary('gauges', '2 gauges · G2 dropped')
+    pump(30)
+    check('C6 (i): with room the whole caption shows',
+          tr.rows['gauges'].caption.text() == '2 gauges · G2 dropped',
+          tr.rows['gauges'].caption.text())
+    check('C6 (i): _split_keep leaves other captions alone',
+          _split_keep('2 gauges') == ('2 gauges', '')
+          and _split_keep('R 1.5 m · 5 mm') == ('R 1.5 m · 5 mm', ''))
+    tr.close()
+    # C6 (v)-(vii): 1D Where, the child tooltip, a drop check that failed
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0]))
+    rows1 = sp.gauge_rows()
+    check('C6 (v): 1D with G2 beyond the radius shows Where: `outside the '
+          'domain (dropped)`; without a drop there is no Where column',
+          sp.gauge_headers()[-1] == 'Where'
+          and rows1[1][-1] == 'outside the domain (dropped)'
+          and rows1[0][-1] == '', str(rows1))
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 1.2]))
+    check('C6 (v): ... and none once nothing is dropped',
+          'Where' not in sp.gauge_headers(), str(sp.gauge_headers()))
+    load(sp, ew)
+    tip = sp.tree.child_row('gauges', 1).toolTip()
+    check('C6 (vi): the dropped gauge\'s tree row says why, the kept one '
+          'has no tooltip',
+          tip == 'G2 - inside Wall 1, dropped by the solver'
+          and sp.tree.child_row('gauges', 0).toolTip() == '', repr(tip))
+    check('C6 (iii): the gauge table elides Where in the middle',
+          sp.gauge_table.textElideMode() == Qt.ElideMiddle)
+    bad = Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+                 charge=-1.0, center=(0.0, 1.0), solver='blastfoam',
+                 obstacles=[(1.2, 1.6, 0.0, 1.0)], gauges=[(1.4, 0.3)])
+    check('C6 (vii): the fixture\'s drop check really fails',
+          drop_rule(bad).failed != '')
+    load(sp, bad)
+    wtip = sp.gauge_table.item(0, 6).toolTip()
+    check('C6 (vii): a failed drop check: the Where tooltip and the '
+          'caption say `drop check unavailable - see Checks`',
+          sd.DROP_UNAVAILABLE in wtip
+          and sd.DROP_UNAVAILABLE in sp.tree.summary('gauges'),
+          f'{wtip!r} {sp.tree.summary("gauges")!r}')
     # GUI-15 (f), D9: a 1D gauge beyond the radius is dropped by both
     # solvers - the Gauges node is warn and its caption names it
     load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0, 1.2]))

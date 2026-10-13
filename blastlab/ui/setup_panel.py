@@ -604,11 +604,12 @@ class SetupPanel(QWidget):
                 self._fill_gauges(case)
         # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
         # (the rule, not the warning text); GUI-15 (e): so is its child row
-        gone, off = (scaled_distance.drop_state(case)
-                     if case is not None
-                     and getattr(case, 'dim', None) == self._dim
-                     else ([], None))
-        self._sync_children(gone)
+        gone, off, _failed = (scaled_distance.drop_state(case)
+                              if case is not None
+                              and getattr(case, 'dim', None) == self._dim
+                              else ([], None, ''))
+        self._sync_children(gone, scaled_distance.drop_tips(case, gone)
+                            if case is not None else None)
         # the trigger dropdown offers the gauges as they are now, a dropped
         # one marked (GUI-16 (a))
         f.set_drops(gone, off is not None)
@@ -621,13 +622,16 @@ class SetupPanel(QWidget):
                                  else 'ok')
         self._sync_tree()
 
-    def _sync_children(self, gone=()):
-        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows)."""
+    def _sync_children(self, gone=(), tips=None):
+        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows);
+        `tips` {number: tooltip} for those rows (C6 (vi))."""
         f = self.form
+        tips = tips or {}
         if 'gauges' in f.points:
             rows = f.points['gauges'].get()
             self.tree.set_children('gauges', 'gauge', [
-                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone)
+                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone,
+                 tips.get(i, ''))
                 for i, row in enumerate(rows, start=1)])
         if 'obstacles' in f.points:
             axis = ('r' if self._dim == 2
@@ -807,6 +811,9 @@ class SetupPanel(QWidget):
         t.setSelectionBehavior(QAbstractItemView.SelectRows)
         t.setSelectionMode(QAbstractItemView.SingleSelection)
         t.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # G13Q-F3 (D19): Where elides in the middle, so a narrow column
+        # keeps the end of `4 cm in front of Wall 1 (dropped)`
+        t.setTextElideMode(Qt.ElideMiddle)
         h = t.horizontalHeader()
         h.setHighlightSections(False)
         h.setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -851,7 +858,6 @@ class SetupPanel(QWidget):
         for c in range(1, 4):
             t.setColumnHidden(c, c > len(axes))
         t.setColumnHidden(5, not z_on)
-        t.setColumnHidden(6, dim == 1)          # 1D has no obstacles
         pts = scaled_distance.gauge_points(case)
         rows = scaled_distance.gauges(case)
         t.setRowCount(len(pts))
@@ -859,6 +865,12 @@ class SetupPanel(QWidget):
         mono.setPixelSize(13)
         # GUI-13 (e): the solver's drop rule, built once for the table
         dropped = drop_rule(case)
+        failed = getattr(dropped, 'failed', '')
+        # G15U-L3 (D20): 1D has no obstacles, so Where shows only when a
+        # gauge is dropped (`outside the domain (dropped)`)
+        any_gone = any(scaled_distance.is_dropped(case, p, dropped)
+                       for p in pts)
+        t.setColumnHidden(6, dim == 1 and not any_gone)
         for r, (p, (num, R, Z)) in enumerate(zip(pts, rows)):
             # GUI-14 (d): a dropped gauge's G<n> and Where cells are warn
             gone = scaled_distance.is_dropped(case, p, dropped)
@@ -879,8 +891,12 @@ class SetupPanel(QWidget):
                     item.setFont(f)
                 item.setTextAlignment((Qt.AlignLeft if c in (0, 6)
                                        else Qt.AlignRight) | Qt.AlignVCenter)
-                if c == 6 and text:
-                    item.setToolTip(text)
+                if c == 6 and (text or failed):
+                    # B6, C6 (vii): a drop check that did not run says so
+                    item.setToolTip(
+                        text + (' - ' if text and failed else '')
+                        + (scaled_distance.DROP_UNAVAILABLE if failed
+                           else ''))
                 t.setItem(r, c, item)
         t.setVisible(bool(pts))
         self._gauge_empty.setVisible(not pts)

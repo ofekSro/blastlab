@@ -289,8 +289,11 @@ class CaseForm(FieldForm):
         combo.setToolTip('The gauge whose arrival ends the run (its number '
                          'in the Gauges list)')
         combo.activated.connect(self._trigger_picked)
-        grid.addWidget(cap, 0, 0)
-        grid.addWidget(combo, 0, 1)
+        # G15Q (D18): the caption above the box, so the box has the whole
+        # column and `G3 (0.90, 1.00)` shows whole at 1100 px (measured: 7 px
+        # short beside the 132 px label)
+        grid.addWidget(cap, 0, 0, 1, 2)
+        grid.addWidget(combo, 1, 0, 1, 2)
         remap = label(TRIGGER_REMAP_NOTE, 'small', wrap=True)
         remap.setVisible(self.dim == 2)
         body = card.body_layout
