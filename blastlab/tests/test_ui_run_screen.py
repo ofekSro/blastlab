@@ -1852,9 +1852,23 @@ def r5b_dropped(win):
     xo = dict(times=pay['times'], radii=[0.8, 1.5],
               pressures=pay['pressures'])
     labels, dropped = RG.numbering(c3, xo)
-    check('x-only payload, G3 at the dropped G2\'s x: no drop named, '
-          'payload labels', labels == ['G1', 'G2'] and dropped == [],
+    # GUI-16 (d): the tie is resolved by the rule - two series, two kept
+    # gauges (G1, G3), so the entered numbers stand and G2 is named
+    check('x-only payload, G3 at the dropped G2\'s x: the rule keeps G1 '
+          'and G3, the drop line names G2',
+          labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
           f'{labels} {dropped}')
+    rr = RG.rows(c3, xo)
+    check('GUI-16 (d): the G3 row measures G3\'s own point, not G2\'s',
+          [r['label'] for r in rr] == ['G1', 'G3']
+          and rr[1]['entered'] is not None
+          and abs(rr[1]['r'] - RG.sd.distance(c3, c3.gauges[2])) < 1e-9,
+          str([(r['label'], r['entered'], r['r']) for r in rr]))
+    labels, dropped = RG.numbering(
+        c3, dict(xo, radii=[1.5], pressures=xo['pressures'][:1]))
+    check('GUI-16 (d): a tie whose counts do not add up (1 series, 2 '
+          'kept) keeps plain labels and names no drop',
+          labels == ['G1'] and dropped == [], f'{labels} {dropped}')
     c3.gauges[2] = (2.5, 1.5, 1.5)
     labels, dropped = RG.numbering(c3, dict(xo, radii=[0.8, 2.5]))
     check('x-only payload, no x tie: G1, G3 and G2 inside Wall 1',

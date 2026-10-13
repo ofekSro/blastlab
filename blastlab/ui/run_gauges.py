@@ -204,7 +204,7 @@ def _x_only_tie(case, entered, missing, positions):
     return False
 
 
-def _numbering(case, match, n_series, positions=None):
+def _numbering(case, match, n_series, positions=None, rule=None):
     """(labels, dropped) for `n_series` series matched to the entered
     gauges by `match` (D201, amends D61):
 
@@ -217,8 +217,11 @@ def _numbering(case, match, n_series, positions=None):
     A drop is named only when the count adds up: the series are short by
     exactly the unmatched entered gauges, so a matching miss is never
     called a drop. A series matching none keeps its payload number. Nor
-    is one named when x-only `positions` (the blastFoam live 3D payload)
-    tie a dropped gauge with a kept one (`_x_only_tie`)."""
+    is one guessed when x-only `positions` (the blastFoam live 3D payload)
+    tie a dropped gauge with a kept one (`_x_only_tie`): the labels then
+    come from the rule (`pre_payload`, GUI-16 (d)) when the series are as
+    many as the gauges it keeps - the entered numbers, the drops named -
+    else they stay plain. `rule` is `drop_rule(case)`, None builds it."""
     entered = _entered(case)
     plain = [f'G{k + 1}' for k in range(n_series)]
     if n_series >= len(entered):
@@ -228,6 +231,9 @@ def _numbering(case, match, n_series, positions=None):
     if len(missing) != len(entered) - n_series:
         return plain, []
     if _x_only_tie(case, entered, missing, positions):
+        kept, dropped = pre_payload(case, rule)
+        if n_series == len(kept):
+            return [f'G{j + 1}' for j in kept], dropped
         return plain, []
     labels = [f'G{j + 1}' if j is not None else f'G{k + 1}'
               for k, j in enumerate(match[:n_series])]
@@ -235,14 +241,14 @@ def _numbering(case, match, n_series, positions=None):
                     for j in missing]
 
 
-def numbering(case, gauge_out):
+def numbering(case, gauge_out, rule=None):
     """`_numbering` of a live payload or a finished Result's `gauges`."""
     gauge_out = gauge_out or {}
     series = gauge_out.get('pressures')
     n = 0 if series is None else len(series)
     pos = _positions(gauge_out)
     pos = (pos + [None] * max(0, n - len(pos)))[:n]
-    return _numbering(case, _match(case, pos), n, pos)
+    return _numbering(case, _match(case, pos), n, pos, rule)
 
 
 def dropped_text(dropped):
@@ -345,9 +351,14 @@ def rows(case, payload=None, rule=None):
         match = _match(case, pos[:len(series)])
         entered = _entered(case)
         labels, _dropped = _numbering(case, match, len(series),
-                                      pos[:len(series)])
+                                      pos[:len(series)], rule)
         for k, raw in enumerate(series):
             j = match[k]
+            if j is not None and labels[k] != f'G{j + 1}':
+                # an x-only tie resolved by the rule (GUI-16 (d)): the
+                # series is the kept gauge the label names, not the
+                # neighbour at the same x that `_match` took
+                j = int(labels[k][1:]) - 1
             point = entered[j] if j is not None else pos[k]
             p = _arr(raw)
             n = min(p.size, times.size)
