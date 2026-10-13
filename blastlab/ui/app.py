@@ -1405,10 +1405,6 @@ class MainWindow(QMainWindow):
         self.notify(f'Result ready: {label_}')
 
     def on_finished(self, stopped_early, errored):
-        if not (stopped_early or errored):
-            # the last progress message is often throttled away, so a
-            # completed run would otherwise rest below 100%
-            self.run_panel.mark_complete()
         # the elapsed line says how the run ended (a Stop before the
         # first result leaves no result to call stopped: say so anyway)
         if errored:
@@ -1420,6 +1416,12 @@ class MainWindow(QMainWindow):
             how = 'done'
         else:
             how = 'ended'
+        if how == 'done':
+            # the last progress message is often throttled away, so a
+            # completed run would otherwise rest below 100%. Only a run
+            # that got a result: a Stop during blockMesh posts no progress
+            # and no result, and its bar stays empty at `0 %` (G15Q-5a)
+            self.run_panel.mark_complete()
         self.run_panel.mark_ended(how)
         if self._chain_strip is not None:
             self._chain_strip.finish(how, self._run_clock.run_s())

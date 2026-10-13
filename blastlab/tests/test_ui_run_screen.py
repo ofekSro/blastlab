@@ -1339,6 +1339,28 @@ def r6_finish(win):
         check('no result: no banner, no notification',
               rp.banner.isHidden() and calls == [])
 
+        # G15Q-5a (D4): Stop during blockMesh. No progress was ever posted
+        # and no result landed (StoppedBeforeStart), so on_finished gets
+        # (False, False); the bar used to be filled to 100 % there
+        fake.t = 0.0
+        win.on_running(True)
+        win._stop_asked = True              # what _stop() records
+        fake.t = 1.0
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(20)
+        check('a Stop during blockMesh keeps `0 %` and an empty bar, and '
+              'says Stopped (G15Q-5a)',
+              rp.pct_text() == '0 %' and rp.progress.value() == 0
+              and rp.time_text().startswith('Stopped after'),
+              f'{rp.pct_text()!r} {rp.progress.value()} {rp.time_text()!r}')
+        # the control: a run that ended on its own is still filled
+        fake_run(result([(180, 296e3)]))
+        check('... while a run that ended on its own still reads 100 %',
+              rp.pct_text() == '100 %' and rp.progress.value() == 1000,
+              f'{rp.pct_text()!r} {rp.progress.value()}')
+        calls.clear()
+
         # no gauges: the sentence is left out
         fake_run(result([]))
         check('no gauges: the notification has no Highest peak',
