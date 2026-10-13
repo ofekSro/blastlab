@@ -146,9 +146,14 @@ class LiveGaugePane(QWidget):
         """
         if not payload:
             return
-        times = np.asarray(payload.get('times') or [], dtype=float)
-        series = payload.get('pressures') or []
-        if times.size == 0 or not series:
+        # explicit None checks: a blastFoam payload carries ndarrays
+        # (reader.read_probes), and `ndarray or []` raises (D6)
+        times = payload.get('times')
+        times = np.asarray([] if times is None else times, dtype=float)
+        series = payload.get('pressures')
+        if series is None:
+            series = []
+        if times.size == 0 or len(series) == 0:
             return
         names = _labels(payload, len(series))
         if len(self.curves) != len(series):

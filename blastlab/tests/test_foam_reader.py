@@ -303,6 +303,15 @@ def main():
               and err.getvalue().startswith(
                   '[blastlab] probes: U times do not match p - using p '
                   'only ('), repr((pr3.get('warnings'), err.getvalue())))
+        # D6: the live gauge read meets a torn tail on nearly every read
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            pr3q = reader.read_probes(td, quiet=True)
+        check('quiet=True (the live read, D6): the same keys and warning, '
+              'nothing on stderr',
+              set(pr3q) == set(pr3)
+              and pr3q.get('warnings') == pr3.get('warnings')
+              and err.getvalue() == '', repr(err.getvalue()))
         # equal row count but shifted times: never misaligned by count -
         # p-only for that field, a warning, no raise
         with open(os.path.join(pdir, 'U'), 'w') as f:
