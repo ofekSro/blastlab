@@ -827,7 +827,7 @@ Qt refusal and overwrite dialogs break a path after "C:".
 - `P2-21` Qt 3D form shows a blank tail at the scroll end (OUT-2 QA F5) - the QStackedWidget takes its tallest page's height.
 - `P2-22` Validation accepts a detonation point that activates no cell; blastFoam then dies at t = 0 ("No cells will be activated using the detonation point"). Seen in OUT-3 e2e and harness F05.
 - `P2-23` A resumed run's gauges lose U: after a restart blastProbes writes only p and rho, so `read_probes` drops U_mag (warns since 25ce709). Pre-existing on master (OUT-3 verifier).
-- `P2-24` Qt: the Keep all fields tooltip is one ~1000 px line - wrap it. Tk light mode: unselected sidebar / dimension buttons are very faint (OUT-3 QA).
+- `P2-24` ✅ closed 2026-10-13 (DONE.md §0z).
 - `P2-25` Qt: a native result cannot be reopened in 03 Results after a restart, though its files are in the model folder - add `Open a model folder…` to 03 Results (also covers blastFoam runs whose WSL scratch was released). `docs/UX_REVIEW-redesign.md` UXR-14; owner approved as its own item, not GUI-11 (2026-10-03).
 - `P2-26` Chain: W and Z lost after the first stage - Z hidden on profile stages; a foam 2D profile stage records the form's stale charge and `from_profile=False`; native records 0 (`P3-10`). Detail: `docs/verification/remap-chain-gaps.md` §4, as for P2-27..30.
 - `P2-27` Chain: blastFoam is silent when the hand-off already reaches a boundary, the ground or an obstacle (native warns); `writer.py:1777-1778` claims `validate_case` warns and it does not.

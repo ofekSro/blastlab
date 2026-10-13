@@ -408,11 +408,19 @@ def _apply_ctk_defaults():
     colour - in light mode a greyed Exec / Profile / Remove read as a
     blank slab. `Button` sets it per widget; do it once for every plain
     CTkButton in the app too (QA-19/G13). Also give the segmented
-    buttons a visible unselected fill in both modes."""
+    buttons a visible unselected fill in both modes, and dark text in
+    light mode (the stock near-white text was 1.14:1 on that fill; P2-24).
+    Dark mode keeps the stock text colour."""
     try:
         theme = ctk.ThemeManager.theme
     except Exception:
         return
+    try:
+        seg_text = theme['CTkSegmentedButton']['text_color']
+        seg_text = [LIGHT['text'], seg_text[1] if isinstance(
+            seg_text, (list, tuple)) else seg_text]
+    except (KeyError, TypeError, IndexError):
+        seg_text = None
     muted = [LIGHT['muted'], DARK['muted']]
     seg = [LIGHT['seg'], DARK['seg']]
     border = [LIGHT['border'], DARK['border']]
@@ -420,11 +428,14 @@ def _apply_ctk_defaults():
                                ('CTkSegmentedButton', 'unselected_color', seg),
                                ('CTkSegmentedButton', 'unselected_hover_color',
                                 border),
+                               ('CTkSegmentedButton', 'text_color', seg_text),
                                ('CTkCheckBox', 'text_color_disabled', muted),
                                ('CTkRadioButton', 'text_color_disabled', muted),
                                ('CTkEntry', 'text_color_disabled', muted),
                                ('CTkOptionMenu', 'text_color_disabled', muted),
                                ('CTkComboBox', 'text_color_disabled', muted)):
+        if value is None:
+            continue
         try:
             theme[widget][key] = value
         except (KeyError, TypeError):

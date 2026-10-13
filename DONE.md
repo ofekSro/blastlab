@@ -98,6 +98,19 @@ all", incl. Q1 (P1-23 + P2-22 next) and Q2 (blastFoam trigger measured in that b
 
 ---
 
+## 0z. 2026-10-13 — batch `p2-24-tooltip` (P2-24; branch `dry-run-p2-24`)
+
+Plan `docs/batches/2026-10-13-p2-24-tooltip.md`; verify `2026-10-13-p2-24-tooltip.verify.md`.
+Dry run of the 2026-10-13 /bl-todo flow (owner task, agent cost). Planner Opus (row had no code location), implementer and verifier Sonnet (light), bookkeeping by `close_batch.py`.
+- **A1 (Qt):** the "Keep all fields" tooltip was already wrapped by `edc1154` (GUI-11 T6, D208, `ui/widgets.py` `wrap_tip`, 976 → 432 px); checked, no code.
+- **A2 (Tk):** `gui/theme.py` `_apply_ctk_defaults` gives the segmented buttons `LIGHT['text']` in light mode (stock `#DCE4EE` on the light fill was 1.14:1); unselected 10.58:1, selected 2.67 → 4.53:1; dark mode unchanged. 6 contrast checks in `test_gui_solver_mode.py`.
+- **Tests:** `gate --for` 6/6, all 16 `test_gui_*` + theme 19/19, verifier `gate --changed` 6/6, `test_regression` byte-identical. Verifier fixes: none.
+- **Open:** dark-mode selected segment 2.14:1 and light-mode selected hover 3.73:1, left as is (plan Q1); `test_gui_solver_mode.py` prints `bgerror` lines at exit, exit 0, not examined.
+- **Tasks:** A1 P2-24 VERIFIED; A2 P2-24 VERIFIED.
+- **Commits:** `113cb4b`..`ef55f80` (branch `dry-run-p2-24`).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
