@@ -325,6 +325,7 @@ class ChainPanel(QWidget):
         a dialog. A dialog that hangs or raises must not be able to
         swallow the reason."""
         lines = [str(ln) for ln in lines if str(ln).strip()]
+        lines = chain_route.by_position(lines, self.checked())     # A5
         # one line of sentences: each ends with a stop (GUI QA V2)
         said = [ln.rstrip() if ln.rstrip()[-1] in '.:!?'
                 else ln.rstrip() + '.' for ln in lines]
@@ -355,7 +356,9 @@ class ChainPanel(QWidget):
                     f'color: {theme.cur("error")};')
         self._compat_bad = bool(bad)
         if bad:
-            self._set_status(f'Stage {min(bad)}: {bad[min(bad)]}')
+            first = min(bad)
+            at = self.checked().index(first) + 1     # by position (A5)
+            self._set_status(f'Stage {at}: {bad[first]}')
         elif self.status.text().startswith('Stage '):
             self._set_status('')
         self._sync_run_btn()

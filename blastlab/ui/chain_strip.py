@@ -47,7 +47,7 @@ CAPTION_MIN = 200
 #: what a pill's value can read; the widest sets the row decision, so a
 #: stage change never moves the strip between one and two rows
 VALUE_SAMPLES = ('waiting', 'not run', 'stopped', 'failed', '100 %',
-                 '59 min 59 s', '1 h 59 min')
+                 '59 min 59 s', '1 h 59 min', 'meshing', 'starting')
 
 #: pill states (the `state` QSS property) and what the value says
 STATES = ('waiting', 'running', 'done', 'stopped', 'failed', 'notrun')
@@ -367,12 +367,14 @@ class ChainStrip(QFrame):
     def dims(self):
         return list(self._dims)
 
-    def stage_started(self, k):
-        """Stage `k` (0-based) is running, at 0 %."""
+    def stage_started(self, k, value='0 %'):
+        """Stage `k` (0-based) is running, at 0 % - or, from its `stage`
+        message to its first solve, `meshing` / `starting` (GUI-16
+        round 2)."""
         if not 0 <= k < len(self.pills):
             return
         self._current = k
-        self.pills[k].set_state('running', '0 %')
+        self.pills[k].set_state('running', value)
         n = len(self._dims)
         if k < n - 1:
             nxt = self._dims[k + 1]

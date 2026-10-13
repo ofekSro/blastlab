@@ -158,6 +158,26 @@ def stage_prefix(d):
     return f'Stage {int(d)} ({int(d)}D): '
 
 
+_STAGE_LINE = re.compile(r'^Stage (\d) \((\d)D\): ')
+
+
+def by_position(lines, stages):
+    """GUI-16 round 2 (A5, U4): `services.chain` numbers a stage by its
+    dimension (`Stage 3 (3D): ...`); on route 1 -> 3 the user sees two
+    stages, so the Chain screen's dialogs say `Stage 2 (3D): ...`.
+    `stages` is the checked dims in order. Routes 1 -> 2 and 1 -> 2 -> 3
+    keep every byte; a line with another start is returned as it is."""
+    where = {int(d): i for i, d in enumerate(stages, 1)}
+
+    def one(line):
+        m = _STAGE_LINE.match(line)
+        if m is None or int(m.group(2)) not in where:
+            return line
+        return (f'Stage {where[int(m.group(2))]} ({m.group(2)}D): '
+                + line[m.end():])
+    return [one(str(ln)) for ln in lines]
+
+
 @dataclass
 class StageCheck:
     """What one stage's live check found. `case` is the wired case (None

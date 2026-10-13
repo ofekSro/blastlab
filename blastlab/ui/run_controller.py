@@ -346,11 +346,25 @@ class RunController(QObject):
             w.hooks.latest_frame3d()
         elif tag == 'stage':
             h.on_log(f'=== Stage {msg[2]} ===')
+            # GUI-16 round 2 (A1): a later stage owns the screen from here,
+            # not from its run_started (blastFoam meshes in between)
+            on_stage = getattr(h, 'on_stage', None)
+            if on_stage is not None:
+                on_stage(int(msg[1]))
         elif tag == 'folder':
             # OUT-1: the stage's model folder is written; a finished
             # blastFoam run whose WSL scratch had to be kept says why
             stage_dir, manifest, notice = msg[1], msg[2], msg[3]
             self._folders[stage_dir] = manifest
+            scratch = (manifest or {}).get('wsl_scratch') or {}
+            if (scratch.get('kept_because') == model_folder.KEEP_ALL_WHY
+                    and not notice):
+                # GUI-16 round 2 (A3): Keep all is the user's own choice -
+                # one non-modal line, no dialog (the log had it alone)
+                notify = getattr(h, 'notify', None)
+                if notify is not None:
+                    notify('WSL scratch kept (Keep all fields): '
+                           f"{scratch.get('posix', '')}", 'info')
             if notice:
                 self.show_error('Model folder', notice)
         elif tag == 'result':

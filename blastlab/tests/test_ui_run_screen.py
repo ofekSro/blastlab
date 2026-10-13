@@ -1989,6 +1989,52 @@ def r5b_dropped(win):
           f'{labels} {exported}')
 
 
+def r13_keep_all_note(win):
+    """GUI-16 round 2 (A3, U3): a Keep-all scratch is named outside the
+    log - one non-modal info notice - and a `[note]` log line is muted."""
+    from blastlab.services.model_folder import KEEP_ALL_WHY
+    from blastlab.ui import dialogs, theme
+    rp = win.run_panel
+    asked = []
+    real_err, real_info = dialogs.show_error, dialogs.show_info
+    dialogs.show_error = lambda *a, **k: asked.append(('error', a))
+    dialogs.show_info = lambda *a, **k: asked.append(('info', a))
+    win._status_timer.stop()
+    try:
+        n0 = len(rp.messages_text().splitlines())
+        kept = {'wsl_scratch': {'posix': '/root/blastlab_runs/m_keep',
+                                'deleted': False,
+                                'kept_because': KEEP_ALL_WHY}}
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', kept, ''))
+        msgs = rp.messages_text().splitlines()[n0:]
+        check('A3: a Keep-all manifest gives exactly one info notice that '
+              'names the path, and no dialog',
+              len(msgs) == 1 and msgs[0].endswith(
+                  '  info  WSL scratch kept (Keep all fields): '
+                  '/root/blastlab_runs/m_keep') and not asked,
+              f'{msgs} {asked}')
+        other = {'wsl_scratch': {'posix': '/root/blastlab_runs/m_x',
+                                 'deleted': True}}
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', other, ''))
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', {}, ''))
+        check('A3: a manifest without it gives no notice',
+              len(rp.messages_text().splitlines()) == n0 + 1)
+    finally:
+        dialogs.show_error, dialogs.show_info = real_err, real_info
+    rp.on_log('  [note] WSL scratch kept: x')
+    rp.on_log('  [warn] w')
+    rp.on_log('  [error] e')
+    rp.on_log('plain')
+    cols = dict(rp.log_line_colours())
+    muted, warn, err = (theme.cur(k) for k in ('muted', 'warn', 'error'))
+    check('A3: a [note] line is muted; [warn] and [error] keep theirs; '
+          'a plain line has none',
+          cols['  [note] WSL scratch kept: x'].lower() == muted.lower()
+          and cols['  [warn] w'].lower() == warn.lower()
+          and cols['  [error] e'].lower() == err.lower()
+          and cols['plain'] is None, str(cols))
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -2010,6 +2056,7 @@ def main():
         r10_pmax_fit(win)
         r11_hd13_flow(win)
         r12_strip_and_view(win)
+        r13_keep_all_note(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a

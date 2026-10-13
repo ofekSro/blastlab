@@ -105,6 +105,9 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         self._chain_k = 0
         self._chain_n = 0
+        # GUI-16 round 2 (A1): a later stage announced, not yet solving
+        self._stage_pending = False
+        self._stage_word = ''       # `meshing` / `starting`, for the Stop question
         # GUI-9: the running chain's 02 Run strip (None for a single run)
         # and its one 03 Results entry (None until its first result)
         self._chain_strip = None
@@ -1113,17 +1116,19 @@ class MainWindow(QMainWindow):
         Resolved through `ui.dialogs` at call time, so the QA driver and
         every test patch it rather than meeting a modal (P2-8).
         """
-        notes = [(c, long_run_note(c)) for c in cases]
-        notes = [(c, n) for c, n in notes if n is not None]
+        notes = [(i, c, long_run_note(c)) for i, c in enumerate(cases, 1)]
+        notes = [(i, c, n) for i, c, n in notes if n is not None]
         if not notes:
             return True
         lines = []
-        for case, (t_end, cap, ratio) in notes:
-            where = (f'Stage {case.dim}D: ' if len(cases) > 1 else '')
+        for pos, case, (t_end, cap, ratio) in notes:
+            # by position, as the Chain screen's dialogs (A5, U4)
+            where = (f'Stage {pos} ({case.dim}D): '
+                     if len(cases) > 1 else '')
             lines.append(f'{where}end time {t_end * 1e3:.4g} ms is '
                          f'{ratio:.1f}x the automatic stop time '
                          f'({cap * 1e3:.0f} ms).')
-        worst = max(n[2] for _c, n in notes)
+        worst = max(n[2] for _i, _c, n in notes)
         lines.append('')
         lines.append(f'The full span will be simulated, so expect roughly '
                      f'{worst:.0f}x the wall clock of an automatic run. '
@@ -1196,8 +1201,9 @@ class MainWindow(QMainWindow):
         run that ended early, and the run browser resumes it. `tail` goes
         before the question mark (`' and quit'` on Close, D202)."""
         model = self.ctrl._run_name or self._case_stem()
-        stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n})'
-                 if self._chain_n > 1 else '')
+        stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n}'
+                 + (f', {self._stage_word}' if self._stage_word else '')
+                 + ')' if self._chain_n > 1 else '')
         at = f' at {self._run_pct} %' if self._run_pct is not None else ''
         text = (f'Stop {model}{stage}{at}{tail}?\n\nIt has been running for '
                 f'{fmt_duration(self._run_clock.run_s())}.')
@@ -1222,13 +1228,42 @@ class MainWindow(QMainWindow):
         if '[warn]' in line or '[error]' in line:
             self.notify(line, 'warn')
 
+    def on_stage(self, k):
+        """The worker announced stage `k` (0-based), before its mesh.
+        Stage 0 is the run's own start and changes nothing. A later stage
+        owns the screen from here (GUI-16 round 2, A1, U1 + F-3): the
+        finished stage's 100 % bar, `about 0 s left` and pill must not
+        stand through the next stage's blockMesh. `on_run_started` then
+        only restarts the ETA (D-R6)."""
+        if k <= 0 or self._chain_n < 2 or not self._running_ui:
+            return
+        cases = self._run_cases or []
+        foam = k < len(cases) and getattr(cases[k], 'solver',
+                                          None) == 'blastfoam'
+        self._stage_word = 'meshing' if foam else 'starting'     # D-R7
+        self._stage_pending = True
+        self._run_clock.stage()         # the stage's time counts its mesh
+        self._chain_k = k + 1
+        self._run_pct = None
+        self.run_panel.begin_stage(f'{self._stage_word} stage {k + 1}')
+        self._update_title()
+        if self._chain_strip is not None:
+            self._chain_strip.stage_started(k, self._stage_word)
+
     def on_run_started(self, info):
+        pending = self._stage_pending
+        self._stage_pending = False
+        self._stage_word = ''
         # a (chain) stage: its ETA restarts, the run time goes on
-        self._run_clock.stage()
+        if pending:
+            self._run_clock.restart_eta()   # on_stage restarted the stage
+        else:
+            self._run_clock.stage()
         self.run_panel.on_run_started(info)
         # k of the title's `Chain k/n · ` = runs started since
-        # start_stages (plan §4)
-        self._chain_k += 1
+        # start_stages (plan §4); a stage announced by on_stage has it
+        if not pending:
+            self._chain_k += 1
         # a new stage has no percent yet: the last stage's (often 100 %)
         # must not stand in the title or the Stop question until this
         # stage's first progress (F25)
@@ -1345,6 +1380,8 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         if running:
             self._chain_k = 0
+            self._stage_pending = False
+            self._stage_word = ''
             self._chain_n = len(getattr(self.ctrl, '_stage_dims', None)
                                 or [])
             self._chain_entry = None
@@ -1450,8 +1487,19 @@ class MainWindow(QMainWindow):
             return
         model = getattr(self.ctrl, '_run_name', '') or self._case_stem()
         folder = getattr(getattr(self.ctrl, '_model', None), 'folder', None)
-        self.run_panel.show_finish(model, getattr(res, 'stop_reason', ''),
-                                   folder)
+        reason, time_reason = getattr(res, 'stop_reason', ''), None
+        n = self._chain_n
+        if (how == 'stopped' and n > 1 and self._run_n_results < n
+                and not getattr(res, 'stopped_early', False)):
+            # GUI-16 round 2 (A2): the last result is a finished earlier
+            # stage's, so its stop_reason (`shock arrived ...`) says
+            # nothing about this stop. It stays verbatim in the method
+            # card (D66); the banner and the time line say who stopped.
+            done, at = self._run_n_results, self._run_n_results + 1
+            reason = (f'stage {done} of {n} finished; stopped by user '
+                      f'during stage {at}')
+            time_reason = f'stopped by user during stage {at} of {n}'
+        self.run_panel.show_finish(model, reason, folder, time_reason)
         self.run_panel.set_run_again(True)
         if how != 'done':
             return

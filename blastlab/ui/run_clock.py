@@ -41,6 +41,8 @@ class RunClock:
         self._hold0 = None          # the open hold's start, or None
         self._stage_held0 = 0.0     # held seconds before this stage
         self._stopped = None        # the frozen time, or None while live
+        self._eta0 = None           # where the ETA's stage time starts
+        self._eta_held0 = 0.0       # held seconds before that point
 
     # ── state ────────────────────────────────────────────────────────────
     def started(self):
@@ -68,6 +70,8 @@ class RunClock:
         self._held = self._stage_held0 = 0.0
         self._hold0 = None
         self._stopped = None
+        self._eta0 = t
+        self._eta_held0 = 0.0
 
     def stage(self):
         """A (chain) stage starts: stage_s() and the ETA restart."""
@@ -77,6 +81,17 @@ class RunClock:
         t = self.now()
         self._stage0 = t
         self._stage_held0 = self._held_at(t)
+        self._eta0 = t
+        self._eta_held0 = self._stage_held0
+
+    def restart_eta(self):
+        """The stage's solve begins after its mesh (GUI-16 round 2, D-R6):
+        only the ETA restarts, stage_s() keeps counting from `stage()`."""
+        if not self.live():
+            return
+        t = self.now()
+        self._eta0 = t
+        self._eta_held0 = self._held_at(t)
 
     def hold(self, on):
         """Pause (True) or resume (False) the count; repeats are
@@ -128,4 +143,7 @@ class RunClock:
             return None
         if frac >= 1.0:
             return 0.0
-        return self.stage_s() * (1.0 - frac) / frac
+        t = self._t()
+        solve_s = max(0.0, (t - self._eta0)
+                      - (self._held_at(t) - self._eta_held0))
+        return solve_s * (1.0 - frac) / frac

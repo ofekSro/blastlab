@@ -1287,6 +1287,141 @@ def stopped(res):
 INFO1D = dict(dim=1, radius_m=2.0, gauges=[])
 
 
+def s7_round2(win, rp, fake, res, prog, start):
+    """GUI-16 round 2: A1 a later stage owns the Run screen from its
+    `stage` message (U1, F-3); A2 a chain stopped after a landed stage says
+    so (U2, F-2); A5 is in test_ui_chain_wiring's golden."""
+    from types import SimpleNamespace
+    foam = [SimpleNamespace(solver='blastfoam') for _i in range(2)]
+    native = [SimpleNamespace(solver='native') for _i in range(2)]
+
+    def stage1_landed(cases):
+        win._run_cases = cases
+        strip = start([1, 2])
+        win.on_run_started(INFO1D)
+        fake.t = 5.0
+        win.on_progress(prog(1.0))
+        win.on_result(0, 1, 'M - 1D', res[1])
+        return strip
+
+    # A1: blastFoam stage 2 meshes - `stage` arrives, no run_started yet
+    strip = stage1_landed(foam)
+    fake.t = 8.0
+    win.on_stage(1)
+    pump(20)
+    check('A1: stage 2 announced, still meshing: the bar is not 100 % and '
+          'the time line has no ETA',
+          rp.pct_text() != '100 %' and rp.progress.value() == 0
+          and 'left' not in rp.time_text()
+          and rp.time_text().startswith('meshing stage 2'),
+          f'{rp.pct_text()!r} {rp.time_text()!r}')
+    check('A1: _chain_k is 2, pill 2 runs as `meshing`, pill 1 is done',
+          win._chain_k == 2 and strip.states() == ['done', 'running']
+          and strip.texts()[1] == '02 2D meshing',
+          f'{win._chain_k} {strip.texts()}')
+    check('A1: the title says Chain 2/2 with no percent',
+          win.windowTitle().startswith('Chain 2/2 · ')
+          and '%' not in win.windowTitle(), win.windowTitle())
+    q = win._stop_question().split('?')[0]
+    check('A1: the Stop question names stage 2 and meshing, no percent',
+          'stage 2 of 2' in q and 'meshing' in q and ' at ' not in q, q)
+    check('A1: the Run tile and the strip caption belong to stage 2',
+          rp.pct_text() == '0 %' and 'Stage 2 of 2' in strip.texts()[-1],
+          f'{rp.pct_text()!r} {strip.texts()[-1]!r}')
+    fake.t = 20.0
+    win.on_run_started(INFO1D)
+    pump(20)
+    check('A1: run_started does not advance the chain again; the pill '
+          'reads 0 % and the word is gone',
+          win._chain_k == 2 and strip.texts()[1] == '02 2D 0 %'
+          and 'meshing' not in win._stop_question()
+          and 'meshing' not in rp.time_text(),
+          f'{win._chain_k} {strip.texts()} {rp.time_text()!r}')
+    fake.t = 30.0
+    win.on_progress(prog(0.5))
+    eta = win._run_clock.eta_s(0.5)
+    check('A1: the ETA counts the solve only (10 s in -> 10 s left), the '
+          'stage time counts the mesh too (22 s)',
+          abs(eta - 10.0) < 1e-6 and abs(win._run_clock.stage_s() - 22.0)
+          < 1e-6, f'{eta} {win._run_clock.stage_s()}')
+    win.on_running(False)
+    win.on_finished(False, False)
+
+    # A1 control: a native stage - `stage` then run_started right away
+    strip = stage1_landed(native)
+    win.on_stage(1)
+    check('A1 native: the word is `starting`',
+          strip.texts()[1] == '02 2D starting'
+          and rp.time_text().startswith('starting stage 2'),
+          f'{strip.texts()} {rp.time_text()!r}')
+    win.on_run_started(INFO1D)
+    win.on_progress(prog(0.3))
+    check('A1 native: after run_started the pills, _chain_k and the title '
+          'are what run_started alone gave',
+          win._chain_k == 2 and strip.states() == ['done', 'running']
+          and strip.texts()[1] == '02 2D 30 %'
+          and win.windowTitle().startswith('Chain 2/2 · 30 %'),
+          f'{win._chain_k} {strip.texts()} {win.windowTitle()!r}')
+    win.on_running(False)
+    win.on_finished(False, False)
+    # k == 0 changes nothing
+    start([1, 2])
+    win.on_stage(0)
+    check('A1: stage 0 is a no-op (the run_started that follows counts it)',
+          win._chain_k == 0 and not win._stage_pending)
+    win.on_running(False)
+    win.on_finished(False, False)
+
+    # A2: Stop while stage 2 meshes
+    strip = stage1_landed(foam)
+    win.on_stage(1)
+    win._stop_asked = True
+    win.on_running(False)
+    win.on_finished(False, False)
+    pump(20)
+    tl = rp.time_text()
+    banner = rp.banner.message.toolTip()
+    check('A2: Stop in stage 2\'s mesh: Stopped after .., stopped by user, '
+          'stage 1\'s own ending not repeated',
+          tl.startswith('Stopped after') and 'stopped by user' in tl
+          and 'end time reached' not in tl and 'outer boundary' not in tl
+          and 'end time reached' not in banner
+          and 'stopped by user during stage 2' in banner,
+          f'{tl!r} {banner!r}')
+    check('A2: the strip names stage 2; pill 2 stopped, pill 1 done',
+          'stage 2 of 2' in strip.texts()[-1]
+          and strip.states() == ['done', 'stopped'], str(strip.texts()))
+    # A2 control: stage 2 solving, its own stopped result keeps its reason
+    strip = stage1_landed(native)
+    win.on_stage(1)
+    win.on_run_started(INFO1D)
+    win.on_result(1, 2, 'M - 2D (stopped)', stopped(res[2]))
+    win.on_running(False)
+    win.on_finished(True, False)
+    pump(20)
+    check('A2 control: a native chain stopped in stage 2\'s solve keeps '
+          'its own stopped-by-user reason',
+          rp.time_text().startswith('Stopped after')
+          and 'stopped by the user' in rp.time_text()
+          and strip.states() == ['done', 'stopped'],
+          f'{rp.time_text()!r} {strip.states()}')
+    win._run_cases = None
+
+    # A5 (U4): the Chain screen's dialogs number a stage by position
+    from blastlab.ui import chain_route as cr
+    ln = ['Stage 3 (3D): a', 'Stage 1 (1D): b', 'plain', 'Stage 2 (2D): c']
+    check('A5: route 1->3 renumbers 3D as stage 2, the dimension stays',
+          cr.by_position(ln, [1, 3])
+          == ['Stage 2 (3D): a', 'Stage 1 (1D): b', 'plain',
+              'Stage 2 (2D): c'], str(cr.by_position(ln, [1, 3])))
+    check('A5: routes 1->2->3 and 1->2 keep every byte',
+          cr.by_position(ln, [1, 2, 3]) == ln
+          and cr.by_position(ln[1:], [1, 2]) == ln[1:])
+    check('A5: route 2->3 numbers 2D as stage 1',
+          cr.by_position(['Stage 2 (2D): x', 'Stage 3 (3D): y'], [2, 3])
+          == ['Stage 1 (2D): x', 'Stage 2 (3D): y'])
+
+
 def s7_strip():
     from PySide6.QtCore import QPoint, QRect
     from blastlab.solvers.hooks import Progress
@@ -1534,6 +1669,7 @@ def s7_strip():
               rp.time_text().startswith('Done in')
               and strip.texts()[-1].startswith('Chain done'),
               f'{rp.time_text()!r} {strip.texts()[-1]!r}')
+        s7_round2(win, rp, fake, res, prog, start)
         # F27 (GUI-10, D182): at a stage start STEP / TIME / dt / P MAX read
         # `—` until the stage's first progress; the live plot is restarted
         # (not dropped to its placeholder) and the 3D view is kept
