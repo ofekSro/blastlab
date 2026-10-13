@@ -654,6 +654,10 @@ class _SelectedCard(QFrame):
         else:
             self.peak_dot.setData([row['t_peak_ms']], [row['peak_kpa']])
             self.peak_lbl.setText(f'{row["t_peak_ms"]:.2f} ms')
+            # GUI-16 round 2 (F-4): an early peak has no room to its left,
+            # so the label sits to its right (the left half of the range)
+            early = float(row['t_peak_ms']) < 0.5 * float(t[-1])
+            self.peak_lbl.setAnchor((-0.05, 0.5) if early else (1.05, 0.5))
             self.peak_lbl.setPos(row['t_peak_ms'], row['peak_kpa'])
         self.now_line.setVisible(self._live and bool(t.size))
         if row['waiting'] != was:

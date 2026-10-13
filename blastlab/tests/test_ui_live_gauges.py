@@ -79,6 +79,39 @@ def main():
           'r =' in _labels(dict(radii=[0.5]), 1)[0],
           _labels(dict(radii=[0.5]), 1)[0])
 
+    print('\nG2b: GUI-16 round 2 (F-4): the enlarged card\'s peak label stays '
+          'inside the plot')
+    from blastlab.ui.run_gauges import _SelectedCard
+
+    def card_row(peak_frac):
+        t = np.linspace(0.0, 10.0, 400)
+        k = int(round(peak_frac * 399))
+        y = np.zeros_like(t)
+        y[k] = 250.0
+        return dict(label='G1', z=2.99, r=1.0, where='', waiting=False,
+                    peak_kpa=250.0, t_ms=t, kpa=y, t_peak_ms=float(t[k]))
+
+    card = _SelectedCard()
+    card.resize(360, 200)
+    card.show()
+    pump(60)
+    card.set_row(card_row(0.02), True, False)
+    pump(60)
+    box = card.plot.vb.sceneBoundingRect()
+    lab = card.peak_lbl.sceneBoundingRect()
+    check('an early peak (2 % of the range): the label lies inside the view',
+          box.left() - 0.5 <= lab.left() and lab.right() <= box.right() + 0.5,
+          f'label {lab.left():.1f}..{lab.right():.1f}, '
+          f'view {box.left():.1f}..{box.right():.1f}')
+    check('... and sits to the right of the peak (anchor -0.05)',
+          card.peak_lbl.anchor[0] < 0, str(tuple(card.peak_lbl.anchor)))
+    card.set_row(card_row(0.80), True, False)
+    pump(60)
+    check('a late peak (80 %): the anchor is today\'s, left of the peak',
+          tuple(card.peak_lbl.anchor) == (1.05, 0.5),
+          str(tuple(card.peak_lbl.anchor)))
+    card.close()
+
     win = MainWindow()
     use_model(win)          # OUT-1: Run needs a runs folder and a model
     win.show()
