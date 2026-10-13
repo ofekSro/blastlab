@@ -481,7 +481,7 @@ GAUGE_KEYS = ('speeds', 'rhos', 'overpressures', 'impulses', 'temperatures',
               'dyn_pressures')
 
 
-def read_probes(case_unc, name='gauges', field='p'):
+def read_probes(case_unc, name='gauges', field='p', quiet=False):
     """blastProbes output -> dict(points, times, pressures) or None.
 
     When the run also recorded U and rho (T44/N12) and their rows align
@@ -498,7 +498,10 @@ def read_probes(case_unc, name='gauges', field='p'):
     kept, and the dict gains `warnings` (one reason per dropped field)
     plus one stderr line per field. Never raises for it: a finished run's
     finalise must not fail on a torn probe file. When nothing is dropped
-    the dict is exactly what it was before, with no `warnings` key."""
+    the dict is exactly what it was before, with no `warnings` key.
+    `quiet` skips the stderr lines (the dict keeps `warnings`): the live
+    gauge read of a running solver meets a torn tail on nearly every read,
+    measured at two lines a second on a 1D run (D6)."""
     base = os.path.join(case_unc, 'postProcessing', name)
     tdirs = list_sample_times(case_unc, name)
     if not tdirs:
@@ -530,8 +533,9 @@ def read_probes(case_unc, name='gauges', field='p'):
         if why is None:
             return True
         kind, reason = why
-        print(f'[blastlab] probes: {fname} {kind} do not match p - using p '
-              f'only ({reason})', file=sys.stderr)
+        if not quiet:
+            print(f'[blastlab] probes: {fname} {kind} do not match p - '
+                  f'using p only ({reason})', file=sys.stderr)
         dropped.append(f'{fname}: {kind} do not match p ({reason})')
         return False
 
