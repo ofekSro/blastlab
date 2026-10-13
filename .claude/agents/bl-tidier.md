@@ -39,8 +39,8 @@ The orchestrator runs the tests; you do not.
   touch their order. No VTK and no `matplotlib.pyplot` import, ever.
 - **D viewer** (`viz3d/`): pyvista only in `viewer.py`; the shared-memory
   protocol layout is a contract.
-- **E Tk** (`gui/`): permanent fallback. Never write "deprecated",
-  "legacy", "retired" or anything implying removal about it (CLAUDE.md §9).
+- **E Tk** (`gui/`): frozen (owner 2026-10-13, CLAUDE.md §9). Never tidy it, and
+  never write anything implying it will be removed.
 
 ## Never, in any tier
 

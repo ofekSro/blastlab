@@ -34,8 +34,7 @@ Trust what you run, not the report.
 - Check cited documents say what the comments claim.
 - Read `docs/physics-notes.md` when the diff touches a number; `docs/traps.md` §8.7 before
   judging a geometry or viewer claim.
-- Run the Tk suites when a shared module (`core/`, `solvers/`, `services/`, `output/`)
-  changed (CLAUDE.md §9).
+- The Tk GUI is frozen (CLAUDE.md §9): do not run its `test_gui_*` suites, and do not judge Tk.
 
 ## Fix
 

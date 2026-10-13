@@ -11,7 +11,8 @@ attachment in the first turn, checked in the transcripts 2026-10-13) - never Rea
   `docs/references/ViperTheoryManual_Client.pdf`, `docs/references/ViperTheoryManual_Client.txt`,
   `docs/references/viper_vtk_sample/`, `docs/qa/2026-09-27-out-3/`,
   `docs/qa/2026-09-27-viewer-polish/`. Stage by explicit path only - never `git add -A` / `.`.
-- `blastlab/gui/` (Tk) stays untouched unless the task names it (CLAUDE.md §9).
+- `blastlab/gui/` (Tk) is frozen (owner 2026-10-13, CLAUDE.md §9): never edit it, and never
+  run its `test_gui_*` suites or `_qa_gui_harness.py` as a gate.
 - No numerical change, no solver default change, no edit to a committed behaviour /
   number test or a golden unless the plan names it and the owner approved it. Layout
   pins may change, listed with the reason (`docs/gui-redesign-plan.md` §9).

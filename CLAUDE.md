@@ -61,7 +61,7 @@ Repair: `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\blastlab-ws
 
 ```
 python -m blastlab [--case a.json]     # the Qt GUI (--qt is a no-op alias)
-python -m blastlab --tk                # the Tkinter GUI - the permanent way back
+python -m blastlab --tk                # the Tkinter GUI - frozen (§9)
 python -m blastlab --cli 2d [--solver blastfoam]
 python -m blastlab --clean-foam-runs [--keep-gb N] [--older-than DAYS]
 python -m blastlab --load-foam-run DIR
@@ -147,11 +147,11 @@ form: `docs/traps.md`.
 
 ## 9. Do not touch
 
-- **`blastlab/gui/` (Tk) and `customtkinter` stay forever** behind `--tk` (owner
-  2026-09-18): never delete them, never call them deprecated, retired, "kept for one
-  release" or scheduled for removal - in code, docs or UI text. Run their 9 `test_gui_*`
-  suites and `_qa_gui_harness.py` when a change touches `gui/` or `core/`, `solvers/`,
-  `output/`.
+- **`blastlab/gui/` (Tk) is frozen** (owner 2026-10-13, replacing 2026-09-18's "kept and
+  tested forever"). The code and `--tk` stay as they are, working as long as they work.
+  Nothing is fixed or added there, and no work is planned for it. Its `test_gui_*` suites
+  and `_qa_gui_harness.py` gate nothing; `gate.py` skips them. Do not delete it, since
+  removal would need an owner batch of its own.
 - Regression fixtures `blastlab/tests/baseline/`, `foam_fixtures/`, `foam_golden/` -
   tracked and pinned byte-for-byte.
 - `DONE.md` §7 "verified correct - do not fix" and the §5 id index.
