@@ -74,6 +74,25 @@ units, ≈ $0.25 each; the rest is `full` on Opus (risk: high).
 | 8 | TODO.md split | Proposal only (owner approves). |
 | 9 | Parallel mode | Wall time only, by design. Applied, opt-in. |
 
+## Dry run of the new flow (2026-10-13, branch `dry-run-p2-24`)
+
+Smallest open low-risk item, `P2-24` (2 plan tasks; A1 check-only, A2 one Tk theme line +
+6 checks). `cost.py <this session> --since 2026-10-13T07:33 --tasks 2`:
+
+| Agent | Model | Calls | $ |
+|---|---|---|---|
+| planner | Opus (row had no code location, change 4 rule) | 23 | 0.90 |
+| implementer | Sonnet | 25 | 0.43 (22 % rebuilds - it waited on gate runs past 5 min) |
+| verifier, light | Sonnet | 5 | 0.10 |
+| orchestrator | Opus, *this* session (≈ 300 k context of the agent-cost work) | 10 | 0.91 |
+| **total** | | | **2.34** ($1.17 per plan task) |
+
+The orchestrator figure is not the new flow's: it ran on Opus inside a long session. A
+fresh Sonnet orchestrator at ≈ 40-60 k context would be ≈ $0.15-0.30, putting this
+batch at ≈ $1.6-1.7. Too small a batch to judge rule 3; it says the fixed costs are
+low. Findings: `close_batch.py` did not know list bullets (fixed, `57ab606`); the
+implementer's 22 % rebuilds say gate runs still outlast the 4-minute rule.
+
 ## Method
 
 `cost.py` gives per-agent units. The per-role, start-up, re-pricing and split figures
