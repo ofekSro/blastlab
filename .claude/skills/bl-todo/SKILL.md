@@ -1,7 +1,16 @@
 ---
 name: bl-todo
 description: Works through blastlab's TODO.md in batches, sized to save tokens. Plans the next batch (bl-task-planner, Sonnet when the rows are located and decided, else Opus), implements it (bl-task-implementer, Sonnet - Opus when the plan is risk high), verifies at the depth the risk calls for (bl-task-verifier light or full), then moves finished tasks to DONE.md. GUI QA and UX review run only when the plan marks the end of a track, or on request. Use as /bl-todo to plan and confirm once, /bl-todo go to run without confirmation, /bl-todo plan to plan only, /bl-todo batch <path> to run or resume an existing plan.
+model: sonnet
 ---
+
+**The orchestration runs on Sonnet** (owner 2026-10-13; the `model:` field above). Per the
+Claude Code docs (skills, frontmatter) the override lasts for the rest of the turn that
+invokes the skill; the session model returns on the owner's next message. So: a plain
+"yes" after Stage 1 continues on the session model - tell the owner to answer
+`/bl-todo batch <plan path>` instead, which re-invokes the skill on Sonnet. `go`, `next`
+and `batch` run in one turn and stay on Sonnet. Start /bl-todo in a fresh session: a
+model switch re-writes the whole existing context into the new model's cache.
 
 You orchestrate one batch end to end. Subagents cannot launch each other, so you
 launch every agent and pass the reports along. Owner-approved token rules (2026-10-04):
@@ -100,4 +109,5 @@ how to undo it; what needs the office machine. Last, the `total` and `rule` line
   when the final message is not enough.
 - If an agent declines the task on safety grounds (this domain's vocabulary reads
   alarming out of context, CLAUDE.md §0), relaunch once with `model: "opus"` and the
-  same prompt; if it declines again, report to the owner.
+  same prompt; if it declines again, report to the owner. If you, the orchestrator,
+  would decline, say so in one line instead; the owner reruns on the session model.
