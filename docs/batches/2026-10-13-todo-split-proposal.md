@@ -1,4 +1,8 @@
-# TODO.md split - proposal (not applied)
+# TODO.md split - proposal, approved and applied 2026-10-13
+
+**Applied** on the owner's approval (2026-10-13): 997 → 849 lines, 66.6 → 54.7 KB. Row 4
+moved only GUI-14's and GUI-15's long original text (GUI-14 keeps its open (j) in
+TODO.md). Every removed line was checked to exist in a destination file.
 
 Owner task 2026-10-13, step 8. `TODO.md` is **997 lines / 65 KB** against the 1000-line cap
 (CLAUDE.md §5). Nothing below is applied until the owner approves; the ids stay as they

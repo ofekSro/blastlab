@@ -52,8 +52,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | Id | What | Size | Order |
 |---|---|---|---|
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
-| `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC). Original row: **Left by GUI-13** (2026-10-05; `docs/qa/2026-10-05-gui-13-ux.md` F1-F6, `docs/qa/2026-10-05-gui-13-qa/` #1-4, `…-gui-13-backlog-A.verify.md`) — (a) **owner call:** A1 skipped (4 m box over the unprobed cap); recommended: keep Lz 1.5 m and re-record `char_golden/ui_chain_wiring.json` (3 × `radius_m` 10.0 → 1.5) so the 1D radius seed lands; (b) Tk Gauges column still cut at 1100 px (`gui/results_panel.py:281-284`, minwidth 250 < ~287 needed; QA #1, UX F6); (c) Where column can name a different wall than Checks when two walls are within a cell (UX F2); (d) dropped gauge not marked where gauges are edited — warn colour on the cells and the Gauges tree node (F3); (e) Run card header: drop `selected`, elide right, Z unit (F4); (f) Results drop line in the warn style, as on Run (F5); (g) solver logs still say `Gauge (x, y) inside an obstacle` without `G<n>` (`solver2d.py:284,289`, `solver3d.py:342`; 3 tests pin it); (h) `test_ui_status_cells` S2 flaky (fixed `pump(600)`, poll instead); (i) harness `latest_out()` picks folders by name — sort by mtime; (j) home PC: HD13 char drift, carried from GUI-13 (i). Low items parked in the UX report §6 | M | 14 |
-| `GUI-15` | ✅ 2026-10-12 (a)-(h), DONE.md §0y. Original row: **Left by GUI-14** (2026-10-11; `docs/qa/2026-10-11-gui-14-ux.md` F1-F6, `docs/qa/2026-10-11-gui-14-qa/QA_REPORT.md` F1, `…-gui-14-backlog-B.verify.md`) — **owner 2026-10-11: all approved**, incl. the (b)/(g) pin edits and (d)'s wording — (a) Run: from Start to the first gauge data a dropped gauge is an ordinary `waiting` row, can be the enlarged card, and its header can name another wall than Setup (UX F1); (b) the native log names no wall (`inside an obstacle`) and says "inside" for a gauge Setup calls "in front"; the solver has the obstacle list (UX F2; pin edit needs the owner); (c) Results on blastFoam runs says `inside Wall n` where Run said `on the face of` — the meta stores the face-snapped walls (UX F3); (d) Setup: Checks `on the face of Wall 1` vs Where `3 cm behind Wall 1 (dropped)` on one row; proposed `within a cell of Wall n`, wording is the owner's (UX F4); (e) the Gauges node turns warn but its caption and children do not name the gauge; a chain stage has no gauge table (UX F5); (f) 1D: a gauge beyond the radius is dropped silently — no Checks warning, no log, Results renumbers (`solver1d.py:146`, `foam/writer.py:445`; UX F6 = QA F1; the 1.5 m chain seed makes it easier to hit); (g) owner approval: `_e2e_gui_native_warn.py:63-64` can no longer fail (old `Gauge (` text) — pin `G1 (0.30, 0.80) m`; add a fast 2D/3D solver-log pin; (h) `_qa_ui_harness`'s F group switches to blastFoam despite `--solver native` and ran WSL solves (GUI-14 QA) — make it respect the flag; its F05/F06 blastFoam runs died with exit 134 under AMR (perhaps P1-23, unverified). Low items parked in both reports | M | 15 |
+| `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC): HD13 char drift, carried from GUI-13 (i). The full row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 14 |
+| `GUI-15` | ✅ 2026-10-12 (a)-(h), DONE.md §0y; the closed row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 15 |
 | `GUI-16` | **Left by GUI-15** (2026-10-12; `docs/qa/2026-10-11-gui-15-ux.md` U1-U6, `docs/qa/2026-10-11-gui-15-qa/QA_REPORT.md`, `…-gui-15-backlog-B.verify.md` open items 1-2) — (a) trigger on a dropped gauge: Checks says `Trigger disabled`, but the Checks note ("the run ends when the wave reaches gauge 2" / the remap-file note), the Gauges caption `trigger G2`, the trigger dropdown and the chain HAND-OFF OUT card still show it active; in a chain the hand-off then happens at the stage's normal stop (UX U1, verifier 1); (b) 1D exports (PNG, HTML report, summary) label by kept index (`Gauge 2` for the entered G3) and do not mention the drop — a `numbers=` argument, byte-identical when nothing is dropped (U2); (c) Resume and Run-browser Load: `resume_foam_run` passes no `drops`, `load_foam_run_path` adds no `gauges_dropped` stamp, so Results says `inside Wall 1` on blastFoam and a reloaded 1D run renumbers (U3); (d) blastFoam 3D: a dropped gauge sharing its x with a kept one — the drop line vanishes at the first payload and G3 is relabelled G2; fall back to the drop rule (U4, new from GUI-15 a); (e) every gauge dropped: Run says "This case has no gauges…" and hides the drop line, Results "This result has no gauges" (U5); (f) field-plot markers: native live omits a dropped gauge, blastFoam live draws it plain, the exported animation draws it inside the wall (U6); (g) 3D Detach is undone at once on the native path: `view3d_host.on_window` (`:664-673`) re-embeds while `_floating`; `_e2e_ui_view3d.py` G3 fails, then `AttributeError` at `:131` — fix, update G3, re-measure with the Win32 probe (verifier B item 2, GUI-15 B6). Low items parked in both reports (UX L1-L5; QA: caption cut off at 1100 and 1600 px, `100 %` after a stop, harness `--out` inside OneDrive → `WinError 5`) | M | 16 |
 
 ---
@@ -279,48 +279,15 @@ fire.
 
 ### The residual ≈2 % parallel-vs-serial peak offset · **open, and narrowed**
 
-The x/y symmetry break is closed (it was the ignition seed, and `det_radii` closes
-it). What survives both mitigations is a **symmetric ≈2 % offset** that moves both
-mirror gauges the same way and **flips sign between arms** — the signature of
-temporal aliasing of the peak, not of a physical bias.
-
-> **The settling run.** Take the `det_radii` arm exactly as it is and pin the
-> timestep: `adjustTimeStep no` with a fixed `deltaT` below the smallest adaptive
-> step either run took, everything else byte-identical, np = 1 vs np = 2. If the
-> offset collapses, it is temporal aliasing and the fix belongs in **how blastlab
-> samples the gauge**, not in the solver. If it survives at a fixed timestep,
-> aliasing is excluded and the next cut is the probe-cell election under
-> decomposition.
-
-Full background: [docs/verification/blastfoam-claims.md §5](docs/verification/blastfoam-claims.md).
+*Moved to [docs/verification/open-research.md](docs/verification/open-research.md) on 2026-10-13 (owner); ids unchanged.*
 
 ### Claim 3 — three experiments designed and not run
 
-The wedge half-angle was **withdrawn** as a defect (1° is OpenFOAM's own documented
-example, and blastFoam itself ships 1° wedges). What replaces it: the differentiator
-between the vendor's working wedge+AMR+densityGradient cases and our nine dead runs
-is the **`profile1d` hand-off state**, not the mesh.
-
-| # | Rule | Threshold |
-|---|---|---|
-| **R3.1b** | vendor `mappedBuilding3D/wedge`, **1°** + AMR + densityGradient, unmodified | One-way: SIGFPE → CONFIRMED on vendor input; completion → null |
-| **R3.2** | our reproducer, `densityGradient`, **with vs without** the `profile1d` hand-off, angle fixed at 1° | Hand-off dies and live-charge survives → the trigger is ours → **REFUTED as a solver defect** |
-| **R3.3** | our reproducer at 1° vs 5°, all else identical | Prediction: **difference ≤ 1 %** in time-to-failure. A large difference would refute the `sin θ` cancellation argument |
-
-*(`Lohner` is already the default everywhere, so this is a mechanism question, not a
-blocker.)*
+*Moved to [docs/verification/open-research.md](docs/verification/open-research.md) on 2026-10-13 (owner); ids unchanged.*
 
 ### Corrections the audit implies, not yet applied
 
-- **`adjustLocations` is a no-op for every interior probe.** `core/case.py:90`,
-  `:202`, `:310` and `writer.py:107-111` all state that it "snaps each gauge onto
-  the centre of the cell holding it". **That is wrong for every interior gauge**,
-  which is all of them. The comments need correcting.
-- **The Claim 4 write-up names the wrong function.** It is
-  `fluxScheme::snGradAlpha`, not `fluxScheme::AD` — fix it before the finding is
-  quoted anywhere, because `::AD` sends a reader to a clean four-line function.
-- **Prefer `sum(lambda)` over `count(lambda >= 0.99)`** in any future ignition
-  measurement; the count is valid only at the first write.
+*Moved to [docs/verification/open-research.md](docs/verification/open-research.md) on 2026-10-13 (owner); ids unchanged.*
 
 ### P1-7 · On-screen check only: the player shows frame 0 · **code fixed 2026-09-27**
 
@@ -839,128 +806,13 @@ Qt refusal and overwrite dialogs break a path after "C:".
 
 ## P3 — Capabilities and improvements, on request
 
-*(None of these blocks anything.)*
-
-**Physics**
-
-- `P3-1` Non-box obstacles (STL → snappyHexMesh) — needs the same resampler as AMR.
-- `P3-2` Enable `pressureBased` activation — per-material rate constants; only if
-  ignition physics matters.
-- `P3-3` Per-case override of `maxDeltaT`/`deltaT` — trivial wiring in the writer.
-- `P3-4` HLLC comparison: `dicts.FLUX_SCHEME = 'HLLC'` is a one-line flip;
-  `test_foam_1d_vs_native.py` is the harness. *(HLLC is sharper at contact surfaces —
-  the products/air interface — than Kurganov.)*
-- `P3-5` Axisymmetric smear option in 2D (3D has it; 2D refines only).
-- `P3-12` Static refinement zones for a profile-initialised stage. `refineMesh`
-  renumbers cells, so `writeCellCentres` + `build_remap` must move before
-  `write_deferred` and the fields must be written through `spec.remap` — the
-  machinery exists, only the order is wrong.
-- `P3-13` Extra charges exist only in 3D. In **planar 2D** it is feasible — a 2D
-  charge is an infinite cylinder, and `spec.charges` is already a list on the 2D
-  path. Missing: the setFieldsDict, overlap/boundary checks and the GUI table.
-  Axisymmetric stays a single charge on the axis — that is geometry, not a gap.
-- `P3-14` 3D→3D remap — **moved to P1** ("Remap-chain gaps", owner 2026-10-11).
-- `P3-15` Obstacles do not survive the 2D→3D remap — they would become rings around
-  the axis, so `save_profile_2d` drops them with a warning only. The 3D stage
-  continues a state that evolved around obstacles that are no longer there.
-  **Minimum:** raise it to a validation warning in the GUI instead of a stdout print.
-- `P3-27` A hemispherical surface burst through the chain (1D→3D / 1D→2D near the ground); the factor is an owner call, cited from UFC 3-340-02. Detail: `docs/verification/remap-chain-gaps.md` §5.
-- `P3-28` Several charges with a hand-off: extra charges beside a remapped field, and several 1D hand-offs placed in one 2D/3D stage (one common hand-off time, fields not yet met). Same doc §5.
-
-**From the solver-options review** — full detail and dict snippets in
-[docs/verification/solver-options-review.md](docs/verification/solver-options-review.md).
-
-- `P3-16` **`conservedQuantities` on every run**, checked in `postmortem`. Both
-  hand-off bugs were energy non-conservation, and this function object would have
-  caught both automatically. *Small.*
-- `P3-17` **`timeOfArrival` + `overpressure store yes`.** Arrival time is the third
-  standard output of blast engineering and the repo already produces the other two.
-  *Small.*
-- `P3-18` **`volScalarFieldMassIntegrated`** for charge mass — sets alpha so the
-  deposited mass equals the request **exactly**, which would let the charge
-  resolution drop from 8 cells back to 5 and save 4.1× the cells in 3D. **Validate
-  against the KB anchor first:** the afterburn calibration was fitted with the
-  present deficit baked in and would need refitting. *Medium.*
-- `P3-19` **`beginUnrefine`** (the guide recommends it explicitly for explosives) and
-  **`allowableImbalance`** in `dynamicMeshDict`. *Small.*
-- `P3-20` **`rotateFields`** as a replacement for the Python remap. Operates on
-  fields rather than interpolated conserved quantities, rotates vectors correctly,
-  and `-refine` lifts the "no refinement zones on a profile stage" restriction.
-  **The guide warns the mapping is not conservative** — validate against the
-  baselines, do not swap blindly. *Large.*
-- `P3-21` Expose `activation programmedIgnition` and `initiation delays` in the GUI.
-  *Medium.*
-- `P3-22` **`reconstructParAll`** for the parallel AMR path — the entire
-  post-processing path would work directly instead of through the special Python
-  ingest. The existing workaround works and is cheaper, so this is an opportunity,
-  not a bug. *Medium.*
-- `P3-23` **`DoanNickel` EOS for air** — accounts for dissociation at high shock
-  temperatures, where constant γ overestimates pressure. Directly relevant to the KB
-  anchor at small Z, and a one-word change. *Small, research value.*
-- `P3-24` **Schlieren / shadowgraph** fields for animations — the standard
-  visualisation for shock waves, one extra field per time directory. *Small.*
-
-**Performance**
-
-- `P3-6` Read `processor*/` directly for uniform MPI runs too (skip reconstructPar) —
-  only if the ~3 s per write is annoying. The mechanism already exists for AMR.
-- `P3-7`, `P3-8`, `P3-25` ✅ closed 2026-09-27 (batch `viewer-polish`) — [DONE.md](DONE.md) §0e.
-
-**Cosmetic** *(anything touching solver stdout needs a re-baseline)*
-
-- `P3-9` The x-axis label on an axisymmetric animation: `x [m]` → `r [m]`.
-- `P3-10` A chained run prints "0 kg TNT" in the 3D initialisation line.
-- `P3-11` The semantics of `n_snapshots` differ between 1D and 2D/3D.
-
-**Architecture** *(owner decision 2026-09-26, during `OUT-1`)*
-
-- `P3-26` **A command-line layer outside `solvers/`.** `solvers/foam/cli_run.py` and the
-  prompt flows in `cli.py` are command-line code that lives in the solver layer, so
-  `test_layering` (solvers must not import services) forces the model folder to reach
-  them through a registration hook (`jobs.register_stage_folder`, `OUT-1` Steps 3 and 8).
-  The owner chose the hook for now and **the proper fix as a task**: move the
-  command-line flows into a `cli/` (or `output/`) layer that may import `services/`,
-  delete the hook, and leave `test_layering` untouched. Do it after the `OUT` track;
-  byte-identity of `test_regression.py` and the `legacy/` pins are the gates.
+*Moved to [docs/backlog/p3-on-request.md](docs/backlog/p3-on-request.md) on 2026-10-13 (owner); ids unchanged.* `P3-7`, `P3-8`, `P3-25` are closed (DONE.md §0e).
 
 ---
 
 ## P4 — Environment, disk, personal
 
-### P4-1 · The repository sits inside OneDrive
-
-`git worktree remove` failed once with "Permission denied" — a sync lock on `.git`.
-Consider excluding `.git` from syncing, or moving the repository out of OneDrive.
-
-### P4-2 · Disk cleanup — low urgency
-
-Candidates, all of them calm decisions rather than pressure: a 13.4 GB zip that
-duplicates an unpacked folder beside it; `C:\OneDriveTemp` (~6 GB of upload
-temporaries, recreated if deleted); a ~45 GB reference-model duplication; and the
-large win without deleting anything — **Files On-Demand ("Free up space")** on the
-biggest archive folders. `hiberfil.sys` is 3.1 GB and `powercfg /h off` removes it
-if Hibernate is unused.
-
-> **Never touch `~\Desktop`** — about 930 GB of thesis data.
-
-### P4-3 · WSL run cleanup, and the trap inside it
-
-`python -m blastlab --clean-foam-runs` (also `--older-than N` / `--keep-gb N`).
-Automatic cleanup on GUI start runs only with `auto_cleanup: true` in
-`<repo>\settings.json` (P0-5: the file lives in the checkout, git-ignored; every
-checkout and worktree has its own). To see what it *would* delete, run the dry run
-`env.cleanup_plan` (CLAUDE.md §8.2), never `env.auto_cleanup`, which deletes. In the
-OneDrive checkout a sync lock can fail the atomic write in `settings.save()` (the
-`P4-1` symptom): it warns once, and the lost `hw_*` cache caps the next headless run
-as a 4 GB VM (CLAUDE.md §4).
-
-**The `ext4.vhdx` does not shrink by itself.** Reclaim with `wsl --shutdown` then
-`wsl --manage Ubuntu --set-sparse true`.
-
-> The corpus once reached **374 GB and filled C:**. Cleanup is **off by default** since
-> 2026-09-27 (owner: deletion inside WSL is final, a full disk is recoverable); it runs
-> only when the settings file says `auto_cleanup: true`. With it off, the GUI warns at
-> start when the runs root passes `cleanup_max_gb` (150 GB here) and deletes nothing.
+*Moved to [docs/backlog/p4-environment.md](docs/backlog/p4-environment.md) on 2026-10-13 (owner); ids unchanged.*
 
 ---
 
