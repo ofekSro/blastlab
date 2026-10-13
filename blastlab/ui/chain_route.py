@@ -31,7 +31,7 @@ from ..core import mode as mode_mod
 from ..services import chain as chain_svc
 from ..services import model_folder
 from ..services.validation import validate_case
-from . import setup_nodes
+from . import scaled_distance, setup_nodes
 
 #: (key, label, dims) in board order (Chain.dc.html, `ROUTES`)
 ROUTES = (('123', '1D → 2D → 3D', (1, 2, 3)),
@@ -489,6 +489,14 @@ def out_text(case, nxt):
                     f'({_n1(case.radius_m)} m). {then}')
         return f'The profile at the end of the run. {then}'
     tg = getattr(case, 'trigger_gauge', None)
+    if tg is not None and scaled_distance.drop_state(case)[1] is not None:
+        # GUI-16 (a), D21: a dropped trigger never fires - the stage runs on
+        ends = setup_nodes.terminate_sides(case)
+        lead = (f'The field when the wave reaches {" or ".join(ends)}, or '
+                f'at the end of the run' if ends else
+                'The field at the end of the run')
+        return (f'{lead} (trigger G{tg} is dropped, so it never fires). '
+                f'{then}')
     if tg is not None:
         action = getattr(case, 'trigger_action', 'terminate')
         return (f'The field when the wave reaches G{tg} (trigger gauge, '

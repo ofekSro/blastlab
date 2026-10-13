@@ -417,7 +417,7 @@ def t3_trigger():
                   and not combo.isHidden()
                   and new.v['trigger_gauge'].get() == '1'
                   and combo.currentData() == '1'
-                  and combo.currentText().startswith('G1 · '),
+                  and combo.currentText().startswith('G1 ('),
                   combo.currentText())
             i = combo.findData('2')
             combo.setCurrentIndex(i)
@@ -426,8 +426,9 @@ def t3_trigger():
             ok, why = same_case(new.get_case(), old.get_case())
             check(f'{tag}: picking G2 builds the Case typing 2 builds',
                   ok and new.get_case().trigger_gauge == 2, why)
-            want = ('G2 · r 2.95, z 1.50' if d == 2
-                    else 'G2 · 1.20, 0.75, 0.75')
+            # C6 (D18): `G2 (2.95, 1.50)`, the axis names in the tooltip
+            want = ('G2 (2.95, 1.50)' if d == 2
+                    else 'G2 (1.20, 0.75, 0.75)')
             check(f'{tag}: the entry reads {want!r}',
                   combo.currentText() == want, combo.currentText())
             sw.click()
@@ -547,7 +548,7 @@ def t3_trigger():
                 check(f'{tag}: the dropdown shows the same coordinates',
                       f.trigger_combo.currentData() == '2'
                       and f.trigger_combo.currentText().endswith(
-                          f'{g3[-1]:.2f}')
+                          f'{g3[-1]:.2f})')
                       and f'{g3[0]:.2f}' in f.trigger_combo.currentText(),
                       f.trigger_combo.currentText())
             remove_row(f, 2)            # old G4, after the trigger

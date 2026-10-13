@@ -290,15 +290,24 @@ def dropped_numbers(case):
     - `is_dropped`, the rule built once. 1D: the radii beyond the domain
     (GUI-15 (f)). [] for 0D (no gauges) and for a case that cannot say.
     GUI-15 (e): the Gauges node's caption and warn child rows."""
+    return drop_state(case)[0]
+
+
+def drop_state(case):
+    """(dropped numbers, disabled trigger) with the rule built once.
+    The trigger is `services.validation.trigger_disabled`'s number - the
+    entered trigger gauge when the solver drops that gauge, so the
+    trigger never fires - else None (GUI-16 (a), C1)."""
     if getattr(case, 'dim', None) not in (1, 2, 3):
-        return []
-    from ..services.validation import drop_rule
+        return [], None
+    from ..services.validation import drop_rule, trigger_disabled
     dropped = drop_rule(case)
     try:
-        return [k for k, p in enumerate(gauge_points(case), start=1)
+        gone = [k for k, p in enumerate(gauge_points(case), start=1)
                 if is_dropped(case, p, dropped)]
+        return gone, trigger_disabled(case, dropped)
     except (AttributeError, TypeError, ValueError):
-        return []
+        return [], None
 
 
 def any_dropped(case):

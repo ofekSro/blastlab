@@ -604,11 +604,14 @@ class SetupPanel(QWidget):
                 self._fill_gauges(case)
         # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped
         # (the rule, not the warning text); GUI-15 (e): so is its child row
-        gone = (scaled_distance.dropped_numbers(case)
-                if case is not None and getattr(case, 'dim', None) == self._dim
-                else [])
+        gone, off = (scaled_distance.drop_state(case)
+                     if case is not None
+                     and getattr(case, 'dim', None) == self._dim
+                     else ([], None))
         self._sync_children(gone)
-        # the trigger dropdown offers the gauges as they are now
+        # the trigger dropdown offers the gauges as they are now, a dropped
+        # one marked (GUI-16 (a))
+        f.set_drops(gone, off is not None)
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self._dim, n) for n in f.bad}
         drop = bool(gone)

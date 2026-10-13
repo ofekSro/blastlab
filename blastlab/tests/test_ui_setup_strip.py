@@ -745,6 +745,24 @@ def s3_dock():
           'rows clear',
           'dropped' not in sp.tree.summary('gauges') and kids == [False] * 2,
           f'{sp.tree.summary("gauges")!r} {kids}')
+    # GUI-16 (a), C1: the trigger on the dropped G2 never fires - the
+    # caption, the dropdown and the remap note all say so
+    load(sp, dataclasses.replace(ew, trigger_gauge=2))
+    cap = sp.tree.summary('gauges')
+    combo = sp.form.trigger_combo
+    texts = [combo.itemText(i) for i in range(combo.count())]
+    check('GUI-16 (a): the caption names G2 dropped and the trigger G2 '
+          '(disabled); the dropdown\'s G2 ends (dropped); no remap note',
+          cap.endswith('G2 dropped · trigger G2 (disabled)')
+          and texts[1].startswith('G2') and texts[1].endswith('(dropped)')
+          and not texts[0].endswith('(dropped)')
+          and not sp.form._trig['remap'].isVisibleTo(sp.form),
+          f'{cap!r} {texts}')
+    load(sp, dataclasses.replace(ew, trigger_gauge=1))
+    cap = sp.tree.summary('gauges')
+    check('GUI-16 (a): a trigger on the kept G1 reads plain, remap shown',
+          cap.endswith('G2 dropped · trigger G1')
+          and sp.form._trig['remap'].isVisibleTo(sp.form), cap)
     # GUI-15 (f), D9: a 1D gauge beyond the radius is dropped by both
     # solvers - the Gauges node is warn and its caption names it
     load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0, 1.2]))

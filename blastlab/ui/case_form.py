@@ -61,6 +61,8 @@ class CaseForm(FieldForm):
                  parent=None, placement='columns'):
         self._mode = mode_mod.normalize(mode)
         self._trig = None            # the trigger switch widgets ('nodes')
+        self._gone = ()              # dropped gauge numbers (C1, set_drops)
+        self._trig_off = False       # the trigger gauge is dropped
         self._fed = False            # a Chain stage fed by the one before
         self._loaded_amr = {}        # set_case's AMR values (F16, D223)
         self.t_end_ms = None         # the `= 12.0 ms` line (D221)
@@ -404,12 +406,33 @@ class CaseForm(FieldForm):
                 self._trig['last'] = last
             self.refresh_trigger_choices()
 
-    def _gauge_label(self, i, g):
+    def _axes(self):
+        """The axis names of a gauge row, for the dropdown's tooltips."""
         if self.dim == 3:
-            return f'G{i} · {g[0]:.2f}, {g[1]:.2f}, {g[2]:.2f}'
-        r, z = (('r', 'z') if self.v['geometry'].get() == 'axisymmetric'
+            return ('x', 'y', 'z')
+        return (('r', 'z') if self.v['geometry'].get() == 'axisymmetric'
                 else ('x', 'y'))
-        return f'G{i} · {r} {g[0]:.2f}, {z} {g[1]:.2f}'
+
+    def _gauge_label(self, i, g):
+        """`G3 (0.60, 0.50)`, a dropped one `G2 (1.40, 0.30) (dropped)`
+        (D18): short enough to show whole in the closed box; the axis
+        names are in the entry's tooltip."""
+        nums = ', '.join(f'{v:.2f}' for v in g[:len(self._axes())])
+        return (f'G{i} ({nums})'
+                + (' (dropped)' if i in self._gone else ''))
+
+    def set_drops(self, gone, trigger_off=False):
+        """GUI-16 (a): the numbers of the gauges the solver drops, and
+        whether the trigger gauge is one of them. The dropdown marks them
+        `(dropped)` in warn and the remap note hides while the trigger is
+        disabled (it never fires, so nothing is written). Setup and the
+        Chain stage hand them in after each validation."""
+        gone, off = tuple(gone or ()), bool(trigger_off)
+        if (gone, off) == (self._gone, self._trig_off):
+            return
+        self._gone, self._trig_off = gone, off
+        self.refresh_trigger_choices()
+        self._sync_trigger_widgets()
 
     def refresh_trigger_choices(self):
         """Rebuild the dropdown from the gauge list and select the entry
@@ -442,6 +465,22 @@ class CaseForm(FieldForm):
                 for text_, data in items:
                     combo.addItem(text_, data)
             combo.setCurrentIndex(cur)
+            axes = self._axes()
+            warn = theme.qcolor('warn')
+            for k, g in enumerate(rows):
+                # item k of the list (a leading `(choose a gauge)` shifts it)
+                idx = combo.findData(str(k + 1))
+                if idx < 0:
+                    continue
+                named = ', '.join(f'{a} {v:.2f}'
+                                  for a, v in zip(axes, g)) + ' m'
+                combo.setItemData(
+                    idx, f'G{k + 1}: {named}'
+                    + (' - dropped by the solver' if k + 1 in self._gone
+                       else ''), Qt.ToolTipRole)
+                combo.setItemData(
+                    idx, warn if k + 1 in self._gone else None,
+                    Qt.ForegroundRole)
         finally:
             combo.blockSignals(False)
         self._paint_trigger_combo()
@@ -454,7 +493,8 @@ class CaseForm(FieldForm):
             return
         on = t['on']
         t['pick'].setVisible(on)
-        t['remap'].setVisible(on and self.dim == 2)
+        # a disabled trigger writes nothing: no remap note (GUI-16 (a))
+        t['remap'].setVisible(on and self.dim == 2 and not self._trig_off)
         t['off'].setVisible(not on)
         axisym = (self.dim == 2
                   and self.v['geometry'].get() == 'axisymmetric')
@@ -483,8 +523,13 @@ class CaseForm(FieldForm):
         combo = self._trig['combo']
         want = ('true' if 'trigger_gauge' in self._bad
                 or self.trigger_pending() else 'false')
-        if combo.property('bad') != want:
+        # the closed box shows a dropped gauge in warn (not while it is red)
+        shown = combo.currentData()
+        warn = ('true' if shown and _is_int(shown)
+                and int(shown) in self._gone else 'false')
+        if combo.property('bad') != want or combo.property('warn') != warn:
             combo.setProperty('bad', want)
+            combo.setProperty('warn', warn)
             theme.repolish(combo)
 
     def mark_fields(self, names):

@@ -361,6 +361,26 @@ def s3_cards(win):
           ch.editors[2].hand_out.caption.text().startswith(
               'The field when the wave reaches G1 (trigger gauge, remap)'),
           ascii(ch.editors[2].hand_out.caption.text()))
+    # GUI-16 (a), C1 (D21): the trigger on a gauge outside the domain never
+    # fires - HAND-OFF OUT names the end of the run, the stage's drop caption
+    # and dropdown say so
+    f2.points['gauges'].set([(1.5, 1.0), (500.0, 500.0)])
+    f2.v['trigger_gauge'].set('2')
+    pump(450)
+    out2 = ch.editors[2].hand_out.caption.text()
+    cap2 = ch.editors[2].tree.summary('gauges')
+    cmb = f2.trigger_combo
+    check('GUI-16 (a): a dropped trigger G2: HAND-OFF OUT names the end of '
+          'the run, not "reaches G2"; caption and dropdown mark it',
+          'reaches G2' not in out2 and 'end of the run' in out2
+          and 'G2 is dropped' in out2
+          and cap2.endswith('trigger G2 (disabled)')
+          and cmb.itemText(cmb.count() - 1).endswith('(dropped)'),
+          f'{out2!r} {cap2!r}')
+    f2.v['trigger_gauge'].set('1')
+    f2.v['trigger_action'].set('remap')
+    f2.points['gauges'].set([(1.5, 1.0)])
+    pump(450)
     check('the 2D in-text names the 2D form\'s burst height',
           # GUI-13 (b): by its form label, Burst z
           'Burst z, 2.0 m' in ch.editors[2].hand_in.caption.text(),
