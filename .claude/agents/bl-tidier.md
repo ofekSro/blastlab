@@ -27,7 +27,8 @@ The orchestrator runs the tests; you do not.
   `foam_golden/` enforce it. **No change may reorder floating-point
   arithmetic**: no vectorising a loop, no regrouping `a*b*c`, no hoisting
   that changes evaluation order, no `sum()` for a loop of `+=`. Comments,
-  docstrings, names of locals, dead code, guard clauses only.
+  docstrings, names of locals, dead code, guard clauses only. Read
+  `docs/physics-notes.md` once before proposing in this tier.
 - **B plumbing** (`core/` settings etc., `solvers/` hooks/jobs/worker,
   `foam/` env/runner/runloop/backend, `output/`, `services/`, `models/`,
   `legacy/`): behaviour, log text, file names and on-disk formats unchanged.

@@ -31,7 +31,9 @@ through a plan.
 
 ## Procedure
 
-1. Read the plan (your part only, plus its rules). Read only the code it names.
+1. Read the plan (your part only, plus its rules). Read only the code it names. Read
+   `docs/physics-notes.md` before touching `solvers/`, `core/` or `output/` numbers, and
+   `docs/traps.md` §8.7 before window-geometry or viewer work (§8.3 if a WSL solve dies).
 2. `gate.py --for <the plan's files>` once, to know the starting state.
 3. Per task: restate the criteria → protective test if numbers are involved → implement
    → `gate.py --changed HEAD` (**only the suites for the touched files**) → fix (max three

@@ -22,6 +22,8 @@ once. The only file you write is
   asked about, then Grep for ids. Read `DONE.md` only for the entries the tasks cite.
 - Locate code with Grep / Glob; Read only the functions involved.
 - Do not restate rules that live in `CLAUDE.md` or `docs/agent-rules.md`; cite them.
+- Read on demand only: `docs/physics-notes.md` when a task touches a solver, a number or
+  a unit; `docs/traps.md` when a task touches WSL, window geometry or the run corpus.
 - **The plan is at most 300 lines.** Final message ≤ 30 lines.
 
 ## Choosing the batch
