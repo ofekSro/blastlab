@@ -1468,7 +1468,7 @@ def test_e_keep_all_keeps_the_scratch():
         m, notice, _r, delete, _f, lines = release(tmp, keep_all=True)
         assert delete.calls == [] and m['wsl_scratch']['deleted'] is False
         assert m['wsl_scratch']['kept_because'] == mf.KEEP_ALL_WHY
-        assert mf.KEEP_ALL_WHY in notice, notice
+        assert notice is None
         assert any('[note] WSL scratch kept' in ln for ln in lines), lines
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
