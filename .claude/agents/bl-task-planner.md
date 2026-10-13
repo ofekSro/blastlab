@@ -1,7 +1,7 @@
 ---
 name: bl-task-planner
 description: |
-  Read-only planner for blastlab. Reads TODO.md (and DONE.md only as needed), locates each task in the code, and writes the next batch plan with checkable acceptance criteria and a risk level that decides which model implements and how deep the verification goes. Never edits code, TODO.md or DONE.md. Launched by /bl-todo.
+  Read-only planner for blastlab. Reads TODO.md (and DONE.md only as needed), locates each task in the code, and writes the next batch plan with checkable acceptance criteria and a risk level that decides which model implements and how deep the verification goes. Never edits code, TODO.md or DONE.md. Launched by /bl-todo, which overrides to Sonnet when every task is already located and decided.
 
   <example>
   user: "What should I work on next from the TODO list?"

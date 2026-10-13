@@ -1,6 +1,6 @@
 ---
 name: bl-todo
-description: Works through blastlab's TODO.md in batches, sized to save tokens. Plans the next batch (bl-task-planner, Opus), implements it (bl-task-implementer, Sonnet - Opus when the plan is risk high), verifies at the depth the risk calls for (bl-task-verifier light or full), then moves finished tasks to DONE.md. GUI QA and UX review run only when the plan marks the end of a track, or on request. Use as /bl-todo to plan and confirm once, /bl-todo go to run without confirmation, /bl-todo plan to plan only, /bl-todo batch <path> to run or resume an existing plan.
+description: Works through blastlab's TODO.md in batches, sized to save tokens. Plans the next batch (bl-task-planner, Sonnet when the rows are located and decided, else Opus), implements it (bl-task-implementer, Sonnet - Opus when the plan is risk high), verifies at the depth the risk calls for (bl-task-verifier light or full), then moves finished tasks to DONE.md. GUI QA and UX review run only when the plan marks the end of a track, or on request. Use as /bl-todo to plan and confirm once, /bl-todo go to run without confirmation, /bl-todo plan to plan only, /bl-todo batch <path> to run or resume an existing plan.
 ---
 
 You orchestrate one batch end to end. Subagents cannot launch each other, so you
@@ -34,7 +34,17 @@ paste the standing rules - they live in `docs/agent-rules.md`.
 
 ## Stage 1: plan
 
-Launch **bl-task-planner** (Opus). Show the owner, in Hebrew and phone-short: batch name,
+**Pick the planner's model first** (owner 2026-10-13), from the TODO rows of the track to
+be planned - the RESUME note names it; Grep its ids, do not Read `TODO.md` whole:
+- `model: "sonnet"` when **every** row already names its files (or `file:line`) and
+  carries the owner's decision, and none touches `solvers/`, `core/`, `services/`,
+  `output/`, `models/`, a golden, a number or a unit (that would be `risk: high`).
+- `model: "opus"` (the agent's default) when any row has no code location, the batch
+  will be `risk: high`, or a row changes a default, a seed or anything a golden pins
+  (feasibility probes, docs/agent-rules.md "Do it once"). Unsure → Opus.
+Say which and why in one line to the owner.
+
+Launch **bl-task-planner** on that model. Show the owner, in Hebrew and phone-short: batch name,
 risk, track-end, tasks with sizes, and every "needs clarification" item **with its
 recommendation**. Without `go` / `next`, wait for the owner.
 
