@@ -245,8 +245,22 @@ def main():
         del win.ctrl.stop
         del win.ctrl.shutdown
         patched('proceed')
+        print('\nC5: Close shuts every 3D host down, the Setup preview too')
+        downs = []
+        hosts = {'run': win.view3d, 'results': win.results,
+                 'setup': win.setup.view3d}
+        for key, host in hosts.items():
+            if host is not None:
+                real = host.shutdown
+                host.shutdown = (lambda key=key, real=real:
+                                 (downs.append(key), real()))
         win.close()
         pump(50)
+        # G14Q: the Setup preview's host was left out, and its card still
+        # held the render window at teardown (_e2e_ui_viewer_noise.py)
+        check('run, results and setup hosts were shut down',
+              sorted(downs) == sorted(k for k, h in hosts.items()
+                                      if h is not None), str(downs))
     finally:
         dialogs.ask_discard = hook
     print('\nUI CLOSE GUARD: '

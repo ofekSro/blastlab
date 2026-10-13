@@ -1636,8 +1636,13 @@ class MainWindow(QMainWindow):
         dialogs.clear_tray()
         self.ctrl.shutdown()
         # release the embedded window first, then stop the child: the
-        # reverse order leaves Qt holding a dangling HWND
-        for panel in (self.view3d, self.results):
+        # reverse order leaves Qt holding a dangling HWND. The Setup
+        # preview's host too (G14Q): left out, its card still held the
+        # render window at teardown, and every QA run logged two
+        # `External WM_DESTROY` for its stack (_e2e_ui_viewer_noise.py)
+        for panel in (self.view3d, self.results, self.setup.view3d):
+            if panel is None:           # no pyvista: no Setup 3D host
+                continue
             try:
                 panel.shutdown()
             except Exception:
