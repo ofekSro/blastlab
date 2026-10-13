@@ -1066,6 +1066,48 @@ def s5g_dropped(link):
     check("GUI-15 (c): on screen the drop line is Run's text",
           g.drop_caption.text() == run_text,
           f'{g.drop_caption.text()!r} {run_text!r}')
+    # GUI-16 (c): the Run browser's Load stamps the same reason from the
+    # loaded run's own case.json; a run with no case file gets none
+    from blastlab.models.case import save_case
+    from blastlab.solvers.foam import postmortem as pm
+
+    def load_through_panel(res, name):
+        real_load = pm.load_run
+        pm.load_run = lambda path: res
+        n0 = len(p.entries())
+        try:
+            p.load_foam_run_path('/root/blastlab_runs/' + name)
+            for _ in range(200):
+                pump(10)
+                if len(p.entries()) > n0:
+                    break
+        finally:
+            pm.load_run = real_load
+        return p.entries()[-1].result if len(p.entries()) > n0 else None
+    cdir = tempfile.mkdtemp(prefix='blastlab_gui16c_')
+    try:
+        save_case(ran, os.path.join(cdir, 'case.json'))
+        withcase = sample_dropped()
+        withcase.meta.update(gauges=list(ran.gauges), charge=500.0,
+                             obstacles=[(1.25, 1.6, 0.0, 1.0)],
+                             case_dir=cdir)
+        got = load_through_panel(withcase, 'with_case')
+        check('GUI-16 (c): a loaded run with its case file carries the '
+              "stamp, and Results' drop line is Run's text",
+              got is not None and got.meta.get('gauges_dropped')
+              == RUN.drops(ran)
+              and g.drop_caption.text() == run_text,
+              f'{got and got.meta.get("gauges_dropped")} '
+              f'{g.drop_caption.text()!r}')
+        nocase = sample_dropped()
+        nocase.meta.update(gauges=list(ran.gauges), charge=500.0,
+                           obstacles=[(1.25, 1.6, 0.0, 1.0)])
+        got = load_through_panel(nocase, 'no_case')
+        check('GUI-16 (c): a loaded run without a case file gets no stamp '
+              'and nothing raises',
+              got is not None and 'gauges_dropped' not in got.meta)
+    finally:
+        shutil.rmtree(cdir, ignore_errors=True)
     # GUI-15 (f), D9: a 1D meta keeps no entered list, so a gauge beyond
     # the radius left the series numbered G1, G2. With RunController's
     # stamp the series are the entered numbers not dropped, and the drop

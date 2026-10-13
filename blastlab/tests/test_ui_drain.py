@@ -248,6 +248,34 @@ def main():
           and 'Wall 1' in why[0][1], str(got and got.meta.get(
               'gauges_dropped')))
 
+    print("\nT5b2: GUI-16 (c) - a RESUMED stage's result carries the stamp too")
+    from blastlab.ui import run_controller as rc
+    real_resume = rc.resume_stage
+    rc.resume_stage = lambda dim, path, *a, **k: rc.solve_stage(dim, ew)
+    try:
+        h = _Handlers()
+        c = RunController(handlers=h)
+        check("resume_foam_run with the run's case starts",
+              c.resume_foam_run('/root/blastlab_runs/x', 2, case=ew) is True)
+        end = time.time() + 300
+        while c.running and time.time() < end:
+            pump(100)
+        got = h.results[0][3] if h.results else None
+        check("the resumed Result's meta['gauges_dropped'] is [[2, reason]]",
+              got is not None and got.meta.get('gauges_dropped') == why,
+              str(got and got.meta.get('gauges_dropped')))
+        h = _Handlers()
+        c = RunController(handlers=h)
+        c.resume_foam_run('/root/blastlab_runs/x', 2)
+        end = time.time() + 300
+        while c.running and time.time() < end:
+            pump(100)
+        got = h.results[0][3] if h.results else None
+        check("a resume with no case has no stamp, as before",
+              got is not None and 'gauges_dropped' not in got.meta)
+    finally:
+        rc.resume_stage = real_resume
+
     print("\nT5c: GUI-15 (f) - a 1D gauge beyond the radius, through Run")
     from blastlab.core.case import Case1D
     from blastlab.ui import results_gauges

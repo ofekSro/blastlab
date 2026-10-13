@@ -161,7 +161,10 @@ class RunController(QObject):
         else:
             stage = resume_stage(dim, path, case, stage_dir=model.folder,
                                  run_info=model_folder.run_info(model, case))
-        return self._launch([stage], [dim], run_name=run_name, model=model)
+        # GUI-16 (c): the resumed Result carries the drop stamp too
+        drops = [run_gauges.drops(case)] if case is not None else None
+        return self._launch([stage], [dim], run_name=run_name, model=model,
+                            drops=drops)
 
     def _launch(self, stages, dims, paused=False, run_name='', model=None,
                 drops=None):

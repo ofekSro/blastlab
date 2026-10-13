@@ -24,6 +24,7 @@ writing in `exports`, so each is testable without building a window.
 
 import os
 import threading
+from types import SimpleNamespace
 
 from PySide6.QtCore import QEvent, QSize, Qt, Signal
 from PySide6.QtWidgets import (QApplication, QBoxLayout, QDialog, QFrame,
@@ -1134,6 +1135,24 @@ class ResultsPanel(QWidget):
         self._run_browser.show()
         return self._run_browser
 
+    @staticmethod
+    def _stamp_drops(res):
+        """GUI-16 (c): the drop stamp Run puts on a Result
+        (`meta['gauges_dropped']`, `run_gauges.drops`) for a loaded run
+        that has its case file, so Results words the drop as Run did. No
+        case file, or one that does not read, gives no stamp."""
+        path = case_source(SimpleNamespace(result=res))
+        if not path:
+            return
+        try:
+            from ..core.case import load_case
+            from .run_gauges import drops
+            drop = drops(load_case(path))
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            return
+        if drop and res.meta is not None:
+            res.meta['gauges_dropped'] = drop
+
     def load_foam_run_path(self, path):
         """Post-mortem load of one run dir (UNC / posix / bare name) off
         the GUI thread, then add it to the results list."""
@@ -1156,6 +1175,7 @@ class ResultsPanel(QWidget):
             name = (str(res.meta.get('name') or '').strip()
                     or os.path.basename(str(path).rstrip('/' + os.sep)))
             res.meta.setdefault('name', name)
+            self._stamp_drops(res)
             text = f'{name} (loaded, {dim}D)'
             # widgets only on the GUI thread
             self._bridge.post(self.add_result, text, dim, res)
