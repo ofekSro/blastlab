@@ -132,8 +132,9 @@ fixed); the `.gif` / `.mp4` choice stays as **Animation format**.
   blastFoam only; case key `keep_all_fields`) turns that off for one run:
   no written time is deleted - not by this, not by the VTK export - and
   the WSL scratch is kept after a finished run too, with "Keep all fields
-  in WSL was ticked" as the reason in `manifest.json` and the folder
-  notice (otherwise the release at the end would keep nothing). The
+  in WSL was ticked" as the reason in `manifest.json` and a `[note]` log
+  line, with no dialog, since the user asked for it (GUI-16 R2); otherwise
+  the release at the end would keep nothing. The
   validation strip gives the disk estimate.
 - **A run that never ends** (the window closed mid-run) still leaves
   `MODEL.json` and a `manifest.json` whose `stop_reason` begins
