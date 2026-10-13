@@ -120,6 +120,31 @@ def main():
           f'{app.solver} {app._solver_seg.get()}')
     check('the explainer is filled in', bool(app._solver_hint.cget('text')))
 
+    print('\nSegmented switches are legible in both modes (P2-24)')
+
+    def lum(h):
+        c = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        c = [v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+             for v in c]
+        return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+    def ratio(a, b):
+        hi, lo = sorted((lum(a), lum(b)), reverse=True)
+        return (hi + 0.05) / (lo + 0.05)
+
+    for label, seg in (('solver switch', app._solver_seg),
+                       ('dimension switch', app.setup._dim_seg)):
+        for i, mode_name in enumerate(('light', 'dark')):
+            txt = seg.cget('text_color')[i]
+            un = seg.cget('unselected_color')[i]
+            r_un = ratio(txt, un)
+            check(f'{label}, {mode_name}: unselected text >= 4.5:1',
+                  r_un >= 4.5, f'{r_un:.2f}')
+            if mode_name == 'light':
+                r_sel = ratio(txt, seg.cget('selected_color')[i])
+                check(f'{label}, light: selected text >= 4.5:1',
+                      r_sel >= 4.5, f'{r_sel:.2f}')
+
     print('\nSetup forms: inventory per mode')
     for m in ('blastfoam', 'native'):
         app.set_solver(m)
