@@ -35,6 +35,7 @@ Run:
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -3194,7 +3195,9 @@ def f08_stop_during_solve(qa):
     qa.check(not qa.log_has('did not stop cleanly'),
              'and it was graceful', 'S2')
     labels = [e.label for e in qa.win.results.entries()]
-    qa.check(labels and labels[-1].endswith('(stopped)'),
+    # GUI-16 round 2 (A6, F-5): the app dedupes a repeated label with
+    # ` #2`, which is correct
+    qa.check(labels and re.search(r'\(stopped\)( #\d+)?$', labels[-1]),
              'the stopped foam run is labelled "(stopped)"', 'S2',
              evidence=str(labels))
     qa.shot('stopped')
