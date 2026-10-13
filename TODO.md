@@ -54,7 +54,7 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
 | `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC): HD13 char drift, carried from GUI-13 (i). The full row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 14 |
 | `GUI-15` | ✅ 2026-10-12 (a)-(h), DONE.md §0y; the closed row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 15 |
-| `GUI-16` | **Left by GUI-15** (2026-10-12; `docs/qa/2026-10-11-gui-15-ux.md` U1-U6, `docs/qa/2026-10-11-gui-15-qa/QA_REPORT.md`, `…-gui-15-backlog-B.verify.md` open items 1-2) — (a) trigger on a dropped gauge: Checks says `Trigger disabled`, but the Checks note ("the run ends when the wave reaches gauge 2" / the remap-file note), the Gauges caption `trigger G2`, the trigger dropdown and the chain HAND-OFF OUT card still show it active; in a chain the hand-off then happens at the stage's normal stop (UX U1, verifier 1); (b) 1D exports (PNG, HTML report, summary) label by kept index (`Gauge 2` for the entered G3) and do not mention the drop — a `numbers=` argument, byte-identical when nothing is dropped (U2); (c) Resume and Run-browser Load: `resume_foam_run` passes no `drops`, `load_foam_run_path` adds no `gauges_dropped` stamp, so Results says `inside Wall 1` on blastFoam and a reloaded 1D run renumbers (U3); (d) blastFoam 3D: a dropped gauge sharing its x with a kept one — the drop line vanishes at the first payload and G3 is relabelled G2; fall back to the drop rule (U4, new from GUI-15 a); (e) every gauge dropped: Run says "This case has no gauges…" and hides the drop line, Results "This result has no gauges" (U5); (f) field-plot markers: native live omits a dropped gauge, blastFoam live draws it plain, the exported animation draws it inside the wall (U6); (g) 3D Detach is undone at once on the native path: `view3d_host.on_window` (`:664-673`) re-embeds while `_floating`; `_e2e_ui_view3d.py` G3 fails, then `AttributeError` at `:131` — fix, update G3, re-measure with the Win32 probe (verifier B item 2, GUI-15 B6). Low items parked in both reports (UX L1-L5; QA: caption cut off at 1100 and 1600 px, `100 %` after a stop, harness `--out` inside OneDrive → `WinError 5`) | M | 16 |
+| `GUI-16` | **Left by GUI-15** (2026-10-12; `docs/qa/2026-10-11-gui-15-ux.md` U1-U6, `docs/qa/2026-10-11-gui-15-qa/QA_REPORT.md`, `…-gui-15-backlog-B.verify.md` open items 1-2) — (a) trigger on a dropped gauge: Checks says `Trigger disabled`, but the Checks note ("the run ends when the wave reaches gauge 2" / the remap-file note), the Gauges caption `trigger G2`, the trigger dropdown and the chain HAND-OFF OUT card still show it active; in a chain the hand-off then happens at the stage's normal stop (UX U1, verifier 1); (b) 1D exports (PNG, HTML report, summary) label by kept index (`Gauge 2` for the entered G3) and do not mention the drop — a `numbers=` argument, byte-identical when nothing is dropped (U2); (c) Resume and Run-browser Load: `resume_foam_run` passes no `drops`, `load_foam_run_path` adds no `gauges_dropped` stamp, so Results says `inside Wall 1` on blastFoam and a reloaded 1D run renumbers (U3); (d) blastFoam 3D: a dropped gauge sharing its x with a kept one — the drop line vanishes at the first payload and G3 is relabelled G2; fall back to the drop rule (U4, new from GUI-15 a); (e) every gauge dropped: Run says "This case has no gauges…" and hides the drop line, Results "This result has no gauges" (U5); (f) field-plot markers: native live omits a dropped gauge, blastFoam live draws it plain, the exported animation draws it inside the wall (U6); (g) 3D Detach is undone at once on the native path: `view3d_host.on_window` (`:664-673`) re-embeds while `_floating`; `_e2e_ui_view3d.py` G3 fails, then `AttributeError` at `:131` — fix, update G3, re-measure with the Win32 probe (verifier B item 2, GUI-15 B6). Low items parked in both reports (UX L1-L5; QA: caption cut off at 1100 and 1600 px, `100 %` after a stop, harness `--out` inside OneDrive → `WinError 5`). **Progress:** parts A-F verified (branch `final-gui`); clean loop round 1 (2026-10-13, `docs/batches/2026-10-13-gui-final-round1*.md`) fixed R1 (chain Stop ends `stopped`) and R2 (no dialog for Keep all), both verified; round 2 takes QA F-1..F-5 and UX U1-U6 of `docs/qa/2026-10-13-gui-final-round1/`. Close (DONE.md, merge into `master`) once a round comes back clean | M | 16 |
 
 ---
 
@@ -69,6 +69,33 @@ fixed and approved — the disk.
 | Id | What | Order |
 |---|---|---|
 | `OUT-1..5` | ✅ all done 2026-09-26 … 09-28 (DONE.md §0c-§0k); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – |
+
+---
+
+## VV · Application validation report (owner, 2026-10-13)
+
+**The whole specification is [docs/vv-plan.md](docs/vv-plan.md).** This entry only
+orders it; every rule, target and acceptance criterion lives there. blastFoam backend
+only; the native NumPy solvers are out of scope. Never invent reference data: a case
+without a cited source file stays `pending`. Placed below GUI, above HD1 (owner
+2026-10-13, batch gui-final-round1 Q2).
+
+Runs are launched by `docs/vv/run_all.py` as a detached process, one at a time
+(RAM). Agents write the scripts and read `docs/vv/results/*.json`; they do not wait
+on a solve or tail its log.
+
+| Id | What | Size | Risk | Order |
+|---|---|---|---|---|
+| `VV-0` | Pin versions (blastFoam commit, OpenFOAM, blastlab); `docs/vv/` tree; `run_all.py` with a run cache and a `--only <case>` flag; LaTeX toolchain check | S | low | 1 |
+| `VV-1` | Wrapper verification: dictionaries vs input (existing golden tests), charge mass set vs requested, post-processing vs analytic Friedlander, remap-chain conservation, one blastFoam shipped validation case reproduced | M | high | 2 |
+| `VV-2` | Case 1 inputs: 1 kg TNT 1D spherical, incident (8 probes, 0.5-20 m) and reflected (1, 3, 10 m), grids 4/2/1 mm, afterburn off. Inputs and run script only; owner launches | S | high | 2 ∥ VV-1 |
+| `VV-3` | Case 1 analysis: KB free-air comparison, order of convergence, GCI, error tables, figures, cells-per-charge-radius rule. Needs VV-2 results on disk | M | high | 3 |
+| `VV-4` | LaTeX report skeleton, all tables and numbers generated from `results/`, a check script that fails when a number in the PDF text differs from its JSON source | M | low | 2 ∥ VV-1 |
+| `VV-5` | Report with Case 1 compiled to PDF; **track-end for part A, owner reviews** | S | high | 4 |
+| `VV-6` | Case 2 clearing (Tyas/Rigby). **Blocked: owner supplies paper + digitized gauges** | M | high | 5 |
+| `VV-7` | Case 3 urban street (Rose & Smith / Fouchier). **Blocked: reference data; office machine or cloud** | L | high | 6 |
+| `VV-8` | Case 4 blast wall (Chapman, Rose & Smith). **Blocked: reference data; office machine or cloud** | L | high | 7 |
+| `VV-9` | Afterburn section (on vs off, what was fitted), validity envelope, final report | M | high | 8 |
 
 ---
 
