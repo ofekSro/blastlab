@@ -26,10 +26,11 @@ from ..models.case import load_any_case
 from ..services.model_folder import CASE_FILE, model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
-from . import chain_route, dialogs, theme
+from . import chain_route, dialogs, scaled_distance, theme
 from .bridge import ThreadBridge
 from .chain_panel import ChainPanel
 from .chain_strip import ChainStrip
+from .live_gauges import ALL_DROPPED
 from .results_panel import ResultsPanel
 from .run_clock import fmt_duration
 from .run_controller import RunController
@@ -1289,8 +1290,13 @@ class MainWindow(QMainWindow):
         pts = getattr(case, 'gauges', None)
         if pts is None:
             pts = getattr(case, 'gauge_radii', None)
-        if not pts and not self.run_panel.gauges.has_data():
+        if self.run_panel.gauges.has_data():
+            return
+        if not pts:
             self.run_panel.say_no_gauges()
+        elif len(scaled_distance.dropped_numbers(case)) >= len(pts):
+            # GUI-16 (e): gauges, every one dropped - not "no gauges"
+            self.run_panel.say_no_gauges(ALL_DROPPED)
 
     def on_running(self, running):
         if running:

@@ -270,6 +270,7 @@ class GaugesView(QWidget):
     NO_RESULT = ('Add gauges to a case and its traces appear here, with '
                  'the per-gauge numbers below.')
     NO_GAUGES = 'This result has no gauges.'
+    ALL_DROPPED = 'Every gauge of this result was dropped by the solver.'
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -541,7 +542,7 @@ class GaugesView(QWidget):
             self._labels, dropped = {}, []
         # D201: a dropped gauge is named, on a line of its own that wraps
         self._set_drop_note(dropped_text(dropped))
-        self._draw_curves(res)
+        self._draw_curves(res, dropped)
         self.fill_summary(res)
         if self._sel not in self._order:
             self._sel = self._default_gauge(res)
@@ -555,7 +556,7 @@ class GaugesView(QWidget):
             self.plot.removeItem(self.fill)
         self._fill_span = None
 
-    def _draw_curves(self, res):
+    def _draw_curves(self, res, dropped=()):
         self._drop_curves()
         failed = None
         try:
@@ -569,7 +570,9 @@ class GaugesView(QWidget):
         self.head_lbl.setText(f'{field_name(self._field)} at the gauges')
         self.plot.setTitle(self._title_extra)
         if not data:
-            self.hint.setText(self.NO_GAUGES if failed is None else
+            # GUI-16 (e), D22: dropped gauges are not "no gauges"
+            self.hint.setText((self.ALL_DROPPED if dropped
+                               else self.NO_GAUGES) if failed is None else
                               f'Could not draw the gauges: {failed}')
             self.plot_stack.setCurrentIndex(1)
             return

@@ -1123,6 +1123,29 @@ def s5g_dropped(link):
           and labels1 == {1: 'G1', 2: 'G3'}
           and drop1 == [(2, 'outside the domain')],
           f'{plain1} {labels1} {drop1}')
+    # GUI-16 (e), D22: the one gauge was dropped - a result with gauges all
+    # dropped says so (not "no gauges"); one with none keeps NO_GAUGES
+    allg = sample_2d()
+    allg.gauges = dict(times=allg.gauges['times'], points=[], pressures=[])
+    allg.meta.update(gauges=[(1.2, 0.6)], obstacles=[(1.0, 1.4, 0.0, 1.2)],
+                     Lx=4.0, Ly=4.0)
+    p.add_result('all dropped', 2, allg)
+    pump(60)
+    check('GUI-16 (e): every gauge dropped: the page says so, the drop '
+          'line names G1 and Wall 1 and is visible',
+          g.hint.text() == g.ALL_DROPPED and g.hint.text() != g.NO_GAUGES
+          and g.drop_caption.isVisibleTo(g)
+          and 'G1' in g.drop_caption.text()
+          and 'Wall 1' in g.drop_caption.text(),
+          f'{g.hint.text()!r} {g.drop_caption.text()!r}')
+    nog = sample_2d()
+    nog.gauges = dict(times=nog.gauges['times'], points=[], pressures=[])
+    nog.meta.update(gauges=[])
+    p.add_result('no gauges', 2, nog)
+    pump(60)
+    check('GUI-16 (e): a result with no gauges keeps NO_GAUGES, no drop line',
+          g.hint.text() == g.NO_GAUGES and not g.drop_caption.isVisibleTo(g),
+          f'{g.hint.text()!r}')
     p.add_result('one', 1, one)
     pump(60)
     check('GUI-15 (f): on screen the 1D rows read G1 and G3 and the drop '

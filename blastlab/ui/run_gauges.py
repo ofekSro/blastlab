@@ -42,7 +42,7 @@ from ..services.validation import drop_rule, drop_wall, gauge_drop_reason
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
-from .live_gauges import NO_GAUGES, _decimate
+from .live_gauges import ALL_DROPPED, NO_GAUGES, _decimate
 from .results_list import ElidedLabel
 from .setup_tree import _letter_space
 
@@ -930,7 +930,11 @@ class GaugeColumn(QWidget):
         n = len(self._table)
         has = n > 0
         dim0 = getattr(self._case, 'dim', None) == 0
-        self.empty.setText(NO_GAUGES_0D if dim0 else NO_GAUGES)
+        # GUI-16 (e), D22: a case whose gauges are all dropped is not a case
+        # with none - the drop line below names them
+        all_gone = not has and bool(_entered(self._case))
+        self.empty.setText(NO_GAUGES_0D if dim0 else
+                           ALL_DROPPED if all_gone else NO_GAUGES)
         for w in (self.card, self.list_frame):
             w.setVisible(has)
         self.empty.setVisible(not has)
@@ -951,7 +955,7 @@ class GaugeColumn(QWidget):
                          if has else '')
         self.sub.setVisible(has)
         self.drop.setText(f'{note}.' if note else '')
-        self.drop.setVisible(has and bool(note))
+        self.drop.setVisible(bool(note))
         order = [row['number'] for row in self._table]
         if order != self._order:
             self._rebuild(order)

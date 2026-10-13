@@ -23,7 +23,8 @@ from ..core import refine
 from ..services.model_folder import folder_for
 from . import theme
 from .components import Banner, Collapsible, StatTile, ToggleSwitch
-from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
+from .live_gauges import (ALL_DROPPED, NO_GAUGES, WAITING,  # noqa: F401
+                          LiveGaugePane)
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .run_clock import RunClock, fmt_duration
 from .run_dock import RunDock
@@ -1303,9 +1304,10 @@ class RunPanel(QWidget):
         """The last stage's Result.gauges: the full traces."""
         self.gauge_col.set_payload(gauges, final=True)
 
-    def say_no_gauges(self):
-        """The case has no gauges, so the view has nothing to wait for."""
-        self.gauges.reset(NO_GAUGES)
+    def say_no_gauges(self, text=NO_GAUGES):
+        """The case has no gauges (or, `ALL_DROPPED`, the solver drops
+        every one), so the view has nothing to wait for."""
+        self.gauges.reset(text)
 
     def set_validation(self, ok, n_errors=0, text=None, n_cells=None):
         """Mirror the Setup validation on the Run screen's Setup link and

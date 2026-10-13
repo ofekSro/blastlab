@@ -1068,6 +1068,31 @@ def r5_gauges(win):
           col.empty.isVisibleTo(col) and col.empty.text() == NO_GAUGES
           and col.card.isHidden() and col.list_frame.isHidden())
 
+    # GUI-16 (e), D22: one gauge, inside Wall 1 - every gauge dropped is
+    # said, not "no gauges", and the drop line stays
+    from blastlab.core.case import Case2D as _Case2D
+    from blastlab.ui.live_gauges import ALL_DROPPED
+    allg = _Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                   charge=20.0, center=(0.6, 0.0), solver='native',
+                   obstacles=[(1.2, 1.6, 0.0, 0.6)], gauges=[(1.4, 0.3)])
+    rp.set_gauge_case(allg)
+    pump(20)
+    check('every gauge dropped: the column says so (not NO_GAUGES), the '
+          'drop line names G1 and Wall 1 and is visible',
+          col.empty.isVisibleTo(col) and col.empty.text() == ALL_DROPPED
+          and col.empty.text() != NO_GAUGES
+          and col.drop.isVisibleTo(col) and 'G1' in col.drop.text()
+          and 'Wall 1' in col.drop.text()
+          and col.card.isHidden() and col.list_frame.isHidden(),
+          f'{col.empty.text()!r} {col.drop.text()!r}')
+    rp.say_no_gauges(ALL_DROPPED)
+    check('the live pane takes the same text',
+          rp.gauges._holder.text() == ALL_DROPPED, rp.gauges._holder.text())
+    rp.set_gauge_case(sample_case(gauges=[]))
+    pump(20)
+    check('and a case with no gauges still says NO_GAUGES, no drop line',
+          col.empty.text() == NO_GAUGES and not col.drop.isVisibleTo(col))
+
     # the collection rule (decision D60)
     win._show('run')
     rp.show_slice_tab()
