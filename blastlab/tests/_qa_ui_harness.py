@@ -1361,7 +1361,21 @@ def q02_repolish_everywhere(qa):
              evidence=str({k: pal[k] for k in bad}))
 
 
-@scenario('Q03', 'Q', est=120)
+def _ensure_native2d(qa):
+    """D39: the native 2D result Q03 selects, built here when the D
+    scenarios' cache lacks it (a fresh --out, or Q03 run alone)."""
+    if qa.cached('native2d') is not None:
+        return
+    qa.log('Q03: no cached native2d - running the native 2D case')
+    qa.goto('setup')
+    qa.set_case(cases()['N2D'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.check(qa.run_wait(300), 'the native 2D run finished', 'S1')
+    _cache_result(qa, 'native2d', dim=2)
+
+
+@scenario('Q03', 'Q', est=240)
 def q03_screen_vs_file(qa):
     """The Fields panel beside the grid its export writes.
 
@@ -1370,6 +1384,7 @@ def q03_screen_vs_file(qa):
     deliberately different. This is the evidence for that decision, and
     the check that the difference is the intended one.
     """
+    _ensure_native2d(qa)
     ensure_results(qa, names=('native2d',))
     qa.goto('results')
     if not select_result(qa, 'QA native2d'):
