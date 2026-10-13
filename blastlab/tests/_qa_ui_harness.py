@@ -3058,9 +3058,11 @@ def f07_stop_during_meshing(qa):
     qa.click(rp.run_btn, 'Run')
     qa.check(qa.wait_log('blockMesh', 200),
              'the blockMesh stage line appeared', 'S2')
+    # G15Q: the first shot is taken BEFORE the Stop lands (it used to be
+    # taken right after the click, so both shots showed a stopped run)
+    qa.shot('meshing')
     t0 = time.perf_counter()
     qa.click(rp.stop_btn, 'Stop')
-    qa.shot('stop_during_meshing')
     qa.check(qa.run_wait(150), 'the run ended', 'S1')
     dt = time.perf_counter() - t0
     qa.note(f'stop during meshing -> the run ended in {dt:.1f} s')
