@@ -70,7 +70,8 @@ message and commit it.
 
 - `risk: low` → **bl-task-verifier**, depth **light**, default model.
 - `risk: high` → **bl-task-verifier**, depth **full**, `model: "opus"`.
-- `risk: none` → no verifier.
+- `risk: none` → no verifier; write `<plan>[-<part>].verify.md` yourself holding only the
+  `## Status` block (format in `bl-task-verifier.md`), for Stage 5's script.
 
 ## Stage 4: QA and UX - only when the plan says `track-end: yes`, or the owner asks
 
@@ -78,19 +79,26 @@ message and commit it.
 findings become the next batch, not an in-batch retry loop. No simplifier stage for UI
 batches. Skip the stage when no GUI screen was touched.
 
-## Stage 5: bookkeeping (you, exact and small)
+## Stage 5: bookkeeping (by script, owner 2026-10-13)
 
 1. Trust the verifier's run; rerun `test_regression.py` yourself only if anything
    touched a shared module after the verifier finished.
-2. VERIFIED / FIXED tasks: mark them done in `TODO.md` (keep its ids and order) and add
-   an entry to `DONE.md` in the file's existing style: what, tests, verifier fixes, open
-   items, commit range. Never rewrite either file wholesale.
-3. SKIPPED / PARTIAL / FAILED stay in `TODO.md` with a one-line reason.
-4. **Length cap** (CLAUDE.md §5: every markdown file ≤ 1000 lines). Count the lines of
-   `TODO.md` and `DONE.md` after your edit. Over the cap: do not split or trim them
-   yourself - their names and ids are cited from code - but put it in Stage 6 as an
-   open question, with a concrete split proposal (which sections move to which file).
-5. Commit `chore: close batch <name> (<id>)`. Never push unless the owner asks.
+2. Write 3-6 bullets to a scratch `notes.md` in `DONE.md`'s style - what changed and
+   where, the tests (gate counts, regression), verifier fixes, open items - from the
+   agents' final messages; do not re-read the reports for it.
+3. `python .claude/skills/bl-todo/close_batch.py <plan> --base <BASE> --notes <notes.md>`
+   (`--still-open "ID=(x)"` for a sub-item this batch did not do; `--keep-body ID` to keep
+   a closed heading's body). It reads each verify report's `## Status` block: VERIFIED /
+   FIXED close (table row `✅ …`, heading `✅ closed …`, new `DONE.md` §0x); SKIPPED /
+   PARTIAL / FAILED stay open and are listed. A report without the block: add it from
+   the verifier's verdict lines, then rerun. `--dry-run` shows the diff first.
+4. Review `git diff TODO.md DONE.md` (only these two files) and fix by Edit what reads
+   wrong. Never rewrite either file wholesale.
+5. **Length cap** (CLAUDE.md §5: every markdown file ≤ 1000 lines): the script prints both
+   counts and exits 2 over the cap. Do not split or trim the files yourself - their names
+   and ids are cited from code - put it in Stage 6 as an open question with a concrete
+   split proposal (which sections move to which file).
+6. Commit `chore: close batch <name> (<id>)`. Never push unless the owner asks.
 
 ## Stage 6: report to the owner (Hebrew, phone-readable)
 

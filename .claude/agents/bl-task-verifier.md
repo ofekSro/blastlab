@@ -49,3 +49,16 @@ question.
 Per task: VERIFIED / FIXED / FAILED, each criterion with the check used, fixes with
 hashes. Defects (file:line, severity, fixed or not). Engineering questions. GUI screens
 that need QA. One-line verdict. Final message ≤ 40 lines.
+
+End the report with a `## Status` block - `close_batch.py` reads it to edit `TODO.md` and
+`DONE.md`, so it must be exact. One line per task: plan task id, the TODO id it closes
+(with the sub-item in parentheses when the TODO row has lettered items), the status, then
+fix hashes or a short reason:
+
+```
+## Status
+
+- B1 GUI-16 (a): FIXED f183a4f
+- B2 P1-23: PARTIAL the wording waits for the owner
+- B3 P2-22: VERIFIED
+```
