@@ -24,7 +24,7 @@ from ..core import mode as mode_mod
 from . import chain_route, scaled_distance, setup_nodes, setup_strip, theme
 from .case_form import CaseForm
 from .components import HandoffCard
-from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
+from .model_overlay import ModelOverlay, hover_text, hover_tip, plane_caption
 from .preview_panel import Preview1D, Preview2D
 from .results_list import ElidedLabel
 from .setup_panel import (PROPS_PAD, PROPS_W, WHEEL_ZOOM, DerivedCard,
@@ -593,7 +593,7 @@ class StageEditor(QWidget):
                                        else '')
             # UXR-15 (D221, D224): the readout's units stay on the
             # caption, so moving onto it after the hover can show them
-            self._view_caption.set_tip(HOVER_TIP if case else None)
+            self._view_caption.set_tip(hover_tip() if case else None)
 
     def _rings_toggled(self, on):
         self._overlay.rings = bool(on)
@@ -617,7 +617,7 @@ class StageEditor(QWidget):
         if lbl.property('hover') != 'true':
             lbl.setProperty('hover', 'true')
             theme.repolish(lbl)
-            lbl.set_tip(HOVER_TIP)              # UXR-15: the units
+            lbl.set_tip(hover_tip())            # UXR-15: the units
         lbl.setText(text)
 
     def _unhover(self, _event=None):

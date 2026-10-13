@@ -125,7 +125,7 @@ def s1_strip():
           and not s.tiles['memory'].bar.isVisibleTo(s))
     zs = [z for _n, _r, z in sd.gauges(case)]
     check('Z at gauges: min-max of the Z helper (2.99-3.31)',
-          s.shown('z') == (f'{min(zs):.2f}–{max(zs):.2f}', 'm/kg^1/3')
+          s.shown('z') == (f'{min(zs):.2f}–{max(zs):.2f}', sd.unit())
           and s.shown('z')[0] == '2.99–3.31', str(s.shown('z')))
     check('the Z tile is the accent variant',
           s.tiles['z'].property('variant') == 'accent')
@@ -446,8 +446,8 @@ def s2_model_view():
           sp.view_caption())
     # UXR-15 (D221): the units the compact readout leaves out
     tip = sp._view_caption.toolTip()
-    check('the readout\'s tooltip gives the units (Z in m/kg^1/3)',
-          'm/kg^1/3' in tip and 'in m' in tip, tip)
+    check('the readout\'s tooltip gives the units (Z in m per cube root of '
+          'kg)', sd.unit() in tip and 'in m' in tip, tip)
     from matplotlib.backend_bases import LocationEvent
     canvas.callbacks.process('figure_leave_event',
                              LocationEvent('figure_leave_event', canvas,
@@ -660,7 +660,7 @@ def s3_dock():
     rows = sd.gauges(case)
     check('headers: Gauge · r · z · R from charge · Z · Where',
           sp.gauge_headers() == ['Gauge', 'r [m]', 'z [m]',
-                                 'R from charge [m]', 'Z [m/kg^1/3]',
+                                 'R from charge [m]', sd.label(),
                                  'Where'], str(sp.gauge_headers()))
     want = [[f'G{n}', f'{p[0]:.2f}', f'{p[1]:.2f}', f'{R:.2f}', f'{Z:.2f}',
              sd.where_text(case, p)]
@@ -692,7 +692,7 @@ def s3_dock():
     load(sp, Case1D(charge_kg=1.0, gauge_radii=[2.0, 3.0]))
     check('1D: r only, no Where (no obstacles)',
           sp.gauge_headers() == ['Gauge', 'r [m]', 'R from charge [m]',
-                                 'Z [m/kg^1/3]']
+                                 sd.label()]
           and sp.gauge_rows()[0] == ['G1', '2.00', '2.00', '2.00'],
           str(sp.gauge_rows()))
     # GUI-14 (d), D2-D3: a dropped gauge is marked in the table and on the
@@ -957,8 +957,8 @@ def s3_dock():
     pump(40)
     check('narrow: R, Z and Where stay on screen (coordinates give way)',
           sp.gauge_headers() in (
-              ['Gauge', 'r [m]', 'z [m]', 'R [m]', 'Z [m/kg^1/3]', 'Where'],
-              ['Gauge', 'R [m]', 'Z [m/kg^1/3]', 'Where'])
+              ['Gauge', 'r [m]', 'z [m]', 'R [m]', sd.label(), 'Where'],
+              ['Gauge', 'R [m]', sd.label(), 'Where'])
           and [r[-2] for r in sp.gauge_rows()] == ['3.31', '2.99'],
           str(sp.gauge_headers()))
     check('narrow: the checks fall back to one column',
@@ -1000,11 +1000,11 @@ def s4_units():
     sp = panel()
     case, rep = load(sp, sample_case())
     z_tip = sp.strip.tiles['z'].toolTip()
-    check('the strip Z tile', 'm/kg^1/3' in z_tip, z_tip)
+    check('the strip Z tile', sd.unit() in z_tip, z_tip)
     near = sp.derived()
     check('the Derived card\'s nearest gauge (Z 2.99)',
           ' · Z ' in near.value('nearest')
-          and 'm/kg^1/3' in near._vals['nearest'].toolTip(),
+          and sd.unit() in near._vals['nearest'].toolTip(),
           f"{near.value('nearest')!r} {near._vals['nearest'].toolTip()!r}")
     load(sp, sample_case(geometry='planar', center=(1.0, 2.0)))
     check('no Z (planar): no Z tooltip on the Derived card',
@@ -1018,7 +1018,7 @@ def s4_units():
     pump(20)
     head = col.head_lbls[1]
     check('the live gauge column\'s Z header',
-          head.text() == 'Z' and 'm/kg^1/3' in head.toolTip(),
+          head.text() == 'Z' and sd.unit() in head.toolTip(),
           f'{head.text()!r} {head.toolTip()!r}')
     col.set_case(sample_case(geometry='planar', center=(1.0, 2.0)))
     pump(20)

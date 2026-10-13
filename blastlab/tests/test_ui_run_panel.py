@@ -258,6 +258,25 @@ def main():
     check("ordinary lines are untouched",
           lines[0] == 'plain line' and lines[2] == 'after')
 
+    print("\nU11b: [warn] and [error] lines take their colours (G14U-P2b)")
+    from blastlab.ui import theme as _th
+    rp.on_log('  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped')
+    rp.on_log('  [error] something failed')
+    rp.on_log('quiet line')
+    got = dict(rp.log_line_colours())
+    check("a [warn] line has the warn foreground, an [error] line the "
+          "error one, a plain line none",
+          got['  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped'].lower()
+          == _th.qcolor('warn').name().lower()
+          and got['  [error] something failed'].lower()
+          == _th.qcolor('error').name().lower()
+          and got['quiet line'] is None, str(got))
+    check("log_text() returns the plain lines, unchanged",
+          rp.log_text().splitlines()[-3:] ==
+          ['  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped',
+           '  [error] something failed', 'quiet line'],
+          str(rp.log_text().splitlines()[-3:]))
+
     print("\nU12: the refresh box reports an unusable value")
     rp.mark_refresh(False)
     check("red border on", rp.refresh_val.property('error') == 'true')

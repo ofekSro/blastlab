@@ -6,7 +6,8 @@ UFC 3-340-02 (2008), para. 2-13.1 (Free Air Burst), printed p. 44 (PDF
 page 120 of docs/references/ufc_3_340_02.pdf): the blast-wave parameters
 of a spherical TNT explosion "are given in Figure 2-7 versus the scaled
 distance (Z = R/W1/3)". The document writes Z in ft/lb^1/3; the app
-shows it in SI, m/kg^1/3 (plan §5.3) - R in metres, W in kilograms.
+shows it in SI, m per cube root of kg (plan §5.3) - R in metres, W in
+kilograms.
 
 R is the distance from the burst point to the gauge in the plane of the
 case: 1D spherical, the gauge radius r; 2D axisymmetric, (r, z) with the
@@ -31,13 +32,59 @@ case as entered, display only.
 import math
 from types import SimpleNamespace
 
+#: the unit in plain characters - the text every export and report uses,
+#: and the screens' fallback (GUI-16 C8 (iv), D31)
+UNIT = 'm/kg^1/3'
+#: ... and with the superscript glyphs, for the screens whose fonts hold them
+UNIT_GLYPHS = 'm/kg¹ᐟ³'
 #: the column / tile label everywhere (plan §5.3)
-LABEL = 'Z [m/kg^1/3]'
+LABEL = f'Z [{UNIT}]'
 #: UXR-15 (D221): the tooltip wherever a Z value is shown without its
 #: unit. UFC 3-340-02 (2008), para. 2-13.1, printed p. 44: Z = R/W^1/3
-UNIT_TIP = ('Z = R / W^(1/3): the scaled distance, in m/kg^1/3 '
+UNIT_TIP = ('Z = R / W^(1/3): the scaled distance, in ' + UNIT + ' '
             '(UFC 3-340-02, para. 2-13.1). R in m from the burst, W the '
             'charge in kg as entered.')
+
+
+def _glyphs_ok():
+    """True when the UI's fonts (the application font and the mono one)
+    hold every glyph of UNIT_GLYPHS (`QFontMetrics.inFontUcs4`). False
+    without a QApplication, so a headless caller keeps the plain text.
+    Qt is imported here, not above: `chain_route` imports this module and
+    must stay toolkit-free."""
+    try:
+        from PySide6.QtGui import QFont, QFontMetrics, QGuiApplication
+    except ImportError:
+        return False
+    app = QGuiApplication.instance()
+    if app is None:
+        return False
+    from . import theme
+    fonts = [app.font(), QFont(theme.MONO)]
+    marks = [ord(c) for c in UNIT_GLYPHS if ord(c) > 0x7f]
+    return all(QFontMetrics(f).inFontUcs4(cp) for f in fonts for cp in marks)
+
+
+def unit():
+    """The unit as a screen shows it: `m/kg¹ᐟ³` when the UI fonts hold the
+    glyphs, else UNIT (D31). Exports and the report never call this."""
+    return UNIT_GLYPHS if _glyphs_ok() else UNIT
+
+
+def on_screen(text):
+    """`text` with UNIT replaced by `unit()` - for a label or tooltip that
+    a module-level constant built in plain characters."""
+    return str(text).replace(UNIT, unit())
+
+
+def label():
+    """LABEL as a screen shows it."""
+    return on_screen(LABEL)
+
+
+def unit_tip():
+    """UNIT_TIP as a screen shows it."""
+    return on_screen(UNIT_TIP)
 
 
 def case_from_meta(meta, dim, gauge_out=None):
@@ -155,7 +202,7 @@ def distance(case, point):
 
 
 def scaled_distance(case, point):
-    """Z [m/kg^1/3] of `point`, or None when Z is hidden."""
+    """Z (in UNIT) of `point`, or None when Z is hidden."""
     if not z_shown(case):
         return None
     return distance(case, point) / charge_mass(case) ** (1.0 / 3.0)

@@ -957,7 +957,9 @@ def r5_gauges(win):
     check('a click on G2 moves the enlarged card to it',
           col.selected_number() == 2 and num == 'G2'
           # GUI-14 (e), UX F4: no `selected`, Z with its unit
-          and meta == f'Z {RG.fmt_dist(want_z[2])} m/kg^1/3 · Wall 1'
+          # C8 (iv): the unit as the screen shows it (glyphs when the fonts
+          # hold them, else the plain characters)
+          and meta == f'Z {RG.fmt_dist(want_z[2])} {sd.unit()} · Wall 1'
           and peak == f'peak {want}', f'{num} | {meta} | {peak}')
     check('the selected row has the gauge_bg fill',
           theme_pal('gauge_bg') in w2.styleSheet(), w2.styleSheet()[:60])
@@ -1817,9 +1819,12 @@ def r5b_dropped(win):
           str([(r['number'], r['entered']) for r in col.table()]))
     # GUI-13 B3 (UX #11): the note comes first, in the warn colour (the
     # string moved from the end of the caption to its start)
+    # G14U-P2 (D29): the drop line has no full stop, as Results' has none;
+    # the caption joins it with ` · `, as Results does
     check('the caption names G2 and the wall, first',
-          col.caption_text() == 'G2 dropped by the solver (inside Wall 1). '
-          '2 gauges, sorted by Z. Click a row to enlarge it.',
+          col.caption_text() == 'G2 dropped by the solver (inside Wall 1) · '
+          '2 gauges, sorted by Z. Click a row to enlarge it.'
+          and not col.drop.text().endswith('.'),
           col.caption_text())
     from blastlab.ui import theme as _theme
     check('B3: the note starts the caption and is in the warn colour; no '
@@ -1831,23 +1836,29 @@ def r5b_dropped(win):
           f'{col.drop.text()!r} {col.drop.styleSheet()!r}')
     check('the enlarged card says G3', col.card_texts()[0] == 'G3',
           str(col.card_texts()))
-    # GUI-13 (g), QA #2: the card header elides its middle when narrow,
-    # keeps the whole text as the tooltip and never runs under the peak
+    # GUI-13 (g), QA #2 / G14U-P3 (D32): the card header's `Z 2.99 <unit>` is
+    # a label of its own that never shrinks; only the `· Wall n` after it
+    # elides (keeping the whole text as its tooltip) and the header never
+    # runs under the peak
     card = col.card
     full = card.meta.full_text()
-    card.meta.setFixedWidth(60)
+    lead = card.lead.text()
+    card.meta.setFixedWidth(30)
     pump(20)
-    check('a narrow card header: the middle is elided, the whole text is '
-          'the tooltip, the peak keeps its own rect',
-          card.meta.elided() and card.meta.text() != full
-          and card.meta.toolTip() == full
+    check('a narrow card header: `· Wall n` is elided, the whole of it is '
+          'its tooltip, the peak keeps its own rect',
+          full.startswith('· ') and card.meta.elided()
+          and card.meta.text() != full and card.meta.toolTip() == full
           and card.meta.geometry().right() < card.peak.geometry().left(),
           f'{card.meta.text()!r} {card.meta.toolTip()!r}')
-    check('GUI-14 (e): the elided header keeps its head (Z ...), not the '
-          'tail',
-          card.meta.text().startswith('Z ') and card.meta.text().endswith(
-              '…') and not card.meta.full_text().endswith('selected'),
-          f'{card.meta.text()!r} {full!r}')
+    check('G14U-P3: the number and its unit stay whole in their own label '
+          '(Z ... <unit>), never elided',
+          lead.startswith('Z ') and lead.endswith(RG.sd.unit())
+          and card.lead.text() == lead
+          and card.lead.width() >= card.lead.fontMetrics()
+          .horizontalAdvance(lead)
+          and card.meta_text() == f'{lead} {full}',
+          f'{card.lead.text()!r} {card.lead.width()} {full!r}')
     card.meta.setMinimumWidth(0)
     card.meta.setMaximumWidth(16777215)
     pump(20)

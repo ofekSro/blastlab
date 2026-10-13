@@ -11,6 +11,8 @@ elides) and PASS / FAIL.
        trigger dropdown's current text is whole; Where shows `(dropped)`.
   C7   Chain: after selecting warned card 3 its first Checks row lies in the
        viewport; the card meta wraps, never elides.
+  C8   Run: at a forced elide the card header keeps its number and unit
+       whole (only `· Wall n` elides).
 
 Run:  cd blastlab/tests && python _e2e_ui_final_fit.py [--only C6] [--shots DIR]
 Exit 0 when every check passes. No solve, no WSL, no viewer child.
@@ -150,6 +152,45 @@ def c7_chain(win, tag, pump):
               f'{key.width()} px wide')
 
 
+# ── C8: Run ──────────────────────────────────────────────────────────────
+def c8_run(win, tag, pump):
+    from blastlab.core.case import Case2D
+    from blastlab.ui import scaled_distance as sd
+    print(f'\nC8 {tag}: Run card header')
+    win.set_solver('native')
+    win._show('run')
+    rp = win.run_panel
+    # G1 stands 10 cm in front of Wall 1, so the header has a `· Wall 1`
+    case = Case2D(geometry='axisymmetric', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                  charge=20.0, center=(0.0, 0.8), solver='native',
+                  obstacles=[(1.2, 1.6, 0.0, 0.6)], gauges=[(1.1, 0.3)])
+    rp.set_gauge_case(case)
+    for _ in range(10):                     # until the column is on screen
+        pump(200)
+        if rp.gauge_col.card.isVisible():
+            break
+    card = rp.gauge_col.card
+    lead = card.lead.text()
+    adv = card.lead.fontMetrics().horizontalAdvance(lead)
+    check(f'C8 (iii) {tag}: the card header\'s number and unit are whole',
+          lead.startswith('Z ') and lead.endswith(sd.unit())
+          and card.lead.width() >= adv,
+          f'{lead!r} {card.lead.width()} px of {adv} px; rest '
+          f'{card.meta.text()!r}')
+    card.meta.setFixedWidth(12)             # a forced elide
+    pump(400)
+    card.meta._render()     # a label not yet shown has seen no resize event
+    check(f'C8 (iii) {tag}: at a forced elide only `· Wall n` is cut; the '
+          f'lead keeps its whole text',
+          card.lead.text() == lead and card.lead.width() >= adv
+          and card.meta.elided(),
+          f'{card.lead.text()!r} {card.lead.width()} >= {adv}; '
+          f'{card.meta.text()!r} of {card.meta.full_text()!r} '
+          f'({card.meta.width()} px)')
+    card.meta.setMinimumWidth(0)
+    card.meta.setMaximumWidth(16777215)
+
+
 def run_size(win, app, size, mode, pump, only):
     from blastlab.ui import theme
     theme.apply(app, mode)
@@ -160,6 +201,8 @@ def run_size(win, app, size, mode, pump, only):
         c6_setup(win, tag, pump)
     if not only or 'C7' in only:
         c7_chain(win, tag, pump)
+    if not only or 'C8' in only:
+        c8_run(win, tag, pump)
 
 
 def main():

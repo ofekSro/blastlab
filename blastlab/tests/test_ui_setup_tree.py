@@ -658,8 +658,31 @@ def t4_derived():
     heavy.charge = 8.0
     check('and it does change with W (8 kg halves Z)',
           abs(sd.gauges(heavy)[0][2] - sd.gauges(case)[0][2] / 2) < 1e-12)
-    check("the label everywhere is 'Z [m/kg^1/3]'",
-          sd.LABEL == 'Z [m/kg^1/3]')
+    # C8 (iv): LABEL is the plain-character label (exports); a screen shows
+    # `sd.label()`, the same with the glyphs when its fonts hold them
+    check("the label everywhere is 'Z [m/kg^1/3]' (the glyph form on a "
+          "screen whose fonts hold it)",
+          sd.LABEL == f'Z [{sd.UNIT}]' and sd.UNIT == 'm/kg^1/3'
+          and sd.label() in (sd.LABEL, f'Z [{sd.UNIT_GLYPHS}]'))
+    real_ok = sd._glyphs_ok
+    try:
+        sd._glyphs_ok = lambda: True
+        check('C8 (iv): with the glyphs in the fonts a screen reads '
+              '`m/kg¹ᐟ³` (label, tip, a plain-character constant mapped); '
+              'the constants stay plain',
+              sd.unit() == 'm/kg¹ᐟ³'
+              and sd.label() == 'Z [m/kg¹ᐟ³]'
+              and 'm/kg¹ᐟ³' in sd.unit_tip()
+              and sd.on_screen('Z\n[m/kg^1/3]') == 'Z\n[m/kg¹ᐟ³]'
+              and sd.LABEL == 'Z [m/kg^1/3]' and 'kg^1/3' in sd.UNIT_TIP)
+        sd._glyphs_ok = lambda: False
+        check('C8 (iv): without them the text is as before',
+              sd.unit() == 'm/kg^1/3' and sd.label() == sd.LABEL
+              and sd.unit_tip() == sd.UNIT_TIP)
+    finally:
+        sd._glyphs_ok = real_ok
+    check('C8 (iv): the real font test answers a bool',
+          isinstance(sd._glyphs_ok(), bool))
     check('nearest gauge = the min-Z one (G2)',
           sd.nearest_gauge(case)[0] == 2)
 

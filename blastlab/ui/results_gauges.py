@@ -61,7 +61,7 @@ HEADERS = ('Gauge', sd.LABEL, 'Peak [kPa]', 'Arrival [ms]', 't peak [ms]',
            'Net impulse [kPa·ms]', 'Phase ended')
 #: the same headers on two lines, used when the table is too narrow for
 #: one (the copied text always uses HEADERS)
-HEADERS_WRAPPED = ('Gauge', 'Z\n[m/kg^1/3]', 'Peak\n[kPa]', 'Arrival\n[ms]',
+HEADERS_WRAPPED = ('Gauge', f'Z\n[{sd.UNIT}]', 'Peak\n[kPa]', 'Arrival\n[ms]',
                    't peak\n[ms]', 'Pos. phase\n[ms]',
                    'Pos. impulse\n[kPa·ms]', 'Net impulse\n[kPa·ms]',
                    'Phase\nended')
@@ -678,7 +678,10 @@ class GaugesView(QWidget):
                 item.setFont(f)
 
     def _set_headers(self, labels):
-        self.table.setHorizontalHeaderLabels(list(labels))
+        # C8 (iv): the unit with its glyphs when the fonts hold them; the
+        # copied text (`headers()`) keeps HEADERS' plain characters
+        self.table.setHorizontalHeaderLabels(
+            [sd.on_screen(t) for t in labels])
         for i, col in enumerate(COLUMNS):
             it = self.table.horizontalHeaderItem(i)
             it.setToolTip(HEADER_HELP[col])

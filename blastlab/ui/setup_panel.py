@@ -21,7 +21,7 @@ from ..viz3d import MISSING_MSG, pyvista_available
 from . import chain_route, scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
 from .components import DockTabs
-from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
+from .model_overlay import ModelOverlay, hover_text, hover_tip, plane_caption
 from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_strip import LiveStrip
 from .setup_tree import TREE_MIN, SetupTree, _letter_space
@@ -160,7 +160,7 @@ class DerivedCard(Card):
         self._vals['nearest'].setText(text)
         # UXR-15 (D221): the unit the compact `Z 2.99` leaves out
         self._vals['nearest'].setToolTip(
-            scaled_distance.UNIT_TIP if near is not None
+            scaled_distance.unit_tip() if near is not None
             and near[2] is not None else '')
 
 
@@ -852,7 +852,7 @@ class SetupPanel(QWidget):
                 ('r', 'z') if case.geometry == 'axisymmetric' else
                 ('x', 'y')) if dim < 3 else ('x', 'y', 'z')
         heads = ['Gauge'] + [f'{a} [m]' for a in axes] + [''] * (3 - len(axes))
-        heads += ['R from charge [m]', scaled_distance.LABEL, 'Where']
+        heads += ['R from charge [m]', scaled_distance.label(), 'Where']
         for c, text in enumerate(heads):
             item = QTableWidgetItem(text)
             item.setTextAlignment((Qt.AlignLeft if c in (0, 6)
@@ -1105,7 +1105,7 @@ class SetupPanel(QWidget):
             # after the pointer leaves the model, so moving onto the
             # caption can show them (the hover itself clears the readout)
             self._view_caption.setToolTip(
-                HOVER_TIP if kind in ('1d', '2d') and case is not None
+                hover_tip() if kind in ('1d', '2d') and case is not None
                 else '')
 
     def _redraw_overlay(self):
@@ -1148,7 +1148,7 @@ class SetupPanel(QWidget):
         if lbl.property('hover') != 'true':
             lbl.setProperty('hover', 'true')
             theme.repolish(lbl)
-            lbl.setToolTip(HOVER_TIP)           # UXR-15: the units
+            lbl.setToolTip(hover_tip())         # UXR-15: the units
         lbl.setText(text)
 
     def _unhover(self, _event=None):

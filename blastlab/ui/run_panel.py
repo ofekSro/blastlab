@@ -13,7 +13,8 @@ import os
 import numpy as np
 import shiboken6
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QIcon, QTextCursor, QTextDocument
+from PySide6.QtGui import (QColor, QFont, QIcon, QTextCharFormat, QTextCursor,
+                           QTextDocument)
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QProgressBar, QPushButton,
                                QSizePolicy, QStackedWidget, QVBoxLayout,
@@ -1487,8 +1488,42 @@ class RunPanel(QWidget):
         else:
             self._amr_run = 0
         self.log.appendPlainText(line)
+        self._colour_last_line(line)
         self.log.verticalScrollBar().setValue(
             self.log.verticalScrollBar().maximum())
+
+    #: G14U-P2b (D30): the log's severity tags and the palette key each takes
+    _LOG_TAGS = (('[error]', 'error'), ('[warn]', 'warn'))
+
+    def _colour_last_line(self, line):
+        """Give the line just appended its severity colour - `[warn]` the
+        theme's warn, `[error]` its error - as a character format on that
+        block only. The text, so `log_text()` and a copy, is unchanged."""
+        key = next((k for tag, k in self._LOG_TAGS if tag in line), None)
+        if key is None:
+            return
+        cur = QTextCursor(self.log.document().lastBlock())
+        cur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(theme.cur(key)))
+        cur.mergeCharFormat(fmt)
+
+    def log_line_colours(self):
+        """[(line, foreground name or None)] per log line (tests)."""
+        out = []
+        block = self.log.document().firstBlock()
+        while block.isValid():
+            colour = None
+            it = block.begin()
+            while not it.atEnd():
+                fmt = it.fragment().charFormat()
+                if fmt.hasProperty(QTextCharFormat.ForegroundBrush):
+                    colour = fmt.foreground().color().name()
+                    break
+                it += 1
+            out.append((block.text(), colour))
+            block = block.next()
+        return out
 
     def log_text(self):
         """The current run's log (earlier runs are in log_history())."""
