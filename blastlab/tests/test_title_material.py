@@ -213,6 +213,32 @@ def check_nd():
           == '2D remap')
 
 
+def check_cli_1d():
+    print('\nthe blastFoam CLI\'s 1D pop-up figures (cli_run._show_plots_1d)')
+    import matplotlib
+    import matplotlib.pyplot as plt
+    from blastlab.output import pyplot_bridge
+    from blastlab.solvers.foam import cli_run
+    got = []
+    saved = (matplotlib.get_backend, pyplot_bridge.adopt_figure, plt.show)
+    matplotlib.get_backend = lambda: 'TkAgg'     # past its Agg early return
+    pyplot_bridge.adopt_figure = got.append
+    plt.show = lambda *a, **k: None
+    try:
+        case = SimpleNamespace(charge_kg=1.0, radius_m=2.0)
+        for mat, word in (('C4', 'C4'), (None, 'TNT')):
+            got.clear()
+            extra = dict(material=mat) if mat else {}
+            cli_run._show_plots_1d(result_1d(**extra), case)
+            kg = [t for f in got for t in titles(f) if ' kg ' in t]
+            check(f'CLI 1D, {mat or "no material"}: both pop-ups say '
+                  f'`1.0 kg {word}`',
+                  len(kg) == 2 and all(f'1.0 kg {word} ' in t for t in kg),
+                  str(kg))
+    finally:
+        matplotlib.get_backend, pyplot_bridge.adopt_figure, plt.show = saved
+
+
 def check_rule():
     print('\nthe rule: plots.charge_material')
     cm = plots.charge_material
@@ -228,6 +254,7 @@ if __name__ == '__main__':
     check_rule()
     check_1d()
     check_nd()
+    check_cli_1d()
     print()
     print('TITLE MATERIAL: ' + ('PASS' if not FAILS else
                                 f'FAIL ({len(FAILS)}): ' + ', '.join(FAILS)))

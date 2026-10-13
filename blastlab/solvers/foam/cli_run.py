@@ -389,8 +389,11 @@ def _show_plots_1d(res, case):
     from ...output.plots import figure_results_1d, figure_gauges_1d
     from ...output.pyplot_bridge import adopt_figure
     import matplotlib.pyplot as plt
+    mat = res.meta.get('material')      # GUI-16 round 2 (F-1): kg C4 on C4
     adopt_figure(figure_results_1d(res.snapshots, 'JWL',
-                                   case.charge_kg, case.radius_m))
+                                   case.charge_kg, case.radius_m,
+                                   material=mat))
     if res.gauges['radii']:
-        adopt_figure(figure_gauges_1d(res.gauges, case.charge_kg, 'JWL'))
+        adopt_figure(figure_gauges_1d(res.gauges, case.charge_kg, 'JWL',
+                                      material=mat))
     plt.show()
