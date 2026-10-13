@@ -435,8 +435,37 @@ class RunController(QObject):
                                  f'the chain manifest.json: {err}')
 
     # ── shutdown ─────────────────────────────────────────────────────────
-    def shutdown(self, join_s=10.0):
+    #: I02 (batch 2026-10-12-gui-final D3): how long closing the window
+    #: waits for a stopped worker. The stop itself lands within a step;
+    #: what follows is the stage's model folder - animation, figures,
+    #: report - 17 s on I02's N3D case (_e2e_ui_close_during_run.py).
+    #: The window used to wait 10 s for it and then let the process exit
+    #: under the half-written folder. Now it waits briefly and
+    #: `finish_writes` waits for the rest once the window is gone.
+    CLOSE_JOIN_S = 2.0
+    #: the bound on that wait, so a hung writer cannot keep the process
+    FINISH_S = 300.0
+
+    def shutdown(self, join_s=CLOSE_JOIN_S):
         self._timer.stop()
         if self.worker is not None and self.worker.is_alive():
             self.worker.stop()
             self.worker.join(timeout=join_s)
+
+    def finish_writes(self, timeout_s=FINISH_S, log=None):
+        """After the window has closed: let a stopped worker finish
+        writing its model folder before the process exits (the worker is
+        a daemon thread, so leaving `main()` kills it mid-file). True
+        when nothing is left running."""
+        w = self.worker
+        if w is None or not w.is_alive():
+            return True
+        say = log or (lambda m: print(m, file=sys.stderr, flush=True))
+        say('[blastlab] the window is closed; finishing the stopped '
+            "run's model folder…")
+        w.join(timeout=timeout_s)
+        if w.is_alive():
+            say(f'[blastlab] gave up after {timeout_s:.0f} s: the model '
+                'folder may be incomplete')
+            return False
+        return True

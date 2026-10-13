@@ -1675,7 +1675,11 @@ def main(case_file=None):
             pass
     win = MainWindow(case_file=case_file)
     win.show()
-    return app.exec()
+    code = app.exec()
+    # a run stopped by closing the window is still writing its model
+    # folder (I02, D3): the window is gone, the process waits for it
+    win.ctrl.finish_writes()
+    return code
 
 
 if __name__ == '__main__':
