@@ -654,6 +654,33 @@ Cited by `solvers/hooks.py`, `solver1d/2d/3d.py`, `services/validation.py`, `cor
 gauge's entered number; a trigger on a dropped gauge is disabled and warned about (native only,
 D13). The blastFoam side is measured in the P1-23 batch (above).
 
+### P1-25 · 1D blastFoam runs serial only, though MPI cuts a step 2.9× at np 4 · **owner decision 2026-10-13: enable it**
+
+Every 1D blastFoam run is forced to one rank (`foam/backend.py:289-295`, `foam/env.py:528`
+"1D runs are a single wedge", since T48; `services/validation.py:346` says ranks are
+ignored; `ui/setup_spec.py:117` and `gui/forms.py:549` hide the field). Measured
+2026-10-13 on the default-size case (1 kg TNT, R 5 m, dx 1 mm, 5 000 cells, scotch), ms per
+step over the same 263 steps: np 1 113, np 2 65 (1.75×), np 4 39 (2.9×), np 8 28 (4.1×).
+Detail and the pre-registered rule: `docs/verification/1d-mpi-probe.md`.
+
+Fix: let 1D take the run plan's ranks like 2D/3D (decompose after `setRefinedFields`,
+reconstruct for ingest), show the ranks field for 1D blastFoam in both GUIs. **Owner
+approves** editing the `1D is serial` pin in `test_foam_env.py` and the related checks
+(`test_ui_setup_strip.py:191`, `test_model_folder.py:779`). Acceptance: (1) **not measured
+yet - do it first:** serial vs np 4 on that case to t = 3 ms, peak, positive impulse and
+arrival at the 1 m and 2 m gauges each within 1 % (scotch vs `simple` along r if scotch
+fails it); (2) np 4 ≥ 2× faster per step; (3) serial 1D trees stay byte-identical
+(`foam_golden/`, `test_regression.py`). Risk high (`solvers/`, a committed test).
+
+### P1-26 · A 1D blastFoam step costs ~113 ms at 5 000 cells · **found 2026-10-13**
+
+~23 µs per cell-step, with or without the function objects (`liveLine`, `gauges`,
+`conserved`: 112.8 vs 115.7 ms), so a 1D run at dx 1 mm to 10 ms is over an hour serial.
+Where the time goes is not known. Measure first (OpenFOAM `-profiling` or
+`profiling` in controlDict, one phase vs two, `activation`, the JWL products update) on
+the P1-25 case, then decide; it may pay more than P1-25. No change to any number without
+the owner.
+
 ---
 
 ## P2 — Misleading display and missing test coverage
