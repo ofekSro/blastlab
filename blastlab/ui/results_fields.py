@@ -87,17 +87,20 @@ def screen_label_1d(meta):
     return c._replace(eos=display_eos(meta))
 
 
-def screen_title_1d(c):
+def screen_title_1d(c, material=None):
     """The 1D profile figure's title on screen (F17, D214): `1D spherical
-    · 1.0 kg TNT · JWL`, with the builder's own charge and EOS wording
-    (`kg TNT` is E1's open question). `plots.figure_results_1d`'s
+    · 1.0 kg TNT · JWL`, with the builder's own charge and EOS wording.
+    `material` names the charge as every title does
+    (`plots.charge_material`; None: TNT - GUI-16 round 2, F-1).
+    `plots.figure_results_1d`'s
     `1D Spherical Blast - 1.0 kg TNT - EOS: JWL` stays in every export.
 
     Three title styles meet on Results (GUI-12 B3, UX quick win 5): this
     short 1D one on screen; the 2D map's `<field> - <charge_label>` and the
     3D plane's, which `select_field` builds and the exports reuse unchanged.
     The 1D canvas's tooltip names the full export title."""
-    return f'1D spherical · {c.charge_kg} kg TNT · {c.eos}'
+    return (f'1D spherical · {c.charge_kg} kg '
+            f'{plots.charge_material(None, material)} · {c.eos}')
 
 
 def select_field(res, dim, snap_label, field, title_extra=None):
@@ -441,9 +444,10 @@ class FieldsView(QWidget):
         try:
             if ent.dim == 1:
                 c = screen_label_1d(res.meta)
+                mat = res.meta.get('material')      # F-1: as the exports
                 fig = plots.figure_results_1d(
                     res.snapshots, c.eos, c.charge_kg, c.radius_m,
-                    title_extra=self._title_extra)
+                    title_extra=self._title_extra, material=mat)
                 # on screen only: the builder's one-shot tight_layout is
                 # for its own 10-inch page, and in the Results centre
                 # (468 px at 1100 x 720) the tick labels and the title
@@ -457,7 +461,7 @@ class FieldsView(QWidget):
                 # the builder's own title, read back, never retyped
                 full = fig.axes[0].get_title()
                 fig.axes[0].set_title(plots.titled(
-                    screen_title_1d(c), self._title_extra))
+                    screen_title_1d(c, mat), self._title_extra))
                 # GUI-13 B4: on the Export buttons, not the canvas
                 self.export_hint.emit(f'Exports use the full title: {full}')
             else:

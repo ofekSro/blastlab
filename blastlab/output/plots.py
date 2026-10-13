@@ -47,15 +47,24 @@ def titled(base, extra=None):
     return f'{extra}\n{base}' if extra else base
 
 
+def charge_material(meta, material=None):
+    """The material word every figure title puts after `kg` (GUI-16 round
+    2, F-1; P1-9 decision 1): `material`, else the meta's own (blastFoam
+    metas carry it), else TNT - native metas carry none, and native is
+    TNT. A label only: no TNT equivalence, nothing read from a case file."""
+    return material or (meta or {}).get('material') or 'TNT'
+
+
 def charge_label(meta):
     fp = meta.get('from_profile')
     if fp in (True, '1d'):
         return '1D remap'
     if fp == '2d':
         return '2D remap'
+    mat = charge_material(meta)
     if meta.get('geometry') == 'planar':
-        return f"{meta['charge']:g} kg/m TNT"
-    return f"{meta['charge']:g} kg TNT"
+        return f"{meta['charge']:g} kg/m {mat}"
+    return f"{meta['charge']:g} kg {mat}"
 
 
 def _inferno_bad_gray():
@@ -285,7 +294,9 @@ def set_frame(mesh, p, solid, clim=None):
 # ── 1D figures ────────────────────────────────────────────────────────────────
 
 def figure_results_1d(snapshots, eos, charge_kg, radius_m,
-                      title_extra=None):
+                      title_extra=None, material=None):
+    """1D profiles. `material`: the title's material word
+    (`charge_material`; None: TNT). `charge_kg` is printed as given."""
     fig = Figure(figsize=(10, 10))
     axes = fig.subplots(3, 1, sharex=True)
 
@@ -302,7 +313,8 @@ def figure_results_1d(snapshots, eos, charge_kg, radius_m,
     axes[2].set_xlabel('Radius [m]')
 
     axes[0].set_title(titled(
-        f'1D Spherical Blast - {charge_kg} kg TNT - EOS: {eos}',
+        f'1D Spherical Blast - {charge_kg} kg '
+        f'{charge_material(None, material)} - EOS: {eos}',
         title_extra))
     axes[0].axhline(P_AIR / 1e3, color='k', lw=0.8, ls='--', alpha=0.4,
                     label='Ambient')
@@ -317,13 +329,14 @@ def figure_results_1d(snapshots, eos, charge_kg, radius_m,
 
 
 def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None,
-                     numbers=None, drop_note=None):
+                     numbers=None, drop_note=None, material=None):
     """Gauge grid for 1D (radii). GUI-16 (b): `numbers` are the entered
     numbers of the series (`gauge_summary.numbers_1d`), so a gauge the
     solver dropped does not renumber the later ones, and the figure says
     which in a footnote - `drop_note` (the Qt export passes the Gauges
     screen's own), else one `G2 dropped by the solver` line per gap in
-    `numbers`. None for both: today's figure exactly."""
+    `numbers`. None for both: today's figure exactly. `material`: as
+    `figure_results_1d`."""
     times  = gauge_out['times']
     radii  = gauge_out['radii']
     pdata  = gauge_out['pressures']
@@ -347,7 +360,8 @@ def figure_gauges_1d(gauge_out, charge_kg, eos, title_extra=None,
     fig = Figure(figsize=(7 * ncols, 4 * nrows), layout='constrained')
     axes = fig.subplots(nrows, ncols, squeeze=False)
     fig.suptitle(titled(
-        f'Gauge Time Histories - {charge_kg} kg TNT - EOS: {eos}',
+        f'Gauge Time Histories - {charge_kg} kg '
+        f'{charge_material(None, material)} - EOS: {eos}',
         title_extra),
                  fontsize=12)
 
