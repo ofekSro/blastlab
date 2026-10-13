@@ -1562,6 +1562,13 @@ class RunPanel(QWidget):
         self.progress.setValue(1000)
         self.strip.pct_lbl.setText('100 %')
 
+    def reset_bar(self):
+        """A chain stopped between stages: no stage is in flight, so the
+        last stage's 100 % must not stand (GUI-16 R1)."""
+        self._frac = None
+        self.progress.setValue(0)
+        self.strip.pct_lbl.setText('0 %')
+
     def on_progress(self, p):
         frac = max(0.0, min(1.0, p.frac))
         self.progress.setValue(int(round(1000 * frac)))

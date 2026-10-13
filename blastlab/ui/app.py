@@ -151,6 +151,7 @@ class MainWindow(QMainWindow):
         # the elapsed line, the ETA and the 30 s Stop rule read it
         self._run_clock = self.run_panel.clock
         self._run_got_result = False    # a result landed in this run
+        self._run_n_results = 0         # how many (a Stop mid-chain, R1)
         self._last_result = None        # the newest Result of this run
         # `✓ Done · ` in the title after a run that ended on its own,
         # until the next run or Open case (decision D68)
@@ -1314,6 +1315,7 @@ class MainWindow(QMainWindow):
         if running:
             self._run_clock.start()
             self._run_got_result = False
+            self._run_n_results = 0
             self._last_result = None
             self._stop_asked = False
             self._done_mark = False
@@ -1381,6 +1383,8 @@ class MainWindow(QMainWindow):
                     k, self._run_clock.stage_s(),
                     'stopped' if res.stopped_early else 'done')
         self._run_got_result = True
+        if self._running_ui:
+            self._run_n_results += 1
         self._results.append((label_, dim, res))
         model = getattr(self.ctrl, '_run_name', '') or ''
         if self._running_ui and self._chain_n > 1 and model:
@@ -1409,9 +1413,15 @@ class MainWindow(QMainWindow):
         # first result leaves no result to call stopped: say so anyway)
         if errored:
             how = 'failed'
-        elif stopped_early or (self._stop_asked
-                               and not self._run_got_result):
+        elif stopped_early or (self._stop_asked and self._run_n_results
+                               < max(1, self._chain_n)):
+            # GUI-16 R1: a Stop that landed in a later stage's blockMesh
+            # or between stages has fewer results than the chain has
+            # stages, though stage 1's result did arrive
             how = 'stopped'
+            if (not stopped_early and self._chain_n > 1
+                    and self._chain_k <= self._run_n_results):
+                self.run_panel.reset_bar()      # no stage in flight
         elif self._run_got_result:
             how = 'done'
         else:

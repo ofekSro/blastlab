@@ -1501,6 +1501,39 @@ def s7_strip():
               strip.texts()[1] == '02 2D 100 %', str(strip.texts()))
         win.on_running(False)
         win.on_finished(False, False)
+        # GUI-16 R1: a Stop in a later stage (its blockMesh, or between
+        # stages) with stage 1's result already posted ends `stopped`
+        for where in ('in stage 2\'s blockMesh', 'between stages'):
+            strip = start([1, 2, 3])
+            win.on_run_started(INFO1D)
+            win.on_progress(prog(1.0))
+            win.on_result(0, 1, 'M - 1D', res[1])
+            if where != 'between stages':
+                win.on_run_started(INFO1D)      # stage 2, no progress yet
+            win._stop_asked = True
+            win.on_running(False)
+            win.on_finished(False, False)
+            pump(20)
+            check(f'R1: a Stop {where} after stage 1 ends Stopped, not Done',
+                  rp.time_text().startswith('Stopped after')
+                  and 'stopped' in strip.texts()[-1]
+                  and 'done' not in strip.texts()[-1].lower()
+                  and rp.pct_text() != '100 %',
+                  f'{rp.time_text()!r} {strip.texts()[-1]!r} '
+                  f'{rp.pct_text()!r}')
+        # control: every stage posted, a late Stop still ends Done
+        strip = start([1, 2, 3])
+        for k in range(3):
+            win.on_run_started(INFO1D)
+            win.on_result(k, k + 1, f'M - {k + 1}D', res[k + 1])
+        win._stop_asked = True
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(20)
+        check('R1 control: all three results plus a late Stop still ends Done',
+              rp.time_text().startswith('Done in')
+              and strip.texts()[-1].startswith('Chain done'),
+              f'{rp.time_text()!r} {strip.texts()[-1]!r}')
         # F27 (GUI-10, D182): at a stage start STEP / TIME / dt / P MAX read
         # `—` until the stage's first progress; the live plot is restarted
         # (not dropped to its placeholder) and the 3D view is kept
