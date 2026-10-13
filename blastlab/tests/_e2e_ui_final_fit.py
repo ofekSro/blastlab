@@ -16,6 +16,11 @@ elides) and PASS / FAIL.
   C9   Results: a dropped trigger selects the first row; the plot caption
        is whole; every Summary header's text lies within its section; the
        1D export-title hint is a visible line.
+  C11  P2-18: Run chain is greyed while an HD 1.3 assessment runs and its
+       refusal is titled `Run chain`; a 70-character C:\ path stays on one
+       line. P2-24: the Keep-all-fields tooltip is at most 440 px wide.
+       P2-21: the 3D form's blank tail at the scroll end (blastFoam mode)
+       is at most one row.
 
 Run:  cd blastlab/tests && python _e2e_ui_final_fit.py [--only C6] [--shots DIR]
 Exit 0 when every check passes. No solve, no WSL, no viewer child.
@@ -295,6 +300,114 @@ def c9_results(win, tag, pump):
           f'{hint.text()!r} visible {hint.isVisible()}')
 
 
+# ── C11: P2-18, P2-24 verify, P2-21 measure ──────────────────────────────
+def c11_checks(win, tag, pump):
+    from PySide6.QtCore import QPoint, Qt, QTimer
+    from PySide6.QtWidgets import (QApplication, QLabel, QMessageBox,
+                                   QToolTip)
+    from blastlab.ui import dialogs, setup_nodes
+    print(f'\nC11 {tag}: busy HD 1.3, dialog paths, tooltip width, 3D tail')
+    # P2-18: Run chain greys while an HD 1.3 assessment runs, and its
+    # refusal is titled after the action
+    seen = []
+    real_info = dialogs.show_info
+    dialogs.show_info = lambda title, text, parent=None: seen.append(
+        (title, text))
+    win._show('chain')
+    pump(200)
+    win._set_hd13_busy(True)
+    pump(100)
+    check(f'C11 P2-18 {tag}: Run chain is disabled while an HD 1.3 '
+          f'assessment is busy', not win.chain.run_btn.isEnabled(),
+          f'enabled {win.chain.run_btn.isEnabled()}')
+    win.chain.run()                 # a direct call is not greyed by the button
+    win._set_hd13_busy(False)
+    dialogs.show_info = real_info
+    check(f'C11 P2-18 {tag}: ... and its refusal is titled `Run chain`',
+          seen and seen[-1][0] == 'Run chain'
+          and 'already in progress' in seen[-1][1], str(seen))
+    # a 70-character C:\ path in a refusal box stays on one line
+    path = 'C:\\' + 'blastlab_runs\\a_long_model_name\\' * 2 + 'x' * 8
+    path = path[:70]
+    box = QMessageBox(QMessageBox.Critical, 'Run',
+                      f'Runs folder does not exist: {path}',
+                      QMessageBox.Ok, win)
+    dialogs._keep_paths(box)
+    box.show()
+    pump(300)
+    lbl = box.findChild(QLabel, 'qt_msgbox_label')
+    fm = lbl.fontMetrics()
+    lines = lbl.text().split('\n')
+    on_a_line = [ln for ln in lines if path in ln.replace('\u200b', '')]
+    check(f'C11 P2-18 {tag}: a {len(path)}-character C:\\ path stays on one '
+          f'line',
+          bool(on_a_line)
+          and fm.horizontalAdvance(on_a_line[0].strip()) <= lbl.width(),
+          f'{len(path)} chars, {fm.horizontalAdvance(path)} px of a '
+          f'{lbl.width()} px label; lines {lines}')
+    box.close()
+    # P2-24: the Keep-all-fields tooltip renders at most 440 px wide
+    win.set_solver('blastfoam')
+    win._show('setup')
+    win.setup.set_dim(2)
+    pump(300)
+    node = setup_nodes.node_of_field(2, 'keep_all_fields')
+    win.setup.select_node(node)
+    pump(300)
+    keep = win.setup.form.widgets.get('keep_all_fields')
+    if keep is not None and keep.isVisible():
+        QToolTip.showText(keep.mapToGlobal(QPoint(5, 5)), keep.toolTip(),
+                          keep)
+        pump(300)
+        tips = [w for w in QApplication.topLevelWidgets()
+                if w.isVisible() and w.metaObject().className() == 'QTipLabel']
+        width = max((w.width() for w in tips), default=0)
+        check(f'C11 P2-24 {tag}: the Keep-all-fields tooltip is at most '
+              f'440 px wide', 0 < width <= 440, f'{width} px')
+        QToolTip.hideText()
+    else:
+        check(f'C11 P2-24 {tag}: the Keep-all-fields box is on screen',
+              False, f'widget {keep}')
+    win.setup.set_dim(2)
+    # P2-21: the gap under the 3D form's last card, at the scroll end - in
+    # blastFoam mode, which has the most cards (OUT-2 QA F5 saw it there)
+    win._show('setup')
+    sp = win.setup
+    sp.set_dim(3)
+    pump(300)
+    scrolled = []
+    row = QLabel('x')
+    row_h = max(row.sizeHint().height(), 34)
+    worst = (0, '')
+    for n, _t in setup_nodes.nodes(3):
+        if not sp.select_node(n.id):
+            continue
+        pump(120)
+        sp._scroll.verticalScrollBar().setValue(
+            sp._scroll.verticalScrollBar().maximum())
+        pump(60)
+        content = sp._content
+        bottoms = [c.mapTo(content, QPoint(0, c.height())).y()
+                   for t, c in sp.form.cards.items()
+                   if c.isVisibleTo(content)]
+        gap = content.height() - max(bottoms) if bottoms else 0
+        # a column taller than its content has no scroll end to measure:
+        # the viewport's empty bottom is just the column
+        scrolls = sp._scroll.verticalScrollBar().maximum() > 0
+        if scrolls:
+            scrolled.append((n.id, gap))
+        if scrolls and gap > worst[0]:
+            worst = (gap, n.id)
+    check(f'C11 P2-21 {tag}: the blank tail under the 3D form\'s last card '
+          f'at the scroll end is at most one row ({row_h} px)',
+          worst[0] <= row_h,
+          f'worst {worst[0]} px on node {worst[1]!r}; nodes that scroll '
+          f'(node, tail px): {scrolled}')
+    sp.set_dim(2)
+    win.set_solver('native')
+    pump(200)
+
+
 def run_size(win, app, size, mode, pump, only):
     from blastlab.ui import theme
     theme.apply(app, mode)
@@ -309,6 +422,8 @@ def run_size(win, app, size, mode, pump, only):
         c8_run(win, tag, pump)
     if not only or 'C9' in only:
         c9_results(win, tag, pump)
+    if not only or 'C11' in only:
+        c11_checks(win, tag, pump)
 
 
 def main():
@@ -333,6 +448,9 @@ def main():
             for mode in MODES:
                 run_size(win, app, size, mode, pump, only)
     finally:
+        # the recorder is for Qt slots; an exception out of a check
+        # function must still print its traceback
+        sys.excepthook = sys.__excepthook__
         win.close()
         pump(100)
     check('no uncaught exception', not crashes, '\n'.join(crashes)[:400])
