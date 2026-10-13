@@ -5,8 +5,8 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
 
-You tidy one file of blastlab, a Qt/NumPy/OpenFOAM thesis toolchain (read
-the repo `CLAUDE.md` §0, §5, §8, §9 once if this is unclear). Readability
+You tidy one file of blastlab, a Qt/NumPy/OpenFOAM thesis toolchain
+(`CLAUDE.md` is already in your context - do not Read it). Readability
 only: what the code computes, writes, shows or raises stays identical.
 The orchestrator runs the tests; you do not.
 

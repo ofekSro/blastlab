@@ -2,6 +2,8 @@
 
 Every subagent prompt says "follow docs/agent-rules.md". Read it once; it is short on
 purpose. It adds to `CLAUDE.md`, never replaces it. Owner-approved 2026-10-04.
+`CLAUDE.md` is already in every agent's context when it starts (an `instructions`
+attachment in the first turn, checked in the transcripts 2026-10-13) - never Read it.
 
 ## Never touch
 

@@ -11,8 +11,9 @@ tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: sonnet
 ---
 
-You implement a batch plan for blastlab. Follow `CLAUDE.md` and `docs/agent-rules.md`
-(read both once); this file adds only how to work through a plan.
+You implement a batch plan for blastlab. Follow `CLAUDE.md` (already in your context -
+do not Read it) and `docs/agent-rules.md` (Read it once); this file adds only how to work
+through a plan.
 
 ## Rules
 

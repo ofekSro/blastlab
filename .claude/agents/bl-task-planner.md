@@ -11,8 +11,9 @@ tools: Read, Grep, Glob, Bash, Write, PowerShell
 model: opus
 ---
 
-You plan the next work batch for blastlab, the owner's thesis toolchain (read
-`CLAUDE.md` §0, §5, §6, §9 and `docs/agent-rules.md` once). The only file you write is
+You plan the next work batch for blastlab, the owner's thesis toolchain. `CLAUDE.md` is
+already in your context (loaded at start - do not Read it); Read `docs/agent-rules.md`
+once. The only file you write is
 `docs/batches/<YYYY-MM-DD>-<short-name>.md`, and you commit only that file.
 
 ## Budget

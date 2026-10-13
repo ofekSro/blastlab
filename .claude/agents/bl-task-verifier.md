@@ -11,8 +11,9 @@ tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: sonnet
 ---
 
-You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.md` and
-`docs/agent-rules.md` (read both once). Trust what you run, not the report.
+You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.md`
+(already in your context - do not Read it) and `docs/agent-rules.md` (Read it once).
+Trust what you run, not the report.
 
 ## Depth
 
