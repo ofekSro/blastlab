@@ -89,6 +89,55 @@ def latest_out():
     return os.path.join(QA_ROOT, runs[-1]) if runs else None
 
 
+def refused_out(out):
+    """G15Q-6 (D37): `--out` under OneDrive or inside the repo is refused
+    (a sync client holds shots and model folders open; the repo would be
+    littered). Returns the one-line reason, or '' when `out` is fine."""
+    def norm(p):
+        return os.path.normcase(os.path.realpath(os.path.abspath(p)))
+
+    def inside(p, root):
+        try:
+            return os.path.commonpath([p, root]) == root
+        except ValueError:      # another drive
+            return False
+
+    here = norm(out)
+    roots = [('the repo', REPO)]
+    for var in ('OneDrive', 'OneDriveCommercial', 'OneDriveConsumer'):
+        if os.environ.get(var):
+            roots.append((f'%{var}%', os.environ[var]))
+    for what, root in roots:
+        if inside(here, norm(root)):
+            return (f'--out {out} is inside {what} ({root}); give a '
+                    f'folder outside OneDrive and the repo')
+    return ''
+
+
+def set_aside_partial_models(runs):
+    """G15Q-6 (D38): a model folder in `runs` without MODEL.json is what a
+    cut-off run leaves; `use_model` would refuse it at boot ("not a
+    blastlab model folder") and `--resume` crashed. Rename each to
+    `<name>.partial-<n>`; returns the log lines."""
+    lines = []
+    try:
+        names = sorted(os.listdir(runs))
+    except OSError:
+        return lines
+    for name in names:
+        src = os.path.join(runs, name)
+        if not os.path.isdir(src) \
+                or os.path.isfile(os.path.join(src, 'MODEL.json')):
+            continue
+        n = 1
+        while os.path.exists(f'{src}.partial-{n}'):
+            n += 1
+        os.rename(src, f'{src}.partial-{n}')
+        lines.append(f'resume: model folder {name} has no MODEL.json - '
+                     f'renamed to {name}.partial-{n}')
+    return lines
+
+
 class QA:
     def __init__(self, out, args):
         self.out = out
@@ -4677,8 +4726,14 @@ def main():
         out = latest_out()
     else:
         out = os.path.join(QA_ROOT, time.strftime('%Y%m%d-%H%M'))
+    why = refused_out(out)
+    if why:
+        print(why, file=sys.stderr, flush=True)
+        return 2
     os.makedirs(out, exist_ok=True)
     print(f'QA output: {out}', flush=True)
+    renamed = (set_aside_partial_models(os.path.join(out, 'runs'))
+               if args.resume and not args.list else [])
 
     # scratch settings + CWD BEFORE importing the app. auto_cleanup off
     # is not optional: building the window otherwise sweeps the WSL run
@@ -4701,6 +4756,8 @@ def main():
     sys.path.insert(0, REPO)
 
     qa = QA(out, args)
+    for line in renamed:
+        qa.log(line)
     qa.solver_seed = args.solver or None
     only = [g for g in args.only.split(',') if g]
     skip = [s for s in args.skip.split(',') if s]
