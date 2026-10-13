@@ -75,3 +75,6 @@ export: the orange `x` (B5). The live panes do not draw `gauges_dropped` yet (C/
 
 **Verdict:** Part B verified. B1 had one low defect, fixed in `f183a4f`. B2 stays PARTIAL until the owner rules on
 one pin. No number moved.
+
+**Owner ruling 2026-10-13:** questions 1 and 2 approved. B2 finished in `200573b` (the log line and the three pins,
+text only; `gate --changed` 31/31 green). B2 is now **FIXED**, B4's 212 hash lines accepted.
