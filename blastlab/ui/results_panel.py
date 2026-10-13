@@ -1247,6 +1247,12 @@ class ResultsPanel(QWidget):
                 res.meta.setdefault('from_profile', getattr(
                     load_case(os.path.join(folder, mf.CASE_FILE)),
                     'init_mode', 'charge') != 'charge')
+                # C12: load_result reads `eos` from the saved case, where a
+                # blastFoam run's native-only field says idealGas; the
+                # run's own meta says JWL (backend finalize_*), so every
+                # title and export of the loaded result does too
+                if res.meta.get('solver') == 'blastfoam':
+                    res.meta['eos'] = 'JWL'
             return res
         path = os.path.normpath(str(path))
         name = os.path.basename(path)

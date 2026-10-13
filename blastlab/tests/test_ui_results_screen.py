@@ -1605,6 +1605,38 @@ def s6_field(link):
                   got_t == 'QA title\n' + want, ascii(got_t))
             p.title_box.setText('')
             pump(60)
+            # C12 (owner 2026-10-13): a blastFoam result is JWL products,
+            # whatever the native-only `eos` of its case says; a native
+            # result's title (just checked) is unchanged
+            import copy
+            bf = copy.copy(res)
+            bf.meta = dict(res.meta, solver='blastfoam', eos='idealGas')
+            p.add_result('foam 1d', 1, bf)
+            pump(120)
+            bf_title = p.fields.canvas.figure.axes[0].get_title()
+            check('C12: a blastFoam 1D result\'s title and export hint name '
+                  'JWL, never idealGas',
+                  bf_title == f'1D spherical · {c.charge_kg} kg TNT · JWL'
+                  and 'idealGas' not in bf_title
+                  and 'EOS: JWL' in p._export_btns['pngs'].toolTip()
+                  and 'idealGas' not in p._export_btns['pngs'].toolTip(),
+                  ascii(bf_title))
+            from blastlab.ui import results_fields as RFS
+            check('C12: a native result with the same eos keeps its own',
+                  RFS.screen_label_1d(res.meta) == m_charge(res.meta)
+                  and RFS.display_eos(dict(res.meta, eos='idealGas',
+                                           solver='native')) == 'idealGas'
+                  and RFS.display_eos(dict(res.meta, eos='JWL')) == 'JWL')
+            from blastlab.ui import setup_nodes
+            from blastlab.models.case import Case1D as _C1
+            foam1 = setup_nodes.summaries(_C1(solver='blastfoam'))['solver']
+            nat1 = setup_nodes.summaries(_C1(solver='native',
+                                             eos='idealGas'))['solver']
+            check('C12: the Setup tree\'s Solver line names no idealGas for '
+                  'a blastFoam case, and keeps it for a native one',
+                  'idealGas' not in foam1 and nat1.startswith('idealGas · '),
+                  f'{foam1!r} {nat1!r}')
+            p.sel.setCurrentIndex(p.sel.count() - 2)
             p.resize(1600, 1000)
             pump(40)
             continue
@@ -2128,6 +2160,22 @@ def s_open_model_folder(win, link):
               and g.drop_caption.text()
               == 'G2 dropped by the solver (inside Wall 1)',
               f'{g.cells()} {g.drop_caption.text()!r}')
+        # C12: a blastFoam model folder's case holds the native-only eos
+        # (idealGas); the loaded Result must say JWL, as the run's own does
+        from blastlab.services import model_folder as mf
+        real_load = mf.load_result
+
+        def as_foam(path):
+            r = real_load(path)
+            r.meta.update(solver='blastfoam', eos='idealGas')
+            return r
+        mf.load_result = as_foam
+        try:
+            _n, _whole, got = p.read_model_folder(folder)
+        finally:
+            mf.load_result = real_load
+        check('C12: a loaded blastFoam model folder carries eos JWL',
+              got[0][1].meta['eos'] == 'JWL', str(got[0][1].meta['eos']))
         # a chain: two stage folders under one model folder
         from blastlab.models.case import Case1D
         one = _written_model(runs, Case1D(

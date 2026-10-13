@@ -68,6 +68,25 @@ def screen_unit(unit):
     return unit.replace('[Pa·s]', '[kPa·ms]')
 
 
+def display_eos(meta):
+    """C12 (owner 2026-10-13): the products EOS a result's title names.
+    `meta['eos']` is native's own choice (`idealGas` or `JWL`); a blastFoam
+    result is JWL products whatever that field holds - `case.eos` is a
+    native-only field the writer forces to `idealGas` for blastFoam
+    (writer.py), and a model folder loaded back (`load_result`) reads it
+    from the saved case. Native results keep their own."""
+    if (meta or {}).get('solver') == 'blastfoam':
+        return 'JWL'
+    return (meta or {}).get('eos')
+
+
+def screen_label_1d(meta):
+    """`models.meta.charge_label(meta)` with the EOS a screen shows
+    (`display_eos`); a native meta gives exactly `charge_label`'s."""
+    c = charge_label(meta)
+    return c._replace(eos=display_eos(meta))
+
+
 def screen_title_1d(c):
     """The 1D profile figure's title on screen (F17, D214): `1D spherical
     · 1.0 kg TNT · JWL`, with the builder's own charge and EOS wording
@@ -421,7 +440,7 @@ class FieldsView(QWidget):
         res = ent.result
         try:
             if ent.dim == 1:
-                c = charge_label(res.meta)
+                c = screen_label_1d(res.meta)
                 fig = plots.figure_results_1d(
                     res.snapshots, c.eos, c.charge_kg, c.radius_m,
                     title_extra=self._title_extra)
