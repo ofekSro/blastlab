@@ -349,11 +349,56 @@ class MeshOverlay:
             pass
 
 
-def add_gauge_markers(plot, points, trigger=None, color=GAUGE_COLOR):
+#: a marker's label sits up and to the right of its point; D23: where that
+#: would meet another label it takes the next of these (the alternate side
+#: first), judged in pixels
+_LABEL_ANCHORS = ((-0.2, 1.25), (1.2, -0.25), (1.2, 1.25), (-0.2, -0.25))
+
+
+def _declutter(plot, labels):
+    """GUI-16 (f), D23: labels of markers that stand close (within ~3 label
+    heights) must not overlap - GUI-14's `G1G2` run-together. In order,
+    each label takes the first anchor of `_LABEL_ANCHORS` whose pixel
+    rectangle misses the labels already placed (the first one that does
+    not, if none is free). `labels` is [(TextItem, x, y)]. A no-op until
+    the view has a size and a range; the caller re-runs it when either
+    changes."""
+    vb = plot.getViewBox()
+    (x0, x1), (y0, y1) = vb.viewRange()
+    w, h = vb.width(), vb.height()
+    if w <= 1 or h <= 1 or x1 <= x0 or y1 <= y0:
+        return
+    placed = []
+    for txt, x, y in labels:
+        px = (x - x0) / (x1 - x0) * w
+        py = (y1 - y) / (y1 - y0) * h              # screen y grows down
+        r = txt.boundingRect()
+        tw, th = r.width(), r.height()
+        pick = _LABEL_ANCHORS[0]
+        for ax, ay in _LABEL_ANCHORS:
+            box = QRectF(px - ax * tw, py - ay * th, tw, th).adjusted(
+                -2, -2, 2, 2)
+            if not any(box.intersects(o) for o in placed):
+                pick = (ax, ay)
+                break
+        if tuple(txt.anchor) != tuple(pick):
+            txt.setAnchor(pick)
+        placed.append(QRectF(px - pick[0] * tw, py - pick[1] * th, tw, th)
+                      .adjusted(-2, -2, 2, 2))
+
+
+def add_gauge_markers(plot, points, trigger=None, color=GAUGE_COLOR,
+                      dropped=None):
     """Gauge positions on a field plot: a ringed dot per gauge with its
     number (the trigger gauge heavier, starred). `points` is
-    [(n, x, y), ...] as plots.gauge_points builds. Returns the items."""
-    items = []
+    [(n, x, y), ...] as plots.gauge_points builds. Returns the items.
+
+    GUI-16 (f), D13: `dropped` [(n, x, y)] are the gauges the solver
+    dropped, at their ENTERED points: a hollow `x` in the theme's warn
+    colour with its `G<n>`, never starred - the look of
+    `output.plots.add_gauge_markers`. None: exactly today's items.
+    Labels that would run together take alternating anchors (D23)."""
+    items, labels = [], []
     for n, x, y in points:
         is_trig = (trigger is not None and n == trigger)
         dot = pg.ScatterPlotItem(
@@ -363,11 +408,33 @@ def add_gauge_markers(plot, points, trigger=None, color=GAUGE_COLOR):
         dot.setZValue(3.5)
         plot.addItem(dot)
         txt = pg.TextItem(f'G{n}' + ('*' if is_trig else ''), color=color,
-                          anchor=(-0.2, 1.25))
+                          anchor=_LABEL_ANCHORS[0])
         txt.setPos(float(x), float(y))
         txt.setZValue(3.5)
         plot.addItem(txt)
         items += [dot, txt]
+        labels.append((txt, float(x), float(y)))
+    warn = theme.cur('warn')
+    for n, x, y in dropped or ():
+        dot = pg.ScatterPlotItem(
+            [float(x)], [float(y)], size=9, symbol='x',
+            pen=pg.mkPen(warn, width=1.4), brush=pg.mkBrush(None),
+            pxMode=True)
+        dot.setZValue(3.5)
+        plot.addItem(dot)
+        txt = pg.TextItem(f'G{n}', color=warn, anchor=_LABEL_ANCHORS[0])
+        txt.setPos(float(x), float(y))
+        txt.setZValue(3.5)
+        plot.addItem(txt)
+        items += [dot, txt]
+        labels.append((txt, float(x), float(y)))
+    if len(labels) > 1:
+        def again(*_a):
+            _declutter(plot, labels)
+        vb = plot.getViewBox()
+        vb.sigResized.connect(again)
+        vb.sigRangeChanged.connect(again)
+        again()
     return items
 
 
@@ -437,8 +504,11 @@ class LiveSlicePane(QWidget):
         plot.setLabel('left', info.get('ylabel', 'y [m]'))
         self._title_base = str(info.get('title', '') or '')
         self._set_title(self._title_base)
-        self._markers = add_gauge_markers(plot, info.get('gauges') or [],
-                                          trigger=info.get('trigger_gauge'))
+        # GUI-16 (f): the dropped gauges too, at their entered points
+        self._markers = add_gauge_markers(
+            plot, info.get('gauges') or [],
+            trigger=info.get('trigger_gauge'),
+            dropped=info.get('gauges_dropped') or None)
 
     def start_1d(self, info):
         plot = self._new_plot()
