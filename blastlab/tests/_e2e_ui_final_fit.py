@@ -13,6 +13,9 @@ elides) and PASS / FAIL.
        viewport; the card meta wraps, never elides.
   C8   Run: at a forced elide the card header keeps its number and unit
        whole (only `· Wall n` elides).
+  C9   Results: a dropped trigger selects the first row; the plot caption
+       is whole; every Summary header's text lies within its section; the
+       1D export-title hint is a visible line.
 
 Run:  cd blastlab/tests && python _e2e_ui_final_fit.py [--only C6] [--shots DIR]
 Exit 0 when every check passes. No solve, no WSL, no viewer child.
@@ -191,6 +194,107 @@ def c8_run(win, tag, pump):
     card.meta.setMaximumWidth(16777215)
 
 
+# ── C9: Results ──────────────────────────────────────────────────────────
+_RESULTS = {}
+
+
+def results_fixture():
+    """A native 2D-like Result with three entered gauges, G2 inside Wall 1
+    (dropped) and the trigger on it, and one 1D Result for the title hint."""
+    import numpy as np
+    from blastlab.core.constants import P_AIR
+    from blastlab.solvers.hooks import Result
+    from test_gui_results_fields import fake_2d
+    res = fake_2d()
+    t = np.linspace(0.0, 8e-3, 400)
+    traces = []
+    for t0, pk in ((4.7e-3, 184e3), (4.15e-3, 231e3)):
+        s = np.clip((t - t0) / 1.3e-3, 0.0, None)
+        traces.append(np.where(t >= t0, P_AIR + pk * (1 - s) * np.exp(-2 * s),
+                               P_AIR))
+    res.gauges = dict(times=t, points=[(2.975, 0.525), (2.975, 1.525)],
+                      pressures=traces)
+    res.meta.update(geometry='axisymmetric', charge=1.0,
+                    charge_center=(0.0, 2.0), dx=0.05,
+                    gauges=[(2.95, 0.50), (1.2, 0.6), (2.95, 1.50)],
+                    obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0,
+                    from_profile=False, trigger_gauge=2)
+    return Result(res.snapshots, res.gauges, res.meta, res.stop_reason,
+                  False)
+
+
+def c9_results(win, tag, pump):
+    from PySide6.QtCore import Qt
+    from blastlab.ui import results_gauges as RG
+    print(f'\nC9 {tag}: Results gauges page, export hint')
+    rp = win.results
+    if 'two' not in _RESULTS:
+        _RESULTS['two'] = results_fixture()
+        win._show('results')
+        rp.add_result('fit - 2D', 2, _RESULTS['two'])
+        pump(500)
+    win._show('results')
+    rp.sel.setCurrentIndex(0)                # the 2D fixture
+    rp.show_view('Gauges')
+    pump(500)
+    g = rp.gauges
+    check(f'C9 (i) {tag}: trigger G2 was dropped, the default row is row 1 '
+          f'(the first listed)',
+          g.selected() == g.order()[0] and g.label(g.selected()) == 'G3'
+          if g.order() else False,
+          f'selected {g.selected()}, order {g.order()}, labels '
+          f'{[c[0] for c in g.cells()]}')
+    cap = g.head_caption
+    check(f'C9 (ii) {tag}: the plot caption shows whole - its full text, '
+          f'or its short form where that does not fit; never cut',
+          cap.isVisible() and cap.text() in (RG.PLOT_CAPTION,
+                                             RG.PLOT_CAPTION_SHORT)
+          and cap.fontMetrics().horizontalAdvance(cap.text()) <= cap.width(),
+          f'{cap.text()!r} in {cap.width()} px')
+    hdr = g.table.horizontalHeader()
+    bad = []
+    for c in g.visible_columns():
+        text = g.table.horizontalHeaderItem(c).text()
+        lines = text.split('\n')
+        need_w = max(hdr.fontMetrics().horizontalAdvance(ln) for ln in lines)
+        need_h = len(lines) * hdr.fontMetrics().lineSpacing()
+        if need_w + 8 > hdr.sectionSize(c) or need_h > hdr.height():
+            bad.append((text, need_w, hdr.sectionSize(c), need_h,
+                        hdr.height()))
+    check(f'C9 (iii) {tag}: every Summary header\'s text is within its '
+          f'section (width and height)', not bad,
+          f'{bad}; table {g.table.viewport().width()} px, columns '
+          f'{hdr.length()} px (it scrolls sideways when narrower), '
+          f'wrapped {g.headers_wrapped()}')
+    # the export-title hint is a line, not only a tooltip (a 1D result)
+    if 'one' not in _RESULTS:
+        import numpy as np
+        from blastlab.core.constants import P_AIR
+        from blastlab.solvers.hooks import Result
+        r = np.linspace(0.01, 2.0, 60)
+        snap = dict(r=r, p=P_AIR + 200e3 * np.exp(-r),
+                    rho=np.full_like(r, 1.2), u=np.zeros_like(r))
+        _RESULTS['one'] = Result(
+            {'t = 0.100 ms (final)': snap},
+            dict(times=np.linspace(0, 2e-3, 30), radii=[0.5, 1.0],
+                 pressures=[P_AIR + 100e3 * np.ones(30),
+                            P_AIR + 50e3 * np.ones(30)]),
+            dict(eos='JWL', charge_kg=1.0, radius_m=2.0,
+                 final_profile=np.column_stack(
+                     [r, snap['p'], snap['rho'], snap['u']])),
+            'end time reached', False)
+        rp.add_result('fit - 1D', 1, _RESULTS['one'])
+        pump(500)
+    rp.sel.setCurrentIndex(1)                # the 1D fixture
+    rp.show_view('Field')
+    pump(500)
+    hint = rp.export_col.hint
+    check(f'C9 (iv) {tag}: the export-title hint is a visible muted line',
+          hint.isVisible() and hint.text().startswith('Exports use the full '
+                                                      'title'),
+          f'{hint.text()!r} visible {hint.isVisible()}')
+
+
 def run_size(win, app, size, mode, pump, only):
     from blastlab.ui import theme
     theme.apply(app, mode)
@@ -203,6 +307,8 @@ def run_size(win, app, size, mode, pump, only):
         c7_chain(win, tag, pump)
     if not only or 'C8' in only:
         c8_run(win, tag, pump)
+    if not only or 'C9' in only:
+        c9_results(win, tag, pump)
 
 
 def main():

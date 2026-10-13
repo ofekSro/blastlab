@@ -1123,6 +1123,29 @@ def s5g_dropped(link):
           and labels1 == {1: 'G1', 2: 'G3'}
           and drop1 == [(2, 'outside the domain')],
           f'{plain1} {labels1} {drop1}')
+    # G15U-L5 (D33): the default row follows the trigger by its entered
+    # number. G1 (inside Wall 1) is dropped and is the trigger: no row is
+    # labelled G1, so the first row (G3, the lowest Z) stands in - it used
+    # to be the row numbered 1, which is G2
+    trig = sample_2d(trigger=1)
+    trig.meta.update(gauges=[(1.2, 0.6), (2.95, 0.50), (2.95, 1.50)],
+                     obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0)
+    p.add_result('trigger dropped', 2, trig)
+    pump(60)
+    check('G15U-L5: trigger G1 dropped -> the first row (G3) is selected, '
+          'not the row numbered 1 (G2)',
+          g.selected() == g.order()[0] and g.label(g.selected()) == 'G3'
+          and g.label(1) == 'G2', f'{g.selected()} {g.order()} '
+          f'{[g.label(k) for k in g.order()]}')
+    kept = sample_2d(trigger=2)
+    kept.meta.update(gauges=[(1.2, 0.6), (2.95, 0.50), (2.95, 1.50)],
+                     obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0)
+    p.add_result('trigger kept', 2, kept)
+    pump(60)
+    check('G15U-L5: trigger G2 (kept) selects the row labelled G2 even '
+          'though it is not the first',
+          g.label(g.selected()) == 'G2' and g.selected() != g.order()[0],
+          f'{g.selected()} {g.order()}')
     # GUI-16 (e), D22: the one gauge was dropped - a result with gauges all
     # dropped says so (not "no gauges"); one with none keeps NO_GAUGES
     allg = sample_2d()
@@ -1154,6 +1177,49 @@ def s5g_dropped(link):
           and g.drop_caption.text()
           == 'G2 dropped by the solver (outside the domain)',
           f'{g.cells()} {g.drop_caption.text()!r}')
+    # G13U (D34): the 1D figure's export-title hint is a muted line under
+    # the buttons (and still on the figure buttons' tooltips)
+    p.show_view('Field')
+    pump(200)
+    hint = p.export_col.hint
+    check('G13U: the 1D export-title hint is a visible muted line, and the '
+          'figure buttons keep it in their tooltips',
+          hint.isVisibleTo(p.export_col) and hint.objectName() == 'expcaption'
+          and hint.text().startswith('Exports use the full title')
+          and hint.text() in p.export_col.buttons['pngs'].toolTip(),
+          f'{hint.text()!r}')
+    p.add_result('plain 2D', 2, sample_2d())
+    pump(100)
+    check('G13U: ... and gone again for a 2D result',
+          not hint.isVisibleTo(p.export_col) and hint.text() == '',
+          f'{hint.text()!r}')
+    # C9 (ii): the plot caption has a full and a short wording, the whole
+    # text always in its tooltip
+    p.show_view('Gauges')
+    pump(100)
+    cap = g.head_caption
+    full_w = cap.fontMetrics().horizontalAdvance(RG.PLOT_CAPTION)
+    cap.setFixedWidth(full_w + 4)
+    pump(20)
+    cap._render()
+    wide = cap.text()
+    cap.setFixedWidth(cap.fontMetrics().horizontalAdvance(
+        RG.PLOT_CAPTION_SHORT) + 4)
+    pump(20)
+    cap._render()
+    narrow = cap.text()
+    cap.setFixedWidth(20)
+    pump(20)
+    cap._render()
+    tiny = cap.text()
+    cap.setMinimumWidth(0)
+    cap.setMaximumWidth(16777215)
+    check('G14Q-F5: the plot caption reads in full where it fits, in its '
+          'short form where it does not, elides only below that; the '
+          'tooltip is always the full text',
+          wide == RG.PLOT_CAPTION and narrow == RG.PLOT_CAPTION_SHORT
+          and tiny.endswith('…') and cap.toolTip() == RG.PLOT_CAPTION,
+          f'{wide!r} {narrow!r} {tiny!r}')
     p.shutdown()
     p.deleteLater()
     pump(20)

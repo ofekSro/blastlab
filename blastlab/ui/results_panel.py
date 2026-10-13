@@ -992,6 +992,8 @@ class ResultsPanel(QWidget):
         if text == self._export_hint:
             return
         self._export_hint = text
+        if getattr(self, 'export_col', None) is not None:
+            self.export_col.set_hint(text)
         if hasattr(self, '_export_btns'):
             self._sync_export_buttons(self.current())
 

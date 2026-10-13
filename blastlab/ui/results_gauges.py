@@ -104,6 +104,8 @@ TABLE_MAX_SHARE = 0.42
 #: board lines 112 and 154
 PLOT_CAPTION = ('selected gauge in colour, the others grey · shaded: '
                 'positive phase')
+#: ... and what the caption says where that does not fit (1100 x 720)
+PLOT_CAPTION_SHORT = 'selected in colour'
 TABLE_CAPTION = ('click a row to plot it · net impulse includes the '
                  'negative phase')
 PLOT_TIP = ('On screen, every gauge on one plot. The exported gauge '
@@ -262,6 +264,31 @@ class _Table(QTableWidget):
         super().keyPressEvent(event)
 
 
+class _FitCaption(ElidedLabel):
+    """A one-line caption with two wordings: the full text when it fits
+    the width, else the short one (elided only below that). The whole text
+    is always the tooltip."""
+
+    def __init__(self, full, short, parent=None):
+        self._short = str(short)
+        super().__init__(full, Qt.ElideRight, parent)
+        self.set_tip(full)
+
+    def short_text(self):
+        return self._short
+
+    def _render(self):
+        w = self.width()
+        fm = self.fontMetrics()
+        if w <= 0 or fm.horizontalAdvance(self._full) <= w:
+            shown = self._full
+        else:
+            shown = fm.elidedText(self._short, Qt.ElideRight, w) \
+                if fm.horizontalAdvance(self._short) > w else self._short
+        QLabel.setText(self, shown)
+        self.setToolTip(self._tip if self._tip is not None else self._full)
+
+
 class GaugesView(QWidget):
     #: a gauge was selected (its G number): a row click, or select()
     gauge_selected = Signal(int)
@@ -305,8 +332,11 @@ class GaugesView(QWidget):
         self.head_lbl.setObjectName('gaugehead')
         self.head_lbl.setToolTip(PLOT_TIP)
         head.addWidget(self.head_lbl, 0, Qt.AlignBaseline)
-        # elided at the right on a narrow window, whole in the tooltip
-        self.head_caption = ElidedLabel(PLOT_CAPTION, Qt.ElideRight)
+        # G14Q-F5: the full caption when it fits, else its short form -
+        # beside the title at 1100 px the centre leaves ~140 px, where the
+        # full text was cut to `selected gauge in colou…` (a line of its own
+        # would take height from the plot, which D100's pins forbid)
+        self.head_caption = _FitCaption(PLOT_CAPTION, PLOT_CAPTION_SHORT)
         self.head_caption.setObjectName('gaugecaption')
         head.addWidget(self.head_caption, 1, Qt.AlignBaseline)
         # the selector and its caption live in one widget, shown and
@@ -594,8 +624,16 @@ class GaugesView(QWidget):
         always, native since P1-24), so after a dropped gauge its row is
         the one labelled `G<n>`, not row n."""
         trig = res.meta.get('trigger_gauge')
-        trig = next((k for k, lbl in self._labels.items()
-                     if lbl == f'G{trig}'), trig)
+        if self._labels:
+            # G15U-L5 (D33): the labels name the entered numbers. A trigger
+            # the solver dropped has no row - the first row stands in; it
+            # used to fall through to the row *numbered* like the trigger,
+            # which is another gauge once a drop has shifted the numbers
+            hit = next((k for k, lbl in self._labels.items()
+                        if lbl == f'G{trig}'), None)
+            if hit in self._order:
+                return hit
+            return self._order[0] if self._order else None
         if trig in self._order:
             return trig
         return self._order[0] if self._order else None
