@@ -96,7 +96,11 @@ Otherwise run the parts serially, as above, and say why in one line.
 
 ## Stage 4: QA and UX - only when the plan says `track-end: yes`, or the owner asks
 
-**gui-qa-tester** and **gui-ux-reviewer** in parallel, given the screens touched. Their
+**gui-qa-tester** and **gui-ux-reviewer** in parallel, given the screens touched. Both
+are personal agents that never read `docs/agent-rules.md`, so put this in their prompt:
+"Never let more than 4 minutes pass between two of your tool calls; anything longer runs
+in the background and you poll with `Start-Sleep 240` or less." (Baseline 2026-10-13:
+gui-qa-tester lost 62 % of its cost to cache rebuilds in both runs.) Their
 findings become the next batch, not an in-batch retry loop. No simplifier stage for UI
 batches. Skip the stage when no GUI screen was touched.
 
