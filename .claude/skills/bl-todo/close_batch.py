@@ -17,6 +17,8 @@ a verify file holding only the Status block.
 TODO.md, in the file's existing style (see the GUI-15 / P1-24 closures):
 - a table row `| `ID` | ...` gets `✅ <date> <items>, DONE.md §0x. Original row: `
   in front of its text (`; **(j) still open**` when something of it is);
+- a list bullet `- `ID` text` closed in full becomes `- `ID` ✅ closed <date>
+  (DONE.md §0x).` (the text lives on in DONE.md and git; `--keep-body` keeps it);
 - a `### ID · title · status` heading closed in full gets `· ✅ closed <date>
   (DONE.md §0x)` and its body becomes one line naming the code that cites the
   id (code cites TODO ids - CLAUDE.md §6), unless `--keep-body ID`; the
@@ -131,11 +133,24 @@ def close_todo(todo, todo_id, closed_subs, open_subs, sec, date, notes, keep_bod
     if row.search(todo):
         lead = f'✅ {date}{" " + items if items else ""}, DONE.md §{sec}{still}. Original row: '
         return row.sub(lambda m: m.group(1) + lead, todo, count=1)
+    # list bullet `- `ID` text` (the P2 list): closed in full, the text goes to
+    # DONE.md and the bullet keeps only the id, as `- `P3-7` ... ✅ closed` does
+    bullet = re.compile(r'^(- `' + idre + r'`)(?! ✅)(.*)$', re.M)
+    b = bullet.search(todo)
+    if b:
+        if open_subs:
+            tail = f'{b.group(2)} · partly done {date} (DONE.md §{sec}){still}'
+        elif keep_body:
+            tail = f'{b.group(2)} · ✅ closed {date} (DONE.md §{sec})'
+        else:
+            tail = f' ✅ closed {date} (DONE.md §{sec}).'
+        return todo[:b.start()] + b.group(1) + tail + todo[b.end():]
     # heading
     head = re.compile(r'^(### `?' + idre + r'`? · .*?)( · \*\*[^\n]*\*\*)?[ \t]*$', re.M)
     m = head.search(todo)
     if not m:
-        notes.append(f'{todo_id}: not found in TODO.md as a table row or a ### heading - edit by hand')
+        notes.append(f'{todo_id}: not found in TODO.md as a table row, a list bullet or a '
+                     '### heading - edit by hand')
         return todo
     if '✅' in m.group(0):
         notes.append(f'{todo_id}: already closed in TODO.md - left alone')
