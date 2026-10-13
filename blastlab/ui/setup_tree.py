@@ -76,6 +76,7 @@ class SetupTree(QFrame):
     add_gauge = Signal()
     add_obstacle = Signal()
     pill_clicked = Signal()
+    mark_clicked = Signal(str)                # a `!` mark (D25), node id
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -144,6 +145,7 @@ class SetupTree(QFrame):
         for node_id, number, title in nodes:
             row = TreeRow(node_id, number, title)
             row.clicked.connect(self.node_clicked.emit)
+            row.mark_clicked.connect(self.mark_clicked.emit)
             lay.insertWidget(lay.count() - 1, row)
             self.rows[node_id] = row
             holder = QWidget()

@@ -25,6 +25,7 @@ p. 6) - background for the texts only, not a source for any value.
 
 import copy
 import os
+import re
 from dataclasses import dataclass, field
 
 from ..core import mode as mode_mod
@@ -243,9 +244,10 @@ def _burst_above_3d(two, three):
         return ''
     axisym = getattr(two, 'geometry', 'axisymmetric') == 'axisymmetric'
     burst, height = ('Burst z', 'Height H') if axisym else ('Burst y', 'Ly')
+    # F45 (C7 (i)): a short lead - the burst, not the whole field, is the
+    # point; the advice sentence says what to size
     head = (f'The 2D stage\'s {burst} ({_n1(zb)} m) is at or above this '
-            f'stage\'s Lz ({_n1(Lz)} m): the 3D box cuts the 2D field off '
-            f'above {_n1(Lz)} m, burst included. ')
+            f'stage\'s Lz ({_n1(Lz)} m): the 3D box cuts the burst off. ')
     try:
         Ly = float(two.Ly)
     except (AttributeError, TypeError, ValueError):
@@ -309,6 +311,50 @@ def handoff_reach(dims, cases):
                       f'keep it inside.' if fix else ''))
         out[d] = msg
     return out
+
+
+_GAUGE_LINE = re.compile(r'G(\d+)\b')
+
+
+def focus_target(message):
+    """D24, toolkit-free: what a click on a Checks line focuses, by the
+    message. `(stage or None, kind, key)` - `stage` None is the stage the
+    line stands in: F45 (the 2D burst at or above this stage's Lz) ->
+    `(None, 'field', 'Lz')`; S2-1 (the 1D hand-off reaches this stage's
+    boundary) -> `(1, 'field', 'radius_m')`, the 1D stage's radius; a line
+    that starts `G<n>` -> `(None, 'gauge', n)`. None for any other line:
+    a click on it does nothing."""
+    text = str(message).replace('’', "'")
+    if text.startswith('The 1D stage hands off'):
+        return 1, 'field', 'radius_m'
+    if text.startswith('The 2D stage') and "this stage's Lz" in text:
+        return None, 'field', 'Lz'
+    m = _GAUGE_LINE.match(text)
+    if m:
+        return None, 'gauge', int(m.group(1))
+    return None
+
+
+#: D28: what a blastFoam stage's `Large grid` line gains while the WSL
+#: hardware probe runs - validation then judges it against assumed caps
+PROVISIONAL = ' (provisional until the WSL hardware check finishes)'
+
+
+def provisional_grid(chk):
+    """C7 (ii), D28: while the hardware probe runs, a blastFoam stage's
+    `Large grid: ...` warning becomes a note carrying PROVISIONAL (the cap
+    it is judged against is an assumed VM's). Only that line moves; a
+    native stage, whose caps the probe does not touch, is left alone."""
+    if getattr(chk.case, 'solver', 'native') != 'blastfoam':
+        return chk
+    keep = []
+    for w in chk.warnings:
+        if w.startswith('Large grid'):
+            chk.notes.append(w + PROVISIONAL)
+        else:
+            keep.append(w)
+    chk.warnings = keep
+    return chk
 
 
 def stage_checks(dims, sources, hand):

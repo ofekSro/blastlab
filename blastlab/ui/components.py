@@ -226,6 +226,8 @@ class TreeRow(QFrame):
     `clicked(row_id)`."""
 
     clicked = Signal(str)
+    #: the `!` mark of a warn row was clicked (after `clicked`; D25)
+    mark_clicked = Signal(str)
 
     def __init__(self, row_id, number, title, caption='', parent=None):
         super().__init__(parent)
@@ -272,6 +274,9 @@ class TreeRow(QFrame):
         if event.button() == Qt.LeftButton \
                 and self.rect().contains(event.position().toPoint()):
             self.clicked.emit(self._id)
+            if self._status == 'warn' and self.mark.geometry().contains(
+                    event.position().toPoint()):
+                self.mark_clicked.emit(self._id)
         super().mouseReleaseEvent(event)
 
     def set_selected(self, selected):

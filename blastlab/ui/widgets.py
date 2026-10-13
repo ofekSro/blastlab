@@ -155,6 +155,32 @@ def clean_copy(label):
     return label._clean_copy
 
 
+class _ClickFilter(QObject):
+    """Calls `fn()` when a (selectable) label is clicked: a left release on
+    it with no text selected, so selecting by mouse still works (D24)."""
+
+    def __init__(self, label, fn):
+        super().__init__(label)
+        self._label, self._fn = label, fn
+        label.installEventFilter(self)
+        label.setCursor(Qt.PointingHandCursor)
+
+    def eventFilter(self, obj, event):
+        if (obj is self._label and event.type() == QEvent.MouseButtonRelease
+                and event.button() == Qt.LeftButton
+                and not self._label.hasSelectedText()
+                and self._label.rect().contains(event.position().toPoint())):
+            self._fn()
+        return False
+
+
+def on_label_click(label, fn):
+    """Make clicking `label` call `fn()`; the helper is kept as
+    `label._click` and the pointing-hand cursor says so."""
+    label._click = _ClickFilter(label, fn)
+    return label._click
+
+
 #: a tooltip longer than this many characters is wrapped (P2-24, D208)
 TIP_WRAP_CHARS = 60
 #: the width a wrapped tooltip's lines break at, in px: with the tooltip's

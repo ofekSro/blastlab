@@ -604,8 +604,8 @@ def s5_live(win):
           and ('warn', w3) in ed3.check_rows()
           # GUI-13 (b): the axisymmetric form's labels, "at or above"
           and w3 == 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                    'stage\'s Lz (1.5 m): the 3D box cuts the 2D field '
-                    'off above 1.5 m, burst included. Raise Lz to at '
+                    'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                    'Raise Lz to at '
                     'least 4.0 m (the 2D stage\'s Height H) or lower the '
                     '2D stage\'s Burst z.'
           and ch.run_btn.isEnabled(),
@@ -621,6 +621,110 @@ def s5_live(win):
                   for n, _t in cr.setup_nodes.nodes(3) if n.id != 'domain'),
           ascii([ed3.tree.rows['domain']._status,
                  ed.tree.rows['domain']._status]))
+    # GUI-16 C7 (iv), D27: S2-1 is fixed in stage 1's radius too - its
+    # Domain row shows `!` while stage 2 carries the reach line
+    ed1 = ch.editors[1]
+    check('C7 (iv): under S2-1 stage 1\'s Domain row is warn (`!`), stage '
+          '1\'s card still reads case OK',
+          ed1.tree.rows['domain']._status == 'warn'
+          and ed1.tree.rows['domain'].mark.text() == '!'
+          and ch.cards[1].state_text() == '● case OK',
+          ascii([ed1.tree.rows['domain']._status,
+                 ch.cards[1].state_text()]))
+    # C7 (iii), D24: a click on the F45 line focuses stage 3's Lz, one on
+    # the S2-1 line stage 1's radius; a line that names nothing does nothing
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    ch.window().activateWindow()
+    from PySide6.QtWidgets import QLabel
+    from blastlab.ui.widgets import ZWSP
+
+    def line_label(editor, needle):
+        for row in editor.check_row_widgets():
+            lbl = row.findChild(QLabel, 'checktext')
+            if lbl is not None and needle in lbl.text().replace(ZWSP, ''):
+                return lbl
+        return None
+    lbl = line_label(ed3, 'Lz (')
+    ch.focus_stage(2)
+    pump(50)
+    QTest.mouseClick(lbl, Qt.LeftButton)
+    pump(100)
+    lz = ch.forms[3].widgets['Lz']
+    check('C7 (iii): clicking the F45 line shows stage 3 and focuses Lz',
+          ch.stage() == 3 and ed3.selected_node() == 'domain'
+          and lz.hasFocus(), f'{ch.stage()} {ed3.selected_node()} '
+          f'{lz.hasFocus()}')
+    lbl = line_label(ed, 'hands off')
+    QTest.mouseClick(lbl, Qt.LeftButton)
+    pump(100)
+    rad = ch.forms[1].widgets['radius_m']
+    check('C7 (iii): clicking the S2-1 line shows stage 1 and focuses its '
+          'radius', ch.stage() == 1 and ed1.selected_node() == 'domain'
+          and rad.hasFocus(), f'{ch.stage()} {rad.hasFocus()}')
+    check('C7 (iii): a line that names nothing is not a link',
+          cr.focus_target('Cell size 0.01 m is fine') is None
+          and cr.focus_target('G2 (1.4, 0.3) m inside Wall 1 - will be '
+                              'dropped') == (None, 'gauge', 2))
+    # C7 (v), D25: selecting a warned stage brings its Checks into view
+    ed1.select_node('stage')            # the node a stage switch carries on
+    ch.focus_stage(2)
+    pump(150)
+    vp = ed.scroll_viewport()
+    first = ed.check_row_widgets()[0]
+    top = first.mapTo(vp, first.rect().topLeft()).y()
+    check('C7 (v): selecting warned stage 2 puts its first Checks row in '
+          'the viewport', ed.selected_node() == 'stage'
+          and top >= 0 and top + first.height() <= vp.height(),
+          f'top {top} h {first.height()} viewport {vp.height()}')
+    ed.select_node('domain')
+    ed.tree.pill_clicked.emit()
+    pump(150)
+    top = first.mapTo(vp, first.rect().topLeft()).y()
+    check('C7 (v): a click on the pill does the same from another node',
+          ed.selected_node() == 'stage' and 0 <= top
+          and top + first.height() <= vp.height(), f'top {top}')
+    # C7 (ii), D28: while the WSL hardware probe runs, a blastFoam stage's
+    # `Large grid` line is a provisional note; it is a warning again when
+    # the probe ends. 2D axisymmetric 5 x 5 m at 1 cm: ~575 k cells
+    # (what validation says about the grid depends on this machine's WSL
+    # hardware, so the line is added to the stage's check by a stand-in)
+    real_checks = cr.stage_checks
+
+    def with_large_grid(dims, sources, hand):
+        out = real_checks(dims, sources, hand)
+        out[2].warnings.append('Large grid: ~574,564 cells - expect a long '
+                               'run and GBs of case files on the WSL disk')
+        return out
+    cr.stage_checks = with_large_grid
+    ch.set_stage_solver(1, 'blastfoam')
+    ch.set_stage_solver(2, 'blastfoam')
+    ch.set_hw_pending(False)
+    pump(450)
+    rows2 = ch.editors[2].check_rows()
+    check('C7 (ii): probe done, the Large grid line is a warning',
+          any(s == 'warn' and m.startswith('Large grid') for s, m in rows2),
+          ascii(rows2))
+    ch.set_hw_pending(True)
+    pump(450)
+    rows2 = ch.editors[2].check_rows()
+    check('C7 (ii): probe running, the Large grid line is a note that says '
+          'it is provisional; the other warnings stay',
+          any(s == 'note' and m.startswith('Large grid')
+              and 'provisional' in m for s, m in rows2)
+          and not any(s == 'warn' and m.startswith('Large grid')
+                      for s, m in rows2)
+          and any(s == 'warn' and m.startswith('The 1D stage')
+                  for s, m in rows2), ascii(rows2))
+    ch.set_hw_pending(False)
+    pump(450)
+    check('C7 (ii): and re-validated when the probe ends',
+          any(s == 'warn' and m.startswith('Large grid')
+              for s, m in ch.editors[2].check_rows()))
+    cr.stage_checks = real_checks
+    ch.set_stage_solver(2, 'native')
+    ch.set_stage_solver(1, 'native')
+    pump(450)
     ch.forms[3].v['Lz'].set('4.0')
     pump(450)
     check('B2: at Lz 4.0 the stage-3 Domain & mesh row shows ok again',
@@ -843,8 +947,8 @@ def s5r_reach():
     # above", the advice Lz >= the 2D stage's height
     check('2 → 3, burst z 2 above Lz 1.5: the F45 text',
           got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                     'above 1.5 m, burst included. Raise Lz to at least '
+                     'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                     'Raise Lz to at least '
                      '4.0 m (the 2D stage\'s Height H) or lower the 2D '
                      'stage\'s Burst z.'},
           ascii(got))
@@ -853,8 +957,8 @@ def s5r_reach():
           'text with those labels and its Ly',
           cr.handoff_reach([2, 3], {2: flat, 3: low})
           == {3: 'The 2D stage\'s Burst y (2.0 m) is at or above this '
-                 'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                 'above 1.5 m, burst included. Raise Lz to at least 5.0 m '
+                 'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                 'Raise Lz to at least 5.0 m '
                  '(the 2D stage\'s Ly) or lower the 2D stage\'s Burst y.'})
     import types
     noly = types.SimpleNamespace(geometry='axisymmetric', center=(0.0, 2.0))
@@ -862,8 +966,8 @@ def s5r_reach():
     check('2 → 3, the 2D Ly unreadable: the text ends "Raise Lz above '
           '2.0 m."',
           got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                     'above 1.5 m, burst included. Raise Lz above 2.0 m.'},
+                     'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                     'Raise Lz above 2.0 m.'},
           ascii(got))
     check('in_text names the burst height by its form label (Burst z), '
           'not "burst height, z"',

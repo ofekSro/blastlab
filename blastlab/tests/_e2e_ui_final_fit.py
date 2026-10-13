@@ -9,6 +9,8 @@ elides) and PASS / FAIL.
 
   C6   Setup: the Gauges caption keeps `G2 dropped` and `trigger G3`; the
        trigger dropdown's current text is whole; Where shows `(dropped)`.
+  C7   Chain: after selecting warned card 3 its first Checks row lies in the
+       viewport; the card meta wraps, never elides.
 
 Run:  cd blastlab/tests && python _e2e_ui_final_fit.py [--only C6] [--shots DIR]
 Exit 0 when every check passes. No solve, no WSL, no viewer child.
@@ -111,6 +113,43 @@ def c6_setup(win, tag, pump):
           f'{seen!r} (full {where!r}) in {room} px')
 
 
+# ── C7: Chain ────────────────────────────────────────────────────────────
+def c7_chain(win, tag, pump):
+    from PySide6.QtCore import QRect, Qt
+    print(f'\nC7 {tag}: Chain, Checks in view, card meta')
+    win.set_solver('native')
+    win._show('chain')
+    ch = win.chain
+    ch.set_route('123')
+    pump(300)
+    ch.forms[3].v['Lz'].set('1.0')          # F45: the 2D burst is above it
+    pump(600)
+    ed = ch.editors[3]
+    ch.focus_stage(1)
+    ed.select_node('stage')                 # the node a stage switch keeps
+    ch.focus_stage(3)
+    pump(300)
+    vp = ed.scroll_viewport()
+    first = ed.check_row_widgets()[0]
+    top = first.mapTo(vp, first.rect().topLeft()).y()
+    check(f'C7 (v) {tag}: selecting warned card 3, its first Checks row lies '
+          f'inside the viewport',
+          ed.has_alerts() and 0 <= top and top + first.height() <= vp.height(),
+          f'row y {top}..{top + first.height()} in a {vp.height()} px '
+          f'viewport')
+    for d in (1, 2, 3):
+        key = ch.cards[d].key
+        full = key.full_text()
+        need = key.fontMetrics().boundingRect(
+            QRect(0, 0, max(key.width(), 1), 10000),
+            int(Qt.TextWordWrap | Qt.AlignLeft), full).height()
+        check(f'C7 (vi) {tag}: card {d} meta is not elided (wraps)',
+              need <= key.height() and key.height() <= 2 * key.fontMetrics()
+              .lineSpacing() + 2,
+              f'{full!r} needs {need} px of {key.height()} px, '
+              f'{key.width()} px wide')
+
+
 def run_size(win, app, size, mode, pump, only):
     from blastlab.ui import theme
     theme.apply(app, mode)
@@ -119,6 +158,8 @@ def run_size(win, app, size, mode, pump, only):
     tag = f'{size[0]}x{size[1]} {mode}'
     if not only or 'C6' in only:
         c6_setup(win, tag, pump)
+    if not only or 'C7' in only:
+        c7_chain(win, tag, pump)
 
 
 def main():

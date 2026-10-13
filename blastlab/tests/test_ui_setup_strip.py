@@ -830,6 +830,23 @@ def s3_dock():
           'has no tooltip',
           tip == 'G2 - inside Wall 1, dropped by the solver'
           and sp.tree.child_row('gauges', 0).toolTip() == '', repr(tip))
+    # C7 (iii), D24: a Checks line that starts `G2 ...` leads to that gauge
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QLabel
+    sp.set_dock_tab('Checks')
+    sp.select_node('domain')
+    pump(50)
+    g2 = [r.findChild(QLabel, 'checktext') for r in sp._check_rows]
+    g2 = [lbl for lbl in g2 if lbl.text().startswith('G2')]
+    if g2:
+        QTest.mouseClick(g2[0], Qt.LeftButton)
+        pump(100)
+    pl = sp.form.points['gauges']
+    check('C7 (iii): clicking the `G2 ...` Checks line selects 05 and G2 in '
+          'its list',
+          bool(g2) and sp.selected_node() == 'gauges'
+          and pl.tree.indexOfTopLevelItem(pl.tree.currentItem()) == 1,
+          f'{[l.text() for l in g2]} {sp.selected_node()}')
     check('C6 (iii): the gauge table elides Where in the middle',
           sp.gauge_table.textElideMode() == Qt.ElideMiddle)
     bad = Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,

@@ -409,6 +409,18 @@ class CaseForm(FieldForm):
                 self._trig['last'] = last
             self.refresh_trigger_choices()
 
+    def focus_field(self, name):
+        """D24: put the keyboard focus on field `name`'s input (its text
+        selected); True when the row is shown and took it. The caller has
+        shown the field's node (`StageEditor.focus_field`)."""
+        w = self.widgets.get(name)
+        if w is None or not self.row_visible(name):
+            return False
+        w.setFocus(Qt.OtherFocusReason)
+        if hasattr(w, 'selectAll'):
+            w.selectAll()
+        return True
+
     def _axes(self):
         """The axis names of a gauge row, for the dropdown's tooltips."""
         if self.dim == 3:

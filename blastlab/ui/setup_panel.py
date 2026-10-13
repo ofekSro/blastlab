@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QFrame, QGridLayout,
 from ..core import mode as mode_mod
 from ..services.validation import drop_rule
 from ..viz3d import MISSING_MSG, pyvista_available
-from . import scaled_distance, setup_nodes, theme
+from . import chain_route, scaled_distance, setup_nodes, theme
 from .case_form import CaseForm
 from .components import DockTabs
 from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
@@ -26,7 +26,7 @@ from .preview_panel import Preview1D, Preview2D, Preview3DBridge
 from .setup_strip import LiveStrip
 from .setup_tree import TREE_MIN, SetupTree, _letter_space
 from .theme import GAP, PAD
-from .widgets import Card, label
+from .widgets import Card, label, on_label_click
 
 #: the dock under the model view (board line 217: 212 px, tabs 40 px +
 #: a 1 px rule). On a short window it gives way down to DOCK_MIN
@@ -759,6 +759,11 @@ class SetupPanel(QWidget):
             text.setObjectName('checktext')
             text.setStyleSheet(f'color: {theme.cur(colour)};')
             text.setTextInteractionFlags(Qt.TextSelectableByMouse)
+            # D24: a `G<n> ...` line leads to that gauge's row
+            target = chain_route.focus_target(message)
+            if target is not None and target[1] == 'gauge':
+                on_label_click(text, lambda n=target[2]:
+                               self._child_clicked('gauges', n - 1))
             rl.addWidget(text, 1)
             self._check_rows.append(row)
         self._checks_cols = None

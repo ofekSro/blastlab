@@ -455,14 +455,24 @@ class MainWindow(QMainWindow):
                 hw = foam_env.hardware(probe=True) or {}
                 hardware.detect_host_ram_gb()
             except Exception:
+                self.bridge.post(self._chain_hw_pending, False)
                 return
             try:
                 foam_env.persist_hardware(hw)
             except Exception:
                 pass
+            self.bridge.post(self._chain_hw_pending, False)
             self.bridge.post(self._poll_wsl)
             self.bridge.post(self._schedule_validate)
+        # D28: until it ends, a blastFoam stage's `Large grid` line is
+        # judged against assumed caps - the Chain says so (C7 (ii))
+        self._chain_hw_pending(True)
         threading.Thread(target=work, daemon=True).start()
+
+    def _chain_hw_pending(self, on):
+        chain = getattr(self, 'chain', None)
+        if chain is not None:
+            chain.set_hw_pending(on)
 
     def _redetect_hw(self):
         foam_env.forget_hardware()
