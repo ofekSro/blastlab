@@ -25,6 +25,7 @@ launch the `bl-task-*` agents, never the unprefixed ones.
 - none: plan, show the batch, ask once, then run.
 - `go`: plan and run without asking. `next`: same, skipping "needs clarification".
 - `plan`: plan only, show it, stop.
+- `parallel` (with any of the above, never the default): see "Parallel mode" below.
 - `batch <path>`: run an existing plan, all parts in order. **Resume:** a part whose
   verify report (`<plan>[-<part>].verify.md`, next to the plan) exists and is committed
   is done - skip it. A part with only an implement report goes straight to Stage 3.
@@ -65,6 +66,26 @@ recommendation**. Without `go` / `next`, wait for the owner.
 
 If a report-file write is refused for the agent, write the file yourself from its final
 message and commit it.
+
+### Parallel mode (opt-in, owner 2026-10-13)
+
+**It saves wall time, not tokens** - two contexts in flight and a merge step cost a little
+more. Only when the owner wrote `parallel`, and only for two parts at a time, when all hold:
+1. `python -c "from blastlab.core import hardware as h; print(h.detect_host_ram_gb())"`
+   is ≥ 12 (the office machine; never the 8 GB home PC);
+2. both parts say `parallel-safe: yes` and their `files:` sets do not overlap;
+3. at most one says `needs-wsl: yes` - and `wsl -d Ubuntu -- pgrep -a blastFoam` is empty
+   before it starts (CLAUDE.md §8.6).
+Otherwise run the parts serially, as above, and say why in one line.
+
+- Launch both implementers in one message, each with `isolation: "worktree"` and the
+  same BASE; tell each to run `gate.py -j 2` (two gates share the machine; gate.py
+  already runs one GUI suite at a time across both).
+- When both are done, merge their branches into the batch branch **in part order**
+  (`git merge --no-ff <branch>`, message file + `-F`). A conflict: `git merge --abort`,
+  stop parallel mode, and redo the later part serially on the merged tree.
+- Remove both worktrees and their branches once merged (docs/agent-rules.md).
+- Verify serially on the merged tree (Stage 3), parts in order.
 
 ## Stage 3: verify (per part)
 

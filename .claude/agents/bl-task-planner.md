@@ -50,6 +50,9 @@ Doc-only work is `risk: none`.
 2. Tasks in order: id, TODO text, interpretation if needed, files, size S/M/L, 1-3
    acceptance criteria each checkable by running something, dependencies,
    `References:` from `docs/references/INDEX.md` where one applies (read-only file).
+   Per part, three lines /bl-todo's parallel mode reads (owner 2026-10-13):
+   `parallel-safe: yes | no` (yes only if the part depends on no other part's result),
+   `files:` the files it will change (globs allowed), `needs-wsl: yes | no`.
 3. Risks and how they are protected (characterisation test first for calculation code).
 4. Proposed defaults for non-blocking choices (they become decision rows).
 5. Needs clarification, each with a recommendation.

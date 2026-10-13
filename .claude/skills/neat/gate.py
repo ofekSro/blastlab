@@ -63,9 +63,15 @@ GUI_SOURCE = re.compile(r'PySide6|tkinter|blastlab\.ui|blastlab\.gui|viz3d')
 #: 8 lanes pushed test_blast3d from 10.6 to over 15 min (BLAS threads
 #: oversubscribe the cores); 4 + the GUI lane measured clean
 JOBS = 4
-#: below this much RAM the default is one lane: the home PC has 8 GB and
-#: runs heavy suites one at a time (docs/agent-rules.md)
+#: below this much RAM the default is two lanes, not JOBS
 LOW_RAM_GB = 16
+#: below this much RAM the default is one lane: the home PC has 8 GB and
+#: runs heavy suites one at a time (docs/agent-rules.md). The second lane
+#: and /bl-todo's parallel mode share this threshold (owner 2026-10-13)
+MIN_RAM_GB = 12
+#: two gates at once (/bl-todo parallel, two worktrees) still run one GUI
+#: suite at a time on the machine: a lock file all of them share
+GUI_LOCK = 'gui-suite.lock'
 TIMEOUT_S = 1800
 TAIL_LINES = 12
 #: a package module named inside a string (subprocess code, importlib)
@@ -218,11 +224,59 @@ def select(paths, deep):
 
 
 def default_jobs():
-    """JOBS lanes, or one on a machine under LOW_RAM_GB."""
+    """JOBS lanes; two under LOW_RAM_GB; one under MIN_RAM_GB."""
     sys.path.insert(0, ROOT)
     from blastlab.core import hardware
     ram = hardware.detect_host_ram_gb()
-    return 1 if ram and ram < LOW_RAM_GB else JOBS
+    if ram and ram < MIN_RAM_GB:
+        return 1
+    return 2 if ram and ram < LOW_RAM_GB else JOBS
+
+
+class gui_lock:
+    """Hold the machine-wide GUI-suite lock (an OS file lock, released by the
+    OS if the holder dies). Waits up to TIMEOUT_S, then runs anyway and says so."""
+
+    def __enter__(self):
+        os.makedirs(STATE, exist_ok=True)
+        self.f = open(os.path.join(STATE, GUI_LOCK), 'a+b')
+        t0 = time.time()
+        while True:
+            try:
+                if os.name == 'nt':
+                    import msvcrt
+                    self.f.seek(0)
+                    msvcrt.locking(self.f.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self.held = True
+                return self
+            except OSError:
+                if time.time() - t0 > TIMEOUT_S:
+                    print('GUI lock still taken after', TIMEOUT_S, 's - running without it')
+                    self.held = False
+                    return self
+                time.sleep(2)
+
+    def __exit__(self, *exc):
+        if self.held:
+            try:
+                if os.name == 'nt':
+                    import msvcrt
+                    self.f.seek(0)
+                    msvcrt.locking(self.f.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        self.f.close()
+
+
+def run_gui(name, logdir):
+    with gui_lock():
+        return run_one(name, logdir)
 
 
 def check_cleanup_off():
@@ -282,15 +336,15 @@ def run_all(names, logdir, jobs):
     """GUI suites one at a time in their own lane (real windows, one Qt/Tk
     app per process, viewer child); everything else on `jobs` lanes,
     longest first so test_blast3d (~10 min) does not start last."""
-    if jobs <= 1:
-        return {n: run_one(n, logdir) for n in names}
     gui = [n for n in names if is_gui(n)]
+    if jobs <= 1:
+        return {n: (run_gui if n in gui else run_one)(n, logdir) for n in names}
     rest = [n for n in names if n not in gui]
     dur = past_durations()
     rest.sort(key=lambda n: -dur.get(n, 30))
     res = {}
     with ThreadPoolExecutor(max_workers=jobs + 1) as pool:
-        lane = pool.submit(lambda: {n: run_one(n, logdir) for n in gui})
+        lane = pool.submit(lambda: {n: run_gui(n, logdir) for n in gui})
         futs = {pool.submit(run_one, n, logdir): n for n in rest}
         for fu, n in futs.items():
             res[n] = fu.result()
@@ -313,8 +367,8 @@ def main():
     ap.add_argument('--deep', action='store_true',
                     help='with --changed / --for: follow imports through the package')
     ap.add_argument('-j', '--jobs', type=int, default=None,
-                    help=f'parallel lanes for non-GUI suites (default {JOBS}, '
-                         f'1 under {LOW_RAM_GB} GB RAM; 1 = serial)')
+                    help=f'parallel lanes for non-GUI suites (default {JOBS}, 2 under '
+                         f'{LOW_RAM_GB} GB RAM, 1 under {MIN_RAM_GB} GB; 1 = serial)')
     args = ap.parse_args()
     picking = args.changed or args.files
     if picking and args.baseline:
@@ -342,7 +396,9 @@ def main():
             print('nothing to run')
             return 0
     check_cleanup_off()
-    tag = args.save or args.against or 'last'
+    # 'last' per checkout: two worktrees gating at once must not share logs
+    tag = args.save or args.against or (
+        'last-' + hashlib.sha256(ROOT.lower().encode()).hexdigest()[:8])
     logdir = os.path.join(STATE, tag + ('-after' if args.against else ''))
     os.makedirs(logdir, exist_ok=True)
 

@@ -62,7 +62,7 @@ gate is the same for all.
    נוודא** (gate = byte regression + all fast suites). Wait for a yes.
 3. `python .claude/skills/neat/gate.py --baseline` → note the `base-...`
    name. 128 suites, **~28 min** (4 lanes + a serial GUI lane; measured
-   2026-10-04, 36 min serial - and serial it is under 16 GB RAM): run it in the background with `python -u`,
+   2026-10-04, 36 min serial - two lanes under 16 GB RAM, serial under 12 GB): run it in the background with `python -u`,
    no timeout, and tell the owner. On an unchanged tree it is reused
    instantly. It refuses to start if `auto_cleanup` is on (§8.2).
    Record `git status --porcelain` now.
