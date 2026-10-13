@@ -23,6 +23,19 @@ The 2026-10-04 figures are this script on session e7422584 (gui-12 and
 gui-13), `--tasks 21`.
 Rule 1 checks the mechanism. Rule 2 is the outcome and is noisy - task
 sizes differ from batch to batch - so read it over two or three runs.
+
+Decision rule 3, pre-registered 2026-10-13 before the first run under the
+token changes of that day (Sonnet orchestrator and planner-by-need, 9 KB
+CLAUDE.md, close_batch.py, the QA agents' 4-minute rule; baseline in
+docs/batches/2026-10-13-agent-cost-baseline.md). Units cannot see a move
+from Opus to Sonnet, so this rule is in dollars (PRICE below):
+  3. $ per task <= 0.85 x the same kind of run in the baseline:
+     --kind full  $2.43  (session 9e7c70fd: gui-15, 10 low-risk tasks, QA + UX)
+     --kind high  $1.95  (session 190303b8: gui-final B, 11 risk: high tasks,
+                          implement + full verify, no plan, no QA)
+  and MAIN runs on Sonnet. Expected: about -20 % on a full low-risk run,
+  -3 to -5 % on a risk: high part (its cost is the Opus implementer, which
+  these changes do not touch). Read it over two or three runs, as rule 2.
 """
 
 import argparse
@@ -37,6 +50,12 @@ REBUILD_MAX = 0.05
 BASE_PER_TASK = 0.96e6
 PER_TASK_MAX = 0.8
 W_IN, W_W5, W_W1H, W_READ, W_OUT = 1, 1.25, 2, 0.1, 5
+#: $ per million tokens (input, 5-min write, 1-h write, cache read, output),
+#: from the claude-api skill's table cached 2026-09-25 (Opus 5.5, Sonnet 5.5)
+PRICE = {'opus': (4, 5, 8, 0.20, 20), 'sonnet': (2, 2.5, 4, 0.20, 10),
+         'haiku': (1, 1.25, 2, 0.10, 5)}
+PER_TASK_USD = {'full': 2.43, 'high': 1.95}
+USD_MAX = 0.85
 
 
 def newest_session():
@@ -88,6 +107,12 @@ def cost(c, w5=True, w1h=True):
             + (W_W5 * c['w5'] if w5 else 0) + (W_W1H * c['w1h'] if w1h else 0))
 
 
+def usd(c, family):
+    i, w5, w1h, r, o = PRICE.get(family, PRICE['opus'])
+    return (i * c['inp'] + w5 * c['w5'] + w1h * c['w1h'] + r * c['read']
+            + o * c['out']) / 1e6
+
+
 def summarise(name, cs):
     ttl = 3600 if any(c['w1h'] for c in cs) else 300
     total = sum(cost(c) for c in cs)
@@ -95,9 +120,10 @@ def summarise(name, cs):
                   if (c['t0'] - a['t1']).total_seconds() > ttl)
     family = next((f for f in ('opus', 'sonnet', 'haiku') if f in cs[0]['model']), '?')
     ctx = sum(c['inp'] + c['read'] + c['w5'] + c['w1h'] for c in cs) / len(cs)
+    dollars = sum(usd(c, family) for c in cs)
     print(f'  {name:20} {family:6} {len(cs):4} calls  ctx {ctx / 1e3:4.0f}k  '
-          f'cost {total / 1e6:5.2f}M  rebuilds {rebuild / max(total, 1):4.0%}')
-    return family, total, rebuild
+          f'cost {total / 1e6:5.2f}M ${dollars:6.2f}  rebuilds {rebuild / max(total, 1):4.0%}')
+    return family, total, rebuild, dollars
 
 
 def main():
@@ -105,6 +131,8 @@ def main():
     ap.add_argument('session', nargs='?')
     ap.add_argument('--since', help='local time, e.g. 2026-10-11T09:30')
     ap.add_argument('--tasks', type=int)
+    ap.add_argument('--kind', choices=sorted(PER_TASK_USD), default='full',
+                    help='which 2026-10-13 baseline rule 3 compares with')
     args = ap.parse_args()
     main_path = find_session(args.session) if args.session else newest_session()
     since = datetime.fromisoformat(args.since).astimezone() if args.since else None
@@ -121,18 +149,22 @@ def main():
 
     print('session', os.path.basename(main_path)[:-6], '| since', args.since or 'start')
     by_family, sub_total, sub_rebuild = defaultdict(float), 0.0, 0.0
+    dollars, main_family = 0.0, '?'
     for name, p in agents:
         cs = calls_of(p, since)
         if not cs:
             continue
-        family, total, rebuild = summarise(name, cs)
+        family, total, rebuild, d = summarise(name, cs)
         by_family[family] += total
-        if name != 'MAIN':
+        dollars += d
+        if name == 'MAIN':
+            main_family = family
+        else:
             sub_total += total
             sub_rebuild += rebuild
     grand = sum(by_family.values())
     print(f'total {grand / 1e6:.2f}M (' + ', '.join(
-        f'{k} {v / 1e6:.2f}M' for k, v in sorted(by_family.items())) + ')')
+        f'{k} {v / 1e6:.2f}M' for k, v in sorted(by_family.items())) + f'), ${dollars:.2f}')
     if sub_total:
         share = sub_rebuild / sub_total
         print(f'rule 1, rebuilds {share:.0%} of subagent cost (< {REBUILD_MAX:.0%}): '
@@ -142,6 +174,11 @@ def main():
         limit = PER_TASK_MAX * BASE_PER_TASK
         print(f'rule 2, {per / 1e6:.2f}M per task (<= {limit / 1e6:.2f}M): '
               + ('PASS' if per <= limit else 'FAIL'))
+        per_usd = dollars / args.tasks
+        lim_usd = USD_MAX * PER_TASK_USD[args.kind]
+        ok = per_usd <= lim_usd and main_family == 'sonnet'
+        print(f'rule 3 ({args.kind}), ${per_usd:.2f} per task (<= ${lim_usd:.2f}), '
+              f'MAIN on {main_family}: ' + ('PASS' if ok else 'FAIL'))
 
 
 if __name__ == '__main__':

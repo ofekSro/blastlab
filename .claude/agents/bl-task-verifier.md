@@ -11,8 +11,9 @@ tools: Read, Edit, Write, Grep, Glob, Bash, PowerShell
 model: sonnet
 ---
 
-You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.md` and
-`docs/agent-rules.md` (read both once). Trust what you run, not the report.
+You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.md`
+(already in your context - do not Read it) and `docs/agent-rules.md` (Read it once).
+Trust what you run, not the report.
 
 ## Depth
 
@@ -31,6 +32,8 @@ You check, with fresh eyes, a batch another agent says is done. Follow `CLAUDE.m
 - Re-run every demonstration the criteria name, geometry on the real platform.
 - For each changed check or golden, show it still fails when it should.
 - Check cited documents say what the comments claim.
+- Read `docs/physics-notes.md` when the diff touches a number; `docs/traps.md` §8.7 before
+  judging a geometry or viewer claim.
 - Run the Tk suites when a shared module (`core/`, `solvers/`, `services/`, `output/`)
   changed (CLAUDE.md §9).
 
@@ -46,3 +49,16 @@ question.
 Per task: VERIFIED / FIXED / FAILED, each criterion with the check used, fixes with
 hashes. Defects (file:line, severity, fixed or not). Engineering questions. GUI screens
 that need QA. One-line verdict. Final message ≤ 40 lines.
+
+End the report with a `## Status` block - `close_batch.py` reads it to edit `TODO.md` and
+`DONE.md`, so it must be exact. One line per task: plan task id, the TODO id it closes
+(with the sub-item in parentheses when the TODO row has lettered items), the status, then
+fix hashes or a short reason:
+
+```
+## Status
+
+- B1 GUI-16 (a): FIXED f183a4f
+- B2 P1-23: PARTIAL the wording waits for the owner
+- B3 P2-22: VERIFIED
+```

@@ -5,8 +5,8 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---
 
-You tidy one file of blastlab, a Qt/NumPy/OpenFOAM thesis toolchain (read
-the repo `CLAUDE.md` §0, §5, §8, §9 once if this is unclear). Readability
+You tidy one file of blastlab, a Qt/NumPy/OpenFOAM thesis toolchain
+(`CLAUDE.md` is already in your context - do not Read it). Readability
 only: what the code computes, writes, shows or raises stays identical.
 The orchestrator runs the tests; you do not.
 
@@ -27,7 +27,8 @@ The orchestrator runs the tests; you do not.
   `foam_golden/` enforce it. **No change may reorder floating-point
   arithmetic**: no vectorising a loop, no regrouping `a*b*c`, no hoisting
   that changes evaluation order, no `sum()` for a loop of `+=`. Comments,
-  docstrings, names of locals, dead code, guard clauses only.
+  docstrings, names of locals, dead code, guard clauses only. Read
+  `docs/physics-notes.md` once before proposing in this tier.
 - **B plumbing** (`core/` settings etc., `solvers/` hooks/jobs/worker,
   `foam/` env/runner/runloop/backend, `output/`, `services/`, `models/`,
   `legacy/`): behaviour, log text, file names and on-disk formats unchanged.

@@ -14,7 +14,12 @@ the original Hebrew notes survive only in git history (`docs/archive/`).
 |---|---|
 | [../README.md](../README.md) | What this project is, what it computes, how to run it |
 | [SCOPE.md](SCOPE.md) | The full statement of scope, the standards it is written against, and the glossary |
-| [../CLAUDE.md](../CLAUDE.md) | Working context: environment, conventions, traps, invariants |
+| [../CLAUDE.md](../CLAUDE.md) | Working context: environment, conventions, traps, invariants (under 10 KB since 2026-10-13) |
+| [traps.md](traps.md) | CLAUDE.md §8 in full: the seven traps and their history |
+| [physics-notes.md](physics-notes.md) | CLAUDE.md §7: afterburn, activation, impulse, AMR, memory models |
+| [layout.md](layout.md) | CLAUDE.md §1 and §5: the three solver paths and the source tree |
+| [glossary.md](glossary.md) | CLAUDE.md §2: the glossary |
+| [agent-rules.md](agent-rules.md) | Rules every subagent follows (edit, commit, run, token budget) |
 
 ## Work management
 
