@@ -352,6 +352,42 @@ def main():
           error_headline(chained))
     check("a bare message survives", error_headline('boom') == 'boom')
 
+    print("\nT9: I02 (D3) - Close does not wait for a stopped run's writes")
+    import threading
+
+    class _Writing(threading.Thread):
+        """Stops at once, then writes its model folder for WRITE_S."""
+        WRITE_S = RunController.CLOSE_JOIN_S + 1.5
+
+        def __init__(self):
+            super().__init__(daemon=True)
+            self.halt = threading.Event()
+            self.wrote = False
+
+        def run(self):
+            self.halt.wait(30)
+            time.sleep(self.WRITE_S)
+            self.wrote = True
+
+        def stop(self):
+            self.halt.set()
+    c = RunController(handlers=_Handlers())
+    c.worker = _Writing()
+    c.worker.start()
+    t0 = time.monotonic()
+    c.shutdown()
+    dt = time.monotonic() - t0
+    check("shutdown() returns after CLOSE_JOIN_S, not after the writes",
+          dt < RunController.CLOSE_JOIN_S + 0.5 and c.worker.is_alive(),
+          f'{dt:.2f} s, alive={c.worker.is_alive()}')
+    said = []
+    check("finish_writes() then waits for them, and says so",
+          c.finish_writes(log=said.append) is True and c.worker.wrote
+          and not c.worker.is_alive() and len(said) == 1, str(said))
+    check("with nothing running it returns at once, silently",
+          RunController(handlers=_Handlers()).finish_writes(
+              log=said.append) is True and len(said) == 1)
+
     pump(20)
     print("\n" + "=" * 50)
     if FAIL:

@@ -248,11 +248,68 @@ def main():
     ring.close(unlink=True)
     host.close()
     pump(20)
+
+    v10_native_detach_stays()
     print("\n" + "=" * 50)
     if FAIL:
         print(f"FAILED: {len(FAIL)} check(s): {FAIL}")
         sys.exit(1)
     print("All Qt 3D-host checks passed.")
+
+
+def v10_native_detach_stays():
+    """GUI-16 (g): the bookkeeping of a native-mount Detach. Offscreen
+    there is no real window to adopt, so the mount is a plain widget and
+    the Win32 release is stubbed; `_e2e_ui_view3d.py` G3 measures the
+    real window."""
+    from PySide6.QtWidgets import QWidget
+    print("\nV10: a native Detach stays detached until Re-attach or close")
+    link = FakeLink()
+    host = View3DHost(link, 'nat')
+    host.resize(900, 600)
+    host.show()
+    pump(30)
+    embeds = []
+    host._embed = lambda: embeds.append(host._hwnd) or True
+
+    def release():
+        host._native = False
+    host._release_native = release
+    host._has_scene = True
+    host._hwnd = 4242
+    mount = QWidget()
+    host._view_stack.addWidget(mount)
+    host._view_stack.setCurrentWidget(mount)
+    host._container, host._native = mount, True
+
+    host.set_floating(True)
+    check("Detach hands the window back (mount dropped)",
+          host._floating and host._container is None
+          and link.last('detach')[1:] == ('nat', True))
+    host.on_window(4242)     # the child re-reports after every detach
+    check("the re-reported handle is NOT re-embedded while floating",
+          embeds == [] and host._floating, str(embeds))
+    check("the card keeps the 'in its own window' note",
+          host._view_stack.currentWidget() is host._float_box)
+    host.on_closed()         # the floating window's own close button
+    check("closing the floating window re-attaches",
+          not host._floating and link.last('detach')[1:] == ('nat', False))
+    host.on_window(4242)
+    check("and the handle the child re-reports is embedded again",
+          embeds == [4242], str(embeds))
+
+    print("\nV11: a failed embed floats, and closing it does not loop")
+    link2 = FakeLink()
+    other = View3DHost(link2, 'flt')
+    other._has_scene = True
+    other._floating = True          # what a failed `_embed` leaves
+    other.on_closed()
+    check("the window stays floating with the 'closed' note",
+          other._floating and 'closed' in other._float_lbl.text()
+          and link2.last('detach') is None)
+    host.close()
+    other.close()
+    pump(20)
 
 
 if __name__ == '__main__':
