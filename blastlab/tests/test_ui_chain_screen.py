@@ -561,6 +561,31 @@ def s5_live(win):
           and ch.forms[1].get_case().radius_m == 1.5
           and not ch.touched(1),
           ascii([ch.cards[2].state_text(), ch.forms[1].v['radius_m'].get()]))
+    # gui-final D5 (owner decision 4): stage 3 opens at Lz 2.5 m, above the
+    # seed's 2D burst (z 2.0 m), so card 3 opens clean too (no F45)
+    cards = [ch.cards[d].state_text() for d in (1, 2, 3)]
+    check('D5: the default 1 → 2 → 3 route, native: stage 3 at Lz 2.5 m '
+          'and untouched, cards 1-3 ● case OK',
+          ch.forms[3].get_case().Lz == 2.5 and not ch.touched(3)
+          and cards == ['● case OK'] * 3, ascii(cards))
+    # the same on blastFoam with a probed plan (the planner's probe: a
+    # 14-core, 63 GB VM); the machine's own cache is put back after
+    from blastlab.solvers.foam import env as foam_env
+    saved = (foam_env._cores, foam_env._slots, foam_env._ram_gb,
+             foam_env._cores_src, foam_env._slots_src, foam_env._ram_src)
+    foam_env.forget_hardware()
+    foam_env.prime_hardware(cores=14, ram_gb=63)
+    for d in (1, 2, 3):
+        ch.set_stage_solver(d, 'blastfoam')
+    pump(450)
+    cards = [ch.cards[d].state_text() for d in (1, 2, 3)]
+    check('D5: the same route on blastFoam, probed plan: cards 1-3 '
+          '● case OK', cards == ['● case OK'] * 3, ascii(cards))
+    for d in (1, 2, 3):
+        ch.set_stage_solver(d, 'native')
+    (foam_env._cores, foam_env._slots, foam_env._ram_gb,
+     foam_env._cores_src, foam_env._slots_src, foam_env._ram_src) = saved
+    pump(450)
     ch.set_route('13')
     ch.set_route('123')
     pump(450)
@@ -569,8 +594,11 @@ def s5_live(win):
           ch.forms[1].v['radius_m'].get())
     check('GUI-14 (a): 01 Setup\'s 1D radius default is still 10 m',
           setup_spec.by_name(1)['radius_m'].default == 10.0)
-    # the checks below pin the S2-1 warning, which needs the form's 10 m
+    # the checks below pin the S2-1 warning, which needs the form's 10 m,
+    # and F45 / B2, which need stage 3 below the 2D burst: the form's
+    # 1.5 m Lz (D5: the seed is 2.5)
     ch.forms[1].v['radius_m'].set('10.0')
+    ch.forms[3].v['Lz'].set('1.5')
     pump(450)
     # GUI-11 T9 (QA S2-1, D200): the default seed's 10 m 1D stage hands
     # off after its shock has left the 4 x 4 m stage 2 - card 2 warns
@@ -598,7 +626,7 @@ def s5_live(win):
     w3 = cr.handoff_reach([2, 3], {
         2: ch.checks()[2].case, 3: ch.checks()[3].case})[3]
     ed3 = ch.editors[3]
-    check('F45: the default seed (2D burst z 2.0 m, 3D Lz 1.5 m) warns on '
+    check('F45: the seed\'s 2D burst (z 2.0 m) over a 3D Lz 1.5 m warns on '
           'card 3, the line in its Checks, Run chain still enabled',
           ch.cards[3].state_text() == '● 1 warning'
           and ('warn', w3) in ed3.check_rows()

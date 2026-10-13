@@ -70,9 +70,13 @@ SEED_CAPTION = 'New stages take the charge, material and solver from 01 Setup.'
 #: route opens with card 2 clean: at the form's 10 m the 1D stage hands off
 #: beyond stage 2's 4 x 4 m box (S2-1). Checked 2026-10-11: 1.5 m brings no
 #: error or warning that 10 m does not, native / blastFoam, unprobed and
-#: probed. Stage 3's Lz stays 1.5 (the 4.0 m seed trips the blastFoam cell
-#: cap unprobed; GUI-13 A1).
-CHAIN_SEED = {1: {'radius_m': '1.5'}}
+#: probed. Stage 3's Lz starts at 2.5 m (owner decision 4, 2026-10-12;
+#: gui-final D5): at the form's 1.5 m the seed's 2D burst (z 2.0 m) is at or
+#: above the 3D box (F45, card 3 warns). 2.5 m is 360,000 cells, under the
+#: blastFoam cap unprobed (1,113,510); every card reads case OK native and
+#: blastFoam probed. Not 4.0: that trips the cap unprobed (GUI-13 A1); not a
+#: lower 2D burst: 1.0 m trades F45 for S2-1 on card 2.
+CHAIN_SEED = {1: {'radius_m': '1.5'}, 3: {'Lz': '2.5'}}
 
 #: the live checks' debounce: the Setup's (`MainWindow._validate_timer`)
 CHECK_MS = 300
