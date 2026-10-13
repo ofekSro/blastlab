@@ -164,7 +164,9 @@ class MainWindow(QMainWindow):
                                     log_fn=self._result_msg,
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run,
-                                    bridge=self.bridge)
+                                    bridge=self.bridge,
+                                    runs_dir=lambda: (
+                                        self.run_panel.current_runs_dir()))
         self.results.load_case_requested.connect(self._load_case_from_result)
         self.chain = ChainPanel(on_run_chain=self._run_chain,
                                 mode=self.solver_mode,
@@ -1511,12 +1513,33 @@ class MainWindow(QMainWindow):
             self.notify(f'cannot resume {path}: {exc}', 'error')
             self._log_threadsafe(f'  [runs] cannot resume {path}: {exc}')
             return False
-        model = self._model_target('Resume')
+        model = self._own_model(_p)
+        if model is not None and (self.ctrl.running or self._hd13_busy):
+            # the same refusal `_model_target` gives, titled `Resume`
+            dialogs.show_info('Resume', 'A run is already in progress.')
+            return False
+        model = model or self._model_target('Resume')
         if model is None:
             return False
         self._run_cases = [case]
         return self.ctrl.resume_foam_run(path, dim, run_name=model.model,
                                          model=model, case=case)
+
+    def _own_model(self, posix):
+        """P2-17: a resume writes into the model folder the run belongs to
+        (`model_folder.model_of_run`, by the manifest's WSL scratch), whatever
+        the Model box says - its release decision then rewrites that
+        model's own manifest. A Target for it, with no overwrite question
+        (it is the run's own folder); None when no model holds the run
+        (the Model box decides, as before)."""
+        from ..services import model_folder
+        from .run_browser import model_label
+        runs = str(self.run_panel.current_runs_dir() or '').strip()
+        stage = model_folder.model_of_run(runs, posix)
+        if stage is None:
+            return None
+        return model_folder.Target(runs_dir=runs, model=model_label(stage),
+                                   folder=stage)
 
     # ── status line ──────────────────────────────────────────────────────
     def notify(self, text, level='info'):

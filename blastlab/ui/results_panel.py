@@ -413,11 +413,14 @@ class ResultsPanel(QWidget):
     load_case_requested = Signal(str)
 
     def __init__(self, viewer_link=None, log_fn=print, mode=None,
-                 on_resume=None, bridge=None, parent=None):
+                 on_resume=None, bridge=None, parent=None, runs_dir=None):
         super().__init__(parent)
         self._entries = []
         self._log = log_fn
         self._on_resume = on_resume
+        #: the Run tab's Runs folder (a callable): where "Open a model
+        #: folder" starts, and what the run browser's Model column reads
+        self._runs_dir = runs_dir or (lambda: '')
         # the post-mortem loader runs on a worker thread and must not
         # touch a widget from there; without a bridge it falls back to
         # calling straight through, which is only safe in tests
@@ -489,6 +492,20 @@ class ResultsPanel(QWidget):
         # at the right end, also when Load a run… is hidden (native mode)
         row.addWidget(self._remove_btn, 0, Qt.AlignRight)
         col.add_layout(row)
+        # P2-25: a model folder written by an earlier session, in both
+        # solver modes (a chain's folder opens as a chain entry)
+        self._model_btn = QPushButton('Open a model folder…')
+        self._model_btn.setObjectName('resbtn')
+        self._model_btn.setIcon(theme.icon('folder', 14))
+        self._model_btn.setIconSize(QSize(14, 14))
+        self._model_btn._blastlab_icon = ('folder', 14, None)
+        self._model_btn.setCursor(Qt.PointingHandCursor)
+        self._model_btn.setMinimumWidth(0)
+        self._model_btn.setToolTip(
+            'Load a finished model folder (a run\'s MODEL.json, its gauge '
+            'files and saved end state) back into Results')
+        self._model_btn.clicked.connect(lambda *_: self.open_model_folder())
+        col.add(self._model_btn)
 
         self.method = MethodCard()
         self.method.show_btn.clicked.connect(lambda *_: self.show_case())
@@ -1133,7 +1150,8 @@ class ResultsPanel(QWidget):
             return win
         self._run_browser = FoamRunBrowser(
             self, on_load=self.load_foam_run_path, log=self._log,
-            on_resume=self._on_resume, bridge=self._bridge)
+            on_resume=self._on_resume, bridge=self._bridge,
+            runs_dir=self._runs_dir)
         self._run_browser.show()
         return self._run_browser
 
@@ -1184,6 +1202,80 @@ class ResultsPanel(QWidget):
             self._log(f'Loaded: {text} ({len(res.snapshots)} snapshots)')
 
         threading.Thread(target=work, daemon=True).start()
+
+    # ── P2-25: a model folder loaded back ────────────────────────────────
+    def open_model_folder(self, path=None):
+        """Load a model folder written by an earlier session into the
+        results list (`model_folder.load_result`, read only): a single
+        model's folder is one entry, a chain's folder (`1d`, `2d`, `3d`
+        stage folders) one chain entry with its STAGE tabs. Read off the
+        GUI thread; a folder that is no model folder is said in the log.
+        `path` None asks with a folder dialog starting at the Runs
+        folder. True once a load has started."""
+        if path is None:
+            start = str(self._runs_dir() or '')
+            path = dialogs.pick_dir('Open a model folder', self,
+                                    start if os.path.isdir(start) else '')
+        if not path:
+            return False
+        self._log(f'Opening model folder {path} ...')
+
+        def work():
+            try:
+                name, whole, stages = self.read_model_folder(path)
+            except Exception as exc:
+                self._log(f'Open failed: {exc}')
+                return
+            self._bridge.post(self._add_model_stages, name, whole, stages)
+        threading.Thread(target=work, daemon=True).start()
+        return True
+
+    @staticmethod
+    def read_model_folder(path):
+        """(model name, whole, [(dim, Result)]) of a model folder: `whole`
+        True for a single model's own folder (MODEL.json in it), False
+        for a chain's (the stage folders under it). ValueError when it is
+        neither."""
+        from ..models.case import load_case
+        from ..services import model_folder as mf
+
+        def load(folder):
+            res = mf.load_result(folder)
+            # the keys `scaled_distance.case_from_meta` needs to name a
+            # dropped gauge's wall (load_result's meta has no `from_profile`)
+            if res.meta is not None:
+                res.meta.setdefault('from_profile', getattr(
+                    load_case(os.path.join(folder, mf.CASE_FILE)),
+                    'init_mode', 'charge') != 'charge')
+            return res
+        path = os.path.normpath(str(path))
+        name = os.path.basename(path)
+        if os.path.isfile(os.path.join(path, mf.CASE_FILE)):
+            res = load(path)
+            meta = res.meta or {}
+            dim = 1 if 'radius_m' in meta else 3 if 'Lz' in meta else 2
+            return name, True, [(dim, res)]
+        stages = []
+        for d in (1, 2, 3):
+            sub = os.path.join(path, f'{d}d')
+            if os.path.isfile(os.path.join(sub, mf.CASE_FILE)):
+                stages.append((d, load(sub)))
+        if not stages:
+            raise ValueError(f'{path} is not a model folder: no '
+                             f'{mf.CASE_FILE}, and no 1d / 2d / 3d stage '
+                             f'folder holding one')
+        return name, False, stages
+
+    def _add_model_stages(self, name, whole, stages):
+        if whole:
+            dim, res = stages[0]
+            ent = self.add_result(f'{name} (loaded, {dim}D)', dim, res)
+            self._log(f'Opened: {ent.label}')
+            return
+        chain = self.start_chain(name, [d for d, _r in stages])
+        for dim, res in stages:
+            self.add_stage(chain, f'{name} - {dim}D', dim, res)
+        self._log(f'Opened chain: {name} ({len(stages)} stages)')
 
     def shutdown(self):
         self.field_view.stop_play()

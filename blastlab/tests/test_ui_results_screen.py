@@ -2064,6 +2064,112 @@ def s3_placeholder(win):
     pump(60)
 
 
+def _written_model(runs, case, name):
+    """A native run written into `<runs>\\<name>` as Run writes it
+    (test_model_load.write_run): returns the model folder."""
+    import queue
+    import threading
+    from blastlab.services import model_folder as mf
+    from blastlab.solvers import jobs
+    from blastlab.solvers.worker import GuiHooks
+    folder = mf.prepare(runs, name, confirm=lambda text: True)
+    bound = mf.bind_case(case, folder)
+    hooks = GuiHooks(queue.Queue(), threading.Event())
+    _label, solve = jobs.solve_stage(case.dim, bound)
+    res = solve(hooks)
+    mf.write_all(res, bound, case.dim, folder, dict(model=name),
+                 log=lambda s: None)
+    return folder
+
+
+def s_open_model_folder(win, link):
+    """P2-25: 03 Results opens a model folder - in both solver modes - through
+    `model_folder.load_result`; a chain model opens as a chain entry."""
+    from blastlab.models.case import Case2D
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS7: Open a model folder (P2-25)')
+    runs = tempfile.mkdtemp(prefix='blastlab_openmodel_')
+    p = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p.resize(1280, 840)
+    p.show()
+    pump(50)
+    try:
+        case = Case2D(Lx=0.6, Ly=1.2, cell_size_m=0.03, charge=0.5,
+                      n_snapshots=1, t_end=2e-4, center=(0.0, 0.6),
+                      record_frames=0,
+                      bcs=dict(x_lo='reflect', x_hi='transmit',
+                               y_lo='reflect', y_hi='transmit'),
+                      obstacles=[(0.35, 0.47, 0.0, 0.3)],
+                      gauges=[(0.25, 0.6), (0.41, 0.15), (0.5, 0.6)])
+        folder = _written_model(runs, case, 'OPEN_ME')
+        check('the button is there, in native mode and in blastFoam mode',
+              p._model_btn.text().startswith('Open a model folder')
+              and all((p.set_solver_mode(m), not p._model_btn.isHidden())[1]
+                      for m in ('native', 'blastfoam')))
+        n0 = len(p.entries())
+        check('opening it starts a load', p.open_model_folder(folder) is True)
+        for _ in range(300):
+            pump(20)
+            if len(p.entries()) > n0:
+                break
+        ent = p.entries()[-1] if len(p.entries()) > n0 else None
+        res = ent.result if ent is not None else None
+        check('a model folder becomes one entry, labelled with its model',
+              ent is not None and ent.dim == 2
+              and ent.label == 'OPEN_ME (loaded, 2D)',
+              str([e.label for e in p.entries()]))
+        p.show_view('Gauges')
+        pump(100)
+        g = p.gauges
+        check('its gauges read as entered: G1 and G3, G2 named dropped '
+              'inside Wall 1',
+              res is not None
+              and sorted(c[0] for c in g.cells()) == ['G1', 'G3']
+              and g.drop_caption.text()
+              == 'G2 dropped by the solver (inside Wall 1)',
+              f'{g.cells()} {g.drop_caption.text()!r}')
+        # a chain: two stage folders under one model folder
+        from blastlab.models.case import Case1D
+        one = _written_model(runs, Case1D(
+            radius_m=1.0, charge_kg=0.5, cell_size_m=0.01, n_snapshots=1,
+            t_end=3e-4, gauge_radii=[0.5, 1.5]), 'ONE_D')
+        chain = os.path.join(runs, 'CHAIN_M')
+        os.makedirs(chain)
+        shutil.copytree(one, os.path.join(chain, '1d'))
+        shutil.copytree(folder, os.path.join(chain, '2d'))
+        n0 = len(p.entries())
+        p.open_model_folder(chain)
+        for _ in range(300):
+            pump(20)
+            if len(p.entries()) > n0:
+                break
+        from blastlab.ui.results_panel import ChainEntry
+        cent = p.sel.currentData()
+        check('a chain model opens as ONE chain entry with its stages',
+              len(p.entries()) == n0 + 1 and isinstance(cent, ChainEntry)
+              and [s.dim for s in cent.stages] == [1, 2]
+              and cent.label == 'CHAIN_M',
+              str([(e.label, type(e).__name__) for e in p.entries()]))
+        # not a model folder: said in the log, nothing added
+        said = []
+        p._log = said.append
+        n1 = len(p.entries())
+        p.open_model_folder(runs)
+        for _ in range(100):
+            pump(20)
+            if any('Open failed' in s for s in said):
+                break
+        check('a folder that is no model folder is said, and adds nothing',
+              len(p.entries()) == n1
+              and any('Open failed' in s and 'not a model folder' in s
+                      for s in said), str(said))
+    finally:
+        p.shutdown()
+        p.deleteLater()
+        pump(20)
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     from blastlab.ui.results_panel import ResultsPanel
@@ -2092,6 +2198,7 @@ def main():
         s3_placeholder(win)
         s5_gauges(win, link)
         s5g_dropped(link)
+        s_open_model_folder(win, link)
         s6_field(link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]

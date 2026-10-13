@@ -246,6 +246,28 @@ def part_a():
                   got and how == 'resume' and args[:2] == (posix, 2)
                   and kw['model'].folder == os.path.join(runs, 'RESUMED')
                   and kw['case'].solver == 'blastfoam', f'{how} {args}')
+            # P2-17: once a model's manifest holds the run's scratch, the
+            # resume writes into THAT model, whatever the Model box says
+            own = os.path.join(runs, 'OWN_MODEL')
+            os.makedirs(own, exist_ok=True)
+            with open(os.path.join(own, 'manifest.json'), 'w',
+                      encoding='utf-8') as f:
+                json.dump(dict(wsl_scratch=dict(posix=posix)), f)
+            launches.calls.clear()
+            dlg.clear()
+            for box in ('SOMETHING_ELSE', ''):
+                rp.run_name.setText(box)
+                got = win._resume_foam_run(posix)
+                how, args, kw = (launches.calls[-1] if launches.calls
+                                 else ('', (), {}))
+                check(f'P2-17: Model box {box!r}: the resume writes the '
+                      f'run\'s own model folder',
+                      got and how == 'resume'
+                      and kw['model'].folder == own
+                      and kw['model'].model == 'OWN_MODEL'
+                      and not dlg.errors
+                      and not os.path.exists(os.path.join(
+                          runs, 'SOMETHING_ELSE')), f'{how} {kw}')
         finally:
             foam_env.case_paths = real_paths
             shutil.rmtree(scratch, ignore_errors=True)

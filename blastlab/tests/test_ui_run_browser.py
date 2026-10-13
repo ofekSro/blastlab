@@ -118,10 +118,18 @@ def main():
         sizer=sizer, deleter=lambda dirs: (deleted.append(list(dirs))
                                            or True),
         confirm=lambda t, m: True, on_resume=resumed.append,
-        warner=lambda t, m: None)
+        warner=lambda t, m: None, runs_dir=lambda: 'RUNS',
+        # P2-17: the first run is held by a chain's stage folder of MODEL_A
+        modeler=lambda runs, posix: (
+            os.path.join(runs, 'MODEL_A', '2d')
+            if runs == 'RUNS' and posix.endswith(FAKE[0][0]) else None))
     win.resize(760, 420)
     win.show()
     until(lambda: len(win.names()) == 3)
+    check('P2-17: the Model column is last, a placeholder until the second '
+          'pass', win.table.horizontalHeaderItem(5).text() == 'Model'
+          and win.row_text(FAKE[0][0])[5] == '…',
+          str(win.row_text(FAKE[0][0])))
     check('the names are on screen before any size is known',
           win.names() == [n for n, _a in FAKE], str(win.names()))
     check('with the size column still a placeholder',
@@ -139,6 +147,10 @@ def main():
     check('the sizes arrive in a second pass',
           win.row_text(FAKE[0][0])[2] == '1.0 MB',
           str(win.row_text(FAKE[0][0])))
+    check('P2-17: the Model column names the model that holds each run (a '
+          'chain\'s stage folder gives its model), `-` when none does',
+          [win.row_text(n)[5] for n, _a in FAKE] == ['MODEL_A', '-', '-'],
+          str([win.row_text(n)[5] for n, _a in FAKE]))
     check('and the selection survived it, by name',
           win.selected_name() == FAKE[1][0], str(win.selected_name()))
     check('the status line totals them',

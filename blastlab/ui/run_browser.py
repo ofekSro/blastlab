@@ -37,6 +37,23 @@ from .bridge import ThreadBridge
 from .theme import PAD
 from .widgets import Card, button, hbox, label, vbox
 
+#: P2-17: the Model column follows the shared columns (`solvers.foam.runs`,
+#: which the Tk browser reads too): the model folder whose manifest holds
+#: this run's WSL scratch, `-` when none does
+MODEL_HEAD, MODEL_WIDTH, NO_MODEL = 'Model', 150, '-'
+
+
+def model_label(stage_dir):
+    """The model a stage folder (`model_folder.model_of_run`) belongs to:
+    its own name, or - a chain's `1d`, `2d`, `3d` stage - its parent's."""
+    if not stage_dir:
+        return ''
+    stage_dir = os.path.normpath(stage_dir)
+    name = os.path.basename(stage_dir)
+    if name.lower() in ('1d', '2d', '3d'):
+        return os.path.basename(os.path.dirname(stage_dir))
+    return name
+
 
 class FoamRunBrowser(QDialog):
     """`on_load(unc_path)` receives the selected run (the Results
@@ -47,10 +64,15 @@ class FoamRunBrowser(QDialog):
 
     def __init__(self, parent=None, on_load=None, log=print, lister=None,
                  sizer=None, deleter=None, confirm=None, autorefresh=True,
-                 on_resume=None, warner=None, bridge=None):
+                 on_resume=None, warner=None, bridge=None, runs_dir=None,
+                 modeler=None):
         super().__init__(parent)
         self.setWindowTitle('blastFoam runs')
-        self.resize(760, 420)
+        self.resize(900, 420)
+        # P2-17: `runs_dir()` is the Run tab's Runs folder; `modeler(runs,
+        # posix)` finds a run's model folder (injectable like the rest)
+        self._runs_dir = runs_dir or (lambda: '')
+        self._modeler = modeler or self._find_model
         self._on_load = on_load or (lambda path: None)
         self._on_resume = on_resume
         self._log = log
@@ -69,14 +91,14 @@ class FoamRunBrowser(QDialog):
         card = Card(title=self.TITLE, pad=12)
         root.addWidget(card, 1)
 
-        self.table = QTableWidget(0, len(COLS))
-        self.table.setHorizontalHeaderLabels(list(HEADS))
+        self.table = QTableWidget(0, len(COLS) + 1)
+        self.table.setHorizontalHeaderLabels(list(HEADS) + [MODEL_HEAD])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setAlternatingRowColors(True)
-        for i, w in enumerate(WIDTHS):
+        for i, w in enumerate(tuple(WIDTHS) + (MODEL_WIDTH,)):
             self.table.setColumnWidth(i, w)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.doubleClicked.connect(lambda *_: self.load_selected())
@@ -132,14 +154,27 @@ class FoamRunBrowser(QDialog):
                 # names first, so 80 run dirs are on screen immediately
                 self._bridge.post(self._fill, dict(rows), False)
                 sizes = self._sizer([r['posix'] for r in rows.values()])
-                self._bridge.post(self._fill,
-                                  apply_sizes(rows, sizes), True)
+                sized = apply_sizes(rows, sizes)
+                runs = self._runs_dir()
+                for r in sized.values():       # P2-17: off the GUI thread
+                    r['model'] = self._modeler(runs, r['posix'])
+                self._bridge.post(self._fill, sized, True)
             except Exception as exc:        # surfaced, never a dead window
                 self._bridge.post(self._failed,
                                   f'{type(exc).__name__}: {exc}')
 
         threading.Thread(target=work, daemon=True).start()
         return True
+
+    @staticmethod
+    def _find_model(runs_dir, posix):
+        """The stage folder of the model that holds this run's scratch, or
+        None (`model_folder.model_of_run`)."""
+        from ..services import model_folder
+        try:
+            return model_folder.model_of_run(runs_dir, posix)
+        except OSError:
+            return None
 
     def _fill(self, rows, sized):
         """Repaint the table, keeping the selection by NAME - the row
@@ -153,7 +188,9 @@ class FoamRunBrowser(QDialog):
             total += row['bytes'] or 0
             values = (name, row['dims'],
                       human_size(row['bytes']) if sized else '…',
-                      started_from_name(name), state_text(row['alive']))
+                      started_from_name(name), state_text(row['alive']),
+                      (model_label(row.get('model')) or NO_MODEL) if sized
+                      else '…')
             for c, text in enumerate(values):
                 item = QTableWidgetItem(str(text))
                 item.setTextAlignment(Qt.AlignVCenter | (
