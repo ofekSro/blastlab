@@ -107,7 +107,7 @@ def index_checks():
     check('trigger 2, dropped: disabled with a "was dropped" line',
           trigger_index(2, 4, hooks, numbers=kept) is None
           and hooks.lines[-1].strip()
-          == '[warn] Trigger gauge 2 was dropped - trigger disabled',
+          == '[warn] Trigger gauge G2 was dropped - trigger disabled',
           str(hooks.lines))
     check('trigger 5 of 4 entered: does not exist, counted as entered',
           trigger_index(5, 4, hooks, numbers=kept) is None
@@ -195,7 +195,7 @@ def numbering(tag, solve, make, kept, in_wall):
           not two.stop_reason.startswith('trigger')
           and 'trigger' not in two.meta
           and two.meta['trigger_gauge'] is None
-          and any('Trigger gauge 2 was dropped - trigger disabled' in ln
+          and any('Trigger gauge G2 was dropped - trigger disabled' in ln
                   for ln in hooks.lines),
           f'{two.stop_reason!r} {two.meta["trigger_gauge"]}')
     return drop

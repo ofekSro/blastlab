@@ -123,7 +123,7 @@ def trigger_checks(tag, make):
         check(f'{tag}: trigger G{n} (dropped) is disabled, with the '
               f'dropped warn line',
               got == (None, None) and len(h.msgs) == 1
-              and f'Trigger gauge {n} was dropped' in h.msgs[0]
+              and f'Trigger gauge G{n} was dropped' in h.msgs[0]
               and 'disabled' in h.msgs[0], f'{got} {h.msgs}')
     h = _Hooks()
     got = backend._trigger_cells(

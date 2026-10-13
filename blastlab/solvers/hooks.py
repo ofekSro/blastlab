@@ -81,7 +81,7 @@ def trigger_index(trigger_gauge, n_gauges, hooks, numbers=None):
         return k
     numbers = list(numbers)
     if k + 1 not in numbers:
-        hooks.log(f"  [warn] Trigger gauge {k + 1} was dropped - trigger "
+        hooks.log(f"  [warn] Trigger gauge G{k + 1} was dropped - trigger "
                   f"disabled")
         return None
     return numbers.index(k + 1)
