@@ -773,6 +773,10 @@ def _case_from_fields(dim: int, values: dict, mode: str) -> tuple:
             gauge_file=v['gauge_file'] or None,
             profile_file=v['profile_out'] or None,
             solver=mode,
+            # P1-25: the Qt form has a 1D ranks row; the frozen Tk form
+            # has none, so its 1D values carry no key and stay at auto
+            n_procs=(_I('n_procs', 'MPI ranks')
+                     if foam and 'n_procs' in v else 0),
             **_charge_model()), errs, bad
 
     sides = BC_SIDES_2D if dim == 2 else BC_SIDES_3D

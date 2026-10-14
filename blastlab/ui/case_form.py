@@ -681,6 +681,10 @@ class CaseForm(FieldForm):
                 self.points[name].set(value)
             else:
                 self.v[name].set(value)
+        # P1-25: 1D has a ranks row here but not in the frozen Tk form,
+        # which shares fields_from_case - so it is loaded here, not there
+        if self.dim == 1 and 'n_procs' in self.v:
+            self.v['n_procs'].set(str(int(getattr(case, 'n_procs', 0) or 0)))
         # F16 (D211, D223): the file's own AMR values, kept as loaded
         self._loaded_amr = {k: getattr(case, k)
                             for k in fields.AMR_FORM_FALLBACKS
