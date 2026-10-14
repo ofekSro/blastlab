@@ -131,6 +131,21 @@ Owner 2026-10-12 "last GUI batch"; 2026-10-14: GUI no longer high priority, clos
 
 ---
 
+## 0zb. 2026-10-14 — batch `1d-mpi` (P1-26, P1-25 B1-B3 + B5; branch `p1-25-1d-mpi`, base `05e099d`)
+
+Plan `docs/batches/2026-10-14-1d-mpi.md`; reports `…-1d-mpi-A.implement.md`, `…-B.implement.md`, `…-B.verify.md`.
+Owner 2026-10-14: Q1 approved (`foam_1d` validation golden), Q2 keep D1 (auto 1D stays serial below 200 000 cells), Q3 no profiler install; "parallel": Part A (WSL) and B1-B4 (worktree, no WSL) ran side by side, B5 after A2.
+- **A1 (P1-26, risk none, no verifier):** `docs/verification/1d-step-cost.md`, rule before the runs. Step cost is per cell, 1.0 ms + 22.3 µs·n (fixed 0.9 %); syscalls < 1 %. Leads: Euler -45 %, plain gradient -23 %, one phase -44 %; all change results, none numerics-neutral. M1 -3.7 %, M4 -12 %, M5 +0.5 %, M7 late window +1.7 %. Mean, not median (ExecutionTime has 10 ms resolution).
+- **A2 (P1-25 gate):** `docs/verification/1d-mpi-probe.md` "Gauge check": serial vs np 4 scotch to 3 ms, 1 m 916.545 kPa / 123.163 Pa·s / 0.515789 ms, 2 m 169.358 kPa / 70.3752 Pa·s / 1.97718 ms, all six within 0.001 % (rule 1 %). PASS-scotch, no writer change.
+- **B1-B3 (P1-25):** the 1D np 4 tree pinned first (`test_foam_writer.py`); `env.plan_run` and `backend._preflight` treat 1D like 2D/3D, the banner names ranks only when > 1 (D2); `_report_run_plan` shared, 1D validation has a run plan, `model_folder.run_info` 1D branch gone; `foam_1d` golden moved (run_plan + one note), the approved strip pin moved with B3.
+- **B5:** `_e2e_foam_1d_mpi.py` through the app, 0.5 m / 1 m gauges < 0.0001 % apart, ms/step 120 → 40 (3.0×), app wall 0.44; WSL gates `test_foam_1d_vs_native`, `test_foam_kb_anchor` pass.
+- **Tests:** `gate --changed 05e099d --deep` 100/100; `test_regression` byte-identical; `foam_golden/`, `baseline/`, `foam_fixtures/`, `gui/` untouched.
+- **Verifier fixes:** `48d226d` (`ui/setup_strip.py` docstring). Status: B1, B2, B5 VERIFIED; B3 FIXED.
+- **Open:** B4 (Qt 1D ranks field) on `p1-25-1d-mpi-B4-pending` `29ddcf0`, moves `ui_case_form.json`, owner; `setup_spec.py:117` comment (B4 rewrites it); no fast test of `backend.py:296`; 1D auto-ranks rule (Q2 follow-up); parallel 1D stores each write twice (217 vs 111 MB); 1D Memory tile uses the 2D/3D per-cell model; WSL dirs `/root/p126_step_cost`, `/root/p125_gauge` and 7 B5/verify runs in the corpus, safe to delete.
+- **Commits:** `c60f89d`..`0e35c63` (branch `p1-25-1d-mpi`; B1-B3 merged from a worktree in `5dbc729`).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and
