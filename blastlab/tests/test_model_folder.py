@@ -776,7 +776,9 @@ def test_c_run_info_and_layout():
     assert info == dict(model='M', runs_dir='R', model_dir=t.folder,
                         n_cells=864000, n_procs=13), info
     assert mf.run_info(t, case2d(), rep)['n_procs'] == 1
-    assert mf.run_info(t, case1d(solver='blastfoam'), rep)['n_procs'] == 1
+    # P1-25 (owner-approved edit): 1D blastFoam takes the report's ranks
+    assert mf.run_info(t, case1d(solver='blastfoam'), rep)['n_procs'] == 13
+    assert mf.run_info(t, case1d(), rep)['n_procs'] == 1
     assert 'n_cells' not in mf.run_info(t)
     h = mf.handoff_paths(t, [1, 2, 3])
     assert h == {(1, 2): os.path.join(t.folder, 'handoff_1d_to_2d.txt'),

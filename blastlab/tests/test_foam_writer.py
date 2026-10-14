@@ -608,6 +608,51 @@ def semantic_checks(specs):
     check('deterministic render', two.files == s1.files)
 
 
+def parallel_1d_checks(specs):
+    """P1-25 (B1, D3): the 1D tree for 4 MPI ranks is the serial tree plus
+    system/decomposeParDict and nothing else, byte for byte. Pinned here
+    rather than as a foam_golden/ fixture, before 1D takes ranks at all."""
+    s1 = specs['case1d_tnt']
+    s1p = render_case(cases()['case1d_tnt'], n_procs=4)
+    check('1D np4: file set is the serial set plus decomposeParDict',
+          set(s1p.files) == set(s1.files) | {'system/decomposeParDict'},
+          sorted(set(s1p.files) ^ set(s1.files)))
+    dpd = norm(s1p.files.get('system/decomposeParDict', ''))
+    check('1D np4: decomposeParDict scotch, 4 subdomains',
+          'numberOfSubdomains 4;' in dpd and 'method scotch;' in dpd, dpd)
+    check('1D np4: every other file equals the serial render byte for byte',
+          {k: v for k, v in s1p.files.items()
+           if k != 'system/decomposeParDict'} == s1.files)
+
+    # B2: the mesh stages decompose last (after setRefinedFields), and the
+    # banner names the ranks only when there is more than one (D2)
+    from blastlab.solvers.foam import backend as _be
+    cmds = [c for _l, c in _be._mesh_stages(s1p, None) if isinstance(c, str)]
+    ser = [c for _l, c in _be._mesh_stages(s1, None) if isinstance(c, str)]
+    check('1D np4: setRefinedFields, then decomposePar -force last',
+          cmds[-1] == 'decomposePar -force'
+          and any('setRefinedFields' in c for c in cmds[:-1])
+          and cmds[:-1] == ser, str(cmds))
+
+    class _Log:
+        def __init__(self):
+            self.lines = []
+
+        def log(self, line):
+            self.lines.append(line)
+
+    case = cases()['case1d_tnt']
+    b1, b4 = _Log(), _Log()
+    _be._log_banner_1d(b1, case, s1)
+    _be._log_banner_1d(b4, case, s1p)
+    check('1D banner: serial names no ranks',
+          not any('MPI' in ln for ln in b1.lines))
+    check('1D banner: np4 adds one MPI-ranks line naming 4, nothing else',
+          [ln for ln in b4.lines if ln not in b1.lines]
+          == ['  MPI ranks       : 4'] and len(b4.lines) == len(b1.lines) + 1,
+          str(b4.lines))
+
+
 def chain_eos_checks(specs):
     """B0/B1/B2: what a profile-initialised stage hands blastFoam.
 
@@ -1731,6 +1776,7 @@ def main():
     specs['case2d_planar_amr_np4'] = render_case(
         cases()['case2d_planar_amr'], n_procs=4)
     semantic_checks(specs)
+    parallel_1d_checks(specs)
     profile_checks(specs)
     profile_amr_checks(specs)
     chain_eos_checks(specs)
