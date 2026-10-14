@@ -80,8 +80,8 @@ process never imports VTK nor `matplotlib.pyplot` (pinned by `test_ui_no_vtk_in_
 
 ## 6. Working conventions
 
-- **`TODO.md`** is the one work list, P0→P4, with `GUI`, `OUT`, `HD1` above P0 (owner
-  directives). **`DONE.md`** is the record; code cites `TODO.md <id>` / `DONE.md <id>`
+- **`TODO.md`** is the one work list, P0→P4, with `OUT`, `HD1` above P0 (owner
+  directives; `GUI` low priority since 2026-10-14). **`DONE.md`** is the record; code cites `TODO.md <id>` / `DONE.md <id>`
   (`B23`, `G7`, `N7`, `W1`) - never rename either file or renumber an id. Write "solver
   review B0" for that review's `B`/`N` ids (they clash with `DONE.md` §5).
 - Cite stable ids in commits; style `area: what changed (<id>)`. `master` is the trunk,
