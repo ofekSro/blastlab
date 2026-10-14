@@ -481,7 +481,6 @@ def plan_run(n_req, n_cells, cores=None, ram_gb=None, dim=3, amr=0,
 
       * an explicit n_req >= 1 is honoured up to `rank_ceiling` - what
         the machine physically has - and clamped past it (N21);
-      * 1D and dynamic-AMR runs are serial (AMR until T42);
       * a grid under AUTO_PARALLEL_MIN_CELLS stays serial - decompose
         and reconstruct cost more than the ranks save;
       * otherwise as many ranks as the cores (minus headroom), the
@@ -524,8 +523,9 @@ def plan_run(n_req, n_cells, cores=None, ram_gb=None, dim=3, amr=0,
                         'requested %d MPI ranks, clamped to %d (%s)'
                         % (n, ceiling, why), requested=n, clamped_from=n)
         return plan(n, 'requested: %d MPI ranks' % n, requested=n)
-    if dim == 1:
-        return plan(1, 'serial: 1D runs are a single wedge')
+    # P1-25: 1D follows the same rules (it was always serial). Its wedge
+    # decomposes along r like any mesh; under the shared cell floor an
+    # auto (0) 1D run of default size still stays serial (batch 1d-mpi D1)
     # dynamic AMR runs in parallel since T42 (N16-b) - the ingest reads
     # processor*/ directly, so no reconstruction is needed
     if n_cells < AUTO_PARALLEL_MIN_CELLS:

@@ -624,6 +624,34 @@ def parallel_1d_checks(specs):
           {k: v for k, v in s1p.files.items()
            if k != 'system/decomposeParDict'} == s1.files)
 
+    # B2: the mesh stages decompose last (after setRefinedFields), and the
+    # banner names the ranks only when there is more than one (D2)
+    from blastlab.solvers.foam import backend as _be
+    cmds = [c for _l, c in _be._mesh_stages(s1p, None) if isinstance(c, str)]
+    ser = [c for _l, c in _be._mesh_stages(s1, None) if isinstance(c, str)]
+    check('1D np4: setRefinedFields, then decomposePar -force last',
+          cmds[-1] == 'decomposePar -force'
+          and any('setRefinedFields' in c for c in cmds[:-1])
+          and cmds[:-1] == ser, str(cmds))
+
+    class _Log:
+        def __init__(self):
+            self.lines = []
+
+        def log(self, line):
+            self.lines.append(line)
+
+    case = cases()['case1d_tnt']
+    b1, b4 = _Log(), _Log()
+    _be._log_banner_1d(b1, case, s1)
+    _be._log_banner_1d(b4, case, s1p)
+    check('1D banner: serial names no ranks',
+          not any('MPI' in ln for ln in b1.lines))
+    check('1D banner: np4 adds one MPI-ranks line naming 4, nothing else',
+          [ln for ln in b4.lines if ln not in b1.lines]
+          == ['  MPI ranks       : 4'] and len(b4.lines) == len(b1.lines) + 1,
+          str(b4.lines))
+
 
 def chain_eos_checks(specs):
     """B0/B1/B2: what a profile-initialised stage hands blastFoam.

@@ -100,7 +100,12 @@ def run_plan_checks():
     table = [
         ('explicit request wins',      P(4, 10 ** 6, 8, 16, 3, 0), 4, True),
         ('explicit beats every floor', P(6, 1000, 8, 16, 3, 0), 6, True),
-        ('1D is serial',               P(0, 10 ** 7, 8, 16, 1, 0), 1, True),
+        # P1-25 (owner-approved edit, 2026-10-14): 1D used to be serial
+        ('1D follows the 2D/3D rules (P1-25)',
+                                       P(0, 10 ** 7, 8, 16, 1, 0), 7, True),
+        ('1D small grid is serial',    P(0, 5000, 8, 16, 1, 0), 1, True),
+        ('1D explicit request honoured',
+                                       P(4, 5000, 8, 16, 1, 0), 4, True),
         ('AMR goes parallel (T42)',    P(0, 10 ** 7, 8, 16, 3, 2), 7, True),
         ('tiny grid is serial',        P(0, 120_000, 8, 16, 3, 0), 1, True),
         ('cores-limited',              P(0, 10 ** 7, 8, 64, 3, 0), 7, True),
