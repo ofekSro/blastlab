@@ -855,6 +855,9 @@ Qt refusal and overwrite dialogs break a path after "C:".
 - `P2-28` Chain accuracy coverage: no impulse in `_e2e_foam_chain`; no blastFoam chain-vs-direct test for 2D→3D or 1D→3D; no `profile2d` writer golden.
 - `P2-29` 2D→3D remap puts ambient air in the 3D layer below the first 2D cell centre (`core/profiles.py:274-275`) - latent, only when the 3D cells are finer near the ground.
 - `P2-30` Hand-off fidelity, measure first: interface cut at alpha 0.5 with `p` recomputed; no source-vs-target mass/energy/momentum check; a 2D AMR source exports at display level.
+- `P2-31` A 2D blastFoam run that stops at an explicit `t_end` reports `safety cap` as the stop reason; 3D says `end time reached` (P1-23 Part A implementer and verifier, 2026-10-12; owner approved as a TODO item 2026-10-13).
+- `P2-32` 3D with extra charges and explicit `det_radii`: validation wants one radius, the writer lights one per charge - the counts disagree. Pre-dates P1-23 (Part A verify, 2026-10-12).
+- `P2-33` `backend._scan_set_mass` notes an intermediate mesh stage's mass (`case3d_amr`: "13.04 kg (1.63 of the 8 kg requested)", final 7.997 kg), and prints the ratio to 2 decimals against the full request, so a wall-halved charge reads 0.49 (Part A verify, 2026-10-12).
 
 ---
 

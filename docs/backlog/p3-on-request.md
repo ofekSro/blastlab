@@ -30,6 +30,7 @@ Moved out of [`TODO.md`](../../TODO.md) on 2026-10-13 (owner-approved split, TOD
   **Minimum:** raise it to a validation warning in the GUI instead of a stdout print.
 - `P3-27` A hemispherical surface burst through the chain (1D→3D / 1D→2D near the ground); the factor is an owner call, cited from UFC 3-340-02. Detail: `docs/verification/remap-chain-gaps.md` §5.
 - `P3-28` Several charges with a hand-off: extra charges beside a remapped field, and several 1D hand-offs placed in one 2D/3D stage (one common hand-off time, fields not yet met). Same doc §5.
+- `P3-29` An ideal-gas-only charge for blastFoam (owner 2026-10-13). Native already has it: `eos idealGas`, `solver1d.py:110-113`, the material's rho and e0 with p = (γ_air − 1) ρ e, a Brode-type pressurised sphere. blastFoam always writes `expl` as `detonating` (Murnaghan → JWL); this would write it as a `basic` idealGas phase. **Owner call first:** how the initial state is set (the same e as native, or an energy-equivalent p and radius). Then verify against native 1D.
 
 **From the solver-options review** — full detail and dict snippets in
 [docs/verification/solver-options-review.md](docs/verification/solver-options-review.md).
