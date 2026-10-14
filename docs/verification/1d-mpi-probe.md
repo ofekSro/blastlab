@@ -59,3 +59,27 @@ without the function objects, so a full 1D run at dx = 1 mm to 10 ms is over an 
 serial. Where that time goes was not examined.
 
 Probe cases left in `/root/mpi1d_probe` (outside the run corpus; safe to delete).
+
+## Gauge check (P1-25 step 1, batch 1d-mpi task A2)
+
+### Decision rule - written 2026-10-14 09:50, before the first run of this section
+
+Case A as the current writer writes it, `t_end = 3e-3`, gauges 1 m and 2 m; written twice to
+`/root/p125_gauge/np1` (`n_procs=1`) and `/root/p125_gauge/np4` (`n_procs=4`, scotch); the trees
+differ only by `system/decomposeParDict`. Stages: blockMesh, `setRefinedFields -noRefine`, then
+for np 4 `decomposePar -force`, `mpirun --allow-run-as-root -np 4 blastFoam -parallel`,
+`reconstructPar`. Both run side by side (timing is not judged here).
+
+Metrics: `reader.read_probes` on each run dir, `output.gauge_summary.summarize_trace`
+(arrival = first sample above 1.1 x ambient, `ARRIVAL_FRAC = 0.10`, P1-13). At the 1 m and 2 m
+gauges: |peak4 - peak1| <= 1 % of peak1, |I4 - I1| <= 1 % of I1 (positive-phase impulse inside
+the 3 ms window; at 2 m the window may truncate it, identically in both runs), |ta4 - ta1| <=
+1 % of ta1. All six must hold.
+- Pass with scotch: Part B goes ahead unchanged.
+- Fail with scotch: rerun np 4 with `method simple; simpleCoeffs { n (4 1 1); }` (the 1D mesh
+  runs along +x, `writer.py:613-630`; D7). If `simple` passes, Part B writes `simple` for 1D only.
+  If the failure is in peak only, also run the open-research settling variant (`adjustTimeStep
+  no`, fixed `deltaT` below the smallest adaptive step, np 1 vs np 4) as a diagnostic: reported,
+  not a pass.
+- Fail with both: STOP; Part B is not started; the six numbers per method go to the owner.
+- Reported, not judged: step count and ms/step of each run.
