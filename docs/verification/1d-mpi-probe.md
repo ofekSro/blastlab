@@ -135,3 +135,40 @@ after the other, nothing else on WSL. In 1 ms the shock reaches the 0.5 m and 1 
   live frame with a full-length profile in both runs, the 4 gauges in the Result, the banner
   names `MPI ranks : 4` only at np 4 (D2), both runs end at t_end.
 - A failed rule is reported with its numbers, never tuned.
+
+### Result (2026-10-14, office machine, the two runs alone on WSL)
+
+`python -u blastlab/tests/_e2e_foam_1d_mpi.py` -> `FOAM 1D MPI E2E: PASS` (exit 0), every
+machinery check and both rules. Runs `/root/blastlab_runs/20261014-105507_1d_p26716-00` (np 1)
+and `…/20261014-110320_1d_p26716-01` (np 4), 111 MB and 217 MB (`du -sh`; np 4 keeps every
+write twice, root and ranks, as there is no write budget), safe to delete (not deleted here). Both
+stop at t_end (`safety cap`), 4 121 steps each, gauge times identical (4 122 samples).
+
+| gauge | metric | np 1 | np 4 (scotch) | delta |
+|---|---|---|---|---|
+| 0.5 m | peak overpressure [kPa] | 3592.76 | 3592.76 | < 0.0001 % |
+| 0.5 m | positive impulse [Pa s] (complete) | 133.329 | 133.329 | < 0.0001 % |
+| 0.5 m | arrival [ms] | 0.151719 | 0.151719 | 0 (same sample) |
+| 1 m | peak overpressure [kPa] | 903.345 | 903.345 | < 0.0001 % |
+| 1 m | positive impulse [Pa s] (cut at 1 ms in both) | 118.770 | 118.770 | < 0.0001 % |
+| 1 m | arrival [ms] | 0.519408 | 0.519408 | 0 (same sample) |
+| - | ms/step, median (mean) of 4 121 steps | 120.0 (118.1) | 40.0 (41.5) | ratio 3.00 (2.85) |
+| - | app-path wall [s] (reported) | 492 | 215 | np 4 / np 1 = 0.44 |
+
+Sample level (scratch `gauge_detail.py`, session scratchpad `partB5/`): 275 of 4 122 samples
+differ at 0.5 m, 55 at 1 m, by at most 20 Pa (5.6e-6 of the peak) and 8 Pa (8.9e-6); the 2 m and
+4 m gauges, not yet reached, are identical. `ExecutionTime` is printed to 0.01 s, so per-step
+deltas come in 10 ms steps and the medians land on 120 / 40; the means give the finer ratio,
+2.85, also above 2.0. Live view: 569 (np 1) and 111 (np 4) live frames, all full length; np 4
+reconstructed all 161 rank times at the root. The wall ratio 0.44 is below 0.6, so the
+per-write `reconstructPar` ingest is not the bottleneck at this size: no owner question.
+
+**Verdict B5: PASS.** Through the app path, a 1D blastFoam run on 4 ranks gives the serial
+gauge numbers to < 0.0001 % and runs 2.85-3.0x faster per step (2.3x end to end).
+
+## Closing verdict (batch 1d-mpi, P1-25)
+
+The gauge check (A2, 3 ms, 1 m / 2 m) and the app-path check (B5, 1 ms, 0.5 m / 1 m) both pass
+with the writer's scotch `decomposeParDict`, unchanged; 1D now takes the run plan's ranks like
+2D/3D (B2/B3). Default behaviour is unchanged (D1): auto stays serial below 200 000 cells, so
+ranks are used when typed (case file / CLI; the Qt field is B4, held for the owner).
