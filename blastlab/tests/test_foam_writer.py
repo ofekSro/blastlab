@@ -608,6 +608,23 @@ def semantic_checks(specs):
     check('deterministic render', two.files == s1.files)
 
 
+def parallel_1d_checks(specs):
+    """P1-25 (B1, D3): the 1D tree for 4 MPI ranks is the serial tree plus
+    system/decomposeParDict and nothing else, byte for byte. Pinned here
+    rather than as a foam_golden/ fixture, before 1D takes ranks at all."""
+    s1 = specs['case1d_tnt']
+    s1p = render_case(cases()['case1d_tnt'], n_procs=4)
+    check('1D np4: file set is the serial set plus decomposeParDict',
+          set(s1p.files) == set(s1.files) | {'system/decomposeParDict'},
+          sorted(set(s1p.files) ^ set(s1.files)))
+    dpd = norm(s1p.files.get('system/decomposeParDict', ''))
+    check('1D np4: decomposeParDict scotch, 4 subdomains',
+          'numberOfSubdomains 4;' in dpd and 'method scotch;' in dpd, dpd)
+    check('1D np4: every other file equals the serial render byte for byte',
+          {k: v for k, v in s1p.files.items()
+           if k != 'system/decomposeParDict'} == s1.files)
+
+
 def chain_eos_checks(specs):
     """B0/B1/B2: what a profile-initialised stage hands blastFoam.
 
@@ -1731,6 +1748,7 @@ def main():
     specs['case2d_planar_amr_np4'] = render_case(
         cases()['case2d_planar_amr'], n_procs=4)
     semantic_checks(specs)
+    parallel_1d_checks(specs)
     profile_checks(specs)
     profile_amr_checks(specs)
     chain_eos_checks(specs)
