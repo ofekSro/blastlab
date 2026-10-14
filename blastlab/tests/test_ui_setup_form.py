@@ -278,6 +278,21 @@ def main():
     f.set_mode('native')
     check("nothing typed was lost across two switches",
           f.v['Lx'].get() == '6.25' and f.v['n_procs'].get() == '7')
+    # P1-25: 1D blastFoam takes MPI ranks too; native still hides the row
+    f1b, f1n = form(1, 'blastfoam'), form(1, 'native')
+    check("1D blastFoam shows the MPI ranks row",
+          'n_procs' in f1b.v and f1b.row_visible('n_procs'))
+    check("1D native hides the MPI ranks row",
+          not f1n.row_visible('n_procs'))
+    f1b.v['n_procs'].set('4')
+    check("1D blastFoam: typed ranks reach the case",
+          f1b.get_case().n_procs == 4)
+    f1b.set_case(Case1D(solver='blastfoam', n_procs=3))
+    check("1D blastFoam: a loaded case's ranks round-trip",
+          f1b.v['n_procs'].get() == '3' and f1b.get_case().n_procs == 3,
+          f1b.v['n_procs'].get())
+    check("1D native: the hidden ranks box is not read",
+          f1n.get_case().n_procs == 0)
 
     print("\nS6b: Material is a blastFoam row (UXR-3, owner 2026-10-03, "
           "D210)")

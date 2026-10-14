@@ -286,13 +286,14 @@ def _preflight(case, hooks):
         raise ValueError("Invalid blastFoam case:\n  "
                          + "\n  ".join(rep.errors))
     _stop_check(hooks, 'before writing the case')
-    # effective rank count: 1D always serial; auto stays serial for
-    # small grids (decompose overhead beats the speed-up there)
+    # effective rank count, every dim alike since P1-25 (1D was always
+    # serial); auto stays serial for small grids (decompose overhead
+    # beats the speed-up there)
     plan = writer.plan_case(case)
     # AMR runs go parallel too since T42 (N16-b): reconstructPar still
     # cannot follow a changing mesh, so those runs are ingested straight
     # from processor*/ instead of being reconstructed.
-    n_procs = 1 if case.dim == 1 else env.resolve_nprocs(
+    n_procs = env.resolve_nprocs(
         getattr(case, 'n_procs', 0), plan.n_cells,
         dim=case.dim, amr=plan.amr)
     # the live-sample cadence follows the GUI's "Refresh every N steps"
@@ -741,6 +742,10 @@ def _log_banner_1d(hooks, case, spec):
             f'  Explosive radius: {spec.r_exp:.4f} m',
             f'  Domain radius   : {case.radius_m} m',
             f'  Cell size       : {spec.dx:.5f} m  ({spec.nx} cells)',
+            # P1-25 (D2): named only when parallel, so serial logs stay
+            # line for line what they were
+            *([f'  MPI ranks       : {spec.n_procs}']
+              if int(getattr(spec, 'n_procs', 1) or 1) > 1 else []),
             '  EOS             : JWL products + ideal-gas air',
             f'  vDet            : {m.vDet:g} m/s',
             f'  Safety cap      : {spec.end_time*1e3:.1f} ms',

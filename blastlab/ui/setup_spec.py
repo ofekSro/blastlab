@@ -113,10 +113,10 @@ def _numerics(dim):
                      scope='blastfoam', group='cref'))
     out.append(F('n_snapshots', 'Snapshots', 'int', 5 if dim == 1 else 6))
     out.append(F('cfl', 'CFL', 'float', {1: 0.5, 2: 0.4, 3: 0.30}[dim]))
-    if dim > 1:
-        # blastFoam MPI ranks; 1D always runs serial, so no field
-        out.append(F('n_procs', 'MPI ranks (0 = auto)', 'int', 0,
-                     scope='blastfoam'))
+    # blastFoam MPI ranks, every dim since P1-25 (1D was always serial);
+    # native hides the row (CLAUDE.md 4)
+    out.append(F('n_procs', 'MPI ranks (0 = auto)', 'int', 0,
+                 scope='blastfoam'))
     # T52: every dimension can set an end time; whichever comes first
     # wins - a terminate boundary, the trigger gauge, or this
     out.append(F('t_end', 'End time [s] (0 = auto)', 'float', 0.0))

@@ -653,7 +653,11 @@ Cited by `solvers/hooks.py`, `solver1d/2d/3d.py`, `services/validation.py`, `cor
 gauge's entered number; a trigger on a dropped gauge is disabled and warned about (native only,
 D13). The blastFoam side is measured in the P1-23 batch (above).
 
-### P1-25 · 1D blastFoam runs serial only, though MPI cuts a step 2.9× at np 4 · **owner decision 2026-10-13: enable it**
+### P1-25 · 1D blastFoam runs serial only, though MPI cuts a step 2.9× at np 4 · ✅ closed 2026-10-14 (DONE.md §0zb)
+
+Batch `1d-mpi`: gauges within 0.001 % (scotch), np 4 3.0× per step, serial trees
+byte-identical; 1D takes the run plan's ranks; the Qt form shows the ranks field for 1D
+blastFoam (B4, owner-approved `ui_case_form.json` re-baseline). Follow-ups: P1-27, P1-28.
 
 Every 1D blastFoam run is forced to one rank (`foam/backend.py:289-295`, `foam/env.py:528`
 "1D runs are a single wedge", since T48; `services/validation.py:346` says ranks are
@@ -672,7 +676,11 @@ arrival at the 1 m and 2 m gauges each within 1 % (scotch vs `simple` along r if
 fails it); (2) np 4 ≥ 2× faster per step; (3) serial 1D trees stay byte-identical
 (`foam_golden/`, `test_regression.py`). Risk high (`solvers/`, a committed test).
 
-### P1-26 · A 1D blastFoam step costs ~113 ms at 5 000 cells · **found 2026-10-13**
+### P1-26 · A 1D blastFoam step costs ~113 ms at 5 000 cells · ✅ closed 2026-10-14 (DONE.md §0zb)
+
+Measured in `docs/verification/1d-step-cost.md`: per-cell (1.0 ms + 22.3 µs·n), no
+numerics-neutral lead; Euler (-45 %), plain gradient (-23 %), one phase (-44 %) all change
+results - owner question. Original text:
 
 ~23 µs per cell-step, with or without the function objects (`liveLine`, `gauges`,
 `conserved`: 112.8 vs 115.7 ms), so a 1D run at dx 1 mm to 10 ms is over an hour serial.
@@ -680,6 +688,25 @@ Where the time goes is not known. Measure first (OpenFOAM `-profiling` or
 `profiling` in controlDict, one phase vs two, `activation`, the JWL products update) on
 the P1-25 case, then decide; it may pay more than P1-25. No change to any number without
 the owner.
+
+**Owner 2026-10-14:** the result-changing leads (Euler, plain gradient) are not adopted; a
+pre-registered peak / impulse / arrival check would be its own task if ever wanted.
+
+### P1-27 · Auto ranks keep 1D serial below 200 000 cells · **owner 2026-10-14: add**
+
+D1 of batch `1d-mpi`: auto (0) ranks use the shared 2D/3D floor (`env.py:55`), so every
+default-size 1D run stays serial though np 4 is 2.85× per step and 2.3× end to end at
+5 000 cells (`docs/verification/1d-mpi-probe.md`). Fix: a 1D auto rule (e.g. ranks from a
+few thousand cells), pre-registered from those numbers; it moves the `foam_1d` validation
+golden and `test_foam_env.py` rows - owner approval per pin.
+
+### P1-28 · A parallel 1D run stores every write twice; 1D memory tile uses the 2D/3D model · **owner 2026-10-14: add**
+
+At np 4 each write is kept in the root and in `processor*` (B5: 217 vs 111 MB for 1 ms), so
+a full-length parallel 1D run is several times its serial size. Decide whether 1D drops
+the rank copies after reconstruct as runs with a write budget do (HD1-15). Same task:
+check the per-cell memory model behind the 1D Memory tile (~130 MB at 5 000 cells), which
+was measured on 2D/3D only.
 
 ---
 

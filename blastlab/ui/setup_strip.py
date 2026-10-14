@@ -12,7 +12,7 @@ measured per-cell RSS of blastFoam that `plan_run` sizes its cell caps
 with - shown in the same GB (2^30 B) as validation's own messages.
 
 A tile whose number is not available is hidden, never greyed (plan
-§5.3): the MPI and memory tiles need a `run_plan` (blastFoam 2D/3D), the
+§5.3): the MPI and memory tiles need a `run_plan` (blastFoam, any dim), the
 charge needs a charge (not a profile start), Z needs `z_shown` and a
 gauge, and a 0-D case has no tile at all.
 
