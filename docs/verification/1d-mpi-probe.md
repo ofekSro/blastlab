@@ -83,3 +83,33 @@ the 3 ms window; at 2 m the window may truncate it, identically in both runs), |
   not a pass.
 - Fail with both: STOP; Part B is not started; the six numbers per method go to the owner.
 - Reported, not judged: step count and ms/step of each run.
+
+### Result (2026-10-14; run side by side on the office machine)
+
+`/root/p125_gauge/np1`, `/root/p125_gauge/np4` (4 `processor*` dirs, `nProcs : 4`; both safe to
+delete, D4). Table reproduced by the scratch script `gauge_table.py` (session scratchpad
+`partA/`: `python gauge_table.py /root/p125_gauge/np1 /root/p125_gauge/np4`; `gauge_detail.py`
+gives the sample-level differences). Probe `p` at 13 523 samples to t = 3 ms in both, the sample
+times identical.
+
+| gauge | metric | np 1 | np 4 (scotch) | delta |
+|---|---|---|---|---|
+| 1 m | peak overpressure [kPa] | 916.545 | 916.545 | < 0.001 % |
+| 1 m | positive impulse [Pa s] (complete) | 123.163 | 123.163 | < 0.001 % |
+| 1 m | arrival [ms] | 0.515789 | 0.515789 | 0 (same sample) |
+| 2 m | peak overpressure [kPa] | 169.358 | 169.358 | < 0.001 % |
+| 2 m | positive impulse [Pa s] (truncated at 3 ms in both) | 70.3752 | 70.3752 | < 0.001 % |
+| 2 m | arrival [ms] | 1.97718 | 1.97718 | 0 (same sample) |
+
+The two traces are not byte-identical: 3 614 of 13 523 samples differ at 1 m and 140 at 2 m,
+by at most 7 Pa (7.6e-6 of the 1 m peak) and 3 Pa (1.8e-5 of the 2 m peak): last-digit
+floating-point order in the rank-boundary exchange, three to four orders below the 1 % rule.
+Both runs took 13 522 steps. Reported, not judged (side by side, so timing is contended): np 1
+117.8 ms/step (ExecutionTime 1592.71 s), np 4 44.1 ms/step (595.65 s), ratio 2.67;
+`decomposePar` + `reconstructPar` of np 4: reconstructPar 14.4 s.
+
+**Verdict: PASS-scotch.** All six numbers are within 1 % (they are within 0.001 %). Part B
+goes ahead unchanged with the writer's scotch `decomposeParDict`; the `simple` fallback and the
+settling diagnostic were not needed. Caveat: this is a 1 m / 2 m, 3 ms, 5 000-cell check of the
+unforced case; the ~2 % parallel-vs-serial peak offset seen on 2D/3D (`open-research.md:8-21`)
+did not appear here.
