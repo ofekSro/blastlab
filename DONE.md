@@ -131,7 +131,7 @@ Owner 2026-10-12 "last GUI batch"; 2026-10-14: GUI no longer high priority, clos
 
 ---
 
-## 0zb. 2026-10-14 — batch `1d-mpi` (P1-26, P1-25 B1-B3 + B5; branch `p1-25-1d-mpi`, base `05e099d`)
+## 0zb. 2026-10-14 — batch `1d-mpi` (P1-26, P1-25; branch `p1-25-1d-mpi`, base `05e099d`)
 
 Plan `docs/batches/2026-10-14-1d-mpi.md`; reports `…-1d-mpi-A.implement.md`, `…-B.implement.md`, `…-B.verify.md`.
 Owner 2026-10-14: Q1 approved (`foam_1d` validation golden), Q2 keep D1 (auto 1D stays serial below 200 000 cells), Q3 no profiler install; "parallel": Part A (WSL) and B1-B4 (worktree, no WSL) ran side by side, B5 after A2.
@@ -141,8 +141,10 @@ Owner 2026-10-14: Q1 approved (`foam_1d` validation golden), Q2 keep D1 (auto 1D
 - **B5:** `_e2e_foam_1d_mpi.py` through the app, 0.5 m / 1 m gauges < 0.0001 % apart, ms/step 120 → 40 (3.0×), app wall 0.44; WSL gates `test_foam_1d_vs_native`, `test_foam_kb_anchor` pass.
 - **Tests:** `gate --changed 05e099d --deep` 100/100; `test_regression` byte-identical; `foam_golden/`, `baseline/`, `foam_fixtures/`, `gui/` untouched.
 - **Verifier fixes:** `48d226d` (`ui/setup_strip.py` docstring). Status: B1, B2, B5 VERIFIED; B3 FIXED.
-- **Open:** B4 (Qt 1D ranks field) on `p1-25-1d-mpi-B4-pending` `29ddcf0`, moves `ui_case_form.json`, owner; `setup_spec.py:117` comment (B4 rewrites it); no fast test of `backend.py:296`; 1D auto-ranks rule (Q2 follow-up); parallel 1D stores each write twice (217 vs 111 MB); 1D Memory tile uses the 2D/3D per-cell model; WSL dirs `/root/p126_step_cost`, `/root/p125_gauge` and 7 B5/verify runs in the corpus, safe to delete.
-- **Commits:** `c60f89d`..`0e35c63` (branch `p1-25-1d-mpi`; B1-B3 merged from a worktree in `5dbc729`).
+- **B4 (owner approved after the batch, 2026-10-14 "approve all"):** `setup_spec` gives `n_procs` to every dim, `models/fields.py` reads it only when present (Tk unaffected), `ui/case_form.set_case`; `ui_case_form.json` re-baselined, exactly 3 added lines (`a61814b`). Not verifier-run: `gate --changed 8175a0d` 12/12 by the orchestrator, `test_regression` byte-identical after.
+- **Owner 2026-10-14:** Euler / plain-gradient leads not adopted; follow-ups P1-27 (1D auto ranks), P1-28 (parallel 1D disk, 1D memory model). The 10 B5/verify runs in the corpus and `/root/p126_step_cost`, `/root/p125_gauge` deleted by exact name.
+- **Open:** no fast test of `backend.py:296` (1D ranks in `_preflight`; only the WSL e2e catches a revert).
+- **Commits:** `c60f89d`..`a61814b` (branch `p1-25-1d-mpi`; B1-B3 merged from a worktree in `5dbc729`, B4 cherry-picked as `28076a2`).
 
 ---
 
