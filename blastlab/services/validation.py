@@ -342,8 +342,6 @@ def _validate_solver(case, rep):
                  f"balance alone (only TNT is calibrated, against "
                  f"Kingery-Bulmash). The order of magnitude is right - do "
                  f"not quote these numbers without a source of your own.")
-    if n_procs > 1 and case.dim == 1:
-        note("1D cases always run serial (MPI ranks ignored)")
     from ..solvers.foam import env as foam_env
     st, detail = foam_env.status()
     if st == 'fail':
@@ -965,6 +963,9 @@ def _validate_1d(case, rep, ctx):
              f"({n_exp} cells inside the charge)")
     rep.effective_dx = dx
     rep.n_cells = int(case.radius_m / dx)
+    if ctx.foam:
+        # P1-25: 1D plans its ranks like 2D/3D (it was always serial)
+        _report_run_plan(case, rep, rep.n_cells, 0)
 
 
 def _validate_domain_and_charge(case, rep, ctx):
@@ -1648,23 +1649,32 @@ def _validate_caps(case, rep, ctx, hw=None):
     rep.n_cells = n
     _validate_write_budget(case, rep, n, foam, amr)
     if foam:
-        # N17/T48: resolve the rank count with the real cell count and
-        # say what was decided, for auto (0) as well as an explicit ask.
-        # Every argument the RUN will use is passed, so what validation
-        # reports is what actually launches (N21: sources and the settings
-        # rank limit included - without max_ranks the note would promise
-        # more ranks than resolve_nprocs goes on to ask for)
-        rep.run_plan = _env.plan_run(
-            int(getattr(case, 'n_procs', 0) or 0), n,
-            cores=_hw.get('cores'), ram_gb=_hw.get('ram_gb'),
-            dim=case.dim, amr=amr, headroom=_env.mpi_headroom(),
-            ram_source=_hw.get('ram_source'),
-            cores_source=_hw.get('cores_source'),
-            max_ranks=_env.mpi_max_ranks())
-        if case.dim > 1:
-            note("Parallel run: " + rep.run_plan.reason)
+        _report_run_plan(case, rep, n, amr, _hw)
     if plan is not None and plan.refined:
         _check_display_grid(case, rep, plan)
+
+
+def _report_run_plan(case, rep, n, amr, hw=None):
+    """blastFoam: `rep.run_plan` for `n` cells and the `Parallel run:`
+    note. Shared by `_validate_caps` (2D/3D) and `_validate_1d` (P1-25:
+    1D used to have no plan at all, being always serial). `hw` is the
+    WSL hardware dict; None reads `env.hardware()` (never touches WSL)."""
+    from ..solvers.foam import env as _env
+    _hw = (_env.hardware() or {}) if hw is None else hw
+    # N17/T48: resolve the rank count with the real cell count and
+    # say what was decided, for auto (0) as well as an explicit ask.
+    # Every argument the RUN will use is passed, so what validation
+    # reports is what actually launches (N21: sources and the settings
+    # rank limit included - without max_ranks the note would promise
+    # more ranks than resolve_nprocs goes on to ask for)
+    rep.run_plan = _env.plan_run(
+        int(getattr(case, 'n_procs', 0) or 0), n,
+        cores=_hw.get('cores'), ram_gb=_hw.get('ram_gb'),
+        dim=case.dim, amr=amr, headroom=_env.mpi_headroom(),
+        ram_source=_hw.get('ram_source'),
+        cores_source=_hw.get('cores_source'),
+        max_ranks=_env.mpi_max_ranks())
+    rep.notes.append("Parallel run: " + rep.run_plan.reason)
 
 
 def _check_amr_growth(case, rep, plan, cap_warn, cap_refuse, ram_hint):

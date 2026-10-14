@@ -324,8 +324,7 @@ def run_info(target, case=None, rep=None, handoff=None):
     if case is not None:
         if getattr(case, 'solver', 'native') != 'blastfoam':
             info['n_procs'] = 1
-        elif case.dim == 1:
-            info['n_procs'] = 1                 # 1D blastFoam runs serial
+        # P1-25: 1D blastFoam takes its planned ranks too (was always 1)
         elif rep is not None and getattr(rep, 'run_plan', None) is not None:
             info['n_procs'] = int(rep.run_plan.ranks)
     return info

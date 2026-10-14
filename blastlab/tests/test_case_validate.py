@@ -520,8 +520,43 @@ def run_plan_checks():
             setattr(env, a, v)
 
 
+def run_plan_1d_checks():
+    """P1-25: a 1D blastFoam case gets a run plan like 2D/3D - auto stays
+    serial under the shared cell floor (D1), a typed rank count is
+    honoured - and the old "1D always runs serial" note is gone."""
+    from blastlab.core.case import Case1D
+    from blastlab.solvers.foam import env
+    print("\nP1-25: 1D blastFoam run plan")
+    old = tuple(getattr(env, a) for a in _HW_ATTRS)
+    try:
+        env.forget_hardware()
+        env.prime_hardware(cores=8, ram_gb=64)
+        kw = dict(radius_m=5.0, charge_kg=1.0, cell_size_m=0.005,
+                  gauge_radii=[1.0, 2.0], solver='blastfoam')
+        auto = validate_case(Case1D(**kw))
+        check('1D blastFoam: auto has a run plan, serial on a small grid',
+              auto.run_plan is not None and auto.run_plan.ranks == 1,
+              str(auto.run_plan))
+        check('1D blastFoam: the plan is said as a "Parallel run" note',
+              any(n.startswith('Parallel run: ') for n in auto.notes),
+              str(auto.notes))
+        four = validate_case(Case1D(n_procs=4, **kw))
+        check('1D blastFoam: n_procs 4 -> 4 ranks',
+              not four.errors and four.run_plan is not None
+              and four.run_plan.ranks == 4, str(four.run_plan))
+        check('1D blastFoam: no "always run serial" note any more',
+              not any('serial' in n and 'ignored' in n
+                      for n in four.notes), str(four.notes))
+        nat = validate_case(Case1D(**dict(kw, solver='native')))
+        check('1D native: still no run plan', nat.run_plan is None)
+    finally:
+        for a, v in zip(_HW_ATTRS, old):
+            setattr(env, a, v)
+
+
 def main():
     run_plan_checks()
+    run_plan_1d_checks()
     # N21: these cases test the CAPS, so the hardware they are capped
     # against must be pinned. Before N21 they ran against whatever the
     # ambient env cache happened to hold - which was "unknown" here, and

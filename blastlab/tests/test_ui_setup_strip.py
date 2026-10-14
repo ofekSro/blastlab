@@ -188,9 +188,15 @@ def s1_strip():
           f'{s.shown("cells")} {s.shown("memory")}')
     c1 = Case1D(solver='blastfoam', charge_kg=1.0, gauge_radii=[2.0, 3.0])
     case, rep = load(sp, c1)
-    check('1D blastFoam: no run plan -> MPI and Memory hidden',
-          rep.run_plan is None and s.shown('ranks') is None
-          and s.shown('memory') is None)
+    # P1-25 (owner-approved edit): 1D blastFoam has a run plan now, so
+    # the MPI and Memory tiles show; auto stays serial on a small grid
+    check('1D blastFoam: a run plan -> MPI "1 · auto · serial" and Memory',
+          rep.run_plan is not None
+          and s.shown('ranks') is not None
+          and s.shown('ranks')[0] == '1'
+          and s.shown('ranks')[1] == 'auto · serial'
+          and s.shown('memory') is not None,
+          f'{s.shown("ranks")} {s.shown("memory")}')
     check('1D: cells, radius and Z 2.00-3.00 from the report / helper',
           s.shown('cells')[0] == f'{rep.n_cells / 1e3:.0f} k'
           and s.shown('charge') == ('1.0 kg TNT',

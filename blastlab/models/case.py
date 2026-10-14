@@ -281,7 +281,7 @@ class Case1D:
     #: between identical runs. The Chain tab pins it on every stage.
     adaptive_write: bool = True
     n_procs: int = 0                  # blastFoam MPI ranks (0 = auto;
-                                      # 1D always runs serial)
+                                      # P1-25: 1D follows the 2D/3D plan)
     #: OUT-2: VTK volumes (the whole radial line) for ParaView,
     #: {on, mode, value, fields}; None or on = False is not written
     #: (case_to_dict). 1D has no sections or obstacles, so no
