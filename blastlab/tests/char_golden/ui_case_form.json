@@ -426,6 +426,7 @@
       "gauge_file": "",
       "keep_all_fields": false,
       "material": "PETN",
+      "n_procs": "0",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
       "profile_out": "prof.txt",
@@ -593,6 +594,7 @@
       "afterburn",
       "gauge_file",
       "material",
+      "n_procs",
       "profile_out"
     ],
     "points": {
@@ -616,6 +618,7 @@
       "gauge_file": "",
       "keep_all_fields": false,
       "material": "PETN",
+      "n_procs": "0",
       "n_snapshots": "3",
       "order": "2 (MUSCL)",
       "profile_out": "prof.txt",
