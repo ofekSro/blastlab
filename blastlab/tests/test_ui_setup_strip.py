@@ -125,7 +125,7 @@ def s1_strip():
           and not s.tiles['memory'].bar.isVisibleTo(s))
     zs = [z for _n, _r, z in sd.gauges(case)]
     check('Z at gauges: min-max of the Z helper (2.99-3.31)',
-          s.shown('z') == (f'{min(zs):.2f}–{max(zs):.2f}', 'm/kg^1/3')
+          s.shown('z') == (f'{min(zs):.2f}–{max(zs):.2f}', sd.unit())
           and s.shown('z')[0] == '2.99–3.31', str(s.shown('z')))
     check('the Z tile is the accent variant',
           s.tiles['z'].property('variant') == 'accent')
@@ -446,8 +446,8 @@ def s2_model_view():
           sp.view_caption())
     # UXR-15 (D221): the units the compact readout leaves out
     tip = sp._view_caption.toolTip()
-    check('the readout\'s tooltip gives the units (Z in m/kg^1/3)',
-          'm/kg^1/3' in tip and 'in m' in tip, tip)
+    check('the readout\'s tooltip gives the units (Z in m per cube root of '
+          'kg)', sd.unit() in tip and 'in m' in tip, tip)
     from matplotlib.backend_bases import LocationEvent
     canvas.callbacks.process('figure_leave_event',
                              LocationEvent('figure_leave_event', canvas,
@@ -660,7 +660,7 @@ def s3_dock():
     rows = sd.gauges(case)
     check('headers: Gauge · r · z · R from charge · Z · Where',
           sp.gauge_headers() == ['Gauge', 'r [m]', 'z [m]',
-                                 'R from charge [m]', 'Z [m/kg^1/3]',
+                                 'R from charge [m]', sd.label(),
                                  'Where'], str(sp.gauge_headers()))
     want = [[f'G{n}', f'{p[0]:.2f}', f'{p[1]:.2f}', f'{R:.2f}', f'{Z:.2f}',
              sd.where_text(case, p)]
@@ -692,7 +692,7 @@ def s3_dock():
     load(sp, Case1D(charge_kg=1.0, gauge_radii=[2.0, 3.0]))
     check('1D: r only, no Where (no obstacles)',
           sp.gauge_headers() == ['Gauge', 'r [m]', 'R from charge [m]',
-                                 'Z [m/kg^1/3]']
+                                 sd.label()]
           and sp.gauge_rows()[0] == ['G1', '2.00', '2.00', '2.00'],
           str(sp.gauge_rows()))
     # GUI-14 (d), D2-D3: a dropped gauge is marked in the table and on the
@@ -745,6 +745,122 @@ def s3_dock():
           'rows clear',
           'dropped' not in sp.tree.summary('gauges') and kids == [False] * 2,
           f'{sp.tree.summary("gauges")!r} {kids}')
+    # GUI-16 (a), C1: the trigger on the dropped G2 never fires - the
+    # caption, the dropdown and the remap note all say so
+    load(sp, dataclasses.replace(ew, trigger_gauge=2))
+    cap = sp.tree.summary('gauges')
+    combo = sp.form.trigger_combo
+    texts = [combo.itemText(i) for i in range(combo.count())]
+    check('GUI-16 (a): the caption names G2 dropped and the trigger G2 '
+          '(disabled); the dropdown\'s G2 ends (dropped); no remap note',
+          cap.endswith('G2 dropped · trigger G2 (disabled)')
+          and texts[1].startswith('G2') and texts[1].endswith('(dropped)')
+          and not texts[0].endswith('(dropped)')
+          and not sp.form._trig['remap'].isVisibleTo(sp.form),
+          f'{cap!r} {texts}')
+    load(sp, dataclasses.replace(ew, trigger_gauge=1))
+    cap = sp.tree.summary('gauges')
+    check('GUI-16 (a): a trigger on the kept G1 reads plain, remap shown',
+          cap.endswith('G2 dropped · trigger G1')
+          and sp.form._trig['remap'].isVisibleTo(sp.form), cap)
+    # GUI-16 / C6 (iv): `inside` and `on the face of` end (dropped) when
+    # the caller's rule drops the gauge; with no rule they are as before
+    from PySide6.QtCore import Qt
+    from blastlab.services.validation import drop_rule
+    bf = sample_case()
+    rule = drop_rule(bf)
+    inside = sd.where_text(bf, (3.1, 1.0), rule)
+    face = sd.where_text(bf, (3.0, 1.0), rule)
+    check('C6 (iv): blastFoam, a gauge inside Wall 1 reads `inside Wall 1 '
+          '(dropped)`; on the face, (dropped) exactly when the rule drops it',
+          inside == 'inside Wall 1 (dropped)'
+          and face.startswith('on the face of Wall 1')
+          and face.endswith('(dropped)') == bool(rule((3.0, 1.0))),
+          f'{inside!r} {face!r}')
+    check('C6 (iv): without a rule `inside` / `on the face of` are '
+          'unchanged',
+          sd.where_text(bf, (3.1, 1.0)) == 'inside Wall 1'
+          and sd.where_text(bf, (3.0, 1.0)) == 'on the face of Wall 1')
+    # C6 (i): the caption gives up its Where segment first
+    from blastlab.ui.setup_tree import SetupTree, _split_keep
+    tr = SetupTree()
+    tr.set_nodes([('gauges', 5, 'Gauges')])
+    tr.resize(224, 400)
+    tr.show()
+    pump(30)
+    full = '2 · in front of Wall 1 · G2 dropped · trigger G3'
+    shown = {}
+    for w in (224, 280):
+        tr.resize(w, 400)
+        tr.set_summary('gauges', full)
+        pump(30)
+        shown[w] = tr.rows['gauges'].caption.text()
+    # (the tree's widest, 280 px, leaves the caption 192 px: the tail is
+    # 161 px, so no head stays; at 224 px (136) the tail itself elides but
+    # keeps `G2 dropped` - the real-platform fit script measures the app)
+    check('C6 (i): at the tree\'s widest the caption shows `G2 dropped · '
+          'trigger G3` (the Where segment elided first); narrowest keeps '
+          '`G2 dropped`, never the Where segment',
+          shown[280] == 'G2 dropped · trigger G3'
+          and shown[224].startswith('G2 dropped')
+          and 'Wall' not in shown[224], str(shown))
+    tr.set_summary('gauges', '2 gauges · G2 dropped')
+    pump(30)
+    check('C6 (i): with room the whole caption shows',
+          tr.rows['gauges'].caption.text() == '2 gauges · G2 dropped',
+          tr.rows['gauges'].caption.text())
+    check('C6 (i): _split_keep leaves other captions alone',
+          _split_keep('2 gauges') == ('2 gauges', '')
+          and _split_keep('R 1.5 m · 5 mm') == ('R 1.5 m · 5 mm', ''))
+    tr.close()
+    # C6 (v)-(vii): 1D Where, the child tooltip, a drop check that failed
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0]))
+    rows1 = sp.gauge_rows()
+    check('C6 (v): 1D with G2 beyond the radius shows Where: `outside the '
+          'domain (dropped)`; without a drop there is no Where column',
+          sp.gauge_headers()[-1] == 'Where'
+          and rows1[1][-1] == 'outside the domain (dropped)'
+          and rows1[0][-1] == '', str(rows1))
+    load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 1.2]))
+    check('C6 (v): ... and none once nothing is dropped',
+          'Where' not in sp.gauge_headers(), str(sp.gauge_headers()))
+    load(sp, ew)
+    tip = sp.tree.child_row('gauges', 1).toolTip()
+    check('C6 (vi): the dropped gauge\'s tree row says why, the kept one '
+          'has no tooltip',
+          tip == 'G2 - inside Wall 1, dropped by the solver'
+          and sp.tree.child_row('gauges', 0).toolTip() == '', repr(tip))
+    # C7 (iii), D24: a Checks line that starts `G2 ...` leads to that gauge
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QLabel
+    sp.set_dock_tab('Checks')
+    sp.select_node('domain')
+    pump(50)
+    g2 = [r.findChild(QLabel, 'checktext') for r in sp._check_rows]
+    g2 = [lbl for lbl in g2 if lbl.text().startswith('G2')]
+    if g2:
+        QTest.mouseClick(g2[0], Qt.LeftButton)
+        pump(100)
+    pl = sp.form.points['gauges']
+    check('C7 (iii): clicking the `G2 ...` Checks line selects 05 and G2 in '
+          'its list',
+          bool(g2) and sp.selected_node() == 'gauges'
+          and pl.tree.indexOfTopLevelItem(pl.tree.currentItem()) == 1,
+          f'{[l.text() for l in g2]} {sp.selected_node()}')
+    check('C6 (iii): the gauge table elides Where in the middle',
+          sp.gauge_table.textElideMode() == Qt.ElideMiddle)
+    bad = Case2D(geometry='axisymmetric', Lx=4.0, Ly=4.0, cell_size_m=0.05,
+                 charge=-1.0, center=(0.0, 1.0), solver='blastfoam',
+                 obstacles=[(1.2, 1.6, 0.0, 1.0)], gauges=[(1.4, 0.3)])
+    check('C6 (vii): the fixture\'s drop check really fails',
+          drop_rule(bad).failed != '')
+    load(sp, bad)
+    wtip = sp.gauge_table.item(0, 6).toolTip()
+    check('C6 (vii): a failed drop check: the Where tooltip and the '
+          'caption say `drop check unavailable - see Checks`',
+          sd.DROP_UNAVAILABLE in wtip
+          and sd.DROP_UNAVAILABLE in sp.tree.summary('gauges'),
+          f'{wtip!r} {sp.tree.summary("gauges")!r}')
     # GUI-15 (f), D9: a 1D gauge beyond the radius is dropped by both
     # solvers - the Gauges node is warn and its caption names it
     load(sp, Case1D(radius_m=1.5, gauge_radii=[1.0, 2.0, 1.2]))
@@ -841,8 +957,8 @@ def s3_dock():
     pump(40)
     check('narrow: R, Z and Where stay on screen (coordinates give way)',
           sp.gauge_headers() in (
-              ['Gauge', 'r [m]', 'z [m]', 'R [m]', 'Z [m/kg^1/3]', 'Where'],
-              ['Gauge', 'R [m]', 'Z [m/kg^1/3]', 'Where'])
+              ['Gauge', 'r [m]', 'z [m]', 'R [m]', sd.label(), 'Where'],
+              ['Gauge', 'R [m]', sd.label(), 'Where'])
           and [r[-2] for r in sp.gauge_rows()] == ['3.31', '2.99'],
           str(sp.gauge_headers()))
     check('narrow: the checks fall back to one column',
@@ -884,11 +1000,11 @@ def s4_units():
     sp = panel()
     case, rep = load(sp, sample_case())
     z_tip = sp.strip.tiles['z'].toolTip()
-    check('the strip Z tile', 'm/kg^1/3' in z_tip, z_tip)
+    check('the strip Z tile', sd.unit() in z_tip, z_tip)
     near = sp.derived()
     check('the Derived card\'s nearest gauge (Z 2.99)',
           ' · Z ' in near.value('nearest')
-          and 'm/kg^1/3' in near._vals['nearest'].toolTip(),
+          and sd.unit() in near._vals['nearest'].toolTip(),
           f"{near.value('nearest')!r} {near._vals['nearest'].toolTip()!r}")
     load(sp, sample_case(geometry='planar', center=(1.0, 2.0)))
     check('no Z (planar): no Z tooltip on the Derived card',
@@ -902,7 +1018,7 @@ def s4_units():
     pump(20)
     head = col.head_lbls[1]
     check('the live gauge column\'s Z header',
-          head.text() == 'Z' and 'm/kg^1/3' in head.toolTip(),
+          head.text() == 'Z' and sd.unit() in head.toolTip(),
           f'{head.text()!r} {head.toolTip()!r}')
     col.set_case(sample_case(geometry='planar', center=(1.0, 2.0)))
     pump(20)

@@ -13,13 +13,14 @@ that code comments cite.
 Every item carries a stable id (`P2-3`, `N5-11`, `HD1-3`) — **cite it in commits
 and in discussion.**
 
-**Three exceptions sit above P0, in this order: `GUI`, `OUT`, then `HD1`.** All are
-owner directives (2026-09-28, 2026-09-26 and 2026-09-20) and are not part of the P
-ranking.
+**Two exceptions sit above P0, in this order: `OUT`, then `HD1`.** Both are owner
+directives (2026-09-26 and 2026-09-20) and are not part of the P ranking. The `GUI`
+section stays where it is, but **since 2026-10-14 it is no longer high priority (owner)**:
+its open rows are kept and worked on request.
 
 ---
 
-## GUI · ⭐ Highest priority (owner, 2026-09-28) — the redesigned Qt GUI
+## GUI · Low priority since 2026-10-14 (owner; highest 2026-09-28 … 10-13) — the redesigned Qt GUI
 
 **The whole specification, approved screen by screen on 2026-09-28, is
 [docs/gui-redesign-plan.md](docs/gui-redesign-plan.md)**, with the design boards in
@@ -35,10 +36,8 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 >    Q1/Q2): ahead of HD1-18 / HD1-19, because harness F05/F06 die at t = 0. See P1-23 below.
 >    **Owner 2026-10-12:** the same batch moves the closed GUI-14 / GUI-15 rows and the P1-24
 >    body to `docs/history/todo-closed.md` (TODO.md at 992 of 1000 lines).
-> 2. **`GUI-16`** — what GUI-15's QA/UX left (row below). **Owner 2026-10-12: the LAST GUI batch.**
->    It takes the parked lows of the GUI-14/15 reports too; every QA/UX finding, any severity, is
->    fixed in the same batch and QA/UX re-run until clean — nothing new goes to TODO. Only a call
->    that needs the owner or the home PC is reported.
+> 2. **`GUI-16`** — ✅ closed 2026-10-14 (DONE.md §0za), the last GUI batch. **Owner 2026-10-14: GUI is
+>    no longer high priority**; the round-3 lows stay in the GUI-16 row, on request, no clean loop.
 > 3. GUI-14 (j) on the home PC. The office-machine runs of GUI-14 are done (DONE.md §0y, B6).
 >
 > The owner reviewed the open calls on 2026-10-03 and 2026-10-04 ("approve all"):
@@ -54,7 +53,7 @@ they are. Owner: *"implement everything"*, then run the QA and UX agents on the 
 | `GUI-1..13` | ✅ all done 2026-09-29 … 10-05 (DONE.md §0l-§0w); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – | – |
 | `GUI-14` | ✅ 2026-10-11 (a)-(i), DONE.md §0x; **(j) still open** (home PC): HD13 char drift, carried from GUI-13 (i). The full row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 14 |
 | `GUI-15` | ✅ 2026-10-12 (a)-(h), DONE.md §0y; the closed row is in [docs/history/todo-closed.md](docs/history/todo-closed.md) | M | 15 |
-| `GUI-16` | **Left by GUI-15** (2026-10-12; `docs/qa/2026-10-11-gui-15-ux.md` U1-U6, `docs/qa/2026-10-11-gui-15-qa/QA_REPORT.md`, `…-gui-15-backlog-B.verify.md` open items 1-2) — (a) trigger on a dropped gauge: Checks says `Trigger disabled`, but the Checks note ("the run ends when the wave reaches gauge 2" / the remap-file note), the Gauges caption `trigger G2`, the trigger dropdown and the chain HAND-OFF OUT card still show it active; in a chain the hand-off then happens at the stage's normal stop (UX U1, verifier 1); (b) 1D exports (PNG, HTML report, summary) label by kept index (`Gauge 2` for the entered G3) and do not mention the drop — a `numbers=` argument, byte-identical when nothing is dropped (U2); (c) Resume and Run-browser Load: `resume_foam_run` passes no `drops`, `load_foam_run_path` adds no `gauges_dropped` stamp, so Results says `inside Wall 1` on blastFoam and a reloaded 1D run renumbers (U3); (d) blastFoam 3D: a dropped gauge sharing its x with a kept one — the drop line vanishes at the first payload and G3 is relabelled G2; fall back to the drop rule (U4, new from GUI-15 a); (e) every gauge dropped: Run says "This case has no gauges…" and hides the drop line, Results "This result has no gauges" (U5); (f) field-plot markers: native live omits a dropped gauge, blastFoam live draws it plain, the exported animation draws it inside the wall (U6); (g) 3D Detach is undone at once on the native path: `view3d_host.on_window` (`:664-673`) re-embeds while `_floating`; `_e2e_ui_view3d.py` G3 fails, then `AttributeError` at `:131` — fix, update G3, re-measure with the Win32 probe (verifier B item 2, GUI-15 B6). Low items parked in both reports (UX L1-L5; QA: caption cut off at 1100 and 1600 px, `100 %` after a stop, harness `--out` inside OneDrive → `WinError 5`) | M | 16 |
+| `GUI-16` | ✅ 2026-10-14 (a)-(g), DONE.md §0za; the original row is in [docs/history/todo-closed.md](docs/history/todo-closed.md). **Still open, low priority (owner 2026-10-14):** these lows are kept, worked on request (no clean loop): B2 names the refined cell not the base one entered (UX N4, QA 1); stage 2 meshing still shows stage 1's tiles, slice and gauge card (N1, QA 2); Keep-all path lost from the status bar (N2); `[note]` muted colour hits every note, first line only (N3, QA 5); stage card title cut at 1100 px (QA 7); 3.5-9 s at `100 %` before the `stage` message (QA 6); dead `reset_bar` branch `app.py:1459` | M | 16 |
 
 ---
 
@@ -69,6 +68,33 @@ fixed and approved — the disk.
 | Id | What | Order |
 |---|---|---|
 | `OUT-1..5` | ✅ all done 2026-09-26 … 09-28 (DONE.md §0c-§0k); the closed rows are in [docs/history/todo-closed.md](docs/history/todo-closed.md) | – |
+
+---
+
+## VV · Application validation report (owner, 2026-10-13)
+
+**The whole specification is [docs/vv-plan.md](docs/vv-plan.md).** This entry only
+orders it; every rule, target and acceptance criterion lives there. blastFoam backend
+only; the native NumPy solvers are out of scope. Never invent reference data: a case
+without a cited source file stays `pending`. Placed below GUI, above HD1 (owner
+2026-10-13, batch gui-final-round1 Q2).
+
+Runs are launched by `docs/vv/run_all.py` as a detached process, one at a time
+(RAM). Agents write the scripts and read `docs/vv/results/*.json`; they do not wait
+on a solve or tail its log.
+
+| Id | What | Size | Risk | Order |
+|---|---|---|---|---|
+| `VV-0` | Pin versions (blastFoam commit, OpenFOAM, blastlab); `docs/vv/` tree; `run_all.py` with a run cache and a `--only <case>` flag; LaTeX toolchain check | S | low | 1 |
+| `VV-1` | Wrapper verification: dictionaries vs input (existing golden tests), charge mass set vs requested, post-processing vs analytic Friedlander, remap-chain conservation, one blastFoam shipped validation case reproduced | M | high | 2 |
+| `VV-2` | Case 1 inputs: 1 kg TNT 1D spherical, incident (8 probes, 0.5-20 m) and reflected (1, 3, 10 m), grids 4/2/1 mm, afterburn off. Inputs and run script only; owner launches | S | high | 2 ∥ VV-1 |
+| `VV-3` | Case 1 analysis: KB free-air comparison, order of convergence, GCI, error tables, figures, cells-per-charge-radius rule. Needs VV-2 results on disk | M | high | 3 |
+| `VV-4` | LaTeX report skeleton, all tables and numbers generated from `results/`, a check script that fails when a number in the PDF text differs from its JSON source | M | low | 2 ∥ VV-1 |
+| `VV-5` | Report with Case 1 compiled to PDF; **track-end for part A, owner reviews** | S | high | 4 |
+| `VV-6` | Case 2 clearing (Tyas/Rigby). **Blocked: owner supplies paper + digitized gauges** | M | high | 5 |
+| `VV-7` | Case 3 urban street (Rose & Smith / Fouchier). **Blocked: reference data; office machine or cloud** | L | high | 6 |
+| `VV-8` | Case 4 blast wall (Chapman, Rose & Smith). **Blocked: reference data; office machine or cloud** | L | high | 7 |
+| `VV-9` | Afterburn section (on vs off, what was fitted), validity envelope, final report | M | high | 8 |
 
 ---
 
@@ -626,6 +652,34 @@ Cited by `solvers/hooks.py`, `solver1d/2d/3d.py`, `services/validation.py`, `cor
 `ui/results_gauges.py` and `tests/test_trigger_numbering.py`. The native solvers now carry each
 gauge's entered number; a trigger on a dropped gauge is disabled and warned about (native only,
 D13). The blastFoam side is measured in the P1-23 batch (above).
+
+### P1-25 · 1D blastFoam runs serial only, though MPI cuts a step 2.9× at np 4 · **owner decision 2026-10-13: enable it**
+
+Every 1D blastFoam run is forced to one rank (`foam/backend.py:289-295`, `foam/env.py:528`
+"1D runs are a single wedge", since T48; `services/validation.py:346` says ranks are
+ignored; `ui/setup_spec.py:117` and `gui/forms.py:549` hide the field). Measured
+2026-10-13 on the default-size case (1 kg TNT, R 5 m, dx 1 mm, 5 000 cells, scotch), ms per
+step over the same 263 steps: np 1 113, np 2 65 (1.75×), np 4 39 (2.9×), np 8 28 (4.1×).
+Detail and the pre-registered rule: `docs/verification/1d-mpi-probe.md`.
+
+Fix: let 1D take the run plan's ranks like 2D/3D (decompose after `setRefinedFields`,
+reconstruct for ingest), show the ranks field for 1D blastFoam in the Qt GUI (`gui/` is
+frozen, CLAUDE.md §9 - leave `gui/forms.py` alone). **Owner
+approves** editing the `1D is serial` pin in `test_foam_env.py` and the related checks
+(`test_ui_setup_strip.py:191`, `test_model_folder.py:779`). Acceptance: (1) **not measured
+yet - do it first:** serial vs np 4 on that case to t = 3 ms, peak, positive impulse and
+arrival at the 1 m and 2 m gauges each within 1 % (scotch vs `simple` along r if scotch
+fails it); (2) np 4 ≥ 2× faster per step; (3) serial 1D trees stay byte-identical
+(`foam_golden/`, `test_regression.py`). Risk high (`solvers/`, a committed test).
+
+### P1-26 · A 1D blastFoam step costs ~113 ms at 5 000 cells · **found 2026-10-13**
+
+~23 µs per cell-step, with or without the function objects (`liveLine`, `gauges`,
+`conserved`: 112.8 vs 115.7 ms), so a 1D run at dx 1 mm to 10 ms is over an hour serial.
+Where the time goes is not known. Measure first (OpenFOAM `-profiling` or
+`profiling` in controlDict, one phase vs two, `activation`, the JWL products update) on
+the P1-25 case, then decide; it may pay more than P1-25. No change to any number without
+the owner.
 
 ---
 

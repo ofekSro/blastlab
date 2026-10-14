@@ -161,7 +161,10 @@ class RunController(QObject):
         else:
             stage = resume_stage(dim, path, case, stage_dir=model.folder,
                                  run_info=model_folder.run_info(model, case))
-        return self._launch([stage], [dim], run_name=run_name, model=model)
+        # GUI-16 (c): the resumed Result carries the drop stamp too
+        drops = [run_gauges.drops(case)] if case is not None else None
+        return self._launch([stage], [dim], run_name=run_name, model=model,
+                            drops=drops)
 
     def _launch(self, stages, dims, paused=False, run_name='', model=None,
                 drops=None):
@@ -343,11 +346,25 @@ class RunController(QObject):
             w.hooks.latest_frame3d()
         elif tag == 'stage':
             h.on_log(f'=== Stage {msg[2]} ===')
+            # GUI-16 round 2 (A1): a later stage owns the screen from here,
+            # not from its run_started (blastFoam meshes in between)
+            on_stage = getattr(h, 'on_stage', None)
+            if on_stage is not None:
+                on_stage(int(msg[1]))
         elif tag == 'folder':
             # OUT-1: the stage's model folder is written; a finished
             # blastFoam run whose WSL scratch had to be kept says why
             stage_dir, manifest, notice = msg[1], msg[2], msg[3]
             self._folders[stage_dir] = manifest
+            scratch = (manifest or {}).get('wsl_scratch') or {}
+            if (scratch.get('kept_because') == model_folder.KEEP_ALL_WHY
+                    and not notice):
+                # GUI-16 round 2 (A3): Keep all is the user's own choice -
+                # one non-modal line, no dialog (the log had it alone)
+                notify = getattr(h, 'notify', None)
+                if notify is not None:
+                    notify('WSL scratch kept (Keep all fields): '
+                           f"{scratch.get('posix', '')}", 'info')
             if notice:
                 self.show_error('Model folder', notice)
         elif tag == 'result':
@@ -432,8 +449,37 @@ class RunController(QObject):
                                  f'the chain manifest.json: {err}')
 
     # ── shutdown ─────────────────────────────────────────────────────────
-    def shutdown(self, join_s=10.0):
+    #: I02 (batch 2026-10-12-gui-final D3): how long closing the window
+    #: waits for a stopped worker. The stop itself lands within a step;
+    #: what follows is the stage's model folder - animation, figures,
+    #: report - 17 s on I02's N3D case (_e2e_ui_close_during_run.py).
+    #: The window used to wait 10 s for it and then let the process exit
+    #: under the half-written folder. Now it waits briefly and
+    #: `finish_writes` waits for the rest once the window is gone.
+    CLOSE_JOIN_S = 2.0
+    #: the bound on that wait, so a hung writer cannot keep the process
+    FINISH_S = 300.0
+
+    def shutdown(self, join_s=CLOSE_JOIN_S):
         self._timer.stop()
         if self.worker is not None and self.worker.is_alive():
             self.worker.stop()
             self.worker.join(timeout=join_s)
+
+    def finish_writes(self, timeout_s=FINISH_S, log=None):
+        """After the window has closed: let a stopped worker finish
+        writing its model folder before the process exits (the worker is
+        a daemon thread, so leaving `main()` kills it mid-file). True
+        when nothing is left running."""
+        w = self.worker
+        if w is None or not w.is_alive():
+            return True
+        say = log or (lambda m: print(m, file=sys.stderr, flush=True))
+        say('[blastlab] the window is closed; finishing the stopped '
+            "run's model folder…")
+        w.join(timeout=timeout_s)
+        if w.is_alive():
+            say(f'[blastlab] gave up after {timeout_s:.0f} s: the model '
+                'folder may be incomplete')
+            return False
+        return True

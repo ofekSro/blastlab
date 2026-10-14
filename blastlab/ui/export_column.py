@@ -195,6 +195,14 @@ class ExportColumn(QFrame):
             self.groups[title] = tuple(kinds)
             col.add(box)
 
+        # G13U (D34): the 1D figure's export-title hint is a line of its
+        # own under the buttons, not only their tooltip; hidden when empty
+        self.hint = QLabel('')
+        self.hint.setObjectName('expcaption')
+        self.hint.setWordWrap(True)
+        self.hint.setVisible(False)
+        col.add(self.hint)
+
         tbox = QWidget()
         tl = QVBoxLayout(tbox)
         tl.setContentsMargins(0, 0, 0, 0)
@@ -217,6 +225,13 @@ class ExportColumn(QFrame):
         self.view3d_btn.setIconSize(QSize(17, 17))
         self.view3d_btn._blastlab_icon = ('cube', 17, None)
         col.add(self.view3d_btn)
+
+    def set_hint(self, text):
+        """The muted export-title hint under the buttons ('' hides it)."""
+        text = str(text or '')
+        self.hint.setText(text)
+        self.hint.setToolTip(text)
+        self.hint.setVisible(bool(text))
 
     def order(self):
         """{'Data': kinds, 'Figures': kinds} in the order they sit."""

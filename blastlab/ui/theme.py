@@ -317,6 +317,8 @@ def qss(mode_name):
        `bad` is what the Setup form's mark_fields() sets */
     QLineEdit[error="true"], QLineEdit[bad="true"],
     QComboBox[bad="true"] {{ border: 1px solid {p['error']}; }}
+    /* the Setup trigger dropdown while its gauge is dropped (GUI-16 (a)) */
+    QComboBox[warn="true"] {{ color: {p['warn']}; }}
     QLineEdit:focus, QComboBox:focus {{ border: 1px solid {p['accent']}; }}
     QComboBox::drop-down {{ border: none; width: 22px; }}
     QComboBox QAbstractItemView {{ background: {p['card2']}; color: {p['text']};

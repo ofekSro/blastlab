@@ -1468,7 +1468,7 @@ def test_e_keep_all_keeps_the_scratch():
         m, notice, _r, delete, _f, lines = release(tmp, keep_all=True)
         assert delete.calls == [] and m['wsl_scratch']['deleted'] is False
         assert m['wsl_scratch']['kept_because'] == mf.KEEP_ALL_WHY
-        assert mf.KEEP_ALL_WHY in notice, notice
+        assert notice is None
         assert any('[note] WSL scratch kept' in ln for ln in lines), lines
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1478,6 +1478,26 @@ def test_e_keep_all_keeps_the_scratch():
         assert delete.calls == [[POSIX]] and notice is None
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_e_keep_all_failed_copy_still_warns():
+    """GUI-16 R2 (D-R3): Keep all silences only its own outcome. A ticked
+    run whose foam\\ copy or a row failed still gets the dialog, and the
+    reason is the failure, not the box (`release_decision` order)."""
+    row = dict(name='report', path='report.html', why='empty file')
+    for fake, name in ((dict(flip='system/controlDict'), 'system/controlDict'),
+                       (dict(failed=[row]), 'report.html')):
+        tmp = tempfile.mkdtemp(prefix='blastlab_mf_e_')
+        try:
+            m, notice, _r, delete, _f, lines = release(tmp, keep_all=True,
+                                                       **fake)
+            assert delete.calls == [] and not m['wsl_scratch']['deleted']
+            assert notice is not None and name in notice, (name, notice)
+            why = m['wsl_scratch']['kept_because']
+            assert why != mf.KEEP_ALL_WHY and name in why, why
+            assert any('[warn] WSL scratch kept' in ln for ln in lines), lines
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
@@ -1515,7 +1535,8 @@ TESTS = [test_a_empty_and_whitespace, test_a_forbidden_chars,
          test_d_vtk_not_converted_keeps_scratch,
          test_d_skeleton_omits_vtk_surfaces, test_d_stage_sets_vtk_dir,
          test_e_stage_sets_purge_fields, test_e_wsl_fields_record,
-         test_e_keep_all_keeps_the_scratch, test_f_model_of_run,
+         test_e_keep_all_keeps_the_scratch,
+         test_e_keep_all_failed_copy_still_warns, test_f_model_of_run,
          test_f_resume_rewrites_the_original_manifest]
 
 

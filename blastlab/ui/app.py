@@ -26,10 +26,11 @@ from ..models.case import load_any_case
 from ..services.model_folder import CASE_FILE, model_for_case_file
 from ..solvers.foam import env as foam_env
 from ..viz3d import pyvista_available
-from . import chain_route, dialogs, theme
+from . import chain_route, dialogs, scaled_distance, theme
 from .bridge import ThreadBridge
 from .chain_panel import ChainPanel
 from .chain_strip import ChainStrip
+from .live_gauges import ALL_DROPPED
 from .results_panel import ResultsPanel
 from .run_clock import fmt_duration
 from .run_controller import RunController
@@ -104,6 +105,9 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         self._chain_k = 0
         self._chain_n = 0
+        # GUI-16 round 2 (A1): a later stage announced, not yet solving
+        self._stage_pending = False
+        self._stage_word = ''       # `meshing` / `starting`, for the Stop question
         # GUI-9: the running chain's 02 Run strip (None for a single run)
         # and its one 03 Results entry (None until its first result)
         self._chain_strip = None
@@ -150,6 +154,7 @@ class MainWindow(QMainWindow):
         # the elapsed line, the ETA and the 30 s Stop rule read it
         self._run_clock = self.run_panel.clock
         self._run_got_result = False    # a result landed in this run
+        self._run_n_results = 0         # how many (a Stop mid-chain, R1)
         self._last_result = None        # the newest Result of this run
         # `✓ Done · ` in the title after a run that ended on its own,
         # until the next run or Open case (decision D68)
@@ -163,7 +168,9 @@ class MainWindow(QMainWindow):
                                     log_fn=self._result_msg,
                                     mode=self.solver_mode,
                                     on_resume=self._resume_foam_run,
-                                    bridge=self.bridge)
+                                    bridge=self.bridge,
+                                    runs_dir=lambda: (
+                                        self.run_panel.current_runs_dir()))
         self.results.load_case_requested.connect(self._load_case_from_result)
         self.chain = ChainPanel(on_run_chain=self._run_chain,
                                 mode=self.solver_mode,
@@ -454,14 +461,24 @@ class MainWindow(QMainWindow):
                 hw = foam_env.hardware(probe=True) or {}
                 hardware.detect_host_ram_gb()
             except Exception:
+                self.bridge.post(self._chain_hw_pending, False)
                 return
             try:
                 foam_env.persist_hardware(hw)
             except Exception:
                 pass
+            self.bridge.post(self._chain_hw_pending, False)
             self.bridge.post(self._poll_wsl)
             self.bridge.post(self._schedule_validate)
+        # D28: until it ends, a blastFoam stage's `Large grid` line is
+        # judged against assumed caps - the Chain says so (C7 (ii))
+        self._chain_hw_pending(True)
         threading.Thread(target=work, daemon=True).start()
+
+    def _chain_hw_pending(self, on):
+        chain = getattr(self, 'chain', None)
+        if chain is not None:
+            chain.set_hw_pending(on)
 
     def _redetect_hw(self):
         foam_env.forget_hardware()
@@ -1099,17 +1116,19 @@ class MainWindow(QMainWindow):
         Resolved through `ui.dialogs` at call time, so the QA driver and
         every test patch it rather than meeting a modal (P2-8).
         """
-        notes = [(c, long_run_note(c)) for c in cases]
-        notes = [(c, n) for c, n in notes if n is not None]
+        notes = [(i, c, long_run_note(c)) for i, c in enumerate(cases, 1)]
+        notes = [(i, c, n) for i, c, n in notes if n is not None]
         if not notes:
             return True
         lines = []
-        for case, (t_end, cap, ratio) in notes:
-            where = (f'Stage {case.dim}D: ' if len(cases) > 1 else '')
+        for pos, case, (t_end, cap, ratio) in notes:
+            # by position, as the Chain screen's dialogs (A5, U4)
+            where = (f'Stage {pos} ({case.dim}D): '
+                     if len(cases) > 1 else '')
             lines.append(f'{where}end time {t_end * 1e3:.4g} ms is '
                          f'{ratio:.1f}x the automatic stop time '
                          f'({cap * 1e3:.0f} ms).')
-        worst = max(n[2] for _c, n in notes)
+        worst = max(n[2] for _i, _c, n in notes)
         lines.append('')
         lines.append(f'The full span will be simulated, so expect roughly '
                      f'{worst:.0f}x the wall clock of an automatic run. '
@@ -1182,8 +1201,9 @@ class MainWindow(QMainWindow):
         run that ended early, and the run browser resumes it. `tail` goes
         before the question mark (`' and quit'` on Close, D202)."""
         model = self.ctrl._run_name or self._case_stem()
-        stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n})'
-                 if self._chain_n > 1 else '')
+        stage = (f' (stage {max(self._chain_k, 1)} of {self._chain_n}'
+                 + (f', {self._stage_word}' if self._stage_word else '')
+                 + ')' if self._chain_n > 1 else '')
         at = f' at {self._run_pct} %' if self._run_pct is not None else ''
         text = (f'Stop {model}{stage}{at}{tail}?\n\nIt has been running for '
                 f'{fmt_duration(self._run_clock.run_s())}.')
@@ -1208,13 +1228,42 @@ class MainWindow(QMainWindow):
         if '[warn]' in line or '[error]' in line:
             self.notify(line, 'warn')
 
+    def on_stage(self, k):
+        """The worker announced stage `k` (0-based), before its mesh.
+        Stage 0 is the run's own start and changes nothing. A later stage
+        owns the screen from here (GUI-16 round 2, A1, U1 + F-3): the
+        finished stage's 100 % bar, `about 0 s left` and pill must not
+        stand through the next stage's blockMesh. `on_run_started` then
+        only restarts the ETA (D-R6)."""
+        if k <= 0 or self._chain_n < 2 or not self._running_ui:
+            return
+        cases = self._run_cases or []
+        foam = k < len(cases) and getattr(cases[k], 'solver',
+                                          None) == 'blastfoam'
+        self._stage_word = 'meshing' if foam else 'starting'     # D-R7
+        self._stage_pending = True
+        self._run_clock.stage()         # the stage's time counts its mesh
+        self._chain_k = k + 1
+        self._run_pct = None
+        self.run_panel.begin_stage(f'{self._stage_word} stage {k + 1}')
+        self._update_title()
+        if self._chain_strip is not None:
+            self._chain_strip.stage_started(k, self._stage_word)
+
     def on_run_started(self, info):
+        pending = self._stage_pending
+        self._stage_pending = False
+        self._stage_word = ''
         # a (chain) stage: its ETA restarts, the run time goes on
-        self._run_clock.stage()
+        if pending:
+            self._run_clock.restart_eta()   # on_stage restarted the stage
+        else:
+            self._run_clock.stage()
         self.run_panel.on_run_started(info)
         # k of the title's `Chain k/n · ` = runs started since
-        # start_stages (plan §4)
-        self._chain_k += 1
+        # start_stages (plan §4); a stage announced by on_stage has it
+        if not pending:
+            self._chain_k += 1
         # a new stage has no percent yet: the last stage's (often 100 %)
         # must not stand in the title or the Stop question until this
         # stage's first progress (F25)
@@ -1289,13 +1338,19 @@ class MainWindow(QMainWindow):
         pts = getattr(case, 'gauges', None)
         if pts is None:
             pts = getattr(case, 'gauge_radii', None)
-        if not pts and not self.run_panel.gauges.has_data():
+        if self.run_panel.gauges.has_data():
+            return
+        if not pts:
             self.run_panel.say_no_gauges()
+        elif len(scaled_distance.dropped_numbers(case)) >= len(pts):
+            # GUI-16 (e): gauges, every one dropped - not "no gauges"
+            self.run_panel.say_no_gauges(ALL_DROPPED)
 
     def on_running(self, running):
         if running:
             self._run_clock.start()
             self._run_got_result = False
+            self._run_n_results = 0
             self._last_result = None
             self._stop_asked = False
             self._done_mark = False
@@ -1325,6 +1380,8 @@ class MainWindow(QMainWindow):
         self._run_pct = None
         if running:
             self._chain_k = 0
+            self._stage_pending = False
+            self._stage_word = ''
             self._chain_n = len(getattr(self.ctrl, '_stage_dims', None)
                                 or [])
             self._chain_entry = None
@@ -1363,6 +1420,8 @@ class MainWindow(QMainWindow):
                     k, self._run_clock.stage_s(),
                     'stopped' if res.stopped_early else 'done')
         self._run_got_result = True
+        if self._running_ui:
+            self._run_n_results += 1
         self._results.append((label_, dim, res))
         model = getattr(self.ctrl, '_run_name', '') or ''
         if self._running_ui and self._chain_n > 1 and model:
@@ -1387,21 +1446,29 @@ class MainWindow(QMainWindow):
         self.notify(f'Result ready: {label_}')
 
     def on_finished(self, stopped_early, errored):
-        if not (stopped_early or errored):
-            # the last progress message is often throttled away, so a
-            # completed run would otherwise rest below 100%
-            self.run_panel.mark_complete()
         # the elapsed line says how the run ended (a Stop before the
         # first result leaves no result to call stopped: say so anyway)
         if errored:
             how = 'failed'
-        elif stopped_early or (self._stop_asked
-                               and not self._run_got_result):
+        elif stopped_early or (self._stop_asked and self._run_n_results
+                               < max(1, self._chain_n)):
+            # GUI-16 R1: a Stop that landed in a later stage's blockMesh
+            # or between stages has fewer results than the chain has
+            # stages, though stage 1's result did arrive
             how = 'stopped'
+            if (not stopped_early and self._chain_n > 1
+                    and self._chain_k <= self._run_n_results):
+                self.run_panel.reset_bar()      # no stage in flight
         elif self._run_got_result:
             how = 'done'
         else:
             how = 'ended'
+        if how == 'done':
+            # the last progress message is often throttled away, so a
+            # completed run would otherwise rest below 100%. Only a run
+            # that got a result: a Stop during blockMesh posts no progress
+            # and no result, and its bar stays empty at `0 %` (G15Q-5a)
+            self.run_panel.mark_complete()
         self.run_panel.mark_ended(how)
         if self._chain_strip is not None:
             self._chain_strip.finish(how, self._run_clock.run_s())
@@ -1420,8 +1487,19 @@ class MainWindow(QMainWindow):
             return
         model = getattr(self.ctrl, '_run_name', '') or self._case_stem()
         folder = getattr(getattr(self.ctrl, '_model', None), 'folder', None)
-        self.run_panel.show_finish(model, getattr(res, 'stop_reason', ''),
-                                   folder)
+        reason, time_reason = getattr(res, 'stop_reason', ''), None
+        n = self._chain_n
+        if (how == 'stopped' and n > 1 and self._run_n_results < n
+                and not getattr(res, 'stopped_early', False)):
+            # GUI-16 round 2 (A2): the last result is a finished earlier
+            # stage's, so its stop_reason (`shock arrived ...`) says
+            # nothing about this stop. It stays verbatim in the method
+            # card (D66); the banner and the time line say who stopped.
+            done, at = self._run_n_results, self._run_n_results + 1
+            reason = (f'stage {done} of {n} finished; stopped by user '
+                      f'during stage {at}')
+            time_reason = f'stopped by user during stage {at} of {n}'
+        self.run_panel.show_finish(model, reason, folder, time_reason)
         self.run_panel.set_run_again(True)
         if how != 'done':
             return
@@ -1495,12 +1573,33 @@ class MainWindow(QMainWindow):
             self.notify(f'cannot resume {path}: {exc}', 'error')
             self._log_threadsafe(f'  [runs] cannot resume {path}: {exc}')
             return False
-        model = self._model_target('Resume')
+        model = self._own_model(_p)
+        if model is not None and (self.ctrl.running or self._hd13_busy):
+            # the same refusal `_model_target` gives, titled `Resume`
+            dialogs.show_info('Resume', 'A run is already in progress.')
+            return False
+        model = model or self._model_target('Resume')
         if model is None:
             return False
         self._run_cases = [case]
         return self.ctrl.resume_foam_run(path, dim, run_name=model.model,
                                          model=model, case=case)
+
+    def _own_model(self, posix):
+        """P2-17: a resume writes into the model folder the run belongs to
+        (`model_folder.model_of_run`, by the manifest's WSL scratch), whatever
+        the Model box says - its release decision then rewrites that
+        model's own manifest. A Target for it, with no overwrite question
+        (it is the run's own folder); None when no model holds the run
+        (the Model box decides, as before)."""
+        from ..services import model_folder
+        from .run_browser import model_label
+        runs = str(self.run_panel.current_runs_dir() or '').strip()
+        stage = model_folder.model_of_run(runs, posix)
+        if stage is None:
+            return None
+        return model_folder.Target(runs_dir=runs, model=model_label(stage),
+                                   folder=stage)
 
     # ── status line ──────────────────────────────────────────────────────
     def notify(self, text, level='info'):
@@ -1597,8 +1696,13 @@ class MainWindow(QMainWindow):
         dialogs.clear_tray()
         self.ctrl.shutdown()
         # release the embedded window first, then stop the child: the
-        # reverse order leaves Qt holding a dangling HWND
-        for panel in (self.view3d, self.results):
+        # reverse order leaves Qt holding a dangling HWND. The Setup
+        # preview's host too (G14Q): left out, its card still held the
+        # render window at teardown, and every QA run logged two
+        # `External WM_DESTROY` for its stack (_e2e_ui_viewer_noise.py)
+        for panel in (self.view3d, self.results, self.setup.view3d):
+            if panel is None:           # no pyvista: no Setup 3D host
+                continue
             try:
                 panel.shutdown()
             except Exception:
@@ -1631,7 +1735,11 @@ def main(case_file=None):
             pass
     win = MainWindow(case_file=case_file)
     win.show()
-    return app.exec()
+    code = app.exec()
+    # a run stopped by closing the window is still writing its model
+    # folder (I02, D3): the window is gone, the process waits for it
+    win.ctrl.finish_writes()
+    return code
 
 
 if __name__ == '__main__':

@@ -109,6 +109,124 @@ def main():
         except Exception as exc:
             print(f'  [note] screen grab skipped: {exc}')
 
+    if win.view3d._native:
+        g3_native(win, pump)
+    else:
+        g3_container(win, pump)
+
+    print("\nG4: a second run replaces the scene cleanly")
+    win.run_panel.show_slice_tab()
+    use_model(win)          # OUT-1: the same model again, no overwrite modal
+    win._run_single()
+    for _ in range(2400):
+        pump(50)
+        if not win.ctrl.running:
+            break
+    check("second run finished", win.run_panel.log_text().count(
+        '[run finished]') == 1 and len(win._results) == 2)
+    check("viewer still alive", win.viewer_link.alive)
+
+    win.close()
+    pump(300)
+    check("viewer process closed with the window", not win.viewer_link.alive)
+
+    print("\n" + "=" * 50)
+    if FAIL:
+        print(f"FAILED: {len(FAIL)} check(s): {FAIL}")
+        sys.exit(1)
+    print("All Qt view3d e2e checks passed.")
+
+
+# Win32 is the ground truth here (CLAUDE.md §8.7), as in
+# _e2e_ui_viewer_place.py: never Qt's own idea of the window.
+def _u32():
+    import ctypes
+    return ctypes, ctypes.windll.user32
+
+
+def win32_parent(hwnd):
+    ctypes, u32 = _u32()
+    u32.GetParent.restype = ctypes.c_void_p
+    return int(u32.GetParent(ctypes.c_void_p(hwnd)) or 0)
+
+
+def win32_visible(hwnd):
+    ctypes, u32 = _u32()
+    return bool(u32.IsWindowVisible(ctypes.c_void_p(hwnd)))
+
+
+def win32_close(hwnd):
+    """WM_CLOSE, as the floating window's own close button sends it."""
+    ctypes, u32 = _u32()
+    u32.PostMessageW(ctypes.c_void_p(hwnd), 0x0010, 0, 0)
+
+
+def _sample(pump, seconds, ok, period_ms=50):
+    """Sample `ok()` every `period_ms` for `seconds`: (all ok, the time
+    of the first sample that was ok or None, samples taken)."""
+    n = max(1, int(seconds * 1000 / period_ms))
+    first, every = None, True
+    t0 = time.monotonic()
+    for _ in range(n):
+        pump(period_ms)
+        good = ok()
+        every = every and good
+        if good and first is None:
+            first = time.monotonic() - t0
+    return every, first, n
+
+
+def g3_native(win, pump):
+    """GUI-16 (g): the native mount hands the render window back to the
+    viewer as a framed top-level on Detach - and it has to STAY there.
+    The child re-reports its handle on every detach, and that report
+    used to re-embed the window at once."""
+    print("\nG3: detach / re-attach on the native mount (Win32 truth)")
+    host = win.view3d
+    hwnd = int(host._hwnd)
+
+    def floating():
+        return win32_parent(hwnd) == 0 and win32_visible(hwnd)
+    host.set_floating(True)
+    # the host hides the window while it un-parents it and the child
+    # shows it again on its `detach`: one round trip, then it must stay
+    _every, first, _n = _sample(pump, 1.0, floating)
+    check("after Detach the window appears as a top-level within 1 s",
+          first is not None,
+          f"after {first:.2f} s" if first is not None else
+          f"never (parent {win32_parent(hwnd):#x}, "
+          f"visible {win32_visible(hwnd)})")
+    every, _first, n = _sample(pump, 2.0, floating)
+    check("and stays a visible top-level for 2 s (no re-embed)",
+          every, f"({n} samples at 50 ms)")
+    check("no re-embed while detached",
+          host._floating and host._container is None
+          and host._view_stack.currentWidget() is host._float_box)
+
+    def attached():
+        mount = host._container
+        return (mount is not None and host._native
+                and win32_parent(hwnd) == int(mount.winId()))
+    host.set_floating(False)
+    _every, first, _n = _sample(pump, 1.0, attached)
+    check("Re-attach puts it back in the mount within 1 s",
+          first is not None and attached(),
+          f"after {first:.2f} s" if first is not None else "never")
+
+    host.set_floating(True)
+    _every, first, _n = _sample(pump, 1.0, floating)
+    check("detached again", first is not None and floating())
+    win32_close(hwnd)
+    _every, first, _n = _sample(pump, 1.0, attached)
+    check("closing the floating window (WM_CLOSE) re-attaches within 1 s",
+          first is not None and attached() and not host._floating,
+          f"after {first:.2f} s" if first is not None else "never")
+    check("the card shows the mount again",
+          host._view_stack.currentWidget() is host._container)
+
+
+def g3_container(win, pump):
+    """The Qt window-container path (no native mount)."""
     print("\nG3: detach / re-attach (the container travels, nothing is "
           "destroyed)")
     container = win.view3d._container
@@ -133,28 +251,6 @@ def main():
     check("closed window came back into the host",
           not win.view3d._floating
           and win.view3d._view_stack.currentWidget() is container)
-
-    print("\nG4: a second run replaces the scene cleanly")
-    win.run_panel.show_slice_tab()
-    use_model(win)          # OUT-1: the same model again, no overwrite modal
-    win._run_single()
-    for _ in range(2400):
-        pump(50)
-        if not win.ctrl.running:
-            break
-    check("second run finished", win.run_panel.log_text().count(
-        '[run finished]') == 1 and len(win._results) == 2)
-    check("viewer still alive", win.viewer_link.alive)
-
-    win.close()
-    pump(300)
-    check("viewer process closed with the window", not win.viewer_link.alive)
-
-    print("\n" + "=" * 50)
-    if FAIL:
-        print(f"FAILED: {len(FAIL)} check(s): {FAIL}")
-        sys.exit(1)
-    print("All Qt view3d e2e checks passed.")
 
 
 if __name__ == '__main__':

@@ -106,6 +106,51 @@ def main():
           and rp.pane.plot.getAxis('left').labelText == 'y [m]')
     check("gauge markers are drawn (dot + label each)",
           len(rp.pane._markers) == 4, str(len(rp.pane._markers)))
+    # GUI-16 (f), C5: the gauges the solver dropped are drawn too, as a
+    # hollow x in warn at the entered point; without the key nothing changes
+    from blastlab.ui import theme
+    from blastlab.ui.pg_plots import LiveSlicePane
+    dpane = LiveSlicePane()
+    dpane.resize(400, 300)
+    dpane.show()
+    dpane.start_2d(dict(INFO_2D, gauges_dropped=[(3, 0.2, 1.5)]))
+    pump(30)
+    extra = dpane._markers[4:]
+    warn = theme.qcolor('warn').name().lower()
+    check("with gauges_dropped the pane holds 2 more items (dot + label), "
+          "warn-coloured, no star",
+          len(dpane._markers) == 6 and len(extra) == 2
+          and extra[0].opts['symbol'] == 'x'
+          and extra[0].opts['pen'].color().name().lower() == warn
+          and extra[1].color.name().lower() == warn
+          and extra[1].toPlainText() == 'G3',
+          str(len(dpane._markers)))
+    dpane.start_2d(INFO_2D)
+    check("without gauges_dropped the count stays 4",
+          len(dpane._markers) == 4, str(len(dpane._markers)))
+    # D23: two gauges one cell apart on a 120 px slice must not run their
+    # labels together (`G1G2`)
+    close = dict(INFO_2D, x_face=np.linspace(0.0, 1.0, 11),
+                 y_face=np.linspace(0.0, 1.0, 11),
+                 solid=np.zeros((10, 10), bool),
+                 gauges=[(1, 0.5, 0.5), (2, 0.6, 0.5)], trigger_gauge=None)
+    dpane.resize(300, 120)
+    dpane.start_2d(close)
+    dpane.plot.getViewBox().setRange(xRange=(0, 1), yRange=(0, 1),
+                                     padding=0)
+    pump(60)
+    labs = [it for it in dpane._markers if hasattr(it, 'toPlainText')]
+    rects = [it.sceneBoundingRect() for it in labs]
+    check("two gauges one cell apart on a 120 px slice: the label "
+          "rectangles do not intersect",
+          len(rects) == 2 and not rects[0].intersects(rects[1]),
+          str(rects))
+    for it in labs:                         # the default anchors collide
+        it.setAnchor((-0.2, 1.25))
+    r0 = [it.sceneBoundingRect() for it in labs]
+    check("(the same two labels at the default anchors do intersect, so "
+          "the check above can fail)", r0[0].intersects(r0[1]), str(r0))
+    dpane.close()
     rp.on_frame(RAMP, 1.0e-3)
     img = rp.pane.image.img
     check("the image keeps the field's (Nx, Ny) shape - no transpose",
@@ -212,6 +257,25 @@ def main():
           lines[1].endswith('[4 AMR writes so far]'), lines[1])
     check("ordinary lines are untouched",
           lines[0] == 'plain line' and lines[2] == 'after')
+
+    print("\nU11b: [warn] and [error] lines take their colours (G14U-P2b)")
+    from blastlab.ui import theme as _th
+    rp.on_log('  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped')
+    rp.on_log('  [error] something failed')
+    rp.on_log('quiet line')
+    got = dict(rp.log_line_colours())
+    check("a [warn] line has the warn foreground, an [error] line the "
+          "error one, a plain line none",
+          got['  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped'].lower()
+          == _th.qcolor('warn').name().lower()
+          and got['  [error] something failed'].lower()
+          == _th.qcolor('error').name().lower()
+          and got['quiet line'] is None, str(got))
+    check("log_text() returns the plain lines, unchanged",
+          rp.log_text().splitlines()[-3:] ==
+          ['  [warn] G2 (1.40, 0.30) m inside Wall 1 - dropped',
+           '  [error] something failed', 'quiet line'],
+          str(rp.log_text().splitlines()[-3:]))
 
     print("\nU12: the refresh box reports an unusable value")
     rp.mark_refresh(False)

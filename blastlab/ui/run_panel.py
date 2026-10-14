@@ -13,7 +13,8 @@ import os
 import numpy as np
 import shiboken6
 from PySide6.QtCore import QEvent, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QFont, QIcon, QTextCursor, QTextDocument
+from PySide6.QtGui import (QColor, QFont, QIcon, QTextCharFormat, QTextCursor,
+                           QTextDocument)
 from PySide6.QtWidgets import (QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QProgressBar, QPushButton,
                                QSizePolicy, QStackedWidget, QVBoxLayout,
@@ -23,7 +24,8 @@ from ..core import refine
 from ..services.model_folder import folder_for
 from . import theme
 from .components import Banner, Collapsible, StatTile, ToggleSwitch
-from .live_gauges import NO_GAUGES, WAITING, LiveGaugePane  # noqa: F401
+from .live_gauges import (ALL_DROPPED, NO_GAUGES, WAITING,  # noqa: F401
+                          LiveGaugePane)
 from .pg_plots import MESH_MAX_LINES, LiveSlicePane
 from .run_clock import RunClock, fmt_duration
 from .run_dock import RunDock
@@ -424,6 +426,7 @@ class RunPanel(QWidget):
         self._dim = 2
         self._shape = None
         self._frac = None           # the stage's progress fraction
+        self._stage_note = ''       # `meshing stage 2`, until its solve
         self._ended = None          # how the last run / assessment ended
         self._end_reason = ''       # the last result's stop_reason (T7)
         self._tick = QTimer(self)
@@ -1146,6 +1149,7 @@ class RunPanel(QWidget):
         if running:
             self.progress.setValue(0)
             self._frac = None
+            self._stage_note = ''
             self._ended = None
             self._end_reason = ''
             self.banner.hide()
@@ -1176,10 +1180,12 @@ class RunPanel(QWidget):
         self._sync_tick()
         self._render_time()
 
-    def show_finish(self, model, reason, folder=None):
+    def show_finish(self, model, reason, folder=None, time_reason=None):
         """The finish banner (plan §6): `Result ready: <model> · <how it
         ended>. Files in <folder>\\`. `reason` is the last result's
-        stop_reason verbatim (decision D66); the time line appends it."""
+        stop_reason verbatim (decision D66); the time line appends it.
+        `time_reason` is the time line's own, shorter wording (GUI-16
+        round 2, A2: a chain stopped after a landed stage)."""
         reason = str(reason or '').strip() or 'finished'
         head = f'Result ready: {model} · {reason}.'
         where = (f"Files in {str(folder).rstrip('/' + os.sep)}{os.sep}"
@@ -1191,7 +1197,7 @@ class RunPanel(QWidget):
         if self.banner.isHidden():
             self._shrink_viewer_for_banner()
         self.banner.show()
-        self._end_reason = reason
+        self._end_reason = str(time_reason or '').strip() or reason
         self._render_time()
 
     def _render_banner(self):
@@ -1303,9 +1309,10 @@ class RunPanel(QWidget):
         """The last stage's Result.gauges: the full traces."""
         self.gauge_col.set_payload(gauges, final=True)
 
-    def say_no_gauges(self):
-        """The case has no gauges, so the view has nothing to wait for."""
-        self.gauges.reset(NO_GAUGES)
+    def say_no_gauges(self, text=NO_GAUGES):
+        """The case has no gauges (or, `ALL_DROPPED`, the solver drops
+        every one), so the view has nothing to wait for."""
+        self.gauges.reset(text)
 
     def set_validation(self, ok, n_errors=0, text=None, n_cells=None):
         """Mirror the Setup validation on the Run screen's Setup link and
@@ -1440,6 +1447,8 @@ class RunPanel(QWidget):
                 where = ('held' if self._last_step is None
                          else f'held at step {self._last_step}')
                 return f'{where} · {el} elapsed'
+            if self._stage_note:
+                return f'{self._stage_note} · {el} elapsed'
             eta = c.eta_s(self._frac) if self._frac is not None else None
             if eta is None:
                 return f'{el} elapsed'
@@ -1485,8 +1494,44 @@ class RunPanel(QWidget):
         else:
             self._amr_run = 0
         self.log.appendPlainText(line)
+        self._colour_last_line(line)
         self.log.verticalScrollBar().setValue(
             self.log.verticalScrollBar().maximum())
+
+    #: G14U-P2b (D30): the log's severity tags and the palette key each takes
+    #: `[note]` (GUI-16 round 2, A3) is the muted one: kept scratch and the like
+    _LOG_TAGS = (('[error]', 'error'), ('[warn]', 'warn'),
+                 ('[note]', 'muted'))
+
+    def _colour_last_line(self, line):
+        """Give the line just appended its severity colour - `[warn]` the
+        theme's warn, `[error]` its error - as a character format on that
+        block only. The text, so `log_text()` and a copy, is unchanged."""
+        key = next((k for tag, k in self._LOG_TAGS if tag in line), None)
+        if key is None:
+            return
+        cur = QTextCursor(self.log.document().lastBlock())
+        cur.movePosition(QTextCursor.EndOfBlock, QTextCursor.KeepAnchor)
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(theme.cur(key)))
+        cur.mergeCharFormat(fmt)
+
+    def log_line_colours(self):
+        """[(line, foreground name or None)] per log line (tests)."""
+        out = []
+        block = self.log.document().firstBlock()
+        while block.isValid():
+            colour = None
+            it = block.begin()
+            while not it.atEnd():
+                fmt = it.fragment().charFormat()
+                if fmt.hasProperty(QTextCharFormat.ForegroundBrush):
+                    colour = fmt.foreground().color().name()
+                    break
+                it += 1
+            out.append((block.text(), colour))
+            block = block.next()
+        return out
 
     def log_text(self):
         """The current run's log (earlier runs are in log_history())."""
@@ -1525,6 +1570,13 @@ class RunPanel(QWidget):
         self.progress.setValue(1000)
         self.strip.pct_lbl.setText('100 %')
 
+    def reset_bar(self):
+        """A chain stopped between stages: no stage is in flight, so the
+        last stage's 100 % must not stand (GUI-16 R1)."""
+        self._frac = None
+        self.progress.setValue(0)
+        self.strip.pct_lbl.setText('0 %')
+
     def on_progress(self, p):
         frac = max(0.0, min(1.0, p.frac))
         self.progress.setValue(int(round(1000 * frac)))
@@ -1542,10 +1594,22 @@ class RunPanel(QWidget):
         self._render_readouts()
         self._render_time()
 
+    def begin_stage(self, note):
+        """A later chain stage was announced (the worker's `stage`
+        message) and is meshing or starting: the last stage's finished
+        bar must not stand while it does (GUI-16 round 2, A1). The time
+        line reads `<note> · 12 s elapsed` until `on_run_started`."""
+        self._frac = None
+        self.progress.setValue(0)
+        self.strip.pct_lbl.setText('0 %')
+        self._stage_note = str(note or '')
+        self._render_time()
+
     def on_run_started(self, info):
         # a chain stage: the fraction (and so the ETA) restarts, and the
         # bar and the percent tile with it - the last stage's 100 % must
         # not stand until this stage's first progress (F25)
+        self._stage_note = ''
         self._frac = None
         self.progress.setValue(0)
         self.strip.pct_lbl.setText('0 %')

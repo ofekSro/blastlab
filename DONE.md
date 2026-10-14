@@ -111,6 +111,26 @@ Dry run of the 2026-10-13 /bl-todo flow (owner task, agent cost). Planner Opus (
 
 ---
 
+## 0za. 2026-10-14 — batches `gui-final`, `gui-final-2`, `gui-final-round1`, `gui-final-round2` (GUI-16 a-g, P2-17, P2-18, P2-25, Q03, G15Q, I02, G14Q; branch `final-gui`, merged <pending>)
+
+Plans `docs/batches/2026-10-12-gui-final.md` (A, B, D), `…-gui-final-2.md` (C, F; E dropped, Tk frozen
+by the owner 2026-10-13), `2026-10-13-gui-final-round1.md`, `…-round2.md`; reports `…-{A,B,C,D,F,…}.implement.md` /
+`.verify.md` beside them. QA/UX `docs/qa/2026-10-13-gui-final-round1/`, `…/2026-10-14-gui-final-round2/` (0 high, 0 medium).
+Owner 2026-10-12 "last GUI batch"; 2026-10-14: GUI no longer high priority, close now. `p1-23-ignition-radius` is NOT on this branch (plan and reports only), still open.
+- **A (no report):** a dropped gauge or trigger is said everywhere — Run, Results, Resume, the run browser's Load, the live pane, the Setup caption, dropdown and remap note; the blastFoam 3D x-tie keeps the entered numbers (a-e).
+- **B1-B11 (full):** `Trigger disabled` in Checks for both solvers (B1 FIXED `f183a4f`: no trigger note beside a trigger with no gauge); `G<n>` on trigger lines (B2 PARTIAL, see Open); 1D exports keep the entered numbers and name the drop (B3, b); one arrow style in exports, 212 golden hash lines proved arrow-only (B4); dropped-gauge markers on every field plot (B5, f); a `drop_rule` that cannot run says so (B6); a user stop is not "it raised" (B7); the log names each writer-dropped gauge (B8); a run knows its model, a model folder loads back (B9, B10); unchecked ignition radii warn (B11).
+- **C1-C12 (VERIFIED):** Setup, Chain, Run and Results polish (GUI-16); Resume targets the run's own model, Model column, Results opens a model folder (P2-17, P2-25); the fit script measures P2-18/P2-21/P2-24 on the real platform (C11); a blastFoam result never says idealGas (C12).
+- **D1-D6 (VERIFIED):** Detach stays detached on the native 3D mount, `_e2e_ui_view3d` G3 (g); Close shuts the Setup 3D preview, no `External WM_DESTROY` (G14Q); closing a native 3D run takes ~4-5 s (I02); a Stop in blockMesh keeps 0 % (G15Q-5a); chain stage 3 opens at Lz 2.5 m; 1D and 2D live gauges update live, both solvers (owner 2026-10-13).
+- **F1-F4 (VERIFIED):** the QA harness refuses `--out` under OneDrive or the repo and `--resume` sets aside a cut-off model folder (G15Q-6); Q03 builds its native 2D result; F07 and new scenario F12 (blastFoam gauge drop).
+- **R1, R2 (round 1):** a chain stopped in a later stage ends `stopped` (R1 VERIFIED); Keep all raises no dialog (R2 FIXED `c28e54d`, `a55e4e5`).
+- **A1-A6, B1-B2 (round 2):** later chain stage owns the Run screen, stages numbered by position, peak-time label inside the gauge card (A1-A6 VERIFIED); figure titles name the charge's material, kg C4 on a C4 result (the 1D TNT title pin moved, owner 2026-10-13); the unchecked-radii warning names domain and cell size (B2 VERIFIED); the blastFoam CLI's 1D pop-ups name the material (B1 FIXED `612e5d3`).
+- **Tests:** B `gate --changed 934028f --deep` 114/114; C-F, rounds per their verify reports green; `test_regression` byte-identical after each part and round (`gate --only regression`).
+- **Verifier fixes:** `f183a4f`, `c28e54d`, `a55e4e5`, `612e5d3`.
+- **Open:** B2 held line `hooks.py:84` `Trigger gauge {n} was dropped` (pin `test_foam_trigger_drop.py:126`; verifier recommends the text edit); `figure_gauges_1d` footnotes a trailing drop only with `drop_note` (Tk frozen, Qt fine); round-3 lows stay in the GUI-16 row (refined-cell wording, stage 2 stale tiles, Keep-all path, `[note]` colour, stage card at 1100 px, 100 % before `stage`, dead `reset_bar` branch); GUI-14 (j) home PC; P1-23 + P2-22.
+- **Commits:** Parts A-B `934028f`..`9ae0ee4`, `f183a4f` (already on `master`); `6077342`..`0b50c98` (62 commits `master..final-gui`, base `a4a8f4d`).
+
+---
+
 ## 1. The timeline — T0–T70
 
 **71 tasks, all closed.** T0–T24 through 2026-09-05, T25–T48 on 09-07 (the QA round and

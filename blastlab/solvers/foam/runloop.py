@@ -617,7 +617,7 @@ def gated_step(run, hooks):
         hooks.step_gate()
 
 
-def tail_live(spec, hooks, st, live, set_name, decode):
+def tail_live(spec, hooks, st, live, set_name, decode, gauges=None):
     """Shared live-sample tail (1D line / 2D+3D slice): poll the
     postProcessing/<set_name> dirs, emit at most one hooks.frame per
     call (the newest complete sample), delete consumed dirs so disk
@@ -625,7 +625,10 @@ def tail_live(spec, hooks, st, live, set_name, decode):
     the sample is still mid-write; a `(field, levels)` tuple carries a
     dynamic-AMR frame's level map. The GUI refresh policy is honored:
     seconds mode throttles wall time, steps mode gates on solver steps
-    since the last emitted live frame."""
+    since the last emitted live frame. `gauges()`, when given, rides
+    each emitted frame: the live gauge traces (backend._emit_gauges,
+    throttled there), which otherwise moved only with the written times
+    (owner 2026-10-13, D6; FoamRunLoop.gauges)."""
     entries = reader.list_sample_times(spec.case_unc, set_name)
     fresh = [(t, n) for t, n in entries if n not in live['seen']]
     if not fresh:
@@ -653,6 +656,8 @@ def tail_live(spec, hooks, st, live, set_name, decode):
             # decoded and about to be dropped.
             if spec.dim == 3 and hooks.wants_surf3d():
                 hooks.surf3d(t, field)
+            if gauges is not None:
+                gauges()
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -920,6 +925,10 @@ class FoamRunLoop:
     purge = None
     #: OUT-2 (vtk_export.VtkExport), with the same class-default reason
     vtk = None
+    #: D6: the live gauge callback tail_live calls with each live frame,
+    #: set by the solve_*_foam caller after construction (an attribute,
+    #: not an argument: the test stand-ins share this signature)
+    gauges = None
 
     def __init__(self, spec, hooks, fields, done, live_set, decode,
                  read_dir, on_frame):
@@ -1013,7 +1022,7 @@ class FoamRunLoop:
             return
         self._sync_live_steps()
         tail_live(self.spec, self.hooks, self.st, self.live, self.live_set,
-                  self.decode)
+                  self.decode, gauges=self.gauges)
 
     def _check_stop(self):
         """Turn the user's Stop into `stopAt writeNow` HERE, between the

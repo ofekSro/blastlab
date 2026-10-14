@@ -197,15 +197,17 @@ def png_figures(res, dim, show_mesh=False, title_extra=None,
     numbers (GUI-16 (b))."""
     if dim == 1:
         c = charge_label(res.meta)
+        # GUI-16 round 2 (F-1): `kg C4` on a C4 result; no material: TNT
+        mat = res.meta.get('material')
         return [('blast_1d_results.png',
                  plots.figure_results_1d(
                      res.snapshots, c.eos, c.charge_kg, c.radius_m,
-                     title_extra=title_extra)),
+                     title_extra=title_extra, material=mat)),
                 ('blast_1d_gauges.png',
                  plots.figure_gauges_1d(
                      res.gauges, c.charge_kg, c.eos,
                      title_extra=title_extra, numbers=numbers,
-                     drop_note=drop_note))]
+                     drop_note=drop_note, material=mat))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = builder(res.snapshots, res.meta, include_peak=True,
                    show_mesh=show_mesh, title_extra=title_extra)
@@ -226,13 +228,14 @@ def report_figures(res, dim, show_mesh=False, title_extra=None,
     `png_figures`)."""
     if dim == 1:
         c = charge_label(res.meta)
+        mat = res.meta.get('material')      # as png_figures (F-1)
         return [('Results', plots.figure_results_1d(
                     res.snapshots, c.eos, c.charge_kg, c.radius_m,
-                    title_extra=title_extra)),
+                    title_extra=title_extra, material=mat)),
                 ('Gauge time histories', plots.figure_gauges_1d(
                     res.gauges, c.charge_kg, c.eos,
                     title_extra=title_extra, numbers=numbers,
-                    drop_note=drop_note))]
+                    drop_note=drop_note, material=mat))]
     builder = plots.figures_fields_2d if dim == 2 else plots.figures_fields_3d
     figs = [(_report_caption(n, dim), f)
             for n, f in builder(res.snapshots, res.meta, include_peak=True,

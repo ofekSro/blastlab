@@ -1,0 +1,2180 @@
+[
+ {
+  "title": "Chain 0/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "1 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D waiting",
+   "02 2D waiting",
+   ""
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 0,
+  "run_pct": null,
+  "banner": "",
+  "t": 0.4
+ },
+ {
+  "title": "Chain 0/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "1 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D waiting",
+   "02 2D waiting",
+   ""
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 0,
+  "run_pct": null,
+  "banner": "",
+  "t": 0.9
+ },
+ {
+  "title": "Chain 0/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "2 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D waiting",
+   "02 2D waiting",
+   ""
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 0,
+  "run_pct": null,
+  "banner": "",
+  "t": 1.3
+ },
+ {
+  "title": "Chain 0/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "2 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D waiting",
+   "02 2D waiting",
+   ""
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 0,
+  "run_pct": null,
+  "banner": "",
+  "t": 1.8
+ },
+ {
+  "title": "Chain 0/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "2 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D waiting",
+   "02 2D waiting",
+   ""
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 0,
+  "run_pct": null,
+  "banner": "",
+  "t": 2.2
+ },
+ {
+  "title": "Chain 1/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "3 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D 0 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": null,
+  "banner": "",
+  "t": 2.6
+ },
+ {
+  "title": "Chain 1/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "3 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D 0 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": null,
+  "banner": "",
+  "t": 3.0
+ },
+ {
+  "title": "Chain 1/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "4 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D 0 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": null,
+  "banner": "",
+  "t": 3.5
+ },
+ {
+  "title": "Chain 1/2 \u00b7 0 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "4 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D 0 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "1",
+   "t [ms]": "0.000",
+   "dt [s]": "1.20e-07",
+   "p max [kPa]": "101.3",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 0,
+  "banner": "",
+  "t": 3.9
+ },
+ {
+  "title": "Chain 1/2 \u00b7 35 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "5 s elapsed \u00b7 about 4 s left",
+  "pct": "35 %",
+  "bar": 347,
+  "strip": [
+   "01 1D 35 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "72",
+   "t [ms]": "0.009",
+   "dt [s]": "1.46e-07",
+   "p max [kPa]": "6.86e+06",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 35,
+  "banner": "",
+  "t": 4.4
+ },
+ {
+  "title": "Chain 1/2 \u00b7 55 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "5 s elapsed \u00b7 about 2 s left",
+  "pct": "55 %",
+  "bar": 548,
+  "strip": [
+   "01 1D 55 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "123",
+   "t [ms]": "0.017",
+   "dt [s]": "1.72e-07",
+   "p max [kPa]": "1.212e+05",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 55,
+  "banner": "",
+  "t": 4.8
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "6 s elapsed \u00b7 about 1 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 5.2
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "6 s elapsed \u00b7 about 1 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 5.7
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "6 s elapsed \u00b7 about 1 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 6.1
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "7 s elapsed \u00b7 about 2 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 6.5
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "7 s elapsed \u00b7 about 2 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 7.0
+ },
+ {
+  "title": "Chain 1/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "8 s elapsed \u00b7 about 2 s left",
+  "pct": "71 %",
+  "bar": 709,
+  "strip": [
+   "01 1D 71 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "170",
+   "t [ms]": "0.026",
+   "dt [s]": "1.97e-07",
+   "p max [kPa]": "2.78e+04",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 71,
+  "banner": "",
+  "t": 7.4
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "8 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 7.9
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "9 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 8.3
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "9 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 8.8
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "9 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 9.2
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "10 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 9.6
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "10 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 10.1
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "11 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 10.5
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "11 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 10.9
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "12 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 11.4
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "12 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 11.8
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "13 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 12.3
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "13 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 12.8
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "13 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 13.2
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "14 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 13.6
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "14 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 14.1
+ },
+ {
+  "title": "Chain 1/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "15 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D 100 %",
+   "02 2D waiting",
+   "Stage 1 of 2 \u00b7 the 2D stage starts from handoff_1d_to_2d.txt"
+  ],
+  "chips": {
+   "step": "256",
+   "t [ms]": "0.045",
+   "dt [s]": "2.50e-07",
+   "p max [kPa]": "6,759",
+   "cells": "\u2014"
+  },
+  "chain_k": 1,
+  "run_pct": 100,
+  "banner": "",
+  "t": 14.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "meshing stage 2 \u00b7 16 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D meshing",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "610",
+   "t [ms]": "0.162",
+   "dt [s]": "3.94e-07",
+   "p max [kPa]": "33.92",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 15.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "meshing stage 2 \u00b7 16 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D meshing",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "610",
+   "t [ms]": "0.162",
+   "dt [s]": "3.94e-07",
+   "p max [kPa]": "33.92",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 16.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "17 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 16.6
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "17 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 17.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "18 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 17.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 untitled \u00b7 BlastLab",
+  "time": "18 s elapsed",
+  "pct": "0 %",
+  "bar": 0,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "\u2014",
+   "t [ms]": "\u2014",
+   "dt [s]": "\u2014",
+   "p max [kPa]": "\u2014",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "",
+  "t": 17.9
+ },
+ {
+  "title": "Chain 2/2 \u00b7 0 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "19 s elapsed",
+  "pct": "0 %",
+  "bar": 1,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "5",
+   "t [ms]": "0.042",
+   "dt [s]": "2.32e-07",
+   "p max [kPa]": "6,996",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 0,
+  "banner": "",
+  "t": 18.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 0 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "19 s elapsed",
+  "pct": "0 %",
+  "bar": 2,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "11",
+   "t [ms]": "0.045",
+   "dt [s]": "5.24e-07",
+   "p max [kPa]": "6,393",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 0,
+  "banner": "",
+  "t": 18.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 0 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "19 s elapsed",
+  "pct": "0 %",
+  "bar": 2,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 0 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "16",
+   "t [ms]": "0.047",
+   "dt [s]": "5.24e-07",
+   "p max [kPa]": "5,739",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 0,
+  "banner": "",
+  "t": 19.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 51 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "21 s elapsed \u00b7 about 4 s left",
+  "pct": "51 %",
+  "bar": 515,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 51 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "38",
+   "t [ms]": "0.061",
+   "dt [s]": "6.89e-07",
+   "p max [kPa]": "4,591",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 51,
+  "banner": "",
+  "t": 21.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 54 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "22 s elapsed \u00b7 about 4 s left",
+  "pct": "54 %",
+  "bar": 538,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 54 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "40",
+   "t [ms]": "0.063",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "4,343",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 54,
+  "banner": "",
+  "t": 21.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 54 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "22 s elapsed \u00b7 about 5 s left",
+  "pct": "54 %",
+  "bar": 538,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 54 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "48",
+   "t [ms]": "0.069",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "4,139",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 54,
+  "banner": "",
+  "t": 21.9
+ },
+ {
+  "title": "Chain 2/2 \u00b7 57 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "23 s elapsed \u00b7 about 5 s left",
+  "pct": "57 %",
+  "bar": 574,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 57 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "54",
+   "t [ms]": "0.073",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,901",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 57,
+  "banner": "",
+  "t": 22.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 60 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "23 s elapsed \u00b7 about 4 s left",
+  "pct": "60 %",
+  "bar": 600,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 60 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "58",
+   "t [ms]": "0.077",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,788",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 60,
+  "banner": "",
+  "t": 22.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 60 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "23 s elapsed \u00b7 about 5 s left",
+  "pct": "60 %",
+  "bar": 600,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 60 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "62",
+   "t [ms]": "0.080",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,651",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 60,
+  "banner": "",
+  "t": 23.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 63 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "24 s elapsed \u00b7 about 4 s left",
+  "pct": "63 %",
+  "bar": 634,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 63 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "67",
+   "t [ms]": "0.083",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,510",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 63,
+  "banner": "",
+  "t": 23.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 63 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "24 s elapsed \u00b7 about 5 s left",
+  "pct": "63 %",
+  "bar": 634,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 63 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "73",
+   "t [ms]": "0.088",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,365",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 63,
+  "banner": "",
+  "t": 24.1
+ },
+ {
+  "title": "Chain 2/2 \u00b7 66 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "25 s elapsed \u00b7 about 4 s left",
+  "pct": "66 %",
+  "bar": 656,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 66 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "80",
+   "t [ms]": "0.093",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,177",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 66,
+  "banner": "",
+  "t": 24.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 66 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "25 s elapsed \u00b7 about 5 s left",
+  "pct": "66 %",
+  "bar": 656,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 66 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "84",
+   "t [ms]": "0.096",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "3,084",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 66,
+  "banner": "",
+  "t": 25.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 69 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "26 s elapsed \u00b7 about 4 s left",
+  "pct": "69 %",
+  "bar": 691,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 69 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "91",
+   "t [ms]": "0.102",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "2,898",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 69,
+  "banner": "",
+  "t": 25.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "26 s elapsed \u00b7 about 4 s left",
+  "pct": "71 %",
+  "bar": 713,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 71 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "94",
+   "t [ms]": "0.104",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "2,878",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 71,
+  "banner": "",
+  "t": 25.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 71 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "27 s elapsed \u00b7 about 4 s left",
+  "pct": "71 %",
+  "bar": 713,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 71 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "101",
+   "t [ms]": "0.109",
+   "dt [s]": "7.65e-07",
+   "p max [kPa]": "2,710",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 71,
+  "banner": "",
+  "t": 26.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 74 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "27 s elapsed \u00b7 about 4 s left",
+  "pct": "74 %",
+  "bar": 738,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 74 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "106",
+   "t [ms]": "0.114",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,612",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 74,
+  "banner": "",
+  "t": 26.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 74 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "27 s elapsed \u00b7 about 4 s left",
+  "pct": "74 %",
+  "bar": 738,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 74 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "110",
+   "t [ms]": "0.117",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,553",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 74,
+  "banner": "",
+  "t": 27.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 76 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "28 s elapsed \u00b7 about 4 s left",
+  "pct": "76 %",
+  "bar": 761,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 76 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "116",
+   "t [ms]": "0.122",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,417",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 76,
+  "banner": "",
+  "t": 27.6
+ },
+ {
+  "title": "Chain 2/2 \u00b7 79 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "28 s elapsed \u00b7 about 3 s left",
+  "pct": "79 %",
+  "bar": 791,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 79 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "119",
+   "t [ms]": "0.125",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,405",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 79,
+  "banner": "",
+  "t": 28.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 79 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "29 s elapsed \u00b7 about 3 s left",
+  "pct": "79 %",
+  "bar": 791,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 79 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "126",
+   "t [ms]": "0.131",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,254",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 79,
+  "banner": "",
+  "t": 28.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 81 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "29 s elapsed \u00b7 about 3 s left",
+  "pct": "81 %",
+  "bar": 813,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 81 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "130",
+   "t [ms]": "0.134",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,221",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 81,
+  "banner": "",
+  "t": 28.9
+ },
+ {
+  "title": "Chain 2/2 \u00b7 81 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "30 s elapsed \u00b7 about 3 s left",
+  "pct": "81 %",
+  "bar": 813,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 81 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "132",
+   "t [ms]": "0.136",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,171",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 81,
+  "banner": "",
+  "t": 29.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 83 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "30 s elapsed \u00b7 about 3 s left",
+  "pct": "83 %",
+  "bar": 835,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 83 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "140",
+   "t [ms]": "0.143",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,081",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 83,
+  "banner": "",
+  "t": 29.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 83 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "30 s elapsed \u00b7 about 3 s left",
+  "pct": "83 %",
+  "bar": 835,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 83 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "141",
+   "t [ms]": "0.144",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "2,056",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 83,
+  "banner": "",
+  "t": 30.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 86 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "31 s elapsed \u00b7 about 2 s left",
+  "pct": "86 %",
+  "bar": 857,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 86 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "150",
+   "t [ms]": "0.152",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,955",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 86,
+  "banner": "",
+  "t": 30.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 88 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "31 s elapsed \u00b7 about 2 s left",
+  "pct": "88 %",
+  "bar": 880,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 88 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "154",
+   "t [ms]": "0.155",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,886",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 88,
+  "banner": "",
+  "t": 31.1
+ },
+ {
+  "title": "Chain 2/2 \u00b7 90 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "32 s elapsed \u00b7 about 2 s left",
+  "pct": "90 %",
+  "bar": 899,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 90 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "159",
+   "t [ms]": "0.159",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,826",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 90,
+  "banner": "",
+  "t": 31.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 90 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "32 s elapsed \u00b7 about 2 s left",
+  "pct": "90 %",
+  "bar": 899,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 90 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "165",
+   "t [ms]": "0.164",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,764",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 90,
+  "banner": "",
+  "t": 32.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 90 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "33 s elapsed \u00b7 about 2 s left",
+  "pct": "90 %",
+  "bar": 899,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 90 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "165",
+   "t [ms]": "0.164",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,764",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 90,
+  "banner": "",
+  "t": 32.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 92 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "33 s elapsed \u00b7 about 1 s left",
+  "pct": "92 %",
+  "bar": 922,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 92 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "173",
+   "t [ms]": "0.171",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,706",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 92,
+  "banner": "",
+  "t": 32.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 94 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "34 s elapsed \u00b7 about 1 s left",
+  "pct": "94 %",
+  "bar": 942,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 94 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "179",
+   "t [ms]": "0.176",
+   "dt [s]": "8.61e-07",
+   "p max [kPa]": "1,647",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 94,
+  "banner": "",
+  "t": 33.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 96 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "34 s elapsed \u00b7 about 1 s left",
+  "pct": "96 %",
+  "bar": 962,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 96 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "183",
+   "t [ms]": "0.180",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,601",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 96,
+  "banner": "",
+  "t": 33.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 96 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "34 s elapsed \u00b7 about 1 s left",
+  "pct": "96 %",
+  "bar": 962,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 96 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "188",
+   "t [ms]": "0.185",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,557",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 96,
+  "banner": "",
+  "t": 34.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 98 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "35 s elapsed \u00b7 about 0 s left",
+  "pct": "98 %",
+  "bar": 982,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 98 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "194",
+   "t [ms]": "0.191",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,503",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 98,
+  "banner": "",
+  "t": 34.6
+ },
+ {
+  "title": "Chain 2/2 \u00b7 98 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "35 s elapsed \u00b7 about 0 s left",
+  "pct": "98 %",
+  "bar": 982,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 98 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "194",
+   "t [ms]": "0.191",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,503",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 98,
+  "banner": "",
+  "t": 35.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 98 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "36 s elapsed \u00b7 about 0 s left",
+  "pct": "98 %",
+  "bar": 982,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 98 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "194",
+   "t [ms]": "0.191",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,503",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 98,
+  "banner": "",
+  "t": 35.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 98 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "36 s elapsed \u00b7 about 0 s left",
+  "pct": "98 %",
+  "bar": 982,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 98 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "194",
+   "t [ms]": "0.191",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,503",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 98,
+  "banner": "",
+  "t": 35.9
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "37 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 36.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "37 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 36.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "38 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 37.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "38 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 37.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "38 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 38.1
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "39 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 38.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "39 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 39.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "40 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 39.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "40 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 39.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "41 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 40.3
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "41 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 40.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "41 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 41.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "42 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 41.6
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "42 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 42.0
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "43 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 42.4
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "43 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 42.8
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "44 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 43.2
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "44 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 43.7
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "44 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 44.1
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "45 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 44.5
+ },
+ {
+  "title": "Chain 2/2 \u00b7 100 % \u00b7 untitled \u00b7 BlastLab",
+  "time": "45 s elapsed \u00b7 about 0 s left",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D 100 %",
+   "Stage 2 of 2 \u00b7 the last stage"
+  ],
+  "chips": {
+   "step": "196",
+   "t [ms]": "0.193",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,494",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": 100,
+  "banner": "",
+  "t": 45.0
+ },
+ {
+  "title": "\u2713 Done \u00b7 untitled \u00b7 BlastLab",
+  "time": "Done in 46 s \u00b7 shock arrived at a terminate boundary (p_edge = 1.019e+05 Pa, live sample)",
+  "pct": "100 %",
+  "bar": 1000,
+  "strip": [
+   "01 1D \u2713 12 s",
+   "02 2D \u2713 30 s",
+   "Chain done in 46 s"
+  ],
+  "chips": {
+   "step": "208",
+   "t [ms]": "0.205",
+   "dt [s]": "9.84e-07",
+   "p max [kPa]": "1,399",
+   "cells": "\u2014"
+  },
+  "chain_k": 2,
+  "run_pct": null,
+  "banner": "Result ready: R2_chain \u00b7 shock arrived at a terminate boundary (p_edge = 1.019e+05 Pa, live sample). Files in C:\\Users\\ROTEM~1.OFE\\AppData\\Local\\Temp\\qa_r2_lubvzsu5\\runs\\R2_chain\\",
+  "t": 45.6
+ }
+]

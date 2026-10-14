@@ -70,9 +70,13 @@ SEED_CAPTION = 'New stages take the charge, material and solver from 01 Setup.'
 #: route opens with card 2 clean: at the form's 10 m the 1D stage hands off
 #: beyond stage 2's 4 x 4 m box (S2-1). Checked 2026-10-11: 1.5 m brings no
 #: error or warning that 10 m does not, native / blastFoam, unprobed and
-#: probed. Stage 3's Lz stays 1.5 (the 4.0 m seed trips the blastFoam cell
-#: cap unprobed; GUI-13 A1).
-CHAIN_SEED = {1: {'radius_m': '1.5'}}
+#: probed. Stage 3's Lz starts at 2.5 m (owner decision 4, 2026-10-12;
+#: gui-final D5): at the form's 1.5 m the seed's 2D burst (z 2.0 m) is at or
+#: above the 3D box (F45, card 3 warns). 2.5 m is 360,000 cells, under the
+#: blastFoam cap unprobed (1,113,510); every card reads case OK native and
+#: blastFoam probed. Not 4.0: that trips the cap unprobed (GUI-13 A1); not a
+#: lower 2D burst: 1.0 m trades F45 for S2-1 on card 2.
+CHAIN_SEED = {1: {'radius_m': '1.5'}, 3: {'Lz': '2.5'}}
 
 #: the live checks' debounce: the Setup's (`MainWindow._validate_timer`)
 CHECK_MS = 300
@@ -176,6 +180,7 @@ class ChainPanel(QWidget):
         self._quiet = 1             # the forms fire on_change while built
         self._shown = False
         self._stale = False         # a check came due while off screen
+        self._hw_pending = False    # the WSL hardware probe is running
         self._checks = {}
         # the one timer of the screen: the live checks' debounce
         self._check_timer = QTimer(self)
@@ -279,6 +284,7 @@ class ChainPanel(QWidget):
                 lambda m, d=d: self._solver_clicked(d, m))
             ed.copy_clicked.connect(lambda d=d: self.copy_from_setup(d))
             ed.load_clicked.connect(lambda d=d: self.load_case(d))
+            ed.focus_requested.connect(self._focus_requested)
             el.addWidget(ed)
             self.editors[d] = ed
             #: the same object API as before GUI-9: one CaseForm per stage
@@ -319,6 +325,7 @@ class ChainPanel(QWidget):
         a dialog. A dialog that hangs or raises must not be able to
         swallow the reason."""
         lines = [str(ln) for ln in lines if str(ln).strip()]
+        lines = chain_route.by_position(lines, self.checked())     # A5
         # one line of sentences: each ends with a stop (GUI QA V2)
         said = [ln.rstrip() if ln.rstrip()[-1] in '.:!?'
                 else ln.rstrip() + '.' for ln in lines]
@@ -349,7 +356,9 @@ class ChainPanel(QWidget):
                     f'color: {theme.cur("error")};')
         self._compat_bad = bool(bad)
         if bad:
-            self._set_status(f'Stage {min(bad)}: {bad[min(bad)]}')
+            first = min(bad)
+            at = self.checked().index(first) + 1     # by position (A5)
+            self._set_status(f'Stage {at}: {bad[first]}')
         elif self.status.text().startswith('Stage '):
             self._set_status('')
         self._sync_run_btn()
@@ -518,6 +527,18 @@ class ChainPanel(QWidget):
             ed.select_node(self._node)
         else:
             ed.select_node(STAGE_NODE)
+        # D25: a warned stage opens with its Checks in view
+        if ed.selected_node() == STAGE_NODE and ed.has_alerts():
+            ed.reveal_checks()
+
+    def _focus_requested(self, d, kind, key):
+        """D24: a Checks line was clicked - show the stage that holds the
+        fix (the 1D stage's radius for S2-1) and focus the field or gauge."""
+        d = int(d)
+        if d not in self.editors or d not in self.checked():
+            return
+        self.focus_stage(d)
+        self.editors[d].focus(kind, key)
 
     def stage(self):
         return self._stage
@@ -530,6 +551,17 @@ class ChainPanel(QWidget):
         """(Re)start the one debounce: every form, route, solver and
         Run-tab model change lands here."""
         self._check_timer.start()
+
+    def set_hw_pending(self, on):
+        """D28: the WSL hardware probe is running (`on`) or ended. While
+        it runs a blastFoam stage's `Large grid` line reads as a
+        provisional note (`chain_route.provisional_grid`); the checks run
+        again when it ends."""
+        on = bool(on)
+        if on == self._hw_pending:
+            return
+        self._hw_pending = on
+        self.schedule_checks()
 
     def _form_changed(self, d):
         if not self._quiet:
@@ -559,6 +591,9 @@ class ChainPanel(QWidget):
         dims = self.checked()
         checks = chain_route.stage_checks(
             dims, {d: self.forms[d] for d in dims}, self._live_hand(dims))
+        if self._hw_pending:
+            for chk in checks.values():
+                chain_route.provisional_grid(chk)
         self._checks = checks
         self._sync_titles()
         runs, model = self._model_source()
@@ -578,8 +613,11 @@ class ChainPanel(QWidget):
                 key = chain_route.key_line(chk.case, prev)
                 self.cards[d].set_key(key)
             src = checks[prev].case if prev in checks else None
+            # D27: S2-1 (a 1D hand-off reaching the next stage) is fixed in
+            # the 1D stage's radius too
+            fed = d == 1 and nxt in checks and bool(checks[nxt].reach)
             self.editors[d].show_check(chk, self.stage_solver[d], prev, nxt,
-                                       note, source=src)
+                                       note, source=src, fed_reach=fed)
         self._update_run_line()
         self._refresh_copy()
 

@@ -24,14 +24,15 @@ from ..core import mode as mode_mod
 from . import chain_route, scaled_distance, setup_nodes, setup_strip, theme
 from .case_form import CaseForm
 from .components import HandoffCard
-from .model_overlay import HOVER_TIP, ModelOverlay, hover_text, plane_caption
+from .model_overlay import ModelOverlay, hover_text, hover_tip, plane_caption
 from .preview_panel import Preview1D, Preview2D
 from .results_list import ElidedLabel
 from .setup_panel import (PROPS_PAD, PROPS_W, WHEEL_ZOOM, DerivedCard,
                           _tool_button, pill_text)
 from .setup_tree import TREE_MIN, SetupTree, _letter_space
 from .theme import GAP
-from .widgets import ZWSP, Card, Segmented, clean_copy, label
+from .widgets import (ZWSP, Card, Segmented, clean_copy, label,
+                      on_label_click)
 
 #: the stage tree's width (board Chain line 100)
 TREE_W = 272
@@ -82,6 +83,9 @@ class StageEditor(QWidget):
     solver_picked = Signal(str)
     copy_clicked = Signal()
     load_clicked = Signal()
+    #: a Checks line was clicked (D24): (stage dim, kind, key) - the
+    #: panel focuses it, in another stage's editor when the fix is there
+    focus_requested = Signal(int, str, object)
 
     def __init__(self, dim, mode, on_change=None, parent=None):
         super().__init__(parent)
@@ -103,8 +107,9 @@ class StageEditor(QWidget):
         self.tree.set_adds_visible(False, False)
         self.tree.node_clicked.connect(self.select_node)
         self.tree.child_clicked.connect(self._child_clicked)
-        self.tree.pill_clicked.connect(
-            lambda: self.select_node(STAGE_NODE))
+        # D25: the pill and a `!` mark lead to this stage's Checks
+        self.tree.pill_clicked.connect(self.reveal_checks)
+        self.tree.mark_clicked.connect(lambda _id: self.reveal_checks())
         # the board's 40 px pill (theme: `#casepill[chain="true"]`)
         self.tree.pill.setProperty('chain', 'true')
         theme.repolish(self.tree.pill)
@@ -275,6 +280,7 @@ class StageEditor(QWidget):
         checks.setObjectName('eyebrow')
         _letter_space(checks)
         lay.addWidget(checks)
+        self._checks_head = checks
         self._checks_box = QVBoxLayout()
         self._checks_box.setSpacing(8)
         lay.addLayout(self._checks_box)
@@ -315,6 +321,12 @@ class StageEditor(QWidget):
             text.setTextInteractionFlags(Qt.TextSelectableByMouse)
             # a copied message carries no ZWSP (GUI-10, F23)
             clean_copy(text)
+            # D24: a line that names a field or a gauge leads to it
+            target = chain_route.focus_target(message)
+            if target is not None:
+                stage, kind, key = target
+                on_label_click(text, lambda s=stage or self.dim, k=kind,
+                               v=key: self.focus_requested.emit(s, k, v))
             rl.addWidget(text, 1)
             self._checks_box.addWidget(row)
             self._check_rows.append(row)
@@ -322,6 +334,60 @@ class StageEditor(QWidget):
     def check_rows(self):
         """(severity, message) of the Checks list, as shown (tests)."""
         return list(self._rows)
+
+    def check_row_widgets(self):
+        """The Checks rows as widgets, in order (tests, `reveal_checks`)."""
+        return list(self._check_rows)
+
+    # ── D24 / D25: going to what a line names, and to the lines ──────────
+    def focus(self, kind, key):
+        """Show and focus what a Checks line named: a form field (by its
+        name) or a gauge's row. True when it did."""
+        if kind == 'gauge':
+            self._child_clicked('gauges', int(key) - 1)
+            return True
+        if kind == 'field':
+            return self.focus_field(key)
+        return False
+
+    def focus_field(self, name):
+        """Select the node holding field `name`, scroll it into view and
+        put the focus on it (`CaseForm.focus_field`)."""
+        node = setup_nodes.node_of_field(self.dim, name)
+        if node is None or not self.select_node(node):
+            return False
+        self._content.layout().activate()
+        ok = self.form.focus_field(name)
+        w = self.form.widgets.get(name)
+        if w is not None:
+            self._scroll.ensureWidgetVisible(w, 0, 24)
+        return ok
+
+    def scroll_viewport(self):
+        """The properties column's viewport (tests, the fit script)."""
+        return self._scroll.viewport()
+
+    def has_alerts(self):
+        """True when the Checks list holds an error or a warning."""
+        return any(s in ('error', 'warn') for s, _m in self._rows)
+
+    def reveal_checks(self):
+        """D25: show the 00 Stage page with its Checks list in view - what
+        selecting a warned stage and a click on its pill or `!` do. The
+        page is taller than the 1100 x 720 column, so the list would
+        otherwise sit below the fold. No layout change: a scroll."""
+        self.select_node(STAGE_NODE)
+        self._reveal_now()
+        QTimer.singleShot(0, self._reveal_now)      # once it is laid out
+
+    def _reveal_now(self):
+        if self._node != STAGE_NODE or not self._check_rows:
+            return
+        self._content.layout().activate()
+        self._scroll.ensureWidgetVisible(self._check_rows[0], 0, 8)
+        # the CHECKS caption above it, when it fits too
+        self._scroll.ensureWidgetVisible(self._checks_head, 0, 0)
+        self._scroll.ensureWidgetVisible(self._check_rows[0], 0, 8)
 
     # ── position in the route ────────────────────────────────────────────
     def set_position(self, number, title):
@@ -414,13 +480,16 @@ class StageEditor(QWidget):
         self._content.layout().activate()
         self._scroll.ensureWidgetVisible(pl, 0, 0)
 
-    def _sync_children(self, gone=()):
-        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows)."""
+    def _sync_children(self, gone=(), tips=None):
+        """`gone`: the dropped gauges' numbers (GUI-15 (e) - warn rows);
+        `tips` {number: tooltip} for those rows (C6 (vi))."""
         f = self.form
+        tips = tips or {}
         if 'gauges' in f.points:
             rows = f.points['gauges'].get()
             self.tree.set_children('gauges', 'gauge', [
-                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone)
+                (f'G{i}', ', '.join(f'{v:.2f}' for v in row), i in gone,
+                 tips.get(i, ''))
                 for i, row in enumerate(rows, start=1)])
         if 'obstacles' in f.points:
             axis = ('r' if self.dim == 2
@@ -431,11 +500,14 @@ class StageEditor(QWidget):
                 for i, row in enumerate(rows, start=1)])
 
     # ── what the live check found ────────────────────────────────────────
-    def show_check(self, chk, solver, prev, nxt, note, source=None):
+    def show_check(self, chk, solver, prev, nxt, note, source=None,
+                   fed_reach=False):
         """Fill the tree, the pill, the header numbers, the 00 Stage page
         and the preview from one `chain_route.StageCheck`. `source` is
         the wired case of the stage before (the 3D hint's burst height
-        when fed by 2D), or None."""
+        when fed by 2D), or None. `fed_reach` (D27): the stage after this
+        1D stage warns that the hand-off reaches its boundary (S2-1), so
+        this stage's Domain row - where its radius is - shows `!` too."""
         f = self.form
         case = chk.case
         self._sync_tree_nodes()
@@ -462,9 +534,11 @@ class StageEditor(QWidget):
             self.hand_out.set(chain_route.out_file(self.dim, nxt))
         # GUI-14 (d), D3: the Gauges node is warn while a gauge is dropped;
         # GUI-15 (e): so is its child row
-        gone = (scaled_distance.dropped_numbers(case)
-                if case is not None else [])
-        self._sync_children(gone)
+        gone, off, _failed = (scaled_distance.drop_state(case)
+                              if case is not None else ([], None, ''))
+        self._sync_children(gone, scaled_distance.drop_tips(case, gone)
+                            if case is not None else None)
+        f.set_drops(gone, off is not None)
         f.refresh_trigger_choices()
         bad = {setup_nodes.node_of_field(self.dim, n) for n in f.bad}
         stage_level = {chain_route.AXISYM_REFUSAL.split(': ', 1)[1],
@@ -474,7 +548,8 @@ class StageEditor(QWidget):
             # GUI-13 B2 (UX #12, D8): the row that fixes the F45 / S2-1
             # reach line shows the warn glyph, not a tick
             self.tree.set_status(n.id, 'error' if n.id in bad else
-                                 'warn' if n.id == 'domain' and chk.reach
+                                 'warn' if n.id == 'domain'
+                                 and (chk.reach or fed_reach)
                                  or n.id == 'gauges' and drop
                                  else 'ok')
         self.tree.set_status(STAGE_NODE, 'error' if any(
@@ -518,7 +593,7 @@ class StageEditor(QWidget):
                                        else '')
             # UXR-15 (D221, D224): the readout's units stay on the
             # caption, so moving onto it after the hover can show them
-            self._view_caption.set_tip(HOVER_TIP if case else None)
+            self._view_caption.set_tip(hover_tip() if case else None)
 
     def _rings_toggled(self, on):
         self._overlay.rings = bool(on)
@@ -542,7 +617,7 @@ class StageEditor(QWidget):
         if lbl.property('hover') != 'true':
             lbl.setProperty('hover', 'true')
             theme.repolish(lbl)
-            lbl.set_tip(HOVER_TIP)              # UXR-15: the units
+            lbl.set_tip(hover_tip())            # UXR-15: the units
         lbl.setText(text)
 
     def _unhover(self, _event=None):

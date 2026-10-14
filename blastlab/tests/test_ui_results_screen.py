@@ -1066,6 +1066,48 @@ def s5g_dropped(link):
     check("GUI-15 (c): on screen the drop line is Run's text",
           g.drop_caption.text() == run_text,
           f'{g.drop_caption.text()!r} {run_text!r}')
+    # GUI-16 (c): the Run browser's Load stamps the same reason from the
+    # loaded run's own case.json; a run with no case file gets none
+    from blastlab.models.case import save_case
+    from blastlab.solvers.foam import postmortem as pm
+
+    def load_through_panel(res, name):
+        real_load = pm.load_run
+        pm.load_run = lambda path: res
+        n0 = len(p.entries())
+        try:
+            p.load_foam_run_path('/root/blastlab_runs/' + name)
+            for _ in range(200):
+                pump(10)
+                if len(p.entries()) > n0:
+                    break
+        finally:
+            pm.load_run = real_load
+        return p.entries()[-1].result if len(p.entries()) > n0 else None
+    cdir = tempfile.mkdtemp(prefix='blastlab_gui16c_')
+    try:
+        save_case(ran, os.path.join(cdir, 'case.json'))
+        withcase = sample_dropped()
+        withcase.meta.update(gauges=list(ran.gauges), charge=500.0,
+                             obstacles=[(1.25, 1.6, 0.0, 1.0)],
+                             case_dir=cdir)
+        got = load_through_panel(withcase, 'with_case')
+        check('GUI-16 (c): a loaded run with its case file carries the '
+              "stamp, and Results' drop line is Run's text",
+              got is not None and got.meta.get('gauges_dropped')
+              == RUN.drops(ran)
+              and g.drop_caption.text() == run_text,
+              f'{got and got.meta.get("gauges_dropped")} '
+              f'{g.drop_caption.text()!r}')
+        nocase = sample_dropped()
+        nocase.meta.update(gauges=list(ran.gauges), charge=500.0,
+                           obstacles=[(1.25, 1.6, 0.0, 1.0)])
+        got = load_through_panel(nocase, 'no_case')
+        check('GUI-16 (c): a loaded run without a case file gets no stamp '
+              'and nothing raises',
+              got is not None and 'gauges_dropped' not in got.meta)
+    finally:
+        shutil.rmtree(cdir, ignore_errors=True)
     # GUI-15 (f), D9: a 1D meta keeps no entered list, so a gauge beyond
     # the radius left the series numbered G1, G2. With RunController's
     # stamp the series are the entered numbers not dropped, and the drop
@@ -1081,6 +1123,52 @@ def s5g_dropped(link):
           and labels1 == {1: 'G1', 2: 'G3'}
           and drop1 == [(2, 'outside the domain')],
           f'{plain1} {labels1} {drop1}')
+    # G15U-L5 (D33): the default row follows the trigger by its entered
+    # number. G1 (inside Wall 1) is dropped and is the trigger: no row is
+    # labelled G1, so the first row (G3, the lowest Z) stands in - it used
+    # to be the row numbered 1, which is G2
+    trig = sample_2d(trigger=1)
+    trig.meta.update(gauges=[(1.2, 0.6), (2.95, 0.50), (2.95, 1.50)],
+                     obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0)
+    p.add_result('trigger dropped', 2, trig)
+    pump(60)
+    check('G15U-L5: trigger G1 dropped -> the first row (G3) is selected, '
+          'not the row numbered 1 (G2)',
+          g.selected() == g.order()[0] and g.label(g.selected()) == 'G3'
+          and g.label(1) == 'G2', f'{g.selected()} {g.order()} '
+          f'{[g.label(k) for k in g.order()]}')
+    kept = sample_2d(trigger=2)
+    kept.meta.update(gauges=[(1.2, 0.6), (2.95, 0.50), (2.95, 1.50)],
+                     obstacles=[(1.0, 1.4, 0.0, 1.2)], Lx=4.0, Ly=4.0)
+    p.add_result('trigger kept', 2, kept)
+    pump(60)
+    check('G15U-L5: trigger G2 (kept) selects the row labelled G2 even '
+          'though it is not the first',
+          g.label(g.selected()) == 'G2' and g.selected() != g.order()[0],
+          f'{g.selected()} {g.order()}')
+    # GUI-16 (e), D22: the one gauge was dropped - a result with gauges all
+    # dropped says so (not "no gauges"); one with none keeps NO_GAUGES
+    allg = sample_2d()
+    allg.gauges = dict(times=allg.gauges['times'], points=[], pressures=[])
+    allg.meta.update(gauges=[(1.2, 0.6)], obstacles=[(1.0, 1.4, 0.0, 1.2)],
+                     Lx=4.0, Ly=4.0)
+    p.add_result('all dropped', 2, allg)
+    pump(60)
+    check('GUI-16 (e): every gauge dropped: the page says so, the drop '
+          'line names G1 and Wall 1 and is visible',
+          g.hint.text() == g.ALL_DROPPED and g.hint.text() != g.NO_GAUGES
+          and g.drop_caption.isVisibleTo(g)
+          and 'G1' in g.drop_caption.text()
+          and 'Wall 1' in g.drop_caption.text(),
+          f'{g.hint.text()!r} {g.drop_caption.text()!r}')
+    nog = sample_2d()
+    nog.gauges = dict(times=nog.gauges['times'], points=[], pressures=[])
+    nog.meta.update(gauges=[])
+    p.add_result('no gauges', 2, nog)
+    pump(60)
+    check('GUI-16 (e): a result with no gauges keeps NO_GAUGES, no drop line',
+          g.hint.text() == g.NO_GAUGES and not g.drop_caption.isVisibleTo(g),
+          f'{g.hint.text()!r}')
     p.add_result('one', 1, one)
     pump(60)
     check('GUI-15 (f): on screen the 1D rows read G1 and G3 and the drop '
@@ -1089,6 +1177,49 @@ def s5g_dropped(link):
           and g.drop_caption.text()
           == 'G2 dropped by the solver (outside the domain)',
           f'{g.cells()} {g.drop_caption.text()!r}')
+    # G13U (D34): the 1D figure's export-title hint is a muted line under
+    # the buttons (and still on the figure buttons' tooltips)
+    p.show_view('Field')
+    pump(200)
+    hint = p.export_col.hint
+    check('G13U: the 1D export-title hint is a visible muted line, and the '
+          'figure buttons keep it in their tooltips',
+          hint.isVisibleTo(p.export_col) and hint.objectName() == 'expcaption'
+          and hint.text().startswith('Exports use the full title')
+          and hint.text() in p.export_col.buttons['pngs'].toolTip(),
+          f'{hint.text()!r}')
+    p.add_result('plain 2D', 2, sample_2d())
+    pump(100)
+    check('G13U: ... and gone again for a 2D result',
+          not hint.isVisibleTo(p.export_col) and hint.text() == '',
+          f'{hint.text()!r}')
+    # C9 (ii): the plot caption has a full and a short wording, the whole
+    # text always in its tooltip
+    p.show_view('Gauges')
+    pump(100)
+    cap = g.head_caption
+    full_w = cap.fontMetrics().horizontalAdvance(RG.PLOT_CAPTION)
+    cap.setFixedWidth(full_w + 4)
+    pump(20)
+    cap._render()
+    wide = cap.text()
+    cap.setFixedWidth(cap.fontMetrics().horizontalAdvance(
+        RG.PLOT_CAPTION_SHORT) + 4)
+    pump(20)
+    cap._render()
+    narrow = cap.text()
+    cap.setFixedWidth(20)
+    pump(20)
+    cap._render()
+    tiny = cap.text()
+    cap.setMinimumWidth(0)
+    cap.setMaximumWidth(16777215)
+    check('G14Q-F5: the plot caption reads in full where it fits, in its '
+          'short form where it does not, elides only below that; the '
+          'tooltip is always the full text',
+          wide == RG.PLOT_CAPTION and narrow == RG.PLOT_CAPTION_SHORT
+          and tiny.endswith('…') and cap.toolTip() == RG.PLOT_CAPTION,
+          f'{wide!r} {narrow!r} {tiny!r}')
     p.shutdown()
     p.deleteLater()
     pump(20)
@@ -1474,6 +1605,38 @@ def s6_field(link):
                   got_t == 'QA title\n' + want, ascii(got_t))
             p.title_box.setText('')
             pump(60)
+            # C12 (owner 2026-10-13): a blastFoam result is JWL products,
+            # whatever the native-only `eos` of its case says; a native
+            # result's title (just checked) is unchanged
+            import copy
+            bf = copy.copy(res)
+            bf.meta = dict(res.meta, solver='blastfoam', eos='idealGas')
+            p.add_result('foam 1d', 1, bf)
+            pump(120)
+            bf_title = p.fields.canvas.figure.axes[0].get_title()
+            check('C12: a blastFoam 1D result\'s title and export hint name '
+                  'JWL, never idealGas',
+                  bf_title == f'1D spherical · {c.charge_kg} kg TNT · JWL'
+                  and 'idealGas' not in bf_title
+                  and 'EOS: JWL' in p._export_btns['pngs'].toolTip()
+                  and 'idealGas' not in p._export_btns['pngs'].toolTip(),
+                  ascii(bf_title))
+            from blastlab.ui import results_fields as RFS
+            check('C12: a native result with the same eos keeps its own',
+                  RFS.screen_label_1d(res.meta) == m_charge(res.meta)
+                  and RFS.display_eos(dict(res.meta, eos='idealGas',
+                                           solver='native')) == 'idealGas'
+                  and RFS.display_eos(dict(res.meta, eos='JWL')) == 'JWL')
+            from blastlab.ui import setup_nodes
+            from blastlab.models.case import Case1D as _C1
+            foam1 = setup_nodes.summaries(_C1(solver='blastfoam'))['solver']
+            nat1 = setup_nodes.summaries(_C1(solver='native',
+                                             eos='idealGas'))['solver']
+            check('C12: the Setup tree\'s Solver line names no idealGas for '
+                  'a blastFoam case, and keeps it for a native one',
+                  'idealGas' not in foam1 and nat1.startswith('idealGas · '),
+                  f'{foam1!r} {nat1!r}')
+            p.sel.setCurrentIndex(p.sel.count() - 2)
             p.resize(1600, 1000)
             pump(40)
             continue
@@ -1933,6 +2096,128 @@ def s3_placeholder(win):
     pump(60)
 
 
+def _written_model(runs, case, name):
+    """A native run written into `<runs>\\<name>` as Run writes it
+    (test_model_load.write_run): returns the model folder."""
+    import queue
+    import threading
+    from blastlab.services import model_folder as mf
+    from blastlab.solvers import jobs
+    from blastlab.solvers.worker import GuiHooks
+    folder = mf.prepare(runs, name, confirm=lambda text: True)
+    bound = mf.bind_case(case, folder)
+    hooks = GuiHooks(queue.Queue(), threading.Event())
+    _label, solve = jobs.solve_stage(case.dim, bound)
+    res = solve(hooks)
+    mf.write_all(res, bound, case.dim, folder, dict(model=name),
+                 log=lambda s: None)
+    return folder
+
+
+def s_open_model_folder(win, link):
+    """P2-25: 03 Results opens a model folder - in both solver modes - through
+    `model_folder.load_result`; a chain model opens as a chain entry."""
+    from blastlab.models.case import Case2D
+    from blastlab.ui.results_panel import ResultsPanel
+    print('\nS7: Open a model folder (P2-25)')
+    runs = tempfile.mkdtemp(prefix='blastlab_openmodel_')
+    p = ResultsPanel(viewer_link=link, log_fn=lambda *_: None)
+    p.resize(1280, 840)
+    p.show()
+    pump(50)
+    try:
+        case = Case2D(Lx=0.6, Ly=1.2, cell_size_m=0.03, charge=0.5,
+                      n_snapshots=1, t_end=2e-4, center=(0.0, 0.6),
+                      record_frames=0,
+                      bcs=dict(x_lo='reflect', x_hi='transmit',
+                               y_lo='reflect', y_hi='transmit'),
+                      obstacles=[(0.35, 0.47, 0.0, 0.3)],
+                      gauges=[(0.25, 0.6), (0.41, 0.15), (0.5, 0.6)])
+        folder = _written_model(runs, case, 'OPEN_ME')
+        check('the button is there, in native mode and in blastFoam mode',
+              p._model_btn.text().startswith('Open a model folder')
+              and all((p.set_solver_mode(m), not p._model_btn.isHidden())[1]
+                      for m in ('native', 'blastfoam')))
+        n0 = len(p.entries())
+        check('opening it starts a load', p.open_model_folder(folder) is True)
+        for _ in range(300):
+            pump(20)
+            if len(p.entries()) > n0:
+                break
+        ent = p.entries()[-1] if len(p.entries()) > n0 else None
+        res = ent.result if ent is not None else None
+        check('a model folder becomes one entry, labelled with its model',
+              ent is not None and ent.dim == 2
+              and ent.label == 'OPEN_ME (loaded, 2D)',
+              str([e.label for e in p.entries()]))
+        p.show_view('Gauges')
+        pump(100)
+        g = p.gauges
+        check('its gauges read as entered: G1 and G3, G2 named dropped '
+              'inside Wall 1',
+              res is not None
+              and sorted(c[0] for c in g.cells()) == ['G1', 'G3']
+              and g.drop_caption.text()
+              == 'G2 dropped by the solver (inside Wall 1)',
+              f'{g.cells()} {g.drop_caption.text()!r}')
+        # C12: a blastFoam model folder's case holds the native-only eos
+        # (idealGas); the loaded Result must say JWL, as the run's own does
+        from blastlab.services import model_folder as mf
+        real_load = mf.load_result
+
+        def as_foam(path):
+            r = real_load(path)
+            r.meta.update(solver='blastfoam', eos='idealGas')
+            return r
+        mf.load_result = as_foam
+        try:
+            _n, _whole, got = p.read_model_folder(folder)
+        finally:
+            mf.load_result = real_load
+        check('C12: a loaded blastFoam model folder carries eos JWL',
+              got[0][1].meta['eos'] == 'JWL', str(got[0][1].meta['eos']))
+        # a chain: two stage folders under one model folder
+        from blastlab.models.case import Case1D
+        one = _written_model(runs, Case1D(
+            radius_m=1.0, charge_kg=0.5, cell_size_m=0.01, n_snapshots=1,
+            t_end=3e-4, gauge_radii=[0.5, 1.5]), 'ONE_D')
+        chain = os.path.join(runs, 'CHAIN_M')
+        os.makedirs(chain)
+        shutil.copytree(one, os.path.join(chain, '1d'))
+        shutil.copytree(folder, os.path.join(chain, '2d'))
+        n0 = len(p.entries())
+        p.open_model_folder(chain)
+        for _ in range(300):
+            pump(20)
+            if len(p.entries()) > n0:
+                break
+        from blastlab.ui.results_panel import ChainEntry
+        cent = p.sel.currentData()
+        check('a chain model opens as ONE chain entry with its stages',
+              len(p.entries()) == n0 + 1 and isinstance(cent, ChainEntry)
+              and [s.dim for s in cent.stages] == [1, 2]
+              and cent.label == 'CHAIN_M',
+              str([(e.label, type(e).__name__) for e in p.entries()]))
+        # not a model folder: said in the log, nothing added
+        said = []
+        p._log = said.append
+        n1 = len(p.entries())
+        p.open_model_folder(runs)
+        for _ in range(100):
+            pump(20)
+            if any('Open failed' in s for s in said):
+                break
+        check('a folder that is no model folder is said, and adds nothing',
+              len(p.entries()) == n1
+              and any('Open failed' in s and 'not a model folder' in s
+                      for s in said), str(said))
+    finally:
+        p.shutdown()
+        p.deleteLater()
+        pump(20)
+        shutil.rmtree(runs, ignore_errors=True)
+
+
 def main():
     from blastlab.ui.app import MainWindow
     from blastlab.ui.results_panel import ResultsPanel
@@ -1961,6 +2246,7 @@ def main():
         s3_placeholder(win)
         s5_gauges(win, link)
         s5g_dropped(link)
+        s_open_model_folder(win, link)
         s6_field(link)
     finally:
         check('nothing raised', not crashes, crashes[0][-400:]

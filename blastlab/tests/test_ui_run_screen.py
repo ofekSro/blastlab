@@ -957,7 +957,9 @@ def r5_gauges(win):
     check('a click on G2 moves the enlarged card to it',
           col.selected_number() == 2 and num == 'G2'
           # GUI-14 (e), UX F4: no `selected`, Z with its unit
-          and meta == f'Z {RG.fmt_dist(want_z[2])} m/kg^1/3 · Wall 1'
+          # C8 (iv): the unit as the screen shows it (glyphs when the fonts
+          # hold them, else the plain characters)
+          and meta == f'Z {RG.fmt_dist(want_z[2])} {sd.unit()} · Wall 1'
           and peak == f'peak {want}', f'{num} | {meta} | {peak}')
     check('the selected row has the gauge_bg fill',
           theme_pal('gauge_bg') in w2.styleSheet(), w2.styleSheet()[:60])
@@ -1067,6 +1069,31 @@ def r5_gauges(win):
     check('no gauges: the column says NO_GAUGES, no card, no list',
           col.empty.isVisibleTo(col) and col.empty.text() == NO_GAUGES
           and col.card.isHidden() and col.list_frame.isHidden())
+
+    # GUI-16 (e), D22: one gauge, inside Wall 1 - every gauge dropped is
+    # said, not "no gauges", and the drop line stays
+    from blastlab.core.case import Case2D as _Case2D
+    from blastlab.ui.live_gauges import ALL_DROPPED
+    allg = _Case2D(geometry='planar', Lx=2.4, Ly=1.6, cell_size_m=0.04,
+                   charge=20.0, center=(0.6, 0.0), solver='native',
+                   obstacles=[(1.2, 1.6, 0.0, 0.6)], gauges=[(1.4, 0.3)])
+    rp.set_gauge_case(allg)
+    pump(20)
+    check('every gauge dropped: the column says so (not NO_GAUGES), the '
+          'drop line names G1 and Wall 1 and is visible',
+          col.empty.isVisibleTo(col) and col.empty.text() == ALL_DROPPED
+          and col.empty.text() != NO_GAUGES
+          and col.drop.isVisibleTo(col) and 'G1' in col.drop.text()
+          and 'Wall 1' in col.drop.text()
+          and col.card.isHidden() and col.list_frame.isHidden(),
+          f'{col.empty.text()!r} {col.drop.text()!r}')
+    rp.say_no_gauges(ALL_DROPPED)
+    check('the live pane takes the same text',
+          rp.gauges._holder.text() == ALL_DROPPED, rp.gauges._holder.text())
+    rp.set_gauge_case(sample_case(gauges=[]))
+    pump(20)
+    check('and a case with no gauges still says NO_GAUGES, no drop line',
+          col.empty.text() == NO_GAUGES and not col.drop.isVisibleTo(col))
 
     # the collection rule (decision D60)
     win._show('run')
@@ -1311,6 +1338,28 @@ def r6_finish(win):
         fake_run(None)
         check('no result: no banner, no notification',
               rp.banner.isHidden() and calls == [])
+
+        # G15Q-5a (D4): Stop during blockMesh. No progress was ever posted
+        # and no result landed (StoppedBeforeStart), so on_finished gets
+        # (False, False); the bar used to be filled to 100 % there
+        fake.t = 0.0
+        win.on_running(True)
+        win._stop_asked = True              # what _stop() records
+        fake.t = 1.0
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(20)
+        check('a Stop during blockMesh keeps `0 %` and an empty bar, and '
+              'says Stopped (G15Q-5a)',
+              rp.pct_text() == '0 %' and rp.progress.value() == 0
+              and rp.time_text().startswith('Stopped after'),
+              f'{rp.pct_text()!r} {rp.progress.value()} {rp.time_text()!r}')
+        # the control: a run that ended on its own is still filled
+        fake_run(result([(180, 296e3)]))
+        check('... while a run that ended on its own still reads 100 %',
+              rp.pct_text() == '100 %' and rp.progress.value() == 1000,
+              f'{rp.pct_text()!r} {rp.progress.value()}')
+        calls.clear()
 
         # no gauges: the sentence is left out
         fake_run(result([]))
@@ -1792,9 +1841,12 @@ def r5b_dropped(win):
           str([(r['number'], r['entered']) for r in col.table()]))
     # GUI-13 B3 (UX #11): the note comes first, in the warn colour (the
     # string moved from the end of the caption to its start)
+    # G14U-P2 (D29): the drop line has no full stop, as Results' has none;
+    # the caption joins it with ` · `, as Results does
     check('the caption names G2 and the wall, first',
-          col.caption_text() == 'G2 dropped by the solver (inside Wall 1). '
-          '2 gauges, sorted by Z. Click a row to enlarge it.',
+          col.caption_text() == 'G2 dropped by the solver (inside Wall 1) · '
+          '2 gauges, sorted by Z. Click a row to enlarge it.'
+          and not col.drop.text().endswith('.'),
           col.caption_text())
     from blastlab.ui import theme as _theme
     check('B3: the note starts the caption and is in the warn colour; no '
@@ -1806,23 +1858,29 @@ def r5b_dropped(win):
           f'{col.drop.text()!r} {col.drop.styleSheet()!r}')
     check('the enlarged card says G3', col.card_texts()[0] == 'G3',
           str(col.card_texts()))
-    # GUI-13 (g), QA #2: the card header elides its middle when narrow,
-    # keeps the whole text as the tooltip and never runs under the peak
+    # GUI-13 (g), QA #2 / G14U-P3 (D32): the card header's `Z 2.99 <unit>` is
+    # a label of its own that never shrinks; only the `· Wall n` after it
+    # elides (keeping the whole text as its tooltip) and the header never
+    # runs under the peak
     card = col.card
     full = card.meta.full_text()
-    card.meta.setFixedWidth(60)
+    lead = card.lead.text()
+    card.meta.setFixedWidth(30)
     pump(20)
-    check('a narrow card header: the middle is elided, the whole text is '
-          'the tooltip, the peak keeps its own rect',
-          card.meta.elided() and card.meta.text() != full
-          and card.meta.toolTip() == full
+    check('a narrow card header: `· Wall n` is elided, the whole of it is '
+          'its tooltip, the peak keeps its own rect',
+          full.startswith('· ') and card.meta.elided()
+          and card.meta.text() != full and card.meta.toolTip() == full
           and card.meta.geometry().right() < card.peak.geometry().left(),
           f'{card.meta.text()!r} {card.meta.toolTip()!r}')
-    check('GUI-14 (e): the elided header keeps its head (Z ...), not the '
-          'tail',
-          card.meta.text().startswith('Z ') and card.meta.text().endswith(
-              '…') and not card.meta.full_text().endswith('selected'),
-          f'{card.meta.text()!r} {full!r}')
+    check('G14U-P3: the number and its unit stay whole in their own label '
+          '(Z ... <unit>), never elided',
+          lead.startswith('Z ') and lead.endswith(RG.sd.unit())
+          and card.lead.text() == lead
+          and card.lead.width() >= card.lead.fontMetrics()
+          .horizontalAdvance(lead)
+          and card.meta_text() == f'{lead} {full}',
+          f'{card.lead.text()!r} {card.lead.width()} {full!r}')
     card.meta.setMinimumWidth(0)
     card.meta.setMaximumWidth(16777215)
     pump(20)
@@ -1852,9 +1910,23 @@ def r5b_dropped(win):
     xo = dict(times=pay['times'], radii=[0.8, 1.5],
               pressures=pay['pressures'])
     labels, dropped = RG.numbering(c3, xo)
-    check('x-only payload, G3 at the dropped G2\'s x: no drop named, '
-          'payload labels', labels == ['G1', 'G2'] and dropped == [],
+    # GUI-16 (d): the tie is resolved by the rule - two series, two kept
+    # gauges (G1, G3), so the entered numbers stand and G2 is named
+    check('x-only payload, G3 at the dropped G2\'s x: the rule keeps G1 '
+          'and G3, the drop line names G2',
+          labels == ['G1', 'G3'] and dropped == [(2, 'inside Wall 1')],
           f'{labels} {dropped}')
+    rr = RG.rows(c3, xo)
+    check('GUI-16 (d): the G3 row measures G3\'s own point, not G2\'s',
+          [r['label'] for r in rr] == ['G1', 'G3']
+          and rr[1]['entered'] is not None
+          and abs(rr[1]['r'] - RG.sd.distance(c3, c3.gauges[2])) < 1e-9,
+          str([(r['label'], r['entered'], r['r']) for r in rr]))
+    labels, dropped = RG.numbering(
+        c3, dict(xo, radii=[1.5], pressures=xo['pressures'][:1]))
+    check('GUI-16 (d): a tie whose counts do not add up (1 series, 2 '
+          'kept) keeps plain labels and names no drop',
+          labels == ['G1'] and dropped == [], f'{labels} {dropped}')
     c3.gauges[2] = (2.5, 1.5, 1.5)
     labels, dropped = RG.numbering(c3, dict(xo, radii=[0.8, 2.5]))
     check('x-only payload, no x tie: G1, G3 and G2 inside Wall 1',
@@ -1917,6 +1989,52 @@ def r5b_dropped(win):
           f'{labels} {exported}')
 
 
+def r13_keep_all_note(win):
+    """GUI-16 round 2 (A3, U3): a Keep-all scratch is named outside the
+    log - one non-modal info notice - and a `[note]` log line is muted."""
+    from blastlab.services.model_folder import KEEP_ALL_WHY
+    from blastlab.ui import dialogs, theme
+    rp = win.run_panel
+    asked = []
+    real_err, real_info = dialogs.show_error, dialogs.show_info
+    dialogs.show_error = lambda *a, **k: asked.append(('error', a))
+    dialogs.show_info = lambda *a, **k: asked.append(('info', a))
+    win._status_timer.stop()
+    try:
+        n0 = len(rp.messages_text().splitlines())
+        kept = {'wsl_scratch': {'posix': '/root/blastlab_runs/m_keep',
+                                'deleted': False,
+                                'kept_because': KEEP_ALL_WHY}}
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', kept, ''))
+        msgs = rp.messages_text().splitlines()[n0:]
+        check('A3: a Keep-all manifest gives exactly one info notice that '
+              'names the path, and no dialog',
+              len(msgs) == 1 and msgs[0].endswith(
+                  '  info  WSL scratch kept (Keep all fields): '
+                  '/root/blastlab_runs/m_keep') and not asked,
+              f'{msgs} {asked}')
+        other = {'wsl_scratch': {'posix': '/root/blastlab_runs/m_x',
+                                 'deleted': True}}
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', other, ''))
+        win.ctrl._dispatch(None, ('folder', 'C:/m/stage1', {}, ''))
+        check('A3: a manifest without it gives no notice',
+              len(rp.messages_text().splitlines()) == n0 + 1)
+    finally:
+        dialogs.show_error, dialogs.show_info = real_err, real_info
+    rp.on_log('  [note] WSL scratch kept: x')
+    rp.on_log('  [warn] w')
+    rp.on_log('  [error] e')
+    rp.on_log('plain')
+    cols = dict(rp.log_line_colours())
+    muted, warn, err = (theme.cur(k) for k in ('muted', 'warn', 'error'))
+    check('A3: a [note] line is muted; [warn] and [error] keep theirs; '
+          'a plain line has none',
+          cols['  [note] WSL scratch kept: x'].lower() == muted.lower()
+          and cols['  [warn] w'].lower() == warn.lower()
+          and cols['  [error] e'].lower() == err.lower()
+          and cols['plain'] is None, str(cols))
+
+
 def main():
     from blastlab.ui.app import MainWindow
     crashes = []
@@ -1938,6 +2056,7 @@ def main():
         r10_pmax_fit(win)
         r11_hd13_flow(win)
         r12_strip_and_view(win)
+        r13_keep_all_note(win)
     finally:
         check('nothing raised', not crashes, str(crashes[:1]))
         # the recorder above is for Qt slots only: an exception out of a

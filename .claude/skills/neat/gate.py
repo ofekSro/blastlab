@@ -25,7 +25,7 @@ MainWindow runs for a change to any widget it pulls in. Changed files no
 fast suite imports, and WSL solve suites that would have been picked, are
 printed - never silently dropped.
 
-Excluded on purpose: the WSL solve suites (minutes each, and they need an
+Excluded on purpose: the frozen Tk suites `test_gui_*` (owner 2026-10-13), the WSL solve suites (minutes each, and they need an
 idle VM - CLAUDE.md 8.6), `_e2e_*` and `_qa_*`. A tidy edit that cannot
 change a number is fully covered by the byte-level regression plus the
 fast suites; the solve suites are for physics changes, which /neat never
@@ -54,6 +54,10 @@ WSL_SOLVES = {
     'test_foam_features.py', 'test_foam_kb_anchor.py', 'test_foam_parallel.py',
     'test_foam_postmortem.py', 'test_foam_stop.py',
 }
+#: the frozen Tk GUI's own suites (owner 2026-10-13, CLAUDE.md 9): never
+#: picked or run, so they gate nothing. Mixed suites that merely import
+#: blastlab.gui still run.
+FROZEN = re.compile(r'^test_gui_.*\.py$')
 #: run first: CLAUDE.md 6 - nothing else is trusted until this is green
 FIRST = 'test_regression.py'
 #: suites that build a Qt/Tk app or the viewer child run one at a time:
@@ -82,7 +86,7 @@ IMPORT_LINE = re.compile(r'^\s*(?:from|import)\s+([\w.]+)', re.M)
 def suites(only):
     names = sorted(f for f in os.listdir(TESTS)
                    if f.startswith('test_') and f.endswith('.py')
-                   and f not in WSL_SOLVES)
+                   and f not in WSL_SOLVES and not FROZEN.match(f))
     if only:
         names = [n for n in names if any(o in n for o in only)]
     if FIRST in names:
@@ -199,7 +203,8 @@ def select(paths, deep):
             graph[m] = {x for x in with_parents(imports_of(p, pkg)) if x in idx}
     picked, wsl, hit = set(), set(), set()
     for name in sorted(f for f in os.listdir(TESTS)
-                       if f.startswith('test_') and f.endswith('.py')):
+                       if f.startswith('test_') and f.endswith('.py')
+                       and not FROZEN.match(f)):
         raw = imports_of(os.path.join(TESTS, name))
         for h in raw & helpers.keys():
             raw |= imports_of(helpers[h])

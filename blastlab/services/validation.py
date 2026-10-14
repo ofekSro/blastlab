@@ -1400,12 +1400,13 @@ def _validate_det_radii(case, rep, ctx):
     if axisym:
         pts = [(0.0,) + p[1:] for p in pts]
     plan = ctx.plan
+    dx = None                   # named by the warning if the layout fails
     try:
         from ..solvers.foam.writer import FOAM_SMALL
         from ..core.grid import _faces_shared
         from ..core import refine
         if plan is not None:
-            dx_base = float(plan.dx_base)
+            dx = dx_base = float(plan.dx_base)
         elif ctx.amr or ctx.zones or ctx.cref == 'zone':
             return              # no plan for it: refused elsewhere
         else:
@@ -1418,9 +1419,10 @@ def _validate_det_radii(case, rep, ctx):
             dx_base = _faces_shared(tuple(float(L) for L in ctx.dims),
                                     dx)[1]
     except (ArithmeticError, ValueError, TypeError, IndexError) as exc:
-        _det_radii_unchecked(rep, exc)
+        _det_radii_unchecked(rep, exc, dims=ctx.dims, dx=dx)
         return
     for k, (pt, r) in enumerate(zip(pts, radii), start=1):
+        level = h = None        # named by the warning when known
         try:
             r = float(r)
             if r <= FOAM_SMALL or len(pt) != case.dim:
@@ -1442,7 +1444,8 @@ def _validate_det_radii(case, rep, ctx):
                 d2 += (p - c) ** 2
             d = math.sqrt(d2)
         except (ArithmeticError, ValueError, TypeError, IndexError) as exc:
-            _det_radii_unchecked(rep, exc, k)
+            _det_radii_unchecked(rep, exc, k, dims=ctx.dims, dx=dx_base,
+                                 level=level, h=h)
             continue
         if r <= d:
             rep.errors.append(
@@ -1454,17 +1457,42 @@ def _validate_det_radii(case, rep, ctx):
                 f"leave the radii empty for the default")
 
 
-def _det_radii_unchecked(rep, exc, point=None):
+def _det_radii_unchecked(rep, exc, point=None, dims=None, dx=None,
+                         level=None, h=None):
     """B11: say that `_validate_det_radii` could not check the ignition
     radii (all of them, or detonation point `point`), and why. A warning,
     not an error: the backend still refuses a radius that lights no cell
-    on the real mesh before blastFoam starts."""
+    on the real mesh before blastFoam starts.
+
+    GUI-16 round 2 (U5): the words lead with the input - the domain size
+    `dims` [m] and the cell size `dx` [m], and the `level` and its cell `h`
+    [m] where the caller has them - and the exception follows last as
+    `(detail: <Type>: <msg>)` (D-R10: kept, for a bug report and the B11
+    pins). A value that will not format is left out, not raised on."""
     which = (f"Detonation point {point}: ignition radius"
              if point is not None else "Ignition radii")
+
+    def _mm(v):
+        try:
+            return f"{float(v) * 1e3:.4g} mm"
+        except (TypeError, ValueError):
+            return ''
+    try:
+        dom = ' x '.join(f"{float(L):g}" for L in dims) + ' m'
+    except (TypeError, ValueError):
+        dom = ''
+    cell = _mm(dx)
+    where = (f"the domain size{f' ({dom})' if dom else ''} and cell "
+             f"size{f' ({cell})' if cell else ''}")
+    if level is not None:
+        where += f" at level {level}"
+        if _mm(h):
+            where += f" ({_mm(h)} cells)"
     rep.warnings.append(
         f"{which} not checked - the cell layout could not be computed "
-        f"({type(exc).__name__}: {exc}). The run still refuses a radius "
-        f"that reaches no cell centre before blastFoam starts")
+        f"from {where}. The run still refuses a radius that reaches no "
+        f"cell centre before blastFoam starts "
+        f"(detail: {type(exc).__name__}: {exc})")
 
 
 def _note_charge_cells(case, rep, dx_charge, dims, n_exp):

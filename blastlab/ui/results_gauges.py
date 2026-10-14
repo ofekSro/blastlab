@@ -61,7 +61,7 @@ HEADERS = ('Gauge', sd.LABEL, 'Peak [kPa]', 'Arrival [ms]', 't peak [ms]',
            'Net impulse [kPa·ms]', 'Phase ended')
 #: the same headers on two lines, used when the table is too narrow for
 #: one (the copied text always uses HEADERS)
-HEADERS_WRAPPED = ('Gauge', 'Z\n[m/kg^1/3]', 'Peak\n[kPa]', 'Arrival\n[ms]',
+HEADERS_WRAPPED = ('Gauge', f'Z\n[{sd.UNIT}]', 'Peak\n[kPa]', 'Arrival\n[ms]',
                    't peak\n[ms]', 'Pos. phase\n[ms]',
                    'Pos. impulse\n[kPa·ms]', 'Net impulse\n[kPa·ms]',
                    'Phase\nended')
@@ -104,6 +104,8 @@ TABLE_MAX_SHARE = 0.42
 #: board lines 112 and 154
 PLOT_CAPTION = ('selected gauge in colour, the others grey · shaded: '
                 'positive phase')
+#: ... and what the caption says where that does not fit (1100 x 720)
+PLOT_CAPTION_SHORT = 'selected in colour'
 TABLE_CAPTION = ('click a row to plot it · net impulse includes the '
                  'negative phase')
 PLOT_TIP = ('On screen, every gauge on one plot. The exported gauge '
@@ -262,6 +264,31 @@ class _Table(QTableWidget):
         super().keyPressEvent(event)
 
 
+class _FitCaption(ElidedLabel):
+    """A one-line caption with two wordings: the full text when it fits
+    the width, else the short one (elided only below that). The whole text
+    is always the tooltip."""
+
+    def __init__(self, full, short, parent=None):
+        self._short = str(short)
+        super().__init__(full, Qt.ElideRight, parent)
+        self.set_tip(full)
+
+    def short_text(self):
+        return self._short
+
+    def _render(self):
+        w = self.width()
+        fm = self.fontMetrics()
+        if w <= 0 or fm.horizontalAdvance(self._full) <= w:
+            shown = self._full
+        else:
+            shown = fm.elidedText(self._short, Qt.ElideRight, w) \
+                if fm.horizontalAdvance(self._short) > w else self._short
+        QLabel.setText(self, shown)
+        self.setToolTip(self._tip if self._tip is not None else self._full)
+
+
 class GaugesView(QWidget):
     #: a gauge was selected (its G number): a row click, or select()
     gauge_selected = Signal(int)
@@ -270,6 +297,7 @@ class GaugesView(QWidget):
     NO_RESULT = ('Add gauges to a case and its traces appear here, with '
                  'the per-gauge numbers below.')
     NO_GAUGES = 'This result has no gauges.'
+    ALL_DROPPED = 'Every gauge of this result was dropped by the solver.'
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -304,8 +332,11 @@ class GaugesView(QWidget):
         self.head_lbl.setObjectName('gaugehead')
         self.head_lbl.setToolTip(PLOT_TIP)
         head.addWidget(self.head_lbl, 0, Qt.AlignBaseline)
-        # elided at the right on a narrow window, whole in the tooltip
-        self.head_caption = ElidedLabel(PLOT_CAPTION, Qt.ElideRight)
+        # G14Q-F5: the full caption when it fits, else its short form -
+        # beside the title at 1100 px the centre leaves ~140 px, where the
+        # full text was cut to `selected gauge in colou…` (a line of its own
+        # would take height from the plot, which D100's pins forbid)
+        self.head_caption = _FitCaption(PLOT_CAPTION, PLOT_CAPTION_SHORT)
         self.head_caption.setObjectName('gaugecaption')
         head.addWidget(self.head_caption, 1, Qt.AlignBaseline)
         # the selector and its caption live in one widget, shown and
@@ -541,7 +572,7 @@ class GaugesView(QWidget):
             self._labels, dropped = {}, []
         # D201: a dropped gauge is named, on a line of its own that wraps
         self._set_drop_note(dropped_text(dropped))
-        self._draw_curves(res)
+        self._draw_curves(res, dropped)
         self.fill_summary(res)
         if self._sel not in self._order:
             self._sel = self._default_gauge(res)
@@ -555,7 +586,7 @@ class GaugesView(QWidget):
             self.plot.removeItem(self.fill)
         self._fill_span = None
 
-    def _draw_curves(self, res):
+    def _draw_curves(self, res, dropped=()):
         self._drop_curves()
         failed = None
         try:
@@ -569,7 +600,9 @@ class GaugesView(QWidget):
         self.head_lbl.setText(f'{field_name(self._field)} at the gauges')
         self.plot.setTitle(self._title_extra)
         if not data:
-            self.hint.setText(self.NO_GAUGES if failed is None else
+            # GUI-16 (e), D22: dropped gauges are not "no gauges"
+            self.hint.setText((self.ALL_DROPPED if dropped
+                               else self.NO_GAUGES) if failed is None else
                               f'Could not draw the gauges: {failed}')
             self.plot_stack.setCurrentIndex(1)
             return
@@ -591,8 +624,16 @@ class GaugesView(QWidget):
         always, native since P1-24), so after a dropped gauge its row is
         the one labelled `G<n>`, not row n."""
         trig = res.meta.get('trigger_gauge')
-        trig = next((k for k, lbl in self._labels.items()
-                     if lbl == f'G{trig}'), trig)
+        if self._labels:
+            # G15U-L5 (D33): the labels name the entered numbers. A trigger
+            # the solver dropped has no row - the first row stands in; it
+            # used to fall through to the row *numbered* like the trigger,
+            # which is another gauge once a drop has shifted the numbers
+            hit = next((k for k, lbl in self._labels.items()
+                        if lbl == f'G{trig}'), None)
+            if hit in self._order:
+                return hit
+            return self._order[0] if self._order else None
         if trig in self._order:
             return trig
         return self._order[0] if self._order else None
@@ -675,7 +716,10 @@ class GaugesView(QWidget):
                 item.setFont(f)
 
     def _set_headers(self, labels):
-        self.table.setHorizontalHeaderLabels(list(labels))
+        # C8 (iv): the unit with its glyphs when the fonts hold them; the
+        # copied text (`headers()`) keeps HEADERS' plain characters
+        self.table.setHorizontalHeaderLabels(
+            [sd.on_screen(t) for t in labels])
         for i, col in enumerate(COLUMNS):
             it = self.table.horizontalHeaderItem(i)
             it.setToolTip(HEADER_HELP[col])

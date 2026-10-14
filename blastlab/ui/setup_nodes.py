@@ -247,11 +247,16 @@ def summaries(case):
          + ', '.join(f'Wall {i}' for i in walls) if walls
          else _count(len(pts or []), 'gauge'))
     # GUI-15 (e), D2 / D11: the dropped gauges are named before the trigger
-    gone = scaled_distance.dropped_numbers(case)
+    gone, off, failed = scaled_distance.drop_state(case)
     if gone:
         g += ' · ' + ', '.join(f'G{n}' for n in gone) + ' dropped'
     tg = getattr(case, 'trigger_gauge', None)
-    out['gauges'] = g + (f' · trigger G{tg}' if tg is not None else '')
+    # GUI-16 (a): a dropped trigger never fires - the caption says so
+    if tg is not None:
+        g += f' · trigger G{tg}' + (' (disabled)' if off is not None else '')
+    # B6, C6 (vii): the drop check could not run, so no gauge reads dropped
+    out['gauges'] = g + (f' · {scaled_distance.DROP_UNAVAILABLE}'
+                         if failed else '')
     # 06 Solver
     if foam:
         burn = ('no afterburn' if case.afterburn == 'none'

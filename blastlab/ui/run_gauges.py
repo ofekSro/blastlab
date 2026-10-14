@@ -42,7 +42,7 @@ from ..services.validation import drop_rule, drop_wall, gauge_drop_reason
 from . import scaled_distance as sd
 from . import theme
 from .components import _css
-from .live_gauges import NO_GAUGES, _decimate
+from .live_gauges import ALL_DROPPED, NO_GAUGES, _decimate
 from .results_list import ElidedLabel
 from .setup_tree import _letter_space
 
@@ -204,7 +204,7 @@ def _x_only_tie(case, entered, missing, positions):
     return False
 
 
-def _numbering(case, match, n_series, positions=None):
+def _numbering(case, match, n_series, positions=None, rule=None):
     """(labels, dropped) for `n_series` series matched to the entered
     gauges by `match` (D201, amends D61):
 
@@ -217,8 +217,11 @@ def _numbering(case, match, n_series, positions=None):
     A drop is named only when the count adds up: the series are short by
     exactly the unmatched entered gauges, so a matching miss is never
     called a drop. A series matching none keeps its payload number. Nor
-    is one named when x-only `positions` (the blastFoam live 3D payload)
-    tie a dropped gauge with a kept one (`_x_only_tie`)."""
+    is one guessed when x-only `positions` (the blastFoam live 3D payload)
+    tie a dropped gauge with a kept one (`_x_only_tie`): the labels then
+    come from the rule (`pre_payload`, GUI-16 (d)) when the series are as
+    many as the gauges it keeps - the entered numbers, the drops named -
+    else they stay plain. `rule` is `drop_rule(case)`, None builds it."""
     entered = _entered(case)
     plain = [f'G{k + 1}' for k in range(n_series)]
     if n_series >= len(entered):
@@ -228,6 +231,9 @@ def _numbering(case, match, n_series, positions=None):
     if len(missing) != len(entered) - n_series:
         return plain, []
     if _x_only_tie(case, entered, missing, positions):
+        kept, dropped = pre_payload(case, rule)
+        if n_series == len(kept):
+            return [f'G{j + 1}' for j in kept], dropped
         return plain, []
     labels = [f'G{j + 1}' if j is not None else f'G{k + 1}'
               for k, j in enumerate(match[:n_series])]
@@ -235,14 +241,14 @@ def _numbering(case, match, n_series, positions=None):
                     for j in missing]
 
 
-def numbering(case, gauge_out):
+def numbering(case, gauge_out, rule=None):
     """`_numbering` of a live payload or a finished Result's `gauges`."""
     gauge_out = gauge_out or {}
     series = gauge_out.get('pressures')
     n = 0 if series is None else len(series)
     pos = _positions(gauge_out)
     pos = (pos + [None] * max(0, n - len(pos)))[:n]
-    return _numbering(case, _match(case, pos), n, pos)
+    return _numbering(case, _match(case, pos), n, pos, rule)
 
 
 def dropped_text(dropped):
@@ -326,7 +332,8 @@ def rows(case, payload=None, rule=None):
         label       `G<n>` as shown: the entered number when the solver
                     dropped a gauge (`_numbering`, D201), else `number`
         entered     the matched entered gauge, 1-based, or None
-        r, z        R [m], Z [m/kg^1/3] (None when hidden or unknown)
+        r, z        R [m], Z [m per cube root of kg] (None when hidden or
+                    unknown)
         where       `Wall 1` within 0.5 m (scaled_distance.where), or ''
         t_ms, kpa   the series so far: time [ms], overpressure [kPa]
         peak_kpa, t_peak_ms, arrival_ms   summarize_trace's numbers
@@ -345,9 +352,14 @@ def rows(case, payload=None, rule=None):
         match = _match(case, pos[:len(series)])
         entered = _entered(case)
         labels, _dropped = _numbering(case, match, len(series),
-                                      pos[:len(series)])
+                                      pos[:len(series)], rule)
         for k, raw in enumerate(series):
             j = match[k]
+            if j is not None and labels[k] != f'G{j + 1}':
+                # an x-only tie resolved by the rule (GUI-16 (d)): the
+                # series is the kept gauge the label names, not the
+                # neighbour at the same x that `_match` took
+                j = int(labels[k][1:]) - 1
             point = entered[j] if j is not None else pos[k]
             p = _arr(raw)
             n = min(p.size, times.size)
@@ -571,11 +583,15 @@ class _SelectedCard(QFrame):
         head.setSpacing(8)
         self.num = QLabel('')
         # GUI-13 (g), QA #2: the whole text is the tooltip and it never
-        # runs under the peak. GUI-14 (e): the end is elided, so the head
-        # (`Z 1.23 m/kg^1/3`) always stays
+        # runs under the peak. GUI-14 (e) / G14U-P3 (D32): the number and its
+        # unit (`Z 1.23 m/kg¹ᐟ³`) are a label of their own that never
+        # shrinks; only the `· Wall n` after it elides
+        self.lead = QLabel('')
+        self.lead.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.meta = ElidedLabel('', Qt.ElideRight)
         self.peak = QLabel('')
         head.addWidget(self.num, 0, Qt.AlignBaseline)
+        head.addWidget(self.lead, 0, Qt.AlignBaseline)
         head.addWidget(self.meta, 1, Qt.AlignBaseline)
         head.addWidget(self.peak, 0, Qt.AlignBaseline)
         lay.addLayout(head)
@@ -603,6 +619,11 @@ class _SelectedCard(QFrame):
         self._row = None
         self._live = False
 
+    def meta_text(self):
+        """The whole header text, `Z 2.99 m/kg¹ᐟ³ · Wall 1` (tests)."""
+        return ' '.join(t for t in (self.lead.text(),
+                                    self.meta.full_text()) if t)
+
     def set_row(self, row, z_on, live):
         """Texts, the trace and its marks; the peak label is re-styled
         only when the waiting state changes (see _GaugeRow.set_row)."""
@@ -612,11 +633,11 @@ class _SelectedCard(QFrame):
         # GUI-14 (e), UX F4: Z carries its unit (from the column label),
         # and the header says nothing about being selected - the enlarged
         # card is the selection
-        unit = sd.LABEL[sd.LABEL.index('[') + 1:sd.LABEL.rindex(']')]
-        lead = (f'Z {fmt_dist(row["z"])} {unit}' if z_on
+        lead = (f'Z {fmt_dist(row["z"])} {sd.unit()}' if z_on
                 else f'R {fmt_dist(row["r"])} m')
-        bits = [lead] + ([row['where']] if row['where'] else [])
-        self.meta.setText(' · '.join(bits))
+        self.lead.setText(lead)
+        self.meta.setText(f'· {row["where"]}' if row['where'] else '')
+        self.meta.setVisible(bool(row['where']))
         self.peak.setText(WAITING if row['waiting']
                           else f'peak {fmt_peak(row["peak_kpa"])}')
         t, y = row['t_ms'], row['kpa']
@@ -633,6 +654,10 @@ class _SelectedCard(QFrame):
         else:
             self.peak_dot.setData([row['t_peak_ms']], [row['peak_kpa']])
             self.peak_lbl.setText(f'{row["t_peak_ms"]:.2f} ms')
+            # GUI-16 round 2 (F-4): an early peak has no room to its left,
+            # so the label sits to its right (the left half of the range)
+            early = float(row['t_peak_ms']) < 0.5 * float(t[-1])
+            self.peak_lbl.setAnchor((-0.05, 0.5) if early else (1.05, 0.5))
             self.peak_lbl.setPos(row['t_peak_ms'], row['peak_kpa'])
         self.now_line.setVisible(self._live and bool(t.size))
         if row['waiting'] != was:
@@ -674,6 +699,7 @@ class _SelectedCard(QFrame):
                            f' border: 1px solid {border}; '
                            f'border-radius: 10px; }}')
         self.num.setStyleSheet(_css(13, 600, 'gauge', theme.MONO))
+        self.lead.setStyleSheet(_css(12, None, 'faint'))
         self.meta.setStyleSheet(_css(12, None, 'faint'))
         self._style_peak()
         self.plot_w.setBackground(p['gauge_bg'])
@@ -871,7 +897,7 @@ class GaugeColumn(QWidget):
         return None if row is None else row['number']
 
     def card_texts(self):
-        return (self.card.num.text(), self.card.meta.full_text(),
+        return (self.card.num.text(), self.card.meta_text(),
                 self.card.peak.text())
 
     def now_visible(self):
@@ -885,7 +911,7 @@ class GaugeColumn(QWidget):
         gauge's name first (D201, GUI-13 B3)."""
         if self.drop.isHidden():
             return self.sub.text()
-        return f'{self.drop.text()} {self.sub.text()}'
+        return f'{self.drop.text()} · {self.sub.text()}'
 
     def row_labels(self):
         """The GAUGE cells in display order (`G1`, `G3`, ...)."""
@@ -919,7 +945,11 @@ class GaugeColumn(QWidget):
         n = len(self._table)
         has = n > 0
         dim0 = getattr(self._case, 'dim', None) == 0
-        self.empty.setText(NO_GAUGES_0D if dim0 else NO_GAUGES)
+        # GUI-16 (e), D22: a case whose gauges are all dropped is not a case
+        # with none - the drop line below names them
+        all_gone = not has and bool(_entered(self._case))
+        self.empty.setText(NO_GAUGES_0D if dim0 else
+                           ALL_DROPPED if all_gone else NO_GAUGES)
         for w in (self.card, self.list_frame):
             w.setVisible(has)
         self.empty.setVisible(not has)
@@ -927,7 +957,7 @@ class GaugeColumn(QWidget):
         self.head_lbls[1].setText(axis)
         # UXR-15 (D221): the unit the narrow header leaves out
         self.head_lbls[1].setToolTip(
-            sd.UNIT_TIP if z_on else 'R: the distance from the burst, in m')
+            sd.unit_tip() if z_on else 'R: the distance from the burst, in m')
         # D201: a gauge the solver dropped is named, so the entered
         # numbers on the rows do not read as a gap
         # (before the first payload too: the same rule, GUI-15 (a))
@@ -939,8 +969,9 @@ class GaugeColumn(QWidget):
                          f'{axis}. Click a row to enlarge it.'
                          if has else '')
         self.sub.setVisible(has)
-        self.drop.setText(f'{note}.' if note else '')
-        self.drop.setVisible(has and bool(note))
+        # G14U-P2 (D29): no full stop, as Results' line ends
+        self.drop.setText(note)
+        self.drop.setVisible(bool(note))
         order = [row['number'] for row in self._table]
         if order != self._order:
             self._rebuild(order)

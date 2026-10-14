@@ -361,6 +361,26 @@ def s3_cards(win):
           ch.editors[2].hand_out.caption.text().startswith(
               'The field when the wave reaches G1 (trigger gauge, remap)'),
           ascii(ch.editors[2].hand_out.caption.text()))
+    # GUI-16 (a), C1 (D21): the trigger on a gauge outside the domain never
+    # fires - HAND-OFF OUT names the end of the run, the stage's drop caption
+    # and dropdown say so
+    f2.points['gauges'].set([(1.5, 1.0), (500.0, 500.0)])
+    f2.v['trigger_gauge'].set('2')
+    pump(450)
+    out2 = ch.editors[2].hand_out.caption.text()
+    cap2 = ch.editors[2].tree.summary('gauges')
+    cmb = f2.trigger_combo
+    check('GUI-16 (a): a dropped trigger G2: HAND-OFF OUT names the end of '
+          'the run, not "reaches G2"; caption and dropdown mark it',
+          'reaches G2' not in out2 and 'end of the run' in out2
+          and 'G2 is dropped' in out2
+          and cap2.endswith('trigger G2 (disabled)')
+          and cmb.itemText(cmb.count() - 1).endswith('(dropped)'),
+          f'{out2!r} {cap2!r}')
+    f2.v['trigger_gauge'].set('1')
+    f2.v['trigger_action'].set('remap')
+    f2.points['gauges'].set([(1.5, 1.0)])
+    pump(450)
     check('the 2D in-text names the 2D form\'s burst height',
           # GUI-13 (b): by its form label, Burst z
           'Burst z, 2.0 m' in ch.editors[2].hand_in.caption.text(),
@@ -541,6 +561,31 @@ def s5_live(win):
           and ch.forms[1].get_case().radius_m == 1.5
           and not ch.touched(1),
           ascii([ch.cards[2].state_text(), ch.forms[1].v['radius_m'].get()]))
+    # gui-final D5 (owner decision 4): stage 3 opens at Lz 2.5 m, above the
+    # seed's 2D burst (z 2.0 m), so card 3 opens clean too (no F45)
+    cards = [ch.cards[d].state_text() for d in (1, 2, 3)]
+    check('D5: the default 1 → 2 → 3 route, native: stage 3 at Lz 2.5 m '
+          'and untouched, cards 1-3 ● case OK',
+          ch.forms[3].get_case().Lz == 2.5 and not ch.touched(3)
+          and cards == ['● case OK'] * 3, ascii(cards))
+    # the same on blastFoam with a probed plan (the planner's probe: a
+    # 14-core, 63 GB VM); the machine's own cache is put back after
+    from blastlab.solvers.foam import env as foam_env
+    saved = (foam_env._cores, foam_env._slots, foam_env._ram_gb,
+             foam_env._cores_src, foam_env._slots_src, foam_env._ram_src)
+    foam_env.forget_hardware()
+    foam_env.prime_hardware(cores=14, ram_gb=63)
+    for d in (1, 2, 3):
+        ch.set_stage_solver(d, 'blastfoam')
+    pump(450)
+    cards = [ch.cards[d].state_text() for d in (1, 2, 3)]
+    check('D5: the same route on blastFoam, probed plan: cards 1-3 '
+          '● case OK', cards == ['● case OK'] * 3, ascii(cards))
+    for d in (1, 2, 3):
+        ch.set_stage_solver(d, 'native')
+    (foam_env._cores, foam_env._slots, foam_env._ram_gb,
+     foam_env._cores_src, foam_env._slots_src, foam_env._ram_src) = saved
+    pump(450)
     ch.set_route('13')
     ch.set_route('123')
     pump(450)
@@ -549,8 +594,11 @@ def s5_live(win):
           ch.forms[1].v['radius_m'].get())
     check('GUI-14 (a): 01 Setup\'s 1D radius default is still 10 m',
           setup_spec.by_name(1)['radius_m'].default == 10.0)
-    # the checks below pin the S2-1 warning, which needs the form's 10 m
+    # the checks below pin the S2-1 warning, which needs the form's 10 m,
+    # and F45 / B2, which need stage 3 below the 2D burst: the form's
+    # 1.5 m Lz (D5: the seed is 2.5)
     ch.forms[1].v['radius_m'].set('10.0')
+    ch.forms[3].v['Lz'].set('1.5')
     pump(450)
     # GUI-11 T9 (QA S2-1, D200): the default seed's 10 m 1D stage hands
     # off after its shock has left the 4 x 4 m stage 2 - card 2 warns
@@ -578,14 +626,14 @@ def s5_live(win):
     w3 = cr.handoff_reach([2, 3], {
         2: ch.checks()[2].case, 3: ch.checks()[3].case})[3]
     ed3 = ch.editors[3]
-    check('F45: the default seed (2D burst z 2.0 m, 3D Lz 1.5 m) warns on '
+    check('F45: the seed\'s 2D burst (z 2.0 m) over a 3D Lz 1.5 m warns on '
           'card 3, the line in its Checks, Run chain still enabled',
           ch.cards[3].state_text() == '● 1 warning'
           and ('warn', w3) in ed3.check_rows()
           # GUI-13 (b): the axisymmetric form's labels, "at or above"
           and w3 == 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                    'stage\'s Lz (1.5 m): the 3D box cuts the 2D field '
-                    'off above 1.5 m, burst included. Raise Lz to at '
+                    'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                    'Raise Lz to at '
                     'least 4.0 m (the 2D stage\'s Height H) or lower the '
                     '2D stage\'s Burst z.'
           and ch.run_btn.isEnabled(),
@@ -601,6 +649,110 @@ def s5_live(win):
                   for n, _t in cr.setup_nodes.nodes(3) if n.id != 'domain'),
           ascii([ed3.tree.rows['domain']._status,
                  ed.tree.rows['domain']._status]))
+    # GUI-16 C7 (iv), D27: S2-1 is fixed in stage 1's radius too - its
+    # Domain row shows `!` while stage 2 carries the reach line
+    ed1 = ch.editors[1]
+    check('C7 (iv): under S2-1 stage 1\'s Domain row is warn (`!`), stage '
+          '1\'s card still reads case OK',
+          ed1.tree.rows['domain']._status == 'warn'
+          and ed1.tree.rows['domain'].mark.text() == '!'
+          and ch.cards[1].state_text() == '● case OK',
+          ascii([ed1.tree.rows['domain']._status,
+                 ch.cards[1].state_text()]))
+    # C7 (iii), D24: a click on the F45 line focuses stage 3's Lz, one on
+    # the S2-1 line stage 1's radius; a line that names nothing does nothing
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    ch.window().activateWindow()
+    from PySide6.QtWidgets import QLabel
+    from blastlab.ui.widgets import ZWSP
+
+    def line_label(editor, needle):
+        for row in editor.check_row_widgets():
+            lbl = row.findChild(QLabel, 'checktext')
+            if lbl is not None and needle in lbl.text().replace(ZWSP, ''):
+                return lbl
+        return None
+    lbl = line_label(ed3, 'Lz (')
+    ch.focus_stage(2)
+    pump(50)
+    QTest.mouseClick(lbl, Qt.LeftButton)
+    pump(100)
+    lz = ch.forms[3].widgets['Lz']
+    check('C7 (iii): clicking the F45 line shows stage 3 and focuses Lz',
+          ch.stage() == 3 and ed3.selected_node() == 'domain'
+          and lz.hasFocus(), f'{ch.stage()} {ed3.selected_node()} '
+          f'{lz.hasFocus()}')
+    lbl = line_label(ed, 'hands off')
+    QTest.mouseClick(lbl, Qt.LeftButton)
+    pump(100)
+    rad = ch.forms[1].widgets['radius_m']
+    check('C7 (iii): clicking the S2-1 line shows stage 1 and focuses its '
+          'radius', ch.stage() == 1 and ed1.selected_node() == 'domain'
+          and rad.hasFocus(), f'{ch.stage()} {rad.hasFocus()}')
+    check('C7 (iii): a line that names nothing is not a link',
+          cr.focus_target('Cell size 0.01 m is fine') is None
+          and cr.focus_target('G2 (1.4, 0.3) m inside Wall 1 - will be '
+                              'dropped') == (None, 'gauge', 2))
+    # C7 (v), D25: selecting a warned stage brings its Checks into view
+    ed1.select_node('stage')            # the node a stage switch carries on
+    ch.focus_stage(2)
+    pump(150)
+    vp = ed.scroll_viewport()
+    first = ed.check_row_widgets()[0]
+    top = first.mapTo(vp, first.rect().topLeft()).y()
+    check('C7 (v): selecting warned stage 2 puts its first Checks row in '
+          'the viewport', ed.selected_node() == 'stage'
+          and top >= 0 and top + first.height() <= vp.height(),
+          f'top {top} h {first.height()} viewport {vp.height()}')
+    ed.select_node('domain')
+    ed.tree.pill_clicked.emit()
+    pump(150)
+    top = first.mapTo(vp, first.rect().topLeft()).y()
+    check('C7 (v): a click on the pill does the same from another node',
+          ed.selected_node() == 'stage' and 0 <= top
+          and top + first.height() <= vp.height(), f'top {top}')
+    # C7 (ii), D28: while the WSL hardware probe runs, a blastFoam stage's
+    # `Large grid` line is a provisional note; it is a warning again when
+    # the probe ends. 2D axisymmetric 5 x 5 m at 1 cm: ~575 k cells
+    # (what validation says about the grid depends on this machine's WSL
+    # hardware, so the line is added to the stage's check by a stand-in)
+    real_checks = cr.stage_checks
+
+    def with_large_grid(dims, sources, hand):
+        out = real_checks(dims, sources, hand)
+        out[2].warnings.append('Large grid: ~574,564 cells - expect a long '
+                               'run and GBs of case files on the WSL disk')
+        return out
+    cr.stage_checks = with_large_grid
+    ch.set_stage_solver(1, 'blastfoam')
+    ch.set_stage_solver(2, 'blastfoam')
+    ch.set_hw_pending(False)
+    pump(450)
+    rows2 = ch.editors[2].check_rows()
+    check('C7 (ii): probe done, the Large grid line is a warning',
+          any(s == 'warn' and m.startswith('Large grid') for s, m in rows2),
+          ascii(rows2))
+    ch.set_hw_pending(True)
+    pump(450)
+    rows2 = ch.editors[2].check_rows()
+    check('C7 (ii): probe running, the Large grid line is a note that says '
+          'it is provisional; the other warnings stay',
+          any(s == 'note' and m.startswith('Large grid')
+              and 'provisional' in m for s, m in rows2)
+          and not any(s == 'warn' and m.startswith('Large grid')
+                      for s, m in rows2)
+          and any(s == 'warn' and m.startswith('The 1D stage')
+                  for s, m in rows2), ascii(rows2))
+    ch.set_hw_pending(False)
+    pump(450)
+    check('C7 (ii): and re-validated when the probe ends',
+          any(s == 'warn' and m.startswith('Large grid')
+              for s, m in ch.editors[2].check_rows()))
+    cr.stage_checks = real_checks
+    ch.set_stage_solver(2, 'native')
+    ch.set_stage_solver(1, 'native')
+    pump(450)
     ch.forms[3].v['Lz'].set('4.0')
     pump(450)
     check('B2: at Lz 4.0 the stage-3 Domain & mesh row shows ok again',
@@ -823,8 +975,8 @@ def s5r_reach():
     # above", the advice Lz >= the 2D stage's height
     check('2 → 3, burst z 2 above Lz 1.5: the F45 text',
           got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                     'above 1.5 m, burst included. Raise Lz to at least '
+                     'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                     'Raise Lz to at least '
                      '4.0 m (the 2D stage\'s Height H) or lower the 2D '
                      'stage\'s Burst z.'},
           ascii(got))
@@ -833,8 +985,8 @@ def s5r_reach():
           'text with those labels and its Ly',
           cr.handoff_reach([2, 3], {2: flat, 3: low})
           == {3: 'The 2D stage\'s Burst y (2.0 m) is at or above this '
-                 'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                 'above 1.5 m, burst included. Raise Lz to at least 5.0 m '
+                 'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                 'Raise Lz to at least 5.0 m '
                  '(the 2D stage\'s Ly) or lower the 2D stage\'s Burst y.'})
     import types
     noly = types.SimpleNamespace(geometry='axisymmetric', center=(0.0, 2.0))
@@ -842,8 +994,8 @@ def s5r_reach():
     check('2 → 3, the 2D Ly unreadable: the text ends "Raise Lz above '
           '2.0 m."',
           got == {3: 'The 2D stage\'s Burst z (2.0 m) is at or above this '
-                     'stage\'s Lz (1.5 m): the 3D box cuts the 2D field off '
-                     'above 1.5 m, burst included. Raise Lz above 2.0 m.'},
+                     'stage\'s Lz (1.5 m): the 3D box cuts the burst off. '
+                     'Raise Lz above 2.0 m.'},
           ascii(got))
     check('in_text names the burst height by its form label (Burst z), '
           'not "burst height, z"',
@@ -1135,6 +1287,141 @@ def stopped(res):
 INFO1D = dict(dim=1, radius_m=2.0, gauges=[])
 
 
+def s7_round2(win, rp, fake, res, prog, start):
+    """GUI-16 round 2: A1 a later stage owns the Run screen from its
+    `stage` message (U1, F-3); A2 a chain stopped after a landed stage says
+    so (U2, F-2); A5 is in test_ui_chain_wiring's golden."""
+    from types import SimpleNamespace
+    foam = [SimpleNamespace(solver='blastfoam') for _i in range(2)]
+    native = [SimpleNamespace(solver='native') for _i in range(2)]
+
+    def stage1_landed(cases):
+        win._run_cases = cases
+        strip = start([1, 2])
+        win.on_run_started(INFO1D)
+        fake.t = 5.0
+        win.on_progress(prog(1.0))
+        win.on_result(0, 1, 'M - 1D', res[1])
+        return strip
+
+    # A1: blastFoam stage 2 meshes - `stage` arrives, no run_started yet
+    strip = stage1_landed(foam)
+    fake.t = 8.0
+    win.on_stage(1)
+    pump(20)
+    check('A1: stage 2 announced, still meshing: the bar is not 100 % and '
+          'the time line has no ETA',
+          rp.pct_text() != '100 %' and rp.progress.value() == 0
+          and 'left' not in rp.time_text()
+          and rp.time_text().startswith('meshing stage 2'),
+          f'{rp.pct_text()!r} {rp.time_text()!r}')
+    check('A1: _chain_k is 2, pill 2 runs as `meshing`, pill 1 is done',
+          win._chain_k == 2 and strip.states() == ['done', 'running']
+          and strip.texts()[1] == '02 2D meshing',
+          f'{win._chain_k} {strip.texts()}')
+    check('A1: the title says Chain 2/2 with no percent',
+          win.windowTitle().startswith('Chain 2/2 · ')
+          and '%' not in win.windowTitle(), win.windowTitle())
+    q = win._stop_question().split('?')[0]
+    check('A1: the Stop question names stage 2 and meshing, no percent',
+          'stage 2 of 2' in q and 'meshing' in q and ' at ' not in q, q)
+    check('A1: the Run tile and the strip caption belong to stage 2',
+          rp.pct_text() == '0 %' and 'Stage 2 of 2' in strip.texts()[-1],
+          f'{rp.pct_text()!r} {strip.texts()[-1]!r}')
+    fake.t = 20.0
+    win.on_run_started(INFO1D)
+    pump(20)
+    check('A1: run_started does not advance the chain again; the pill '
+          'reads 0 % and the word is gone',
+          win._chain_k == 2 and strip.texts()[1] == '02 2D 0 %'
+          and 'meshing' not in win._stop_question()
+          and 'meshing' not in rp.time_text(),
+          f'{win._chain_k} {strip.texts()} {rp.time_text()!r}')
+    fake.t = 30.0
+    win.on_progress(prog(0.5))
+    eta = win._run_clock.eta_s(0.5)
+    check('A1: the ETA counts the solve only (10 s in -> 10 s left), the '
+          'stage time counts the mesh too (22 s)',
+          abs(eta - 10.0) < 1e-6 and abs(win._run_clock.stage_s() - 22.0)
+          < 1e-6, f'{eta} {win._run_clock.stage_s()}')
+    win.on_running(False)
+    win.on_finished(False, False)
+
+    # A1 control: a native stage - `stage` then run_started right away
+    strip = stage1_landed(native)
+    win.on_stage(1)
+    check('A1 native: the word is `starting`',
+          strip.texts()[1] == '02 2D starting'
+          and rp.time_text().startswith('starting stage 2'),
+          f'{strip.texts()} {rp.time_text()!r}')
+    win.on_run_started(INFO1D)
+    win.on_progress(prog(0.3))
+    check('A1 native: after run_started the pills, _chain_k and the title '
+          'are what run_started alone gave',
+          win._chain_k == 2 and strip.states() == ['done', 'running']
+          and strip.texts()[1] == '02 2D 30 %'
+          and win.windowTitle().startswith('Chain 2/2 · 30 %'),
+          f'{win._chain_k} {strip.texts()} {win.windowTitle()!r}')
+    win.on_running(False)
+    win.on_finished(False, False)
+    # k == 0 changes nothing
+    start([1, 2])
+    win.on_stage(0)
+    check('A1: stage 0 is a no-op (the run_started that follows counts it)',
+          win._chain_k == 0 and not win._stage_pending)
+    win.on_running(False)
+    win.on_finished(False, False)
+
+    # A2: Stop while stage 2 meshes
+    strip = stage1_landed(foam)
+    win.on_stage(1)
+    win._stop_asked = True
+    win.on_running(False)
+    win.on_finished(False, False)
+    pump(20)
+    tl = rp.time_text()
+    banner = rp.banner.message.toolTip()
+    check('A2: Stop in stage 2\'s mesh: Stopped after .., stopped by user, '
+          'stage 1\'s own ending not repeated',
+          tl.startswith('Stopped after') and 'stopped by user' in tl
+          and 'end time reached' not in tl and 'outer boundary' not in tl
+          and 'end time reached' not in banner
+          and 'stopped by user during stage 2' in banner,
+          f'{tl!r} {banner!r}')
+    check('A2: the strip names stage 2; pill 2 stopped, pill 1 done',
+          'stage 2 of 2' in strip.texts()[-1]
+          and strip.states() == ['done', 'stopped'], str(strip.texts()))
+    # A2 control: stage 2 solving, its own stopped result keeps its reason
+    strip = stage1_landed(native)
+    win.on_stage(1)
+    win.on_run_started(INFO1D)
+    win.on_result(1, 2, 'M - 2D (stopped)', stopped(res[2]))
+    win.on_running(False)
+    win.on_finished(True, False)
+    pump(20)
+    check('A2 control: a native chain stopped in stage 2\'s solve keeps '
+          'its own stopped-by-user reason',
+          rp.time_text().startswith('Stopped after')
+          and 'stopped by the user' in rp.time_text()
+          and strip.states() == ['done', 'stopped'],
+          f'{rp.time_text()!r} {strip.states()}')
+    win._run_cases = None
+
+    # A5 (U4): the Chain screen's dialogs number a stage by position
+    from blastlab.ui import chain_route as cr
+    ln = ['Stage 3 (3D): a', 'Stage 1 (1D): b', 'plain', 'Stage 2 (2D): c']
+    check('A5: route 1->3 renumbers 3D as stage 2, the dimension stays',
+          cr.by_position(ln, [1, 3])
+          == ['Stage 2 (3D): a', 'Stage 1 (1D): b', 'plain',
+              'Stage 2 (2D): c'], str(cr.by_position(ln, [1, 3])))
+    check('A5: routes 1->2->3 and 1->2 keep every byte',
+          cr.by_position(ln, [1, 2, 3]) == ln
+          and cr.by_position(ln[1:], [1, 2]) == ln[1:])
+    check('A5: route 2->3 numbers 2D as stage 1',
+          cr.by_position(['Stage 2 (2D): x', 'Stage 3 (3D): y'], [2, 3])
+          == ['Stage 1 (2D): x', 'Stage 2 (3D): y'])
+
+
 def s7_strip():
     from PySide6.QtCore import QPoint, QRect
     from blastlab.solvers.hooks import Progress
@@ -1349,6 +1636,40 @@ def s7_strip():
               strip.texts()[1] == '02 2D 100 %', str(strip.texts()))
         win.on_running(False)
         win.on_finished(False, False)
+        # GUI-16 R1: a Stop in a later stage (its blockMesh, or between
+        # stages) with stage 1's result already posted ends `stopped`
+        for where in ('in stage 2\'s blockMesh', 'between stages'):
+            strip = start([1, 2, 3])
+            win.on_run_started(INFO1D)
+            win.on_progress(prog(1.0))
+            win.on_result(0, 1, 'M - 1D', res[1])
+            if where != 'between stages':
+                win.on_run_started(INFO1D)      # stage 2, no progress yet
+            win._stop_asked = True
+            win.on_running(False)
+            win.on_finished(False, False)
+            pump(20)
+            check(f'R1: a Stop {where} after stage 1 ends Stopped, not Done',
+                  rp.time_text().startswith('Stopped after')
+                  and 'stopped' in strip.texts()[-1]
+                  and 'done' not in strip.texts()[-1].lower()
+                  and rp.pct_text() != '100 %',
+                  f'{rp.time_text()!r} {strip.texts()[-1]!r} '
+                  f'{rp.pct_text()!r}')
+        # control: every stage posted, a late Stop still ends Done
+        strip = start([1, 2, 3])
+        for k in range(3):
+            win.on_run_started(INFO1D)
+            win.on_result(k, k + 1, f'M - {k + 1}D', res[k + 1])
+        win._stop_asked = True
+        win.on_running(False)
+        win.on_finished(False, False)
+        pump(20)
+        check('R1 control: all three results plus a late Stop still ends Done',
+              rp.time_text().startswith('Done in')
+              and strip.texts()[-1].startswith('Chain done'),
+              f'{rp.time_text()!r} {strip.texts()[-1]!r}')
+        s7_round2(win, rp, fake, res, prog, start)
         # F27 (GUI-10, D182): at a stage start STEP / TIME / dt / P MAX read
         # `—` until the stage's first progress; the live plot is restarted
         # (not dropped to its placeholder) and the 3D view is kept

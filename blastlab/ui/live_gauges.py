@@ -23,6 +23,8 @@ from .widgets import hbox, label, vbox
 WAITING = 'gauge traces appear here once the solver reaches them…'
 NO_GAUGES = ('This case has no gauges.\n'
              'Add one on the Setup tab to watch a point during the run.')
+#: GUI-16 (e), D22: the case has gauges, and the solver drops every one
+ALL_DROPPED = 'Every gauge of this case is dropped by the solver.'
 
 #: more than this many points per trace and the line is decimated for
 #: drawing. A native 2D run samples every step, so a few seconds of
@@ -144,9 +146,14 @@ class LiveGaugePane(QWidget):
         """
         if not payload:
             return
-        times = np.asarray(payload.get('times') or [], dtype=float)
-        series = payload.get('pressures') or []
-        if times.size == 0 or not series:
+        # explicit None checks: a blastFoam payload carries ndarrays
+        # (reader.read_probes), and `ndarray or []` raises (D6)
+        times = payload.get('times')
+        times = np.asarray([] if times is None else times, dtype=float)
+        series = payload.get('pressures')
+        if series is None:
+            series = []
+        if times.size == 0 or len(series) == 0:
             return
         names = _labels(payload, len(series))
         if len(self.curves) != len(series):

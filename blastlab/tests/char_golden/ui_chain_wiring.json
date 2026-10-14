@@ -72,7 +72,7 @@
   "refuse/native1d_foam3d_route13": {
     "launched": [],
     "log": [
-      "Chain: Stage 3 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+      "Chain: Stage 2 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
     ],
     "on_disk": [],
     "returned": false,
@@ -80,7 +80,7 @@
       [
         "Chain",
         [
-          "Stage 3 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
+          "Stage 2 (3D): a blastFoam stage cannot be fed a profile produced by the native solver: the native hand-off carries an ideal-gas state and blastFoam re-derives internal energy from its pressure with the JWL products EOS, injecting ~33 % extra energy into the product cells. Run the stage before it on blastFoam, or run this stage on the native solver."
         ]
       ]
     ]
@@ -452,7 +452,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",
@@ -637,7 +637,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",
@@ -752,7 +752,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",
@@ -867,7 +867,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",
@@ -1018,7 +1018,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",
@@ -1174,7 +1174,7 @@
           {
             "Lx": "1.5",
             "Ly": "1.5",
-            "Lz": "1.5",
+            "Lz": "2.5",
             "activation": "linear",
             "adaptive_write": false,
             "afterburn": "none",

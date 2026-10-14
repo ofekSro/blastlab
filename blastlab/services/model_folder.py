@@ -1283,7 +1283,9 @@ def verify_and_release_scratch(manifest, stage_dir, scratch_posix, errored,
         kind = 'note' if (errored or stopped_early or stopped) else 'warn'
         log(f'  [{"note" if why == KEEP_ALL_WHY else kind}] WSL scratch '
             f'kept ({why}): {scratch_posix}')
-        if kind == 'warn':
+        # Keep all was the user's own choice: the [note] line and
+        # kept_because say why, no dialog (GUI-16 R2, D-R3).
+        if kind == 'warn' and why != KEEP_ALL_WHY:
             notice = (f'The blastFoam run finished, but its WSL scratch was '
                       f'kept:\n{why}\n\n{scratch_posix}\n\nThe model folder '
                       f'{stage_dir} holds everything that could be copied. '

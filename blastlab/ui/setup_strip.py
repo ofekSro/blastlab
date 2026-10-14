@@ -162,8 +162,8 @@ def tiles(case, rep):
     if zs and scaled_distance.z_shown(case):
         lo, hi = f'{min(zs):.2f}', f'{max(zs):.2f}'
         out['z'] = Tile(lo if lo == hi else f'{lo}–{hi}', '',
-                        'm/kg^1/3',
-                        tip=f'{scaled_distance.LABEL} at the gauges: '
+                        scaled_distance.unit(),
+                        tip=f'{scaled_distance.label()} at the gauges: '
                             'R / W^(1/3), W as entered')
     return out
 

@@ -35,6 +35,7 @@ Run:
 import argparse
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -87,6 +88,55 @@ def latest_out():
     except OSError:
         return None
     return os.path.join(QA_ROOT, runs[-1]) if runs else None
+
+
+def refused_out(out):
+    """G15Q-6 (D37): `--out` under OneDrive or inside the repo is refused
+    (a sync client holds shots and model folders open; the repo would be
+    littered). Returns the one-line reason, or '' when `out` is fine."""
+    def norm(p):
+        return os.path.normcase(os.path.realpath(os.path.abspath(p)))
+
+    def inside(p, root):
+        try:
+            return os.path.commonpath([p, root]) == root
+        except ValueError:      # another drive
+            return False
+
+    here = norm(out)
+    roots = [('the repo', REPO)]
+    for var in ('OneDrive', 'OneDriveCommercial', 'OneDriveConsumer'):
+        if os.environ.get(var):
+            roots.append((f'%{var}%', os.environ[var]))
+    for what, root in roots:
+        if inside(here, norm(root)):
+            return (f'--out {out} is inside {what} ({root}); give a '
+                    f'folder outside OneDrive and the repo')
+    return ''
+
+
+def set_aside_partial_models(runs):
+    """G15Q-6 (D38): a model folder in `runs` without MODEL.json is what a
+    cut-off run leaves; `use_model` would refuse it at boot ("not a
+    blastlab model folder") and `--resume` crashed. Rename each to
+    `<name>.partial-<n>`; returns the log lines."""
+    lines = []
+    try:
+        names = sorted(os.listdir(runs))
+    except OSError:
+        return lines
+    for name in names:
+        src = os.path.join(runs, name)
+        if not os.path.isdir(src) \
+                or os.path.isfile(os.path.join(src, 'MODEL.json')):
+            continue
+        n = 1
+        while os.path.exists(f'{src}.partial-{n}'):
+            n += 1
+        os.rename(src, f'{src}.partial-{n}')
+        lines.append(f'resume: model folder {name} has no MODEL.json - '
+                     f'renamed to {name}.partial-{n}')
+    return lines
 
 
 class QA:
@@ -1312,7 +1362,21 @@ def q02_repolish_everywhere(qa):
              evidence=str({k: pal[k] for k in bad}))
 
 
-@scenario('Q03', 'Q', est=120)
+def _ensure_native2d(qa):
+    """D39: the native 2D result Q03 selects, built here when the D
+    scenarios' cache lacks it (a fresh --out, or Q03 run alone)."""
+    if qa.cached('native2d') is not None:
+        return
+    qa.log('Q03: no cached native2d - running the native 2D case')
+    qa.goto('setup')
+    qa.set_case(cases()['N2D'])
+    qa.goto('run')
+    qa.click(qa.win.run_panel.run_btn, 'Run')
+    qa.check(qa.run_wait(300), 'the native 2D run finished', 'S1')
+    _cache_result(qa, 'native2d', dim=2)
+
+
+@scenario('Q03', 'Q', est=240)
 def q03_screen_vs_file(qa):
     """The Fields panel beside the grid its export writes.
 
@@ -1321,6 +1385,7 @@ def q03_screen_vs_file(qa):
     deliberately different. This is the evidence for that decision, and
     the check that the difference is the intended one.
     """
+    _ensure_native2d(qa)
     ensure_results(qa, names=('native2d',))
     qa.goto('results')
     if not select_result(qa, 'QA native2d'):
@@ -3058,9 +3123,11 @@ def f07_stop_during_meshing(qa):
     qa.click(rp.run_btn, 'Run')
     qa.check(qa.wait_log('blockMesh', 200),
              'the blockMesh stage line appeared', 'S2')
+    # G15Q: the first shot is taken BEFORE the Stop lands (it used to be
+    # taken right after the click, so both shots showed a stopped run)
+    qa.shot('meshing')
     t0 = time.perf_counter()
     qa.click(rp.stop_btn, 'Stop')
-    qa.shot('stop_during_meshing')
     qa.check(qa.run_wait(150), 'the run ended', 'S1')
     dt = time.perf_counter() - t0
     qa.note(f'stop during meshing -> the run ended in {dt:.1f} s')
@@ -3128,7 +3195,9 @@ def f08_stop_during_solve(qa):
     qa.check(not qa.log_has('did not stop cleanly'),
              'and it was graceful', 'S2')
     labels = [e.label for e in qa.win.results.entries()]
-    qa.check(labels and labels[-1].endswith('(stopped)'),
+    # GUI-16 round 2 (A6, F-5): the app dedupes a repeated label with
+    # ` #2`, which is correct
+    qa.check(labels and re.search(r'\(stopped\)( #\d+)?$', labels[-1]),
              'the stopped foam run is labelled "(stopped)"', 'S2',
              evidence=str(labels))
     qa.shot('stopped')
@@ -3229,6 +3298,157 @@ def f11_close_during_foam(qa):
             + ', '.join(f'{os.path.basename(d)} alive={r.alive}'
                         for d, r in own.items()))
     qa.win = None
+
+
+def _drop_case():
+    """F12's case: planar 2D blastFoam, Wall 1 at x 1.22-1.62. G1 is kept,
+    G2 sits inside Wall 1, and G3 is the gauge only the foam rule drops:
+    found with `validation.drop_rule`, the first point left of the wall
+    that is outside the entered box yet dropped (the wall snaps outward
+    onto base-cell faces), so Checks reads `within a cell of Wall 1`."""
+    from blastlab.core.case import Case2D
+    from blastlab.services.validation import drop_rule
+    case = Case2D(geometry='planar', Lx=2.0, Ly=2.0, cell_size_m=0.05,
+                  charge=20.0, center=(0.5, 1.2),
+                  obstacles=[(1.22, 1.62, 0.0, 0.62)],
+                  gauges=[(0.9, 1.2), (1.45, 0.3)], n_snapshots=2,
+                  record_frames=20, solver='blastfoam', material='TNT',
+                  # the scratch is kept, so the run browser can Load it
+                  keep_all_fields=True,
+                  bcs=dict(x_lo='terminate', x_hi='terminate',
+                           y_lo='terminate', y_hi='terminate'))
+    rule = drop_rule(case)
+    x = 1.219
+    # the foam-only drop: outside the entered box, inside the snapped one;
+    # walk left to the first point the rule keeps, G3 is the one before it
+    while x > 1.0 and rule((x, 0.3)):
+        x = round(x - 0.001, 3)
+    x = round(x + 0.001, 3)
+    if x < 1.22 and rule((x, 0.3)):
+        case.gauges = [(0.9, 1.2), (1.45, 0.3), (x, 0.3)]
+    return case
+
+
+@scenario('F12', 'F', est=300)
+def f12_foam_drop_path(qa):
+    """blastFoam gauge drops end to end: Checks, Run's drop line from
+    Start, the live markers, Results rows, Load, an exported PNG's note."""
+    from blastlab.core.case import validate_case
+    case = _drop_case()
+    qa.check(len(case.gauges) == 3,
+             'the fixture has a gauge only the foam rule drops (G3)', 'S1',
+             evidence=str(case.gauges))
+    qa.goto('setup')
+    qa.set_case(case)
+    rep = validate_case(qa.win.setup.get_case())
+    warns = ' | '.join(rep.warnings)
+    qa.check('G2' in warns and 'inside Wall 1' in warns
+             and 'G3' in warns and 'within a cell of Wall 1' in warns,
+             'Checks names G2 inside Wall 1 and G3 within a cell of Wall 1',
+             'S2', evidence=warns)
+    qa.shot('checks')
+    qa.goto('run')
+    rp = qa.win.run_panel
+    if not qa.click(rp.run_btn, 'Run'):
+        qa.check(False, 'Run is enabled for the F12 case', 'S1',
+                 evidence=' | '.join(qa.strip_text()))
+        return
+    qa.pump(1.0)
+    note = rp.gauge_col.caption_text()
+    qa.check(not rp.gauge_col.drop.isHidden() and 'G2' in note
+             and 'G3' in note and 'Wall 1' in note,
+             'Run names both dropped gauges from Start, before any '
+             'payload', 'S2', evidence=note)
+    qa.shot('drop_line_at_start')
+    qa.check(qa.wait_log('[blastfoam] write', 400),
+             'the run reached its first write', 'S2')
+    qa.pump(2.5)
+    marks = getattr(rp.pane, '_markers', None) or []
+    xs = [m for m in marks
+          if getattr(m, 'opts', {}).get('symbol') == 'x']
+    qa.check(len(xs) == 2,
+             'the live pane draws the two dropped gauges as hollow x',
+             'S2', evidence=f'{len(marks)} items, {len(xs)} x markers')
+    qa.shot('live_markers')
+    qa.check(_wait_while_progressing(qa), 'the F12 run finished', 'S1')
+    qa.pump(1.0)
+    qa.reap_own()
+    qa.goto('results')
+    rs = qa.win.results
+    ents = rs.entries()
+    if not ents or ents[-1].dim != 2:
+        qa.check(False, 'the F12 run arrived in Results as a 2D result',
+                 'S1', evidence=str([e.label for e in ents]))
+        return
+    rs.show_view('Gauges')
+    qa.pump(1.0)
+    cap = rs.gauges.caption_text()
+    qa.check('G2 dropped by the solver (inside Wall 1)' in cap
+             and 'G3 dropped by the solver (within a cell of Wall 1)'
+             in cap,
+             'Results words both drops as Run did', 'S2', evidence=cap)
+    qa.check(len(rs.gauges.rows()) == 1,
+             'and its table holds the one kept gauge', 'S2',
+             evidence=str(rs.gauges.rows()))
+    qa.shot('results_gauges')
+    _cache_result(qa, 'foam2d_drop', dim=2)
+    # B4: the exported PNGs carry the same note, one line per gauge. A
+    # pixel cannot be read back, so this checks the footnote text the
+    # export hands the figure, and that PNGs were written.
+    from blastlab.ui import exports
+    seen = []
+    real = exports.run_export
+
+    def spy(kind, ent, target, opts, *a, **k):
+        seen.append((opts or {}).get('gauge_drop_note', ''))
+        return real(kind, ent, target, opts, *a, **k)
+    exports.run_export = spy
+    t_start = time.time()
+    try:
+        rs.export('pngs', threaded=False)
+        qa.pump(2.0)
+    finally:
+        exports.run_export = real
+    pngs = _written_since(qa.dirs['exports'], t_start, '.png')
+    qa.check(bool(pngs), 'PNGs were exported', 'S2')
+    foot = seen[-1] if seen else ''
+    qa.check('G2 dropped' in foot and 'G3 dropped' in foot
+             and '\n' in foot and 'Wall 1' in foot,
+             'the PNG export carries one footnote line per dropped gauge',
+             'S2', evidence=repr(foot))
+    # C2: Load from the run browser stamps the drop like Run did
+    name = os.path.basename(
+        str((ents[-1].result.meta or {}).get('case_dir', '')).rstrip('/\\'))
+    browser = rs.open_run_browser()
+    if browser is None:
+        qa.check(False, 'the run browser opened', 'S1')
+        return
+    qa.until(lambda: not browser._busy, 180)
+    qa.check(name in browser.names(),
+             'the F12 run is in the run browser', 'S2', evidence=name)
+    if name in browser.names():
+        browser.select(name)
+        qa.pump(0.3)
+        n_before = len(rs.entries())
+        browser.load_selected()
+        qa.check(qa.wait_log('Loaded:', 300), 'the post-mortem load '
+                 'succeeded', 'S1', evidence=qa.run_log()[-400:])
+        qa.pump(1.5)
+        loaded = rs.entries()
+        if len(loaded) > n_before and select_result(qa, '(loaded, 2D)'):
+            rs.show_view('Gauges')
+            qa.pump(1.0)
+            lcap = rs.gauges.caption_text()
+            qa.check('G2 dropped by the solver (inside Wall 1)' in lcap
+                     and 'G3 dropped by the solver (within a cell of '
+                     'Wall 1)' in lcap,
+                     'a loaded run says the Run wording for its drops',
+                     'S2', evidence=lcap)
+            qa.shot('loaded_gauges')
+        else:
+            qa.check(False, 'the loaded run arrived in Results', 'S2')
+    browser.close()
+    qa.pump(0.5)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -4677,8 +4897,14 @@ def main():
         out = latest_out()
     else:
         out = os.path.join(QA_ROOT, time.strftime('%Y%m%d-%H%M'))
+    why = refused_out(out)
+    if why:
+        print(why, file=sys.stderr, flush=True)
+        return 2
     os.makedirs(out, exist_ok=True)
     print(f'QA output: {out}', flush=True)
+    renamed = (set_aside_partial_models(os.path.join(out, 'runs'))
+               if args.resume and not args.list else [])
 
     # scratch settings + CWD BEFORE importing the app. auto_cleanup off
     # is not optional: building the window otherwise sweeps the WSL run
@@ -4701,6 +4927,8 @@ def main():
     sys.path.insert(0, REPO)
 
     qa = QA(out, args)
+    for line in renamed:
+        qa.log(line)
     qa.solver_seed = args.solver or None
     only = [g for g in args.only.split(',') if g]
     skip = [s for s in args.skip.split(',') if s]

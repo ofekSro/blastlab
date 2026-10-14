@@ -675,12 +675,13 @@ def _arrived_2d_grid(pg, bcs):
     return False
 
 
-def _gauges_from_probes(spec):
-    """blastProbes output -> the native gauges dict (1D: radii)."""
+def _gauges_from_probes(spec, quiet=False):
+    """blastProbes output -> the native gauges dict (1D: radii).
+    `quiet`: the live read, see reader.read_probes."""
     empty = dict(times=np.array([]), radii=[], pressures=[])
     if not spec.probe_pts:
         return empty
-    probes = reader.read_probes(spec.case_unc)
+    probes = reader.read_probes(spec.case_unc, quiet=quiet)
     if not probes:
         return empty
     radii = []
@@ -703,8 +704,18 @@ GAUGE_LIVE_S = 1.0
 _gauge_live = {'at': 0.0}
 
 
+def _reset_gauge_live():
+    """A run's first live gauge payload is due at once (D6): the
+    throttle stamp is module state, and the last run's must not hold the
+    next one back by up to GAUGE_LIVE_S."""
+    _gauge_live['at'] = 0.0
+
+
 def _emit_gauges(hooks, spec):
-    """Hand the live gauge traces over, if anything is watching."""
+    """Hand the live gauge traces over, if anything is watching. Called
+    with each emitted live frame - the written-time `on_frame` of 1D, 2D
+    and 3D and the live-sample tail (D6; before it only 3D's `on_frame`
+    did, so 1D and 2D gauges arrived only at the end)."""
     if not hooks.wants_gauges() or not spec.probe_pts:
         return
     now = _time.time()
@@ -712,7 +723,8 @@ def _emit_gauges(hooks, spec):
         return
     _gauge_live['at'] = now
     try:
-        payload = _gauges_from_probes(spec)
+        # quiet: a torn tail is the normal state of a file mid-write
+        payload = _gauges_from_probes(spec, quiet=True)
     except Exception:
         return              # a probe file mid-write is not a run failure
     if payload and len(payload.get('times', ())):
@@ -1104,6 +1116,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
     hooks.run_started(dict(dim=1, r=r, radius_m=case.radius_m,
                            gauges=live, gauges_dropped=live_dropped))
     _initial_frame(spec, hooks)
+    _reset_gauge_live()
 
     store = {}                      # dirname -> dict(t, p, rho, u)
     pin = dict(name=None, frozen=False)     # OUT-2 (D1): see _track_pin
@@ -1134,6 +1147,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
                and entry['t'] >= st['t_frame'])
         if due or will_pause:
             hooks.frame(np.array([r, entry['p']]), entry['t'])
+            _emit_gauges(hooks, spec)
             st['t_frame'] = entry['t']
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -1157,6 +1171,7 @@ def solve_1d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, store, writer.LIVE_SET,
                        decode_line, read_dir, on_frame)
+    loop.gauges = lambda: _emit_gauges(hooks, spec)     # D6: tail_live
     try:
         stop_reason = loop.run()
     except WslVanished as exc:          # W3: WSL died under the solver
@@ -1515,6 +1530,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
             z0=y0, r_exp=spec.r_exp, R=case.Lx, Lz=case.Ly)
     hooks.run_started(run_info)
     _initial_frame(spec, hooks)
+    _reset_gauge_live()
 
     record_frames = frame_budget(case.record_frames, Nx * Ny, hooks,
                                  amr=bool(spec.amr))
@@ -1578,6 +1594,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
                and t >= st['t_frame'])
         if due or will_pause:
             _emit_frame(hooks, p, t, mesh)
+            _emit_gauges(hooks, spec)
             st['t_frame'] = t
             live['step'] = st['step']
             live['draw'] = _time.time()
@@ -1640,6 +1657,7 @@ def solve_2d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
+    loop.gauges = lambda: _emit_gauges(hooks, spec)     # D6: tail_live
     try:
         stop_reason = loop.run()
     except WslVanished as exc:          # W3: WSL died under the solver
@@ -2265,6 +2283,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
                      solver='blastfoam')))
     _initial_frame(spec, hooks, live_sl)
     _initial_frame3d(spec, hooks)
+    _reset_gauge_live()
 
     # the 3D record holds the live PLANE, not the volume
     record_frames = frame_budget(
@@ -2413,6 +2432,7 @@ def solve_3d_foam(case, hooks=None, adaptive_write=True, spec=None):
 
     loop = FoamRunLoop(spec, hooks, fields, ingested, writer.LIVE_SLICE,
                        decode, read_dir, on_frame)
+    loop.gauges = lambda: _emit_gauges(hooks, spec)     # D6: tail_live
     try:
         stop_reason = loop.run()
     except WslVanished as exc:          # W3: WSL died under the solver

@@ -8,7 +8,7 @@ from `theme` through object-name QSS rules (D6); the arrow is painted in
 `paintEvent` (plan §11).
 """
 
-from PySide6.QtCore import QPointF, QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QPointF, QSize, Qt, Signal
 from PySide6.QtGui import QPainter, QPen
 from PySide6.QtWidgets import (QButtonGroup, QFrame, QHBoxLayout, QLabel,
                                QPushButton, QSizePolicy, QVBoxLayout,
@@ -67,6 +67,55 @@ class RouteBar(QFrame):
                 b.setChecked(k == key)
 
 
+class _MetaLabel(QLabel):
+    """The card's mono key line (D26): it wraps to a second line when it
+    is wider than the card instead of eliding, and never holds the card
+    wider. The whole text stays the tooltip. The height follows the lines
+    it needs (one or two), so a roomy card keeps its board height."""
+
+    LINES = 2
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._full = ''
+        self.setWordWrap(True)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+
+    def setText(self, text):                         # noqa: N802 (Qt)
+        self._full = str(text or '')
+        QLabel.setText(self, self._full)
+        self._fit()
+
+    def full_text(self):
+        return self._full
+
+    def set_tip(self, tip):
+        self.setToolTip(str(tip or ''))
+
+    def lines(self):
+        """The lines the text needs at the current width (at most LINES)."""
+        fm = self.fontMetrics()
+        w = max(self.width(), 1)
+        flags = Qt.TextWordWrap | Qt.AlignLeft
+        h = fm.boundingRect(0, 0, w, 10000, int(flags), self._full).height()
+        return max(1, min(self.LINES, -(-h // max(fm.lineSpacing(), 1))))
+
+    def _fit(self):
+        fm = self.fontMetrics()
+        self.setFixedHeight(self.lines() * fm.lineSpacing() + 2)
+
+    def resizeEvent(self, event):                    # noqa: N802 (Qt)
+        super().resizeEvent(event)
+        self._fit()
+
+    def changeEvent(self, event):                    # noqa: N802 (Qt)
+        super().changeEvent(event)
+        if event.type() in (QEvent.FontChange, QEvent.StyleChange):
+            self._fit()
+
+
 # ── a stage card (board lines 65-77) ─────────────────────────────────────
 class StageCard(QFrame):
     """Number · title · solver chip / the mono key line / `● case OK`
@@ -98,7 +147,7 @@ class StageCard(QFrame):
         top.addWidget(self.title, 1)
         top.addWidget(self.chip)
         lay.addLayout(top)
-        self.key = ElidedLabel('', mode=Qt.ElideRight)
+        self.key = _MetaLabel()
         self.key.setObjectName('stagekey')
         lay.addWidget(self.key)
         bottom = QHBoxLayout()
@@ -128,8 +177,8 @@ class StageCard(QFrame):
         self.chip.setText(str(text))
 
     def set_key(self, text):
-        """The key line, elided at the right with the whole of it in the
-        tooltip."""
+        """The key line: wrapped onto a second line when it is wider than
+        the card (D26), the whole of it in the tooltip."""
         self.key.setText(text)
         self.key.set_tip(text)
 
