@@ -111,7 +111,7 @@ Dry run of the 2026-10-13 /bl-todo flow (owner task, agent cost). Planner Opus (
 
 ---
 
-## 0za. 2026-10-14 — batches `gui-final`, `gui-final-2`, `gui-final-round1`, `gui-final-round2` (GUI-16 a-g, P2-17, P2-18, P2-25, Q03, G15Q, I02, G14Q; branch `final-gui`, merged <pending>)
+## 0za. 2026-10-14 — batches `gui-final`, `gui-final-2`, `gui-final-round1`, `gui-final-round2` (GUI-16 a-g, P2-17, P2-18, P2-25, Q03, G15Q, I02, G14Q; branch `final-gui`, merged `b9058b4`)
 
 Plans `docs/batches/2026-10-12-gui-final.md` (A, B, D), `…-gui-final-2.md` (C, F; E dropped, Tk frozen
 by the owner 2026-10-13), `2026-10-13-gui-final-round1.md`, `…-round2.md`; reports `…-{A,B,C,D,F,…}.implement.md` /
