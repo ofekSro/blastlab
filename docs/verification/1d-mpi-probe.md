@@ -113,3 +113,25 @@ goes ahead unchanged with the writer's scotch `decomposeParDict`; the `simple` f
 settling diagnostic were not needed. Caveat: this is a 1 m / 2 m, 3 ms, 5 000-cell check of the
 unforced case; the ~2 % parallel-vs-serial peak offset seen on 2D/3D (`open-research.md:8-21`)
 did not appear here.
+
+## End to end through the app (P1-25, batch 1d-mpi task B5)
+
+### Decision rule - written 2026-10-14 10:53, before either run of this section
+
+`blastlab/tests/_e2e_foam_1d_mpi.py` (same rule in its docstring). Case A cut to 1 ms: 1 kg TNT,
+R = 5 m, dx = 1 mm (5 000 cells), gauges 0.5 / 1 / 2 / 4 m, `t_end = 1e-3`, run through
+`backend.solve_1d_foam(adaptive_write=False)` at `n_procs = 1`, then `n_procs = 4` (scotch), one
+after the other, nothing else on WSL. In 1 ms the shock reaches the 0.5 m and 1 m gauges only.
+1. At 0.5 m and 1.0 m, from the Result's gauge traces with `summarize_trace` (arrival = first
+   sample above 1.1 x ambient, `ARRIVAL_FRAC = 0.10`): peak, positive impulse (inside the 1 ms
+   window; at 1 m the window may cut it, identically in both) and arrival each within 1 % of
+   serial. All six must hold.
+2. ms/step np 1 / ms/step np 4 >= 2.0, ms/step = the median per-step `ExecutionTime` delta of
+   each run's `log.blastFoam` over the same first N steps (N = the smaller step count; D6).
+- Reported, not judged: app-path wall time np 4 / np 1 (preflight, `decomposePar` and the
+  per-write `reconstructPar` included). If > 0.6 while rule 2 passes, the ingest is the
+  bottleneck: owner question, no tuning in this batch.
+- Also checked (machinery): 4 `processor*` dirs, every rank time reconstructed at the root, >= 1
+  live frame with a full-length profile in both runs, the 4 gauges in the Result, the banner
+  names `MPI ranks : 4` only at np 4 (D2), both runs end at t_end.
+- A failed rule is reported with its numbers, never tuned.
