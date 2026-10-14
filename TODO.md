@@ -666,7 +666,8 @@ step over the same 263 steps: np 1 113, np 2 65 (1.75×), np 4 39 (2.9×), np 8 
 Detail and the pre-registered rule: `docs/verification/1d-mpi-probe.md`.
 
 Fix: let 1D take the run plan's ranks like 2D/3D (decompose after `setRefinedFields`,
-reconstruct for ingest), show the ranks field for 1D blastFoam in both GUIs. **Owner
+reconstruct for ingest), show the ranks field for 1D blastFoam in the Qt GUI (`gui/` is
+frozen, CLAUDE.md §9 - leave `gui/forms.py` alone). **Owner
 approves** editing the `1D is serial` pin in `test_foam_env.py` and the related checks
 (`test_ui_setup_strip.py:191`, `test_model_folder.py:779`). Acceptance: (1) **not measured
 yet - do it first:** serial vs np 4 on that case to t = 3 ms, peak, positive impulse and
